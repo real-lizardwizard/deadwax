@@ -87,7 +87,7 @@ instructions for how to use it are a little annoying". The boards are `NowPlayin
   where a circle of the groove's radius round the record's centre meets the arm's reach round its
   pivot (`needleAt`), about 99 to 122.5 degrees across a song. **Dragged, the angle says the time**
   (`armTimeAt`), held to the arm's sweep - past either end is the song's start or end, never the
-  circle's far side where the reach meets the grooves again. The head lifts while held. **Nothing
+  circle's far side where the reach meets the grooves again. The head lifts while held (on the bar since 2.1.19 - "The head lifted on the bar"). **Nothing
   moves until the finger has travelled `TAP_SLOP_PX`**: the needle stays over the song as it plays
   (`time: null`), so a nudge shows nothing it won't go to. The first cut previewed the arm from the
   first move and seeked only past the slop - and the whole song is about 83 CSS px of needle on a
@@ -946,3 +946,32 @@ under it and the next starting about 200 ms later, the finger lifted 700 ms afte
 song played on (2.2 s in); built without it, the same run left the new song PAUSED at 1 s - the bug, seen. Not seen:
 .11's still press in a browser (the harness's songs are FLACs whose windows arrive at once, so its presses were the
 deck's - turntable.sim holds .11's), a real finger, and the iPhone.
+
+### The head lifted on the bar (2.1.19)
+
+James, 2026-11-14, on the iPhone app's 0.9: "in the turntable, when you tap on the play head, it looks like it
+dislocates." The web drew the lift the same way: the head's `y` less `ARM_PARTS.lift` (5 units) - but in the arm's
+group, which is turned round the pivot (`rotate(...)`), so 5 units "up" was sideways off the bar, and a press on the
+handle popped the head off the arm and back. Both apps now draw it the same way: **the head stays on the bar and
+comes toward you** - grown `ARM_PARTS.lift.scale` (1.08) about its own middle, with a soft shadow round it.
+
+- **The drawing** (Turntable.tsx): the head and a shadow of the same box in a group, `app-tt-headset`, whose
+  `transform-box: fill-box; transform-origin: center` grows it about the head's middle; the scale is inline from
+  `ARM_PARTS.lift.scale` (geometry stays in lib/turntable.ts, as the arm's other numbers do). The shadow is an SVG
+  `feGaussianBlur` of `ARM_PARTS.lift.shadow` (3 units, the phone's `shadowRadius`) on a rect filled
+  `--dw-tt-head-shadow` (`--dw-shadow`'s black at 0.5) while `is-lifted`, transparent otherwise - **no offset**, so
+  its direction doesn't turn with the arm. An SVG filter, not CSS `filter: drop-shadow()`, which WebKit has not
+  always drawn on an SVG element. One filter id for every turntable on a page (`app-tt-head-shadow`): each draws
+  the same filter, and the sims' hooks have no `useId`.
+- **Eased** over `--dw-duration` with `--dw-ease` each way (the transform and the shadow's fill), so a tap doesn't
+  flicker; under reduced motion theme.css's block makes both a step. The phone eases over its own 0.12 s.
+- **Verified**: turntable.sim - at rest the head's box is the bar's end and the shadow's the same, nothing grown;
+  held, the same box, grown `scale(1.08)`; let go, as it was; the filter's blur the lift's units (built with the
+  old `y`, the held check fails). In Chromium on the bench (/player/lab/, built, served statically): the head's
+  middle the same to the hundredth of a pixel at rest and held, 1.08 times the size, the shadow's fill
+  rgba(0,0,0,0.5) held and transparent at rest; looked at magnified, the head held sits on the bar with its
+  shadow round it. **Not seen**: Safari, and a real finger.
+- **The phone** (ios branch, Phase 4's turntable fix) holds `TurntableGeometry.headLift` to these numbers once
+  main is merged; until then its `armLift` stays, held to turntable.json's old `ARM_PARTS.lift`, and
+  export-deck-vectors' fixture is regenerated at that merge.
+

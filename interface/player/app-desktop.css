@@ -79,8 +79,9 @@
         --app-desk-scrub-max: 520px;
         --app-desk-scrub-hit: 16px;       /* the bar's own target: a pointer, not a thumb */
         --app-desk-clock-gap: 10px;
-        --pl-scrub-track: 6px;            /* the board's thin sunken bar */
+        --pl-scrub-track: 6px;            /* the board's thin sunken bar - rounded, as before 2.1.20's phone bar */
         --pl-scrub-track-held: 8px;
+        --pl-scrub-radius: var(--pl-radius-track);
         --pl-scrub-thumb: 10px;
 
         /* the album pages: the cover beside the title */

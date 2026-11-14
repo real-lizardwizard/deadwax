@@ -7,7 +7,9 @@ import Foundation
 // web app share both: a queue saved on one is picked up on the other.
 //
 // What is saved is a WINDOW: at most `Resume.before` entries before the song playing and `Resume.maxEntries` in
-// all. The snapshot (v1, made only by toSave, read only by fromSnapshot) carries the queue's id (app 0.8, the web's
+// all. The snapshot (v1 - or, since the web's 2.1.18, v2: the same keys, for a queue a reader before the roll-back's
+// port would read back wrong, snapshotVersion - made only by toSave, read only by fromSnapshot, which reads both alike)
+// carries the queue's id (app 0.8, the web's
 // 2.1.15 - written second, read back so the queue is the same on every device; one saved without it is given a new
 // one, or the queue held's when it is that queue: `holding`, sameQueue) and lists the source by id, with the whole
 // song (`extra`) only for source songs outside the window, one character a level per entry. It is written as
@@ -167,9 +169,22 @@ private func sliced<T>(_ list: [T], _ start: Int, _ end: Int) -> ArraySlice<T> {
     return list[from..<max(from, min(end, list.count))]
 }
 
+/// (the web's 2.1.18) Which version a snapshot of `marks` (the window's, the song playing at `index` in it) is written
+/// as. Every reader before 2.1.18 - the web's, and this app's until the roll-back's port - reads v1 alone: given any
+/// other it reads nothing (fromSnapshot nil) and puts back the plain list of the window's songs, at the song playing
+/// and its position. It reads a v1 it can't follow wrong: songs brought back from the play history (`starts`) are its,
+/// a roll-back across Repeat All's rounds (`reached`) loses the songs moved back down from the later round, and with no
+/// list song at or before the song playing its passPlaying answers -1, so restoreQueue's withRepeat (Repeat off or One)
+/// lets go of every list song after it. So any of the three is v2; any other queue is v1, read by both as before.
+public func snapshotVersion(_ marks: ArraySlice<Mark>, index: Int, reached: Bool, starts: Bool) -> Int {
+    if reached || starts { return 2 }
+    return marks.enumerated().contains { $0.offset <= index && $0.element.from == .source } ? 1 : 2
+}
+
 /// What a full save sends of a queue: its window - entries [start, end), the index and `startedAt` moved down by
 /// `start` (startedAt floored at 0), the marks sliced with them - and the snapshot of its Up Next, `left`, `source`,
-/// `paged` as they are.
+/// `paged` as they are; (2.1.18) `reached` while it is after the song playing in the window, and the window's rows
+/// brought back from the play history with their starts.
 public func toSave(_ queue: UpNextQueue, position: Double) -> Saving {
     let (start, end) = windowOf(queue.tracks.count, queue.index)
     let entries = Array(sliced(queue.tracks, start, end))
@@ -187,13 +202,19 @@ public func toSave(_ queue: UpNextQueue, position: Double) -> Saving {
         extra[track.id] = bare(track)
         extraOrder.append(track.id)
     }
+    let window = sliced(state.marks, start, end)
+    //? (2.1.18) where the list runs on to after a roll-back, while it means something here; the rows brought back's
+    //? starts
+    let reachedAt = window.firstIndex { $0.key == state.reached }.map { $0 - window.startIndex } ?? -1
+    let starts = window.filter { !($0.starts ?? []).isEmpty }
+    let version = snapshotVersion(window, index: index, reached: reachedAt > index, starts: !starts.isEmpty)
     var made = WebJSON.Writer()
     made.open()
-    made.member("v", first: true) { $0.int(1) }
+    made.member("v", first: true) { $0.int(version) }
     made.member("id") { $0.string(state.id) }
     made.member("levels") { $0.string(entries.map { levelChar($0.level) }.joined()) }
     made.member("marks") { writer in
-        writer.array(Array(sliced(state.marks, start, end))) { item, mark in
+        writer.array(Array(window)) { item, mark in
             item.raw("[\(mark.key),\"\(fromChar(mark.from))\",\(mark.at),\(mark.pass)]")
         }
     }
@@ -221,6 +242,14 @@ public func toSave(_ queue: UpNextQueue, position: Double) -> Saving {
             }
         }
     }
+    if reachedAt > index, let reached = state.reached { made.member("reached") { $0.int(reached) } }
+    if !starts.isEmpty {
+        made.member("starts") { writer in
+            writer.array(starts) { item, mark in
+                item.raw("[\(mark.key),[\((mark.starts ?? []).map { String($0) }.joined(separator: ","))]]")
+            }
+        }
+    }
     made.close()
     let snapshot = made.text
     return Saving(ids: ids, index: index, position: position,
@@ -240,6 +269,12 @@ private func int(_ value: WebJSON.Value?) -> Int? {
 private func finite(_ value: WebJSON.Value?) -> Double? {
     guard case .number(let number)? = value, number.isFinite else { return nil }
     return number
+}
+
+/// A snapshot's version, as the web takes it: 1 or 2 (read alike, snapshotVersion).
+private func readable(_ made: [String: WebJSON.Value]) -> Bool {
+    guard case .number(let v)? = made["v"] else { return false }
+    return v == 1 || v == 2
 }
 
 private func text(_ value: WebJSON.Value?) -> String? {
@@ -292,7 +327,7 @@ private func readPaged(_ value: WebJSON.Value?, _ setting: Normalization) -> Pag
 /// string must be `count` UTF-16 units long, and is then read a code point at a time (`[...levels]`), so a
 /// character outside the BMP - which no writer makes - leaves the list one short.
 public func savedLevels(_ snapshot: String?, count: Int) -> [Level?] {
-    if let snapshot, case .object(let made)? = WebJSON.parse(snapshot), case .number(1)? = made["v"],
+    if let snapshot, case .object(let made)? = WebJSON.parse(snapshot), readable(made),
        let levels = text(made["levels"]), levels.utf16.count == count {
         return levels.unicodeScalars.map { scalar -> Level? in scalar == "a" ? .album : scalar == "t" ? .track : nil }
     }
@@ -300,16 +335,17 @@ public func savedLevels(_ snapshot: String?, count: Int) -> [Level?] {
 }
 
 /// The queue a snapshot describes, over `tracks` - Navidrome's songs, the window's entries, in order - playing
-/// `index`, every level re-fitted to `setting`. Nil when it doesn't read back: not JSON, another version, a source
+/// `index`, every level re-fitted to `setting`. Nil when it doesn't read back: not JSON, a version but 1 or 2, a source
 /// song in neither Navidrome's songs nor `extra`, or a rebuilt state failing its checks - marks as long as the
 /// entries, each mark's `from` one of the three, a source mark's `at` inside the source and naming its song, an
 /// added mark's at and pass -1, keys unique and below nextKey, startedAt not below 0 (and past the song playing's
-/// run, lowered to it). (2.1.15) Its id as saved; saved without one (or one that isn't), a new one (`newId`) -
-/// unless it is the queue `holding` (the one the player holds, sameQueue): then that one's, so the starts made in it
-/// here stay its rows.
+/// run, lowered to it); (2.1.18) `starts` each an entry of the window's that isn't a copy, with whole moments, and
+/// `reached` a key - kept only while it is an entry after the song playing, not a copy. (2.1.15) Its id as saved;
+/// saved without one (or one that isn't), a new one (`newId`) - unless it is the queue `holding` (the one the player
+/// holds, sameQueue): then that one's, so the starts made in it here stay its rows.
 public func fromSnapshot(_ snapshot: String?, tracks: [QueueTrack], index: Int, setting: Normalization,
                          holding: UpNextQueue? = nil, newId: () -> String = UpNext.newQueueId) -> UpNextQueue? {
-    guard let snapshot, case .object(let made)? = WebJSON.parse(snapshot), case .number(1)? = made["v"] else { return nil }
+    guard let snapshot, case .object(let made)? = WebJSON.parse(snapshot), readable(made) else { return nil }
     let n = tracks.count
     guard let levels = text(made["levels"]), levels.utf16.count == n,
           case .array(let marks)? = made["marks"], marks.count == n else { return nil }
@@ -375,6 +411,25 @@ public func fromSnapshot(_ snapshot: String?, tracks: [QueueTrack], index: Int, 
         guard case .array(let pair) = raw, pair.count == 2, let pass = int(pair[0]), let at = int(pair[1]) else { return nil }
         gone.append(LeftOut(pass: pass, at: at))
     }
+    //? (2.1.18) the rows brought back from the play history: their starts on their marks again
+    if let raw = made["starts"] {
+        guard case .array(let held) = raw else { return nil }
+        let places = Dictionary(rebuilt.enumerated().map { ($0.element.key, $0.offset) }, uniquingKeysWith: { first, _ in first })
+        for each in held {
+            guard case .array(let pair) = each, pair.count == 2, let key = int(pair[0]),
+                  case .array(let moments) = pair[1], !moments.isEmpty else { return nil }
+            let ats = moments.map { int($0) }
+            guard let place = places[key], rebuilt[place].from != .one, rebuilt[place].starts == nil,
+                  ats.allSatisfy({ ($0 ?? -1) >= 0 }) else { return nil }
+            rebuilt[place].starts = ats.map { Int64($0!) }
+        }
+    }
+    var reached: Int?
+    if let raw = made["reached"] {
+        guard let key = int(raw) else { return nil }
+        reached = key
+    }
+    let reachedAt = reached.flatMap { key in rebuilt.firstIndex { $0.key == key } } ?? -1
     var paged: Paged?
     if let raw = made["paged"] {
         guard let read = readPaged(raw, setting) else { return nil }
@@ -397,7 +452,8 @@ public func fromSnapshot(_ snapshot: String?, tracks: [QueueTrack], index: Int, 
     let saved = text(made["id"]).flatMap { UpNext.isQueueId($0) ? $0 : nil }
     var state = UpNextState(id: saved ?? newId(), marks: rebuilt, source: list, shuffle: shuffle, nextKey: nextKey,
                             startedAt: min(startedAt, run),
-                            left: gone, paged: paged, pagedRounds: pagedRounds)
+                            left: gone, paged: paged, pagedRounds: pagedRounds,
+                            reached: reachedAt > index && rebuilt[reachedAt].from != .one ? reached : nil)
     let queue = UpNextQueue(tracks: entries, index: index, upNext: state)
     if saved == nil, let held = holding, let kept = held.upNext?.id, !kept.isEmpty, sameQueue(held, queue) {
         state.id = kept

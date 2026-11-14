@@ -4993,6 +4993,11 @@ async function outcome(promise, ms = 1_000) {
     tap(() => p.player.next())
     await run(400)
     check('...then Next: song 2', p.player.track.id, '2')
+    const ms = mediaSources.length, made = madeStreams.length, rp = replans
+    tap(() => p.player.jumpTo(UP.historyRows(p.player.queue)[0].key))
+    await run(400)
+    check('(2.1.18) ...History\'s song 1 tapped: rolled back - the stream holds it, so a seek in it, as Previous; one MediaSource, nothing replanned',
+      [p.player.track.id, e0.playingNow, p.player.queue.index, comingIds(p), mediaSources.length - ms, madeStreams.length - made, replans - rp, mediaSources.length], ['1', true, 0, ['2', '3'], 0, 0, 0, 1])
   }
   {
     const p = streamPage({ durations: { 1: 20, 2: 20, 3: 20, 4: 20 } })
@@ -5005,12 +5010,74 @@ async function outcome(promise, ms = 1_000) {
     await run(600)
     check('(2.1.3) with a song added: song 3 plays, song 9 still next after it, song 2 behind it', [p.player.track.id, p.player.queue.tracks.map((t) => t.id), comingIds(p)], ['3', ['1', '2', '3', '9', '4'], ['9', '4']])
     const history1 = p.player.queue.upNext.marks[p.player.queue.tracks.findIndex((t) => t.id === '1')].key
+    const ms = mediaSources.length, made = madeStreams.length, rp = replans
+    const songs = p.player.queue.tracks
     tap(() => p.player.jumpTo(history1))
     await run(600)
-    check('(2.1.3) a row of History\'s tap (song 1): that song again, after song 3 - then Up Next as it was', [p.player.track.id, e0.playingNow, p.player.queue.tracks.map((t) => t.id), comingIds(p)], ['1', true, ['1', '2', '3', '1', '9', '4'], ['9', '4']])
-    tap(() => p.player.previous())
+    //? (the tap on 3 put the song added after it: the stream was replanned from song 1 on, so 3 was a new stream - which
+    //? holds no song 1)
+    check('(2.1.18) a row of History\'s tap (song 1): rolled back to it - the same songs in the same order, 2, 3 and the song added to come; the stream (begun at 3) without it, so a new one from it, in the tap - nothing replanned',
+      [p.player.track.id, e0.playingNow, p.player.queue.tracks === songs, p.player.queue.index, comingIds(p), mediaSources.length - ms, madeStreams.length - made, replans - rp], ['1', true, true, 0, ['2', '3', '9', '4'], 1, 1, 0])
+    check('...song 1 from its start', p.player.position() < 1.5, true)
+    tap(() => p.player.next())
     await run(400)
-    check('...Previous early: the song that was playing, song 3', p.player.track.id, '3')
+    tap(() => p.player.next())
+    await run(400)
+    check('...Next, Next: song 3 again, from its start - the song that was playing, a new play of it', [p.player.track.id, p.player.position() < 1.5], ['3', true])
+    tap(() => p.player.next())
+    await run(400)
+    check('...Next: the song added, where it was - after song 3 (James: "keep their place")', p.player.track.id, '9')
+  }
+  {
+    //? (2.1.18) a roll-back that lets Repeat One's copies go (Repeat off now: a row plays once) - other tracks, so a new
+    //? stream from the row, made in the tap, as a list tap past the stream is
+    const p = streamPage({ durations: { 1: 4, 2: 20, 3: 20 } })
+    const [e0] = elements
+    tap(() => p.player.setRepeat('one'))
+    tap(() => p.player.playTracks(tracks(['1', '2', '3']), 0))
+    await run(5_000)
+    tap(() => p.player.setRepeat('off'))
+    tap(() => p.player.next())
+    await run(600)
+    check('(2.1.18) song 1 twice under Repeat One, then Repeat off and Next: song 2, History one row for song 1', [p.player.track.id, p.player.queue.tracks.map((t) => t.id), UP.historyRows(p.player.queue).map((r) => r.track.id)], ['2', ['1', '1', '2', '3'], ['1']])
+    const ms = mediaSources.length, rp = replans
+    tap(() => p.player.jumpTo(UP.historyRows(p.player.queue)[0].key))
+    await run(800)
+    check('...History\'s song 1 tapped: rolled back, its copy gone - a new stream from it, in the tap; nothing replanned',
+      [p.player.track.id, e0.playingNow, p.player.queue.tracks.map((t) => t.id), p.player.queue.index, mediaSources.length - ms, replans - rp], ['1', true, ['1', '2', '3'], 0, 1, 0])
+  }
+  {
+    //? (2.1.18) an older row of the play history tapped: brought back ahead of History's songs - other tracks, a new stream
+    const p = streamPage({ durations: { 1: 20, 2: 20, 3: 20, 8: 20 } })
+    const [e0] = elements
+    tap(() => p.player.playTracks(tracks(['1', '2', '3']), 0))
+    await run(2_000)
+    tap(() => p.player.next())
+    await run(600)
+    const ms = mediaSources.length, rp = replans
+    const [older] = tracks(['8'])
+    tap(() => p.player.jumpTo([{ track: older, starts: [1_700_000_000_000], entry: null }]))
+    await run(800)
+    check('(2.1.18) an older row\'s tap (song 8, played in another queue): it plays at once - a new stream, made in the tap; then song 1, song 2 (that was playing) and 3 to come',
+      [p.player.track.id, e0.playingNow, p.player.queue.index, comingIds(p), p.player.queue.upNext.marks[0].starts, mediaSources.length - ms, replans - rp], ['8', true, 0, ['1', '2', '3'], [1_700_000_000_000], 1, 0])
+    tap(() => p.player.next())
+    await run(600)
+    check('...Next: song 1 - the queue it rolled back through, as it played', p.player.track.id, '1')
+    tap(() => p.player.jumpTo([]))
+    check('...no rows: nothing', [p.player.track.id, p.player.queue.index], ['1', 1])
+  }
+  {
+    //? (2.1.18) with Gapless off: the roll-back the URL way, loaded in the tap - as Previous
+    const p = page({ durations: { 1: 20, 2: 20, 3: 20 } })
+    const [e0] = elements
+    tap(() => p.player.playTracks(tracks(['1', '2', '3']), 0))
+    await run(1_000)
+    tap(() => p.player.jumpTo(keyIn(p, '3')))
+    await run(800)
+    tap(() => p.player.jumpTo(UP.historyRows(p.player.queue)[0].key))
+    await run(800)
+    check('(2.1.18) Gapless off, History\'s song 1 tapped: rolled back - song 1 the URL way, playing; 2 and 3 to come',
+      [p.player.track.id, e0.playingNow, /\/stream\/1\?/.test(e0.getAttribute('src') ?? ''), comingIds(p)], ['1', true, true, ['2', '3']])
   }
   {
     const p = streamPage({ durations: { 1: 300, 2: 300, 3: 300, 4: 300, 5: 300, 6: 300 } })
@@ -5044,6 +5111,11 @@ async function outcome(promise, ms = 1_000) {
     check('...from pause: the row\'s tap plays it', [p.player.track.id, p.player.playing], ['3', true])
     tap(() => p.player.jumpTo(999))
     check('...a key no longer in Up Next does nothing', p.player.track.id, '3')
+    tap(() => p.player.toggle())
+    await run(500)
+    tap(() => p.player.jumpTo(UP.historyRows(p.player.queue)[0].key))
+    await run(800)
+    check('(2.1.18) ...History\'s row from pause: rolled back, playing', [p.player.track.id, p.player.playing], ['1', true])
   }
 
   console.log('\nShuffle mid-song: the song playing goes on, untouched')
@@ -5431,6 +5503,29 @@ async function outcome(promise, ms = 1_000) {
     tap(() => p.player.jumpTo(keyIn(p, '4')))
     await run(600)
     check('a row\'s tap there (song 4): it plays - not refused for the song that ended', p.player.track.id, '4')
+    p = await unseenJoin()
+    //? song 1's entry: History's row once the engine has caught up with the join it hasn't seen - which the tap does first
+    tap(() => p.player.jumpTo(p.player.queue.upNext.marks[0].key))
+    await run(600)
+    check('(2.1.18) History\'s row there (song 1): rolled back to it - never refused', p.player.track.id, '1')
+    {
+      //? (2.1.18 review) an older row's tap there with History at its 50 (2-51, 52 playing - an album put back there,
+      //? played on - the join into 53 unseen): the catchUp moves History's floor on to 3 - the floor the rows were
+      //? drawn against (2's) goes with them, so 2 is still to come after the row brought back
+      const album = Array.from({ length: 56 }, (_, i) => String(i + 1))
+      const q = streamPage({ durations: Object.fromEntries([...album, 'x'].map((id) => [id, 10])) })
+      const [e0] = elements
+      q.player.restoreQueue({ ...UP.startUpNext(tracks(album), 0), index: 51 }, 0)
+      tap(() => q.player.toggle())
+      const at = starts(['52', '53'])
+      await run((at[1] - 0.5) * 1000)
+      e0.clock = e0.heard = at[1] + 0.2
+      const drawn = UP.historyRows(q.player.queue)
+      tap(() => q.player.jumpTo([{ track: tracks(['x'])[0], starts: [5], entry: null }], drawn[0].key))
+      await run(600)
+      check('(2.1.18 review) an older row\'s tap racing the join into 53, History drawn from 2: the row plays, and 2-56 after it - 2 kept, as drawn',
+        [drawn.length, drawn[0].track.id, q.player.track.id, comingIds(q)[0], comingIds(q).length], [50, '2', 'x', '2', 55])
+    }
     p = await unseenJoin()
     tap(() => p.player.removeFromQueue(keyIn(p, '3')))
     check('a removal there: made at once, against song 2 - not held', [p.player.track.id, comingIds(p)], ['2', ['4']])
@@ -6247,6 +6342,22 @@ async function outcome(promise, ms = 1_000) {
     tap(() => p.player.jumpTo(row))
     await run(1_000)
     check('a row\'s tap in Up Next: that song, playing', [p.player.track?.id, p.player.playing, elements[0].getAttribute('src')], ['3', true, '/deadwax/navidrome/stream/3?format=raw'])
+    p = page({ userAgent: ARC, maxTouchPoints: 0, durations: ALBUM })
+    p.player.restoreQueue({ ...UP.startUpNext(list(), 0), index: 2 }, 95)
+    const back = UP.historyRows(p.player.queue)[0].key
+    tap(() => p.player.jumpTo(back))
+    await run(1_000)
+    check('(2.1.18) History\'s row on a queue put back: rolled back to it, playing - loaded in the tap', [p.player.track?.id, p.player.playing, elements[0].getAttribute('src'), comingIds(p)], ['1', true, '/deadwax/navidrome/stream/1?format=raw', ['2', '3', '4']])
+    //? (2.1.18 review) the same tap as the first gesture on an iPhone with Gapless on (one stream): the second element
+    //? unlocked in it, as every tap that plays unlocks it (unlockSpare) - iOS unlocks an element only from a gesture,
+    //? and the spare is the one Gapless hands over to
+    p = streamPage({ durations: ALBUM })
+    p.player.restoreQueue({ ...UP.startUpNext(list(), 0), index: 2 }, 95)
+    const lockedBefore = elements[1]?.unlocked
+    tap(() => p.player.jumpTo(UP.historyRows(p.player.queue)[0].key))
+    await run(1_000)
+    check('(2.1.18 review) ...the first tap on an iPhone, one stream: the second element unlocked in it (locked before); song 1 playing in the stream',
+      [elements.length, lockedBefore, elements[1].unlocked, p.player.track?.id, p.player.playing, mediaSources.length > 0], [2, false, true, '1', true, true])
     p = page({ userAgent: ARC, maxTouchPoints: 0, durations: { ...ALBUM, 9: 60 } })
     putBack(p, list(), 2, 95)
     let started = null

@@ -5306,7 +5306,8 @@ is sideways off the bar, and a quick tap popped the head off the arm and back.
   drawing, by explicit animations; `noActions` still keeps every implicit one off, and now covers the shadow's keys.
 - Reduce Motion: `TurntableLook.still` (DeckController's `reduced`) makes the two states a step.
 - `ttHeadShadow` isn't in TurntablePalette.tokens: tokens.json has no `--dw-shadow`, and adding it to
-  export-deck-vectors.cjs's list changes `made_with` and so writes every fixture again.
+  export-deck-vectors.cjs's list changes `made_with` and so writes every fixture again. (Since main's 2.1.19 merge it
+  is: the web gave it a token of its own, `--dw-tt-head-shadow`, and the deck fixtures were made again then.)
 
 **The web** makes the same change on main, in branch web-tonearm, shipping as 2.1.19: the head on the bar, 1.08
 about its middle, a shadow of blur 3 at rgba(0, 0, 0, 0.5) with no offset, on `--dw-duration` and `--dw-ease`. There
@@ -5315,7 +5316,8 @@ about its middle, a shadow of blur 3 at rgba(0, 0, 0, 0.5) with no offset, on `-
 Until main merges, `armLift` (5) stays in TurntableGeometry, held to turntable.json's `ARM_PARTS.lift` by
 TurntableGeometryTests. **iosdeck.sim exports it**: it runs export-deck-vectors.cjs --check, which reads `ARM_PARTS`
 out of ui/src/lib/turntable.ts. So it wasn't regenerated here. The deck vectors are made again at that merge, and
-`armLift` can then give way to the web's numbers.
+`armLift` can then give way to the web's numbers. (Done at main's 2.1.19 merge: `headLift` is held to
+`ARM_PARTS.lift` and `armLift` is gone - see "Going back in Up Next, ported - and main's 2.1.18-2.1.21 merged".)
 
 **Tests** (TurntableRenderTests):
 - `theHeadIsFiveUnitsUpWhenLifted` is now `theHeadStaysOnTheBarAndComesTowardTheViewerWhenLifted`, rendered over a
@@ -5395,7 +5397,7 @@ James's, on main as its own 2.1.x. The phone reads it ahead of the server (below
     - It is still let go once two lists ten minutes apart agree it has gone from Navidrome.
   - **`Playlist.smart`** is read loosely, false when it is absent, so today's server reads as no playlist smart.
     tests/test_ios_contract.py exempts it (`PLAYLIST_AHEAD`) only while summary() leaves it out. Once main sends it,
-    the same equality holds it like any other field.
+    the same equality holds it like any other field. (Main sends it since 2.1.21; the exemption went at that merge.)
   - **Until main ships it, the phone can't tell any playlist is smart.** summary() keeps only `editable` (mine and
     not `readonly`), and Navidrome's `readonly` is true for a smart playlist, an .m3u-synced one and anyone else's
     alike. So nothing is treated as smart before then.
@@ -5694,7 +5696,7 @@ Verified:
 - The iOS pytest files and test_source_bytes: 179 passed, 1 skipped (test_ios_palette.py new).
 - The 11 ios sims and shuffle.sim.cjs.
 
-Not verified - only the phone can tell (the spec's section 9; docs/ios.md's checks 85-94):
+Not verified - only the phone can tell (the spec's section 9; docs/ios.md's checks 92-101):
 - That a horizontal paging ScrollView of two pages, each its own vertical ScrollView, swipes and scrolls as hoped: a
   vertical scroll never pages, and whether a sideways drag that begins on the letter index pages (question 18).
 - That iOS 18's scroll geometry reads the pull as 0 at rest under Find's drawer and the inline bar, inside the pager;
@@ -5769,7 +5771,7 @@ the time, so that fix is the port's. The app stays 0.9 (9), and src/__init__.py 
     system takes while the app stays active and no audio interruption comes - a call's banner over the app, say -
     reads as a lift.
   - The order is the phone's to tell. If iOS ends the scroll's interaction before it says the app is resigning, while
-    its state still reads `.active`, the pull shuffles. That is accepted, with a phone check (check 88's new
+    its state still reads `.active`, the pull shuffles. That is accepted, with a phone check (check 95's new
     sentence).
 - **LOW 8 - the palette test caught only one spelling.**
   - It now uses a regex, `\bborderedProminent\b|\bBorderedProminentButtonStyle\b`, over every line of ios/App's
@@ -5777,13 +5779,13 @@ the time, so that fix is the port's. The app stays 0.9 (9), and src/__init__.py 
   - ButtonFaces' fields are matched as whole names, because `PrimaryButton.pressed` matched inside `pressedTop`
     otherwise. `pressedTop`, `pressedBottom` and `pressedEdge` are in the list.
   - There is no `colorMultiply` or `.brightness(` in ButtonFaces.
-- **LOW 9 - SecondaryPill's comment said it lightened as pressed, and check 92 said both darken.**
+- **LOW 9 - SecondaryPill's comment said it lightened as pressed, and check 99 said both darken.**
   - What theme.css says: `--dw-secondary-bg` is white at 0.09 to 0.05, top to bottom, and `--dw-secondary-bg-active`
     is 0.05 to 0.09 - the same gradient reversed. It is lit from below, as if pressed in, and neither lighter nor
     darker. `.pl-pill:active` uses it.
   - The code already drew that (`Palette.secondaryFillPressed`). So the review's suggestion, darkening the pill too,
     isn't what the web does.
-  - The comment, check 92 (docs/ios.md and the spec) and 2.8 now say it: Play darkens with its label staying white,
+  - The comment, check 99 (docs/ios.md and the spec) and 2.8 now say it: Play darkens with its label staying white,
     and Shuffle's shading turns over.
   - `test_the_secondary_pill_turns_its_gradient_over_when_pressed` holds theme.css's two gradients as each other's
     reverse, player.css's `.pl-pill:active` as drawn from them, DeadwaxApp.swift's `secondaryFillPressed` as bottom
@@ -5888,10 +5890,181 @@ Verified:
 - The iOS pytest files and test_source_bytes: 180 passed, 1 skipped.
 - The 11 ios sims and shuffle.sim.cjs.
 
-Not verified - only the phone can tell (the spec's section 9; docs/ios.md's checks 85, 88 and 92):
+Not verified - only the phone can tell (the spec's section 9; docs/ios.md's checks 92, 95 and 99):
 - That iOS 18's scroll phase reaches `.idle` as a swipe settles, so the switch, the bar and Find follow then and a
   half swipe changes nothing; and that the switch's animated tap ends on the page tapped.
 - The order in which iOS says the system took a touch: a pull cut short by Notification Center, Siri or a call
   should shuffle nothing. A banner call over an active app, with no audio interruption, can't be told from a lift.
 - The pressed primary on James's screen beside the web's: the fill a little darker, the label still white.
 - iOS 17 (the page following at the swipe's halfway): not run on one.
+
+## Going back in Up Next, ported - and main's 2.1.18-2.1.21 merged (2026-11-14)
+
+Branch `rollback-port`, from ios (5aeb89a): the merge of main's 2.1.18 to 2.1.21 (a18acbc), then the port. The app
+stays 0.9 (9); src/__init__.py is main's 2.1.21, untouched.
+
+**Why one piece.** Main's 2.1.18 made a tap above the song playing ROLL BACK (James: "so it just moves back up the
+list"; notes/play-history.md): a History row moves the playing point up to it, and an older row of the play history
+brings it and every older row below it back into the queue ahead of History's songs - lib/upNext.ts, playHistory.ts
+and resume.ts (snapshot v2). 2.1.19 put the turntable's head on the bar (ARM_PARTS.lift a scale and a shadow), 2.1.20
+squared off Now Playing's bar, 2.1.21 sends each playlist's `smart`. The sims hold the phone to the web's own
+TypeScript - iostraces to upNext.ts and resume.ts, ioshistory to playHistory.ts, iosdeck to ARM_PARTS - so the merge
+alone left them red: the merge and the port are one piece, as notes/play-history.md's iPhone list said.
+
+### What the merge brought, besides going back
+
+- **The turntable's lift** (2.1.19): `TurntableGeometry.headLift` (scale 1.08, shadow 3, 0.14 s) is held to
+  turntable.json's `ARM_PARTS.lift` by TurntableGeometryTests, and `armLift` (5) is gone - see "The turntable's head
+  stays on the arm". `TurntablePalette.ttHeadShadow` is now one of the tokens, held to `--dw-tt-head-shadow`:
+  export-deck-vectors.cjs's TOKENS gained 'tt-head-shadow', and Fixtures/deck was made again on Node 20.12.2 (3063 KB
+  of its 3072 KB budget). export-deck-recording.cjs was run again too: its `--check` said the recording is the same,
+  so only web-script.made.json moved (turntable.ts's hash) - tests/test_ios_deck_recording.py had failed on it.
+- **Smart playlists** (2.1.21): summary() sends `smart`, so tests/test_ios_contract.py's `PLAYLIST_AHEAD` exemption
+  is gone, `assert_decodes`' `ahead` with it - the Playlist's keys are summary()'s exactly. The phone still reads it
+  loosely, false when absent: a deadwax before 2.1.21 says no playlist is smart.
+- **Now Playing's bar** (2.1.20) was the phone's already ("Now Playing's bar, squared off").
+
+### The port (DeadwaxCore), to the web's rules exactly
+
+- **UpNextTypes**: `Mark.starts` ([Int64]?, a row brought back's start moments) and `UpNextState.reached` (the
+  key of the furthest unit played, while after the song playing).
+- **UpNext.swift**: `layoutAt`/`layout` (the list runs on to the reach and through what was drawn after it then),
+  `reachedPlace`, `furthest`; passPlaying's fallback (no list song before: the round of the first after);
+  withRepeat's round the max with the reach's; withShuffle keeps the later rounds up to the reach's - each shuffled on
+  its own, never starting with the song that ends the last, or with Shuffle off sorted by place (Swift's sort isn't
+  stable: ties by offset, as Array.prototype.sort), the reach then on whichever moved-down unit is last; withoutKey
+  hands the reach to the unit before it; movedKey keeps each place's time round (recast) and the reach on the last
+  unit at or before it; `jumpedTo(queue, key, mode)` - History's row is `rolledBack` (`Jump.back`; copies after it
+  go outside Repeat One, `copyAfter`); `broughtBack(queue, rows, mode, floor:)` with `Brought` {track, starts,
+  entry}; `heldStarts`; shownKeys to the end of the reach's unit; wentBack names the furthest.
+- **PlayHistory**: `QueueShows.held` (each `at:id` the queue holds, as UTF-16 units), `heldByQueue`, pastRows (a run
+  of one song's starts all on its row; `entry` only when begun in this queue), `rowsFrom`.
+- **Resume**: `snapshotVersion` - 2 with `reached` or `starts`, else 1 when a list song is at or before the index,
+  else 2; toSave writes `v` by it, then `reached` (after the song playing, in the window) and `starts` last; a
+  snapshot of v 1 or 2 is read (`readable`); fromSnapshot reads `starts` (refusing a copy's, a key twice or not in the
+  window, an empty list, a negative or fractional moment) and `reached` (kept only after the index, not a copy).
+- **QueueController**: jumpTo hands jumpedTo the device's Repeat; `rollBack(rows, floor:)` replaces playAgain, and
+  playsAlone is gone; `jump(made:)`'s back path - the same entries: `move(to:)`, the engine's skip, as Previous moves;
+  other entries (copies let go, older rows brought back): the queue played afresh from the row. Never refused, never
+  held; a held edit still runs after it, as after every move.
+
+### The app
+
+- **PlayerModel.rollBack(rows, floor:)** replaces playAgain: each row's song at the setting's level for a song
+  (`levelFor(normalization, .songs)`), as a song's Play Next queues it, then QueueController.rollBack. Nothing with no
+  controller - the old fallback that played an older row as a queue of its own went with playsAlone, as the web's
+  broughtBack is null with nothing playing.
+- **UpNextScreen**: History's row - `player.jump(to:)`, then `rolledTo`; an older row - `PlayHistory.rowsFrom` of the
+  pastRows drawn, with the floor History's first row's key, else the song playing's (the web's replayPast). `rolledTo`
+  holds the scroll (the card is where the row was, under the finger), then - once drawn - moves VoiceOver to what
+  plays next (Playing Next's head, else the list's first, else Done) and says "Playing {title}".
+
+### Where the phone can't follow the web exactly
+
+- **No gesture unlock.** The web's back path calls `unlockSpare()` - iOS Safari unlocks each audio element from a
+  gesture, and Gapless has a second one. The phone's engine has no such rule, so nothing stands for it.
+- **A skip, or played afresh - decided by the entries, not the stream.** The web seeks within its one stream when it
+  still holds the song (moveInStream), else loads a new one from the row. The phone's engine holds every entry it was
+  given, so the same entries are always a skip (`move(to:)`), and other entries are always `engine.play` from the
+  row. The web can make a new stream with the songs unchanged (a stream begun after the row); the phone never needs to.
+- **Moments as integers.** The web takes a start's moment or `reached` as any JavaScript integer (`Number.isInteger`,
+  1e300 included); the phone's reader takes whole numbers under 9.2e18 only, so a snapshot holding a larger one is
+  refused where the web reads it. Moments are milliseconds since 1970 (1.8e12 now), so no real snapshot differs.
+- **QueueShows.held** is a Set of UTF-16 unit arrays where the web's is a Set of strings: the same comparison (the
+  web's `===`), another type - Swift's `==` on String would take "é" for "e\u{301}".
+
+### Fixtures and exporters
+
+- **export-traces.cjs**: stateOf records `reached`, `starts` and - where an entry's level isn't its song's in the
+  table (a row brought back at the setting's) - `levels`; Run.jumpedTo(key, repeat) records `back`; new ops
+  broughtBack (rows as [id, level, starts, entry]), heldStarts, shownKeys; `set` takes reached and starts. The 2.1.18
+  and review scenarios of upnext.sim, 69 scenarios in all; the property loop is upnext.sim's again (the seed's first
+  draw let go, one run in twenty a 55-74 song album, op 14 older rows), canonical() with reached, starts and levels;
+  the resume cases (v 1 or 2, starts and reached read or refused), and the round trip at 1,000 runs (older rows
+  brought back every other run), counting rolled, brought, reachedKept, startsKept and v2.
+  - **The 200-song scenario** (past Up Next's 100) is recorded as one `set` of the state the sim's song-by-song walk
+    reaches, held to that walk by the exporter (it stops if the two differ): its 210 ops made scenarios.json 896 KB.
+  - Sizes: scenarios.json 528 KB (263 before), traces.json 2.17 MB (1.99), resume/cases.json 1.40 MB (1.25),
+    roundtrip.json 1.30 MB (1.07).
+- **export-history.cjs**: the History tap's jump with Repeat; op 6 brings back rowsFrom with the floor; each line
+  carries the starts the queue holds and each older row's starts and entry; the words' `playing` once (one rolledTo
+  says it).
+- Every ios*.sim `--check` green.
+
+### Tests
+
+- **UpNextTraceTests**: the replay knows jumpedTo's mode and `back`, broughtBack, heldStarts and shownKeys, and
+  compares each state's reached, starts and levels; `set` reads them.
+- **UpNextPropertyTests**: upnext.sim's loop and checks again - a History tap the same queue at the row less its
+  copies, drawn as it was, Previous's walk to it with no copies; older rows each its own entry, first, in order,
+  moved or added, with their starts, the queue after them as it was; Up Next drawing every song up to the furthest
+  played. Its tallies: walkedTo > 300, brought > 500, broughtMoved > 200, broughtNew > 500, longRuns > 50.
+- **ResumeRoundTripTests**: 1,000 runs; `reached` in what reads back; Up Next to come and the starts held the same
+  after a reload; the counts. **ResumeCaseTests**: the counts.
+- **HistoryVectorTests**: the moves and lines as export-history's, and drawnOnce as history.sim's 2.1.18 check (a
+  start held by a row brought back is the queue's; one moved back down past the rows drawn is to come).
+- **UpNextTests**: every jump names Repeat; `historysTapRollsBack`, `aRollBackUnderRepeat`,
+  `pastUpNextsHundredTheRoundMovedBackDownIsHeld`, `aShuffleRolledBackKeepsItsOrder`, `olderRowsBroughtBack` and
+  `theFloorDrawnKeepsTheQueueFromThere` - upnext.sim's 2.1.18 section check by check; wentBack's `reached` and
+  Repeat keeping a round played in the 2.1.3 tests.
+- **QueueControllerTests**: History's tap a skip, nothing replaced, Playing Next kept after the song that was
+  playing; from a pause with a seek on its way, never refused; Repeat One's copies let go, played afresh - and kept
+  with Repeat One still on, a skip;
+  QueueControllerRollBackTests (an older row, a pause, the next song scheduled, the floor after the engine ran on,
+  nothing playing) in place of the play-again suite.
+- **Mutations**: 36 over the ported rules, each run alone (copyAfter both ways, shownKeys' reach, broughtBack's
+  floor, order, starts, startedAt and reach, withRepeat's and withShuffle's later rounds - kept, the song before, each
+  shuffled, the reach - withoutKey's and movedKey's reach and rounds, wentBack's and rolledBack's furthest,
+  passPlaying's fallback, layout's reach, the History tap's back, heldStarts, snapshotVersion both ways, v2 refused,
+  starts read and on a copy, reached written, heldByQueue, rowsFrom, pastRows' entry and starts, the back path's skip
+  and play, rollBack's floor, jumpTo's Repeat), all caught. The first run missed one, closed by a test: jumpTo handing
+  jumpedTo Repeat off always (`aRollBackUnderRepeatOneKeepsItsCopiesAndSkips`: with Repeat One still on, a History tap
+  keeps the copies and skips).
+
+### Verified, and not
+
+- Verified: `swift test` (DeadwaxKit, every target), the unsigned Release device build (Xcode 27.2 here),
+  ios/scripts/check_project.py, all 81 sims on Node 22 (iosdeck on Node 20.12.2 too), pytest's ios files and
+  test_source_bytes.py, the mutations.
+- Not verified: CI's Xcode 26.6 (an older Swift; the closures new here spell out their types). The app's halves -
+  rolledTo's scroll and focus, the floor handed from the screen - are compiled, not tested: they're the phone's
+  checks 85-91 in docs/ios.md, with the rest of going back on the phone, locked.
+
+## Phase 4's branch takes ios at 893390b (2026-11-14)
+
+`phase4-library` merged `ios` at 893390b, which brought three things:
+- main's 2.1.18-2.1.21;
+- the History roll-back's port ("Going back in Up Next, ported", above);
+- 893390b's test-only split of UpNextPropertyTests' digest, so CI's Xcode 26.6 can type-check it.
+
+The app stays 0.9 (9).
+
+**Conflicts.** Only docs/ios.md and notes/ios.md conflicted, each because both sides added at the same place.
+- The port's phone checks keep 85-91, so slice 3b's are now **92-101**. They are renumbered in docs/ios.md, the
+  spec's section 8, and slice 3b's two sections here.
+- Three files merged by themselves:
+  - PlayerModel: the feed's loop beside `rollBack`;
+  - Playlists.swift: the smart comment beside `PlaylistRules.found`;
+  - tests/test_ios_contract.py: `PLAYLIST_AHEAD` gone, beside the shuffle routes and ROUTE_COUNT 38.
+
+**Where the two meet.** Going back keeps a library shuffle's pages. History's tap moves the place only, and
+`broughtBack` keeps the state (`var next = state`), so the feed carries on after it.
+- ShuffleFeedLoopTests has a new test, `goingBackMidShuffleLosesAndDoublesNothing`. It runs 12 seeds of 650 songs,
+  with up to 8 History rows a few songs back tapped while pages are out, failing and landing. The order reaches the
+  queue whole, each song once, and the feed runs to its end.
+- Rows brought back from deadwax's older history come in as `.added`, outside the order. They are untested with the
+  feed.
+
+Finding 1 of slice 3b's review (a paged shuffle's snapshot past `snapshotMax`) is still open: the port didn't change
+the limit.
+
+Verified on the merged tree:
+- `swift test`: Core 1343, Audio 158, Turntable 12.
+- The unsigned Release and Debug device builds: no warnings.
+- `check_project.py` ok.
+- `npm run build` and all 81 sims on Node 22.23.4, every ios sim's exporter `--check` among them: iostraces against
+  upNext.ts and resume.ts, ioshistory against playHistory.ts, iosdeck against ARM_PARTS.
+- The iOS pytest files and test_source_bytes: 180 passed, 1 skipped.
+
+Not verified: CI's Xcode 26.6, which has the older Swift. The new tests spell out their closures' types. Nothing has
+run on a phone: checks 85-101.

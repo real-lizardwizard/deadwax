@@ -96,12 +96,17 @@ public struct Mark: Sendable, Equatable, Hashable {
     public var at: Int
     /// which time round of the list (0 the first; Repeat All's later ones 1, 2...); -1 for a song added
     public var pass: Int
+    /// (the web's 2.1.18) an entry brought back from the play history (broughtBack): the moments of the starts its row
+    /// stood for, all of this entry's song - while the queue holds the entry from History's floor on they are its, never
+    /// drawn above again (heldStarts, PlayHistory.swift). Rides with the mark through every edit; a copy never has it.
+    public var starts: [Int64]?
 
-    public init(key: Int, from: MarkFrom, at: Int, pass: Int) {
+    public init(key: Int, from: MarkFrom, at: Int, pass: Int, starts: [Int64]? = nil) {
         self.key = key
         self.from = from
         self.at = at
         self.pass = pass
+        self.starts = starts
     }
 }
 
@@ -173,9 +178,14 @@ public struct UpNextState: Sendable, Equatable {
     /// (Part B) the orders of the earlier times round still in the queue. nil and [] are different states, as in
     /// the TypeScript (absent, and present but empty - withRepeat can leave it so).
     public var pagedRounds: [PagedRound]?
+    /// (the web's 2.1.18) the key of the furthest unit played before the playing point moved back up the list (a
+    /// roll-back, or Previous): while it is after the song playing, the list Up Next draws runs on to it - and on through
+    /// what was drawn after it then - whatever the time round, so every row moved back down is drawn as it will play; its
+    /// round is the one Repeat judges by (withRepeat). Always a unit's first entry. Past it, it means nothing.
+    public var reached: Int?
 
     public init(id: String, marks: [Mark], source: [QueueTrack], shuffle: Bool, nextKey: Int, startedAt: Int,
-                left: [LeftOut] = [], paged: Paged? = nil, pagedRounds: [PagedRound]? = nil) {
+                left: [LeftOut] = [], paged: Paged? = nil, pagedRounds: [PagedRound]? = nil, reached: Int? = nil) {
         self.id = id
         self.marks = marks
         self.source = source
@@ -185,6 +195,7 @@ public struct UpNextState: Sendable, Equatable {
         self.left = left
         self.paged = paged
         self.pagedRounds = pagedRounds
+        self.reached = reached
     }
 }
 

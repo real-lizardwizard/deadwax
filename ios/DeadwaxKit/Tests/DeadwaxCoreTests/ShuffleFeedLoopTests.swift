@@ -196,6 +196,40 @@ import Testing
         }
     }
 
+    /// (the History roll-back's port, merged) A History row tapped mid-shuffle - the playing point moved back up, every
+    /// song after it to come again - while pages are out, fail and land: the order still reaches the queue whole, each
+    /// song once, and the feed still runs to its end.
+    @Test(arguments: Array(Int64(1)...Int64(12)))
+    func goingBackMidShuffleLosesAndDoublesNothing(seed: Int64) {
+        let world = World(total: 650, mode: .off, seed: seed)
+        world.start()
+        var steps = 0
+        var wentBack = 0
+        while steps < 20000 {
+            let before = world.controller.queue.index
+            if wentBack < 8, world.rng.next() < 0.02, let marks = world.controller.queue.upNext?.marks {
+                // a History row a few songs back (Up Next draws them), tapped
+                let index = world.controller.queue.index
+                let back = max(0, index - 1 - world.rng.pick(min(20, index)))
+                if back < index, world.controller.jumpTo(key: marks[back].key) { wentBack += 1 }
+            }
+            world.step(failRate: 0.2, holdRate: 0.3)
+            steps += 1
+            let stuck = world.controller.queue.index == before && world.atTheEnd
+            if stuck && world.pending.isEmpty && !world.retryDue { break }
+            if stuck { world.settle() }
+        }
+        let queue = world.controller.queue
+        let marks = queue.upNext?.marks ?? []
+        let fromTheOrder = queue.tracks.indices.filter { (place: Int) -> Bool in
+            marks.indices.contains(place) && marks[place].from == .source
+        }.map { (place: Int) -> String in queue.tracks[place].id }
+        #expect(wentBack > 0, "never went back")
+        #expect(fromTheOrder.count == 650, "the order in the queue: \(fromTheOrder.count)")
+        #expect(Set(fromTheOrder) == Set(world.all), "a song lost")
+        #expect(queue.upNext?.paged.map { (paged: Paged) -> Bool in paged.fetched == paged.total } == true)
+    }
+
     @Test func anOrderDeadwaxLostStartsOverAndSaysSoOnce() {
         let world = World(total: 450, mode: .off, seed: 7)
         world.start()

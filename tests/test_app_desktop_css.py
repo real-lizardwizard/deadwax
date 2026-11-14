@@ -209,8 +209,9 @@ def test_the_bars_scrubber_has_its_clocks_at_its_ends():
     assert declarations(DESKTOP, ".app-desk .app-playbar .pl-clocks > :first-child", DESK)["grid-column"] == "1"
     assert declarations(DESKTOP, ".app-desk .app-playbar .pl-scrub", DESK)["grid-column"] == "2"
     assert declarations(DESKTOP, ".app-desk .app-playbar .pl-clocks > :last-child", DESK)["grid-column"] == "3"
-    #? the board's thin sunken bar
+    #? the board's thin sunken bar, rounded - the phone's squared-off one (2.1.20) is the phone's
     assert media_tokens(DESKTOP, DESK)["--pl-scrub-track"] == "6px"
+    assert media_tokens(DESKTOP, DESK)["--pl-scrub-radius"] == "var(--pl-radius-track)"
 
 
 def test_get_pressed_while_the_panel_shows_its_sources_is_tinted_not_solid():

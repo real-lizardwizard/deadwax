@@ -38,8 +38,8 @@ public struct Playlist: Codable, Sendable, Equatable, Hashable, Identifiable {
     public let editable: Bool
     /// (slice 3's review) One of Navidrome's smart playlists (made from rules, an `.nsp`): worked out again as it is
     /// read, so it is never downloaded (James: "No Download for them") - it plays only while deadwax can be reached.
-    /// Sent by deadwax's summary() from main's 2.1.x on, read from Navidrome's playlist; false when deadwax doesn't
-    /// send it, so no playlist reads as smart before then.
+    /// Sent by deadwax's summary() since 2.1.21 (its `is_smart`: Navidrome's `validUntil`); false when an older
+    /// deadwax doesn't send it, so no playlist reads as smart on one.
     public let smart: Bool
 
     enum CodingKeys: String, CodingKey {

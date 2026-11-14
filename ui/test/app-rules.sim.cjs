@@ -239,10 +239,11 @@
  *    App); the song rows' ••• (Search's, the Library's, an album page's) call App's menu, never the player;
  *    ActionsContext isn't widened; lib/upNext.ts is pure; Up Next and the menu are sheets by the one hook with locks
  *    of their own, Up Next's scroller Info's; Now Playing's icon row has Up next always, before •••. (2.1.3) A row of
- *    History's (replay) is jumpTo by its key, last in the click, nothing awaited, nothing else of the player. (2.1.15)
- *    An older row of the play history (replayPast) is playNext with the song through queued(), then jumpTo by the key
- *    read before it, both in the click; usePlayHistory is called once, in App, handed to Up Next, and calls nothing of
- *    the player; lib/playHistory.ts is pure.
+ *    History's (replay) is jumpTo by its key, last in the click, nothing awaited, nothing else of the player. (2.1.15;
+ *    2.1.18) An older row of the play history (replayPast) is jumpTo with it and every older row below it (rowsFrom),
+ *    their songs through queued() as songs, in the click, nothing awaited, nothing else of the player - Up Next reaches
+ *    no playNext now; usePlayHistory is called once, in App, handed to Up Next, and calls nothing of the player;
+ *    lib/playHistory.ts is pure.
  *  - Resume what was playing (2.0.0-player.64): the engine's restoreQueue is reached only from app/useResume.ts, and
  *    that hook reaches nothing else of the player; it is called once, in App, after useShuffleFeed; ActionsContext
  *    isn't widened; lib/resume.ts is pure; neither new file needs a secure page (no randomUUID, no crypto.subtle) -
@@ -343,8 +344,8 @@ const ALLOWED = {
   //? Up Next, shuffle and repeat (2.0.0-player.57): the song menu's two rows - a song's or an album's Play Next and Play Last
   'app/QueueMenu.tsx': ['playLast', 'playNext'],
   //? ...Up Next's rows (a tap plays one now), its Edit (moves, removals, Clear) and its Shuffle and Repeat chips -
-  //? (2.1.15) and an older row of the play history, its song played again: Play Next's entry, moved to
-  'app/UpNext.tsx': ['clearPlayingNext', 'jumpTo', 'moveInQueue', 'playNext', 'removeFromQueue', 'setRepeat', 'setShuffle'],
+  //? (2.1.15; 2.1.18) and an older row of the play history, rolled back to: jumpTo with the rows from it down
+  'app/UpNext.tsx': ['clearPlayingNext', 'jumpTo', 'moveInQueue', 'removeFromQueue', 'setRepeat', 'setShuffle'],
   //? ...the Library's Shuffle (Part B): the first page of the whole library's order, in hand at the tap
   'app/ShuffleSongs.tsx': ['playTracks'],
   //? ...and its feed, which brings the rest of the order in as it plays - nothing that plays
@@ -430,7 +431,7 @@ console.log('\nthe playback actions only from the files allowed')
     'app/Requests.tsx': ['playTracks'],
     'app/Search.tsx': ['playTracks'],
     'app/ShuffleSongs.tsx': ['playTracks'],
-    'app/UpNext.tsx': ['clearPlayingNext', 'jumpTo', 'moveInQueue', 'playNext', 'removeFromQueue', 'setRepeat', 'setShuffle'],
+    'app/UpNext.tsx': ['clearPlayingNext', 'jumpTo', 'moveInQueue', 'removeFromQueue', 'setRepeat', 'setShuffle'],
     'app/context.ts': ['next', 'playTracks', 'previous', 'setGapless', 'showAirPlay', 'toggle'],
     'app/useResume.ts': ['restoreQueue'],
     'app/useShuffleFeed.ts': ['extendQueue'],
@@ -2457,18 +2458,19 @@ console.log('\nUp Next, shuffle and repeat (2.0.0-player.57): each new action fr
   const jump = /const jump = \(group: Group, rows: readonly UpNextRow\[\], index: number\) => \{([\s\S]*?)\n  \}/.exec(upNext)?.[1] ?? ''
   check('Up Next\'s row: a tap jumps to it by its key, straight from the click',
     [/onClick=\{\(\) => jump\(group, rows, index\)\}/.test(upNext), /const row = rows\[index\]!/.test(jump), /\n\s*player\.jumpTo\(row\.key\)\s*$/.test(jump), /\bawait\b|\.then\(/.test(jump)], [true, true, true, false])
-  //? (2.1.3) History's row: the song again, by its key, straight from the click - after only the bookkeeping of where the
-  //? view is held, focus goes and what is said
+  //? (2.1.3; 2.1.18) History's row: rolled back to, by its key, straight from the click - after only the bookkeeping of
+  //? where the view is held, focus goes and what is said
   const replay = /const replay = \(row: UpNextRow\) => \{([\s\S]*?)\n  \}/.exec(upNext)?.[1] ?? ''
-  check('(2.1.3) ...and History\'s row: the song again by its key, straight from the click',
+  check('(2.1.3) ...and History\'s row: rolled back to by its key, straight from the click',
     [/onClick=\{\(\) => replay\(row\)\}/.test(upNext), /\n\s*player\.jumpTo\(row\.key\)\s*$/.test(replay), /\bawait\b|\.then\(/.test(replay), (replay.match(/\bplayer\.\w+\(/g) ?? []).length], [true, true, false, 1])
-  //? (2.1.15) an older row of the play history: the song again - Play Next's entry, at the setting's level, then moved to by
-  //? the key it is given, both straight from the click; nothing awaited, nothing else of the player
+  //? (2.1.15; 2.1.18) an older row of the play history: rolled back to, everywhere - jumpTo with it and every older row
+  //? below it (rowsFrom), their songs through queued() as a song's ••• queues them, each row's starts and entry with it,
+  //? straight from the click, with (review) the first entry drawn for this queue; nothing awaited, nothing else of the player
   const replayPast = /const replayPast = \(row: PastRow\) => \{([\s\S]*?)\n  \}/.exec(upNext)?.[1] ?? ''
-  check('(2.1.15) ...and an older row\'s: Play Next with the song in hand, queued as a song, then moved to - straight from the click',
+  check('(2.1.18) ...and an older row\'s: jumpTo with the rows from it down, their songs queued as songs - straight from the click',
     [/onClick=\{\(\) => replayPast\(row\)\}/.test(upNext),
-      /const key = player\.queue\.upNext\?\.nextKey\s*const began = player\.playNext\(queued\(\[row\.track\], 'songs'\)\)\s*if \(!began && key !== undefined\) player\.jumpTo\(key\)\s*$/.test(replayPast),
-      /\bawait\b|\.then\(/.test(replayPast), (replayPast.match(/\bplayer\.(?!queue\b)\w+\(/g) ?? []).length], [true, true, false, 2])
+      /const floor = view\.history\[0\]\?\.key \?\? player\.queue\.upNext\?\.marks\[player\.queue\.index\]\?\.key\s*const back = rowsFrom\(past, row\.key\)\s*const tracks = queued\(back\.map\(\(each\) => each\.track\), 'songs'\)\s*player\.jumpTo\(back\.map\(\(each, i\) => \(\{ track: tracks\[i\]!, starts: each\.starts, entry: each\.entry \}\)\), floor\)\s*$/.test(replayPast),
+      /\bawait\b|\.then\(/.test(replayPast), (replayPast.match(/\bplayer\.(?!queue\b)\w+\(/g) ?? []).length], [true, true, false, 1])
   const hook = code(read('app/usePlayHistory.ts'))
   check('...its pages: usePlayHistory called once, in App, and handed to Up Next; it calls nothing of the player',
     [(app.match(/\busePlayHistory\(/g) ?? []).length, /<UpNext open=\{upNextOpen\}[^\n]*history=\{playHistory\}/.test(app), actionsIn(hook),
@@ -2886,10 +2888,12 @@ console.log('\nNormalization (2.0.0-player.62): every queued song through queued
     ['app/Requests.tsx', 'playTracks', true], ['app/Search.tsx', 'playTracks', true],
     //? the Library's Shuffle queues them a line before - it reads the level they got for its paging (below)
     ['app/ShuffleSongs.tsx', 'playTracks', false],
-    //? (2.1.15) an older row of Up Next's play history: its song again, as a song's ••• queues it
-    ['app/UpNext.tsx', 'playNext', true],
     ['player/AlbumPage.tsx', 'playTracks', true],
   ])
+  //? (2.1.18) jumpTo with an older row's rows brings songs in too: through queued() as songs, the line before
+  const upNextCode = code(read('app/UpNext.tsx'))
+  check('...(2.1.18) and Up Next\'s older rows brought back (jumpTo with them): their songs queued as songs, then handed over',
+    [(upNextCode.match(/\bqueued\(/g) ?? []).length, /const tracks = queued\(back\.map\(\(each\) => each\.track\), 'songs'\)\s*player\.jumpTo\(back\.map\(\(each, i\) => \(\{ track: tracks\[i\]!/.test(upNextCode)], [1, true])
   const shuffle = code(read('app/ShuffleSongs.tsx'))
   check('...the Library\'s Shuffle too: queued as songs, then played - its level on the shuffle\'s paging, for the feed',
     [/const tracks = queued\(first\.songs\.map\(shuffledTrack\), 'songs'\)/.test(shuffle), /actions\.playTracks\(tracks, 0, false, \{[^}]*\.\.\.\(level \? \{ level \} : \{\}\) \}\)/.test(shuffle)], [true, true])

@@ -665,6 +665,7 @@
     --dw-tt-pivot:        #3a3642;
     --dw-tt-pivot-edge:   #56525f;
     --dw-tt-handle-edge:  rgba(235, 235, 245, 0.18);
+    --dw-tt-head-shadow:  rgba(0, 0, 0, 0.5);   /* (2.1.19) round the head while the arm is held: --dw-shadow's black */
     /* (--dw-record-turn, the CSS spin's 1.8 s, went in 2.0.0-player.14: the platter is turned frame
        by frame by player/deck.ts now, at lib/platter.ts's DEGREES_PER_SECOND - one turn in
        SECONDS_PER_TURN - and stopped under reduced motion there.) */

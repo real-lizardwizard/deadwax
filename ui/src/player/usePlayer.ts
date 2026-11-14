@@ -81,8 +81,8 @@ import {
   asksForMp4, isFlac, resampledFrom, resamples, wrappedAs, wrapsFlac, type MaxRate, type Wrapped,
 } from '../lib/streamWrap'
 import {
-  TOP_UP_HEARD_S, backward, jumpedTo, movedKey, onward, pastCopies, startUpNext, toppedUp, wentBack, withLast, withMore, withNext,
-  withRepeat, withShuffle, withoutAdded, withoutKey, type Paged, type Repeat, type UpNextQueue,
+  TOP_UP_HEARD_S, backward, broughtBack, jumpedTo, movedKey, onward, pastCopies, startUpNext, toppedUp, wentBack, withLast, withMore,
+  withNext, withRepeat, withShuffle, withoutAdded, withoutKey, type Brought, type Paged, type Repeat, type UpNextQueue,
 } from '../lib/upNext'
 import {
   readPlayerGapless, readPlayerMaxRate, readPlayerRepeat, readPlayerSpeed, writePlayerGapless, writePlayerMaxRate, writePlayerRepeat,
@@ -155,8 +155,11 @@ export interface Player {
   playNext(tracks: QueueTrack[]): boolean
   playLast(tracks: QueueTrack[]): boolean
   /** a row of Up Next or History, by key: it plays now (even from pause) - lib/upNext jumpedTo: the rows it passes stay
-   *  behind it; History's plays the song again */
-  jumpTo(key: number): void
+   *  behind it; (2.1.18) History's rolls back to it, everything after it to come again. Or the older rows of the play
+   *  history from the one tapped down to History's (lib/upNext broughtBack), brought back ahead of them, the first
+   *  playing - their songs through queued(), in the tap; `floor` the key of the first entry Up Next drew then (the
+   *  rows were read against it: lib/upNext broughtBack) */
+  jumpTo(to: number | readonly Brought[], floor?: number): void
   /** a row of Up Next to place `to` of its own group; one out of Up Next; every song added out (Clear) */
   moveInQueue(key: number, to: number): void
   removeFromQueue(key: number): void
@@ -1655,11 +1658,23 @@ export function usePlayer(): Player {
       playLast(tracks: QueueTrack[]): boolean {
         return addSongs(tracks, withLast)
       },
-      jumpTo(key: number) {
+      jumpTo(to: number | readonly Brought[], floor?: number) {
         catchUp()
-        const jump = jumpedTo(state.queue, key)
+        const jump = typeof to === 'number' ? jumpedTo(state.queue, to, state.repeat) : broughtBack(state.queue, to, state.repeat, floor)
+        if (!jump) return
+        //? (2.1.18) a roll-back - the queue already at the row: moved to as Previous moves, a seek in the stream when it
+        //? holds the song of the same songs, else a new stream from it, this being a tap. Never a replan: the songs before
+        //? the one playing are what changed (or not at all), so it can't be refused
+        if (jump.back) {
+          state.intendsToPlay = true
+          state.change = null
+          unlockSpare()
+          if (moveInStream(jump.queue, true)) return
+          load(jump.queue, true, true)
+          return
+        }
         //? a key gone from Up Next, or a seek on its way: nothing - a jump is a tap, done now or not at all
-        if (!jump || !replaceUpcoming(jump.queue)) return
+        if (!replaceUpcoming(jump.queue)) return
         //? a row's tap plays it, paused or not
         state.intendsToPlay = true
         state.change = null

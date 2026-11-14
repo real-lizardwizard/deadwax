@@ -29,6 +29,8 @@ export interface Playlist {
   mine: boolean
   /** the asker's own, and not a smart playlist or one kept in step with a file */
   editable: boolean
+  /** (2.1.21) one of Navidrome's smart playlists, by its validUntil - the iPhone app downloads none */
+  smart: boolean
 }
 
 /** One playlist with its songs - Navidrome's own, as they are - and how many of them it isn't listing just now. */

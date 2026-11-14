@@ -93,16 +93,13 @@ public enum TurntableGeometry {
     public static let armWeight = (from: -52.0, length: 34.0, thick: 18.0, radius: 5.0)
     public static let armBase = 22.0
     public static let armBaseEdge = 3.0
-    /// The web's lift (ARM_PARTS.lift): its head drawn 5 units up while held - in the arm's turned frame, sideways off
-    /// the bar, so a tap read as the head knocked out of place (James, 2026-11-14, on 0.9: "it looks like it
-    /// dislocates"). The phone draws none of it (`headLift`); it stays here, held to turntable.json, until main's web
-    /// makes the same change and the vectors follow.
-    public static let armLift = 5.0
-    /// The phone's lift (2.5, 2026-11-14), the web's too (main's 2.1.19, ARM_PARTS.lift = { scale: 1.08, shadow: 3 }):
-    /// the head stays on the bar and comes toward the viewer while held - grown `scale` about its own middle, with a soft
-    /// shadow round it (no offset, so it doesn't turn with the arm; its blur `shadow` units, TurntablePalette.ttHeadShadow),
-    /// eased each way over `seconds` on `headLiftEase` so a tap doesn't flicker - the app's one motion token,
-    /// `--dw-duration` (140 ms) on `--dw-ease`. Reduce Motion: the same two states with no easing.
+    /// The head lifted while the arm is held (2.5, 2026-11-14; the web's since main's 2.1.19, ARM_PARTS.lift, and held to
+    /// turntable.json's): it stays on the bar and comes toward the viewer - grown `scale` about its own middle, with a soft
+    /// shadow round it (no offset, so it doesn't turn with the arm; its blur `shadow` units, TurntablePalette.ttHeadShadow).
+    /// (Before, the web drew it 5 units up in the arm's turned frame - sideways off the bar, so a tap read as the head
+    /// knocked out of place: James, 2026-11-14, "it looks like it dislocates".) `seconds` is the phone's own: eased each
+    /// way over it on `headLiftEase` so a tap doesn't flicker - the app's one motion token, `--dw-duration` (140 ms) on
+    /// `--dw-ease` (the web's head lifts at once). Reduce Motion: the same two states with no easing.
     public static let headLift = (scale: 1.08, shadow: 3.0, seconds: 0.14)
     /// `--dw-ease`, cubic-bezier(0.16, 1, 0.3, 1): the lift's curve.
     public static let headLiftEase = (x1: 0.16, y1: 1.0, x2: 0.3, y2: 1.0)

@@ -9,7 +9,7 @@
     "ui/src/player/Turntable.tsx the song-change effect (:269-280)": "bafe1e174116abfdc321df053e5f19e6157f880a45fd79cc1930d28503f44124",
     "ui/src/player/NowPlaying.tsx the turntable's toggle (:282)": "64f00a4f057a47be137fe281b2d206f96f6061f826341e7d0db494f742a077bb",
     "ui/src/player/deck.ts": "7b1b18dc391a651d10560a43fd0c67eb44babd08138ebea133ddbf37ebc6278c",
-    "ui/src/lib/turntable.ts": "a731a7598c05444e8c2fe958b16a4c3c7f81a3ee98bf7292e8d159ab766e89a5",
+    "ui/src/lib/turntable.ts": "c9bdf0084edd5d2dfc6f5857ecf2cf480b2422a327b07945591005de820882cd",
     "ui/src/lib/deckClock.ts": "d56be8cf57c49f391c73a8f34c586b321c32cfbd17f9d2be109cb0b3bf2f63c4",
     "ui/src/lib/scrub.ts": "101947f91a58149f22697fe10f7de50f84eb90b4c57d449f884f89e19740dda8"
   },

@@ -340,8 +340,9 @@ address (`http://your-server:8080/`) opens the app too: that address sends the b
   never guessed. **Debug** is how the song is
   being played, in labelled rows, and it is an admin's: see [Info → Debug](#info--debug). Everyone
   else's Info is About alone, with no tabs above it. **Done**, Escape or a tap above the sheet closes it.
-- **The scrubber** is the whole bar: tap anywhere along it to jump there, or drag from anywhere on
-  it and it follows your finger, seeking when you let go. It works from the keyboard too (arrows
+- **The scrubber** is the whole bar - a squared-off bar that thickens while your finger is on it: tap
+  anywhere along it to jump there, or drag from anywhere on it and it follows your finger, seeking when
+  you let go. It works from the keyboard too (arrows
   move 5 seconds, Page Up and Page Down 30, Home and End to the ends), and VoiceOver's swipe up
   and down move it. [Seeking](#seeking-and-where-safari-lands) says why a seek in Safari can land
   somewhere other than where you put it.
@@ -386,8 +387,18 @@ player bar's **Up Next** button, and opens as a panel beside the page, as Info d
   everything you played before it, in the order you played it. A song Repeat One played again, or that you started
   again, is one row; Repeat All's earlier times round are there as they played. A song you skipped after a second
   is there like any other. As you scroll near the top the next older songs come, a spinner showing while they do
-  (and, if they can't, a line saying so with **Try again**). Tap any of them to hear it again now: Playing Next and
-  the album carry on after it as they were, and the song that was playing joins the list. To a keyboard, the list
+  (and, if they can't, a line saying so with **Try again**). **Tap any of them to go back to it** (since 2.1.18): it
+  plays now, from its start, and everything played after it moves back down into Up Next, in the order you see it -
+  the songs above the one that was playing, that song itself (from its start, when it comes round), then Playing
+  Next and the rest of the album or list, as they were. Nothing is lost or reshuffled: songs you added with Play
+  Next that were still waiting keep their place, after the song that was playing; with Shuffle on, what comes back
+  keeps the order it played in (turned on afterwards, [Shuffle](#up-next-shuffle-and-repeat) shuffles it with the
+  rest, as ever - a later time round of Repeat All's on its own, after this one's - and off, the album or list
+  carries on in its own order); with Repeat One each song's repeats come back with it, and otherwise each plays
+  once. Tap a song from before this album or list and everything played since it comes back too, skips included,
+  however many - shown as songs to come, not above; each joins what you've played again as it plays (deadwax's own
+  record of what you played is never changed). Previous from a song you went back to plays the one above it (from
+  one from before the album or list, the song again). To a keyboard, the list
   is one stop of Tab - the up and down arrows move inside it - and VoiceOver reads it as one list, "History", then
   the song playing's title as a heading.
   - **What goes in it**: every song that starts playing - the moment Navidrome is told "now playing" - skips
@@ -419,6 +430,12 @@ player bar's **Up Next** button, and opens as a panel beside the page, as Info d
 - **After Previous**, a song you'd added that was still waiting stays where it was - after the song you went
   back from - so Up Next lists it there, in the album's group, rather than under Playing Next; **Clear** takes
   only the songs under Playing Next.
+- **After going back** - Previous, or a tap on a song you've played (2.1.18) - Up Next lists every song you'd
+  played on to, and what was to come after it then, whatever the time round: with Repeat All, the next time round's
+  songs you'd heard, and the rest of that round, are in the one list, where they play; turning Repeat off or to One
+  keeps them (they played), and lets go only of what comes after. Songs brought back from before the album or list
+  are listed first, under Playing Next when they came from another album or list (Clear takes them), with the
+  album's group when they were this one's.
 - **Edit** (at the top left) turns the rows into ones you move and remove, as Home's Pinned does: **up** and
   **down**, **✕** to take one out, and a grip at the right to drag it by (only the grip drags, so the list
   still scrolls under your finger elsewhere). A song moves within its own group - Playing Next, or the
@@ -1390,8 +1407,8 @@ below.
   ending are always instant. Kept on the device, like the others.
 - **Drag the arm** to jump anywhere in the song: to the middle of the record is the end, to its
   edge the start. It starts to move once your finger has gone a few pixels, from where the song
-  is, so a small wobble moves nothing. The song jumps when you let go; while you hold the arm, the
-  time line says **Needle up** and the time letting go will go to - even while the record is still
+  is, so a small wobble moves nothing. The song jumps when you let go; while you hold the arm, its
+  head lifts toward you (a little bigger, with a shadow round it) and the time line says **Needle up** and the time letting go will go to - even while the record is still
   coasting from a flick, which goes quiet as you take the arm (the arm then moves on from where the
   record was going to land).
 - **From the keyboard, and with VoiceOver**, the arm is a slider like the scrubber (arrows move 5
@@ -2494,7 +2511,16 @@ fixes that.
   bar, after leaving it).
 - **[Picking up where you left off](#picking-up-where-you-left-off)** comes back from the last save - up to 30
   seconds early for an app iOS closed in a pocket - keeps 2,000 songs at most, and from another app's queue
-  only the songs, as a plain list. Amperfy keeps its own queue, which deadwax can't see.
+  only the songs, as a plain list. Amperfy keeps its own queue, which deadwax can't see. Going back to a song
+  from long ago can make Up Next longer than that: it all plays, but a reload keeps 2,000 of it, from the 50 before
+  the song playing on, and the songs past them go (what you'd played of them shows above again). A deadwax tab
+  opened before 2.1.18 (reload it), and an [iPhone app](ios.md) build from before it learned going back, don't know
+  a going-back: opening a queue you went back in, they put it back as a plain list - every song, in order, at the
+  song and second you were at, nothing lost - but without Playing Next, the Shuffle chip or each song's own
+  [Normalization](#normalization) level (the setting's instead), as another app's queue comes back. And once such an
+  iPhone build has saved the queue, songs brought back from before the album or list can show above as well as to
+  come, and tapping one there brings it back a second time. The iPhone app's builds since go back as the web app
+  does.
 - **Up Next**'s History goes back 50 plays and starts again with each album or list you play (it doesn't
   reach back into the one before); Up Next has
   no "keep playing similar music" after the list, no ••• on album tiles (an album's ••• is on its page),
@@ -2657,7 +2683,9 @@ question the whole player existed to answer. Still to find out:
   home-screen app, and VoiceOver through Up Next, its Edit and the song menu; (2.1.3) **History**: Up Next
   opening at the song playing and keeping its place as songs end, on the phone and in a desktop's panel, a tap
   on a song further down the album moving within the one stream (a seek, not a new start) on the iPhone's own
-  player, a History row playing again, and VoiceOver through 50 rows of History before the song playing; (2.1.15)
+  player, a History row going back (2.1.18: a seek within the one stream when it still holds the song, a new
+  stream from it when it doesn't, on the iPhone's own player), and VoiceOver through 50 rows of History before
+  the song playing; (2.1.15)
   **what you've played** scrolled back through months of it on the phone (there is no windowing: a month is a few
   thousand rows), an older song tapped while the one stream plays, and the songs played in a pocket reaching deadwax; Repeat One the second-player
   way (Gapless on, not FLAC), which hands the same song over each time (about 100 ms, as any handover) and

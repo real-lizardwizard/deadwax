@@ -2,17 +2,21 @@ import Foundation
 import Testing
 @testable import DeadwaxCore
 
-/// Up Next's invariant by property, as ui/test/upnext.sim.cjs checks it (:175-350): seeded runs of 30 steps - every
-/// edit, top-up and forward move, a row of Up Next's or History's tapped, Previous by wentBack (2.1.3), its draws and
-/// its choices from the one Park-Miller generator, in the sim's order - each step checked. Fixtures/upnext/
-/// property.json holds a digest of the queue each of the sim's 2,000 runs ended with (made by export-traces.cjs from
-/// the same loop), so the first test runs the very queues the sim checks. After Previous the order behind the place is
-/// as it played (`loose`); and after every step History is exactly what Previous walks back through, by place and by
-/// song, every copy is of its run's song, and every row drawn is reached by its tap.
+/// Up Next's invariant by property, as ui/test/upnext.sim.cjs checks it (:195-460): seeded runs of 30 steps - every
+/// edit, top-up and forward move, a row of Up Next's or History's tapped, Previous by wentBack (2.1.3), older rows of
+/// the play history brought back (2.1.18), its draws and its choices from the one Park-Miller generator, in the sim's
+/// order - each step checked. Fixtures/upnext/property.json holds a digest of the queue each of the sim's 2,000 runs
+/// ended with (made by export-traces.cjs from the same loop), so the first test runs the very queues the sim checks.
+/// After Previous or a roll-back the order behind the place is as it played (`loose`); and after every step History is
+/// exactly what Previous walks back through, by place and by song, every copy is of its run's song, Up Next draws every
+/// song up to the furthest played and what was drawn after it, in order, and every row drawn is reached by its tap.
 ///
-/// The sim seeds run n with n + 1, and Park-Miller's first number from a seed under 2,000 is under 0.016 - so every
-/// one of the sim's runs starts from a ONE-song list (`1 + pick(6)` is always 1), with songs added after. The second
-/// test runs the same loop from seeds spread over the generator's range, its first number let go, lists of 1-12.
+/// (2.1.18) The sim lets each seed's first number go - from a seed under 2,000 it is under 0.016, so every run had
+/// been a one-song list - and one run in twenty is a long album (55-74 songs), so History's 50 and the older rows
+/// before it come in. A History tap is a roll-back (the same queue, the place moved back to the row - exactly
+/// Previous's walk to it with no copies anywhere); older rows brought back are each its own entry, first, in order -
+/// moved, or a new song added - with their starts, the queue from History's first row on after them as it was. The
+/// second test runs the same loop from seeds spread over the generator's range, lists of 1-12.
 @Suite struct UpNextPropertyTests {
     @Test func theInvariantHoldsOverTheSimsTwoThousandRuns() throws {
         let file = try Fixtures.json("upnext/property.json")
@@ -24,11 +28,18 @@ import Testing
         var unlike: [Int] = []
         var tally = Tally()
         for run in 0..<2000 {
-            let queue = propertyRun(run, Seeded(Int64(run + 1)), sizes: 6, problems: &problems, tally: &tally)
+            let random = Seeded(Int64(run + 1))
+            _ = random.next()
+            let long = run % 20 == 7
+            if long { tally.longRuns += 1 }
+            let size = long ? 55 + random.pick(20) : 1 + random.pick(6)
+            let queue = propertyRun(run, random, size: size, problems: &problems, tally: &tally)
             if run < digests.count && digest(queue) != digests[run] { unlike.append(run) }
         }
         #expect(problems.isEmpty, "\(problems)")
         #expect(tally.walkedBack > 500 && tally.historyTaps > 500 && tally.drawnChecked > 10_000, "\(tally)")
+        #expect(tally.walkedTo > 300 && tally.brought > 500 && tally.broughtMoved > 200 && tally.broughtNew > 500
+                && tally.longRuns > 50, "\(tally)")
         #expect(unlike.isEmpty, "\(unlike.count) runs ended unlike the sim's, the first \(unlike.prefix(5))")
     }
 
@@ -40,12 +51,13 @@ import Testing
         for run in 0..<2000 {
             let random = Seeded(Int64(run) * 1_000_003 % 2_147_483_646 + 1)
             _ = random.next()
-            let queue = propertyRun(run, random, sizes: 12, problems: &problems, tally: &tally)
+            let queue = propertyRun(run, random, size: 1 + random.pick(12), problems: &problems, tally: &tally)
             sizes.insert(queue.upNext?.source.count ?? 0)
             if queue.upNext?.shuffle == true { shuffled += 1 }
         }
         #expect(problems.isEmpty, "\(problems)")
         #expect(sizes == Set(1...12) && shuffled > 500)
+        #expect(tally.brought > 500 && tally.historyTaps > 500, "\(tally)")
     }
 
     @Test func repeatAllShuffledNeverStartsARoundWithTheSongThatEndedTheLast() {
@@ -73,20 +85,42 @@ import Testing
         #expect(startUpNext(album, start: nil).current?.id == "1")
     }
 
-    /// How much of 2.1.3 the runs reached: Previous moves, History taps, drawn rows tapped.
+    /// How much of 2.1.3 and 2.1.18 the runs reached: Previous moves, History taps (roll-backs), drawn rows tapped; a
+    /// History tap held to Previous's walk, older rows brought back (moved, new), long albums.
     struct Tally {
         var walkedBack = 0, historyTaps = 0, drawnChecked = 0
+        var walkedTo = 0, brought = 0, broughtMoved = 0, broughtNew = 0, longRuns = 0
     }
 
-    /// One of the sim's runs: a list of 1...`sizes` songs started, then 30 steps, each checked; the queue it ended with.
-    private func propertyRun(_ run: Int, _ random: Seeded, sizes: Int, problems: inout [String],
+    /// (2.1.18) upnext.sim's playingKey: the key of the unit playing.
+    private func playingKey(_ queue: UpNextQueue) -> Int {
+        let marks = queue.upNext?.marks ?? []
+        var p = queue.index
+        while p > 0 && marks[p].from == .one { p -= 1 }
+        return marks[p].key
+    }
+
+    /// (2.1.18) upnext.sim's aheadKeys: the rows Up Next draws after the song playing, every one (no cap).
+    private func aheadKeys(_ queue: UpNextQueue, _ mode: Repeat) -> [Int] {
+        let view = upNextView(queue, mode, limit: Int.max)
+        return (view.added + (view.list?.rows ?? [])).map(\.key)
+    }
+
+    /// (2.1.18) upnext.sim's firstShown: where History's rows begin - its first row's place, else the song playing's.
+    private func firstShown(_ queue: UpNextQueue) -> Int {
+        let marks = queue.upNext?.marks ?? []
+        let key = historyRows(queue).first?.key ?? playingKey(queue)
+        return marks.firstIndex { $0.key == key } ?? -1
+    }
+
+    /// One of the sim's runs: a list of `size` songs started, then 30 steps, each checked; the queue it ended with.
+    private func propertyRun(_ run: Int, _ random: Seeded, size: Int, problems: inout [String],
                              tally: inout Tally) -> UpNextQueue {
         var found: [String] = []
         func note(_ step: Int, _ what: String) {
             if found.count < 8 { found.append("run \(run) step \(step): \(what)") }
         }
         let pick = { (count: Int) in random.pick(count) }
-        let size = 1 + pick(sizes)
         var mode = Repeat.allCases[pick(3)]
         let start: Int? = random.next() < 0.3 ? nil : pick(size)
         let shuffle = random.next() < 0.5
@@ -102,7 +136,7 @@ import Testing
         var back = false
         for step in 0..<30 {
             let before = queue
-            let op = pick(14)
+            let op = pick(15)
             var edit = true
             let someKey = { () -> Int in
                 let keys = (queue.upNext?.marks.dropFirst(queue.index + 1) ?? []).map(\.key)
@@ -137,7 +171,15 @@ import Testing
                     }
                     let place = queue.upNext?.marks.firstIndex { $0.key == key } ?? -1
                     let fromHistory = drawnHistory.contains { $0.key == key }
-                    if let jumped = jumpedTo(queue, key) {
+                    let jump = jumpedTo(queue, key, mode)
+                    if let jumped = jump, jumped.back {
+                        //? (2.1.18) History's: a roll-back, the queue already at the row
+                        rolledBack(queue, jumped, to: place, key: key, fromHistory: fromHistory, mode,
+                                   note: { note(step, $0) }, tally: &tally)
+                        queue = jumped.queue
+                        back = true
+                    } else if let jumped = jump {
+                        if fromHistory { note(step, "a row History draws jumped to, not rolled back to") }
                         let kept = jumped.queue.index == queue.index
                             && (0...queue.index).allSatisfy {
                                 jumped.queue.tracks[$0] == queue.tracks[$0] && jumped.queue.upNext?.marks[$0] == queue.upNext?.marks[$0]
@@ -146,27 +188,45 @@ import Testing
                         if !(jumped.index > queue.index && jumped.index < jumped.queue.tracks.count) {
                             note(step, "a jump to \(jumped.index) from \(queue.index)")
                         }
-                        if fromHistory {
-                            tally.historyTaps += 1
-                            let again = jumped.queue.upNext?.marks[jumped.index]
-                            if jumped.queue.tracks[jumped.index] != queue.tracks[place] || again?.from != .added
-                                || jumped.queue.tracks.count != queue.tracks.count + 1 {
-                                note(step, "History's tap: not that song again, as one song added")
-                            }
-                            let was = drawnHistory.map(\.key)
-                            let now = historyRows(jumped.queue.at(jumped.index)).map(\.key)
-                            let gone = was.filter { !now.contains($0) }
-                            if gone != Array(was.prefix(gone.count)) || Array(now.prefix(was.count - gone.count)) != Array(was.dropFirst(gone.count)) {
-                                note(step, "History's tap rewrote History")
-                            }
-                        } else {
-                            if place <= queue.index { note(step, "entry \(place), not drawn in History, jumped to") }
-                            if jumped.queue.upNext?.marks[jumped.index].key != key { note(step, "an Up Next tap landed elsewhere") }
-                            if jumped.queue.ids.sorted() != queue.ids.sorted() { note(step, "an Up Next tap dropped or added a song") }
-                        }
+                        if place <= queue.index { note(step, "entry \(place), not drawn in History, jumped to") }
+                        if jumped.queue.upNext?.marks[jumped.index].key != key { note(step, "an Up Next tap landed elsewhere") }
+                        if jumped.queue.ids.sorted() != queue.ids.sorted() { note(step, "an Up Next tap dropped or added a song") }
                         queue = jumped.queue.at(jumped.index)
                     } else if fromHistory {
                         note(step, "a row History draws refused")
+                    }
+                } else if op == 14 {
+                    //? (2.1.18) older rows of the play history brought back, oldest first: entries of this queue (before
+                    //? History's floor or not, in order or not, copies, another song than theirs, one twice) and songs from
+                    //? elsewhere - each row's song as UpNext.tsx passes it, at a level of its own
+                    let from = firstShown(queue)
+                    let marks = queue.upNext?.marks ?? []
+                    let rows = (0..<(1 + pick(4))).map { i -> Brought in
+                        let starts = (0..<(1 + pick(2))).map { k in Int64(run * 1000 + step * 10 + i * 3 + k) }
+                        if random.next() < 0.6 {
+                            let range = random.next() < 0.8 ? from : queue.tracks.count
+                            let p = pick(max(1, range))
+                            var track: QueueTrack
+                            if random.next() < 0.9 {
+                                track = queue.tracks[p]
+                                track.level = random.next() < 0.5 ? .album : .track
+                            } else {
+                                track = simTrack("x\(extra)")
+                                extra += 1
+                            }
+                            return Brought(track: track, starts: starts, entry: marks[p].key)
+                        }
+                        let track = simTrack("p\(extra)")
+                        extra += 1
+                        let entry: Int? = random.next() < 0.5 ? nil : (queue.upNext?.nextKey ?? 0) + 5
+                        return Brought(track: track, starts: starts, entry: entry)
+                    }
+                    if let jump = broughtBack(queue, rows, mode), jump.back, jump.index == 0, jump.queue.index == 0 {
+                        broughtRows(queue, jump.queue, rows, from: from, mode, note: { note(step, $0) }, tally: &tally)
+                        queue = jump.queue
+                        back = true
+                    } else {
+                        note(step, "older rows: not a roll-back to the first")
                     }
                 } else if op == 9 {
                     if let next = onward(queue) { queue = queue.at(next) }
@@ -213,10 +273,91 @@ import Testing
         return queue
     }
 
+    /// (2.1.18) A History tap, as upnext.sim checks it: History's rows alone, and the same queue with the place moved
+    /// back to the row - outside Repeat One less the copies after it (a row plays once) - nothing added; every row from
+    /// it on drawn as it was, now to come (the row tapped the card, then History's rows after it, the song that was
+    /// playing, Playing Next, the list); History above it the rows above the row tapped; and with no copies anywhere,
+    /// exactly Previous's walk to it, one row at a time.
+    private func rolledBack(_ queue: UpNextQueue, _ jumped: Jump, to place: Int, key: Int, fromHistory: Bool, _ mode: Repeat,
+                            note: (String) -> Void, tally: inout Tally) {
+        guard let state = queue.upNext else { return }
+        if !fromHistory { note("entry \(place), not drawn in History, rolled back to") }
+        tally.historyTaps += 1
+        let keeps = { (i: Int) -> Bool in !(mode != .one && i > place && state.marks[i].from == .one) }
+        let wantTracks = queue.tracks.indices.filter(keeps).map { queue.tracks[$0] }
+        let wantMarks = state.marks.indices.filter(keeps).map { state.marks[$0] }
+        let j = jumped.queue
+        if jumped.index != place || j.index != place || j.tracks != wantTracks || j.upNext?.marks != wantMarks
+            || j.upNext?.nextKey != state.nextKey {
+            note("History's tap: not the same queue, moved back to the row")
+        }
+        let drawnHistory = historyRows(queue)
+        let tappedAt = drawnHistory.firstIndex { $0.key == key } ?? 0
+        let was = drawnHistory[tappedAt...].map(\.key) + [playingKey(queue)] + aheadKeys(queue, mode)
+        let now = [playingKey(j)] + aheadKeys(j, mode)
+        if was != now { note("History's tap: drawn \(now) where \(was) was") }
+        let above = drawnHistory[..<tappedAt].map(\.key)
+        let nowHistory = historyRows(j).map(\.key)
+        if nowHistory.count < above.count || Array(nowHistory.suffix(above.count)) != above {
+            note("History's tap: History above it rewritten")
+        }
+        if !state.marks.contains(where: { $0.from == .one }) {
+            var w = queue
+            while w.index > place {
+                guard case .go(let index) = backward(w, position: 0) else { break }
+                w = wentBack(w, index)
+            }
+            if w.ids != j.ids || w.index != j.index || w.upNext != j.upNext { note("History's tap: not where Previous walks to") }
+            tally.walkedTo += 1
+        }
+    }
+
+    /// (2.1.18) Older rows brought back, as upnext.sim checks them: each row its own entry, first, in order - moved (the
+    /// entry it names, kept whole) while that is before History's floor, not a copy, of the row's song and after the
+    /// last moved; else a new song added - with its starts; then the queue from History's first row on, as it was
+    /// (outside Repeat One less its copies); drawn as they play - the rows, History's songs, the song that was playing,
+    /// then Up Next as it was; History empty, startedAt 0, the queue's id kept.
+    private func broughtRows(_ queue: UpNextQueue, _ j: UpNextQueue, _ rows: [Brought], from: Int, _ mode: Repeat,
+                             note: (String) -> Void, tally: inout Tally) {
+        guard let state = queue.upNext, let now = j.upNext else { return }
+        tally.brought += 1
+        let marks = state.marks
+        var last = -1
+        for (i, row) in rows.enumerated() {
+            let p = row.entry.flatMap { entry in marks.firstIndex { $0.key == entry } } ?? -1
+            let moves = p > last && p < from && marks[p].from != .one && queue.tracks[p].id == row.track.id
+            if moves { last = p }
+            guard i < now.marks.count else {
+                note("older row \(i): not in the queue")
+                continue
+            }
+            let mark = now.marks[i]
+            let right = moves
+                ? mark.key == marks[p].key && mark.from == marks[p].from && mark.at == marks[p].at && mark.pass == marks[p].pass
+                    && j.tracks[i] == queue.tracks[p]
+                : mark.from == .added && mark.key >= state.nextKey && mark.at == -1 && mark.pass == -1 && j.tracks[i] == row.track
+            if moves { tally.broughtMoved += 1 } else { tally.broughtNew += 1 }
+            if !right || mark.starts != row.starts { note("older row \(i): not \(moves ? "moved" : "a new song added") with its starts") }
+        }
+        let keeps = { (i: Int) -> Bool in i >= from && !(mode != .one && marks[i].from == .one) }
+        let rest = queue.tracks.indices.filter(keeps)
+        if j.tracks.count != rows.count + rest.count
+            || rest.enumerated().contains(where: { n, i in j.tracks[rows.count + n] != queue.tracks[i] || now.marks[rows.count + n] != marks[i] }) {
+            note("older rows: the queue after them not as it was")
+        }
+        let was = now.marks.prefix(rows.count).map(\.key) + historyRows(queue).map(\.key) + [playingKey(queue)] + aheadKeys(queue, mode)
+        let drawn = [playingKey(j)] + aheadKeys(j, mode)
+        if was != drawn { note("older rows: drawn \(drawn) where \(was) was") }
+        if now.startedAt != 0 || !historyRows(j).isEmpty || now.id != state.id {
+            note("older rows: History, startedAt or the queue's id not as they should be")
+        }
+    }
+
     /// (2.1.3) What upnext.sim checks after every step: startedAt at or before the song playing; History exactly the
     /// units Previous walks back through, down to its floor, by place and by song; every copy of its run's song; the
-    /// rows drawn on their side of the song playing, none twice, every song before the next time round drawn, and
-    /// every row reached by its tap.
+    /// rows drawn on their side of the song playing, none twice; (2.1.18) every song up to the furthest played and what
+    /// was drawn after it while it played drawn, whatever its time round, in order, each once - else every song before
+    /// the next time round; and every row reached by its tap.
     private func historyChecks(_ queue: UpNextQueue, _ mode: Repeat, op: Int, note: (String) -> Void, tally: inout Tally) {
         guard let state = queue.upNext else { return }
         let marks = state.marks
@@ -249,22 +390,26 @@ import Testing
             note("a row on the wrong side of the song playing")
         }
         if Set((view.history + ahead).map(\.key)).count != view.history.count + ahead.count { note("a row drawn twice") }
-        let shown = shownPass(queue)
-        var p = queue.index + 1
-        var want = 0
-        while p < marks.count && marks[p].from == .one { p += 1 }
-        while p < marks.count {
-            defer { p += 1 }
-            if marks[p].from == .one { continue }
-            if marks[p].from == .source && marks[p].pass != shown { break }
-            want += 1
+        //? the end of the time round shown from a place: past the copies after it, up to the first list song of another round
+        let end = { (q: UpNextQueue) -> Int in
+            let shown = shownPass(q)
+            let marks = q.upNext?.marks ?? []
+            var p = q.index + 1
+            while p < marks.count && marks[p].from == .one { p += 1 }
+            while p < marks.count && !(marks[p].from == .source && marks[p].pass != shown) { p += 1 }
+            return p
         }
+        let reachAt = state.reached.flatMap { reached in marks.firstIndex { $0.key == reached } } ?? -1
+        let stop = max(end(queue), reachAt > queue.index ? end(queue.at(reachAt)) : 0)
+        let want = (queue.index + 1..<max(stop, queue.index + 1)).filter { marks[$0].from != .one }.map { marks[$0].key }
         let pending = state.paged.map { max(0, $0.total - $0.fetched) } ?? 0
         let drawnCount = view.added.count + (view.list.map { $0.rows.count + $0.more - pending } ?? 0)
-        if drawnCount != want { note("Up Next draws \(drawnCount) of the \(want) songs before the next round") }
+        if drawnCount != want.count { note("Up Next draws \(drawnCount) of the \(want.count) songs to come") }
+        let every = aheadKeys(queue, mode)
+        if every != want { note("Up Next draws \(every) where \(want) play") }
         for row in ahead + view.history {
             tally.drawnChecked += 1
-            guard let jumped = jumpedTo(queue, row.key), jumped.queue.tracks[jumped.index] == row.track else {
+            guard let jumped = jumpedTo(queue, row.key, mode), jumped.queue.tracks[jumped.index] == row.track else {
                 note("row \(row.key) not reached by its tap")
                 break
             }
@@ -299,18 +444,36 @@ import Testing
         return nil
     }
 
-    /// export-traces.cjs's canonical line, FNV-1a'd.
+    /// export-traces.cjs's canonical line, FNV-1a'd - (2.1.18) with how far it had got, the starts each row brought back
+    /// carries, and the entries' levels.
     private func digest(_ queue: UpNextQueue) -> String {
         guard let state = queue.upNext else { return "" }
         let char: (MarkFrom) -> String = { $0 == .source ? "s" : $0 == .added ? "a" : "o" }
-        let line = [
+        let level: (Level?) -> String = { $0 == .album ? "a" : $0 == .track ? "t" : "-" }
+        //? each part on its own, its type spelled out: as one array literal CI's Xcode 26.6 gave up type-checking it
+        let marks: String = state.marks.map { (mark: Mark) -> String in
+            "\(mark.key)\(char(mark.from))\(mark.at)/\(mark.pass)"
+        }.joined(separator: ",")
+        let left: String = state.left.map { (each: LeftOut) -> String in "\(each.pass)/\(each.at)" }
+            .joined(separator: ",")
+        let reached: String = state.reached.map { (at: Int) -> String in String(at) } ?? ""
+        let starts: String = state.marks.compactMap { (mark: Mark) -> String? in
+            guard let each = mark.starts else { return nil }
+            return "\(mark.key):\(each.map { (moment: Int64) -> String in String(moment) }.joined(separator: "."))"
+        }.joined(separator: ",")
+        let levels: String = queue.tracks.map { (track: QueueTrack) -> String in level(track.level) }.joined()
+        let parts: [String] = [
             "\(queue.index)",
             queue.ids.joined(separator: ","),
-            state.marks.map { "\($0.key)\(char($0.from))\($0.at)/\($0.pass)" }.joined(separator: ","),
-            state.source.map(\.id).joined(separator: ","),
+            marks,
+            state.source.map { (song: QueueTrack) -> String in song.id }.joined(separator: ","),
             "\(state.shuffle ? 1 : 0),\(state.nextKey),\(state.startedAt)",
-            state.left.map { "\($0.pass)/\($0.at)" }.joined(separator: ","),
-        ].joined(separator: ";")
+            left,
+            reached,
+            starts,
+            levels,
+        ]
+        let line = parts.joined(separator: ";")
         var hash: UInt32 = 0x811c_9dc5
         for byte in line.utf8 {
             hash = (hash ^ UInt32(byte)) &* 0x0100_0193

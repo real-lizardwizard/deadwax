@@ -19,6 +19,14 @@
  * (2.1.3) A row's tap is recorded as jumpedTo's edit with the index it moves to (`index`), then the move (setIndex);
  * Previous as wentBack (startedAt following it down); History as historyRows, and in every view.
  *
+ * (2.1.18) A ROLL-BACK: jumpedTo takes the device's Repeat (`repeat`) and History's row is a `back` jump - the whole
+ * queue at the row; an older row's tap is broughtBack (its rows as [id, level, starts, entry], `floor` when given);
+ * heldStarts and shownKeys are queried. A state carries `reached` and `starts` ([key, moments] for each mark brought
+ * back) when the queue has them, and `levels` (a character an entry) when a song is at another level than the table's
+ * (a row's song, queued at the setting's level). The property loop and the round trip are resume.sim's and upnext.sim's
+ * new ones (2,000 runs, one in twenty a long album, older rows brought back; 1,000 runs, older rows every other one),
+ * their digests over `reached`, the starts and the levels too; every snapshot written v1 or v2 by snapshotVersion.
+ *
  * and two in Fixtures/resume/:
  *
  *   cases.json      resume.ts function by function: the window, relevel, the notice's words, savedLevels; toSave of
@@ -193,10 +201,15 @@ function pagedOf(paged) {
   return out
 }
 
+const LEVEL = { album: 'a', track: 't' }
+const levelChars = (tracks) => tracks.map((t) => LEVEL[t.level] ?? '-').join('')
+
 /** The queue as the Swift test compares it: ids for songs (the table has the rest), marks as resume's snapshot
- *  writes them. Without an Up Next account (EMPTY_QUEUE, a plain queue) only the index and the ids. */
-function stateOf(queue) {
+ *  writes them. Without an Up Next account (EMPTY_QUEUE, a plain queue) only the index and the ids. (2.1.18) With
+ *  `songs`, the entries' levels too (`levels`) whenever one isn't its song's in the table - a row brought back. */
+function stateOf(queue, songs) {
   const out = { index: queue.index, ids: queue.tracks.map((t) => t.id) }
+  if (songs && queue.tracks.some((t) => (t.level ?? null) !== (songs.byId.get(t.id)?.level ?? null))) out.levels = levelChars(queue.tracks)
   const state = queue.upNext
   if (!state) return out
   out.marks = state.marks.map((m) => [m.key, FROM[m.from], m.at, m.pass])
@@ -207,6 +220,10 @@ function stateOf(queue) {
   out.left = state.left.map((gone) => [gone.pass, gone.at])
   if (state.paged) out.paged = pagedOf(state.paged)
   if (state.pagedRounds) out.pagedRounds = state.pagedRounds.map((held) => ({ pass: held.pass, paged: pagedOf(held.paged) }))
+  //? (2.1.18) how far it had got, and the starts each row brought back carries
+  if (state.reached !== undefined) out.reached = state.reached
+  const starts = state.marks.filter((m) => m.starts !== undefined).map((m) => [m.key, [...m.starts]])
+  if (starts.length) out.starts = starts
   return out
 }
 
@@ -250,7 +267,7 @@ class Run {
   edit(fields, next) {
     const same = next === this.queue
     const entry = this.record({ ...fields, same })
-    if (!same) entry.state = stateOf(next)
+    if (!same) entry.state = stateOf(next, this.songs)
     this.queue = next
     return next
   }
@@ -276,13 +293,41 @@ class Run {
   movedKey(key, to) { return this.edit({ op: 'movedKey', key, to }, U.movedKey(this.queue, key, to)) }
   withoutAdded() { return this.edit({ op: 'withoutAdded' }, U.withoutAdded(this.queue)) }
   /** (2.1.3) A row's tap: its edit (or the same queue) recorded with the index to move to - the caller moves there
-   *  (setIndex), as the player does. The jump, or null. */
-  jumpedTo(key) {
-    const jump = U.jumpedTo(this.queue, key)
-    if (jump === null) { this.query({ op: 'jumpedTo', key }, null); return null }
-    this.edit({ op: 'jumpedTo', key, index: jump.index }, jump.queue)
+   *  (setIndex), as the player does; (2.1.18) under the device's Repeat, History's a roll-back (`back`). The jump, or
+   *  null. */
+  jumpedTo(key, repeat = 'off') {
+    const jump = U.jumpedTo(this.queue, key, repeat)
+    if (jump === null) { this.query({ op: 'jumpedTo', key, repeat }, null); return null }
+    this.edit({ op: 'jumpedTo', key, repeat, index: jump.index, back: jump.back === true }, jump.queue)
     return jump
   }
+  /** (2.1.18) An older row's tap: the rows brought back - each [id, level (null for none), starts, entry] - under the
+   *  device's Repeat, `floor` the first entry drawn when given. Every row's song must be in the table by its id (at
+   *  any level). The jump, or null. */
+  broughtBack(rows, repeat = 'off', floor) {
+    for (const row of rows) if (!this.songs.byId.has(row.track.id)) throw new Error(`broughtBack: no song ${row.track.id} in the table`)
+    const fields = { op: 'broughtBack', rows: rows.map((row) => [row.track.id, row.track.level ?? null, [...row.starts], row.entry]), repeat }
+    if (floor !== undefined) fields.floor = floor
+    const jump = U.broughtBack(this.queue, rows, repeat, floor)
+    if (jump === null) { this.query(fields, null); return null }
+    this.edit({ ...fields, index: jump.index, back: jump.back === true }, jump.queue)
+    return jump
+  }
+  /** (2.1.18) The starts the queue holds as rows brought back, as [id, moment] - and the keys its rows stand for. */
+  heldStarts(limit) {
+    const fields = { op: 'heldStarts' }
+    if (limit !== undefined) fields.limit = limit
+    const held = limit === undefined ? U.heldStarts(this.queue) : U.heldStarts(this.queue, limit)
+    return this.query(fields, held.map(({ id, at }) => [id, at]))
+  }
+  shownKeys(limit) {
+    const fields = { op: 'shownKeys' }
+    if (limit !== undefined) fields.limit = limit
+    const keys = limit === undefined ? U.shownKeys(this.queue) : U.shownKeys(this.queue, limit)
+    return this.query(fields, [...keys].sort((a, b) => a - b))
+  }
+  /** A fresh generator for the next op, its first number let go (the sims' `random()` after seeded(n)). */
+  seededPast(seed) { const generator = new ParkMiller(seed); generator.int(); this.tape = new Tape(generator); return this }
   /** (2.1.3) Previous's move: startedAt following it down before where listening began. */
   wentBack(index) { return this.edit({ op: 'wentBack', index }, U.wentBack(this.queue, index)) }
   /** (scenarios) the sim's previous(): backward early, then wentBack. */
@@ -314,6 +359,10 @@ class Run {
         left: state.left.map(([pass, at]) => ({ pass, at })),
       },
     }
+    if (state.paged || state.pagedRounds || state.levels) throw new Error('set: paged rounds and levels are not made by hand')
+    //? (2.1.18) how far it had got, and the starts each row brought back carries
+    if (state.reached !== undefined) queue.upNext.reached = state.reached
+    for (const [key, starts] of state.starts ?? []) queue.upNext.marks.find((m) => m.key === key).starts = [...starts]
     this.ops.push({ op: 'set', state })
     this.queue = queue
     return queue
@@ -394,8 +443,9 @@ function trace(seed, songs) {
     const keys = rowKeys()
     return keys.length && chance(0.85) ? keys[pick(keys.length)] : pick((run.queue.upNext?.nextKey ?? 0) + 2)
   }
+  //? (2.1.18) a song of the queue's as the table holds it: a row brought back may be at another level
   const added = (kind) => Array.from({ length: 1 + pick(2) }, () => {
-    if (chance(0.2) && run.queue.tracks.length) return run.queue.tracks[pick(run.queue.tracks.length)]
+    if (chance(0.2) && run.queue.tracks.length) return songs.byId.get(run.queue.tracks[pick(run.queue.tracks.length)].id)
     return song(`${['m', 'd', 'x'][pick(3)]}${kind}${extra++}`)
   })
 
@@ -411,17 +461,42 @@ function trace(seed, songs) {
     else if (op === 6) { repeat = repeatOf(); run.withRepeat(repeat); run.toppedUp(repeat) }
     else if (op === 7) run.toppedUp(repeat)
     else if (op === 8) {
-      //? (2.1.3) now and then a row of History's
       const history = U.historyRows(run.queue)
-      const jump = run.jumpedTo(history.length && chance(0.3) ? history[pick(history.length)].key : someKey())
-      if (jump !== null) run.setIndex(jump.index)
+      const marks = run.queue.upNext?.marks
+      if (marks && Q.current(run.queue) && chance(0.3)) {
+        //? (2.1.18) older rows brought back: entries of the queue's (at their own level or another) and songs from
+        //? elsewhere, entries named that it hasn't; a floor as Up Next passes it, none, or any key
+        const rows = Array.from({ length: 1 + pick(3) }, (_, i) => {
+          const starts = Array.from({ length: 1 + pick(2) }, (_, k) => seed * 100_000 + step * 10 + i * 3 + k)
+          if (chance(0.6)) {
+            const p = pick(run.queue.tracks.length)
+            const own = songs.byId.get(run.queue.tracks[p].id)
+            const track = chance(0.3) ? { ...own, level: ['album', 'track', undefined][pick(3)] } : own
+            return { track, starts, entry: marks[p].key }
+          }
+          return { track: song(`${['m', 'd', 'x'][pick(3)]}o${extra++}`), starts, entry: chance(0.5) ? null : run.queue.upNext.nextKey + 5 }
+        })
+        const floorDraw = driver.next()
+        const floor = floorDraw < 0.4 ? undefined : floorDraw < 0.8 ? (history[0]?.key ?? marks[run.queue.index].key) : pick(run.queue.upNext.nextKey + 2)
+        run.broughtBack(rows, repeat, floor)
+      } else {
+        //? (2.1.3) now and then a row of History's - (2.1.18) a roll-back
+        const jump = run.jumpedTo(history.length && chance(0.3) ? history[pick(history.length)].key : someKey(), repeat)
+        if (jump !== null) run.setIndex(jump.index)
+      }
     } else if (op === 9) { const next = run.onward(); if (next !== null) run.setIndex(next); run.toppedUp(repeat) }
     else if (op === 10) { const next = run.nextIndex(); if (next !== null) run.setIndex(next); run.toppedUp(repeat) }
     else if (op === 11) {
       const action = run.backward([0, 1, 3, 3.5, 40][pick(5)])
       if (action.kind === 'go') run.wentBack(action.index)
     } else if (op === 12) run.pastCopies(run.queue.index + pick(2))
-    else if (op === 13) run.shownPass()
+    else if (op === 13) {
+      run.shownPass()
+      //? (2.1.18) what the queue's rows stand for, and the starts it holds
+      const limit = [1, 3, 100][pick(3)]
+      run.shownKeys(limit)
+      run.heldStarts(limit)
+    }
     else if (op === 14) run.view(['off', 'all', 'one'][pick(3)], [1, 3, 100][pick(3)])
     else {
       const paged = run.queue.upNext.paged
@@ -992,7 +1067,7 @@ scenario('(2.1.3 review) a unit is one song: Shuffle and Repeat take a list song
   r.withRepeat('one')
   r.view('one')
 })
-scenario('(2.1.3) History\'s tap: the song again, then Up Next as it was', (r, { album, track }) => {
+scenario('(2.1.3; 2.1.18) History\'s tap: rolled back to, then Up Next as it was', (r, { album, track }) => {
   r.start(album(9), 0)
   r.setIndex(6)
   r.withNext([track('a')])
@@ -1008,12 +1083,12 @@ scenario('(2.1.3) History\'s tap: the song again, then Up Next as it was', (r, {
   r.setIndex(2)
   r.toppedUp('one')
   r.keep('one')
-  r.setIndex(r.jumpedTo(r.queue.upNext.marks[0].key).index)
+  r.setIndex(r.jumpedTo(r.queue.upNext.marks[0].key, 'one').index)
   r.toppedUp('one')
   r.use('one')
-  r.jumpedTo(r.queue.upNext.marks[2].key)
-  r.jumpedTo(r.queue.upNext.marks[3].key)
-  r.jumpedTo(99)
+  r.jumpedTo(r.queue.upNext.marks[2].key, 'one')
+  r.jumpedTo(r.queue.upNext.marks[3].key, 'one')
+  r.jumpedTo(99, 'one')
   r.start(album(12), 4)
   r.setIndex(6)
   r.jumpedTo(r.queue.upNext.marks[1].key)
@@ -1026,7 +1101,7 @@ scenario('(2.1.3) History\'s tap: the song again, then Up Next as it was', (r, {
   r.toppedUp('all')
   r.ended()
   r.toppedUp('all')
-  r.setIndex(r.jumpedTo(r.queue.upNext.marks[0].key).index)
+  r.setIndex(r.jumpedTo(r.queue.upNext.marks[0].key, 'all').index)
   r.withRepeat('off')
 })
 scenario('(2.1.3) Shuffle off after a jump in a shuffle: the album from that song\'s place', (r, { album }) => {
@@ -1049,6 +1124,194 @@ scenario('(2.1.3) Previous across songs added: the list drawn through them, rows
   r.withoutAdded()
   r.setIndex(r.jumpedTo(r.keyOf('5')).index)
   r.view('off')
+})
+
+// (2.1.18) History's tap rolls back, older rows brought back (upnext.sim.cjs's 2.1.18 section)
+scenario('(2.1.18) James\'s: A to D played, songs added waiting - tap B: B, C, D, the songs added, the rest', (r, { track }) => {
+  r.start(['A', 'B', 'C', 'D', 'E', 'F'].map((id) => track(id)), 0)
+  r.setIndex(3)
+  r.withNext([track('n1'), track('n2')])
+  r.jumpedTo(r.queue.upNext.marks[1].key, 'off')
+  r.view('off')
+  r.keep('b')
+  r.previous()
+  r.use('b')
+  r.setIndex(r.onward())
+  r.use('b')
+  for (let i = 0; i < 6; i++) r.ended()
+  r.historyRows()
+  r.use('b')
+  r.withoutAdded()
+  r.shownKeys()
+  r.setIndex(2)
+  r.jumpedTo(r.queue.upNext.marks[0].key, 'off')
+  r.view('off')
+  r.setIndex(r.jumpedTo(r.keyOf('E'), 'off').index)
+})
+scenario('(2.1.18) tap 3 with 7 playing: where Previous, four times, lands', (r, { album }) => {
+  r.start(album(9), 0)
+  r.setIndex(6)
+  r.keep('q')
+  for (let i = 0; i < 4; i++) r.previous()
+  r.use('q')
+  r.jumpedTo(r.queue.upNext.marks[2].key, 'off')
+})
+scenario('(2.1.18) Repeat One\'s copies kept by a roll-back under Repeat One, let go outside it', (r, { album }) => {
+  r.start(album(4), 0)
+  r.setIndex(1)
+  r.toppedUp('one')
+  r.ended(); r.toppedUp('one'); r.ended(); r.toppedUp('one')
+  r.withRepeat('off'); r.toppedUp('off')
+  r.setIndex(r.onward())
+  r.withRepeat('one'); r.toppedUp('one')
+  r.keep('one')
+  const two = r.queue.upNext.marks[1].key
+  r.jumpedTo(two, 'one')
+  r.use('one')
+  r.withRepeat('off'); r.toppedUp('off')
+  r.jumpedTo(two, 'off')
+  r.view('off')
+  r.use('one')
+  r.jumpedTo(r.queue.upNext.marks[4].key, 'one')
+  r.jumpedTo(r.queue.upNext.marks[5].key, 'one')
+  r.start(album(12), 4)
+  r.setIndex(6)
+  r.jumpedTo(r.queue.upNext.marks[1].key, 'off')
+  r.start(album(80), 0)
+  r.setIndex(70)
+  r.jumpedTo(r.queue.upNext.marks[19].key, 'off')
+  r.jumpedTo(r.queue.upNext.marks[20].key, 'off')
+  r.view('off')
+  r.historyRows()
+})
+scenario('(2.1.18) Repeat All: a roll-back into the earlier round - Repeat, Edit and Shuffle after it', (r, { album }) => {
+  r.start(album(3), 0)
+  r.setIndex(2)
+  r.toppedUp('all')
+  r.ended(); r.toppedUp('all'); r.ended(); r.toppedUp('all')
+  r.jumpedTo(r.queue.upNext.marks[0].key, 'all')
+  r.view('all')
+  r.keep('back')
+  const reach = r.queue.upNext.reached
+  const secondOne = r.queue.upNext.marks[3].key
+  r.withRepeat('off')
+  r.view('off')
+  r.use('back')
+  r.withRepeat('one'); r.toppedUp('one')
+  r.use('back')
+  r.movedKey(secondOne, 0)
+  r.view('all')
+  r.use('back')
+  r.withoutKey(reach)
+  r.view('all')
+  r.use('back')
+  r.movedKey(reach, 0)
+  r.view('all')
+  r.use('back')
+  r.seeded(5).withShuffle(true)
+  r.view('all')
+  r.keep('on')
+  r.withShuffle(false)
+  r.withRepeat('off')
+  r.use('on')
+  r.withRepeat('off')
+  for (let seed = 1; seed <= 12; seed++) { r.use('back'); r.seededPast(seed).withShuffle(true) }
+})
+scenario('(2.1.18) Repeat One\'s copies in the later round shuffled with their song', (r, { album }) => {
+  r.start(album(3), 0)
+  r.setIndex(2)
+  r.toppedUp('all')
+  r.ended(); r.withRepeat('one'); r.toppedUp('one')
+  r.ended(); r.toppedUp('one'); r.ended(); r.toppedUp('one')
+  r.setIndex(r.onward()); r.toppedUp('one')
+  r.jumpedTo(r.queue.upNext.marks[1].key, 'one')
+  r.keep('tapped')
+  for (let seed = 1; seed <= 4; seed++) { r.use('tapped'); r.seeded(seed).withShuffle(true) }
+  r.withShuffle(false)
+})
+scenario('(2.1.18) past Up Next\'s 100: the later round\'s songs moved back down, held by the queue whatever Shuffle does', (r, { album }) => {
+  //? played round to the second time's 10 - as the sim's song-by-song walk makes it, recorded as the state it
+  //? reaches (210 ops of it made the fixture three times the size)
+  let walked = U.toppedUp(U.startUpNext(album(200), 149, false, undefined, undefined, 'walk'), 'all')
+  while (walked.index < 209) walked = U.toppedUp({ ...walked, index: walked.index + 1 }, 'all')
+  r.start(album(200), 149)
+  r.set(stateOf(walked))
+  r.jumpedTo(r.queue.upNext.marks[199].key, 'all')
+  r.shownKeys()
+  r.keep('tapped')
+  for (let seed = 11; seed <= 13; seed++) { r.use('tapped'); r.seeded(seed).withShuffle(true); r.shownKeys(); r.heldStarts() }
+})
+scenario('(2.1.18) a shuffle rolled back keeps its order; Shuffle on after an album rolled back', (r, { album, track }) => {
+  r.seeded(3).start(album(6), 0, true)
+  r.setIndex(4)
+  r.jumpedTo(r.queue.upNext.marks[1].key, 'off')
+  r.start(album(6), 0)
+  r.setIndex(4)
+  r.withNext([track('a')])
+  r.jumpedTo(r.queue.upNext.marks[1].key, 'off')
+  r.seeded(4).withShuffle(true)
+})
+scenario('(2.1.18) older rows brought back: another queue\'s and this one\'s past History\'s 50, each its own entry', (r, { track }) => {
+  const list = r.tracks(Array.from({ length: 80 }, (_, i) => `${i + 1}`), (id) => simTrack(id, { level: 'album' }))
+  r.start(list, 0)
+  r.setIndex(70)
+  r.keep('q')
+  const q = r.queue
+  const rows = Array.from({ length: 20 }, (_, i) => ({ track: { ...q.tracks[i], level: 'track' }, starts: [1000 + i], entry: q.upNext.marks[i].key }))
+  const elsewhere = { track: track('z', { album: 'Dummy', albumId: 'dum', level: 'track' }), starts: [900, 901], entry: null }
+  r.broughtBack([elsewhere, ...rows], 'off')
+  r.view('off', 1000)
+  r.view('off')
+  r.historyRows()
+  r.backward(0)
+  r.heldStarts()
+  r.shownKeys()
+  r.use('q')
+  r.broughtBack([rows[12]], 'off')
+  r.use('q')
+  r.broughtBack([rows[2], rows[0]], 'off')
+  r.use('q')
+  r.broughtBack([], 'off')
+  r.empty()
+  r.broughtBack(rows, 'off')
+})
+scenario('(2.1.18) a library\'s shuffle rolled back to an older row: its pages carry on', (r, { album, track }) => {
+  r.start(album(3, 'p'), 0, false, { token: 't1', total: 40, fetched: 3, scope: 'yours' })
+  r.setIndex(2)
+  r.broughtBack([{ track: track('old'), starts: [5], entry: null }], 'off')
+  r.withMore('t1', album(2, 'q'))
+  r.view('off')
+})
+scenario('(2.1.18 review) a tap racing the engine\'s catch-up: the floor drawn keeps the queue from there', (r, { album }) => {
+  r.start(album(80), 0)
+  r.setIndex(59)
+  const floor = U.historyRows(r.queue)[0].key
+  const rows = [4, 5, 6, 7, 8].map((i) => ({ track: r.queue.tracks[i], starts: [2000 + i], entry: r.queue.upNext.marks[i].key }))
+  r.setIndex(60)
+  r.keep('caught')
+  r.broughtBack(rows, 'off', floor)
+  r.use('caught')
+  r.broughtBack(rows, 'off')
+  r.use('caught')
+  r.broughtBack(rows, 'off', U.historyRows(r.queue)[0].key)
+  r.use('caught')
+  r.broughtBack(rows, 'off', r.queue.upNext.marks[70].key)
+  r.use('caught')
+  r.broughtBack(rows, 'off', 999)
+})
+scenario('(2.1.18) Previous names how far it had got; Repeat One keeps a later round Previous walked back from', (r, { album }) => {
+  r.start(album(12), 4)
+  r.setIndex(6)
+  r.wentBack(5)
+  r.wentBack(4)
+  r.start(album(2), 0)
+  r.setIndex(1)
+  r.toppedUp('all')
+  r.ended(); r.toppedUp('all')
+  r.withRepeat('one'); r.toppedUp('one')
+  r.previous(); r.toppedUp('one')
+  r.withRepeat('one')
+  r.view('one')
 })
 
 /* ===== the words and the constants ===== */
@@ -1078,7 +1341,7 @@ const constants = {
   REPEATS: U.REPEATS, RESTART_AFTER_SECONDS: Q.RESTART_AFTER_SECONDS, HISTORY_BACK: U.HISTORY_BACK,
 }
 
-/* ===== upnext.sim.cjs's property loop (:207-262), its every call as there, each run's last queue digested ===== */
+/* ===== upnext.sim.cjs's property loop (:237-460), its every call as there, each run's last queue digested ===== */
 
 /** 32-bit FNV-1a over the canonical line's character codes (ASCII), as eight hex digits. */
 function fnv1a(text) {
@@ -1090,7 +1353,8 @@ function fnv1a(text) {
   return hash.toString(16).padStart(8, '0')
 }
 
-/** The line the Swift test builds the same way: index; ids; marks; source; shuffle, nextKey, startedAt; left. */
+/** The line the Swift test builds the same way: index; ids; marks; source; shuffle, nextKey, startedAt; left -
+ *  (2.1.18) reached (empty for none); each mark's starts, key:moments; the entries' levels. */
 function canonical(queue) {
   const s = queue.upNext
   return [
@@ -1100,6 +1364,9 @@ function canonical(queue) {
     s.source.map((t) => t.id).join(','),
     `${s.shuffle ? 1 : 0},${s.nextKey},${s.startedAt}`,
     s.left.map((gone) => `${gone.pass}/${gone.at}`).join(','),
+    `${s.reached ?? ''}`,
+    s.marks.filter((m) => m.starts !== undefined).map((m) => `${m.key}:${m.starts.join('.')}`).join(','),
+    levelChars(queue.tracks),
   ].join(';')
 }
 
@@ -1110,16 +1377,26 @@ function propertyDigests() {
   const album = (n) => Array.from({ length: n }, (_, i) => simTrack(`${i + 1}`))
   const at = (queue, index) => ({ ...queue, index })
   const ended = (queue) => ({ ...queue, index: Math.min(queue.index + 1, queue.tracks.length - 1) })
+  //? (2.1.18) the key of the unit playing; where History's rows begin (upnext.sim's playingKey and firstShown)
+  const playingKey = (q) => { let p = q.index; while (p > 0 && q.upNext.marks[p].from === 'one') p--; return q.upNext.marks[p].key }
+  const firstShown = (q) => {
+    const rows = U.historyRows(q)
+    if (rows.length) return q.upNext.marks.findIndex((m) => m.key === rows[0].key)
+    return q.upNext.marks.findIndex((m) => m.key === playingKey(q))
+  }
   const digests = []
   for (let run = 0; run < PROPERTY_RUNS; run++) {
     const random = seeded(run + 1)
     const pick = (n) => Math.floor(random() * n)
-    const size = 1 + pick(6)
+    //? (2.1.18) the seed's first draw let go, and one run in twenty a long album
+    random()
+    const long = run % 20 === 7
+    const size = long ? 55 + pick(20) : 1 + pick(6)
     let repeat = U.REPEATS[pick(3)]
     let queue = U.toppedUp(U.startUpNext(album(size), random() < 0.3 ? null : pick(size), random() < 0.5, random), repeat, random)
     let extra = 0
     for (let step = 0; step < PROPERTY_STEPS; step++) {
-      const op = pick(14)
+      const op = pick(15)
       const rowKeys = () => queue.upNext.marks.slice(queue.index + 1).map((m) => m.key)
       const someKey = () => { const keys = rowKeys(); return keys.length && random() < 0.85 ? keys[pick(keys.length)] : pick(queue.upNext.nextKey + 2) }
       if (op === 0) queue = U.withNext(queue, Array.from({ length: 1 + pick(2) }, () => simTrack(`n${extra++}`)))
@@ -1136,8 +1413,25 @@ function propertyDigests() {
           const drawnHistory = U.historyRows(queue)
           const key = op === 12 && drawnHistory.length ? drawnHistory[pick(drawnHistory.length)].key
             : random() < 0.5 ? someKey() : queue.upNext.marks[pick(queue.upNext.marks.length)].key
-          const jumped = U.jumpedTo(queue, key)
-          if (jumped) queue = at(jumped.queue, jumped.index)
+          const jumped = U.jumpedTo(queue, key, repeat)
+          //? (2.1.18) History's: a roll-back, the queue already at the row
+          if (jumped?.back) queue = jumped.queue
+          else if (jumped) queue = at(jumped.queue, jumped.index)
+        } else if (op === 14) {
+          //? (2.1.18) older rows of the play history brought back, oldest first, their songs as UpNext.tsx passes them
+          const from = firstShown(queue)
+          const { marks } = queue.upNext
+          const rows = Array.from({ length: 1 + pick(4) }, (_, i) => {
+            const starts = Array.from({ length: 1 + pick(2) }, (_, k) => run * 1000 + step * 10 + i * 3 + k)
+            if (random() < 0.6) {
+              const p = pick(Math.max(1, random() < 0.8 ? from : queue.tracks.length))
+              return { track: random() < 0.9 ? { ...queue.tracks[p], level: random() < 0.5 ? 'album' : 'track' } : simTrack(`x${extra++}`), starts, entry: marks[p].key }
+            }
+            return { track: simTrack(`p${extra++}`), starts, entry: random() < 0.5 ? null : queue.upNext.nextKey + 5 }
+          })
+          const jump = U.broughtBack(queue, rows, repeat)
+          if (!jump || !jump.back || jump.index !== 0 || jump.queue.index !== 0) throw new Error(`property run ${run} step ${step}: older rows not a roll-back`)
+          queue = jump.queue
         } else if (op === 9) { const next = U.onward(queue); if (next !== null) queue = at(queue, next) }
         else if (op === 13) {
           const b = U.backward(queue, 0)
@@ -1272,6 +1566,10 @@ function queueRecord(queue, songs, madeFrom = null) {
   }
   if (state.paged) out.upNext.paged = pagedOf(state.paged)
   if (state.pagedRounds) out.upNext.pagedRounds = state.pagedRounds.map((held) => ({ pass: held.pass, paged: pagedOf(held.paged) }))
+  //? (2.1.18) how far it had got, and the starts each row brought back carries
+  if (state.reached !== undefined) out.upNext.reached = state.reached
+  const starts = state.marks.filter((m) => m.starts !== undefined).map((m) => [m.key, [...m.starts]])
+  if (starts.length) out.upNext.starts = starts
   return out
 }
 
@@ -1279,7 +1577,10 @@ function queueRecord(queue, songs, madeFrom = null) {
  * Snapshot v1 written out by hand, key by key, as Resume.swift's toSave writes it - the form the phone was built
  * to: keys in this order; `extra`'s songs with their four nullable fields written as null, the source's songs
  * outside the window only, the first of each id, none named as Object.prototype's own (`id in extra`), the keys
- * JavaScript lists first (array indexes) first; `paged`, its `level` and `pagedRounds` left out when absent. Every
+ * JavaScript lists first (array indexes) first; `paged`, its `level` and `pagedRounds` left out when absent;
+ * (2.1.18) `v` 2 whenever a reader before the roll-back would read it wrong (snapshotVersion), `reached` while it is
+ * after the song playing in the window, and `starts` - [key, moments] for the window's marks that carry some - last,
+ * each left out when there is none. Every
  * snapshot recorded must be this text: a change of the form stops the export here rather than reaching the phone
  * as a mismatch.
  */
@@ -1301,14 +1602,21 @@ function referenceSnapshot(queue) {
     `"suffix":${q(t.suffix)},"sampleRate":${q(t.sampleRate)},"bitDepth":${q(t.bitDepth)},"channels":${q(t.channels)}}`
   const paged = (p) => `{"token":${q(p.token)},"total":${q(p.total)},"fetched":${q(p.fetched)},"scope":${q(p.scope)}` +
     `${p.level !== undefined ? `,"level":${q(p.level)}` : ''}}`
-  return `{"v":1,"id":${q(state.id)},"levels":${q(entries.map(char).join(''))},` +
-    `"marks":[${state.marks.slice(start, end).map((m) => `[${m.key},"${FROM[m.from]}",${m.at},${m.pass}]`).join(',')}],` +
+  const marks = state.marks.slice(start, end)
+  const index = queue.index - start
+  const reachedAt = marks.findIndex((m) => m.key === state.reached)
+  const starts = marks.filter((m) => m.starts?.length)
+  const v = reachedAt > index || starts.length ? 2 : marks.some((m, place) => place <= index && m.from === 'source') ? 1 : 2
+  return `{"v":${v},"id":${q(state.id)},"levels":${q(entries.map(char).join(''))},` +
+    `"marks":[${marks.map((m) => `[${m.key},"${FROM[m.from]}",${m.at},${m.pass}]`).join(',')}],` +
     `"source":[${state.source.map((t) => q(t.id)).join(',')}],"sourceLevels":${q(state.source.map(char).join(''))},` +
     `"extra":{${keys.map((key) => `${q(key)}:${song(kept.get(key))}`).join(',')}},` +
     `"shuffle":${q(state.shuffle)},"nextKey":${q(state.nextKey)},"startedAt":${q(Math.max(0, state.startedAt - start))},` +
     `"left":[${state.left.map((gone) => `[${gone.pass},${gone.at}]`).join(',')}]` +
     `${state.paged ? `,"paged":${paged(state.paged)}` : ''}` +
-    `${state.pagedRounds ? `,"pagedRounds":[${state.pagedRounds.map((held) => `{"pass":${q(held.pass)},"paged":${paged(held.paged)}}`).join(',')}]` : ''}}`
+    `${state.pagedRounds ? `,"pagedRounds":[${state.pagedRounds.map((held) => `{"pass":${q(held.pass)},"paged":${paged(held.paged)}}`).join(',')}]` : ''}` +
+    `${reachedAt > index ? `,"reached":${q(state.reached)}` : ''}` +
+    `${starts.length ? `,"starts":[${starts.map((m) => `[${m.key},[${m.starts.map((at) => q(at)).join(',')}]]`).join(',')}]` : ''}}`
 }
 
 /** (2.1.15) A queue id given by hand (startUpNext's `id`), where the Swift test makes the same queue itself - the
@@ -1318,7 +1626,8 @@ const QUEUE_ID = 'mhyx7k2c-a1b2c3d4'
  *  phone still reads (a new id given, or the held queue's: fromSnapshot's `holding`). */
 const withoutId = (snapshot, id) => {
   const member = `"id":${JSON.stringify(id)},`
-  if (!snapshot.startsWith(`{"v":1,${member}`)) throw new Error('a snapshot without its id second')
+  //? (2.1.18) v1 or v2
+  if (!snapshot.startsWith(`{"v":1,${member}`) && !snapshot.startsWith(`{"v":2,${member}`)) throw new Error('a snapshot without its id second')
   return snapshot.replace(member, '')
 }
 
@@ -1420,7 +1729,7 @@ saveCase('Repeat One over two songs (Normalization Off): a copy\'s at its origin
 {
   let shuffled = U.startUpNext(rAlbum(7, 'h'), 2, true, parkMiller(77))
   shuffled = U.withoutKey(shuffled, shuffled.upNext.marks[4].key)
-  const jumped = U.jumpedTo(shuffled, shuffled.upNext.marks[5].key)
+  const jumped = U.jumpedTo(shuffled, shuffled.upNext.marks[5].key, 'off')
   shuffled = atIndex(jumped.queue, jumped.index)
   shuffled = U.toppedUp(U.withRepeat(shuffled, 'all'), 'all', parkMiller(78))
   saveCase('Shuffle on, songs left out of a round, Repeat All\'s next round shuffled', shuffled, 100.25)
@@ -1478,6 +1787,54 @@ saveCase('Repeat One over two songs (Normalization Off): a copy\'s at its origin
 }
 saveCase('120 songs played at 100: 50 before, `extra` the 50 before them', atIndex(U.startUpNext(rAlbum(120, 'w'), 30), 100), 42)
 
+// (2.1.18) a roll-back's account (resume.sim.cjs's 2.1.18 checks): written only when there is one, v2 whenever a reader
+// before 2.1.18 would read the queue wrong, read back strictly
+{
+  const plain = U.startUpNext(rAlbum(6, 'rb'), 0, false, undefined, undefined, QUEUE_ID)
+  const playedOn = atIndex(plain, 4)
+  const rolledBack = U.jumpedTo(playedOn, playedOn.upNext.marks[1].key, 'off').queue
+  saveCase('(2.1.18) rolled back from 5 to 2: v2, how far it had got', rolledBack, 0)
+  saveCase('(2.1.18) ...played on past where it had got: v1, neither key', atIndex(rolledBack, 5), 0)
+  saveCase('(2.1.18) never rolled back, Playing Next: v1', U.withNext(plain, [rTrack('rbn')]), 0)
+  const brought = U.broughtBack(playedOn, [{ track: rTrack('rbx'), starts: [11, 12], entry: null }], 'off').queue
+  const saving = saveCase('(2.1.18) an older row brought back: v2, how far it had got and its starts, by key', brought, 0)
+  const tracks = brought.tracks.map(bareTrack)
+  const xKey = brought.upNext.marks[0].key
+  const edited = (base, edit) => { const snapshot = JSON.parse(base); edit(snapshot); return JSON.stringify(snapshot) }
+  for (const [label, edit] of [
+    ['starts not a list', (x) => { x.starts = {} }], ['starts null', (x) => { x.starts = null }], ['starts empty', (x) => { x.starts = [] }],
+    ['an entry not a pair', (x) => { x.starts = [[xKey]] }], ['an entry of three', (x) => { x.starts = [[xKey, [1], 2]] }],
+    ['an entry not a list', (x) => { x.starts = [xKey] }], ['moments not a list', (x) => { x.starts = [[xKey, 1]] }],
+    ['no moments', (x) => { x.starts = [[xKey, []]] }], ['a moment 1.5', (x) => { x.starts = [[xKey, [1.5]]] }],
+    ['a moment -1', (x) => { x.starts = [[xKey, [-1]]] }], ['a moment "1"', (x) => { x.starts = [[xKey, ['1']]] }],
+    ['a moment null', (x) => { x.starts = [[xKey, [null]]] }], ['a moment 0', (x) => { x.starts = [[xKey, [0]]] }],
+    ['a moment past 2^53', (x) => { x.starts = [[xKey, [2 ** 60]]] }], ['a key it hasn\'t', (x) => { x.starts = [[99, [1]]] }],
+    ['a key twice', (x) => { x.starts = [[xKey, [1]], [xKey, [2]]] }], ['a key "0"', (x) => { x.starts = [[String(xKey), [1]]] }],
+    ['a key 1.5', (x) => { x.starts = [[1.5, [1]]] }], ['the song playing\'s and another\'s', (x) => { x.starts = [[xKey, [1]], [x.marks[1][0], [2, 3]]] }],
+    ['reached "far"', (x) => { x.reached = 'far' }], ['reached 1.5', (x) => { x.reached = 1.5 }], ['reached null', (x) => { x.reached = null }],
+    ['reached at the song playing', (x) => { x.reached = xKey }], ['reached a key it hasn\'t', (x) => { x.reached = 999 }],
+    ['reached left out', (x) => { delete x.reached }], ['starts left out', (x) => { delete x.starts }],
+    ['as v1', (x) => { x.v = 1 }], ['as v3', (x) => { x.v = 3 }],
+  ]) fromCase(`(2.1.18) an older row's snapshot, ${label}`, edited(saving.snapshot, edit), tracks, 0)
+  const one = U.toppedUp(U.broughtBack(playedOn, [{ track: rTrack('rbx'), starts: [11], entry: null }], 'off').queue, 'one')
+  const oneSaving = saveCase('(2.1.18) ...under Repeat One: its copies carry none', one, 0)
+  fromCase('(2.1.18) ...starts on a copy\'s key', edited(oneSaving.snapshot, (x) => { x.starts = [[one.upNext.marks[1].key, [5]]] }), one.tracks.map(bareTrack), 0)
+  fromCase('(2.1.18) ...reached a copy\'s key', edited(oneSaving.snapshot, (x) => { x.reached = one.upNext.marks[1].key }), one.tracks.map(bareTrack), 0)
+  const levelledBack = U.jumpedTo(atIndex(U.startUpNext(rAlbum(4, 'rl', { level: 'album' }), 0, false, undefined, undefined, QUEUE_ID), 3), 1, 'off').queue
+  saveCase('(2.1.18) rolled back, the songs at the album level', levelledBack, 0)
+  //? the kinds a reader before 2.1.18 reads wrong: older rows from another queue, a roll-back across Repeat All's rounds,
+  //? and no list song at or before the song playing
+  const abc = U.startUpNext(['A', 'B', 'C', 'D', 'E', 'F'].map((id) => rTrack(`rb${id}`)), 0, false, undefined, undefined, QUEUE_ID)
+  const other = (id, starts) => ({ track: rTrack(`rb${id}`, { album: 'Dummy', albumId: 'dum' }), starts, entry: null })
+  saveCase('(2.1.18) older rows from another queue (X Y, then the album): v2', U.broughtBack(abc, [other('X', [5]), other('Y', [6])], 'off').queue, 30)
+  let rounds = U.toppedUp(atIndex(U.startUpNext(['A', 'B', 'C'].map((id) => rTrack(`rr${id}`)), 0, false, undefined, undefined, QUEUE_ID), 2), 'all')
+  rounds = U.toppedUp(atIndex(rounds, U.onward(rounds)), 'all')
+  rounds = U.toppedUp(atIndex(rounds, U.onward(rounds)), 'all')
+  saveCase('(2.1.18) rolled back across Repeat All\'s rounds: v2', U.jumpedTo(rounds, rounds.upNext.marks[1].key, 'all').queue, 30)
+  const added60 = atIndex(U.withNext(U.startUpNext(rAlbum(3, 'ra', { level: 'album' }), 0, false, undefined, undefined, QUEUE_ID), rAlbum(60, 'rn', { level: 'track' })), 55)
+  saveCase('(2.1.18) 60 songs played next, the 55th playing - no list song at or before it: v2', added60, 30)
+}
+
 // toSave from recipes (too big to keep as queues): resume.sim.cjs:276 and :281, and the cap in UTF-16 units
 /** The queue a recipe makes - rebuilt the same way by the Swift test, under the same id (QUEUE_ID). */
 function fromRecipe(recipe) {
@@ -1527,9 +1884,11 @@ for (const unit of ['x', '😀']) {
   const cases = [
     ['as toSave wrote it', base],
     ['v as 1.0', swap('{"v":1,', '{"v":1.0,')], ['v as 1e0', swap('{"v":1,', '{"v":1e0,')], ['v as "1"', swap('{"v":1,', '{"v":"1",')],
-    ['v as true', swap('{"v":1,', '{"v":true,')], ['no v', text({ ...made(), v: undefined })], ['v 2', text({ ...made(), v: 2 })],
-    ['a key twice: the last one read', `${swap('{"v":1,', '{"v":2,').slice(0, -1)},"v":1}`],
-    ['...the last one wrong', `${base.slice(0, -1)},"v":2}`],
+    ['v as true', swap('{"v":1,', '{"v":true,')], ['no v', text({ ...made(), v: undefined })],
+    //? (2.1.18) v2 is read as v1 is; v3, nothing
+    ['v 2', text({ ...made(), v: 2 })], ['v 3', text({ ...made(), v: 3 })], ['v 0', text({ ...made(), v: 0 })], ['v 2.0', swap('{"v":1,', '{"v":2.0,')],
+    ['a key twice: the last one read', `${swap('{"v":1,', '{"v":3,').slice(0, -1)},"v":1}`],
+    ['...the last one wrong', `${base.slice(0, -1)},"v":3}`],
     ['pretty-printed with spaces', JSON.stringify(made(), null, 2)], ['with tabs and CRLF', JSON.stringify(made(), null, '\t').replace(/\n/g, '\r\n')],
     ['space before and after', ` \t\r\n${base}\n `], ['a byte-order mark first', `\ufeff${base}`], ['something after it', `${base}x`],
     ['a comma after its last key', `${base.slice(0, -1)},}`], ['cut short', base.slice(0, -1)],
@@ -1639,7 +1998,7 @@ for (const unit of ['x', '😀']) {
 // savedLevels (:220): the levels of a snapshot that doesn't read whole
 {
   const base = saved(U.withNext(U.startUpNext(rAlbum(5).map((t) => ({ ...t, level: 'album' })), 2), [rTrack('x', { level: 'track' })]), 61).snapshot
-  for (const [snapshot, count] of [[base, 6], [base, 5], [base, 7], [null, 3], ['{', 2], ['null', 1], ['[]', 1], ['{"v":2,"levels":"aa"}', 2],
+  for (const [snapshot, count] of [[base, 6], [base, 5], [base, 7], [null, 3], ['{', 2], ['null', 1], ['[]', 1], ['{"v":2,"levels":"aa"}', 2], ['{"v":3,"levels":"aa"}', 2],
     ['{"v":1,"levels":"at-x"}', 4], ['{"v":1,"levels":"😀a"}', 3], ['{"v":1,"levels":"\\ud800a"}', 2], ['{"v":1.0,"levels":"a"}', 1],
     ['{"v":true,"levels":"a"}', 1], ['{"v":1,"levels":5}', 1], ['{"v":1,"levels":"t"}', 0], ['{"v":1,"levels":""}', 0], [base, 0]]) {
     resumeCases.push({ kind: 'savedLevels', snapshot, count, result: R.savedLevels(snapshot, count).map((level) => level ?? null) })
@@ -1669,7 +2028,7 @@ for (const song of [
   resumedCase('...logins off (shared): the same', answer(all, 2, 61, 'deadwax', kept(), true), 'auto', 'desk-2')
   const made = () => JSON.parse(saving.snapshot)
   const withExtra = (song) => JSON.stringify({ ...made(), source: [...made().source, 'z'], sourceLevels: `${made().sourceLevels}a`, extra: { ...made().extra, z: song } })
-  for (const [label, snapshot] of [['not JSON', '{nope'], ['v2', JSON.stringify({ ...made(), v: 2 })],
+  for (const [label, snapshot] of [['not JSON', '{nope'], ['v3', JSON.stringify({ ...made(), v: 3 })],
     ['a mark out of its source', JSON.stringify({ ...made(), marks: made().marks.map((m, i) => (i === 0 ? [m[0], 's', 99, 0] : m)) })],
     ['a key twice', JSON.stringify({ ...made(), marks: made().marks.map((m) => [0, m[1], m[2], m[3]]) })],
     ['startedAt below 0', JSON.stringify({ ...made(), startedAt: -1 })],
@@ -1860,18 +2219,25 @@ piece('ui/src/state/persisted.ts', /const made = Array\.from\(bytes, \(byte\) =>
 // the round trip (:169-267): every step of resume.sim.cjs's 500 runs - runs 0-39 in full (the queue, and the snapshot
 // toSave wrote for it, which the phone must write to the byte and read back as the web does), every run's snapshots
 // digested (the Swift test runs the same generator over its own Up Next and must write the very same texts)
-const ROUND_TRIP_RUNS = 500
+const ROUND_TRIP_RUNS = 1000
 const ROUND_TRIP_KEPT = 40
 const ROUND_TRIP_STEPS = 25
 const ROUND_TRIP_POSITION = 12.5
 const roundTripSongs = new LevelledSongs()
 const roundTrip = []
 const roundTripDigests = []
-const roundTripCounts = { states: 0, behind: 0, paged: 0, pagedRounds: 0, left: 0, ones: 0, added: 0, shuffled: 0, extra: 0 }
+const roundTripCounts = {
+  states: 0, behind: 0, paged: 0, pagedRounds: 0, left: 0, ones: 0, added: 0, shuffled: 0, extra: 0,
+  rolled: 0, brought: 0, reachedKept: 0, startsKept: 0, v2: 0,
+}
+//? resume.sim's `compared`: the steps compared before this one, in every run - the moments of the starts brought back
+let roundTripCompared = 0
 for (let run = 0; run < ROUND_TRIP_RUNS; run++) {
   const random = parkMiller(run + 7)
   //? a small seed's first draw is always near 0 - which started every run from its first song, null: let it go
   random()
+  //? (2.1.18) older rows brought back in every other run, the rest as before
+  const bringsBack = run % 2 === 0
   const pick = (n) => Math.floor(random() * n)
   const level = () => (random() < 0.5 ? 'album' : 'track')
   const size = 1 + pick(7)
@@ -1882,7 +2248,7 @@ for (let run = 0; run < ROUND_TRIP_RUNS; run++) {
   let extra = 0
   const digests = []
   for (let step = 0; step < ROUND_TRIP_STEPS; step++) {
-    const op = pick(12)
+    const op = pick(13)
     const rowKeys = () => queue.upNext.marks.slice(queue.index + 1).map((m) => m.key)
     const someKey = () => { const keys = rowKeys(); return keys.length && random() < 0.85 ? keys[pick(keys.length)] : pick(queue.upNext.nextKey + 2) }
     if (op === 0) queue = U.withNext(queue, Array.from({ length: 1 + pick(2) }, () => rTrack(`n${extra++}`, { level: level() })))
@@ -1900,8 +2266,18 @@ for (let run = 0; run < ROUND_TRIP_RUNS; run++) {
     } else if (op === 8) {
       //? (2.1.3) a row's tap - of History's now and then (an entry before the song playing)
       const before = queue.upNext.marks.slice(0, queue.index).map((m) => m.key)
-      const jumped = U.jumpedTo(queue, before.length && random() < 0.3 ? before[pick(before.length)] : someKey())
-      if (jumped) queue = atIndex(jumped.queue, jumped.index)
+      const jumped = U.jumpedTo(queue, before.length && random() < 0.3 ? before[pick(before.length)] : someKey(), repeat)
+      if (jumped) { queue = atIndex(jumped.queue, jumped.index); if (jumped.back) roundTripCounts.rolled++ }
+    } else if (op === 12 && bringsBack) {
+      //? (2.1.18) older rows brought back: entries of the queue's (moved, while before History's floor) and songs from
+      //? elsewhere, each at a level of its own (queued(..., 'songs')'s copy)
+      const rows = Array.from({ length: 1 + pick(3) }, (_, i) => {
+        const starts = Array.from({ length: 1 + pick(2) }, (_, k) => 1_800_000_000_000 + roundTripCompared * 100 + i * 3 + k)
+        if (queue.index > 0 && random() < 0.5) { const p = pick(queue.index); return { track: { ...queue.tracks[p], level: level() }, starts, entry: queue.upNext.marks[p].key } }
+        return { track: rTrack(`b${extra++}`, { level: level() }), starts, entry: null }
+      })
+      const jumped = U.broughtBack(queue, rows, repeat)
+      if (jumped) { queue = jumped.queue; roundTripCounts.brought++ }
     } else if (op === 9) { const next = U.onward(queue); if (next !== null) queue = atIndex(queue, next) }
     else if (op === 10) {
       //? (2.1.3) as the engine moves now (wentBack), or - half the time - as an app before 2.1.3 saved it
@@ -1911,23 +2287,34 @@ for (let run = 0; run < ROUND_TRIP_RUNS; run++) {
     queue = U.toppedUp(queue, repeat, random)
 
     const saving = saved(queue, ROUND_TRIP_POSITION)
+    roundTripCompared++
     const { start } = saving
     const end = start + saving.ids.length
     //? the sim's own check, as the premise of what the phone is held to: the web reads its own snapshot back whole
     const back = R.fromSnapshot(saving.snapshot, queue.tracks.slice(start, end).map(bareTrack), saving.index, 'auto')
     const was = queue.upNext
+    //? (2.1.18) how far it had got, while that is after the song playing and in the window
+    const reachAt = was.marks.findIndex((m) => m.key === was.reached)
+    const reached = reachAt > queue.index && reachAt < end ? was.reached : undefined
     //? (2.1.3) startedAt past the song playing's run comes back lowered to it
     let unit = queue.index
     while (unit > 0 && was.marks[unit].from === 'one') unit--
     const wanted = {
       id: was.id, tracks: queue.tracks.slice(start, end), index: queue.index - start, marks: was.marks.slice(start, end), source: was.source,
       shuffle: was.shuffle, nextKey: was.nextKey, startedAt: Math.min(Math.max(0, was.startedAt - start), unit - start), left: was.left, paged: was.paged, pagedRounds: was.pagedRounds,
+      reached,
     }
     const got = back && {
       id: back.upNext.id, tracks: back.tracks, index: back.index, marks: back.upNext.marks, source: back.upNext.source, shuffle: back.upNext.shuffle,
       nextKey: back.upNext.nextKey, startedAt: back.upNext.startedAt, left: back.upNext.left, paged: back.upNext.paged, pagedRounds: back.upNext.pagedRounds,
+      reached: back.upNext.reached,
     }
     if (JSON.stringify(got) !== JSON.stringify(wanted)) throw new Error(`the round trip's run ${run} step ${step} didn't read back in the TypeScript`)
+    //? (2.1.18) ...Up Next the same songs to come, holding the same starts
+    const ahead = (q) => { const v = U.upNextView(q, repeat, Infinity); return [...v.added, ...(v.list?.rows ?? [])].map((row) => `${row.key}:${row.track.id}`).join() }
+    if (ahead(back) !== ahead(queue) || JSON.stringify(U.heldStarts(back)) !== JSON.stringify(U.heldStarts(queue))) {
+      throw new Error(`the round trip's run ${run} step ${step}: Up Next or the starts held came back otherwise in the TypeScript`)
+    }
     digests.push(saving.snapshot === null ? null : unitHash(saving.snapshot))
     if (run < ROUND_TRIP_KEPT) roundTrip.push({ run, step, queue: queueRecord(queue, roundTripSongs), index: saving.index, start, snapshot: saving.snapshot })
     const c = roundTripCounts
@@ -1940,6 +2327,9 @@ for (let run = 0; run < ROUND_TRIP_RUNS; run++) {
     if (was.marks.some((m) => m.from === 'added')) c.added++
     if (was.shuffle) c.shuffled++
     if (saving.snapshot !== null && saving.snapshot.indexOf('"extra":{}') < 0) c.extra++
+    if (reached !== undefined) c.reachedKept++
+    if (wanted.marks.some((m) => m.starts)) c.startsKept++
+    if (saving.snapshot !== null && saving.snapshot.startsWith('{"v":2,')) c.v2++
   }
   roundTripDigests.push(digests)
 }

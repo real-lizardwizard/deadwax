@@ -68,7 +68,7 @@ import Testing
     @Test func theSnapshotIsTheWebsToTheUnit() throws {
         let loaded = try Self.load()
         let cases = loaded.cases["toSave", default: []]
-        #expect(cases.count == 20)
+        #expect(cases.count == 29) // (2.1.18) with v2, reached and starts
         for item in cases {
             let label = item["label"]?.string ?? "?"
             let queue = try #require(loaded.songs.queue(item["queue"]), "\(label): the queue doesn't rebuild")
@@ -112,7 +112,7 @@ import Testing
     @Test func snapshotsReadAsTheWebReadsThem() throws {
         let loaded = try Self.load()
         let cases = loaded.cases["fromSnapshot", default: []]
-        #expect(cases.count == 225)
+        #expect(cases.count == 303) // (2.1.18) with v 1 or 2, reached and starts, read or refused
         var nils = 0
         var fresh = 0
         var held = 0
@@ -140,7 +140,7 @@ import Testing
             let difference = queueDifference(back, wanted)
             #expect(difference == nil, "\(label): \(difference ?? "")")
         }
-        #expect(nils == 70 && fresh == 36 && held == 16)
+        #expect(nils == 91 && fresh == 45 && held == 16)
     }
 
     /// (2.1.15) Whether a queue read back without an id is the queue held: the web's sameQueue, case by case.
@@ -159,7 +159,7 @@ import Testing
     @Test func levelsOfASnapshotThatDoesntReadWhole() throws {
         let loaded = try Self.load()
         let cases = loaded.cases["savedLevels", default: []]
-        #expect(cases.count == 17)
+        #expect(cases.count == 18)
         for item in cases {
             let got = savedLevels(item["snapshot"]?.string, count: try #require(item["count"]?.int)).map { $0?.rawValue }
             let wanted = try #require(item["result"]?.array).map(\.string)

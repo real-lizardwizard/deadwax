@@ -671,10 +671,21 @@ already played:
   like any other. As you scroll near the top the next older songs come, a spinner over the top of the
   list while they do (VoiceOver: "Loading earlier songs") - and nothing you're looking at moves when
   they land. If they can't come, the top of the list says "Couldn't load the songs you played before.",
-  with **Try again**. **Tap any of them** to hear it again now ("play again", VoiceOver calls it, and
-  says "Playing" and its title once it starts): Playing Next and the album carry on after it as they
-  were, the song that was playing joins the list, and the list stays where it is under your finger.
-  VoiceOver reads the songs as one list with no heading, then the song playing's title as a heading.
+  with **Try again**. **Tap any of them to go back to it** (as the web app does since deadwax 2.1.18):
+  it plays now, from its start, and everything played after it moves back down into Up Next, in the
+  order you see it - the songs between, the song that was playing (from its start, when it comes round),
+  then Playing Next and the rest of the album or list, as they were. The song you tapped is where your
+  finger was. Nothing is lost or reshuffled: songs you added with Play Next that were still waiting keep
+  their place, after the song that was playing; with Shuffle on, what comes back keeps the order it
+  played in (turned on afterwards, Shuffle shuffles it with the rest - a later time round of Repeat
+  All's on its own, after this one's - and off, the album or list carries on in its own order); with
+  Repeat One each song's repeats come back with it, and otherwise each plays once. Tap a song from
+  before this album or list and everything played since it comes back too, skips included, however
+  many - shown as songs to come, not above. Each joins what you've played again as it plays (deadwax's
+  record of what you played is never changed). Previous from a song you went back to plays the one above
+  it (from one from before the album or list, the song again). VoiceOver calls each row "play again",
+  says "Playing" and its title once it starts, and moves to the song that plays next. It reads the songs
+  as one list with no heading, then the song playing's title as a heading.
   What goes in it, and where it's kept: [What you've played](#what-youve-played).
 - **The song playing**, where Up Next opens - and with Repeat One on, "Repeat one: this song plays again
   until you skip it." Under it, **Shuffle** and **Repeat**, the same settings as on Now Playing.
@@ -2228,54 +2239,87 @@ songs from a few albums, on Wi-Fi, with the web app open beside the phone.
 - **83 VoiceOver.** The arrow reads "Download"; while it downloads, its value says how far; downloaded,
   the mark opens its menu with what it is and Remove Download. A Downloading row reads as one ("Late
   night, 3 of 12 songs to go, 75 percent").
-- **84 Smart playlists** (once deadwax is on the version that says which playlists are smart). Open a
+- **84 Smart playlists** (deadwax 2.1.21 or later says which playlists are smart). Open a
   smart playlist: no arrow beside the •••, nothing to download in the •••, and under its count "Smart
   playlists are worked out again each time, so this one plays only while deadwax can be reached." An
   .m3u playlist still has its arrow. If you downloaded a smart playlist on an earlier build: it's still
   on the phone, its line says it stays as it was when you made it, and Remove Download takes it off.
 
-### The Library's switch's checks (85-94)
+### Going back's checks (85-91)
+
+These come with the build that learns going back in Up Next (still app 0.9), and want deadwax 2.1.18 or
+later. Use an album of a dozen songs, headphones on, with the web app open beside the phone.
+
+- **85 A song you played, tapped.** Play the album from song 1 to song 5 (Next is fine), then Play Next
+  two songs from another album. Open Up Next and tap song 2 above the song playing: it plays at once,
+  from its start, with no gap you wouldn't hear at a Previous. Does the row you tapped stay under your
+  finger, now as the song playing? Under it: 3, 4, 5, the two songs you added, then 6 on - and nothing
+  above it but song 1. Next, Next, Next: 3, 4, then 5 from its start; Next again: the first song you
+  added. Previous from song 2 plays song 1.
+- **86 Repeat.** Repeat One on song 3 until it has played three times, Repeat off, then Next: tap song 3
+  above - it plays once, then 4 (its repeats went: a row plays once), and it starts cleanly. Now Repeat
+  All: play past the album's end into the second time round, to its song 3, and tap the first time
+  round's song 11 above: Up Next lists 12, then the second time round's 1, 2 and 3 as one list, then the
+  rest. Turn Shuffle on: 12 stays first (the first round's), then 1, 2 and 3 of the second round in some
+  order, then the rest - does the second round ever start with 12? Shuffle off: 12, 1, 2, 3, 4...
+- **87 From before the album.** Play another album first for a song or two, then this one. In Up Next,
+  scroll above to the other album's songs and tap the first of them: it plays at once; below it the
+  other album's songs after it, then this album's songs as played, then the song that was playing,
+  then the rest. Nothing above it (Previous starts it again). Is each tapped song drawn only once - below,
+  never above as well? Let them play: each shows above again as it plays, here and in the web app's Up
+  Next.
+- **88 Locked.** Go back to a song with the phone about to lock, lock it: does it keep playing, and does
+  the lock screen show the song you went back to? Do Next and Previous there follow Up Next's new order?
+- **89 Picked up.** After going back, force-quit the app and open it again: paused at the song you went
+  back to, with the songs moved back down still under it in the same order. Open the web app (reloaded,
+  2.1.18 or later): it picks the queue up the same. Go back there, then open the phone: the same again.
+- **90 Offline.** In Airplane Mode with the album downloaded, go back to a song: it plays. A song above
+  that isn't on the phone is dimmed and a tap does nothing.
+- **91 VoiceOver.** Tap a song above the song playing with VoiceOver on: it says "Playing" and the title,
+  and VoiceOver is on the song that plays next (Done, at the end of the queue).
+
+### The Library's switch's checks (92-101)
 
 These come with the build that adds the Library's switch, its pull to shuffle and the web app's Play
 button (still app 0.9). Earlier checks' "Library > Playlists" is now the switch's Playlists page, and
 "Downloaded" is in the Library's •••.
 
-- **85 The switch.** The Library opens on Albums, with nothing above the albums but their count, and
+- **92 The switch.** The Library opens on Albums, with nothing above the albums but their count, and
   Albums | Playlists at the top. Swipe left: Playlists - the switch, the buttons and Find follow as the page
   settles; swipe halfway and let go: it springs back, and nothing else changes. Tap Albums: back. Go to
   You and back: the same page. Scroll a long way down and tap the Library tab: the page goes to its top.
   Force-quit and open: Albums. Scrolling up and down never swipes to the other page.
-- **86 Edit order.** ••• > Edit order: drag Playlists above Albums, Done. The switch reads Playlists |
+- **93 Edit order.** ••• > Edit order: drag Playlists above Albums, Done. The switch reads Playlists |
   Albums at once; force-quit and open: the Library opens on Playlists. (Put it back as you like it.)
-- **87 The •••.** Downloaded opens what's on the phone - with the card asking whether to keep your library
+- **94 The •••.** Downloaded opens what's on the phone - with the card asking whether to keep your library
   on this phone at its top, once, if you never answered it. All music opens All albums (with a library
   of your own). Make a playlist in the web app, then ••• > Refresh: it's on Playlists. Shuffle plays your
   library shuffled.
-- **88 Pull to shuffle.** On Albums, pull down slowly: the ring fills and the mark grows and turns, "Pull
+- **95 Pull to shuffle.** On Albums, pull down slowly: the ring fills and the mark grows and turns, "Pull
   to shuffle". At the line: a tick, the purple disc, "Release to shuffle". Push back up a little: the
   ring again, no tick; down again: another tick. Let go armed: "Shuffling", and your library plays - the
   mini player shows a song from anywhere in it. Let go before the line: nothing plays. The same on
   Playlists. A fast fling up to the top shows nothing. Pull to the purple disc, then pull down
   Notification Center (or ask Siri, or take a call) before letting go: nothing plays. Does the graphic sit
   in the gap the pull opens, at your text size? Does the music start the moment you let go?
-- **89 Past the first 200** (the phase's). With the shuffle playing, press Next 160 times or so (or let it
+- **96 Past the first 200** (the phase's). With the shuffle playing, press Next 160 times or so (or let it
   play an evening): Up Next keeps going, never ending at 200. With Repeat off it ends only once every song
   of your library has played; with Repeat All, at the end a new order begins with a different song. Lock
   the phone mid-shuffle for an hour: does it keep going?
-- **90 Started over.** Shuffle, then restart deadwax (or leave the phone a day) and press Next past 150:
+- **97 Started over.** Shuffle, then restart deadwax (or leave the phone a day) and press Next past 150:
   "Your shuffle started over - deadwax no longer had its order", once, and the music carries on.
-- **91 Offline.** Airplane Mode: the Library's Albums page is Downloaded, under the same switch; ••• >
+- **98 Offline.** Airplane Mode: the Library's Albums page is Downloaded, under the same switch; ••• >
   Shuffle downloads, and a pull ("Release to shuffle your downloads"), play only songs on the phone -
   every one of them in time. ••• > Your albums is the way back. With nothing downloaded: no Shuffle in the
   •••, and the pull says "Nothing on this phone to shuffle".
-- **92 The Play button.** An album's page and a playlist's: Play is the web app's purple, its white
+- **99 The Play button.** An album's page and a playlist's: Play is the web app's purple, its white
   triangle and word plainly readable; Shuffle beside it the web app's grey, the same height and corners.
   Pressed, Play darkens, its word staying white, and Shuffle's shading turns over, as the web app's do. The
   other purple buttons - Add to my library, the EQ's Use for, Create in the
   picker, Sign in, Try again - the same purple. Does it look like the web app's Play on your screen?
-- **93 Find on Playlists.** On Playlists, type part of a playlist's name: only the playlists that hold
+- **100 Find on Playlists.** On Playlists, type part of a playlist's name: only the playlists that hold
   it; nonsense: "No playlists match “…”." Back on Albums, Find holds the albums' own words.
-- **94 VoiceOver and Reduce Motion.** VoiceOver reads the switch as the Library's pages, Albums and
+- **101 VoiceOver and Reduce Motion.** VoiceOver reads the switch as the Library's pages, Albums and
   Playlists; the ••• as "More for the Library", with Shuffle first. With Reduce Motion on (Settings >
   Accessibility > Motion), the pull's mark doesn't grow or turn, the states change at once, and a tap on
   the switch moves the page without sliding.

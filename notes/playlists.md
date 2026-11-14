@@ -282,3 +282,27 @@ Verified: test_playlists.py's lock tests - each of the three routes holds the lo
 lets it go once answered; only an idle lock is let go past the bound - each failing under its mutation (the delete's
 `async with` removed; the eviction ignoring `locked()`). Not tested: two requests truly overlapping (the suite's
 TestClient sends one at a time); asyncio.Lock's own ordering is what that relies on.
+
+### Which playlists are smart (2.1.21)
+
+The iPhone app's playlist downloads (Phase 4, slice 3) found a loop on smart playlists: Navidrome works one out
+again as it is read, so a downloaded smart playlist's songs, and its `changed`, move under the phone. James chose
+**no Download for smart playlists** ("No Download for them") - and the phone couldn't tell which they were:
+summary() kept only `editable`, which is false for a smart playlist, a file-synced one and somebody else's alike.
+
+Every playlist deadwax answers now carries **`smart`**, read from Navidrome's **`validUntil`**
+(`src/playlists.py is_smart`). Navidrome's source at 46c4327, server/subsonic/playlists.go `buildOSPlaylist`: a
+smart playlist (`IsSmartPlaylist()`, its rules set) answers `readonly: true` and - only when `EvaluatedAt` is set -
+`validUntil` (EvaluatedAt plus its refresh delay); every other playlist answers `readonly` alone
+(responses.go: `json:"validUntil,omitempty"`). `readonly` can't tell: it is true for file-synced and others'
+playlists too. getPlaylist evaluates a smart playlist as it answers (`GetWithTracks`), so **one playlist's answer
+always says**; getPlaylists doesn't, so a smart playlist nobody has opened since Navidrome started lists as not
+smart until it is opened - harmless for the phone, whose Download is on the playlist's own page. A client Navidrome
+counts as a legacy one (`LegacyClients`) gets no OpenSubsonic fields at all, and every playlist reads as not smart;
+deadwax isn't one.
+
+The fake Navidrome (tests/test_player_as_you.py) sends `validUntil` for a smart playlist once worked out, and
+getPlaylist works it out. Tests: test_playlists.py - the shape gains `smart`; a smart playlist listed as not smart
+until opened, then smart in the list and in its own answer; synced and shared ones never; a blank or stray
+`validUntil` is no smart playlist. The web's `Playlist` type gains `smart` and shows nothing new. Verified against
+the fake and Navidrome's source as read, not a real Navidrome: the real `validUntil` is phone check 84's.

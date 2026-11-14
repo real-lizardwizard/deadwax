@@ -702,39 +702,39 @@ docs/ios.md's "Downloaded playlists' checks (77-84)" holds them as James reads t
 
 Slice 3b's:
 
-- **85 The switch.** The Library opens on Albums, with nothing above the albums but their count; Albums | Playlists in
+- **92 The switch.** The Library opens on Albums, with nothing above the albums but their count; Albums | Playlists in
   the bar. Swipe left: Playlists, the switch, the bar and Find following as the page settles; half a swipe let go
   springs back and changes nothing; tap Albums: back. Leave for You and come back: the same
   page. Scroll down a long way and tap the Library tab: the page shown goes to its top. Force-quit and open: Albums.
-- **86 Edit order.** ••• > Edit order: drag Playlists above Albums, Done. The switch reads Playlists | Albums; force-quit
+- **93 Edit order.** ••• > Edit order: drag Playlists above Albums, Done. The switch reads Playlists | Albums; force-quit
   and open: the Library opens on Playlists.
-- **87 The •••.** Downloaded opens what's on the phone (its first ask's card at the top, once, on a phone that never
+- **94 The •••.** Downloaded opens what's on the phone (its first ask's card at the top, once, on a phone that never
   answered it); All music opens All albums (with a library of your own); Refresh asks now (a playlist made in the web
   app shows); Shuffle plays your library shuffled.
-- **88 Pull to shuffle.** On Albums, pull down slowly: the ring fills and the mark grows and turns, "Pull to shuffle";
+- **95 Pull to shuffle.** On Albums, pull down slowly: the ring fills and the mark grows and turns, "Pull to shuffle";
   at the line a tick, the purple disc, "Release to shuffle"; push back up a little: the ring again, no tick; down again:
   a tick. Let go armed: "Shuffling", and your library plays shuffled - the mini player, a song from anywhere in it. Let
   go before the line: nothing plays. The same on Playlists. A fast fling to the top shows nothing. Armed, then pull
   down Notification Center (or ask Siri, or take a call) before letting go: nothing plays.
-- **89 Past the first 200** (the phase's). With the shuffle playing, skip ahead with Next 160 times or so (or let it
+- **96 Past the first 200** (the phase's). With the shuffle playing, skip ahead with Next 160 times or so (or let it
   play an evening): Up Next keeps going, never ending at 200; with Repeat off it ends only once every song of your
   library has played. With Repeat All, at the end a new round starts with a different song.
-- **90 Started over.** Shuffle, then restart deadwax (or leave the phone a day) and skip ahead past 150: "Your shuffle
+- **97 Started over.** Shuffle, then restart deadwax (or leave the phone a day) and skip ahead past 150: "Your shuffle
   started over - deadwax no longer had its order", once, and the music carries on.
-- **91 Offline.** Airplane Mode: the Library on Downloaded's albums under the same switch; ••• > Shuffle downloads, and
+- **98 Offline.** Airplane Mode: the Library on Downloaded's albums under the same switch; ••• > Shuffle downloads, and
   the pull's "Release to shuffle your downloads": only songs on the phone, every one of them in time. ••• > Your albums
   is the way back. With nothing downloaded: no Shuffle, and the pull says "Nothing on this phone to shuffle".
-- **92 The Play button.** An album's page and a playlist's: Play is the web's purple with a white triangle and word,
+- **99 The Play button.** An album's page and a playlist's: Play is the web's purple with a white triangle and word,
   plainly readable; Shuffle beside it the web's grey pill, the same height and corners. Pressed, Play darkens, its
   label staying white, and Shuffle's shading turns over, as the web's do. The other
   purple buttons - Add to my library, the EQ's Use for, Create in the picker, Sign in, Try again - the same purple.
-- **93 Find on Playlists.** On Playlists type part of a name: only the playlists that hold it; nonsense: "No playlists
+- **100 Find on Playlists.** On Playlists type part of a name: only the playlists that hold it; nonsense: "No playlists
   match “…”."; back on Albums, Find holds its own words.
-- **94 VoiceOver and Reduce Motion.** The switch reads "Albums, 1 of 2" (or as iOS words it); the ••• reads "More for
+- **101 VoiceOver and Reduce Motion.** The switch reads "Albums, 1 of 2" (or as iOS words it); the ••• reads "More for
   the Library", Shuffle first. With Reduce Motion on, the pull's mark doesn't grow or turn, the states change at once,
   and a tap on the switch moves the page without sliding.
 
-docs/ios.md's "The Library's switch's checks (85-94)" holds them as James reads them.
+docs/ios.md's "The Library's switch's checks (92-101)" holds them as James reads them.
 
 ## 9. What only the phone can tell
 
