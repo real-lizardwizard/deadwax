@@ -550,6 +550,13 @@ What slice 3b is, as built, is in notes/ios.md's "Phase 4, slice 3b: the Library
 button" - Core and the app, what was decided here, the tests and mutations, and what was verified. Questions 17-26
 came of it.
 
+### 6.10 Slice 4, built (2026-11-14)
+
+What slice 4 is, as built, is in notes/ios.md's "Phase 4, slice 4: Artists" - Core (Artists.swift, held to the web by
+export-artist-vectors.cjs), the app (the Artists page, All artists, an artist's page, the album's artist line), what
+was decided here, the tests and mutations, and what was verified. Question 26 was built with it; questions 27-31 came
+of it. docs/ios.md's checks 102-111 are its.
+
 ## 7. Tests (Swift Testing; Core's on Linux and macOS)
 
 - **The fixture's replay** (slice 1): every rule of 2.1 and 2.3 over the web's own answers - groups, every line under
@@ -719,8 +726,8 @@ Slice 3b's:
 - **96 Past the first 200** (the phase's). With the shuffle playing, skip ahead with Next 160 times or so (or let it
   play an evening): Up Next keeps going, never ending at 200; with Repeat off it ends only once every song of your
   library has played. With Repeat All, at the end a new round starts with a different song.
-- **97 Started over.** Shuffle, then restart deadwax (or leave the phone a day) and skip ahead past 150: "Your shuffle
-  started over - deadwax no longer had its order", once, and the music carries on.
+- **97 Started over.** Shuffle, then restart the deadwax container (or leave the phone a day) and press Next past
+  150: "Your shuffle started over - deadwax no longer had its order", once, and the music carries on.
 - **98 Offline.** Airplane Mode: the Library on Downloaded's albums under the same switch; ••• > Shuffle downloads, and
   the pull's "Release to shuffle your downloads": only songs on the phone, every one of them in time. ••• > Your albums
   is the way back. With nothing downloaded: no Shuffle, and the pull says "Nothing on this phone to shuffle".
@@ -878,4 +885,26 @@ docs/ios.md's "The Library's switch's checks (92-101)" holds them as James reads
 26. **Room in the bar for four pages.** The switch sits in the bar's middle with the page's own buttons at its right
     (Albums: the order and the layout, then the •••). Albums | Playlists fits any phone; Albums | Playlists | Artists |
     Songs at a large text size won't, beside three buttons. *Recommend* (for slices 4-5, nothing built yet): the order
-    and the layout move into the ••• then, leaving the switch and the ••• alone in the bar.
+    and the layout move into the ••• then, leaving the switch and the ••• alone in the bar. *Built in slice 4*: Albums'
+    Album order and Show as list/grid, and Artists' Artist order, are the •••'s second section (each order a submenu
+    showing the one chosen); Playlists keeps its + beside the ••• (question 30).
+27. **The artist page's picture** (slice 4). The web's hero is the picture full-bleed, a scrim over it and the name
+    on it. *Recommend, and built*: the picture round and centred, 200 pt, the name under it - laid out as the album
+    page's hero is, and as their row's picture is round - with no full-bleed picture under a translucent bar to get
+    right before James has seen it. The web's hero is the alternative if he wants the two to match.
+28. **Two pressings on an artist's page** (slice 4). With MusicBrainz's answer the web makes one row per release
+    group, and Play plays its first album; without it (question 4) every album Navidrome has is a row - the phone's
+    case always. So an artist with a CD and a vinyl rip of one album lists both, and Play plays both. *Recommend, and
+    built*: every album Navidrome has, as the web's own rule without MusicBrainz - the release groups come with
+    Search and Get (Phases 5-6).
+29. **An album Navidrome no longer has, on an artist's page** (slice 4). Its songs' ask answers `{}`; the web takes
+    that as in hand and then counts it ("Plays the 3 albums you have", playing two). *Recommend, and built*: left out
+    as one that didn't load ("Plays 2 of the 3 albums you have - the rest didn't load", Try again) - the line then
+    says what Play does.
+30. **Playlists' + in the bar** (slice 4, question 26). *Recommend, and built*: kept beside the •••, on Playlists only -
+    it is that page's one way to make a playlist, and the bar has room for the switch, it and the •••; Albums and
+    Artists have the ••• alone.
+31. **The artists list kept on the phone** (slice 4). Albums are kept on disk; the artists list is asked as the page
+    shows, as the web's is, and kept in memory only. *Recommend, and built*: in memory - the app opened with deadwax
+    out of reach lists the artists of the downloaded albums (ArtistWords.offlineList) - and kept on disk only if that
+    stand-in proves too thin on the phone.

@@ -16,8 +16,9 @@ enum LibraryLayout: String, CaseIterable, Sendable {
         self = saved.flatMap(LibraryLayout.init(rawValue:)) ?? .grid
     }
 
-    /// The toolbar button's words, which say what it switches TO - the phone's own (the web has no switch).
-    var switchLabel: String { self == .grid ? "Show as list" : "Show as grid" }
+    /// The switch's words, which say what it switches TO - the phone's own (the web has no switch); the Library's •••
+    /// says the same (LibraryMenuItem.layout, slice 4).
+    var switchLabel: String { self == .grid ? LibrarySwitchWords.showAsList : LibrarySwitchWords.showAsGrid }
     var switchSymbol: String { self == .grid ? "list.bullet" : "square.grid.2x2" }
 }
 

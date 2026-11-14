@@ -2,14 +2,16 @@ import DeadwaxCore
 import SwiftUI
 
 /// The Library tab's root (D2; since Phase 4 slice 3b the switch - phase4-library.md 2.8, 3.1). James: "I like just
-/// opening library to your albums", with a switch at the top - Albums | Playlists (Artists and Songs join in slices 4
-/// and 5) - "and I would also like to be able to swipe left and right between them, and maybe a way to rearrange the
+/// opening library to your albums", with a switch at the top - Albums | Playlists | Artists (slice 4; Songs joins in
+/// slice 5) - "and I would also like to be able to swipe left and right between them, and maybe a way to rearrange the
 /// order". So the bar holds the switch (a segmented control, the pages in the order kept on this phone, LibraryPages),
-/// the page's own buttons and the Library's ••• (LibraryMenu: Shuffle, Downloaded or the way back to the albums, All
-/// music, Refresh, Edit order); Find under it; and under them the pages side by side, a swipe moving between them as
-/// the switch does - each following the other. The Library opens on the first page of the order, and on it again for a
-/// new person; after that, on the one last shown. Pulling a page down shuffles your library (2.8's PullShuffle; 3.5's
-/// graphic) - never refreshes: the Library refreshes itself as it shows, and the •••'s Refresh asks now.
+/// Playlists' + on its page, and the Library's ••• (LibraryMenu: Shuffle; the page's own order, and Albums' Show as
+/// list or grid - in the ••• since slice 4, question 26, so three pages and more fit; Downloaded or the way back to the
+/// albums, All music's submenu - All albums, All artists; Refresh, Edit order); Find under it; and under them the pages
+/// side by side, a swipe moving between them as the switch does - each following the other. The Library opens on the
+/// first page of the order, and on it again for a new person; after that, on the one last shown. Pulling a page down
+/// shuffles your library (2.8's PullShuffle; 3.5's graphic) - never refreshes: the Library refreshes itself as it
+/// shows, and the •••'s Refresh asks now.
 ///
 /// The Albums page is the Albums list of the person's scope - "Your albums" with a library of your own, "Albums" with
 /// logins off and for the break-glass admin - or, when a check finds deadwax has no Navidrome that answers, the Navidrome
@@ -32,6 +34,7 @@ struct LibraryView: View {
     @Environment(PlayerModel.self) private var player
     @Environment(DownloadModel.self) private var downloads
     @Environment(PlaylistsModel.self) private var playlists
+    @Environment(ArtistsModel.self) private var artists
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var shownOnce = false
@@ -52,9 +55,11 @@ struct LibraryView: View {
     /// Each page's own words in Find.
     @State private var findAlbums = ""
     @State private var findPlaylists = ""
+    @State private var findArtists = ""
     /// Each page's pull.
     @State private var albumsPull = ShufflePull()
     @State private var playlistsPull = ShufflePull()
+    @State private var artistsPull = ShufflePull()
     @State private var editingOrder = false
     /// New playlist's sheet (the Playlists page's +), while it is up.
     @State private var newPlaylist: PlaylistsPage.NewSheet?
@@ -95,6 +100,7 @@ struct LibraryView: View {
                 show(LibraryPages.first(order))
                 findAlbums = ""
                 findPlaylists = ""
+                findArtists = ""
                 shown()
             }
             .onChange(of: library.scope) { _, scope in
@@ -215,9 +221,8 @@ struct LibraryView: View {
         }
         .navigationTitle("Library")
         .navigationBarTitleDisplayMode(.inline)
-        .searchable(text: shownPage == .albums ? $findAlbums : $findPlaylists,
-                    placement: .navigationBarDrawer(displayMode: .always),
-                    prompt: Text(shownPage == .albums ? LibraryWords.findPlaceholder : LibrarySwitchWords.findPlaylists))
+        .searchable(text: find(shownPage), placement: .navigationBarDrawer(displayMode: .always),
+                    prompt: Text(findPrompt(shownPage)))
         .autocorrectionDisabled()
         .textInputAutocapitalization(.never)
         .toolbar {
@@ -225,11 +230,8 @@ struct LibraryView: View {
                 switcher(order)
             }
             ToolbarItemGroup(placement: .topBarTrailing) {
-                switch shownPage {
-                case .albums:
-                    LibrarySortMenu()
-                    LibraryLayoutSwitch()
-                case .playlists:
+                // (slice 4, question 26) the order and the layout are the •••'s: only Playlists' + beside it
+                if shownPage == .playlists {
                     Button {
                         newPlaylist = PlaylistsPage.NewSheet()
                     } label: {
@@ -238,7 +240,7 @@ struct LibraryView: View {
                     .disabled(!online)
                     .accessibilityLabel(PlaylistWords.newPlaylist)
                 }
-                more(albums: albums, can: can)
+                more(albums: albums, can: can, page: shownPage)
             }
         }
         .sheet(isPresented: $editingOrder) {
@@ -261,6 +263,27 @@ struct LibraryView: View {
             PlaylistsPage(typed: $findPlaylists, current: current,
                           pulling: PullShuffling(state: playlistsPull, can: can, on: pulls, start: shuffleNow),
                           newSheet: $newPlaylist)
+        case .artists:
+            ArtistsScreen(page: ArtistsScreen.Page(
+                typed: $findArtists, current: current,
+                pulling: PullShuffling(state: artistsPull, can: can, on: pulls, start: shuffleNow)))
+        }
+    }
+
+    /// Each page's own words in Find.
+    private func find(_ page: LibraryPage) -> Binding<String> {
+        switch page {
+        case .albums: return $findAlbums
+        case .playlists: return $findPlaylists
+        case .artists: return $findArtists
+        }
+    }
+
+    private func findPrompt(_ page: LibraryPage) -> String {
+        switch page {
+        case .albums: return LibraryWords.findPlaceholder
+        case .playlists: return LibrarySwitchWords.findPlaylists
+        case .artists: return ArtistWords.findPlaceholder
         }
     }
 
@@ -283,9 +306,10 @@ struct LibraryView: View {
     }
 
     /// The Library's ••• (LibraryMenu, Core's): its sections, each item's words and whether it can be used now.
-    private func more(albums: AlbumList, can: ShuffleCan) -> some View {
+    private func more(albums: AlbumList, can: ShuffleCan, page: LibraryPage) -> some View {
         let personal = server.access.hasLibrary
-        let sections = LibraryMenu.sections(shuffle: can, albumsPage: albums == .downloaded ? .downloaded : .albums,
+        let sections = LibraryMenu.sections(shuffle: can, page: page, grid: library.layout == .grid,
+                                            albumsPage: albums == .downloaded ? .downloaded : .albums,
                                             scope: library.scope, personal: personal, online: reachability.online)
         return Menu {
             ForEach(sections.indices, id: \.self) { (section: Int) in
@@ -308,16 +332,71 @@ struct LibraryView: View {
         case .shuffle:
             Button(action: shuffleNow) { Label(words, systemImage: "shuffle") }
                 .disabled(!item.enabled)
+        case .order(let page):
+            orderPicker(page, words: words)
+        case .layout:
+            Button {
+                library.layout = library.layout == .grid ? .list : .grid
+            } label: {
+                Label(words, systemImage: library.layout.switchSymbol)
+            }
         case .downloaded:
             Button { navigation.open(.downloaded) } label: { Label(words, systemImage: DownloadWords.downloadSymbol) }
-        case .albums(let scope):
-            Button { navigation.open(.albums(scope)) } label: { Label(words, systemImage: "square.stack") }
+        case .albums, .artists:
+            place(item, personal: personal)
         case .allMusic:
-            Button { navigation.open(.albums(.store)) } label: { Label(words, systemImage: "square.stack.3d.up") }
+            // (slice 4) a submenu: the collection's albums and artists
+            Menu {
+                ForEach(LibraryMenu.allMusic.indices, id: \.self) { (index: Int) in
+                    place(LibraryMenu.allMusic[index], personal: personal)
+                }
+            } label: {
+                Label(words, systemImage: "square.stack.3d.up")
+            }
         case .refresh:
             Button(action: refresh) { Label(words, systemImage: "arrow.clockwise") }
         case .editOrder:
             Button { editingOrder = true } label: { Label(words, systemImage: "line.3.horizontal") }
+        }
+    }
+
+    /// A list pushed from the ••• - a scope's albums, or (slice 4) its artists.
+    @ViewBuilder
+    private func place(_ item: LibraryMenuItem, personal: Bool) -> some View {
+        let words = item.words(personal: personal)
+        switch item {
+        case .albums(let scope):
+            Button { navigation.open(.albums(scope)) } label: { Label(words, systemImage: "square.stack") }
+        case .artists(let scope):
+            Button { navigation.open(.artists(scope)) } label: { Label(words, systemImage: "music.mic") }
+        default:
+            EmptyView()
+        }
+    }
+
+    /// (slice 4, question 26) The page's order, a submenu of its orders showing the one chosen: Albums' (one for both
+    /// scopes, LibraryModel's) or Artists' (ArtistsModel's) - each kept per device.
+    @ViewBuilder
+    private func orderPicker(_ page: LibraryPage, words: String) -> some View {
+        switch page {
+        case .artists:
+            Picker(selection: Binding(get: { artists.order }, set: { (chosen: ArtistOrder) in artists.order = chosen })) {
+                ForEach(ArtistOrder.allCases, id: \.self) { (order: ArtistOrder) in
+                    Text(order.label).tag(order)
+                }
+            } label: {
+                Label(words, systemImage: "arrow.up.arrow.down")
+            }
+            .pickerStyle(.menu)
+        default:
+            Picker(selection: Binding(get: { library.sort }, set: { (chosen: AlbumSort) in library.sort = chosen })) {
+                ForEach(AlbumSort.allCases, id: \.self) { (sort: AlbumSort) in
+                    Text(sort.label).tag(sort)
+                }
+            } label: {
+                Label(words, systemImage: "arrow.up.arrow.down")
+            }
+            .pickerStyle(.menu)
         }
     }
 
@@ -344,8 +423,8 @@ struct LibraryView: View {
         }
     }
 
-    /// The •••'s Refresh: your albums and the playlists asked now, whatever their age - or, while deadwax can't be
-    /// reached, whether it is back (a probe at once).
+    /// The •••'s Refresh: your albums, the playlists and the artists asked now, whatever their age - or, while deadwax
+    /// can't be reached, whether it is back (a probe at once).
     private func refresh() {
         guard reachability.online else {
             reachability.tryNow()
@@ -354,6 +433,7 @@ struct LibraryView: View {
         let scope = library.scope
         Task { await library.refresh(scope) }
         Task { await playlists.ask(fresh: true) }
+        Task { await artists.ask() }
         shuffles.shown(scope)
     }
 }

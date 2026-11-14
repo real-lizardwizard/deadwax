@@ -2,7 +2,7 @@ import DeadwaxCore
 import SwiftUI
 
 /// The top of an album page (screens.md 4, AlbumPage.tsx's hero): the cover (asked at 1024), the title (two lines,
-/// a step smaller over 60 letters), the artist (plain text in Phase 1 - the artist page is Phase 3), the meta line,
+/// a step smaller over 60 letters), the artist (plain text until Phase 4's slice 4, the link to their page since), the meta line,
 /// the badge - its place held, unseen, until whose it is is known - the album's download line under it (Phase 2), and
 /// Play and Shuffle, live once the songs are in (offline: once a song of it is on this phone). Drawn at once from what
 /// opened the page, then filled as the album answers.
@@ -16,6 +16,7 @@ struct AlbumHero: View {
     let shuffle: () -> Void
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(AppNavigation.self) private var navigation
 
     /// The cover's side, in points (CoverImage asks the nearest step for the screen's scale: 1024 on an iPhone).
     static let coverSide: CGFloat = 280
@@ -36,11 +37,7 @@ struct AlbumHero: View {
                 .accessibilityAddTraits(.isHeader)
 
             if !model.artist.isEmpty {
-                Text(model.artist)
-                    .font(.title3)
-                    .foregroundStyle(Palette.quiet)
-                    .multilineTextAlignment(.center)
-                    .lineLimit(2)
+                artistLine
                     .padding(.top, 2)
             }
 
@@ -69,6 +66,36 @@ struct AlbumHero: View {
         }
         .frame(maxWidth: .infinity)
         .animation(reduceMotion ? nil : .default, value: DownloadWords.albumLine(download) != nil)
+    }
+
+    /// (Phase 4, slice 4) The artist (ArtistLink, AlbumPage.tsx's): a link to their page in the accent when the album
+    /// names an artist and their name; drawn the same, but not tappable, while the album hasn't answered and it might
+    /// still become one - so it never flashes from grey to the accent; quiet once the album has answered naming no
+    /// artist to go to.
+    @ViewBuilder private var artistLine: some View {
+        let words = Text(model.artist)
+            .font(.title3)
+            .multilineTextAlignment(.center)
+            .lineLimit(2)
+        switch model.artistLink {
+        case .link(let id):
+            // a button, not a NavigationLink: in the page's List a link would take the whole hero's row
+            Button {
+                navigation.open(.artist(ArtistRoute(id: id, preview: Artist(id: id, name: model.artist))))
+            } label: {
+                words
+                    .foregroundStyle(Palette.accent)
+                    // 44 pt to a finger, as the web's link reaches past its line
+                    .frame(minHeight: 44)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .padding(.vertical, -8)
+        case .pending:
+            words.foregroundStyle(Palette.accent)
+        case .plain:
+            words.foregroundStyle(Palette.quiet)
+        }
     }
 }
 

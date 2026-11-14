@@ -26,15 +26,17 @@ phone is charging if you choose, and with the app in the background when iOS all
 on this phone](#your-library-on-this-phone)). Phase 4 has begun with **playlists**: yours and those
 shared with you, in the Library, played as the web app plays them, and made, added to, edited and
 deleted on the phone as in the web app, and downloaded to play with no connection, kept in step as they
-change (see [Playlists](#playlists)); and with the Library's switch - Albums | Playlists, swiped between,
-in the order you choose - and a pull down that shuffles your whole library (see [The Library](#the-library)).
-Artists, songs, Search and the rest come next (see [What it can't do yet](#what-it-cant-do-yet)).
+change (see [Playlists](#playlists)); with the Library's switch - Albums | Playlists | Artists, swiped
+between, in the order you choose - and a pull down that shuffles your whole library (see [The
+Library](#the-library)); and with **artists**: your artists, and an artist's page with their albums, Play
+and Shuffle (see [Artists](#artists)). Songs, Search and the rest come next (see [What it can't do
+yet](#what-it-cant-do-yet)).
 
-**Nothing of Phase 2, the lyrics, the EQ, the turntable, play history, your library downloaded or
-playlists has been seen on an iPhone yet.** It's built and tested on a Mac, and what only a phone can
-tell is what [the checks](#the-checks) are for. Until they're answered, read everything about
-downloads, lyrics, the EQ, the turntable, play history, your library and playlists below as what the
-app is built to do.
+**Nothing of Phase 2, the lyrics, the EQ, the turntable, play history, your library downloaded,
+playlists or artists has been seen on an iPhone yet.** It's built and tested on a Mac, and what only a
+phone can tell is what [the checks](#the-checks) are for. Until they're answered, read everything about
+downloads, lyrics, the EQ, the turntable, play history, your library, playlists and artists below as what
+the app is built to do.
 
 The app talks only to deadwax, never to Navidrome, through deadwax's own routes, so the phone never
 needs the Navidrome account deadwax itself uses. With logins on, you sign in with your own Navidrome
@@ -185,35 +187,39 @@ and every screen scrolls far enough for its last row to come up above it.
 
 ## The Library
 
-The Library opens on its pages, side by side: **Albums** and **Playlists** (Artists and Songs join them
-later in Phase 4). The switch at the top - Albums | Playlists - picks one, or swipe left and right between
-them, the switch moving with you. The Library opens on the first page each time the app starts, and when
-someone else signs in; after that it stays on the page you left it on. Tap the Library tab while you're on
-it, and the page goes back to its top. Nothing sits above the albums but their count.
+The Library opens on its pages, side by side: **Albums**, **Playlists** and **Artists** (Songs joins them
+later in Phase 4). The switch at the top - Albums | Playlists | Artists - picks one, or swipe left and
+right between them, the switch moving with you. The Library opens on the first page each time the app
+starts, and when someone else signs in; after that it stays on the page you left it on. Tap the Library
+tab while you're on it, and the page goes back to its top. Nothing sits above the albums but their count.
 
 With logins on, **Albums** is **Your albums**: the albums in your library, as the web app's Library has them
-([sharing deadwax](sharing.md) says how an album gets there), and ••• > **All music** is the whole
-collection's. With logins off, and for the break-glass `deadwax` sign-in, Albums is the whole collection.
-**Playlists** is your playlists (see [Playlists](#playlists)).
+([sharing deadwax](sharing.md) says how an album gets there), and ••• > **All music** > **All albums** is
+the whole collection's. With logins off, and for the break-glass `deadwax` sign-in, Albums is the whole
+collection. **Playlists** is your playlists (see [Playlists](#playlists)), and **Artists** the artists of
+your albums (see [Artists](#artists)).
 
 **The •••** at the top right (VoiceOver reads it "More for the Library"):
 
 - **Shuffle**: your whole library, shuffled - see [Shuffling your library](#shuffling-your-library). Until
   it's ready it reads "Getting ready…", dimmed.
+- **The page's own**: on Albums, **Album order** (showing the one chosen - below) and **Show as list**
+  (or **Show as grid**); on Artists, **Artist order**. Playlists has none.
 - **Downloaded**: what's on this phone (below).
-- **All music**: the whole collection's albums, with a library of your own.
-- **Refresh**: your albums and your playlists asked for again now.
+- **All music**, with a library of your own: **All albums** and **All artists**, the whole collection's.
+- **Refresh**: your albums, your playlists and the artists asked for again now.
 - **Edit order**: the pages as rows - drag them by their handles into the order you want, and **Done**. The
-  Library opens on the first, and this phone remembers the order.
+  Library opens on the first, and this phone remembers the order. A page that's new since you last
+  arranged them (Artists, for an order arranged before it came) joins at the end.
 
-Beside the ••• are the page's own buttons: on Albums, the order and Grid or list; on Playlists, **+** for
-[New playlist](#playlists).
+Beside the ••• is Playlists' **+**, for [New playlist](#playlists), on that page. The orders and Grid or
+list moved into the ••• when Artists joined, so three pages - four, with Songs - fit beside it.
 
 On the Albums page:
 
-- **Grid or list**: the button at the top right switches between covers and rows. It starts as a
-  grid, and this phone remembers your choice.
-- **The order** (the button beside it): **Artist** (the first time), **Title**, **Recently added**,
+- **Grid or list**: ••• > **Show as list** switches to rows, **Show as grid** back to covers. It starts as
+  a grid, and this phone remembers your choice.
+- **The order** (••• > **Album order**): **Artist** (the first time), **Title**, **Recently added**,
   **Year, newest first** or **Year, oldest first**, under headers: the first letter (names that don't
   start with a letter come last, under #), the month it was added ("Date unknown" when deadwax
   doesn't know), or the year ("No year"). In Your albums, Recently added means when the album came
@@ -239,13 +245,13 @@ the collection. (Its words mention Search and Get: those are the web app's, for 
 
 ### Shuffling your library
 
-**Pull down** on either page, a good way past its top: a ring round the shuffle mark fills as
+**Pull down** on any page, a good way past its top: a ring round the shuffle mark fills as
 you pull, the mark growing and turning, "Pull to shuffle" under it. At the line the phone ticks, the ring
 becomes a purple disc, and it says "Release to shuffle" - let go then, and your library plays shuffled
 ("Shuffling"). Push back up a little before you let go and it's the ring again (pull down again for
 another tick); let go before the line and nothing plays. A pull never refreshes the Library now: it asks
 for itself as it comes into view, and ••• > Refresh asks now. The lists opened from the ••• - All albums,
-Downloaded, Downloaded playlists - still refresh when pulled.
+All artists, Downloaded, Downloaded playlists - still refresh when pulled.
 
 It's deadwax's shuffle, the web app's Library > Shuffle: every song of your library (of the collection,
 without a library of your own) once, in an order deadwax makes, played from the first. Its first 200
@@ -314,7 +320,11 @@ back to the Library tab or the app, and when you pull down.
   closes it.
 - **Add to my library** and **Remove from my library**, with logins on. Removing takes the album out
   of your library only: "it's still in the collection, and nothing was deleted."
-- The artist's name is plain text for now: artist pages come in a later phase.
+- **The artist's name**, in purple, opens [their page](#artists). An album that names no artist to go to
+  shows the name in grey, and it opens nothing. While the album is still loading, and the list you came
+  from didn't say who its artist is, the name is purple but can't be tapped yet, so it never changes
+  colour as the album comes in. If the album doesn't come - it couldn't be loaded, it's gone, or deadwax
+  can't be reached and it isn't on the phone - the name is grey.
 
 **Downloading it** (see [Downloads](#downloads)):
 
@@ -518,6 +528,56 @@ Downloaded playlists at its top.
 Nothing is made or changed while deadwax can't be reached: Add to a playlist… isn't in the ••• menus
 or Now Playing's, and **+** and **Edit** are dimmed. Nothing is kept to send later - a playlist can be
 changed from any app, and a change sent later could land on one that has changed since.
+
+## Artists
+
+**The Artists page** is a page of the Library's switch. With logins on it's **Your artists**: the artists of
+the albums in your library, each with how many of your albums are theirs ("2 albums"), as the web app's
+Library > Artists has them. ••• > **All music** > **All artists** is every artist in the collection, each
+with how many albums the collection has of theirs ("12 albums in the collection"). With logins off, and
+for the break-glass `deadwax` sign-in, the page is **Artists**, the whole collection's.
+
+- **A row** is the artist's round picture (Navidrome's, as the web app shows it), their name and their
+  count. **Tap it** to open their page. Nothing plays from the list but the pull.
+- **The order** (••• > **Artist order**): **Name** (the first time) or **Most albums**. Name sorts by
+  deadwax's own spelling of a name - "The" at the start, accents and case set aside - under letter headers,
+  with names that don't start with a letter under # at the end. Most albums has no headers. This phone
+  remembers the order.
+- **Find**, under the switch, keeps the artists whose name holds every word you type, in any order and
+  anywhere in a word. The count then says "3 of 120 artists".
+- **The index** down the right edge for Name, once a list has 50 artists or more, as the albums' is.
+
+The list is asked for each time the page comes into view, and with ••• > Refresh; until it comes, what was
+last listed shows. If deadwax can't be asked, the list stays as it was, under "Couldn't update this list -
+showing it as it was." An empty Your artists says "No artists in your library yet.", with **See All
+music**. All artists, pushed from the •••, refreshes when pulled; the page in the switch shuffles, as the
+others do.
+
+**An artist's page**: their picture and name, **Play** and **Shuffle**, and **Albums** - their albums in
+the collection, newest first (undated ones last), each with its cover, its title, and a line like "1994 ·
+in your library", a green tick before it for the ones in your library ("in the collection" and no tick for
+the rest). With logins off every album is ticked. **Tap an album** to open its page.
+
+- **Play** plays every album of theirs, in the page's order, each as an album - from the first song of the
+  newest. **Shuffle** plays every song of them once, in a random order. With Normalization on, Play levels
+  each album as a whole and Shuffle each song on its own, as the web app does.
+- As the page opens it fetches every album's songs, four albums at a time, so the music starts the moment
+  you tap. Until they're in, the line under the buttons says "Getting the songs of the 3 albums you have…"
+  ("in the collection" with a library of your own), and Play and Shuffle are dimmed. Then "Plays the 3
+  albums you have". An album that wouldn't come is left out - "Plays 2 of the 3 albums you have - the rest
+  didn't load" - with **Try again** under it.
+- An artist deadwax no longer has says "This artist isn't here any more - their albums may have been moved
+  or deleted."
+- Not on the phone yet: the web app's discography from MusicBrainz, the description, the facts, pins, and
+  the pictures and names managed from the artist's page. Those come with Search and Get.
+
+**Offline**, the Artists page lists what it last listed, an artist with nothing on this phone dimmed (it
+opens nothing). With no list in hand it lists the artists of the albums on the phone, under "Only the
+artists of downloaded albums show until deadwax is back." - each named as most of their albums here name
+them, so an album they made with someone else ("Portishead & Tricky") doesn't rename them. An artist's page that's one of the last 20 you
+opened since the app started shows their albums as it last had them - any other, the ones on the phone -
+with the albums not on the phone dimmed, and Play and Shuffle playing only the songs here ("Only
+downloaded albums play until deadwax is back.").
 
 ## Playing
 
@@ -2334,13 +2394,64 @@ button (still app 0.9). Earlier checks' "Library > Playlists" is now the switch'
   Accessibility > Motion), the pull's mark doesn't grow or turn, the states change at once, and a tap on
   the switch moves the page without sliding.
 
+### Artists' checks (102-111)
+
+**Not done yet.** These come with the build that adds Artists (still app 0.9). Since it, the Albums page's
+order and Grid or list are in the Library's •••, and All music is a submenu: ••• > All music > All albums.
+
+- **102 The page.** The switch reads Albums | Playlists | Artists - Artists added at the end of an order
+  you'd arranged before. Swipe to Artists: every artist of your albums with "2 albums" under each, in
+  letter headers, the index down the edge once there are 50 or more - the web app's Library > Artists, the
+  same artists and counts. Does each round picture show the artist? Tap the Library tab: back to the top.
+- **103 The •••, three pages.** On Albums: Album order (showing the one chosen) and Show as list; choose
+  Title, then Show as list - the albums follow, and back. On Artists: Artist order, Most albums - most first,
+  no headers, no index; back to Name. On Playlists: neither, and the + beside the •••. Force-quit and open:
+  both orders and the list are as you left them. At the largest text size, does the bar fit the switch, +
+  and •••?
+- **104 All music.** ••• > All music: All albums and All artists. All artists: every artist of the
+  collection, "12 albums in the collection" under each - the collection's count, which can be more than
+  your artists' row says. Pull down: it refreshes, no shuffle. With logins off: no All music, and the
+  Artists page is every artist, the count alone under each ("12 albums").
+- **105 Find.** On Artists, type part of a name ("bj" for Björk, "beat" for The Beatles): only the artists
+  whose name holds it, "3 of 120 artists"; nonsense: "No artists match “…”." Back on Albums and
+  Playlists, Find holds their own words.
+- **106 An artist's page.** Open an artist with several albums: the round picture, the name, Play and
+  Shuffle dimmed for a moment under "Getting the songs of the 3 albums you have…" ("in the collection" with
+  logins on), then "Plays the 3 albums you have". Their albums are newest first, the undated last, each
+  "1994 · in your library" with a green tick - or "in the collection", no tick, for one that isn't in your
+  library. Tap one: its page. Back: the page as it was, nothing fetched again. Go back to the list and
+  open them again: their albums at once, and "Getting the songs…" or "Plays…" at once under Play - never
+  "None of their albums are here to play." while their albums are listed.
+- **107 Play and Shuffle.** Play: the newest album from its first song, then the next album, and so on -
+  Up Next lists them in the page's order. Shuffle: songs from every album, in no order, with Shuffle on.
+  Does the music start the moment you tap, both times? With Normalization on Automatic, Info says Play's
+  songs are levelled as an album, Shuffle's as songs.
+- **108 The album's artist.** On an album's page the artist is purple: tap it - their page. An album from
+  Up Next or Now Playing's Go to the album: the same. Does the name ever flash from grey to purple as the
+  page loads? In Airplane Mode, Now Playing's Go to the album for a song that isn't downloaded: the name
+  grey, not a purple one that can't be tapped.
+- **109 Cut off.** Open an artist with many albums and turn on Airplane Mode before the line says
+  "Plays…": "Only downloaded albums play until deadwax is back.", the albums not on the phone dimmed.
+  Airplane Mode off: in a moment, "Plays the 5 albums you have" - the albums that didn't come are asked
+  for again by themselves. (Should one still not come, the line says "Plays 4 of the 5 albums you have -
+  the rest didn't load", with Try again under it.)
+- **110 Offline.** Airplane Mode: the Artists page lists as before, an artist with nothing downloaded
+  dimmed. Force-quit and open in Airplane Mode: the artists of your downloaded albums, under "Only the
+  artists of downloaded albums show until deadwax is back." Open one: their downloaded albums, Play and
+  Shuffle playing only those songs, "Only downloaded albums play until deadwax is back." An artist with a
+  downloaded album made with someone else ("A & B") and more of their own is listed by their own name.
+- **111 VoiceOver.** The switch reads Albums, Playlists and Artists; an artist's row "Portishead, 2
+  albums"; an album row on their page "Dummy, 1994 · in your library"; the ••• has Album order and Show as
+  list on Albums, Artist order on Artists.
+
 ## What it can't do yet
 
 These are the web app's for now. Most of them come to the phone in the next phases:
 
 - **The visualizer**: it stays the web app's, on a desktop.
 
-- **Artist pages** and a **songs list**.
+- A **songs list**, and on an artist's page their **discography** from MusicBrainz, the **description**
+  and the artist's managing (pictures, names).
 - **Search**, **Get** and **Requests**.
 - **Home** and **pins**.
 - **Looking after deadwax**: People, Server settings, the event log, Needs a look, Library care, the
@@ -2362,6 +2473,8 @@ These are the web app's for now. Most of them come to the phone in the next phas
 | Library: **"Your music isn't available yet"** (an admin sees **"Connect Navidrome"**) | deadwax hasn't been told where Navidrome is. An admin's **Set up Navidrome** opens the web app in Safari: set it up in Server settings (Connections), then come back. |
 | Library: **"Couldn't update this list - showing it as it was."** | deadwax didn't answer just then. ••• > Refresh to try again (pull down, on a list opened from the •••). |
 | An album's page: **"This album isn't here any more - it may have been moved or deleted."** | Go back, and ••• > Refresh in the Library to bring it up to date. |
+| An artist's page: **"This artist isn't here any more - their albums may have been moved or deleted."** | The same: go back, and ••• > Refresh. |
+| An artist's page: **"Plays 2 of the 5 albums you have - the rest didn't load"**, or **"Couldn't load their songs."** | deadwax didn't send those albums' songs just then. **Try again** under it; Play and Shuffle meanwhile play the albums that came. |
 | A song's line says **"The connection dropped while this song was loading"**, or the next song's says **"Skipped "..." - it wouldn't play"** | The app asks for a song once more after a moment, then goes on past it. Check the phone's network. |
 | **"This device couldn't play this song's audio"**, or **"Skipped "..." - this device couldn't play its audio"** | The file is damaged, or in a form iPhones can't play. Try it on the web app; an admin finds the details in You > Debug > Playing. |
 | Info's Normalization: **"Not this time - the album's volume couldn't be checked"** ("the song's" for a song levelled on its own) | deadwax is older than 2.1.1, or didn't answer in time. The song plays as it is; with 2.1.1 or later, the album's next play is levelled. |

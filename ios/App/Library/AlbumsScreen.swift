@@ -535,11 +535,14 @@ private struct StoreAlbumsLink<Content: View>: View {
     }
 }
 
-/// Your library empty (EmptyLibrary): what is empty, how to fill it, and See All music.
-private struct EmptyLibraryNote: View {
+/// Your library empty (EmptyLibrary): what is empty - `lead`, your albums' or (slice 4) your artists' - how to fill it,
+/// and See All music.
+struct EmptyLibraryNote: View {
+    var lead = LibraryWords.emptyLibrary
+
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text(LibraryWords.emptyLibrary)
+            Text(lead)
             Text(LibraryWords.emptyLibraryHow)
                 .foregroundStyle(Palette.quiet)
             StoreAlbumsLink {
@@ -553,8 +556,8 @@ private struct EmptyLibraryNote: View {
 }
 
 /// A list that couldn't be asked again, drawn as it was (COULDNT_REFRESH), with the error and Try again.
-private struct RefreshProblemNote: View {
-    let failure: APIFailure
+struct RefreshProblemNote: View {
+    let failure: any Error
     let retry: () -> Void
 
     var body: some View {
@@ -571,8 +574,8 @@ private struct RefreshProblemNote: View {
     }
 }
 
-/// One line in place of the albums ("No albums yet.", "No albums match “…”.").
-private struct ShelfNote: View {
+/// One line in place of the albums or the artists ("No albums yet.", "No artists match “…”.").
+struct ShelfNote: View {
     let words: String
 
     init(_ words: String) {

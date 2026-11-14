@@ -291,6 +291,17 @@ final class PlayerModel {
         startQueue { $0.playTracks(plan.tracks, start: index, shuffle: shuffle) }
     }
 
+    /// (Phase 4, slice 4) An artist's Play and Shuffle (phase4-library.md 2.6, ArtistPage.tsx `play`): every song of
+    /// `albums` - each album as its answer has it, in the page's order - Play from the first at the album level, Shuffle
+    /// every song once, anywhere, at the songs level (ArtistPlay.plan); every album remembered as the queue's. Call it in
+    /// the tap with the songs in hand, nothing awaited first.
+    func play(artist albums: [Album], shuffle: Bool) {
+        guard let plan = ArtistPlay.plan(albums, shuffle: shuffle, setting: normalization) else { return }
+        played.rememberQueue(plan.albums, keeping: QueueAlbums.named(plan.tracks))
+        shelve(albums.flatMap { (album: Album) -> [Song] in album.song ?? [] })
+        startQueue { $0.playTracks(plan.tracks, start: plan.start, shuffle: shuffle) }
+    }
+
     /// (Phase 4, slice 3b) The Library's Shuffle - the •••'s tap, the pull's release (phase4-library.md 2.8;
     /// ShuffleSongs.tsx's tap): the first page asked ahead, played from its first song as a library's shuffle (`paged`:
     /// the order's token and total, the songs fetched, the scope, the level the first song got) - the feed brings in the

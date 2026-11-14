@@ -104,6 +104,10 @@ public enum Routes {
     // no longer holds it)
     public static let shuffle = Endpoint(method: "GET", path: "/deadwax/navidrome/shuffle", query: ["scope", "playing", "claim"])
     public static let shufflePage = Endpoint(method: "GET", path: "/deadwax/navidrome/shuffle/{token}", query: ["offset"])
+    // slice 4's (phase4-library.md 2.6): every artist, Navidrome's getArtists flattened (`ArtistList`), and one artist
+    // with their albums (getArtist, `ArtistWithAlbums`; `{}` for one Navidrome doesn't have)
+    public static let artists = Endpoint(method: "GET", path: "/deadwax/navidrome/artists", query: [])
+    public static let artist = Endpoint(method: "GET", path: "/deadwax/navidrome/artists/{artist_id}", query: [])
 
     /// The levels spec's name for `levelAlbum`: the album's levels warmed before its first play.
     public static var warmLevels: Endpoint { levelAlbum }
@@ -121,6 +125,7 @@ public enum Routes {
         history, recordHistory,
         playlists, playlist, createPlaylist, addToPlaylist, editPlaylist, deletePlaylist,
         shuffle, shufflePage,
+        artists, artist,
     ]
 
     /// The routes given longer than the transport's own 8 seconds to answer, in seconds: the album index reads every

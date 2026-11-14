@@ -30,6 +30,28 @@ enum AppRoute: Hashable {
     case playlist(PlaylistRoute)
     /// (Phase 4, slice 3) The playlists downloaded to this phone - reached from Downloaded.
     case downloadedPlaylists
+    /// (Phase 4, slice 4) An artist's page (phase4-library.md 2.6), by Navidrome's artist id - from an artists list's row
+    /// and an album page's artist line.
+    case artist(ArtistRoute)
+    /// (slice 4) An artists list of a scope, pushed: All music's All artists (the store's), from the Library's •••.
+    case artists(AlbumScope)
+}
+
+/// An artist page's address: Navidrome's artist id, and what opened it - the name and picture drawn at once while the
+/// artist loads. Only `id` decides which artist.
+struct ArtistRoute: Hashable {
+    let id: String
+    var preview: Artist?
+
+    init(id: String, preview: Artist? = nil) {
+        self.id = id
+        self.preview = preview
+    }
+
+    /// An artists list's row.
+    init(_ artist: Artist) {
+        self.init(id: artist.id, preview: artist)
+    }
 }
 
 /// A playlist page's address: its id, and the row that opened it - the hero drawn at once while the playlist loads.
@@ -63,9 +85,12 @@ struct AlbumRoute: Hashable {
     /// The album's MusicBrainz release id, as the opener knew it: what the page tells your library it opened with
     /// (MyLibraryState.opened - the web's preview's musicBrainzId).
     var musicBrainzId: String?
+    /// (Phase 4, slice 4) The album artist's Navidrome id, as the opener knew it: the hero's artist line is their link
+    /// before the album answers (ArtistLink - the web's `shown?.artistId`).
+    var artistId: String?
 
     init(id: String, name: String? = nil, artist: String? = nil, coverArt: String? = nil, year: Int? = nil,
-         genre: String? = nil, musicBrainzId: String? = nil) {
+         genre: String? = nil, musicBrainzId: String? = nil, artistId: String? = nil) {
         self.id = id
         self.name = name
         self.artist = artist
@@ -73,18 +98,19 @@ struct AlbumRoute: Hashable {
         self.year = year
         self.genre = genre
         self.musicBrainzId = musicBrainzId
+        self.artistId = artistId
     }
 
     /// A Library row's album.
     init(_ album: IndexAlbum) {
         self.init(id: album.id, name: album.name, artist: album.artist, coverArt: album.coverArt, year: album.year,
-                  genre: album.genre, musicBrainzId: album.musicBrainzId)
+                  genre: album.genre, musicBrainzId: album.musicBrainzId, artistId: album.artistId)
     }
 
     /// An album already loaded.
     init(_ album: Album) {
         self.init(id: album.id, name: album.name, artist: album.artist, coverArt: album.coverArt, year: album.year,
-                  genre: album.genre, musicBrainzId: album.musicBrainzId)
+                  genre: album.genre, musicBrainzId: album.musicBrainzId, artistId: album.artistId)
     }
 
     /// A queue entry's album (Now Playing's Go to the album, Info's album line); nil when the track names none.
@@ -268,6 +294,8 @@ extension View {
                 case .eq(let page): EQDestination(route: page)
                 case .playlist(let playlist): PlaylistView(route: playlist)
                 case .downloadedPlaylists: DownloadedPlaylistsScreen()
+                case .artist(let artist): ArtistView(route: artist)
+                case .artists(let scope): ArtistsScreen(scope: scope)
                 }
             }
             .clearsPlayer()
