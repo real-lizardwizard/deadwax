@@ -580,13 +580,29 @@ enum SearchAlbumsVectors {
                     continue
                 }
                 let diff = try #require(made, "\(what)")
-                #expect(diff.added.map { [String($0.position), $0.title, $0.length.map(String.init) ?? "-", $0.after ?? "-"] }
-                        == wanted.added.map { [String($0.position), $0.title, $0.length.map(String.init) ?? "-", $0.after ?? "-"] },
-                        "\(what): added")
-                #expect(diff.removed.map { [String($0.position), $0.title, $0.length.map(String.init) ?? "-"] }
-                        == wanted.removed.map { [String($0.position), $0.title, $0.length.map(String.init) ?? "-"] }, "\(what): removed")
-                #expect(diff.renamed.map { [String($0.position), $0.from, $0.to] }
-                        == wanted.renamed.map { [String($0.position), $0.from, $0.to] }, "\(what): renamed")
+                // each row made [String] by a typed function and compared outside #expect: CI's Xcode 26.6 gives up
+                // type-checking these closures written inline in the macro
+                let madeAdded: [[String]] = diff.added.map { (a: TracklistDiff.Added) -> [String] in
+                    diffCells(a.position, a.title, a.length) + [a.after ?? "-"]
+                }
+                let wantedAdded: [[String]] = wanted.added.map { (a: V.PressingsCase.Added) -> [String] in
+                    diffCells(a.position, a.title, a.length) + [a.after ?? "-"]
+                }
+                #expect(madeAdded == wantedAdded, "\(what): added")
+                let madeRemoved: [[String]] = diff.removed.map { (r: TracklistDiff.Removed) -> [String] in
+                    diffCells(r.position, r.title, r.length)
+                }
+                let wantedRemoved: [[String]] = wanted.removed.map { (r: V.PressingsCase.Removed) -> [String] in
+                    diffCells(r.position, r.title, r.length)
+                }
+                #expect(madeRemoved == wantedRemoved, "\(what): removed")
+                let madeRenamed: [[String]] = diff.renamed.map { (r: TracklistDiff.Renamed) -> [String] in
+                    [String(r.position), r.from, r.to]
+                }
+                let wantedRenamed: [[String]] = wanted.renamed.map { (r: V.PressingsCase.Renamed) -> [String] in
+                    [String(r.position), r.from, r.to]
+                }
+                #expect(madeRenamed == wantedRenamed, "\(what): renamed")
                 #expect(diff.versions.map { [$0.position, $0.from, $0.to, $0.delta] } == wanted.versions.map { [$0.position, $0.from, $0.to, $0.delta] },
                         "\(what): other versions")
                 #expect(diff.versions.map(\.title) == wanted.versions.map(\.title), "\(what): other versions' titles")
@@ -679,4 +695,11 @@ enum SearchAlbumsVectors {
             #expect(made == each.addresses, "\(each.release ?? "nil") \(each.group)")
         }
     }
+}
+
+/// A tracklist diff's row as words - its position, title and length ("-" for none) - for comparing the made and the
+/// wanted (the pressings case above).
+private func diffCells(_ position: Int, _ title: String, _ length: Int?) -> [String] {
+    let shown: String = length.map { (seconds: Int) -> String in String(seconds) } ?? "-"
+    return [String(position), title, shown]
 }
