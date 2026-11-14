@@ -52,13 +52,16 @@ new and listed in section 1.
   | `GET /deadwax/navidrome/album_index?scope=yours` (already `Routes.albumIndex`) | your albums - what is yours, and each artist's count of yours | 1 (no change) |
   | `GET /deadwax/navidrome/albums/{album_id}` (already `Routes.album`) | an album's songs - what lets a song's tap play | 1 (no change) |
   | `GET /deadwax/search_musicbrainz/fully_search` (`src/routes/search_musicbrainz.py:49`) | release groups for a query (`limit`, `releases`, `offset` <= `FULLY_SEARCH_OFFSET_MAX`, `quick`) | 2 |
-  | `GET .../release_group` (`:322`), `GET .../releases` (`:294`), `GET .../release` (`:390`) | one group; its pressings (`tracks=false`); one pressing with its tracklist - the album you don't have | 2 |
+  | `GET .../release_group` (`:322`) | one group's every pressing with its tracklist (`{id, releases, problem}`) - the album you don't have, as the web's page reads it (question 15) | 2 |
+  | `GET /deadwax/coverart/{kind}/{mbid}?size=` (`src/routes/coverart.py`, server 2.1.24) | a release's or a group's front cover from the Cover Art Archive, through deadwax (question 8) | 2 |
+  | `GET /deadwax/store/album?release_mbid=` (already `Routes.storeAlbum`) | Navidrome's album of a release you hold - a held album opening yours | 2 (a query added) |
   | `GET .../artists` (`:155`) | MusicBrainz artists by name (`limit` 10 by default, `offset`) | 3 |
   | `GET .../songs` (`:109`) | recordings for a query (`limit`, `offset`), grouped into songs on the phone | 3 |
   | `GET .../artist` (`:360`), `GET .../discography` (`:245`) | a MusicBrainz artist, and their release groups - a MusicBrainz artist's page (question 9) | 3 |
   | `GET .../saved` (`:203`) | what MusicBrainz answered before, searched under any words (`words`) | 4 |
 
-  tests/test_ios_contract.py's ROUTE_COUNT moves 40 -> 41 (slice 1: `/library/owned`), 45 (2), 49 (3), 50 (4).
+  tests/test_ios_contract.py's ROUTE_COUNT moves 40 -> 41 (slice 1: `/library/owned`), 44 (2: `/fully_search`,
+  `/release_group` and the covers' relay - question 15), 48 (3), 49 (4).
 - **What search3 answers.** Navidrome's search3, passed on as it is: `artists` (ArtistID3: id, name, coverArt,
   albumCount, musicBrainzId, starred...), `albums` (AlbumID3: id, name, artist, artistId, coverArt, songCount,
   duration, year, genre, starred, musicBrainzId, created...), `songs` (Child: id, title, album, albumId, artist,
@@ -327,9 +330,9 @@ the empty cover.
 | slice 1: `SearchReading.swift` - searchQuery.ts (`artistNames`, the reading, the queries) | `SearchScreen` - the tab's root: the box, the chips, All, a kind view, the gate's words, offline |
 | slice 1: `SearchList.swift` - the rows, `SearchMarks` (whose), the pool and the sections, `SongTitle.key` (titleKey), the tier, the rank, the family, Top results, the lines, the words, `SearchPacing`, `SearchDrawn`, `KindLibrary` (a kind view's own and its More) | `SearchRow` views - an artist's, an album's, a song's (▶, •••, dimmed offline) |
 | slice 1: `LibraryResults` (lenient), `Routes.libraryOwned` (41), `Routes.search` with `artistOffset` and `albumOffset`; `DeadwaxClient.searchLibrary(_:counts:offsets:)`, `owned(ifNoneMatch:)` | `AppTab.search`, its stack in `AppNavigation`, MainTabs' third tab |
-| slice 2: MusicBrainz's groups (`ReleaseGroup` lenient), searchResults.ts' kinds and years, `notInLibrary`, `heldUnlisted`, the moments (`decidedTop`, `sectionsReady`, `lateKinds`, `drawInOrFold`, `nextBehind`), pressings.ts' page rules; 4 routes (45) | the moments as drawn, the album you don't have (`AppRoute.group`), Get's place |
-| slice 3: songs.ts (`groupSongs`, `namedAlbum`, `newSongs`, the disclosure), `newArtists`, MusicBrainz artists; 4 routes (49) | the songs' disclosure, a MusicBrainz artist's page |
-| slice 4: `savedFor`, `SAVED_WAIT_MS`, the kept answers (24), More from MusicBrainz; 1 route (50); the app 0.11 (11) | the saved rows, the kept answers |
+| slice 2: MusicBrainz's groups (`ReleaseGroup` lenient), searchResults.ts' kinds and years, `notInLibrary`, `heldUnlisted`, the moments (`decidedTop`, `sectionsReady`, `lateKinds`, `drawInOrFold`, `nextBehind`), pressings.ts' page rules; 3 routes (44) | the moments as drawn, the album you don't have (`AppRoute.group`), Get's place |
+| slice 3: songs.ts (`groupSongs`, `namedAlbum`, `newSongs`, the disclosure), `newArtists`, MusicBrainz artists; 4 routes (48) | the songs' disclosure, a MusicBrainz artist's page |
+| slice 4: `savedFor`, `SAVED_WAIT_MS`, the kept answers (24), More from MusicBrainz; 1 route (49); the app 0.11 (11) | the saved rows, the kept answers |
 
 ### 5.2 Held to the web
 
@@ -385,6 +388,15 @@ Questions 1-7 and 10 were built with it; questions 11-13 came of it. docs/ios.md
 review's fixes (a failure asked again drawn, words come back to drawn, your albums asked again, a repeated row):
 "Phase 5, slice 1, after its review".
 
+### 6.6 Slice 2, built (2026-11-14)
+
+What slice 2 is, as built, is in notes/ios.md's "Phase 5, slice 2: albums you don't have" - Core (MusicBrainz.swift,
+SearchAlbums.swift, Pressings.swift, and slice 2's half of SearchList.swift, SearchReading.swift and SearchState.swift,
+held to the web by export-search-albums-vectors.cjs and its second fixture), the app (SearchModel's MusicBrainz
+half, the moments drawn in SearchScreen, GroupView and PressingPickerSheet, ArchiveCover through the 2.1.24
+relay), what was decided here, the tests and mutations, and what was verified. Question 8 was built with it (the
+relay, on main as 2.1.24); questions 14-23 came of it. docs/ios.md's checks 130-139 are its.
+
 ## 7. Tests (Swift Testing; Core's on Linux and macOS)
 
 - **The fixture's replay** (slice 1): every rule of 2.1-2.5 over the web's own answers - readings of every shape (a
@@ -400,7 +412,7 @@ review's fixes (a failure asked again drawn, words come back to drawn, your albu
   drawn list's freeze (marks changing in place, a new text's answer replacing it only once settled, an empty box),
   `KindLibrary`'s More (appending without repeats, full again only when the page was full and new), the prefetch's
   choice, the song tap's rule (in hand, among them, not, offline and on this phone), the pacing's numbers.
-- **The contract** (tests/test_ios_contract.py): ROUTE_COUNT 41; `/library/owned` named with the fields the app reads
+- **The contract** (tests/test_ios_contract.py): ROUTE_COUNT 41 (44 with slice 2); `/library/owned` named with the fields the app reads
   within `OWNED_FIELDS` and `yours`; `LibraryResults`' keys within what the route returns; every count and offset the
   app sends within the route's bounds; the box's limit at most `q`'s 200.
 - **Mutations** run by hand and caught (notes/ios.md lists each).
@@ -435,7 +447,10 @@ Numbered after Phase 4's 120. Slice 1's (docs/ios.md's "Search's checks (121-129
   list found is announced ("In your library: 1 artist, 2 albums, 11 songs."); a chip's "Showing albums.".
 
 The phase's (the plan's two, with slices 2-4): search an album you don't have - its MusicBrainz page opens (slice 2);
-each slice numbers its own after the last.
+each slice numbers its own after the last. Slice 2's are 130-139 (docs/ios.md's "Search's checks, slice 2
+(130-139)"): the hint, an album you don't have opening its page (the plan's second), its pressings and the filter,
+held and maybe, the moments beside the web's, an artist alone and the studio line, short words, covers on 2.1.24
+and 2.1.23, offline, VoiceOver.
 
 ## 9. What only the phone can tell
 
@@ -480,7 +495,10 @@ each slice numbers its own after the last.
    stays until the library settles (the transport's 8 seconds at most); slice 2 brings the web's rule with
    MusicBrainz's rows.
 8. **MusicBrainz's covers** (slice 2). *Recommend*: a deadwax relay for the Cover Art Archive (section 4), a main
-   2.1.x patch, since the app talks only to deadwax; until it exists, the empty cover. Not built (slice 2).
+   2.1.x patch, since the app talks only to deadwax; until it exists, the empty cover. Built: the relay is main's
+   2.1.24; the phone asks it at 250 for a row and 1200 for the album's own page (question 19), and draws the empty
+   cover for anything but a 200 (it sends no ETag yet, so no 304 comes) - an older server's 404 for the route
+   included, so it runs on 2.1.23.
 9. **A MusicBrainz artist's page** (slice 3). The web's artist page opened from MusicBrainz (`mb:<mbid>`) is their
    discography and description. *Recommend*: their release groups in the web's order, each opening the album you
    don't have (or yours), and the description in Phase 7's links if at all. Not built (slice 3).
@@ -497,3 +515,50 @@ each slice numbers its own after the last.
 13. **Where the list goes when it changes.** *Recommend, and built*: to its top, at once, when a chip changes the view
     and when new words' list takes the old one's place; a row's line changing in place never moves it, and Search
     tapped at the list scrolls to the top as the other tabs do.
+
+14. **What slice 2 asks MusicBrainz** (slice 2). *Recommend, and built*: albums only - `/fully_search` for All's
+    Albums and the Albums view. The Artists and Songs views, and All's Artists and Songs, ask nothing of MusicBrainz
+    until slice 3, so the moments wait on the albums alone (the web's `sectionsReady` over the kinds asked), and a
+    kind view's late clock is armed only for a view that asks (Albums). Core's row type has slice 3's MusicBrainz
+    artist already; nothing makes one yet, and drawn it would open nothing.
+15. **The routes** (slice 2). Section 0 counted four, `/releases` and `/release` among them; the web's album page
+    reads every pressing's tracklist from `/release_group`'s one answer (`{id, releases, problem}`), and the covers
+    need the relay. *Recommend, and built*: three - `/fully_search`, `/release_group` and `/coverart/{kind}/{mbid}` -
+    and `/store/album` taking `release_mbid` beside `navidrome_id` (the app's already); ROUTE_COUNT 44, slices 3 and
+    4 then 48 and 49.
+16. **An album MusicBrainz found that you hold** (slice 2). The web opens yours through the id bridge
+    (`heldReleases`, then `/store/album?release_mbid=` for each until Navidrome has one). *Recommend, and built*:
+    the same - the row shows that it's asking and other rows wait; your album's page opens when found, else the
+    album you don't have's page, its line saying it's in your library.
+17. **What the album you don't have's page leaves out** (slice 2). The web's has the album's description,
+    MusicBrainz's links, the editors' "Match it to a pressing in Edit album." and Get. *Recommend, and built*: the
+    cover, the title, the credit (a link to your library's artist when one is theirs - a MusicBrainz artist's page
+    is question 9's), the line with "maybe in your library" dashed, Pressing, the facts, the maybe sentence without
+    the editors' (the phone has no Edit album), the summary and the tracklist with "Not on this pressing"; Get's
+    place drawn empty for Phase 6; no description or links (Phase 7's, with the artist's).
+18. **The pressing picker** (slice 2). *Recommend, and built*: a sheet (medium, then large), the chosen pressing
+    ticked, a tap choosing it and closing the sheet; the web's filter (`.searchable`) only over 30 pressings, its
+    words announced as it narrows; the web's fold ("3 more pressings with the usual tracklist").
+19. **Cover sizes** (slice 2). *Recommend, and built*: the relay's 250 for a row (a row's cover is small, and 250
+    is the Archive's smallest) and 1200 for the album's own page (its cover is the screen's width); the page tries
+    the chosen pressing's front, then the album's, as the web does.
+20. **Pressings kept** (slice 2). The web keeps the last 20 complete lists for the session (`PRESSINGS_KEPT`).
+    *Recommend, and built*: the same, in memory, the newest last, a list with a problem never kept - so a page
+    opened again, or offline, draws at once.
+21. **MusicBrainz offline** (slice 2, beside question 5). *Recommend, and built*: none of it - a drawn list loses
+    MusicBrainz's rows, its slots and its words (yours stay, as slice 1's), since each of them opens a page that
+    needs deadwax (back online, they're drawn again); an album page keeps what it has shown, its pressings kept
+    for the session, and one that hasn't loaded them says "This album's pressings load once deadwax is back." (the
+    phone's own words, question 5's shape) and loads them once it is; a cover not yet fetched is the empty cover
+    (none kept on the phone). Words searched while away are asked of MusicBrainz as the pause would have asked them.
+22. **How long the phone waits for MusicBrainz** (slice 2). *Recommend, and built*: 20 s for the albums - deadwax
+    gives up in about eight seconds while MusicBrainz turns searches away (`SEARCH_PATIENCE`), which the contract
+    test holds below it - and 60 s for an album's pressings (several of MusicBrainz's pages). A connection hanging
+    on deadwax's side (up to about a minute and a half for a search) is then said as "That took too long." with Try
+    again, where the web, waiting it out, says "Searching for more isn't working right now - try again in a few
+    minutes." The other way: wait as long as deadwax could (minutes), for the web's words every time.
+23. **Slice 1's stand-ins** (questions 3, 4 and 7). *Recommend, and built*: the web's again - the hint is
+    searchResults.ts' ("Search your library and albums you don't have yet."); under three letters, with MusicBrainz
+    not asked, `TYPE_MORE` where the albums would go; the late library drawn after 1.5 s with its place kept at the
+    top ("Searching your library…", then Show 5 from your library, or that it found nothing); and nothing found
+    with Navidrome not there says "No results for “…”." as the web does.

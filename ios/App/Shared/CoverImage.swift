@@ -113,6 +113,27 @@ final class CoverCache {
     /// (its task cancelled) before it came. A failure within `againAfter` (a minute) is not asked again; the lock
     /// screen passes 0, as it keeps its own failure rule (PlayerModel.coverFailed).
     func load(client: DeadwaxClient, id: String, size: Int, againAfter: TimeInterval = CoverCache.againAfter) async -> UIImage? {
+        await load(client: client, id: id, size: size, againAfter: againAfter, archive: nil)
+    }
+
+    /// (Phase 5, slice 2) A Cover Art Archive front through deadwax's relay (server 2.1.24), kept as Navidrome's covers
+    /// are - nil for anything but a front: none (404), the Archive away (502, 504), or a server before 2.1.24 (its own
+    /// 404 for the route). Never on the phone, so offline it is the empty cover.
+    func loadArchive(client: DeadwaxClient, cover: ArchiveCoverID, size: Int) async -> UIImage? {
+        await load(client: client, id: Self.archiveId(cover), size: size, againAfter: Self.againAfter, archive: cover)
+    }
+
+    func cachedArchive(client: DeadwaxClient, cover: ArchiveCoverID, size: Int) -> UIImage? {
+        cached(client: client, id: Self.archiveId(cover), size: size)
+    }
+
+    /// An archive front's key in the cache - never a Navidrome cover id's shape.
+    private static func archiveId(_ cover: ArchiveCoverID) -> String {
+        "archive/\(cover.kind.rawValue)/\(cover.mbid)"
+    }
+
+    private func load(client: DeadwaxClient, id: String, size: Int, againAfter: TimeInterval,
+                      archive: ArchiveCoverID?) async -> UIImage? {
         let key = Self.key(client, id, size)
         if let image = images.object(forKey: key as NSString) { return image }
         let flight = Self.flightKey(key, client)
@@ -125,7 +146,7 @@ final class CoverCache {
             task = Task<UIImage?, Never> { [weak self] in
                 // a downloaded album's cover is on the phone (phase2-downloads.md 8.8): its 1024 drawn down to the size
                 // asked, with no network - deadwax asked only when it isn't
-                if let kept = KeptCovers.shared.url(for: id),
+                if archive == nil, let kept = KeptCovers.shared.url(for: id),
                    let image = await Task.detached(priority: .userInitiated, operation: { Self.thumbnail(kept, size: size) }).value {
                     self?.landed(key, flight, image, called: false)
                     return image
@@ -135,7 +156,13 @@ final class CoverCache {
                     self?.landed(key, flight, nil, called: false)
                     return nil
                 }
-                let data = try? await client.cover(coverID: id, size: size)
+                let data: Data?
+                if let archive {
+                    let answer = try? await client.archiveCover(archive, size: size)
+                    if case .fresh(let body, _)? = answer { data = body } else { data = nil }
+                } else {
+                    data = try? await client.cover(coverID: id, size: size)
+                }
                 // UIImage(data:) only reads the header; the pixels are decoded here, off the main thread
                 let raw = data.flatMap(UIImage.init(data:))
                 let image = await raw?.byPreparingForDisplay() ?? raw

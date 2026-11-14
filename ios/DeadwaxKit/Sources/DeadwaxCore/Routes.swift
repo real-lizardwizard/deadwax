@@ -54,8 +54,9 @@ public enum Routes {
     public static let saveQueueAt = Endpoint(method: "POST", path: "/deadwax/navidrome/queue/at", query: [])
 
     // Phase 1's: the id bridge and your library (logins on)
-    /// One album across its ids - asked by Navidrome's (`StoreAlbum`), only when there is a library (Access.hasLibrary).
-    public static let storeAlbum = Endpoint(method: "GET", path: "/deadwax/store/album", query: ["navidrome_id"])
+    /// One album across its ids - asked by Navidrome's (`StoreAlbum`), only when there is a library (Access.hasLibrary);
+    /// and (Phase 5, slice 2) by a release you hold, for Navidrome's album of it - a held album Search found opening yours.
+    public static let storeAlbum = Endpoint(method: "GET", path: "/deadwax/store/album", query: ["navidrome_id", "release_mbid"])
     public static let myLibrary = Endpoint(method: "GET", path: "/deadwax/me/library", query: [])
     public static let libraryAdd = Endpoint(method: "POST", path: "/deadwax/me/library/add", query: [])
     public static let libraryRemove = Endpoint(method: "POST", path: "/deadwax/me/library/remove", query: [])
@@ -111,6 +112,13 @@ public enum Routes {
     // Phase 5, slice 1's (phase5-search.md 0, 2.6): every album on disk, reduced to which album and edition it is
     // (`OwnedAnswer`, with an ETag) - the names Search reads the box against, and whose an unstarred album is
     public static let libraryOwned = Endpoint(method: "GET", path: "/deadwax/library/owned", query: [])
+    // Phase 5, slice 2's (phase5-search.md 6.2): MusicBrainz's albums for the box (`FullySearchAnswer` - asked with
+    // `releases=false` and `quick=true`, `SearchAlbums.limit` of them), one album's every pressing with its tracklist
+    // (`ReleaseGroupAnswer`, the album you don't have), and its front cover from the Cover Art Archive through deadwax
+    // (server 2.1.24; a 404 for an older server's missing route is drawn as the empty cover)
+    public static let fullySearch = Endpoint(method: "GET", path: "/deadwax/search_musicbrainz/fully_search", query: ["query", "limit", "releases", "quick"])
+    public static let releaseGroup = Endpoint(method: "GET", path: "/deadwax/search_musicbrainz/release_group", query: ["release_group_mbid"])
+    public static let archiveCover = Endpoint(method: "GET", path: "/deadwax/coverart/{kind}/{mbid}", query: ["size"])
 
     /// The levels spec's name for `levelAlbum`: the album's levels warmed before its first play.
     public static var warmLevels: Endpoint { levelAlbum }
@@ -130,13 +138,25 @@ public enum Routes {
         shuffle, shufflePage,
         artists, artist,
         libraryOwned,
+        fullySearch, releaseGroup, archiveCover,
     ]
 
     /// The routes given longer than the transport's own 8 seconds to answer, in seconds: the album index reads every
     /// album of a scope from Navidrome, a page at a time, before it answers; AutoEq's search may wait for deadwax's
     /// first fetch of AutoEq's list (src/autoeq.py FIRST_FETCH_SECONDS, 15 s) and a profile for its file
-    /// (PROFILE_DEADLINE_SECONDS, 15 s) - tests/test_ios_contract.py holds each above the server's.
-    public static let timeouts: [Endpoint: Double] = [albumIndex: 30, autoEqSearch: 20, autoEqProfile: 20, libraryOwned: 30]
+    /// (PROFILE_DEADLINE_SECONDS, 15 s); MusicBrainz's albums for the box take about eight seconds to give up while
+    /// MusicBrainz turns searches away (SEARCH_PATIENCE), and an album's pressings with their tracklists up to five
+    /// MusicBrainz pages - tests/test_ios_contract.py holds each above the server's.
+    public static let timeouts: [Endpoint: Double] = [albumIndex: 30, autoEqSearch: 20, autoEqProfile: 20, libraryOwned: 30, fullySearch: 20, releaseGroup: 60]
+}
+
+/// The Cover Art Archive's thumbnail sizes the app asks deadwax's relay for (`Routes.archiveCover`'s `size`, which takes
+/// 250, 500 or 1200 - the contract test checks each).
+public enum ArchiveCoverSize {
+    /// A list's row.
+    public static let row = 250
+    /// The album you don't have's own cover.
+    public static let hero = 1200
 }
 
 /// The cover sizes the app asks for (`Routes.cover`'s `size`) - the contract test checks each is within the server's

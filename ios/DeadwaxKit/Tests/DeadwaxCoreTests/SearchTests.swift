@@ -29,9 +29,19 @@ import Testing
         return state
     }
 
-    /// The All view's next draw, with no folders and no full artist list unless given.
+    /// The All view's next draw, with no folders and no full artist list unless given - MusicBrainz's albums, when the
+    /// words ask them, answered at once with nothing (these are the library's half's tests), so the list is drawn whole.
+    static func drawing(_ state: inout SearchState, owned: [String] = [], list: [Artist]? = nil) -> SearchState.Drawing? {
+        state.ownedArtists = owned
+        if state.view == .all, !state.query.isEmpty, state.drawnMusicBrainz(state.query), !state.askedForQuery,
+           let ask = state.askingMusicBrainz(state.query, view: .all) {
+            state.albumsAnswered(ask, FullySearchAnswer(), query: ask.first, index: nil)
+        }
+        return state.advance(artistList: list, marks: marks)
+    }
+
     static func advance(_ state: inout SearchState, owned: [String] = [], list: [Artist]? = nil) -> SearchList.Drawn? {
-        state.advance(ownedArtists: owned, artistList: list, marks: marks)
+        drawing(&state, owned: owned, list: list)?.drawn
     }
 
     // MARK: the box and the list drawn
@@ -39,7 +49,7 @@ import Testing
     @Test func theListIsDrawnOnceTheLibrarySettlesAndThenFrozen() throws {
         var state = SearchState()
         let emptied = state.typed("  portishead ")
-        #expect(!emptied && state.query == "portishead")
+        #expect(emptied == .settle && state.query == "portishead")
         #expect(state.wantsLibrary)
         let early = Self.advance(&state)
         #expect(early == nil, "not asked yet")
@@ -50,12 +60,13 @@ import Testing
         #expect(asking == nil, "still asking")
         let kept = state.libraryAnswered(token, "portishead", Self.found)
         #expect(kept && state.settled && state.resultsForQuery == Self.found)
-        let drawnMade = Self.advance(&state)
-        let drawn = try #require(drawnMade)
+        let drawingMade = Self.drawing(&state)
+        let drawing = try #require(drawingMade)
+        let drawn = drawing.drawn
         #expect(drawn.text == "portishead")
         #expect(drawn.top.map(\.key) == ["artist:ar-p", "album:nd-dummy", "song:s-roads"])
-        #expect(drawn.sections.map(\.kind) == [.artists, .albums, .songs])
-        #expect(drawn.said(personal: false) == "In your library: 1 artist, 1 album, 2 songs.")
+        #expect(drawn.sections?.map(\.kind) == [.artists, .albums, .songs])
+        #expect(drawing.said == "In your library: 1 artist, 1 album, 2 songs. Nothing more found.")
         #expect(state.drawn == drawn)
         // drawn once per run: nothing new however often it is asked
         let again = Self.advance(&state)
@@ -63,7 +74,7 @@ import Testing
         // the same words with other spaces are the same words: no new run
         let spaced = state.typed("portishead  ")
         let still = Self.advance(&state)
-        #expect(!spaced && still == nil)
+        #expect(spaced == nil && still == nil)
     }
 
     @Test func newWordsKeepTheOldListUntilTheirsSettles() throws {
@@ -95,7 +106,7 @@ import Testing
         state.albumReady(Self.dummy)
         let token = state.askingLibrary()
         let emptied = state.typed("   ")
-        #expect(emptied)
+        #expect(emptied == .clear)
         #expect(state.query.isEmpty && state.drawn == nil && state.library == nil && state.libraryText == nil)
         #expect(state.kind == nil && state.ready.isEmpty && state.view == .all)
         #expect(!state.wantsLibrary && !state.wantsKind)
@@ -114,7 +125,7 @@ import Testing
         let drawnMade = Self.advance(&state, owned: ["Portishead"], list: [Self.portishead])
         let drawn = try #require(drawnMade)
         #expect(drawn.failed && !drawn.nothing)
-        #expect(drawn.sections.map(\.kind) == [.artists])
+        #expect(drawn.sections?.map(\.kind) == [.artists])
         #expect(drawn.top.map(\.key) == ["artist:ar-p"])
         // the keyboard's Search asks again, and the answer is drawn afresh
         #expect(state.wantsLibrary)
@@ -131,7 +142,7 @@ import Testing
         var state = Self.answered("dummy")
         let firstMade = Self.advance(&state)
         let first = try #require(firstMade)
-        #expect(first.sections.flatMap(\.rows).map(\.key).contains("album:nd-dummy"))
+        #expect((first.sections ?? []).flatMap(\.rows).map(\.key).contains("album:nd-dummy"))
         // a chip and back: drawn again from what is in hand, its lines as they are now
         let chose = state.choose(.albums)
         let inKind = Self.advance(&state)
@@ -155,10 +166,12 @@ import Testing
         state.typed("roads")
         state.librarySkipped()
         #expect(state.settled && !state.wantsLibrary)
-        let drawnMade = Self.advance(&state)
-        let drawn = try #require(drawnMade)
-        #expect(drawn.skipped && !drawn.failed && !drawn.nothing)
-        #expect(drawn.said(personal: false).isEmpty)
+        let drawingMade = Self.drawing(&state)
+        let drawing = try #require(drawingMade)
+        let drawn = drawing.drawn
+        //? MusicBrainz finding nothing as well: "No results", as the web's says it (a skipped library is no problem drawn)
+        #expect(drawn.skipped && !drawn.failed && drawn.nothing)
+        #expect(drawing.said == "Nothing more found.", "nothing said of the library, which wasn't searched")
         // and with nothing found it is "No results"
         var empty = Self.answered("zzz", LibraryResults())
         let noneMade = Self.advance(&empty)
@@ -207,7 +220,7 @@ import Testing
         state.libraryAnswered(token, "roads", Self.found)
         let answeredMade = Self.advance(&state)
         let answered = try #require(answeredMade)
-        #expect(!answered.skipped && answered.sections.map(\.kind) == [.artists, .albums, .songs])
+        #expect(!answered.skipped && answered.sections?.map(\.kind) == [.artists, .albums, .songs])
     }
 
     @Test func resumingLeavesAnAnswerAndAKindViewsRunAlone() throws {
@@ -361,10 +374,10 @@ import Testing
                                                                songs: [Self.rip, Self.roads, Self.glory]))
         let results = try #require(state.resultsForQuery)
         // Top results' songs first (Roads isn't among Top results - the Rip is the third pick), then the answer's
-        let wanted = state.albumsWanted("portishead", results, ownedArtists: [], artistList: nil, marks: Self.marks)
+        let wanted = state.albumsWanted("portishead", results, artistList: nil, marks: Self.marks)
         #expect(wanted == ["nd-third", "nd-dummy"])
         state.albumReady(Album(id: "nd-third", song: [Self.rip]))
-        #expect(state.albumsWanted("portishead", results, ownedArtists: [], artistList: nil, marks: Self.marks)
+        #expect(state.albumsWanted("portishead", results, artistList: nil, marks: Self.marks)
                 == ["nd-dummy"], "not asked again")
         // an album asked beside an older ask is not kept
         let stale = state.askingLibrary()
@@ -406,8 +419,8 @@ import Testing
     }
 
     @Test func theWordsThePhoneAddsAreItsOwn() {
-        #expect(SearchWords.hint(personal: false) == "Search your library.")
-        #expect(SearchWords.hint(personal: true) == "Search your library and the collection.")
+        #expect(SearchWords.hint(personal: false) == "Search your library and albums you don't have yet.")
+        #expect(SearchWords.hint(personal: true) == "Search your library, the collection, and albums nobody has yet.")
         #expect(SearchWords.chip(.all) == "All" && SearchWords.section(.songs) == "Songs")
         #expect(SearchWords.seeAllLabel(.albums) == "See all albums")
         #expect(SearchView(.artists) == .artists && SearchView.all.kind == nil)

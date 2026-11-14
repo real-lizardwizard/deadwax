@@ -211,6 +211,24 @@ enum SearchVectors {
         [(.artists, by.artists), (.albums, by.albums), (.songs, by.songs)]
     }
 
+    /// A state with a case's words typed, its library answered (or failed) and - when the words ask MusicBrainz - its
+    /// albums answered with nothing, as slice 1's cases hold none.
+    static func state(_ each: Case, ownedArtists: [String]) -> SearchState {
+        var state = SearchState()
+        state.ownedArtists = ownedArtists
+        state.typed(each.text)
+        let token = state.askingLibrary()
+        if each.failed {
+            state.libraryFailed(token, state.query)
+        } else {
+            state.libraryAnswered(token, state.query, each.library ?? LibraryResults())
+        }
+        if state.drawnMusicBrainz(state.query), let ask = state.askingMusicBrainz(state.query, view: .all) {
+            state.albumsAnswered(ask, FullySearchAnswer(), query: ask.first, index: nil)
+        }
+        return state
+    }
+
     /// A case's marks as the web's Search makes them (Search.tsx `marksNow`): the albums in hand - search3's over
     /// those asked for so a song plays.
     static func marks(_ each: Case, index: OwnedIndex) -> SearchMarks {
@@ -406,8 +424,8 @@ enum SearchVectors {
             let plan = SearchReading.read(term, names: names)
             guard let wanted = each.plan else {
                 #expect(plan == nil, "\(what): nothing to read")
-                #expect(SearchList.draw(term, results: results, failed: each.failed, ownedArtists: ownedArtists,
-                                        artistList: each.artistList, marks: marks) == nil, "\(what): nothing drawn")
+                var state = V.state(each, ownedArtists: ownedArtists)
+                #expect(state.advance(artistList: each.artistList, marks: marks) == nil, "\(what): nothing drawn")
                 continue
             }
             let reading = try #require(plan, "\(what)")
@@ -416,7 +434,7 @@ enum SearchVectors {
 
             let pool = SearchList.pool(reading: reading, library: results, artistList: each.artistList, marks: marks)
             for (kind, placed) in V.kinds(try #require(each.pool)) {
-                #expect(pool[kind].map { V.Placed(key: $0.row.key, holder: $0.holder.rawValue, position: $0.position) } == placed,
+                #expect(pool[kind].library.map { V.Placed(key: $0.row.key, holder: $0.holder.rawValue, position: $0.position) } == placed,
                         "\(what): the pool's \(kind)")
             }
             let candidates = SearchList.candidates(pool, box: term, reading: reading)
@@ -436,7 +454,7 @@ enum SearchVectors {
 
             var drawnSections: [SearchList.Drawn.Section] = []
             for (kind, lines) in V.kinds(try #require(each.sections)) {
-                let rows = SearchList.sectionRows(pool[kind], cap: SearchPacing.preview(kind))
+                let rows = SearchList.sectionRows(pool[kind], cap: SearchPacing.cap(kind))
                 #expect(rows.map(\.key) == lines.map(\.key), "\(what): the \(kind) section")
                 for (row, line) in zip(rows, lines) {
                     let made = SearchList.line(row, marks)
@@ -448,7 +466,7 @@ enum SearchVectors {
             for (kind, keys) in V.kinds(try #require(each.full)) {
                 #expect(SearchList.sectionRows(pool[kind]).map(\.key) == keys, "\(what): all the \(kind)")
             }
-            let whose = SearchKind.allCases.flatMap { (kind: SearchKind) -> [SearchPlaced] in pool[kind] }
+            let whose = SearchKind.allCases.flatMap { (kind: SearchKind) -> [SearchPlaced] in pool[kind].library }
             #expect(whose.map(\.row.key) == (each.whose ?? []).map(\.key), "\(what): whose, the rows")
             for (placed, yours) in zip(whose, each.whose ?? []) {
                 #expect(SearchWhose.row(placed.row, marks) == yours.yours, "\(what): whose \(placed.row.key)")
@@ -462,14 +480,20 @@ enum SearchVectors {
             let named = SearchList.namedArtist(reading, SearchList.knownArtists(each.artistList, results?.artists ?? []))
             #expect(named?.id == each.named, "\(what): the artist named")
 
-            // the list as the phone draws it: the same Top results and sections, frozen
-            let drawn = try #require(SearchList.draw(term, results: results, failed: each.failed,
-                                                     ownedArtists: ownedArtists, artistList: each.artistList,
-                                                     marks: marks), "\(what): drawn")
+            // the list as the phone draws it (SearchState, MusicBrainz answering with nothing): the same Top results
+            // and sections, drawn whole
+            var state = V.state(each, ownedArtists: ownedArtists)
+            let drawingMade = state.advance(artistList: each.artistList, marks: marks)
+            let drawing = try #require(drawingMade, "\(what): drawn")
+            let drawn = drawing.drawn
+            let musicBrainz = state.drawnMusicBrainz(term)
             #expect(drawn.top == top, "\(what): drawn, Top results")
             #expect(drawn.sections == drawnSections, "\(what): drawn, the sections")
-            #expect(drawn.failed == each.failed && drawn.said(personal: each.personal) == each.said, "\(what): drawn")
-            #expect(drawn.nothing == (top.isEmpty && drawnSections.isEmpty && !each.failed), "\(what): nothing found")
+            #expect(drawn.failed == each.failed && drawn.musicBrainz == musicBrainz, "\(what): drawn")
+            #expect(drawing.said == [each.said ?? "", musicBrainz ? "Nothing more found." : ""].filter { !$0.isEmpty }
+                .joined(separator: " "), "\(what): drawn, the words")
+            #expect(drawn.nothing == (top.isEmpty && drawnSections.isEmpty && !each.failed && musicBrainz),
+                    "\(what): nothing found")
             // a kind view's Artists, led by the artist the box named when its own search3 didn't list them
             if let found = results {
                 let rows = SearchList.kindRows(.artists, rows: found.artists.map { SearchRow.artist($0) }, text: term,

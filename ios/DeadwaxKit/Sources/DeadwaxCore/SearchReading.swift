@@ -140,6 +140,48 @@ public enum SearchReading {
         return String(out)
     }
 
+    /// Secondary types "studio only" leaves out, by name (`NOISY_SECONDARY_TYPES`).
+    public static let noisySecondaryTypes = ["Live", "Compilation", "Interview", "Demo", "Remix", "DJ-mix"]
+
+    /// The type clauses to AND onto a search, or "" for none (`typeFilter`): primary types OR'd in their own brackets,
+    /// then each noisy secondary type excluded by name.
+    public static func typeFilter(primary: [String] = [], studioOnly: Bool = false) -> String {
+        var clauses: [String] = []
+        if !primary.isEmpty {
+            let types = primary.map { "primarytype:\(quoteTerm($0))" }
+            clauses.append(types.count > 1 ? "(\(types.joined(separator: " OR ")))" : types[0])
+        }
+        if studioOnly {
+            for type in noisySecondaryTypes { clauses.append("-secondarytype:\(quoteTerm(type))") }
+        }
+        return clauses.joined(separator: " AND ")
+    }
+
+    /// Whether the words are long enough for MusicBrainz to be asked by the pause alone (`asksMusicBrainzBySettling`):
+    /// three UTF-16 units, trimmed - fewer only by the keyboard's Search.
+    public static func asksMusicBrainzBySettling(_ text: String) -> Bool {
+        JSText.trim(text).utf16.count >= musicBrainzMinChars
+    }
+
+    /// What MusicBrainz's half does as the box changes (`musicBrainzOnTyping`), given the words it was last asked for.
+    public enum OnTyping: String, Sendable, Equatable {
+        /// The box is empty: everything called off and cleared.
+        case clear
+        /// Long enough to ask by itself: asked once typing pauses (`musicBrainzSettleMs`).
+        case settle
+        /// Too short to ask by itself, and not what was asked: the longer words' answer dropped.
+        case drop
+        /// Exactly the words asked (Search pressed on them): their answer stands.
+        case keep
+    }
+
+    public static func musicBrainzOnTyping(_ text: String, asked: String?) -> OnTyping {
+        let query = JSText.trim(text)
+        if query.isEmpty { return .clear }
+        if let asked, WebText.same(query, asked) { return .keep }
+        return asksMusicBrainzBySettling(query) ? .settle : .drop
+    }
+
     /// `(query) AND filter`, or the query alone with no filter (`withTypeFilter`).
     public static func withTypeFilter(_ query: String, _ filter: String) -> String {
         filter.isEmpty ? query : "(\(query)) AND \(filter)"
