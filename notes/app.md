@@ -2271,3 +2271,53 @@ Verified: tests/test_app_css.py (the tokens, the radius, the held height, the hi
 test_app_desktop_css.py (the desktop's radius); in Chromium, a throwaway page of the two states at a phone's 345px:
 the bar 12px and 16px tall, square, no thumb, the fill and well as before. Not seen: Safari, and the app itself with a
 song playing.
+
+### A library's shuffle saved however long it plays (2.1.22)
+
+Found by the iPhone app's slice 3b review, in both apps (the web's lib/resume.ts and the phone's Resume.swift, a port
+of it). **toSave wrote a library's shuffle's whole list** - `source`, every song it had fetched, and each one before
+the window whole in `extra` - and that list only grows: the feed (app/useShuffleFeed.ts) appends each page of 200 to
+the list and the entries alike (withMore), so every song played stays in it. The reviewer measured 256,470 UTF-16 units
+700 songs in and none from 750 (resume.sim's own songs, shaped as Navidrome's: 252,082 at 700, left out at 750):
+past RESUME_SNAPSHOT_MAX (262,144) the snapshot is left out, and the next reload or launch put the queue back as the
+plain list of the window's songs - no `paged`, so the feed never asked for the next page and the shuffle stopped after
+the songs it had (Repeat off), or Repeat All went round them again instead of a fresh order.
+
+**What a library's shuffle's list is.** Nothing is made from it: toppedUp and withShuffle return a `paged` queue as it is
+(its feed tops it up), withRepeat goes by the marks' rounds and `pagedRounds`, and withMore numbers new songs from the
+list's length - and asks deadwax for the next page by `paged.fetched`, never by the list. So the list is only where the
+entries are: each mark's `at`, one place per song fetched (a song's Repeat One copies share its place). `left` (the
+places taken out of a time round) is read only by withShuffle, which leaves a library's shuffle be, and names places no
+entry has - withoutKey takes a song out with its copies.
+
+**The fix** (`savedList`, writer only): a `paged` queue's snapshot keeps the songs the window's marks name - a copy names
+its song's place, its song's own entry possibly before the window - in the list's order, each mark's place renumbered
+to its rank among them, and `left: []`; every other queue is written exactly as before (an album's or a playlist's list
+whole: Repeat All's rounds and Shuffle are made from it). Every source song is then one of the window's, so `extra` is
+empty and the snapshot is at most the window's 2,000 entries: 11,126 units 2,000 songs in, 11,744 at 20,000 (Repeat
+All, round 14) - a window of its own (50 played, 200 or so ahead). A full window of 2,000 entries would be some 50
+units an entry (its mark, its id, its level), about 100,000: not measured, no shuffle runs that far ahead.
+
+- **Why not the reviewer's way** (no `extra` for songs before the window, and fromSnapshot accepting source ids it can't
+  resolve for a `paged` queue): the list's ids would still grow - some 25 units a song, past the cap again near 10,000
+  songs - the rebuilt list would need songs it doesn't have, and a reader before the change would refuse it (a source
+  song in neither Navidrome's songs nor `extra` is null). The list renumbered is a valid snapshot of the same queue.
+- **No new version, no reader change.** The snapshot is v1 or v2 by snapshotVersion as before - the marks' kinds and the
+  song playing are untouched - and every reader reads it as the same queue: 2.1.22's, 2.1.18-2.1.21's, 2.1.17's (the
+  frozen 5e3460c reader in ui/test/fixtures/resume-2.1.17, run on it in resume.sim: exact, `paged`, the same marks and
+  list), and the iPhone app's 0.9. An older WRITER still drops a long one, until it updates.
+- **Not changed**: a long list that isn't a library's shuffle - a playlist past about 2,500 songs - still outgrows the
+  cap as before (the table in notes/play-history.md "Every bound"); `pagedRounds` is bounded by the rounds still in the
+  queue (withMore keeps those from the song playing's on), and the marks by the window.
+
+**resume.sim** (2.1.22's section): the measure before (2.1.17's toSave, which 2.1.21's was); Repeat off with a library of
+5,000 and All with 1,500, 2,000 songs in through the feed as useShuffleFeed asks (FEED_BELOW, pages of 200, a fresh
+claimed order never starting with the song that ends the last): saved, v1, the list the window's songs and nothing in
+`extra`; put back exactly with the same `paged`; then played on beside the queue never reloaded - the same songs, to
+the order's end and every song once with Repeat off, a fresh order (order-3) as its own round with All; 20,000 songs in
+still saved; the reader before 2.1.18 reading it whole; the window beginning among a song's Repeat One copies; and in
+the 1,000 seeded runs, every library's shuffle's list read back as its window's songs, nothing it took out one of them
+(1,722 steps with songs taken out). The round trip's crash on a snapshot that didn't read back (an inner `run`
+shadowing the loop's in its note) is fixed. Seven mutations of savedList - kept whole, places not renumbered, in the
+order first named, `left` kept, a copy's place not named, `extra` over the whole list, the list written whole beside
+renumbered marks - each fail it.

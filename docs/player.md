@@ -494,7 +494,10 @@ The songs come to the phone 200 at a time as they're needed, so Up Next says the
 more songs."). With **Repeat All**, the end of the whole order starts a fresh one - songs added to the
 library meanwhile are in it; with Repeat off the queue ends once every song has played. The order is a
 snapshot: a song deleted since is skipped when its turn comes, and one added since comes in the next
-shuffle. If deadwax restarts mid-shuffle - or a day passes without the shuffle being played, as when one is
+shuffle. Closed and opened again, or [picked up](#picking-up-where-you-left-off) on another device, it carries on
+from where it was however many songs in - the same order, its next songs coming as before (deadwax 2.1.21 and
+earlier put a shuffle some 750 songs in back as just the songs it had already fetched, which then stopped, or with
+Repeat All went round again). If deadwax restarts mid-shuffle - or a day passes without the shuffle being played, as when one is
 picked up again later - deadwax no longer has its order, and the shuffle starts over with a fresh one (it says
 so, once: "Your shuffle started over - deadwax no longer had its order"), so songs already heard can come again. Turning Repeat off (or to One) once the next order has started coming
 lets that order go, and the shuffle ends after the one playing. Up Next's Shuffle chip, the now-playing
@@ -511,7 +514,11 @@ until you press play - iOS starts sound only from a tap. Play - on the mini play
 turntable, the desktop's player bar, Space in the visualizer, the lock screen - carries on from that second,
 the way any song plays: Gapless's one stream, FLAC in an MP4 on an iPhone, the resampled copy and
 Normalization all as they would be. Next, Previous, the scrubber, a song tapped in Up Next and Play Next work on
-it as on any paused queue, and anything else you play simply replaces it.
+it as on any paused queue, and anything else you play simply replaces it. A queue you
+[went back in](#up-next-shuffle-and-repeat) comes back with every song you'd played on to still to come (deadwax
+2.1.18 to 2.1.22 could lose them: going back a second time, after a change to Up Next made while the furthest song
+you'd got to was playing, it came back - reopened, or on another device - without the songs played since the one
+you went back to).
 
 **It follows you.** It's kept as your **play queue in Navidrome** - with logins on, your own, as you - with
 deadwax's account of Up Next beside it in its own database (Navidrome keeps only the songs, which one is
