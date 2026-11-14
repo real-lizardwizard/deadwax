@@ -370,15 +370,27 @@ public enum DownloadChoice: String, Sendable, CaseIterable {
     /// (Phase 3) One song's items when your library keeps it (it carries the library's origin): no Remove Download of the
     /// song alone - the library would ask for it again at once. Its album's Remove Download keeps the album off.
     public static func forSong(_ state: SongDownload, keptByLibrary: Bool) -> [DownloadChoice] {
-        let choices = forSong(state)
-        return keptByLibrary ? choices.filter { $0 != .remove } : choices
+        forSong(state, staying: keptByLibrary)
     }
 
     /// (Phase 3) Several songs asked for each alone (Up Next, a selection - not an album): Remove Download only when a
     /// song that isn't your library's is asked for or here; `keptByLibrary` beside `states`.
     public static func forSongs(_ states: [SongDownload], gone: Bool = false, keptByLibrary: [Bool]) -> [DownloadChoice] {
+        forSongs(states, gone: gone, staying: keptByLibrary)
+    }
+
+    /// (Phase 4, slice 3) One song's items when it would stay after its Remove Download - your library or a downloaded
+    /// playlist keeps it (DownloadRemoval.stays): no Remove Download, which would leave it where it is.
+    public static func forSong(_ state: SongDownload, staying: Bool) -> [DownloadChoice] {
+        let choices = forSong(state)
+        return staying ? choices.filter { $0 != .remove } : choices
+    }
+
+    /// (Phase 4, slice 3) Several songs': Remove Download only when one asked for or here would go with it - `staying`
+    /// beside `states`, each song's DownloadRemoval.stays for that Remove (a song's, alone; an album's, for an album).
+    public static func forSongs(_ states: [SongDownload], gone: Bool = false, staying: [Bool]) -> [DownloadChoice] {
         let choices = forSongs(states, gone: gone)
-        let removable = zip(states, keptByLibrary).contains { pair in pair.0 != .none && !pair.1 }
+        let removable = zip(states, staying).contains { (pair: (SongDownload, Bool)) -> Bool in pair.0 != .none && !pair.1 }
         return removable ? choices : choices.filter { $0 != .remove }
     }
 

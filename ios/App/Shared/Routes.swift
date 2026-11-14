@@ -29,6 +29,8 @@ enum AppRoute: Hashable {
     case playlists
     /// One playlist's page (3.3), by Navidrome's playlist id.
     case playlist(PlaylistRoute)
+    /// (Phase 4, slice 3) The playlists downloaded to this phone - reached from Downloaded.
+    case downloadedPlaylists
 }
 
 /// A playlist page's address: its id, and the row that opened it - the hero drawn at once while the playlist loads.
@@ -267,6 +269,7 @@ extension View {
                 case .eq(let page): EQDestination(route: page)
                 case .playlists: PlaylistsScreen()
                 case .playlist(let playlist): PlaylistView(route: playlist)
+                case .downloadedPlaylists: DownloadedPlaylistsScreen()
                 }
             }
             .clearsPlayer()

@@ -332,8 +332,22 @@ run back to speed goes silent, its end still comes (`armTaken` deck.ts:1893, `qu
 up (its y less 5, in the arm's unrotated frame) (Turntable.tsx:428-486, `is-lifted`), and the handle is
 `is-held` - the needle visibly up, as the time line's "Needle up" says.
 
-**Phone.** The same, drawn as CAShapeLayers in a container turned round the pivot each frame; the head's lift a
-change of its layer's position in that frame, with no animation (the web's is a jump, under the finger). The handle
+**The lift changed (2026-11-14, on 0.9).** James: "in the turntable, when you tap on the play head, it looks like
+it dislocates." The arm's frame is turned, so 5 units up in it is sideways off the bar: a tap popped the head off
+the arm and back. The phone's head now stays on the bar always and the lift is the head coming toward the viewer:
+grown `TurntableGeometry.headLift.scale` (1.08) about its own middle, not its end, with a soft shadow round it
+(`TurntablePalette.ttHeadShadow`, `--dw-shadow`'s black at 0.5; a blur of `headLift.shadow`, 3 units across the
+stage, and **no offset**, so its direction doesn't turn with the arm's container). Both are eased each way over
+`headLift.seconds` on `headLiftEase` - the app's one motion token, `--dw-duration` (0.14 s) on `--dw-ease`
+(cubic-bezier(0.16, 1, 0.3, 1)), as the web's lift - from where the head is on screen, so a tap that sets it down
+mid-lift turns back rather than flickering; under Reduce Motion (`TurntableLook.still`) the two states are a step.
+The web makes the same change on main (2.1.19, ARM_PARTS.lift = { scale: 1.08, shadow: 3 } in place of `lift: 5`);
+until main merges, `armLift` (5) stays in TurntableGeometry, held to turntable.json's ARM_PARTS.lift, and the phone
+draws none of it - the deck vectors are made again at that merge.
+
+**Phone.** The same, drawn as CAShapeLayers in a container turned round the pivot each frame; the head a layer of
+its own size with its middle on the bar, the lift its transform and shadow opacity - the one thing in the drawing
+eased, by explicit animations (`liftHead`), every other write a frame's with no animation. The handle
 a CAShapeLayer with `lineDashPattern`, 1 pt, Palette.ttHandleEdge; with Increase Contrast on
 (`UIAccessibility.isDarkerSystemColorsEnabled`), Palette.text3 (#8e8ea3, `--dw-text-3`) instead - at white 0.18 on
 the vinyl the ring is near invisible to anyone who has asked for more contrast (**new**; the web has no case: the
@@ -1774,7 +1788,8 @@ Questions for slice 3, and for James:
   fader held) rendered with `CALayer.render(in:)` at the iPhone 16's and the SE's plinth sizes, at 3x, written as
   PNGs to the job's artifacts; and pixel assertions that don't need an eye - the sheen's brightest band at 48°
   from the top (2.4), the label's ring where the web's is, the grooves' period 4 pt, the readout's colours the
-  Palette's, the head 5 units up when lifted. `ui/test/` gains nothing: the web's screenshots of the same states
+  Palette's, the head 5 units up when lifted (since 2026-11-14: on the bar, grown about its middle, its shadow
+  beside it - 2.5's "The lift changed"). `ui/test/` gains nothing: the web's screenshots of the same states
   are taken by hand once (notes/screenshots.md's way) and put beside the artifacts for the review.
 - **Verified**: Core's rules for the screen (layout, words, rows, the disc, the states of 2.8 as a pure function
   of the deck's report and the song) on Linux; the drawing on the macOS job, rendered and asserted (above);
@@ -1857,7 +1872,7 @@ Questions for slice 3, and for James:
 | What | Result |
 | --- | --- |
 | The plinth (TurntableFit) | 321 pt in a 393 pt phone's room (345 wide, tall enough); 440 at most; 284 pt in the SE's room, held by its height |
-| The renders, asserted | The sheen brightest at 48 deg from the top, within 2 deg; the label's ring where the web's is; the grooves' period 4 pt; the readout's colours the Palette's; the head 5 units up when lifted; the face turning with the CD art over the label; the handle brighter under Increase Contrast |
+| The renders, asserted | The sheen brightest at 48 deg from the top, within 2 deg; the label's ring where the web's is; the grooves' period 4 pt; the readout's colours the Palette's; the head 5 units up when lifted (since 2026-11-14 on the bar, grown, its shadow beside it); the face turning with the CD art over the label; the handle brighter under Increase Contrast |
 | swift test | Core 953, DeadwaxAudio 139, DeadwaxTurntable 9: all passed |
 | The unsigned Release device build | Builds, with no warnings in the app's sources |
 | pytest tests/test_ios_*.py tests/test_source_bytes.py | 146 passed, 1 skipped |
@@ -2591,7 +2606,7 @@ changed is in the sections above; this is the list.
 - 2.2 - The plinth's top highlight added.
 - 2.4 - Grooves and layers in Core Graphics and Core Animation only, in a `DeadwaxTurntable` target, so the
   drawing renders on the macOS runner; the sheen's CSS angles mapped to a conic CAGradientLayer's, and tested.
-- 2.5 - The arm's head lifts 5 units while held; the handle's ring at text-3 under Increase Contrast (**new**).
+- 2.5 - The arm's head lifts 5 units while held (since 2026-11-14 it stays on the bar, grown with a shadow, eased - "The lift changed"); the handle's ring at text-3 under Increase Contrast (**new**).
 - 2.10 - The arm's `.notEnabled` without a length; direct interaction on the record considered and refused.
 - 2.11, 2.14 - The time line, readout and chip in `.monospaced()` (the web's mono), the time line in
   Palette.quiet, centred, scaled before truncating.

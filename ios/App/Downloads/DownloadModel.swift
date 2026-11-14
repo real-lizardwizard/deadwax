@@ -119,6 +119,8 @@ final class DownloadModel {
     /// (Phase 3, slice 1) Your library followed onto this phone, read-only - Debug's "Follow your library"
     /// (phase3-autodownload.md 6.1). Opened and closed with the store.
     let follower: LibraryFollower
+    /// (Phase 4, slice 3) The downloaded playlists, kept in step with deadwax - opened and closed with the store.
+    let playlists: PlaylistKeeper
 
     // MARK: kept
 
@@ -191,6 +193,7 @@ final class DownloadModel {
         self.session = session
         playable = files.downloads
         follower = LibraryFollower(server: server, reachability: reachability)
+        playlists = PlaylistKeeper(server: server, reachability: reachability)
         downloadOver = DownloadOver(saved: UserDefaults.standard.string(forKey: DownloadOver.storageKey))
         storageLimit = StorageLimit(saved: UserDefaults.standard.string(forKey: StorageLimit.storageKey))
         onlyWhileCharging = UserDefaults.standard.bool(forKey: AutoDownload.onlyWhileChargingKey)
@@ -211,6 +214,13 @@ final class DownloadModel {
         follower.changed = { [weak self] in self?.replan() }
         follower.switchedOff = { [weak self] in self?.libraryOff() }
         follower.librarySongs = { [weak self] entry in self?.librarySongs(of: entry) ?? [] }
+        playlists.note = { [weak self] line in self?.note(line) }
+        playlists.carrying = { [weak self] id in self?.carrying(playlist: id) ?? [] }
+        playlists.origins = { [weak self] in self?.origins ?? [:] }
+        playlists.ask = { [weak self] songs, id in self?.want(songs, origin: .playlist(id)) }
+        playlists.take = { [weak self] songs, id in
+            self?.removeOrigins(DownloadRemoval.playlist(id), from: songs) ?? false
+        }
         let center = NotificationCenter.default
         observers.append(center.addObserver(forName: UIApplication.didBecomeActiveNotification, object: nil, queue: .main) { [weak self] _ in
             MainActor.assumeIsolated { self?.becameActive() }
@@ -266,19 +276,43 @@ final class DownloadModel {
     /// Anything of the album asked for or here (its songs' records, by id) - nil for none.
     func songIDs(album albumID: String) -> [String]? { songsOfAlbum[albumID] }
 
-    /// A ••• menu's download items for one song - no Remove Download of a song your library keeps (it would come
-    /// back at once: its album's Remove Download keeps the album off).
+    /// A ••• menu's download items for one song - no Remove Download of a song that would stay: your library keeps it
+    /// (it would come back at once: its album's Remove Download keeps the album off), or a downloaded playlist does
+    /// (its Remove Download is the playlist's - slice 3).
     func choices(song songID: String) -> [DownloadChoice] {
-        DownloadChoice.forSong(state(songID), keptByLibrary: keptByLibrary(songID))
+        DownloadChoice.forSong(state(songID), staying: staysAfterRemove(songID))
     }
 
     /// An album's download items (its Remove Download takes your library's too); `gone` when the album is no longer in
-    /// the collection. `alone`: Up Next's or a selection's songs, each asked for alone - Remove Download only for a song
-    /// your library doesn't keep.
+    /// the collection. `alone`: Up Next's or a selection's songs, each asked for alone. Remove Download only when a song
+    /// asked for or here would go with it - not one a downloaded playlist keeps, nor (alone) one your library keeps.
     func choices(songs: [Song], gone: Bool = false, alone: Bool = false) -> [DownloadChoice] {
         let states = songs.map { state($0.id) }
-        guard alone else { return DownloadChoice.forSongs(states, gone: gone) }
-        return DownloadChoice.forSongs(states, gone: gone, keptByLibrary: songs.map { keptByLibrary($0.id) })
+        let staying = songs.map { (song: Song) -> Bool in
+            alone ? staysAfterRemove(song.id) : staysAfterRemove(song.id, album: song.albumId ?? records[song.id]?.albumID)
+        }
+        return DownloadChoice.forSongs(states, gone: gone, staying: staying)
+    }
+
+    /// The song stays on this phone after a song's Remove Download (`album` nil) or its album's - another origin keeps
+    /// it (DownloadRemoval.stays).
+    func staysAfterRemove(_ songID: String, album albumID: String? = nil) -> Bool {
+        let removed = albumID.map { DownloadRemoval.album($0) }
+            ?? DownloadRemoval.song(albumID: records[songID]?.albumID ?? "")
+        return DownloadRemoval.stays(origins[songID], removing: removed)
+    }
+
+    /// The downloaded playlist keeping a song a menu offers no Remove Download of - its header ("Downloaded with Late
+    /// night"), the first of them by name; nil when none does, or the Remove would take something (`album`: an album's).
+    func keepingPlaylist(_ songs: [Song], album albumID: String? = nil) -> String? {
+        let asked = songs.filter { (song: Song) -> Bool in records[song.id] != nil }
+        guard !asked.isEmpty, asked.allSatisfy({ (song: Song) -> Bool in
+            staysAfterRemove(song.id, album: albumID)
+        }) else { return nil }
+        var carried = Set<DownloadOrigin>()
+        for song in asked { carried.formUnion(origins[song.id] ?? []) }
+        return PlaylistDownloads.keeping(carried, kept: playlists.kept)
+            .map { (entry: KeptPlaylist) -> String in entry.name.isEmpty ? PlayerWords.untitled : entry.name }
     }
 
     /// The song carries your library's origin.
@@ -478,7 +512,7 @@ final class DownloadModel {
     /// A song's Remove Download: its own origin and its album's taken away; deleted when none is left.
     func remove(_ songID: String) {
         guard let record = records[songID] else { return }
-        removeOrigins([.song, .album(record.albumID)], from: [songID])
+        removeOrigins(DownloadRemoval.song(albumID: record.albumID), from: [songID])
     }
 
     /// An album's Remove Download: every song of it asked for through the album or alone, and with your library - which
@@ -487,7 +521,7 @@ final class DownloadModel {
     func remove(album albumID: String) {
         if follower.on { follower.setKeptOff(album: albumID, at: ListenTracker.wallMs()) }
         let songs = records.values.filter { $0.albumID == albumID }.map(\.id)
-        removeOrigins([.song, .album(albumID), .library], from: songs)
+        removeOrigins(DownloadRemoval.album(albumID), from: songs)
     }
 
     /// Didn't download's Remove of an album your library keeps: those songs' origins taken, the library's with them,
@@ -495,12 +529,110 @@ final class DownloadModel {
     /// at the next turn, as for any album kept off; a song of it downloaded by hand stays.
     func remove(failed songIDs: [String], album albumID: String) {
         if follower.on { follower.setKeptOff(album: albumID, at: ListenTracker.wallMs()) }
-        removeOrigins([.song, .album(albumID), .library], from: songIDs)
+        removeOrigins(DownloadRemoval.album(albumID), from: songIDs)
     }
 
     /// Up Next's or a selection's Remove Download.
     func remove(songs songIDs: [String]) {
         for id in songIDs { remove(id) }
+    }
+
+    // MARK: a downloaded playlist (Phase 4, slice 3)
+
+    /// A playlist's Download (its page's control, its •••): kept on this phone as it is in hand, its songs asked for
+    /// under its origin - planned whole, as an album is - and kept in step with deadwax from then on. Never a smart
+    /// playlist's (the keeper refuses one: PlaylistKeeping.download).
+    func download(playlist answer: PlaylistWithSongs) {
+        playlists.download(answer)
+    }
+
+    /// A playlist's Remove Download: its origin taken from its songs - one downloaded any other way (by hand, with an
+    /// album, with your library, with another playlist) stays.
+    func remove(playlist id: String) {
+        playlists.remove(id)
+    }
+
+    /// A downloaded playlist's Download Again: its songs that didn't download, tried afresh.
+    func tryAgain(playlist id: String) {
+        let failed = carrying(playlist: id).filter { (songID: String) -> Bool in records[songID]?.state == .failed }
+        guard !failed.isEmpty else { return }
+        update(failed.sorted()) { DownloadRules.apply(.retry, to: $0) }
+        note("try again: playlist \(id) (\(failed.count))")
+        replan()
+    }
+
+    /// The songs the store has under a playlist's origin.
+    func carrying(playlist id: String) -> Set<String> {
+        let origin = DownloadOrigin.playlist(id)
+        return Set(origins.compactMap { (entry: (key: String, value: Set<DownloadOrigin>)) -> String? in
+            entry.value.contains(origin) ? entry.key : nil
+        })
+    }
+
+    /// A playlist's download state (its control, its hero's line): nil when it isn't downloaded - else from the songs
+    /// of its kept answer, each once.
+    func playlistState(_ id: String) -> AlbumDownload? {
+        let entry = playlists.entry(id)
+        return PlaylistDownloads.state(downloaded: entry != nil, songs: (entry?.songIDs ?? []).map { facts(id: $0) })
+    }
+
+    /// (slice 3's review) The playlist is smart (PlaylistDownloads.isSmart): no Download, its page saying why - or, one
+    /// downloaded before deadwax said so, kept as it was.
+    func playlistIsSmart(_ id: String, answer: PlaylistWithSongs?) -> Bool {
+        PlaylistDownloads.isSmart(answer, kept: playlists.entry(id))
+    }
+
+    /// The downloaded playlist's kept answer - its page drawn from it with no connection.
+    func keptPlaylist(_ id: String) -> PlaylistWithSongs? { playlists.entry(id)?.answer }
+
+    /// The playlist opens with no connection: downloaded, with a song of it on this phone.
+    func playlistPlaysOffline(_ id: String) -> Bool {
+        playlists.entry(id)?.songIDs.contains { isHere($0) } == true
+    }
+
+    /// Downloading's row for a downloaded playlist: its songs still to come (nil for none) and the first wait.
+    func playlistProgress(_ entry: KeptPlaylist) -> (progress: PlaylistDownloads.Progress, wait: DownloadWait?,
+                                                     fetching: Bool)? {
+        let states = entry.songIDs.map { state($0) }
+        guard let progress = PlaylistDownloads.progress(entry, states: states) else { return nil }
+        var wait: DownloadWait?
+        var fetching = false
+        for state in states {
+            switch state {
+            case .fetching: fetching = true
+            case .waiting(let reason) where reason != .queued && wait == nil: wait = reason
+            default: break
+            }
+        }
+        return (progress, fetching ? nil : wait, fetching)
+    }
+
+    /// Downloaded's row for a downloaded playlist: its songs here (each once), of its songs, and their bytes.
+    func playlistHere(_ entry: KeptPlaylist) -> (here: Int, of: Int, bytes: Int64) {
+        var here = 0
+        var bytes: Int64 = 0
+        for id in entry.songIDs {
+            guard let record = records[id], record.state == .done else { continue }
+            here += 1
+            bytes += record.bytes ?? 0
+        }
+        return (here, entry.songIDs.count, bytes)
+    }
+
+    /// A playlist's page drew deadwax's answer: a downloaded one takes it in as a read (PlaylistDownloads.read).
+    func playlistAnswered(_ answer: PlaylistWithSongs) {
+        playlists.took(answer)
+    }
+
+    /// A playlist's page was answered gone (a 404): a downloaded one is read, and let go only once two answers ten
+    /// minutes apart agree.
+    func playlistGone(_ id: String) {
+        playlists.read(id)
+    }
+
+    /// A write here changed a playlist (PlaylistsModel's): a downloaded one is kept in step at once.
+    func playlistWritten(_ id: String, _ kind: PlaylistsModel.Wrote) {
+        playlists.written(id, kind)
     }
 
     /// A failed song's Try again (its tries start afresh), or a done one's Download Again.
@@ -529,7 +661,8 @@ final class DownloadModel {
         verifyQueue = []
         Task { _ = await session.cancel(tasks, resume: false) }
         do {
-            try store.removeEverything()
+            // the playlists kept in memory let go as soon as the database is emptied, before the folders are made again
+            try store.removeEverything(emptied: { playlists.removedAll() })
             note("removed everything")
         } catch {
             note("remove all failed: \(error)")
@@ -720,6 +853,7 @@ final class DownloadModel {
             note("opened \(person)")
             reload()
             follower.opened(opened)
+            playlists.opened(opened)
             Task { await settle(opened) }
         } catch {
             storeProblem = String(describing: error)
@@ -730,6 +864,7 @@ final class DownloadModel {
 
     private func close(_ closing: DownloadStore) {
         follower.closed()
+        playlists.closed()
         let out = records.values.filter { $0.state == .fetching }
         let tasks = Set(out.compactMap { live[$0.id] })
         // the tasks out become sign-in waits, and no resume data is kept past the person: it carries their session's
@@ -840,6 +975,7 @@ final class DownloadModel {
         }
         sendKeptPlays()
         follower.cameToFront()
+        playlists.cameToFront()
     }
 
     private func movedToBackground() {
@@ -1004,6 +1140,7 @@ final class DownloadModel {
         replan()
         if reachability.online { sendKeptPlays() }
         follower.reachabilityChanged()
+        playlists.reachabilityChanged()
     }
 
     // MARK: your library (Phase 3)

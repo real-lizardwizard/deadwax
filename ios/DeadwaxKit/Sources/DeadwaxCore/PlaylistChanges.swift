@@ -85,6 +85,11 @@ public struct PlaylistEditBody: Encodable, Sendable, Equatable {
     public func trying(_ tried: [String]?) -> PlaylistEditBody {
         PlaylistEditBody(base: base, songIds: songIds, tried: tried, name: name, comment: comment, isPublic: isPublic)
     }
+
+    /// (slice 3's review) The songs this Edit took out: in `base` and nowhere in the songs now - a song listed twice and
+    /// taken out once is still in it. A downloaded playlist lets these go at once, and only these (a song Navidrome is
+    /// hiding is missing from Done's answer too, and isn't the Edit's).
+    public var removed: Set<String> { Set(base).subtracting(songIds) }
 }
 
 // MARK: what they answer

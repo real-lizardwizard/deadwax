@@ -198,11 +198,26 @@ and the picks the menus make (`PlaylistPick` from a QueuePick of songs, or from 
   hand download: never given way, never evicted (Choice 19). Remove Download on the playlist takes that origin
   alone; a song with no origin left goes.
 - **The answer kept**: the playlist's last answer is kept with it in the store (a new table, DB version 6), so it
-  opens and plays offline - the Library's **On this phone** gains **Playlists** (downloaded ones).
+  opens and plays offline - **Downloaded playlists**, on the Library's Downloaded (question 15: not a place of its
+  own above the albums - this said "On this phone gains Playlists" until slice 3 was built).
+- **Planned whole** (question 14): a downloaded playlist's songs are one unit of the planner, as an album's are - the
+  storage limit and the 2 GB reserve checked for all of them at once. After slice 3's review: those not yet started.
+  A song of it already on its way (asked for by hand, with your library, or with another playlist) carries on as
+  itself, and never lets the rest past the limit.
+- **Remove Download elsewhere** (built): a song's own Remove Download, or an album's, is offered only when it would
+  take something - a song a downloaded playlist keeps says "Downloaded with Late night" in its menu instead, and
+  stays; your library (Phase 3) never takes a playlist's origin.
 - **Kept in step** (question 3): the playlists list is read at the library follower's cadence; a playlist whose
   `changed` moved is read again. A song the playlist gained comes; a song it lost goes only when two reads 10 minutes
-  apart agree (Phase 3's caution) - or at once after this phone's own Edit. A playlist missing from two lists 10
-  minutes apart, or deleted here, lets its origin go. An empty song list is never taken in on its own.
+  apart agree (Phase 3's caution) - or at once after this phone's own Edit, those it took out and only those. While
+  Navidrome is hiding at least as many songs as an answer lacks (`hidden`), none of them is marked. A playlist
+  missing from two lists 10 minutes apart, or deleted here, lets its origin go. An empty song list is never taken in
+  on its own.
+- **Smart playlists** (question 16, James: "No Download for them"): one of Navidrome's smart playlists offers no
+  Download, and plays only online. Its page says why: "Smart playlists are worked out again each time, so this one
+  plays only while deadwax can be reached." One downloaded before deadwax said it was smart stays as it was: never
+  read again, nothing asked or taken, with Remove Download as any playlist's. Known by `smart` in the playlist summary
+  (section 4).
 
 ### 2.6 Artists (slice 4)
 
@@ -279,11 +294,13 @@ accessibility sizes the rows' text wraps (three lines for a title) and Play and 
 
 ## 4. The server
 
-**Nothing is needed.** Every route Phase 4 reads or writes exists (section 0's table) and answers what the web
-already reads. Two things looked at and left: a route listing *your* songs alone (Subsonic can't; the web's answer,
-followed here, is Songs as the collection's with your songs through your albums and the Shuffle - question 2), and a
-playlist's `changed` on the list being enough to keep a downloaded playlist in step (it is: Navidrome moves it on
-every add and removal, `notes/playlists.md`), so no new "changed since" route.
+**One field** (slice 3's review, question 16): `smart: bool` in each playlist summary (src/playlists.py `summary()`),
+from Navidrome's playlist. It is James's, on main as its own 2.1.x. The phone reads it ahead of the server, as false
+when it is absent, so it builds and runs without it. Otherwise every route Phase 4 reads or writes exists (section 0's
+table) and answers what the web already reads. Two things looked at and left: a route listing *your* songs alone
+(Subsonic can't; the web's answer, followed here, is Songs as the collection's with your songs through your albums
+and the Shuffle - question 2), and a playlist's `changed` on the list being enough to keep a downloaded playlist in
+step (it is: Navidrome moves it on every add and removal, `notes/playlists.md`), so no new "changed since" route.
 
 ## 5. The machinery (for the builders)
 
@@ -297,7 +314,7 @@ every add and removal, `notes/playlists.md`), so no new "changed since" route.
 | `Album.partial`, `AboutAlbum(album:)` passing it | Info, unchanged |
 | `Routes.playlists`, `Routes.playlist`; `DeadwaxClient.playlists()`, `playlist(id:)` | `PlaylistsScreen`, `PlaylistView`, `AppRoute.playlists` / `.playlist`, the root's row |
 | slice 2: `PlaylistChanges.swift` - the four writes' bodies and answers, the picker's order, the picks, the add words and question, `PlaylistEdit` (Edit's rows, moves, removes, the body, a refusal's meaning); 4 routes (36) | `PlaylistsModel`'s writes (each telling the list and the pages, `lastChange`), `PlaylistPageModel`'s Edit and Delete, `PlaylistPicker` (MainTabs' sheet, and Now Playing's own), `NewPlaylistFields`, New on Playlists |
-| slice 3: `DownloadOrigin.playlist`, the keeping-in-step rules; store v6 | Download a playlist, On this phone > Playlists |
+| slice 3: `DownloadOrigin.playlist`, `PlaylistDownloads` (the keeping-in-step rules, the control, the rows), `DownloadRemoval`; store v6 | `PlaylistKeeper` (DownloadModel's), the playlist's control and ••• items, Downloaded > Downloaded playlists, You > Downloads' rows |
 | slice 4: the artist sorts and lines; 2 routes | Artists, an artist's page |
 | slice 5: the shuffle feed's rules; 2 routes | Songs, the Shuffle button, the feed |
 
@@ -329,9 +346,13 @@ and the kept pages told of every write (the web's `announcePlaylistChanged`). Bu
 The control in a playlist's bar (Download, then the ring and the mark, as an album's), its ••• items, the hero's line,
 the rows' marks; `DownloadOrigin.playlist(id)`; the store's `playlist` table (id, the answer as deadwax sent it, when
 read, the songs missing since when) at DB version 6; keeping in step (2.5); Downloading's row per playlist ("Late
-night - 3 of 12 songs to go"); On this phone > Playlists; Remove Download; Remove All taking playlists too. Words:
-"Download", "Remove Download" (Phase 2's), "Downloaded with Late night" (a song's menu title), "This playlist is
-downloaded - it plays with no connection.", "Downloaded playlists" (the place).
+night - 3 of 12 songs to go"); Downloaded > Downloaded playlists (question 15; this said On this phone > Playlists
+until it was built); Remove Download; Remove All taking playlists too. Words: "Download", "Remove Download" (Phase
+2's), "Downloaded with Late night" (a song's menu title), "This playlist is downloaded - it plays with no
+connection.", "Downloaded playlists" (the place). After its review: "Smart playlists are worked out again each time,
+so this one plays only while deadwax can be reached." (a smart one's page) and "Smart playlists are worked out again
+each time, so this download stays as it was when you made it." (one downloaded before deadwax said it was smart).
+Built: 6.8.
 
 ### 6.4 Slice 4 - Artists
 
@@ -353,6 +374,14 @@ hold, what was decided where this spec was silent, the tests and what was verifi
 
 What slice 2 is, as built, is in notes/ios.md's "Phase 4, slice 2: Add to a playlist, New, Edit, Delete" - Core and the
 app, what was decided here, the tests and mutations, and what was verified. Questions 9-13 came of it.
+
+### 6.8 Slice 3, built (2026-11-14)
+
+What slice 3 is, as built, is in notes/ios.md's "Phase 4, slice 3: Download a playlist" - Core (PlaylistDownloads,
+the store's version 6) and the app (PlaylistKeeper, the control, the rows), what was decided here, the tests and
+mutations, and what was verified. Questions 14-15 came of it. Downloaded playlists sit under the Library's Downloaded,
+where the Library's switch (slice 3b, James's 2026-11-14) wants them. Its review's fixes, and question 16: "Phase 4,
+slice 3, after its review".
 
 ## 7. Tests (Swift Testing; Core's on Linux and macOS)
 
@@ -386,6 +415,18 @@ app, what was decided here, the tests and mutations, and what was verified. Ques
 - **The contract** (slice 2): the three bodies' keys exactly the extra="forbid" models' fields, the required sent, only
   fields with a default optional; the duplicates the route's Literal; the bounds the server's; the add's three answers
   and the delete's within what the app decodes; the statuses the phone reads where the routes raise them.
+- **Slice 3** (PlaylistDownloadTests, PlaylistDatabaseTests): the origin's raw form read back and as Phase 2 reserved
+  it; what each Remove Download takes and what stays; the staying choices; the library never taking a playlist's
+  origin; the planner's playlist unit, planned whole under the limit and the reserve; every rule of keeping in step
+  (`listed`, `missing`, `read`, `actions`, `orphans`, `dueReads`, `nextLook`, `due`) at the 10-minute bounds; the
+  control's state, items and lines; the rows' progress and words; the store's `playlist` table written, read back,
+  an unreadable row kept; Remove All; and a real version-5 file brought to version 6 with every row of every table
+  kept. No new route: ROUTE_COUNT stays 32, and the playlist's body is kept as deadwax sent it.
+- **Slice 3's review** (PlaylistDownloadTests, PlaylistKeepingTests): a started song never letting its playlist past
+  the limit or the reserve; a song two playlists share; an Edit's own removals and songs Navidrome is hiding; a mark
+  from the future; a list at the moment of a download; the rows' rules; the keeper's order (a write before its
+  effects, nothing after a failed write or take, an older answer dropped); smart playlists. The contract reads
+  `smart` ahead of the server (`PLAYLIST_AHEAD`).
 
 ## 8. James's checks (on his iPhone)
 
@@ -412,9 +453,9 @@ Numbered after Phase 3's 63. Slice 1's:
 docs/ios.md's "Playlists' checks (64-69)" holds them as James reads them.
 
 The phase's (the plan's three, with slices 2, 3 and 5): make a playlist on the phone and see it in the web app and
-Amperfy (slice 2's **70**); download it and play it offline; shuffle the whole library and let it run past the first
-200 songs - the last two numbered with slices 3 and 5 (this said 71 and 72 before slice 2 was built; each slice
-numbers its own after the last). Each slice adds its own.
+Amperfy (slice 2's **70**); download it and play it offline (slice 3's **77**); shuffle the whole library and let it
+run past the first 200 songs - numbered with slice 5 (this said 71 and 72 before slice 2 was built; each slice numbers
+its own after the last). Each slice adds its own.
 
 Slice 2's:
 
@@ -444,6 +485,27 @@ Slice 2's:
 
 docs/ios.md's "Playlists' changes' checks (70-76)" holds them as James reads them.
 
+Slice 3's:
+
+- **77 Download one and play it offline** (the phase's). The arrow, the ring, "Downloading - 4 of 12 songs", the
+  Downloading row; then "This playlist is downloaded - it plays with no connection."; then in Airplane Mode after a
+  force quit, Downloaded > Downloaded playlists opens it and every song plays, each with its own album's cover; and
+  Library > Playlists lists it, bright.
+- **78 Kept in step.** A song added in the web app comes; one taken out there stays on the phone until a look ten
+  minutes on agrees; one taken out with Edit here goes at once.
+- **79 What stays.** A song downloaded by hand, or with an album, stays after the playlist's Remove Download; a song
+  only the playlist brought says "Downloaded with …" with no Remove Download; turning Download your library off keeps
+  the playlist's songs.
+- **80 Where it is.** Downloaded playlists; You > Downloads' Downloaded with the playlist first and its songs under no
+  album row; a swipe's Remove; Remove All's question saying they go too.
+- **81 Deleted.** Deleted here: gone at once. Deleted in the web app: stays ten minutes or more, then goes.
+- **82 Room.** Under the storage limit the whole playlist waits; nothing half-fetched.
+- **83 VoiceOver.** The control's label and values; a Downloading row read as one.
+- **84 Smart playlists** (once main sends `smart`). A smart playlist: no arrow, nothing to download in its •••, and
+  the line saying why. One downloaded before: kept as it was, Remove Download still there.
+
+docs/ios.md's "Downloaded playlists' checks (77-84)" holds them as James reads them.
+
 ## 9. What only the phone can tell
 
 - That the mosaic covers (`pl-<id>_<hash>`) come through deadwax's cover route at the rows' and the hero's sizes as
@@ -456,6 +518,15 @@ docs/ios.md's "Playlists' changes' checks (70-76)" holds them as James reads the
   every •••) and from Now Playing's full-screen cover; that confirmation dialogs anchored on the bar's Cancel and on
   Delete playlist show where they should; the notice over Now Playing; and Navidrome's real `changed` moving on every
   write, so the picker's order and the 409 behave as against the fakes.
+- Slice 3's: that Navidrome's real `changed` moves on an add or removal made in another app, so a list's look reads the
+  playlist again (only fakes here; the page's own ask takes it in either way); that a Menu with a header and no items
+  (a song's ••• with nothing to offer but "Downloaded with …") shows its header; that the control sits beside the
+  ••• in the bar as the album's does; that a downloaded playlist's songs, from many albums, fetch in the background
+  and on a locked phone as an album's do; and how long a playlist of a few hundred songs takes to be planned and
+  asked for (one transaction, one plan).
+- Slice 3's review: that a real Navidrome's getPlaylists and getPlaylist carry `validUntil` for a smart playlist,
+  including one never yet worked out (the field main's `smart` can be read from, going by the source at 46c4327); and
+  that a rename's Done while a song's file is being moved keeps that song.
 
 ## 10. Open questions (each with what the build does until James answers)
 
@@ -499,3 +570,23 @@ docs/ios.md's "Playlists' changes' checks (70-76)" holds them as James reads the
     second tap never adds the songs twice - across every opening of the picker and both its openers (the tabs' and Now
     Playing's), as the web's one picker's `writing` lasts (built so after the review: the first build's gate was each
     opening's own).
+14. **A downloaded playlist and the room.** Planned song by song, a playlist bigger than the room left would fetch
+    its first songs and stop; planned whole, it waits until all of it fits. *Recommend, and built*: whole, as an
+    album is (Phase 2's units) - a playlist downloaded to play offline is useless half there, and a hand download
+    never gives way. A song of it also asked for with its album goes in the album's unit; the rest are one unit,
+    the first downloaded playlist's by id when a song is in two.
+15. **Where downloaded playlists live.** The spec said the Library's On this phone gains Playlists. James's
+    redesign of the Library (2026-11-14, slice 3b: the Library's switch) moves Downloaded into the Library's •••
+    and takes the places rows away. *Recommend, and built*: **Downloaded playlists** is a row at the top of the
+    Downloaded screen (pushed, or the root while deadwax can't be reached), with how many - no place of its own
+    above the albums - and the Playlists screen, offline with no list in hand, lists the downloaded ones. Their
+    mosaic covers aren't kept with the download (a cover route of their own, with no kept file): offline, the
+    cover cache's or the empty cover.
+16. **Smart playlists** (slice 3's review). Navidrome works a smart playlist out again each time it is read, so a
+    download of one would chase a list that moves on every look. **James: "No Download for them."** Built: no
+    Download and no download items; the page says why ("Smart playlists are worked out again each time, so this one
+    plays only while deadwax can be reached."); one downloaded before deadwax said it was smart is kept as it was -
+    never read again, nothing asked or taken - with Remove Download as any playlist's, and let go once two lists
+    agree it has gone. Ordinary and .m3u-synced playlists download as before. The server sends `smart` from main's
+    2.1.x; until then the phone can tell no playlist is smart (`readonly` is true for .m3u-synced ones and anyone
+    else's too), so none is treated as one.

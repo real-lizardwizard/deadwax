@@ -76,7 +76,7 @@ private func deleted(_ turn: LibraryDownloads.Turn, _ songs: [StoreSong]) -> [St
 
     @Test func noSongWantedByHandInAPlaylistOrAnyOtherWayIsEverDeleted() {
         // every reason the library has to give back, each album holding songs wanted another way beside its own
-        let others: [Set<DownloadOrigin>] = [[.song], [.album("x")], [.other("playlist:p1")], [.other("anything:later")]]
+        let others: [Set<DownloadOrigin>] = [[.song], [.album("x")], [.playlist("p1")], [.other("anything:later")]]
         var songs: [StoreSong] = []
         for (n, origin) in others.enumerated() {
             for album in ["removed", "gave", "kept", "notOn"] {

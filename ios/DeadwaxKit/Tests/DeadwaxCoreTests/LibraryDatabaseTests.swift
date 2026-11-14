@@ -177,7 +177,7 @@ private func followed(_ id: String, _ position: Int, songs: [FollowedSong]? = ni
                 try v4.setMeta("library_etag", "\"e1\"")
             }
             let v5 = try DownloadDatabase(path: path)
-            #expect(try v5.userVersion() == 5)
+            #expect(try v5.userVersion() == DownloadDatabase.version)
             #expect(try v5.library() == [album], "the row kept, nothing found to have left it")
             #expect(try v5.meta("library_etag") == "\"e1\"")
             #expect(try v5.setLibrarySongs(album: "a", songs: songs, left: ["s3": 20], at: 20))

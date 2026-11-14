@@ -74,7 +74,8 @@ struct AlbumsScreen: View {
                     Color.clear
                         .frame(height: 0)
                         .id(ShelfAnchor.top)
-                    if root && !finding {
+                    // the root's places - and Downloaded's own, pushed too (slice 3: its downloaded playlists)
+                    if (root || list == .downloaded) && !finding {
                         places(personal: personal, online: online, hasAlbums: drawn?.albums.isEmpty == false)
                     }
                     if let drawn, !drawn.view.countText.isEmpty, !(list == .downloaded && drawn.albums.isEmpty) {
@@ -184,27 +185,43 @@ struct AlbumsScreen: View {
                     PlaceRow(symbol: "square.stack", label: LibraryWords.allAlbums, route: .albums(.store))
                 }
             }
-            if !downloads.records.isEmpty {
+            if !downloads.records.isEmpty || !downloads.playlists.kept.isEmpty {
                 PlaceGroup(title: DownloadWords.onThisPhone) {
                     PlaceRow(symbol: DownloadWords.downloadSymbol, label: DownloadWords.downloadedTitle,
                              count: downloads.albumCount, route: .downloaded)
                 }
             }
         case .downloaded:
-            // the root is Downloaded (deadwax couldn't be reached as it was last shown): the way back to the albums
-            VStack(alignment: .leading, spacing: 0) {
-                // named as the page it opens is titled: "Your albums", or "Albums" without a library of your own
-                PlaceRow(symbol: "square.stack", label: LibraryWords.title(library.scope, personal: personal),
-                         route: .albums(library.scope))
-                // and to the playlists (phase4-library.md 3.1): those whose page is in hand open with what is here
-                PlaceRow(symbol: "music.note.list", label: PlaylistWords.title, route: .playlists, divider: online)
-                if !online {
-                    Text(DownloadWords.onlyDownloadedPlay)
-                        .font(.footnote)
-                        .foregroundStyle(Palette.quiet)
-                        .fixedSize(horizontal: false, vertical: true)
-                        .padding(.bottom, 10)
-                    Divider()
+            // the playlists its screen lists (the shelf: those whose answer can be read), never an unreadable row's
+            let downloadedPlaylists = PlaylistDownloads.shelf(downloads.playlists.kept).count
+            if root || downloadedPlaylists > 0 {
+                VStack(alignment: .leading, spacing: 0) {
+                    if root {
+                        // the root is Downloaded (deadwax couldn't be reached as it was last shown): the way back to
+                        // the albums - named as the page it opens is titled: "Your albums", or "Albums" without a
+                        // library of your own
+                        PlaceRow(symbol: "square.stack", label: LibraryWords.title(library.scope, personal: personal),
+                                 route: .albums(library.scope))
+                        // and to the playlists (phase4-library.md 3.1): those whose page is in hand open with what is
+                        // here
+                        PlaceRow(symbol: "music.note.list", label: PlaylistWords.title, route: .playlists,
+                                 divider: online || downloadedPlaylists > 0)
+                    }
+                    // (slice 3) the playlists downloaded to this phone: under Downloaded, where the Library's redesign
+                    // (slice 3b) will want them - never a place of their own above the albums
+                    if downloadedPlaylists > 0 {
+                        PlaceRow(symbol: "music.note.list", label: PlaylistDownloadWords.place,
+                                 count: downloadedPlaylists, counted: PlaylistDownloadWords.count,
+                                 route: .downloadedPlaylists, divider: !(root && !online))
+                    }
+                    if root && !online {
+                        Text(DownloadWords.onlyDownloadedPlay)
+                            .font(.footnote)
+                            .foregroundStyle(Palette.quiet)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .padding(.bottom, 10)
+                        Divider()
+                    }
                 }
             }
         }
@@ -215,7 +232,8 @@ struct AlbumsScreen: View {
     @ViewBuilder
     private func content(_ drawn: DrawnShelf?, failure: APIFailure?, personal: Bool, online: Bool) -> some View {
         if list == .downloaded, drawn?.albums.isEmpty != false {
-            NothingDownloadedNote()
+            // (slice 3) an empty playlist downloaded has no album: its row above says what is here
+            if downloads.playlists.kept.isEmpty { NothingDownloadedNote() }
         } else {
             switch AlbumListBody.of(scope ?? .store, list: drawn?.albums, failed: failure != nil,
                                     found: drawn?.view.found.count ?? 0, typed: typed) {
@@ -428,6 +446,8 @@ struct PlaceRow: View {
     let symbol: String
     let label: String
     var count: Int?
+    /// The count, spoken - albums, unless the place holds something else (slice 3's playlists).
+    var counted: (Int) -> String = { (n: Int) -> String in Find.countText(n, one: "album", many: "albums") }
     let route: AppRoute
     var divider = true
 
@@ -456,7 +476,7 @@ struct PlaceRow: View {
             }
             .buttonStyle(.plain)
             .accessibilityLabel(label)
-            .accessibilityValue(count.map { Find.countText($0, one: "album", many: "albums") } ?? "")
+            .accessibilityValue(count.map(counted) ?? "")
             if divider { Divider() }
         }
     }

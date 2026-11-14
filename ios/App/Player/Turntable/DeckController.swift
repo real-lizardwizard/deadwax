@@ -1179,7 +1179,7 @@ final class DeckController {
     }
 
     /// The layers written, with no animation: the face (the deck's angle and the hand's turn, Turntable.tsx:426), the
-    /// arm, the handle.
+    /// arm, the handle - but for the head's lift, which the layers ease themselves (a step under Reduce Motion).
     private func redraw() {
         guard let view else { return }
         var look = TurntableLook()
@@ -1188,6 +1188,7 @@ final class DeckController {
         look.arm = trig.armAngle(shownTime, length)
         look.needle = trig.needleAt(shownTime, length)
         look.lifted = press?.drag?.kind == .arm
+        look.still = reduced
         look.contrast = contrast
         look.speed = player.speed
         look.faderHeld = faderDrag?.from != nil

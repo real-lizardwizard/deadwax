@@ -36,16 +36,21 @@ public struct Playlist: Codable, Sendable, Equatable, Hashable, Identifiable {
     public let mine: Bool
     /// The asker's own, and not a smart playlist or one kept in step with a file.
     public let editable: Bool
+    /// (slice 3's review) One of Navidrome's smart playlists (made from rules, an `.nsp`): worked out again as it is
+    /// read, so it is never downloaded (James: "No Download for them") - it plays only while deadwax can be reached.
+    /// Sent by deadwax's summary() from main's 2.1.x on, read from Navidrome's playlist; false when deadwax doesn't
+    /// send it, so no playlist reads as smart before then.
+    public let smart: Bool
 
     enum CodingKeys: String, CodingKey {
         case id, name, comment, songCount, duration, created, changed, owner
         case isPublic = "public"
-        case coverArt, mine, editable
+        case coverArt, mine, editable, smart
     }
 
     public init(id: String, name: String = "", comment: String = "", songCount: Int = 0, duration: Double = 0,
                 created: String = "", changed: String = "", owner: String = "", isPublic: Bool = false,
-                coverArt: String? = nil, mine: Bool = false, editable: Bool = false) {
+                coverArt: String? = nil, mine: Bool = false, editable: Bool = false, smart: Bool = false) {
         self.id = id
         self.name = name
         self.comment = comment
@@ -58,6 +63,7 @@ public struct Playlist: Codable, Sendable, Equatable, Hashable, Identifiable {
         self.coverArt = coverArt
         self.mine = mine
         self.editable = editable
+        self.smart = smart
     }
 
     public init(from decoder: any Decoder) throws {
@@ -75,6 +81,15 @@ public struct Playlist: Codable, Sendable, Equatable, Hashable, Identifiable {
         coverArt = cover?.isEmpty == false ? cover : nil
         mine = fields.looseField(Bool.self, .mine) ?? false
         editable = fields.looseField(Bool.self, .editable) ?? false
+        smart = fields.looseField(Bool.self, .smart) ?? false
+    }
+
+    /// The same playlist known to be a smart one - a downloaded playlist found to be one is kept as it was (slice 3's
+    /// review), its songs `songs` long.
+    func asSmart(songs: Int) -> Playlist {
+        Playlist(id: id, name: name, comment: comment, songCount: songs, duration: duration, created: created,
+                 changed: changed, owner: owner, isPublic: isPublic, coverArt: coverArt, mine: mine, editable: editable,
+                 smart: true)
     }
 }
 
@@ -98,8 +113,9 @@ public struct PlaylistList: Decodable, Sendable, Equatable {
 }
 
 /// `GET /deadwax/navidrome/playlists/{id}` (and what a new playlist and Edit's Done answer): one playlist with its songs -
-/// Navidrome's own, as they are, a song twice listed twice - and how many of them it isn't listing just now.
-public struct PlaylistWithSongs: Decodable, Sendable, Equatable {
+/// Navidrome's own, as they are, a song twice listed twice - and how many of them it isn't listing just now. Encodable
+/// too (slice 3): a playlist downloaded from the answer in hand is kept as it is encoded until its first read.
+public struct PlaylistWithSongs: Codable, Sendable, Equatable {
     public let playlist: Playlist
     public let songs: [Song]
     /// The songs Navidrome counts but isn't listing just now (deleted, or being moved) - an editable playlist's only.

@@ -66,10 +66,15 @@ struct PlaylistsScreen: View {
                     groups(PlaylistRules.groups(list), online: online)
                 }
             } else if !online {
-                Text(PlaylistWords.offlineList)
+                // (slice 3) no list in hand: the downloaded playlists still open, and play
+                let downloaded = PlaylistDownloads.shelf(downloads.playlists.kept)
+                Text(downloaded.isEmpty ? PlaylistWords.offlineList : PlaylistDownloadWords.offlineDownloaded)
                     .foregroundStyle(Palette.quiet)
                     .fixedSize(horizontal: false, vertical: true)
                     .listRowSeparator(.hidden)
+                ForEach(downloaded) { (playlist: Playlist) in
+                    PlaylistRow(playlist: playlist, dimmed: !downloads.playlistPlaysOffline(playlist.id))
+                }
             } else if let failure = playlists.failure {
                 ListFailedNote(failure: failure) { Task { await playlists.ask(fresh: true) } }
                     .listRowSeparator(.hidden)
@@ -188,8 +193,52 @@ struct PlaylistsScreen: View {
     @ViewBuilder private func rows(_ list: [Playlist], online: Bool) -> some View {
         ForEach(list) { playlist in
             let dimmed = !online && !playlists.playsOffline(playlist.id, here: downloads.isHere)
+                && !downloads.playlistPlaysOffline(playlist.id)
             PlaylistRow(playlist: playlist, dimmed: dimmed)
         }
+    }
+}
+
+/// Downloaded playlists (Phase 4, slice 3; phase4-library.md 2.5, question 15): every playlist downloaded to this phone,
+/// by name, each a row opening its page - drawn from what this phone keeps, so it lists them with no connection too
+/// (one with nothing of it here yet dimmed then). Reached from the Library's Downloaded, where the Library's redesign
+/// (slice 3b) will want it: no place of its own above the albums. With none, what is empty and how to fill it. A pull
+/// looks at deadwax for their changes now - or, with no connection, whether deadwax is back.
+struct DownloadedPlaylistsScreen: View {
+    @Environment(DownloadModel.self) private var downloads
+    @Environment(Reachability.self) private var reachability
+
+    var body: some View {
+        let online = reachability.online
+        let shelf = PlaylistDownloads.shelf(downloads.playlists.kept)
+        List {
+            if shelf.isEmpty {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text(PlaylistDownloadWords.noneYet)
+                    Text(PlaylistDownloadWords.noneYetHow)
+                        .font(.subheadline)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                .foregroundStyle(Palette.quiet)
+                .listRowSeparator(.hidden)
+                .accessibilityElement(children: .combine)
+            } else {
+                ForEach(shelf) { (playlist: Playlist) in
+                    PlaylistRow(playlist: playlist, dimmed: !online && !downloads.playlistPlaysOffline(playlist.id))
+                }
+            }
+        }
+        .listStyle(.plain)
+        .navigationTitle(PlaylistDownloadWords.place)
+        .navigationBarTitleDisplayMode(.large)
+        .refreshable {
+            guard reachability.online else {
+                reachability.tryNow()
+                return
+            }
+            downloads.playlists.look(.byHand)
+        }
+        .task { await downloads.followProgress() }
     }
 }
 

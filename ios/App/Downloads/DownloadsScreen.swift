@@ -48,14 +48,15 @@ struct DownloadsScreen: View {
                     Text(DownloadWords.lastFooter)
                 }
             } else {
-                if !shelf.downloading.isEmpty || downloads.libraryProgress != nil {
-                    DownloadingSection(rows: shelf.downloading, allWaitForWifi: shelf.allWaitForWifi)
+                if !shelf.downloading.isEmpty || downloads.libraryProgress != nil || !shelf.playlistsGoing.isEmpty {
+                    DownloadingSection(rows: shelf.downloading, playlists: shelf.playlistsGoing,
+                                       allWaitForWifi: shelf.allWaitForWifi)
                 }
                 if !shelf.failed.isEmpty {
                     FailedSection(rows: shelf.failed)
                 }
-                if !shelf.downloaded.isEmpty {
-                    DownloadedSection(rows: shelf.downloaded)
+                if !shelf.downloaded.isEmpty || !shelf.playlistsHere.isEmpty {
+                    DownloadedSection(rows: shelf.downloaded, playlists: shelf.playlistsHere)
                 }
                 Section {
                     Button(role: .destructive) {
@@ -74,7 +75,8 @@ struct DownloadsScreen: View {
                     } message: {
                         let scope = downloads.follower.scope ?? AlbumScope.albums(for: server.me)
                         Text([DownloadWords.removeAllMessage(songs: shelf.songsHere, bytes: downloads.bytesHere),
-                              downloads.follower.on ? AutoDownloadWords.removeAllToo(scope) : nil]
+                              downloads.follower.on ? AutoDownloadWords.removeAllToo(scope) : nil,
+                              PlaylistDownloadWords.removeAllToo(playlists: PlaylistDownloads.shelf(downloads.playlists.kept).count)]
                             .compactMap { $0 }.joined(separator: " "))
                     }
                 } footer: {
@@ -86,7 +88,9 @@ struct DownloadsScreen: View {
         .navigationTitle(DownloadWords.downloads)
         .animation(.default, value: shelf.isEmpty)
         .refreshable {
-            // a pull checks your library now (`byHand`), held until the check has answered
+            // a pull checks your library now (`byHand`), held until the check has answered - and looks at the downloaded
+            // playlists (slice 3)
+            downloads.playlists.look(.byHand)
             let follower = downloads.follower
             guard follower.on else { return }
             follower.check(.byHand)
@@ -128,9 +132,22 @@ private struct DownloadShelf {
         let verdict: DownloadRules.Verdict
     }
 
+    /// (slice 3) A downloaded playlist's row: Downloading's while songs of it are to come, Downloaded's while some are
+    /// here.
+    struct PlaylistLine: Identifiable {
+        let id: String
+        let name: String
+        let coverArt: String?
+        let line: String
+        let spoken: String
+        let fraction: Double?
+    }
+
     let downloading: [Going]
     let failed: [Failed]
     let downloaded: [Here]
+    let playlistsGoing: [PlaylistLine]
+    let playlistsHere: [PlaylistLine]
     let songsHere: Int
     let albumsHere: Int
     /// Every song on its way waits for Wi-Fi (the Downloading footer).
@@ -140,14 +157,44 @@ private struct DownloadShelf {
 
     let library: Bool
 
-    var isEmpty: Bool { downloading.isEmpty && failed.isEmpty && downloaded.isEmpty && !library }
+    var isEmpty: Bool {
+        downloading.isEmpty && failed.isEmpty && downloaded.isEmpty && !library && playlistsGoing.isEmpty
+            && playlistsHere.isEmpty
+    }
 
     @MainActor
     init(_ downloads: DownloadModel, server: ServerModel) {
         library = downloads.libraryProgress != nil
         let going = downloads.downloading
         let waits = going.map { downloads.state($0.id) }
-        downloading = Self.byAlbum(going).map { albumID, records in
+        // (slice 3) a downloaded playlist's songs are its own row's - not an album's, unless asked for another way too,
+        // or (its review) the playlist's answer no longer lists it: then its album's, so it is on some row
+        let listing = PlaylistDownloads.listing(downloads.playlists.kept)
+        let ownRows = going.filter { (record: DownloadRecord) -> Bool in
+            PlaylistDownloads.inDownloadingAlbumRow(record.id, origins: downloads.origins[record.id] ?? [.song],
+                                                    listing: listing)
+        }
+        let shelf = PlaylistDownloads.shelf(downloads.playlists.kept)
+        let entries = shelf.compactMap { (playlist: Playlist) -> KeptPlaylist? in
+            downloads.playlists.entry(playlist.id)
+        }
+        playlistsGoing = entries.compactMap { (entry: KeptPlaylist) -> PlaylistLine? in
+            guard let going = downloads.playlistProgress(entry) else { return nil }
+            let line = PlaylistDownloadWords.downloadingRow(going.progress, wait: going.wait)
+            let name = entry.name.isEmpty ? PlayerWords.untitled : entry.name
+            return PlaylistLine(id: entry.id, name: name, coverArt: entry.answer?.playlist.coverArt, line: line,
+                            spoken: PlaylistDownloadWords.downloadingSpoken(name, going.progress, wait: going.wait),
+                            fraction: going.fetching ? going.progress.fraction : nil)
+        }
+        playlistsHere = entries.compactMap { (entry: KeptPlaylist) -> PlaylistLine? in
+            let here = downloads.playlistHere(entry)
+            guard here.here > 0 || entry.songIDs.isEmpty else { return nil }
+            let line = DownloadWords.downloadedRow(here: here.here, of: here.of, bytes: here.bytes)
+            let name = entry.name.isEmpty ? PlayerWords.untitled : entry.name
+            return PlaylistLine(id: entry.id, name: name, coverArt: entry.answer?.playlist.coverArt, line: line,
+                            spoken: "\(name), \(line)", fraction: nil)
+        }
+        downloading = Self.byAlbum(ownRows).map { albumID, records in
             let all = downloads.songIDs(album: albumID)?.compactMap { downloads.records[$0] } ?? records
             let state = downloads.album(records: all.filter { $0.state != .failed })
             var here = 0, of = records.count, wait: DownloadWait?, fraction: Double?
@@ -176,7 +223,14 @@ private struct DownloadShelf {
 
         let done = downloads.downloaded
         songsHere = done.count
-        let here = Self.byAlbum(done).map { albumID, records -> Here in
+        albumsHere = Set(done.map(\.albumID)).count
+        // (slice 3) a song only downloaded playlists keep is under its playlist's row, not an album's - unless (its
+        // review) none of them lists it now
+        let albumRows = done.filter { (record: DownloadRecord) -> Bool in
+            PlaylistDownloads.inDownloadedAlbumRow(record.id, origins: downloads.origins[record.id] ?? [.song],
+                                                   listing: listing)
+        }
+        let here = Self.byAlbum(albumRows).map { albumID, records -> Here in
             let album = downloads.keptAlbum(albumID)
             let bytes = records.reduce(Int64(0)) { $0 + ($1.bytes ?? 0) }
             let total = max(album?.song?.count ?? album?.songCount ?? records.count, records.count)
@@ -186,7 +240,6 @@ private struct DownloadShelf {
         }
         // largest first - the order iOS's own storage lists keep, since this is where space is made
         downloaded = here.sorted { $0.bytes != $1.bytes ? $0.bytes > $1.bytes : $0.id < $1.id }
-        albumsHere = here.count
     }
 
     /// The records grouped by album, in the order the first of each came.
@@ -464,6 +517,49 @@ private struct QuestionRow: View {
     }
 }
 
+/// (slice 3) A downloaded playlist's row - in Downloading ("3 of 12 songs to go", the bar while its songs fetch) and in
+/// Downloaded ("12 songs · 412 MB"): its mosaic (not kept with the download, question 15: with no connection it is
+/// the cover cache's, or the empty cover), its name and line; a tap opens its page, pushed on You's stack. One VoiceOver element.
+private struct PlaylistLineRow: View {
+    let row: DownloadShelf.PlaylistLine
+
+    @Environment(AppNavigation.self) private var navigation
+    @Environment(\.dynamicTypeSize) private var typeSize
+    @ScaledMetric(relativeTo: .body) private var cover: CGFloat = 44
+
+    var body: some View {
+        let large = typeSize.isAccessibilitySize
+        Button {
+            navigation.open(.playlist(PlaylistRoute(id: row.id)))
+        } label: {
+            HStack(alignment: .center, spacing: 12) {
+                PlaylistCover(id: row.coverArt, side: cover, pixels: CoverSize.row, corner: 4)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(row.name)
+                        .foregroundStyle(.primary)
+                        .lineLimit(large ? nil : 1)
+                    Text(row.line)
+                        .font(.subheadline)
+                        .foregroundStyle(Palette.quiet)
+                        .monospacedDigit()
+                        .fixedSize(horizontal: false, vertical: true)
+                    if let fraction = row.fraction {
+                        DownloadBar(fraction: fraction)
+                            .padding(.top, 4)
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .padding(.vertical, 2)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(row.spoken)
+        .accessibilityAddTraits(row.fraction != nil ? [.isButton, .updatesFrequently] : .isButton)
+    }
+}
+
 /// Downloading's one row for your library (3.3): its name, "38 of 412 albums to go · 12.4 GB" or what it waits for,
 /// and the bar; a tap opens the Library's Downloaded. One VoiceOver element ("Your library, 38 of 412 albums to go,
 /// 12.4 GB, 40 percent").
@@ -568,6 +664,8 @@ private struct DownloadOverSection: View {
 
 private struct DownloadingSection: View {
     let rows: [DownloadShelf.Going]
+    /// (slice 3) A row per downloaded playlist with songs of it to come.
+    let playlists: [DownloadShelf.PlaylistLine]
     let allWaitForWifi: Bool
 
     @Environment(DownloadModel.self) private var downloads
@@ -576,6 +674,10 @@ private struct DownloadingSection: View {
         Section {
             if let progress = downloads.libraryProgress {
                 LibraryDownloadingRow(progress: progress)
+            }
+            ForEach(playlists) { row in
+                PlaylistLineRow(row: row)
+                    .removable(name: row.name) { downloads.remove(playlist: row.id) }
             }
             ForEach(rows) { row in
                 AlbumLine(album: row.album, albumID: row.id, spoken: spoken(row), updates: row.fraction != nil) {
@@ -675,7 +777,7 @@ private struct FailedRow: View {
                 .padding(.leading, AlbumLineInset.text)
             }
         }
-        .removable(name: row.album?.name, asks: asks, ask: ask) { remove() }
+        .removable(name: row.album?.name, asks: asks, ask: ask, offered: removes) { remove() }
         // keeping a library album off lets go of its songs already here too: said, with Cancel
         .confirmationDialog(AutoDownloadWords.keepOffTitle(name), isPresented: $askingKeepOff,
                             titleVisibility: .visible) {
@@ -695,6 +797,14 @@ private struct FailedRow: View {
 
     /// Its Remove asks first: the album would be kept off with songs of it here only the library wants.
     private var asks: Bool { keepsOff && downloads.keptOffLoses(album: row.id) > 0 }
+
+    /// (slice 3) Its Remove would take something: not every failed song is one a downloaded playlist keeps (that
+    /// playlist's Remove Download is its own).
+    private var removes: Bool {
+        row.records.contains { (record: DownloadRecord) -> Bool in
+            !downloads.staysAfterRemove(record.id, album: keepsOff ? row.id : nil)
+        }
+    }
 
     private func ask() {
         songsHere = downloads.keptOffLoses(album: row.id)
@@ -725,12 +835,18 @@ private struct FailedRow: View {
 
 private struct DownloadedSection: View {
     let rows: [DownloadShelf.Here]
+    /// (slice 3) The downloaded playlists with songs of them here, first.
+    let playlists: [DownloadShelf.PlaylistLine]
 
     @Environment(DownloadModel.self) private var downloads
     @Environment(\.dynamicTypeSize) private var typeSize
 
     var body: some View {
         Section {
+            ForEach(playlists) { row in
+                PlaylistLineRow(row: row)
+                    .removable(name: row.name) { downloads.remove(playlist: row.id) }
+            }
             ForEach(rows) { row in
                 let large = typeSize.isAccessibilitySize
                 AlbumLine(album: row.album, albumID: row.id, spoken: spoken(row)) {
@@ -874,9 +990,10 @@ private extension View {
     /// The row's swipe: Remove (destructive, `trash`), which VoiceOver has as an action; its notice names the album.
     /// `asks`: the Remove asks first (`ask`) - drawn red without the destructive role, so a full swipe doesn't take the
     /// row out before the answer.
-    func removable(name: String?, asks: Bool = false, ask: @escaping () -> Void = {},
+    /// `offered`: false when the Remove would take nothing (slice 3) - no swipe at all.
+    func removable(name: String?, asks: Bool = false, ask: @escaping () -> Void = {}, offered: Bool = true,
                    remove: @escaping () -> Void) -> some View {
-        modifier(Removable(name: name, asks: asks, ask: ask, remove: remove))
+        modifier(Removable(name: name, asks: asks, ask: ask, offered: offered, remove: remove))
     }
 }
 
@@ -884,13 +1001,16 @@ private struct Removable: ViewModifier {
     let name: String?
     let asks: Bool
     let ask: () -> Void
+    let offered: Bool
     let remove: () -> Void
 
     @Environment(PlayerModel.self) private var player
 
     func body(content: Content) -> some View {
         content.swipeActions(edge: .trailing, allowsFullSwipe: true) {
-            if asks {
+            if !offered {
+                EmptyView()
+            } else if asks {
                 Button(DownloadWords.remove, systemImage: "trash") { ask() }
                     .tint(.red) // the destructive swipe's own red
             } else {

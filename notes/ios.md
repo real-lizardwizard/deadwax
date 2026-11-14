@@ -5140,6 +5140,386 @@ Not verified - only the phone can tell (docs/ios.md's checks 71, 73 and 75 now a
 - New playlist's sheet swiped away and opened again.
 - A second opening of the picker saying "Adding…" over Now Playing.
 
+## Phase 4, slice 3: Download a playlist (2026-11-14)
+
+The third of Phase 4's five slices (notes/ios-specs/phase4-library.md 2.5 and 6.3; 6.8 points here), on
+`phase4-library` from `ios` 2fb2ecb (slice 2, its review and main's 2.1.16-2.1.17 merged). **The app stays 0.9 (9)**;
+src/__init__.py untouched; **no server change**: slice 1's two read routes (the list, and one playlist with its
+songs) answer everything keeping a playlist in step needs. ROUTE_COUNT stays 32.
+
+This section is slice 3 as first built. Its review changed the planner's playlist unit, the Edit's takes, songs
+Navidrome is hiding, the keeper's order (now Core's PlaylistKeeping) and smart playlists: "Phase 4, slice 3, after
+its review", after the turntable's section below.
+
+### Core (DeadwaxCore)
+
+- **PlaylistDownloads.swift** (new):
+  - **`DownloadOrigin.playlist(id)`** is `.other("playlist:<id>")`, the raw Phase 2 reserved - one representation,
+    so every switch over DownloadOrigin and every row a store already holds read as before. `playlistID`,
+    `playlists(_:)` (sorted), `keptInStep` (only the library's or playlists'), `onlyPlaylists`.
+  - **`DownloadRemoval`**: what each Remove Download takes - a song's `[.song, .album(its album)]`, an album's those
+    and `.library`, a playlist's its own origin alone - and `stays(origins, removing:)` (none kept reads as `[.song]`,
+    as the store's rules read it).
+  - **`KeptPlaylist`**: a row of the store's `playlist` table - the last answer (nil when it can't be read) and its
+    body as deadwax sent it, `readAt`, `missingSince`, `left` (song id to the first read without it), `askedAt`;
+    `songIDs` (each once), `leftAgreed`, `secondReadAt`.
+  - **`PlaylistDownloads`**, the rules: `started`; `listed` (listed: no longer missing, read when its `changed`
+    moved or its answer couldn't be read; not listed: marked, let go once a list 10 minutes on agrees; an empty list
+    believes nothing and reads every one; one downloaded after the list was asked is left alone); `missing` (a read's
+    404 is a list without it); `read` (a song carried and not in the answer marked by its first read; `here` - this
+    phone's Edit - marks it agreed already; a song back unmarked; an emptied answer not taken in while a mark is
+    unagreed); `actions` (ask the songs not carrying the origin, each once, in order; take the agreed-left ones the
+    answer doesn't list; nothing from an unreadable answer); `orphans`; `dueReads`, `nextLook`, `due` (the library
+    follower's cadence, and on the minute when a second read or a missing mark is due); and for the screens
+    `shelf`, `keeping`, `state`, `choices`, `progress`.
+  - **`PlaylistDownloadWords`** (spec 6.3's words, and `heroLine`, `downloadingRow`, `count`, `removeAllToo`).
+- **DownloadPlan**: `Asked.unit` is `playlist:<id>` (the first by id) for a song a downloaded playlist wants and no
+  album download does - **planned whole**, the storage limit and the 2 GB reserve checked for all of it at once
+  (question 14). Hand units, as before: never given way, never evicted.
+- **DownloadRules**: `DownloadChoice.forSong(_:staying:)` and `forSongs(_:gone:staying:)`, Phase 3's `keptByLibrary`
+  forms now calling them.
+- **DownloadDatabase version 6**: the `playlist` table (id, json, read_at, missing_since, left_songs, asked_at);
+  `playlists()` (in the order downloaded; a row whose answer can't be read, or is another playlist's, kept with no
+  answer - never left out, or its songs' origin would read as an orphan's), `putPlaylist`, `deletePlaylist`; Remove
+  All takes the table with the songs.
+- **Playlists.swift**: `PlaylistWithSongs` is Codable (it encodes back to what reads the same). **DeadwaxClient**:
+  `playlistAnswered(id:)` - the answer and its body as sent; `playlist(id:)` through it.
+
+### The app
+
+- **PlaylistKeeper** (App/Downloads, new): DownloadModel's `playlists`, beside the library's follower, opened and
+  closed with the store. It holds the downloaded playlists in memory; everything it asks for and lets go goes through
+  DownloadModel's own `want` (origin `.playlist(id)`) and `removeOrigins` (DownloadRemoval.playlist). At open: the
+  rows read back, orphans' origins taken, each playlist's asks and takes made, a look. A look (PlaylistDownloads.due)
+  lists the playlists, saves the marks, lets go what two lists agree on, then reads those the list says to and those
+  due a second read - one at a time, each once a run, only while deadwax can be asked; a 404 is `missing`. A timer
+  every minute while the app lives. **Download**: the row written, then the songs asked for, then a read. **Remove**:
+  the row deleted, then the origin taken. **A write here** (PlaylistsModel's new `wrote`): an add or a write's 404
+  reads it; Edit's Done takes in the answer it was given with `here`; a delete (or a Delete answered 404) lets it go
+  at once. **A page's answer** (PlaylistPageModel's new `heard`) is taken in as a read - so opening the playlist twice
+  ten minutes apart agrees on a song gone - and its 404 reads it. A read answered after a newer answer was taken in
+  is dropped (`takenIn`), or a read sent before an Edit here would bring back what the Edit took out.
+- **DownloadModel**: `playlists`, wired in init; `staysAfterRemove(_:album:)` (DownloadRemoval.stays) for the
+  choices - a song's Remove Download offered only when it would take something, an album's only when a song of it
+  would go - and `keepingPlaylist(_:album:)`, the header's name; Remove Download's sets are DownloadRemoval's; the
+  playlist's `download`, `remove`, `tryAgain`, `carrying`, `playlistState`, `keptPlaylist`, `playlistPlaysOffline`,
+  `playlistProgress`, `playlistHere`, `playlistAnswered`, `playlistGone`, `playlistWritten`; the keeper told of
+  open, close, the front, deadwax back and Remove All.
+- **DownloadControl.swift**: **PlaylistDownloadControl** (the arrow; downloaded, the mark opening a menu titled with
+  the playlist's line - "This playlist is downloaded - it plays with no connection." and its size once all are here)
+  and **PlaylistDownloadMenuSection** (Download, or Download Again and Remove Download), also the bar •••'s second
+  section (QueueMenuRequest's new `playlist`). DownloadMenuSection's header says "Downloaded with Late night" for
+  songs a downloaded playlist keeps with nothing to remove; the album control's title too.
+- **PlaylistView**: the control beside the •••; the hero's download line (AlbumHero's DownloadLine, made internal;
+  `heroLine`); the page drawn first from the stored answer (`stored` ?? the page kept in memory), so a downloaded
+  playlist opens with no connection after a launch.
+- **Downloaded playlists** (question 15): AppRoute `.downloadedPlaylists`, DownloadedPlaylistsScreen (PlaylistsScreen.
+  swift) - the downloaded ones by name, a pull looking now. Its row is on the Downloaded screen, pushed or as the
+  root, with a count ("3 playlists" to VoiceOver; PlaceRow's new `counted`) - not a place of its own above the
+  albums. The root's On this phone shows with only a playlist downloaded; Downloaded's "nothing downloaded" note
+  doesn't show under a downloaded playlist's row. The Playlists screen, offline with no list in hand, lists the
+  downloaded ones; offline, a downloaded playlist's row is never dimmed while a song of it is here.
+- **You > Downloads**: Downloading's album rows leave out songs only the library and playlists want (`keptInStep`),
+  each downloaded playlist with songs to come having its own row ("3 of 12 songs to go", or its wait; the bar while
+  fetching); Downloaded's album rows leave out songs only playlists want (`onlyPlaylists`), each downloaded playlist
+  with songs here listed first ("12 songs · 412 MB"); a playlist row opens its page and swipes to Remove. Didn't
+  download's row has no swipe when its Remove would take nothing. Remove All's question adds `removeAllToo`. The
+  pull looks at the playlists too. Storage's counts still count every song.
+
+### Decided here (the spec was silent, or this departs from it)
+
+- **The place** (question 15): Downloaded > Downloaded playlists, as the coordinator relayed James's redesign of the
+  Library (slice 3b, the Library's switch, moves Downloaded into the Library's •••): not On this phone > Playlists.
+- **Planned whole** (question 14), as an album is.
+- **Remove Download elsewhere**: a song's or an album's is never offered when it would take nothing (it would look
+  like it did nothing); "Downloaded with …" says why instead. A song your library keeps keeps Phase 3's rule.
+- **The page's answers count as reads**, and the Edit's own answer is taken in rather than asked for again.
+- **A Delete answered 404 here** lets the download go at once, as a Delete answered (`gone(_:deletedHere:)`); a 404
+  anywhere else waits for two answers 10 minutes apart. The page says it has gone meanwhile; its songs stay.
+- **Crash order**: Download writes the row before asking; Remove deletes the row before taking - an origin left
+  without its row is an orphan, taken as the store opens. A just-downloaded playlist isn't judged by a list asked
+  before it (`askedAt`).
+- **The mosaic isn't kept** (question 15): it is a cover of its own on Navidrome with no file to keep; offline, the
+  cover cache's or the empty cover.
+- **An empty playlist** can be downloaded: it is "downloaded", and gains songs as they come.
+
+### Tests
+
+- **PlaylistDownloadTests** (new, 24): the origin's raw form and reading it back (an empty id none); kept in step and
+  only playlists; the library's `gives` never a playlist's; what each Remove takes and what stays; the staying
+  choices; the planner's unit and a playlist planned whole under the limit and the reserve; listed (changed moved,
+  unreadable, missing twice 10 minutes apart and at the bound, downloaded after the list, an empty list); a 404; a
+  song gained asked once in order; a song lost agreed at 10 minutes and not a millisecond before, back in it
+  unmarked, two marks' second read; an Edit here at once; an emptied answer held, agreed, emptied here (an empty or
+  unreadable kept one replaced at once); only a read
+  takes, a song the kept answer lists never; orphans; due, next look; keeping and the shelf by folded name; the
+  control's state, items and hero line; Downloading's progress and words; the words' banned list; the body kept as
+  sent.
+- **PlaylistDatabaseTests** (new, 5): written and read back in order; an unreadable row kept; Remove All; a
+  playlist's origin taken alone; **a real version-5 file** (made with `upTo: 5`, every table holding rows - song,
+  origin with a raw `playlist:p1`, album and its cover, loudness, lyrics, play, start, queue, library with its left
+  songs, meta) brought to 6 with every row kept, and the orphan it holds found.
+- LibraryDatabaseTests' version check is `DownloadDatabase.version`; LibraryDownloadsTests and DownloadRulesTests
+  use `.playlist(_:)`.
+- **Mutations**: 74, over PlaylistDownloads, DownloadRemoval, the planner's unit, the staying choices and the store's
+  version 6 - all caught. The first run missed 6: two were equivalent (`listed` and `read` asked the same thing twice,
+  so the code was made plainer), and four were closed by tests - no origins kept reading as a song's, the second read
+  due from the latest mark, a song the kept answer still lists never taken, and an unreadable row (whose test crashed
+  on an index rather than failing, so it `#require`s the count first). A rerun missed one more - an emptied answer held
+  whatever the kept one was - closed by a kept answer that was empty, or couldn't be read, being replaced at once.
+
+### Verified, and not
+
+Verified: `swift test` - Core 1268 (1239 + 29), Audio 158, Turntable 11; the unsigned Release device build (Xcode,
+`generic/platform=iOS`), so the App's wiring compiles; `check_project.py` ok; the iOS pytest files and
+test_source_bytes, 170 passed and 1 skipped; the 11 ios sims on Node 22.
+
+Not verified - none of the App's wiring has a test, and only a phone can tell (docs/ios.md's checks 77-83):
+- That a downloaded playlist plays offline after a force quit, from the stored answer, each song with its own cover.
+- That Navidrome's real `changed` moves on a change in another app, so a look reads the playlist (the page's own ask
+  takes it in either way).
+- That a menu with a header and no items (a song's download section with only "Downloaded with …") shows its header.
+- That the control sits beside the ••• as the album's does, and its menu's title reads as the album's.
+- That a playlist's songs from many albums download in the background and locked, as an album's do; how long a
+  playlist of a few hundred songs takes to be asked for and planned.
+- The swipes on You > Downloads' playlist rows, and Remove All's longer question.
+
+## The turntable's head stays on the arm (2026-11-14)
+
+James, on 0.9: "in the turntable, when you tap on the play head, it looks like it dislocates." Its own commit on
+`phase4-library`, after slice 3 (4c89833) and before slice 3's review fixes. The app stays 0.9 (9); src/__init__.py
+untouched; no server change.
+
+**Cause.** The phone ported the web's `is-lifted` (Turntable.tsx:492): while the arm was held, TurntableLayers
+moved the head `-TurntableGeometry.armLift` (5 units) along the arm's y axis. The arm's container is turned, so that
+is sideways off the bar, and a quick tap popped the head off the arm and back.
+
+**Fix** (turntable spec 2.5, "The lift changed"):
+- The head stays on the bar always: its layer is now its own size with its middle on the bar, and nothing moves it.
+- The lift is the head coming toward the viewer: grown `TurntableGeometry.headLift.scale` (1.08) about its middle,
+  with a soft shadow round it - `TurntablePalette.ttHeadShadow` (`--dw-shadow`'s black at 0.5), a blur of
+  `headLift.shadow` (3 units across the stage) and no offset, so it doesn't turn with the arm.
+- Both are eased each way over `headLift.seconds` on `headLiftEase`: the app's one motion token, `--dw-duration`
+  (0.14 s) on `--dw-ease` (cubic-bezier(0.16, 1, 0.3, 1)), as the web's lift. The coordinator's first ask was 0.12 s
+  ease-in-out, changed to the token so the two apps match. The easing runs from the presentation layer's values, so a
+  tap that sets the head down mid-lift turns back rather than flickering. This is the only eased thing in the
+  drawing, by explicit animations; `noActions` still keeps every implicit one off, and now covers the shadow's keys.
+- Reduce Motion: `TurntableLook.still` (DeckController's `reduced`) makes the two states a step.
+- `ttHeadShadow` isn't in TurntablePalette.tokens: tokens.json has no `--dw-shadow`, and adding it to
+  export-deck-vectors.cjs's list changes `made_with` and so writes every fixture again.
+
+**The web** makes the same change on main, in branch web-tonearm, shipping as 2.1.19: the head on the bar, 1.08
+about its middle, a shadow of blur 3 at rgba(0, 0, 0, 0.5) with no offset, on `--dw-duration` and `--dw-ease`. There
+`ARM_PARTS.lift = { scale: 1.08, shadow: 3 }` takes the place of `lift: 5`.
+
+Until main merges, `armLift` (5) stays in TurntableGeometry, held to turntable.json's `ARM_PARTS.lift` by
+TurntableGeometryTests. **iosdeck.sim exports it**: it runs export-deck-vectors.cjs --check, which reads `ARM_PARTS`
+out of ui/src/lib/turntable.ts. So it wasn't regenerated here. The deck vectors are made again at that merge, and
+`armLift` can then give way to the web's numbers.
+
+**Tests** (TurntableRenderTests):
+- `theHeadIsFiveUnitsUpWhenLifted` is now `theHeadStaysOnTheBarAndComesTowardTheViewerWhenLifted`, rendered over a
+  white plinth with everything but the arm hidden:
+  - the head's middle doesn't move (within 0.35 pt);
+  - its area grows by `scale` squared (within 0.06);
+  - a pixel 2 units off its long side is clear set down and shadowed lifted.
+- `theLiftIsEasedButAStepUnderReduceMotion`:
+  - the lift's two animations are there each way unless `still`;
+  - the duration is `seconds`, on `headLiftEase`'s control points, pinned at 0.14 s and (0.16, 1, 0.3, 1);
+  - the model ends grown with its shadow (zero offset, the blur scaled), then back;
+  - a frame that changes nothing of the lift leaves the easing alone.
+- **Mutations:** 14, all caught:
+  - the web's 5 units up again;
+  - grown about its end;
+  - not grown;
+  - no shadow, and the shadow left on;
+  - an offset shadow, and no blur;
+  - eased under Reduce Motion, never eased, and eased every frame;
+  - the wrong duration;
+  - the shadow not eased;
+  - the old ease-in-out, and the curve's points swapped.
+
+**Verified:**
+- `swift test`: Core 1268, Audio 158, Turntable 12 (11 + 1). The shadow is checked in pixels, so `render(in:)` does
+  draw it.
+- The unsigned Release device build.
+- `check_project.py`.
+- test_source_bytes.
+- The 11 ios sims on Node 22, iosdeck's exporter check included. They ran before the move to the motion token, which
+  touches nothing they read.
+
+**Not verified (only the phone can tell; docs/ios.md check 10):**
+- That it reads as the head lifting toward you, rather than only growing.
+- That the shadow shows at all over the dark vinyl.
+- That a quick tap, and taps in a row, look smooth.
+- That Reduce Motion's step is right.
+
+## Phase 4, slice 3, after its review (2026-11-14)
+
+The review of 4c89833 found two HIGH, one MEDIUM, five LOW and five test gaps. All are fixed in one commit on
+`phase4-library`, after the turntable's head (bfc7bb8). The app stays 0.9 (9); src/__init__.py untouched.
+
+The server needs one field: `smart` in each playlist summary (src/playlists.py `summary()`), from Navidrome. That is
+James's, on main as its own 2.1.x. The phone reads it ahead of the server (below), so nothing here waits for it.
+
+### What was wrong, and the fix
+
+- **HIGH 1 - one started song let a whole playlist past the limit and the reserve.**
+  - The bug: the planner's `started` is per unit, and a started unit skips the room and reserve checks. A playlist
+    was one unit (`playlist:<id>`), so a song of it already fetching made the whole playlist "started". Three ways
+    that happened:
+    - a song downloaded by hand (`[.song, .playlist]`) or your library's (`[.library, .playlist]`), still fetching
+      as the playlist was downloaded;
+    - a song mid-fetch shared with another downloaded playlist, which went in the playlist sorting first by id;
+    - a song added to a playlist that was still downloading.
+  - **Fix** (`DownloadPlan.Asked.unit`): a playlist's song that has started (a task out, bytes in, resume data) is
+    a unit of its own, `song:<id>`. It carries on. The playlist's unit holds only its songs not yet started, and the
+    limit and the 2 GB reserve are checked for them as one.
+- **HIGH 2 - smart playlists** (James: "No Download for them").
+  - Navidrome's smart playlists (made from rules, an `.nsp`) are worked out again each time they are read. A
+    download of one would chase a list that moves on every look.
+  - Ordinary playlists, and those kept in step with an .m3u, download as built.
+  - **A smart playlist offers no Download.**
+    - The control in the bar isn't drawn, and the bar's ••• has no download section.
+    - It plays only online. Its page says why, under the count: "Smart playlists are worked out again each time, so
+      this one plays only while deadwax can be reached." (`PlaylistDownloadWords.smartOnline`).
+  - **One downloaded before deadwax said it was smart stays as it was.**
+    - It keeps the songs last taken in, and its marks are dropped. It is never read again, and nothing is asked for
+      or taken by it.
+    - That holds whether a read's answer or a list says it is smart (`PlaylistDownloads.frozen`).
+    - It keeps Download Again and Remove Download, and its line says "Smart playlists are worked out again each
+      time, so this download stays as it was when you made it." (`smartKept`).
+    - Remove Download works as for any playlist: the row is deleted, then its origin is taken from every song
+      carrying it, and a song kept any other way stays. It is reachable from the control's menu, the bar's •••, the
+      You > Downloads swipe, and Remove All.
+    - It is still let go once two lists ten minutes apart agree it has gone from Navidrome.
+  - **`Playlist.smart`** is read loosely, false when it is absent, so today's server reads as no playlist smart.
+    tests/test_ios_contract.py exempts it (`PLAYLIST_AHEAD`) only while summary() leaves it out. Once main sends it,
+    the same equality holds it like any other field.
+  - **Until main ships it, the phone can't tell any playlist is smart.** summary() keeps only `editable` (mine and
+    not `readonly`), and Navidrome's `readonly` is true for a smart playlist, an .m3u-synced one and anyone else's
+    alike. So nothing is treated as smart before then.
+  - **Navidrome's field** (read at 46c4327, server/subsonic/helpers.go buildOSPlaylist): `validUntil` is set only
+    when `p.IsSmartPlaylist()` (Rules and their Expression non-nil) and `p.EvaluatedAt != nil`. Its value is
+    EvaluatedAt + the refresh delay.
+    - `readonly` is true for every smart playlist, but not only for them.
+    - A smart playlist never yet worked out has no `validUntil` in getPlaylists. getPlaylist works it out as it
+      answers (notes/playlists.md "Hidden songs"), so its answer should carry one. That is read from the source, not
+      seen on a real Navidrome.
+    - Its `changed` moves on every evaluation, which is why a smart one is never read again.
+- **MEDIUM - an Edit took every song its answer lacked.** `here` marked agreed every song carried that Done's answer
+  didn't list, so a Done that changed only the name took a song Navidrome was hiding (a file being moved).
+  - **Fix**: Done passes the songs it took out (`PlaylistEditBody.removed`: in `base`, and nowhere in the songs now)
+    to `read(…, edited:)`, and only those are taken at once (`PlaylistsModel.Wrote.edited(_, removed:)`).
+  - **And the hidden hold**: while an answer's `hidden` is at least the songs carried that it lacks (the Edit's own
+    aside), any of them may be a hidden one. So none is marked, and an earlier mark is dropped, so a hiding read is
+    never the second read that agrees. An emptied answer is held then too.
+  - Once a read lacks more songs than Navidrome is hiding, they are all marked, since it can't say which. `hidden` is
+    0 for anything but an editable playlist (notes/playlists.md), so this touches only yours.
+- **LOW 1 - a failed write acted anyway.** `letGo` did `try? deletePlaylist`, then took; the put paths did
+  `try? putPlaylist`, then asked or took.
+  - **Fix**: every change goes through `PlaylistKeeping.run` (below): its write first, and on a throw nothing
+    else - not memory, not the songs.
+- **LOW 2 - Remove All could leave the playlists in memory.** If the database emptied but making a folder again threw,
+  `removedAll` was never reached.
+  - **Fix**: `DownloadStore.removeEverything(emptied:)` tells DownloadModel the moment `database.removeAll()`
+    succeeds, and the keeper is cleared then.
+- **LOW 3 - a list that failed waited 15 minutes.** `lastBegan` was set before `await list`.
+  - **Fix**: the follower's rule. It is set as the list goes out, and put back when the list fails or the store
+    changed meanwhile (`list` answers Bool), so the next minute's timer looks again.
+- **LOW 4 - a read asked again while its run was out waited for the next tick.** A run tries each id once.
+  - **Fix**: the run's `defer` starts another when reads it had already tried are left, while deadwax can be asked.
+- **LOW 5 - polish.**
+  - The Downloaded screen's "N playlists" row and Remove All's count read `kept.count`, which counts rows whose answer
+    can't be read. Both now count the shelf (`PlaylistDownloads.shelf`), which is what Downloaded playlists lists.
+  - A song carrying a playlist's origin that its kept answer doesn't list (marked, hidden, or still coming) was in no
+    You > Downloads row: album rows left it out, and the playlist's row counts only its answer's songs. Now
+    `PlaylistDownloads.inDownloadingAlbumRow` and `inDownloadedAlbumRow` draw it under its album unless your
+    library's row or a downloaded playlist's row draws it (`drawnWithPlaylists`, over a `listing` made once a draw).
+
+### Core: the keeper's order (the review's gap)
+
+**PlaylistKeeping.swift** (new) is PlaylistKeeper's (App) every moment without its I/O: the kept playlists and each
+answer's serial (in place of `takenIn`).
+- Each moment gives a **Change**: its one write (`.put` or `.delete`, or none), its effects in order (`.take`, then
+  `.ask`), and whether it takes an answer in.
+- The moments: `opened` (orphans by id first, then each playlist's), `download` (nil when kept already, or smart),
+  `remove`, `took` (`edited:`), `answered` (nil when the serial moved since the read went out), `gone` (marked, or let
+  go), and `listed` (the entries whose marks moved, those let go, and those to read).
+- `apply` puts in place or last, deletes, and moves a serial. `clear` empties it.
+- `run` makes a change: the write; on a throw, false and nothing else. Then `apply`, then the effects, a take that
+  fails (the store couldn't be written) stopping the asks after it.
+  - `apply` is a closure, not a mutating call, so nothing of the keeper is held while the takes and asks run.
+
+PlaylistKeeper keeps a `PlaylistKeeping` and performs every change through `run`, with the store's put and delete
+as the write. Its reads are a set (`here` is gone). An Edit's Done still reads the playlist again after its answer is
+taken in, as before. The smart guards on the screens are DownloadModel's `playlistIsSmart` (`PlaylistDownloads.isSmart`:
+the answer in hand, or the one kept, says so), read by PlaylistDownloadControl, PlaylistDownloadMenuSection (an empty
+list of choices draws no section) and the page's hero.
+
+### Tests
+
+- **PlaylistDownloadTests**: 24 to 29.
+  - `aStartedSongNeverLetsItsPlaylistPastTheLimitOrTheReserve`: a `[.song, .playlist]` and a `[.library, .playlist]`
+    song out, against the limit and the reserve. A song added to a playlist still downloading.
+  - `aSongTwoPlaylistsShareGoesOnAloneAndEachPlaylistIsJudgedOnItsOwn`.
+  - `anEditTakesOnlyWhatItTookOutAndASongNavidromeIsHidingStays`: a rename with a song hidden; an Edit's removal with
+    another hidden; two hiding reads ten minutes apart and an old mark dropped; hidden at the count and below it;
+    `removed` with a song listed twice.
+  - `aMarkFromTheFutureIsTheReadsAndAListAtTheMomentOfADownloadSpeaksForIt`: the `min(…, at)` clamp, and `listed`'s
+    `askedAt > at` at the same moment.
+  - `aSongIsDrawnWithItsPlaylistOnlyWhileItsAnswerListsIt`: the listing and both rows' rules.
+  - The unit test's started cases. `here:` became `edited:`.
+- **PlaylistKeepingTests** (new, 12):
+  - a download's row before its asks;
+  - a failed write touching nothing;
+  - a remove's delete before its take;
+  - a failed take stopping the asks;
+  - an older answer dropped, and an older 404;
+  - a 404 marked, then let go ten minutes on;
+  - a list writing only what moved, and letting go what two lists agree on;
+  - an opening's orphans first;
+  - apply's place and serial;
+  - a smart playlist never downloaded (and `isSmart`, and the field read when absent, sent, and kept);
+  - a downloaded one found smart, kept as it was with Remove still offered;
+  - a list saying smart, not read again, but let go once gone.
+- **tests/test_ios_contract.py**: `PLAYLIST_AHEAD`, `assert_decodes(…, ahead)`, and the Swift reading an ahead field
+  from its absence.
+- **Mutations**: 53 over the review's changes, all caught:
+  - the planner's started rule, both ways;
+  - the Edit's songs: every one taken, or none at once, and `removed` as the whole base;
+  - the hidden hold: dropped, counting the Edit's songs, only past the count, with nothing lacking, keeping old marks,
+    and an emptied answer taken while hiding;
+  - the clamp, and `askedAt >=`;
+  - smart playlists: read, `frozen`'s marks, missing, count and body, the list's branch, frozen again, missing kept,
+    actions, choices, both lines, `downloadable`, `isSmart`, and the field read when absent or never;
+  - the rows: the listing, `drawnWithPlaylists`, and each rule of both rows;
+  - PlaylistKeeping: a failed write going on, applied before the write, a failed take going on, asks before takes,
+    serials (none moved, an older answer and an older 404 taken, a took moving none), a smart or a kept one
+    downloaded, a remove deleting no row, the orphans' order and place, a list writing everything or letting nothing
+    go, a 404 let go at once, a put appended, a clear keeping serials.
+  - The first run missed two, closed by tests: a smart one found by a read or a list was left missing (it is found),
+    and one kept smart was frozen again on every list (a later list now writes nothing).
+- Slice 3's own 74 were run again, the 11 whose code the review changed aimed at it as it is now: all 74 caught.
+
+### Verified, and not
+
+Verified:
+- `swift test`: Core 1285 (1268 + 17), Audio 158, Turntable 12.
+- The unsigned Release device build.
+- `check_project.py`.
+- The iOS pytest files and test_source_bytes: 170 passed, 1 skipped.
+- The 11 ios sims on Node 22.
+
+Not verified - the keeper's wiring has no test beyond its Core order, and only a phone and a real Navidrome can tell
+(docs/ios.md's checks 77-84):
+- That a smart playlist's page shows its line and no control once main sends `smart`.
+- That Navidrome's real getPlaylists and getPlaylist carry `validUntil` for a smart playlist, and getPlaylists for
+  one never yet worked out.
+- That a hand-downloaded song mid-fetch, then its playlist's Download, leaves the rest of the playlist waiting for
+  room.
+- That a rename's Done with a song's file being moved keeps that song.
+
 ## Now Playing's bar, squared off (2026-11-14)
 
 James: "maybe instead of the thin bar, a squared off thicker bar for the play progress in the play page?" Shown
@@ -5148,4 +5528,3 @@ is now two `Rectangle`s (the track white at 0.2, the fill white at 0.85, as befo
 on it (the same eased grow, 0.15 s), no knob - as the web's phone bar since main's 2.1.20 (notes/app.md "Now
 Playing's bar, squared off and thicker"). The target is still the whole 44 pt row; nothing about how it seeks
 changed. Verified: CI's device build (ios.yml). Not seen: on the phone - with the next install.
-

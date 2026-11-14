@@ -6,7 +6,10 @@ import Foundation
 /// reachability change and coming to the front.
 ///
 /// - **Units**: an album asked for as an album is planned whole - all of its songs not here fit, or it waits - so a
-///   download never stops at half an album for room. A song asked for alone is a unit of its own.
+///   download never stops at half an album for room. A downloaded playlist's songs (Phase 4, slice 3) are planned
+///   whole the same way, the storage limit and the reserve checked for all of them at once (phase4-library.md question
+///   14) - those not yet started: one started goes on as itself (slice 3's review, `Asked.unit`). A song asked for
+///   alone is a unit of its own.
 /// - **Order**: by when each was asked (the unit's first), then disc and track. A unit that doesn't fit waits and the
 ///   next is tried - one big album never holds up small ones; when room comes, the oldest goes first.
 /// - **Fits** when the bytes here, plus every unit let go, plus this one, are within the limit; and the phone's free
@@ -106,11 +109,22 @@ public enum DownloadPlan {
         public var isLibrary: Bool { DownloadOrigin.onlyLibrary(origins) }
 
         /// The unit it is planned in: the library's album for a song only the library wants; else its album's when
-        /// asked for with it, else its own.
+        /// asked for with it; else (Phase 4, slice 3) its downloaded playlist's - the first by id - planned whole, as an
+        /// album is; else its own.
+        ///
+        /// (slice 3's review) A playlist's song already started - a task out, bytes in, resume data - goes on as a unit
+        /// of its own, so the playlist's unit is only its songs not yet started, the limit and the reserve checked for
+        /// them as one. A started song never makes the whole playlist "started": a song downloaded by hand, or the
+        /// library's, still fetching as its playlist is downloaded would have let every song of it past the limit and
+        /// the 2 GB the phone keeps - and so would one mid-fetch shared with another downloaded playlist, or a song
+        /// added to a playlist already downloading.
         var unit: String {
             if isLibrary { return "library:\(albumID)" }
             for origin in origins.sorted() {
                 if case .album(let id) = origin { return "album:\(id)" }
+            }
+            if let playlist = DownloadOrigin.playlists(origins).first {
+                return started ? "song:\(id)" : "playlist:\(playlist)"
             }
             return "song:\(id)"
         }

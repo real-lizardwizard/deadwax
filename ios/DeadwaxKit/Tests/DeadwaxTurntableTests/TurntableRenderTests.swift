@@ -2,7 +2,7 @@
 // drawing, at the iPhone 16's plinth (321 pt) and the SE's (284 pt), at 3x, written as PNGs to $TURNTABLE_RENDERS
 // (ios.yml uploads them as the job's artifact) - and the checks that don't need an eye: the sheen's brightest band at
 // 48 deg clockwise of the top, the label's ring where the web's is, the grooves' period 4 pt, the readout's colours
-// the Palette's, the head 5 units up when lifted.
+// the Palette's, the head on the bar and grown when lifted.
 #if canImport(QuartzCore) && canImport(ImageIO)
 import CoreGraphics
 @testable import DeadwaxCore
@@ -351,17 +351,31 @@ enum Pictures {
         }
     }
 
-    /// 2.5: lifted, the head is drawn 5 units up in the arm's own frame - its middle moved by 5 units turned by the
-    /// arm's angle; nothing else of the arm moves.
-    @Test func theHeadIsFiveUnitsUpWhenLifted() {
+    /// 2.5 (2026-11-14): lifted, the head stays on the bar - its middle where it was, never moved off it (the web's
+    /// 5 units up, which James saw as the head dislocating) - grown TurntableGeometry.headLift.scale about that middle,
+    /// with its shadow round it. Drawn over a white plinth, everything but the arm hidden, so the shadow shows.
+    @Test func theHeadStaysOnTheBarAndComesTowardTheViewerWhenLifted() {
         for size in Self.sizes {
-            func headMiddle(_ lifted: Bool) -> (x: Double, y: Double, count: Int) {
+            func headMiddle(_ lifted: Bool) -> (x: Double, y: Double, count: Int, beside: Double) {
                 let layers = Self.layers(size.width)
-                layers.handle.isHidden = true
+                for layer in [layers.handle, layers.face, layers.platter, layers.sheen, layers.highlight, layers.pivot] as [CALayer] {
+                    layer.isHidden = true
+                }
+                layers.plinth.backgroundColor = CGColor(srgbRed: 1, green: 1, blue: 1, alpha: 1)
                 var look = Self.look()
+                layers.set(look)
                 look.lifted = lifted
+                look.still = true
                 layers.set(look)
                 let render = Render(layers)
+                // just off the head's long side, past its grown edge and inside the shadow's blur: 13 units off the bar,
+                // across its middle, turned clockwise by the arm's angle round the pivot (y-down)
+                let k = layers.layout.across(1)
+                let h = TurntableGeometry.armHead
+                let a = look.arm * .pi / 180
+                let along = (h.from + h.length / 2) * k, off = (h.thick / 2 + 2) * k
+                let pivot = layers.layout.pivot
+                let beside = render.at(pivot.x + along * cos(a) - off * sin(a), pivot.y + along * sin(a) + off * cos(a))
                 let colour = TurntablePalette.ttArmHead
                 var sum = (x: 0.0, y: 0.0, count: 0)
                 let step = 1 / Render.scale
@@ -377,16 +391,58 @@ enum Pictures {
                     }
                     y += step
                 }
-                return (sum.x / Double(max(sum.count, 1)), sum.y / Double(max(sum.count, 1)), sum.count)
+                return (sum.x / Double(max(sum.count, 1)), sum.y / Double(max(sum.count, 1)), sum.count, beside.g)
             }
             let down = headMiddle(false), up = headMiddle(true)
-            #expect(down.count > 100 && abs(Double(up.count - down.count)) < Double(down.count) * 0.05)
-            let k = TurntableLayout(width: size.width).across(1)
-            let a = Self.look().arm * .pi / 180
-            // (0, -5) in the arm's frame, turned clockwise by its angle in y-down
-            let want = (x: 5 * k * sin(a), y: -5 * k * cos(a))
-            #expect(abs((up.x - down.x) - want.x) < 0.35 && abs((up.y - down.y) - want.y) < 0.35,
-                    "\(size.name): moved (\(up.x - down.x), \(up.y - down.y)), not \(want)")
+            #expect(abs(up.x - down.x) < 0.35 && abs(up.y - down.y) < 0.35,
+                    "\(size.name): the head's middle moved (\(up.x - down.x), \(up.y - down.y)) - it stays on the bar")
+            let grown = TurntableGeometry.headLift.scale * TurntableGeometry.headLift.scale
+            let ratio = Double(up.count) / Double(max(down.count, 1))
+            #expect(down.count > 100 && ratio > grown - 0.06 && ratio < grown + 0.06,
+                    "\(size.name): the head's area grew \(ratio), not about \(grown)")
+            #expect(down.beside > 250, "\(size.name): no shadow set down (\(down.beside))")
+            #expect(up.beside < 240, "\(size.name): the shadow beside the lifted head (\(up.beside))")
+        }
+    }
+
+    /// 2.5: the lift is eased each way, and a step under Reduce Motion (`still`); either way the head ends grown with
+    /// its shadow shown, then back as it was.
+    @Test func theLiftIsEasedButAStepUnderReduceMotion() {
+        let lift = TurntableGeometry.headLift
+        for still in [false, true] {
+            let layers = Self.layers(321)
+            var look = Self.look()
+            look.still = still
+            layers.set(look)
+            #expect(layers.head.animation(forKey: "lift") == nil && CATransform3DIsIdentity(layers.head.transform)
+                && layers.head.shadowOpacity == 0, "set down, as the layers were made")
+            look.lifted = true
+            layers.set(look)
+            let grow = layers.head.animation(forKey: "lift") as? CABasicAnimation
+            #expect(still ? grow == nil : grow?.duration == lift.seconds)
+            // on --dw-ease's curve, as the web's lift
+            let ease = TurntableGeometry.headLiftEase
+            if let curve = grow?.timingFunction {
+                var first: [Float] = [0, 0], second: [Float] = [0, 0]
+                curve.getControlPoint(at: 1, values: &first)
+                curve.getControlPoint(at: 2, values: &second)
+                #expect(first == [Float(ease.x1), Float(ease.y1)] && second == [Float(ease.x2), Float(ease.y2)])
+            }
+            #expect(lift.seconds == 0.14 && ease.x1 == 0.16 && ease.y1 == 1 && ease.x2 == 0.3 && ease.y2 == 1,
+                    "the app's motion token, --dw-duration on --dw-ease")
+            #expect((layers.head.animation(forKey: "liftShadow") != nil) == !still)
+            #expect(CATransform3DEqualToTransform(layers.head.transform,
+                                                  CATransform3DMakeScale(CGFloat(lift.scale), CGFloat(lift.scale), 1)))
+            #expect(layers.head.shadowOpacity == 1 && layers.head.shadowOffset == .zero)
+            #expect(layers.head.shadowRadius == CGFloat(lift.shadow * layers.layout.across(1)))
+            // a frame that changes nothing of the lift leaves its easing alone
+            look.angle = 30
+            layers.set(look)
+            #expect((layers.head.animation(forKey: "lift") != nil) == !still)
+            look.lifted = false
+            layers.set(look)
+            #expect((layers.head.animation(forKey: "lift") != nil) == !still)
+            #expect(CATransform3DIsIdentity(layers.head.transform) && layers.head.shadowOpacity == 0)
         }
     }
 

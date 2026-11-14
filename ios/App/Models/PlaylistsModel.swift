@@ -37,6 +37,23 @@ final class PlaylistsModel {
         let answered: Bool
     }
 
+    /// (Phase 4, slice 3) What a write here did to a playlist - a downloaded one is kept in step by it at once
+    /// (DownloadModel.playlistWritten).
+    enum Wrote {
+        /// Songs added at its end (the picker's).
+        case added
+        /// This phone's Edit, saved: the answer Done was given, and the songs it took out (PlaylistEditBody.removed) -
+        /// those, and only those, go from the phone at once.
+        case edited(PlaylistWithSongs, removed: Set<String>)
+        /// Deleted here, for good.
+        case deleted
+        /// A write answered it gone (a 404).
+        case gone
+    }
+
+    /// Told of each write here that changed a playlist (DeadwaxApp: the downloads).
+    @ObservationIgnored var wrote: (String, Wrote) -> Void = { _, _ in }
+
     /// The last playlist a write here changed - each page of it watches this.
     private(set) var lastChange: Change?
     /// Navidrome's answer, in its order (by name) - nil until the first comes.
@@ -156,7 +173,10 @@ final class PlaylistsModel {
         let answer = try await write(.add(playlist: id, mode: duplicates)) { (client: DeadwaxClient) -> PlaylistAddAnswer in
             try await client.addToPlaylist(id: id, songIDs: songIDs, duplicates: duplicates)
         }
-        if answer.done { changed(id, now: nil) }
+        if answer.done {
+            changed(id, now: nil)
+            wrote(id, .added)
+        }
         return answer
     }
 
@@ -166,6 +186,7 @@ final class PlaylistsModel {
             try await client.editPlaylist(id: id, body: body)
         }
         changed(id, now: saved)
+        wrote(id, .edited(saved, removed: body.removed))
         return saved
     }
 
@@ -173,11 +194,14 @@ final class PlaylistsModel {
     func delete(_ id: String) async throws {
         try await write(nil) { (client: DeadwaxClient) -> Void in try await client.deletePlaylist(id: id) }
         changed(id, now: nil)
+        wrote(id, .deleted)
     }
 
-    /// A playlist answered gone by a write (a 404): its kept answer let go, the list asked again.
-    func gone(_ id: String) {
+    /// A playlist answered gone by a write (a 404): its kept answer let go, the list asked again. `deletedHere`: the write
+    /// was this phone's Delete - a downloaded one is let go at once, as for a delete that was answered.
+    func gone(_ id: String, deletedHere: Bool = false) {
         forget(id)
+        wrote(id, deletedHere ? .deleted : .gone)
         Task { await ask(fresh: true) }
     }
 
@@ -242,6 +266,10 @@ final class PlaylistPageModel {
 
     @ObservationIgnored private var asks = 0
     @ObservationIgnored private var key: String?
+    /// (slice 3) A downloaded playlist's answer kept on this phone, by id - drawn first, with no connection too.
+    @ObservationIgnored var stored: (String) -> PlaylistWithSongs? = { _ in nil }
+    /// (slice 3) Told each answer deadwax gave this page - nil for its 404 - so a downloaded playlist keeps in step.
+    @ObservationIgnored var heard: (PlaylistWithSongs?) -> Void = { _ in }
 
     init(route: PlaylistRoute) {
         self.route = route
@@ -291,7 +319,8 @@ final class PlaylistPageModel {
             failure = nil
             flow.reset()
         }
-        if answer == nil, let kept = playlists.kept(route.id) { answer = kept }
+        // a downloaded playlist's answer kept on this phone first (slice 3): the keeper's reads keep it the newest
+        if answer == nil, let kept = stored(route.id) ?? playlists.kept(route.id) { answer = kept }
         guard let client, online, !flow.editing else { return }
         asks += 1
         let asked = asks
@@ -304,11 +333,13 @@ final class PlaylistPageModel {
             answer = found
             failure = nil
             flow.answered()
+            heard(found)
         } catch {
             guard asked == asks, generation == playlists.generation, !APIFailure.isCancellation(error) else { return }
             if ErrorWords.kind(of: error) == .notFound {
                 playlists.forget(route.id)
                 flow.notFound()
+                heard(nil)
                 return
             }
             failure = error
@@ -426,7 +457,7 @@ final class PlaylistPageModel {
             return .notSent
         } catch {
             guard flow.deleteRefused(error) else { return .refused }
-            playlists.gone(route.id)
+            playlists.gone(route.id, deletedHere: true)
             return .gone
         }
     }
