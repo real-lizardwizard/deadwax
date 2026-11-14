@@ -184,13 +184,13 @@ const byType = (type) => (node) => node.type === type
 /* ===== the playlists deadwax answers with ===== */
 
 const pl = (id, more = {}) => ({ id, name: id, comment: '', songCount: 3, duration: 600, created: '2026-10-01T00:00:00Z', changed: '2026-10-01T00:00:00Z',
-  owner: 'james', public: false, coverArt: `pl-${id}_x`, mine: true, editable: true, ...more })
+  owner: 'james', public: false, coverArt: `pl-${id}_x`, mine: true, editable: true, smart: false, ...more })
 const song = (id, more = {}) => ({ id, title: `Song ${id}`, artist: 'Portishead', album: 'Dummy', albumId: 'dum', coverArt: 'al-dum', duration: 200, ...more })
 const LATE = pl('Late night', { id: 'late', changed: '2026-10-20T10:00:00Z', public: true })
 const ROAD = pl('Road trip', { id: 'road', changed: '2026-10-19T10:00:00Z' })
 const ALPHA = pl('Alpha', { id: 'alpha', changed: '2026-10-19T10:00:00Z' })
 const SUNDAY = pl('Sunday', { id: 'sunday', owner: 'ethan', mine: false, editable: false, songCount: 20, duration: 3900 })
-const SMART = pl('Recently played', { id: 'smart', editable: false, songCount: 30 })
+const SMART = pl('Recently played', { id: 'smart', editable: false, smart: true, songCount: 30 })
 const LIST = [ALPHA, LATE, SMART, ROAD, SUNDAY]
 
 ;(async () => {

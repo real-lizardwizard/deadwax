@@ -128,7 +128,8 @@ def test_ethan_lists_his_own_and_jamess_shared_never_jamess_private(player):
     assert listed[1]["owner"] == "james" and listed[1]["public"] is True
     assert {call["user"] for call in fake.playlist_calls} == {"ethan"}
     #? the shape: every field, '' or None for what Navidrome left out
-    assert set(listed[0]) == {"id", "name", "comment", "songCount", "duration", "created", "changed", "owner", "public", "coverArt", "mine", "editable"}
+    assert set(listed[0]) == {"id", "name", "comment", "songCount", "duration", "created", "changed", "owner", "public", "coverArt", "mine", "editable",
+                              "smart"}
     assert (listed[0]["comment"], listed[0]["public"], listed[0]["coverArt"]) == ("", False, "pl-pl-ethan_5f3a")
 
 
@@ -157,6 +158,24 @@ def test_smart_and_synced_playlists_are_mine_and_not_editable(player):
     fake.playlist("pl-file", "From an m3u", "ethan", [SONG], sync=True)
     listed = {row["id"]: row for row in signed_in(player, "ethan").get(f"{PLAYER}/playlists").json()["playlists"]}
     assert [(listed[key]["mine"], listed[key]["editable"]) for key in ("pl-smart", "pl-file")] == [(True, False), (True, False)]
+
+
+def test_a_smart_playlist_says_so_by_navidromes_valid_until_and_no_other_does(player):
+    #? (2.1.21) the iPhone app downloads no smart playlist; `readonly` can't tell it from a synced one or somebody else's
+    fake = player.fake
+    fake.playlist("pl-smart", "Recently played", "ethan", [SONG], smart=True)
+    fake.playlist("pl-file", "From an m3u", "ethan", [SONG], sync=True)
+    fake.playlist("pl-shared", "Sunday", "james", [SONG], public=True)
+    ethan = signed_in(player, "ethan")
+    smart = lambda: {row["id"]: row["smart"] for row in ethan.get(f"{PLAYER}/playlists").json()["playlists"]}
+
+    #? never worked out since Navidrome started: no validUntil in the list yet - but one playlist's answer works it out
+    assert smart() == {"pl-ethan": False, "pl-file": False, "pl-shared": False, "pl-smart": False}
+    assert ethan.get(f"{PLAYER}/playlists/pl-smart").json()["playlist"]["smart"] is True
+    assert smart() == {"pl-ethan": False, "pl-file": False, "pl-shared": False, "pl-smart": True}
+    assert [ethan.get(f"{PLAYER}/playlists/{key}").json()["playlist"]["smart"] for key in ("pl-file", "pl-shared")] == [False, False]
+    #? only a real time: a blank or a stray value is no smart playlist
+    assert [rules.is_smart(each) for each in ({"validUntil": ""}, {"validUntil": None}, {"validUntil": 5}, {})] == [False] * 4
 
 
 def test_none_at_all_is_an_empty_list(player):
