@@ -261,12 +261,14 @@ scrolled away, and the ••• for the whole playlist (Play Next, Play Last; n
 7). Gone: the gone line alone. Slice 2 adds Edit to the bar; slice 3 the download control beside the •••.
 
 Slice 2's Edit, as built: Edit in the bar (yours and editable only; dimmed until this page's own ask has answered,
-and while deadwax can't be reached); in Edit the hero and the hidden line give way to a form - the name, "A playlist
+and while deadwax can't be reached); in Edit the hero stays (Play and Shuffle dimmed, as the web's) and the hidden
+line gives way to a form - the name, "A playlist
 needs a name." under a blank one, the description (two to six lines), Shared with everyone (its note the hint), and
 `hiddenEditWords` - then "Songs", each row its title and artist with the red minus and the drag handle, then Delete
 playlist last (question 11); the bar has Cancel (asking `discardQuestion` when anything changed) and Done (Saving…;
-dimmed with a blank name), the back button hidden while Edit is open. Nothing is saved until Done answers, and the page
-then draws the server's answer, never what was typed.
+dimmed with a blank name), the back button hidden while Edit is open - and the tab tapped again goes back no further
+than the page. Nothing is saved until Done answers, and the page then draws the server's answer, never what was
+typed.
 
 ### 3.4 VoiceOver and Dynamic Type
 
@@ -421,18 +423,21 @@ Slice 2's:
 - **71 Add to a playlist.** An album's •••, an album page's song's, a playlist's song's and its bar's, and Now Playing's
   •••: Add to a playlist… opens the picker, its head what it adds ("Dummy · 11 songs", "Roads · Portishead"), your
   playlists the one changed last first; a tap closes it and the notice says "Added 11 songs to Late night". New
-  playlist… in the picker makes one with them ("Made Late night with Roads"). In the web app, the songs are there.
+  playlist… in the picker makes one with them ("Made Late night with Roads"). In the web app, the songs are there. A
+  tap, the picker closed while it says Adding…, opened again (or Now Playing's): still Adding…, the songs added once.
 - **72 Already in it.** Add the same album again: "These 11 songs are all in Late night already." (Add them again /
   Cancel); with one of them there: "1 of these 11 songs is in Late night already." (Add them all / Skip that one); one
   song: "Roads is in Late night already." (Add it again / Cancel). Each does what it says.
 - **73 Edit.** On a playlist of yours: Edit - rename it, change the description, share it, drag a song, take one out
   with its red minus (one tap), Done: Saving…, then the page as Navidrome has it; the web app agrees. A blank name
-  says "A playlist needs a name." and Done is dimmed. Cancel after a change asks "Discard your changes?".
+  says "A playlist needs a name." and Done is dimmed. Cancel after a change asks "Discard your changes?". The name
+  stops at 200 typed or pasted; the tab tapped again stays on the playlist; a Done refused goes to why.
 - **74 Changed elsewhere.** Open Edit on the phone, add a song to that playlist in the web app, then change something
   on the phone and Done: it says the playlist changed in another app and your changes weren't saved, and shows it with
   the web app's song.
 - **75 Delete.** Edit > Delete playlist > the question > Delete playlist: back on Playlists, "Deleted Late night", and
-  it has gone from the web app and Amperfy.
+  it has gone from the web app and Amperfy. New playlist's sheet swiped away straight after Create, and opened again:
+  the second keeps its name.
 - **76 Only yours, and offline.** A playlist shared with you, or from a file: no Edit, and the picker never lists it.
   In Airplane Mode: no Add to a playlist… in the ••• menus or Now Playing's, and + and Edit dimmed. With VoiceOver, in
   Edit: each song's actions (Move up, Move down, Remove), and what is said ("Roads: 3 of 12", "Roads removed").
@@ -491,4 +496,6 @@ docs/ios.md's "Playlists' changes' checks (70-76)" holds them as James reads the
     New playlist… opens the name in place of its row, as the web's.
 13. **One write at a time in the picker.** The web lets a playlist's tap through while a New playlist… is being made.
     *Recommend, and built*: every row and New playlist… wait for the write that is out, so one tap is one write and a
-    second tap never adds the songs twice.
+    second tap never adds the songs twice - across every opening of the picker and both its openers (the tabs' and Now
+    Playing's), as the web's one picker's `writing` lasts (built so after the review: the first build's gate was each
+    opening's own).

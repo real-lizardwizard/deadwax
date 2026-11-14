@@ -19,11 +19,14 @@ import Observation
 /// web's never are). Nothing is changed before deadwax answers. Each that was written is told (`changed`, the web's
 /// announcePlaylistChanged): the playlist's kept answer replaced by the one the write gave, or let go when it gave
 /// none, the list asked again, and `lastChange` moved on - a page of that playlist asks for it again. One answered
-/// after the person changed is thrown as `Superseded`, and nothing of it kept or said.
+/// after the person changed is thrown as `Superseded`, and nothing of it kept or said. Add to a playlist's writes - an
+/// add, its New playlist… - go one at a time across every opening of the picker (`writes`, Core's PlaylistWrites): a
+/// tap while one is out sends nothing, whichever sheet it is in.
 @MainActor
 @Observable
 final class PlaylistsModel {
-    /// A write's answer came after the person changed (a sign-out, another person): nothing of it is kept, drawn or said.
+    /// A write's answer came after the person changed (a sign-out, another person) - or it wasn't sent, another of the
+    /// picker's being out: nothing of it is kept, drawn or said.
     struct Superseded: Error {}
 
     /// A write here changed a playlist: which, and whether its answer came with it (a page drawn from it may offer Edit;
@@ -40,6 +43,9 @@ final class PlaylistsModel {
     private(set) var list: [Playlist]?
     /// The last ask failed: the list in hand (if any) is the one before it.
     private(set) var failure: (any Error)?
+    /// The writes out: the picker's one at a time (its rows wait while `writes.busy`; "Adding…" on `adding(id)`), and
+    /// who each was asked as.
+    private(set) var writes = PlaylistWrites()
 
     private let server: ServerModel
     /// When the list in hand was answered.
@@ -128,23 +134,26 @@ final class PlaylistsModel {
         keptPages = [:]
         keptOrder = []
         lastChange = nil
+        writes.reset()
     }
 
     // MARK: the writes (slice 2)
 
     /// A new playlist of the person's, with `songIDs` (none from the Playlists screen), named `name` as typed - sent
-    /// trimmed as the web's form sends it. Answered whole: kept as the new playlist's page.
-    func create(name: String, songIDs: [String]) async throws -> PlaylistWithSongs {
-        let made = try await write { (client: DeadwaxClient) -> PlaylistWithSongs in
+    /// trimmed as the web's form sends it. Answered whole: kept as the new playlist's page. The picker's (`picker`) waits
+    /// for the picker's write out, and holds the others back while it is out.
+    func create(name: String, songIDs: [String], picker: Bool) async throws -> PlaylistWithSongs {
+        let made = try await write(picker ? .create : nil) { (client: DeadwaxClient) -> PlaylistWithSongs in
             try await client.createPlaylist(name: name, songIDs: songIDs)
         }
         changed(made.playlist.id, now: made)
         return made
     }
 
-    /// Songs added at a playlist's end. `.ask` with some there already writes nothing - not a change.
+    /// Songs added at a playlist's end - the picker's, one at a time. `.ask` with some there already writes nothing -
+    /// not a change.
     func add(_ songIDs: [String], to id: String, duplicates: PlaylistDuplicates) async throws -> PlaylistAddAnswer {
-        let answer = try await write { (client: DeadwaxClient) -> PlaylistAddAnswer in
+        let answer = try await write(.add(playlist: id, mode: duplicates)) { (client: DeadwaxClient) -> PlaylistAddAnswer in
             try await client.addToPlaylist(id: id, songIDs: songIDs, duplicates: duplicates)
         }
         if answer.done { changed(id, now: nil) }
@@ -153,7 +162,7 @@ final class PlaylistsModel {
 
     /// Edit's Done: the playlist as deadwax answered it after the write, kept for its page.
     func edit(_ id: String, _ body: PlaylistEditBody) async throws -> PlaylistWithSongs {
-        let saved = try await write { (client: DeadwaxClient) -> PlaylistWithSongs in
+        let saved = try await write(nil) { (client: DeadwaxClient) -> PlaylistWithSongs in
             try await client.editPlaylist(id: id, body: body)
         }
         changed(id, now: saved)
@@ -162,7 +171,7 @@ final class PlaylistsModel {
 
     /// A playlist deleted, for good: its kept answer let go.
     func delete(_ id: String) async throws {
-        try await write { (client: DeadwaxClient) -> Void in try await client.deletePlaylist(id: id) }
+        try await write(nil) { (client: DeadwaxClient) -> Void in try await client.deletePlaylist(id: id) }
         changed(id, now: nil)
     }
 
@@ -185,12 +194,14 @@ final class PlaylistsModel {
         Task { await ask(fresh: true) }
     }
 
-    /// One write, as the person signed in now, in a task nothing calls off: answered for someone else, `Superseded`.
-    private func write<Value: Sendable>(_ call: @escaping @Sendable (DeadwaxClient) async throws -> Value) async throws
+    /// One write, as the person signed in now, in a task nothing calls off - `gate` the picker's, sent only while none
+    /// of the picker's is out. Not sent, or answered for someone else: `Superseded`.
+    private func write<Value: Sendable>(_ gate: PlaylistWrites.Write?,
+                                        _ call: @escaping @Sendable (DeadwaxClient) async throws -> Value) async throws
         -> Value {
-        guard let client = server.client else { throw Superseded() }
-        let person = server.person
-        let under = generation
+        guard let client = server.client, let ticket = writes.begin(gate, person: server.person) else {
+            throw Superseded()
+        }
         let task = Task { () -> Result<Value, any Error> in
             do {
                 return .success(try await call(client))
@@ -199,7 +210,7 @@ final class PlaylistsModel {
             }
         }
         let result = await task.value
-        guard under == generation, person == server.person else { throw Superseded() }
+        guard writes.end(ticket, person: server.person) else { throw Superseded() }
         return try result.get()
     }
 }
@@ -210,12 +221,11 @@ final class PlaylistsModel {
 /// and says so; a 404 is gone, the kept answer let go; nothing drawn and the first ask failing: why, and Try again.
 /// While deadwax can't be reached nothing is asked: the kept answer draws, its songs on this phone play.
 ///
-/// EDIT (slice 2) - the person's own, editable, at most 2,000 songs - is offered only once this page's own ask has
-/// answered (`fresh`), never from a kept answer or one a write elsewhere has made old. Nothing is asked while it is
-/// open, and an answer landing meanwhile is dropped: Done's `base` is the songs as drawn when Edit began, and deadwax
-/// refuses it (a 409) if the playlist changed in another app since. Done refused for any other reason leaves Edit open
-/// with why, and the next Done sends `tried` - the songs the refused one sent, which Navidrome may have taken before
-/// refusing - and leaving Edit after one asks the playlist again. Nothing is drawn as saved before deadwax says it is.
+/// EDIT (slice 2) - the person's own, editable, at most 2,000 songs - is Core's PlaylistEditFlow, which this drives: offered
+/// only once this page's own ask has answered (`fresh`), never from a kept answer or one a write elsewhere has made old;
+/// nothing asked while it is open, an answer landing meanwhile dropped; Done's refusals each leaving what the flow says
+/// (a 409 drawn as it is now, a 404 gone, anything else Edit open with why and `tried` kept for the next Done), and a
+/// Delete answered 404 gone as a deleted one is. Nothing is drawn as saved before deadwax says it is.
 @MainActor
 @Observable
 final class PlaylistPageModel {
@@ -223,33 +233,15 @@ final class PlaylistPageModel {
 
     /// The playlist and its songs, as last answered; nil until then.
     private(set) var answer: PlaylistWithSongs?
-    /// deadwax says it is gone (a 404): the page draws the gone line alone.
-    private(set) var gone = false
     /// The last ask failed (not gone).
     private(set) var failure: (any Error)?
     /// deadwax can be reached (the page's Reachability, set as it draws).
     var online = true
-    /// The answer drawn is this page's own ask's (or its own Done's): Edit may begin from it.
-    private(set) var fresh = false
-
-    /// Edit, open: what it began with and what it holds now - nil while closed.
-    private(set) var start: PlaylistEditState?
-    var edit: PlaylistEditState?
-    /// Done is out.
-    private(set) var saving = false
-    /// Done was refused (not a 409 or a 404): why, while Edit stays open.
-    private(set) var editFailure: (any Error)?
-    /// Delete is out.
-    private(set) var deleting = false
-    /// Delete was refused: why, under its row.
-    private(set) var deleteFailure: (any Error)?
-    /// The playlist changed in another app while it was being edited (Done's 409): said over the songs as they are now.
-    private(set) var note: String?
+    /// Edit, and what the page's asks and writes leave of it (Core's).
+    private(set) var flow = PlaylistEditFlow()
 
     @ObservationIgnored private var asks = 0
     @ObservationIgnored private var key: String?
-    /// The songs the last Done that FAILED sent (the web's `tried`).
-    @ObservationIgnored private var tried: [String]?
 
     init(route: PlaylistRoute) {
         self.route = route
@@ -257,29 +249,38 @@ final class PlaylistPageModel {
 
     /// What the hero shows: the answer's summary, else the row's that opened the page.
     var playlist: Playlist? { answer?.playlist ?? route.preview }
+    /// deadwax says it is gone (a 404), or it was deleted here: the page draws the gone line alone.
+    var gone: Bool { flow.gone }
     /// The songs drawn - none once gone.
     var songs: [Song] { gone ? [] : answer?.songs ?? [] }
     var name: String { playlist?.name ?? "" }
     var hidden: Int { gone ? 0 : answer?.hidden ?? 0 }
 
-    /// Edit is open.
-    var editing: Bool { edit != nil }
+    /// Edit's changes as they are now - nil while closed (the form's fields write here).
+    var edit: PlaylistEditState? {
+        get { flow.now }
+        set { flow.now = newValue }
+    }
+    var editing: Bool { flow.editing }
+    var fresh: Bool { flow.fresh }
+    var saving: Bool { flow.saving }
+    var deleting: Bool { flow.deleting }
+    var busy: Bool { flow.busy }
+    var changed: Bool { flow.changed }
+    var needsName: Bool { flow.needsName }
+    var editFailure: (any Error)? { flow.failure }
+    var deleteFailure: (any Error)? { flow.deleteFailure }
+    var note: String? { flow.note }
+    /// One more for each Done refused with Edit left open: the page scrolls to why.
+    var refusals: Int { flow.refusals }
+
     /// The playlist can be edited here: the person's own, editable, at most 2,000 songs (PlaylistRules.canEdit).
     var editable: Bool {
         guard let answer, !gone else { return false }
         return PlaylistRules.canEdit(answer.playlist, songs: answer.songs.count)
     }
     /// Edit may begin now: editable, this page's own answer drawn, deadwax in reach.
-    var canBegin: Bool { editable && fresh && online && !editing }
-    /// Edit holds changes Done would send.
-    var changed: Bool {
-        guard let start, let edit else { return false }
-        return PlaylistEdit.changed(start: start, now: edit)
-    }
-    /// The name is blank: Done waits.
-    var needsName: Bool { edit.map(PlaylistEdit.needsName) ?? false }
-    /// A write is out.
-    var busy: Bool { saving || deleting }
+    var canBegin: Bool { flow.canBegin(editable: editable, online: online) }
 
     /// The page's task: the kept answer drawn at once, then deadwax asked (while it can be reached). `key` is who and
     /// which playlist: another drops what is in hand first. Nothing is asked while Edit is open.
@@ -287,14 +288,11 @@ final class PlaylistPageModel {
         if key != self.key {
             self.key = key
             answer = nil
-            gone = false
             failure = nil
-            fresh = false
-            closeEdit()
-            note = nil
+            flow.reset()
         }
         if answer == nil, let kept = playlists.kept(route.id) { answer = kept }
-        guard let client, online, !editing else { return }
+        guard let client, online, !flow.editing else { return }
         asks += 1
         let asked = asks
         // who asked: a sign-out meanwhile (PlaylistsModel.reset) drops the answer, kept and drawn alike
@@ -302,17 +300,15 @@ final class PlaylistPageModel {
         do {
             let found = try await client.playlist(id: route.id)
             // an answer landing while Edit is open is dropped (the web's): Done's base is the songs Edit began from
-            guard asked == asks, !editing, playlists.keep(found, asked: generation) else { return }
+            guard asked == asks, !flow.editing, playlists.keep(found, asked: generation) else { return }
             answer = found
-            gone = false
             failure = nil
-            fresh = true
+            flow.answered()
         } catch {
             guard asked == asks, generation == playlists.generation, !APIFailure.isCancellation(error) else { return }
             if ErrorWords.kind(of: error) == .notFound {
                 playlists.forget(route.id)
-                gone = true
-                closeEdit()
+                flow.notFound()
                 return
             }
             failure = error
@@ -331,7 +327,7 @@ final class PlaylistPageModel {
     func changedHere(_ change: PlaylistsModel.Change, client: DeadwaxClient?, playlists: PlaylistsModel) async {
         // (deleted here - gone already - there is nothing to ask)
         guard change.id == route.id, !gone, let key else { return }
-        if !change.answered { fresh = false }
+        if !change.answered { flow.madeOld() }
         await load(key: key, client: client, playlists: playlists)
     }
 
@@ -339,44 +335,24 @@ final class PlaylistPageModel {
 
     /// Edit begins from the songs as drawn now.
     func beginEdit() {
-        guard canBegin, let answer else { return }
-        let began = PlaylistEdit.start(songs: answer.songs, playlist: answer.playlist)
-        start = began
-        edit = began
-        editFailure = nil
-        deleteFailure = nil
-        note = nil
+        guard let answer else { return }
+        flow.begin(songs: answer.songs, playlist: answer.playlist, editable: editable, online: online)
     }
 
     /// Edit closed, nothing sent. After a Done that failed, what is drawn may be old: asked again (`true`).
     @discardableResult
     func leaveEdit() -> Bool {
-        closeEdit()
-        guard tried != nil else { return false }
-        tried = nil
-        fresh = false
-        return true
-    }
-
-    private func closeEdit() {
-        start = nil
-        edit = nil
-        editFailure = nil
-        deleteFailure = nil
+        flow.leave()
     }
 
     /// The row at `from` moved to `to`.
     func move(from: Int, to: Int) {
-        guard var now = edit, !busy else { return }
-        now.rows = PlaylistEdit.move(now.rows, from: from, to: to)
-        edit = now
+        flow.move(from: from, to: to)
     }
 
     /// The row at `index` taken out.
     func remove(at index: Int) {
-        guard var now = edit, !busy else { return }
-        now.rows = PlaylistEdit.remove(now.rows, at: index)
-        edit = now
+        flow.remove(at: index)
     }
 
     /// What became of Done.
@@ -395,74 +371,66 @@ final class PlaylistPageModel {
         case notSent
     }
 
-    /// Done: the one body Edit's changes make, sent as the person signed in. Drawn only from deadwax's answer.
+    /// Done: the one body Edit's changes make (with `tried`), sent as the person signed in. Drawn only from deadwax's
+    /// answer.
     func done(playlists: PlaylistsModel) async -> Done {
-        guard let start, let edit, !busy else { return .notSent }
-        guard let body = PlaylistEdit.body(start: start, now: edit) else {
-            leaveEdit()
-            return .unchanged
+        let body: PlaylistEditBody
+        switch flow.done() {
+        case .notSent: return .notSent
+        case .unchanged: return .unchanged
+        case .send(let sent): body = sent
         }
-        guard !PlaylistEdit.needsName(edit) else { return .notSent }
-        saving = true
-        editFailure = nil
-        let sent = body.trying(tried)
         do {
-            let saved = try await playlists.edit(route.id, sent)
-            saving = false
-            tried = nil
+            let saved = try await playlists.edit(route.id, body)
             answer = saved
-            gone = false
             failure = nil
-            fresh = true
-            closeEdit()
+            flow.saved()
             return .saved
         } catch is PlaylistsModel.Superseded {
-            saving = false
+            flow.notSent()
             return .notSent
         } catch {
-            saving = false
-            switch PlaylistEdit.refusal(of: error) {
+            switch flow.refused(error) {
             case .changedElsewhere:
-                tried = nil
-                closeEdit()
-                fresh = false
-                note = PlaylistWords.playlistChanged
                 return .changedElsewhere
             case .gone:
-                tried = nil
-                closeEdit()
                 playlists.gone(route.id)
-                gone = true
                 return .gone
             case .refused:
-                tried = body.songIds
-                editFailure = error
                 return .refused
             }
         }
     }
 
-    /// Delete: the playlist gone from Navidrome for good, as the person signed in - true once deadwax says it is.
-    func delete(playlists: PlaylistsModel) async -> Bool {
-        guard editing, !busy else { return false }
-        deleting = true
-        deleteFailure = nil
+    /// What became of Delete.
+    enum Deleted {
+        /// Deleted: gone from Navidrome, for good.
+        case deleted
+        /// deadwax said it was gone already (a 404): gone all the same.
+        case gone
+        /// Refused: why, under the button, Edit open.
+        case refused
+        /// Not open, or out already, or the person changed: nothing sent.
+        case notSent
+    }
+
+    /// Delete: the playlist gone from Navidrome for good, as the person signed in.
+    func delete(playlists: PlaylistsModel) async -> Deleted {
+        guard flow.beginDelete() else { return .notSent }
         do {
             try await playlists.delete(route.id)
-            deleting = false
-            closeEdit()
-            gone = true
-            return true
+            flow.deleted()
+            return .deleted
         } catch is PlaylistsModel.Superseded {
-            deleting = false
-            return false
+            flow.deleteNotSent()
+            return .notSent
         } catch {
-            deleting = false
-            deleteFailure = error
-            return false
+            guard flow.deleteRefused(error) else { return .refused }
+            playlists.gone(route.id)
+            return .gone
         }
     }
 
     /// The note said over the songs (PLAYLIST_CHANGED) put away - Edit begun again, or the page left.
-    func clearNote() { note = nil }
+    func clearNote() { flow.clearNote() }
 }

@@ -4800,7 +4800,9 @@ drawn from its answer, and a refusal leaves what is drawn as the server last sai
 - **PlaylistView's Edit**, through PlaylistPageModel:
   - **Edit in the bar**, for an editable playlist, can be tapped only once this page's own ask has answered (`fresh`)
     and deadwax can be reached (`canBegin`).
-  - **In Edit**: `editMode` is active, and the hero, the hidden line, the bar's ••• and the back button are put away.
+  - **In Edit**: `editMode` is active; the hero stays, its Play and Shuffle dimmed (the web's), and the hidden line,
+    the bar's ••• and the back button are put away. (This said the hero was put away too; corrected after the
+    review.)
   - **The form**:
     - Name, with "A playlist needs a name." under a blank one;
     - Description, two to six lines;
@@ -4978,3 +4980,162 @@ Not verified - none of the App's wiring has a test, and only a phone can tell (d
 - That Navidrome's real `changed` moves on every write, so the picker's order and the 409 behave as they do against
   the fakes.
 - That an add's notice, made after the sheet has closed, is seen.
+
+## Phase 4, slice 2, after its review (2026-11-14)
+
+The review of d95b9e1 found one HIGH, one LOW-MEDIUM and six LOW, and that none of the App's safety rules had a test.
+All are fixed in one commit on `phase4-library`. The app stays 0.9 (9); src/__init__.py untouched; no server change.
+
+### What was wrong, and the fix
+
+- **HIGH - "one write at a time" didn't last past closing the picker.**
+  - The bug: each opening made its own PlaylistPickerModel, whose gate (`writing`) began false. There are two sheets,
+    MainTabs' and Now Playing's. The web has one PlaylistPicker whose `writing` lasts across openings and openers
+    (App.tsx).
+  - On a slow Navidrome:
+    - Late night tapped ("Adding…"), the sheet closed, opened again (or Now Playing's), and Late night tapped again;
+    - the second ask-add read the playlist before the first had written;
+    - the server's add route reads, then writes, so both appended - the songs twice, the question never asked;
+    - and the reopened picker didn't say "Adding…".
+  - **Fix, in Core: `PlaylistWrites`**, held once by PlaylistsModel (`writes`, reset with the person). It is the
+    picker's write out - an add (to which playlist, how) or New playlist… - and at most one.
+    - `begin` answers nil while one is out, so nothing is sent.
+    - Every opening's rows and New playlist… wait on `writes.busy`.
+    - The row, or the question's button, says "Adding…" from `writes.adding(id)`, in any opening.
+  - Its tickets also hold who each write was asked as. `end` says whether the answer counts: PlaylistsModel.write's
+    `Superseded`, until now an App check of its own.
+  - Edit's Done, Delete and the Playlists screen's New take ungated tickets, which never open or shut the picker's
+    gate.
+- **LOW-MEDIUM - a refused Done didn't scroll to its reason.** `proxy.scrollTo(Place.problem)` ran in the same turn
+  that set the failure, before its row existed.
+  - **Fix**: `PlaylistEditFlow.refusals` goes up by one for each refusal that leaves Edit open.
+  - The page's `onChange(of: refusals)` scrolls in a task, once the row is drawn. A second refusal with the same words
+    scrolls too.
+- **LOW - a Delete answered 404 left Edit open on a playlist that had gone.**
+  - **Fix**: `deleteRefused` reads it as gone: Edit closed, gone, `playlists.gone`.
+  - The page leaves as a delete does, the notice saying it had gone (PLAYLIST_GONE).
+- **LOW - the name and description bindings cut text already over the bound.** One keystroke in a 250-letter name
+  (made in another app) cut it to 200, and Done saved the cut.
+  - **Fix, in Core: `PlaylistEdit.typed(_:was:max:)`**, maxLength's rule:
+    - text within the bound, or no longer than it was, is taken as it is;
+    - text that grows past it keeps what was there and takes as much of what was put in as fits, found between the
+      start and end the two share, so a paste in the middle keeps what follows the cursor;
+    - nothing is taken when nothing fits.
+  - The bindings now take the text as typed, and each field's `onChange` puts it back with `typed`. That is a change
+    of its own, so the field shows what was kept; a setter refusing the text would change nothing, and the field would
+    go on showing it.
+  - NewPlaylistFields works the same way.
+- **LOW - tapping the current tab again threw Edit's changes away.**
+  - **Fix**: AppNavigation's `editingPlaylist`, set by the page as Edit opens and closes, and let go once no page of
+    it is left.
+  - A tab tapped again keeps every page up to the topmost page of that playlist (`PlaylistEdit.pagesKept`). From Go
+    to album over an Edit, it comes back to the Edit.
+  - Chosen over asking: Cancel's question stays the one place changes are thrown away.
+- **LOW - New playlist's sheets shared one `making`.** A slow Create answering after its sheet was swiped away and
+  another opened closed the new sheet and lost its name.
+  - **Fix**: each opening is its own (`NewSheet`, a UUID, `sheet(item:)`).
+  - `PlaylistEdit.made(sentFrom:up:shown:)` decides what follows:
+    - the sheet that sent it still up: it closes, and the playlist opens once it has gone;
+    - none up and the screen on top: the playlist opens;
+    - otherwise: the notice says it was made, and nothing closes.
+- **LOW - NewPlaylistFields' announcement left out `admin`**, while its ErrorNote drew the admin's words. **Fix**:
+  `admin: server.access.seesDetail`.
+- **LOW, docs - the hero.** This file and spec 3.3 said the hero is put away in Edit. It stays, Play and Shuffle
+  dimmed, as on the web. Corrected.
+
+### Core: the App's safety rules as state machines (the review's gap)
+
+PlaylistFlows.swift (new):
+- `PlaylistWrites` (above).
+- `PlaylistPickerFlow`, one opening of the picker: New playlist…'s name, the question, the failure, `finished` and
+  `shown`. PlaylistPickerModel now wraps it.
+  - `answered`: while shown, the question is drawn; once closed, the notice says "Nothing added - some are in X
+    already". Added: said, and the sheet closed while shown.
+  - `failed`: while shown, why under the head and to VoiceOver; once closed, the notice. Whoever runs deadwax gets the
+    admin's words, and a 404 lets the playlist go.
+  - `made`, `sending` and `back`.
+- `PlaylistEditFlow`, the page's Edit. PlaylistPageModel now holds one and forwards to it.
+  - `fresh`: set by this page's own answer (`answered`, dropped while Edit is open), cleared by `madeOld` (an add's
+    change); `notFound` for a 404.
+  - `canBegin`, `begin`, and `leave` (asking again after a refusal).
+  - `move` and `remove`, which do nothing while a write is out.
+  - `done`: `.unchanged(askAgain:)`, `.notSent`, or `.send(body)` with `tried`.
+  - `saved`, `notSent`, and `refused` (each refusal's transition).
+    - A save is this page's own answer, so `fresh`, even after an add's change landed while Done was out.
+    - If that add was written after the edit, the answer drawn lacks it, and Edit may begin from it. The next Done's
+      `base` is then old, and the server refuses it with a 409: Edit closes and the playlist is asked again. Nothing
+      is lost; the cost is one Done refused.
+  - `beginDelete`, `deleted`, `deleteRefused` and `deleteNotSent`.
+- `PlaylistEdit.made` and `pagesKept`.
+
+PlaylistChanges.swift: `typed`, with `clamped` now its cut of what was put in.
+
+### Tests
+
+Core 1239 (from 1224). **PlaylistFlowTests**, 15. Every mutating call is made before its `#expect`, never inside one.
+- The gate:
+  - one write out;
+  - Done never opening it;
+  - an answer ended twice;
+  - a reset;
+  - another person.
+- The review's case: a second opening sees the add out, its rows waiting, and the first's answer is said in the
+  notice.
+- The picker:
+  - its answers, shown and closed;
+  - its refusals, with and without admin;
+  - a 404 let go;
+  - a made playlist.
+- Edit waiting for the page's own answer:
+  - a kept answer;
+  - an add's change;
+  - an answer while open dropped;
+  - gone, and a 404 with Edit open closing it;
+  - a save after an add's change counting as the page's own.
+- A refused Done:
+  - Edit open, why, and `tried` the songs it sent;
+  - the next Done sending them;
+  - a second refusal keeping its own.
+- 409 and 404 closing Edit.
+- Leaving after a refusal asking again, including a refused Done undone by hand.
+- Done sending nothing it shouldn't: a blank name, one already out, moves held.
+- Delete: closed, out, deleted, 404 gone, refused.
+- `made`, `pagesKept` and `typed`:
+  - a keystroke past the bound;
+  - pastes at the end, in the middle and at the start;
+  - a selection replaced;
+  - nothing fitting;
+  - a two-unit character at the edge;
+  - a name already over the bound - kept, shortened, never grown.
+
+**Mutations: 55**, each a rule broken alone in PlaylistFlows.swift or `typed`, then `swift test --filter Playlist`:
+- the gate, 8;
+- the picker, 8;
+- Edit, Done and Delete, 30;
+- `made` and `pagesKept`, 4;
+- `typed`, 5.
+
+All 55 are caught. The first pass caught 53. No test reached either of the two misses:
+- "saved not fresh" - a save with `fresh` already false;
+- "the page's 404 leaves Edit open" - `notFound()` with Edit open.
+
+Two cases in `editWaitsForThisPagesOwnAnswer` now catch both.
+
+### Verified, and not
+
+Verified (2026-11-14, this Mac, Xcode's toolchain):
+- `swift test`: Core 1239, DeadwaxAudio 158 and DeadwaxTurntable 11, all pass.
+- The mutations.
+- The unsigned Release device build, with no warnings but appintents' "Metadata extraction skipped".
+- check_project.py, with the .xcodeproj unchanged.
+- `pytest tests/test_ios_*.py tests/test_source_bytes.py`.
+- The 11 ios sims on Node 22, ui/node_modules deleted afterwards.
+
+Not run: Core on Linux.
+
+Not verified - only the phone can tell (docs/ios.md's checks 71, 73 and 75 now ask):
+- The scroll to why, from `onChange(of: refusals)` and a task, on a real List.
+- That a field's `onChange` correction shows the kept text, SwiftUI's usual pattern for a bound.
+- The tab tapped again during Edit.
+- New playlist's sheet swiped away and opened again.
+- A second opening of the picker saying "Adding…" over Now Playing.

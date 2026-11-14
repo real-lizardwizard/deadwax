@@ -26,9 +26,11 @@ import SwiftUI
 /// said: "Roads: 3 of 12", "Roads removed") - and Delete playlist, last. All of it is saved at once with Done, as the
 /// person signed in (PlaylistPageModel.done): nothing is drawn as saved before deadwax says it is. Changed in another
 /// app since Edit began: nothing saved, the playlist drawn as it is now and PLAYLIST_CHANGED said at its top. Refused:
-/// Edit stays open with why at the top of the form. Cancel takes Back's place, and asks first when there are changes
-/// ("Discard your changes?"); Delete asks (deleteQuestion) - there is no undo - and, deleted, says so and goes back
-/// while the page is still what shows. Play, Shuffle and the ••• wait while Edit is open.
+/// Edit stays open with why at the top of the form, the page scrolled to it. Cancel takes Back's place, and asks first
+/// when there are changes ("Discard your changes?"); the tab tapped again goes back no further than this page while Edit
+/// is open (AppNavigation.editing). Delete asks (deleteQuestion) - there is no undo - and, deleted (or answered gone),
+/// says so and goes back while the page is still what shows. The hero stays; Play, Shuffle and the ••• wait while Edit is
+/// open.
 struct PlaylistView: View {
     let route: PlaylistRoute
 
@@ -132,6 +134,19 @@ struct PlaylistView: View {
                 // a write here changed it (an add from the picker, its own Done): asked again
                 guard let change else { return }
                 Task { await model.changedHere(change, client: server.client, playlists: playlists) }
+            }
+            .onChange(of: model.refusals) { _, _ in
+                // Done refused, Edit open: to why, at the form's top - once the row saying it has been drawn
+                Task { @MainActor in
+                    withAnimation { proxy.scrollTo(Place.problem, anchor: .top) }
+                }
+            }
+            .onChange(of: model.editing) { _, editing in
+                navigation.editing(route.id, editing)
+            }
+            .onDisappear {
+                // popped, not covered: a tab tapped again needn't stop at it any more
+                navigation.pageGone(route.id)
             }
         }
     }
@@ -303,6 +318,11 @@ struct PlaylistView: View {
                     .autocorrectionDisabled()
                     .submitLabel(.done)
                     .accessibilityLabel(PlaylistWords.nameField)
+                    .onChange(of: model.edit?.name) { (was: String?, typed: String?) -> Void in
+                        guard let was, let typed else { return }
+                        let kept = PlaylistEdit.typed(typed, was: was, max: PlaylistRules.nameMax)
+                        if kept != typed { model.edit?.name = kept }
+                    }
                 if model.needsName {
                     Text(PlaylistWords.needsAName)
                         .font(.footnote)
@@ -311,6 +331,11 @@ struct PlaylistView: View {
                 TextField(PlaylistWords.descriptionField, text: commentBinding, axis: .vertical)
                     .lineLimit(2...6)
                     .accessibilityLabel(PlaylistWords.descriptionField)
+                    .onChange(of: model.edit?.comment) { (was: String?, typed: String?) -> Void in
+                        guard let was, let typed else { return }
+                        let kept = PlaylistEdit.typed(typed, was: was, max: PlaylistRules.commentMax)
+                        if kept != typed { model.edit?.comment = kept }
+                    }
                 VStack(alignment: .leading, spacing: 6) {
                     Toggle(PlaylistWords.sharedWithEveryone, isOn: publicBinding)
                     Text(PlaylistWords.sharedNote)
@@ -407,16 +432,15 @@ struct PlaylistView: View {
         }
     }
 
+    /// The name as typed, taken as it is: the field's onChange then puts it back within its bound (PlaylistEdit.typed)
+    /// as a change of its own, so the field shows what was kept - a setter refusing the text would change nothing, and
+    /// the field would go on showing what the model never took.
     private var nameBinding: Binding<String> {
-        Binding(get: { model.edit?.name ?? "" },
-                set: { (typed: String) -> Void in model.edit?.name = PlaylistEdit.clamped(typed, to: PlaylistRules.nameMax) })
+        Binding(get: { model.edit?.name ?? "" }, set: { (typed: String) -> Void in model.edit?.name = typed })
     }
 
     private var commentBinding: Binding<String> {
-        Binding(get: { model.edit?.comment ?? "" },
-                set: { (typed: String) -> Void in
-                    model.edit?.comment = PlaylistEdit.clamped(typed, to: PlaylistRules.commentMax)
-                })
+        Binding(get: { model.edit?.comment ?? "" }, set: { (typed: String) -> Void in model.edit?.comment = typed })
     }
 
     private var publicBinding: Binding<Bool> {
@@ -484,7 +508,7 @@ struct PlaylistView: View {
                 withAnimation { proxy.scrollTo(Place.top, anchor: .top) }
                 Notice.announce(PlaylistWords.playlistGone)
             case .refused:
-                withAnimation { proxy.scrollTo(Place.problem, anchor: .top) }
+                // (scrolled to why by the page's onChange of `refusals`, once its row is drawn)
                 if let failure = model.editFailure {
                     Notice.announce(ErrorWords.of(failure, admin: server.access.seesDetail).said)
                 }
@@ -494,16 +518,25 @@ struct PlaylistView: View {
         }
     }
 
-    /// Delete, answered: said in the notice, and back from the page while it is still what shows.
+    /// Delete, answered: said in the notice, and back from the page while it is still what shows - a 404 (gone in
+    /// another app already) as a delete.
     private func deletePlaylist() {
         let name = model.name
         Task { @MainActor in
-            if await model.delete(playlists: playlists) {
+            switch await model.delete(playlists: playlists) {
+            case .deleted:
                 player.say(PlaylistWords.deleted(name))
                 navigation.leavePlaylist(route.id)
-            } else if let failure = model.deleteFailure {
-                Notice.announce(ErrorWords.of(failure, admin: server.access.seesDetail).said)
+            case .gone:
+                player.say(PlaylistWords.playlistGone)
+                navigation.leavePlaylist(route.id)
+            case .refused:
+                if let failure = model.deleteFailure {
+                    Notice.announce(ErrorWords.of(failure, admin: server.access.seesDetail).said)
+                }
                 refocus(.delete)
+            case .notSent:
+                break
             }
         }
     }

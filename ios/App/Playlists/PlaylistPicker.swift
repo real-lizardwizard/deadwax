@@ -19,8 +19,9 @@ struct PlaylistPickRequest: Identifiable {
 /// (PlaylistRules.picker: yours and editable, the one changed last on top). The list is asked afresh as it opens, what is
 /// held drawing meanwhile.
 ///
-/// A playlist's tap adds (`.ask` first): one write at a time - its row says "Adding…" and every row waits until the
-/// answer, so a double tap never adds twice. Written: the sheet closes and the app's notice says what happened
+/// A playlist's tap adds (`.ask` first): one write at a time, across every opening of the picker and both its openers
+/// (PlaylistsModel.writes) - the row says "Adding…" and every row and New playlist… wait until the answer, in this
+/// sheet and in one opened again meanwhile, so neither a double tap nor a second opening ever adds twice. Written: the sheet closes and the app's notice says what happened
 /// (`addedWords`). Some there already and nothing written: the list gives way to the question - add them again, skip
 /// those, or Cancel back to the list. Refused: why, in a listener's words, under the head, the sheet open; a playlist
 /// gone asks the list again. Closing the sheet while an add is out never calls it off (a write) - the notice still
@@ -96,7 +97,7 @@ struct PlaylistPicker: View {
                     .foregroundStyle(Palette.quiet)
             }
             if model.making {
-                NewPlaylistFields(busyOutside: model.writing) { name in
+                NewPlaylistFields(busyOutside: playlists.writes.busy) { name in
                     try await model.make(name: name, playlists: playlists, player: player)
                 } cancel: {
                     model.making = false
@@ -104,12 +105,12 @@ struct PlaylistPicker: View {
                 }
             } else {
                 Button {
-                    guard !model.writing else { return }
+                    guard !playlists.writes.busy else { return }
                     model.making = true
                 } label: {
                     PickerRow(cover: nil, name: PlaylistWords.newPlaylistRow, line: nil, symbol: "plus")
                 }
-                .disabled(model.writing)
+                .disabled(playlists.writes.busy)
                 .accessibilityFocused($focus, equals: .first)
             }
             ForEach(rows) { playlist in
@@ -117,11 +118,11 @@ struct PlaylistPicker: View {
                     model.add(to: playlist, mode: .ask, playlists: playlists, player: player, admin: server.access.seesDetail)
                 } label: {
                     PickerRow(cover: playlist.coverArt, name: playlist.name,
-                              line: model.adding?.id == playlist.id ? PlaylistWords.adding
+                              line: playlists.writes.adding(playlist.id) != nil ? PlaylistWords.adding
                                   : PlaylistRules.songCount(playlist.songCount),
                               symbol: nil)
                 }
-                .disabled(model.writing)
+                .disabled(playlists.writes.busy)
             }
             if playlists.list == nil {
                 if let failure = playlists.failure {
@@ -141,9 +142,10 @@ struct PlaylistPicker: View {
 
     // MARK: the question
 
-    private func questionSection(_ question: PlaylistPickerModel.Asked) -> some View {
+    private func questionSection(_ question: PlaylistPickerFlow.Asked) -> some View {
         let asked = PlaylistRules.duplicateQuestion(already: question.already, asked: question.asked, pick: model.pick,
                                                     name: question.playlist.name)
+        let adding = playlists.writes.adding(question.playlist.id)
         return Section {
             Text(asked.text)
                 .fixedSize(horizontal: false, vertical: true)
@@ -152,21 +154,21 @@ struct PlaylistPicker: View {
                 model.add(to: question.playlist, mode: .add, playlists: playlists, player: player,
                           admin: server.access.seesDetail)
             } label: {
-                Text(model.adding?.mode == asked.yes.mode ? PlaylistWords.adding : asked.yes.label)
+                Text(adding != nil && adding == asked.yes.mode ? PlaylistWords.adding : asked.yes.label)
                     .fontWeight(.semibold)
             }
-            .disabled(model.writing)
+            .disabled(playlists.writes.busy)
             Button {
                 if let mode = asked.no.mode {
                     model.add(to: question.playlist, mode: mode, playlists: playlists, player: player,
                               admin: server.access.seesDetail)
                 } else {
-                    model.question = nil
+                    model.back()
                 }
             } label: {
-                Text(model.adding != nil && model.adding?.mode == asked.no.mode ? PlaylistWords.adding : asked.no.label)
+                Text(adding != nil && adding == asked.no.mode ? PlaylistWords.adding : asked.no.label)
             }
-            .disabled(model.writing)
+            .disabled(playlists.writes.busy)
         }
     }
 
@@ -216,100 +218,74 @@ private struct PickerRow: View {
     }
 }
 
-/// The picker's state, one per opening: what it adds, the question, the write out, why it was refused. Its writes run in
-/// tasks of their own, which the sheet closing never calls off - `shown` says whether what they answer is drawn here
-/// or said in the app's notice.
+/// The picker's state, one per opening - Core's PlaylistPickerFlow: what it adds, New playlist…'s name, the question, why
+/// the last add was refused. The write out is PlaylistsModel's (`writes`), shared by every opening. Its writes run in
+/// tasks of their own, which the sheet closing never calls off - `shown` says whether what they answer is drawn here or
+/// said in the app's notice.
 @MainActor
 @Observable
 final class PlaylistPickerModel {
-    struct Asked: Equatable {
-        let playlist: Playlist
-        let already: Int
-        let asked: Int
-    }
-
-    struct Adding: Equatable {
-        let id: String
-        let mode: PlaylistDuplicates
-    }
-
-    let pick: PlaylistPick
-    /// New playlist…'s name, open in place of its row.
-    var making = false
-    /// Some of the songs are in the playlist already: the question, in place of the list.
-    var question: Asked?
-    /// The add out: to which playlist, and how - so the row or button pressed is the one that says "Adding…".
-    private(set) var adding: Adding?
-    /// A write is out - an add or a new playlist: one at a time.
-    private(set) var writing = false
-    /// The last add was refused: why, under the head.
-    private(set) var failure: (any Error)?
-    /// Done: the sheet closes.
-    private(set) var finished = false
-    /// The sheet is up: an answer is drawn here, else said in the notice.
-    @ObservationIgnored var shown = true
+    private(set) var flow: PlaylistPickerFlow
 
     init(pick: PlaylistPick) {
-        self.pick = pick
+        flow = PlaylistPickerFlow(pick: pick)
     }
 
-    /// The songs added to `playlist` - `mode` `.ask` from the list, the question's choice from it.
+    var pick: PlaylistPick { flow.pick }
+    /// New playlist…'s name, open in place of its row.
+    var making: Bool {
+        get { flow.making }
+        set { flow.making = newValue }
+    }
+    /// Some of the songs are in the playlist already: the question, in place of the list.
+    var question: PlaylistPickerFlow.Asked? { flow.question }
+    /// The last add was refused: why, under the head.
+    var failure: (any Error)? { flow.failure }
+    /// Done: the sheet closes.
+    var finished: Bool { flow.finished }
+    /// The sheet is up: an answer is drawn here, else said in the notice.
+    var shown: Bool {
+        get { flow.shown }
+        set { flow.shown = newValue }
+    }
+
+    /// The question's Cancel: back to the list.
+    func back() { flow.back() }
+
+    /// The songs added to `playlist` - `mode` `.ask` from the list, the question's choice from it. Nothing while the
+    /// picker's write is out, from this opening or another.
     func add(to playlist: Playlist, mode: PlaylistDuplicates, playlists: PlaylistsModel, player: PlayerModel, admin: Bool) {
-        guard !writing, !pick.songs.isEmpty else { return }
-        writing = true
-        adding = Adding(id: playlist.id, mode: mode)
-        failure = nil
-        let ids = pick.ids
-        let pick = pick
+        guard !playlists.writes.busy, !flow.pick.songs.isEmpty else { return }
+        flow.sending()
+        let ids = flow.pick.ids
         Task { @MainActor in
             do {
                 let answer = try await playlists.add(ids, to: playlist.id, duplicates: mode)
-                writing = false
-                adding = nil
-                switch PlaylistRules.outcome(of: answer, mode: mode, pick: pick, name: playlist.name) {
-                case .asks(let already, let asked):
-                    if shown {
-                        question = Asked(playlist: playlist, already: already, asked: asked)
-                    } else {
-                        player.say(PlaylistWords.someAlready(playlist.name))
-                    }
-                case .added(let words):
-                    player.say(words)
-                    if shown {
-                        question = nil
-                        finished = true
-                    }
-                }
+                said(flow.answered(answer, mode: mode, to: playlist), playlists: playlists, player: player)
             } catch is PlaylistsModel.Superseded {
-                writing = false
-                adding = nil
+                return
             } catch {
-                writing = false
-                adding = nil
-                if ErrorWords.kind(of: error) == .notFound { playlists.gone(playlist.id) }
-                guard shown else {
-                    player.say(ErrorWords.notice(PlaylistWords.couldntAdd(playlist.name), error, admin: admin))
-                    return
-                }
-                question = nil
-                failure = error
-                Notice.announce(ErrorWords.of(error, admin: admin).said)
+                said(flow.failed(error, to: playlist, admin: admin), playlists: playlists, player: player)
             }
         }
     }
 
     /// New playlist… with the songs: made, said, and the sheet closed - or thrown, for the name's form to say why.
     func make(name: String, playlists: PlaylistsModel, player: PlayerModel) async throws {
-        guard !writing else { return }
-        writing = true
-        defer { writing = false }
+        guard !playlists.writes.busy else { return }
         do {
-            let made = try await playlists.create(name: name, songIDs: pick.ids)
-            player.say(PlaylistRules.madeWords(made.playlist.name, pick: pick))
-            if shown { finished = true }
+            let made = try await playlists.create(name: name, songIDs: flow.pick.ids, picker: true)
+            said(flow.made(made.playlist), playlists: playlists, player: player)
         } catch is PlaylistsModel.Superseded {
             return
         }
+    }
+
+    /// What the flow says beyond the sheet: a playlist gone, the notice, VoiceOver.
+    private func said(_ said: PlaylistPickerFlow.Said, playlists: PlaylistsModel, player: PlayerModel) {
+        if let gone = said.gone { playlists.gone(gone) }
+        if let notice = said.notice { player.say(notice) }
+        if let announce = said.announce { Notice.announce(announce) }
     }
 }
 
@@ -323,6 +299,7 @@ struct NewPlaylistFields: View {
     let create: (String) async throws -> Void
     let cancel: () -> Void
 
+    @Environment(ServerModel.self) private var server
     @State private var name = ""
     @State private var busy = false
     @State private var failure: (any Error)?
@@ -338,9 +315,10 @@ struct NewPlaylistFields: View {
                 .autocorrectionDisabled()
                 .submitLabel(.done)
                 .onSubmit(send)
-                .onChange(of: name) { _, typed in
-                    let bounded = PlaylistEdit.clamped(typed, to: PlaylistRules.nameMax)
-                    if bounded != typed { name = bounded }
+                .onChange(of: name) { (was: String, typed: String) -> Void in
+                    // kept within the bound as an HTML field's maxLength keeps it
+                    let kept = PlaylistEdit.typed(typed, was: was, max: PlaylistRules.nameMax)
+                    if kept != typed { name = kept }
                 }
                 .accessibilityLabel(PlaylistWords.nameField)
             if let failure {
@@ -370,7 +348,7 @@ struct NewPlaylistFields: View {
             } catch {
                 busy = false
                 failure = error
-                Notice.announce(ErrorWords.of(error).said)
+                Notice.announce(ErrorWords.of(error, admin: server.access.seesDetail).said)
             }
         }
     }

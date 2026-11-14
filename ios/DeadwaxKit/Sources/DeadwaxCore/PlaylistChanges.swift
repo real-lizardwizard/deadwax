@@ -406,8 +406,32 @@ public enum PlaylistEdit {
         WebText.trim(text)
     }
 
-    /// Typed text cut to `max` UTF-16 code units, at a character's edge - what an HTML field's maxLength lets in
-    /// (PLAYLIST_NAME_MAX, PLAYLIST_COMMENT_MAX), so the server's own bound (code points, never more) is never met.
+    /// A field's text after a keystroke or a paste, `was` the text before it, kept within `max` UTF-16 code units as an
+    /// HTML field's maxLength keeps it (PLAYLIST_NAME_MAX, PLAYLIST_COMMENT_MAX - the server's own bound, in code
+    /// points, never met): text within the bound, or no longer than it was, taken as it is - a name already over it is
+    /// never cut, and can be cut down by hand; text that grows past it keeps what was there and takes only as much of
+    /// what was put in as fits, at a character's edge - nothing, when nothing does.
+    public static func typed(_ text: String, was old: String, max: Int) -> String {
+        let units = text.utf16.count
+        guard units > max, units > old.utf16.count else { return text }
+        // what was put in: between what the two share at the start and at the end
+        let before = Array(old)
+        let after = Array(text)
+        var head = 0
+        while head < before.count, head < after.count, before[head] == after[head] { head += 1 }
+        var tail = 0
+        while tail < before.count - head, tail < after.count - head,
+              before[before.count - 1 - tail] == after[after.count - 1 - tail] { tail += 1 }
+        let lead = String(before[..<head])
+        let rest = String(before[(before.count - tail)...])
+        let room = max - lead.utf16.count - rest.utf16.count
+        guard room > 0 else { return old }
+        let put = clamped(String(after[head..<(after.count - tail)]), to: room)
+        guard !put.isEmpty else { return old }
+        return lead + put + rest
+    }
+
+    /// Text cut to `max` UTF-16 code units, at a character's edge (`typed`'s cut of what was put in).
     public static func clamped(_ text: String, to max: Int) -> String {
         guard text.utf16.count > max else { return text }
         var kept = ""

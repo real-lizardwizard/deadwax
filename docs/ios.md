@@ -369,7 +369,8 @@ When some of them are in it already, nothing is added yet, and it asks:
 **Cancel** goes back to your playlists. **New playlist…** at the top makes one with them: a name, then
 **Create** ("Made Late night with Roads"). One tap adds once: the playlists wait ("Adding…") until
 Navidrome has answered. Close it while an add is on its way and the add carries on, and the app still
-says how it went. If it couldn't be added, it says why over your playlists.
+says how it went - open it again meanwhile, from anywhere, and it's still "Adding…", the playlists
+waiting. If it couldn't be added, it says why over your playlists.
 
 ### Edit and Delete
 
@@ -377,9 +378,11 @@ says how it went. If it couldn't be added, it says why over your playlists.
 one from a file, or one of more than 2,000 songs - the page says why instead - and it can be tapped
 once the page has been brought up to date. In Edit:
 
-- **Name** (a playlist needs one: "A playlist needs a name.", and Done waits), **Description**, and
-  **Shared with everyone**: everyone with an account on this Navidrome can find it and play it - in
-  deadwax, Navidrome and their other apps. Only you can change it.
+- **Name** (a playlist needs one: "A playlist needs a name.", and Done waits; up to 200 letters),
+  **Description** (up to 1,000), and **Shared with everyone**: everyone with an account on this
+  Navidrome can find it and play it - in deadwax, Navidrome and their other apps. Only you can change
+  it. A name or description made longer in another app is kept as it is: it can be shortened here,
+  not lengthened.
 - **The songs**: drag one by its handle to move it, and tap its red minus to take it out - one tap,
   as in Up Next. With VoiceOver, each song has Move up, Move down and Remove. Edit only takes songs
   out and reorders them; add them with Add to a playlist.
@@ -390,13 +393,16 @@ once the page has been brought up to date. In Edit:
   nothing: "This playlist changed in another app while you were editing it - here it is now. Your
   changes weren't saved." Tap Edit and make them again. If Done is refused for any other reason, Edit
   stays open with why, and **Done** tries again.
+- Tapping the tab you're on goes back only as far as the playlist while Edit is open: Cancel or Done
+  leaves Edit.
 - When Navidrome counts songs it isn't listing just now: "2 songs that aren't in the library just now
   will be dropped if you change the songs."
 
 **Delete playlist** is at the bottom of Edit. It asks first: "Delete "Late night"? It goes from
 Navidrome for good - from Amperfy and every other app too, and for everyone it's shared with. The
 songs stay in the library." - **Delete playlist**, or **Keep it**. There's no undo. Deleted, the page
-closes and the app says "Deleted Late night".
+closes and the app says "Deleted Late night". If it had gone already - deleted in another app - the
+page closes all the same, saying so.
 
 ### Playlists offline
 
@@ -2044,7 +2050,9 @@ one.
   on a playlist's page, and Now Playing's •••: **Add to a playlist…** opens your playlists - does it
   say what you're adding, with the one changed last at the top? Tap one: it closes and says "Added 11
   songs to …". Then **New playlist…** in it: a name, Create - "Made … with …". In the web app, the songs
-  are there, in that order.
+  are there, in that order. Then, ideally with the server slow: tap a playlist, close the picker while
+  it says Adding…, open it again (or Now Playing's) and tap the same one - is it still Adding…, and
+  are the songs in the playlist only once?
 - **72 Already in it.** Add the same album to the same playlist again: "These 11 songs are all in …
   already." - try Add them again, then remove the copies in Edit. Add an album with one song of it in
   the playlist: "1 of these 11 songs is in … already." - Skip that one adds the other 10. One song
@@ -2053,12 +2061,15 @@ one.
   everyone, drag a song, take one out with its red minus (does one tap do it?), Done. It says Saving…,
   then shows it saved; the web app agrees, and Amperfy after a refresh. Clear the name: "A playlist
   needs a name." and Done dimmed. Change something and Cancel: it asks "Discard your changes?". Do the
-  fields take typing, and the switch a tap, while the songs can be dragged?
+  fields take typing, and the switch a tap, while the songs can be dragged? Type past 200 letters in
+  the name, and paste a long line into it: it stops at 200. Tap the Library tab while editing: it stays
+  on the playlist. Make Done fail (Airplane Mode just after tapping it): does the page go to why?
 - **74 Changed elsewhere.** Tap Edit on the phone, add a song to that playlist in the web app, then
   change something on the phone and tap Done: it says the playlist changed in another app and your
   changes weren't saved, and shows it with the web app's song.
 - **75 Delete.** Edit > Delete playlist: the question, then Delete playlist. Back on Playlists, "Deleted
-  …", and it's gone from the web app and Amperfy.
+  …", and it's gone from the web app and Amperfy. Then New playlist twice quickly: **+**, a name, Create,
+  swipe the sheet away at once, **+** again - the second sheet stays, with what you type in it.
 - **76 Only yours, and offline.** A playlist shared with you, or one from a file: no Edit, and Add to
   a playlist… never lists it. In Airplane Mode: no Add to a playlist… in the ••• menus or Now
   Playing's, and **+** and Edit dimmed. With VoiceOver in Edit: each song's actions (Move up, Move

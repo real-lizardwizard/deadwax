@@ -124,6 +124,9 @@ final class AppNavigation {
     /// Add to a playlist (Phase 4, slice 2), opened from a page's ••• (QueueMenu): the picker over the tabs, with the
     /// songs in hand. Now Playing opens its own, over itself.
     var playlistPick: PlaylistPickRequest?
+    /// The playlist whose Edit is open on a tab's page: the tab tapped again goes back no further than that page, so
+    /// Edit's changes are never thrown away without Cancel's question (PlaylistEdit.pagesKept).
+    private(set) var editingPlaylist: String?
 
     /// A file shared to deadwax (`.onOpenURL`): shown by the preview that is up, in place - else by the EQ sheet,
     /// opened over Now Playing (by Now Playing) or over the tabs (here).
@@ -155,10 +158,39 @@ final class AppNavigation {
         }
         switch tapped {
         case .library:
-            if library.isEmpty { libraryScrollToTop += 1 } else { library.removeAll() }
+            if library.isEmpty { libraryScrollToTop += 1 } else { backToRoot(&library) }
         case .you:
-            if you.isEmpty { youScrollToTop += 1 } else { you.removeAll() }
+            if you.isEmpty { youScrollToTop += 1 } else { backToRoot(&you) }
         }
+    }
+
+    /// Every page popped - but none of a playlist being edited, nor the pages under it.
+    private func backToRoot(_ stack: inout [AppRoute]) {
+        let ids = stack.map { (route: AppRoute) -> String? in
+            if case .playlist(let shown) = route { return shown.id }
+            return nil
+        }
+        let kept = PlaylistEdit.pagesKept(ids, editing: editingPlaylist)
+        stack.removeLast(stack.count - kept)
+    }
+
+    /// A playlist's page opened or closed its Edit.
+    func editing(_ id: String, _ open: Bool) {
+        if open {
+            editingPlaylist = id
+        } else if editingPlaylist == id {
+            editingPlaylist = nil
+        }
+    }
+
+    /// A playlist's page went away: popped (no page of it left on either tab), its Edit with it.
+    func pageGone(_ id: String) {
+        guard editingPlaylist == id else { return }
+        let held = (library + you).contains { (route: AppRoute) -> Bool in
+            if case .playlist(let shown) = route { return shown.id == id }
+            return false
+        }
+        if !held { editingPlaylist = nil }
     }
 
     /// `route` pushed on the tab shown.
@@ -213,6 +245,7 @@ final class AppNavigation {
         nowPlayingShown = false
         eqImportSheet = false
         playlistPick = nil
+        editingPlaylist = nil
         importAnswered()
         tab = .library
     }
