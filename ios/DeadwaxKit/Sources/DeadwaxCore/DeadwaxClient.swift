@@ -387,6 +387,30 @@ public struct DeadwaxClient: Sendable {
         try await call(Routes.releaseGroup, as: ReleaseGroupAnswer.self, query: [("release_group_mbid", mbid)])
     }
 
+    /// MusicBrainz's artists going by a name (`Routes.searchArtists`): the words typed, never a query - deadwax asks
+    /// for the name and its aliases. A 503 is MusicBrainz away, a 422 with words a search it refused.
+    public func searchArtists(_ name: String, limit: Int = MBArtistSearch.limit) async throws -> ArtistSearchAnswer {
+        try await call(Routes.searchArtists, as: ArtistSearchAnswer.self, query: [("name", name), ("limit", String(limit))])
+    }
+
+    /// MusicBrainz's recordings for a query (`Routes.searchSongs`), each with every release it is on.
+    public func searchSongs(_ query: String, limit: Int = SongSearch.limit) async throws -> SongSearchAnswer {
+        try await call(Routes.searchSongs, as: SongSearchAnswer.self, query: [("query", query), ("limit", String(limit))])
+    }
+
+    /// Who a MusicBrainz artist is (`Routes.artistFacts`) - a 503 when MusicBrainz can't say.
+    public func artistFacts(mbid: String) async throws -> MBArtistFacts {
+        try await call(Routes.artistFacts, as: MBArtistFacts.self, query: [("mbid", mbid)])
+    }
+
+    /// A MusicBrainz artist's albums (`Routes.discography`), as the web's artist page asks them: their albums
+    /// (`types=album`), the studio ones alone with `studioOnly` - `problem` when MusicBrainz broke the list off.
+    public func discography(mbid: String, studioOnly: Bool) async throws -> DiscographyAnswer {
+        var query = [("artist_mbid", mbid), ("types", "album")]
+        if studioOnly { query.append(("studio_only", "true")) }
+        return try await call(Routes.discography, as: DiscographyAnswer.self, query: query)
+    }
+
     /// A Cover Art Archive front through deadwax (`Routes.archiveCover`, server 2.1.24).
     public func archiveCoverRequest(_ cover: ArchiveCoverID, size: Int) -> HTTPRequest {
         var built = request(Routes.archiveCover, path: ["kind": cover.kind.rawValue, "mbid": cover.mbid],

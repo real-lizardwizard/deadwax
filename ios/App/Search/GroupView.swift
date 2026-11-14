@@ -14,6 +14,11 @@ import SwiftUI
 /// Drawn at once from the album Search showed (`route.preview`); what it says of the library is from `/library/owned`,
 /// asked again as the page shows. No description and no links out (question 20). Nothing is asked while deadwax can't be
 /// reached: a list kept from earlier in the session is drawn, else the page says it loads once deadwax is back.
+///
+/// (Slice 3) Opened from a song (`route.song`, its recordings): its title drawn while the pressings load, the pressing
+/// shown one with the song (unless one is picked - a pick then always kept, so the song never overrules it), the song's
+/// tracks marked (tinted, an accent bar, and ", the song you searched for" for VoiceOver) and brought into view once, as
+/// they are first drawn, only from the top. The credit with no library artist of theirs opens their MusicBrainz page.
 struct GroupView: View {
     let route: GroupRoute
 
@@ -26,6 +31,8 @@ struct GroupView: View {
     @State private var picking = false
     /// The hero's title has scrolled away: the bar shows it.
     @State private var titleInBar = false
+    /// The song it was opened from has been brought into view (once).
+    @State private var songShown = false
 
     private static let edge: CGFloat = 16
 
@@ -37,21 +44,27 @@ struct GroupView: View {
     /// The page as drawn from what is in hand (Core's GroupPage).
     private var page: GroupPage {
         GroupPage(id: route.id, answer: model.answer, preview: route.preview, index: search.ownedIndex,
-                  picked: model.picked, personal: server.access.hasLibrary, editors: false)
+                  picked: model.picked, personal: server.access.hasLibrary, editors: false,
+                  fallbackTitle: route.title ?? "", song: route.song)
     }
 
     var body: some View {
         let page = self.page
-        ScrollView {
-            LazyVStack(alignment: .leading, spacing: 0) {
-                hero(page)
-                    .onAppear { titleInBar = false }
-                    .onDisappear { titleInBar = true }
-                actions(page)
-                below(page)
+        ScrollViewReader { proxy in
+            ScrollView {
+                LazyVStack(alignment: .leading, spacing: 0) {
+                    hero(page)
+                        .onAppear { titleInBar = false }
+                        .onDisappear { titleInBar = true }
+                    actions(page)
+                    below(page)
+                }
+                .padding(.horizontal, Self.edge)
+                .padding(.bottom, 24)
             }
-            .padding(.horizontal, Self.edge)
-            .padding(.bottom, 24)
+            .onChange(of: page.tracks.first(where: \.song)?.key, initial: true) { _, key in
+                showSong(key, proxy)
+            }
         }
         .navigationTitle(page.title)
         .navigationBarTitleDisplayMode(.inline)
@@ -67,8 +80,9 @@ struct GroupView: View {
         .sheet(isPresented: $picking) {
             if let view = page.view {
                 PressingPickerSheet(view: view) { (id: String) -> Void in
-                    // the default chosen again is the default: nothing kept of it
-                    model.picked = id == view.defaultId ? nil : id
+                    // the default chosen again is the default: nothing kept of it - but on a page opened from a song a
+                    // pick is always kept, so the song's own choice never comes back over it
+                    model.picked = route.song.isEmpty && id == view.defaultId ? nil : id
                 }
             }
         }
@@ -85,6 +99,20 @@ struct GroupView: View {
 
     private func reload() {
         Task { await model.load(client: server.client, online: reachability.online) }
+    }
+
+    /// The song brought into view as its tracks are first drawn - once for the page, only while it is the page shown,
+    /// and only from the top: a page scrolled meanwhile is left where it is. The least scroll that shows it (`nearest`).
+    private func showSong(_ key: String?, _ proxy: ScrollViewProxy) {
+        guard let key, !songShown else { return }
+        songShown = true
+        guard !titleInBar, navigation.shownStack.last == .group(route) else { return }
+        Task { @MainActor in
+            // a frame for the tracklist to be laid out
+            try? await Task.sleep(nanoseconds: 50_000_000)
+            guard !titleInBar else { return }
+            withAnimation { proxy.scrollTo(key, anchor: nil) }
+        }
     }
 
     // MARK: the hero
@@ -116,19 +144,13 @@ struct GroupView: View {
         .frame(maxWidth: .infinity)
     }
 
-    /// The credit: the library's artist's page when exactly one answers to the album's sole credited artist, else words.
+    /// The credit: the library's artist's page when exactly one answers to the album's sole credited artist, else (slice
+    /// 3) that artist's MusicBrainz page - else words.
     @ViewBuilder private func artistLine(_ page: GroupPage) -> some View {
         if let artist = libraryArtist(page) {
-            Button {
-                navigation.open(.artist(ArtistRoute(artist)))
-            } label: {
-                Text(page.artist)
-                    .font(.title3)
-                    .foregroundStyle(Palette.accent)
-                    .multilineTextAlignment(.center)
-                    .lineLimit(2)
-            }
-            .buttonStyle(.plain)
+            creditLink(page.artist) { navigation.open(.artist(ArtistRoute(artist))) }
+        } else if let sole = soleCredit(page) {
+            creditLink(page.artist) { navigation.open(.mbArtist(MBArtistRoute(mbid: sole.mbid, name: sole.name))) }
         } else {
             Text(page.artist)
                 .font(.title3)
@@ -138,14 +160,30 @@ struct GroupView: View {
         }
     }
 
-    /// The library's artist for the album's sole credit (the group's, else the chosen pressing's) - ReleaseGroupPage's
-    /// `artistLink`, on the phone a library artist only: a MusicBrainz artist's page is slice 3's.
-    private func libraryArtist(_ page: GroupPage) -> Artist? {
+    private func creditLink(_ name: String, _ open: @escaping () -> Void) -> some View {
+        Button(action: open) {
+            Text(name)
+                .font(.title3)
+                .foregroundStyle(Palette.accent)
+                .multilineTextAlignment(.center)
+                .lineLimit(2)
+        }
+        .buttonStyle(.plain)
+    }
+
+    /// The album's sole credited artist (the group's credit, else the chosen pressing's) - ReleaseGroupPage's
+    /// `artistLink`: nil unless ONE artist MusicBrainz knows is credited.
+    private func soleCredit(_ page: GroupPage) -> (mbid: String, name: String)? {
         let releases = model.answer?.releases ?? []
         let credited = route.preview ?? releases.first(where: { (release: PageRelease) -> Bool in release.releaseGroup != nil })?.releaseGroup
         let chosen = releases.first { (release: PageRelease) -> Bool in release.id == page.chosenId }
         let credit = (credited?.artistCredit ?? []).isEmpty ? chosen?.artistCredit : credited?.artistCredit
-        guard let sole = Credits.sole(credit), let list = artists.list else { return nil }
+        return Credits.sole(credit)
+    }
+
+    /// The library's artist for the album's sole credit - their own page before a MusicBrainz one.
+    private func libraryArtist(_ page: GroupPage) -> Artist? {
+        guard let sole = soleCredit(page), let list = artists.list else { return nil }
         return SearchAlbums.libraryArtist(list, mbid: sole.mbid, index: search.ownedIndex, name: sole.name)
     }
 
@@ -295,7 +333,9 @@ struct GroupView: View {
                     .padding(.bottom, 2)
                     .accessibilityAddTraits(.isHeader)
             }
-            PressedTrackRow(number: track.number, title: track.title, length: track.length, mark: track.mark)
+            PressedTrackRow(number: track.number, title: track.title, length: track.length, mark: track.mark,
+                            song: track.song)
+                .id(track.key)
         }
         if !page.missing.isEmpty {
             Text(Pressings.notOnThisPressing)
@@ -312,13 +352,16 @@ struct GroupView: View {
 }
 
 /// One track of a pressing's tracklist (ReleaseGroupPage.tsx's `app-rg-track`): its number, its title with what marks
-/// it under it ("Only on this pressing"), the mark's chip ("Bonus"), its length. Read as one.
+/// it under it ("Only on this pressing"), the mark's chip ("Bonus"), its length. Read as one. The song the album was
+/// opened from (slice 3, `.is-song`): tinted, an accent bar at its edge, its title in the accent - and VoiceOver hears
+/// ", the song you searched for" after it.
 private struct PressedTrackRow: View {
     let number: String
     let title: String
     let length: String
     let mark: PressingTrack.Mark?
     var left = false
+    var song = false
 
     @Environment(\.dynamicTypeSize) private var typeSize
 
@@ -332,8 +375,10 @@ private struct PressedTrackRow: View {
                     .accessibilityHidden(left)
                 VStack(alignment: .leading, spacing: 1) {
                     Text(title)
-                        .foregroundStyle(left ? Palette.quiet : .primary)
+                        .foregroundStyle(left ? Palette.quiet : song ? Palette.accent : .primary)
+                        .fontWeight(song ? .semibold : nil)
                         .lineLimit(typeSize.isAccessibilitySize ? 4 : 2)
+                        .accessibilityLabel(song ? title + SongSearch.songWords : title)
                     if let mark {
                         Text(mark.note)
                             .font(.footnote)
@@ -355,8 +400,27 @@ private struct PressedTrackRow: View {
                     .foregroundStyle(Palette.quiet)
             }
             .padding(.vertical, 8)
+            .padding(.horizontal, song ? Self.bleed : 0)
+            .background(alignment: .leading) {
+                if song {
+                    ZStack(alignment: .leading) {
+                        RoundedRectangle(cornerRadius: 8, style: .continuous)
+                            .fill(Palette.pressed)
+                        Rectangle()
+                            .fill(Palette.accent)
+                            .frame(width: Self.bar)
+                    }
+                    .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                }
+            }
+            .padding(.horizontal, song ? -Self.bleed : 0)
             Divider()
         }
         .accessibilityElement(children: .combine)
     }
+
+    /// How far the song's tint reaches past the row's text, and its accent bar's width (app.css `--app-rg-mark-bleed`,
+    /// `--app-song-bar`).
+    private static let bleed: CGFloat = 8
+    private static let bar: CGFloat = 3
 }

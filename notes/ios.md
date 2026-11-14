@@ -7391,3 +7391,227 @@ Not verified - only the phone can tell (docs/ios.md's checks 140-143):
 - The slots holding their height as their answer lands, at the largest text size too.
 - A held album's row left before its answer, by another tab or another row.
 - Covers loading in place once back online.
+
+## Phase 5, slice 3: artists and songs from MusicBrainz (2026-11-14)
+
+notes/ios-specs/phase5-search.md 6.3, and questions 9 and 24-27 (6.7 points here). The third slice of Phase 5:
+MusicBrainz's artists and songs in Search's one list, after yours, through the moments slice 2 built; a song's
+albums opening under it, and the album it names opening with the song marked; and a MusicBrainz artist's page.
+What's saved, the kept answers and More from MusicBrainz are slice 4; Get is Phase 6; a description and links
+Phase 7.
+
+On `phase5-search` at `ios` b451241 (slice 2 and its review merged, and CI's type-checking fix). src/__init__.py
+untouched; the app stays 0.10 (10); the .xcodeproj unchanged (the two new App files joined the synchronized folder).
+ROUTE_COUNT 44 -> 48: `/search_musicbrainz/artists`, `/search_musicbrainz/songs`, `/search_musicbrainz/artist` and
+`/search_musicbrainz/discography`, all on the server since before 2.1.23 - no server change.
+
+### Core (DeadwaxCore)
+
+- **SongSearch.swift** (new), songs.ts and searchQuery.ts' song queries:
+  - `/songs`' answer read leniently: `SongSearchAnswer`, `MBRecording`, `MBRecordingRelease`, `MBRecordingMedium`,
+    `MBRecordingTrack`.
+  - The songs: `key` (songKey), `group` (groupSongs: every take of one title by one credit one `FoundSong`, its
+    albums unioned and ordered so the studio album leads - `band`, `sortAlbums`), `bands` and `foldLabel` (the
+    disclosure: the albums listed, the rest folded, "On 11 compilations, live albums and soundtracks").
+  - What's held: `holding` (songAlbumHolding: a pressing the song was found on, one whose kept tracklist has it, one
+    the library's own search shows it on, and one nothing vouches for), `held`, `heldReleases` (the id bridge's
+    order), `heldWords`, `albumWords`, `namedAlbum` (the first album you have the song on, yours before the
+    collection's, else the first it's on), `albumLine`. `SongEvidence` is the web's `evidence`: the library half's
+    songs, and the album pressings the session keeps.
+  - The album opened from a song: `ids` (songIds - lowercase MBIDs, each once, at most 8), `matcher` (songMatcher:
+    one of its recordings, or a track titled as one of those is), `pressing` (songPressing).
+  - The queries: `query` (songSearchQuery - nothing for an artist's name alone), `titleQuery` (songTitleQuery, the
+    fallback), `fieldedQuery`. `limit` 25, `rowsShown` 3, `idsKept` 8.
+  - The words: `needATitle`, `noRelease`, `songWords`; `disclosureHint` and `foldHint` (the phone's own, question
+    25).
+- **MBArtist.swift** (new): `MBArtistSearch.limit` (10), `ArtistSearchAnswer`, `MBArtistFacts` (the fields the line
+  reads), `DiscographyAnswer` (`brokenOff` when `problem` is said: never their albums); `MBArtistPage` - artistPage.ts
+  for a MusicBrainz artist alone: `rows` (artistRows([], groups, index): each group once, newest year first, the
+  undated last, then by folded title in localeCompare's order), `line` (rowLine), `marked`, `asksBridge` (openRow),
+  `factsLine`; `kept` (20, ARTISTS_KEPT) and ArtistPage.tsx's words.
+- **Collation.swift** (new): `WebCollation.compare`, JavaScript's `localeCompare` as ICU's root collation answers it
+  - letters first with accents and case away, then accents, then case lowercase first, punctuation weighed in ICU's
+  order before digits and letters. Linux has no ICU tables, so it's an approximation, built from what Node's ICU
+  answers for the characters titles carry; the fixture's 364 titles and 600 seeded pairs hold it. songs.ts sorts an
+  album's pressings, and artistPage.ts an artist's albums, by localeCompare: a bootleg's "1984-09-24" stands before
+  "1984‐09‐15" there because a hyphen-minus weighs less than a hyphen, which no code-point order gets.
+- **MusicBrainz.swift**: `MBArtistMatch` (artist_match less its score, read leniently) and its `line` ("as Kanye
+  West", disambiguation, type, country).
+- **SearchList.swift**, slice 3's half of searchList.ts: the rows `.mbArtist`, `.mbSong` and `.songAlbum`; the pool
+  with MusicBrainz's artists and songs - `newArtists` (a library artist answering to a match, by its MusicBrainz id or
+  by a name only one match answers to, brought in - never drawn twice) and `newSongs` (a song whose title and credit
+  are a library song's dropped; one held on an album it's on brought in); their candidates, Top results' relatives and
+  `decidedTop` over three kinds; `sectionRows` with both caps for each kind; every new row's line; `hasAside`.
+- **SearchState.swift**: MusicBrainz's three kinds, each its own `Answer` (`albums`, `artists`, `songs`: idle,
+  searching, done or failed, only the newest ask's): `wantedKinds` and `keyFor` (the web's - artists not asked under the
+  album-by-artist reading, songs not for an artist's name alone); `askingMusicBrainz` returns `MusicBrainzAsks`, one
+  ask a kind not in hand or on its way (the songs' with its fallback, the box's words as one title, for a title beside
+  an artist); `artistsAnswered`, `songsAnswered` (the recordings made songs) and their failures; `failure(of:)`; the
+  moments over the kinds asked. A kind view asks its own kind (the Songs view under an artist's name alone says
+  `needATitle`).
+- **Pressings.swift**: the album opened from a song - `GroupPage` takes `song` (the recording ids) and a
+  `fallbackTitle` (drawn while the pressings load: the route carries the album's title, no preview); the default
+  pressing is one with the song (`SongSearch.pressing`), and `trackRows` marks its tracks (`song`). `KeptPressings`
+  gives the session's releases by album, for `SongEvidence`.
+- **Routes and the client**: the four routes; `searchArtists` (`name`, `limit`), `searchSongs` (`query`, `limit`),
+  `artistFacts(mbid:)` and `discography(mbid:studioOnly:)` (`types=album`, `studio_only=true` with Studio only).
+  `/artists` and `/songs` given 20 s; `/artist` and `/discography` 60 s (question 27).
+- **export-search-songs-vectors.cjs** (new) compiles lib/searchList.ts, lib/songs.ts, lib/artistPage.ts,
+  lib/pressings.ts and lib/idBridge.ts with tsc, reads noReleaseWords from Search.tsx, SONG_WORDS from
+  ReleaseGroupPage.tsx and ARTISTS_KEPT and the discography's words from ArtistPage.tsx, and writes a third fixture,
+  Fixtures/search/search-songs-vectors.json (2.4 MB, plain ASCII, seeded): the numbers (5) and words; 76 readings'
+  song queries; the 7 recorded song searches in tests/fixtures/songs/ grouped (each recording's key, the songs in
+  full, their bands and folds); every album's holding over 5 to 7 folder lists and 4 kinds of evidence (the last list, the song's first album the
+  collection's alone and a later one yours, added for mutation 17); The Slow Rush's
+  pressings opened from a song (tests/fixtures/songs/slow-rush-pressings.json: ids, matcher, pressing, the tracks
+  marked); 68 whole searches with MusicBrainz's artists, albums and songs in hand (23 worked, 45 seeded: the pool,
+  Top results, the sections, every line, every song's disclosure); 16 artist pages and 8 facts lines; and
+  localeCompare over 364 titles and 600 pairs. **ui/test/iossearchsongs.sim.cjs** runs its `--check`.
+
+### Where the phone can't follow the web exactly
+
+- **A MusicBrainz artist's page** (question 9): their albums only - no description, links, Play or Navidrome albums
+  merged in; Studio only a button at the heading's end.
+- **Their rows before the library answers** (question 26): drawn as the discography lands, the library's words filling
+  in place, where the web waits up to 1.5 s.
+- **Offline** (question 24): the artist page's albums not drawn.
+- **VoiceOver's disclosure** (question 25): hints, where the web has `aria-expanded`.
+- **localeCompare**: WebCollation is ICU's order as far as the recorded answers and the seeded titles reach; two
+  titles in another script tying on everything before them could stand in another order than the web's.
+
+### The app
+
+- **SearchModel** gains the artists and songs:
+  - `askMusicBrainz` sends each ask `askingMusicBrainz` returns - `askAlbums`, `askArtists`, `askSongs` - each
+    waiting up to 1.5 s for `/library/owned` before it draws, as the albums do. `askSongs` asks the fallback (the
+    words as one title) when a title beside an artist found no recording, the ask still the newest, and closes
+    every song's albums and fold as an answer lands.
+  - `marks` carries `evidence`: All's search3 songs and `GroupPageModel.keptReleases`.
+  - `openSongAlbum` (Search.tsx's openSongAlbum, in its order): a pressing the song was found on, or whose kept
+    tracklist has it - yours through the id bridge, the row busy; a pressing the library's own search shows it on -
+    that album, at once; only a pressing nothing vouches for, its pressings not kept - they are asked (busy) and kept
+    for the page, then the bridge if a held pressing has the song; else the album you don't have (`GroupRoute(album)`,
+    its title and the song's recording ids). It runs on `askingHeld`, so `standDown()` covers it, and opens only on
+    the list it was tapped on (the tab, the Search stack, Now Playing not over it, the same epoch).
+  - `openArtist` pushes `AppRoute.mbArtist`; `toggleSong` and `toggleFold` keep which songs are open.
+  - `letGo` and the `drop` effect cancel all three asks and close every song.
+- **SearchScreen**: a MusicBrainz artist's row (its line, a chevron; dimmed and inert offline); a MusicBrainz song's
+  row in a section as `SongDisclosure` - its title and line, a chevron turning as it opens onto `SongAlbumRow`s (a
+  36 pt cover through the relay, `albumLine`, busy while the bridge is asked), the fold's button or caption, the hints
+  for VoiceOver; in Top results a song's row opens its named album. `KindFoot` says `needATitle`; `SectionSlot`
+  reads each kind's failure (`failure(of:)`).
+- **Routes**: `AppRoute.mbArtist(MBArtistRoute)` (mbid, name); `GroupRoute` gains `title` and `song` (`init(_ album:
+  SongAlbum)`), so the album opened from a song draws its title at once and marks the song.
+- **GroupView**: `GroupPage` given the route's title and song; the pick rule keeps any pick on a page opened from a
+  song (the default chosen again would otherwise hand the choice back to the song); the song's tracks tinted
+  (`Palette.pressed`, a 3 pt accent bar, an 8 pt bleed - app.css's `--app-rg-mark-bleed` and `--app-song-bar`), its
+  title in the accent, ", the song you searched for" for VoiceOver alone; brought into view once, as first drawn,
+  only while the page is the one shown and not scrolled (`ScrollViewReader`, the least scroll - the web's
+  `scrollIntoView({block: 'nearest'})`). The credit opens the library artist's page, else (one MusicBrainz artist
+  credited) their MusicBrainz page, else words.
+- **MBArtistModel** (new) and **MBArtistView** (new): `load` asks the facts and the albums together; `browse` - the
+  session's at once (unless Try again), else `/discography`, `brokenOff` or a 503 said as `MBArtistPage.away`, any
+  other failure in a listener's words with Try again; a re-browse keeps the last answer on screen, and a failure keeps
+  it only when it answered the same question; facts that fail leave the line out. Studio only on unless turned off,
+  kept per artist; the session keeps 20 artists' facts, albums and Studio only (the oldest let go). A row's tap:
+  `asksBridge` - the id bridge, the row busy, opening yours only on the page it was tapped on (the tab, its stack, Now
+  Playing not over it) - else the album you don't have; `standDown()` on another tab, Now Playing, or the page
+  leaving. The hero's facts line is held with a space while it loads; the rows are one line each, so nothing below
+  moves as an answer lands. Offline: the hero, and "Their albums show once deadwax is back." - asked again as deadwax
+  comes back.
+
+### Decided here (the spec was silent, or this departs from it)
+
+Question 9 built to its recommendation (a MusicBrainz artist's page, their albums alone), and questions 24-27 in the
+spec, each built to its recommendation:
+- 24, nothing of their albums offline;
+- 25, the disclosure's hints for VoiceOver;
+- 26, rows drawn as the discography lands;
+- 27, how long the phone waits for the four routes.
+
+And smaller ones, not worth a question:
+- `/artist`'s timeout raised from 20 s to 60 s while writing the contract test: get_artist takes deadwax's ten
+  attempts (no search patience), 3 s apart on a 503, which 20 s would give up before;
+- the album a song names opens with its title and no preview, as the web's `{id, title}` does - the cover and
+  credit come with the pressings;
+- an album Search's `openSongAlbum` fetched is kept in `KeptPressings` for its page, so the page draws at once;
+- the song's tint and bar are the web's `.is-song` sizes, under the phone's own palette.
+
+### Tests
+
+- **SearchSongsVectorTests** (10): every vector of search-songs-vectors.json - the numbers and words, the queries,
+  titles and bands, the recorded songs grouped, the holding, the pressings opened from a song, every whole search,
+  the artist pages and facts lines, and the collation (each title's place, each pair's sign).
+- **SearchSongsTests** (8), by hand: each kind asked by the reading (artists not under album-by-artist, songs not for
+  a name alone, the fallback only for a title beside an artist); an answer keeping what was asked and an older one
+  dropped; the Artists view bringing in the library's artist once and MusicBrainz's others below; the Songs view
+  saying it can't ask (`needATitle`) and what it found nothing of (`noRelease` beside a library song, "No songs for"
+  with none); the album opened from a song showing a pressing with it and marking it; a MusicBrainz artist's page
+  listing their albums newest first with what's held; the answers read leniently; the four calls asked as the web
+  asks them (the query items, the timeouts, a 503 an `APIFailure`).
+- **SearchTests** and **SearchVectorTests** answer every kind asked with nothing (`answerEmpty`), so the earlier
+  slices' tests draw whole with three kinds asked; **SearchAlbumsTests** answers the artists and songs so, its
+  every-kind-failed test failing the artists too, and what each view asks is slice 3's (an artist's name: their
+  albums and artists, no songs).
+- **ClientTests**: `Routes.all` 48; the four among the routes given longer. **FixtureFiles**: the new fixture read
+  from the checkout.
+- **tests/test_ios_contract.py**: ROUTE_COUNT 48; four new tests - `/artists` and `/songs` asked within their bounds
+  with the server's own page sizes, the name within `/artists`' and the longest song query the box can make (4 x 200
+  + 45) within `/songs`'; their answers' keys (ArtistSearchAnswer, MBArtistMatch less `score`, SongSearchAnswer) and a
+  recording's fields within what MusicBrainz's recorded answers carry; `/artist`'s fields within ARTIST_FACT_FIELDS
+  and `/discography` asked with `types=album` and `studio_only`, its every answer carrying `release-groups`,
+  `truncated` and `problem`; the timeouts above deadwax's own waits (the searches' patience, `/artist`'s ten 3 s
+  pauses, the discography's five pages as the pressings').
+- **Mutations**: 18, each applied alone with the six Search suites run (ios/DeadwaxKit's `--filter Search`). 16 were
+  caught at first; the 2 that lived were closed and caught when run again:
+  - 5, the tick only for yours even without a library of your own: the tick's rule is ArtistPage.tsx's, a
+    component the exporter doesn't compile, and no by-hand row was held by the collection alone. Closed in
+    `aMusicBrainzArtistsPageListsTheirAlbumsNewestFirstWithWhatIsHeld` (ticked without a library of your own, not
+    with one, "in the collection").
+  - 17, the named album not yours first: no folder list held the song's first album by the collection alone and a
+    later one by you. Closed by that list in the exporter (the fixture regenerated; 122 cases then failed).
+
+  The 18:
+  1. the song search asks 24, not 25;
+  2. 19 artist pages kept, not 20;
+  3. an address keeps 7 recording ids;
+  4. an artist's albums oldest first;
+  5. the tick only for yours, even without a library of your own;
+  6. an ended artist said "since";
+  7. a library artist matched by name alone never brought in;
+  8. a song you have drawn again from MusicBrainz;
+  9. "a pressing" left out of an album held without the song;
+  10. artists asked under album-by-artist;
+  11. songs asked for an artist's name alone;
+  12. a hyphen weighed before a hyphen-minus (WebCollation);
+  13. the fielded song query without `artistname`;
+  14. no fallback to the title alone;
+  15. the song never marked on its album;
+  16. the fold always plural;
+  17. the named album not yours first;
+  18. an album heard holding the song said as only a pressing.
+
+### Verified, and not
+
+Verified, on the tree before its commit:
+- `swift test`: Core 1487, Audio 158, Turntable 12. No new warnings.
+- The unsigned Debug and Release device builds (Xcode, `generic/platform=iOS`): no warnings but the usual
+  appintentsmetadataprocessor line; the .xcodeproj unchanged (MBArtistModel and MBArtistView joined the
+  synchronized folder).
+- `check_project.py` ok.
+- `npm run build` and all 86 sims on Node 22.23.4, iossearchsongs' `--check` among them.
+- The full pytest suite: 4516 passed, 1 skipped (test_ios_contract's four new tests and the four new routes' parameter
+  checks among them, and test_compose_example's docs rule).
+- The 18 mutations above, the 2 that lived closed and caught.
+
+Not verified - only the phone can tell (docs/ios.md's checks 144-155, beside the spec's section 9):
+- The rows' timing over WireGuard with three kinds asked: the artists and songs landing in their slots, nothing moving.
+- A song's disclosure opening and folding in a LazyVStack, and the album page bringing the song into view
+  (`ScrollViewReader` in a lazy stack, a 50 ms wait for the layout).
+- `Toggle` in `.button` style as Studio only, and how VoiceOver reads it.
+- The id bridge from a song's album and from an artist page's row against James's store index; `/release_group` asked
+  first for a song only a pressing nothing vouches for is on.
+- `/artists`, `/songs`, `/artist` and `/discography` against real MusicBrainz through deadwax (the contract test reads
+  the server's code; the recorded answers are MusicBrainz's own, from the web's work).
+- WebCollation against ICU for titles outside the recorded answers.
+- CI's Xcode 26.6 (the older Swift): the new code spells out its closures' types and keeps each `#expect` small.

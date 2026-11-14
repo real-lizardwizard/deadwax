@@ -43,23 +43,55 @@ enum AppRoute: Hashable {
     /// (Phase 5, slice 2) The album you don't have (phase5-search.md 3.6): a MusicBrainz album's page, by its release
     /// group's id - from Search's MusicBrainz rows.
     case group(GroupRoute)
+    /// (Phase 5, slice 3) A MusicBrainz artist's page (question 9): their albums, by their MusicBrainz id - from Search's
+    /// MusicBrainz artists and the album you don't have's credit.
+    case mbArtist(MBArtistRoute)
 }
 
 /// The album you don't have's address: its release group's id as MusicBrainz gave it (lowercase - deadwax's routes take
-/// no other), and the album Search showed, drawn at once while its pressings load (ReleaseGroupPage.tsx's `preview`).
-/// Only `id` decides which album.
+/// no other), and the album Search showed, drawn at once while its pressings load (ReleaseGroupPage.tsx's `preview`) -
+/// or, opened from a song (slice 3), its title alone and the song's recordings (`song`, SongSearch.ids: at most eight,
+/// lowercase), the song then marked on a pressing that has it. `id` and `song` decide the page.
 struct GroupRoute: Hashable {
     let id: String
     var preview: ReleaseGroup?
+    /// The title drawn while the pressings load, when there is no preview (the web's `{ id, title }`).
+    var title: String?
+    /// The recordings of the song it was opened from - none: no song.
+    var song: [String]
 
-    init(id: String, preview: ReleaseGroup? = nil) {
+    init(id: String, preview: ReleaseGroup? = nil, title: String? = nil, song: [String] = []) {
         self.id = id
         self.preview = preview
+        self.title = title
+        self.song = song
+    }
+
+    /// An album a MusicBrainz song is on, opened from the song (Search.tsx `openSongAlbum`'s `open`).
+    init(_ album: SongAlbum) {
+        self.init(id: album.id, title: album.title, song: SongSearch.ids(album.recordings))
     }
 
     /// A Search row's album.
     init(_ group: ReleaseGroup) {
         self.init(id: group.id, preview: group)
+    }
+}
+
+/// A MusicBrainz artist's page's address: their MusicBrainz id, and the name they were found by - drawn at once, while
+/// who they are loads. Only `mbid` decides which artist.
+struct MBArtistRoute: Hashable {
+    let mbid: String
+    var name: String
+
+    init(mbid: String, name: String) {
+        self.mbid = mbid
+        self.name = name
+    }
+
+    /// A Search row's MusicBrainz artist.
+    init(_ match: MBArtistMatch) {
+        self.init(mbid: match.mbid, name: match.name)
     }
 }
 
@@ -260,8 +292,8 @@ final class AppNavigation {
         }
     }
 
-    /// The pages of the tab shown.
-    private var shownStack: [AppRoute] {
+    /// The pages of the tab shown - what a page's late answer checks is still as it was before it opens anything.
+    var shownStack: [AppRoute] {
         switch tab {
         case .library: return library
         case .search: return search
@@ -343,6 +375,7 @@ extension View {
                 case .artists(let scope): ArtistsScreen(scope: scope)
                 case .allSongs: SongsScreen()
                 case .group(let group): GroupView(route: group)
+                case .mbArtist(let artist): MBArtistView(route: artist)
                 }
             }
             .clearsPlayer()

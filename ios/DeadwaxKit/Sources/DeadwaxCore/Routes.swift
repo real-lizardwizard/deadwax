@@ -119,6 +119,13 @@ public enum Routes {
     public static let fullySearch = Endpoint(method: "GET", path: "/deadwax/search_musicbrainz/fully_search", query: ["query", "limit", "releases", "quick"])
     public static let releaseGroup = Endpoint(method: "GET", path: "/deadwax/search_musicbrainz/release_group", query: ["release_group_mbid"])
     public static let archiveCover = Endpoint(method: "GET", path: "/deadwax/coverart/{kind}/{mbid}", query: ["size"])
+    // Phase 5, slice 3's (phase5-search.md 6.3): MusicBrainz's artists going by the box's words (`ArtistSearchAnswer`,
+    // `MBArtistSearch.limit` of them) and its songs (`SongSearchAnswer`, `SongSearch.limit` recordings) - and a
+    // MusicBrainz artist's page: who they are (`MBArtistFacts`) and their albums (`DiscographyAnswer`, a browse)
+    public static let searchArtists = Endpoint(method: "GET", path: "/deadwax/search_musicbrainz/artists", query: ["name", "limit", "offset"])
+    public static let searchSongs = Endpoint(method: "GET", path: "/deadwax/search_musicbrainz/songs", query: ["query", "limit", "offset"])
+    public static let artistFacts = Endpoint(method: "GET", path: "/deadwax/search_musicbrainz/artist", query: ["mbid"])
+    public static let discography = Endpoint(method: "GET", path: "/deadwax/search_musicbrainz/discography", query: ["artist_mbid", "types", "studio_only"])
 
     /// The levels spec's name for `levelAlbum`: the album's levels warmed before its first play.
     public static var warmLevels: Endpoint { levelAlbum }
@@ -139,6 +146,7 @@ public enum Routes {
         artists, artist,
         libraryOwned,
         fullySearch, releaseGroup, archiveCover,
+        searchArtists, searchSongs, artistFacts, discography,
     ]
 
     /// The routes given longer than the transport's own 8 seconds to answer, in seconds: the album index reads every
@@ -146,8 +154,10 @@ public enum Routes {
     /// first fetch of AutoEq's list (src/autoeq.py FIRST_FETCH_SECONDS, 15 s) and a profile for its file
     /// (PROFILE_DEADLINE_SECONDS, 15 s); MusicBrainz's albums for the box take about eight seconds to give up while
     /// MusicBrainz turns searches away (SEARCH_PATIENCE), and an album's pressings with their tracklists up to five
-    /// MusicBrainz pages - tests/test_ios_contract.py holds each above the server's.
-    public static let timeouts: [Endpoint: Double] = [albumIndex: 30, autoEqSearch: 20, autoEqProfile: 20, libraryOwned: 30, fullySearch: 20, releaseGroup: 60]
+    /// MusicBrainz pages; the artists and songs are quick searches as the albums are, an artist's facts one request with
+    /// MusicBrainz's ten attempts (3 s apart while it is busy), and their albums a browse of up to five pages -
+    /// tests/test_ios_contract.py holds each above the server's.
+    public static let timeouts: [Endpoint: Double] = [albumIndex: 30, autoEqSearch: 20, autoEqProfile: 20, libraryOwned: 30, fullySearch: 20, releaseGroup: 60, searchArtists: 20, searchSongs: 20, artistFacts: 60, discography: 60]
 }
 
 /// The Cover Art Archive's thumbnail sizes the app asks deadwax's relay for (`Routes.archiveCover`'s `size`, which takes

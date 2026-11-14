@@ -2,12 +2,14 @@ import DeadwaxCore
 import Foundation
 import Observation
 
-/// Search (Phase 5, slices 1 and 2 - notes/ios-specs/phase5-search.md 2.6-2.9 and 6.2; the web's app/Search.tsx):
+/// Search (Phase 5, slices 1-3 - notes/ios-specs/phase5-search.md 2.6-2.9, 6.2 and 6.3; the web's app/Search.tsx):
 /// Core's SearchState kept here, and the requests it says to make - All's search3 once typing pauses
 /// (`SearchReading.librarySettleMs`) or at once on the keyboard's Search, a kind view's own beside it, More by offset,
 /// the albums a song plays from, `/library/owned` as Search shows; and MusicBrainz's albums once typing pauses longer
 /// (`SearchReading.musicBrainzSettleMs`, three characters at least) or on the keyboard's Search, with the plain words
-/// asked again when a fielded read finds nothing, and a moment's wait for `/library/owned` before they draw.
+/// asked again when a fielded read finds nothing, and a moment's wait for `/library/owned` before they draw - and, beside
+/// them (slice 3), MusicBrainz's artists by the words typed and its songs by the box as read (a title beside an artist
+/// you have asked again as one title when it finds none), each waiting for `/library/owned` the same way.
 ///
 /// Every rule of when to ask and what to draw is Core's (SearchState, SearchList); this makes the asks, keeps their
 /// tasks and the moments' clocks - the library's late (`libraryLateMs`), a kind view's late, the run's cap
@@ -23,6 +25,10 @@ import Observation
 ///   in memory for the person, never on disk; a failure is quiet.
 /// - A MusicBrainz album the library holds opens yours (the id bridge, `/store/album` by its releases you hold), else
 ///   the album you don't have (`AppRoute.group`).
+/// - (Slice 3) A MusicBrainz song's row opens onto the albums it is on (`openSongs`, its fold `openFolds` - both closed
+///   as a new answer of songs lands); an album it is on opens yours when you hold the song on it, else the album you
+///   don't have with the song marked (`openSongAlbum`, the web's order); a MusicBrainz artist opens their page
+///   (`AppRoute.mbArtist`). Every late answer that opens a page opens it only on the list it was tapped from.
 ///
 /// `reset()` - a new person - lets everything go, and nothing asked before it lands after it.
 @MainActor
@@ -40,8 +46,12 @@ final class SearchModel {
     /// `/library/owned`'s answer for the person, and its index - nil until it has answered.
     private(set) var owned: OwnedAnswer?
     private(set) var ownedIndex: OwnedIndex?
-    /// The MusicBrainz album whose row is asking the id bridge (its busy look) - nil when none is.
+    /// The MusicBrainz album whose row is asking the id bridge (its busy look) - a group's id, or a song's key and its
+    /// album's id (`songAlbumKey`) - nil when none is.
     private(set) var opening: String?
+    /// The MusicBrainz songs whose albums are shown (by key), and those whose fold is open - let go as songs land.
+    private(set) var openSongs: Set<String> = []
+    private(set) var openFolds: Set<String> = []
 
     private let server: ServerModel
     private let library: LibraryModel
@@ -57,6 +67,8 @@ final class SearchModel {
     @ObservationIgnored private var askingKind: Task<Void, Never>?
     @ObservationIgnored private var askingMore: Task<Void, Never>?
     @ObservationIgnored private var askingAlbums: Task<Void, Never>?
+    @ObservationIgnored private var askingArtists: Task<Void, Never>?
+    @ObservationIgnored private var askingSongs: Task<Void, Never>?
     @ObservationIgnored private var askingHeld: Task<Void, Never>?
     @ObservationIgnored private var prefetching: [Task<Void, Never>] = []
     @ObservationIgnored private var ownedTag: String?
@@ -78,13 +90,22 @@ final class SearchModel {
     /// With logins on and a library of your own: the library's rows are the collection's, each saying whose it is.
     var personal: Bool { server.access.hasLibrary }
 
-    /// What says whose a row is, now: your albums (the Library's own list), the folders, the albums in hand.
+    /// What says whose a row is, now: your albums (the Library's own list), the folders, the albums in hand - and what
+    /// says a song is on a pressing you hold (`evidence`): All's search3 songs, the session's pressing lists.
     var marks: SearchMarks {
         let personal = self.personal
         let yours = personal ? library.albums(.yours).map { SearchMarks.yours($0.albums) } : nil
         return SearchMarks(personal: personal, index: ownedIndex, yourAlbums: yours?.ids, yourArtists: yours?.artists,
-                           known: state.knownAlbums)
+                           known: state.knownAlbums, evidence: evidence)
     }
+
+    /// The web's `evidence`: the library's own songs found for the words, and every album's pressings kept.
+    var evidence: SongEvidence {
+        SongEvidence(heard: state.results?.songs, pressings: GroupPageModel.keptReleases)
+    }
+
+    /// A song's album's busy key (`${song.key}\n${album.id}`).
+    static func songAlbumKey(_ song: FoundSong, _ album: SongAlbum) -> String { "\(song.key)\n\(album.id)" }
 
     /// Navidrome known not to be there (the Library's gate, closed): nothing asked of search3.
     var navidromeAway: NavidromeGate.Closed? {
@@ -138,7 +159,11 @@ final class SearchModel {
             letGo()
             return
         }
-        if effect == .drop { askingAlbums?.cancel() }
+        if effect == .drop {
+            askingAlbums?.cancel()
+            askingArtists?.cancel()
+            askingSongs?.cancel()
+        }
         // words whose answer is in hand already (back to them inside the pause): drawn now - the web's advance runs on
         // every render; nothing is drawn unless the library has settled for the box's words
         draw()
@@ -303,8 +328,88 @@ final class SearchModel {
         }
     }
 
+    /// An album a MusicBrainz song is on (Search.tsx `openSongAlbum`): the album you have when you hold the song on it,
+    /// else the album you don't have, opened on a pressing with the song, the song marked -
+    ///  - a pressing the song was found on, or whose kept tracklist has it: yours, from the id bridge (the row busy);
+    ///  - a pressing the library's own search shows the song on: that album of Navidrome's, at once;
+    ///  - only a pressing nothing vouches for, its pressings not kept: they are asked first (the row busy) and kept for
+    ///    the page - a held pressing with the song opens yours through the bridge; none, the album you don't have.
+    /// Navidrome not having it, the bridge or MusicBrainz failing: the album you don't have. As `open(_:)`, an answer
+    /// opens only on the list it was tapped on - `standDown()` lets it go.
+    func openSongAlbum(_ song: FoundSong, _ album: SongAlbum) {
+        askingHeld?.cancel()
+        let key = Self.songAlbumKey(song, album)
+        let index = ownedIndex
+        let evidence = self.evidence
+        // drawn with the album's credit, so the album page's artist line holds its place as it loads
+        let artist: String? = album.credit.isEmpty ? nil : album.credit
+        func yours(_ id: String) -> AppRoute { .album(AlbumRoute(id: id, name: album.title, artist: artist)) }
+        let releases = SongSearch.heldReleases(index, album, song, evidence)
+        let holding = SongSearch.holding(index, album, song, evidence)
+        guard reachability.online, let client = server.client else {
+            opening = nil
+            navigation.open(.group(GroupRoute(album)))
+            return
+        }
+        if releases.isEmpty, let first = holding.albums.first {
+            // the library's own search shows the song on a pressing you hold: that album, at once
+            opening = nil
+            navigation.open(yours(first))
+            return
+        }
+        if releases.isEmpty && (holding.other.isEmpty || GroupPageModel.isKept(album.id)) {
+            // nothing held - or the pressings kept already, and none you hold has the song
+            opening = nil
+            navigation.open(.group(GroupRoute(album)))
+            return
+        }
+        opening = key
+        let epoch = self.epoch
+        let tab = navigation.tab
+        let pages = navigation.search
+        askingHeld = Task { [weak self] in
+            var held = releases
+            if held.isEmpty {
+                // only a pressing nothing vouches for: the album's pressings asked, and kept for its page
+                if let found = try? await client.releaseGroup(mbid: album.id) {
+                    GroupPageModel.keep(album.id, found)
+                    let now = self?.ownedIndex ?? index
+                    held = SongSearch.heldReleases(now, album, song,
+                                                   SongEvidence(heard: evidence.heard, pressings: [album.id: found.releases]))
+                }
+            }
+            let id: String? = held.isEmpty ? nil : try? await client.navidromeAlbum(releases: held)
+            guard !Task.isCancelled, let self, epoch == self.epoch, self.opening == key else { return }
+            self.opening = nil
+            let navigation = self.navigation
+            guard navigation.tab == tab, navigation.search == pages, !navigation.nowPlayingShown else { return }
+            if let id {
+                navigation.open(yours(id))
+            } else {
+                navigation.open(.group(GroupRoute(album)))
+            }
+        }
+    }
+
+    /// A MusicBrainz artist's row: their page.
+    func openArtist(_ match: MBArtistMatch) {
+        guard !match.mbid.isEmpty else { return }
+        navigation.open(.mbArtist(MBArtistRoute(match)))
+    }
+
+    /// A MusicBrainz song's row in a section: its albums shown or hidden.
+    func toggleSong(_ key: String) {
+        if openSongs.contains(key) { openSongs.remove(key) } else { openSongs.insert(key) }
+    }
+
+    /// Its fold ("2 live albums and 1 compilation"): opened or closed.
+    func toggleFold(_ key: String) {
+        if openFolds.contains(key) { openFolds.remove(key) } else { openFolds.insert(key) }
+    }
+
     /// The list a held album's row was tapped on stopped showing (another tab, a page pushed or popped, Now Playing):
-    /// the id bridge's ask let go, so its answer opens nothing on whatever shows now.
+    /// the id bridge's ask let go - a song's album's pressings with it - so its answer opens nothing on whatever shows
+    /// now.
     func standDown() {
         askingHeld?.cancel()
         askingHeld = nil
@@ -425,20 +530,25 @@ final class SearchModel {
         kindLateClock = (key, task)
     }
 
-    /// MusicBrainz asked for what the view needs (Search.tsx `askMusicBrainz`, slice 2's albums): `/library/owned`
-    /// beside it, the albums asked unless in hand or on their way - the plain words again when a fielded read finds
-    /// nothing - then a moment's wait for `/library/owned` (`ownedWaitMs`), so what you hold is left out before they
-    /// draw. The run's cap counts from the ask, in All.
+    /// MusicBrainz asked for what the view needs (Search.tsx `askMusicBrainz`): `/library/owned` beside it, each kind
+    /// asked unless in hand or on its way (the state's asks, in SEND_ORDER) - then a moment's wait for `/library/owned`
+    /// (`ownedWaitMs`), so what you hold is left out or marked before they draw. The run's cap counts from the ask, in All.
     private func askMusicBrainz(view: SearchView, reread: Bool = false) {
         guard reachability.online, let client = server.client else { return }
         let words = state.query
         askOwned()
-        let ask = state.askingMusicBrainz(words, view: view, reread: reread)
+        let asks = state.askingMusicBrainz(words, view: view, reread: reread)
         syncCap()
-        guard let ask else { return }
+        let admin = server.access.seesDetail
+        if let ask = asks.albums { askAlbums(ask, client: client, admin: admin) }
+        if let ask = asks.artists { askArtists(ask, client: client, admin: admin) }
+        if let ask = asks.songs { askSongs(ask, client: client, admin: admin) }
+    }
+
+    /// MusicBrainz's albums (slice 2's): the plain words again when a fielded read finds nothing.
+    private func askAlbums(_ ask: SearchState.AlbumsAsk, client: DeadwaxClient, admin: Bool) {
         askingAlbums?.cancel()
         let epoch = self.epoch
-        let admin = server.access.seesDetail
         askingAlbums = Task { [weak self] in
             do {
                 var query = ask.first
@@ -455,6 +565,54 @@ final class SearchModel {
             } catch {
                 guard let self, epoch == self.epoch, !APIFailure.isCancellation(error) else { return }
                 guard self.state.albumsFailed(ask, MBFailure.of(error, admin: admin)) else { return }
+                self.draw()
+            }
+        }
+    }
+
+    /// MusicBrainz's artists going by the words typed (`askArtists`).
+    private func askArtists(_ ask: SearchState.ArtistsAsk, client: DeadwaxClient, admin: Bool) {
+        askingArtists?.cancel()
+        let epoch = self.epoch
+        askingArtists = Task { [weak self] in
+            do {
+                let found = try await client.searchArtists(ask.name)
+                await self?.waitForOwned()
+                guard !Task.isCancelled, let self, epoch == self.epoch else { return }
+                guard self.state.artistsAnswered(ask, found) else { return }
+                self.draw()
+            } catch {
+                guard let self, epoch == self.epoch, !APIFailure.isCancellation(error) else { return }
+                guard self.state.artistsFailed(ask, MBFailure.of(error, admin: admin)) else { return }
+                self.draw()
+            }
+        }
+    }
+
+    /// MusicBrainz's songs for the box as read (`askSongs`): a title beside an artist that finds no recording by them
+    /// asked again as the words typed, as one title. As they land every song's albums are hidden again, every fold
+    /// closed.
+    private func askSongs(_ ask: SearchState.SongsAsk, client: DeadwaxClient, admin: Bool) {
+        askingSongs?.cancel()
+        let epoch = self.epoch
+        askingSongs = Task { [weak self] in
+            do {
+                var query = ask.first
+                var found = try await client.searchSongs(query)
+                if found.recordings.isEmpty, let fallback = ask.fallback, !fallback.isEmpty {
+                    guard let self, epoch == self.epoch, self.state.isNewestSongs(ask.token) else { return }
+                    query = fallback
+                    found = try await client.searchSongs(query)
+                }
+                await self?.waitForOwned()
+                guard !Task.isCancelled, let self, epoch == self.epoch else { return }
+                guard self.state.songsAnswered(ask, found, query: query) else { return }
+                self.openSongs = []
+                self.openFolds = []
+                self.draw()
+            } catch {
+                guard let self, epoch == self.epoch, !APIFailure.isCancellation(error) else { return }
+                guard self.state.songsFailed(ask, MBFailure.of(error, admin: admin)) else { return }
                 self.draw()
             }
         }
@@ -545,6 +703,8 @@ final class SearchModel {
         askingKind?.cancel()
         askingMore?.cancel()
         askingAlbums?.cancel()
+        askingArtists?.cancel()
+        askingSongs?.cancel()
         askingHeld?.cancel()
         lateClock?.cancel()
         kindLateClock?.task.cancel()
@@ -557,6 +717,8 @@ final class SearchModel {
         kindFailure = nil
         moreFailure = nil
         opening = nil
+        openSongs = []
+        openFolds = []
     }
 
     /// At most `SearchReading.maxCharacters` - counted as the server's `q` counts them, by Unicode scalar.

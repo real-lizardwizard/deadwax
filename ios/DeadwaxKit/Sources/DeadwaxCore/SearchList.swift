@@ -196,16 +196,21 @@ public enum SearchPacing {
 // MARK: the rows
 
 /// One row of the list - a section's, or a Top result (searchList.ts `Row`): the library's three, and MusicBrainz's
-/// albums (slice 2) and artists (in slice 2 only a MusicBrainz album's credited artist among Top results' family -
-/// the artists' section is slice 3's). Its key is what keeps it in its place: the kind and the id.
+/// albums (slice 2), artists and songs (slice 3) - and a MusicBrainz song's named album, pulled into Top results from
+/// the song's own fields. Its key is what keeps it in its place: the kind and the id.
 public enum SearchRow: Sendable, Equatable, Identifiable {
     case artist(Artist)
     case album(Album)
     case song(Song)
     /// MusicBrainz's album - one you don't have, or one MusicBrainz brought in that you hold.
     case group(ReleaseGroup)
-    /// MusicBrainz's artist.
+    /// MusicBrainz's artist - one `/artists` found, or one a credit names.
     case mbArtist(MBArtistMatch)
+    /// MusicBrainz's song: every take of one title by one credit, on the albums it is on.
+    case mbSong(FoundSong)
+    /// A MusicBrainz song's named album, as Top results pull it in (not a ReleaseGroup: the song's own fields) - keyed
+    /// as MusicBrainz's album would be, so the two are never both drawn.
+    case songAlbum(FoundSong, SongAlbum)
 
     public var key: String {
         switch self {
@@ -214,6 +219,8 @@ public enum SearchRow: Sendable, Equatable, Identifiable {
         case .song(let song): return "song:\(song.id)"
         case .group(let group): return "group:\(group.id)"
         case .mbArtist(let match): return "mb-artist:\(match.mbid)"
+        case .mbSong(let song): return "mb-song:\(song.key)"
+        case .songAlbum(_, let album): return "group:\(album.id)"
         }
     }
 
@@ -222,8 +229,8 @@ public enum SearchRow: Sendable, Equatable, Identifiable {
     public var kind: SearchKind {
         switch self {
         case .artist, .mbArtist: return .artists
-        case .album, .group: return .albums
-        case .song: return .songs
+        case .album, .group, .songAlbum: return .albums
+        case .song, .mbSong: return .songs
         }
     }
 
@@ -235,13 +242,15 @@ public enum SearchRow: Sendable, Equatable, Identifiable {
         case .song(let song): return song.title ?? ""
         case .group(let group): return group.title ?? ""
         case .mbArtist(let match): return match.name
+        case .mbSong(let song): return song.title
+        case .songAlbum(_, let album): return album.title
         }
     }
 
     /// Whether it is MusicBrainz's.
     public var isMusicBrainz: Bool {
         switch self {
-        case .group, .mbArtist: return true
+        case .group, .mbArtist, .mbSong, .songAlbum: return true
         case .artist, .album, .song: return false
         }
     }
@@ -254,6 +263,8 @@ public enum SearchRow: Sendable, Equatable, Identifiable {
         case .song(let song): return (song.title ?? "", song.artist ?? "")
         case .group(let group): return (group.title ?? "", Credits.name(group.artistCredit))
         case .mbArtist(let match): return (match.name, match.name)
+        case .mbSong(let song): return (song.title, song.credit)
+        case .songAlbum(_, let album): return (album.title, album.credit)
         }
     }
 }
@@ -262,21 +273,24 @@ public enum SearchRow: Sendable, Equatable, Identifiable {
 
 /// What says whose a row is (searchList.ts `Marks`): logins on with a library of your own (`personal`),
 /// `/library/owned`'s index, your albums' ids and each artist's count of them (nil until they have answered), and the
-/// albums in hand by id - search3's, a kind view's, those asked for so a song plays (`albumOf`).
+/// albums in hand by id - search3's, a kind view's, those asked for so a song plays (`albumOf`) - and what else says a
+/// pressing you hold has a MusicBrainz song (`evidence`, Search.tsx's: search3's songs, the pressings kept).
 public struct SearchMarks: Sendable {
     public var personal: Bool
     public var index: OwnedIndex?
     public var yourAlbums: Set<String>?
     public var yourArtists: [String: Int]?
     public var known: [String: Album]
+    public var evidence: SongEvidence
 
     public init(personal: Bool, index: OwnedIndex? = nil, yourAlbums: Set<String>? = nil,
-                yourArtists: [String: Int]? = nil, known: [String: Album] = [:]) {
+                yourArtists: [String: Int]? = nil, known: [String: Album] = [:], evidence: SongEvidence = .none) {
         self.personal = personal
         self.index = index
         self.yourAlbums = yourAlbums
         self.yourArtists = yourArtists
         self.known = known
+        self.evidence = evidence
     }
 
     /// Your albums as the marks read them: their ids, and how many each artist (by the album's artist id) has.
@@ -340,7 +354,8 @@ public enum SearchWhose {
     }
 
     /// A row's (`rowYours`): a MusicBrainz album's when the library holds it (`groupYours`), else nil; a MusicBrainz
-    /// artist's nil.
+    /// song's, and its named album's, when a pressing with the song is held (`namedAlbum`, `songAlbumHeld`); a
+    /// MusicBrainz artist's nil.
     public static func row(_ row: SearchRow, _ marks: SearchMarks) -> Bool? {
         switch row {
         case .artist(let artist): return self.artist(artist, marks)
@@ -348,6 +363,12 @@ public enum SearchWhose {
         case .song(let song): return self.song(song, marks)
         case .group(let group): return SearchAlbums.held(marks.index, group.id) ? SearchAlbums.yours(group, marks) : nil
         case .mbArtist: return nil
+        case .mbSong(let song):
+            let held = SongSearch.namedAlbum(song, marks.index, marks.evidence).held
+            return held.isEmpty ? nil : !marks.personal || SongSearch.anyYours(held)
+        case .songAlbum(let song, let album):
+            let held = SongSearch.held(marks.index, album, song, marks.evidence)
+            return held.isEmpty ? nil : !marks.personal || SongSearch.anyYours(held)
         }
     }
 
@@ -445,21 +466,36 @@ public enum SearchList {
     }
 
     /// Everything in hand for the words, each thing once, in its block (`pool`): under the album-by-artist reading the
-    /// artist named leads Artists when search3 didn't list them; MusicBrainz's albums less those the library holds
-    /// (`shown`), and those it holds that search3 didn't list brought into their holder's block (`heldUnlisted`) - a
-    /// group found held only since its answer landed stays in MusicBrainz's block, marked in place.
+    /// artist named leads Artists when search3 didn't list them; MusicBrainz's artists less the library's - one the
+    /// library has brought in (`newArtists`); MusicBrainz's albums less those the library holds (`shown`), and those it
+    /// holds that search3 didn't list brought into their holder's block (`heldUnlisted`) - a group found held only since
+    /// its answer landed stays in MusicBrainz's block, marked in place; MusicBrainz's songs less the library's, one held
+    /// on an album it is on brought in (`newSongs`).
     public static func pool(reading: SearchPlan, library: LibraryResults?, artistList: [Artist]?,
-                            marks: SearchMarks, albums found: SearchAlbumsInHand? = nil) -> SearchPool {
+                            marks: SearchMarks, albums found: SearchAlbumsInHand? = nil,
+                            artists matches: [MBArtistMatch]? = nil, songs foundSongs: [FoundSong]? = nil) -> SearchPool {
         let listedArtists = library?.artists ?? []
         let known = knownArtists(artistList, listedArtists)
-        var artists: [SearchPlaced] = []
-        if let named = namedArtist(reading, known), !listedArtists.contains(where: { $0.id == named.id }) {
-            artists.append(SearchPlaced(row: .artist(named), holder: SearchHolder(SearchWhose.artist(named, marks)),
-                                        position: -1))
+        let named = namedArtist(reading, known)
+        var artists = SearchKindPool()
+        if let named, !listedArtists.contains(where: { $0.id == named.id }) {
+            artists.library.append(SearchPlaced(row: .artist(named), holder: SearchHolder(SearchWhose.artist(named, marks)),
+                                                position: -1))
         }
         for (position, artist) in listedArtists.enumerated() {
-            artists.append(SearchPlaced(row: .artist(artist), holder: SearchHolder(SearchWhose.artist(artist, marks)),
-                                        position: position))
+            artists.library.append(SearchPlaced(row: .artist(artist), holder: SearchHolder(SearchWhose.artist(artist, marks)),
+                                                position: position))
+        }
+        if let matches {
+            let listed = named.map { listedArtists + [$0] } ?? listedArtists
+            let split = newArtists(matches, known: known, index: marks.index, listed: listed)
+            artists.musicbrainz = split.musicbrainz.map { (each: (match: MBArtistMatch, position: Int)) -> SearchPlaced in
+                SearchPlaced(row: .mbArtist(each.match), holder: .yours, position: each.position)
+            }
+            artists.brought = split.brought.map { (each: (artist: Artist, position: Int)) -> SearchPlaced in
+                SearchPlaced(row: .artist(each.artist), holder: SearchHolder(SearchWhose.artist(each.artist, marks)),
+                             position: each.position)
+            }
         }
         let libraryAlbums = library?.albums ?? []
         var albums = SearchKindPool(library: libraryAlbums.enumerated().map { (each: (offset: Int, element: Album)) -> SearchPlaced in
@@ -481,12 +517,84 @@ public enum SearchList {
                                  position: at[group.id] ?? 0)
                 }
         }
-        let songs = (library?.songs ?? []).enumerated().map { (each: (offset: Int, element: Song)) -> SearchPlaced in
+        let librarySongs = library?.songs ?? []
+        var songs = SearchKindPool(library: librarySongs.enumerated().map { (each: (offset: Int, element: Song)) -> SearchPlaced in
             SearchPlaced(row: .song(each.element), holder: SearchHolder(SearchWhose.song(each.element, marks)),
                          position: each.offset)
+        })
+        if let foundSongs {
+            //? a Map of key -> position, as the albums' ids: a key named twice keeps its last
+            var at: [FoldKey: Int] = [:]
+            for (position, song) in foundSongs.enumerated() { at[FoldKey(song.key)] = position }
+            let split = newSongs(foundSongs, library: librarySongs, index: marks.index, evidence: marks.evidence)
+            songs.musicbrainz = split.musicbrainz.map { (each: (song: FoundSong, position: Int)) -> SearchPlaced in
+                SearchPlaced(row: .mbSong(each.song), holder: .yours, position: at[FoldKey(each.song.key)] ?? 0)
+            }
+            songs.brought = split.brought.map { (each: (song: FoundSong, position: Int, yours: Bool)) -> SearchPlaced in
+                SearchPlaced(row: .mbSong(each.song), holder: marks.personal && !each.yours ? .store : .yours,
+                             position: at[FoldKey(each.song.key)] ?? 0)
+            }
         }
-        return SearchPool(artists: SearchKindPool(library: artists), albums: albums,
-                          songs: SearchKindPool(library: songs))
+        return SearchPool(artists: artists, albums: albums, songs: songs)
+    }
+
+    /// How many MusicBrainz artists of an answer answer to a name (`answering`): by their name, or the name they were
+    /// matched as (foldName).
+    static func answering(_ matches: [MBArtistMatch], _ name: String?) -> Int {
+        let wanted = Fold.key(name)
+        if wanted.isEmpty { return 0 }
+        return matches.filter { (match: MBArtistMatch) -> Bool in
+            WebText.same(Fold.key(match.name), wanted)
+                || (!match.matchedAs.isEmpty && WebText.same(Fold.key(match.matchedAs), wanted))
+        }.count
+    }
+
+    /// MusicBrainz's artists less the library's (`newArtists`): one is the library's when `libraryArtist` finds them in
+    /// `known` - by id; by the name the folders with that id are filed under; by MusicBrainz's name for an artist with no
+    /// id - the name steps believed only when exactly one artist of the answer answers to it (two Nirvanas stay two
+    /// rows). A matched one is dropped: the library's artist shows instead, brought in when search3 didn't list them -
+    /// at the match's position, each once.
+    public static func newArtists(_ matches: [MBArtistMatch], known: [Artist], index: OwnedIndex?, listed: [Artist])
+        -> (musicbrainz: [(match: MBArtistMatch, position: Int)], brought: [(artist: Artist, position: Int)]) {
+        var musicbrainz: [(match: MBArtistMatch, position: Int)] = []
+        var brought: [(artist: Artist, position: Int)] = []
+        let listedIds = Set(listed.map(\.id))
+        for (position, match) in matches.enumerated() {
+            let found = SearchAlbums.libraryArtist(known, mbid: match.mbid, index: index, name: match.name)
+            guard let found else {
+                musicbrainz.append((match, position))
+                continue
+            }
+            let byId = MBID.of(found.musicBrainzId) == MBID.of(match.mbid)
+            if !byId && answering(matches, found.name) != 1 {
+                musicbrainz.append((match, position))
+                continue
+            }
+            if !listedIds.contains(found.id) && !brought.contains(where: { $0.artist.id == found.id }) {
+                brought.append((found, position))
+            }
+        }
+        return (musicbrainz, brought)
+    }
+
+    /// MusicBrainz's songs less the library's (`newSongs`): one dropped when a library song of the answer is it - its
+    /// title (titleKey) and credit (foldName); one held on an album it is on (`songAlbumHeld`, any of them) brought in,
+    /// with whether a folder of it is yours. No match by recording id: deadwax never writes one.
+    public static func newSongs(_ found: [FoundSong], library: [Song], index: OwnedIndex?, evidence: SongEvidence = .none)
+        -> (musicbrainz: [(song: FoundSong, position: Int)], brought: [(song: FoundSong, position: Int, yours: Bool)]) {
+        let heard = Set(library.map { FoldKey("\(SongTitle.key($0.title))\n\(Fold.key($0.artist))") })
+        var musicbrainz: [(song: FoundSong, position: Int)] = []
+        var brought: [(song: FoundSong, position: Int, yours: Bool)] = []
+        for (position, song) in found.enumerated() {
+            if heard.contains(FoldKey("\(SongTitle.key(song.title))\n\(Fold.key(song.credit))")) { continue }
+            let held = song.albums.flatMap { SongSearch.held(index, $0, song, evidence) }
+            if held.isEmpty {
+                musicbrainz.append((song, position))
+            } else {
+                brought.append((song, position, SongSearch.anyYours(held)))
+            }
+        }
+        return (musicbrainz, brought)
     }
 
     /// Rows as the phone draws them: each key once, the first kept. search3 can name a song twice (the fixture's
@@ -655,10 +763,12 @@ public enum SearchList {
     }
 
     /// What the best match belongs to, as Apple pulls it in (`familyOf`): a library song's album (search3's row when it
-    /// has one, else made of the song's own fields) then its artist; a library album's artist; a MusicBrainz album's sole
-    /// credited artist.
+    /// has one, else made of the song's own fields) then its artist; a library album's artist; a MusicBrainz song's named
+    /// album (MusicBrainz's albums answer's own group when it holds the same id - `groups` - else made of the song's own
+    /// album) then its sole credited artist; a MusicBrainz album's sole credited artist.
     public static func family(of row: SearchRow, library: LibraryResults?, artistList: [Artist]?,
-                              index: OwnedIndex? = nil) -> [SearchRow] {
+                              index: OwnedIndex? = nil, groups: [ReleaseGroup] = [],
+                              evidence: SongEvidence = .none) -> [SearchRow] {
         func libraryArtist(_ id: String?, _ name: String?) -> SearchRow? {
             guard let id, !id.isEmpty else { return nil }
             let listed: Artist? = library?.artists.first(where: { (artist: Artist) -> Bool in artist.id == id })
@@ -680,16 +790,27 @@ public enum SearchList {
         case .group(let group):
             guard let sole = Credits.sole(group.artistCredit) else { return [] }
             return [creditedRow(mbid: sole.mbid, name: sole.name, artistList: artistList, index: index)]
-        case .artist, .mbArtist:
+        case .mbSong(let song):
+            let named = SongSearch.namedAlbum(song, index, evidence).album
+            let group = groups.first { WebText.same($0.id, named.id) }
+            var out: [SearchRow] = [group.map { SearchRow.group($0) } ?? .songAlbum(song, named)]
+            if song.artists.count == 1, let mbid = MBID.of(song.artists[0].id) {
+                let sole = song.artists[0]
+                out.append(creditedRow(mbid: mbid, name: sole.name.isEmpty ? song.credit : sole.name,
+                                       artistList: artistList, index: index))
+            }
+            return out
+        case .artist, .mbArtist, .songAlbum:
             return []
         }
     }
 
     /// Top results' rows (`topResults`, its picks' rows - a phantom picked has none, and is left out).
     public static func topResults(_ candidates: [Candidate], n: Int, library: LibraryResults?, artistList: [Artist]?,
-                                  index: OwnedIndex? = nil, fixed: [SearchRow] = []) -> [SearchRow] {
-        topPicks(candidates, n: n, library: library, artistList: artistList, index: index, fixed: fixed)
-            .compactMap(\.row)
+                                  index: OwnedIndex? = nil, groups: [ReleaseGroup] = [], evidence: SongEvidence = .none,
+                                  fixed: [SearchRow] = []) -> [SearchRow] {
+        topPicks(candidates, n: n, library: library, artistList: artistList, index: index, groups: groups,
+                 evidence: evidence, fixed: fixed).compactMap(\.row)
     }
 
     /// Top results decided before MusicBrainz has answered, without anything moving (`decidedTop`): the picks over what
@@ -697,8 +818,10 @@ public enum SearchList {
     /// `prefix`, drawn at once and frozen; `place` when a phantom was picked - one place kept at Top results' foot for
     /// the rest. A phantom first: no prefix.
     public static func decidedTop(_ candidates: [Candidate], phantoms: [Candidate], n: Int, library: LibraryResults?,
-                                  artistList: [Artist]?, index: OwnedIndex? = nil) -> (prefix: [SearchRow], place: Bool) {
-        let picks = topPicks(candidates + phantoms, n: n, library: library, artistList: artistList, index: index)
+                                  artistList: [Artist]?, index: OwnedIndex? = nil, groups: [ReleaseGroup] = [],
+                                  evidence: SongEvidence = .none) -> (prefix: [SearchRow], place: Bool) {
+        let picks = topPicks(candidates + phantoms, n: n, library: library, artistList: artistList, index: index,
+                             groups: groups, evidence: evidence)
         guard let first = picks.firstIndex(where: \.phantom) else { return (picks.compactMap(\.row), false) }
         return (picks[..<first].compactMap(\.row), true)
     }
@@ -708,7 +831,8 @@ public enum SearchList {
     /// than the round taking its best left, until there are `n` (fewer candidates, fewer picks). A phantom picked is
     /// returned as one - decidedTop stops there.
     public static func topPicks(_ candidates: [Candidate], n: Int, library: LibraryResults?, artistList: [Artist]?,
-                                index: OwnedIndex? = nil, fixed: [SearchRow] = []) -> [Candidate] {
+                                index: OwnedIndex? = nil, groups: [ReleaseGroup] = [], evidence: SongEvidence = .none,
+                                fixed: [SearchRow] = []) -> [Candidate] {
         var picked: [Candidate] = fixed.map { Candidate(row: $0, tier: 0, source: 0, position: 0) }
         var keys = Set(fixed.map(\.key))
         //? JavaScript's sort is stable: equal candidates keep their order
@@ -727,7 +851,8 @@ public enum SearchList {
         if picked.isEmpty, let best = left.first {
             take(best)
             if let row = best.row {
-                for relative in family(of: row, library: library, artistList: artistList, index: index) {
+                for relative in family(of: row, library: library, artistList: artistList, index: index, groups: groups,
+                                       evidence: evidence) {
                     if picked.count >= n { break }
                     if keys.contains(relative.key) { continue }
                     take(Candidate(row: relative, tier: 3, source: 2, position: 0))
@@ -771,7 +896,8 @@ public enum SearchList {
     /// A row's line (`rowLine`); `top` as Top results say it, the kind word first. A MusicBrainz album: "[kind ·]
     /// credit · year", the kind said in a section only when it isn't a plain album, the place where the library holds
     /// it - or "maybe in your library" when a folder may be it by its name alone. A MusicBrainz artist: "[Artist ·]" its
-    /// disambiguation, type and country, no place.
+    /// disambiguation, type and country, no place. A MusicBrainz song: "[Song ·] credit · [length ·] its named album",
+    /// the place where a pressing with it is held. A song's named album: "[kind ·] credit · year", where it is held.
     public static func line(_ row: SearchRow, _ marks: SearchMarks, top: Bool = false) -> Line {
         func join(_ parts: String?...) -> String {
             parts.compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: " · ")
@@ -798,6 +924,16 @@ public enum SearchList {
         case .mbArtist(let match):
             let said = match.line
             return Line(line: top ? join("Artist", said) : said, place: "")
+        case .mbSong(let song):
+            let (album, held) = SongSearch.namedAlbum(song, marks.index, marks.evidence)
+            return Line(line: top ? join("Song", song.credit, album.title)
+                            : join(song.credit, SongSearch.length(album.length), album.title),
+                        place: SongSearch.heldWords(held, personal: marks.personal))
+        case .songAlbum(let song, let album):
+            let word = !album.kind.isEmpty && album.kind != "Album" ? album.kind : "Album"
+            return Line(line: join(top ? word : "", album.credit, SongSearch.yearOf(album.date)),
+                        place: SongSearch.albumWords(SongSearch.holding(marks.index, album, song, marks.evidence),
+                                                     personal: marks.personal))
         }
     }
 
@@ -912,7 +1048,7 @@ public enum SearchList {
         let names = SearchReading.artistNames(knownNames(ownedArtists, results))
         guard let reading = SearchReading.read(text, names: names) else { return [] }
         let pool = self.pool(reading: reading, library: results, artistList: artistList, marks: marks)
-        let phantoms = musicBrainz ? SearchState.wantedKinds(reading, view: .all).compactMap { phantom($0, reading) } : []
+        let phantoms = musicBrainz ? SearchState.wantedKinds(text, reading, view: .all).compactMap { phantom($0, reading) } : []
         return decidedTop(candidates(pool, box: text, reading: reading), phantoms: phantoms, n: SearchPacing.topResults,
                           library: results, artistList: artistList, index: marks.index).prefix
     }
@@ -1311,6 +1447,12 @@ public enum SongTitle {
         while text.first == " " { text = text.dropFirst() }
         while text.last == " " { text = text.dropLast() }
         return String(String.UnicodeScalarView(text))
+    }
+
+    /// Whether a title carries such an aside anywhere (songs.ts `hasAside`) - "Roads (live)" does, "Roads" doesn't.
+    public static func hasAside(_ title: String) -> Bool {
+        let scalars = Array(title.unicodeScalars)
+        return scalars.indices.contains { asideEnd(scalars, from: $0) != nil }
     }
 
     /// `SAME_SONG_ASIDE` (`/\s*[([]\s*(?:live\b[^)\]]*|[^)\]]*\bremaster(?:ed)?\b[^)\]]*|mono|stereo)\s*[)\]]/giu`) each

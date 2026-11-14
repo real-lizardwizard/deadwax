@@ -223,8 +223,9 @@ enum SearchVectors {
         } else {
             state.libraryAnswered(token, state.query, each.library ?? LibraryResults())
         }
-        if state.drawnMusicBrainz(state.query), let ask = state.askingMusicBrainz(state.query, view: .all) {
-            state.albumsAnswered(ask, FullySearchAnswer(), query: ask.first, index: nil)
+        if state.drawnMusicBrainz(state.query) {
+            let asks = state.askingMusicBrainz(state.query, view: .all)
+            SearchTests.answerEmpty(&state, asks)
         }
         return state
     }

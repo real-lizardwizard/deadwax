@@ -29,15 +29,22 @@ import Testing
         return state
     }
 
-    /// The All view's next draw, with no folders and no full artist list unless given - MusicBrainz's albums, when the
+    /// The All view's next draw, with no folders and no full artist list unless given - MusicBrainz's kinds, when the
     /// words ask them, answered at once with nothing (these are the library's half's tests), so the list is drawn whole.
     static func drawing(_ state: inout SearchState, owned: [String] = [], list: [Artist]? = nil) -> SearchState.Drawing? {
         state.ownedArtists = owned
-        if state.view == .all, !state.query.isEmpty, state.drawnMusicBrainz(state.query), !state.askedForQuery,
-           let ask = state.askingMusicBrainz(state.query, view: .all) {
-            state.albumsAnswered(ask, FullySearchAnswer(), query: ask.first, index: nil)
+        if state.view == .all, !state.query.isEmpty, state.drawnMusicBrainz(state.query), !state.askedForQuery {
+            let asks = state.askingMusicBrainz(state.query, view: .all)
+            answerEmpty(&state, asks)
         }
         return state.advance(artistList: list, marks: marks)
+    }
+
+    /// Every ask answered with nothing - `albums` too unless `albums` is false.
+    static func answerEmpty(_ state: inout SearchState, _ asks: SearchState.MusicBrainzAsks, albums: Bool = true) {
+        if albums, let ask = asks.albums { state.albumsAnswered(ask, FullySearchAnswer(), query: ask.first, index: nil) }
+        if let ask = asks.artists { state.artistsAnswered(ask, ArtistSearchAnswer()) }
+        if let ask = asks.songs { state.songsAnswered(ask, SongSearchAnswer(), query: ask.first) }
     }
 
     static func advance(_ state: inout SearchState, owned: [String] = [], list: [Artist]? = nil) -> SearchList.Drawn? {
