@@ -340,8 +340,9 @@ address (`http://your-server:8080/`) opens the app too: that address sends the b
   never guessed. **Debug** is how the song is
   being played, in labelled rows, and it is an admin's: see [Info → Debug](#info--debug). Everyone
   else's Info is About alone, with no tabs above it. **Done**, Escape or a tap above the sheet closes it.
-- **The scrubber** is the whole bar: tap anywhere along it to jump there, or drag from anywhere on
-  it and it follows your finger, seeking when you let go. It works from the keyboard too (arrows
+- **The scrubber** is the whole bar - a squared-off bar that thickens while your finger is on it: tap
+  anywhere along it to jump there, or drag from anywhere on it and it follows your finger, seeking when
+  you let go. It works from the keyboard too (arrows
   move 5 seconds, Page Up and Page Down 30, Home and End to the ends), and VoiceOver's swipe up
   and down move it. [Seeking](#seeking-and-where-safari-lands) says why a seek in Safari can land
   somewhere other than where you put it.

@@ -2251,3 +2251,23 @@ song menu handing the queue's albums over, app-rules' two regexes; every sim on 
 rules (the kept ids passed over; the album just put kept) each fail info.sim. Not covered by a test: rememberAdded's own
 adding of the added albums to the set (api.ts is stubbed in the sims) - it matters only when one tap adds songs of
 several albums.
+
+### Now Playing's bar, squared off and thicker (2.1.20)
+
+James, 2026-11-14: "maybe instead of the thin bar, a squared off thicker bar for the play progress in the play
+page?" Shown four versions (today's 4 pt rounded bar, then squared-off 8, 12 and 16 pt), he chose **12 pt**, on
+**both apps**. On a phone the scrubber is now a squared-off bar 12px tall (`--pl-scrub-track`), 16px while a finger
+holds it (`--pl-scrub-track-held`), corners `--pl-scrub-radius: 0`, still the sunken well with the grey fill up to
+where the song is - and **no thumb** (`.pl-scrub-thumb` is `visibility: hidden`): beside a bar that thick a round
+knob of the same height read as a bump, and the fill's end already says where the song is. Nothing about how it
+behaves changed: the whole bar is the target (`--pl-hit`), a tap seeks, a drag seeks where it's let go.
+
+The **desktop's player bar** keeps its thin rounded bar (6px, 8px held, `--pl-scrub-radius:
+var(--pl-radius-track)` in app-desktop.css) and its thumb under the pointer - it's a pointer's bar along the
+bottom of every screen, not "the play page". The iPhone app's ScrubberView draws the same 12 and 16 points, square,
+in its own colours (ios branch).
+
+Verified: tests/test_app_css.py (the tokens, the radius, the held height, the hidden thumb) and
+test_app_desktop_css.py (the desktop's radius); in Chromium, a throwaway page of the two states at a phone's 345px:
+the bar 12px and 16px tall, square, no thumb, the fill and well as before. Not seen: Safari, and the app itself with a
+song playing.
