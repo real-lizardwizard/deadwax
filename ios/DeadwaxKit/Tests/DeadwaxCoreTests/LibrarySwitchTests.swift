@@ -3,7 +3,8 @@ import Testing
 @testable import DeadwaxCore
 
 /// The Library's switch (Phase 4, slice 3b - phase4-library.md 2.8): the pages' order as this phone keeps it, Edit
-/// order's moves, the page it opens on, what the Shuffle can do, the •••'s sections and words, and Find on Playlists.
+/// order's moves, the page it opens on, what the Shuffle can do, the •••'s sections and words, and Find on Playlists -
+/// and (slice 5, question 32) Songs: the fourth page, shown only without a library of your own.
 @Suite struct LibrarySwitchTests {
     /// The ids, in order - outside a key path, for CI's older Swift.
     private static func ids(_ list: [Playlist]) -> [String] { list.map { (playlist: Playlist) -> String in playlist.id } }
@@ -11,31 +12,48 @@ import Testing
     // MARK: the order
 
     @Test func theOrderIsReadWithCare() {
-        let standard: [LibraryPage] = [.albums, .playlists, .artists]
+        let standard: [LibraryPage] = [.albums, .playlists, .artists, .songs]
         #expect(LibraryPages.standard == standard)
         #expect(LibraryPages.read(nil) == standard, "nothing kept: the standard order")
         #expect(LibraryPages.read("") == standard)
-        #expect(LibraryPages.read("albums,playlists,artists") == standard)
-        #expect(LibraryPages.read("artists,playlists,albums") == [.artists, .playlists, .albums])
-        // (slice 4, question 23) an order saved before Artists was a page: Artists joins at its end
+        #expect(LibraryPages.read("albums,playlists,artists,songs") == standard)
+        #expect(LibraryPages.read("songs,artists,playlists,albums") == [.songs, .artists, .playlists, .albums])
+        // (slice 4, question 23) an order saved before Artists was a page: Artists joins at its end - and Songs after it
         #expect(LibraryPages.read("albums,playlists") == standard)
-        #expect(LibraryPages.read("playlists,albums") == [.playlists, .albums, .artists])
-        #expect(LibraryPages.read("playlists") == [.playlists, .albums, .artists], "a page it doesn't name joins at the end")
+        #expect(LibraryPages.read("playlists,albums") == [.playlists, .albums, .artists, .songs])
+        #expect(LibraryPages.read("playlists") == [.playlists, .albums, .artists, .songs], "a page it doesn't name joins at the end")
         #expect(LibraryPages.read("albums") == standard)
-        #expect(LibraryPages.read("artists") == [.artists, .albums, .playlists])
-        #expect(LibraryPages.read("songs,playlists") == [.playlists, .albums, .artists], "a name it doesn't know left out")
-        #expect(LibraryPages.read("playlists,playlists,albums") == [.playlists, .albums, .artists], "a page twice, once")
-        #expect(LibraryPages.read(" playlists , albums ") == [.playlists, .albums, .artists], "spaces round a name")
-        #expect(LibraryPages.read(",,playlists,,") == [.playlists, .albums, .artists])
-        #expect(LibraryPages.read("Playlists,ALBUMS,Artists") == standard, "names as written, never folded")
+        #expect(LibraryPages.read("artists") == [.artists, .albums, .playlists, .songs])
+        #expect(LibraryPages.read("radio,playlists") == [.playlists, .albums, .artists, .songs], "a name it doesn't know left out")
+        #expect(LibraryPages.read("playlists,playlists,albums") == [.playlists, .albums, .artists, .songs], "a page twice, once")
+        #expect(LibraryPages.read(" playlists , albums ") == [.playlists, .albums, .artists, .songs], "spaces round a name")
+        #expect(LibraryPages.read(",,playlists,,") == [.playlists, .albums, .artists, .songs])
+        #expect(LibraryPages.read("Playlists,ALBUMS,Artists,SONGS") == standard, "names as written, never folded")
         #expect(LibraryPages.read("garbage\u{0}") == standard)
+        #expect(LibraryPages.read("songs") == [.songs, .albums, .playlists, .artists])
+    }
+
+    /// (slice 5) An order this phone kept with three pages - slice 4's - is read back as it was, Songs joining at its end:
+    /// nobody's order moves under them, and Songs is where a fourth page added since goes.
+    @Test func aThreePageOrderKeptReadsBackWithSongsAtItsEnd() {
+        let kept: [[LibraryPage]] = [[.albums, .playlists, .artists], [.playlists, .albums, .artists],
+                                     [.artists, .albums, .playlists], [.playlists, .artists, .albums],
+                                     [.artists, .playlists, .albums], [.albums, .artists, .playlists]]
+        for three in kept {
+            let saved = three.map { (page: LibraryPage) -> String in page.rawValue }.joined(separator: ",")
+            #expect(LibraryPages.read(saved) == three + [.songs], "\(saved)")
+            #expect(LibraryPages.shown(LibraryPages.read(saved), personal: true) == three, "\(saved): yours shows it as it was")
+            #expect(LibraryPages.first(LibraryPages.shown(LibraryPages.read(saved), personal: false)) == three[0],
+                    "\(saved): it opens where it did")
+        }
     }
 
     @Test func theOrderIsWrittenAsItIsRead() {
         #expect(LibraryPages.saved([.playlists, .albums]) == "playlists,albums")
-        #expect(LibraryPages.saved(LibraryPages.standard) == "albums,playlists,artists")
-        let orders: [[LibraryPage]] = [[.albums, .playlists, .artists], [.playlists, .albums, .artists],
-                                       [.artists, .albums, .playlists], [.playlists, .artists, .albums]]
+        #expect(LibraryPages.saved(LibraryPages.standard) == "albums,playlists,artists,songs")
+        let orders: [[LibraryPage]] = [[.albums, .playlists, .artists, .songs], [.playlists, .albums, .artists, .songs],
+                                       [.artists, .albums, .playlists, .songs], [.playlists, .artists, .albums, .songs],
+                                       [.songs, .albums, .playlists, .artists], [.albums, .songs, .artists, .playlists]]
         for order in orders {
             #expect(LibraryPages.read(LibraryPages.saved(order)) == order)
         }
@@ -64,6 +82,63 @@ import Testing
         #expect(LibraryPages.first([]) == .albums)
         #expect(LibraryPage.albums.title == "Albums" && LibraryPage.playlists.title == "Playlists")
         #expect(LibraryPage.artists.title == "Artists" && LibraryPages.first([.artists, .albums, .playlists]) == .artists)
+        #expect(LibraryPage.songs.title == "Songs" && LibraryPages.first([.songs, .albums, .playlists, .artists]) == .songs)
+    }
+
+    // MARK: (slice 5, question 32) Songs, shown without a library of your own
+
+    @Test func songsIsAPageOnlyWithoutALibraryOfYourOwn() {
+        let order: [LibraryPage] = [.albums, .songs, .playlists, .artists]
+        #expect(LibraryPages.shown(order, personal: false) == order, "the collection is the Library: every page")
+        #expect(LibraryPages.shown(order, personal: true) == [.albums, .playlists, .artists], "yours: All music > All songs")
+        #expect(LibraryPages.shown([.songs, .artists, .albums, .playlists], personal: true) == [.artists, .albums, .playlists])
+        #expect(LibraryPages.first(LibraryPages.shown([.songs, .artists, .albums, .playlists], personal: true)) == .artists,
+                "Songs first in the order kept: yours opens on the next")
+        #expect(LibraryPages.shown([], personal: true).isEmpty)
+    }
+
+    @Test func thePageShownIsOneTheSwitchShows() {
+        let yours: [LibraryPage] = [.albums, .playlists, .artists]
+        let all: [LibraryPage] = [.songs, .albums, .playlists, .artists]
+        #expect(LibraryPages.showing(.playlists, in: yours) == .playlists)
+        #expect(LibraryPages.showing(.songs, in: yours) == .albums, "Songs gone with a library of your own: the first")
+        #expect(LibraryPages.showing(.songs, in: all) == .songs)
+        #expect(LibraryPages.showing(nil, in: all) == .songs, "none yet: the first")
+        #expect(LibraryPages.showing(nil, in: []) == .albums)
+    }
+
+    @Test func editOrderMovesOnlyThePagesShownAndSongsKeepsItsPlace() {
+        let order: [LibraryPage] = [.albums, .songs, .playlists, .artists]
+        // yours lists Albums, Playlists, Artists: Artists dragged to the top - Songs stays second of the order kept
+        #expect(LibraryPages.moved(order, personal: true, from: IndexSet(integer: 2), to: 0)
+                == [.artists, .songs, .albums, .playlists])
+        #expect(LibraryPages.moved(order, personal: true, from: IndexSet(integer: 0), to: 3)
+                == [.playlists, .songs, .artists, .albums])
+        #expect(LibraryPages.moved(order, personal: true, from: IndexSet(integer: 1), to: 1) == order, "dropped where it was")
+        #expect(LibraryPages.moved(order, personal: true, from: IndexSet(), to: 0) == order)
+        // Songs last, or first, of the order kept: still there after any move of yours
+        let last: [LibraryPage] = [.albums, .playlists, .artists, .songs]
+        #expect(LibraryPages.moved(last, personal: true, from: IndexSet(integer: 0), to: 3) == [.playlists, .artists, .albums, .songs])
+        let first: [LibraryPage] = [.songs, .albums, .playlists, .artists]
+        #expect(LibraryPages.moved(first, personal: true, from: IndexSet(integer: 2), to: 0) == [.songs, .artists, .albums, .playlists])
+        // without one: every page moves, Songs among them
+        #expect(LibraryPages.moved(order, personal: false, from: IndexSet(integer: 1), to: 0) == [.songs, .albums, .playlists, .artists])
+        #expect(LibraryPages.moved(order, personal: false, from: IndexSet(integer: 3), to: 1)
+                == LibraryPages.moved(order, from: IndexSet(integer: 3), to: 1))
+        // every move of yours, of every order: the pages shown are the List's move, Songs where it was
+        let orders: [[LibraryPage]] = [[.albums, .songs, .playlists, .artists], [.songs, .albums, .playlists, .artists],
+                                       [.albums, .playlists, .artists, .songs], [.albums, .playlists, .songs, .artists]]
+        for each in orders {
+            let shown = LibraryPages.shown(each, personal: true)
+            for from in 0..<shown.count {
+                for to in 0...shown.count {
+                    let moved = LibraryPages.moved(each, personal: true, from: IndexSet(integer: from), to: to)
+                    #expect(LibraryPages.shown(moved, personal: true) == LibraryPages.moved(shown, from: IndexSet(integer: from), to: to))
+                    #expect(moved.firstIndex(of: .songs) == each.firstIndex(of: .songs), "\(each) \(from) -> \(to)")
+                    #expect(Set(moved) == Set(LibraryPage.allCases) && moved.count == 4)
+                }
+            }
+        }
     }
 
     @Test func threePagesMoveAsTheListDoes() {
@@ -122,7 +197,11 @@ import Testing
         let playlists = LibraryMenu.sections(shuffle: .ready, page: .playlists, grid: true, albumsPage: .albums,
                                              scope: .yours, personal: true, online: true)
         #expect(playlists == [[.shuffle(.ready)], [.downloaded, .allMusic], [.refresh, .editOrder]])
-        #expect(LibraryMenu.allMusic == [.albums(.store), .artists(.store)])
+        // (slice 5) Songs has neither an order nor a layout: Navidrome's order is its one order
+        let songs = LibraryMenu.sections(shuffle: .ready, page: .songs, grid: true, albumsPage: .albums,
+                                         scope: .store, personal: false, online: true)
+        #expect(songs == [[.shuffle(.ready)], [.downloaded], [.refresh, .editOrder]])
+        #expect(LibraryMenu.allMusic == [.albums(.store), .artists(.store), .allSongs])
     }
 
     @Test func theMenusWords() {
@@ -138,6 +217,8 @@ import Testing
         #expect(LibraryMenuItem.albums(.store).words(personal: true) == "All albums")
         #expect(LibraryMenuItem.artists(.store).words(personal: true) == "All artists")
         #expect(LibraryMenuItem.artists(.store).words(personal: false) == "Artists")
+        #expect(LibraryMenuItem.allSongs.words(personal: true) == "All songs")
+        #expect(LibraryMenuItem.allSongs.words(personal: false) == "Songs")
         #expect(LibraryMenuItem.order(.albums).words(personal: true) == "Album order")
         #expect(LibraryMenuItem.order(.artists).words(personal: true) == "Artist order")
         #expect(LibraryMenuItem.layout(grid: true).words(personal: true) == "Show as list")
@@ -145,8 +226,8 @@ import Testing
         #expect(LibraryMenuItem.refresh.words(personal: true) == "Refresh")
         #expect(LibraryMenuItem.editOrder.words(personal: true) == "Edit order")
         let enabled = [LibraryMenuItem.shuffle(.ready), .shuffle(.downloads), .shuffle(.gettingReady), .shuffle(.failed("x")),
-                       .downloaded, .refresh, .order(.artists), .layout(grid: true), .artists(.store)].map(\.enabled)
-        #expect(enabled == [true, true, false, false, true, true, true, true, true])
+                       .downloaded, .refresh, .order(.artists), .layout(grid: true), .artists(.store), .allSongs].map(\.enabled)
+        #expect(enabled == [true, true, false, false, true, true, true, true, true, true])
         #expect(LibrarySwitchWords.more == "More for the Library")
         #expect(LibrarySwitchWords.orderFooter == "Drag the pages into the order you want. The Library opens on the first.")
     }

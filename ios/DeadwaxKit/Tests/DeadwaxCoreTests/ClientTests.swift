@@ -184,6 +184,18 @@ func sentJSON(_ request: HTTPRequest?) throws -> [String: SentValue] {
         #expect(url.absoluteString.contains("q=Start%20test%20%26%20more%2B"))
     }
 
+    /// (slice 5) Songs' page: librarySongs' own ask - every song (an empty q), no artists or albums, 100 from the offset.
+    @Test func songsAskForEverySong() async throws {
+        let (deadwax, transport) = client(session: "s.1")
+        transport.answer("/deadwax/navidrome/search", 200, #"{"artists":[],"albums":[],"songs":[{"id":"so","title":"Roads"}]}"#)
+        let found = try await deadwax.search(SongsList.query("   "), songs: SongsPaging.pageSize, songOffset: 200)
+        #expect(found.songs.map(\.id) == ["so"])
+        let url = try #require(transport.last?.url)
+        let items = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems ?? []
+        #expect(items.map(\.name) == ["q", "artistCount", "albumCount", "songCount", "songOffset"])
+        #expect(items.map { (item: URLQueryItem) -> String in item.value ?? "-" } == ["", "0", "0", "100", "200"])
+    }
+
     @Test func theStreamIsTheFileAsItIsWithTheSession() throws {
         let (deadwax, _) = client(session: "s.xyz")
         let request = deadwax.streamRequest(songID: "a/b?c", format: "raw")

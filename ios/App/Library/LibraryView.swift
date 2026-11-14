@@ -2,12 +2,13 @@ import DeadwaxCore
 import SwiftUI
 
 /// The Library tab's root (D2; since Phase 4 slice 3b the switch - phase4-library.md 2.8, 3.1). James: "I like just
-/// opening library to your albums", with a switch at the top - Albums | Playlists | Artists (slice 4; Songs joins in
-/// slice 5) - "and I would also like to be able to swipe left and right between them, and maybe a way to rearrange the
-/// order". So the bar holds the switch (a segmented control, the pages in the order kept on this phone, LibraryPages),
+/// opening library to your albums", with a switch at the top - Albums | Playlists | Artists (slice 4) | Songs (slice 5,
+/// only where the collection is the Library: with a library of your own it is All music's All songs, question 32) -
+/// "and I would also like to be able to swipe left and right between them, and maybe a way to rearrange the order". So
+/// the bar holds the switch (a segmented control, the pages shown in the order kept on this phone, LibraryPages),
 /// Playlists' + on its page, and the Library's ••• (LibraryMenu: Shuffle; the page's own order, and Albums' Show as
 /// list or grid - in the ••• since slice 4, question 26, so three pages and more fit; Downloaded or the way back to the
-/// albums, All music's submenu - All albums, All artists; Refresh, Edit order); Find under it; and under them the pages
+/// albums, All music's submenu - All albums, All artists, All songs; Refresh, Edit order); Find under it; and under them the pages
 /// side by side, a swipe moving between them as the switch does - each following the other. The Library opens on the
 /// first page of the order, and on it again for a new person; after that, on the one last shown. Pulling a page down
 /// shuffles your library (2.8's PullShuffle; 3.5's graphic) - never refreshes: the Library refreshes itself as it
@@ -35,6 +36,7 @@ struct LibraryView: View {
     @Environment(DownloadModel.self) private var downloads
     @Environment(PlaylistsModel.self) private var playlists
     @Environment(ArtistsModel.self) private var artists
+    @Environment(SongsModel.self) private var songs
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var shownOnce = false
@@ -56,10 +58,12 @@ struct LibraryView: View {
     @State private var findAlbums = ""
     @State private var findPlaylists = ""
     @State private var findArtists = ""
+    @State private var findSongs = ""
     /// Each page's pull.
     @State private var albumsPull = ShufflePull()
     @State private var playlistsPull = ShufflePull()
     @State private var artistsPull = ShufflePull()
+    @State private var songsPull = ShufflePull()
     @State private var editingOrder = false
     /// New playlist's sheet (the Playlists page's +), while it is up.
     @State private var newPlaylist: PlaylistsPage.NewSheet?
@@ -70,7 +74,7 @@ struct LibraryView: View {
         root
             .onAppear {
                 look()
-                if page == nil { show(LibraryPages.first(order)) }
+                if page == nil { show(LibraryPages.first(shownOrder)) }
                 guard !shownOnce else { return }
                 shownOnce = true
                 if reachability.online { shown() }
@@ -97,15 +101,20 @@ struct LibraryView: View {
             }
             .onChange(of: server.person) { _, _ in
                 // a new person opens on the first page, Find empty
-                show(LibraryPages.first(order))
+                show(LibraryPages.first(shownOrder))
                 findAlbums = ""
                 findPlaylists = ""
                 findArtists = ""
+                findSongs = ""
                 shown()
             }
             .onChange(of: library.scope) { _, scope in
                 // who the person is came in (or changed): the Shuffle of their scope
-                if reachability.online { shuffles.shown(scope) }
+                if reachability.online { shuffles.shown(.library, scope) }
+            }
+            .onChange(of: server.access.hasLibrary) { _, _ in
+                // (slice 5) a library of your own came in, or went: Songs shown or not - the page kept while it still is
+                show(LibraryPages.showing(page, in: shownOrder))
             }
             .onChange(of: server.signInOver == nil) { _, gone in
                 // signed in again over the app, as the same person: what failed while signed out is asked again
@@ -116,7 +125,7 @@ struct LibraryView: View {
     /// The Library came into view: its lists, your library's New marks, and the Shuffle's first page.
     private func shown() {
         library.libraryShown()
-        shuffles.shown(library.scope)
+        shuffles.shown(.library, library.scope)
     }
 
     /// The root on screen: its tab chosen, nothing pushed over it, the app not in the background.
@@ -167,8 +176,11 @@ struct LibraryView: View {
     /// The pages in the order kept.
     private var order: [LibraryPage] { LibraryPages.read(savedOrder) }
 
-    /// The page shown.
-    private var shownPage: LibraryPage { page ?? LibraryPages.first(order) }
+    /// (slice 5, question 32) The pages the switch shows, in the order kept: Songs only without a library of your own.
+    private var shownOrder: [LibraryPage] { LibraryPages.shown(order, personal: server.access.hasLibrary) }
+
+    /// The page shown - always one the switch shows.
+    private var shownPage: LibraryPage { LibraryPages.showing(page, in: shownOrder) }
 
     /// What the Shuffle can do now (ShuffleCan): play the first page in hand, shuffle the downloads, or why not. The
     /// songs on this phone are read only while deadwax can't be reached (slice 3b's review), so a download coming in
@@ -176,8 +188,8 @@ struct LibraryView: View {
     /// nothing to play.
     private var shuffleCan: ShuffleCan {
         let online = reachability.online
-        return ShuffleCan.of(online: online, ready: shuffles.ready, empty: shuffles.empty,
-                             failed: shuffles.failure, songsHere: online ? 0 : downloads.songsHere.count)
+        return ShuffleCan.of(online: online, ready: shuffles.ready(.library), empty: shuffles.empty(.library),
+                             failed: shuffles.failure(.library), songsHere: online ? 0 : downloads.songsHere.count)
     }
 
     /// The page shown set, the pager moved to it with it (the switch's tap, the first draw, a new person).
@@ -193,7 +205,7 @@ struct LibraryView: View {
 
     /// The pages side by side under the switch, a swipe between them; Find, the bar and the ••• the switch's.
     private func pager(albums: AlbumList) -> some View {
-        let order = self.order
+        let order = shownOrder
         let can = shuffleCan
         let shownPage = self.shownPage
         let online = reachability.online
@@ -244,7 +256,7 @@ struct LibraryView: View {
             }
         }
         .sheet(isPresented: $editingOrder) {
-            EditOrderSheet(saved: $savedOrder)
+            EditOrderSheet(saved: $savedOrder, personal: server.access.hasLibrary)
         }
     }
 
@@ -267,6 +279,10 @@ struct LibraryView: View {
             ArtistsScreen(page: ArtistsScreen.Page(
                 typed: $findArtists, current: current,
                 pulling: PullShuffling(state: artistsPull, can: can, on: pulls, start: shuffleNow)))
+        case .songs:
+            SongsScreen(page: SongsScreen.Page(
+                typed: $findSongs, current: current,
+                pulling: PullShuffling(state: songsPull, can: can, on: pulls, start: shuffleNow)))
         }
     }
 
@@ -276,6 +292,7 @@ struct LibraryView: View {
         case .albums: return $findAlbums
         case .playlists: return $findPlaylists
         case .artists: return $findArtists
+        case .songs: return $findSongs
         }
     }
 
@@ -284,6 +301,7 @@ struct LibraryView: View {
         case .albums: return LibraryWords.findPlaceholder
         case .playlists: return LibrarySwitchWords.findPlaylists
         case .artists: return ArtistWords.findPlaceholder
+        case .songs: return SongWords.findPlaceholder
         }
     }
 
@@ -342,10 +360,10 @@ struct LibraryView: View {
             }
         case .downloaded:
             Button { navigation.open(.downloaded) } label: { Label(words, systemImage: DownloadWords.downloadSymbol) }
-        case .albums, .artists:
+        case .albums, .artists, .allSongs:
             place(item, personal: personal)
         case .allMusic:
-            // (slice 4) a submenu: the collection's albums and artists
+            // (slice 4) a submenu: the collection's albums and artists - and (slice 5) its songs
             Menu {
                 ForEach(LibraryMenu.allMusic.indices, id: \.self) { (index: Int) in
                     place(LibraryMenu.allMusic[index], personal: personal)
@@ -360,7 +378,7 @@ struct LibraryView: View {
         }
     }
 
-    /// A list pushed from the ••• - a scope's albums, or (slice 4) its artists.
+    /// A list pushed from the ••• - a scope's albums, or (slice 4) its artists, or (slice 5) the collection's songs.
     @ViewBuilder
     private func place(_ item: LibraryMenuItem, personal: Bool) -> some View {
         let words = item.words(personal: personal)
@@ -369,6 +387,8 @@ struct LibraryView: View {
             Button { navigation.open(.albums(scope)) } label: { Label(words, systemImage: "square.stack") }
         case .artists(let scope):
             Button { navigation.open(.artists(scope)) } label: { Label(words, systemImage: "music.mic") }
+        case .allSongs:
+            Button { navigation.open(.allSongs) } label: { Label(words, systemImage: "music.note") }
         default:
             EmptyView()
         }
@@ -408,7 +428,7 @@ struct LibraryView: View {
     private func shuffleNow() {
         switch shuffleCan {
         case .ready:
-            guard let taken = shuffles.take(level: PlaylistPlay.songsLevel(player.normalization)) else { return }
+            guard let taken = shuffles.take(.library, level: PlaylistPlay.songsLevel(player.normalization)) else { return }
             player.play(shuffled: taken)
         case .downloads:
             // the list the readiness counted; should it have emptied since (a removal), said, as the pull would
@@ -423,8 +443,9 @@ struct LibraryView: View {
         }
     }
 
-    /// The •••'s Refresh: your albums, the playlists and the artists asked now, whatever their age - or, while deadwax
-    /// can't be reached, whether it is back (a probe at once).
+    /// The •••'s Refresh: your albums, the playlists and the artists asked now, whatever their age - and (slice 5) the
+    /// Songs page's first page, once it has been shown - or, while deadwax can't be reached, whether it is back (a probe
+    /// at once).
     private func refresh() {
         guard reachability.online else {
             reachability.tryNow()
@@ -434,14 +455,17 @@ struct LibraryView: View {
         Task { await library.refresh(scope) }
         Task { await playlists.ask(fresh: true) }
         Task { await artists.ask() }
-        shuffles.shown(scope)
+        if !server.access.hasLibrary, songs.paging.query != nil { songs.refresh(findSongs) }
+        shuffles.shown(.library, scope)
     }
 }
 
-/// Edit order (3.5): the pages as rows, each with its drag handle - a List held in edit mode, no deletions - kept as
-/// each move is made; the footer says the Library opens on the first.
+/// Edit order (3.5): the pages the switch shows as rows, each with its drag handle - a List held in edit mode, no
+/// deletions - kept as each move is made; the footer says the Library opens on the first. (slice 5) With a library of
+/// your own, Songs isn't a page of the switch: it isn't listed, and keeps its place in the order kept.
 private struct EditOrderSheet: View {
     @Binding var saved: String
+    let personal: Bool
 
     @Environment(\.dismiss) private var dismiss
 
@@ -450,11 +474,11 @@ private struct EditOrderSheet: View {
         NavigationStack {
             List {
                 Section {
-                    ForEach(order) { (page: LibraryPage) in
+                    ForEach(LibraryPages.shown(order, personal: personal)) { (page: LibraryPage) in
                         Text(page.title)
                     }
                     .onMove { (from: IndexSet, to: Int) -> Void in
-                        saved = LibraryPages.saved(LibraryPages.moved(order, from: from, to: to))
+                        saved = LibraryPages.saved(LibraryPages.moved(order, personal: personal, from: from, to: to))
                     }
                 } footer: {
                     Text(LibrarySwitchWords.orderFooter)

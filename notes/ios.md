@@ -6410,3 +6410,186 @@ conflicted only here, at the end, where both had added; ios's section stands fir
 Not verified - on the phone (docs/ios.md's checks 106, 108 and 110 now ask for each): the reopened artist's line,
 the grey line in Airplane Mode, the collaboration's name offline. Fix 2 needs a first sign-in with deadwax's album
 index failing, which no check asks for.
+
+## Phase 4, slice 5: Songs, All songs' Shuffle, the app as 0.10 (2026-11-14)
+
+notes/ios-specs/phase4-library.md 2.7, 3.1 and 6.5, and questions 2 and 24 (6.11 points here). The last slice of
+Phase 4. It adds:
+- **Songs**: every song of the collection, 100 a page, in Navidrome's order. A row opens its album and its ••• is the
+  song's menu. It is the switch's fourth page where the collection is the Library, and All music > All songs with a
+  library of your own.
+- **All songs' Shuffle**: the collection's, at the head of All songs.
+- **The feed held to the web**: useShuffleFeed.ts itself driven by an exporter, and replayed through the phone's
+  ShuffleFeedRun.
+- **The app as 0.10 (10)**.
+
+On `phase4-songs` from `ios` 20bb0b3. src/__init__.py untouched; **no server change**: Songs pages the web's own
+`GET /deadwax/navidrome/search` (search3, `q=&songCount=100&songOffset=`, artists and albums 0), and the Shuffle is
+3b's two routes. ROUTE_COUNT stays 40.
+
+### Core (DeadwaxCore)
+
+- **Songs.swift** (new), the web's app/usePaged.ts and LibraryViews.tsx's SongsView ported:
+  - `SongWords`: the web's words verbatim (Songs / All songs and `title(personal:)`, NO_SONGS, ", opens its album",
+    the count line) and the phone's own (Find's "Find in songs", "No songs match “…”.", the offline line).
+  - `SongsPaging`: the list a page at a time. Keyed on the query ("" for every song, else Find's words):
+    - `start` asks the first page. Another query empties the list at once; the same query again keeps the list
+      drawn until the first page lands in its place (`stale`).
+    - `more` asks the next page - not while one is out, once every page is in, after a failure, or over a stale
+      list. `retry` asks the failed page again.
+    - `answered` adds a page, leaving out songs already drawn (`appended`, the web's appendPage). The next offset
+      follows what the server handed out; a page short of 100 is the last.
+    - `failed`; `reset`; `isNewest` (only the newest ask's answer or failure counts, the web's latestOnly).
+    - `countText`: "N songs", once every page is in.
+  - `SongsBody` (a spinner, the failure, the empty or no-match line, the offline line, the rows) and `SongsFoot` (a
+    spinner, the failure, a refresh's "couldn't update", nothing).
+  - `SongsList`: Find's query (trimmed), whether a row opens its album (an album id), whether it is dimmed (offline and
+    not on the phone), and `asksMore` - the next page asked 25 rows from the end (usePaged's 800 px rootMargin, and a
+    flick's worth more).
+  - `ShuffleButtonFace`: All songs' Shuffle from ShuffleCan - Shuffle; Shuffle downloads; Getting ready… dimmed, with
+    why under it after a failure; no button with nothing to shuffle.
+- **LibrarySwitch**:
+  - `LibraryPage.songs`, joining a saved order at its end (question 23's rule, already built).
+  - Question 32: `LibraryPages.shown(_:personal:)` (Songs left out with a library of your own),
+    `moved(_:personal:from:to:)` (Edit order's move over the pages shown, Songs keeping its place in the order kept)
+    and `showing(_:in:)` (the page shown, or the first shown when it went).
+  - `LibraryMenuItem.allSongs`, the end of `LibraryMenu.allMusic`; Songs has no page section in the •••.
+- **Shuffle.swift**:
+  - `ShuffleOf` (`.library` follows the Library's scope, `.allSongs` is always the store's) and `ShuffleAheads`:
+    two ShuffleAheads behind one API (subscript, shown, answered, failed, take, reset), so neither lets the other's
+    first page go (question 42).
+  - `ShuffleFeed.startingElsewhere` made the web's exactly (question 41a): it draws even when there is no other
+    song to start with, and a draw out of range swaps nothing. 3b's clamped the draw and made none then.
+- **export-shuffle-vectors.cjs** (new) compiles useShuffleFeed.ts and usePaged.ts, with lib/upNext.ts,
+  yourLibrary.ts, appFrame.ts and artistPage.ts, under shuffle.sim's Preact stand-in. Its own stand-ins are
+  player/api.js (a faked deadwax keeping every ask, answered when the run says), app/usePins.js (the notice) and
+  api/http.js. It writes Fixtures/shuffle/shuffle-vectors.json:
+  - the words and numbers;
+  - 524 `startingElsewhere` cases, each with its seed and how many draws it made;
+  - 272 `songsAhead` queues, made by seeded runs of lib/upNext.ts's own edits;
+  - 39 `appendPage` cases;
+  - 60 runs of the hook itself: shuffle.sim.cjs's own 12 cases scripted, and 48 seeded. Their 3,477 steps are songs
+    moving on, Repeat, Play Next, another shuffle, the queue cleared, an ask answered, failed or 404'd, and a retry.
+    Each records the asks made, what extendQueue was handed (token, ids, levels, next order), the notice, the retries
+    waiting, and the queue after.
+
+  Plain ASCII, every random choice seeded. **ui/test/iosshuffle.sim.cjs** runs its `--check`.
+
+### Where the phone and the web part
+
+- **The retry** (question 41b, kept): the web's effect runs again when Repeat changes, and keeps every timer it
+  started; the phone keeps one 30 s retry whatever changes. No run of the fixture changes Repeat, or starts another
+  shuffle, while a retry waits; ShuffleTests hold the phone's own rule there.
+- **Find on Songs** (question 33) asks Navidrome's search. The web's Songs has no Find.
+- **The list kept while the app runs** (question 35). The web's SongsView asks its first page again each time it is
+  drawn.
+- **VoiceOver** says ", opens its album" only on a row that opens one (question 39).
+- **A row's •••** is the song's whole menu (question 40).
+
+### The app
+
+- **SongsModel** (new, an environment object made with the server, reset for a new person): one list per person.
+  - `show` asks only when the query differs, or nothing was drawn after a failure; `refresh` asks the first page
+    again; `near(index)` asks the next page; `retry`.
+  - The asks are `client.search(query, songs: 100, songOffset:)`. Each cancels the one before; an epoch and
+    `isNewest` guard what lands; `landed` moves when a first page does, and the screen goes to its top.
+- **SongsScreen** and **SongRow** (new), drawn two ways (question 32): as the switch's page (`SongsScreen(page:)`:
+  the switch's Find, bar and •••, the pull shuffling the Library) or pushed (`SongsScreen()`, AppRoute.allSongs: its
+  own title and Find, pull to refresh, All songs' Shuffle at its head as a SecondaryPill).
+  - The ask is keyed on the person, deadwax reachable, the page being the one shown, and the query; while typing it
+    waits 350 ms.
+  - Rows are SongRow: the cover (48 pt), the title, "artist · album", a NavigationLink to the album
+    (AppRoute.album), the song's QueueMenu (Play Next, Play Last, Add to a playlist…, the download items).
+  - A row 25 from the end asks for more as it appears; the foot follows SongsFoot; a refresh's failure is
+    RefreshProblemNote at the top.
+  - Offline, rows not on this phone are dimmed and open nothing, and no more is asked. It goes to its top on another
+    Find, a first page landing, and the Library tab tapped.
+- **ShuffleModel** holds `ShuffleAheads`: every call names `.library` or `.allSongs`. LibraryView's are `.library`;
+  All songs asks `.allSongs` as it shows, back in front, deadwax back, and on its pull. All songs' tap plays its page
+  as `player.play(shuffled:)` does the Library's, in the tap; offline it is Shuffle downloads.
+- **LibraryView**:
+  - The pager, the switch, Edit order and the first page are the pages shown (`shownOrder`); Songs' Find text and its
+    pull are the page's own.
+  - A library of your own arriving or going re-shows the page (`onChange(of: server.access.hasLibrary)`).
+  - The •••'s All music ends with All songs (symbol music.note).
+  - Refresh asks Songs' first page again, once it has been shown, without a library of your own.
+- **AppRoute.allSongs**; DeadwaxApp makes the SongsModel and resets it with the others.
+- **The app's version 0.10 (10)**: Base.xcconfig (and its comment's list of versions), check_project.py, ios.yml's
+  plutil check, tests/test_ios_install.py; ios/README.md, docs/ios.md (the install line, About, checks 112-120), the
+  README's iPhone paragraph (Phases 1 to 4).
+
+### Decided here (the spec was silent, or this departs from it)
+
+Questions 32-42 in the spec, each built to its recommendation:
+- 32 Songs a page only where the collection is the Library;
+- 33 Find asking Navidrome;
+- 34 offline;
+- 35 the list kept while the app runs;
+- 36 a page that won't come waiting for Try again;
+- 37 All songs' Shuffle, and none on the switch's Songs page;
+- 38 the page kept with no songs;
+- 39 VoiceOver's ", opens its album" only where true;
+- 40 the song's whole •••;
+- 41 the feed's two partings;
+- 42 two ShuffleAheads.
+
+Questions 2 and 24 are built as recommended.
+
+### Tests
+
+- **SongsTests** (16):
+  - The paging: every song a page at a time; a page of exactly 100 asking once more; the offset following what the
+    server handed out; only the newest ask counting; another query emptying the list; the same query keeping it
+    until its first page; a refresh's failure; a failed page waiting for Try again.
+  - The body and the foot in every state.
+  - A row's rules, VoiceOver's words and the words.
+  - All songs' button.
+  - The two Shuffles' scopes, and that they never move each other.
+- **ShuffleVectorTests** (5): every vector of shuffle-vectors.json - the words and numbers, `startingElsewhere` (its
+  draws counted), `songsAhead`, `appended`, and every run replayed step by step through ShuffleFeedRun and Up Next's
+  Swift functions - counted, so a fixture that stopped meeting answers, next orders, the notice or retries fails.
+- **LibrarySwitchTests** (9 + 4): four pages; a three-page saved order reading back with Songs at its end; `shown`
+  and `showing`; the personal moves, every one-page move with Songs in each of its four places (the pages shown moved
+  as the List moves them, Songs where it was); the •••'s sections and words with All songs.
+- **ShuffleTests** (+1): a draw made with nothing else to start with; a random of 1 now swaps nothing;
+  `repeatTurnedOffWhileARoundIsOnItsWay` races the next round's answer under Repeat Off as well as One, and lands it
+  under All (the mutation below).
+- **ClientTests**: `songsAskForEverySong` - the ask's path and items (`q` "", `artistCount` 0, `albumCount` 0,
+  `songCount` 100, `songOffset` 200).
+- **tests/test_ios_contract.py**: unchanged but a comment - the feed's numbers and words are still read from the web's
+  own source.
+- **Mutations**: 69 over:
+  - Songs.swift: the paging, the body and the foot, a row's rules, the button;
+  - LibrarySwitch's pages shown;
+  - Shuffle.swift's feed: `startingElsewhere` (3b's clamp and its skipped draw among them), `songsAhead`, and
+    ShuffleFeedRun's look, fresh, retry and letting go;
+  - the two ShuffleAheads.
+
+  67 were caught at first. The 2 that lived:
+  - a next round's answer played under Repeat Off when it lands before the look has caught up - the fixture's runs
+    always look when Repeat changes, which lets the ask go first, and ShuffleTests raced it under One only. Closed by
+    racing it under Off too; run again, caught.
+  - `more()` asking over a refresh's old list (`!stale` dropped) - equivalent: a list is stale only while its first
+    page is out or has failed, which `!loading` and `!failing` already refuse. Kept, as the rule's own statement.
+
+### Verified, and not
+
+Verified:
+- `swift test`: Core 1406, Audio 158, Turntable 12. No new warnings.
+- The unsigned Debug and Release device builds (Xcode, `generic/platform=iOS`): no warnings but the usual
+  appintentsmetadataprocessor line; no change to the .xcodeproj (the new files joined the synchronized App folder).
+- `check_project.py` ok.
+- `npm run build` and all 83 sims on Node 22.23.4, iosshuffle's `--check` among them.
+- The full pytest suite: 4378 passed, 1 skipped (test_compose_example's docs rule, test_source_bytes and
+  test_ios_install's 0.10 among them).
+- The mutations above.
+
+Not verified - only the phone can tell (the spec's section 9; docs/ios.md's checks 112-120):
+- Songs against a real Navidrome: that search3 with an empty query pages every song, in the web's order, to its end;
+  what its search finds for Find's words.
+- Paging under a fast flick: that the next page is in before the end is reached; scrolling 10,000 rows.
+- The four pages in the pager with logins off, and the switch and Edit order with logins on and off on one phone.
+- All songs' Shuffle playing in the tap, past 200, and its "Getting ready…".
+- Offline: the dimmed rows, no spinner at the end.
+- VoiceOver's rows.
+- CI's Xcode 26.6 (the older Swift): the new code spells out its closures' types.

@@ -5,8 +5,10 @@ import Foundation
 // each once, in a random order deadwax makes and holds (src/routes/navidrome.py /shuffle), played a page at a time.
 // ShuffleAhead is app/ShuffleSongs.tsx's rules - its first page asked ahead, so the tap plays songs in hand;
 // ShuffleFeed and ShuffleFeedRun are app/useShuffleFeed.ts's - the rest of the order brought in as it plays. Pure: the
-// app makes the asks they name and hands back what came (ShuffleModel, PlayerModel's feed). Held to the web by hand
-// until slice 5's exporter (question 24): each number and word below is named with its source.
+// app makes the asks they name and hands back what came (ShuffleModel, PlayerModel's feed). Since slice 5 (question 24)
+// the feed is held to the web by ios/scripts/export-shuffle-vectors.cjs: useShuffleFeed.ts itself driven, every ask and
+// every song it hands the player, which ShuffleVectorTests replays through ShuffleFeedRun; each number and word below is
+// named with its source.
 
 /// `GET /deadwax/navidrome/shuffle`: a new order - its token, how many songs it has, and its first page (SHUFFLE_PAGE,
 /// 200). Read leniently, as every answer is: a song that can't be read is left out.
@@ -207,10 +209,12 @@ public enum ShuffleFeed {
                                          random: () -> Double = UpNext.systemRandom) -> [QueueTrack] {
         var out = tracks
         guard let ending, out.count >= 2, out[0].id == ending else { return out }
-        let later = out.indices.filter { $0 > 0 && out[$0].id != ending }
-        guard !later.isEmpty else { return out }
-        let pick = later[min(Int((random() * Double(later.count)).rounded(.down)), later.count - 1)]
-        out.swapAt(0, pick)
+        let later = out.indices.filter { (place: Int) -> Bool in place > 0 && out[place].id != ending }
+        // drawn even with no other song to start with, and a draw out of range swaps nothing - the web's
+        // `later[Math.floor(random() * later.length)]`, undefined then (the fixture counts the draws)
+        let scaled = (random() * Double(later.count)).rounded(.down)
+        guard scaled >= 0, scaled < Double(later.count) else { return out }
+        out.swapAt(0, later[Int(scaled)])
         return out
     }
 
@@ -366,5 +370,79 @@ public enum ShuffleHere {
             if let found = song(id) { songs.append(found) }
         }
         return songs
+    }
+}
+
+/// (slice 5) Which Shuffle: the Library's - your library with one of your own, else the collection (ShuffleSongs's
+/// `scope="yours"` on the Library's root) - or All songs', the collection's beside yours (SongSection's
+/// `scope={personal ? 'store' : 'yours'}`: with a library of your own; without one, Songs is the switch's page and
+/// shuffles as the Library does).
+public enum ShuffleOf: Sendable, Hashable, CaseIterable {
+    case library
+    case allSongs
+
+    /// The scope its orders are of, the Library's being `library`.
+    public func scope(library: AlbumScope) -> PagedScope {
+        switch self {
+        case .library: return library == .yours ? .yours : .store
+        case .allSongs: return .store
+        }
+    }
+}
+
+/// The Library's Shuffle and All songs' (slice 5): two ShuffleAheads, each its first page asked ahead as its list
+/// shows, so either tap plays songs in hand - one the scope never moves under the other: ShuffleAhead starts afresh
+/// for another scope, so a single one shared would let your library's page go each time All songs showed, and back.
+/// Both played through the one feed (ShuffleFeedRun), each queue's own scope riding on its `paged`.
+public struct ShuffleAheads: Sendable, Equatable {
+    public private(set) var library = ShuffleAhead()
+    public private(set) var allSongs = ShuffleAhead()
+
+    public init() {}
+
+    public subscript(_ which: ShuffleOf) -> ShuffleAhead {
+        switch which {
+        case .library: return library
+        case .allSongs: return allSongs
+        }
+    }
+
+    /// `which`'s list came into view - the Library's scope `scope`: its first page asked, when ShuffleAhead says to.
+    public mutating func shown(_ which: ShuffleOf, library scope: AlbumScope, now: Double) -> ShuffleAhead.Ask? {
+        let paged = which.scope(library: scope)
+        switch which {
+        case .library: return library.shown(paged, now: now)
+        case .allSongs: return allSongs.shown(paged, now: now)
+        }
+    }
+
+    /// `which`'s ask answered.
+    public mutating func answered(_ which: ShuffleOf, _ ask: ShuffleAhead.Ask, _ answer: ShuffleStart) {
+        switch which {
+        case .library: library.answered(ask, answer)
+        case .allSongs: allSongs.answered(ask, answer)
+        }
+    }
+
+    /// `which`'s ask failed, why in a listener's words.
+    public mutating func failed(_ which: ShuffleOf, _ ask: ShuffleAhead.Ask, words: String) {
+        switch which {
+        case .library: library.failed(ask, words: words)
+        case .allSongs: allSongs.failed(ask, words: words)
+        }
+    }
+
+    /// `which`'s tap: its page in hand played, and the next order asked.
+    public mutating func take(_ which: ShuffleOf, level: Level?, now: Double) -> ShuffleAhead.Taken? {
+        switch which {
+        case .library: return library.take(level: level, now: now)
+        case .allSongs: return allSongs.take(level: level, now: now)
+        }
+    }
+
+    /// A new person: both let go.
+    public mutating func reset() {
+        library.reset()
+        allSongs.reset()
     }
 }

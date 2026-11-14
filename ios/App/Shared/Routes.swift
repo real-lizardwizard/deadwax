@@ -35,6 +35,9 @@ enum AppRoute: Hashable {
     case artist(ArtistRoute)
     /// (slice 4) An artists list of a scope, pushed: All music's All artists (the store's), from the Library's •••.
     case artists(AlbumScope)
+    /// (slice 5, question 32) Every song of the collection, pushed: All music's All songs, from the Library's ••• with a
+    /// library of your own (without one, Songs is a page of the switch).
+    case allSongs
 }
 
 /// An artist page's address: Navidrome's artist id, and what opened it - the name and picture drawn at once while the
@@ -296,6 +299,7 @@ extension View {
                 case .downloadedPlaylists: DownloadedPlaylistsScreen()
                 case .artist(let artist): ArtistView(route: artist)
                 case .artists(let scope): ArtistsScreen(scope: scope)
+                case .allSongs: SongsScreen()
                 }
             }
             .clearsPlayer()
