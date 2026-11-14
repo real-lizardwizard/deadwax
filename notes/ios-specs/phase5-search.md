@@ -376,6 +376,13 @@ What's saved (`/saved`, drawn at the library's moment, MusicBrainz's answer addi
 24 answers kept for the session, used with no request; More from MusicBrainz (by offset) in a kind view; the app's
 version 0.11 (11) with everything pinned to it; docs/ios.md and README for the phase.
 
+### 6.5 Slice 1, built (2026-11-14)
+
+What slice 1 is, as built, is in notes/ios.md's "Phase 5, slice 1: Search, your library's half" - Core (Owned.swift,
+SearchReading.swift, SearchList.swift, SearchState.swift, held to the web by export-search-vectors.cjs), the app
+(SearchModel, SearchScreen, the Search tab), what was decided here, the tests and mutations, and what was verified.
+Questions 1-7 and 10 were built with it; questions 11-13 came of it. docs/ios.md's checks 121-129 are its.
+
 ## 7. Tests (Swift Testing; Core's on Linux and macOS)
 
 - **The fixture's replay** (slice 1): every rule of 2.1-2.5 over the web's own answers - readings of every shape (a
@@ -477,3 +484,14 @@ each slice numbers its own after the last.
    don't have (or yours), and the description in Phase 7's links if at all. Not built (slice 3).
 10. **A song's album not yet in hand.** *Recommend, and built*: as the web - its album's page opens (a tap that waited
     for the album and then played would start the music outside the tap, which iOS refuses on a locked phone).
+
+11. **A song's ••• before its album is in hand.** The web's row menu queues the song alone. *Recommend, and built*:
+    with its album in hand, the album page's song menu (Play Next, Play Last, Add to a playlist…, Download, the song
+    queued with its album); before, the song's own (PlaylistPlay.pick - each song with its own album, as a
+    playlist's), so the ••• never waits on anything.
+12. **Offline rows** (beside question 5). *Recommend, and built*: dimmed as the Library dims them - a song not on this
+    phone, an album with nothing here, an artist with no album here - and opening nothing; a song on the phone plays
+    from its album's songs that are here, the album as it was downloaded when the prefetch didn't bring it.
+13. **Where the list goes when it changes.** *Recommend, and built*: to its top, at once, when a chip changes the view
+    and when new words' list takes the old one's place; a row's line changing in place never moves it, and Search
+    tapped at the list scrolls to the top as the other tabs do.

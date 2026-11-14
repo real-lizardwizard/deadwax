@@ -32,6 +32,7 @@ struct DeadwaxApp: App {
     @State private var shuffles: ShuffleModel
     @State private var artists: ArtistsModel
     @State private var songs: SongsModel
+    @State private var search: SearchModel
 
     /// The one background session, made before anything else can ask it.
     private static let downloadSession = DownloadSession()
@@ -56,6 +57,8 @@ struct DeadwaxApp: App {
         let artists = ArtistsModel(server: server)
         // Phase 4, slice 5: every song of the collection, a page at a time
         let songs = SongsModel(server: server)
+        // Phase 5, slice 1: Search, your library's half
+        let search = SearchModel(server: server, library: library, artists: artists, reachability: reachability)
         let downloads = DownloadModel(server: server, reachability: reachability, files: files, session: Self.downloadSession)
         player.connect(downloads: downloads, reachability: reachability)
         // Phase 4, slice 3: a write here to a downloaded playlist keeps it in step at once
@@ -85,6 +88,7 @@ struct DeadwaxApp: App {
             shuffles.reset()
             artists.reset()
             songs.reset()
+            search.reset()
         }
         _server = State(initialValue: server)
         _player = State(initialValue: player)
@@ -101,6 +105,7 @@ struct DeadwaxApp: App {
         _shuffles = State(initialValue: shuffles)
         _artists = State(initialValue: artists)
         _songs = State(initialValue: songs)
+        _search = State(initialValue: search)
     }
 
     var body: some Scene {
@@ -121,6 +126,7 @@ struct DeadwaxApp: App {
                 .environment(shuffles)
                 .environment(artists)
                 .environment(songs)
+                .environment(search)
                 .preferredColorScheme(.dark)
                 .tint(Palette.accent)
         }

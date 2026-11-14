@@ -46,7 +46,8 @@ enum Fixtures {
         for path in ["errors/error-words.json", "levels/levels-vectors.json", "library/dates.json", "resume/cases.json",
                      "upnext/traces.json", "you/you.json", "gate/navidrome.json", "lyrics/lyrics-vectors.json",
                      "lyrics/answers.json", "autoeq/answers.json",
-                     "playlists/playlist-vectors.json", "artists/artist-vectors.json", "shuffle/shuffle-vectors.json"] {
+                     "playlists/playlist-vectors.json", "artists/artist-vectors.json", "shuffle/shuffle-vectors.json",
+                     "search/search-vectors.json"] {
             #expect(try Fixtures.url(path) == Fixtures.checkout.appendingPathComponent(path), "\(path)")
         }
     }

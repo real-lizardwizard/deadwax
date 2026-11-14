@@ -1,4 +1,4 @@
-# The iPhone app (early: app 0.10, downloads, lyrics, the EQ, the turntable, play history, your library and the Library)
+# The iPhone app (early: app 0.10, downloads, lyrics, the EQ, the turntable, play history, your library, the Library and Search)
 
 deadwax is getting a native iPhone app, built with SwiftUI and its own audio engine, for what a web
 page can't do well: seamless joins and normalization done on the phone, downloads to play offline,
@@ -31,14 +31,15 @@ phone as in the web app, and downloaded to play with no connection, kept in step
 a pull down that shuffles your whole library (see [The
 Library](#the-library)); **artists** - your artists, and an artist's page with their albums, Play and
 Shuffle (see [Artists](#artists)); and **songs** - every song, a page at a time, each opening its album
-(see [Songs](#songs)). Search, Get and the rest come next (see [What it can't do
-yet](#what-it-cant-do-yet)).
+(see [Songs](#songs)). Phase 5's Search has begun: its first half searches your library, as the web app's
+Search does (see [Search](#search)); albums you don't have, Get and the rest come next (see [What it
+can't do yet](#what-it-cant-do-yet)).
 
 **Nothing of Phase 2, the lyrics, the EQ, the turntable, play history, your library downloaded,
-playlists, artists or songs has been seen on an iPhone yet.** It's built and tested on a Mac, and what
+playlists, artists, songs or Search has been seen on an iPhone yet.** It's built and tested on a Mac, and what
 only a phone can tell is what [the checks](#the-checks) are for. Until they're answered, read everything
-about downloads, lyrics, the EQ, the turntable, play history, your library, playlists, artists and songs
-below as what the app is built to do.
+about downloads, lyrics, the EQ, the turntable, play history, your library, playlists, artists, songs and
+Search below as what the app is built to do.
 
 The app talks only to deadwax, never to Navidrome, through deadwax's own routes, so the phone never
 needs the Navidrome account deadwax itself uses. With logins on, you sign in with your own Navidrome
@@ -618,6 +619,47 @@ and All artists, rather than a page among your own albums and artists.
 - **Offline**, the songs already fetched stay, the ones not on this phone dimmed (they open nothing), and no
   more are fetched until deadwax is back - then the next 100 come, if you had got near the end. With none
   fetched yet: "Songs show here once deadwax is back."
+
+## Search
+
+**Search** is the tab between Library and You. Its field is always there at the top - tap it to type -
+with "Search your library." under it while it's empty ("Search your library and the collection." with a
+library of your own). It searches what deadwax has, as the web app's Search does: **this half of Search
+is your library's**. Albums you don't have yet, from MusicBrainz, and Get come later (see [What it can't
+do yet](#what-it-cant-do-yet)).
+
+A fifth of a second after you stop typing - or at once when you press **Search** on the keyboard - it
+asks Navidrome, and shows **one list**, the web app's:
+
+- **Top results**: the three best matches of any kind, as the web app picks them - the album or artist
+  your words name first ("dummy portishead" and "portishead dummy" both lead with Dummy), then what fits
+  best.
+- Then **Artists** (the first 2), **Albums** (3) and **Songs** (3), each with **See all**. With a library
+  of your own, the rows of your library come first in each, and each row says whose it is: "in your
+  library", or "in the collection" for one of an album you haven't added.
+- **The chips** under the field - **All**, **Artists**, **Albums**, **Songs** - show one kind in full: up
+  to 50 artists or albums, or 100 songs, with **More from your library** ("More from the collection")
+  when there are more. **All** puts the list back as it was.
+
+**The list is drawn once for the words.** Typing on keeps it where it is until the new words' list is
+in, and that takes its place whole - nothing moves under your finger while you watch. What changes in
+place is a row's line (whose it is). Clearing the field brings the hint back.
+
+- **A song**: tap it to play it, with its album's songs after it in Up Next. The phone fetches the albums
+  of the first songs found as the list comes in, so a song with **▶** after it plays the moment you tap.
+  One without (its album not fetched yet) opens its album's page instead. Its **•••** is the song's own
+  menu: Play Next, Play Last, Add to a playlist… and Download.
+- **An album** opens its page; **an artist**, theirs. Back takes you to the list as you left it.
+- Nothing found says "No results for “…”." and "Check the spelling or try a new search." (a chip's:
+  "No albums for “…”."). If Navidrome couldn't be asked, why, and **Try again**. If deadwax can't reach
+  Navidrome at all, the Library's words for it ("Can't reach Navidrome", or "Your music isn't available right
+  now") stand above the list, with Try again once Navidrome is set up.
+- **Offline**, a list already drawn for the words stays, the songs not on this phone dimmed (a tap does
+  nothing) and the ones on it playing; albums and artists with nothing here dimmed. New words say "Search
+  works once deadwax is back." and are searched once it is.
+- **VoiceOver** reads a row as one: its title, its line, and for a song "plays it from its album" or "opens
+  its album". The list is announced as it comes in ("In your library: 1 artist, 2 albums, 11 songs."), and
+  a chip as it's chosen ("Showing albums.").
 
 ## Playing
 
@@ -1663,6 +1705,8 @@ answering, **Try again**. It goes by itself once deadwax answers.
   is back."
 - **Songs**: the songs already fetched stay, the ones not on the phone dimmed, and no more are fetched (see
   [Songs](#songs)).
+- **Search**: a list already drawn for the words stays, what isn't on the phone dimmed; new words wait for
+  deadwax: "Search works once deadwax is back." (see [Search](#search)).
 - **Playlists**: one with a song on the phone, among the last eight you opened since the app started,
   opens with the songs not on the phone dimmed; the others are dimmed and open nothing. None is made or
   changed: Add to a playlist… is left out of the ••• menus, and New playlist and Edit are dimmed (see
@@ -2529,6 +2573,38 @@ break-glass `deadwax` sign-in.
   title and line alone), its ••• "More for Roads", and a dimmed one adds "Not on this phone". All songs'
   Shuffle reads "Shuffle". With logins off the switch reads Albums, Playlists, Artists and Songs.
 
+### Search's checks (121-129)
+
+**Not done yet.** These come with the build that adds Search's first half - your library's (still app
+0.10). Check 126 wants logins on and a library of your own; the rest work either way. The web app's Search
+is the one to compare with: it should give the same lists.
+
+- **121 The tab.** The tabs read Library | Search | You. Search shows the field and "Search your
+  library." (with logins on and a library of your own, "Search your library and the collection."). Open an
+  album from a list, then tap Search: back to the list; tap it again at the list: its top.
+- **122 A song you have.** Type "roads" (or a song of yours): Top results and Songs list it, with ▶ after
+  it. Tap it: it plays from that song, its album's songs after it in Up Next - in the tap, no wait. A song
+  further down Songs (See all) with no ▶: its album's page opens.
+- **123 Top results, as the web's.** Type the same three searches in the web app's Search and on the phone -
+  "portishead", "roads", "glory box" (or your own artist, song and album): Top results are the same three,
+  in the same order, and each section the same rows (the phone shows 2 artists, 3 albums and 3 songs, as
+  the web app does on a phone).
+- **124 Album and artist.** "dummy portishead" and "portishead dummy": Dummy first. Tap an album: its page.
+  Tap an artist: theirs. Back: the list as you left it, the words still in the field.
+- **125 The chips.** Albums: every album found (up to 50), More from your library when there are more; All:
+  the list as it was. See all under Songs: the Songs chip, every song found.
+- **126 Whose** (logins on, a library of your own). A song of an album you haven't added says "in the
+  collection", after your own in its section; your own, "in your library". Add an album to your library in
+  the web app, then search it on the phone: "in your library".
+- **127 Typing fast.** Type "portishead" quickly, then delete back to "port" and on to "portis": one list
+  at a time, never a row jumping under your finger while you watch. Clear the field: the hint again.
+- **128 Offline.** With a list drawn, turn on Airplane Mode: the list stays, the songs not downloaded
+  dimmed (a tap does nothing), a downloaded one plays. Type new words: "Search works once deadwax is back."
+  Turn Airplane Mode off: the new words are searched.
+- **129 VoiceOver.** A song's row reads its title, its line ("Song · Portishead · Dummy · in your library"
+  in Top results), and "plays it from its album" (or "opens its album"); the list found is announced ("In
+  your library: 1 artist, 2 albums, 11 songs."); a chip as it's chosen ("Showing albums.").
+
 ## What it can't do yet
 
 These are the web app's for now. Most of them come to the phone in the next phases:
@@ -2537,7 +2613,8 @@ These are the web app's for now. Most of them come to the phone in the next phas
 
 - On an artist's page their **discography** from MusicBrainz, the **description** and the artist's
   managing (pictures, names).
-- **Search**, **Get** and **Requests**.
+- In **Search**, albums, artists and songs you don't have yet (MusicBrainz's), and what's saved of
+  MusicBrainz's answers; **Get** and **Requests**.
 - **Home** and **pins**.
 - **Looking after deadwax**: People, Server settings, the event log, Needs a look, Library care, the
   editors, and changing your password. For an admin, **Set up Navidrome** opens the web app in Safari.

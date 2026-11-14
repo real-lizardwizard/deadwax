@@ -58,5 +58,5 @@ patterns. The app is then built to the spec and reviewed against it. notes/ios.m
   words (the web's lib/searchList.ts, searchQuery.ts and searchResults.ts, and the phone's own for offline), the box's
   reading, whose a row is, the sections, Top results (tier, source, kind, position; the family; the rounds), the lines,
   what is asked and when, the list drawn once per text and frozen, a song playing in its tap, the album you don't have
-  with room for Get; no server addition for slice 1 (a Cover Art Archive relay recommended before slice 2); four slices,
-  tests, James's checks (121 on) and 10 open questions.
+  with room for Get; no server addition for slice 1 (a Cover Art Archive relay recommended before slice 2); four slices
+  (the first built), tests, James's checks (121 on) and 13 open questions.

@@ -24,7 +24,7 @@ public enum Routes {
     public static let me = Endpoint(method: "GET", path: "/deadwax/me", query: [])
     public static let signIn = Endpoint(method: "POST", path: "/deadwax/auth/login", query: [])
     public static let signOut = Endpoint(method: "POST", path: "/deadwax/auth/logout", query: [])
-    public static let search = Endpoint(method: "GET", path: "/deadwax/navidrome/search", query: ["q", "artistCount", "albumCount", "songCount", "songOffset"])
+    public static let search = Endpoint(method: "GET", path: "/deadwax/navidrome/search", query: ["q", "artistCount", "artistOffset", "albumCount", "albumOffset", "songCount", "songOffset"])
     public static let stream = Endpoint(method: "GET", path: "/deadwax/navidrome/stream/{song_id}", query: ["format"])
     public static let cover = Endpoint(method: "GET", path: "/deadwax/navidrome/cover/{cover_id}", query: ["size"])
 
@@ -108,6 +108,9 @@ public enum Routes {
     // with their albums (getArtist, `ArtistWithAlbums`; `{}` for one Navidrome doesn't have)
     public static let artists = Endpoint(method: "GET", path: "/deadwax/navidrome/artists", query: [])
     public static let artist = Endpoint(method: "GET", path: "/deadwax/navidrome/artists/{artist_id}", query: [])
+    // Phase 5, slice 1's (phase5-search.md 0, 2.6): every album on disk, reduced to which album and edition it is
+    // (`OwnedAnswer`, with an ETag) - the names Search reads the box against, and whose an unstarred album is
+    public static let libraryOwned = Endpoint(method: "GET", path: "/deadwax/library/owned", query: [])
 
     /// The levels spec's name for `levelAlbum`: the album's levels warmed before its first play.
     public static var warmLevels: Endpoint { levelAlbum }
@@ -126,13 +129,14 @@ public enum Routes {
         playlists, playlist, createPlaylist, addToPlaylist, editPlaylist, deletePlaylist,
         shuffle, shufflePage,
         artists, artist,
+        libraryOwned,
     ]
 
     /// The routes given longer than the transport's own 8 seconds to answer, in seconds: the album index reads every
     /// album of a scope from Navidrome, a page at a time, before it answers; AutoEq's search may wait for deadwax's
     /// first fetch of AutoEq's list (src/autoeq.py FIRST_FETCH_SECONDS, 15 s) and a profile for its file
     /// (PROFILE_DEADLINE_SECONDS, 15 s) - tests/test_ios_contract.py holds each above the server's.
-    public static let timeouts: [Endpoint: Double] = [albumIndex: 30, autoEqSearch: 20, autoEqProfile: 20]
+    public static let timeouts: [Endpoint: Double] = [albumIndex: 30, autoEqSearch: 20, autoEqProfile: 20, libraryOwned: 30]
 }
 
 /// The cover sizes the app asks for (`Routes.cover`'s `size`) - the contract test checks each is within the server's

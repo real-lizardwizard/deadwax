@@ -2,9 +2,11 @@ import DeadwaxCore
 import Observation
 import SwiftUI
 
-/// The app's two tabs (D1): Library and You.
+/// The app's tabs (D1): Library, Search (Phase 5 - phase5-search.md 3.1, question 1: the web's order, You at the end)
+/// and You.
 enum AppTab: Hashable {
     case library
+    case search
     case you
 }
 
@@ -133,12 +135,15 @@ final class AppNavigation {
     private(set) var tab: AppTab = .library
     /// The Library tab's pages, root first left out.
     var library: [AppRoute] = []
+    /// (Phase 5) The Search tab's pages - an album, an artist, anything the Library pushes.
+    var search: [AppRoute] = []
     /// The You tab's pages.
     var you: [AppRoute] = []
     /// Now Playing is open (a full-screen cover over the tabs).
     var nowPlayingShown = false
     /// One more each time a tab already at its root is tapped again: its root list scrolls to the top.
     private(set) var libraryScrollToTop = 0
+    private(set) var searchScrollToTop = 0
     private(set) var youScrollToTop = 0
 
     /// An EQ import's preview (eq.md 3.9), one at a time: a file shared to deadwax, or one an EQ page read from Files or
@@ -189,6 +194,8 @@ final class AppNavigation {
         switch tapped {
         case .library:
             if library.isEmpty { libraryScrollToTop += 1 } else { backToRoot(&library) }
+        case .search:
+            if search.isEmpty { searchScrollToTop += 1 } else { backToRoot(&search) }
         case .you:
             if you.isEmpty { youScrollToTop += 1 } else { backToRoot(&you) }
         }
@@ -213,10 +220,10 @@ final class AppNavigation {
         }
     }
 
-    /// A playlist's page went away: popped (no page of it left on either tab), its Edit with it.
+    /// A playlist's page went away: popped (no page of it left on any tab), its Edit with it.
     func pageGone(_ id: String) {
         guard editingPlaylist == id else { return }
-        let held = (library + you).contains { (route: AppRoute) -> Bool in
+        let held = (library + search + you).contains { (route: AppRoute) -> Bool in
             if case .playlist(let shown) = route { return shown.id == id }
             return false
         }
@@ -227,7 +234,17 @@ final class AppNavigation {
     func open(_ route: AppRoute) {
         switch tab {
         case .library: library.append(route)
+        case .search: search.append(route)
         case .you: you.append(route)
+        }
+    }
+
+    /// The pages of the tab shown.
+    private var shownStack: [AppRoute] {
+        switch tab {
+        case .library: return library
+        case .search: return search
+        case .you: return you
         }
     }
 
@@ -236,7 +253,7 @@ final class AppNavigation {
     /// goToAlbum: "opens the album page on the current tab"). An album already on top of it isn't pushed twice.
     func openAlbum(_ album: AlbumRoute) {
         nowPlayingShown = false
-        let top = tab == .library ? library.last : you.last
+        let top = shownStack.last
         if case .album(let shown)? = top, shown.id == album.id { return }
         open(.album(album))
     }
@@ -247,6 +264,8 @@ final class AppNavigation {
         switch tab {
         case .library:
             if case .playlist(let shown)? = library.last, shown.id == id { library.removeLast() }
+        case .search:
+            if case .playlist(let shown)? = search.last, shown.id == id { search.removeLast() }
         case .you:
             if case .playlist(let shown)? = you.last, shown.id == id { you.removeLast() }
         }
@@ -264,6 +283,7 @@ final class AppNavigation {
         }
         switch tab {
         case .library: popped(&library)
+        case .search: popped(&search)
         case .you: popped(&you)
         }
     }
@@ -271,6 +291,7 @@ final class AppNavigation {
     /// The person changed: every page popped, Now Playing closed, Library shown.
     func reset() {
         library.removeAll()
+        search.removeAll()
         you.removeAll()
         nowPlayingShown = false
         eqImportSheet = false

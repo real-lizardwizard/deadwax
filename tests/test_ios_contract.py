@@ -79,6 +79,7 @@ from src.api.app import start  # noqa: E402
 from src.api.navidrome_endpoint import CLIENT_NAME  # noqa: E402
 from src.config import Config  # noqa: E402
 from src.routes import eq as eq_route  # noqa: E402
+from src.routes import library as library_route  # noqa: E402
 from src.routes import my_library, navidrome, store_album  # noqa: E402
 from src.routes import play_history as history_route  # noqa: E402
 from src.routes.auth import SignIn  # noqa: E402
@@ -87,7 +88,7 @@ from src.store import JobStore  # noqa: E402
 
 CORE = Path(__file__).resolve().parent.parent / "ios" / "DeadwaxKit" / "Sources" / "DeadwaxCore"
 ENDPOINT = re.compile(r'Endpoint\(method: "(\w+)", path: "([^"]+)", query: \[([^\]]*)\]\)')
-ROUTE_COUNT = 40
+ROUTE_COUNT = 41
 RAW_OPENING = re.compile(r'#+"')
 HASHES = re.compile(r"#*")
 
@@ -302,11 +303,20 @@ def test_what_the_app_sends_is_within_the_servers_bounds(monkeypatch):
     scrub = routes[("GET", "/deadwax/navidrome/scrub/{song_id}")]
     hi_res = swift_constant("TestSongs.swift", "HiRes", "pageSize")
     pages = swift_constant("TestSongs.swift", "HiRes", "maxPages")
+
+    def pacing(name: str) -> int:
+        # (Phase 5) Search's counts: All's search3 and a kind view's own (SearchPacing, the web's SEARCH_COUNTS)
+        return swift_constant("SearchList.swift", "SearchPacing", name)
+
     sent = [
-        ((search, "songCount"), [swift_constant("TestSongs.swift", "TestSounds", "pageSize"), hi_res]),
-        ((search, "songOffset"), [0, (pages - 1) * hi_res]),
-        ((search, "artistCount"), [0]),
-        ((search, "albumCount"), [0]),
+        ((search, "songCount"), [swift_constant("TestSongs.swift", "TestSounds", "pageSize"), hi_res,
+                                 pacing("songCount"), pacing("chipSongCount")]),
+        ((search, "songOffset"), [0, (pages - 1) * hi_res, pacing("chipSongCount")]),
+        ((search, "artistCount"), [0, pacing("artistCount"), pacing("chipArtistCount")]),
+        ((search, "albumCount"), [0, pacing("albumCount"), pacing("chipAlbumCount")]),
+        # a kind view's More asks from the rows it has (SearchState.askingMore), the other kinds' offsets 0
+        ((search, "artistOffset"), [0, pacing("chipArtistCount")]),
+        ((search, "albumOffset"), [0, pacing("chipAlbumCount")]),
         ((cover, "size"), [swift_constant("Routes.swift", "CoverSize", name) for name in ("row", "tile", "hero", "lockScreen")]),
         # milliseconds since 1970: one in 2026, and one in 2027
         ((scrobble, "time"), [0, 1_767_312_000_000, 1_800_000_000_000]),
@@ -1151,3 +1161,38 @@ def test_the_artist_answers_are_what_the_app_decodes():
     for album in answers.ARTIST["album"]:
         assert set(album) <= set(fields("Album")), album
         assert required_fields("Album") <= set(album)
+
+
+# ---------------------------------------------------------------------------- Phase 5, slice 1: Search
+
+def test_the_owned_answer_is_what_the_app_decodes():
+    # /library/owned answers {albums, problem}, each album OWNED_FIELDS and, with logins on, `yours` - every field the
+    # phone reads is one it sends (one renamed would read as absent: no album artist to read the box against, every
+    # folder the collection's), and only the path is needed of a row
+    source = inspect.getsource(library_route.owned)
+    assert re.search(r'json_with_etag\(request, \{\s*"albums": albums,\s*', source)
+    assert '"problem": result.get("problem")' in source
+    assert 'album["yours"] = album.get("path") in yours' in source
+    assert set(fields("OwnedAnswer")) == {"albums", "problem"}
+    assert required_fields("OwnedAnswer") == {"albums"}
+    assert set(fields("OwnedAlbum")) <= set(library_route.OWNED_FIELDS) | {"yours"}
+    assert required_fields("OwnedAlbum") == {"path"}
+    # the answer carries an ETag, which the phone sends back (DeadwaxClient.owned): a 304 while the library is as it was
+    assert "ifNoneMatch" in swift_function("DeadwaxClient.swift", "owned")
+
+
+def test_search_answers_what_the_app_decodes():
+    # search3's three lists, under the names LibraryResults reads (each leniently: a list absent is none)
+    (answer,) = returned_literals(navidrome.search)
+    assert literal_keys(answer) == {"artists", "albums", "songs"}
+    assert set(fields("LibraryResults")) == literal_keys(answer)
+
+
+def test_the_box_is_never_longer_than_the_route_takes(monkeypatch):
+    # the phone clamps the box to SearchReading.maxCharacters Unicode scalars (SearchModel.clamped) - a str's length
+    # in Python, which `q`'s max_length counts: a bound lowered under it would make a long search a 422
+    monkeypatch.setattr(Config, "AUTH_MODE", None)
+    search = app_routes()[("GET", "/deadwax/navidrome/search")]
+    query = next(f for f in search.dependant.query_params if f.alias == "q")
+    lengths = {type(rule).__name__: rule for rule in query.field_info.metadata}
+    assert swift_constant("SearchReading.swift", "SearchReading", "maxCharacters") == lengths["MaxLen"].max_length == 200

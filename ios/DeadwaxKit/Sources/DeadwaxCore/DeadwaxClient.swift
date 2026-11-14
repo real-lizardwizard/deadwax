@@ -350,6 +350,27 @@ public struct DeadwaxClient: Sendable {
         try await call(Routes.shufflePage, path: ["token": token], query: [("offset", String(offset))])
     }
 
+    // MARK: Phase 5, slice 1: Search
+
+    /// Search's search3 for `query`, as the person signed in: `counts` of each kind, from `offsets` (each sent only when
+    /// above 0, as the web's searchLibrary sends them) - artists, albums and songs, each in Navidrome's order.
+    public func searchLibrary(_ query: String, counts: SearchCounts,
+                              offsets: SearchCounts = .none) async throws -> LibraryResults {
+        var items: [(String, String)] = [
+            ("q", query), ("artistCount", String(counts.artists)), ("albumCount", String(counts.albums)),
+            ("songCount", String(counts.songs)),
+        ]
+        if offsets.artists > 0 { items.append(("artistOffset", String(offsets.artists))) }
+        if offsets.albums > 0 { items.append(("albumOffset", String(offsets.albums))) }
+        if offsets.songs > 0 { items.append(("songOffset", String(offsets.songs))) }
+        return try await call(Routes.search, as: LibraryResults.self, query: items)
+    }
+
+    /// Every album on disk, as `/library/owned` reduces it - `.unchanged` when the answer kept (its ETag) still is.
+    public func owned(ifNoneMatch etag: String?) async throws -> Fetched<OwnedAnswer> {
+        try await fetch(Routes.libraryOwned, as: OwnedAnswer.self, ifNoneMatch: etag)
+    }
+
     // MARK: Phase 4, slice 4: artists
 
     /// Every artist in the collection, in Navidrome's order (getArtists, its index flattened by deadwax).
