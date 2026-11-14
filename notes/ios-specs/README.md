@@ -47,3 +47,10 @@ patterns. The app is then built to the spec and reviewed against it. notes/ios.m
   `library` beside Phase 2's, Only while charging, BGAppRefreshTask and BGProcessingTask; You > Downloads' section,
   the first ask, Downloading's one row, the album page, Debug; no server addition (the `album_songs` route named, built
   only if the first read is slow); three slices, tests, James's checks (L0a-L0g, 50-63) and 16 open questions.
+- `phase4-library.md` - playlists, artists, songs (Phase 4, app 0.10), designed 2026-11-13 against 2.1.15 / ios b4cf8e0
+  (app 0.9): the words (the web's lib/playlists.ts, and the phone's own for offline), whose playlists are (Navidrome's,
+  as the asker), the list and its groups, a playlist's page, playing one (each song with its own album, at the songs
+  level, the albums Info knows as the web's lib/playedAlbums.ts keeps them), Add to a playlist, New, Edit and Delete,
+  Download a playlist with its own origin `playlist:<id>` kept in step by two reads, the artists and an artist's page,
+  every song paged, the Library's Shuffle and its feed; no server addition; five slices (the first built), tests,
+  James's checks (64 on) and 8 open questions.

@@ -129,8 +129,9 @@ struct HeldBadge: View {
     }
 }
 
-/// Play (filled) and Shuffle (plain), side by side - one above the other at the largest text sizes.
-private struct PlayButtons: View {
+/// Play (filled) and Shuffle (plain), side by side - one above the other at the largest text sizes. An album's page's,
+/// and a playlist's (Phase 4).
+struct PlayButtons: View {
     let enabled: Bool
     let play: () -> Void
     let shuffle: () -> Void

@@ -4501,3 +4501,204 @@ Not verified - none of the App's wiring has a test, and only a phone can tell:
 - Whether a stopped follower's dropped check costs anything at the next front.
 - Whether the session's `countOfBytesReceived` moves as the bytes do, which the stall rule reads.
 - The new budgets against what iOS really gives.
+
+## Phase 4, slice 1: playlists, read and play (2026-11-13)
+
+The first of Phase 4's five slices (notes/ios-specs/phase4-library.md, written first; the plan's section 5), on
+branch `phase4-library` from `ios` b4cf8e0 (Phase 3 done, app 0.9). **The app stays 0.9 (9)** until the phase is
+done (0.10 with slice 5); src/__init__.py untouched; **no server change**: the two read routes the web's Playlists
+use (GET /deadwax/navidrome/playlists and /playlists/{id}, as the asker) answer everything slice 1 needs. Navidrome's
+own playlists, read and played; no writes, and no playlist downloads (slices 2 and 3).
+
+### Core (DeadwaxCore)
+
+- **Playlists.swift**: `Playlist` (src/playlists.py's summary(): id, name, comment, songCount, duration, created,
+  changed, owner, public as `isPublic`, coverArt - an empty one nil - mine, editable; read leniently, every field but
+  the id defaulting), `PlaylistList`, `PlaylistWithSongs` (playlist, songs, hidden - below 0 read as 0).
+  **PlaylistRules**, the web's lib/playlists.ts ported: `group(of:)` (not mine: shared; mine and editable: yours;
+  mine and read-only: files), `groups` (Navidrome's order kept in each), `songCount`, `lengthText` (whole minutes by
+  JS Math.round, "1h 5m" from 60), `songsLine`, `rowLine`, `ownerLine`, `readOnlyWords`, `canEdit` (slice 2's),
+  `hiddenWords`, `total` (the songs' own durations, the footer's), `songLine` (a row's artist · album); the limits
+  (name 200, comment 1000, 2,000 songs), PLAYLISTS_FRESH_MS (30 s) and PLAYLISTS_KEPT (8). **PlaylistWords**: the
+  web's lines and the TSX's, and the phone's own (`offlineList`, `offlinePage`); `playlistsEmpty` and
+  `playlistEmptyNow` (the first sentence of PLAYLIST_EMPTY) until slice 2 (question 6).
+- **PlayedAlbums.swift**: the web's lib/playedAlbums.ts, generic over the album - `remember` (an album's Play: floor
+  0, the last 8), `rememberQueue` (every album of a queue kept, up to 64, until the next queue; put in reverse so the
+  first to play is the newest), `also` (in as the newest, letting go of nothing held, up to 64), `get`, and the
+  phone's `forget` (an album gone).
+- **PlaylistPlay.swift**: a playlist's songs as the queue (the web's `toQueueTrack(song, stubFor(song))`): each song
+  with its own album, `albumId` nil when the song names none; `songsLevel` (`levelFor(setting, .songs)`: Automatic
+  levels each song as a song); `albums` (the web's playlistAlbums: one stub per album in the order its first song
+  plays, the playlist's songs of it, the album artist else the song's, a cover and year only when there is one,
+  `partial`); `withHeld` (an album held whole kept as it is; an earlier stub's songs kept beside the new ones);
+  `plan(songs, setting:, held:)`; `pick(name:songs:)` (the bar's •••) and `pick(song:)` (a row's).
+- **`Album.partial`** (never decoded - deadwax never sends it), and Info's `AboutAlbum(album:)` passing it, so Info's
+  About counts nothing of the album from a stub: "Track 5", no "of 12", no disc line, no song count.
+- **Routes** `playlists` and `playlist` (Routes.all 32), and the client's `playlists()` and `playlist(id:)` (a 404
+  thrown, read as `.notFound`). Models.swift's lenient `looseField`/`looseList` are now module-wide, not fileprivate,
+  for the playlists' decoding.
+
+### The app
+
+- **PlaylistsModel** (environment, one per person, reset by whenPersonChanges): the list (asked afresh each time the
+  screen shows, else not within 30 s; the newest answer only; an answer for a person no longer signed in dropped), the
+  last failure, and the last 8 pages' answers (`kept`, `keep`, `forget`, `playsOffline`). **PlaylistPageModel**: the
+  kept answer drawn first, then deadwax's; a 404 is gone (the kept answer let go); a refresh that fails keeps what is
+  drawn; nothing asked while deadwax can't be reached.
+- **The Library's root**: a **Playlists** row (music.note.list), the first of the places after the first-ask card, in
+  every scope - and on the Downloaded root the Library shows while deadwax can't be reached, under the way back to the
+  albums.
+- **PlaylistsScreen**: a plain List - Yours and Shared with you under LibraryHeader, From files folded in a
+  DisclosureGroup ("From files (3)", the screen's own state); each row the mosaic at the rows' size (or the playlist
+  mark on the empty-cover square), the name, its line, read as one; pull to refresh; ErrorNote for a failure (Try
+  again with no list). Offline: the list in hand draws, a row dimmed and disabled unless its kept page has a song on
+  this phone; with none in hand, "Your playlists show here once deadwax is back."
+- **PlaylistView**: the album page's layout - the mosaic at AlbumHero's side, the name, `ownerLine`, `readOnlyWords`,
+  the comment, `songsLine`, **Play and Shuffle** (AlbumHero's PlayButtons, now internal); the hidden line; the rows,
+  each with its own cover (a waveform over it for the song playing), title, artist · album, its download mark and
+  time, and its ••• (the song's Play Next, Play Last and download items); the footer; the name in the bar once
+  scrolled. The bar's ••• is the whole playlist's Play Next and Play Last, **with no download items**
+  (`QueueMenuRequest.offersDownload` false - question 7). Offline: the songs not on this phone dimmed, Play and
+  Shuffle taking those that are, a row's tap counted among them.
+- **PlayerModel**: its played albums are `PlayedAlbums<Album>`; `play(playlist:at:shuffle:)` plans with PlaylistPlay
+  (the held albums from `played.get`), `rememberQueue`s the albums, and starts the queue in the tap; Play Next and
+  Play Last take an optional album (nil: the songs each with their own, the stubs `also`); an album page's album is
+  `also` (question 8); an album gone is `forget`.
+- **Routes**: `.playlists` and `.playlist(PlaylistRoute)` (the id, and the row's playlist as a preview for the hero).
+
+### Decided here (the spec was silent, or this departs from it)
+
+- **Questions 6, 7 and 8 built as recommended**: the empty lines' first sentences alone; no download items on the
+  bar's ••• until slice 3 (so slice 3 never meets a playlist's songs downloaded as loose ones); the album page's album
+  kept as `also` - which, the review found, DID let go of a playlist's albums mid-play once the floor reached 64
+  (fixed: "after its review", below).
+- **A row is dimmed offline unless its kept page has a song on this phone**: the list's answer says nothing of the
+  songs, so only a page opened this run can open with no connection (question 5's in-memory answer).
+- **The Playlists row is on the Downloaded root too**: offline the Library's root is Downloaded, and without it a
+  playlist in hand could be reached only if its screen was already open.
+- **The Library's Playlists row carries no count**: the list isn't asked until the screen opens (the web's phone row
+  asks nothing either).
+- **The lenient decoding helpers made internal** rather than copied into Playlists.swift.
+
+### Tests
+
+Core 1196 (from 1178): **PlaylistVectorTests** 8 - the web's own answers replayed from
+`Fixtures/playlists/playlist-vectors.json` (ios/scripts/export-playlist-vectors.cjs compiles src/lib/playlists.ts and
+src/lib/playedAlbums.ts; `ui/test/iosplaylists.sim.cjs` runs it with `--check`): the words and limits, the empty
+line's first sentence, groups and every line over 15 playlists at 0, 1, 12, 2,000 and 2,001 songs, the groups'
+order over five lists, counts, lengths (negatives too), stubs, `withHeld`, and seven PlayedAlbums runs at the bounds.
+**PlaylistPlayTests** 10, by hand: each song its own album, the songs level under each setting, a plan keeping an
+album held whole, the picks, the length, the row line, the screen's words and the banned vocabulary, a stub never
+sent and Info's partial, the list read (an empty `{}` too), one playlist read (odd fields leniently) and the 404's
+kind. InfoTests' cards take `partial` stubs; ClientTests' route count 32. **tests/test_ios_contract.py**: ROUTE_COUNT
+32, and `test_the_playlist_answers_are_what_the_app_decodes` - Playlist's fields exactly summary()'s keys (only the
+cover optional), a bare summary decoding, with_songs()'s three keys, and the routes sending them so.
+
+**Mutations, 26, each caught by a failing test, none by a build error** (scratchpad mutate.py, each file restored
+from its own bytes): the groups swapped; shared as yours; lengths floored; an hour at 61; no owner unnamed; public not
+said; 2,000 songs refused; hidden's verb; hidden at none; hidden below none; an empty cover kept; the songs level made
+the album's; no album id kept as ""; a stub over a whole album; an earlier stub's songs dropped; stubs not partial;
+year 0 kept; the song artist over the album artist; a song with no album id stubbed; the queue's floor none and
+unbounded; the queue played first last; `also` letting go; `remember` keeping the floor; `put` not refreshing; Info's
+partial lost.
+
+### Verified, and not
+
+Verified (2026-11-13, this Mac, Xcode's toolchain): `swift test` - Core 1196, DeadwaxAudio 158, DeadwaxTurntable 11,
+all pass; the 26 mutations; the unsigned Release device build with no warnings; check_project.py with the .xcodeproj
+unchanged; `pytest tests/test_ios_*.py tests/test_source_bytes.py`, and the full suite (4351 passed, 1 skipped); the
+11 ios sims on Node 22, iosplaylists among them. Not run: Core on Linux (ios.yml's ubuntu job will).
+
+Not verified - none of the App's wiring has a test, and only a phone can tell (docs/ios.md's checks 64-69):
+- That the mosaic covers (`pl-<id>_<hash>`) come through deadwax's cover route at the rows' and the hero's sizes.
+- That a playlist of a few hundred songs draws and scrolls smoothly (a plain List, each row its own cover).
+- That the lock screen and the mini player show each song's own album's cover as a playlist plays across albums.
+- That Navidrome's real `owner` (its case, an admin's view) and `readonly` group the playlists as the web does.
+- Nothing drawn has been seen: the From files fold, the dimmed rows offline, VoiceOver's reading of a row.
+
+## Phase 4, slice 1, after its review (2026-11-13)
+
+The review of c69f42b found no HIGH, one MEDIUM, four LOW and some gaps in the tests; all fixed in one commit on
+`phase4-library`. The app stays 0.9 (9); src/__init__.py untouched; no server change; **the web unchanged** (the
+MEDIUM's eviction is there too, more narrowly - below - for the coordinator to decide about on main).
+
+### What was wrong, and the fix
+
+- **MEDIUM - an album page shown let go of a playlist's album still to play.** PlayerModel's `albumShown` called
+  `played.also(album)`, and `also` raises the floor by one for each album not held, up to 64; past it the trim lets
+  the oldest album go - and `rememberQueue` puts a playlist's albums in reverse, so the oldest is the playlist's LAST
+  album, still to play. A 30-album playlist lost its last album at the 35th distinct page shown; a 64-album one lost
+  one at every page. Those songs' Info > About then had only the queue track (check 65 fails), Go to album the thin
+  preview, Debug its album. **Fix, in Core: an album the queue names is never let go.** PlayedAlbums' `remember`,
+  `rememberQueue` and `also` take `keeping` (ids), and the trim passes over every one of them - and over the album
+  just put - letting the oldest of the rest go; with all that's left kept, the store holds more than its bound until
+  the queue no longer names them. `QueueAlbums.named(tracks)` is the queue's ids (none for a track naming none).
+  PlayerModel passes the new queue's to `rememberQueue` (so a playlist of more than 64 albums keeps them all), the
+  queue's and the ones being added to Play Next and Play Last, and the queue's to `albumShown`'s `also`. Chosen over
+  a separate store for pages because it states the rule itself, and covers Play Next and Play Last too.
+  **A change from the web's createPlayedAlbums**, the phone's own: with `keeping` empty the store answers exactly as
+  the web's (the fixture's runs pass none, and a test holds empty and left out alike). **The web has the same
+  eviction**, but narrower: it calls `also` only for Play Next, Play Last (rememberAdded) and resume, never for a page
+  shown, so its floor climbs only with albums added to Up Next - a queue's last album goes once 64 are held that way
+  (a 64-album artist Play or playlist and one Play Next; a 30-album playlist and 35 albums Play Nexted). Not changed
+  on the web here.
+- **LOW - a page's answer kept under the next person.** `PlaylistPageModel.load` kept its answer in PlaylistsModel
+  without asking who had asked; a load run from `onChange(of: reachability.online)` is an unstructured Task that the
+  navigation's reset doesn't cancel, so one person's playlist (their mine/editable, their songs for `playsOffline`)
+  could be kept under the next after a sign-out. **Fix**: PlaylistsModel's `generation`, moved on by `reset`;
+  the page captures it before its await, and `keep(_:asked:)` refuses (false) an older one's answer - the page then
+  draws nothing of it either, and a failure from an older one says nothing. The list's own ask checks it beside the
+  person.
+- **LOW - not asked again when the app came back to the front.** The web counts the app in front as shown; the
+  Library's root and Up Next already react to scenePhase. **Fix**: on `.active` (deadwax reachable), the Playlists
+  screen asks `fresh` and a playlist's page loads again.
+- **LOW - the refresh's note lost its advice.** RefreshFailedNote passed `retry: true` to ErrorWords, but draws no Try
+  again, so the line lost "Try again." and the advice of its other cases. **Fix**: `retry: false` there
+  (OpenFailedNote's, which draws the button, keeps true).
+- **LOW - Routes.swift**: the two playlist routes had gone in between warmLevels' `///` comment and its declaration;
+  moved above the comment.
+
+### Core
+
+- PlayedAlbums: `keeping:` on `remember`, `rememberQueue` and `also` (default none); `trim(keeping:)`; the type's
+  comment says what is the phone's own. `QueueAlbums.named`.
+- `PlaylistPlay.offlineStart(row:songs:here:)` - a row's tap while deadwax can't be reached, moved out of
+  PlaylistView: the row's place among the songs on this phone, counted (a song listed twice is two rows), nil for a
+  row not here or not there.
+
+### The app
+
+PlayerModel passes `keeping` at four of its five writes (an album's own Play needs none: its queue is that album, kept
+as the one just put); PlaylistsModel's generation and `keep(_:asked:)`; PlaylistView and
+PlaylistsScreen on scenePhase; RefreshFailedNote; PlaylistView's `play(row:)` through `offlineStart`.
+
+### Tests
+
+Core 1204 (from 1196): **PlaylistReviewTests** 8 - the review's two cases (pages shown never letting go of a 30-
+or a 64-album playlist, against the web's store, which does); a queue of 70 kept whole; Play Next keeping the
+queue's and the added album, back within the bound once the queue names none, a kept album in the middle, remember's
+own album; `keeping` empty the web's store; `forget` (gone at once, the order kept, nothing for one not held, put again
+as new, a queue's album forgotten leaving the rest); the queue's ids; a row's offline start (a song listed twice, rows
+not here, rows not there, every song here). **The fixture**: every album of a played run now carries the step that put
+it (`s3`, `s3.1` for a queue's second), and each step records WHICH answer `get` returns for every id held - so a put
+that left an old answer (a stub never replaced) fails, on both sides (the exporter records it from the web's store,
+PlaylistVectorTests compares it); two new runs, an empty `rememberQueue([])` (after a queue, and with nothing) and the
+same album put again by each operation; and a shared-with-you playlist with no length ("sam · 3 songs").
+
+**Mutations, 12, each caught by a failing test, none by a build error** (scratchpad mutate_review.py, each file restored
+byte for byte, sha-256 checked): the trim keeping nothing; `also`, and `remember`, letting their own album go; a queue
+keeping only the web's 64; the trim letting the newest go first; a put keeping the old answer (also caught by the
+fixture's tags alone, run against PlaylistVectorTests by itself); `forget` leaving the order, and forgetting nothing;
+the queue naming an empty id; an offline row not on the phone starting, a start counting the row itself, and one looked
+up by id.
+
+### Verified, and not
+
+Verified (2026-11-13, this Mac, Xcode's toolchain): `swift test` - Core 1204, DeadwaxAudio 158, DeadwaxTurntable 11, all pass; the mutations; the unsigned
+Release device build with no warnings; check_project.py with the .xcodeproj unchanged; `pytest tests/test_ios_*.py
+tests/test_source_bytes.py`; the 11 ios sims on Node 22. Not run: Core on Linux.
+
+Not verified - only the phone can tell:
+- That `scenePhase` reaches a page pushed under another (a page in the stack asks too: one request, harmless).
+- Check 65's new step: a dozen album pages opened while a playlist plays, and Info still naming its last songs'
+  albums.

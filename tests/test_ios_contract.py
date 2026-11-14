@@ -34,6 +34,10 @@ HistorySong - every name the phone writes one the server declares, and the other
 HistoryTaken to what src/play_history.py page() and the POST answer; a start as the phone writes it (every field, nulls
 written out - PlayHistoryTests' own JSON) taken by the real route and paged back; and the page the phone asks for and the
 batch it sends within the route's bounds.
+
+And app 0.10's playlists (Phase 4, notes/ios-specs/phase4-library.md): Playlist, PlaylistList and PlaylistWithSongs to
+what src/playlists.py's summary() and with_songs() build and the two read routes send - every field the phone reads one
+they send, and every one it can't do without there and not null, Navidrome's fields left out included.
 """
 
 import importlib.util
@@ -54,6 +58,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from src import auth, autoeq, levels, loudness, lyrics, users  # noqa: E402
 from src import play_history as history_rules  # noqa: E402
+from src import playlists as playlist_rules  # noqa: E402
 from src import play_queue as queue_rules  # noqa: E402
 from src.api.app import start  # noqa: E402
 from src.api.navidrome_endpoint import CLIENT_NAME  # noqa: E402
@@ -67,7 +72,7 @@ from src.store import JobStore  # noqa: E402
 
 CORE = Path(__file__).resolve().parent.parent / "ios" / "DeadwaxKit" / "Sources" / "DeadwaxCore"
 ENDPOINT = re.compile(r'Endpoint\(method: "(\w+)", path: "([^"]+)", query: \[([^\]]*)\]\)')
-ROUTE_COUNT = 30
+ROUTE_COUNT = 32
 RAW_OPENING = re.compile(r'#+"')
 HASHES = re.compile(r"#*")
 
@@ -920,3 +925,39 @@ def test_the_phones_page_and_batch_are_within_the_routes_bounds(monkeypatch):
     batch = swift_constant("PlayHistory.swift", "PlayHistory", "postMax")
     size = {type(rule).__name__: rule for rule in history_route.HistoryPost.model_fields["starts"].metadata}
     assert size["MinLen"].min_length == 1 and batch == size["MaxLen"].max_length == history_rules.HISTORY_POST_MAX
+
+
+# ---------------------------------------------------------------------------- app 0.10's playlists (Phase 4)
+
+NAVIDROME_PLAYLIST = {
+    "id": "pl1", "name": "Late night", "comment": "For after", "songCount": 3, "duration": 611, "public": True,
+    "owner": "James", "readonly": False, "created": "2026-10-01T10:00:00Z", "changed": "2026-11-01T10:00:00Z",
+    "coverArt": "pl-pl1_abc", "entry": [{"id": "s1", "title": "Roads", "albumId": "al-d", "duration": 305},
+                                        {"id": "s2", "title": "Teardrop", "albumId": "al-m", "duration": 306}],
+}
+
+
+def test_the_playlist_answers_are_what_the_app_decodes():
+    # summary() is each row of the list and a playlist's own: the phone reads exactly its keys - the cover optional
+    # (null for an empty playlist), every other one always sent; Navidrome leaving everything out still decodes
+    row = playlist_rules.summary(NAVIDROME_PLAYLIST, "james")
+    assert set(fields("Playlist")) == set(row), sorted(set(fields("Playlist")) ^ set(row))
+    assert optional_fields("Playlist") == {"coverArt"}
+    assert_decodes("Playlist", row)
+    assert row["mine"] and row["editable"] and row["public"]
+    bare = playlist_rules.summary({"id": "pl2"}, "james")
+    assert_decodes("Playlist", bare)
+    assert bare["coverArt"] is None and not bare["mine"]
+    # with_songs() is one playlist: its summary, its songs and how many aren't listed
+    whole = playlist_rules.with_songs(NAVIDROME_PLAYLIST, "james", 1)
+    assert set(fields("PlaylistWithSongs")) == set(whole) == {"playlist", "songs", "hidden"}
+    assert_decodes("PlaylistWithSongs", whole)
+    assert_decodes("Playlist", whole["playlist"])
+    assert whole["playlist"]["songCount"] == 2 and whole["hidden"] == 1
+    # the songs as Navidrome sent them, which carry what Song needs (its id: everything else may be left out)
+    assert all(required_fields("Song") <= set(song) for song in whole["songs"]) and required_fields("Song") == {"id"}
+    # and the two routes send them so: the list under "playlists", one through _answer (with_songs)
+    assert fields("PlaylistList") == {"playlists": False}
+    assert '{"playlists": [playlist_rules.summary(' in inspect.getsource(navidrome.playlists)
+    assert "return _answer(found, counter, asker)" in inspect.getsource(navidrome.playlist)
+    assert "playlist_rules.with_songs(" in inspect.getsource(navidrome._answer)

@@ -137,8 +137,11 @@ final class PlayerModel {
         return entries[queue.index...].map { shelf[$0.track.id] ?? Song(queued: $0.track) }
     }
 
-    /// An album a queue came from, as its page last loaded it (the last 8 kept), for Info's album lines.
-    func playedAlbum(id: String) -> Album? { albums.first { $0.id == id } }
+    /// An album a queue came from, as its page last loaded it - or, for a playlist's songs, the stub made from them
+    /// (PlaylistPlay.albums) - for Info's album lines, Go to album and the turntable. Kept as the web keeps them
+    /// (PlayedAlbums: the last 8, or every album of a playlist up to 64), and every album the queue names kept while it
+    /// names it (`keeping`).
+    func playedAlbum(id: String) -> Album? { played.get(id) }
 
     /// Each entry of the queue's level as decided (levels.md 4.3, LevelDecisions) - by Up Next's key; Info reads
     /// `settled(key:level:song:)`.
@@ -164,7 +167,8 @@ final class PlayerModel {
     private var entries: [QueueEntry] = []
     /// The songs the app has of the queue's tracks, by id (an album page's, Debug's, resume's).
     @ObservationIgnored private var shelf: [String: Song] = [:]
-    @ObservationIgnored private var albums: [Album] = []
+    /// The album answers the queue's songs were played from (lib/playedAlbums.ts, ported - phase4-library.md 2.3).
+    @ObservationIgnored private var played = PlayedAlbums<Album>()
     private var loudnessAnswers: [String: AlbumLoudness] = [:]
     /// The decoded length the engine reported for the entry heard.
     private var length: Double?
@@ -261,32 +265,58 @@ final class PlayerModel {
         let level = QueuePickWords.playLevel(normalization)
         let tracks = songs.map { QueueTrack(song: $0, albumId: album.id, albumName: album.name ?? "",
                                             albumArtist: album.artist, albumCoverArt: album.coverArt, level: level) }
-        remember(album)
+        played.remember(album)
         shelve(songs)
         startQueue { $0.playTracks(tracks, start: index, shuffle: shuffle) }
+    }
+
+    /// A playlist's Play, Shuffle and a song's tap (phase4-library.md 2.3, PlaylistPage.tsx `play`): `songs` played from
+    /// `index` (nil with Shuffle: anywhere), each with its own album, at the songs level - and the albums they are on
+    /// remembered first (PlaylistPlay.plan: stubs, an album held whole kept as it is), every one of them. Call it in the
+    /// tap, nothing awaited first.
+    func play(playlist songs: [Song], at index: Int?, shuffle: Bool = false) {
+        guard !songs.isEmpty else { return }
+        let plan = PlaylistPlay.plan(songs, setting: normalization) { [played] (id: String) -> Album? in played.get(id) }
+        // every album the new queue names kept while it does (PlayedAlbums' `keeping`), past the 64 too
+        played.rememberQueue(plan.albums, keeping: QueueAlbums.named(plan.tracks))
+        shelve(songs)
+        startQueue { $0.playTracks(plan.tracks, start: index, shuffle: shuffle) }
     }
 
     /// Play Next from a ••• menu: the pick queued straight after the song playing's copies (pick.choose(.next,
     /// setting: normalization)), and the notice said when the music didn't start from it (pick.notice). True when
     /// something was queued (the menu closes). QueueController.playNext(tracks).
     @discardableResult
-    func playNext(_ pick: QueuePick<Song>, album: Album) -> Bool { choose(.next, pick, album: album) }
+    func playNext(_ pick: QueuePick<Song>, album: Album?) -> Bool { choose(.next, pick, album: album) }
 
     /// Play Last from a ••• menu: the pick queued at the end of Playing Next. QueueController.playLast.
     @discardableResult
-    func playLast(_ pick: QueuePick<Song>, album: Album) -> Bool { choose(.last, pick, album: album) }
+    func playLast(_ pick: QueuePick<Song>, album: Album?) -> Bool { choose(.last, pick, album: album) }
 
     /// Play Next or Play Last, by the choice (QueuedHow). With nothing playing - or a queue played out with nothing
-    /// after it - the songs play from the first, and the mini player is the notice.
+    /// after it - the songs play from the first, and the mini player is the notice. `album` nil: a playlist's songs,
+    /// each queued with its own album and its stub remembered beside what is held (PlaylistPlay; the web's
+    /// rememberAdded) - an album's own answer held already kept as it is.
     @discardableResult
-    func choose(_ choice: QueueChoice, _ pick: QueuePick<Song>, album: Album) -> Bool {
+    func choose(_ choice: QueueChoice, _ pick: QueuePick<Song>, album: Album?) -> Bool {
         guard let queued = pick.choose(choice, setting: normalization) else { return false }
         // no engine (iOS wouldn't make one): nothing queued, and the song's line says so
         guard ensureController() != nil else { return true }
-        let tracks = queued.tracks.map { QueueTrack(song: $0, albumId: album.id, albumName: album.name ?? "",
+        let tracks: [QueueTrack]
+        if let album {
+            tracks = queued.tracks.map { QueueTrack(song: $0, albumId: album.id, albumName: album.name ?? "",
                                                     albumArtist: album.artist, albumCoverArt: album.coverArt,
                                                     level: queued.level) }
-        remember(album)
+            played.also(album, keeping: QueueAlbums.named(entries.map(\.track) + tracks))
+        } else {
+            tracks = PlaylistPlay.tracks(queued.tracks, level: queued.level)
+            let held = PlaylistPlay.withHeld(PlaylistPlay.albums(queued.tracks)) { [played] (id: String) -> Album? in
+                played.get(id)
+            }
+            // the queue's albums and every one being added kept: none of them lets another go
+            let keeping = QueueAlbums.named(entries.map(\.track) + tracks)
+            for each in held { played.also(each, keeping: keeping) }
+        }
         shelve(queued.tracks)
         var started = false
         // only songs added: a song that failed keeps its retry (the web's addSongs leaves the retry's timer alone)
@@ -513,7 +543,7 @@ final class PlayerModel {
         resuming = nil
         resumeFor = nil
         stop()
-        albums = []
+        played = PlayedAlbums()
         shelf = [:]
         book.reset()
         loudnessAnswers = [:]
@@ -526,14 +556,15 @@ final class PlayerModel {
     /// The album page showed `album` with its songs: kept for Info, and - when Normalization will level them
     /// (AlbumPageLines.warms) - its loudness asked for and its levels warmed (the LoudnessBook).
     func albumShown(_ album: Album) {
-        remember(album)
+        // `also` (phase4-library.md question 8), the queue's albums kept: a page shown never lets go of one still to play
+        played.also(album, keeping: QueueAlbums.named(entries.map(\.track)))
         guard AlbumPageLines.warms(normalization, songs: album.song) else { return }
         book.wantPage(album.id)
     }
 
     /// The album page found its album gone (404): nothing kept of it.
     func albumGone(id: String) {
-        albums.removeAll { $0.id == id }
+        played.forget(id)
         book.leavePage(id)
     }
 
@@ -1256,12 +1287,6 @@ final class PlayerModel {
     }
 
     // MARK: kept for Info
-
-    private func remember(_ album: Album) {
-        albums.removeAll { $0.id == album.id }
-        albums.insert(album, at: 0)
-        if albums.count > 8 { albums.removeLast(albums.count - 8) }
-    }
 
     private func shelve(_ songs: [Song]) {
         for song in songs { shelf[song.id] = song }

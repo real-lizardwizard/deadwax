@@ -1,0 +1,4138 @@
+{
+ "made_from": "ui/src/lib/playlists.ts and ui/src/lib/playedAlbums.ts (compiled)",
+ "words": {
+  "PLAYLISTS_EMPTY": "No playlists yet.",
+  "PLAYLISTS_EMPTY_HOW": "Make one here, or start one from a song's or an album's \u2022\u2022\u2022 menu, or from Now Playing: Add to a playlist.",
+  "PLAYLIST_EMPTY": "Nothing in this playlist yet. Add songs from a song's or an album's \u2022\u2022\u2022 menu - Add to a playlist - or from Now Playing's \u2022\u2022\u2022 while a song plays.",
+  "PLAYLIST_GONE": "This playlist isn't on Navidrome any more - deleted in another app, maybe.",
+  "listFailed": "Couldn't list your playlists. Why it failed."
+ },
+ "constants": {
+  "PLAYLIST_NAME_MAX": 200,
+  "PLAYLIST_COMMENT_MAX": 1000,
+  "PLAYLIST_SONGS_MAX": 2000,
+  "PLAYLISTS_FRESH_MS": 30000,
+  "PLAYLISTS_KEPT": 8,
+  "PLAYED_KEPT": 8,
+  "QUEUE_ALBUMS_KEPT": 64
+ },
+ "playlists": [
+  {
+   "playlist": {
+    "id": "yours",
+    "name": "Playlist yours",
+    "comment": "",
+    "songCount": 12,
+    "duration": 2880,
+    "created": "2026-10-01T10:00:00Z",
+    "changed": "2026-11-01T10:00:00Z",
+    "owner": "james",
+    "public": false,
+    "coverArt": "pl-yours_abc",
+    "mine": true,
+    "editable": true
+   },
+   "group": "yours",
+   "rowLine": "12 songs \u00b7 48 min",
+   "ownerLine": "Yours",
+   "readOnly": [
+    {
+     "songs": 0,
+     "words": null,
+     "canEdit": true
+    },
+    {
+     "songs": 1,
+     "words": null,
+     "canEdit": true
+    },
+    {
+     "songs": 12,
+     "words": null,
+     "canEdit": true
+    },
+    {
+     "songs": 2000,
+     "words": null,
+     "canEdit": true
+    },
+    {
+     "songs": 2001,
+     "words": "deadwax edits playlists of up to 2,000 songs - edit this one in Amperfy or Navidrome.",
+     "canEdit": false
+    }
+   ]
+  },
+  {
+   "playlist": {
+    "id": "yours-public",
+    "name": "Playlist yours-public",
+    "comment": "",
+    "songCount": 12,
+    "duration": 2880,
+    "created": "2026-10-01T10:00:00Z",
+    "changed": "2026-11-01T10:00:00Z",
+    "owner": "james",
+    "public": true,
+    "coverArt": "pl-yours-public_abc",
+    "mine": true,
+    "editable": true
+   },
+   "group": "yours",
+   "rowLine": "12 songs \u00b7 48 min \u00b7 Shared",
+   "ownerLine": "Yours \u00b7 Shared with everyone",
+   "readOnly": [
+    {
+     "songs": 0,
+     "words": null,
+     "canEdit": true
+    },
+    {
+     "songs": 1,
+     "words": null,
+     "canEdit": true
+    },
+    {
+     "songs": 12,
+     "words": null,
+     "canEdit": true
+    },
+    {
+     "songs": 2000,
+     "words": null,
+     "canEdit": true
+    },
+    {
+     "songs": 2001,
+     "words": "deadwax edits playlists of up to 2,000 songs - edit this one in Amperfy or Navidrome.",
+     "canEdit": false
+    }
+   ]
+  },
+  {
+   "playlist": {
+    "id": "yours-one",
+    "name": "Playlist yours-one",
+    "comment": "",
+    "songCount": 1,
+    "duration": 251,
+    "created": "2026-10-01T10:00:00Z",
+    "changed": "2026-11-01T10:00:00Z",
+    "owner": "james",
+    "public": false,
+    "coverArt": "pl-yours-one_abc",
+    "mine": true,
+    "editable": true
+   },
+   "group": "yours",
+   "rowLine": "1 song \u00b7 4 min",
+   "ownerLine": "Yours",
+   "readOnly": [
+    {
+     "songs": 0,
+     "words": null,
+     "canEdit": true
+    },
+    {
+     "songs": 1,
+     "words": null,
+     "canEdit": true
+    },
+    {
+     "songs": 12,
+     "words": null,
+     "canEdit": true
+    },
+    {
+     "songs": 2000,
+     "words": null,
+     "canEdit": true
+    },
+    {
+     "songs": 2001,
+     "words": "deadwax edits playlists of up to 2,000 songs - edit this one in Amperfy or Navidrome.",
+     "canEdit": false
+    }
+   ]
+  },
+  {
+   "playlist": {
+    "id": "yours-empty",
+    "name": "Playlist yours-empty",
+    "comment": "",
+    "songCount": 0,
+    "duration": 0,
+    "created": "2026-10-01T10:00:00Z",
+    "changed": "2026-11-01T10:00:00Z",
+    "owner": "james",
+    "public": false,
+    "coverArt": null,
+    "mine": true,
+    "editable": true
+   },
+   "group": "yours",
+   "rowLine": "0 songs",
+   "ownerLine": "Yours",
+   "readOnly": [
+    {
+     "songs": 0,
+     "words": null,
+     "canEdit": true
+    },
+    {
+     "songs": 1,
+     "words": null,
+     "canEdit": true
+    },
+    {
+     "songs": 12,
+     "words": null,
+     "canEdit": true
+    },
+    {
+     "songs": 2000,
+     "words": null,
+     "canEdit": true
+    },
+    {
+     "songs": 2001,
+     "words": "deadwax edits playlists of up to 2,000 songs - edit this one in Amperfy or Navidrome.",
+     "canEdit": false
+    }
+   ]
+  },
+  {
+   "playlist": {
+    "id": "yours-long",
+    "name": "Playlist yours-long",
+    "comment": "",
+    "songCount": 340,
+    "duration": 81000,
+    "created": "2026-10-01T10:00:00Z",
+    "changed": "2026-11-01T10:00:00Z",
+    "owner": "james",
+    "public": false,
+    "coverArt": "pl-yours-long_abc",
+    "mine": true,
+    "editable": true
+   },
+   "group": "yours",
+   "rowLine": "340 songs \u00b7 22h 30m",
+   "ownerLine": "Yours",
+   "readOnly": [
+    {
+     "songs": 0,
+     "words": null,
+     "canEdit": true
+    },
+    {
+     "songs": 1,
+     "words": null,
+     "canEdit": true
+    },
+    {
+     "songs": 12,
+     "words": null,
+     "canEdit": true
+    },
+    {
+     "songs": 2000,
+     "words": null,
+     "canEdit": true
+    },
+    {
+     "songs": 2001,
+     "words": "deadwax edits playlists of up to 2,000 songs - edit this one in Amperfy or Navidrome.",
+     "canEdit": false
+    }
+   ]
+  },
+  {
+   "playlist": {
+    "id": "yours-hour",
+    "name": "Playlist yours-hour",
+    "comment": "",
+    "songCount": 15,
+    "duration": 3600,
+    "created": "2026-10-01T10:00:00Z",
+    "changed": "2026-11-01T10:00:00Z",
+    "owner": "james",
+    "public": false,
+    "coverArt": "pl-yours-hour_abc",
+    "mine": true,
+    "editable": true
+   },
+   "group": "yours",
+   "rowLine": "15 songs \u00b7 1h 0m",
+   "ownerLine": "Yours",
+   "readOnly": [
+    {
+     "songs": 0,
+     "words": null,
+     "canEdit": true
+    },
+    {
+     "songs": 1,
+     "words": null,
+     "canEdit": true
+    },
+    {
+     "songs": 12,
+     "words": null,
+     "canEdit": true
+    },
+    {
+     "songs": 2000,
+     "words": null,
+     "canEdit": true
+    },
+    {
+     "songs": 2001,
+     "words": "deadwax edits playlists of up to 2,000 songs - edit this one in Amperfy or Navidrome.",
+     "canEdit": false
+    }
+   ]
+  },
+  {
+   "playlist": {
+    "id": "yours-just-under",
+    "name": "Playlist yours-just-under",
+    "comment": "",
+    "songCount": 14,
+    "duration": 3569,
+    "created": "2026-10-01T10:00:00Z",
+    "changed": "2026-11-01T10:00:00Z",
+    "owner": "james",
+    "public": false,
+    "coverArt": "pl-yours-just-under_abc",
+    "mine": true,
+    "editable": true
+   },
+   "group": "yours",
+   "rowLine": "14 songs \u00b7 59 min",
+   "ownerLine": "Yours",
+   "readOnly": [
+    {
+     "songs": 0,
+     "words": null,
+     "canEdit": true
+    },
+    {
+     "songs": 1,
+     "words": null,
+     "canEdit": true
+    },
+    {
+     "songs": 12,
+     "words": null,
+     "canEdit": true
+    },
+    {
+     "songs": 2000,
+     "words": null,
+     "canEdit": true
+    },
+    {
+     "songs": 2001,
+     "words": "deadwax edits playlists of up to 2,000 songs - edit this one in Amperfy or Navidrome.",
+     "canEdit": false
+    }
+   ]
+  },
+  {
+   "playlist": {
+    "id": "yours-rounds-up",
+    "name": "Playlist yours-rounds-up",
+    "comment": "",
+    "songCount": 14,
+    "duration": 3570,
+    "created": "2026-10-01T10:00:00Z",
+    "changed": "2026-11-01T10:00:00Z",
+    "owner": "james",
+    "public": false,
+    "coverArt": "pl-yours-rounds-up_abc",
+    "mine": true,
+    "editable": true
+   },
+   "group": "yours",
+   "rowLine": "14 songs \u00b7 1h 0m",
+   "ownerLine": "Yours",
+   "readOnly": [
+    {
+     "songs": 0,
+     "words": null,
+     "canEdit": true
+    },
+    {
+     "songs": 1,
+     "words": null,
+     "canEdit": true
+    },
+    {
+     "songs": 12,
+     "words": null,
+     "canEdit": true
+    },
+    {
+     "songs": 2000,
+     "words": null,
+     "canEdit": true
+    },
+    {
+     "songs": 2001,
+     "words": "deadwax edits playlists of up to 2,000 songs - edit this one in Amperfy or Navidrome.",
+     "canEdit": false
+    }
+   ]
+  },
+  {
+   "playlist": {
+    "id": "shared",
+    "name": "Playlist shared",
+    "comment": "",
+    "songCount": 12,
+    "duration": 2880,
+    "created": "2026-10-01T10:00:00Z",
+    "changed": "2026-11-01T10:00:00Z",
+    "owner": "sam",
+    "public": true,
+    "coverArt": "pl-shared_abc",
+    "mine": false,
+    "editable": false
+   },
+   "group": "shared",
+   "rowLine": "sam \u00b7 12 songs \u00b7 48 min",
+   "ownerLine": "sam's \u00b7 Shared with you",
+   "readOnly": [
+    {
+     "songs": 0,
+     "words": "Only sam can change this playlist.",
+     "canEdit": false
+    },
+    {
+     "songs": 1,
+     "words": "Only sam can change this playlist.",
+     "canEdit": false
+    },
+    {
+     "songs": 12,
+     "words": "Only sam can change this playlist.",
+     "canEdit": false
+    },
+    {
+     "songs": 2000,
+     "words": "Only sam can change this playlist.",
+     "canEdit": false
+    },
+    {
+     "songs": 2001,
+     "words": "Only sam can change this playlist.",
+     "canEdit": false
+    }
+   ]
+  },
+  {
+   "playlist": {
+    "id": "shared-no-owner",
+    "name": "Playlist shared-no-owner",
+    "comment": "",
+    "songCount": 12,
+    "duration": 2880,
+    "created": "2026-10-01T10:00:00Z",
+    "changed": "2026-11-01T10:00:00Z",
+    "owner": "",
+    "public": true,
+    "coverArt": "pl-shared-no-owner_abc",
+    "mine": false,
+    "editable": false
+   },
+   "group": "shared",
+   "rowLine": "Somebody \u00b7 12 songs \u00b7 48 min",
+   "ownerLine": "Somebody's \u00b7 Shared with you",
+   "readOnly": [
+    {
+     "songs": 0,
+     "words": "Only its owner can change this playlist.",
+     "canEdit": false
+    },
+    {
+     "songs": 1,
+     "words": "Only its owner can change this playlist.",
+     "canEdit": false
+    },
+    {
+     "songs": 12,
+     "words": "Only its owner can change this playlist.",
+     "canEdit": false
+    },
+    {
+     "songs": 2000,
+     "words": "Only its owner can change this playlist.",
+     "canEdit": false
+    },
+    {
+     "songs": 2001,
+     "words": "Only its owner can change this playlist.",
+     "canEdit": false
+    }
+   ]
+  },
+  {
+   "playlist": {
+    "id": "shared-short",
+    "name": "Playlist shared-short",
+    "comment": "",
+    "songCount": 2,
+    "duration": 29,
+    "created": "2026-10-01T10:00:00Z",
+    "changed": "2026-11-01T10:00:00Z",
+    "owner": "Ana Lu\u00eds",
+    "public": true,
+    "coverArt": "pl-shared-short_abc",
+    "mine": false,
+    "editable": false
+   },
+   "group": "shared",
+   "rowLine": "Ana Lu\u00eds \u00b7 2 songs \u00b7 0 min",
+   "ownerLine": "Ana Lu\u00eds's \u00b7 Shared with you",
+   "readOnly": [
+    {
+     "songs": 0,
+     "words": "Only Ana Lu\u00eds can change this playlist.",
+     "canEdit": false
+    },
+    {
+     "songs": 1,
+     "words": "Only Ana Lu\u00eds can change this playlist.",
+     "canEdit": false
+    },
+    {
+     "songs": 12,
+     "words": "Only Ana Lu\u00eds can change this playlist.",
+     "canEdit": false
+    },
+    {
+     "songs": 2000,
+     "words": "Only Ana Lu\u00eds can change this playlist.",
+     "canEdit": false
+    },
+    {
+     "songs": 2001,
+     "words": "Only Ana Lu\u00eds can change this playlist.",
+     "canEdit": false
+    }
+   ]
+  },
+  {
+   "playlist": {
+    "id": "shared-silent",
+    "name": "Playlist shared-silent",
+    "comment": "",
+    "songCount": 3,
+    "duration": 0,
+    "created": "2026-10-01T10:00:00Z",
+    "changed": "2026-11-01T10:00:00Z",
+    "owner": "sam",
+    "public": true,
+    "coverArt": "pl-shared-silent_abc",
+    "mine": false,
+    "editable": false
+   },
+   "group": "shared",
+   "rowLine": "sam \u00b7 3 songs",
+   "ownerLine": "sam's \u00b7 Shared with you",
+   "readOnly": [
+    {
+     "songs": 0,
+     "words": "Only sam can change this playlist.",
+     "canEdit": false
+    },
+    {
+     "songs": 1,
+     "words": "Only sam can change this playlist.",
+     "canEdit": false
+    },
+    {
+     "songs": 12,
+     "words": "Only sam can change this playlist.",
+     "canEdit": false
+    },
+    {
+     "songs": 2000,
+     "words": "Only sam can change this playlist.",
+     "canEdit": false
+    },
+    {
+     "songs": 2001,
+     "words": "Only sam can change this playlist.",
+     "canEdit": false
+    }
+   ]
+  },
+  {
+   "playlist": {
+    "id": "file",
+    "name": "Playlist file",
+    "comment": "",
+    "songCount": 12,
+    "duration": 2880,
+    "created": "2026-10-01T10:00:00Z",
+    "changed": "2026-11-01T10:00:00Z",
+    "owner": "james",
+    "public": false,
+    "coverArt": "pl-file_abc",
+    "mine": true,
+    "editable": false
+   },
+   "group": "files",
+   "rowLine": "From a file \u00b7 12 songs",
+   "ownerLine": "From a file in the music folders",
+   "readOnly": [
+    {
+     "songs": 0,
+     "words": "Navidrome made this playlist from a file in the music folders - a smart playlist, or an .m3u - so it can't be changed here.",
+     "canEdit": false
+    },
+    {
+     "songs": 1,
+     "words": "Navidrome made this playlist from a file in the music folders - a smart playlist, or an .m3u - so it can't be changed here.",
+     "canEdit": false
+    },
+    {
+     "songs": 12,
+     "words": "Navidrome made this playlist from a file in the music folders - a smart playlist, or an .m3u - so it can't be changed here.",
+     "canEdit": false
+    },
+    {
+     "songs": 2000,
+     "words": "Navidrome made this playlist from a file in the music folders - a smart playlist, or an .m3u - so it can't be changed here.",
+     "canEdit": false
+    },
+    {
+     "songs": 2001,
+     "words": "Navidrome made this playlist from a file in the music folders - a smart playlist, or an .m3u - so it can't be changed here.",
+     "canEdit": false
+    }
+   ]
+  },
+  {
+   "playlist": {
+    "id": "file-public",
+    "name": "Playlist file-public",
+    "comment": "",
+    "songCount": 1,
+    "duration": 61,
+    "created": "2026-10-01T10:00:00Z",
+    "changed": "2026-11-01T10:00:00Z",
+    "owner": "james",
+    "public": true,
+    "coverArt": "pl-file-public_abc",
+    "mine": true,
+    "editable": false
+   },
+   "group": "files",
+   "rowLine": "From a file \u00b7 1 song",
+   "ownerLine": "From a file in the music folders",
+   "readOnly": [
+    {
+     "songs": 0,
+     "words": "Navidrome made this playlist from a file in the music folders - a smart playlist, or an .m3u - so it can't be changed here.",
+     "canEdit": false
+    },
+    {
+     "songs": 1,
+     "words": "Navidrome made this playlist from a file in the music folders - a smart playlist, or an .m3u - so it can't be changed here.",
+     "canEdit": false
+    },
+    {
+     "songs": 12,
+     "words": "Navidrome made this playlist from a file in the music folders - a smart playlist, or an .m3u - so it can't be changed here.",
+     "canEdit": false
+    },
+    {
+     "songs": 2000,
+     "words": "Navidrome made this playlist from a file in the music folders - a smart playlist, or an .m3u - so it can't be changed here.",
+     "canEdit": false
+    },
+    {
+     "songs": 2001,
+     "words": "Navidrome made this playlist from a file in the music folders - a smart playlist, or an .m3u - so it can't be changed here.",
+     "canEdit": false
+    }
+   ]
+  },
+  {
+   "playlist": {
+    "id": "file-empty",
+    "name": "Playlist file-empty",
+    "comment": "",
+    "songCount": 0,
+    "duration": 0,
+    "created": "2026-10-01T10:00:00Z",
+    "changed": "2026-11-01T10:00:00Z",
+    "owner": "james",
+    "public": false,
+    "coverArt": "pl-file-empty_abc",
+    "mine": true,
+    "editable": false
+   },
+   "group": "files",
+   "rowLine": "From a file \u00b7 0 songs",
+   "ownerLine": "From a file in the music folders",
+   "readOnly": [
+    {
+     "songs": 0,
+     "words": "Navidrome made this playlist from a file in the music folders - a smart playlist, or an .m3u - so it can't be changed here.",
+     "canEdit": false
+    },
+    {
+     "songs": 1,
+     "words": "Navidrome made this playlist from a file in the music folders - a smart playlist, or an .m3u - so it can't be changed here.",
+     "canEdit": false
+    },
+    {
+     "songs": 12,
+     "words": "Navidrome made this playlist from a file in the music folders - a smart playlist, or an .m3u - so it can't be changed here.",
+     "canEdit": false
+    },
+    {
+     "songs": 2000,
+     "words": "Navidrome made this playlist from a file in the music folders - a smart playlist, or an .m3u - so it can't be changed here.",
+     "canEdit": false
+    },
+    {
+     "songs": 2001,
+     "words": "Navidrome made this playlist from a file in the music folders - a smart playlist, or an .m3u - so it can't be changed here.",
+     "canEdit": false
+    }
+   ]
+  },
+  {
+   "playlist": {
+    "id": "odd-owner",
+    "name": "Playlist odd-owner",
+    "comment": "",
+    "songCount": 12,
+    "duration": 2880,
+    "created": "2026-10-01T10:00:00Z",
+    "changed": "2026-11-01T10:00:00Z",
+    "owner": "SAM",
+    "public": true,
+    "coverArt": "pl-odd-owner_abc",
+    "mine": false,
+    "editable": true
+   },
+   "group": "shared",
+   "rowLine": "SAM \u00b7 12 songs \u00b7 48 min",
+   "ownerLine": "SAM's \u00b7 Shared with you",
+   "readOnly": [
+    {
+     "songs": 0,
+     "words": "Only SAM can change this playlist.",
+     "canEdit": false
+    },
+    {
+     "songs": 1,
+     "words": "Only SAM can change this playlist.",
+     "canEdit": false
+    },
+    {
+     "songs": 12,
+     "words": "Only SAM can change this playlist.",
+     "canEdit": false
+    },
+    {
+     "songs": 2000,
+     "words": "Only SAM can change this playlist.",
+     "canEdit": false
+    },
+    {
+     "songs": 2001,
+     "words": "Only SAM can change this playlist.",
+     "canEdit": false
+    }
+   ]
+  }
+ ],
+ "groups": [
+  {
+   "name": "none",
+   "ids": [],
+   "groups": {
+    "yours": [],
+    "shared": [],
+    "files": []
+   }
+  },
+  {
+   "name": "all of them",
+   "ids": [
+    "yours",
+    "yours-public",
+    "yours-one",
+    "yours-empty",
+    "yours-long",
+    "yours-hour",
+    "yours-just-under",
+    "yours-rounds-up",
+    "shared",
+    "shared-no-owner",
+    "shared-short",
+    "shared-silent",
+    "file",
+    "file-public",
+    "file-empty",
+    "odd-owner"
+   ],
+   "groups": {
+    "yours": [
+     "yours",
+     "yours-public",
+     "yours-one",
+     "yours-empty",
+     "yours-long",
+     "yours-hour",
+     "yours-just-under",
+     "yours-rounds-up"
+    ],
+    "shared": [
+     "shared",
+     "shared-no-owner",
+     "shared-short",
+     "shared-silent",
+     "odd-owner"
+    ],
+    "files": [
+     "file",
+     "file-public",
+     "file-empty"
+    ]
+   }
+  },
+  {
+   "name": "reversed",
+   "ids": [
+    "odd-owner",
+    "file-empty",
+    "file-public",
+    "file",
+    "shared-silent",
+    "shared-short",
+    "shared-no-owner",
+    "shared",
+    "yours-rounds-up",
+    "yours-just-under",
+    "yours-hour",
+    "yours-long",
+    "yours-empty",
+    "yours-one",
+    "yours-public",
+    "yours"
+   ],
+   "groups": {
+    "yours": [
+     "yours-rounds-up",
+     "yours-just-under",
+     "yours-hour",
+     "yours-long",
+     "yours-empty",
+     "yours-one",
+     "yours-public",
+     "yours"
+    ],
+    "shared": [
+     "odd-owner",
+     "shared-silent",
+     "shared-short",
+     "shared-no-owner",
+     "shared"
+    ],
+    "files": [
+     "file-empty",
+     "file-public",
+     "file"
+    ]
+   }
+  },
+  {
+   "name": "only shared",
+   "ids": [
+    "shared",
+    "shared-no-owner",
+    "shared-short",
+    "shared-silent",
+    "odd-owner"
+   ],
+   "groups": {
+    "yours": [],
+    "shared": [
+     "shared",
+     "shared-no-owner",
+     "shared-short",
+     "shared-silent",
+     "odd-owner"
+    ],
+    "files": []
+   }
+  },
+  {
+   "name": "yours and files, interleaved",
+   "ids": [
+    "file",
+    "file-empty",
+    "file-public",
+    "yours",
+    "yours-empty",
+    "yours-hour",
+    "yours-just-under",
+    "yours-long",
+    "yours-one",
+    "yours-public",
+    "yours-rounds-up"
+   ],
+   "groups": {
+    "yours": [
+     "yours",
+     "yours-empty",
+     "yours-hour",
+     "yours-just-under",
+     "yours-long",
+     "yours-one",
+     "yours-public",
+     "yours-rounds-up"
+    ],
+    "shared": [],
+    "files": [
+     "file",
+     "file-empty",
+     "file-public"
+    ]
+   }
+  }
+ ],
+ "songCount": [
+  {
+   "n": 0,
+   "text": "0 songs"
+  },
+  {
+   "n": 1,
+   "text": "1 song"
+  },
+  {
+   "n": 2,
+   "text": "2 songs"
+  },
+  {
+   "n": 12,
+   "text": "12 songs"
+  },
+  {
+   "n": 999,
+   "text": "999 songs"
+  },
+  {
+   "n": 2000,
+   "text": "2000 songs"
+  },
+  {
+   "n": 2001,
+   "text": "2001 songs"
+  }
+ ],
+ "lengthText": [
+  {
+   "seconds": 0,
+   "text": ""
+  },
+  {
+   "seconds": 0.4,
+   "text": "0 min"
+  },
+  {
+   "seconds": 1,
+   "text": "0 min"
+  },
+  {
+   "seconds": 29,
+   "text": "0 min"
+  },
+  {
+   "seconds": 29.9,
+   "text": "0 min"
+  },
+  {
+   "seconds": 30,
+   "text": "1 min"
+  },
+  {
+   "seconds": 59,
+   "text": "1 min"
+  },
+  {
+   "seconds": 89,
+   "text": "1 min"
+  },
+  {
+   "seconds": 90,
+   "text": "2 min"
+  },
+  {
+   "seconds": 251,
+   "text": "4 min"
+  },
+  {
+   "seconds": 2880,
+   "text": "48 min"
+  },
+  {
+   "seconds": 3569,
+   "text": "59 min"
+  },
+  {
+   "seconds": 3570,
+   "text": "1h 0m"
+  },
+  {
+   "seconds": 3599,
+   "text": "1h 0m"
+  },
+  {
+   "seconds": 3600,
+   "text": "1h 0m"
+  },
+  {
+   "seconds": 3629,
+   "text": "1h 0m"
+  },
+  {
+   "seconds": 3630,
+   "text": "1h 1m"
+  },
+  {
+   "seconds": 3900,
+   "text": "1h 5m"
+  },
+  {
+   "seconds": 5399,
+   "text": "1h 30m"
+  },
+  {
+   "seconds": 36000,
+   "text": "10h 0m"
+  },
+  {
+   "seconds": 81000,
+   "text": "22h 30m"
+  },
+  {
+   "seconds": 360000,
+   "text": "100h 0m"
+  },
+  {
+   "seconds": -1,
+   "text": "0 min"
+  },
+  {
+   "seconds": -29,
+   "text": "0 min"
+  },
+  {
+   "seconds": -31,
+   "text": "-1 min"
+  },
+  {
+   "seconds": -90,
+   "text": "-1 min"
+  }
+ ],
+ "songsLine": [
+  {
+   "n": 0,
+   "seconds": 0,
+   "text": "0 songs"
+  },
+  {
+   "n": 0,
+   "seconds": 59,
+   "text": "0 songs, 1 min"
+  },
+  {
+   "n": 0,
+   "seconds": 2880,
+   "text": "0 songs, 48 min"
+  },
+  {
+   "n": 0,
+   "seconds": 3900,
+   "text": "0 songs, 1h 5m"
+  },
+  {
+   "n": 1,
+   "seconds": 0,
+   "text": "1 song"
+  },
+  {
+   "n": 1,
+   "seconds": 59,
+   "text": "1 song, 1 min"
+  },
+  {
+   "n": 1,
+   "seconds": 2880,
+   "text": "1 song, 48 min"
+  },
+  {
+   "n": 1,
+   "seconds": 3900,
+   "text": "1 song, 1h 5m"
+  },
+  {
+   "n": 2,
+   "seconds": 0,
+   "text": "2 songs"
+  },
+  {
+   "n": 2,
+   "seconds": 59,
+   "text": "2 songs, 1 min"
+  },
+  {
+   "n": 2,
+   "seconds": 2880,
+   "text": "2 songs, 48 min"
+  },
+  {
+   "n": 2,
+   "seconds": 3900,
+   "text": "2 songs, 1h 5m"
+  },
+  {
+   "n": 12,
+   "seconds": 0,
+   "text": "12 songs"
+  },
+  {
+   "n": 12,
+   "seconds": 59,
+   "text": "12 songs, 1 min"
+  },
+  {
+   "n": 12,
+   "seconds": 2880,
+   "text": "12 songs, 48 min"
+  },
+  {
+   "n": 12,
+   "seconds": 3900,
+   "text": "12 songs, 1h 5m"
+  },
+  {
+   "n": 999,
+   "seconds": 0,
+   "text": "999 songs"
+  },
+  {
+   "n": 999,
+   "seconds": 59,
+   "text": "999 songs, 1 min"
+  },
+  {
+   "n": 999,
+   "seconds": 2880,
+   "text": "999 songs, 48 min"
+  },
+  {
+   "n": 999,
+   "seconds": 3900,
+   "text": "999 songs, 1h 5m"
+  },
+  {
+   "n": 2000,
+   "seconds": 0,
+   "text": "2000 songs"
+  },
+  {
+   "n": 2000,
+   "seconds": 59,
+   "text": "2000 songs, 1 min"
+  },
+  {
+   "n": 2000,
+   "seconds": 2880,
+   "text": "2000 songs, 48 min"
+  },
+  {
+   "n": 2000,
+   "seconds": 3900,
+   "text": "2000 songs, 1h 5m"
+  },
+  {
+   "n": 2001,
+   "seconds": 0,
+   "text": "2001 songs"
+  },
+  {
+   "n": 2001,
+   "seconds": 59,
+   "text": "2001 songs, 1 min"
+  },
+  {
+   "n": 2001,
+   "seconds": 2880,
+   "text": "2001 songs, 48 min"
+  },
+  {
+   "n": 2001,
+   "seconds": 3900,
+   "text": "2001 songs, 1h 5m"
+  }
+ ],
+ "hiddenWords": [
+  {
+   "hidden": -1,
+   "text": ""
+  },
+  {
+   "hidden": 0,
+   "text": ""
+  },
+  {
+   "hidden": 1,
+   "text": "1 song in this playlist isn't in the library just now - deleted, or being moved."
+  },
+  {
+   "hidden": 2,
+   "text": "2 songs in this playlist aren't in the library just now - deleted, or being moved."
+  },
+  {
+   "hidden": 10,
+   "text": "10 songs in this playlist aren't in the library just now - deleted, or being moved."
+  }
+ ],
+ "stubs": [
+  {
+   "name": "none",
+   "songs": [],
+   "albums": [],
+   "stubFor": []
+  },
+  {
+   "name": "two albums interleaved, a song twice",
+   "songs": [
+    {
+     "id": "a1",
+     "title": "Song a1",
+     "album": "Dummy",
+     "albumId": "al-d",
+     "artist": "Portishead",
+     "coverArt": "al-d",
+     "year": 1994,
+     "displayAlbumArtist": "Portishead"
+    },
+    {
+     "id": "b1",
+     "title": "Song b1",
+     "album": "Mezzanine",
+     "albumId": "al-m",
+     "artist": "Massive Attack",
+     "coverArt": "al-m",
+     "year": 1998
+    },
+    {
+     "id": "a2",
+     "title": "Song a2",
+     "album": "Dummy",
+     "albumId": "al-d",
+     "artist": "Portishead",
+     "coverArt": "al-d-2",
+     "year": 1995
+    },
+    {
+     "id": "a1",
+     "title": "Song a1",
+     "album": "Dummy",
+     "albumId": "al-d",
+     "artist": "Portishead",
+     "coverArt": "al-d",
+     "year": 1994
+    }
+   ],
+   "albums": [
+    {
+     "id": "al-d",
+     "name": "Dummy",
+     "artist": "Portishead",
+     "coverArt": "al-d",
+     "year": 1994,
+     "songs": [
+      "a1",
+      "a2",
+      "a1"
+     ],
+     "partial": true
+    },
+    {
+     "id": "al-m",
+     "name": "Mezzanine",
+     "artist": "Massive Attack",
+     "coverArt": "al-m",
+     "year": 1998,
+     "songs": [
+      "b1"
+     ],
+     "partial": true
+    }
+   ],
+   "stubFor": [
+    {
+     "id": "al-d",
+     "name": "Dummy",
+     "artist": null,
+     "coverArt": null,
+     "year": null,
+     "songs": [],
+     "partial": false
+    },
+    {
+     "id": "al-m",
+     "name": "Mezzanine",
+     "artist": null,
+     "coverArt": null,
+     "year": null,
+     "songs": [],
+     "partial": false
+    },
+    {
+     "id": "al-d",
+     "name": "Dummy",
+     "artist": null,
+     "coverArt": null,
+     "year": null,
+     "songs": [],
+     "partial": false
+    },
+    {
+     "id": "al-d",
+     "name": "Dummy",
+     "artist": null,
+     "coverArt": null,
+     "year": null,
+     "songs": [],
+     "partial": false
+    }
+   ]
+  },
+  {
+   "name": "no album id, an empty one, no album name",
+   "songs": [
+    {
+     "id": "x1",
+     "title": "Song x1",
+     "album": "Loose",
+     "artist": "Someone"
+    },
+    {
+     "id": "x2",
+     "title": "Song x2",
+     "albumId": "",
+     "album": "Empty id"
+    },
+    {
+     "id": "x3",
+     "title": "Song x3",
+     "albumId": "al-n",
+     "artist": "Nameless"
+    }
+   ],
+   "albums": [
+    {
+     "id": "al-n",
+     "name": "",
+     "artist": "Nameless",
+     "coverArt": null,
+     "year": null,
+     "songs": [
+      "x3"
+     ],
+     "partial": true
+    }
+   ],
+   "stubFor": [
+    {
+     "id": "",
+     "name": "Loose",
+     "artist": null,
+     "coverArt": null,
+     "year": null,
+     "songs": [],
+     "partial": false
+    },
+    {
+     "id": "",
+     "name": "Empty id",
+     "artist": null,
+     "coverArt": null,
+     "year": null,
+     "songs": [],
+     "partial": false
+    },
+    {
+     "id": "al-n",
+     "name": "",
+     "artist": null,
+     "coverArt": null,
+     "year": null,
+     "songs": [],
+     "partial": false
+    }
+   ]
+  },
+  {
+   "name": "the album artist over the song artist, empties dropped",
+   "songs": [
+    {
+     "id": "c1",
+     "title": "Song c1",
+     "album": "Split",
+     "albumId": "al-s",
+     "artist": "Guest",
+     "displayAlbumArtist": "Various Artists",
+     "coverArt": "",
+     "year": 0
+    },
+    {
+     "id": "c2",
+     "title": "Song c2",
+     "album": "Blank artist",
+     "albumId": "al-b",
+     "artist": "",
+     "displayAlbumArtist": ""
+    },
+    {
+     "id": "c3",
+     "title": "Song c3",
+     "album": "Only artist",
+     "albumId": "al-o",
+     "artist": "Solo",
+     "displayAlbumArtist": ""
+    },
+    {
+     "id": "c4",
+     "title": "Song c4",
+     "album": "No artist",
+     "albumId": "al-x"
+    }
+   ],
+   "albums": [
+    {
+     "id": "al-s",
+     "name": "Split",
+     "artist": "Various Artists",
+     "coverArt": null,
+     "year": null,
+     "songs": [
+      "c1"
+     ],
+     "partial": true
+    },
+    {
+     "id": "al-b",
+     "name": "Blank artist",
+     "artist": null,
+     "coverArt": null,
+     "year": null,
+     "songs": [
+      "c2"
+     ],
+     "partial": true
+    },
+    {
+     "id": "al-o",
+     "name": "Only artist",
+     "artist": "Solo",
+     "coverArt": null,
+     "year": null,
+     "songs": [
+      "c3"
+     ],
+     "partial": true
+    },
+    {
+     "id": "al-x",
+     "name": "No artist",
+     "artist": null,
+     "coverArt": null,
+     "year": null,
+     "songs": [
+      "c4"
+     ],
+     "partial": true
+    }
+   ],
+   "stubFor": [
+    {
+     "id": "al-s",
+     "name": "Split",
+     "artist": null,
+     "coverArt": null,
+     "year": null,
+     "songs": [],
+     "partial": false
+    },
+    {
+     "id": "al-b",
+     "name": "Blank artist",
+     "artist": null,
+     "coverArt": null,
+     "year": null,
+     "songs": [],
+     "partial": false
+    },
+    {
+     "id": "al-o",
+     "name": "Only artist",
+     "artist": null,
+     "coverArt": null,
+     "year": null,
+     "songs": [],
+     "partial": false
+    },
+    {
+     "id": "al-x",
+     "name": "No artist",
+     "artist": null,
+     "coverArt": null,
+     "year": null,
+     "songs": [],
+     "partial": false
+    }
+   ]
+  }
+ ],
+ "withHeld": [
+  {
+   "name": "nothing held",
+   "songs": [
+    {
+     "id": "a1",
+     "title": "Song a1",
+     "album": "Dummy",
+     "albumId": "al-d",
+     "artist": "Portishead",
+     "coverArt": "al-d",
+     "year": 1994,
+     "displayAlbumArtist": "Portishead"
+    },
+    {
+     "id": "b1",
+     "title": "Song b1",
+     "album": "Mezzanine",
+     "albumId": "al-m",
+     "artist": "Massive Attack",
+     "coverArt": "al-m",
+     "year": 1998
+    },
+    {
+     "id": "a2",
+     "title": "Song a2",
+     "album": "Dummy",
+     "albumId": "al-d",
+     "artist": "Portishead",
+     "coverArt": "al-d-2",
+     "year": 1995
+    },
+    {
+     "id": "a1",
+     "title": "Song a1",
+     "album": "Dummy",
+     "albumId": "al-d",
+     "artist": "Portishead",
+     "coverArt": "al-d",
+     "year": 1994
+    }
+   ],
+   "held": [],
+   "albums": [
+    {
+     "id": "al-d",
+     "name": "Dummy",
+     "artist": "Portishead",
+     "coverArt": "al-d",
+     "year": 1994,
+     "songs": [
+      "a1",
+      "a2",
+      "a1"
+     ],
+     "partial": true
+    },
+    {
+     "id": "al-m",
+     "name": "Mezzanine",
+     "artist": "Massive Attack",
+     "coverArt": "al-m",
+     "year": 1998,
+     "songs": [
+      "b1"
+     ],
+     "partial": true
+    }
+   ]
+  },
+  {
+   "name": "the whole album held",
+   "songs": [
+    {
+     "id": "a1",
+     "title": "Song a1",
+     "album": "Dummy",
+     "albumId": "al-d",
+     "artist": "Portishead",
+     "coverArt": "al-d",
+     "year": 1994,
+     "displayAlbumArtist": "Portishead"
+    },
+    {
+     "id": "b1",
+     "title": "Song b1",
+     "album": "Mezzanine",
+     "albumId": "al-m",
+     "artist": "Massive Attack",
+     "coverArt": "al-m",
+     "year": 1998
+    },
+    {
+     "id": "a2",
+     "title": "Song a2",
+     "album": "Dummy",
+     "albumId": "al-d",
+     "artist": "Portishead",
+     "coverArt": "al-d-2",
+     "year": 1995
+    },
+    {
+     "id": "a1",
+     "title": "Song a1",
+     "album": "Dummy",
+     "albumId": "al-d",
+     "artist": "Portishead",
+     "coverArt": "al-d",
+     "year": 1994
+    }
+   ],
+   "held": [
+    {
+     "id": "al-d",
+     "name": "Whole al-d",
+     "artist": "Whole artist",
+     "coverArt": "cover-al-d",
+     "year": 2001,
+     "songs": [
+      "a1",
+      "a2",
+      "a3",
+      "a4"
+     ],
+     "partial": false
+    }
+   ],
+   "albums": [
+    {
+     "id": "al-d",
+     "name": "Whole al-d",
+     "artist": "Whole artist",
+     "coverArt": "cover-al-d",
+     "year": 2001,
+     "songs": [
+      "a1",
+      "a2",
+      "a3",
+      "a4"
+     ],
+     "partial": false
+    },
+    {
+     "id": "al-m",
+     "name": "Mezzanine",
+     "artist": "Massive Attack",
+     "coverArt": "al-m",
+     "year": 1998,
+     "songs": [
+      "b1"
+     ],
+     "partial": true
+    }
+   ]
+  },
+  {
+   "name": "an earlier stub held, its songs overlapping",
+   "songs": [
+    {
+     "id": "a1",
+     "title": "Song a1",
+     "album": "Dummy",
+     "albumId": "al-d",
+     "artist": "Portishead",
+     "coverArt": "al-d",
+     "year": 1994,
+     "displayAlbumArtist": "Portishead"
+    },
+    {
+     "id": "b1",
+     "title": "Song b1",
+     "album": "Mezzanine",
+     "albumId": "al-m",
+     "artist": "Massive Attack",
+     "coverArt": "al-m",
+     "year": 1998
+    },
+    {
+     "id": "a2",
+     "title": "Song a2",
+     "album": "Dummy",
+     "albumId": "al-d",
+     "artist": "Portishead",
+     "coverArt": "al-d-2",
+     "year": 1995
+    },
+    {
+     "id": "a1",
+     "title": "Song a1",
+     "album": "Dummy",
+     "albumId": "al-d",
+     "artist": "Portishead",
+     "coverArt": "al-d",
+     "year": 1994
+    }
+   ],
+   "held": [
+    {
+     "id": "al-m",
+     "name": "Stub al-m",
+     "artist": "Whole artist",
+     "coverArt": "cover-al-m",
+     "year": 2001,
+     "songs": [
+      "b0",
+      "b1",
+      "b2"
+     ],
+     "partial": true
+    }
+   ],
+   "albums": [
+    {
+     "id": "al-d",
+     "name": "Dummy",
+     "artist": "Portishead",
+     "coverArt": "al-d",
+     "year": 1994,
+     "songs": [
+      "a1",
+      "a2",
+      "a1"
+     ],
+     "partial": true
+    },
+    {
+     "id": "al-m",
+     "name": "Mezzanine",
+     "artist": "Massive Attack",
+     "coverArt": "al-m",
+     "year": 1998,
+     "songs": [
+      "b0",
+      "b2",
+      "b1"
+     ],
+     "partial": true
+    }
+   ]
+  },
+  {
+   "name": "both, and one held of another album",
+   "songs": [
+    {
+     "id": "a1",
+     "title": "Song a1",
+     "album": "Dummy",
+     "albumId": "al-d",
+     "artist": "Portishead",
+     "coverArt": "al-d",
+     "year": 1994,
+     "displayAlbumArtist": "Portishead"
+    },
+    {
+     "id": "b1",
+     "title": "Song b1",
+     "album": "Mezzanine",
+     "albumId": "al-m",
+     "artist": "Massive Attack",
+     "coverArt": "al-m",
+     "year": 1998
+    },
+    {
+     "id": "a2",
+     "title": "Song a2",
+     "album": "Dummy",
+     "albumId": "al-d",
+     "artist": "Portishead",
+     "coverArt": "al-d-2",
+     "year": 1995
+    },
+    {
+     "id": "a1",
+     "title": "Song a1",
+     "album": "Dummy",
+     "albumId": "al-d",
+     "artist": "Portishead",
+     "coverArt": "al-d",
+     "year": 1994
+    }
+   ],
+   "held": [
+    {
+     "id": "al-m",
+     "name": "Whole al-m",
+     "artist": "Whole artist",
+     "coverArt": "cover-al-m",
+     "year": 2001,
+     "songs": [
+      "b1"
+     ],
+     "partial": false
+    },
+    {
+     "id": "al-d",
+     "name": "Stub al-d",
+     "artist": "Whole artist",
+     "coverArt": "cover-al-d",
+     "year": 2001,
+     "songs": [
+      "a2",
+      "a9"
+     ],
+     "partial": true
+    },
+    {
+     "id": "al-other",
+     "name": "Whole al-other",
+     "artist": "Whole artist",
+     "coverArt": "cover-al-other",
+     "year": 2001,
+     "songs": [
+      "z1"
+     ],
+     "partial": false
+    }
+   ],
+   "albums": [
+    {
+     "id": "al-d",
+     "name": "Dummy",
+     "artist": "Portishead",
+     "coverArt": "al-d",
+     "year": 1994,
+     "songs": [
+      "a9",
+      "a1",
+      "a2",
+      "a1"
+     ],
+     "partial": true
+    },
+    {
+     "id": "al-m",
+     "name": "Whole al-m",
+     "artist": "Whole artist",
+     "coverArt": "cover-al-m",
+     "year": 2001,
+     "songs": [
+      "b1"
+     ],
+     "partial": false
+    }
+   ]
+  }
+ ],
+ "played": [
+  {
+   "name": "remember past eight",
+   "kept": null,
+   "queueKept": null,
+   "steps": [
+    {
+     "op": "remember",
+     "ids": [
+      "a000"
+     ],
+     "held": [
+      {
+       "id": "a000",
+       "tag": "s0"
+      }
+     ]
+    },
+    {
+     "op": "remember",
+     "ids": [
+      "a001"
+     ],
+     "held": [
+      {
+       "id": "a000",
+       "tag": "s0"
+      },
+      {
+       "id": "a001",
+       "tag": "s1"
+      }
+     ]
+    },
+    {
+     "op": "remember",
+     "ids": [
+      "a002"
+     ],
+     "held": [
+      {
+       "id": "a000",
+       "tag": "s0"
+      },
+      {
+       "id": "a001",
+       "tag": "s1"
+      },
+      {
+       "id": "a002",
+       "tag": "s2"
+      }
+     ]
+    },
+    {
+     "op": "remember",
+     "ids": [
+      "a003"
+     ],
+     "held": [
+      {
+       "id": "a000",
+       "tag": "s0"
+      },
+      {
+       "id": "a001",
+       "tag": "s1"
+      },
+      {
+       "id": "a002",
+       "tag": "s2"
+      },
+      {
+       "id": "a003",
+       "tag": "s3"
+      }
+     ]
+    },
+    {
+     "op": "remember",
+     "ids": [
+      "a004"
+     ],
+     "held": [
+      {
+       "id": "a000",
+       "tag": "s0"
+      },
+      {
+       "id": "a001",
+       "tag": "s1"
+      },
+      {
+       "id": "a002",
+       "tag": "s2"
+      },
+      {
+       "id": "a003",
+       "tag": "s3"
+      },
+      {
+       "id": "a004",
+       "tag": "s4"
+      }
+     ]
+    },
+    {
+     "op": "remember",
+     "ids": [
+      "a005"
+     ],
+     "held": [
+      {
+       "id": "a000",
+       "tag": "s0"
+      },
+      {
+       "id": "a001",
+       "tag": "s1"
+      },
+      {
+       "id": "a002",
+       "tag": "s2"
+      },
+      {
+       "id": "a003",
+       "tag": "s3"
+      },
+      {
+       "id": "a004",
+       "tag": "s4"
+      },
+      {
+       "id": "a005",
+       "tag": "s5"
+      }
+     ]
+    },
+    {
+     "op": "remember",
+     "ids": [
+      "a006"
+     ],
+     "held": [
+      {
+       "id": "a000",
+       "tag": "s0"
+      },
+      {
+       "id": "a001",
+       "tag": "s1"
+      },
+      {
+       "id": "a002",
+       "tag": "s2"
+      },
+      {
+       "id": "a003",
+       "tag": "s3"
+      },
+      {
+       "id": "a004",
+       "tag": "s4"
+      },
+      {
+       "id": "a005",
+       "tag": "s5"
+      },
+      {
+       "id": "a006",
+       "tag": "s6"
+      }
+     ]
+    },
+    {
+     "op": "remember",
+     "ids": [
+      "a007"
+     ],
+     "held": [
+      {
+       "id": "a000",
+       "tag": "s0"
+      },
+      {
+       "id": "a001",
+       "tag": "s1"
+      },
+      {
+       "id": "a002",
+       "tag": "s2"
+      },
+      {
+       "id": "a003",
+       "tag": "s3"
+      },
+      {
+       "id": "a004",
+       "tag": "s4"
+      },
+      {
+       "id": "a005",
+       "tag": "s5"
+      },
+      {
+       "id": "a006",
+       "tag": "s6"
+      },
+      {
+       "id": "a007",
+       "tag": "s7"
+      }
+     ]
+    },
+    {
+     "op": "remember",
+     "ids": [
+      "a008"
+     ],
+     "held": [
+      {
+       "id": "a001",
+       "tag": "s1"
+      },
+      {
+       "id": "a002",
+       "tag": "s2"
+      },
+      {
+       "id": "a003",
+       "tag": "s3"
+      },
+      {
+       "id": "a004",
+       "tag": "s4"
+      },
+      {
+       "id": "a005",
+       "tag": "s5"
+      },
+      {
+       "id": "a006",
+       "tag": "s6"
+      },
+      {
+       "id": "a007",
+       "tag": "s7"
+      },
+      {
+       "id": "a008",
+       "tag": "s8"
+      }
+     ]
+    },
+    {
+     "op": "remember",
+     "ids": [
+      "a009"
+     ],
+     "held": [
+      {
+       "id": "a002",
+       "tag": "s2"
+      },
+      {
+       "id": "a003",
+       "tag": "s3"
+      },
+      {
+       "id": "a004",
+       "tag": "s4"
+      },
+      {
+       "id": "a005",
+       "tag": "s5"
+      },
+      {
+       "id": "a006",
+       "tag": "s6"
+      },
+      {
+       "id": "a007",
+       "tag": "s7"
+      },
+      {
+       "id": "a008",
+       "tag": "s8"
+      },
+      {
+       "id": "a009",
+       "tag": "s9"
+      }
+     ]
+    },
+    {
+     "op": "remember",
+     "ids": [
+      "a003"
+     ],
+     "held": [
+      {
+       "id": "a002",
+       "tag": "s2"
+      },
+      {
+       "id": "a003",
+       "tag": "s10"
+      },
+      {
+       "id": "a004",
+       "tag": "s4"
+      },
+      {
+       "id": "a005",
+       "tag": "s5"
+      },
+      {
+       "id": "a006",
+       "tag": "s6"
+      },
+      {
+       "id": "a007",
+       "tag": "s7"
+      },
+      {
+       "id": "a008",
+       "tag": "s8"
+      },
+      {
+       "id": "a009",
+       "tag": "s9"
+      }
+     ]
+    },
+    {
+     "op": "remember",
+     "ids": [
+      "a010"
+     ],
+     "held": [
+      {
+       "id": "a003",
+       "tag": "s10"
+      },
+      {
+       "id": "a004",
+       "tag": "s4"
+      },
+      {
+       "id": "a005",
+       "tag": "s5"
+      },
+      {
+       "id": "a006",
+       "tag": "s6"
+      },
+      {
+       "id": "a007",
+       "tag": "s7"
+      },
+      {
+       "id": "a008",
+       "tag": "s8"
+      },
+      {
+       "id": "a009",
+       "tag": "s9"
+      },
+      {
+       "id": "a010",
+       "tag": "s11"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "name": "a queue of twelve, then one played",
+   "kept": null,
+   "queueKept": null,
+   "steps": [
+    {
+     "op": "remember",
+     "ids": [
+      "a900"
+     ],
+     "held": [
+      {
+       "id": "a900",
+       "tag": "s0"
+      }
+     ]
+    },
+    {
+     "op": "queue",
+     "ids": [
+      "a000",
+      "a001",
+      "a002",
+      "a003",
+      "a004",
+      "a005",
+      "a006",
+      "a007",
+      "a008",
+      "a009",
+      "a010",
+      "a011"
+     ],
+     "held": [
+      {
+       "id": "a000",
+       "tag": "s1"
+      },
+      {
+       "id": "a001",
+       "tag": "s1.1"
+      },
+      {
+       "id": "a002",
+       "tag": "s1.2"
+      },
+      {
+       "id": "a003",
+       "tag": "s1.3"
+      },
+      {
+       "id": "a004",
+       "tag": "s1.4"
+      },
+      {
+       "id": "a005",
+       "tag": "s1.5"
+      },
+      {
+       "id": "a006",
+       "tag": "s1.6"
+      },
+      {
+       "id": "a007",
+       "tag": "s1.7"
+      },
+      {
+       "id": "a008",
+       "tag": "s1.8"
+      },
+      {
+       "id": "a009",
+       "tag": "s1.9"
+      },
+      {
+       "id": "a010",
+       "tag": "s1.10"
+      },
+      {
+       "id": "a011",
+       "tag": "s1.11"
+      }
+     ]
+    },
+    {
+     "op": "also",
+     "ids": [
+      "a100"
+     ],
+     "held": [
+      {
+       "id": "a000",
+       "tag": "s1"
+      },
+      {
+       "id": "a001",
+       "tag": "s1.1"
+      },
+      {
+       "id": "a002",
+       "tag": "s1.2"
+      },
+      {
+       "id": "a003",
+       "tag": "s1.3"
+      },
+      {
+       "id": "a004",
+       "tag": "s1.4"
+      },
+      {
+       "id": "a005",
+       "tag": "s1.5"
+      },
+      {
+       "id": "a006",
+       "tag": "s1.6"
+      },
+      {
+       "id": "a007",
+       "tag": "s1.7"
+      },
+      {
+       "id": "a008",
+       "tag": "s1.8"
+      },
+      {
+       "id": "a009",
+       "tag": "s1.9"
+      },
+      {
+       "id": "a010",
+       "tag": "s1.10"
+      },
+      {
+       "id": "a011",
+       "tag": "s1.11"
+      },
+      {
+       "id": "a100",
+       "tag": "s2"
+      }
+     ]
+    },
+    {
+     "op": "also",
+     "ids": [
+      "a001"
+     ],
+     "held": [
+      {
+       "id": "a000",
+       "tag": "s1"
+      },
+      {
+       "id": "a001",
+       "tag": "s3"
+      },
+      {
+       "id": "a002",
+       "tag": "s1.2"
+      },
+      {
+       "id": "a003",
+       "tag": "s1.3"
+      },
+      {
+       "id": "a004",
+       "tag": "s1.4"
+      },
+      {
+       "id": "a005",
+       "tag": "s1.5"
+      },
+      {
+       "id": "a006",
+       "tag": "s1.6"
+      },
+      {
+       "id": "a007",
+       "tag": "s1.7"
+      },
+      {
+       "id": "a008",
+       "tag": "s1.8"
+      },
+      {
+       "id": "a009",
+       "tag": "s1.9"
+      },
+      {
+       "id": "a010",
+       "tag": "s1.10"
+      },
+      {
+       "id": "a011",
+       "tag": "s1.11"
+      },
+      {
+       "id": "a100",
+       "tag": "s2"
+      }
+     ]
+    },
+    {
+     "op": "remember",
+     "ids": [
+      "a200"
+     ],
+     "held": [
+      {
+       "id": "a000",
+       "tag": "s1"
+      },
+      {
+       "id": "a001",
+       "tag": "s3"
+      },
+      {
+       "id": "a002",
+       "tag": "s1.2"
+      },
+      {
+       "id": "a003",
+       "tag": "s1.3"
+      },
+      {
+       "id": "a004",
+       "tag": "s1.4"
+      },
+      {
+       "id": "a005",
+       "tag": "s1.5"
+      },
+      {
+       "id": "a100",
+       "tag": "s2"
+      },
+      {
+       "id": "a200",
+       "tag": "s4"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "name": "a queue past the bound",
+   "kept": null,
+   "queueKept": null,
+   "steps": [
+    {
+     "op": "queue",
+     "ids": [
+      "a000",
+      "a001",
+      "a002",
+      "a003",
+      "a004",
+      "a005",
+      "a006",
+      "a007",
+      "a008",
+      "a009",
+      "a010",
+      "a011",
+      "a012",
+      "a013",
+      "a014",
+      "a015",
+      "a016",
+      "a017",
+      "a018",
+      "a019",
+      "a020",
+      "a021",
+      "a022",
+      "a023",
+      "a024",
+      "a025",
+      "a026",
+      "a027",
+      "a028",
+      "a029",
+      "a030",
+      "a031",
+      "a032",
+      "a033",
+      "a034",
+      "a035",
+      "a036",
+      "a037",
+      "a038",
+      "a039",
+      "a040",
+      "a041",
+      "a042",
+      "a043",
+      "a044",
+      "a045",
+      "a046",
+      "a047",
+      "a048",
+      "a049",
+      "a050",
+      "a051",
+      "a052",
+      "a053",
+      "a054",
+      "a055",
+      "a056",
+      "a057",
+      "a058",
+      "a059",
+      "a060",
+      "a061",
+      "a062",
+      "a063",
+      "a064",
+      "a065",
+      "a066",
+      "a067",
+      "a068",
+      "a069"
+     ],
+     "held": [
+      {
+       "id": "a000",
+       "tag": "s0"
+      },
+      {
+       "id": "a001",
+       "tag": "s0.1"
+      },
+      {
+       "id": "a002",
+       "tag": "s0.2"
+      },
+      {
+       "id": "a003",
+       "tag": "s0.3"
+      },
+      {
+       "id": "a004",
+       "tag": "s0.4"
+      },
+      {
+       "id": "a005",
+       "tag": "s0.5"
+      },
+      {
+       "id": "a006",
+       "tag": "s0.6"
+      },
+      {
+       "id": "a007",
+       "tag": "s0.7"
+      },
+      {
+       "id": "a008",
+       "tag": "s0.8"
+      },
+      {
+       "id": "a009",
+       "tag": "s0.9"
+      },
+      {
+       "id": "a010",
+       "tag": "s0.10"
+      },
+      {
+       "id": "a011",
+       "tag": "s0.11"
+      },
+      {
+       "id": "a012",
+       "tag": "s0.12"
+      },
+      {
+       "id": "a013",
+       "tag": "s0.13"
+      },
+      {
+       "id": "a014",
+       "tag": "s0.14"
+      },
+      {
+       "id": "a015",
+       "tag": "s0.15"
+      },
+      {
+       "id": "a016",
+       "tag": "s0.16"
+      },
+      {
+       "id": "a017",
+       "tag": "s0.17"
+      },
+      {
+       "id": "a018",
+       "tag": "s0.18"
+      },
+      {
+       "id": "a019",
+       "tag": "s0.19"
+      },
+      {
+       "id": "a020",
+       "tag": "s0.20"
+      },
+      {
+       "id": "a021",
+       "tag": "s0.21"
+      },
+      {
+       "id": "a022",
+       "tag": "s0.22"
+      },
+      {
+       "id": "a023",
+       "tag": "s0.23"
+      },
+      {
+       "id": "a024",
+       "tag": "s0.24"
+      },
+      {
+       "id": "a025",
+       "tag": "s0.25"
+      },
+      {
+       "id": "a026",
+       "tag": "s0.26"
+      },
+      {
+       "id": "a027",
+       "tag": "s0.27"
+      },
+      {
+       "id": "a028",
+       "tag": "s0.28"
+      },
+      {
+       "id": "a029",
+       "tag": "s0.29"
+      },
+      {
+       "id": "a030",
+       "tag": "s0.30"
+      },
+      {
+       "id": "a031",
+       "tag": "s0.31"
+      },
+      {
+       "id": "a032",
+       "tag": "s0.32"
+      },
+      {
+       "id": "a033",
+       "tag": "s0.33"
+      },
+      {
+       "id": "a034",
+       "tag": "s0.34"
+      },
+      {
+       "id": "a035",
+       "tag": "s0.35"
+      },
+      {
+       "id": "a036",
+       "tag": "s0.36"
+      },
+      {
+       "id": "a037",
+       "tag": "s0.37"
+      },
+      {
+       "id": "a038",
+       "tag": "s0.38"
+      },
+      {
+       "id": "a039",
+       "tag": "s0.39"
+      },
+      {
+       "id": "a040",
+       "tag": "s0.40"
+      },
+      {
+       "id": "a041",
+       "tag": "s0.41"
+      },
+      {
+       "id": "a042",
+       "tag": "s0.42"
+      },
+      {
+       "id": "a043",
+       "tag": "s0.43"
+      },
+      {
+       "id": "a044",
+       "tag": "s0.44"
+      },
+      {
+       "id": "a045",
+       "tag": "s0.45"
+      },
+      {
+       "id": "a046",
+       "tag": "s0.46"
+      },
+      {
+       "id": "a047",
+       "tag": "s0.47"
+      },
+      {
+       "id": "a048",
+       "tag": "s0.48"
+      },
+      {
+       "id": "a049",
+       "tag": "s0.49"
+      },
+      {
+       "id": "a050",
+       "tag": "s0.50"
+      },
+      {
+       "id": "a051",
+       "tag": "s0.51"
+      },
+      {
+       "id": "a052",
+       "tag": "s0.52"
+      },
+      {
+       "id": "a053",
+       "tag": "s0.53"
+      },
+      {
+       "id": "a054",
+       "tag": "s0.54"
+      },
+      {
+       "id": "a055",
+       "tag": "s0.55"
+      },
+      {
+       "id": "a056",
+       "tag": "s0.56"
+      },
+      {
+       "id": "a057",
+       "tag": "s0.57"
+      },
+      {
+       "id": "a058",
+       "tag": "s0.58"
+      },
+      {
+       "id": "a059",
+       "tag": "s0.59"
+      },
+      {
+       "id": "a060",
+       "tag": "s0.60"
+      },
+      {
+       "id": "a061",
+       "tag": "s0.61"
+      },
+      {
+       "id": "a062",
+       "tag": "s0.62"
+      },
+      {
+       "id": "a063",
+       "tag": "s0.63"
+      }
+     ]
+    },
+    {
+     "op": "also",
+     "ids": [
+      "a500"
+     ],
+     "held": [
+      {
+       "id": "a000",
+       "tag": "s0"
+      },
+      {
+       "id": "a001",
+       "tag": "s0.1"
+      },
+      {
+       "id": "a002",
+       "tag": "s0.2"
+      },
+      {
+       "id": "a003",
+       "tag": "s0.3"
+      },
+      {
+       "id": "a004",
+       "tag": "s0.4"
+      },
+      {
+       "id": "a005",
+       "tag": "s0.5"
+      },
+      {
+       "id": "a006",
+       "tag": "s0.6"
+      },
+      {
+       "id": "a007",
+       "tag": "s0.7"
+      },
+      {
+       "id": "a008",
+       "tag": "s0.8"
+      },
+      {
+       "id": "a009",
+       "tag": "s0.9"
+      },
+      {
+       "id": "a010",
+       "tag": "s0.10"
+      },
+      {
+       "id": "a011",
+       "tag": "s0.11"
+      },
+      {
+       "id": "a012",
+       "tag": "s0.12"
+      },
+      {
+       "id": "a013",
+       "tag": "s0.13"
+      },
+      {
+       "id": "a014",
+       "tag": "s0.14"
+      },
+      {
+       "id": "a015",
+       "tag": "s0.15"
+      },
+      {
+       "id": "a016",
+       "tag": "s0.16"
+      },
+      {
+       "id": "a017",
+       "tag": "s0.17"
+      },
+      {
+       "id": "a018",
+       "tag": "s0.18"
+      },
+      {
+       "id": "a019",
+       "tag": "s0.19"
+      },
+      {
+       "id": "a020",
+       "tag": "s0.20"
+      },
+      {
+       "id": "a021",
+       "tag": "s0.21"
+      },
+      {
+       "id": "a022",
+       "tag": "s0.22"
+      },
+      {
+       "id": "a023",
+       "tag": "s0.23"
+      },
+      {
+       "id": "a024",
+       "tag": "s0.24"
+      },
+      {
+       "id": "a025",
+       "tag": "s0.25"
+      },
+      {
+       "id": "a026",
+       "tag": "s0.26"
+      },
+      {
+       "id": "a027",
+       "tag": "s0.27"
+      },
+      {
+       "id": "a028",
+       "tag": "s0.28"
+      },
+      {
+       "id": "a029",
+       "tag": "s0.29"
+      },
+      {
+       "id": "a030",
+       "tag": "s0.30"
+      },
+      {
+       "id": "a031",
+       "tag": "s0.31"
+      },
+      {
+       "id": "a032",
+       "tag": "s0.32"
+      },
+      {
+       "id": "a033",
+       "tag": "s0.33"
+      },
+      {
+       "id": "a034",
+       "tag": "s0.34"
+      },
+      {
+       "id": "a035",
+       "tag": "s0.35"
+      },
+      {
+       "id": "a036",
+       "tag": "s0.36"
+      },
+      {
+       "id": "a037",
+       "tag": "s0.37"
+      },
+      {
+       "id": "a038",
+       "tag": "s0.38"
+      },
+      {
+       "id": "a039",
+       "tag": "s0.39"
+      },
+      {
+       "id": "a040",
+       "tag": "s0.40"
+      },
+      {
+       "id": "a041",
+       "tag": "s0.41"
+      },
+      {
+       "id": "a042",
+       "tag": "s0.42"
+      },
+      {
+       "id": "a043",
+       "tag": "s0.43"
+      },
+      {
+       "id": "a044",
+       "tag": "s0.44"
+      },
+      {
+       "id": "a045",
+       "tag": "s0.45"
+      },
+      {
+       "id": "a046",
+       "tag": "s0.46"
+      },
+      {
+       "id": "a047",
+       "tag": "s0.47"
+      },
+      {
+       "id": "a048",
+       "tag": "s0.48"
+      },
+      {
+       "id": "a049",
+       "tag": "s0.49"
+      },
+      {
+       "id": "a050",
+       "tag": "s0.50"
+      },
+      {
+       "id": "a051",
+       "tag": "s0.51"
+      },
+      {
+       "id": "a052",
+       "tag": "s0.52"
+      },
+      {
+       "id": "a053",
+       "tag": "s0.53"
+      },
+      {
+       "id": "a054",
+       "tag": "s0.54"
+      },
+      {
+       "id": "a055",
+       "tag": "s0.55"
+      },
+      {
+       "id": "a056",
+       "tag": "s0.56"
+      },
+      {
+       "id": "a057",
+       "tag": "s0.57"
+      },
+      {
+       "id": "a058",
+       "tag": "s0.58"
+      },
+      {
+       "id": "a059",
+       "tag": "s0.59"
+      },
+      {
+       "id": "a060",
+       "tag": "s0.60"
+      },
+      {
+       "id": "a061",
+       "tag": "s0.61"
+      },
+      {
+       "id": "a062",
+       "tag": "s0.62"
+      },
+      {
+       "id": "a500",
+       "tag": "s1"
+      }
+     ]
+    },
+    {
+     "op": "queue",
+     "ids": [
+      "a000",
+      "a001",
+      "a002",
+      "a001",
+      "a002"
+     ],
+     "held": [
+      {
+       "id": "a000",
+       "tag": "s2"
+      },
+      {
+       "id": "a001",
+       "tag": "s2.1"
+      },
+      {
+       "id": "a002",
+       "tag": "s2.2"
+      },
+      {
+       "id": "a003",
+       "tag": "s0.3"
+      },
+      {
+       "id": "a004",
+       "tag": "s0.4"
+      },
+      {
+       "id": "a005",
+       "tag": "s0.5"
+      },
+      {
+       "id": "a006",
+       "tag": "s0.6"
+      },
+      {
+       "id": "a500",
+       "tag": "s1"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "name": "also grows, then a queue",
+   "kept": 3,
+   "queueKept": 5,
+   "steps": [
+    {
+     "op": "remember",
+     "ids": [
+      "a050"
+     ],
+     "held": [
+      {
+       "id": "a050",
+       "tag": "s0"
+      }
+     ]
+    },
+    {
+     "op": "remember",
+     "ids": [
+      "a051"
+     ],
+     "held": [
+      {
+       "id": "a050",
+       "tag": "s0"
+      },
+      {
+       "id": "a051",
+       "tag": "s1"
+      }
+     ]
+    },
+    {
+     "op": "remember",
+     "ids": [
+      "a052"
+     ],
+     "held": [
+      {
+       "id": "a050",
+       "tag": "s0"
+      },
+      {
+       "id": "a051",
+       "tag": "s1"
+      },
+      {
+       "id": "a052",
+       "tag": "s2"
+      }
+     ]
+    },
+    {
+     "op": "also",
+     "ids": [
+      "a053"
+     ],
+     "held": [
+      {
+       "id": "a050",
+       "tag": "s0"
+      },
+      {
+       "id": "a051",
+       "tag": "s1"
+      },
+      {
+       "id": "a052",
+       "tag": "s2"
+      },
+      {
+       "id": "a053",
+       "tag": "s3"
+      }
+     ]
+    },
+    {
+     "op": "also",
+     "ids": [
+      "a054"
+     ],
+     "held": [
+      {
+       "id": "a050",
+       "tag": "s0"
+      },
+      {
+       "id": "a051",
+       "tag": "s1"
+      },
+      {
+       "id": "a052",
+       "tag": "s2"
+      },
+      {
+       "id": "a053",
+       "tag": "s3"
+      },
+      {
+       "id": "a054",
+       "tag": "s4"
+      }
+     ]
+    },
+    {
+     "op": "also",
+     "ids": [
+      "a055"
+     ],
+     "held": [
+      {
+       "id": "a051",
+       "tag": "s1"
+      },
+      {
+       "id": "a052",
+       "tag": "s2"
+      },
+      {
+       "id": "a053",
+       "tag": "s3"
+      },
+      {
+       "id": "a054",
+       "tag": "s4"
+      },
+      {
+       "id": "a055",
+       "tag": "s5"
+      }
+     ]
+    },
+    {
+     "op": "also",
+     "ids": [
+      "a056"
+     ],
+     "held": [
+      {
+       "id": "a052",
+       "tag": "s2"
+      },
+      {
+       "id": "a053",
+       "tag": "s3"
+      },
+      {
+       "id": "a054",
+       "tag": "s4"
+      },
+      {
+       "id": "a055",
+       "tag": "s5"
+      },
+      {
+       "id": "a056",
+       "tag": "s6"
+      }
+     ]
+    },
+    {
+     "op": "also",
+     "ids": [
+      "a053"
+     ],
+     "held": [
+      {
+       "id": "a052",
+       "tag": "s2"
+      },
+      {
+       "id": "a053",
+       "tag": "s7"
+      },
+      {
+       "id": "a054",
+       "tag": "s4"
+      },
+      {
+       "id": "a055",
+       "tag": "s5"
+      },
+      {
+       "id": "a056",
+       "tag": "s6"
+      }
+     ]
+    },
+    {
+     "op": "queue",
+     "ids": [
+      "a060",
+      "a061"
+     ],
+     "held": [
+      {
+       "id": "a053",
+       "tag": "s7"
+      },
+      {
+       "id": "a060",
+       "tag": "s8"
+      },
+      {
+       "id": "a061",
+       "tag": "s8.1"
+      }
+     ]
+    },
+    {
+     "op": "remember",
+     "ids": [
+      "a070"
+     ],
+     "held": [
+      {
+       "id": "a060",
+       "tag": "s8"
+      },
+      {
+       "id": "a061",
+       "tag": "s8.1"
+      },
+      {
+       "id": "a070",
+       "tag": "s9"
+      }
+     ]
+    },
+    {
+     "op": "remember",
+     "ids": [
+      "a071"
+     ],
+     "held": [
+      {
+       "id": "a060",
+       "tag": "s8"
+      },
+      {
+       "id": "a070",
+       "tag": "s9"
+      },
+      {
+       "id": "a071",
+       "tag": "s10"
+      }
+     ]
+    },
+    {
+     "op": "remember",
+     "ids": [
+      "a072"
+     ],
+     "held": [
+      {
+       "id": "a070",
+       "tag": "s9"
+      },
+      {
+       "id": "a071",
+       "tag": "s10"
+      },
+      {
+       "id": "a072",
+       "tag": "s11"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "name": "bounds of one",
+   "kept": 1,
+   "queueKept": 1,
+   "steps": [
+    {
+     "op": "remember",
+     "ids": [
+      "a001"
+     ],
+     "held": [
+      {
+       "id": "a001",
+       "tag": "s0"
+      }
+     ]
+    },
+    {
+     "op": "remember",
+     "ids": [
+      "a002"
+     ],
+     "held": [
+      {
+       "id": "a002",
+       "tag": "s1"
+      }
+     ]
+    },
+    {
+     "op": "queue",
+     "ids": [
+      "a003",
+      "a004"
+     ],
+     "held": [
+      {
+       "id": "a003",
+       "tag": "s2"
+      }
+     ]
+    },
+    {
+     "op": "also",
+     "ids": [
+      "a005"
+     ],
+     "held": [
+      {
+       "id": "a005",
+       "tag": "s3"
+      }
+     ]
+    },
+    {
+     "op": "also",
+     "ids": [
+      "a005"
+     ],
+     "held": [
+      {
+       "id": "a005",
+       "tag": "s4"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "name": "bounds of nought",
+   "kept": 0,
+   "queueKept": 0,
+   "steps": [
+    {
+     "op": "queue",
+     "ids": [
+      "a001",
+      "a002"
+     ],
+     "held": [
+      {
+       "id": "a001",
+       "tag": "s0"
+      }
+     ]
+    },
+    {
+     "op": "also",
+     "ids": [
+      "a003"
+     ],
+     "held": [
+      {
+       "id": "a003",
+       "tag": "s1"
+      }
+     ]
+    },
+    {
+     "op": "remember",
+     "ids": [
+      "a004"
+     ],
+     "held": [
+      {
+       "id": "a004",
+       "tag": "s2"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "name": "a queue with an album twice",
+   "kept": null,
+   "queueKept": null,
+   "steps": [
+    {
+     "op": "queue",
+     "ids": [
+      "a001",
+      "a002",
+      "a001",
+      "a003"
+     ],
+     "held": [
+      {
+       "id": "a001",
+       "tag": "s0"
+      },
+      {
+       "id": "a002",
+       "tag": "s0.1"
+      },
+      {
+       "id": "a003",
+       "tag": "s0.3"
+      }
+     ]
+    },
+    {
+     "op": "remember",
+     "ids": [
+      "a010"
+     ],
+     "held": [
+      {
+       "id": "a001",
+       "tag": "s0"
+      },
+      {
+       "id": "a002",
+       "tag": "s0.1"
+      },
+      {
+       "id": "a003",
+       "tag": "s0.3"
+      },
+      {
+       "id": "a010",
+       "tag": "s1"
+      }
+     ]
+    },
+    {
+     "op": "remember",
+     "ids": [
+      "a011"
+     ],
+     "held": [
+      {
+       "id": "a001",
+       "tag": "s0"
+      },
+      {
+       "id": "a002",
+       "tag": "s0.1"
+      },
+      {
+       "id": "a003",
+       "tag": "s0.3"
+      },
+      {
+       "id": "a010",
+       "tag": "s1"
+      },
+      {
+       "id": "a011",
+       "tag": "s2"
+      }
+     ]
+    },
+    {
+     "op": "remember",
+     "ids": [
+      "a012"
+     ],
+     "held": [
+      {
+       "id": "a001",
+       "tag": "s0"
+      },
+      {
+       "id": "a002",
+       "tag": "s0.1"
+      },
+      {
+       "id": "a003",
+       "tag": "s0.3"
+      },
+      {
+       "id": "a010",
+       "tag": "s1"
+      },
+      {
+       "id": "a011",
+       "tag": "s2"
+      },
+      {
+       "id": "a012",
+       "tag": "s3"
+      }
+     ]
+    },
+    {
+     "op": "remember",
+     "ids": [
+      "a013"
+     ],
+     "held": [
+      {
+       "id": "a001",
+       "tag": "s0"
+      },
+      {
+       "id": "a002",
+       "tag": "s0.1"
+      },
+      {
+       "id": "a003",
+       "tag": "s0.3"
+      },
+      {
+       "id": "a010",
+       "tag": "s1"
+      },
+      {
+       "id": "a011",
+       "tag": "s2"
+      },
+      {
+       "id": "a012",
+       "tag": "s3"
+      },
+      {
+       "id": "a013",
+       "tag": "s4"
+      }
+     ]
+    },
+    {
+     "op": "remember",
+     "ids": [
+      "a014"
+     ],
+     "held": [
+      {
+       "id": "a001",
+       "tag": "s0"
+      },
+      {
+       "id": "a002",
+       "tag": "s0.1"
+      },
+      {
+       "id": "a003",
+       "tag": "s0.3"
+      },
+      {
+       "id": "a010",
+       "tag": "s1"
+      },
+      {
+       "id": "a011",
+       "tag": "s2"
+      },
+      {
+       "id": "a012",
+       "tag": "s3"
+      },
+      {
+       "id": "a013",
+       "tag": "s4"
+      },
+      {
+       "id": "a014",
+       "tag": "s5"
+      }
+     ]
+    },
+    {
+     "op": "remember",
+     "ids": [
+      "a015"
+     ],
+     "held": [
+      {
+       "id": "a001",
+       "tag": "s0"
+      },
+      {
+       "id": "a002",
+       "tag": "s0.1"
+      },
+      {
+       "id": "a010",
+       "tag": "s1"
+      },
+      {
+       "id": "a011",
+       "tag": "s2"
+      },
+      {
+       "id": "a012",
+       "tag": "s3"
+      },
+      {
+       "id": "a013",
+       "tag": "s4"
+      },
+      {
+       "id": "a014",
+       "tag": "s5"
+      },
+      {
+       "id": "a015",
+       "tag": "s6"
+      }
+     ]
+    },
+    {
+     "op": "remember",
+     "ids": [
+      "a016"
+     ],
+     "held": [
+      {
+       "id": "a001",
+       "tag": "s0"
+      },
+      {
+       "id": "a010",
+       "tag": "s1"
+      },
+      {
+       "id": "a011",
+       "tag": "s2"
+      },
+      {
+       "id": "a012",
+       "tag": "s3"
+      },
+      {
+       "id": "a013",
+       "tag": "s4"
+      },
+      {
+       "id": "a014",
+       "tag": "s5"
+      },
+      {
+       "id": "a015",
+       "tag": "s6"
+      },
+      {
+       "id": "a016",
+       "tag": "s7"
+      }
+     ]
+    },
+    {
+     "op": "remember",
+     "ids": [
+      "a017"
+     ],
+     "held": [
+      {
+       "id": "a010",
+       "tag": "s1"
+      },
+      {
+       "id": "a011",
+       "tag": "s2"
+      },
+      {
+       "id": "a012",
+       "tag": "s3"
+      },
+      {
+       "id": "a013",
+       "tag": "s4"
+      },
+      {
+       "id": "a014",
+       "tag": "s5"
+      },
+      {
+       "id": "a015",
+       "tag": "s6"
+      },
+      {
+       "id": "a016",
+       "tag": "s7"
+      },
+      {
+       "id": "a017",
+       "tag": "s8"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "name": "an empty queue",
+   "kept": null,
+   "queueKept": null,
+   "steps": [
+    {
+     "op": "queue",
+     "ids": [
+      "a000",
+      "a001",
+      "a002",
+      "a003",
+      "a004",
+      "a005",
+      "a006",
+      "a007",
+      "a008",
+      "a009",
+      "a010",
+      "a011"
+     ],
+     "held": [
+      {
+       "id": "a000",
+       "tag": "s0"
+      },
+      {
+       "id": "a001",
+       "tag": "s0.1"
+      },
+      {
+       "id": "a002",
+       "tag": "s0.2"
+      },
+      {
+       "id": "a003",
+       "tag": "s0.3"
+      },
+      {
+       "id": "a004",
+       "tag": "s0.4"
+      },
+      {
+       "id": "a005",
+       "tag": "s0.5"
+      },
+      {
+       "id": "a006",
+       "tag": "s0.6"
+      },
+      {
+       "id": "a007",
+       "tag": "s0.7"
+      },
+      {
+       "id": "a008",
+       "tag": "s0.8"
+      },
+      {
+       "id": "a009",
+       "tag": "s0.9"
+      },
+      {
+       "id": "a010",
+       "tag": "s0.10"
+      },
+      {
+       "id": "a011",
+       "tag": "s0.11"
+      }
+     ]
+    },
+    {
+     "op": "queue",
+     "ids": [],
+     "held": [
+      {
+       "id": "a000",
+       "tag": "s0"
+      },
+      {
+       "id": "a001",
+       "tag": "s0.1"
+      },
+      {
+       "id": "a002",
+       "tag": "s0.2"
+      },
+      {
+       "id": "a003",
+       "tag": "s0.3"
+      },
+      {
+       "id": "a004",
+       "tag": "s0.4"
+      },
+      {
+       "id": "a005",
+       "tag": "s0.5"
+      },
+      {
+       "id": "a006",
+       "tag": "s0.6"
+      },
+      {
+       "id": "a007",
+       "tag": "s0.7"
+      }
+     ]
+    },
+    {
+     "op": "also",
+     "ids": [
+      "a100"
+     ],
+     "held": [
+      {
+       "id": "a000",
+       "tag": "s0"
+      },
+      {
+       "id": "a001",
+       "tag": "s0.1"
+      },
+      {
+       "id": "a002",
+       "tag": "s0.2"
+      },
+      {
+       "id": "a003",
+       "tag": "s0.3"
+      },
+      {
+       "id": "a004",
+       "tag": "s0.4"
+      },
+      {
+       "id": "a005",
+       "tag": "s0.5"
+      },
+      {
+       "id": "a006",
+       "tag": "s0.6"
+      },
+      {
+       "id": "a007",
+       "tag": "s0.7"
+      },
+      {
+       "id": "a100",
+       "tag": "s2"
+      }
+     ]
+    },
+    {
+     "op": "remember",
+     "ids": [
+      "a101"
+     ],
+     "held": [
+      {
+       "id": "a000",
+       "tag": "s0"
+      },
+      {
+       "id": "a001",
+       "tag": "s0.1"
+      },
+      {
+       "id": "a002",
+       "tag": "s0.2"
+      },
+      {
+       "id": "a003",
+       "tag": "s0.3"
+      },
+      {
+       "id": "a004",
+       "tag": "s0.4"
+      },
+      {
+       "id": "a005",
+       "tag": "s0.5"
+      },
+      {
+       "id": "a100",
+       "tag": "s2"
+      },
+      {
+       "id": "a101",
+       "tag": "s3"
+      }
+     ]
+    },
+    {
+     "op": "queue",
+     "ids": [],
+     "held": [
+      {
+       "id": "a000",
+       "tag": "s0"
+      },
+      {
+       "id": "a001",
+       "tag": "s0.1"
+      },
+      {
+       "id": "a002",
+       "tag": "s0.2"
+      },
+      {
+       "id": "a003",
+       "tag": "s0.3"
+      },
+      {
+       "id": "a004",
+       "tag": "s0.4"
+      },
+      {
+       "id": "a005",
+       "tag": "s0.5"
+      },
+      {
+       "id": "a100",
+       "tag": "s2"
+      },
+      {
+       "id": "a101",
+       "tag": "s3"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "name": "the same album put again",
+   "kept": 2,
+   "queueKept": 3,
+   "steps": [
+    {
+     "op": "remember",
+     "ids": [
+      "a001"
+     ],
+     "held": [
+      {
+       "id": "a001",
+       "tag": "s0"
+      }
+     ]
+    },
+    {
+     "op": "also",
+     "ids": [
+      "a001"
+     ],
+     "held": [
+      {
+       "id": "a001",
+       "tag": "s1"
+      }
+     ]
+    },
+    {
+     "op": "queue",
+     "ids": [
+      "a002",
+      "a001"
+     ],
+     "held": [
+      {
+       "id": "a001",
+       "tag": "s2.1"
+      },
+      {
+       "id": "a002",
+       "tag": "s2"
+      }
+     ]
+    },
+    {
+     "op": "also",
+     "ids": [
+      "a002"
+     ],
+     "held": [
+      {
+       "id": "a001",
+       "tag": "s2.1"
+      },
+      {
+       "id": "a002",
+       "tag": "s3"
+      }
+     ]
+    },
+    {
+     "op": "remember",
+     "ids": [
+      "a001"
+     ],
+     "held": [
+      {
+       "id": "a001",
+       "tag": "s4"
+      },
+      {
+       "id": "a002",
+       "tag": "s3"
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

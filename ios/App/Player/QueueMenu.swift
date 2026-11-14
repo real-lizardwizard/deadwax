@@ -3,12 +3,17 @@ import SwiftUI
 
 /// What a ••• queues: one song (a row's - queued as a song) or an album's songs (the album's own - queued as an album),
 /// always in hand (Core's QueuePick), and the album they are from, which the player remembers as just added (Info,
-/// and the album opening at once from Up Next).
+/// and the album opening at once from Up Next). A playlist's songs (Phase 4) name no album: each is queued with its own
+/// (PlaylistPlay), and the playlist's ••• for all of them offers no download items until a playlist downloads as one
+/// (slice 3 - phase4-library.md question 7).
 struct QueueMenuRequest {
     let pick: QueuePick<Song>
-    let album: Album
+    /// The album the songs are from - nil for a playlist's, each song with its own.
+    let album: Album?
     /// The album is gone from the collection (its songs on this phone still play): no Download.
     var gone = false
+    /// The download items under Play Next and Play Last.
+    var offersDownload = true
 }
 
 /// The queue menu (screens.md 5; the web's app/QueueMenu.tsx): Play Next and Play Last, opened FROM the ••• tapped -
@@ -23,7 +28,7 @@ struct QueueMenuRequest {
 /// the music): `PlayerModel.choose`, which queues the songs at the level QueuePick.choose says (an album's ••• as an
 /// album, a song's as a song), remembers the album, and says the notice (D11, "Playing next: Roads") only when the
 /// music didn't start from it - when it did, the mini player says so. The menu closes either way. Playlists' "Add to
-/// a playlist…" is Phase 4's.
+/// a playlist…" is Phase 4's slice 2.
 ///
 /// `request` is nil while there is nothing to queue (the album's songs not in yet): the ••• is then dimmed and opens
 /// nothing. The label is the •••, drawn by the caller; its VoiceOver name is the caller's too ("More for Roads").
@@ -52,9 +57,11 @@ struct QueueMenu<Label: View>: View {
                         }
                     }
                 }
-                DownloadMenuSection(songs: request.pick.tracks,
-                                    album: request.pick.queuedAs == .album ? request.album : nil,
-                                    gone: request.gone, name: request.pick.title)
+                if request.offersDownload {
+                    DownloadMenuSection(songs: request.pick.tracks,
+                                        album: request.pick.queuedAs == .album ? request.album : nil,
+                                        gone: request.gone, name: request.pick.title)
+                }
             }
         } label: {
             label()

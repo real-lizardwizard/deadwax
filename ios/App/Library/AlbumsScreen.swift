@@ -20,7 +20,8 @@ import SwiftUI
 /// is back.
 struct AlbumsScreen: View {
     let list: AlbumList
-    /// The tab's root - the places above its albums (All music, On this phone), and the tab's tap scrolls it to the top.
+    /// The tab's root - the places above its albums (Playlists, All music, On this phone), and the tab's tap scrolls it to
+    /// the top.
     let root: Bool
 
     init(scope: AlbumScope, root: Bool) {
@@ -176,6 +177,8 @@ struct AlbumsScreen: View {
             if hasAlbums && online {
                 FirstAskCard()
             }
+            // Navidrome's playlists, as you (phase4-library.md 3.1): the first of the places
+            PlaceRow(symbol: "music.note.list", label: PlaylistWords.title, route: .playlists)
             if scope == .yours && personal {
                 PlaceGroup(title: LibraryWords.allMusic) {
                     PlaceRow(symbol: "square.stack", label: LibraryWords.allAlbums, route: .albums(.store))
@@ -192,7 +195,9 @@ struct AlbumsScreen: View {
             VStack(alignment: .leading, spacing: 0) {
                 // named as the page it opens is titled: "Your albums", or "Albums" without a library of your own
                 PlaceRow(symbol: "square.stack", label: LibraryWords.title(library.scope, personal: personal),
-                         route: .albums(library.scope), divider: online)
+                         route: .albums(library.scope))
+                // and to the playlists (phase4-library.md 3.1): those whose page is in hand open with what is here
+                PlaceRow(symbol: "music.note.list", label: PlaylistWords.title, route: .playlists, divider: online)
                 if !online {
                     Text(DownloadWords.onlyDownloadedPlay)
                         .font(.footnote)

@@ -23,13 +23,16 @@ own plays go into the web app's too (see [Up Next](#up-next) and [What you've
 played](#what-youve-played)). **This is app 0.9, which adds your library downloaded by itself**, as
 much as fits your storage limit, kept in step with what you star and unstar anywhere - only while the
 phone is charging if you choose, and with the app in the background when iOS allows (see [Your library
-on this phone](#your-library-on-this-phone)). Playlists, Search and the rest come in the next phases
-(see [What it can't do yet](#what-it-cant-do-yet)).
+on this phone](#your-library-on-this-phone)). Phase 4 has begun with **playlists**: yours and those
+shared with you, in the Library, played as the web app plays them (see [Playlists](#playlists)) - not
+yet made, changed or downloaded on the phone. Artists, songs, Search and the rest come next (see [What
+it can't do yet](#what-it-cant-do-yet)).
 
-**Nothing of Phase 2, the lyrics, the EQ, the turntable, play history or your library downloaded has
-been seen on an iPhone yet.** It's built and tested on a Mac, and what only a phone can tell is what
-[the checks](#the-checks) are for. Until they're answered, read everything about downloads, lyrics, the
-EQ, the turntable, play history and your library below as what the app is built to do.
+**Nothing of Phase 2, the lyrics, the EQ, the turntable, play history, your library downloaded or
+playlists has been seen on an iPhone yet.** It's built and tested on a Mac, and what only a phone can
+tell is what [the checks](#the-checks) are for. Until they're answered, read everything about
+downloads, lyrics, the EQ, the turntable, play history, your library and playlists below as what the
+app is built to do.
 
 The app talks only to deadwax, never to Navidrome, through deadwax's own routes, so the phone never
 needs the Navidrome account deadwax itself uses. With logins on, you sign in with your own Navidrome
@@ -200,6 +203,7 @@ the Library is **Albums**: the whole collection.
   Touch or slide along it to jump.
 - **New** marks an album that came into your library and that you haven't opened yet, here or on the
   web app. Opening it clears the mark, on both.
+- **Playlists**, the first row above the albums, opens your playlists (see [Playlists](#playlists)).
 - **Tap an album** to open its page. Nothing plays from the Library itself.
 
 The list is kept on the phone, so the Library shows at once when the app opens, and is asked for
@@ -291,6 +295,65 @@ With [Download your library](#your-library-on-this-phone) on:
 
 With Normalization on, opening an album that has FLAC songs asks deadwax to measure it, if it hasn't
 yet, so its first song is less likely to wait when you play it.
+
+## Playlists
+
+**Library > Playlists** lists your playlists as Navidrome keeps them - the same ones the web app,
+Amperfy and Navidrome show you. With logins on they're read as you, so someone else's private
+playlist never shows; with logins off (and for the break-glass `deadwax` sign-in), they're those of
+the Navidrome account deadwax uses:
+
+- **Yours**: the playlists you made, each with how many songs and how long ("12 songs · 48 min"), and
+  "· Shared" at the end when it's shared with everyone.
+- **Shared with you**: other people's playlists they've shared, with whose they are ("Sam · 12 songs ·
+  48 min").
+- **From files (3)**, folded: playlists Navidrome made from files in the music folders ("From a file ·
+  12 songs"). Tap the row to open it out; it folds again when you leave the screen.
+
+Each group is in Navidrome's order, by name, and shows only when it has playlists. The list is asked
+for each time you open it, and when you come back to the app with it open; pull down to ask now. If deadwax can't be asked, it says "Couldn't list your
+playlists." and why - over the list as it was, or with **Try again** when there's no list to show.
+With none at all: "No playlists yet." **Tap a playlist** to open its page. Nothing plays from the list
+itself.
+
+**A playlist's page** is laid out as an album's:
+
+- **At the top**: its cover (Navidrome's four-cover mosaic), its name, whose it is ("Yours", "Yours ·
+  Shared with everyone", "Sam's · Shared with you", or "From a file in the music folders"), why it
+  can't be changed here when it can't ("Only Sam can change this playlist."), its description, and how
+  many songs and how long ("12 songs, 48 min").
+- **Play** plays it from its first song. **Shuffle** plays it in a random order, with Shuffle on. **Tap
+  a song** to play the playlist from it.
+- **The songs**, each with its own album's cover, and its artist and album under its title; the song
+  playing has moving bars over its cover. A song that's in the playlist twice is there twice. Under the
+  songs: how many and how long.
+- **•••** at the end of a song's row has **Play Next** and **Play Last** for that song, and
+  **Download** (or **Remove Download**, or **Download Again**) for it alone; the **•••** at the top has
+  Play Next and Play Last for the whole playlist.
+- When Navidrome counts songs it isn't listing just now: "2 songs in this playlist aren't in the
+  library just now - deleted, or being moved."
+- A playlist deleted elsewhere says "This playlist isn't on Navidrome any more - deleted in another
+  app, maybe." An empty one says "Nothing in this playlist yet."
+- The page shows at once when you go back to it, or open one of the last few again, and is asked for
+  again as it shows, and when you come back to the app with it open. If that fails it stays as it was, under "Couldn't update this playlist - showing it
+  as it was."; with nothing to show: "Couldn't open this playlist." and why, with **Try again**.
+
+**Playing a playlist**, each song plays as itself, with its own album: the mini player, Now Playing and
+the lock screen show its album's cover, **Go to album** opens its own album, and Info > About names its
+album and year and gives its number alone - "Track 5", not "Track 5 of 12", since the app has only the
+playlist's songs of that album. With Normalization on **Automatic**, each song is levelled on its own,
+as the web app levels a playlist (Info says "Song volume matching, ..."): a playlist isn't an album.
+**By song**, **By album** and **Off** do what they always do.
+
+**Offline**, a playlist with a song on the phone opens if its page is one of the last eight you opened
+since the app started: the songs not on the phone are dimmed, and Play and Shuffle play the ones that
+are. The others are dimmed in the list and open nothing. With no list in hand, Playlists says "Your playlists show here once deadwax is
+back." The Playlists row is on the Downloaded list the Library opens on while deadwax can't be reached,
+too. Playlists are kept only while the app runs, until a later build downloads them.
+
+Not yet on the phone (the next builds): New playlist, **Add to a playlist** from the ••• menus, Edit
+and Delete, and downloading a playlist as one. Do those in the web app or Amperfy for now: the phone
+shows them the next time it asks.
 
 ## Playing
 
@@ -1301,6 +1364,9 @@ answering, **Try again**. It goes by itself once deadwax answers.
 - **An album's page** shows what's on the phone, dims the rest, and Play and Shuffle play only the
   songs here. An album with nothing here says "This album isn't on this phone - it plays once deadwax
   is back."
+- **Playlists**: one with a song on the phone, among the last eight you opened since the app started,
+  opens with the songs not on the phone dimmed; the others are dimmed and open nothing (see
+  [Playlists](#playlists)).
 - **Playing**: a song that isn't on the phone is passed over to the next one that is ("Skipped "Roads"
   - it isn't on this phone"). With nothing left that's here, the player stops on it, paused: "Not on
   this phone - it plays once deadwax is back." Play tries it again.
@@ -1881,14 +1947,41 @@ You > Debug have a "library" line for everything it asks for and lets go, and wh
   - each switch read as one, with its note as the hint, the line of what fits as one - the Library's
   card, and Downloading's row for your library. Nothing cut off or overlapping.
 
+### Playlists' checks (64-69)
+
+These come with the build that adds playlists (still app 0.9). Have a playlist or two in the web app
+first - one with songs from several albums - and, if you can, one someone else shares with you.
+
+- **64 Your playlists.** Library > Playlists: the same playlists as the web app's Playlists, under Yours
+  and Shared with you, and From files folded (if you have any). Does each row say what the web app's
+  row says? Note whether the covers show, at the rows' size and at the top of a playlist's page.
+- **65 Playing one.** Open a playlist of songs from several albums: Play plays it in order; Shuffle in a
+  random order; a song's tap from that song. Each song shows its own album's cover in the mini player,
+  Now Playing and on the lock screen. Info > About on a song names its own album and year, and says
+  "Track 5" alone - no "of 12", and no disc line. Then, while it plays, open a dozen album pages or more
+  from the Library, and skip to the playlist's last songs: Info still names each one's album and year.
+- **66 Normalization.** With Normalization on Automatic, play a playlist: Info > About > Sound >
+  Normalization says "Song volume matching, ..." for each song, never "Album volume matching".
+- **67 Play Next from a playlist.** A song's •••: Play Next and Play Last queue that song; the •••
+  at the top queues the whole playlist. Go to album from Now Playing opens the song's own album, whole.
+- **68 Changed elsewhere.** Add a song to a playlist in the web app or Amperfy; back on the phone, go
+  back to Playlists and open the playlist again: it has the song. Delete a playlist in the web app with
+  its page open on the phone, then pull down on it: it says it isn't on Navidrome any more.
+- **69 Offline.** Download a song of a playlist (its •••), then turn on Airplane Mode with the playlist
+  open: only that song is bright, and Play plays it. Go back to the Library (it may open on Downloaded):
+  Playlists is there, and that playlist opens; one you haven't opened, or with nothing on the phone, is
+  dimmed. Also: a playlist of a
+  few hundred songs - does it scroll smoothly? And with VoiceOver, is each row read as one?
+
 ## What it can't do yet
 
 These are the web app's for now. Most of them come to the phone in the next phases:
 
 - **The visualizer**: it stays the web app's, on a desktop.
 
-- **Playlists**, **artist pages** and a **songs list**, and the Library's **Shuffle** of your whole
-  library.
+- **Making and changing playlists**: New playlist, Add to a playlist, Edit and Delete - and
+  downloading a playlist as one. The phone reads and plays them (see [Playlists](#playlists)).
+- **Artist pages** and a **songs list**, and the Library's **Shuffle** of your whole library.
 - **Search**, **Get** and **Requests**.
 - **Home** and **pins**.
 - **Looking after deadwax**: People, Server settings, the event log, Needs a look, Library care, the
