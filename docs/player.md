@@ -1404,8 +1404,8 @@ below.
   ending are always instant. Kept on the device, like the others.
 - **Drag the arm** to jump anywhere in the song: to the middle of the record is the end, to its
   edge the start. It starts to move once your finger has gone a few pixels, from where the song
-  is, so a small wobble moves nothing. The song jumps when you let go; while you hold the arm, the
-  time line says **Needle up** and the time letting go will go to - even while the record is still
+  is, so a small wobble moves nothing. The song jumps when you let go; while you hold the arm, its
+  head lifts toward you (a little bigger, with a shadow round it) and the time line says **Needle up** and the time letting go will go to - even while the record is still
   coasting from a flick, which goes quiet as you take the arm (the arm then moves on from where the
   record was going to land).
 - **From the keyboard, and with VoiceOver**, the arm is a slider like the scrubber (arrows move 5

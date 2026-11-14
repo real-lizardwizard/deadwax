@@ -709,12 +709,30 @@ console.log('\nthe arm: a drag goes anywhere, a key steps; a slider to the keybo
   const needle = tt.needleAt(151, LENGTH)
   check('taken by its head, round the needle', [handle().props.style.left, handle().props.style.top], [tt.placePoint(needle).left, tt.placePoint(needle).top])
 
+  //? (2.1.19) the head and its shadow, drawn the same box, in a group the lift grows about its middle
+  const headOf = () => {
+    const part = (name) => view.find(byClass(name))[0].props
+    const box = ({ x, y, width, height, rx }) => ({ x, y, width, height, rx })
+    return { head: box(part('app-tt-head')), shadow: box(part('app-tt-head-shadow')), filter: part('app-tt-head-shadow').filter, grown: part('app-tt-headset').style }
+  }
+  const resting = headOf()
+  const { head } = tt.ARM_PARTS
+  check('at rest: the head on the bar at the arm\'s end, its shadow the same box, nothing grown',
+    [resting.head, resting.shadow, resting.grown],
+    [{ x: ARM.x + head.from, y: ARM.y - head.thick / 2, width: head.length, height: head.thick, rx: head.radius }, resting.head, undefined])
+  const blur = view.find((node) => node.type === 'filter')[0]
+  check('...its shadow blurred the lift\'s units by the one filter the layer draws',
+    [resting.filter, blur.props.id, blur.props.children.props.stdDeviation], [`url(#${blur.props.id})`, blur.props.id, tt.ARM_PARTS.lift.shadow])
+
   const armDown = pointer(needle)
   handle().props.onPointerDown(armDown)
   draw()
   check('held: the needle is up over the song, the head lifted, and the pointer captured',
     [previews.at(-1), hasClass(handle(), 'is-held'), view.find(byClass('app-tt-arm'))[0].props.class, armDown.currentTarget.captured],
     [{ how: 'arm', time: null }, true, 'app-tt-arm is-lifted', 1])
+  const held = headOf()
+  check('...lifted on the bar (2.1.19: "it looks like it dislocates" - never moved off it): the same box, grown about its middle',
+    [held.head, held.shadow, held.grown], [resting.head, resting.head, { transform: `scale(${tt.ARM_PARTS.lift.scale})` }])
   //? a nudge under the slop along the arm's arc shows nothing it won't go to, and seeks nothing
   handle().props.onPointerMove(pointer(aboutPivot(needle, TAP_SLOP_PX - 1)))
   draw()
@@ -722,6 +740,7 @@ console.log('\nthe arm: a drag goes anywhere, a key steps; a slider to the keybo
   handle().props.onPointerUp(pointer(aboutPivot(needle, TAP_SLOP_PX - 1)))
   draw()
   check('...and let go, nothing - what it showed', player.seeks, [])
+  check('...and the head set down again, where it was', headOf(), resting)
   handle().props.onPointerDown(pointer(needle))
   const toEnd = reachAt(tt.armAngle(LENGTH, LENGTH) + 10)
   handle().props.onPointerMove(pointer(toEnd))
