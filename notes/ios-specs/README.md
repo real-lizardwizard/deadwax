@@ -54,3 +54,9 @@ patterns. The app is then built to the spec and reviewed against it. notes/ios.m
   Download a playlist with its own origin `playlist:<id>` kept in step by two reads, the artists and an artist's page,
   every song paged, the Library's Shuffle and its feed; no server addition; five slices (the first built), tests,
   James's checks (64 on) and 8 open questions.
+- `phase5-search.md` - Search (Phase 5, app 0.11), designed 2026-11-14 against 2.1.23 / ios 3458122 (app 0.10): the
+  words (the web's lib/searchList.ts, searchQuery.ts and searchResults.ts, and the phone's own for offline), the box's
+  reading, whose a row is, the sections, Top results (tier, source, kind, position; the family; the rounds), the lines,
+  what is asked and when, the list drawn once per text and frozen, a song playing in its tap, the album you don't have
+  with room for Get; no server addition for slice 1 (a Cover Art Archive relay recommended before slice 2); four slices
+  (the first built), tests, James's checks (121 on) and 13 open questions.

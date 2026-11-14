@@ -13,8 +13,10 @@ background when iOS allows - and Phase 4's Library: your playlists read and play
 to, edited, deleted and downloaded, the Library's switch between its pages (Albums, Playlists and
 Artists - and Songs with logins off; with them on, every song is under All music > All songs - in an
 order you choose, a pull down shuffling your library), artists and their pages, and
-every song, a page at a time - kept on the `ios` branch while it's being built. Nothing of Phase 2, the
-lyrics, the EQ, the turntable, play history, Phase 3 or Phase 4 has been seen on an iPhone yet.
+every song, a page at a time - and Phase 5's Search, begun: your library searched as the web app's
+Search searches it, one list with Top results, a song playing from its tap - kept on the `ios` branch
+while it's being built. Nothing of Phase 2, the lyrics, the EQ, the turntable, play history, Phase 3,
+Phase 4 or Search has been seen on an iPhone yet.
 Phase 0's test screen lives on in the app's Debug.
 
 - **To install it, and every week after:** [docs/ios.md](../docs/ios.md) - the steps once on the Mac

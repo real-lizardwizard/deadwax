@@ -6685,3 +6685,307 @@ Verified, on the final tree:
 Not verified - on the phone (docs/ios.md's checks 115, 116 and 119 ask for each): the no-match line while typing on,
 paging picking up when Airplane Mode goes off at the end of All songs, the pull's spinner lasting until the songs
 come.
+
+## Phase 5, slice 1: Search, your library's half (2026-11-14)
+
+notes/ios-specs/phase5-search.md 2.1-2.9, 3.1-3.5 and 6.1, and questions 1-7 and 10 (6.5 points here). The first slice
+of Phase 5: the Search tab, with one list as the web's Search draws it - Top results, then Artists, Albums and Songs,
+yours first in each - from Navidrome's search3, a song playing in its tap. MusicBrainz's half (albums, artists and songs
+you don't have), the album you don't have and Get are slices 2-4.
+
+On `phase5-search` from `ios` 3458122, after the spec (4bf7793) on its own. src/__init__.py untouched; the app stays
+0.10 (10). **No server change**: `/navidrome/search` takes every offset already, and `/library/owned` has answered since
+v0.9.1. ROUTE_COUNT 40 -> 41 (`/library/owned`, new to the phone).
+
+### Core (DeadwaxCore)
+
+- **Owned.swift** (new), ui/src/lib/owned.ts:
+  - `OwnedAlbum` and `OwnedAnswer`, read leniently (a field of the wrong shape is absent; a year as digits or text).
+    `OwnedAnswer.artists` is the album artists, once each - the names the box is read against (app/useOwned.ts).
+  - `OwnedIndex`: by release, by release group, and by name for a folder with no MusicBrainz ids (buildOwnedIndex);
+    `forRelease`, and `forGroup` (slice 2's, ported with the index).
+- **SearchReading.swift** (new), ui/src/lib/searchQuery.ts: `artistNames` (folded name -> the library's spelling);
+  `read` - album-by-artist, an artist, or free words; the longest name winning, at the start or the end; the
+  separators; Various Artists and "va"; `words`, `quoteTerm`, `withTypeFilter`, `fieldedAlbumQuery` (slice 2's
+  MusicBrainz queries, ported with the reading they belong to); the numbers (`librarySettleMs` 200, MusicBrainz's 700
+  ms and 3 characters for slice 2, `maxCharacters` 200).
+- **SearchList.swift** (new), ui/src/lib/searchList.ts, searchResults.ts and whose.ts, and songs.ts' titleKey:
+  - `SearchKind`, `SearchView`; `LibraryResults` (search3's three lists, each read leniently); `SearchCounts`.
+  - `SearchPacing`: All's 5 artists, 8 albums, 12 songs; a kind view's 50, 50, 100; Top results 3 and the
+    sections' previews 2, 3, 3 (a phone's); the 5 albums prefetched (`albumsToPrefetch`, Top results' songs first),
+    `songIndex`, `plays`, `preferredSongs`.
+  - `SearchRow`; `SearchMarks` (logins on with a library of your own; the folders' index; your albums and how many
+    of each artist's; the albums in hand); `SearchWhose` (navidromeYours, albumYours, songYours, artistYours,
+    rowYours, libraryPlace) - an unknown whose is never "not yours".
+  - `SearchList`: `namedArtist`, `knownArtists`, `pool` (each kind's rows, yours before the collection's,
+    `sectionRows`), `matchTier`, `ranks` (tier, then source, kind, position), `candidates`, `family`, `topResults`
+    (the rounds, the family), `line` and `artistLine` (the facts and the place, apart), `Drawn` and `draw` (the All
+    view's list for some words), `kindRows` (a kind view's, Artists led by the artist the box named), `knownNames`.
+  - `KindLibrary`: a kind view's own search3 - its state, its rows, `full` (as many as asked), and More appended
+    without repeats.
+  - `SearchWords` (the web's words, and the phone's own hint and offline line); `SongTitle.key` (titleKey).
+- **SearchState.swift** (new), the state Search.tsx keeps:
+  - The box (`typed`: trimmed as JavaScript trims; an empty box lets everything go), the view (`choose`), Try again,
+    the keyboard's Search (`submitted`).
+  - All's search3: asked once per words (`wantsLibrary`), again only after a failure, Try again or the keyboard's
+    Search on a failure; only the newest ask's token counts; `librarySkipped` while Navidrome is known not to be there.
+  - `advance`: the list drawn once per run, only in All - a chip, See all and Back to All draw afresh. Typing other
+    words keeps the list until theirs settles.
+  - `albumsWanted` and `albumReady`: the albums asked for so a song plays, kept for the box's life, an album landing
+    for an ask let go dropped.
+  - A kind view's own (`wantsKind`, `askingKind`, `kindAnswered`, `kindFailed`, `kindSkipped`, `kindShown`) and its
+    More (`askingMore` with the offsets, `moreAnswered`, `moreFailed`).
+- **JavaScript's semantics, kept**: strings compared by UTF-16 code units (WebText.same), a stable sort (Swift's isn't:
+  the index breaks ties), JavaScript's trim (JSText.trim), and titleKey's `/iu` regex - ſ folds to s, and `\b` counts
+  ASCII word characters plus U+017F and U+212A.
+- **Routes**: `search` gains `artistOffset` and `albumOffset`; `libraryOwned` (41), given 30 s (it walks the library
+  when the saved scan is behind). `DeadwaxClient.searchLibrary(_:counts:offsets:)` (each offset sent only above 0, as
+  the web's searchLibrary) and `owned(ifNoneMatch:)` (a 304 as `.unchanged`).
+- **export-search-vectors.cjs** (new) compiles lib/searchList.ts with tsc and runs searchList, searchQuery,
+  searchResults, songs, whose and owned, reading SEARCH_COUNTS from api.ts and the box's, Top results', More's and
+  the nothing-found words from Search.tsx. It writes Fixtures/search/search-vectors.json (1.4 MB, plain ASCII, every
+  random choice seeded - 5151):
+  - the numbers (11) and words (14);
+  - 78 hard names and titles folded (foldName and titleKey: asides, accents, ligatures, Final Sigma, the long s);
+  - 12 name lists over 57 texts read (672 readings);
+  - 4 folder lists indexed and looked up;
+  - whose under 6 kinds of marks;
+  - the prefetch;
+  - 244 searches - 24 worked and 220 seeded, their texts biased to the names in hand. Each holds its reading, pool,
+    every candidate's tier, Top results, the sections capped and in full, every line in a section and in Top results,
+    the words, and the albums asked for first.
+
+  **ui/test/iossearch.sim.cjs** runs its `--check`. It is already 1.4 MB: slices 2-4 put theirs in a second file, as
+  the spec's 5.2 allows.
+
+### Where the phone can't follow the web exactly
+
+- **No MusicBrainz yet**: no phantoms, no slots, no `RESULTS_WAIT_MS`. Top results are decided on the library alone -
+  the web's `decidedTop` with no MusicBrainz candidates, which is what the fixture's cases run.
+- **The late library** (question 7): no `LIBRARY_LATE_MS`. The asking line stays until the library settles (the
+  transport's 8 seconds at most).
+- **The hint and nothing found** (questions 3 and 4): "Search your library." / "Search your library and the
+  collection.", and "No results for “…”." with "Check the spelling or try a new search." until slice 2.
+- **Navidrome's status unknown**: the web waits for it before asking search3; the phone asks (NavidromeGate's
+  `shownOnPhone`, the Library's own rule) and skips only once a check has found Navidrome isn't there.
+- **Offline** (questions 5 and 12) is the phone's own.
+- **`/library/owned`** (question 6): asked as Search shows, kept in memory per person with its ETag, never on disk.
+- **The sections and Top results are always a phone's** (2, 3, 3 and 3): the web's at a phone's width.
+
+### The app
+
+- **The tab** (question 1): `AppTab.search` between Library and You, `magnifyingglass`. AppNavigation has its stack
+  (`search`) and `searchScrollToTop`: Search tapped on a pushed page pops to the list, at the list scrolls to its top.
+  `open` and the pages' going back know the tab.
+- **SearchModel** (new, an environment object made in DeadwaxApp with the server, the Library's and Artists' models
+  and Reachability; reset for a new person). It keeps Core's SearchState and makes the asks it calls for:
+  - All's search3 200 ms after typing pauses (or at once on the keyboard's Search), a kind view's own beside it, More
+    by offset, each cancelling the one before; an epoch drops anything begun for the last person.
+  - As an answer lands, its five albums - a Songs view's too, as the web's - so a song's tap plays.
+  - `/library/owned` with its ETag each time Search shows, and your albums and the library's artists when not in hand.
+  - The list announced as it draws ("In your library: 1 artist, 2 albums, 11 songs.", or "No results for …"), a chip as
+    it is pressed, More's count as it lands.
+  - The box clamped to 200 Unicode scalars, as `q` counts them.
+  - Nothing asked while deadwax can't be reached; when it is back, or Navidrome is found again, what wasn't asked is.
+- **SearchScreen** (new, ios/App/Search/): a ScrollView of rows under the navigation bar's `.searchable` field, always
+  drawn (question 2), the keyboard's Search submitting.
+  - The chips: a segmented Picker (All, Artists, Albums, Songs) while the box has words.
+  - All: Top results, then each section with See all; a kind view: its rows, More from your library when full, with
+    Loading… and Try again.
+  - The asking line, a failure's words with Try again, nothing found, the hint, the offline line, and the Library's
+    gate words above the list while Navidrome is known not to be there.
+  - It goes to its top when the view changes or new words' list is drawn (question 13).
+- **The rows** (`SearchRowView`), as the Library's:
+  - The cover (round for an artist), the title, and the line - its facts truncating, its place ("in your library")
+    never.
+  - A song's tap plays its album from it, in the tap with nothing awaited, when the album is in hand (▶ after it),
+    else opens the album (question 10). Its ••• is the album page's song menu once the album is in hand, the song's
+    own before (question 11).
+  - An album and an artist push their pages on Search's stack.
+  - Offline, what has nothing on this phone is dimmed and opens nothing (question 12).
+  - VoiceOver reads a row as one: its title, its line, and for a song ", plays it from its album" or ", opens its album".
+
+### Decided here (the spec was silent, or this departs from it)
+
+Questions 11-13 in the spec, each built to its recommendation:
+- 11, a song's ••• before its album is in hand;
+- 12, offline rows dimmed as the Library dims them;
+- 13, the list to its top when it changes.
+
+And smaller ones, not worth a question:
+- `/library/owned` given 30 s, as the album index;
+- the box clamped by Unicode scalars;
+- Try again while deadwax can't be reached checks whether it is back (Reachability.tryNow), as the other pages' do;
+- Navidrome found again asks what was skipped for the words.
+
+### Tests
+
+- **SearchVectorTests** (8): every vector of search-vectors.json - the numbers and words, folding, the readings, the
+  folders indexed and looked up, whose, the prefetch, and every search: its pool, candidates, Top results, the
+  sections capped and in full, each line, whose, the words, the albums prefetched, the artist named, the list as
+  drawn, and the Artists view's rows.
+- **SearchTests** (18), by hand:
+  - The state: the list drawn once the library settles, then frozen; new words keeping the old list until theirs
+    settles; an empty box letting everything go; a failure drawn, and asked again only when asked to; Try again and
+    Back to All drawing afresh; a library not there skipped, not "nothing found"; a kind view's own and More by
+    offset; a full page with nothing new ending More; a kind view for other words not shown.
+  - The rules: a song plays only from its album in hand; the albums prefetched once and kept for the box; tied
+    candidates keeping their order as JavaScript's sort does; your albums counted by their artist; the phone's own
+    words.
+  - Reading leniently: search3's answer and the folders'.
+  - The client: the library asked with its counts, and offsets only above 0; the folders asked with their ETag.
+- **ClientTests**: `Routes.all` 41; `/library/owned` among the routes given longer (30 s). **FixtureFiles**: the new
+  fixture.
+- **tests/test_ios_contract.py**: ROUTE_COUNT 41; every count and offset Search sends within the route's bounds; three
+  new tests - `/library/owned`'s fields within OWNED_FIELDS and `yours` (the path the one needed), search3's keys
+  LibraryResults', and the box's limit `q`'s 200.
+- **Mutations**: 25, each applied alone with SearchTests and SearchVectorTests run. 22 were caught at first; the 3
+  that lived were closed and caught when run again:
+  - 4, Top results' sort not stable: no search in the fixture tied two candidates on every key. Closed by
+    `tiedCandidatesKeepTheirOrderAsJavaScriptsSortDoes`.
+  - 16, the separators kept in the title: no text put a separator where a longer name can't take it in. Closed by
+    five texts that do ("- dummy portishead", "| third | portishead", "portishead third : |" among them).
+  - 18, an untagged folder indexed by name even with ids: no lookup asked a tagged folder's name. Closed by two
+    ("Third" and "Dummy" by Portishead, under a group nobody holds) - a folder with ids is never a guess by its name.
+
+  The 25:
+  1. starts-with needing two characters, not three;
+  2. an artist read as exact under album-by-artist;
+  3. Top results without the best's family;
+  4. Top results' sort not stable;
+  5. the source before the tier;
+  6. a folder deadwax said nothing of not yours;
+  7. a song's album unknown read as the collection's;
+  8. the collection's rows before yours;
+  9. the named artist not leading;
+  10. a year of 0 said;
+  11. titleKey's long s not an s;
+  12. titleKey's remaster aside without its word's end;
+  13. titleKey's brackets folded away;
+  14. the prefetch's order;
+  15. the reading preferring the trailing artist;
+  16. the separators kept;
+  17. "va" not Various Artists;
+  18. an untagged folder indexed by name even with ids;
+  19. a guess looked for though something is held;
+  20. the list drawn again each time;
+  21. an older ask's answer kept;
+  22. a failure not asked again;
+  23. the box emptied keeping the albums in hand;
+  24. More's page appended with its repeats;
+  25. Back to All not drawing afresh.
+
+### Verified, and not
+
+Verified:
+- `swift test`: Core 1434, Audio 158, Turntable 12. No new warnings.
+- The unsigned Debug and Release device builds (Xcode, `generic/platform=iOS`): no warnings but the usual
+  appintentsmetadataprocessor line; no change to the .xcodeproj (ios/App/Search/ and the model joined the synchronized
+  App folder).
+- `check_project.py` ok.
+- `npm ci`, `npm run build` and all 84 sims on Node 22.23.4, iossearch's `--check` among them.
+- The full pytest suite: 4382 passed, 1 skipped (test_ios_contract's new three, and test_compose_example's docs rule, among them).
+- The mutations above.
+
+Not verified - only the phone can tell (the spec's section 9; docs/ios.md's checks 121-129):
+- `.searchable` in a tab's NavigationStack keeping its words over a pushed page, and the keyboard's Search key
+  submitting on iOS 27.
+- The 200 ms pause over WireGuard, the list never flickering as older asks are cancelled, and the prefetch landing
+  before a finger reaches a song.
+- `/library/owned`'s first answer for James's library, and its 304 after.
+- The segmented chips at 320 points and at accessibility sizes.
+- Navidrome's real search3 ordering and matching as the fixtures' fakes do.
+- VoiceOver's rows and announcements; offline's dimmed rows.
+- CI's Xcode 26.6 (the older Swift): the new code spells out its closures' types.
+
+## Phase 5, slice 1, after its review (2026-11-14)
+
+The review of 7291225 found the Core port solid and four bugs in the app's wiring, the first two confirmed by a probe of
+Core. All four are fixed in one commit on `phase5-search`, with Core holding each rule it can; then `ios` 45c4c5f (the
+Phase 4 spec's question 32 answered, docs only) is merged in. The app stays 0.10 (10); no server change.
+
+### What was wrong, and the fix
+
+1. **A failed search asked again when deadwax came back was never drawn.** Reachability counts the phone offline only
+   after two failures, so a first search over a dropping WireGuard runs, fails, and its failure is drawn. When
+   deadwax answered again, `resumed()` asked again, but started a new run only for a library *skipped*, never for one
+   that *failed*. `advance` then had nothing new to draw - and the answer cleared `failure`, so the failure's note
+   fell back to "Search works once deadwax is back." while online.
+   - **Core: `SearchState.resumed()`**, the web's own rule (Search.tsx's status effect, :1087-1100, from its late
+     review): the words' library, failed or skipped, is asked again, and a list this run drew for the words starts a
+     new run, so the answer takes its place. SearchModel's `resumed()` calls it whenever Navidrome isn't known to be
+     away.
+   - **The failure's words stay with the list drawn with them**: SearchModel lets `failure` go only when a list
+     without a failure is drawn, not when an answer lands. The note's fallback (never reached now) says "Something went
+     wrong." online, the offline line only offline.
+2. **Going back to words whose answer had landed drew nothing.** Type "port", pause (asked), type "a": "port"'s answer
+   lands under "porta" and isn't drawn. Backspace inside the pause: the words were asked already, so nothing is asked
+   again - and nothing drew, because SearchModel drew only as an answer landed, where the web's `advance` runs on every
+   render. A spinner for ever, or the last words' list under these.
+   - **SearchModel draws as the box changes, as the pause ends and on the keyboard's Search**, besides as an answer
+     lands. `advance` draws nothing unless the library has settled for the box's words, so drawing more often draws
+     nothing more.
+3. **Your albums were never asked again once in hand.** `shown()` loaded `.yours` only when there was none. After an
+   Add or a Remove, LibraryModel keeps the old list under a forgotten generation, so Search read whose a row is from a
+   list let go; the web asks again on each Add or Remove (`yoursGeneration`).
+   - `shown()` looks at your albums every time (LibraryModel asks only when the generation has moved), and SearchScreen
+     calls it as `library.generations[.yours]` moves while Search is on screen - an Add, a Remove, a star seen from
+     elsewhere. `/library/owned` is asked again with it (a 304 unless something changed; its `yours` follows an Add too).
+4. **Repeated ids reached a SwiftUI ForEach.** search3 can name a song twice (the fixture's seeded answers do), and a
+   ForEach given one id twice draws the wrong rows.
+   - **Core: `SearchList.drawable`** - each key once, the first kept, search3's order otherwise. The screen draws Top
+     results, each section and a kind view's rows through it. The sections' rules stay the web's (the vectors hold the
+     web's repeats); this is the drawing's alone.
+
+And the review's note on type-checking: `SearchScreen.swift:356` took 366 ms. The row view is now small functions with
+every value's type spelled out (the link rows, the three `dims`, the song row and its menu, the face's picture, line
+and trailing mark). Measured with `-warn-long-expression-type-checking=40 -warn-long-function-bodies=80`:
+- **Release (whole module)**: nothing in the Search files over either limit.
+- **Debug**: the row view's slowest function took 374 ms - `dims(album:)`, one `downloads.album(id:)` call.
+  - Moving `dims(song:)` above it moved the cost to `!downloads.isHere(id)`, 267 ms: it is the first member lookup
+    into DownloadModel in the file's frontend job, an @Observable class whose macro-made members are expanded for that
+    lookup. The expression's own complexity has nothing to do with it.
+  - The same one-time cost lands on SongsScreen's `allSongsCan` (374 ms), BackgroundWork's `downloads` didSet (260-346
+    ms), AlbumView's `libraryLine` (365 ms) and others in the same build. `tapped` (147 ms) is the file's first lookup
+    into PlayerModel.
+  - SearchScreen's body is 102-123 ms (its longest expression 57-62 ms).
+  - No spelling of the expression avoids that lookup: whichever line asks DownloadModel first pays it, once per file.
+    A whole-module build - Release, which is what CI's device build is (ios.yml) - pays it once per module.
+
+### Tests
+
+- **SearchTests** (+5, 23):
+  - `deadwaxBackAsksAFailedLibraryAgainAndDrawsItsAnswer`: the failure drawn; asked again without a new run, drawn
+    nowhere (the bug, held as a fact); resumed, the failure staying while it is asked, then the answer in its place.
+  - `navidromeFoundAgainAsksASkippedLibraryAndDrawsItsAnswer`.
+  - `resumingLeavesAnAnswerAndAKindViewsRunAlone`: an answer isn't asked again; another text's failure isn't the
+    box's; a failure under a chip is asked again and drawn when All is chosen.
+  - `backToWordsAlreadyAnsweredDrawsWithoutAsking`: the review's "port", "porta", "port".
+  - `aRowNamedTwiceIsDrawnOnce`: the first kept, search3's order, a song and an album with one id both drawn.
+- **Mutations**: 8 more, each applied alone with SearchTests and SearchVectorTests run, all caught:
+  1. resumed starting no new run;
+  2. resumed not asking a skipped library again;
+  3. resumed for another text's failure;
+  4. resumed only for a skip (the bug);
+  5. resumed for an answer too;
+  6. drawable keeping repeats;
+  7. drawable keeping the last of a repeat;
+  8. drawable by id alone.
+
+  The model's own wiring (when it calls `resumed`, `draw` and `load`) has no test: SearchModel is the app's, untested
+  off a phone, as every model is.
+
+### Verified, and not
+
+Verified, on the fixed tree before its commit (the merge of `ios` after it brings two lines of the Phase 4 spec):
+- `swift test`: Core 1439, Audio 158, Turntable 12.
+- The unsigned Debug and Release device builds: no warnings but the usual appintentsmetadataprocessor line; the
+  .xcodeproj unchanged.
+- `check_project.py` ok.
+- `npm run build` and all 84 sims on Node 22.23.4.
+- The full pytest suite: 4382 passed, 1 skipped.
+- The 8 mutations above; the type-check timings above, Debug and Release.
+
+Not verified - only the phone can tell: each fix as James would see it (docs/ios.md's checks 127 and 128 cover the
+first two: words typed back to, and a search when deadwax comes back), and Search's lines following an Add made from
+an album page pushed over it.

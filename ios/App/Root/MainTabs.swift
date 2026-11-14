@@ -1,7 +1,7 @@
 import DeadwaxCore
 import SwiftUI
 
-/// The app's two tabs (D1), Library and You, each its own NavigationStack. Tapping the tab shown again pops it to its
+/// The app's tabs (D1), Library, Search (Phase 5) and You, each its own NavigationStack. Tapping the tab shown again pops it to its
 /// root (and, at its root, scrolls its list to the top - AppNavigation.select). With something queued the mini
 /// player sits above the tab bar, and a notice (D11) above it; Now Playing opens over everything.
 struct MainTabs: View {
@@ -14,6 +14,11 @@ struct MainTabs: View {
             TabStack(path: $navigation.library) { LibraryView() }
                 .tabItem { Label("Library", systemImage: "square.stack") }
                 .tag(AppTab.library)
+
+            // (Phase 5) between Library and You, the web's order (phase5-search.md question 1)
+            TabStack(path: $navigation.search) { SearchScreen() }
+                .tabItem { Label(SearchWords.title, systemImage: "magnifyingglass") }
+                .tag(AppTab.search)
 
             TabStack(path: $navigation.you) { YouView() }
                 .tabItem { Label("You", systemImage: "person.crop.circle") }
