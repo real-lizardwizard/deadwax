@@ -13,9 +13,14 @@
  *
  *   - while the queue still draws its entry - History (2.1.3: what Previous walks, the songs a tap passed included),
  *     the song playing, or a row still to play - it is the QUEUE's row;
- *   - once its entry has fallen past History's 50, or isn't drawn ahead (Previous back out of Repeat All's next round,
- *     or past the list's first 100 rows), or the queue is another (an album tapped, a queue put back from another
- *     app), it is one of the older rows ABOVE History, in the order they were begun.
+ *   - (2.1.18) while one of the entries the queue's rows stand for holds it as a row brought back from the play
+ *     history (a tap on an older row rolled the queue back to it: lib/upNext.ts broughtBack, Mark.starts, heldStarts),
+ *     or its entry is ahead of the song playing up to the end of the furthest unit played (a roll-back or Previous moved
+ *     it back down: `reached`, even past the list's limit), it is the queue's too - moved down into Up Next, never drawn
+ *     above as history; it comes back into history as it plays again, a new start;
+ *   - once its entry has fallen past History's 50, or isn't drawn ahead (a later time round, or past the list's first
+ *     100 rows, Previous never having gone back across it), or the queue is another (an album tapped, a queue put back
+ *     from another app), it is one of the older rows ABOVE History, in the order they were begun.
  *
  * Above History the older rows run oldest first, so the list read upwards from the song playing goes back in time
  * without a seam; a run of starts of one song (a restart, an hour of Repeat One) is one row, as History's unit is.
@@ -26,7 +31,7 @@
 
 import { current, type QueueTrack } from './playQueue'
 import { bare } from './resume'
-import { UP_NEXT_DRAWN, shownKeys, type UpNextQueue } from './upNext'
+import { UP_NEXT_DRAWN, heldStarts, shownKeys, type UpNextQueue } from './upNext'
 
 /** One start, as deadwax keeps it - GET /deadwax/me/history's `plays`, and what POST takes. */
 export interface Played {
@@ -49,10 +54,14 @@ export interface HistoryPage {
   shared: boolean
 }
 
-/** One older row of Up Next's list: the first start of a run of one song - its key - and the song. */
+/** One older row of Up Next's list: the first start of a run of one song - its key - and the song; (2.1.18) the moments
+ *  of every start of the run, oldest first, and the entry of the queue playing its first start was begun in, when it
+ *  was - what a tap on it brings back (lib/upNext.ts Brought). */
 export interface PastRow {
   key: string
   track: QueueTrack
+  starts: number[]
+  entry: number | null
 }
 
 /** The plays a page asks for - src/play_history.py HISTORY_PAGE. */
@@ -80,18 +89,27 @@ export function startOf(track: QueueTrack, at: number, queue: UpNextQueue): Play
 export interface QueueShows {
   id: string | null
   keys: ReadonlySet<number>
+  /** (2.1.18) the starts (playedKey) the queue holds as rows brought back from the play history - lib/upNext.ts
+   *  heldStarts: of the entries its rows stand for (`keys`), whatever queue they were begun in */
+  held: ReadonlySet<string>
 }
 
 export function queueShows(queue: UpNextQueue, limit: number = UP_NEXT_DRAWN): QueueShows {
   const state = queue.upNext
-  if (!state?.id || !current(queue)) return { id: null, keys: new Set() }
-  return { id: state.id, keys: shownKeys(queue, limit) }
+  if (!state?.id || !current(queue)) return { id: null, keys: new Set(), held: new Set() }
+  return { id: state.id, keys: shownKeys(queue, limit), held: new Set(heldStarts(queue, limit).map(({ id, at }) => `${at}:${id}`)) }
 }
 
 /** Whether `played` is one of the queue's own rows - begun in this queue, its entry one the queue's rows stand for.
  *  Such a start is drawn there, never again above. */
 export function shownByQueue(played: Pick<Played, 'queue' | 'entry'>, shows: QueueShows): boolean {
   return shows.id !== null && played.queue === shows.id && played.entry !== null && shows.keys.has(played.entry)
+}
+
+/** (2.1.18) Whether the queue holds `played`: one of its own rows (shownByQueue), or a row brought back from the play
+ *  history that it holds (QueueShows.held) - moved down into Up Next. Either way never an older row above. */
+export function heldByQueue(played: Pick<Played, 'queue' | 'entry' | 'at' | 'song'>, shows: QueueShows): boolean {
+  return shownByQueue(played, shows) || shows.held.has(playedKey(played))
 }
 
 /** deadwax's pages and this page's own starts as one list, newest first, each start once - `counted` ORed, since a
@@ -107,20 +125,30 @@ export function merged(pages: readonly Played[], own: readonly Played[]): Played
 }
 
 /** The older rows above History, oldest first: every start (newest first, as `merged` gives them) the queue doesn't
- *  show itself (`limit` the list's rows Up Next draws - upNextView's), a run of starts of one song one row - keyed by
- *  the run's first start. */
+ *  hold itself (`limit` the list's rows Up Next draws - upNextView's; heldByQueue), a run of starts of one song one row -
+ *  keyed by the run's first start, with every start's moment (2.1.18). */
 export function pastRows(plays: readonly Played[], queue: UpNextQueue, limit: number = UP_NEXT_DRAWN): PastRow[] {
   const shows = queueShows(queue, limit)
   const rows: PastRow[] = []
   let last: string | null = null
   for (let at = plays.length - 1; at >= 0; at--) {
     const played = plays[at]!
-    if (shownByQueue(played, shows)) continue
-    if (played.song.id === last) continue
+    if (heldByQueue(played, shows)) continue
+    if (played.song.id === last) {
+      rows[rows.length - 1]!.starts.push(played.at)
+      continue
+    }
     last = played.song.id
-    rows.push({ key: playedKey(played), track: played.song })
+    rows.push({ key: playedKey(played), track: played.song, starts: [played.at], entry: shows.id !== null && played.queue === shows.id ? played.entry : null })
   }
   return rows
+}
+
+/** (2.1.18) An older row's tap: the rows from it (by its key) down to History's, oldest first - what comes back into the
+ *  queue, the tapped one first (lib/upNext.ts broughtBack). None for a key not among them. */
+export function rowsFrom(rows: readonly PastRow[], key: string): PastRow[] {
+  const at = rows.findIndex((row) => row.key === key)
+  return at < 0 ? [] : rows.slice(at)
 }
 
 /** Where a page ends: its last play's moment and song - GET's `next`, the page before it asked for by it. */

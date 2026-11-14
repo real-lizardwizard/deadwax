@@ -5,7 +5,7 @@ played yesterday."** His answers, to the design (kept outside the repo at deadwa
 section 9 overruling the rest):
 
 - **Where: in Up Next, Apple Music's way.** Scroll up past the current queue's History and it keeps going; a tap plays
-  the song. No separate History page.
+  the song (since 2.1.18 a tap rolls back to it - "Roll back to a song" below). No separate History page.
 - **What counts: every song started, skips included** - not only the plays that counted.
 - **Which apps: web and iPhone**, kept by deadwax per person, so plays on either show on both; the phone's offline
   plays appear once it reconnects.
@@ -142,8 +142,8 @@ section 9 overruling the rest):
   still the first heading. The older rows are built and drawn only while it is open (the review: Up Next stays
   mounted while closed, and a month scrolled back is thousands of rows rebuilt and re-diffed at every song's change);
   those drawn as it closes stay until the queue next changes, so nothing above the card moves as the sheet slides
-  away. One Tab stop across both (`historyStop` a number or a past key). An older row's tap: the
-  key Play Next will give (`nextKey`) read first, then `player.playNext(queued([row.track], 'songs'))`, then - unless
+  away. One Tab stop across both (`historyStop` a number or a past key). An older row's tap (until 2.1.18, which
+  rolls back to it instead - below): the key Play Next will give (`nextKey`) read first, then `player.playNext(queued([row.track], 'songs'))`, then - unless
   that started the music (a queue played out) - `player.jumpTo(key)`, all in the click; held under the finger and said
   as History's tap is, `took()` also taking a new queue of that song. app-rules allows UpNext `playNext` and lists it
   among the calls through `queued()`. Hidden in Edit with History.
@@ -190,3 +190,210 @@ section 9 overruling the rest):
   review's fixes, the same. **Not verified**:
   the iPhone and Safari (a pocket's starts reaching deadwax, months of rows scrolled, the tap while the one stream
   plays, VoiceOver through the list); a real Navidrome (the stand-in's shapes only).
+
+### Roll back to a song (2.1.18)
+
+James, 2026-11-14: **"Need a change to the history. Instead of just playing a song in the history, I want to roll back
+to that point. Everything between the selected song and the current song should be added to queue so it just moves
+back up the list."** His answers: songs added with Play Next and still waiting - **"Keep their place"** (D playing,
+tap B: B, C, D, then the songs added, then the rest); the older rows - **"Roll back everywhere"** (everything played
+after the row tapped moves back down into Up Next, skips included, even hundreds).
+
+- **The rule.** Up Next is one list - the older rows, History, the song playing, what plays after - and it keeps its
+  order: a tap on a row above the song playing moves the playing point up to it, and every row below it is then to
+  come, as drawn, the song that was playing among them (from its start, when it comes round). Nothing is copied twice,
+  reshuffled or rewritten; deadwax's log is never edited - each song re-enters history as it plays again, a new start.
+  This replaces 2.1.3's "a History tap plays the song again: a new song added after the copies" and 2.1.15's older
+  row's Play Next then jumpTo (and their claims in the sims).
+- **History's row** (lib/upNext.ts `jumpedTo(queue, key, repeat)` -> `rolledBack`, a `Jump` with `back: true`): the
+  place moves back to the row's unit; nothing added or copied, the same tracks - Previous's move, many rows at once
+  (upnext.sim: "tap 3 with 7 playing" is JSON-identical to Previous four times), and Previous from there plays the row
+  above. Outside Repeat One every Repeat One copy after the row goes - a row plays once, as drawn (a copy left would
+  replay a song the list draws once; History's row was one row for the run). Under Repeat One each row keeps its
+  copies. Playing Next's songs stay where they are, after the song that was playing (James's first answer). `startedAt`
+  is untouched (History's rows are at or after it); History's floor (the index less HISTORY_BACK) moves back with the
+  place, so songs that had fallen past the 50 are History's again, taken back from the older rows by the join.
+- **An older row** (`broughtBack(queue, rows, repeat)`; app/UpNext.tsx `replayPast` with lib/playHistory.ts
+  `rowsFrom`): the rows from it down to History's, oldest first, come in AHEAD of History's songs. Each `Brought` is
+  the row's song through `queued(…, 'songs')`, the moments of its starts and the entry of THIS queue its first start
+  was begun in (`PastRow.entry`, when it was). Each row is one entry: that entry MOVED back with its own mark and track
+  (its level, its round) when the queue still holds it before History's floor, it isn't a copy, the song is the same
+  and it comes after the last one moved - so the list's songs keep their order and their rounds never go down after
+  the song playing - else a new song added ('added': played once, never in a later round). Each carries
+  `Mark.starts`. What stood before History's floor and wasn't moved goes (never drawn; the older rows are tapped,
+  never walked), the queue from the floor on stays (less copies outside Repeat One), `index` and `startedAt` 0, and the
+  id, the list, Shuffle, `left`, `paged` and `pagedRounds` are as they were. Previous from the song tapped starts it
+  again: the queue holds nothing before it. New entries sit straight after it, so Up Next draws them under Playing
+  Next (Clear takes them); moved ones are the list's.
+- **`UpNextState.reached`**: the key of the furthest unit played before the playing point moved back up the list -
+  set by both taps and by `wentBack` (Previous is the same move a row at a time); meaningful only while after the song
+  playing (`reachedPlace` -1 otherwise, `furthest` keeping a further one). With it, `layout`'s list runs on to the
+  reach's own list end (`layoutAt(reach)`), so every row moved back down is drawn where it plays, whatever its time
+  round (Repeat All's next round's songs in the one list); `shownKeys` runs to `unitEnd(reach)` even past the list's
+  `limit` ("And N more songs" counts them; their starts are the queue's, never drawn above); `withRepeat` judges by
+  the later of the round playing and the reach's, so Repeat off or One keeps the rounds moved back down (they played)
+  and lets go only of what follows; `withoutKey` hands it to the unit before in its group, `movedKey` to whichever of
+  the units at or before it is now last. Before this, Previous back across a Repeat All round left the next round's
+  songs undrawn (2.1.15's probe drew their starts above as older rows); they are now the queue's rows to come.
+- **Two fixes the property found.** `passPlaying` with no list song at or before the index (rows brought back ahead of
+  the list) answers the round of the first list song after it, which they lead into - it answered -1, and a Repeat
+  change let go of every round. `movedKey`'s `recast`: Edit's Move in a list that now spans rounds keeps each PLACE's
+  round, whichever song is moved there - a song moved up out of the later round is this round's now ("pass 0 after 1").
+- **Each start drawn once** (lib/playHistory.ts): `QueueShows.held` is `heldStarts(queue, limit)` - the starts on the
+  marks of the entries the queue's rows stand for (shownKeys, the same limit), as `at:songId`; `heldByQueue` is
+  shownByQueue or held; `pastRows` skips both, and now keeps every start of a row (`starts`, oldest first) and its
+  `entry`. A brought-back entry falling past History's 50 (or put past the rows drawn by Shuffle) lets its starts go
+  back above, as the queue's own would. A reload and another device read the same snapshot, which keeps them.
+- **The snapshot** (lib/resume.ts; `v: 1`, or `v: 2` for the queues below - "After review"): `reached` (written only
+  while it is after the song playing in the window - a queue never rolled back, or played on past where it had got,
+  saves exactly as before) and
+  `starts: [key, moments][]` for the window's marks carrying any - after `pagedRounds`, in that order; the marks stay
+  four apiece, which the iPhone app reads. `fromSnapshot` is strict: each `starts` key a window entry, not a copy,
+  given once, with whole moments at or above 0, else null (a plain list) as for every bad field; `reached` must be a
+  whole number, and is kept only for an entry after the song playing that isn't a copy.
+- **The engine** (usePlayer.ts - spec'd and covered here; streamSource.ts and lib/{playQueue,gapless,scrub,streamWrap,
+  streamPlan,fmp4}.ts have no diff): `jumpTo(to: number | readonly Brought[], floor?: number)` - a key through
+  `jumpedTo` with `state.repeat`, rows through `broughtBack` with the `floor` Up Next drew them against (After review).
+  A `back` jump is moved to as Previous moves: `intendsToPlay`, `change` null, `unlockSpare()`, then
+  `moveInStream(jump.queue, true)` - a seek in the one stream when the tracks are the same and it holds the song
+  (History's tap with no copies to drop, Gapless on) - else `load(jump.queue, true, true)`, a new stream (or with
+  Gapless off the song's URL) made in the tap. Never `replaceUpcoming`: what changed is before the song playing, so
+  there is nothing to replan - and so a roll-back is never refused, even with a seek on its way (2.1.3's History tap, an
+  edit, could be). Paused, it plays. Everything in the click, nothing awaited; one audio element (two with Gapless), no
+  `createMediaElementSource`. Audio unchanged: the same streams, levels and seeks as Previous and a song's tap.
+- **Up Next** (app/UpNext.tsx): `replay` is `player.jumpTo(row.key)`; `replayPast` is `jumpTo` with the rows
+  `rowsFrom(past, row.key)` gives, their songs through `queued()` as songs, and the floor (History's first row's key, or
+  the song playing's) - no `playNext` (app-rules takes it off UpNext's list). Both through `rolledTo`: the card - the
+  row tapped, now playing - held where the row was under the finger (a row in view, `seen`; else the card to the top),
+  focus to what plays next once taken (`'next'` -> `nextRow()`: Playing Next's first, else the list's, else Done),
+  "Playing <title>" said. `took()` knows an older row's tap taken by its entry moved back or an entry newer than the
+  tap's `nextKey`. Hidden in Edit with History. Labels unchanged ("play again" on History's rows still reads true: they
+  play again).
+- **Settled, as asked**: *Shuffle* - no reshuffle at the tap; what comes back keeps the order it played in. Shuffle
+  turned on after it shuffles the list's songs to come, the moved-down ones among them, songs added staying first, as
+  Shuffle always has - a later Repeat All round's moved down on its own, after (After review); off, the list's order
+  from the song playing. *Repeat One* - History's tap brings each row's copies back with it; an older row's brings none
+  (Repeat One then repeats the song playing, as ever). *Repeat All* - the rounds moved down are kept by any Repeat
+  change; songs brought back new play once. *A library's shuffle* - its pages carry on: `paged` kept, and the feed asks
+  when fewer than FEED_BELOW (50) of the list's songs follow the song playing, so after a roll-back it waits until the
+  moved-down songs have played to within 50 of the end, then pages on from its cursor - nothing asked twice, nothing
+  skipped (upnext.sim). *startedAt* - History's tap leaves it, Previous lowers it as before, an older row's sets 0.
+  *HISTORY_BACK* - History's 50 counted from the new place. *Normalization* - History's roll-back keeps the same track
+  objects (the same levels); a moved-back entry its own; a new one the setting's song level, as 2.1.15's older-row tap
+  queued it.
+- **Every bound** (decision: no cap on how far back - James: "even hundreds"):
+
+  | bound | what it is | at a roll-back |
+  | --- | --- | --- |
+  | the engine | none | all of it plays |
+  | UP_NEXT_DRAWN (100) | the list's rows drawn, then "And N more songs" | shownKeys runs on to the reach past 100: every start moved down is the queue's, none drawn above |
+  | HISTORY_BACK (50) | History's rows | a brought-back entry past them lets its starts go above again |
+  | RESUME_MAX 2000, RESUME_BEFORE 50 (lib/resume.ts and src/play_queue.py; savePlayQueueByIndex takes at most 2000 ids) | a reload keeps 50 before the song playing and up to 1,950 from it | the songs past it go; their starts show above again (the queue no longer holds them), drawn once |
+  | RESUME_SNAPSHOT_MAX (262,144) | over it the snapshot is left out: a reload puts back a plain list of the 2,000 | measured with Navidrome-shaped songs (scratch, not a sim): a list over 2,493 songs already went over before 2.1.18 (`extra` holds the list's songs outside the window); a roll-back pushes list songs out of the window, so list plus rows brought back past about 2,500 does the same - a list of 1,000 songs keeps up to 1,510 rows, 1,500 up to 1,006, 2,000 up to 500, an album any number. Then Up Next's account goes (Shuffle, the list's order), and the brought-back starts show above as well as to come. Left as it is, documented |
+  | BEACON_MAX (60,000) | the keepalive save as the page goes | about 1,500 rows brought back (some 40 bytes each) pass it: that save goes as a plain request, as any long queue's does; the full save 2 s after the tap carries it |
+- **After review** (the same commit, amended):
+  - *Old readers dropped the queue* (HIGH). Every reader before 2.1.18 - the web's 5e3460c, which a tab opened before
+    the upgrade runs until it is reloaded, and the iPhone app's 0.9 (DeadwaxCore, a port of it) - reads a v1 snapshot
+    it can't follow wrong: a roll-back to an older row from another queue puts a song added at index 0, its
+    `passPlaying` answers -1, and restoreQueue's `toppedUp(withRepeat(saved, repeat), repeat)` with Repeat off or One
+    lets go of every list song after it (`[X] Y A B C D E F` came back `[X] Y`); across Repeat All's rounds
+    (`A0 [B0] C0 A1 B1 C1`) the later round went. **Read first, before building on it** (5e3460c's `fromSnapshot`
+    and `savedLevels`, the ios branch's Resume.swift - `case .number(1)? = made["v"]` in both - and its
+    QueueController.restoreQueue): both read v1 alone; any other version makes `fromSnapshot` null and `resumed`'s
+    exact branch puts back `plain(tracks, kept.index, savedLevels(...))` (`plainQueue` on the phone) - the window's
+    songs in order at kept.index and kept.position, every mark the list's at pass 0, which withRepeat and toppedUp
+    keep whole under every Repeat. The cost, said in docs/player.md: Playing Next, the Shuffle chip, `starts`,
+    `reached` and the levels - `savedLevels` refuses the version too, so `relevel(undefined, setting)`: Automatic
+    gives the song level, the others their own, as for another app's list. **So `toSave` writes `v: 2`**
+    (`snapshotVersion(marks, index, reached, starts)`, the window's marks) whenever the window holds `starts` or
+    `reached`, or no list song is at or before the song playing; every other queue is v1, read by old and new alike
+    as before. The new reader reads v2 exactly as v1. **The server** (src/play_queue.py `snapshot_problem`) refused
+    any `v` but 1 with a 422, which would have refused the whole save: it takes 1 or 2 now (a bool still not a
+    number) - the page and the server ship in one image, and old pages write v1. Found doing it: 2.1.17 itself put
+    back its own v1 of an album's first song with 60 played next, the 55th of them playing, without the album's 2
+    and 3 (Repeat off or One) - no list song in the window at or before it; the web reads that v1 whole since b38d557
+    (passPlaying's fallback), and the phone gets a v2. resume.sim runs the old reader itself:
+    **ui/test/fixtures/resume-2.1.17/** holds 5e3460c's lib/resume.ts, upNext.ts and playQueue.ts, transpiled to
+    CommonJS by TypeScript (`transpileModule`, comments removed, the requires between them named `.cjs`; nothing in
+    the app loads them) - given each kind 2.1.18 writes, it puts back every song in order at the song playing under
+    Repeat off, One and All, a v1 whole with its account, and the same snapshots forced to v1 lose songs.
+  - *Shuffle dropped the songs a roll-back moved down from a later Repeat All round* (MEDIUM): `withShuffle` let go
+    of every list song after the song playing but the round's, so Repeat All on A B C, the second round's B playing,
+    History's first A tapped, then Shuffle on gave `[A0] C0 B0`, losing A1 B1 C1 (off the same). Now the units after
+    the song playing whose round is after its own and up to the furthest played's (`reached`, as withRepeat keeps
+    them) stay after the round playing's songs, each with its copies: each round shuffled on its own with Shuffle on
+    (the rounds never go down), never starting with the song just before it (toppedUp's rule - over 200 orders,
+    none); in the list's order with it off (the round playing's from the song playing's place, as ever). `reached`
+    moves to whichever of the units it had moved down is placed last (never the song playing's copies), as movedKey
+    hands it on, so the list Up Next draws and the starts it holds still run past all of them (past Up Next's 100
+    too) - resume.sim's property found that a copy of the song playing could be named.
+  - *A tap racing catchUp lost one song* (LOW): with History at its 50 (s10-s59, s60 playing), an older row's tap
+    in the ~250 ms before the timeupdate after s61 began: jumpTo's catchUp moved on first, History's floor with it,
+    and broughtBack let go of s10 - drawn in History when the rows were read, neither moved nor kept. **Fixed the
+    first way offered**: the tap carries the floor it was drawn against - `broughtBack(queue, rows, repeat, floor)`
+    keeps the queue from the earlier of History's floor now and the floor's entry (a key it hasn't, or one after
+    History's floor, changes nothing); UpNext passes `view.history[0]?.key`, or the song playing's key with no
+    History. Not the second (skipping catchUp on the rows path): catchUp is what keeps the engine's own account -
+    the song crossed into gets its start, its scrobble and its place - and the rows path would then roll back from a
+    song that had already begun.
+  - *Test gaps*: removing `unlockSpare()` from the back path passed player.sim - a case now taps History's row as
+    the first gesture on a queue put back paused on an iPhone with Gapless on (one stream), the second element locked
+    before and unlocked in it. `broughtBack` taking `row.track` for a moved entry passed every sim - the rows'
+    songs are now copies at a level of their own, as `queued(..., 'songs')` makes them (upnext.sim's property and its
+    older-rows case, resume.sim's runs), and the moved entries are pinned to their own track and level.
+- **The iPhone app** (not touched here): until its port, it reads any queue a roll-back left as v2 - the plain list,
+  nothing lost (above). A queue it saves drops `reached` and `starts`, so after it has saved one, songs brought back can
+  show above as well as to come, and tapping one there brings it back a second time. (Its own Previous never sets
+  `reached`, as before 2.1.18.) Its port, on the ios branch: DeadwaxCore's UpNext*.swift (Mark.starts, `reached`,
+  layoutAt/reachedPlace/furthest, passPlaying's fallback, withRepeat's round, withoutKey's and movedKey's reach and
+  recast, jumpedTo with Repeat and rolledBack, broughtBack/Brought, Jump.back, shownKeys' reach, heldStarts, wentBack's
+  reached, withShuffle's later rounds and their reach, broughtBack's floor); PlayHistory (QueueShows.held, heldByQueue,
+  PastRow's starts and entry, rowsFrom); Resume.swift and SnapshotJSON (`reached` and `starts`, written in the web's key
+  order and read as strictly; snapshotVersion's v2 written, and v 1 or 2 read); QueueController.swift (`actions.jumpTo`,
+  a hashed hand-ported piece: the back path, and the floor passed through); its Up Next's taps (an older row's passing
+  History's first row's key). Then ios/scripts/export-traces.cjs
+  - its `jumpedTo` calls take Repeat, `referenceSnapshot` writes the two keys, its generators follow this change's
+  sims (upnext.sim's first draw spent after seeding, a long album one run in twenty, the older-row op; resume.sim's
+  1,000 runs with older rows on even runs) - run, and the traces committed; iostraces.sim fails on that branch until
+  then, naming upNext.ts, resume.ts and usePlayer.ts's jumpTo.
+- **Verified**: upnext.sim (the property over 2,000 runs, now tapping History's rows and older rows; James's B-C-D
+  walk; Repeat One's copies kept and dropped; Repeat All across rounds with Repeat off, One and Edit's Move; Shuffle;
+  a long album past HISTORY_BACK; older rows moved and new, out of order; a library's shuffle; the view: the card held
+  under the row, the oldest row out of view, an older row's tap and its starts), history.sim (each start drawn once at
+  every step, taps and brought-back rows among the moves; the probes now drawn as the queue's rows; another queue's
+  rows held, then let go past the 50), resume.sim (1,000 runs - 500 before - the account back at every step; the
+  snapshot written as before for a queue never rolled back; `starts` and `reached` read strictly), player.sim (a seek
+  in the stream; a new stream when it doesn't hold the song; Repeat One's copy dropped; an older row's tap; Gapless off;
+  from pause; during a seek, never refused; on a queue put back), app-rules (the two taps in the click, `queued()`, no
+  playNext). On Node 22: every sim (70) - upnext 263 (228 before), history 47 (44), resume 142 (135), player 758
+  (746), app-rules 520; `npm ci` and `npm run build`; the whole pytest suite (4220 passed). **Mutated back, one at a
+  time, 20 of 20 caught**: copies kept outside Repeat One, passPlaying without its fallback, heldByQueue without
+  `held`, layout's and shownKeys' reach, withRepeat by the round playing alone, the snapshot without `starts` or
+  `reached`, movedKey without recast, movedKey's and withoutKey's reach not handed on, broughtBack without the `last`
+  order, furthest forgetting a further reach, wentBack without `reached`, heldStarts at the default limit, pastRows
+  keeping a run's first start only, rolledTo holding a row out of view, took() not knowing an entry moved back, the
+  engine's back jump never a seek, and with no back path at all. Four got through the first time (passPlaying's
+  fallback, both reach handoffs, took()), so upnext.sim gained the checks that catch them: the list's heading after
+  rows brought back ahead of it ("again" without the fallback), Edit removing and moving the furthest song played
+  across Repeat All's rounds, and an older row of the queue's own moved back, said and focused. **In a real
+  Chromium** - headless Brave over CDP, this worktree's deadwax against the stand-in Navidrome harness of 2.1.15
+  (logins off, every other host refused), at `http://deadwax.test:8121` (not a secure context), 250 earlier starts
+  sent first, the phone frame (390x844, touch): album playing on to song 3 by its row; History's song 1 tapped - song
+  1 playing from the stand-in, History empty, 2, 3, 4, 5 to come with nothing under Playing Next, the card exactly
+  where the row was (448 to 449 px), focus on 2's row, song 1's new start sent with the queue and its entry, none of
+  the queue's songs above; "Earlier 249" tapped - it playing (so-4), "Earlier 250" under Playing Next, the album's 1-5
+  after, two fewer older rows above with "Earlier 248" the newest, the card where the row was; a reload - put back
+  paused in the same order, neither brought-back start drawn above again; nothing in the console.
+  **After review**, on Node 22: every sim (70) - upnext 274, history 47, resume 155, player 760, app-rules 520;
+  `npm run build`; the whole pytest suite (4222 passed). The review's fixes mutated back one at a time, **18 of 18
+  caught** by the sims: snapshotVersion's three conditions, toSave always v1, fromSnapshot and savedLevels refusing
+  v2, withShuffle dropping the later rounds, not shuffling them, without the seam rule, off not in the list's order,
+  not moving the reach, its reach able to name a copy, broughtBack ignoring the floor, the engine and UpNext not
+  passing it, UpNext's floor the song playing's, the back path without `unlockSpare()`, a moved entry taking the
+  row's track - one (not shuffling them) only once upnext.sim counted each round's orders over 200 seeds; and the
+  server's version check by pytest. The 20 above run again: 20 of 20 caught. The review's fixes were not driven in a browser:
+  each is reached by the sims (the lib functions; the engine's jumpTo through player.sim's real usePlayer; UpNext's
+  tap through upnext.sim's render).
+  **Not verified**: the iPhone and Safari (the seek in the one stream on iOS, the tap locked, VoiceOver through a
+  roll-back); the desktop frame in a browser (the same component, drawn by upnext.sim); a real Navidrome; the old
+  readers on a real device - the web's run from its frozen copy, the iPhone's Resume.swift read, not run.

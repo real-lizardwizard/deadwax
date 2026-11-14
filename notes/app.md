@@ -2044,6 +2044,9 @@ playing one again, as Apple Music has it. This is the web app's half, on main; t
   the old round, so a Repeat change would drop the current one. Under Repeat All it plays once; Repeat One repeats it.
   `jumpedTo` refuses a key History doesn't draw (before `startedAt`, past the 50): every row drawn is reached by its tap,
   and nothing else is.
+- **Since 2.1.18 a History tap ROLLS BACK** (James: "so it just moves back up the list"): the place moves back to the
+  row, nothing added, and everything after it is to come again - notes/play-history.md "Roll back to a song (2.1.18)".
+  The "song again" rule above, and the jumpTo engine note below, describe 2.1.3 to 2.1.17.
 - **Shuffle and Repeat**: History never changes on either (edits keep `tracks[0..index]`). Shuffle on counts songs a tap
   passed as heard, since they're behind the song playing - the same outcome as `left` gave them before; Shuffle off
   inside a shuffle can bring later album songs a tap passed round again, as it already does heard ones.
