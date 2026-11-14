@@ -751,7 +751,8 @@ Debug is where Phase 0's test screen lives now:
     newest first - "Refresh · checked, 3 read, 1 album downloading, charging · 4.20 s · 2 h ago" (the
     refresh, or **Charger** for the run iOS starts when the phone is plugged in), or "ended by iOS",
     "couldn't ask deadwax", "nothing to ask: Download your library is off". "No background runs yet"
-    until iOS has run one: iOS decides when, and may not at all.
+    until iOS has run one: iOS decides when, and may not at all. A run before the phone's first unlock
+    after a restart does nothing and isn't listed (the Downloads events say so).
 - **Library**: how many albums each list had, whether it came new or the kept one still stood, and
   how long it took to come.
 - At the bottom, how long this install runs. In its last two days, it also says to run install.sh
@@ -1266,15 +1267,21 @@ whoever is signed in. This is app 0.9's, on the `ios` branch - not yet in a rele
   what had come, and carries on from there when you plug it in again. With the app in the background,
   iOS downloads what it's been handed and the app can't stop it, so with Only while charging on your
   library hands iOS one album at a time (at most 20 songs at once): unplugged overnight, at most one
-  album more comes down. Albums you download yourself never wait for it.
+  album more comes down. A song that has downloaded nothing for 30 minutes doesn't hold that up: it's
+  started again from where it got to, and your library goes on to the next album meanwhile. Albums you
+  download yourself never wait for it.
 - **In the background**: with the app closed (but not swiped away), iOS may run it now and then -
   about 15 minutes after you leave it, at the soonest - to check your library and hand over what's
-  next, reading at most 20 new albums' songs each time; and, with Only while charging on and an album
-  waiting for it, once the phone is plugged in. iOS decides when, possibly rarely; Background App
-  Refresh off (Settings > General > Background App Refresh), or Low Power Mode, can stop it. It
-  follows the same rules as with the app open: nothing goes that wouldn't then - the ten minutes
-  between two checks hold, and the phone being short of space is never believed within a run that
-  started the app, which iOS gives only seconds. Downloads iOS starts
+  next, reading at most 20 new albums' songs each time, and stopping after 20 seconds whatever it has
+  done; and, with Only while charging on and your library still downloading, once the phone is
+  plugged in - even if, when you left the app, it was waiting for Wi-Fi or for deadwax rather than
+  the charger. Albums below one whose songs it hasn't read yet wait until it has, so nothing is
+  downloaded only to make way again. iOS decides when, possibly rarely; Background App Refresh off
+  (Settings > General > Background App Refresh), or Low Power Mode, can stop it. It follows the same
+  rules as with the app open: nothing goes that wouldn't then - the ten minutes between two checks
+  hold, and the phone being short of space is never believed within a run that started the app,
+  which iOS gives only seconds. Just after the phone restarts, before you first unlock it, the app
+  can't read its own settings: if iOS runs it then, it does nothing. Downloads iOS starts
   while the app is in the background may wait for Wi-Fi and power by themselves. Swiping deadwax away
   in the app switcher stops all of it until you open it again.
 

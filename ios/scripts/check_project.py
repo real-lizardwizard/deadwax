@@ -14,9 +14,10 @@ Checks the iPhone app's project files without Xcode - what can be checked on Lin
     beside NSAllowsLocalNetworking it is ignored), the Local Network text, background audio, a launch
     screen without a storyboard, and the loose-PNG icons it names, each an opaque PNG of its size; and
     plain text as a document type, Alternate, handed over as a copy (an EQ file shared to deadwax, eq.md 3.9);
-    and (app 0.9, phase3-autodownload.md 2.9) your library in the background: UIBackgroundModes audio first,
-    then fetch and processing, and BGTaskSchedulerPermittedIdentifiers exactly the two identifiers Core's
-    LibraryBackground registers - an identifier missing there makes BGTaskScheduler.register crash the app;
+    and (app 0.9, phase3-autodownload.md 2.9) your library in the background: UIBackgroundModes exactly audio,
+    fetch, processing, in the order ios.yml reads them, and BGTaskSchedulerPermittedIdentifiers exactly the two
+    identifiers Core's LibraryBackground registers - for an identifier missing there BGTaskScheduler.register
+    returns false and its task never runs;
   - no asset catalog, storyboard, xib or entitlements file anywhere under ios/ (the plan's risk R2: actool
     and ibtool need a Simulator runtime James's Mac doesn't have; and a free account has no use for
     entitlements).
@@ -36,6 +37,7 @@ BUNDLE_ID = "net.lizardlounge.deadwax"
 MARKETING_VERSION = "0.9"
 BUILD = "9"
 DEPLOYMENT_TARGET = "17.0"
+BACKGROUND_MODES = ["audio", "fetch", "processing"]
 IGNORED_BESIDE_LOCAL = ("NSAllowsLocalNetworking", "NSAllowsArbitraryLoadsForMedia", "NSAllowsArbitraryLoadsInWebContent")
 
 
@@ -271,21 +273,23 @@ def check_info_plist(problems: list) -> None:
             problems.append(f"Info.plist: {key} beside NSAllowsArbitraryLoads makes iOS ignore the latter")
     if not str(info.get("NSLocalNetworkUsageDescription", "")).strip():
         problems.append("Info.plist: no NSLocalNetworkUsageDescription - a LAN connection would just fail")
-    modes = info.get("UIBackgroundModes", [])
+    modes = list(info.get("UIBackgroundModes", []))
     if "audio" not in modes:
         problems.append("Info.plist: UIBackgroundModes has no audio - nothing would play locked")
-    elif modes[0] != "audio":
-        problems.append("Info.plist: UIBackgroundModes doesn't list audio first (ios.yml reads UIBackgroundModes.0)")
     # your library in the background (app 0.9): the refresh needs fetch, the charger's task processing
     for mode, task in (("fetch", "the library's refresh (BGAppRefreshTask)"),
                        ("processing", "the charger's task (BGProcessingTask)")):
         if mode not in modes:
             problems.append(f"Info.plist: UIBackgroundModes has no {mode} - {task} could never be asked for")
+    if modes != BACKGROUND_MODES and all(mode in modes for mode in BACKGROUND_MODES):
+        problems.append(f"Info.plist: UIBackgroundModes is {modes}, not exactly {BACKGROUND_MODES} in that order "
+                        "(ios.yml reads UIBackgroundModes.0, .1 and .2)")
     permitted = info.get("BGTaskSchedulerPermittedIdentifiers", [])
     wanted = background_identifiers(problems)
     if wanted is not None and list(permitted) != wanted:
         problems.append(f"Info.plist: BGTaskSchedulerPermittedIdentifiers is {list(permitted)}, not {wanted} as "
-                        "LibraryBackground.swift registers them - a missing one crashes the app at launch")
+                        "LibraryBackground.swift registers them - for a missing one BGTaskScheduler.register returns "
+                        "false, and its task never runs")
     # the turntable's display link asks for up to 120 Hz (turntable.md 2.6): without this key an iPhone holds every
     # app's CADisplayLink to 60 whatever its preferredFrameRateRange says
     if info.get("CADisableMinimumFrameDurationOnPhone") is not True:

@@ -180,9 +180,9 @@ def test_an_eq_file_can_be_shared_to_deadwax_and_only_as_a_copy(tmp_path, monkey
 
 
 def test_your_library_may_run_in_the_background(tmp_path, monkeypatch):
-    """app 0.9 (phase3-autodownload.md 2.9): UIBackgroundModes audio first, then fetch and processing, and
-    BGTaskSchedulerPermittedIdentifiers exactly Core's two identifiers, in their order - each missing or wrong one
-    named, and the identifiers read from LibraryBackground.swift itself."""
+    """app 0.9 (phase3-autodownload.md 2.9): UIBackgroundModes exactly audio, fetch, processing in that order (as
+    ios.yml reads them), and BGTaskSchedulerPermittedIdentifiers exactly Core's two identifiers, in their order - each
+    missing or wrong one named, and the identifiers read from LibraryBackground.swift itself."""
     real = plistlib.loads((project.IOS / "Config" / "Info.plist").read_bytes())
     swift = (project.IOS / "DeadwaxKit" / "Sources" / "DeadwaxCore" / "LibraryBackground.swift").read_text(encoding="utf-8")
     assert real["UIBackgroundModes"] == ["audio", "fetch", "processing"]
@@ -204,16 +204,18 @@ def test_your_library_may_run_in_the_background(tmp_path, monkeypatch):
     for mode in ("fetch", "processing"):
         less = dict(real, UIBackgroundModes=[m for m in real["UIBackgroundModes"] if m != mode])
         assert any(f"no {mode}" in p for p in problems(less))
-    assert any("audio first" in p for p in problems(dict(real, UIBackgroundModes=["fetch", "audio", "processing"])))
+    for order in (["fetch", "audio", "processing"], ["audio", "processing", "fetch"],
+                  ["audio", "fetch", "processing", "location"]):
+        assert any("in that order" in p for p in problems(dict(real, UIBackgroundModes=order))), order
     assert any("no audio" in p for p in problems(dict(real, UIBackgroundModes=["fetch", "processing"])))
     one = dict(real, BGTaskSchedulerPermittedIdentifiers=["net.lizardlounge.deadwax.library"])
-    assert any("crashes" in p for p in problems(one))
-    assert any("crashes" in p for p in problems({k: v for k, v in real.items() if k != "BGTaskSchedulerPermittedIdentifiers"}))
+    assert any("never runs" in p for p in problems(one))
+    assert any("never runs" in p for p in problems({k: v for k, v in real.items() if k != "BGTaskSchedulerPermittedIdentifiers"}))
     swapped = dict(real, BGTaskSchedulerPermittedIdentifiers=list(reversed(real["BGTaskSchedulerPermittedIdentifiers"])))
-    assert any("crashes" in p for p in problems(swapped))
+    assert any("never runs" in p for p in problems(swapped))
     # Core renamed without the plist: named
     renamed = swift.replace('"net.lizardlounge.deadwax.charging"', '"net.lizardlounge.deadwax.power"')
-    assert any("crashes" in p for p in problems(real, renamed))
+    assert any("never runs" in p for p in problems(real, renamed))
     assert any("bundle id" in p for p in problems(real, swift.replace('"net.lizardlounge.deadwax.library"', '"io.x.library"')))
     assert any("no chargingID" in p for p in problems(real, swift.replace("chargingID =", "chargerID =")))
 

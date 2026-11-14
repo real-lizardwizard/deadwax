@@ -10,6 +10,10 @@ import UIKit
 ///
 /// Both identifiers are in Info.plist's BGTaskSchedulerPermittedIdentifiers (check_project.py checks they are Core's).
 /// iOS decides when either runs, possibly rarely: nothing depends on one running.
+///
+/// After the review: a run asks for the next as it begins (a run iOS ends early still leaves one asked for), has its own
+/// deadline inside iOS's ~30 s, and a launch that couldn't read the phone's settings (before its first unlock) changes
+/// no request but putting back the one it used up.
 @MainActor
 final class BackgroundWork {
     static let shared = BackgroundWork()
@@ -26,10 +30,12 @@ final class BackgroundWork {
     private init() {}
 
     /// Both identifiers given their run - before the launch ends, as BGTaskScheduler requires (the app delegate's
-    /// didFinishLaunching).
+    /// didFinishLaunching). And whether this launch read the settings, now UIApplication can say whether the phone is
+    /// unlocked.
     func register() {
         guard !registered else { return }
         registered = true
+        downloads?.settleReadable(protectedDataAvailable: UIApplication.shared.isProtectedDataAvailable)
         for identifier in LibraryBackground.identifiers {
             let done = BGTaskScheduler.shared.register(forTaskWithIdentifier: identifier, using: .main) {
                 (task: BGTask) -> Void in
@@ -39,19 +45,19 @@ final class BackgroundWork {
         }
     }
 
-    /// The tasks `asks` names asked for (a request already asked for is replaced: the refresh's earliest begin moves 15
-    /// minutes on); the others' requests cancelled.
-    func ask(_ asks: Set<String>) {
+    /// Each request as `asks` says (LibraryBackground.asks): asked for (one already asked for is replaced: the refresh's
+    /// earliest begin moves 15 minutes on), cancelled, or left as it is.
+    func ask(_ asks: [String: LibraryBackground.Ask]) {
         let scheduler = BGTaskScheduler.shared
-        for identifier in LibraryBackground.identifiers where !asks.contains(identifier) {
+        for identifier in LibraryBackground.identifiers where asks[identifier] == .cancel {
             scheduler.cancel(taskRequestWithIdentifier: identifier)
         }
-        if asks.contains(LibraryBackground.refreshID) {
+        if asks[LibraryBackground.refreshID] == .ask {
             let request = BGAppRefreshTaskRequest(identifier: LibraryBackground.refreshID)
             request.earliestBeginDate = Date(timeIntervalSinceNow: Double(LibraryBackground.refreshAfterMs) / 1000)
             submit(request)
         }
-        if asks.contains(LibraryBackground.chargingID) {
+        if asks[LibraryBackground.chargingID] == .ask {
             let request = BGProcessingTaskRequest(identifier: LibraryBackground.chargingID)
             request.requiresExternalPower = true
             request.requiresNetworkConnectivity = true
@@ -59,10 +65,15 @@ final class BackgroundWork {
         }
     }
 
-    /// A relaunch for the background session's events, its events in (DeadwaxApp's `.backgroundTask(.urlSession)`):
-    /// the next batch handed over before the app is suspended again.
-    func eventsHandled() async {
-        await downloads?.eventsHandled()
+    /// A relaunch for the background session's events (DeadwaxApp's `.backgroundTask(.urlSession)`), begun at `began`,
+    /// its events in: the next batch handed over before the app is suspended again - the events and the plan within
+    /// one budget (`LibraryBackground.eventsMs`).
+    func eventsHandled(began: ContinuousClock.Instant) async {
+        let clock = ContinuousClock()
+        let parts = (clock.now - began).components
+        let elapsed = parts.seconds * 1000 + parts.attoseconds / 1_000_000_000_000_000
+        let left = LibraryBackground.left(LibraryBackground.eventsMs, elapsedMs: elapsed)
+        await downloads?.eventsHandled(until: clock.now + .milliseconds(left))
     }
 
     private func submit(_ request: BGTaskRequest) {
@@ -82,6 +93,8 @@ final class BackgroundWork {
             return
         }
         let identifier = task.identifier
+        // the next asked for first: this one's request is used up, and iOS may end this run before it ends
+        downloads.askBackgroundTasks(always: true, ran: identifier)
         let work = Task { @MainActor () -> Void in
             await downloads.backgroundRun(task: identifier)
             completion.finish(success: !Task.isCancelled)

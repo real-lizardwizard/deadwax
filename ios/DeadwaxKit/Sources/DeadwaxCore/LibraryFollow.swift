@@ -400,6 +400,35 @@ public enum LibraryFollow {
         }.map(\.entry)
     }
 
+    /// How a run's reads ended (slice 3's review) - what `cutShort` makes of it.
+    public enum ReadsEnd: Sendable, Equatable {
+        /// Every album to read was read (or refused, and skipped).
+        case toTheEnd
+        /// Too many reads failed: the rest at the next check - an unreadable album never holds the library.
+        case failures
+        /// A background run's cap, or its end, stopped the reads with albums still to read.
+        case cut
+        /// Nothing could be asked (offline, signed out), or the run was stopped from outside.
+        case couldntAsk
+    }
+
+    /// Whether the reads stand cut short after a run's `end`: a cut holds until a run reads to the end (or gives up on
+    /// failures); a run that couldn't ask changes nothing.
+    public static func cutShort(after end: ReadsEnd, was: Bool) -> Bool {
+        switch end {
+        case .toTheEnd, .failures: return false
+        case .cut: return true
+        case .couldntAsk: return was
+        }
+    }
+
+    /// Albums' songs are still to be read, so nothing is asked for below the first of them (spec 6.5;
+    /// LibraryDownloads.actions' `readsPending`): while reads run, and after a background run's cap or end cut them
+    /// short - else the albums below would be asked, and given way again once the ones above were read.
+    public static func readsPending(running: Bool, cutShort: Bool, ordered: [FollowedAlbum]) -> Bool {
+        (running || cutShort) && !unread(ordered).isEmpty
+    }
+
     /// The albums whose songs aren't read yet, in `ordered`'s order: listed, not read, and not among `failed` (asked
     /// this check and refused - asked again at the next).
     public static func unread(_ ordered: [FollowedAlbum], failed: Set<String> = []) -> [String] {

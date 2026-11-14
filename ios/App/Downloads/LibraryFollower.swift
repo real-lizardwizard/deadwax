@@ -21,9 +21,10 @@ import Observation
 /// then the reads go on. Nothing is asked while deadwax can't be reached or the person must sign in - a check that
 /// can't answer changes nothing anyway.
 ///
-/// **In the background** (slice 3, 2.9): `background(reads:)` is a BGTask's run - the same check and reads, the reads
-/// stopped at 20 albums. Nothing about the rules differs: what a check gives back still needs a second check 10 minutes
-/// on to agree, and DownloadModel's plan decides what goes, as in front.
+/// **In the background** (slice 3, 2.9): `background(reads:until:stop:)` is a BGTask's run - the same check and reads,
+/// the reads stopped at 20 albums of its own, and the run stopped at its deadline. Nothing about the rules differs:
+/// what a check gives back still needs a second check 10 minutes on to agree, and DownloadModel's plan decides what
+/// goes, as in front. Reads a background run cut short hold the asks below them until a run reads to the end.
 @MainActor
 @Observable
 final class LibraryFollower {
@@ -90,8 +91,9 @@ final class LibraryFollower {
     /// The question (3.1) is asked now.
     var asks: Bool { on && LibraryFollow.asks(held, keptThem: keptThem) }
 
-    /// Albums' songs are still being read this run: nothing is asked for below the first one (LibraryDownloads.actions).
-    var readsPending: Bool { running && !LibraryFollow.unread(ordered).isEmpty }
+    /// Albums' songs are still to be read - this run, or one a background run cut short: nothing is asked for below the
+    /// first one (LibraryFollow.readsPending, LibraryDownloads.actions).
+    var readsPending: Bool { LibraryFollow.readsPending(running: running, cutShort: cutShort, ordered: ordered) }
 
     /// (read, of): the listed albums whose songs are read, of every listed album - "Reading your library - 1,240 of
     /// 3,010 albums" while some aren't.
@@ -132,9 +134,10 @@ final class LibraryFollower {
     @ObservationIgnored private var failedBefore: Set<String> = []
     /// Bumped by the question's Remove: a check already out when it was answered keeps it standing.
     @ObservationIgnored private var believeToken = 0
-    /// (slice 3) A background run's cap on the albums read, and how many it has read: nil in front.
-    @ObservationIgnored private var readCap: Int?
-    @ObservationIgnored private var readCount = 0
+    /// (slice 3's review) The background runs under way, each with its own cap and count - none in front.
+    @ObservationIgnored private var sessions: [BackgroundReads] = []
+    /// The last reads were cut short by a background run (LibraryFollow.cutShort): held until a run reads to the end.
+    @ObservationIgnored private var cutShort = false
 
     init(server: ServerModel, reachability: Reachability) {
         self.server = server
@@ -166,8 +169,12 @@ final class LibraryFollower {
         clearMemory()
     }
 
-    /// The app came to the front.
-    func cameToFront() { check(.front) }
+    /// The app came to the front: a check when due - and reads a background run cut short go on at once, due or not
+    /// (slice 3's review), so what they hold isn't held longer than it must be.
+    func cameToFront() {
+        check(.front)
+        if cutShort, !running, on, store != nil { Task { await run() } }
+    }
 
     /// The network or deadwax's answer changed: back after it couldn't be reached, a check.
     func reachabilityChanged() {
@@ -202,33 +209,40 @@ final class LibraryFollower {
         if !running { Task { await run() } }
     }
 
-    /// (slice 3, 2.9) A background task's run: waits up to `LibraryBackground.openWaitMs` for the store and for deadwax
-    /// to be askable (the app may have just launched for it), then a check - unless one began within the minute, as
-    /// the store's opening one does at a launch for it - and the reads, at most `reads` albums. Nil: nothing could be
-    /// asked. Returns once the run has ended, or the task calling it is cancelled (iOS ended it).
-    func background(reads cap: Int) async -> (checked: Bool, read: Int)? {
+    /// (slice 3, 2.9; after its review) A background task's run: waits for the store and for deadwax to be askable (the
+    /// app may have just launched for it) - `LibraryBackground.openWaitMs` at most, and never past `deadline` - then a
+    /// check, unless one began within the minute (as the store's opening one does at a launch for it), and the reads,
+    /// at most `reads` albums of this run's own. Returns when the run has ended, at `deadline`, or as soon as the task
+    /// calling it is cancelled (iOS ended it) - and then, with `stop()` true (the app still in the background), a run
+    /// still under way is stopped, so nothing reads on past it, and what it cut short holds the asks below it. Nil:
+    /// nothing could be asked.
+    func background(reads cap: Int, until deadline: ContinuousClock.Instant, stop: () -> Bool) async
+        -> (checked: Bool, read: Int)? {
         let clock = ContinuousClock()
-        let deadline = clock.now + .milliseconds(LibraryBackground.openWaitMs)
+        let opening = min(deadline, clock.now + .milliseconds(LibraryBackground.openWaitMs))
         while !(on && store != nil && canAsk) {
-            guard clock.now < deadline, !Task.isCancelled else { return nil }
+            guard clock.now < opening, !Task.isCancelled else { return nil }
             try? await Task.sleep(for: .milliseconds(250))
         }
         let now = ListenTracker.wallMs()
         // the check that stands for this run: one begun within the minute (out now, or answered), else this one
         var from = now
-        readCap = cap
-        readCount = 0
-        defer { readCap = nil }
+        let reads = BackgroundReads(cap: cap)
+        sessions.append(reads)
+        defer { sessions.removeAll { (other: BackgroundReads) -> Bool in other === reads } }
         if LibraryFollow.due(.front, lastBegan: lastBegan, now: now) {
             check(.background)
         } else {
             from = min(lastBegan ?? now, now)
             if !running { Task { await run() } }
         }
-        // the run (made by check, or the one under way) to its end
+        // the run (made by check, or the one under way) to its end - or this run's
         try? await Task.sleep(for: .milliseconds(50))
         while running || pending != nil {
-            guard !Task.isCancelled else { break }
+            guard !Task.isCancelled, clock.now < deadline else {
+                if stop() { stopBackgroundRun() }
+                break
+            }
             try? await Task.sleep(for: .milliseconds(200))
         }
         let checked: Bool = {
@@ -236,7 +250,17 @@ final class LibraryFollower {
             if case .failed = record.result { return false }
             return true
         }()
-        return (checked, readCount)
+        return (checked, reads.read)
+    }
+
+    /// A background run's end with the follower's run still under way: stopped, as a closed store stops it (its
+    /// answers still to come dropped), and the reads it cut short held.
+    private func stopBackgroundRun() {
+        generation += 1
+        pending = nil
+        readingNow = 0
+        cutShort = LibraryFollow.cutShort(after: .cut, was: cutShort)
+        note("library: background run ended - its check and reads stopped, the rest at the next chance")
     }
 
     // MARK: the marks and the question
@@ -345,12 +369,15 @@ final class LibraryFollower {
         }
         running = true
         let mine = generation
+        // how the reads end: a cut holds the asks below them, reading to the end lets them go (LibraryFollow.cutShort)
+        var end = LibraryFollow.ReadsEnd.couldntAsk
         // this check's: albums refused (not asked again until the next), reads refused in all, stale lists read again
         var failed = Set<String>()
         var failures = 0
         var refreshed = 0
         defer {
             running = false
+            cutShort = LibraryFollow.cutShort(after: end, was: cutShort)
             // the reads ended: what was held for them is asked for now
             if mine == generation { changed() }
             // a check asked for while an older run was stopping: made by a run of its own
@@ -370,17 +397,22 @@ final class LibraryFollower {
             let next = LibraryFollow.toRead(ordered, failed: failed, retryLast: failedBefore, now: now,
                                             refreshing: LibraryFollow.refreshesPerCheck - refreshed)
             guard !next.isEmpty else {
+                end = .toTheEnd
                 firstReadEnded()
                 return
             }
-            // a background run's reads stop at its cap: the rest at the next chance
+            // a background run's reads stop at its own cap (the least any run under way has left): the rest at the
+            // next chance, and nothing asked below them meanwhile
             var room = LibraryFollow.readsAtOnce
-            if let cap = readCap {
-                guard readCount < cap else { return }
-                room = min(room, cap - readCount)
+            if let left = sessions.map(\.room).min() {
+                guard left > 0 else {
+                    end = .cut
+                    return
+                }
+                room = min(room, left)
             }
             let batch = Array(next.prefix(room))
-            readCount += batch.count
+            for session in sessions { session.read += batch.count }
             // a read of an album read before and not due its second read is a stale list read again
             refreshed += batch.filter { (id: String) -> Bool in
                 guard let entry = ordered.first(where: { $0.id == id }), entry.songs != nil else { return false }
@@ -430,6 +462,7 @@ final class LibraryFollower {
             // the matter, and the next check reads on (each album asked at most once a check, so nothing hammers)
             if failures >= LibraryFollow.readFailuresPerRun {
                 note("library: \(failures) reads failed - the rest at the next check")
+                end = .failures
                 return
             }
         }
@@ -467,7 +500,12 @@ final class LibraryFollower {
             let fetched = try await client.fetch(Routes.albumIndex, as: AlbumIndexAnswer.self,
                                                  query: [("scope", scope.rawValue)],
                                                  ifNoneMatch: wasEmpty ? nil : etag)
-            guard mine == generation, self.store === store else { return }
+            // stopped while it was out (a background run's end, the store closed): as a failed check, it changes
+            // nothing - not even when the last began
+            guard mine == generation, self.store === store else {
+                if lastBegan == began { lastBegan = beganBefore }
+                return
+            }
             let answer: LibraryFollow.Answer
             var nextETag = etag
             var listed = 0
@@ -593,9 +631,11 @@ final class LibraryFollower {
         pending = nil
         readingNow = 0
         checking = false
+        cutShort = false
     }
 
     private func clearMemory() {
+        cutShort = false
         ordered = []
         scope = nil
         held = nil
@@ -656,4 +696,17 @@ final class LibraryFollower {
         let parts = duration.components
         return Double(parts.seconds) + Double(parts.attoseconds) / 1e18
     }
+}
+
+/// (slice 3's review) One background run's reads: its own cap and its own count, so two runs at once (the refresh and
+/// the charger's) each stop at theirs, and one ending lifts nothing for the other.
+@MainActor
+private final class BackgroundReads {
+    let cap: Int
+    var read = 0
+
+    init(cap: Int) { self.cap = cap }
+
+    /// Albums it may still read.
+    var room: Int { max(cap - read, 0) }
 }

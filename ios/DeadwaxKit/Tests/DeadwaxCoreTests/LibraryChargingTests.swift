@@ -119,13 +119,15 @@ private func tasks(_ plan: [String: DownloadPlan.Decision], album: String) -> [S
         #expect(DownloadWait.charging.isTheSettings && !DownloadWait.charging.isTheNetwork)
     }
 
-    @Test func theRefreshIsAskedWithTheSwitchOnAndTheChargersOnlyWithSomethingWaitingForIt() {
-        #expect(LibraryBackground.asks(on: false, onlyWhileCharging: true, waits: [.charging]).isEmpty)
-        #expect(LibraryBackground.asks(on: true, onlyWhileCharging: false, waits: [.charging]) == [LibraryBackground.refreshID])
-        #expect(LibraryBackground.asks(on: true, onlyWhileCharging: true, waits: [.queued, .room])
-                == [LibraryBackground.refreshID])
-        #expect(LibraryBackground.asks(on: true, onlyWhileCharging: true, waits: [.queued, .charging])
-                == [LibraryBackground.refreshID, LibraryBackground.chargingID])
+    @Test func theRefreshIsAskedWithTheSwitchOnAndTheChargersOnlyWithTheLibraryToCome() {
+        // (after the review: whatever wait the songs show - LibraryBackgroundReviewTests)
+        func asks(_ on: Bool, _ charging: Bool, _ toCome: Bool) -> [String: LibraryBackground.Ask] {
+            LibraryBackground.asks(readable: true, on: on, onlyWhileCharging: charging, libraryToCome: toCome)
+        }
+        #expect(asks(false, true, true).values.allSatisfy { $0 == .cancel })
+        #expect(asks(true, false, true) == [LibraryBackground.refreshID: .ask, LibraryBackground.chargingID: .cancel])
+        #expect(asks(true, true, false) == [LibraryBackground.refreshID: .ask, LibraryBackground.chargingID: .cancel])
+        #expect(asks(true, true, true) == [LibraryBackground.refreshID: .ask, LibraryBackground.chargingID: .ask])
         #expect(LibraryBackground.identifiers == ["net.lizardlounge.deadwax.library", "net.lizardlounge.deadwax.charging"])
         #expect(LibraryBackground.refreshAfterMs == 15 * 60_000 && LibraryBackground.readsPerRun == 20)
     }

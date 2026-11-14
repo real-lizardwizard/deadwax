@@ -97,8 +97,10 @@ struct DeadwaxApp: App {
                 .tint(Palette.accent)
         }
         .backgroundTask(.urlSession(DownloadSession.identifier)) {
+            let began = ContinuousClock().now
             await Self.downloadSession.eventsDelivered()
-            await BackgroundWork.shared.eventsHandled()
+            // the events and the plan after them within one budget (slice 3's review)
+            await BackgroundWork.shared.eventsHandled(began: began)
         }
     }
 }

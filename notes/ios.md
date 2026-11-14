@@ -4340,8 +4340,8 @@ untouched; no server change. The spec's 6.7 says what the build decided; docs/io
   background (the five runs, or "No background runs yet").
 - **Info.plist**: UIBackgroundModes `audio`, `fetch`, `processing` (audio first: ios.yml reads `.0`), and
   BGTaskSchedulerPermittedIdentifiers with both identifiers. **check_project.py** checks the modes and that the
-  identifiers are exactly LibraryBackground.swift's, in order, under the bundle id: a missing one makes
-  BGTaskScheduler.register crash at launch. **ios.yml** asserts the built Info.plist's `UIBackgroundModes.1/.2` and
+  identifiers are exactly LibraryBackground.swift's, in order, under the bundle id: for a missing one
+  BGTaskScheduler.register returns false and its task never runs (after the review; it said "crash" here). **ios.yml** asserts the built Info.plist's `UIBackgroundModes.1/.2` and
   `BGTaskSchedulerPermittedIdentifiers.0/.1`, and 0.9.
 
 ### Decided here (the spec was silent, or this departs from it)
@@ -4394,8 +4394,8 @@ Not verified - only the phone can tell, and none of the App's wiring has a test:
 - **Whether `@UIApplicationDelegateAdaptor` leaves SwiftUI's `.backgroundTask(.urlSession)` delivering the session's
   events** (the delegate doesn't implement handleEventsForBackgroundURLSession). Phase 2's background downloads
   depend on it: a download finishing with the app suspended must still land.
-- That registering from didFinishLaunching under SwiftUI's lifecycle is in time (a late or missing registration
-  crashes, or the task never runs).
+- That registering from didFinishLaunching under SwiftUI's lifecycle is in time (a registration after the launch
+  ends raises; one for an identifier not in Info.plist returns false, and its task never runs).
 - Whether the battery-state notification arrives promptly in front and playing, and what a background launch reads
   before it.
 - Whether a relaunch for the session's events comes after each batch, or only once every task of the session (hand
@@ -4405,3 +4405,99 @@ Not verified - only the phone can tell, and none of the App's wiring has a test:
 - What BGTaskScheduler.submit says with Background App Refresh off or in Low Power Mode (a "background: couldn't ask"
   line in the downloads log).
 - Nothing drawn has been seen.
+
+## Phase 3, slice 3, after its review (2026-11-13)
+
+The review of 953b8e5 found nothing that breaks Phase 2 and nothing that deletes what the front wouldn't. It checked
+the biggest risk against the iOS 27.2 SwiftUI binary: SwiftUI's own app delegate implements
+handleEventsForBackgroundURLSession, and reaches the adaptor only through forwardingTarget for what it doesn't
+implement - so `.backgroundTask(.urlSession)` keeps its events, and the adaptor stays (as Apple DTS recommends). Eight
+fixes, each below; the spec's 6.8 says them against its sections. The app stays 0.9 (9).
+
+### What was wrong, and the fix
+
+1. **An expired run lost the next refresh, and runs had no deadline.** A refresh's request is used up when it runs,
+   and the next was asked for only at the run's end. Fix: BackgroundWork.run asks first
+   (`askBackgroundTasks(always: true, ran:)`). The run has its own deadline: the follower is waited for
+   `followMs` (15 s, the store's 10 s opening wait within it), then stopped, and the plan settles within `runMs`
+   (20 s). The expiration handler still cancels the run, and `Completion` tells the task once.
+2. **The background read cap let the plan ask below unread albums** (6.5's rule): with the cap's stop, `running` went
+   false and so did `readsPending`. Fix: `LibraryFollow.readsPending(running:cutShort:ordered:)` and
+   `cutShort(after:was:)` - a cut (the cap, or a run's end) holds until a run reads to the end. Too many failures
+   still moves on, as 6.6 decided, and a run that couldn't ask changes nothing. The follower keeps `cutShort` and
+   sets it from each run's `ReadsEnd`, and `cameToFront` carries cut reads on at once, due or not.
+3. **A shared wait hid the charging wait**, so the charger's task was never asked for (Wi-Fi only on cellular, deadwax
+   unreachable, no network). Fix: `LibraryBackground.asks(readable:on:onlyWhileCharging:libraryToCome:ran:)` answers
+   ask, cancel or leave for each request. The charger's is asked with the switch and Only while charging on and songs
+   only the library wants still to come (`libraryToCome`), whatever wait they show. That holds plugged in too - the
+   review said "and not charging", but an unplug while the app is suspended is never told, and a request needing
+   power costs a run at most. With the store not open it is left as it is.
+4. **One stuck task pinned the batch** (a background task can take days to time out). Fix: DownloadModel reads each
+   library task's bytes from the session at each plan with Only while charging on (`readStalls`, the continuous
+   clock, so a locked phone's sleep counts). It passes `idleMs` on `DownloadPlan.Asked`. A task out with nothing
+   for `stallMs` (30 min) is `stalled`: with Only while charging on it is let go with its resume data and made
+   again at the next plan, and an album whose every task out has stalled isn't the batch. A task first seen now,
+   or made again, starts from now, so a short background launch never finds one stalled. Off, nothing changes.
+5. **The relaunch's handling could run past 30 s** (25 s of events, then 5 s of plan). Fix: one budget,
+   `eventsMs` (25 s), from the closure's start: the plan gets `LibraryBackground.left(...)` of it.
+6. **Work went on after expiry**, and two runs shared one cap. Fix: a run that ends with the follower's run still
+   under way, the app still in the background, stops it (`stopBackgroundRun`: the generation bumped, as a closed
+   store's are). Its check still out is dropped as a failed one is, `lastBegan` put back. Each run has its own
+   `BackgroundReads` (cap and count); the reads stop at the least any run has left.
+7. **check_project.py** requires UIBackgroundModes exactly `audio, fetch, processing` (ios.yml's `.0`-`.2`). Its words
+   are corrected: a missing identifier makes `register` return false and the task never run - not a crash.
+8. **A launch before the phone's first unlock** reads UserDefaults as empty: the switch off, so a run would have
+   recorded "off" and cancelled both requests. Fix: `LibraryBackground.stateReadable(kept:protectedDataAvailable:)`.
+   Every readable launch leaves a mark (`libraryStateReadable`); a launch is readable if it found the mark, or the
+   phone is unlocked at didFinishLaunching (a first launch ever). Unreadable: every request is left as it is (but
+   the one the run used up, put back), no run is kept, nothing is asked. `isProtectedDataAvailable` alone wouldn't
+   do: it is false whenever the phone is locked, when nearly every run happens.
+
+### Core
+
+`LibraryFollow.ReadsEnd`, `cutShort(after:was:)`, `readsPending(running:cutShort:ordered:)`. `LibraryBackground.Ask`,
+the new `asks`, `libraryToCome`, `stateReadable`, `readableKey`, `followMs`, `runMs`, `eventsMs`, `left`.
+`DownloadPlan.stallMs`, `Asked.idleMs` and `stalled`, the batch's choice and its outs.
+
+### The app
+
+LibraryFollower: `background(reads:until:stop:)`, `BackgroundReads`, `cutShort`, `stopBackgroundRun`, `cameToFront`
+carrying cut reads on, a stopped check putting `lastBegan` back. DownloadModel: `stateReadable` and
+`settleReadable`, `askBackgroundTasks(always:ran:)` on Core's asks, `backgroundRun` on its deadlines and the
+readable guard, `eventsHandled(until:)`, `planSettled(until:)`, `readStalls` and `progressSeen`. BackgroundWork:
+`ask` of each request's Ask, the asks first in `run`, `settleReadable` in `register`, `eventsHandled(began:)`.
+DeadwaxApp: the closure's start passed on.
+
+### Tests
+
+Core 1178 (from 1171): **LibraryBackgroundReviewTests** 7. They cover reads cut short holding the asks below them,
+through LibraryDownloads.actions; the cut's table; the charger's asked under deadwax's wait, and each case of the
+asks; an unreadable launch leaving everything but the request used up, and `stateReadable`; the budgets; a stalled
+album not the batch, and 29 minutes still the batch; a stalled task in a moving batch let go and made again, and
+nothing changed with Only while charging off. LibraryChargingTests' asks test now takes the new rule.
+test_ios_install.py takes the exact order (three wrong orders named) and the new words.
+
+**Mutations, 19, each caught by a failing test, none by a build error** (scratchpad mutate_r.py, every file restored
+byte for byte, sha-256 checked):
+- a cut not holding the asks; the cap's stop not a cut;
+- reading to the end not clearing it; failures not clearing it; a run that couldn't ask clearing it;
+- the charger's asked with nothing to come; never asked; cancelled before the store opens;
+- any song counted as the library's;
+- an unreadable launch read as readable; the request used up not put back;
+- readable only by the mark; readable only unlocked;
+- what's left going below nothing; a run's budget past 20 s;
+- stalled only past 30 minutes; a stalled album still the batch;
+- a stalled task kept in the batch; a stalled task let go with Only while charging off.
+
+### Verified, and not
+
+Verified (2026-11-13, this Mac, Xcode's toolchain): `swift test` - Core 1178, DeadwaxAudio 158, DeadwaxTurntable 11,
+all pass; the mutations; the unsigned Release device build with no warnings; check_project.py with the .xcodeproj
+unchanged; `pytest tests/test_ios_*.py tests/test_source_bytes.py`; the ios sims on Node 22. Not run: Core on Linux.
+
+Not verified - none of the App's wiring has a test, and only a phone can tell:
+- Whether iOS launches the app for a BGTask (or the session's events) before the first unlock at all.
+- Whether `isProtectedDataAvailable` is true at didFinishLaunching on a first launch ever.
+- Whether a stopped follower's dropped check costs anything at the next front.
+- Whether the session's `countOfBytesReceived` moves as the bytes do, which the stall rule reads.
+- The new budgets against what iOS really gives.
