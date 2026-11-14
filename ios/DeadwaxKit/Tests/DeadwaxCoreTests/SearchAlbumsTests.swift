@@ -203,6 +203,46 @@ import Testing
         #expect(!lateAgain)
     }
 
+    /// (slice 2's review) Words typed while deadwax can't be reached: nothing asked, and no late clock run (SearchModel
+    /// arms it only online), so nothing is drawn - the screen keeps "Search works once deadwax is back." - and once back
+    /// the library is asked for them, with its late clock (`libraryUnplaced`), and the list drawn with it. The contrast:
+    /// a clock left to run out while away drew the list without the library, its rows then behind "Show 3 …".
+    @Test func wordsTypedWhileDeadwaxIsAwayDrawNothingAndTheLibraryOnceBack() throws {
+        let found = LibraryResults(artists: [Self.portishead], albums: [Self.dummy], songs: [Self.roads])
+        var state = SearchState()
+        state.typed("portishead")
+        let unasked = Self.draw(&state)
+        #expect(unasked == nil && state.drawn == nil, "nothing drawn: the offline line stays")
+        // deadwax back (SearchModel.resumed): nothing failed to ask again, but the words still want the library and
+        // have no place for it - so it is asked, its late clock armed
+        let again = state.resumed()
+        #expect(!again && state.wantsLibrary && state.libraryUnplaced)
+        let term = state.armingLibraryLate()
+        let token = state.askingLibrary()
+        #expect(state.libraryUnplaced, "asked, not yet settled, no place kept yet")
+        state.libraryAnswered(token, state.query, found)
+        #expect(!state.libraryUnplaced)
+        let drawnMade = Self.draw(&state)
+        let drawn = try #require(drawnMade)
+        #expect(!drawn.drawn.libraryLate && state.libraryLateSlot == nil, "drawn with the library, no Show them")
+        #expect(drawn.said.hasPrefix("In your library:"))
+        let lateNow = state.libraryLatePassed(term)
+        #expect(!lateNow, "settled: its clock running out is nothing")
+
+        var late = SearchState()
+        late.typed("portishead")
+        let lateTerm = late.armingLibraryLate()
+        let isLate = late.libraryLatePassed(lateTerm)
+        #expect(isLate && !late.libraryUnplaced, "a place is kept: the clock is not armed again")
+        let lateMade = Self.draw(&late)
+        let lateDrawn = try #require(lateMade)
+        #expect(lateDrawn.drawn.libraryLate)
+        let lateToken = late.askingLibrary()
+        late.libraryAnswered(lateToken, late.query, found)
+        let stays = Self.draw(&late)
+        #expect(stays == nil && late.libraryLateSlot == .show(3), "the rows behind Show them")
+    }
+
     @Test func typingUnderThreeCharactersDropsTheAlbumsAndShortWordsAskNone() throws {
         var (state, _) = try Self.asked("portishead", LibraryResults())
         #expect(state.askedForQuery && state.albums != .idle)

@@ -58,7 +58,15 @@ struct SearchScreen: View {
         .onSubmit(of: .search) { search.submitted() }
         .onAppear { search.shown() }
         .onChange(of: navigation.tab) { _, tab in
-            if tab == .search { search.shown() }
+            // another tab: a held album's row asking the id bridge lets go, so its answer opens nothing there
+            if tab == .search { search.shown() } else { search.standDown() }
+        }
+        .onChange(of: navigation.search) { _, _ in
+            // a page pushed or popped over the list: the same
+            search.standDown()
+        }
+        .onChange(of: navigation.nowPlayingShown) { _, shown in
+            if shown { search.standDown() }
         }
         .onChange(of: scenePhase) { _, phase in
             if phase == .active, navigation.tab == .search { search.shown() }
@@ -330,6 +338,71 @@ private struct TopPlace: View {
     }
 }
 
+/// A slot's one height (app.css `--app-search-slot`: a finger-tall row and a little room above and below), whatever
+/// it holds - scaled with the text, so it holds at the accessibility sizes too.
+enum SearchSlotMetrics {
+    static let height: CGFloat = 60
+}
+
+/// A slot's frame (app.css `.app-search-slot`): one fixed height whatever it holds - the asking line, then what lands in
+/// it - and one line, a line too long for it ending in an ellipsis rather than wrapping, so nothing below it moves under
+/// a finger when its answer lands.
+private struct SlotFrame<Content: View>: View {
+    private let content: Content
+
+    @ScaledMetric(relativeTo: .body) private var height: CGFloat = SearchSlotMetrics.height
+
+    init(@ViewBuilder content: () -> Content) {
+        self.content = content()
+    }
+
+    var body: some View {
+        content
+            .lineLimit(1)
+            .truncationMode(.tail)
+            .frame(maxWidth: .infinity, minHeight: height, maxHeight: height, alignment: .leading)
+    }
+}
+
+/// A slot's asking line: the sweep and its words, on the slot's one row.
+private struct SlotAsking: View {
+    let words: String
+
+    var body: some View {
+        HStack(spacing: 10) {
+            ProgressView()
+            Text(words)
+                .foregroundStyle(Palette.quiet)
+        }
+        .accessibilityElement(children: .combine)
+    }
+}
+
+/// A slot's failure on its one row (app.css `.app-search-slot.is-row`): the words, ellipsized, and Try again at its end
+/// - nothing asked while deadwax can't be reached, whether it is back instead.
+private struct SlotFailure: View {
+    let words: String
+    let tryAgain: Bool
+    let retry: () -> Void
+
+    @Environment(Reachability.self) private var reachability
+
+    var body: some View {
+        HStack(spacing: 12) {
+            Text(words)
+                .foregroundStyle(Palette.quiet)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            if tryAgain {
+                Button(SearchWords.tryAgain) {
+                    if reachability.online { retry() } else { reachability.tryNow() }
+                }
+                .fixedSize()
+                .disabled(reachability.probing)
+            }
+        }
+    }
+}
+
 /// A late kind's slot in its section (SearchRows.tsx `slot`), one height whatever it holds: still asking; folded
 /// behind "Show 2 more albums"; why there is nothing; its failure, with Try again unless the words were refused.
 private struct SectionSlot: View {
@@ -339,21 +412,23 @@ private struct SectionSlot: View {
     @Environment(SearchModel.self) private var search
 
     var body: some View {
-        Group {
+        SlotFrame {
             switch slot {
             case .asking:
-                AskingLine(personal: search.personal, musicBrainz: true)
+                SlotAsking(words: SearchWords.searching(personal: search.personal, musicBrainz: true))
             case .show(let rows):
                 Button(SearchWords.fold(kind, rows.count).button) { search.showFolded(kind) }
                     .buttonStyle(SecondaryPill())
-                    .padding(.top, 8)
             case .said(let words):
-                ShelfNote(words)
+                Text(words)
+                    .foregroundStyle(Palette.quiet)
             case .failed:
-                MusicBrainzFailure(failure: albumsFailure, short: true) { search.tryMusicBrainzAgain() }
+                let failure = albumsFailure
+                SlotFailure(words: SearchWords.failure(failure, short: true), tryAgain: !failure.refused) {
+                    search.tryMusicBrainzAgain()
+                }
             }
         }
-        .frame(minHeight: 44, alignment: .leading)
     }
 
     /// The albums' failure as the state holds it - else (never, as the state draws it) MusicBrainz away.
@@ -373,26 +448,35 @@ private struct LibraryLateSlot: View {
     let retry: () -> Void
 
     @Environment(SearchModel.self) private var search
+    @Environment(ServerModel.self) private var server
+    @Environment(Reachability.self) private var reachability
 
     var body: some View {
         let personal = search.personal
-        Group {
+        SlotFrame {
             switch slot {
             case .asking:
-                AskingLine(personal: personal)
+                SlotAsking(words: SearchWords.searching(personal: personal, musicBrainz: false))
             case .failed:
-                FailureNote(failure: failure, retry: retry)
+                SlotFailure(words: failureWords, tryAgain: true, retry: retry)
             case .skipped:
-                ShelfNote(SearchWords.librarySkipped(personal: personal))
+                Text(SearchWords.librarySkipped(personal: personal))
+                    .foregroundStyle(Palette.quiet)
             case .show(let count):
                 Button(SearchWords.libraryLate([.artists: count], personal: personal, text: text).button ?? "", action: show)
                     .buttonStyle(SecondaryPill())
-                    .padding(.top, 8)
             case .nothing:
-                ShelfNote(SearchWords.libraryLate([:], personal: personal, text: text).line)
+                Text(SearchWords.libraryLate([:], personal: personal, text: text).line)
+                    .foregroundStyle(Palette.quiet)
             }
         }
-        .frame(minHeight: 44, alignment: .leading)
+    }
+
+    /// The library's failure in a listener's words, on the slot's one line (the web's `late.message`) - the raw detail
+    /// whoever runs deadwax sees in a FailureNote not drawn here: a slot has no room for it, and the web's has none.
+    private var failureWords: String {
+        guard let failure else { return reachability.online ? ErrorWords.other : SearchWords.offline }
+        return ErrorWords.of(failure, admin: server.access.seesDetail, retry: true).said
     }
 }
 

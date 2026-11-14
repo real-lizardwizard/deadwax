@@ -668,8 +668,11 @@ does: Top results first (with a place kept for a pick still to come), "Searching
 go, then the sections once the albums are in - or a second and a half on, with "Searching…" in Albums'
 place, the albums landing there when they come (or, if something you could tap is already under them,
 behind **Show 2 more albums**). If your library is slow, the list is drawn without it after a second and a
-half, "Searching your library…" at its top, then **Show 5 from your library** to draw it in. Typing on
-keeps the list where it is until the new words' list is in. Clearing the field brings the hint back.
+half, "Searching your library…" at its top, then **Show 5 from your library** to draw it in. Each of those
+places is one line of one height whatever it holds - "Searching…", a Show button, why there's nothing, or
+what went wrong with **Try again** at its end - so nothing below it moves when it changes, at any text size.
+Typing on keeps the list where it is until the new words' list is in. Clearing the field brings the hint
+back.
 
 - **A song**: tap it to play it, with its album's songs after it in Up Next. The phone fetches the albums
   of the first songs found as the list comes in, so a song with **▶** after it plays the moment you tap.
@@ -686,7 +689,8 @@ keeps the list where it is until the new words' list is in. Clearing the field b
   **Renamed**), and **Not on this pressing** for what it leaves out. The artist is a link when one artist of
   your library is theirs. **Get** comes to this page in the next phase; for now get it in the web app.
 - **An album of yours MusicBrainz finds** that Navidrome's search didn't list is drawn among yours, "in
-  your library", and opens your album's page.
+  your library", and opens your album's page. Finding that page can take a moment (the row shows it's
+  working); open something else, or go to another tab, meanwhile and it doesn't open over what you went to.
 - Nothing found says "No results for “…”." and "Check the spelling or try a new search." (a chip's:
   "No albums for “…”."). If Navidrome couldn't be asked, why, and **Try again**. If MusicBrainz couldn't be,
   "Searching for more isn't working right now - try again in a few minutes." (or "Too many searches just now -
@@ -696,9 +700,11 @@ keeps the list where it is until the new words' list is in. Clearing the field b
 - **Covers** of albums you don't have come from the Cover Art Archive, through deadwax: they need deadwax
   2.1.24 or later (`:experimental` for now), and show as an empty square on an older one - see
   [the troubleshooting page](troubleshooting.md#the-iphone-app-shows-no-cover-for-an-album-you-dont-have).
+  A cover that couldn't load while deadwax was out of reach loads as soon as it's back.
 - **Offline**, a list already drawn for the words stays, without the albums you don't have, the songs not
   on this phone dimmed (a tap does nothing) and the ones on it playing; albums and artists with nothing here
-  dimmed. New words say "Search works once deadwax is back." and are searched once it is. An album you
+  dimmed. New words say "Search works once deadwax is back." - never an empty list - and are searched once
+  it is, your library's rows in the list with the rest. An album you
   don't have's page keeps what it has shown; one that hasn't loaded its pressings says "This album's
   pressings load once deadwax is back." and loads them when it is.
 - **VoiceOver** reads a row as one: its title, its line, and for a song "plays it from its album" or "opens
@@ -2649,7 +2655,7 @@ is the one to compare with: it should give the same lists.
   in Top results), and "plays it from its album" (or "opens its album"); the list found is announced ("In
   your library: 1 artist, 2 albums, 11 songs."); a chip as it's chosen ("Showing albums.").
 
-### Search's checks, slice 2 (130-139)
+### Search's checks, slice 2 (130-143)
 
 **Not done yet.** These come with the build that adds MusicBrainz's albums to Search, and the album you don't
 have (still app 0.10). Check 137 wants deadwax 2.1.24 or later (`:experimental` for now) and then 2.1.23; the
@@ -2686,6 +2692,21 @@ rest work on either. As with 121-129, the web app's Search is the one to compare
 - **139 VoiceOver.** An album you don't have's row reads its title and its line ("Portishead · 2008"); the list
   is announced as it comes in ("In your library: …", then "Also found: 3 albums."). On its page, **Pressing**
   reads the pressing chosen; in the picker, the one ticked reads as selected.
+- **140 Typing offline.** Airplane Mode on, type new words ("portishead", then "ab"), and wait a few seconds:
+  "Search works once deadwax is back." stays - never an empty list. Airplane Mode off: the words are searched,
+  your library's rows drawn in the list, never left behind "Show 3 from your library".
+- **141 The places hold their height.** Words whose albums are slow to come (a busy evening for MusicBrainz,
+  or the Wi-Fi throttled): watch the "Searching…" line in Albums become the albums, **Show 2 more albums**, or
+  the failure with **Try again** at its end - the sections below never move. The same at the largest text size
+  (Settings, Accessibility, Larger Text): one line, the words cut short with "…", Try again still on it.
+- **142 A held album, left.** Tap an album of yours that MusicBrainz found (the row spins), and before it opens
+  tap the Library tab: Library stays as it was, and back in Search nothing has opened. Tap one again and,
+  while it spins, open another row: only that row's page opens.
+- **143 Covers, back online.** Airplane Mode on: scroll the Library's Albums to ones whose covers haven't shown
+  yet (empty squares), and on an album you don't have's page pick a pressing you haven't looked at (the album's
+  cover stays). Airplane Mode off: those covers load where you are, without scrolling away or leaving the page,
+  the pressing's own cover in place of the album's if it has one. An album with no cover at all stays the empty
+  square.
 
 ## What it can't do yet
 

@@ -365,6 +365,13 @@ public struct SearchState: Sendable {
     /// The library has settled for the words: answered, failed, or not asked (Navidrome not there).
     public var settled: Bool { librarySettled(query) }
 
+    /// The words' library is yet to settle and no place is kept for it - not asked yet (typed while deadwax was away),
+    /// or asked and its late clock let go as it ran (the phone went offline): the model arms the late clock again as it
+    /// resumes, so the list is drawn with the library or a place for it, never without either.
+    public var libraryUnplaced: Bool {
+        !query.isEmpty && !librarySettled(query) && lateFor.map { WebText.same($0, query) } != true
+    }
+
     private func librarySettled(_ term: String) -> Bool {
         guard let libraryText, WebText.same(libraryText, term), let library else { return false }
         return library != .asking

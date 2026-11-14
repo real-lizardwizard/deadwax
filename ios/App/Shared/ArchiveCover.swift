@@ -13,6 +13,7 @@ struct ArchiveCover: View {
     let size: Int
 
     @Environment(ServerModel.self) private var server
+    @Environment(Reachability.self) private var reachability
     /// What a load gave this view, under the key it was asked by; let go when the view goes.
     @State private var loaded: Loaded?
 
@@ -30,6 +31,9 @@ struct ArchiveCover: View {
     var body: some View {
         let key = self.key
         let image = loaded?.key == key ? loaded?.image : cached
+        // the load's id: the key, and whether deadwax can be reached - so a front that failed while it couldn't asks once
+        // more as it comes back (CoverCache.reach); what is drawn stays under the key alone, never blanked going offline
+        let asking = "\(key)|\(reachability.online)"
         ZStack {
             Rectangle().fill(Palette.coverEmpty)
             if let image {
@@ -41,7 +45,7 @@ struct ArchiveCover: View {
         .aspectRatio(1, contentMode: .fit)
         .clipped()
         .accessibilityHidden(true)
-        .task(id: key) {
+        .task(id: asking) {
             guard let client = server.client, let first = addresses.first,
                   CoverCache.shared.cachedArchive(client: client, cover: first, size: size) == nil else { return }
             for address in addresses {

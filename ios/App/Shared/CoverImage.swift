@@ -17,6 +17,7 @@ struct CoverImage: View {
     let size: CGFloat
 
     @Environment(ServerModel.self) private var server
+    @Environment(Reachability.self) private var reachability
     @Environment(\.displayScale) private var scale
     /// What a load gave this view, under the key it was asked by; let go when the view goes.
     @State private var loaded: Loaded?
@@ -41,6 +42,9 @@ struct CoverImage: View {
     var body: some View {
         let key = self.key
         let image = loaded?.key == key ? loaded?.image : cached
+        // the load's id: the key, and whether deadwax can be reached - so a cover that failed while it couldn't asks once
+        // more as it comes back (CoverCache.reach); what is drawn stays under the key alone, never blanked going offline
+        let asking = "\(key)|\(reachability.online)"
         ZStack {
             Rectangle().fill(Palette.coverEmpty)
             if let image {
@@ -52,7 +56,7 @@ struct CoverImage: View {
         .aspectRatio(1, contentMode: .fit)
         .clipped()
         .accessibilityHidden(true)
-        .task(id: key) {
+        .task(id: asking) {
             guard let id, let client = server.client,
                   CoverCache.shared.cached(client: client, id: id, size: step) == nil else { return }
             let got = await CoverCache.shared.load(client: client, id: id, size: step)
@@ -86,6 +90,9 @@ final class CoverCache {
     private let images = NSCache<NSString, UIImage>()
     private var loading: [String: (task: Task<UIImage?, Never>, waiting: Int)] = [:]
     private var failedAt: [String: Date] = [:]
+    /// The failures among `failedAt` that were deadwax not reached - asked offline, or nothing answering - rather than
+    /// an answer (a 404, the Archive away): forgotten as deadwax comes back, where an answer keeps its minute.
+    private var unreached: Set<String> = []
     /// deadwax can't be reached (Reachability, phase2-downloads.md 5.4 and 7.1): a cover not kept on the phone isn't
     /// asked for - nothing would answer - and is the empty square until deadwax is back.
     private var offline = false
@@ -153,20 +160,31 @@ final class CoverCache {
                 }
                 // nothing that needs deadwax is asked while it can't be reached: a failure, forgotten when it is back
                 if self?.offline == true {
-                    self?.landed(key, flight, nil, called: false)
+                    self?.landed(key, flight, nil, called: false, reached: false)
                     return nil
                 }
-                let data: Data?
+                var data: Data?
+                var reached = true
                 if let archive {
-                    let answer = try? await client.archiveCover(archive, size: size)
-                    if case .fresh(let body, _)? = answer { data = body } else { data = nil }
+                    do {
+                        if case .fresh(let body, _)? = try await client.archiveCover(archive, size: size) { data = body }
+                    } catch {
+                        // only the transport failing is thrown (DeadwaxClient.archiveCover)
+                        reached = false
+                    }
                 } else {
-                    data = try? await client.cover(coverID: id, size: size)
+                    do {
+                        data = try await client.cover(coverID: id, size: size)
+                    } catch APIFailure.answered(_) {
+                        // deadwax answered without the cover: a failure that keeps its minute
+                    } catch {
+                        reached = false
+                    }
                 }
                 // UIImage(data:) only reads the header; the pixels are decoded here, off the main thread
                 let raw = data.flatMap(UIImage.init(data:))
                 let image = await raw?.byPreparingForDisplay() ?? raw
-                self?.landed(key, flight, image, called: Task.isCancelled)
+                self?.landed(key, flight, image, called: Task.isCancelled, reached: reached)
                 return image
             }
             loading[flight] = (task, 1)
@@ -193,12 +211,17 @@ final class CoverCache {
     /// time a view shows them.
     func forgetFailures() {
         failedAt = [:]
+        unreached = []
     }
 
     /// Whether deadwax can be reached: while not, covers not on the phone aren't asked for; as it comes back, the ones
-    /// that failed meanwhile are asked again the next time a view shows them.
+    /// that failed for want of it are asked again - at once by a view showing one, its key holding whether deadwax can
+    /// be reached - while one deadwax answered without a cover (a 404, the Archive away) keeps its minute.
     func reach(online: Bool) {
-        if online && offline { failedAt = [:] }
+        if online && offline {
+            for flight in unreached { failedAt[flight] = nil }
+            unreached = []
+        }
         offline = !online
     }
 
@@ -211,13 +234,15 @@ final class CoverCache {
 
     /// A fetch done: kept, or - unless it was called off - a failure not asked again for a minute. One called off is
     /// out of `loading` already (`left`), and a new fetch of the same cover may be there now.
-    private func landed(_ key: String, _ flight: String, _ image: UIImage?, called off: Bool) {
+    private func landed(_ key: String, _ flight: String, _ image: UIImage?, called off: Bool, reached: Bool = true) {
         if !off { loading[flight] = nil }
         if let image {
             images.setObject(image, forKey: key as NSString, cost: Self.cost(image))
             failedAt[flight] = nil
+            unreached.remove(flight)
         } else if !off {
             failedAt[flight] = Date()
+            if reached { unreached.remove(flight) } else { unreached.insert(flight) }
         }
     }
 

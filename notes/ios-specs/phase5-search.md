@@ -249,6 +249,13 @@ with every song not on this phone dimmed (it opens and plays nothing), as Songs 
 its album's songs on this phone. With nothing drawn, or for new words, "Search works once deadwax is back." Nothing
 of MusicBrainz is drawn offline from slice 2 on - the plan's "show nothing stale as if live" (question 5).
 
+(Slice 2's review) No clock of the list's runs offline either: the library's late clock is armed only while deadwax
+can be reached, and one running out offline is dropped - a list drawn "without the library" then would be blank (its
+MusicBrainz part left out) where the offline line stands, and once back the library's rows would sit behind "Show N
+from your library". As deadwax comes back the words' library is asked with its late clock (`resumed`, by
+`wantsLibrary` or `libraryUnplaced`), so the list is drawn with it. A held album's id-bridge answer (3.6) opens only
+on the list it was tapped on, and a cover that failed for want of deadwax asks once more as it comes back.
+
 ## 3. The screens
 
 ### 3.1 The tab (slice 1)
@@ -288,6 +295,13 @@ Rows as the Library's (`LibraryRow.cover` 44 pt, the row cover size, a round one
 line (the facts truncating, the place never), ▶ after a song that plays from its tap; a song's ••• at the row's end.
 Each section's heading a header, with See all. The asking line while nothing is drawn; a failure at the top with Try
 again; the gate's words above when Navidrome isn't there.
+
+A slot (slice 2: a late kind's in its section, and the library's place at the top of a list drawn without it) is the
+web's `.app-search-slot`: one fixed height whatever it holds (60 pt, `--app-search-slot`, a `@ScaledMetric` so it
+holds at the accessibility sizes), one line ending in "…" - the asking line, a Show button, its words, or a failure
+as one row (`is-row`): the words, then Try again at its end (none for words MusicBrainz refused). So nothing below it
+moves under a finger when its answer lands (slice 2's review; it was a minimum height, and a failure two lines and a
+button).
 
 ### 3.4 A kind view (slice 1)
 
@@ -395,7 +409,9 @@ SearchAlbums.swift, Pressings.swift, and slice 2's half of SearchList.swift, Sea
 held to the web by export-search-albums-vectors.cjs and its second fixture), the app (SearchModel's MusicBrainz
 half, the moments drawn in SearchScreen, GroupView and PressingPickerSheet, ArchiveCover through the 2.1.24
 relay), what was decided here, the tests and mutations, and what was verified. Question 8 was built with it (the
-relay, on main as 2.1.24); questions 14-23 came of it. docs/ios.md's checks 130-139 are its.
+relay, on main as 2.1.24); questions 14-23 came of it. docs/ios.md's checks 130-139 are its. Its review's fixes
+(offline words drawn blank, slots growing as their answer lands, the id bridge's answer opening on whatever showed,
+covers left empty after offline): "Phase 5, slice 2, after its review", with checks 140-143.
 
 ## 7. Tests (Swift Testing; Core's on Linux and macOS)
 
@@ -447,10 +463,12 @@ Numbered after Phase 4's 120. Slice 1's (docs/ios.md's "Search's checks (121-129
   list found is announced ("In your library: 1 artist, 2 albums, 11 songs."); a chip's "Showing albums.".
 
 The phase's (the plan's two, with slices 2-4): search an album you don't have - its MusicBrainz page opens (slice 2);
-each slice numbers its own after the last. Slice 2's are 130-139 (docs/ios.md's "Search's checks, slice 2
-(130-139)"): the hint, an album you don't have opening its page (the plan's second), its pressings and the filter,
+each slice numbers its own after the last. Slice 2's are 130-143 (docs/ios.md's "Search's checks, slice 2
+(130-143)"): the hint, an album you don't have opening its page (the plan's second), its pressings and the filter,
 held and maybe, the moments beside the web's, an artist alone and the studio line, short words, covers on 2.1.24
-and 2.1.23, offline, VoiceOver.
+and 2.1.23, offline, VoiceOver - and, from its review, typing offline (the offline line stays, never an empty list,
+and once back the library's rows in the list), the slots holding their height (at the largest text size too), a
+held album's row left before it opens, and covers loading once back online.
 
 ## 9. What only the phone can tell
 
@@ -551,6 +569,10 @@ and 2.1.23, offline, VoiceOver.
     for the session, and one that hasn't loaded them says "This album's pressings load once deadwax is back." (the
     phone's own words, question 5's shape) and loads them once it is; a cover not yet fetched is the empty cover
     (none kept on the phone). Words searched while away are asked of MusicBrainz as the pause would have asked them.
+    (Slice 2's review) Typed while away, the words draw nothing - "Search works once deadwax is back." stays, never
+    an empty list - since no late clock runs offline; once back, their library is asked with its clock and drawn in
+    the list. A cover that failed for want of deadwax asks once more as it comes back; one deadwax answered without
+    (a 404, the Archive away) keeps its minute.
 22. **How long the phone waits for MusicBrainz** (slice 2). *Recommend, and built*: 20 s for the albums - deadwax
     gives up in about eight seconds while MusicBrainz turns searches away (`SEARCH_PATIENCE`), which the contract
     test holds below it - and 60 s for an album's pressings (several of MusicBrainz's pages). A connection hanging

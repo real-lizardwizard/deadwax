@@ -7306,3 +7306,88 @@ Not verified - only the phone can tell (docs/ios.md's checks 130-139, beside the
 - VoiceOver's rows, the page's Pressing button and the picker's selected row; "Also found: 3 albums." announced.
 - Offline's filtering of MusicBrainz's rows, and the page staying as it was.
 - CI's Xcode 26.6 (the older Swift): the new code spells out its closures' types, as slice 1's.
+
+## Phase 5, slice 2, after its review (2026-11-14)
+
+The review of 2fc64f1 found three bugs in the app's wiring and one small one. All four are fixed in one commit on
+`phase5-search`. Core gains one rule (`SearchState.libraryUnplaced`) and a test; the rest is the app's. The app stays
+0.10 (10); no server change.
+
+### What was wrong, and the fix
+
+1. **Offline, new words went blank after a second and a half.** `settled()` armed the library's late clock with no
+   online check, and the clock drew when it ran out. In Airplane Mode, "portishead" drew moment 1 with `libraryLate`
+   set and an empty list (the offline filter takes MusicBrainz's part out). All then showed that blank DrawnList, not
+   "Search works once deadwax is back.". Short words did the same through the whole branch. Once deadwax was back,
+   `libraryLate` stayed set, so moment 2 left the person's own rows behind "Show N from your library". That undid
+   slice 1's check 128.
+   - **SearchModel**: `armLibraryLate()` returns while deadwax can't be reached, and the clock checks again before
+     `libraryLatePassed`, so a clock running out offline is dropped. Offline, `advance` then draws nothing, and the
+     offline line stands.
+   - **`resumed()` arms the late clock whenever it asks the library.** It asks again after a failure or a skip
+     (`state.resumed()`), or for the first time for words typed while away (`wantsLibrary`). It also arms the clock
+     when the library is still out with no place kept for it (Core's `libraryUnplaced`): an ask in flight whose clock
+     was dropped offline. The list is then drawn with the library, or a place for it, never without both.
+2. **Slots grew when their answer landed.** `SectionSlot` and `LibraryLateSlot` had a 44 pt minimum height. A
+   MusicBrainz failure (words over a button) or the library's FailureNote replaced a 44 pt asking line with 64-86 pt,
+   and the sections below jumped.
+   - **One fixed height, one row (the web's `.app-search-slot`)**:
+     - `SlotFrame` holds 60 pt (`--app-search-slot`, 44 + 2 x 8) through a `@ScaledMetric(relativeTo: .body)`, so it
+       holds at the accessibility sizes.
+     - Everything in a slot is one line ending in "…": the asking line (`SlotAsking`, the sweep and its words), a
+       Show button, its words, or a failure as one row (`SlotFailure`, the web's `is-row`). The failure's words fill
+       the row and Try again sits at its end, with none for words MusicBrainz refused.
+     - The library's failure says its listener's line (`ErrorWords.of(...).said`, the web's `late.message`). The raw
+       detail an admin sees in a FailureNote has no room in a slot, and the web's slot has none either.
+     - The all-failed foot and a kind view's foot are not slots, and keep MusicBrainzFailure.
+3. **The id bridge's answer opened on whatever was showing when it landed.** `open(_ group:)` pushed with
+   `navigation.open`, which appends to the current tab's stack, and only typing or a reset stood the ask down. While a
+   held album's row spun (up to 8 s a release), tapping another row or switching to Library got the album page pushed
+   over that page or into that tab.
+   - **The answer opens only on the list it was tapped on**: `open` captures the tab and the Search stack at the tap.
+     The answer opens only if both are unchanged and Now Playing isn't over them; otherwise it lets `opening` go and
+     drops the answer.
+   - **`standDown()`** (the web's, which lets its heldRequests go when the tab's root stops showing) cancels the ask.
+     SearchScreen calls it when the tab changes away from Search, when the Search stack changes (a page pushed or
+     popped), and when Now Playing opens.
+4. **Covers stayed empty after coming back online.** CoverImage's and ArchiveCover's `.task(id:)` keys held nothing
+   about reachability. A cover asked offline (short-circuited to the empty square) wasn't asked again until its key
+   changed, even though `CoverCache.reach` had cleared the failure.
+   - **The load's id adds `reachability.online`.** Reachability's `whenChanged` clears the failures before SwiftUI
+     restarts the tasks, so a cover on screen asks once more as deadwax comes back. What is drawn stays under the key
+     without it, so going offline never blanks a cover the view holds.
+   - **The 60 s memory of an answer is kept.** `reach` used to forget every failure. CoverCache now marks the ones
+     that were deadwax not reached (`unreached`): asked offline, or a transport failure (thrown by `archiveCover`, or
+     anything but `APIFailure.answered` from `cover`). It forgets only those. A 404, or the relay's 502 or 504, keeps
+     its minute. `forgetFailures()` (the app back to the front) still forgets all of them.
+
+### Tests
+
+- **SearchAlbumsTests** (+1, 17): `wordsTypedWhileDeadwaxIsAwayDrawNothingAndTheLibraryOnceBack`. Words typed with
+  nothing asked draw nothing. Once back, `resumed()` has nothing failed to ask again, but the words want the library
+  and have no place for it (`libraryUnplaced`). Asked and answered, the list is drawn with the library: no
+  `libraryLate`, no late slot, "In your library: …" said. The contrast: a clock run out while away draws the list
+  without the library, `libraryUnplaced` false (a place is kept), and the answer goes behind `.show(3)`.
+- **Mutations**: 3, each applied alone with SearchAlbumsTests run, all caught:
+  1. `libraryUnplaced` without its place clause;
+  2. without its settled clause;
+  3. always false.
+- The model's wiring (the online guards, the stand-down, the tab and stack check), the slots' frame and the covers'
+  ids have no test. They are the app's, untested off a phone, as every model and view is.
+
+### Verified, and not
+
+Verified, on the fixed tree before its commit:
+- `swift test`: Core 1469, Audio 158, Turntable 12.
+- The unsigned Debug and Release device builds: no warnings but the usual appintentsmetadataprocessor line; the
+  .xcodeproj unchanged.
+- `check_project.py` ok.
+- `npm run build` and all 85 sims on Node 22.23.4.
+- The full pytest suite: 4508 passed, 1 skipped.
+- The 3 mutations above.
+
+Not verified - only the phone can tell (docs/ios.md's checks 140-143):
+- Typing in Airplane Mode keeps the offline line, and the library's rows are drawn in the list once back.
+- The slots holding their height as their answer lands, at the largest text size too.
+- A held album's row left before its answer, by another tab or another row.
+- Covers loading in place once back online.

@@ -255,8 +255,13 @@ final class SearchModel {
     /// MusicBrainz for words its pause would have asked while deadwax was away (a failure of it keeps its Try again).
     func resumed() {
         guard !state.query.isEmpty, reachability.online else { return }
-        if navidromeAway == nil, state.resumed() { armLibraryLate() }
+        if navidromeAway == nil { state.resumed() }
+        // the library asked for the words now - again after a failure or a skip, or for the first time, typed while
+        // deadwax was away (no late clock ran then) - or still out with its clock let go offline: the late clock armed,
+        // as the pause's own ask has it
+        let asks = navidromeAway == nil && (state.wantsLibrary || state.libraryUnplaced)
         askLibrary()
+        if asks { armLibraryLate() }
         askKind()
         // MusicBrainz for words long enough to have been asked by the pause, had deadwax been there
         if !state.askedForQuery, SearchReading.asksMusicBrainzBySettling(state.query) {
@@ -267,7 +272,9 @@ final class SearchModel {
 
     /// A MusicBrainz album's row (Search.tsx `openAnyGroup`): one the library holds opens yours - Navidrome's album for
     /// a release of it you hold, asked of the id bridge in turn (the row busy meanwhile) - else, or Navidrome not having
-    /// it, or not answering, the album you don't have, which says it is held.
+    /// it, or not answering, the album you don't have, which says it is held. The answer opens only on the list it was
+    /// tapped on: the Search tab still shown, its pages as they were, Now Playing not over it - anything else (another
+    /// row opened, another tab, Now Playing) drops it (the web's standDown, which lets its heldRequests go).
     func open(_ group: ReleaseGroup) {
         askingHeld?.cancel()
         let releases = SearchAlbums.heldReleases(ownedIndex, group.id)
@@ -278,10 +285,14 @@ final class SearchModel {
         }
         opening = group.id
         let epoch = self.epoch
+        let tab = navigation.tab
+        let pages = navigation.search
         askingHeld = Task { [weak self] in
             let found = try? await client.navidromeAlbum(releases: releases)
             guard !Task.isCancelled, let self, epoch == self.epoch, self.opening == group.id else { return }
             self.opening = nil
+            let navigation = self.navigation
+            guard navigation.tab == tab, navigation.search == pages, !navigation.nowPlayingShown else { return }
             if let id = found {
                 // drawn with its credited artist, so the album page's artist line holds its place as it loads
                 let artist = Credits.name(group.artistCredit)
@@ -290,6 +301,14 @@ final class SearchModel {
                 self.navigation.open(.group(GroupRoute(group)))
             }
         }
+    }
+
+    /// The list a held album's row was tapped on stopped showing (another tab, a page pushed or popped, Now Playing):
+    /// the id bridge's ask let go, so its answer opens nothing on whatever shows now.
+    func standDown() {
+        askingHeld?.cancel()
+        askingHeld = nil
+        opening = nil
     }
 
     /// A new person: everything let go.
@@ -345,14 +364,16 @@ final class SearchModel {
     }
 
     /// The library settles by `libraryLateMs` from now, or the list is drawn as if it found nothing, a place kept at
-    /// its top for it.
+    /// its top for it. Only while deadwax can be reached - armed and run out: offline nothing is asked, so a list drawn
+    /// without the library would be blank (its MusicBrainz part left out) where "Search works once deadwax is back."
+    /// stands, and once back its answer would sit behind Show them. `resumed()` arms it as it asks.
     private func armLibraryLate() {
-        guard !state.query.isEmpty else { return }
+        guard !state.query.isEmpty, reachability.online else { return }
         lateClock?.cancel()
         let term = state.armingLibraryLate()
         lateClock = Task { [weak self] in
             try? await Task.sleep(nanoseconds: UInt64(SearchPacing.libraryLateMs) * 1_000_000)
-            guard !Task.isCancelled, let self else { return }
+            guard !Task.isCancelled, let self, self.reachability.online else { return }
             if self.state.libraryLatePassed(term) { self.draw() }
         }
     }
