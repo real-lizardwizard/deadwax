@@ -7,23 +7,94 @@ import Testing
 // write the web's very texts at every step (digested), the first 40 runs held whole - their queues, and each
 // snapshot read back as the web reads it. (2.1.18) A row's tap rolls back when it is History's, and every other run
 // brings older rows back (their starts carried, snapshot v2): each read back with how far it had got, Up Next the
-// same songs to come, holding the same starts.
+// same songs to come, holding the same starts. (the web's 2.1.22) A library's shuffle's list read back as the songs its
+// window names. (the web's 2.1.23) At every step, History's first row tapped and Previous: each one saved by its
+// position alone reads back from this step's snapshot as a full save of it would.
 
 @Suite struct ResumeRoundTripTests {
     static let position = 12.5
 
     /// What toSave's snapshot must read back as: the window of the queue, its account whole - (2.1.3) startedAt past
     /// the song playing's run, as an app before 2.1.3 saved it, lowered to the run; (2.1.18) how far it had got while
-    /// that is after the song playing and in the window, and the starts the window's marks carry (the marks whole).
+    /// that is after the song playing and in the window, and the starts the window's marks carry (the marks whole);
+    /// (the web's 2.1.22) a library's shuffle's list the songs the window's marks name (a copy its song's), in the
+    /// list's order, each place counted among those, and no `left`.
     static func wanted(_ queue: UpNextQueue, _ saving: Saving) -> UpNextQueue {
         let state = queue.upNext!
         let range = saving.start..<(saving.start + saving.ids.count)
         var run = queue.index
         while run > 0 && state.marks[run].from == .one { run -= 1 }
+        var marks = Array(state.marks[range])
+        var source = state.source
+        var left = state.left
+        if state.paged != nil {
+            let named = Set(marks.filter { $0.at >= 0 }.map(\.at)).sorted()
+            source = named.map { state.source[$0] }
+            marks = marks.map { mark -> Mark in
+                var placed = mark
+                if mark.at >= 0 { placed.at = named.firstIndex(of: mark.at)! }
+                return placed
+            }
+            left = []
+        }
         return UpNextQueue(tracks: Array(queue.tracks[range]), index: queue.index - saving.start, upNext: UpNextState(
-            id: state.id, marks: Array(state.marks[range]), source: state.source, shuffle: state.shuffle, nextKey: state.nextKey,
-            startedAt: min(max(0, state.startedAt - saving.start), run - saving.start), left: state.left, paged: state.paged,
+            id: state.id, marks: marks, source: source, shuffle: state.shuffle, nextKey: state.nextKey,
+            startedAt: min(max(0, state.startedAt - saving.start), run - saving.start), left: left, paged: state.paged,
             pagedRounds: state.pagedRounds, reached: keptReach(queue, saving)))
+    }
+
+    /// (the web's 2.1.23) The window's songs, as Navidrome hands them back: no level.
+    static func bareWindow(_ queue: UpNextQueue, _ saving: Saving) -> [QueueTrack] {
+        queue.tracks[saving.start..<(saving.start + saving.ids.count)].map { track -> QueueTrack in
+            var plain = track
+            plain.level = nil
+            return plain
+        }
+    }
+
+    /// (the web's 2.1.23) What a queue put back says: how far it had got, Up Next's songs to come, and what
+    /// restoreQueue keeps under each Repeat - Repeat All's time round shuffled by one seeded draw each, so two put-backs
+    /// are asked alike.
+    static func said(_ queue: UpNextQueue?, _ mode: Repeat) -> String? {
+        guard let queue else { return nil }
+        let view = upNextView(queue, mode, limit: Int.max)
+        let ahead = (view.added + (view.list?.rows ?? [])).map { "\($0.key):\($0.track.id)" }.joined(separator: ",")
+        let kept = Repeat.allCases.map { each -> String in
+            let random = Seeded(1)
+            let topped = toppedUp(withRepeat(queue, each), each, random: random.next)
+            return topped.tracks[topped.index...].map(\.id).joined(separator: " ")
+        }
+        return "\(queue.upNext?.reached.map(String.init) ?? "-") | \(ahead) | \(kept.joined(separator: " / "))"
+    }
+
+    /// (the web's 2.1.23) The moves at this step that leave the queue's account as it was - History's first row
+    /// tapped, Previous - and are so a song change alone, saved by its position: deadwax's record is then THIS step's
+    /// snapshot at the song moved to, which must read back as a full save of the move would (nil), or what differs.
+    /// `counts`: how many, and how many of them back before how far it had got. Nothing drawn.
+    static func positionSaves(_ queue: UpNextQueue, _ saving: Saving, _ mode: Repeat,
+                              _ counts: inout (only: Int, reach: Int)) -> String? {
+        let start = saving.start
+        let end = saving.start + saving.ids.count
+        var moves: [UpNextQueue] = []
+        if let first = upNextView(queue, mode).history.first, let tap = jumpedTo(queue, first.key, mode) { moves.append(tap.queue) }
+        if case .go(let index) = backward(queue, position: 0) { moves.append(wentBack(queue, index)) }
+        let baseline = SaveBaseline(tracks: queue.tracks, upNext: queue.upNext, index: queue.index, position: position,
+                                    start: start, count: end - start)
+        for moved in moves {
+            guard changedSince(baseline, moved, position: position) == .song, moved.index >= start, moved.index < end else { continue }
+            counts.only += 1
+            if let state = moved.upNext, let reached = state.reached,
+               let at = state.marks.firstIndex(where: { $0.key == reached }), at > moved.index {
+                counts.reach += 1
+            }
+            let asRecord = fromSnapshot(saving.snapshot, tracks: bareWindow(queue, saving), index: moved.index - start, setting: .auto)
+            let full = toSave(moved, position: position)
+            let asFull = fromSnapshot(full.snapshot, tracks: bareWindow(moved, full), index: full.index, setting: .auto)
+            let record = said(asRecord, mode)
+            let wanted = said(asFull, mode)
+            if record != wanted { return "a move saved by its position reads back as \(record ?? "nil") for \(wanted ?? "nil")" }
+        }
+        return nil
     }
 
     /// (2.1.18) How far the queue had got, as its snapshot keeps it: while that is after the song playing and in the
@@ -92,6 +163,8 @@ import Testing
         #expect(runs == 1000 && steps == 25 && digests.count == runs)
         var counts = (states: 0, behind: 0, paged: 0, left: 0, ones: 0, added: 0, shuffled: 0)
         var kept2118 = (reached: 0, starts: 0, v2: 0)
+        var pagedNamed = 0
+        var positions = (only: 0, reach: 0)
         var moves = Moves()
         var failures = 0
         var histories = 0
@@ -115,6 +188,10 @@ import Testing
                     kept2118.starts += 1
                 }
                 if let text = saving.snapshot, text.hasPrefix("{\"v\":2,") { kept2118.v2 += 1 }
+                if state.paged != nil {
+                    let window = state.marks[saving.start..<(saving.start + saving.ids.count)]
+                    if Set(window.filter { $0.at >= 0 }.map(\.at)).count < state.source.count { pagedNamed += 1 }
+                }
                 guard failures < 10 else { return }
                 if digest != wantedDigests[step].string {
                     failures += 1
@@ -136,6 +213,11 @@ import Testing
                     failures += 1
                     Issue.record("run \(run) step \(step): \(ahead)")
                 }
+                //? (the web's 2.1.23) ...and a move back saved by its position alone, read back from this snapshot
+                if let moved = Self.positionSaves(queue, saving, mode, &positions) {
+                    failures += 1
+                    Issue.record("run \(run) step \(step): \(moved)")
+                }
                 if run < kept.count / steps, let recorded = songs.queue(kept[run * steps + step]["queue"]),
                    let difference = queueDifference(queue, recorded) {
                     failures += 1
@@ -153,6 +235,8 @@ import Testing
                 "\(kept2118)")
         #expect(moves.rolled > 100 && moves.brought > 500 && kept2118.reached > 1000 && kept2118.starts > 1000, "\(moves) \(kept2118)")
         #expect(histories > 5_000, "\(histories) steps with a History")
+        #expect(pagedNamed == c["pagedNamed"]?.int && pagedNamed > 300, "\(pagedNamed) libraries' shuffles saved as fewer songs")
+        #expect(positions.only > 3000 && positions.reach == positions.only, "\(positions) moves saved by their position alone")
     }
 
     /// (2.1.18) How many of the round trip's taps rolled back, and how many brought older rows back.

@@ -37,7 +37,10 @@
  *                   broken or written otherwise (1.0, a key twice, pretty-printed, escapes) as the web reads them;
  *                   resumed() of every answer resume.sim gives it and more (as wire JSON, through shuffledTrack -
  *                   the real toQueueTrack); saveDue over a sweep of its clocks; the snapshot's cap in UTF-16 units,
- *                   from recipes rather than stored; and the constants the phone shares (the device id's letters,
+ *                   from recipes rather than stored; (2.1.22) a library's shuffle thousands of songs in, its list
+ *                   saved as the songs its window names, from recipes too; (2.1.23) gone back twice with a full
+ *                   save between while how far it had got played (resume.sim's probe), and deadwax's record - that
+ *                   save - read at the song tapped; and the constants the phone shares (the device id's letters,
  *                   the label, MARGIN_MS, OWED_ORDER, Object.prototype's names).
  *   roundtrip.json  every step of resume.sim.cjs's round trip, runs 0-39 whole: the queue, and the snapshot toSave
  *                   wrote for it - which the phone must write to the byte and read back as the web does; and all 500
@@ -1579,8 +1582,9 @@ function queueRecord(queue, songs, madeFrom = null) {
  * outside the window only, the first of each id, none named as Object.prototype's own (`id in extra`), the keys
  * JavaScript lists first (array indexes) first; `paged`, its `level` and `pagedRounds` left out when absent;
  * (2.1.18) `v` 2 whenever a reader before the roll-back would read it wrong (snapshotVersion), `reached` while it is
- * after the song playing in the window, and `starts` - [key, moments] for the window's marks that carry some - last,
- * each left out when there is none. Every
+ * in the window and (2.1.23) the song playing's unit or after it, and `starts` - [key, moments] for the window's marks
+ * that carry some - last, each left out when there is none; (2.1.22) a library's shuffle's `source` the songs the
+ * window's marks name, in the list's order, each mark's place renumbered to them, and its `left` empty. Every
  * snapshot recorded must be this text: a change of the form stops the export here rather than reaching the phone
  * as a mismatch.
  */
@@ -1590,9 +1594,18 @@ function referenceSnapshot(queue) {
   const { start, end } = R.windowOf(queue.tracks.length, queue.index)
   const entries = queue.tracks.slice(start, end)
   const inWindow = new Set(entries.map((t) => t.id))
+  let marks = state.marks.slice(start, end)
+  let source = state.source
+  let left = state.left
+  if (state.paged) {
+    const places = [...new Set(marks.filter((m) => m.at >= 0).map((m) => m.at))].sort((a, b) => a - b)
+    source = places.map((at) => state.source[at])
+    marks = marks.map((m) => (m.at >= 0 ? { ...m, at: places.indexOf(m.at) } : m))
+    left = []
+  }
   const order = []
   const kept = new Map()
-  for (const t of state.source) if (!inWindow.has(t.id) && !kept.has(t.id) && !PROTO.has(t.id)) { kept.set(t.id, t); order.push(t.id) }
+  for (const t of source) if (!inWindow.has(t.id) && !kept.has(t.id) && !PROTO.has(t.id)) { kept.set(t.id, t); order.push(t.id) }
   const isIndex = (key) => /^(0|[1-9][0-9]*)$/.test(key) && Number(key) <= 4294967294
   const keys = [...order.filter(isIndex).sort((a, b) => Number(a) - Number(b)), ...order.filter((key) => !isIndex(key))]
   const q = (value) => JSON.stringify(value)
@@ -1602,20 +1615,22 @@ function referenceSnapshot(queue) {
     `"suffix":${q(t.suffix)},"sampleRate":${q(t.sampleRate)},"bitDepth":${q(t.bitDepth)},"channels":${q(t.channels)}}`
   const paged = (p) => `{"token":${q(p.token)},"total":${q(p.total)},"fetched":${q(p.fetched)},"scope":${q(p.scope)}` +
     `${p.level !== undefined ? `,"level":${q(p.level)}` : ''}}`
-  const marks = state.marks.slice(start, end)
   const index = queue.index - start
-  const reachedAt = marks.findIndex((m) => m.key === state.reached)
+  let unit = index
+  while (unit > 0 && marks[unit].from === 'one') unit--
+  const found = marks.findIndex((m) => m.key === state.reached)
+  const reachedAt = found >= unit ? found : -1
   const starts = marks.filter((m) => m.starts?.length)
-  const v = reachedAt > index || starts.length ? 2 : marks.some((m, place) => place <= index && m.from === 'source') ? 1 : 2
+  const v = reachedAt >= 0 || starts.length ? 2 : marks.some((m, place) => place <= index && m.from === 'source') ? 1 : 2
   return `{"v":${v},"id":${q(state.id)},"levels":${q(entries.map(char).join(''))},` +
     `"marks":[${marks.map((m) => `[${m.key},"${FROM[m.from]}",${m.at},${m.pass}]`).join(',')}],` +
-    `"source":[${state.source.map((t) => q(t.id)).join(',')}],"sourceLevels":${q(state.source.map(char).join(''))},` +
+    `"source":[${source.map((t) => q(t.id)).join(',')}],"sourceLevels":${q(source.map(char).join(''))},` +
     `"extra":{${keys.map((key) => `${q(key)}:${song(kept.get(key))}`).join(',')}},` +
     `"shuffle":${q(state.shuffle)},"nextKey":${q(state.nextKey)},"startedAt":${q(Math.max(0, state.startedAt - start))},` +
-    `"left":[${state.left.map((gone) => `[${gone.pass},${gone.at}]`).join(',')}]` +
+    `"left":[${left.map((gone) => `[${gone.pass},${gone.at}]`).join(',')}]` +
     `${state.paged ? `,"paged":${paged(state.paged)}` : ''}` +
     `${state.pagedRounds ? `,"pagedRounds":[${state.pagedRounds.map((held) => `{"pass":${q(held.pass)},"paged":${paged(held.paged)}}`).join(',')}]` : ''}` +
-    `${reachedAt > index ? `,"reached":${q(state.reached)}` : ''}` +
+    `${reachedAt >= 0 ? `,"reached":${q(state.reached)}` : ''}` +
     `${starts.length ? `,"starts":[${starts.map((m) => `[${m.key},[${m.starts.map((at) => q(at)).join(',')}]]`).join(',')}]` : ''}}`
 }
 
@@ -1835,6 +1850,34 @@ saveCase('120 songs played at 100: 50 before, `extra` the 50 before them', atInd
   saveCase('(2.1.18) 60 songs played next, the 55th playing - no list song at or before it: v2', added60, 30)
 }
 
+// (2.1.23) gone back twice, a full save between while how far it had got played (resume.sim's probe - the iPhone
+// port's review's): the second tap a song change alone, saved by its position, so deadwax's record is the save
+// between at the song tapped - which carries the reach
+{
+  const on = (q) => U.toppedUp(atIndex(q, U.onward(q)), 'all')
+  let q = U.toppedUp(U.startUpNext(rAlbum(3, 'gb'), 0, false, undefined, undefined, QUEUE_ID), 'all')
+  for (let i = 0; i < 4; i++) q = on(q)
+  const first1 = q.upNext.marks[0].key
+  q = U.jumpedTo(q, first1, 'all').queue
+  for (let i = 0; i < 4; i++) q = on(q)
+  const played = U.withNext(q, [rTrack('gbx')])
+  const between = saveCase('(2.1.23) gone back, played on to how far it had got, a song played next: the reach written (v2)', played, 30)
+  const tapped = U.jumpedTo(played, first1, 'all').queue
+  const baseline = { tracks: played.tracks, upNext: played.upNext, index: played.index, position: 30, start: between.start, count: between.ids.length }
+  if (R.changedSince(baseline, tapped, 30) !== 'song' || !JSON.parse(between.snapshot).reached) throw new Error('the 2.1.23 probe no longer makes its case')
+  const tracks = played.tracks.slice(between.start, between.start + between.ids.length).map(bareTrack)
+  for (const setting of SETTINGS) {
+    fromCase(`(2.1.23) ...the first 1 tapped again, saved by its position: deadwax's record read at it (${setting})`, between.snapshot, tracks, tapped.index - between.start, setting)
+  }
+  saveCase('(2.1.23) ...the first 1 tapped again, saved in full', tapped, 0)
+  saveCase('(2.1.23) ...played on past how far it had got: left out', on(on(played)), 0)
+  //? the reach's song played again as a Repeat One copy: the unit's start is before it
+  let one = U.toppedUp(U.withRepeat(played, 'one'), 'one')
+  one = atIndex(one, one.index + 1)
+  if (one.upNext.marks[one.index].from !== 'one') throw new Error('the 2.1.23 copy case no longer plays a copy')
+  saveCase('(2.1.23) ...a copy of the song it had got to playing (Repeat One): the reach written', one, 0)
+}
+
 // toSave from recipes (too big to keep as queues): resume.sim.cjs:276 and :281, and the cap in UTF-16 units
 /** The queue a recipe makes - rebuilt the same way by the Swift test, under the same id (QUEUE_ID). */
 function fromRecipe(recipe) {
@@ -1871,6 +1914,52 @@ for (const unit of ['x', '😀']) {
   const over = recipeCase('...one unit more: left out', { ...base, pad: { id: 'cap-2400', unit, count, tail: tail + 1 } })
   if (kept.snapshot?.length !== R.RESUME_SNAPSHOT_MAX || over.snapshot !== null) throw new Error('the cap cases missed the cap')
 }
+
+// (2.1.22) a library's shuffle thousands of songs in (resume.sim's 2,000-songs-in checks), from recipes: its pages
+// fetched one after another, played to `index`, songs taken out before the window and songs played next - its
+// snapshot under the cap, the list the window's songs, `paged` kept; read back as the web reads it
+/** The library's shuffle a recipe makes - rebuilt the same way by the Swift test, under the same id. */
+function fromPagedRecipe(recipe) {
+  const page = (k) => rAlbum(recipe.page, `${recipe.prefix}${k}-`, { level: 'track' })
+  const paged = { token: recipe.token, total: recipe.page * recipe.pages + recipe.more, fetched: recipe.page, scope: 'yours', level: 'track' }
+  let queue = U.startUpNext(page(0), 0, false, undefined, paged, recipe.id)
+  for (let k = 1; k < recipe.pages; k++) queue = U.withMore(queue, recipe.token, page(k))
+  queue = atIndex(queue, recipe.index)
+  for (const at of recipe.without) queue = U.withoutKey(queue, queue.upNext.marks[at].key)
+  if (recipe.next) queue = U.withNext(queue, rAlbum(recipe.next, `${recipe.prefix}n`, { level: 'track' }))
+  if (recipe.repeat) queue = U.toppedUp(U.withRepeat(queue, recipe.repeat), recipe.repeat)
+  //? Repeat One's copies played one after another, so the window begins among them
+  for (let i = 0; i < recipe.copies; i++) queue = U.toppedUp(atIndex(queue, queue.index + 1), 'one')
+  return queue
+}
+function pagedCase(label, given) {
+  const recipe = { id: QUEUE_ID, prefix: 'lib', token: 'lib-order', page: 200, more: 0, without: [], next: 0, repeat: null, copies: 0, position: 0, ...given }
+  const queue = fromPagedRecipe(recipe)
+  const saving = saved(queue, recipe.position)
+  if (saving.snapshot === null) throw new Error(`${label}: over the cap - a library's shuffle must never be`)
+  const snapshot = JSON.parse(saving.snapshot)
+  const back = R.fromSnapshot(saving.snapshot, queue.tracks.slice(saving.start, saving.start + saving.ids.length).map(bareTrack), saving.index, 'auto')
+  if (!back?.upNext.paged) throw new Error(`${label}: not read back as a library's shuffle`)
+  resumeCases.push({
+    kind: 'toSavePaged', label, recipe,
+    saving: {
+      count: saving.ids.length, first: saving.ids[0], last: saving.ids[saving.ids.length - 1], index: saving.index, start: saving.start,
+      length: saving.snapshot.length, hash: unitHash(saving.snapshot), head: saving.snapshot.slice(0, 120),
+      queueSource: queue.upNext.source.length, source: snapshot.source.length, left: queue.upNext.left.length,
+    },
+    back: {
+      tracks: back.tracks.length, index: back.index, source: back.upNext.source.map((t) => t.id).join(' ') === snapshot.source.join(' '),
+      paged: pagedOf(back.upNext.paged), ahead: U.upNextView(back, recipe.repeat ?? 'off', Infinity).list?.rows.length ?? 0,
+    },
+  })
+  return saving
+}
+pagedCase('(2.1.22) a library\'s shuffle 2,200 songs in, 12 pages fetched: the window\'s songs alone, under the cap', { pages: 12, index: 2199, more: 1000 })
+pagedCase('(2.1.22) ...its whole order fetched, Repeat All', { pages: 12, index: 2199, repeat: 'all' })
+pagedCase('(2.1.22) ...songs taken out before the window, and three played next', { pages: 12, index: 2150, more: 400, without: [10, 900, 2099], next: 3 })
+pagedCase('(2.1.22) ...from its first song, 5,000 fetched: its next 2,000', { pages: 25, index: 0, position: 3 })
+pagedCase('(2.1.22) ...under Repeat One: the song playing\'s copies', { pages: 12, index: 2300, repeat: 'one', more: 200 })
+pagedCase('(2.1.22) ...60 of its copies played: the window begins among them, its song\'s own entry before it', { pages: 12, index: 2300, repeat: 'one', copies: 60 })
 
 // fromSnapshot: snapshots broken, or written another way than toSave writes them, as the web reads them
 {
@@ -2228,7 +2317,7 @@ const roundTrip = []
 const roundTripDigests = []
 const roundTripCounts = {
   states: 0, behind: 0, paged: 0, pagedRounds: 0, left: 0, ones: 0, added: 0, shuffled: 0, extra: 0,
-  rolled: 0, brought: 0, reachedKept: 0, startsKept: 0, v2: 0,
+  rolled: 0, brought: 0, reachedKept: 0, startsKept: 0, v2: 0, pagedNamed: 0,
 }
 //? resume.sim's `compared`: the steps compared before this one, in every run - the moments of the starts brought back
 let roundTripCompared = 0
@@ -2299,9 +2388,18 @@ for (let run = 0; run < ROUND_TRIP_RUNS; run++) {
     //? (2.1.3) startedAt past the song playing's run comes back lowered to it
     let unit = queue.index
     while (unit > 0 && was.marks[unit].from === 'one') unit--
+    //? (2.1.22) a library's shuffle: its list back as the songs the window's entries are (a copy its song's), in the
+    //? list's order, each place counted among those - and no `left`
+    const named = was.paged ? [...new Set(was.marks.slice(start, end).filter((m) => m.at >= 0).map((m) => m.at))].sort((a, b) => a - b) : null
+    if (named) {
+      roundTripCounts.pagedNamed += named.length < was.source.length ? 1 : 0
+      if (was.left.some((gone) => named.includes(gone.at))) throw new Error(`the round trip's run ${run} step ${step}: a library's shuffle took out a song the window names`)
+    }
     const wanted = {
-      id: was.id, tracks: queue.tracks.slice(start, end), index: queue.index - start, marks: was.marks.slice(start, end), source: was.source,
-      shuffle: was.shuffle, nextKey: was.nextKey, startedAt: Math.min(Math.max(0, was.startedAt - start), unit - start), left: was.left, paged: was.paged, pagedRounds: was.pagedRounds,
+      id: was.id, tracks: queue.tracks.slice(start, end), index: queue.index - start,
+      marks: was.marks.slice(start, end).map((m) => (named && m.at >= 0 ? { ...m, at: named.indexOf(m.at) } : m)),
+      source: named ? named.map((at) => was.source[at]) : was.source,
+      shuffle: was.shuffle, nextKey: was.nextKey, startedAt: Math.min(Math.max(0, was.startedAt - start), unit - start), left: named ? [] : was.left, paged: was.paged, pagedRounds: was.pagedRounds,
       reached,
     }
     const got = back && {

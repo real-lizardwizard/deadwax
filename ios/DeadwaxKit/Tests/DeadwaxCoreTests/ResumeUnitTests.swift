@@ -31,6 +31,57 @@ import Testing
         #expect(fromSnapshot(snapshot, tracks: queue.tracks, index: 1, setting: .off)?.tracks.allSatisfy { $0.level == nil } == true)
     }
 
+    /// (the web's 2.1.23; the iPhone port's review's probe) Gone back twice, a full save between while how far it had
+    /// got played: the second tap is a song change alone (changedSince), saved by its position, so deadwax's record is
+    /// the save between at the song tapped - which must put back what a full save would: under Repeat off
+    /// 1 2 3 1 2 x 3, the later time round's 1 and 2 moved back down kept (it read 1 2 3 x), and Up Next under Repeat
+    /// All drawing them. Played on past how far it had got, the reach is left out: a move back from there names a new
+    /// furthest, a change saved in full.
+    @Test func goneBackTwiceTheRecordKeepsHowFarItHadGot() throws {
+        let on = { (queue: UpNextQueue) -> UpNextQueue in toppedUp(queue.at(onward(queue)!), .all) }
+        var queue = toppedUp(startUpNext(rAlbum(3), start: 0, id: "probe-1"), .all)
+        for _ in 0..<4 { queue = on(queue) }
+        let first1 = try #require(queue.upNext?.marks[0].key)
+        let later2 = try #require(queue.upNext?.marks[4].key)
+        queue = try #require(jumpedTo(queue, first1, .all)).queue
+        for _ in 0..<4 { queue = on(queue) }
+        let played = withNext(queue, [rTrack("x")])
+        let between = toSave(played, position: 30)
+        let tapped = try #require(jumpedTo(played, first1, .all)).queue
+        #expect(played.current?.id == "2" && played.upNext?.reached == later2)
+        #expect(played.upNext?.marks[played.index].key == later2 && tapped.upNext?.reached == later2)
+        let baseline = SaveBaseline(tracks: played.tracks, upNext: played.upNext, index: played.index, position: 30,
+                                    start: between.start, count: between.ids.count)
+        #expect(changedSince(baseline, tapped, position: 30) == .song)
+        let snapshot = try #require(between.snapshot)
+        #expect(snapshot.hasPrefix(#"{"v":2,"#) && snapshot.contains(#""reached":\#(later2)"#))
+        let bare = { (queue: UpNextQueue, saving: Saving) in
+            queue.tracks[saving.start..<(saving.start + saving.ids.count)].map { track -> QueueTrack in
+                var plain = track
+                plain.level = nil
+                return plain
+            }
+        }
+        let record = try #require(fromSnapshot(snapshot, tracks: bare(played, between), index: tapped.index - between.start,
+                                               setting: .auto))
+        let full = toSave(tapped, position: 0)
+        let wholly = try #require(fromSnapshot(full.snapshot, tracks: bare(tapped, full), index: full.index, setting: .auto))
+        let under = { (queue: UpNextQueue, mode: Repeat) -> String in
+            let topped = toppedUp(withRepeat(queue, mode), mode)
+            return topped.tracks[topped.index...].map(\.id).joined(separator: " ")
+        }
+        #expect(record.upNext?.reached == later2)
+        #expect(under(record, .off) == "1 2 3 1 2 x 3" && under(wholly, .off) == "1 2 3 1 2 x 3")
+        #expect(under(record, .one) == under(wholly, .one))
+        let drawn = { (queue: UpNextQueue) -> String in
+            (upNextView(queue, .all, limit: Int.max).list?.rows ?? []).map(\.track.id).joined(separator: " ")
+        }
+        #expect(drawn(record) == "2 3 1 2 x 3" && drawn(wholly) == "2 3 1 2 x 3")
+        let past = on(on(played))
+        #expect(toSave(past, position: 0).snapshot?.contains(#""reached""#) == false)
+        #expect(try #require(jumpedTo(past, first1, .all)).queue.upNext != past.upNext)
+    }
+
     /// (app 0.8, the web's 2.1.15) The queue's `id` is written second and read back - the same queue on every device;
     /// a snapshot saved without one (the phone before 0.8, the web before 2.1.15) reads as the same queue under a new
     /// id - or the queue held's, when it is that queue - and is saved again with it.

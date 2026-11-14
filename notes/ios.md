@@ -6069,6 +6069,107 @@ Verified on the merged tree:
 Not verified: CI's Xcode 26.6, which has the older Swift. The new tests spell out their closures' types. Nothing has
 run on a phone: checks 85-101.
 
+## Main's 2.1.22 and 2.1.23 ported, and the going-back port's review (2026-11-14)
+
+Branch `paged-resume-ios`, from ios (893390b): the merge of main's 2.1.22 and 2.1.23 (49a83cb), then this. The app
+stays 0.9 (9); src/__init__.py is main's 2.1.23, untouched.
+
+**Why.** Two resume bugs the web and the phone share, both fixed on main first (notes/app.md "A library's shuffle saved
+however long it plays (2.1.22)", notes/play-history.md "Gone back twice: the reach saved while it plays (2.1.23)"):
+a library's shuffle some 750 songs in outgrew the snapshot's cap and came back a plain list whose feed asked no more;
+and a second roll-back, saved by its position alone after a full save made while the reach's song played, left
+deadwax's record without `reached`. The phone's own items from the review of the going-back port came with them.
+
+### The port (DeadwaxCore), to the web's rules exactly
+
+- **Resume.swift `savedList`** (2.1.22): a library's shuffle (`paged`) keeps the songs its window's marks name (a
+  copy's names its song's place), in the list's order, each mark's place renumbered to them, and `left` empty; any
+  other list whole. toSave writes `source`, `sourceLevels`, `extra` and `left` from it.
+- **toSave's reach** (2.1.23): `reached` is written while it names the song playing's own unit (walked back over
+  Repeat One's copies, inside the window) or a later one, and snapshotVersion follows it - v2. fromSnapshot is
+  unchanged.
+- **Where it differs**: the walk back stops at the window's end too (`unit < window.count`). The web's indexes the
+  mark without that guard and would throw on an index past the songs; neither ever saves one, so no snapshot differs.
+
+### The review's items
+
+- **HIGH, the reach** - the port above, and the reviewer's probe as a Core test
+  (`ResumeUnitTests.goneBackTwiceTheRecordKeepsHowFarItHadGot`): Repeat All, three songs, the second time round's 2
+  playing; the first 1 tapped; played on to that 2; Play Next x; the first 1 tapped again - a `.song` change; the save
+  between v2 with the reach; read at the song tapped it puts back 1 2 3 1 2 x 3 under Repeat off (it read 1 2 3 x), Up
+  Next under Repeat All drawing 2 3 1 2 x 3, as a full save of it would; played past the reach, left out. The reader
+  before 2.1.18 (the web's frozen one in resume.sim) puts a v2 back as the plain list; the phone has no frozen old
+  reader, and its readers before the roll-back's port took v1 alone.
+- **LOW, a 422 to a v2** (ResumeController `saveFull`): a deadwax before 2.1.18 refuses a v2 snapshot
+  (src/play_queue.py snapshot_problem took v 1 alone), and the phone tried again every 30 s for ever, keeping nothing.
+  Now a full save carrying v2 answered 422 is sent ONCE more, at once, with `snapshot: nil` - the songs, the one
+  playing and the second, which every server keeps; picked up there it is the plain list. A second refusal is the
+  failure it always was (failedAt, tried again 30 s on, in full with its v2 - one more pair). A v1's 422 is not sent
+  again. The web has no such path and needs none: a page is served by the deadwax it saves to, so it never meets an
+  older one. docs/ios.md says so in Up Next's going-back passage; James runs 2.1.21, so it is for others.
+- **Test gap, the held edit through a roll-back**: `QueueControllerTests.aChangeHeldThroughItIsMadeAfterIt` (an older
+  row's tap) and `aChangeHeldThroughAHistoryTapThatLetsCopiesGoIsMadeAfterIt` (History's row, Repeat One's copy let
+  go): Play Next with the next song scheduled is held, the tap plays afresh, and 9 comes right after the song tapped.
+  Replacing jump()'s back-path `runHeld()` with `heldEdit = nil` now fails both.
+- **Test gap, what the app hands the roll-back**: `PlayHistory.brought(plays, queue:, key:, setting:)` (and
+  `brought(rows:...)` over rows drawn) is the web's replayPast in Core - pastRows at Up Next's default limit, rowsFrom,
+  each song at `levelFor(setting, .songs)` (Off: as it was, as queued() leaves it), the floor History's first row's
+  key, else the song playing's. UpNextScreen's older row calls it with `player.queue` and `player.normalization`, and
+  `PlayerModel.rollBack` takes its `[Brought]` and floor as they are. The web's replayPast is a component's inline
+  handler, already held to its text by app-rules.sim (its regex at :2472) - so nothing changed on main for this.
+  export-history.cjs reads it from UpNext.tsx (stopping if its body isn't the one composed), hashes it into the
+  vectors (`replayPast`, which HistoryVectorTests pins), and makes its hand-over from the web's own parts: 48 `brought`
+  cases over rows given whole (a song's own level among them, every setting, a key no row has, a queue with History,
+  one without, a plain queue), and a field on every line of the 300-run property - the middle drawn row tapped, at a
+  setting by turns.
+- **Type-check time** (UpNextPropertyTests' older-row check): its one ternary of && chains and its `||` with an
+  inferred `contains` closure are split into named parts, the closure's types spelt out; the length test still
+  guards the indexes. Measured afterwards with `-warn-long-expression-type-checking=100` (this Mac's Swift, a
+  build of DeadwaxKit and its tests on a scratch path of its own): nothing in a file this touches reaches 100 ms. The
+  only expressions over it are the EQ tests' - EQRenderTests.swift:287, :311 (451 ms) and :361, EQBankTests.swift:129
+  (418 ms), StreamCacheAndHeardEstimateTests.swift:74 - left as they are (not this work's; CI's older Swift is
+  slower, so they are the first to look at if it gives up on one).
+
+### Fixtures and exporters
+
+- **export-traces.cjs**: referenceSnapshot compacts a library's shuffle and writes the reach by the unit rule; the
+  round trip's expectation compacts too, refuses a library's shuffle that took out a song its window names, and
+  counts `pagedNamed` (1,887 of 5,000); `toSavePaged`, 6 recipes of a library's shuffle thousands of songs in (2,200
+  in, its order whole under Repeat All, songs taken out before the window and three played next, from its first song
+  5,000 fetched, Repeat One's copies, 60 copies played so the window begins among them) - the snapshot's length,
+  hash and head, the queue's list and `left`, and what reads back (its feed, Up Next's rows); the 2.1.23 probe as 4
+  toSave cases (the save between, the tap saved in full, played past, a copy of the reach's song playing) and its
+  record read at the song tapped under all four settings.
+  - Sizes: resume/cases.json 1.43 MB (1.40), roundtrip.json 1.26 MB (1.30 - a library's shuffle's snapshots smaller).
+- **export-history.cjs**: lib/loudness.ts compiled too (levelled); `replayPast`, `brought` and the lines' hand-over
+  field. history/vectors.json 532 KB (519).
+
+### Tests
+
+- **ResumeRoundTripTests**: `wanted` compacts a library's shuffle; `pagedNamed` equal to the web's and over 300; and
+  at every step `positionSaves` - History's first row tapped and Previous, each move changedSince calls `.song` read
+  back from this step's snapshot as a full save of it would (the reach, Up Next's songs to come, what each Repeat keeps,
+  All's round shuffled by one seeded draw each), over 3,000 of them and every one back before the reach.
+- **ResumeCaseTests**: `librariesShufflesThousandsOfSongsIn` rebuilds the recipes (`pagedQueue`); the counts (33
+  toSave, 327 fromSnapshot, 49 given a new id).
+- **ResumeUnitTests**, **ResumeControllerTests** (`aV2SnapshotRefusedIsSentOnceMoreWithoutIt`),
+  **QueueControllerTests**, **HistoryVectorTests** (`whatAnOlderRowsTapHandsTheRollBack`, the property's lines): above.
+- **Mutations**, 12, each run alone over the filtered suites, all caught: the reach by 2.1.18's rule, by the song
+  playing alone (not its unit), written whenever in the window, the version not following it; a library's shuffle's
+  list kept whole, its `left` kept, its places in the order met, a copy's place not named (a crash: the place it names
+  isn't kept); the 422 not sent again, sent again however often refused, a v1 sent again; jump()'s back path dropping
+  the change held.
+
+### Verified, and not
+
+- Verified: `swift test` (DeadwaxKit, every target: 1,298 tests and 12), the unsigned Release device build (Xcode
+  27.2 here), ios/scripts/check_project.py, all 81 sims on Node 22, pytest's ios files and test_source_bytes.py (170
+  passed, 1 skipped), the mutations, the type-check times above; on main, resume.sim's own probe and property, all
+  sims, the build and pytest 4224.
+- Not verified: CI's Xcode 26.6; a server before 2.1.18 answering a real phone (the 422 path is the fake server's);
+  the app's call of PlayHistory.brought is compiled, not tested - it is checks 85-91 in docs/ios.md; a long library
+  shuffle put back on the phone by hand.
+
 ## Phase 4, slice 4: Artists (2026-11-14)
 
 notes/ios-specs/phase4-library.md 2.6, 3.1 and 6.4, and question 4 (6.10 points here): Artists joins the Library's
@@ -6295,6 +6396,16 @@ Verified on the fixes' commit:
 - The unsigned Debug and Release device builds: no warnings.
 - `check_project.py` ok.
 - The 11 mutants.
+
+Verified on its merge with `ios` at 3a2ae53 (main's 2.1.22-2.1.23 and their port, check 97's words). That merge
+conflicted only here, at the end, where both had added; ios's section stands first.
+- `swift test`: Core 1380, Audio 158, Turntable 12. Its warnings are all in test files slice 4 doesn't touch:
+  - the Audio tests' redundant `#require`s and DeckReviewTests' `wait`;
+  - ios's PlayHistoryTests (`record`'s result unused) and ResumeCaseTests (a redundant `#require`).
+- The unsigned Debug and Release device builds: no warnings.
+- `check_project.py` ok.
+- `npm run build` and all 82 sims on Node 22.23.4.
+- The full pytest: 4378 passed, 1 skipped.
 
 Not verified - on the phone (docs/ios.md's checks 106, 108 and 110 now ask for each): the reopened artist's line,
 the grey line in Airplane Mode, the collaboration's name offline. Fix 2 needs a first sign-in with deadwax's album

@@ -324,6 +324,32 @@ public enum PlayHistory {
         return Array(rows[at...])
     }
 
+    /// (the web's 2.1.18 replayPast, app/UpNext.tsx; review of the port) What an older row's tap hands the roll-back
+    /// (QueueController.rollBack): the rows Up Next draws above History (pastRows, its default limit) from the one
+    /// tapped down (rowsFrom), each song queued at the setting's level for a song (levelFor(setting, .songs) - under
+    /// Off, as it was, as queued() leaves it), with its starts and its entry; and `floor`, the first entry Up Next draws
+    /// for the queue now - History's first row, else the song playing's - which the rows were read against. No rows for
+    /// a key not among them. Pure, so the hand-over is held to the web's by export-history.cjs's vectors, which compose
+    /// replayPast from the web's own parts and hash its text.
+    public static func brought(_ plays: [Played], queue: UpNextQueue, key: String,
+                               setting: Normalization) -> (rows: [Brought], floor: Int?) {
+        brought(rows: pastRows(plays, queue: queue), queue: queue, key: key, setting: setting)
+    }
+
+    /// brought(_:queue:key:setting:) over the rows Up Next drew (`past`).
+    public static func brought(rows past: [PastRow], queue: UpNextQueue, key: String,
+                               setting: Normalization) -> (rows: [Brought], floor: Int?) {
+        let level = levelFor(setting, .songs)
+        let rows = rowsFrom(past, key).map { row -> Brought in
+            var song = row.track
+            if let level { song.level = level }
+            return Brought(track: song, starts: row.starts, entry: row.entry)
+        }
+        var floor = historyRows(queue).first?.key
+        if floor == nil, let marks = queue.upNext?.marks, marks.indices.contains(queue.index) { floor = marks[queue.index].key }
+        return (rows, floor)
+    }
+
     /// Whether `a` comes after `b` in deadwax's order - its moment, then its song id (the page's ORDER BY).
     static func after(_ a: Played, _ b: Played) -> Bool {
         a.at > b.at || (a.at == b.at && b.song.id.utf16.lexicographicallyPrecedes(a.song.id.utf16))
