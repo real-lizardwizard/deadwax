@@ -450,19 +450,30 @@ import Testing
         guard let state = queue.upNext else { return "" }
         let char: (MarkFrom) -> String = { $0 == .source ? "s" : $0 == .added ? "a" : "o" }
         let level: (Level?) -> String = { $0 == .album ? "a" : $0 == .track ? "t" : "-" }
-        let line = [
+        //? each part on its own, its type spelled out: as one array literal CI's Xcode 26.6 gave up type-checking it
+        let marks: String = state.marks.map { (mark: Mark) -> String in
+            "\(mark.key)\(char(mark.from))\(mark.at)/\(mark.pass)"
+        }.joined(separator: ",")
+        let left: String = state.left.map { (each: LeftOut) -> String in "\(each.pass)/\(each.at)" }
+            .joined(separator: ",")
+        let reached: String = state.reached.map { (at: Int) -> String in String(at) } ?? ""
+        let starts: String = state.marks.compactMap { (mark: Mark) -> String? in
+            guard let each = mark.starts else { return nil }
+            return "\(mark.key):\(each.map { (moment: Int64) -> String in String(moment) }.joined(separator: "."))"
+        }.joined(separator: ",")
+        let levels: String = queue.tracks.map { (track: QueueTrack) -> String in level(track.level) }.joined()
+        let parts: [String] = [
             "\(queue.index)",
             queue.ids.joined(separator: ","),
-            state.marks.map { "\($0.key)\(char($0.from))\($0.at)/\($0.pass)" }.joined(separator: ","),
-            state.source.map(\.id).joined(separator: ","),
+            marks,
+            state.source.map { (song: QueueTrack) -> String in song.id }.joined(separator: ","),
             "\(state.shuffle ? 1 : 0),\(state.nextKey),\(state.startedAt)",
-            state.left.map { "\($0.pass)/\($0.at)" }.joined(separator: ","),
-            state.reached.map(String.init) ?? "",
-            state.marks.compactMap { mark -> String? in
-                mark.starts.map { "\(mark.key):\($0.map(String.init).joined(separator: "."))" }
-            }.joined(separator: ","),
-            queue.tracks.map { level($0.level) }.joined(),
-        ].joined(separator: ";")
+            left,
+            reached,
+            starts,
+            levels,
+        ]
+        let line = parts.joined(separator: ";")
         var hash: UInt32 = 0x811c_9dc5
         for byte in line.utf8 {
             hash = (hash ^ UInt32(byte)) &* 0x0100_0193
