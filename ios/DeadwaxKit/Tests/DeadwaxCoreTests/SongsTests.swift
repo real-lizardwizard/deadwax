@@ -87,7 +87,7 @@ import Testing
         paging.answered(first, Self.songs(0..<100))
         let found = paging.start("roads")
         #expect(paging.items.isEmpty && !paging.stale && found.offset == 0 && found.query == "roads")
-        #expect(SongsBody.of(paging, online: true, typed: "roads") == .loading)
+        #expect(SongsBody.of(paging, online: true) == .loading)
     }
 
     @Test func theSameQueryAgainKeepsTheListDrawnUntilItsFirstPage() throws {
@@ -115,7 +115,7 @@ import Testing
         paging.failed(again)
         #expect(paging.items.count == 40 && paging.stale && paging.failing)
         #expect(SongsFoot.of(paging, online: true) == .couldntRefresh)
-        #expect(SongsBody.of(paging, online: true, typed: "") == .songs)
+        #expect(SongsBody.of(paging, online: true) == .songs)
         let retried = try Self.some(paging.retry())
         #expect(retried.offset == 0, "Try again asks the first page again")
         paging.answered(retried, Self.songs(0..<41))
@@ -141,28 +141,80 @@ import Testing
 
     // MARK: what the page draws
 
+    @Test func deadwaxBackPicksUpWhereTheReaderGotTo() throws {
+        var paging = SongsPaging()
+        var reach = SongsReach()
+        #expect(!reach.wantsMore(paging), "nothing drawn, nothing appeared")
+        let first = paging.start("")
+        paging.answered(first, Self.songs(0..<100))
+        // offline: the rows to the end appear, asking nothing (SongsModel asks only while deadwax can be reached)
+        for index in 60..<100 { reach.appeared(index, in: paging) }
+        #expect(reach.furthest == 99)
+        #expect(reach.wantsMore(paging), "back: the reader is at the end")
+        let next = try Self.some(paging.more())
+        #expect(next.offset == 100)
+        // a row past the list counts for nothing, and the furthest stays the furthest
+        reach.appeared(500, in: paging)
+        reach.appeared(-1, in: paging)
+        reach.appeared(10, in: paging)
+        #expect(reach.furthest == 99)
+        paging.answered(next, Self.songs(100..<200))
+        #expect(!reach.wantsMore(paging), "99 of 200: not near the end")
+        // only near the end: row 40 of 100 wants nothing more, row 75 (25 from the end) does
+        var short = SongsPaging()
+        var near = SongsReach()
+        let page = short.start("")
+        short.answered(page, Self.songs(0..<100))
+        near.appeared(40, in: short)
+        #expect(!near.wantsMore(short))
+        near.appeared(75, in: short)
+        #expect(near.wantsMore(short), "25 from the end")
+        // another list drawn - another query, or a first page in place of the old - forgets the old list's rows
+        _ = short.start("roads")
+        #expect(!near.wantsMore(short))
+        var refreshed = SongsPaging()
+        var seen = SongsReach()
+        let one = refreshed.start("")
+        refreshed.answered(one, Self.songs(0..<100))
+        seen.appeared(99, in: refreshed)
+        let again = refreshed.start("")
+        #expect(seen.wantsMore(refreshed), "a refresh's old list still drawn: the reader is still at its end")
+        let over = refreshed.more()
+        #expect(over == nil, "...though nothing more is asked over it")
+        refreshed.answered(again, Self.songs(0..<100))
+        #expect(!seen.wantsMore(refreshed), "its first page in its place: back at the top")
+        seen.appeared(80, in: refreshed)
+        #expect(seen.furthest == 80 && seen.wantsMore(refreshed), "the new list's own rows")
+    }
+
     @Test func whatSongsDraws() throws {
         var paging = SongsPaging()
-        #expect(SongsBody.of(paging, online: true, typed: "") == .loading, "nothing asked yet")
-        #expect(SongsBody.of(paging, online: false, typed: "") == .offline)
+        #expect(SongsBody.of(paging, online: true) == .loading, "nothing asked yet")
+        #expect(SongsBody.of(paging, online: false) == .offline)
         let first = paging.start("")
-        #expect(SongsBody.of(paging, online: true, typed: "") == .loading)
+        #expect(SongsBody.of(paging, online: true) == .loading)
         paging.failed(first)
-        #expect(SongsBody.of(paging, online: true, typed: "") == .failed)
-        #expect(SongsBody.of(paging, online: false, typed: "") == .offline, "out of reach says so, not the error")
+        #expect(SongsBody.of(paging, online: true) == .failed)
+        #expect(SongsBody.of(paging, online: false) == .offline, "out of reach says so, not the error")
         let again = try Self.some(paging.retry())
         paging.answered(again, [])
-        #expect(SongsBody.of(paging, online: true, typed: "") == .empty("No songs yet."))
-        #expect(SongsBody.of(paging, online: false, typed: "") == .empty("No songs yet."), "an answer in hand stands")
+        #expect(SongsBody.of(paging, online: true) == .empty("No songs yet."))
+        #expect(SongsBody.of(paging, online: false) == .empty("No songs yet."), "an answer in hand stands")
         var found = SongsPaging()
         let ask = found.start("dumy")
         found.answered(ask, [])
-        #expect(SongsBody.of(found, online: true, typed: " dumy ") == .empty("No songs match \u{201C}dumy\u{201D}."))
+        #expect(SongsBody.of(found, online: true) == .empty("No songs match \u{201C}dumy\u{201D}."))
+        // the words are what was searched, not what Find holds now: typed on ("dumyq", the pause before it is asked, or
+        // offline, when it isn't), the list drawn is still "dumy"'s, and says so
+        #expect(SongsBody.of(found, online: false) == .empty("No songs match \u{201C}dumy\u{201D}."))
+        // Find cleared: every song asked - the spinner, never "No songs yet." for a frame
+        _ = found.start(SongsList.query(""))
+        #expect(SongsBody.of(found, online: true) == .loading)
         var some = SongsPaging()
         let page = some.start("")
         some.answered(page, Self.songs(0..<3))
-        #expect(SongsBody.of(some, online: true, typed: "") == .songs)
-        #expect(SongsBody.of(some, online: false, typed: "") == .songs, "songs in hand drawn offline (question 34)")
+        #expect(SongsBody.of(some, online: true) == .songs)
+        #expect(SongsBody.of(some, online: false) == .songs, "songs in hand drawn offline (question 34)")
         #expect(SongsFoot.of(some, online: true) == .nothing)
     }
 

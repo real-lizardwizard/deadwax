@@ -2,15 +2,16 @@ import Foundation
 import Testing
 @testable import DeadwaxCore
 
-/// Fixtures/shuffle/shuffle-vectors.json: what the web's TypeScript answers - app/useShuffleFeed.ts driven as the hook
-/// it is, app/usePaged.ts's appendPage, Songs' words - written by ios/scripts/export-shuffle-vectors.cjs, never by hand,
-/// and the shapes it is read into.
+/// Fixtures/shuffle/shuffle-vectors.json: what the web's TypeScript answers - app/useShuffleFeed.ts and app/usePaged.ts
+/// driven as the hooks they are, usePaged's appendPage, Songs' words - written by ios/scripts/export-shuffle-vectors.cjs,
+/// never by hand, and the shapes it is read into.
 enum ShuffleVectors {
     struct Vectors: Decodable {
         let words: Words
         let elsewhere: [Elsewhere]
         let ahead: [Ahead]
         let runs: [Run]
+        let paged: [PagedRun]
         let append: [Append]
     }
 
@@ -83,6 +84,51 @@ enum ShuffleVectors {
     }
 
     struct Append: Decodable { let shown, page, out: [String] }
+
+    /// A page usePaged asked for: [key, offset].
+    struct PagedAsk: Decodable, Equatable, CustomStringConvertible {
+        let key: String
+        let offset: Int
+        init(key: String, offset: Int) {
+            self.key = key
+            self.offset = offset
+        }
+        init(from decoder: Decoder) throws {
+            var row = try decoder.unkeyedContainer()
+            key = try row.decode(String.self)
+            offset = try row.decode(Int.self)
+        }
+        var description: String { "[\"\(key)\", \(offset)]" }
+    }
+
+    /// What usePaged did after a step: the pages it asked, what it draws (its count, first and last, and FNV-1a over
+    /// every id joined with commas), and loading, done and the error shown.
+    struct PagedThen: Decodable {
+        let asks: [PagedAsk]
+        let count: Int
+        let first: String?
+        let last: String?
+        let digest: UInt32
+        let loading, done, failing: Bool
+    }
+
+    struct PagedStep: Decodable {
+        let op: String
+        let ask: Int?
+        let to: String?
+        let list: String?
+        let id: String?
+        let at: Int?
+        let then: PagedThen
+    }
+
+    /// One run of Songs' paging: the lists (each key's total), the key it starts on, its steps.
+    struct PagedRun: Decodable {
+        let name: String
+        let key: String
+        let lists: [String: Int]
+        let steps: [PagedStep]
+    }
 
     static func load() throws -> Vectors {
         try JSONDecoder().decode(Vectors.self, from: Fixtures.data("shuffle/shuffle-vectors.json"))
@@ -167,6 +213,89 @@ private final class Draws {
             }
             #expect(ShuffleFeed.songsAhead(queue) == each.ahead, "\(each.how)")
         }
+    }
+
+    /// Every run of usePaged, replayed through SongsPaging as SongsModel drives it: the end of the list coming near is
+    /// `more()` (a row 25 from the end appearing, on the phone), Try again `retry()`, another key `start(_:)`, a page
+    /// answered with that key's list as it is then - and the pages asked, what is drawn, loading, done and failing, each
+    /// the web's. A page that wouldn't come, then the end coming near, is the one place the two part (question 36):
+    /// no run has it.
+    @Test func songsPageAsTheWebsUsePagedPages() throws {
+        let runs = try ShuffleVectors.load().paged
+        #expect(runs.count > 40)
+        var answered = 0, repeated = 0, failed = 0, finished = 0, keys = 0
+        for run in runs {
+            var lists: [String: [String]] = [:]
+            for (list, total) in run.lists {
+                let name = list.isEmpty ? "all" : list
+                lists[list] = (0..<total).map { (n: Int) -> String in "\(name).\(n + 1)" }
+            }
+            var paging = SongsPaging()
+            var asks: [SongsPaging.Ask] = []
+            steps: for (n, step) in run.steps.enumerated() {
+                let at = "\(run.name), step \(n) (\(step.op))"
+                var made: [SongsPaging.Ask] = []
+                // an ask the web made and the phone didn't: the run has parted already (said at that step)
+                if let number = step.ask, number >= asks.count {
+                    Issue.record("\(at): the web's ask \(number), of the \(asks.count) the phone made")
+                    break steps
+                }
+                switch step.op {
+                case "begin":
+                    made.append(paging.start(run.key))
+                case "near":
+                    if let ask = paging.more() { made.append(ask) }
+                case "answer":
+                    let ask = asks[try #require(step.ask)]
+                    let list = lists[ask.query] ?? []
+                    let end = min(list.count, ask.offset + SongsPaging.pageSize)
+                    let page = ask.offset < end ? Array(list[ask.offset..<end]) : []
+                    let before = paging.items.count
+                    paging.answered(ask, page.map(Self.song))
+                    answered += 1
+                    if paging.isNewest(ask), ask.offset > 0, paging.items.count - before < page.count { repeated += 1 }
+                case "fail":
+                    paging.failed(asks[try #require(step.ask)])
+                case "retry":
+                    if let ask = paging.retry() { made.append(ask) }
+                case "key":
+                    made.append(paging.start(try #require(step.to)))
+                    keys += 1
+                case "shift":
+                    let list = try #require(step.list)
+                    lists[list, default: []].insert(try #require(step.id), at: 0)
+                case "remove":
+                    let list = try #require(step.list)
+                    let place = try #require(step.at)
+                    lists[list, default: []].remove(at: place)
+                default:
+                    Issue.record("\(at): no such step")
+                }
+                asks += made
+                let asked = made.map { (ask: SongsPaging.Ask) -> ShuffleVectors.PagedAsk in
+                    ShuffleVectors.PagedAsk(key: ask.query, offset: ask.offset)
+                }
+                #expect(asked == step.then.asks, "\(at): the pages asked")
+                let ids = paging.items.map { (song: Song) -> String in song.id }
+                #expect(ids.count == step.then.count && ids.first == step.then.first && ids.last == step.then.last,
+                        "\(at): what is drawn")
+                #expect(Self.digest(ids) == step.then.digest, "\(at): every id drawn")
+                #expect(paging.loading == step.then.loading && paging.done == step.then.done
+                        && paging.failing == step.then.failing, "\(at): loading, done, failing")
+                if step.then.failing { failed += 1 }
+                if step.then.done { finished += 1 }
+            }
+        }
+        // the runs reach every way the paging can go
+        #expect(answered > 300 && repeated > 5 && failed > 40 && finished > 200 && keys > 100,
+                "\(answered) \(repeated) \(failed) \(finished) \(keys)")
+    }
+
+    /// FNV-1a (32 bits) over the ids joined with commas, as the exporter's digest().
+    private static func digest(_ ids: [String]) -> UInt32 {
+        var hash: UInt32 = 2_166_136_261
+        for byte in ids.joined(separator: ",").utf8 { hash = (hash ^ UInt32(byte)) &* 16_777_619 }
+        return hash
     }
 
     @Test func appendedIsTheWebsAppendPage() throws {

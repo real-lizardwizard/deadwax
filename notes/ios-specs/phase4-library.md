@@ -493,7 +493,11 @@ each with its seed and how many draws it made), `songsAhead` over queues lib/upN
 and 60 runs of the hook itself (12 of shuffle.sim.cjs's own cases scripted, 48 seeded; 3,477 steps, each with the asks
 made, the songs handed to the player, the notice, the queue after) - which ShuffleVectorTests replays through
 ShuffleFeedRun and Up Next's Swift functions. `ui/test/iosshuffle.sim.cjs` runs it with `--check`. Where the two
-depart, question 41.
+depart, question 41. Since slice 5's review it drives usePaged too, as SongsView renders it (slice 5 had used only its
+`appendPage`): 49 runs, 9 of its own cases scripted and 40 seeded (1,904 steps: the end of the list coming near, a
+page answered or failed, Try again, another key, a song added at the front or removed), each with the pages asked and
+what is drawn (its count, first and last, and a digest of every id), loading, done and the error - replayed through
+SongsPaging. Where those two depart, question 36.
 
 ## 6. The slices
 
@@ -965,12 +969,17 @@ docs/ios.md's "The Library's switch's checks (92-101)" holds them as James reads
     Songs asks Navidrome's own search (search3, `q` what is typed, trimmed), paged as the list is, once typing pauses
     for 350 ms - one ask for a word, not one a letter; "Find in songs" and "No songs match “…”." (the other pages'
     sentence). Clearing Find brings every song back from the top. What Navidrome finds for the words is its own
-    matching, not the other pages' folding (the phone's to say, section 9).
+    matching, not the other pages' folding (the phone's to say, section 9). Since the review, the no-match line names
+    what was searched, not what Find holds now - so it doesn't name words typed but not yet asked (the pause, or
+    offline), and clearing Find shows the spinner, not "No songs yet.", until every song is in.
 34. **Songs while deadwax can't be reached** (slice 5). *Recommend, and built*: nothing is asked; the songs in hand
     stay drawn, those not on this phone dimmed and opening nothing (an artist's rows' rule), with no more pages and no
     spinner at the end; with none in hand, "Songs show here once deadwax is back." (the phone's own). The list isn't
     kept on disk: it is the whole collection, and the songs on the phone are Downloaded's. With a library of your own
-    All songs can't be opened offline (All music goes from the •••, question 19); one open already stays.
+    All songs can't be opened offline (All music goes from the •••, question 19); one open already stays. Since the
+    review, when deadwax is back the paging picks up from the furthest row that appeared (Core's SongsReach): a reader
+    sitting at the end saw their last rows appear offline, asking nothing, and they won't appear again until scrolled
+    away and back. The refresh banner's Try again, offline, asks whether deadwax is back, as the page's others do.
 35. **The list kept while the app runs** (slice 5). The web's SongsView asks its first page again each time it is
     drawn. *Recommend, and built*: one list per person (SongsModel), drawn again where it was - asking the first
     page again on every show would cut a long list back to 100 under the reader, and back from an album the place in
@@ -980,7 +989,8 @@ docs/ios.md's "The Library's switch's checks (92-101)" holds them as James reads
 36. **A page that won't come** (slice 5). *Recommend, and built*: the songs drawn stay, the foot says why with Try
     again, and nothing more is asked until Try again (the web's sentinel asks again too if it leaves the screen and
     comes back - a retry nobody chose); a refresh that fails says so at the top (the albums' RefreshProblemNote) over
-    the list as it was. The count line shows once every page is in, as the web's.
+    the list as it was. The count line shows once every page is in, as the web's. It is the one place SongsPaging and the
+    web's usePaged part, so no run of the fixture comes near the end while a page has failed (5.2).
 37. **All songs' Shuffle** (slice 5). The web's All songs has ShuffleSongs.tsx's button at its head, of the store's
     scope. *Recommend, and built*: the same, as the secondary pill (question 25): asked ahead as All songs shows (again
     after 10 minutes, back in front, deadwax back), "Getting ready…" dimmed until its page is in, and when that failed

@@ -12,10 +12,13 @@ import Observation
 ///   another query (question 33: Find on Songs asks Navidrome's own search), nothing in hand yet, or what is in hand
 ///   failed with nothing drawn. The list in hand stays as it is otherwise, its place in it kept: asking page 1 again
 ///   each time Songs shows would cut a long list back to 100 songs under the reader.
-/// - `near` as a row near the end of what is drawn appears: the next page (one at a time, none after a failure -
-///   Try again asks that one, `retry`).
+/// - `appeared` as a row appears: how far the reader got kept (Core's SongsReach, outside what is observed, so a row
+///   appearing redraws nothing), and - while deadwax can be reached - the next page when the row is near the end of
+///   what is drawn (one at a time, none after a failure - Try again asks that one, `retry`).
+/// - `resumed` when deadwax is back: the next page, when the reader got near the end while it couldn't be reached -
+///   those rows asked nothing as they appeared, and won't appear again until scrolled away and back.
 /// - `refresh` (the •••'s Refresh, a pushed list's pull): the first page asked again, the list drawn kept until it lands
-///   in its place (SongsPaging's `stale`).
+///   in its place (SongsPaging's `stale`) - its ask handed back, for a pull to wait on.
 ///
 /// Only the newest ask's answer counts (SongsPaging, latestOnly); a list let go has its ask cancelled. `reset()` - a new
 /// person - drops everything, and nothing asked before it lands after it.
@@ -33,6 +36,8 @@ final class SongsModel {
 
     /// One more at every reset: nothing begun for the person before lands after.
     @ObservationIgnored private var epoch = 0
+    /// How far down the list drawn the reader got.
+    @ObservationIgnored private var reach = SongsReach()
     /// The ask on its way, cancelled when another list takes its place.
     @ObservationIgnored private var asking: Task<Void, Never>?
 
@@ -48,15 +53,25 @@ final class SongsModel {
         send(paging.start(query))
     }
 
-    /// The •••'s Refresh, a pushed list's pull: the first page of the list asked again now.
-    func refresh(_ typed: String) {
+    /// The •••'s Refresh, a pushed list's pull: the first page of the list asked again now - the ask handed back, so a
+    /// pull's spinner lasts until it lands (nil when there is no deadwax to ask).
+    @discardableResult
+    func refresh(_ typed: String) -> Task<Void, Never>? {
         asking?.cancel()
-        send(paging.start(SongsList.query(typed)))
+        return send(paging.start(SongsList.query(typed)))
     }
 
-    /// The row at `index` appeared: the next page, when it is near enough the end and one should be asked.
-    func near(_ index: Int) {
-        guard SongsList.asksMore(at: index, of: paging.items.count), let ask = paging.more() else { return }
+    /// The row at `index` appeared: kept as how far the reader got, and - `online` - the next page, when it is near
+    /// enough the end and one should be asked.
+    func appeared(_ index: Int, online: Bool) {
+        reach.appeared(index, in: paging)
+        guard online, SongsList.asksMore(at: index, of: paging.items.count), let ask = paging.more() else { return }
+        send(ask)
+    }
+
+    /// Deadwax is back: the next page, when the reader got near the end of the list while it couldn't be reached.
+    func resumed() {
+        guard reach.wantsMore(paging), let ask = paging.more() else { return }
         send(ask)
     }
 
@@ -72,18 +87,20 @@ final class SongsModel {
         asking?.cancel()
         asking = nil
         paging.reset()
+        reach = SongsReach()
         failure = nil
         landed = 0
     }
 
-    private func send(_ ask: SongsPaging.Ask) {
+    @discardableResult
+    private func send(_ ask: SongsPaging.Ask) -> Task<Void, Never>? {
         guard let client = server.client else {
             failure = nil
             paging.failed(ask)
-            return
+            return nil
         }
         let epoch = self.epoch
-        asking = Task { [weak self] in
+        let task = Task { [weak self] in
             do {
                 let found = try await client.search(ask.query, songs: ask.count, songOffset: ask.offset)
                 guard let self, epoch == self.epoch, self.paging.isNewest(ask) else { return }
@@ -96,5 +113,7 @@ final class SongsModel {
                 self.paging.failed(ask)
             }
         }
+        asking = task
+        return task
     }
 }

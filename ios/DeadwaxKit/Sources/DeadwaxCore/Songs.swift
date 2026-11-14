@@ -81,6 +81,9 @@ public struct SongsPaging: Sendable, Equatable {
     public private(set) var stale = false
     /// Where the next page starts - what the server has handed out, whatever was left out as already drawn.
     public private(set) var next = 0
+    /// One more each time the list drawn is another - another query, or a first page in place of what was drawn - so
+    /// what is kept about the rows drawn (SongsReach) knows it is of another list.
+    public private(set) var list = 0
     /// The newest ask's: an answer for any other is dropped.
     var serial = 0
 
@@ -89,7 +92,10 @@ public struct SongsPaging: Sendable, Equatable {
     /// The list for `query`, from its first page: another query empties the list at once; the same one asked again
     /// keeps it drawn until the first page replaces it.
     public mutating func start(_ query: String) -> Ask {
-        if self.query != query { items = [] }
+        if self.query != query {
+            items = []
+            list += 1
+        }
         stale = !items.isEmpty
         self.query = query
         done = false
@@ -114,6 +120,8 @@ public struct SongsPaging: Sendable, Equatable {
     /// out; the last once it is short.
     public mutating func answered(_ ask: Ask, _ page: [Song]) {
         guard ask.serial == serial else { return }
+        // a first page is another list drawn, from its top
+        if ask.offset == 0 { list += 1 }
         items = ask.offset == 0 ? page : Self.appended(items, page)
         loading = false
         failing = false
@@ -133,6 +141,7 @@ public struct SongsPaging: Sendable, Equatable {
     public mutating func reset() {
         serial += 1
         items = []
+        list += 1
         query = nil
         loading = false
         failing = false
@@ -162,6 +171,36 @@ public struct SongsPaging: Sendable, Equatable {
     }
 }
 
+/// How far down the list drawn the reader got: the furthest row that appeared. A row near the end appearing asks for
+/// the next page (`SongsList.asksMore`) - but not while deadwax can't be reached, and a reader sitting at the end then
+/// sees no row appear again until they scroll away and back. So when deadwax is back, the paging picks up from here.
+/// Kept apart from SongsPaging, which the screen draws from, so a row appearing redraws nothing; it knows the list it
+/// was drawn from by SongsPaging's `list`, and forgets the rows of a list gone.
+public struct SongsReach: Sendable, Equatable {
+    /// The furthest row of the list drawn that appeared - nil until one has.
+    public private(set) var furthest: Int?
+    private var list: Int?
+
+    public init() {}
+
+    /// The row at `index` of `paging`'s list appeared (a row past its end, none).
+    public mutating func appeared(_ index: Int, in paging: SongsPaging) {
+        guard index >= 0, index < paging.items.count else { return }
+        if list != paging.list {
+            list = paging.list
+            furthest = nil
+        }
+        furthest = max(furthest ?? index, index)
+    }
+
+    /// Deadwax is back: whether the reader got near enough the end of the list drawn to want its next page (asked
+    /// through `more()`, which says whether one should be).
+    public func wantsMore(_ paging: SongsPaging) -> Bool {
+        guard list == paging.list, let furthest else { return false }
+        return SongsList.asksMore(at: furthest, of: paging.items.count)
+    }
+}
+
 /// What Songs draws (SongsView), from the list in hand.
 public enum SongsBody: Sendable, Equatable {
     /// nothing in hand, its first page on its way: a spinner
@@ -175,11 +214,15 @@ public enum SongsBody: Sendable, Equatable {
     /// the rows - and at their foot `SongsFoot`
     case songs
 
-    /// `paging`: the list; `online`: deadwax can be reached; `typed`: what is in Find.
-    public static func of(_ paging: SongsPaging, online: Bool, typed: String) -> SongsBody {
+    /// `paging`: the list; `online`: deadwax can be reached. The empty words name what was searched (`paging.query`),
+    /// never what Find holds now: typing on after a search that found nothing - for the pause before it is asked, or
+    /// offline, when it isn't - still says what the list drawn is, and clearing Find draws the spinner, not "No songs
+    /// yet.", until every song is asked.
+    public static func of(_ paging: SongsPaging, online: Bool) -> SongsBody {
         if !paging.items.isEmpty { return .songs }
         if paging.done && !paging.loading {
-            return .empty(Find.finding(typed) ? SongWords.noMatch(typed) : SongWords.noSongs)
+            let searched = paging.query ?? ""
+            return .empty(searched.isEmpty ? SongWords.noSongs : SongWords.noMatch(searched))
         }
         if !online { return .offline }
         if paging.failing { return .failed }

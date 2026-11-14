@@ -101,7 +101,11 @@ struct SongsScreen: View {
             shuffles.shown(.allSongs, library.scope)
         }
         .onChange(of: reachability.online) { _, online in
-            guard online, shown, page == nil else { return }
+            guard online else { return }
+            // deadwax back: the paging picks up where the reader got to - the last rows appeared while it was out of
+            // reach, asking nothing, and won't appear again until scrolled away and back
+            if current, page != nil || shown { songs.resumed() }
+            guard shown, page == nil else { return }
             shuffles.shown(.allSongs, library.scope)
         }
         .onAppear {
@@ -111,14 +115,16 @@ struct SongsScreen: View {
         .onDisappear { shown = false }
     }
 
-    /// A pushed list's pull: its first page asked again now - or, while deadwax can't be reached, whether it is back.
+    /// A pushed list's pull: its first page asked again now, the spinner lasting until it lands (as Artists' does) - or,
+    /// while deadwax can't be reached, whether it is back.
     private func pulled() async {
         guard reachability.online else {
             reachability.tryNow()
             return
         }
-        songs.refresh(typed)
+        let asked = songs.refresh(typed)
         shuffles.shown(.allSongs, library.scope)
+        await asked?.value
     }
 
     private func list(page: Page?) -> some View {
@@ -210,7 +216,7 @@ struct SongsScreen: View {
     @ViewBuilder private var content: some View {
         let paging = songs.paging
         let online = reachability.online
-        switch SongsBody.of(paging, online: online, typed: typed) {
+        switch SongsBody.of(paging, online: online) {
         case .loading:
             ProgressView()
                 .controlSize(.large)
@@ -233,7 +239,10 @@ struct SongsScreen: View {
         case .songs:
             let foot = SongsFoot.of(paging, online: online)
             if foot == .couldntRefresh, let failure = songs.failure {
-                RefreshProblemNote(failure: failure) { songs.retry() }
+                RefreshProblemNote(failure: failure) {
+                    // as the page's other Try agains: nothing asked while deadwax can't be reached (question 34)
+                    if reachability.online { songs.retry() } else { reachability.tryNow() }
+                }
                     .padding(.vertical, 8)
             } else if !paging.countText.isEmpty {
                 Text(paging.countText)
@@ -256,15 +265,16 @@ struct SongsScreen: View {
         }
     }
 
-    /// The rows - a song twice in one page is two rows, as the web keeps it, so each row is known by its place. A row
-    /// near the end of what is drawn asks for the next page as it appears (never while deadwax can't be reached).
+    /// The rows - a song twice in one page is two rows, as the web keeps it, so each row is known by its place. Each row
+    /// appearing is how far the reader got, and a row near the end of what is drawn asks for the next page as it
+    /// appears (never while deadwax can't be reached - `resumed` then, once it is back).
     @ViewBuilder private func rows(_ items: [Song], online: Bool) -> some View {
         ForEach(Array(items.enumerated()), id: \.offset) { (row: (offset: Int, element: Song)) in
             SongRow(song: row.element, dimmed: SongsList.dimmed(row.element, online: online, here: { (id: String) -> Bool in
                 downloads.state(id).isHere
             }))
             .onAppear {
-                if reachability.online { songs.near(row.offset) }
+                songs.appeared(row.offset, online: reachability.online)
             }
         }
     }

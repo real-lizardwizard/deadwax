@@ -26,8 +26,9 @@ you choose, and with the app in the background when iOS allows (see [Your librar
 phone](#your-library-on-this-phone)). **This is app 0.10, Phase 4's Library**: **playlists** - yours and
 those shared with you, played as the web app plays them, and made, added to, edited and deleted on the
 phone as in the web app, and downloaded to play with no connection, kept in step as they change (see
-[Playlists](#playlists)); the Library's switch - Albums | Playlists | Artists | Songs, swiped between, in
-the order you choose - and a pull down that shuffles your whole library (see [The
+[Playlists](#playlists)); the Library's switch - Albums | Playlists | Artists, and Songs with logins off
+(with them on, every song is under All music > All songs), swiped between, in the order you choose - and
+a pull down that shuffles your whole library (see [The
 Library](#the-library)); **artists** - your artists, and an artist's page with their albums, Play and
 Shuffle (see [Artists](#artists)); and **songs** - every song, a page at a time, each opening its album
 (see [Songs](#songs)). Search, Get and the rest come next (see [What it can't do
@@ -189,7 +190,8 @@ and every screen scrolls far enough for its last row to come up above it.
 ## The Library
 
 The Library opens on its pages, side by side: **Albums**, **Playlists**, **Artists** and - without a
-library of your own - **Songs**. The switch at the top - Albums | Playlists | Artists | Songs - picks one,
+library of your own - **Songs**. The switch at the top - Albums | Playlists | Artists, and Songs where it's a
+page - picks one,
 or swipe left and right between them, the switch moving with you. The Library opens on the first page each time the app
 starts, and when someone else signs in; after that it stays on the page you left it on. Tap the Library
 tab while you're on it, and the page goes back to its top. Nothing sits above the albums but their count.
@@ -614,7 +616,8 @@ and All artists, rather than a page among your own albums and artists.
   can't be fetched, the songs so far stay, with why and **Try again** under them; if a refresh can't be,
   "Couldn't update this list - showing it as it was." With no songs at all: "No songs yet."
 - **Offline**, the songs already fetched stay, the ones not on this phone dimmed (they open nothing), and no
-  more are fetched. With none fetched yet: "Songs show here once deadwax is back."
+  more are fetched until deadwax is back - then the next 100 come, if you had got near the end. With none
+  fetched yet: "Songs show here once deadwax is back."
 
 ## Playing
 
@@ -2501,11 +2504,13 @@ break-glass `deadwax` sign-in.
   it. Does the music start from Play Next with nothing playing?
 - **115 Find.** On All songs, type "roads": the songs Navidrome finds for it, by title, artist or album -
   songs further down the list than you've scrolled among them. Type a word quickly: one list, not one a
-  letter. Clear Find: every song again, from the top. Nonsense: "No songs match “…”."
+  letter. Clear Find: every song again, from the top - a spinner first, never "No songs yet.". Nonsense:
+  "No songs match “…”."; type on from it: the line keeps naming what was searched until the new words are.
 - **116 All songs' Shuffle.** Open All songs: Shuffle at its top ("Getting ready…" for a moment the first
   time). Tap it: the collection shuffled - songs of albums not in your library among them - starting the
   moment you tap. Press Next 160 times or so: it keeps going past 200. Then ••• > Shuffle on the Library:
-  only your library's songs. Pull down on All songs: it refreshes, no shuffle.
+  only your library's songs. Pull down on All songs: it refreshes, no shuffle - the spinner staying until
+  the songs are back.
 - **117 Songs as a page** (logins off, or the break-glass `deadwax`). The switch reads Albums | Playlists |
   Artists | Songs - Songs at the end of an order you'd arranged before. Swipe to Songs: every song. Pull
   down: the collection shuffles, as on the other pages. The ••• has no order or layout on Songs; Refresh
@@ -2518,7 +2523,8 @@ break-glass `deadwax` sign-in.
   downloaded dimmed (a tap does nothing); scrolling to the end fetches no more and shows no spinner.
   Shuffle reads "Shuffle downloads" and plays only songs on the phone. The Library's ••• has no All
   music offline, so for the empty page use logins off (117's): force-quit, open in Airplane Mode and
-  swipe to Songs - "Songs show here once deadwax is back."
+  swipe to Songs - "Songs show here once deadwax is back." And at the very end of what All songs has
+  fetched, turn on Airplane Mode, wait, and turn it off without scrolling: more songs come.
 - **120 VoiceOver.** A row reads "Roads, Portishead · Dummy, opens its album" (a song with no album, its
   title and line alone), its ••• "More for Roads", and a dimmed one adds "Not on this phone". All songs'
   Shuffle reads "Shuffle". With logins off the switch reads Albums, Playlists, Artists and Songs.

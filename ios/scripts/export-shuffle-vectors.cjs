@@ -27,12 +27,20 @@
  *              Play Next, another shuffle, the queue cleared, each ask answered, failed, a page's 404, a retry -
  *              with what the hook did after each step: the asks made, what it handed extendQueue (the token, the
  *              songs' ids and levels, the next order), what it said, and the retries waiting
+ *   paged      usePaged driven as SongsView renders it - its own cases scripted, and seeded runs: the end of the
+ *              list coming near, a page answered or failed, Try again, another key (Find's words), the list changing
+ *              under it (a song added at the front, one removed) - with what it did after each step: the pages asked
+ *              (key, offset), what is drawn (its count, first and last, and a digest of every id), loading, done and
+ *              the error shown
  *   append     appendPage over pages that repeat what is drawn, and themselves
  *
- * The one place the phone departs, kept out of the seeded runs: a page that wouldn't come waits out its 30 s on the
- * phone (ShuffleFeedRun.retried) whatever changes meanwhile, and it keeps one retry, never two; the web's effect runs
- * again when Repeat or the shuffle changes, so it can ask again sooner and keeps every timer it started. So no run
- * changes Repeat, or starts another shuffle, while a retry waits (notes/ios.md, "Phase 4, slice 5").
+ * The two places the phone departs, kept out of the seeded runs (notes/ios.md, "Phase 4, slice 5"):
+ *   - a shuffle's page that wouldn't come waits out its 30 s on the phone (ShuffleFeedRun.retried) whatever changes
+ *     meanwhile, and it keeps one retry, never two; the web's effect runs again when Repeat or the shuffle changes, so
+ *     it can ask again sooner and keeps every timer it started. So no run changes Repeat, or starts another shuffle,
+ *     while a retry waits.
+ *   - a page of Songs that wouldn't come waits for Try again on the phone (SongsPaging.more, question 36); the web's
+ *     sentinel coming back into range asks again. So no run comes near the end while the error shows.
  *
  * Every random choice is seeded, and the output is plain ASCII, so a run on any machine writes the same bytes. Never
  * edit the fixture by hand - change the TypeScript, then run this.
@@ -588,6 +596,238 @@ async function seededRuns() {
   return runs
 }
 
+/* ===== usePaged, driven (Songs' paging) ===== */
+
+const SONGS_PAGE_SIZE = Number(piece('src/player/api.ts', /\nexport const SONGS_PAGE = (\d+)\n/, 'SONGS_PAGE')[1])
+
+//? the element at the end of the list, and the observers usePaged watches it with: a run's `near` is that element
+//? coming into range - the phone's row 25 from the end appearing (SongsList.asksMore)
+const SENTINEL = { sentinel: true }
+const observers = []
+globalThis.IntersectionObserver = class {
+  constructor(callback) { this.callback = callback; this.watching = new Set(); this.live = true; observers.push(this) }
+  observe(host) { this.watching.add(host) }
+  unobserve(host) { this.watching.delete(host) }
+  disconnect() { this.watching.clear(); this.live = false }
+}
+
+/** FNV-1a (32 bits) over the ids joined with commas: what is drawn, without writing every id of it at every step. */
+function digest(ids) {
+  let h = 2166136261
+  for (const c of Buffer.from(ids.join(','), 'utf8')) { h ^= c; h = Math.imul(h, 16777619) >>> 0 }
+  return h
+}
+
+/**
+ * One run of Songs' paging: usePaged rendered as SongsView renders it (SONGS_PAGE a page, the key the list's - here
+ * what Songs' Find asks Navidrome for, "" for every song), over lists the run keeps per key and changes as a library
+ * does (`shift`: a song added at the front, so a later page repeats the one at an earlier page's edge; `remove`: one
+ * gone, so a later page skips one). Every page asked is kept open until a step answers it - with that key's list as
+ * it is then - or fails it. The phone replays the lists from the same steps.
+ */
+class PagedRun {
+  constructor({ name, seed, lists, key = '' }) {
+    this.lists = new Map(Object.entries(lists).map(([list, total]) => [list, Array.from({ length: total }, (_, n) => `${list || 'all'}.${n + 1}`)]))
+    this.key = key
+    this.asks = []
+    this.steps = []
+    this.added = 0
+    this.record = { name, seed, key, lists, steps: this.steps }
+    //? only this run's observers are watched
+    observers.length = 0
+    this.render = hooks.root(({ key: now }) => {
+      const paged = P.usePaged((offset) => this.ask(now, offset), SONGS_PAGE_SIZE, now)
+      //? what `ref={songs.sentinel}` does at commit, before the effects run
+      paged.sentinel.current = SENTINEL
+      return paged
+    })
+  }
+
+  ask(key, offset) {
+    let resolve, reject
+    const promise = new Promise((yes, no) => { resolve = yes; reject = no })
+    this.asks.push({ n: this.asks.length, key, offset, resolve, reject, settled: false })
+    return promise
+  }
+
+  get open() { return this.asks.filter((ask) => !ask.settled) }
+
+  async turn() {
+    for (let i = 0; i < 4; i++) await new Promise((resolve) => setImmediate(resolve))
+    this.state = this.render({ key: this.key })
+    this.render.commit()
+    for (let i = 0; i < 4; i++) await new Promise((resolve) => setImmediate(resolve))
+    //? what it draws now
+    this.state = this.render({ key: this.key })
+    this.render.commit()
+  }
+
+  async step(op) {
+    const before = this.asks.length
+    const recorded = { ...op }
+    if ('ask' in op && !this.asks[op.ask]) throw new Error(`${this.record.name}: step ${this.steps.length} names ask ${op.ask}, of ${this.asks.length} made`)
+    switch (op.op) {
+      case 'begin':
+        break
+      case 'near': {
+        const watcher = observers.filter((one) => one.live && one.watching.has(SENTINEL)).pop()
+        if (!watcher) throw new Error(`${this.record.name}: nothing watches the end of the list`)
+        watcher.callback([{ isIntersecting: true }])
+        break
+      }
+      case 'answer': {
+        const ask = this.asks[op.ask]
+        ask.settled = true
+        ask.resolve(this.lists.get(ask.key).slice(ask.offset, ask.offset + SONGS_PAGE_SIZE).map(song))
+        break
+      }
+      case 'fail':
+        this.asks[op.ask].settled = true
+        this.asks[op.ask].reject(new Error('the network dropped'))
+        break
+      case 'retry':
+        //? Try again, shown only with the error
+        if (!this.state.error) throw new Error(`${this.record.name}: Try again with no error shown`)
+        this.state.retry()
+        break
+      case 'key':
+        if (op.to === this.key) throw new Error(`${this.record.name}: the same key again is no new list on the web`)
+        this.key = op.to
+        break
+      case 'shift':
+        this.lists.get(op.list).unshift(op.id)
+        break
+      case 'remove':
+        this.lists.get(op.list).splice(op.at, 1)
+        break
+      default:
+        throw new Error(`no step ${op.op}`)
+    }
+    await this.turn()
+    const ids = this.state.items.map((item) => item.id)
+    recorded.then = {
+      asks: this.asks.slice(before).map((ask) => [ask.key, ask.offset]),
+      count: ids.length,
+      first: ids[0] ?? null,
+      last: ids[ids.length - 1] ?? null,
+      digest: digest(ids),
+      loading: this.state.loading,
+      done: this.state.done,
+      failing: this.state.error != null,
+    }
+    this.steps.push(recorded)
+    return recorded.then
+  }
+}
+
+/** usePaged's own cases, scripted. */
+async function scriptedPaged() {
+  const runs = []
+  const run = async (head, steps) => {
+    const one = new PagedRun(head)
+    await one.step({ op: 'begin' })
+    for (const step of steps) await one.step(typeof step === 'function' ? step(one) : step)
+    runs.push(one.record)
+  }
+  const newest = (one) => one.open[one.open.length - 1].n
+  //? every song a page at a time: nothing more asked while a page is out, the last page short, nothing after it
+  await run({ name: 'every song, a page at a time', seed: 1, lists: { '': 250 } }, [
+    { op: 'near' },
+    { op: 'answer', ask: 0 }, { op: 'near' }, { op: 'near' },
+    { op: 'answer', ask: 1 }, { op: 'near' },
+    { op: 'answer', ask: 2 }, { op: 'near' },
+  ])
+  //? a last page of exactly SONGS_PAGE: one more asked, and its empty answer ends it
+  await run({ name: 'a page of exactly a hundred', seed: 2, lists: { '': 100 } }, [
+    { op: 'answer', ask: 0 }, { op: 'near' }, { op: 'answer', ask: 1 }, { op: 'near' },
+  ])
+  await run({ name: 'no songs at all', seed: 3, lists: { '': 0 } }, [{ op: 'answer', ask: 0 }, { op: 'near' }])
+  //? a song added at the front: the next page repeats the edge song, left out, and the offset follows the server
+  await run({ name: 'a live list', seed: 4, lists: { '': 320 } }, [
+    { op: 'answer', ask: 0 }, { op: 'shift', list: '', id: 'new.1' }, { op: 'near' }, { op: 'answer', ask: 1 },
+    { op: 'shift', list: '', id: 'new.2' }, { op: 'shift', list: '', id: 'new.3' }, { op: 'near' }, { op: 'answer', ask: 2 },
+    { op: 'near' }, { op: 'answer', ask: 3 },
+  ])
+  //? a song gone: the next page skips one, as the web does
+  await run({ name: 'a song removed', seed: 5, lists: { '': 230 } }, [
+    { op: 'answer', ask: 0 }, { op: 'remove', list: '', at: 10 }, { op: 'near' }, { op: 'answer', ask: 1 },
+    { op: 'near' }, { op: 'answer', ask: 2 },
+  ])
+  //? a page that won't come: Try again asks it from the same place
+  await run({ name: 'a failure and Try again', seed: 6, lists: { '': 260 } }, [
+    { op: 'answer', ask: 0 }, { op: 'near' }, { op: 'fail', ask: 1 }, { op: 'retry' }, { op: 'fail', ask: 2 },
+    { op: 'retry' }, { op: 'answer', ask: 3 }, { op: 'near' }, { op: 'answer', ask: 4 },
+  ])
+  await run({ name: 'the first page fails', seed: 7, lists: { '': 40 } }, [
+    { op: 'fail', ask: 0 }, { op: 'retry' }, { op: 'answer', ask: 1 },
+  ])
+  //? another key: the list emptied at once, the old key's page let go, landing or failing late
+  await run({ name: 'another key', seed: 8, lists: { '': 300, roads: 12 } }, [
+    { op: 'answer', ask: 0 }, { op: 'near' }, { op: 'key', to: 'roads' }, { op: 'answer', ask: 1 },
+    { op: 'answer', ask: 2 }, { op: 'key', to: '' }, { op: 'key', to: 'roads' }, { op: 'fail', ask: 3 },
+    { op: 'answer', ask: 4 },
+  ])
+  await run({ name: 'another key while a page fails', seed: 9, lists: { '': 300, blue: 150 } }, [
+    { op: 'answer', ask: 0 }, { op: 'near' }, { op: 'fail', ask: 1 }, { op: 'key', to: 'blue' },
+    (one) => ({ op: 'answer', ask: newest(one) }), { op: 'near' }, (one) => ({ op: 'answer', ask: newest(one) }),
+  ])
+  return runs
+}
+
+/** Seeded runs: whatever a listener and deadwax might do, in any order - but come near the end while a page has
+ *  failed: the web's sentinel asks again then, the phone waits for Try again (question 36). */
+async function seededPaged() {
+  const runs = []
+  const KEYS = ['', 'roads', 'blue', 'zzz']
+  for (let n = 0; n < 40; n++) {
+    const seed = 5003 + n * 13
+    const pickFrom = new ParkMiller(seed)
+    const r = () => pickFrom.next()
+    const pick = (k) => Math.floor(r() * k)
+    const lists = {
+      '': [0, 37, 99, 100, 101, 199, 200, 250, 412, 600][n % 10],
+      roads: pick(160),
+      blue: [0, 100, 205][pick(3)],
+      zzz: 0,
+    }
+    const one = new PagedRun({ name: `seeded paging ${n}`, seed, lists, key: KEYS[n % 4] })
+    await one.step({ op: 'begin' })
+    for (let step = 0; step < 45; step++) {
+      const failing = one.state.error != null
+      const open = one.open
+      const roll = r()
+      let op
+      if (roll < 0.3 && !failing) {
+        op = { op: 'near' }
+      } else if (roll < 0.58 && open.length) {
+        //? mostly the newest ask, sometimes an older one the hook has let go
+        const ask = r() < 0.85 ? open[open.length - 1] : open[pick(open.length)]
+        op = r() < 0.15 ? { op: 'fail', ask: ask.n } : { op: 'answer', ask: ask.n }
+      } else if (roll < 0.68 && failing) {
+        op = { op: 'retry' }
+      } else if (roll < 0.76) {
+        const others = KEYS.filter((key) => key !== one.key)
+        op = { op: 'key', to: others[pick(others.length)] }
+      } else if (roll < 0.86) {
+        //? mostly the list drawn, so a later page of it repeats the song at an earlier one's edge
+        op = { op: 'shift', list: r() < 0.7 ? one.key : KEYS[pick(3)], id: `new.${++one.added}` }
+      } else if (roll < 0.92) {
+        const list = KEYS[pick(3)]
+        const length = one.lists.get(list).length
+        if (!length) continue
+        op = { op: 'remove', list, at: pick(length) }
+      } else if (failing) {
+        op = { op: 'retry' }
+      } else {
+        op = { op: 'near' }
+      }
+      await one.step(op)
+    }
+    runs.push(one.record)
+  }
+  return runs
+}
+
 /* ===== appendPage ===== */
 
 function appendVectors() {
@@ -612,6 +852,7 @@ async function vectors() {
     elsewhere: elsewhereVectors(),
     ahead: aheadVectors(),
     runs: [...await scriptedRuns(), ...await seededRuns()],
+    paged: [...await scriptedPaged(), ...await seededPaged()],
     append: appendVectors(),
   }
 }
@@ -625,7 +866,7 @@ function say(value) {
   keys.forEach((key, k) => {
     const v = value[key]
     const comma = k < keys.length - 1 ? ',' : ''
-    if (key === 'runs') {
+    if (key === 'runs' || key === 'paged') {
       lines.push(` ${one(key)}: [`)
       v.forEach((run, r) => {
         const { steps, ...head } = run

@@ -6593,3 +6593,95 @@ Not verified - only the phone can tell (the spec's section 9; docs/ios.md's chec
 - Offline: the dimmed rows, no spinner at the end.
 - VoiceOver's rows.
 - CI's Xcode 26.6 (the older Swift): the new code spells out its closures' types.
+
+## Phase 4, slice 5, after its review (2026-11-14)
+
+The review of 0de4fbd found nothing serious, and six smaller things. All six are fixed in one commit on
+`phase4-songs`, with Core holding each rule it can. The app stays 0.10 (10).
+
+### What was wrong, and the fix
+
+1. **Songs' empty and no-match words followed Find's live text.** SongsBody built them from what Find held, not
+   what was searched. So after a search for "zzz" found nothing, typing "zzzq" said "No songs match “zzzq”." during
+   the 350 ms pause before it was asked - and offline, where it isn't asked, for good. Clearing Find after a no-match
+   flashed "No songs yet." for a frame. **SongsBody.of now takes no `typed`**: the words are built from
+   `paging.query`, what the list drawn was searched for.
+2. **Paging didn't pick up when deadwax came back to a reader at the end of the list.** The last rows' `onAppear`
+   fired offline and asked nothing; `show` asks nothing for the same query; so the list stopped there, with no spinner
+   and no Try again, until the reader scrolled away and back. **SongsReach** (Core, new) keeps the furthest row that
+   appeared:
+   - SongsModel's `appeared(_:online:)` records every row, and asks the next page as before while deadwax can be
+     reached.
+   - Its `resumed()`, called by SongsScreen when deadwax is back, asks it when the furthest row is near the end
+     (`SongsList.asksMore`) and `more()` would.
+   - SongsReach is held outside what the screen observes. Kept in SongsPaging, every row appearing would have
+     redrawn the whole list.
+   - It knows the list it was drawn from by SongsPaging's new `list`, one more each time another list is drawn
+     (another query, a first page in place of the old), and forgets the rows of a list gone.
+3. **The refresh banner's Try again asked while offline**, against question 34. It now asks whether deadwax is back,
+   as the page's other Try agains do.
+4. **All songs' pull to refresh ended at once**: `pulled()` didn't wait for the refresh, so the spinner went while
+   nothing new was drawn. SongsModel's `refresh` hands back its ask's task, and `pulled()` awaits it, as Artists'
+   does.
+5. **The exporter claim.** 0de4fbd said export-shuffle-vectors.cjs drove usePaged.ts; it compiled it but called only
+   `appendPage`, so SongsPaging's state machine was held by the hand-written tests alone. **The exporter now drives
+   usePaged as SongsView renders it** (`paged`), under the same Preact stand-in:
+   - the end of the list is a fake IntersectionObserver's sentinel coming into range;
+   - each page is kept open until a step answers it, from the key's list as it is then, or fails it.
+
+   It writes 49 runs: 9 of usePaged's own cases scripted (a page at a time, a last page of exactly 100, none at all,
+   a list that grows at its front, one that loses a song, a failure and Try again, the first page failing, another key
+   with the old one's page landing or failing late, another key while a page has failed) and 40 seeded. That is 1,904
+   steps, each with the pages asked, what is drawn (its count, first and last, and FNV-1a over every id), loading,
+   done and the error shown.
+
+   ShuffleVectorTests' `songsPageAsTheWebsUsePagedPages` replays each through SongsPaging: near is `more()`, Try again
+   `retry()`, another key `start(_:)`. Every step matched at once. The one place the two part is question 36: the
+   web's sentinel asks again when it comes back into range after a failure, and the phone waits for Try again. So no
+   run comes near the end while the error shows.
+6. **The README** (and ios/README.md, and docs/ios.md's introduction and The Library) said the switch is Albums,
+   Playlists, Artists and Songs. With logins on it is three pages, every song under All music > All songs. Each now
+   says both.
+
+### Tests
+
+- **SongsTests** (16 + 1):
+  - `whatSongsDraws`: the no-match line names what was searched, offline too, and Find cleared draws the spinner.
+  - `deadwaxBackPicksUpWhereTheReaderGotTo` (new):
+    - rows to the end appearing offline, then the next page asked;
+    - a row past the list counting for nothing;
+    - only near the end;
+    - another query, or a first page in place of the old, forgetting the old list's rows - a refresh's old list
+      still drawn keeps them, and asks nothing over it.
+- **ShuffleVectorTests** (5 + 1): `songsPageAsTheWebsUsePagedPages`, counting answers, pages that repeated a song
+  already drawn, failures, finished lists and keys, so a fixture that stopped reaching them fails.
+- Fixes 3 and 4 are the screen's and the model's (no Core to hold them).
+- **Mutations**:
+  - 9 over the fixes' Core: the words from nothing searched, or no-match said of every song; SongsReach keeping
+    another list's rows, wanting more of another list, keeping the latest row rather than the furthest, counting a
+    row past the list, wanting more wherever the reader got; `list` not moved by a first page or another query. All
+    caught.
+  - Slice 5's 20 paging mutants run again against ShuffleVectorTests **alone**, to see what the web's usePaged now
+    holds by itself: 11 of 20 caught. The 9 it can't reach are the phone's own rules, each caught by SongsTests in
+    slice 5's run:
+    - a refresh of the same query (`stale`: 4 of them) - the web has no such refresh;
+    - more() after a failure - question 36's departure, which the runs leave out;
+    - reset() for a new person; the count line waiting for every page;
+    - more() before anything was asked, and Try again with nothing failed - states the web never reaches (every run
+      begins with a first page, and Try again shows only with the error).
+  - One of the 11 at first took the test process down (`asks[n]` out of range once the phone had parted from the
+    web). The replay now records an issue and ends the run instead; run again, caught with issues.
+
+### Verified, and not
+
+Verified, on the final tree:
+- `swift test` on the whole package: DeadwaxCore 1,408 tests in 161 suites, DeadwaxAudio 158 in 17, and the other
+  12, all passed.
+- The unsigned device builds, Debug and Release: both succeeded.
+- `check_project.py`: passed.
+- `npm run build`, and every sim: 83 run, none failed.
+- The full pytest: 4,378 passed, 1 skipped.
+
+Not verified - on the phone (docs/ios.md's checks 115, 116 and 119 ask for each): the no-match line while typing on,
+paging picking up when Airplane Mode goes off at the end of All songs, the pull's spinner lasting until the songs
+come.

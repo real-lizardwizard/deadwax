@@ -10,8 +10,9 @@ record you can scrub by hand, heard as you turn it, and its speed fader, 0.25x t
 in Up Next (every song you played, here and on the web, scrolled up past the song playing), and
 Phase 3's library downloaded by itself, as much as fits - only while charging if you like, and in the
 background when iOS allows - and Phase 4's Library: your playlists read and played, made, added
-to, edited, deleted and downloaded, the Library's switch between its pages (Albums, Playlists, Artists
-and Songs, in an order you choose, a pull down shuffling your library), artists and their pages, and
+to, edited, deleted and downloaded, the Library's switch between its pages (Albums, Playlists and
+Artists - and Songs with logins off; with them on, every song is under All music > All songs - in an
+order you choose, a pull down shuffling your library), artists and their pages, and
 every song, a page at a time - kept on the `ios` branch while it's being built. Nothing of Phase 2, the
 lyrics, the EQ, the turntable, play history, Phase 3 or Phase 4 has been seen on an iPhone yet.
 Phase 0's test screen lives on in the app's Debug.
