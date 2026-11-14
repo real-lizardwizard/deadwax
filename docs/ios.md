@@ -1834,7 +1834,10 @@ speaker unless a check says. The numbers are the turntable plan's, so answers ca
 - **9 The coast.** Pause, then flick the record: it coasts to a stop with its sound, and the song stays
   paused where it stopped; play starts from there.
 - **10 The arm.** Drag the arm: the head lifts, the time line says "Needle up · ..."; let go and the
-  song plays from there.
+  song plays from there. The head stays on the end of the arm the whole time: lifted, it grows a touch
+  with a soft shadow round it, as if it came toward you. Tap the head quickly a few times: it swells and
+  settles back smoothly, never jumping sideways off the arm or flickering. With Reduce Motion on, it
+  changes size at once instead.
 - **11 An MP3.** Turn the record on one: silent, with "The record makes sound for FLAC songs only -
   this one moves silently." over the foot of the turntable until the next song.
 - **12 Still coming in.** A song never played before (not downloaded), turned while it's still coming

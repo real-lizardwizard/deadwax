@@ -5279,3 +5279,73 @@ Not verified - none of the App's wiring has a test, and only a phone can tell (d
 - That a playlist's songs from many albums download in the background and locked, as an album's do; how long a
   playlist of a few hundred songs takes to be asked for and planned.
 - The swipes on You > Downloads' playlist rows, and Remove All's longer question.
+
+## The turntable's head stays on the arm (2026-11-14)
+
+James, on 0.9: "in the turntable, when you tap on the play head, it looks like it dislocates." Its own commit on
+`phase4-library`, after slice 3 (4c89833) and before slice 3's review fixes. The app stays 0.9 (9); src/__init__.py
+untouched; no server change.
+
+**Cause.** The phone ported the web's `is-lifted` (Turntable.tsx:492): while the arm was held, TurntableLayers
+moved the head `-TurntableGeometry.armLift` (5 units) along the arm's y axis. The arm's container is turned, so that
+is sideways off the bar, and a quick tap popped the head off the arm and back.
+
+**Fix** (turntable spec 2.5, "The lift changed"):
+- The head stays on the bar always: its layer is now its own size with its middle on the bar, and nothing moves it.
+- The lift is the head coming toward the viewer: grown `TurntableGeometry.headLift.scale` (1.08) about its middle,
+  with a soft shadow round it - `TurntablePalette.ttHeadShadow` (`--dw-shadow`'s black at 0.5), a blur of
+  `headLift.shadow` (3 units across the stage) and no offset, so it doesn't turn with the arm.
+- Both are eased each way over `headLift.seconds` on `headLiftEase`: the app's one motion token, `--dw-duration`
+  (0.14 s) on `--dw-ease` (cubic-bezier(0.16, 1, 0.3, 1)), as the web's lift. The coordinator's first ask was 0.12 s
+  ease-in-out, changed to the token so the two apps match. The easing runs from the presentation layer's values, so a
+  tap that sets the head down mid-lift turns back rather than flickering. This is the only eased thing in the
+  drawing, by explicit animations; `noActions` still keeps every implicit one off, and now covers the shadow's keys.
+- Reduce Motion: `TurntableLook.still` (DeckController's `reduced`) makes the two states a step.
+- `ttHeadShadow` isn't in TurntablePalette.tokens: tokens.json has no `--dw-shadow`, and adding it to
+  export-deck-vectors.cjs's list changes `made_with` and so writes every fixture again.
+
+**The web** makes the same change on main, in branch web-tonearm, shipping as 2.1.19: the head on the bar, 1.08
+about its middle, a shadow of blur 3 at rgba(0, 0, 0, 0.5) with no offset, on `--dw-duration` and `--dw-ease`. There
+`ARM_PARTS.lift = { scale: 1.08, shadow: 3 }` takes the place of `lift: 5`.
+
+Until main merges, `armLift` (5) stays in TurntableGeometry, held to turntable.json's `ARM_PARTS.lift` by
+TurntableGeometryTests. **iosdeck.sim exports it**: it runs export-deck-vectors.cjs --check, which reads `ARM_PARTS`
+out of ui/src/lib/turntable.ts. So it wasn't regenerated here. The deck vectors are made again at that merge, and
+`armLift` can then give way to the web's numbers.
+
+**Tests** (TurntableRenderTests):
+- `theHeadIsFiveUnitsUpWhenLifted` is now `theHeadStaysOnTheBarAndComesTowardTheViewerWhenLifted`, rendered over a
+  white plinth with everything but the arm hidden:
+  - the head's middle doesn't move (within 0.35 pt);
+  - its area grows by `scale` squared (within 0.06);
+  - a pixel 2 units off its long side is clear set down and shadowed lifted.
+- `theLiftIsEasedButAStepUnderReduceMotion`:
+  - the lift's two animations are there each way unless `still`;
+  - the duration is `seconds`, on `headLiftEase`'s control points, pinned at 0.14 s and (0.16, 1, 0.3, 1);
+  - the model ends grown with its shadow (zero offset, the blur scaled), then back;
+  - a frame that changes nothing of the lift leaves the easing alone.
+- **Mutations:** 14, all caught:
+  - the web's 5 units up again;
+  - grown about its end;
+  - not grown;
+  - no shadow, and the shadow left on;
+  - an offset shadow, and no blur;
+  - eased under Reduce Motion, never eased, and eased every frame;
+  - the wrong duration;
+  - the shadow not eased;
+  - the old ease-in-out, and the curve's points swapped.
+
+**Verified:**
+- `swift test`: Core 1268, Audio 158, Turntable 12 (11 + 1). The shadow is checked in pixels, so `render(in:)` does
+  draw it.
+- The unsigned Release device build.
+- `check_project.py`.
+- test_source_bytes.
+- The 11 ios sims on Node 22, iosdeck's exporter check included. They ran before the move to the motion token, which
+  touches nothing they read.
+
+**Not verified (only the phone can tell; docs/ios.md check 10):**
+- That it reads as the head lifting toward you, rather than only growing.
+- That the shadow shows at all over the dark vinyl.
+- That a quick tap, and taps in a row, look smooth.
+- That Reduce Motion's step is right.

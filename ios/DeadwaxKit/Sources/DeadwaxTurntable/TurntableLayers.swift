@@ -18,8 +18,10 @@ public struct TurntableLook: Equatable {
     public var arm = 0.0
     /// the needle, in stage units - where the handle is
     public var needle = StagePoint(x: 0, y: 0)
-    /// the head lifted (2.5: from the press that takes the arm to its let-go)
+    /// the head lifted (2.5: from the press that takes the arm to its let-go) - grown, its shadow shown, on the bar
     public var lifted = false
+    /// Reduce Motion: the head's lift a step, not eased
+    public var still = false
     /// Increase Contrast: the handle's ring in Palette.text3
     public var contrast = false
     /// the fader and the readout (slice 4): the speed they show, nil to hide them
@@ -70,6 +72,8 @@ public final class TurntableLayers {
     private var look = TurntableLook()
     private var hasArt = false
     private var groovesMade: (size: Double, scale: CGFloat)?
+    /// The head's lift as drawn: nil until the layers' first drawing (in init), which is never eased.
+    private var headLifted: Bool?
 
     /// `flipped`: the layer tree's geometry made y-down - true on a Mac (its layers are y-up), false under a UIView
     /// (already y-down). Either way the drawing is the web's, top left at (0, 0).
@@ -94,12 +98,15 @@ public final class TurntableLayers {
         lay(layout)
     }
 
-    /// No implicit animation on anything: a frame's write is the frame (2.6), and the head's lift a jump (2.5).
+    /// No implicit animation on anything: a frame's write is the frame (2.6). The head's lift is the one thing eased,
+    /// with explicit animations of its own (`liftHead`, 2.5).
     static let noActions: [String: CAAction] = ["position": NSNull(), "bounds": NSNull(), "transform": NSNull(),
                                                  "contents": NSNull(), "hidden": NSNull(), "path": NSNull(),
                                                  "opacity": NSNull(), "strokeColor": NSNull(), "fillColor": NSNull(),
                                                  "backgroundColor": NSNull(), "borderColor": NSNull(), "string": NSNull(),
-                                                 "foregroundColor": NSNull(), "frame": NSNull(), "sublayers": NSNull()]
+                                                 "foregroundColor": NSNull(), "frame": NSNull(), "sublayers": NSNull(),
+                                                 "shadowOpacity": NSNull(), "shadowPath": NSNull(),
+                                                 "shadowRadius": NSNull()]
 
     static func cg(_ colour: DeckRGBA) -> CGColor {
         CGColor(srgbRed: CGFloat(colour.red) / 255, green: CGFloat(colour.green) / 255, blue: CGFloat(colour.blue) / 255,
@@ -152,6 +159,10 @@ public final class TurntableLayers {
         weight.fillColor = Self.cg(p.ttArmWeight)
         bar.fillColor = Self.cg(p.ttArm)
         head.fillColor = Self.cg(p.ttArmHead)
+        // the lift's shadow: round the head with no offset, so the arm's turn doesn't turn it; shown while held
+        head.shadowColor = Self.cg(p.ttHeadShadow)
+        head.shadowOffset = .zero
+        head.shadowOpacity = 0
         pivot.fillColor = Self.cg(p.ttPivot)
         pivot.strokeColor = Self.cg(p.ttPivotEdge)
         handle.fillColor = nil
@@ -242,8 +253,13 @@ public final class TurntableLayers {
         weight.path = rounded(CGRect(x: a.armWeight.from * k, y: -a.armWeight.thick / 2 * k, width: a.armWeight.length * k,
                                      height: a.armWeight.thick * k), a.armWeight.radius * k)
         bar.path = rounded(CGRect(x: 0, y: -a.armBar.thick / 2 * k, width: a.arm.reach * k, height: a.armBar.thick * k), a.armBar.radius * k)
-        head.path = rounded(CGRect(x: 0, y: -a.armHead.thick / 2 * k, width: a.armHead.length * k, height: a.armHead.thick * k),
-                            a.armHead.radius * k)
+        // the head is a layer of its own size, its middle on the bar, so the lift grows it about that middle
+        let headBox = CGRect(x: 0, y: 0, width: a.armHead.length * k, height: a.armHead.thick * k)
+        head.bounds = headBox
+        head.position = CGPoint(x: (a.armHead.from + a.armHead.length / 2) * k, y: 0)
+        head.path = rounded(headBox, a.armHead.radius * k)
+        head.shadowPath = head.path
+        head.shadowRadius = a.headLift.shadow * k
         pivot.frame = root.bounds
         pivot.path = circle(point(layout.pivot), (a.armBase - a.armBaseEdge / 2) * k)
         pivot.lineWidth = a.armBaseEdge * k
@@ -269,7 +285,10 @@ public final class TurntableLayers {
         let k = layout.across(1)
         face.setAffineTransform(CGAffineTransform(rotationAngle: CGFloat(next.angle * .pi / 180)))
         arm.setAffineTransform(CGAffineTransform(rotationAngle: CGFloat(next.arm * .pi / 180)))
-        head.position = CGPoint(x: TurntableGeometry.armHead.from * k, y: next.lifted ? -TurntableGeometry.armLift * k : 0)
+        if headLifted != next.lifted {
+            liftHead(next.lifted, eased: headLifted != nil && !next.still)
+            headLifted = next.lifted
+        }
         handle.position = point(layout.point(next.needle))
         handle.strokeColor = Self.cg(next.contrast ? TurntablePalette.textTertiary : TurntablePalette.ttHandleEdge)
         if let speed = next.speed {
@@ -280,6 +299,39 @@ public final class TurntableLayers {
             fader.isHidden = true
             readout.isHidden = true
         }
+    }
+
+    /// The head lifted or set down (2.5): grown about its own middle and its shadow shown, or back - eased each way from
+    /// where it is on screen, so a tap that sets it down mid-lift turns back rather than jumping; `eased` false (the
+    /// layers' first drawing, Reduce Motion) is the step alone.
+    private func liftHead(_ lifted: Bool, eased: Bool) {
+        let lift = TurntableGeometry.headLift
+        let grown = CGFloat(lift.scale)
+        let transform = lifted ? CATransform3DMakeScale(grown, grown, 1) : CATransform3DIdentity
+        let shadow: Float = lifted ? 1 : 0
+        if eased {
+            let shown = head.presentation()
+            // --dw-ease, the web's curve for the same lift
+            let ease = TurntableGeometry.headLiftEase
+            let timing = CAMediaTimingFunction(controlPoints: Float(ease.x1), Float(ease.y1), Float(ease.x2), Float(ease.y2))
+            let grow = CABasicAnimation(keyPath: "transform")
+            grow.fromValue = NSValue(caTransform3D: shown?.transform ?? head.transform)
+            grow.toValue = NSValue(caTransform3D: transform)
+            let fade = CABasicAnimation(keyPath: "shadowOpacity")
+            fade.fromValue = NSNumber(value: shown?.shadowOpacity ?? head.shadowOpacity)
+            fade.toValue = NSNumber(value: shadow)
+            for animation in [grow, fade] {
+                animation.duration = lift.seconds
+                animation.timingFunction = timing
+            }
+            head.add(grow, forKey: "lift")
+            head.add(fade, forKey: "liftShadow")
+        } else {
+            head.removeAnimation(forKey: "lift")
+            head.removeAnimation(forKey: "liftShadow")
+        }
+        head.transform = transform
+        head.shadowOpacity = shadow
     }
 
     private func drawFader(_ speed: Double, held: Bool, k: Double) {
