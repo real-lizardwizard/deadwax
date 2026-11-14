@@ -110,7 +110,7 @@ exports.root = (component) => {
 //? what the components reach outside themselves: the sheet hook (its options kept), the album memory, the notice, a cover
 const write = (file, body) => fs.writeFileSync(path.join(OUT, file), body)
 write('app/useSheet.js', `exports.useSheet = (options) => { globalThis.__upnext.sheets.push(options) }\nexports.takeOpener = () => null\n`)
-write('player/api.js', `exports.rememberAdded = (albums) => globalThis.__upnext.calls.push(['rememberAdded', albums.map((a) => a.id)])\n`)
+write('player/api.js', `exports.rememberAdded = (albums, queued) => globalThis.__upnext.calls.push(['rememberAdded', albums.map((a) => a.id), (queued ?? []).map((t) => t.albumId)])\n`)
 write('app/usePins.js', `exports.sayPins = (text) => globalThis.__upnext.calls.push(['sayPins', text])\n`)
 //? the player bar's neighbours it needs nothing of here: the scrubber and the speed chip
 write('player/NowPlaying.js', `exports.Scrubber = function Scrubber() { return null }\n`)
@@ -1456,6 +1456,8 @@ console.log('\nthe song menu: Play Next, Play Last - the albums remembered, then
   const player = {
     playNext: (tracks) => { asked.push(['playNext', tracks.map((t) => t.id)]); W.calls.push(['playNext']); return false },
     playLast: (tracks) => { asked.push(['playLast', tracks.map((t) => t.id)]); W.calls.push(['playLast']); return true },
+    //? (2.1.16) the queue as it stands: its albums handed to rememberAdded, so none is let go for the added ones
+    queue: { tracks: [{ id: 'playing', albumId: 'mezz' }, { id: 'loose', albumId: null }], index: 0 },
   }
   const render = hooks.root(QueueMenu)
   const pick = { label: 'Roads', tracks: [track('roads')], albums: [{ id: 'dum', name: 'Dummy' }] }
@@ -1465,12 +1467,12 @@ console.log('\nthe song menu: Play Next, Play Last - the albums remembered, then
   check('two rows and Cancel, named for what it was opened with; a sheet of its own', [items.map(words), words(find(byClass('app-menu-cancel'), tree)), find((node) => node.props?.role === 'dialog', tree)[0].props['aria-label'], W.sheets[0].lockClass],
     [['Play Next', 'Play Last'], 'Cancel', 'Roads', 'app-queue-menu-open'])
   items[0].props.onClick()
-  check('Play Next: the album remembered, then playNext with the songs, the menu closed, the notice (it queued them)',
-    [W.calls, asked, closed], [[['rememberAdded', ['dum']], ['playNext'], ['sayPins', 'Playing next: Roads']], [['playNext', ['roads']]], 1])
+  check('Play Next: the album remembered (with the queue\'s songs, 2.1.16), then playNext with the songs, the menu closed, the notice (it queued them)',
+    [W.calls, asked, closed], [[['rememberAdded', ['dum'], ['mezz', null]], ['playNext'], ['sayPins', 'Playing next: Roads']], [['playNext', ['roads']]], 1])
   W.calls.length = 0
   render({ open: true, pick: { ...pick, label: 'Dummy' }, opener: { current: null }, onClose: () => { closed += 1 }, player })
   find(byClass('app-menu-item'), render({ open: true, pick: { ...pick, label: 'Dummy' }, opener: { current: null }, onClose: () => { closed += 1 }, player }))[1].props.onClick()
-  check('Play Last that started the music (nothing was playing): no notice - the mini player says so', [W.calls, closed], [[['rememberAdded', ['dum']], ['playLast']], 2])
+  check('Play Last that started the music (nothing was playing): no notice - the mini player says so', [W.calls, closed], [[['rememberAdded', ['dum'], ['mezz', null]], ['playLast']], 2])
   //? (2.0.0-player.58) Add to a playlist…, third: App's, handed what the menu was opened with - nothing of the player
   W.calls.length = 0
   const picked = []

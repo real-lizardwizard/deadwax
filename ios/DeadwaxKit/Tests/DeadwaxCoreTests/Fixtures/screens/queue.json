@@ -2,7 +2,7 @@
   "about": "app/QueueMenu.tsx driven: a pick ({label, count of songs, as - null: not said}) under each setting, Play Next or Play Last, the music started from it or not -> the dialog's name, the player call made with each song's level (null: none), how often it closed, the notice said, the albums remembered; its words; the album page's picks (AlbumPage.tsx, as written).",
   "made_by": "ios/scripts/export-screen-vectors.cjs - never edit by hand: change the TypeScript and run it again",
   "made_from": {
-    "ui/src/app/QueueMenu.tsx": "1349624d324bb048d7c48dcf9b308d5b56119fb976c4fc9a134fe7815cf5c79f",
+    "ui/src/app/QueueMenu.tsx": "d7551ae7ac79836630ccf6d8af0715f8988249e5a9753b75f7198ce8a78db19c",
     "ui/src/player/levelling.ts": "d70c659dd7762c2affd37286a93fc8b20e5ee1b2fff8b1f836494cd25dd9990b",
     "ui/src/lib/loudness.ts levelFor": "4bbd7a92fe88a77e5b5b2f5f624204229e0c06990a5015f91215034612ebe1d7",
     "ui/src/lib/upNext.ts queuedWords": "35536afaa1c9c19f7b564ca9ff112f1b3ff01977bfd39be2804d5399a0f910ec",

@@ -465,6 +465,37 @@ console.log('\nthe albums played from')
   again.also({ id: 'twice' })
   for (let n = 1; n <= PLAYED_KEPT; n++) again.remember({ id: `r${n}` })
   check('...an album added again counts once; remember() still starts afresh, back to its own bound', [again.get('twice'), again.get(`r${PLAYED_KEPT}`)?.id], [null, `r${PLAYED_KEPT}`])
+  //? (2.1.16) the queue's albums, named by `keeping`, are never let go to make room - the iPhone app's review
+  const full = Array.from({ length: QUEUE_ALBUMS_KEPT }, (_, n) => ({ id: `f${n + 1}` }))
+  const fullIds = new Set(full.map((album) => album.id))
+  const before = createPlayedAlbums()
+  before.rememberQueue(full)
+  before.also({ id: 'next' })
+  const after = createPlayedAlbums()
+  after.rememberQueue(full)
+  after.also({ id: 'next' }, fullIds)
+  check(`a ${QUEUE_ALBUMS_KEPT}-album queue, then Play Next: without keeping its last album went; with it every one stays, past the bound`,
+    [before.get(`f${QUEUE_ALBUMS_KEPT}`), full.every((album) => after.get(album.id)?.id === album.id), after.get('next')?.id],
+    [null, true, 'next'])
+  const thirty = Array.from({ length: 30 }, (_, n) => ({ id: `t${n + 1}` }))
+  const thirtyIds = new Set(thirty.map((album) => album.id))
+  const many = createPlayedAlbums()
+  many.rememberQueue(thirty)
+  for (let n = 1; n <= 40; n++) many.also({ id: `p${n}` }, new Set([...thirtyIds, ...Array.from({ length: n }, (_, k) => `p${k + 1}`)]))
+  const fewer = createPlayedAlbums()
+  fewer.rememberQueue(thirty)
+  for (let n = 1; n <= 40; n++) fewer.also({ id: `p${n}` }, thirtyIds)
+  check('...30 albums, then Play Next from 40 others: the queue\'s 30 kept either way; past the bound the oldest added goes, never the queue\'s',
+    [thirty.every((album) => many.get(album.id)), thirty.every((album) => fewer.get(album.id)), !!fewer.get('p1'), fewer.get('p40')?.id, !!many.get('p1')],
+    [true, true, false, 'p40', true])
+  const stub = createPlayedAlbums(2, 3)
+  stub.also({ id: 'k1' }, new Set(['k1', 'k2', 'k3', 'k4']))
+  stub.also({ id: 'k2' }, new Set(['k1', 'k2', 'k3', 'k4']))
+  stub.also({ id: 'k3' }, new Set(['k1', 'k2', 'k3', 'k4']))
+  stub.also({ id: 'k4' }, new Set(['k1', 'k2', 'k3', 'k4']))
+  stub.also({ id: 'k5' }, new Set(['k2', 'k3', 'k4']))
+  check('...with every other album kept, the oldest unkept goes and the store holds more than its bound',
+    ['k1', 'k2', 'k3', 'k4', 'k5'].map((id) => !!stub.get(id)), [false, true, true, true, true])
 }
 
 /* ===== the sheets ===== */

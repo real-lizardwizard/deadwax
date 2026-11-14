@@ -1079,6 +1079,8 @@ function queueFixture() {
           const player = {
             playNext: (queued) => { calls.push(['playNext', queued.map((track) => track.level ?? null)]); return started },
             playLast: (queued) => { calls.push(['playLast', queued.map((track) => track.level ?? null)]); return started },
+            //? (2.1.16) the menu hands rememberAdded the queue's songs, so their albums stay for Info: an empty queue here
+            queue: { tracks: [], index: -1 },
           }
           const tree = hooks.root(QueueMenu)({ open: true, pick, onClose: () => { closed += 1 }, player })
           const items = find(tree, byClass('app-menu-item'))

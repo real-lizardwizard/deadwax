@@ -19,6 +19,12 @@
  * QUEUE_ALBUMS_KEPT, so Info, the turntable's disc art and Go to album know an added song's album as they
  * know the queue's - remember() would have reset the floor, and could drop an artist Play's albums.
  *
+ * Since 2.1.16 `also` is told which albums the queue still names (`keeping`), and lets none of them go: past
+ * the bound it lets the oldest OTHER album go, and when everything left is kept it holds more than the bound
+ * until the queue stops naming them. Without it, with QUEUE_ALBUMS_KEPT held - a 64-album playlist or artist
+ * Play, then one Play Next - the oldest held was the queue's LAST album to play, still to come, and its songs'
+ * Info, disc art and Go to album had only the queue's few fields (the iPhone app's review, Phase 4).
+ *
  * Pure - a small most-recent-first store - so ui/test/info.sim.cjs can hold it to its bounds.
  */
 
@@ -35,8 +41,9 @@ export interface PlayedAlbums<T extends { id: string }> {
    *  they play: every one kept (up to QUEUE_ALBUMS_KEPT) until the next queue starts */
   rememberQueue(albums: readonly T[]): void
   /** (2.0.0-player.57) called in the tap that adds songs to Up Next, with their album's answer: put in as the
-   *  newest, letting go of nothing held (up to QUEUE_ALBUMS_KEPT) */
-  also(album: T): void
+   *  newest, letting go of nothing held (up to QUEUE_ALBUMS_KEPT) - and (2.1.16) of none in `keeping`, the
+   *  albums the queue names, whatever the bound */
+  also(album: T, keeping?: ReadonlySet<string>): void
   /** the answer for that album id, or null when it was never played from (or has been let go of) */
   get(id: string | null | undefined): T | null
 }
@@ -52,9 +59,16 @@ export function createPlayedAlbums<T extends { id: string }>(
     albums.delete(album.id)
     albums.set(album.id, album)
   }
-  const trim = () => {
+  //? `keep`: ids never let go here (2.1.16) - the oldest of the REST goes; with none of the rest left, the bound waits
+  const trim = (keep?: ReadonlySet<string>) => {
     while (albums.size > Math.max(1, kept, floor)) {
-      const [oldest] = albums.keys()
+      let oldest: string | undefined
+      for (const id of albums.keys()) {
+        if (!keep?.has(id)) {
+          oldest = id
+          break
+        }
+      }
       if (oldest === undefined) break
       albums.delete(oldest)
     }
@@ -71,11 +85,12 @@ export function createPlayedAlbums<T extends { id: string }>(
       for (let index = list.length - 1; index >= 0; index--) put(list[index]!)
       trim()
     },
-    also(album) {
+    also(album, keeping) {
       //? one more kept, for an album not held already - whatever was held stays, the queue's included
       if (!albums.has(album.id)) floor = Math.min(Math.max(floor, albums.size) + 1, Math.max(1, queueKept))
       put(album)
-      trim()
+      //? (2.1.16) the queue's albums, and the one just put, are passed over: the oldest of the others goes
+      trim(keeping ? new Set([...keeping, album.id]) : undefined)
     },
     get(id) {
       return (id ? albums.get(id) : undefined) ?? null

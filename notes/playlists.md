@@ -262,3 +262,23 @@ count; the two page kinds and their addresses, never a LibraryPick; the sidebar'
 Browse's) and Managing, sidebarCurrent's playlist branch before any Library-tab branch; usePlaylists as the one list;
 Library tiles and rows only navigate - a playlist plays from its own page. .59 removes this slice's `.app-desk
 .app-library-playlists { display: none }` and its test, on purpose.
+
+### One write at a time per playlist (2.1.17)
+
+The iPhone app's Phase 4 review (slice 2, its picker) found two adds of the same songs to one playlist both going in
+when they overlapped: every write route reads the playlist and then writes from what it read - add's duplicates
+question, edit's `base` check, delete's owner check - and two at once both read it before either wrote, so both found
+the songs absent and both appended, the question never asked. The phone's own fix keeps its picker to one write across
+openings; this is the server's half, for any two clients at once (two phones, a phone and the web, two tabs).
+
+`_playlist_lock(playlist_id)` in routes/navidrome.py: an asyncio.Lock per playlist id, held across add's, edit's and
+delete's read AND write, so the next write reads what this one wrote - a second add of the same songs then gets the
+question (`done: false`), a second Done the 409. Made afresh for another event loop, as `_queue_lock`'s are, and kept
+for the last PLAYLIST_LOCKS_KEPT (1000) ids - past that the oldest IDLE one goes, never one a write holds. deadwax is
+one process (src/main.py runs one uvicorn server), so one lock per id is the whole guard; creating a playlist needs
+none (a new id each time). Reads (the list, one playlist) take no lock.
+
+Verified: test_playlists.py's lock tests - each of the three routes holds the lock over getPlaylist and its write and
+lets it go once answered; only an idle lock is let go past the bound - each failing under its mutation (the delete's
+`async with` removed; the eviction ignoring `locked()`). Not tested: two requests truly overlapping (the suite's
+TestClient sends one at a time); asyncio.Lock's own ordering is what that relies on.
