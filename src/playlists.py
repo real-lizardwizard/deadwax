@@ -68,6 +68,17 @@ def is_listed(playlist: dict, asker: str) -> bool:
     return is_mine(playlist, asker) or playlist.get("public") is True
 
 
+def is_smart(playlist: dict) -> bool:
+    """(2.1.21) One of Navidrome's smart playlists, made from rules and worked out again as it is read - by its
+    `validUntil`, which Navidrome sends for a smart playlist alone (server/subsonic/playlists.go buildOSPlaylist, when
+    the playlist has been worked out at least once; `readonly` can't tell, it is true for file-synced and others'
+    playlists too). getPlaylist works it out as it answers, so one playlist's answer always says; a smart playlist
+    nobody has opened since Navidrome started may list as not smart until it is. The iPhone app downloads no smart
+    playlist (James: "No Download for them")."""
+    until = playlist.get("validUntil")
+    return isinstance(until, str) and bool(until)
+
+
 def is_editable(playlist: dict, asker: str) -> bool:
     """Theirs, and not read-only (a smart playlist, or one Navidrome keeps in step with a file). `readonly` missing
     reads as False - Navidrome 0.64.2 always sends it."""
@@ -97,6 +108,7 @@ def summary(playlist: dict, asker: str) -> dict:
         "coverArt": cover if isinstance(cover, str) and cover else None,
         "mine": is_mine(playlist, asker),
         "editable": is_editable(playlist, asker),
+        "smart": is_smart(playlist),
     }
 
 

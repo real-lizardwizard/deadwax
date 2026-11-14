@@ -55,13 +55,17 @@
     --pl-secondary-text: var(--dw-text-on-secondary);
     --pl-toggled-text: var(--dw-accent-text);
     --pl-hairline: var(--dw-hairline);
-    /* the scrub bar: a thin sunken well with a grey fill, and a round thumb (STYLE allows it) */
+    /* the scrub bar: a sunken well with a grey fill. On a phone (2.1.20, James: "a squared off thicker
+       bar") a squared-off 12px bar, 16px while a finger holds it, and no thumb - the fill's end is where
+       the song is; the desktop's player bar keeps its thin rounded bar and its round thumb
+       (app-desktop.css redefines these) */
     --pl-scrub-fill: var(--dw-bar-grey);
     --pl-scrub-left: var(--dw-track);
     --pl-scrub-edge: var(--dw-border);
     --pl-scrub-inset: var(--dw-track-inset);
-    --pl-scrub-track: 7px;
-    --pl-scrub-track-held: 11px;
+    --pl-scrub-track: 12px;
+    --pl-scrub-track-held: 16px;
+    --pl-scrub-radius: 0;
     --pl-scrub-thumb: 12px;
     --pl-scrub-thumb-held: 1.5;   /* the thumb grows by this while a finger holds the bar */
     --pl-error: var(--dw-danger-text);
@@ -798,7 +802,7 @@ img { display: block; }
     left: 0;
     height: var(--pl-scrub-track);
     border: var(--pl-hairline) solid var(--pl-scrub-edge);
-    border-radius: var(--pl-radius-track);
+    border-radius: var(--pl-scrub-radius);
     /* the grey fill up to where the song is, the sunken track after it */
     background:
         linear-gradient(to right, transparent var(--done, 0%), var(--pl-scrub-left) var(--done, 0%)),
@@ -818,6 +822,8 @@ img { display: block; }
     background: var(--pl-text);
     transform: translate(-50%, -50%);
     transition: transform var(--duration-fast) var(--ease-out);
+    /* (2.1.20) none on a phone's squared-off bar; the desktop's player bar shows it under the pointer */
+    visibility: hidden;
 }
 
 .pl-scrub.is-held .pl-scrub-track { height: var(--pl-scrub-track-held); }

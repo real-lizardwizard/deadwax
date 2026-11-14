@@ -447,8 +447,9 @@ final class PlayerModel {
 
     /// An Up Next or History row tapped: that entry played from its start, paused or not (QueueController.jumpTo(key:))
     /// - in a song's last moments too: a skip, or, when the edit it needs can't be made then, the queue played afresh
-    /// from the row. (2.1.3) The songs it passes stay behind it;
-    /// History's plays its song again. True when the jump was made: the screen says what started only then.
+    /// from the row. (2.1.3) The songs it passes stay behind it; (the web's 2.1.18) History's rolls back to it - the
+    /// playing point moves up to the row, everything after it to come again. True when the jump was made: the screen
+    /// says what started only then.
     @discardableResult
     func jump(to key: Int) -> Bool {
         guard let controller else { return false }
@@ -457,8 +458,8 @@ final class PlayerModel {
         var took = false
         act { took = controller.jumpTo(key: key) }
         if took {
-            // the entry the jump plays (Phase 2's "the song tapped", OfflinePlay.chosen): a History row's tap plays its
-            // song as a new entry under a new key, so the row's own key wouldn't name it - read it from the queue
+            // the entry the jump plays (Phase 2's "the song tapped", OfflinePlay.chosen), read from the queue: the row's
+            // key names it, but the queue says so for every jump alike
             let played = QueueController.entries(controller.queue)
             if played.indices.contains(controller.queue.index) { chosenKey = played[controller.queue.index].key }
         }
@@ -466,25 +467,25 @@ final class PlayerModel {
         return took
     }
 
-    /// (app 0.8) An older row of Up Next's tapped - a song played before, above History: that song again, now, as a
-    /// History row's tap plays its song - a new entry after the song playing, moved to at once, the queue carrying on
-    /// after it (QueueController.playAgain: the web's Play Next and jump as one action). Queued at the setting's level
-    /// for a song (levelFor(normalization, .songs)), as a song's Play Next queues it. With nothing to play next to - a
-    /// queue played out - it plays as a queue of its own. True when it plays: the screen says what started only then.
+    /// (the web's 2.1.18) An older row of Up Next's tapped - a song played before, above History: ROLLED BACK to,
+    /// everywhere (QueueController.rollBack: the web's jumpTo with Brought rows) - it and every older row below it down
+    /// to History's (`rows`, PlayHistory.rowsFrom) come into the queue ahead of History's songs, and it plays; everything
+    /// played since is to come again. Their songs queued at the setting's level for a song (levelFor(normalization,
+    /// .songs)), as a song's Play Next queues it. `floor` the key of the first entry Up Next drew as it was tapped
+    /// (History's first row, else the song playing's). Nothing with nothing playing - an older row is a queue's. True
+    /// when it plays: the screen says what started only then.
     @discardableResult
-    func playAgain(_ track: QueueTrack) -> Bool {
-        guard let controller = ensureController() else { return false }
-        var song = track
-        if let level = levelFor(normalization, .songs) { song.level = level }
-        follow()
-        if controller.playsAlone() {
-            var took = false
-            startQueue { took = $0.playAgain(song) }
-            return took
+    func rollBack(_ rows: [PastRow], floor: Int?) -> Bool {
+        guard let controller else { return false }
+        let level = levelFor(normalization, .songs)
+        let brought = rows.map { row -> Brought in
+            var song = row.track
+            if let level { song.level = level }
+            return Brought(track: song, starts: row.starts, entry: row.entry)
         }
         cancelRetry()
         var took = false
-        act { took = controller.playAgain(song) }
+        act { took = controller.rollBack(brought, floor: floor) }
         if took {
             // the song tapped (Phase 2's OfflinePlay.chosen): its new entry, stopped on offline rather than passed over
             let played = QueueController.entries(controller.queue)

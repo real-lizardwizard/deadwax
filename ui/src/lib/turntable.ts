@@ -77,8 +77,11 @@ export const ARM_PARTS = {
   /** the base's radius to its outside, and its ring's width */
   base: 22,
   baseEdge: 3,
-  /** how far the head lifts off the record while the arm is held */
-  lift: 5,
+  /** the head lifted while the arm is held (2.1.19): it stays on the bar and comes toward you -
+   *  grown `scale` about its own middle, with a soft shadow round it blurred `shadow` units and with
+   *  no offset, so it doesn't turn with the arm. (It was drawn 5 units up in the arm's turned frame -
+   *  sideways off the bar, so a tap read as the head knocked out of place.) */
+  lift: { scale: 1.08, shadow: 3 },
   /** the handle a finger takes the arm by, round the needle */
   handle: 56,
 } as const

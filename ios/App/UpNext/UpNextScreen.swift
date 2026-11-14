@@ -9,21 +9,24 @@ import SwiftUI
 ///
 /// A row's tap plays it now (PlayerModel.jump, by the row's key: a song in twice is two rows, and a key gone does
 /// nothing); the songs it passes stay behind it, where Previous and History find them (James, 2026-11-11). A row of
-/// History's - "{title}, play again" - plays that song again, a new entry after the song playing; History isn't
-/// rewritten, so the row stays under the finger, VoiceOver's focus stays on it and "Playing {title}" is said - only
-/// once the jump took. History is hidden in Edit, and has no moves or removals. Edit gives each row Move up, Move down and Remove - as VoiceOver actions, and as the List's own drag
-/// handle and the row's own red (-), which takes the song out at once - each change made as it is made, a move
-/// staying in its group. Out of Edit a row can't be swiped away, so a song isn't lost by a stray swipe; in Edit iOS
-/// offers no swipe (a List in Edit takes none - notes/ios.md, "Up Next: one tap to take a song out"), so the (-)
-/// is the one action, in place of the system's two (its (-), then Delete). What changed is read out, and
-/// VoiceOver's focus goes where the web's goes (Pinned's rule): a moved row where it went; after a removal the next
-/// row, the one before at the end, Done with none; Clear to the Shuffle chip; Edit to Done; a row's tap to the row
-/// after it - after a list row's, Playing Next's head, carried after it - (Playing Next's last to the list's first), or
-/// Done, once the card is back at the top so it lands in view. Each opening starts at the song playing, History above it scrolled up to, out of Edit; the song playing put
+/// History's - "{title}, play again" - ROLLS BACK to it (the web's 2.1.18, James: "so it just moves back up the list"):
+/// the one list keeps its order, the playing point moves up to the row, and every row below it is to come, as drawn.
+/// Nothing above the row changes, so with the scroll held the card - the row tapped, now playing - is where the row
+/// was, under the finger; VoiceOver's focus goes to what plays next (the first row under the card, Done with none) and
+/// "Playing {title}" is said - only once the jump took. History is hidden in Edit, and has no moves or removals. Edit
+/// gives each row Move up, Move down and Remove - as VoiceOver actions, and as the List's own drag handle and the row's
+/// own red (-), which takes the song out at once - each change made as it is made, a move staying in its group. Out of
+/// Edit a row can't be swiped away, so a song isn't lost by a stray swipe; in Edit iOS offers no swipe (a List in Edit
+/// takes none - notes/ios.md, "Up Next: one tap to take a song out"), so the (-) is the one action, in place of the
+/// system's two (its (-), then Delete). What changed is read out, and VoiceOver's focus goes where the web's goes
+/// (Pinned's rule): a moved row where it went; after a removal the next row, the one before at the end, Done with none;
+/// Clear to the Shuffle chip; Edit to Done; a row's tap to the row after it - after a list row's, Playing Next's head,
+/// carried after it - (Playing Next's last to the list's first), or Done, once the card is back at the top so it lands
+/// in view. Each opening starts at the song playing, History above it scrolled up to, out of Edit; the song playing put
 /// back at the top whenever it changes (a song's end, Next, Previous, an Up Next row's tap) or Edit goes on or off -
-/// never for Shuffle, Repeat, Clear or Edit's moves, and not after a History tap. A bottom margin lets the card reach
-/// the top near an album's end, where scrollTo would stop short. Done ends Edit, else closes; the sheet closes by
-/// itself once nothing is queued.
+/// never for Shuffle, Repeat, Clear or Edit's moves, and not after a tap above the card (a roll-back). A bottom margin
+/// lets the card reach the top near an album's end, where scrollTo would stop short. Done ends Edit, else closes; the
+/// sheet closes by itself once nothing is queued.
 ///
 /// PLAY HISTORY THAT LASTS (app 0.8; the web's 2.1.15, notes/ios.md "Play history on the phone" - James: "so you can
 /// always look back and see what you played yesterday"): above History, ONE CONTINUOUS LIST goes on back through every
@@ -33,8 +36,9 @@ import SwiftUI
 /// asked for as one of the list's first rows comes into view once the sheet has been placed at the song playing - a
 /// spinner over the list's top while it comes, said in a listener's words with Try again if it can't (ErrorWords) -
 /// and anything landing above what is in view holds the view where it was: the topmost row in view put back at the
-/// top. An older row's tap plays its song again, now, as History's does (PlayerModel.playAgain): the row stays under
-/// the finger, VoiceOver's focus on it, and "Playing {title}" said. Hidden in Edit.
+/// top. (The web's 2.1.18) An older row's tap rolls back to it, as History's does (PlayerModel.rollBack): it and every
+/// older row below it come back into the queue ahead of History's songs, and it plays - drawn as songs to come, never
+/// above as well. The card is where the row was, focus to what plays next, "Playing {title}" said. Hidden in Edit.
 ///
 /// Phase 2 (phase2-downloads.md 4.3.1): every song carries its download mark at the end of its line (the album row's
 /// DownloadMark, outside the line's words), in Edit too; and while deadwax can't be reached, a song not on this phone
@@ -49,7 +53,8 @@ struct UpNextScreen: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.scenePhase) private var scenePhase
     @State private var editing = false
-    /// The entry a History tap moved to: its change of song keeps the scroll where it is (the row under the finger).
+    /// The entry a roll-back moved to (a tap above the card): its change of song keeps the scroll where it is - nothing
+    /// above the row tapped changed, so the card is where the row was, under the finger.
     @State private var holdAt: Int?
     /// Where an Up Next row's tap sends VoiceOver's focus - what plays next - set once the card is back at the top, so
     /// it lands on a row in view (the web's "so focus lands in view"): History grew above the card, which pushed the
@@ -441,20 +446,15 @@ struct UpNextScreen: View {
         .modifier(UpNextDownload(songID: row.track.id, part: .row))
     }
 
-    /// (2.1.3) A row of History's: the song again, now - a new entry after the song playing. History isn't rewritten,
-    /// so the row stays where it is under the finger (the scroll held) and VoiceOver's focus on it, and since nothing
-    /// in view moves, what started is said - all only once the jump took (a key gone does nothing, and says nothing).
+    /// (2.1.3; the web's 2.1.18) A row of History's: ROLLED BACK to - the playing point moves up to it, nothing added or
+    /// copied, and every row below it (the song that was playing among them) is to come, in the order drawn. Nothing
+    /// above it changes, so the scroll is held and the card - the row, now playing - is where it was under the finger
+    /// (rolledTo); then focus to what plays next and what started said - all only once the jump took (a key gone does
+    /// nothing, and says nothing).
     private func historyRow(_ row: UpNextRow) -> some View {
         Button {
             guard player.jump(to: row.key) else { return }
-            holdAt = playingKey
-            //? focus kept on the row, then the words - both once the change has been drawn, as the web says them from
-            //? the draw that shows the tap taken: said during the redraw, VoiceOver can cut them off
-            let words = UpNextWords.playing(row.track.title)
-            Task { @MainActor in
-                focus = .row(row.key)
-                Notice.announce(words)
-            }
+            rolledTo(row.track)
         } label: {
             rowLabel(row.track)
         }
@@ -463,26 +463,39 @@ struct UpNextScreen: View {
         .modifier(UpNextDownload(songID: row.track.id, part: .row))
     }
 
-    /// (app 0.8) An older row - a song played before, above History: the song again, now, as a History row's tap plays
-    /// its song (PlayerModel.playAgain) - a new entry after the song playing, the queue carrying on after it. The rows
-    /// above aren't rewritten, so the row stays under the finger (the scroll held), VoiceOver's focus on it, and what
-    /// started is said - only once it took. A song not on this phone is dimmed and can't be tapped offline, as every
-    /// row is.
+    /// (app 0.8; the web's 2.1.18) An older row - a song played before, above History: rolled back to, everywhere
+    /// (PlayerModel.rollBack) - it and every older row below it (PlayHistory.rowsFrom) come back into the queue ahead of
+    /// History's songs, in the order drawn, and it plays. `floor` the first entry Up Next draws for this queue now -
+    /// History's first row, else the song playing's: the rows were read against it. The rows above it aren't rewritten,
+    /// so the card is where the row was (the scroll held), then focus to what plays next and what started said - only
+    /// once it took. A song not on this phone is dimmed and can't be tapped offline, as every row is.
     private func pastRow(_ row: PastRow) -> some View {
         Button {
-            guard player.playAgain(row.track) else { return }
-            holdAt = playingKey
-            let words = UpNextWords.playing(row.track.title)
-            Task { @MainActor in
-                focus = .past(row.key)
-                Notice.announce(words)
-            }
+            let past = PlayHistory.pastRows(history.plays, queue: player.queue)
+            guard player.rollBack(PlayHistory.rowsFrom(past, row.key), floor: player.upNext.history.first?.key ?? playingKey)
+            else { return }
+            rolledTo(row.track)
         } label: {
             rowLabel(row.track)
         }
         .buttonStyle(.plain)
         .accessibilityLabel(UpNextWords.playAgain(row.track.title))
         .modifier(UpNextDownload(songID: row.track.id, part: .row))
+    }
+
+    /// (the web's 2.1.18 rolledTo) A tap above the card taken: the scroll held (the card where the row was), then - once
+    /// the change has been drawn, as the web says them from the draw that shows the tap taken (said during the redraw,
+    /// VoiceOver can cut them off) - focus to what plays next in the queue now (Playing Next's head, else the list's
+    /// first; Done with none) and what started said.
+    private func rolledTo(_ track: QueueTrack) {
+        holdAt = playingKey
+        let now = player.upNext
+        let next: Focus = (now.added.first ?? now.list?.rows.first).map { .row($0.key) } ?? .done
+        let words = UpNextWords.playing(track.title)
+        Task { @MainActor in
+            focus = next
+            Notice.announce(words)
+        }
     }
 
     private func rowLabel(_ track: QueueTrack) -> some View {

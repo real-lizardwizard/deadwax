@@ -2,7 +2,7 @@
   "about": "Every exp, log, sin, cos, atan2, hypot, pow and log10 the web's ported code evaluated while the other fixtures were made - each entry its inputs' and its answer's bits, as base64 of little-endian 64-bit words ([input, answer] or [a, b, answer]), sorted by input. How many calls each voice run made, and their order, is in its own voice/*.json (`maths`). `made_from`: every other file's.",
   "made_by": "ios/scripts/export-deck-vectors.cjs - never edit by hand: change the TypeScript and run it again",
   "made_from": {
-    "interface/styles/theme.css, the tokens below": "4527e7a509a9c18c7c722f70036e55146fbc06dab6c058ce3e17895c0e570f23",
+    "interface/styles/theme.css, the tokens below": "99a239ae26408ea8a6d65ab032866925f611295a42c46a334c18eda2130142dd",
     "ios/scripts/export-deck-vectors.cjs jsmathFixture": "d7add5ee1e7e76a5a14b2882cc8c1aeb5b8175d8fd07d225f5e78aa1a7557c7d",
     "ios/scripts/export-deck-vectors.cjs recipeChannel, recipeWindow": "8661be9eeb1fa0ed099842607b69222f3a1bc42d89bb7d387df0d829a84c08ca",
     "ui/src/app/LookChoice.tsx LOOKS": "48aadb0bca38a9353bab0a377775b58ac8fa020a1e482fa070c2188e9f0aadf3",
@@ -17,7 +17,7 @@
     "ui/src/lib/platter.ts": "5fadaee1aac3916c9fe113563f44d6bf8c626f73dec3d6986b7bb007f58dfe28",
     "ui/src/lib/playSpeed.ts": "78fb8f2ef2dfb57f0863f5e04403813523cdb6c1643f7eb1dbb247d4d0ca76ec",
     "ui/src/lib/scrub.ts": "101947f91a58149f22697fe10f7de50f84eb90b4c57d449f884f89e19740dda8",
-    "ui/src/lib/turntable.ts": "a731a7598c05444e8c2fe958b16a4c3c7f81a3ee98bf7292e8d159ab766e89a5",
+    "ui/src/lib/turntable.ts": "c9bdf0084edd5d2dfc6f5857ecf2cf480b2422a327b07945591005de820882cd",
     "ui/src/player/NowPlaying.tsx the turntable's toggle (:282)": "64f00a4f057a47be137fe281b2d206f96f6061f826341e7d0db494f742a077bb",
     "ui/src/player/SpeedChip.tsx the chip's aria-label": "3e8c913e26ebcbc4d70d57129c01faa38ba17cf4158c6caefe17376ae0117378",
     "ui/src/player/SpeedFader.tsx the fader's aria-label": "1d189adf9605bcc3e2d2deb4cb2b5f2386b613f3ebae63fbda2ac8f4c5b434a5",

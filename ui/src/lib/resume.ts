@@ -14,7 +14,8 @@
  *    as a PLAIN LIST - Navidrome's songs in its order, from its index, as playTracks(tracks, index) queues them.
  *
  * What is saved is a WINDOW: at most RESUME_BEFORE entries before the song playing and RESUME_MAX in all (toSave).
- * The snapshot (v1, made only by toSave, read only by fromSnapshot) lists the source by id, with the whole song
+ * The snapshot (v1 - or since 2.1.18 v2, the same keys, for a queue a reader before 2.1.18 would read back wrong:
+ * snapshotVersion - made only by toSave, read only by fromSnapshot) lists the source by id, with the whole song
  * (`extra`) only for source songs outside the window, one character a level per entry ('a' album, 't' track,
  * '-' none). On reading, the songs are rebuilt one object per (id, level), shared by the entries and the source as
  * startUpNext shares them, every level re-fitted to this device's Normalization (relevel). A snapshot that doesn't
@@ -105,9 +106,10 @@ export interface QueueAnswer<Song = unknown> {
 type LevelChar = 'a' | 't' | '-'
 type FromChar = 's' | 'a' | 'o'
 
-/** Snapshot v1, as toSave writes it. */
+/** Snapshot v1, as toSave writes it - (2.1.18) or v2: the same keys, written whenever a reader before 2.1.18 would
+ *  read the queue back wrong (snapshotVersion), so it puts back the plain list instead. */
 interface SnapshotV1 {
-  v: 1
+  v: 1 | 2
   /** (2.1.15) the queue's id (UpNextState.id) - absent from the web's before 2.1.15 and the phone's before its port: a
    *  queue put back without one is given a new one */
   id?: string
@@ -122,6 +124,27 @@ interface SnapshotV1 {
   left: [number, number][]
   paged?: Paged
   pagedRounds?: { pass: number; paged: Paged }[]
+  /** (2.1.18) UpNextState.reached, written only while it is after the song playing and in the window - so a queue never
+   *  rolled back is saved as it was before */
+  reached?: number
+  /** (2.1.18) the window's entries brought back from the play history: [key, the moments of their row's starts] - the
+   *  marks stay four apiece, which the iPhone app reads */
+  starts?: [number, number[]][]
+}
+
+/**
+ * (2.1.18) Which version a snapshot of `marks` (the window's, the song playing at `index` in it) is written as. Every
+ * reader before 2.1.18 - the web's (5e3460c), and the iPhone app's DeadwaxCore until its port - reads v1 alone: given
+ * any other it reads nothing (fromSnapshot null) and puts back the plain list of the window's songs, in order, at the
+ * song playing and its position - Navidrome's play queue as savePlayQueue was given it - every level from the
+ * setting. It reads a v1 it can't follow wrong: songs brought back from the play history (`starts`) are its, a
+ * roll-back across Repeat All's rounds (`reached`) loses the songs moved back down from the later round, and with no
+ * list song at or before the song playing its passPlaying answers -1, so restoreQueue's withRepeat (Repeat off or
+ * One) lets go of every list song after it. So any of the three is v2; any other queue is v1, read by both as before.
+ */
+export function snapshotVersion(marks: readonly Mark[], index: number, reached: boolean, starts: boolean): 1 | 2 {
+  if (reached || starts) return 2
+  return marks.some((mark, place) => place <= index && mark.from === 'source') ? 1 : 2
 }
 
 const levelChar = (level: Level | undefined): LevelChar => (level === 'album' ? 'a' : level === 'track' ? 't' : '-')
@@ -172,11 +195,15 @@ export function toSave(queue: UpNextQueue, position: number): Saving {
   const inWindow = new Set(ids)
   const extra: Record<string, QueueTrack> = {}
   for (const track of state.source) if (!inWindow.has(track.id) && !(track.id in extra)) extra[track.id] = bare(track)
+  const marks = state.marks.slice(start, end)
+  //? (2.1.18) where the list runs on to after a roll-back, while it means something here; the rows brought back's starts
+  const reachedAt = marks.findIndex((mark) => mark.key === state.reached)
+  const starts = marks.filter((mark) => mark.starts?.length).map((mark): [number, number[]] => [mark.key, [...mark.starts!]])
   const made: SnapshotV1 = {
-    v: 1,
+    v: snapshotVersion(marks, index, reachedAt > index, starts.length > 0),
     id: state.id,
     levels: entries.map((track) => levelChar(track.level)).join(''),
-    marks: state.marks.slice(start, end).map((mark) => [mark.key, fromChar(mark.from), mark.at, mark.pass]),
+    marks: marks.map((mark) => [mark.key, fromChar(mark.from), mark.at, mark.pass]),
     source: state.source.map((track) => track.id),
     sourceLevels: (state.source as LevelledTrack[]).map((track) => levelChar(track.level)).join(''),
     extra,
@@ -186,6 +213,8 @@ export function toSave(queue: UpNextQueue, position: number): Saving {
     left: state.left.map((gone) => [gone.pass, gone.at]),
     ...(state.paged ? { paged: state.paged } : {}),
     ...(state.pagedRounds ? { pagedRounds: state.pagedRounds } : {}),
+    ...(reachedAt > index ? { reached: state.reached! } : {}),
+    ...(starts.length ? { starts } : {}),
   }
   const snapshot = JSON.stringify(made)
   return { ids, index, position, snapshot: snapshot.length <= RESUME_SNAPSHOT_MAX ? snapshot : null, start }
@@ -229,7 +258,7 @@ function readPaged(value: unknown, setting: Normalization): Paged | null {
 export function savedLevels(snapshot: string | null, count: number): (Level | undefined)[] {
   try {
     const made: unknown = snapshot === null ? null : JSON.parse(snapshot)
-    if (isObject(made) && made.v === 1 && typeof made.levels === 'string' && made.levels.length === count) {
+    if (isObject(made) && (made.v === 1 || made.v === 2) && typeof made.levels === 'string' && made.levels.length === count) {
       return [...made.levels].map(charLevel)
     }
   } catch {
@@ -240,10 +269,13 @@ export function savedLevels(snapshot: string | null, count: number): (Level | un
 
 /**
  * The queue a snapshot describes, over `tracks` - Navidrome's songs, the window's entries, in order - playing
- * `index`, every level re-fitted to `setting`. Null when it doesn't read back: not JSON, another version, a source
+ * `index`, every level re-fitted to `setting`. Null when it doesn't read back: not JSON, a version but 1 or 2 (read
+ * alike, snapshotVersion), a source
  * song in neither Navidrome's songs nor `extra`, or a rebuilt state failing its checks - marks as long as the entries,
  * each mark's `from` one of the three, a source mark's `at` inside the source and naming its song, an added mark's
- * at and pass -1, keys unique and below nextKey, startedAt not below 0 (and past the song playing's run, lowered to it).
+ * at and pass -1, keys unique and below nextKey, startedAt not below 0 (and past the song playing's run, lowered to it);
+ * (2.1.18) `starts` each an entry of the window's that isn't a copy, with whole moments, and `reached` a key - kept only
+ * while it is an entry after the song playing.
  */
 export function fromSnapshot(snapshot: string | null, tracks: readonly QueueTrack[], index: number, setting: Normalization,
   holding: UpNextQueue | null = null): UpNextQueue | null {
@@ -254,7 +286,7 @@ export function fromSnapshot(snapshot: string | null, tracks: readonly QueueTrac
   } catch {
     return null
   }
-  if (!isObject(made) || made.v !== 1) return null
+  if (!isObject(made) || (made.v !== 1 && made.v !== 2)) return null
   const n = tracks.length
   const { levels, marks, source, sourceLevels, extra, shuffle, nextKey, startedAt, left } = made
   if (typeof levels !== 'string' || levels.length !== n || !Array.isArray(marks) || marks.length !== n) return null
@@ -303,6 +335,20 @@ export function fromSnapshot(snapshot: string | null, tracks: readonly QueueTrac
     if (!Array.isArray(raw) || raw.length !== 2 || !isInt(raw[0]) || !isInt(raw[1])) return null
     gone.push({ pass: raw[0], at: raw[1] })
   }
+  //? (2.1.18) the rows brought back from the play history: their starts on their marks again
+  if (made.starts !== undefined) {
+    if (!Array.isArray(made.starts)) return null
+    const places = new Map(rebuilt.map((mark, place) => [mark.key, place]))
+    for (const raw of made.starts) {
+      if (!Array.isArray(raw) || raw.length !== 2 || !isInt(raw[0]) || !Array.isArray(raw[1]) || !raw[1].length) return null
+      const place = places.get(raw[0])
+      const ats = raw[1] as unknown[]
+      if (place === undefined || rebuilt[place]!.from === 'one' || rebuilt[place]!.starts || !ats.every((at) => isInt(at) && at >= 0)) return null
+      rebuilt[place] = { ...rebuilt[place]!, starts: ats as number[] }
+    }
+  }
+  if (made.reached !== undefined && !isInt(made.reached)) return null
+  const reachedAt = rebuilt.findIndex((mark) => mark.key === made.reached)
   let paged: Paged | undefined
   if (made.paged !== undefined) {
     const read = readPaged(made.paged, setting)
@@ -327,6 +373,7 @@ export function fromSnapshot(snapshot: string | null, tracks: readonly QueueTrac
     id: saved ?? queueId(),
     marks: rebuilt, source: list as LevelledTrack[], shuffle, nextKey, startedAt: Math.min(startedAt, run), left: gone,
     ...(paged ? { paged } : {}), ...(pagedRounds ? { pagedRounds } : {}),
+    ...(reachedAt > index && rebuilt[reachedAt]!.from !== 'one' ? { reached: made.reached as number } : {}),
   }
   const queue: UpNextQueue = { tracks: entries as LevelledTrack[], index, upNext }
   const kept = holding?.upNext?.id

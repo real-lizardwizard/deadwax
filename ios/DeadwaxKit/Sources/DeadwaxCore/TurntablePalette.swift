@@ -35,9 +35,8 @@ public enum TurntablePalette {
     public static let ttPivot = DeckRGBA(0x3A, 0x36, 0x42)
     public static let ttPivotEdge = DeckRGBA(0x56, 0x52, 0x5F)
     public static let ttHandleEdge = DeckRGBA(235, 235, 245, 0.18)
-    /// The head's shadow while held (TurntableGeometry.headLift): `--dw-shadow`'s colour, black at 0.5. Not in `tokens`
-    /// yet - tokens.json has no `--dw-shadow`, and adding it to the exporter's list writes every fixture again; main's
-    /// web lift brings it.
+    /// The head's shadow while held (TurntableGeometry.headLift): `--dw-tt-head-shadow` (main's 2.1.19), `--dw-shadow`'s
+    /// black at 0.5.
     public static let ttHeadShadow = DeckRGBA(0, 0, 0, 0.5)
     /// The fader's slot (the app's barTrack).
     public static let barTrack = DeckRGBA(0x12, 0x11, 0x17)
@@ -85,6 +84,7 @@ public enum TurntablePalette {
         ("ttPivot", ttPivot, "--dw-tt-pivot", 0),
         ("ttPivotEdge", ttPivotEdge, "--dw-tt-pivot-edge", 0),
         ("ttHandleEdge", ttHandleEdge, "--dw-tt-handle-edge", 0),
+        ("ttHeadShadow", ttHeadShadow, "--dw-tt-head-shadow", 0),
         ("barTrack", barTrack, "--dw-track", 0),
         ("barEdge", barEdge, "--dw-border", 0),
         ("textTertiary", textTertiary, "--dw-text-3", 0),

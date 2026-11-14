@@ -17,7 +17,7 @@ What these hold:
   - A Navidrome failure (a 502, error 40 ending the session, Navidrome unreachable) leaves the record as it was, and
     the next save carries on from it.
   - Every body bounded and declared: over 2,000 ids, none, a bad device or label, a snapshot that isn't JSON, isn't
-    an object, isn't v 1, is over the cap - and an extra field (pydantic would drop it without a word) - each a 422
+    an object, isn't v 1 or 2, is over the cap - and an extra field (pydantic would drop it without a word) - each a 422
     in words, never FastAPI's echo of the input.
   - One save at a time per user (a full save and a position save never interleave their two writes); two users never
     wait on each other.
@@ -120,8 +120,9 @@ def test_a_save_sends_ids_the_index_and_milliseconds_only():
 
 
 @pytest.mark.parametrize("text, problem", [
-    (None, None), ('{"v":1}', None), ("{not json", "isn't JSON"), ("[1]", "isn't an object"), ('{"v":2}', "v 1"),
-    ('{"v":true}', "v 1"), ('{"x":1}', "v 1"), ('{"v":1,"pad":"' + "x" * rules.SNAPSHOT_MAX + '"}', "over"),
+    (None, None), ('{"v":1}', None), ('{"v":2}', None), ("{not json", "isn't JSON"), ("[1]", "isn't an object"),
+    ('{"v":3}', "v 1 or 2"), ('{"v":2.5}', "v 1 or 2"), ('{"v":true}', "v 1 or 2"), ('{"x":1}', "v 1 or 2"),
+    ('{"v":1,"pad":"' + "x" * rules.SNAPSHOT_MAX + '"}', "over"),
 ])
 def test_a_snapshot_is_checked_to_be_one_and_nothing_more(text, problem):
     found = rules.snapshot_problem(text)
