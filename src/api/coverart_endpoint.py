@@ -17,6 +17,8 @@ when the cover is going to be looked at, and what to avoid when it is going to b
 thousand, since an original is often several megabytes.
 """
 
+import asyncio
+
 import httpx
 
 from src import __version__
@@ -237,3 +239,145 @@ class CoverArtClient:
 
 def extension_for(mime: str) -> str:
     return MIME_EXTENSIONS.get(mime, "jpg")
+
+
+# ---------------------------------------------------------------- the relay's fetch (2.1.24)
+#
+# The fronts GET /deadwax/coverart/{kind}/{mbid} passes on to the iPhone app (src/coverart_cache.py keeps them,
+# src/routes/coverart.py answers): a release's front, or a release group's - the Archive's own pick of the group's
+# front - at one of the Archive's three thumbnail sizes. A client of its own beside CoverArtClient rather than that one:
+# CoverArtClient follows a redirect anywhere, which is fine for saving the cover of a release somebody chose, and not
+# for a route that fetches whatever a phone names. Here nothing from a request is part of an address but a kind, an
+# mbid and a size, each from a fixed set or a fixed pattern (the route checks them first); a redirect is followed only
+# to the Archive's own hosts; an answer is read a piece at a time and refused past FRONT_MAX_BYTES; and the whole
+# fetch, every hop and the body, has FRONT_DEADLINE_SECONDS. Three outcomes kept apart, as the AutoEq client keeps
+# them: a front, a 404 (the Archive has none: None), and a failure that says whether it looks like an outage
+# (ArchiveDown, ArchiveSlow) or belongs to this one answer (ArchiveRefused).
+
+#? the kinds and sizes the Archive answers `front-<size>` for - the route takes only these
+FRONT_KINDS = ("release", "release-group")
+FRONT_SIZES = ("250", "500", "1200")
+
+#? Every host a front may come from. The Archive answers with a redirect to archive.org, which redirects again to one
+#? of its own servers (ia800101.us.archive.org and the like) - so these two, archive.org's servers, and nothing else.
+ARCHIVE_HOSTS = ("coverartarchive.org", "archive.org")
+ARCHIVE_SUFFIX = ".archive.org"
+
+#? A 1200px thumbnail is a few hundred KB; past this it isn't a cover a phone should be sent
+FRONT_MAX_BYTES = 4 << 20
+#? The whole fetch: every redirect and the body. The route waits less (src/coverart_cache.py ANSWER_SECONDS) - a
+#? slow Archive costs that ask its answer, not the fetch, whose cover the next ask finds kept.
+FRONT_DEADLINE_SECONDS = 20.0
+#? The Archive's chain is two or three hops (a release group's front is a release's, then archive.org, then its server)
+FRONT_REDIRECTS = 5
+#? between pieces, and to connect: an Archive that isn't there fails in seconds, not at the deadline
+FRONT_TIMEOUT = httpx.Timeout(10.0, connect=5.0)
+
+REDIRECTS = frozenset({301, 302, 303, 307, 308})
+
+
+class ArchiveDown(Exception):
+    """The Archive (or archive.org) didn't answer, or answered as a server in trouble (429, 5xx): an outage, most
+    likely, and a reason to stop asking for a moment."""
+
+
+class ArchiveSlow(ArchiveDown):
+    """The fetch took longer than its deadline, or a piece of it longer than FRONT_TIMEOUT: a 504."""
+
+
+class ArchiveRefused(Exception):
+    """This answer wasn't a cover deadwax passes on: a redirect off the Archive's hosts, not an image, too big, empty,
+    another status, too many redirects. It says nothing about the Archive as a whole."""
+
+
+def front_address(kind: str, mbid: str, size: str) -> str:
+    """The Archive's address for a front at a thumbnail size. `kind`, `mbid` and `size` are the route's, already
+    checked: one of FRONT_KINDS, a lowercase UUID, one of FRONT_SIZES."""
+    if kind not in FRONT_KINDS or size not in FRONT_SIZES:
+        raise ValueError(f"not a front the relay asks for: {kind} at {size}")
+    return f"{BASE_URL}/{kind}/{mbid}/front-{size}"
+
+
+def on_the_archive(url: httpx.URL) -> bool:
+    """Whether a redirect's target is the Archive's own: http or https, no port but the scheme's own, no user, and the
+    host coverartarchive.org, archive.org or one of archive.org's servers. An address by number is never one."""
+    host = (url.host or "").lower()
+    return (url.scheme in ("https", "http") and url.port is None and not url.userinfo
+            and (host in ARCHIVE_HOSTS or host.endswith(ARCHIVE_SUFFIX)))
+
+
+class ArchiveFronts:
+    """The relay's client: one httpx.AsyncClient, redirects followed by hand, a deadline on the whole of each fetch."""
+
+    def __init__(self) -> None:
+        self._client: httpx.AsyncClient | None = None
+
+    def _http(self) -> httpx.AsyncClient:
+        if self._client is None or self._client.is_closed:
+            #? never followed by httpx: each hop is checked here first (on_the_archive)
+            self._client = httpx.AsyncClient(follow_redirects=False, timeout=FRONT_TIMEOUT)
+        return self._client
+
+    async def close_client(self) -> None:
+        if self._client is not None and not self._client.is_closed:
+            await self._client.aclose()
+        self._client = None
+
+    async def front(self, kind: str, mbid: str, size: str) -> tuple[bytes, str] | None:
+        """The front's bytes and type, None when the Archive has none - or ArchiveDown, ArchiveSlow, ArchiveRefused."""
+        what = f"the {kind} {mbid}'s front at {size}px"
+        address = httpx.URL(front_address(kind, mbid, size))
+        #? read at each call, so the tests can shorten it
+        deadline = FRONT_DEADLINE_SECONDS
+        try:
+            async with asyncio.timeout(deadline):
+                return await self._follow(address, what)
+        except TimeoutError as e:
+            raise ArchiveSlow(f"the Cover Art Archive took more than {deadline:g} s for {what}") from e
+
+    async def _follow(self, address: httpx.URL, what: str) -> tuple[bytes, str] | None:
+        headers = {"User-Agent": CoverArtClient.user_agent()}
+        for _ in range(FRONT_REDIRECTS + 1):
+            host = address.host
+            try:
+                async with self._http().stream("GET", address, headers=headers) as response:
+                    status = response.status_code
+                    if status in REDIRECTS:
+                        location = response.headers.get("location")
+                        if not location:
+                            raise ArchiveRefused(f"{host} answered {status} with nowhere to go for {what}")
+                        target = address.join(location)
+                        if not on_the_archive(target):
+                            raise ArchiveRefused(f"{host} sent {what} on to {target.host or location!r}, which isn't "
+                                                 f"the Archive's own, so it wasn't followed")
+                        address = target
+                        continue
+                    if status == 404:
+                        return None
+                    if status == 429 or status >= 500:
+                        raise ArchiveDown(f"{host} answered {status} for {what}")
+                    if status != 200:
+                        raise ArchiveRefused(f"{host} answered {status} for {what}")
+                    mime = (response.headers.get("content-type") or "").split(";")[0].strip().lower()
+                    if mime not in MIME_EXTENSIONS:
+                        raise ArchiveRefused(f"{host} answered {what} as {mime or 'no type'}, which isn't an image")
+                    declared = response.headers.get("content-length") or ""
+                    if declared.isdigit() and int(declared) > FRONT_MAX_BYTES:
+                        raise ArchiveRefused(f"{what} was refused: {_amount(int(declared))}, past "
+                                             f"{_amount(FRONT_MAX_BYTES)}")
+                    body = bytearray()
+                    async for piece in response.aiter_bytes():
+                        body += piece
+                        if len(body) > FRONT_MAX_BYTES:
+                            raise ArchiveRefused(f"{what} was refused: more than {_amount(FRONT_MAX_BYTES)}")
+                    if not body:
+                        raise ArchiveRefused(f"{host} answered {what} with nothing")
+                    return bytes(body), mime
+            except httpx.TimeoutException as e:
+                raise ArchiveSlow(f"{host} took too long for {what} ({type(e).__name__})") from e
+            except httpx.HTTPError as e:
+                raise ArchiveDown(f"{host} couldn't be reached for {what}: {str(e) or type(e).__name__}") from e
+        raise ArchiveRefused(f"{what} was refused: more than {FRONT_REDIRECTS} redirects")
+
+
+archive_fronts = ArchiveFronts()

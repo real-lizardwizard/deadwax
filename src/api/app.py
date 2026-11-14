@@ -12,7 +12,7 @@ from starlette.middleware.gzip import GZipMiddleware
 
 from src.routes import search_musicbrainz, interface_logs, monitor_slskd, download, library, settings, navidrome, me, pins, store_album
 from src.routes import play_history
-from src.routes import auth as auth_routes, describe, eq, held, my_library, own_password, people
+from src.routes import auth as auth_routes, coverart, describe, eq, held, my_library, own_password, people
 from src import auth, permissions, player_cache, stars
 from src.api import navidrome_admin
 from src.musicbrainz_cache import saved_answers
@@ -27,6 +27,7 @@ from src.api.slskd_endpoint import SlskdClient
 from src.api.lrclib_endpoint import lrclib
 from src.api.wikipedia_endpoint import wikipedia
 from src.api.autoeq_endpoint import autoeq_client
+from src.api.coverart_endpoint import archive_fronts
 from src.api.same_origin import SameOriginWrites
 from src.api.navidrome_endpoint import SignedOut, navidrome as navidrome_client
 from src.config import Config, clear_retired_settings
@@ -42,8 +43,10 @@ MEDIA_PATHS = frozenset({
     "/deadwax/library/disc_art/navidrome",
 })
 #? The player's, whose ids are in the path - the turntable's windows of a song (2.0.0-player.14)
-#? among them: FLAC, which gzip would only waste time on and take the length off
-MEDIA_PREFIXES = ("/deadwax/navidrome/stream/", "/deadwax/navidrome/cover/", "/deadwax/navidrome/scrub/")
+#? among them: FLAC, which gzip would only waste time on and take the length off - and (2.1.24) the
+#? Cover Art Archive's fronts passed on to the iPhone app, whose kind and mbid are in the path
+MEDIA_PREFIXES = ("/deadwax/navidrome/stream/", "/deadwax/navidrome/cover/", "/deadwax/navidrome/scrub/",
+                  "/deadwax/coverart/")
 
 
 def serves_media(path: str) -> bool:
@@ -188,6 +191,8 @@ async def lifespan(app: FastAPI):
     await wikipedia.close_client()
     await eq.stop_refreshing(app)
     await autoeq_client.close_client()
+    await coverart.stop(app)
+    await archive_fronts.close_client()
     await navidrome_client.close_client()
     await auth.login_client.close_client()
     await navidrome_admin.close_client()
@@ -465,6 +470,9 @@ def start() -> FastAPI:
     #? (2.1.7) AutoEq's corrections for the iPhone app's EQ, searched and fetched through deadwax - a user's, like
     #? the descriptions: an outside source, read for one person's listening
     app.include_router(eq.router, prefix="/deadwax/eq", tags=["eq"], dependencies=signed_in)
+    #? (2.1.24) the Cover Art Archive's front covers passed on to the iPhone app, kept on disk - a user's, like
+    #? AutoEq: an outside source the phone never talks to itself
+    app.include_router(coverart.router, prefix="/deadwax/coverart", tags=["coverart"], dependencies=signed_in)
     #? signing in and out (2.0.0-player.48) - with no session, of course: see routes/auth.py
     app.include_router(auth_routes.router, prefix="/deadwax/auth", tags=["auth"])
 

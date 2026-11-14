@@ -15,6 +15,17 @@ can then level songs on the phone from the same measurements the web app's Norma
 route only reads what's there and never measures anything itself. It only answers about an album
 the signed-in person can see in Navidrome. Nothing changes for the web app.
 
+deadwax 2.1.24 adds the route the app's Search will draw covers from for the albums you don't have
+yet, the ones it finds on MusicBrainz. deadwax fetches the album's front cover from the Cover Art
+Archive the first time it's asked for and passes it on, so the app still talks only to deadwax. It
+keeps each cover it fetched, up to 128 MB, in a folder of its own beside the player's cache
+(`deadwax-covers`, in [`PLAYER_CACHE_PATH`](configuration.md#paths) or the container's temporary
+space), so a cover it has kept is answered without asking the Archive (and fetched again behind it
+once it's a month old). When the Archive has no cover, or can't be reached, deadwax says so within
+seconds rather than keeping the app waiting, and the app can draw the empty cover. Like **Get
+cover**, it needs deadwax's container to reach `coverartarchive.org` and `archive.org`. Nothing
+changes for the web app, which loads those covers from the Archive itself.
+
 ## What you need
 
 - **A Mac with Xcode.** Xcode 16 or later opens the project. An iPhone on iOS 27 needs **Xcode 27**,

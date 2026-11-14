@@ -675,3 +675,109 @@ headphone. Found by EQ slice 4's review on `ios`, whose suggestion already read 
 Olufsen" and "Bang and Olufsen" are one name. A kept list is folded again as it's read (the review's), so an install
 upgrading needs nothing fetched. One ranking moved: "(51dB + ANC)" now folds longer than "(ANC mode)", so crinacle's
 two modes come before his listening levels for "airpods pro". test_plus_and_ampersand_are_words_of_the_name.
+
+## The Cover Art Archive relay (2.1.24)
+
+Phase 5's question 8 (notes/ios-specs/phase5-search.md on `phase5-search`, sections 4 and 10): the web draws a
+MusicBrainz album's cover straight from coverartarchive.org (`lib/pressings.ts` coverAddresses, `requestsView.ts`,
+`LibraryParts.tsx`), and the app talks only to deadwax. So deadwax passes the Archive's front covers on, as a main
+patch before Search's slice 2. The web doesn't change.
+
+- **The route**: `GET /deadwax/coverart/{kind}/{mbid}?size=`, a user's (included with `current_user`;
+  tests/test_logins.py ROUTES, "user"). `kind` is `release` or `release-group` (a `Literal`, 422 otherwise); `mbid`
+  is MBID_PATTERN, the lowercase hyphenated UUID every other route takes (422 otherwise - an uppercase one too, as
+  MusicBrainz writes them lowercase; one with a slash never reaches the route, a 404); `size` is `250` (the default:
+  Search's rows draw a 44 pt cover, 132 px on a 3x screen), `500` or `1200`, 422 otherwise. Answers: 200
+  with the image (jpeg, png, gif or webp - the Archive's thumbnails are JPEGs), `ETag` (blake2b of the bytes, as
+  json_etag's) and `Cache-Control: private, max-age=604800` (a week: a front can change, so not immutable), a 304 with
+  no body for an If-None-Match naming it (weak or strong, a list, or `*`); 404 when the Archive has no front; 502 when
+  it couldn't be had; 504 when the Archive was too slow. Every failure `Cache-Control: no-store`, `detail` a short
+  sentence (routes/coverart.py WORDS) - the phone draws the empty cover either way. Under GuardMedia's headers
+  (nosniff, the sandbox, same-origin) and never gzipped: `/deadwax/coverart/` is in app.py MEDIA_PREFIXES.
+- **The fetch** (src/api/coverart_endpoint.py `ArchiveFronts`, `archive_fronts`): its own httpx client beside
+  CoverArtClient, `follow_redirects=False`, each hop followed by hand and checked by `on_the_archive()` - http or https,
+  no port but the scheme's own, no user, the host `coverartarchive.org`, `archive.org` or a subdomain of
+  `archive.org`; anything else refused and never asked (an address by number included, so nothing on the network
+  deadwax runs in can be reached through it). At most FRONT_REDIRECTS (5) hops. Only an image type (MIME_EXTENSIONS)
+  is passed on; a Content-Length past FRONT_MAX_BYTES (4 MB) is refused unread, a body read a piece at a time and
+  refused as soon as it passes; an empty one refused. FRONT_DEADLINE_SECONDS (20) for the whole fetch, every hop and
+  the body, and httpx's 10 s between pieces, 5 to connect. The agent is CoverArtClient's (the MusicBrainz one, with
+  its contact, as the Archive asks - else `deadwax/<version>`). Three outcomes: a front, None (a 404 anywhere in the
+  chain), or a failure - ArchiveDown (unreachable, 429, 5xx), ArchiveSlow (the deadline, an httpx timeout: the 504)
+  or ArchiveRefused (this answer's own: an off-Archive redirect, not an image, too big, empty, another status, too
+  many redirects).
+- **The answers** (src/coverart_cache.py `CoverRelay`, one per app as `app.state.coverart`, made at the first ask):
+  a kept cover from disk, at once; a 404 remembered MISS_SECONDS (five minutes) - brief, since one answer can't tell
+  a missing cover from an outage (notes/tooling.md) - so a list of twenty albums with no art asks once, not on every
+  scroll; a failure remembered FAILED_SECONDS (30) and answered as it was; and one that looks like an outage
+  (ArchiveDown, ArchiveSlow) holds EVERY cover not kept for OUTAGE_SECONDS (30): a 502 at once, the Archive not
+  asked, said once in deadwax's log at info level as the hold begins. An ArchiveRefused holds only its own cover.
+  One fetch per cover however many ask at once (single flight); an ask waits ANSWER_SECONDS (7 - under the phone's
+  8 s, URLSessionTransport.standardTimeout) and is a 504 after it, the fetch shielded so it carries on to its own
+  deadline and its cover is kept for the next ask. A kept cover older than FRESH_SECONDS (30 days, by when it was
+  fetched) is answered at once and fetched again behind it: a new one replaces it, a 404 drops it, a failure leaves
+  it. A fault in deadwax while fetching is a 502 with its traceback in the log. The app's shutdown cancels the
+  fetches under way and closes the client.
+- **Bounded** (the review's, before it shipped): the first cut limited nothing in flight - a task per cover not kept,
+  each holding up to 4 MB for up to 20 s and carrying on past its ask's 7 s answer - so a Search list of fifty asked
+  archive.org fifty times at once, and anyone asking new mbids in a loop (with logins off, anyone on the network) could
+  start hundreds. Now:
+  - **FETCHING_AT_ONCE, 6** (a browser's own connections a host): an asyncio.Semaphore around `fronts.front()` alone,
+    one per event loop. The wait for a turn isn't part of FRONT_DEADLINE_SECONDS - the deadline is the Archive's, not
+    the queue's - and the ask's ANSWER_SECONDS still bounds what the phone waits: a cover queued past it is a 504,
+    and kept for the next ask when its turn comes.
+  - **PENDING_MAX, 64** (a Search list of fifty fits, queued six at a time): the fetches under way, running or waiting
+    their turn. An ask that would start one more - a cover not kept and not already being fetched - is a 502 at
+    once with nothing remembered (no failure, no outage hold), so it is asked as ever once they drain; said once in
+    the log while full. An ask for a cover already being fetched joins it, full or not.
+  - **A kept cover's refresh** is a fetch like any other: it takes a turn and counts against PENDING_MAX. The kept
+    cover is answered at once either way; with no room, the refresh isn't started this time, and the next ask tries.
+  - At about half a second a cover from the Archive (assumed - not timed from James's server), fifty take 4-5 s six
+    at a time, inside the 7; slower than that, the last rows are 504s whose covers are kept for the next draw.
+- **Where they're kept, and why there**: `deadwax-covers`, beside the player cache's `deadwax-player` - inside
+  PLAYER_CACHE_PATH, else the container's temporary space - made private and checked by player_cache.open_folder()
+  (its new `name` parameter), so the same rules hold: a real folder, deadwax's own, 0700, never a link; one that
+  isn't is used for nothing, said once. Not the config volume, which people back up and these don't need; not the
+  MusicBrainz file, which is JSON answers in SQLite; not inside `deadwax-player`, whose MP4s that cache counts and
+  clears by rules of its own (and whose `_prepare` clears loose files). No setting of its own - PLAYER_CACHE_PATH
+  moves both, and its row in Server settings and docs/configuration.md now say so. Files are named
+  `<kind>_<mbid>_<size>.<ext>`, written to a `.part` and renamed into place, read with O_NOFOLLOW and refused unless
+  a regular file under FRONT_MAX_BYTES.
+- **The bound**: KEPT_MAX_BYTES, 128 MB - about 3,000 covers at 250 px (41 KB each, seen by hand) or 480 at 1200
+  (268 KB). Past it the covers served longest ago go until the folder is under TRIM_TO (90%) of it, never the one
+  just put; one bigger than the cap alone is answered and not kept, and none is written with less than
+  player_cache.DISK_SPARE_BYTES free. Which was served when is kept in memory (`KeptCovers`, an OrderedDict under a
+  threading.Lock, its disk work on worker threads through asyncio.to_thread); a start reads the folder ordered by
+  each file's mtime, which is when it was fetched, clearing `.part` files ten minutes old.
+
+### Decided here (the spec didn't say)
+
+- **Lowercase only.** Every other route's MBID_PATTERN; Swift's `UUID().uuidString` is uppercase, so the app must
+  send the mbid as MusicBrainz gave it (a string), not through `UUID`.
+- **http allowed** on the Archive's hosts as well as https: every hop seen on 2026-11-14 was https, but a redirect
+  to http on archive.org refused would be a missing cover for nothing, and only an image type is passed on.
+- **The outage hold** is global and short: it makes the second wave of a list quick during an outage, at the price
+  of a 30 s gap after one bad answer from the Archive's servers.
+- **No troubleshooting entry yet**: nothing calls the route until the phone's slice 2, so no listener can see it
+  fail; slice 2 should add one with what the phone shows.
+
+### Verified, and not
+
+- **pytest**: tests/test_coverart_relay.py, through start() with no lifespan and one event loop (as
+  tests/test_autoeq.py), the Archive an httpx MockTransport shaped as the real one was seen (below); plus the route
+  in tests/test_logins.py's ROUTES and a test there that a signed-out ask is a 401 with the Archive never asked (and
+  a signed-in one answered), and the path in tests/test_media_headers.py. Eleven mutations tried by hand - redirect
+  hosts unchecked, no shield, no outage hold, no miss memory, never trimmed, the declared length unchecked, no
+  deadline, any type passed on, the disk never read, never refreshed, the cover just put trimmed - each fails a test.
+  The caps (the review's): no more than six asked at once over twenty covers, a turn's wait outside the deadline
+  (six covers, two turns, a deadline shorter than the queue), a 502 past the pending cap at once and asked
+  normally after, and a refresh counted against both caps while its cover is served at once. Four more
+  mutations - no turns, no pending cap, nothing counted as pending, ten turns - each fail a test.
+- **By hand with curl, 2026-11-14** (not deadwax): `coverartarchive.org/release-group/b1392450-…/front-250` answers
+  307 to `archive.org/download/mbid-30702389-…/mbid-30702389-…-43287476628_thumb250.jpg` (a release group's front
+  goes straight to its release's image, not through a `/release/` address), which answers 302 (typed image/jpeg) to
+  `dn720706.ca.archive.org/0/items/…`, which answers 200 image/jpeg, 41,268 bytes; the release's `front-1200` the same
+  chain, 268,304 bytes; a release with no art (`00000000-0000-4000-8000-000000000000`) a 404 as text/html. All https.
+- **Not seen**: deadwax itself has never asked the real Archive through this route - every answer it has read is the
+  MockTransport's. How long the chain takes from James's server, what an outage really answers (a 503, a hang, a
+  404), and the phone drawing them (slice 2) are unwatched.

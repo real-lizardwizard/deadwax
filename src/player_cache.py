@@ -123,7 +123,9 @@ that mode) before anything in it is listed, deleted or served. So the setting ca
 folder other things share, and a /tmp shared with other users on a machine running from source
 can't hand it a folder somebody else planted. Nothing is resolved at import: a read-only root
 filesystem with no temporary space means no cache - FLAC for Safari, said once - not a deadwax
-that won't start.
+that won't start. (2.1.24) The Cover Art Archive's covers for the iPhone app are kept beside it in
+a second folder of deadwax's own, `deadwax-covers`, made and checked by open_folder() the same way
+and never seen by anything here - src/coverart_cache.py.
 
 HOW MUCH: PLAYER_CACHE_MB of MP4s, a gigabyte by default, least recently served going first. Room
 for a song is made BEFORE it is fetched, counting the songs being made as well as those made - a
@@ -807,14 +809,16 @@ def _own(folder: Path) -> tuple[Path | None, str | None]:
     return (None, problem) if problem else (folder, None)
 
 
-def open_folder(configured: str | None) -> tuple[Path | None, str | None]:
-    """The cache's own folder under this PLAYER_CACHE_PATH, made and checked - or None and why not."""
+def open_folder(configured: str | None, name: str = FOLDER_NAME) -> tuple[Path | None, str | None]:
+    """The cache's own folder under this PLAYER_CACHE_PATH, made and checked - or None and why not. (2.1.24) `name`
+    is another folder of deadwax's own beside it, kept the same way: the Cover Art Archive's covers'
+    (src/coverart_cache.py), apart from the MP4s so that nothing here ever lists or clears them."""
     base, problem = _base(configured)
     if base is None:
         return None, problem
     if (configured or "").strip() and not base.is_dir():
         return None, f"PLAYER_CACHE_PATH, {base}, isn't a folder this container can see"
-    return _own(base / FOLDER_NAME)
+    return _own(base / name)
 
 
 def folder_problem(configured: str | None) -> str | None:
