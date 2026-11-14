@@ -5306,7 +5306,8 @@ is sideways off the bar, and a quick tap popped the head off the arm and back.
   drawing, by explicit animations; `noActions` still keeps every implicit one off, and now covers the shadow's keys.
 - Reduce Motion: `TurntableLook.still` (DeckController's `reduced`) makes the two states a step.
 - `ttHeadShadow` isn't in TurntablePalette.tokens: tokens.json has no `--dw-shadow`, and adding it to
-  export-deck-vectors.cjs's list changes `made_with` and so writes every fixture again.
+  export-deck-vectors.cjs's list changes `made_with` and so writes every fixture again. (Since main's 2.1.19 merge it
+  is: the web gave it a token of its own, `--dw-tt-head-shadow`, and the deck fixtures were made again then.)
 
 **The web** makes the same change on main, in branch web-tonearm, shipping as 2.1.19: the head on the bar, 1.08
 about its middle, a shadow of blur 3 at rgba(0, 0, 0, 0.5) with no offset, on `--dw-duration` and `--dw-ease`. There
@@ -5315,7 +5316,8 @@ about its middle, a shadow of blur 3 at rgba(0, 0, 0, 0.5) with no offset, on `-
 Until main merges, `armLift` (5) stays in TurntableGeometry, held to turntable.json's `ARM_PARTS.lift` by
 TurntableGeometryTests. **iosdeck.sim exports it**: it runs export-deck-vectors.cjs --check, which reads `ARM_PARTS`
 out of ui/src/lib/turntable.ts. So it wasn't regenerated here. The deck vectors are made again at that merge, and
-`armLift` can then give way to the web's numbers.
+`armLift` can then give way to the web's numbers. (Done at main's 2.1.19 merge: `headLift` is held to
+`ARM_PARTS.lift` and `armLift` is gone - see "Going back in Up Next, ported - and main's 2.1.18-2.1.21 merged".)
 
 **Tests** (TurntableRenderTests):
 - `theHeadIsFiveUnitsUpWhenLifted` is now `theHeadStaysOnTheBarAndComesTowardTheViewerWhenLifted`, rendered over a
@@ -5395,7 +5397,7 @@ James's, on main as its own 2.1.x. The phone reads it ahead of the server (below
     - It is still let go once two lists ten minutes apart agree it has gone from Navidrome.
   - **`Playlist.smart`** is read loosely, false when it is absent, so today's server reads as no playlist smart.
     tests/test_ios_contract.py exempts it (`PLAYLIST_AHEAD`) only while summary() leaves it out. Once main sends it,
-    the same equality holds it like any other field.
+    the same equality holds it like any other field. (Main sends it since 2.1.21; the exemption went at that merge.)
   - **Until main ships it, the phone can't tell any playlist is smart.** summary() keeps only `editable` (mine and
     not `readonly`), and Navidrome's `readonly` is true for a smart playlist, an .m3u-synced one and anyone else's
     alike. So nothing is treated as smart before then.

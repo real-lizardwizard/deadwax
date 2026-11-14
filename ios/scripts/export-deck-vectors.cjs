@@ -320,7 +320,7 @@ function jsmathFixture() {
 /* ===== tokens.json: the turntable's tokens, out of theme.css ===== */
 
 const TOKENS = ['tt-plinth', 'tt-platter', 'tt-vinyl', 'tt-grooves', 'tt-sheen', 'tt-label', 'tt-label-edge', 'tt-spindle', 'tt-spindle-edge',
-  'tt-arm', 'tt-arm-head', 'tt-arm-weight', 'tt-pivot', 'tt-pivot-edge', 'tt-handle-edge', 'track', 'border', 'text-3', 'green-icon',
+  'tt-arm', 'tt-arm-head', 'tt-arm-weight', 'tt-pivot', 'tt-pivot-edge', 'tt-handle-edge', 'tt-head-shadow', 'track', 'border', 'text-3', 'green-icon',
   'accent', 'accent-text', 'toggled-bg', 'toggled-border', 'well', 'well-inset', 'highlight', 'secondary-bg', 'secondary-bg-active',
   'secondary-border', 'text-on-secondary', 'text-2']
 

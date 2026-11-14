@@ -43,7 +43,9 @@ import Testing
         }
         #expect(parts?["base"]?.double == TurntableGeometry.armBase)
         #expect(parts?["baseEdge"]?.double == TurntableGeometry.armBaseEdge)
-        #expect(parts?["lift"]?.double == TurntableGeometry.armLift)
+        //? (main's 2.1.19) the head's lift: grown and shadowed, on the bar - its 0.14 s and easing are the phone's own
+        #expect(parts?["lift"]?["scale"]?.double == TurntableGeometry.headLift.scale
+            && parts?["lift"]?["shadow"]?.double == TurntableGeometry.headLift.shadow)
         #expect(parts?["handle"]?.double == TurntableGeometry.armHandle)
         #expect(geometry?["TAP_SLOP_PX"]?.double == TurntableGeometry.tapSlop)
         #expect(DeckFixtures.same(TurntableGeometry.spindleShare, n(geometry?["SPINDLE_SHARE"])))

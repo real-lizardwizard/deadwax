@@ -497,16 +497,14 @@ def optional_fields(struct: str) -> set[str]:
     return {name for name, optional in fields(struct).items() if optional}
 
 
-def assert_decodes(struct: str, answer: dict, ahead: frozenset[str] = frozenset()):
+def assert_decodes(struct: str, answer: dict):
     """What decoding `answer` as `struct` needs: every field the Swift reads is a key the answer has (one renamed would
     read as absent, or fail), and every one it can't do without is there and not null (a null where the Swift has a
-    plain type fails the whole answer). `ahead`: fields the phone reads before the server sends them, each decoded
-    from its absence (PLAYLIST_AHEAD) - exempt only while the answer leaves them out."""
-    ahead = frozenset(ahead) - set(answer)
-    reads = set(fields(struct)) - ahead
+    plain type fails the whole answer)."""
+    reads = set(fields(struct))
     assert reads <= set(answer), f"{struct} reads {sorted(reads - set(answer))}, never sent"
     sent = {name for name, value in answer.items() if value is not None}
-    needs = required_fields(struct) - ahead
+    needs = required_fields(struct)
     assert needs <= sent, f"{struct} needs {sorted(needs - sent)}: {answer}"
 
 
@@ -945,34 +943,26 @@ NAVIDROME_PLAYLIST = {
 }
 
 
-# (iOS slice 3's review, James: "No Download for them") `smart` - one of Navidrome's smart playlists - read by the phone
-# ahead of main's summary() sending it (its own 2.1.x); until then decoded from its absence as false. Exempt only while
-# summary() leaves it out: once main sends it, it is a field like every other, the same equality holding it.
-PLAYLIST_AHEAD = frozenset({"smart"})
-
-
 def test_the_playlist_answers_are_what_the_app_decodes():
     # summary() is each row of the list and a playlist's own: the phone reads exactly its keys - the cover optional
-    # (null for an empty playlist), every other one always sent; Navidrome leaving everything out still decodes
+    # (null for an empty playlist), every other one always sent; Navidrome leaving everything out still decodes.
+    # (2.1.21) `smart` among them - read by the phone ahead of main sending it (iOS slice 3's review, James: "No
+    # Download for them"), exempt until then; main sends it now, so it is a field like every other
     row = playlist_rules.summary(NAVIDROME_PLAYLIST, "james")
-    ahead = PLAYLIST_AHEAD - set(row)
-    reads = set(fields("Playlist")) - ahead
+    reads = set(fields("Playlist"))
     assert reads == set(row), sorted(reads ^ set(row))
+    assert "smart" in row and row["smart"] is False
     assert optional_fields("Playlist") == {"coverArt"}
-    assert_decodes("Playlist", row, PLAYLIST_AHEAD)
+    assert_decodes("Playlist", row)
     assert row["mine"] and row["editable"] and row["public"]
-    # what is read ahead is read from its absence, never required
-    playlist_code = _code((CORE / "Playlists.swift").read_text(encoding="utf-8"))
-    for name in ahead:
-        assert f"{name} = fields.looseField(Bool.self, .{name}) ?? false" in playlist_code, name
     bare = playlist_rules.summary({"id": "pl2"}, "james")
-    assert_decodes("Playlist", bare, PLAYLIST_AHEAD)
+    assert_decodes("Playlist", bare)
     assert bare["coverArt"] is None and not bare["mine"]
     # with_songs() is one playlist: its summary, its songs and how many aren't listed
     whole = playlist_rules.with_songs(NAVIDROME_PLAYLIST, "james", 1)
     assert set(fields("PlaylistWithSongs")) == set(whole) == {"playlist", "songs", "hidden"}
     assert_decodes("PlaylistWithSongs", whole)
-    assert_decodes("Playlist", whole["playlist"], PLAYLIST_AHEAD)
+    assert_decodes("Playlist", whole["playlist"])
     assert whole["playlist"]["songCount"] == 2 and whole["hidden"] == 1
     # the songs as Navidrome sent them, which carry what Song needs (its id: everything else may be left out)
     assert all(required_fields("Song") <= set(song) for song in whole["songs"]) and required_fields("Song") == {"id"}

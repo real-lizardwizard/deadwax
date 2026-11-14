@@ -2,7 +2,7 @@
   "about": "lib/turntable.ts and lib/playSpeed.ts: the drawing's geometry (CSS percentages as the web writes them) and the fader's target at plinth sizes; toStage; grooveRadius, needleAt and armAngle ([time, length, radius, needle, angle]); armTimeAt ([angle, length, time]); angleFromPivot; 24 seeded drags (record and arm, through the slop, onto the spindle, another pointer) with each step's drag, preview, shownTime and previewWords, and both ends; shownTime and previewWords over previews; samePreview; playingDisc and discArtPath; the fader's speeds ([speed, roundSpeed, clampSpeed, detent, faderShare, knobTop, speedLabel, speedWords]), speedAt, speedKey and seeded fader drags ([pointer, y, travel, speed, unchanged, from, answer]); lib/deckClock.ts pointerSamples and eventTime.",
   "made_by": "ios/scripts/export-deck-vectors.cjs - never edit by hand: change the TypeScript and run it again",
   "made_from": {
-    "ui/src/lib/turntable.ts": "a731a7598c05444e8c2fe958b16a4c3c7f81a3ee98bf7292e8d159ab766e89a5",
+    "ui/src/lib/turntable.ts": "c9bdf0084edd5d2dfc6f5857ecf2cf480b2422a327b07945591005de820882cd",
     "ui/src/lib/playSpeed.ts": "78fb8f2ef2dfb57f0863f5e04403813523cdb6c1643f7eb1dbb247d4d0ca76ec",
     "ui/src/lib/deckClock.ts": "d56be8cf57c49f391c73a8f34c586b321c32cfbd17f9d2be109cb0b3bf2f63c4"
   },
@@ -36,7 +36,7 @@
       "weight": {"from":-52,"length":34,"thick":18,"radius":5},
       "base": 22,
       "baseEdge": 3,
-      "lift": 5,
+      "lift": {"scale":1.08,"shadow":3},
       "handle": 56
     },
     "TAP_SLOP_PX": 8,
