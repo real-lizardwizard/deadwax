@@ -5139,3 +5139,13 @@ Not verified - only the phone can tell (docs/ios.md's checks 71, 73 and 75 now a
 - The tab tapped again during Edit.
 - New playlist's sheet swiped away and opened again.
 - A second opening of the picker saying "Adding…" over Now Playing.
+
+## Now Playing's bar, squared off (2026-11-14)
+
+James: "maybe instead of the thin bar, a squared off thicker bar for the play progress in the play page?" Shown
+today's 4 pt capsule beside squared-off 8, 12 and 16 pt bars, he chose **12 pt, on both apps**. ScrubberView's bar
+is now two `Rectangle`s (the track white at 0.2, the fill white at 0.85, as before) 12 pt tall, 16 while a finger is
+on it (the same eased grow, 0.15 s), no knob - as the web's phone bar since main's 2.1.20 (notes/app.md "Now
+Playing's bar, squared off and thicker"). The target is still the whole 44 pt row; nothing about how it seeks
+changed. Verified: CI's device build (ios.yml). Not seen: on the phone - with the next install.
+

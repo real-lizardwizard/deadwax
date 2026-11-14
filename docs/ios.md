@@ -426,7 +426,8 @@ thin line along it for how far in the song is. Tap it for Now Playing.
 **Now Playing**: the cover (a little smaller while paused), the song's title, and "artist — album"
 (tap it to go to the album). Under them:
 
-- **The scrubber**: tap a place to go there, or drag and let go. The clocks say how far in the song is
+- **The scrubber**, a squared-off bar that thickens under your finger: tap a place to go there, or drag
+  and let go. The clocks say how far in the song is
   and how much is left. VoiceOver reads it as "Position in the song", in 5-second steps.
 - **Shuffle, previous, play/pause, next, Repeat.** Previous goes back to the song before in a song's
   first 3 seconds; after that, or on the first song, it starts the song again. Repeat goes from off to

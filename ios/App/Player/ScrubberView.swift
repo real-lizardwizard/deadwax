@@ -7,7 +7,9 @@ import SwiftUI
 /// changes under it. While a finger is on it the bar shows the finger; once let go, PlayerModel's `shownPosition`
 /// holds the seek's target until the engine reports it landed (Scrub.reportedPosition and Scrub.settled), so the
 /// thumb never goes back to the old time meanwhile. A slider to VoiceOver: "Position in the song", "0:12 of 5:00",
-/// swipe up and down moving 5 s (Scrub.adjusted).
+/// swipe up and down moving 5 s (Scrub.adjusted). A squared-off bar, 12 pt, 16 while held (James, 2026-11-14: "a
+/// squared off thicker bar for the play progress"; the web's phone bar since 2.1.20, the same sizes); it was a 4 pt
+/// capsule.
 struct ScrubberView: View {
     @Environment(PlayerModel.self) private var player
     /// The finger on the bar (one: a phone's bar takes one touch).
@@ -20,8 +22,8 @@ struct ScrubberView: View {
     @State private var pressed = false
 
     /// The bar's own height, and the tap target's around it.
-    private static let barHeight: CGFloat = 4
-    private static let heldHeight: CGFloat = 8
+    private static let barHeight: CGFloat = 12
+    private static let heldHeight: CGFloat = 16
     private static let target: CGFloat = 44
 
     var body: some View {
@@ -33,8 +35,8 @@ struct ScrubberView: View {
             GeometryReader { bar in
                 let width = bar.size.width
                 ZStack(alignment: .leading) {
-                    Capsule().fill(Color.primary.opacity(0.2))
-                    Capsule().fill(Color.primary.opacity(0.85))
+                    Rectangle().fill(Color.primary.opacity(0.2))
+                    Rectangle().fill(Color.primary.opacity(0.85))
                         .frame(width: done.isFinite ? width * done : 0)
                 }
                 .frame(height: drag == nil ? Self.barHeight : Self.heldHeight)
