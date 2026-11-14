@@ -45,6 +45,18 @@ final class DownloadModel {
         }
     }
 
+    /// (Phase 3, slice 3, phase3-autodownload.md 2.8) Only while charging: your library's songs download only while the
+    /// phone is charging, or full on the charger - per phone, off until chosen. An unplug lets their tasks go, their
+    /// resume data kept; with it on, one album's tasks at a time are handed to iOS. Hand downloads never wait for it.
+    var onlyWhileCharging: Bool {
+        didSet {
+            guard onlyWhileCharging != oldValue else { return }
+            UserDefaults.standard.set(onlyWhileCharging, forKey: AutoDownload.onlyWhileChargingKey)
+            note("library: only while charging \(onlyWhileCharging ? "on" : "off") (\(LibraryFollowWords.power(power)))")
+            replan()
+        }
+    }
+
     /// Debug's "Stream even when downloaded" - the admin's A/B. Never kept: every launch plays the copies.
     var streamEvenWhenDownloaded = false {
         didSet { playable.streamAlways(streamEvenWhenDownloaded) }
@@ -77,6 +89,14 @@ final class DownloadModel {
     private(set) var bytesHere: Int64 = 0
     /// Other accounts' downloads on this phone, from this server (6.3).
     private(set) var otherBytes: Int64 = 0
+    /// (slice 3) The phone's power as last read (UIDevice.batteryState, monitoring on) - Only while charging's.
+    private(set) var power: PowerState = .unknown
+    /// (slice 3) The last few background runs, newest first (Debug's, check 61) - kept per phone.
+    private(set) var backgroundRuns: [LibraryBackground.Run] = []
+    /// (slice 3's review) Whether this launch could read the phone's settings (LibraryBackground.stateReadable): settled
+    /// as the launch ends, nil until then and read as not. A launch that couldn't - iOS may launch the app in the
+    /// background before the phone's first unlock, when every switch reads as off - asks, cancels and keeps nothing.
+    private(set) var stateReadable: Bool?
     /// When iOS last cancelled downloads because the app was force quit (shown for a day: DownloadWords.forceQuit).
     private(set) var forceQuitAt: Date?
     /// The store couldn't be opened: the system's words (Debug), the screens say DownloadWords.storeUnreadable.
@@ -155,6 +175,14 @@ final class DownloadModel {
     /// minute - /me is asked, and its 401 brings the sign-in - or until the client changes.
     @ObservationIgnored private var refusedSession: String??
     @ObservationIgnored private var refusedAt: Double = 0
+    /// (slice 3) What to do with each background task's request (BackgroundWork's), and the last asked.
+    @ObservationIgnored var askBackground: ([String: LibraryBackground.Ask]) -> Void = { _ in }
+    @ObservationIgnored private var backgroundAsked: [String: LibraryBackground.Ask]?
+    /// The mark a launch that read the settings leaves, as read at this launch.
+    @ObservationIgnored private let stateKept: Bool
+    /// (slice 3's review) Each library task's bytes as last read from the session, and since when they haven't moved
+    /// (the continuous clock: a locked phone's sleep counts) - the stall rule's (DownloadPlan.stallMs).
+    @ObservationIgnored private var progressSeen: [String: (task: Int, bytes: Int64, since: ContinuousClock.Instant)] = [:]
 
     init(server: ServerModel, reachability: Reachability, files: SongFiles, session: DownloadSession) {
         self.server = server
@@ -165,6 +193,11 @@ final class DownloadModel {
         follower = LibraryFollower(server: server, reachability: reachability)
         downloadOver = DownloadOver(saved: UserDefaults.standard.string(forKey: DownloadOver.storageKey))
         storageLimit = StorageLimit(saved: UserDefaults.standard.string(forKey: StorageLimit.storageKey))
+        onlyWhileCharging = UserDefaults.standard.bool(forKey: AutoDownload.onlyWhileChargingKey)
+        stateKept = UserDefaults.standard.bool(forKey: LibraryBackground.readableKey)
+        backgroundRuns = LibraryBackground.runs(raw: UserDefaults.standard.data(forKey: LibraryBackground.runsKey))
+        UIDevice.current.isBatteryMonitoringEnabled = true
+        power = Self.power(UIDevice.current.batteryState)
         DownloadStore.retirePhase0()
         session.connect { [weak self] event in self?.handle(event) }
         reachability.whenChanged { [weak self] in self?.reachabilityChanged() }
@@ -184,6 +217,9 @@ final class DownloadModel {
         })
         observers.append(center.addObserver(forName: UIApplication.didEnterBackgroundNotification, object: nil, queue: .main) { [weak self] _ in
             MainActor.assumeIsolated { self?.movedToBackground() }
+        })
+        observers.append(center.addObserver(forName: UIDevice.batteryStateDidChangeNotification, object: nil, queue: .main) { [weak self] _ in
+            MainActor.assumeIsolated { self?.readPower() }
         })
         watchServer()
         serverChanged()
@@ -797,6 +833,8 @@ final class DownloadModel {
     // MARK: the app's moments
 
     private func becameActive() {
+        // read again: a change while the app was suspended was never told
+        readPower()
         Task {
             if let store { await settle(store) }
         }
@@ -806,6 +844,160 @@ final class DownloadModel {
 
     private func movedToBackground() {
         received = [:]
+        // (slice 3, 2.9) the refresh asked for again, 15 minutes on; the charger's only with something waiting for it
+        askBackgroundTasks(always: true)
+    }
+
+    // MARK: Only while charging, and the background (Phase 3, slice 3)
+
+    /// The phone's power read again: a change plans again - with Only while charging on, an unplug lets the library's
+    /// tasks go (their resume data kept), and charging makes them again.
+    private func readPower() {
+        let now = Self.power(UIDevice.current.batteryState)
+        guard now != power else { return }
+        power = now
+        if onlyWhileCharging { note("power: \(LibraryFollowWords.power(now))") }
+        replan()
+    }
+
+    private static func power(_ state: UIDevice.BatteryState) -> PowerState {
+        switch state {
+        case .charging: return .charging
+        case .full: return .full
+        case .unplugged: return .unplugged
+        case .unknown: return .unknown
+        @unknown default: return .unknown
+        }
+    }
+
+    /// (slice 3's review) Whether this launch read the settings, settled as the launch ends (BackgroundWork.register,
+    /// with UIApplication's word on whether the phone is unlocked) - and the mark left for the next launch when it did.
+    func settleReadable(protectedDataAvailable: Bool) {
+        let readable = LibraryBackground.stateReadable(kept: stateKept, protectedDataAvailable: protectedDataAvailable)
+        stateReadable = readable
+        if readable {
+            if !stateKept { UserDefaults.standard.set(true, forKey: LibraryBackground.readableKey) }
+        } else {
+            note("background: this launch couldn't read the settings (before the phone's first unlock) - nothing asked")
+        }
+    }
+
+    /// What to do with each background task's request now (LibraryBackground.asks), told to iOS - `always` at a move to
+    /// the background and as a run begins (`ran`, its request used up: the refresh 15 minutes on again), else only when
+    /// it has changed. Before the store opens, the charger's is left as it is; a launch that couldn't read the settings
+    /// leaves every request but the one used up.
+    func askBackgroundTasks(always: Bool, ran: String? = nil) {
+        let toCome: Bool? = isOpen ? LibraryBackground.libraryToCome(records.values.filter { (record: DownloadRecord) -> Bool in
+            record.state == .wanted || record.state == .fetching
+        }.map { (record: DownloadRecord) -> DownloadPlan.Asked in
+            DownloadPlan.Asked(record, origins: origins[record.id] ?? [.song])
+        }) : nil
+        let asks = LibraryBackground.asks(readable: stateReadable == true, on: follower.on,
+                                          onlyWhileCharging: onlyWhileCharging, libraryToCome: toCome, ran: ran)
+        guard always || asks != backgroundAsked else { return }
+        backgroundAsked = asks
+        askBackground(asks)
+    }
+
+    /// (2.9; after its review) A background task's run (BackgroundWork's), on its own deadline inside iOS's ~30 s: the
+    /// power read again, the follower's check and reads (at most 20 albums, waited for `followMs`, then stopped), then
+    /// the plan that hands over what the fill lets go, within what is left of `runMs`. The same rules as in front:
+    /// nothing is deleted that the app in front wouldn't (two checks 10 minutes apart; the phone's deficit seen on plans
+    /// 3 minutes apart on this process's uptime clock, so a short run never confirms one). Kept for Debug - but a launch
+    /// that couldn't read the settings does nothing and keeps nothing.
+    func backgroundRun(task: String) async {
+        guard stateReadable == true else {
+            note("background: \(task) - this launch couldn't read the settings, nothing done")
+            return
+        }
+        let began = ListenTracker.wallMs()
+        let clock = ContinuousClock()
+        let start = clock.now
+        readPower()
+        let outcome: LibraryBackground.Outcome
+        if !follower.on {
+            outcome = .off
+        } else if let ran = await follower.background(reads: LibraryBackground.readsPerRun,
+                                                       until: start + .milliseconds(LibraryBackground.followMs),
+                                                       stop: { () -> Bool in UIApplication.shared.applicationState == .background }) {
+            await planSettled(until: start + .milliseconds(LibraryBackground.runMs))
+            outcome = Task.isCancelled ? .expired
+                : .ran(checked: ran.checked, read: ran.read, downloading: libraryAlbumsOut, charging: power.charging)
+        } else {
+            outcome = Task.isCancelled ? .expired : .couldntAsk
+        }
+        let parts = (clock.now - start).components
+        let run = LibraryBackground.Run(task: task, began: began,
+                                        seconds: Double(parts.seconds) + Double(parts.attoseconds) / 1e18,
+                                        outcome: outcome)
+        backgroundRuns = LibraryBackground.keep(run, in: backgroundRuns)
+        UserDefaults.standard.set(LibraryBackground.raw(backgroundRuns), forKey: LibraryBackground.runsKey)
+        note("background: " + LibraryFollowWords.backgroundRun(run, now: began))
+        // asked as it began; again only if what they're for has changed since
+        askBackgroundTasks(always: false)
+    }
+
+    /// (2.8; after its review) A relaunch for the background session's events, its events in: the next batch handed
+    /// over before iOS suspends the app again - Only while charging's one album at a time - within what is left of the
+    /// relaunch's one budget (`deadline`), and the background tasks asked again if what they're for has changed.
+    func eventsHandled(until deadline: ContinuousClock.Instant) async {
+        readPower()
+        await planSettled(until: deadline)
+        askBackgroundTasks(always: false)
+    }
+
+    /// BackgroundWork's words for the downloads log.
+    func noteBackground(_ line: String) { note("background: \(line)") }
+
+    /// A plan, and every plan it asks for, to its end - or to `deadline`, or the calling task's cancellation.
+    private func planSettled(until deadline: ContinuousClock.Instant) async {
+        replan()
+        let clock = ContinuousClock()
+        guard clock.now < deadline else { return }
+        try? await Task.sleep(for: .milliseconds(20))
+        while planQueued || planning {
+            guard clock.now < deadline, !Task.isCancelled else { return }
+            try? await Task.sleep(for: .milliseconds(50))
+        }
+    }
+
+    /// (slice 3's review) How long each library task out has brought nothing (ms), read from the session - only with
+    /// Only while charging on, where one stalled task would hold the one-album batch. A task first seen now, or made
+    /// again, starts from now: a short background launch never finds one stalled.
+    private func readStalls() async -> [String: Int64] {
+        let libraryOut = records.values.filter { (record: DownloadRecord) -> Bool in
+            record.state == .fetching && DownloadOrigin.onlyLibrary(origins[record.id] ?? [.song])
+        }
+        guard onlyWhileCharging, follower.on, !libraryOut.isEmpty else {
+            if !progressSeen.isEmpty { progressSeen = [:] }
+            return [:]
+        }
+        let outs = await session.tasks()
+        let clock = ContinuousClock()
+        let now = clock.now
+        var bytes: [String: (task: Int, received: Int64)] = [:]
+        for out in outs { bytes[out.name.songID] = (out.task, out.received) }
+        var seen: [String: (task: Int, bytes: Int64, since: ContinuousClock.Instant)] = [:]
+        var idle: [String: Int64] = [:]
+        for record in libraryOut {
+            guard let task = live[record.id], let got = bytes[record.id], got.task == task else { continue }
+            if let was = progressSeen[record.id], was.task == task, was.bytes == got.received {
+                seen[record.id] = was
+                let parts = (now - was.since).components
+                idle[record.id] = parts.seconds * 1000 + parts.attoseconds / 1_000_000_000_000_000
+            } else {
+                seen[record.id] = (task, got.received, now)
+            }
+        }
+        progressSeen = seen
+        return idle
+    }
+
+    /// The library's albums with a task out (handed to iOS).
+    var libraryAlbumsOut: Int {
+        Set(records.values.filter { (record: DownloadRecord) -> Bool in
+            record.state == .fetching && origins[record.id]?.contains(.library) == true
+        }.map(\.albumID)).count
     }
 
     private func reachabilityChanged() {
@@ -1067,6 +1259,9 @@ final class DownloadModel {
                 replan()
             }
         }
+        // (slice 3's review) the library's tasks that have stalled - only with Only while charging on
+        let idle = await readStalls()
+        guard self.store === store else { return }
         let asked = records.values.filter { $0.state == .wanted || $0.state == .fetching }
         let freeSpace = DownloadStore.freeSpace() ?? Int64.max / 4
         // your library (Phase 3): the store's songs as its rules read them, its albums' places in the fill's order -
@@ -1084,10 +1279,11 @@ final class DownloadModel {
                                        reach: reachability.reach, path: reachability.path,
                                        signedIn: server.launch == .ready && server.signInOver == nil && server.client != nil
                                            && !refused(server.client?.session),
-                                       over: downloadOver)
+                                       over: downloadOver, onlyWhileCharging: onlyWhileCharging,
+                                       charging: power.charging)
         let askedSongs = asked.map { (record: DownloadRecord) -> DownloadPlan.Asked in
             DownloadPlan.Asked(record, origins: origins[record.id] ?? [.song], received: received[record.id] ?? 0,
-                               libraryRank: rank[albumOf[record.id] ?? record.albumID])
+                               libraryRank: rank[albumOf[record.id] ?? record.albumID], idleMs: idle[record.id])
         }
         if follower.on {
             // what the library asks for and gives back, before anything is planned: a plan follows whatever it does
@@ -1113,6 +1309,8 @@ final class DownloadModel {
         }
         let decisions = DownloadPlan.plan(askedSongs, facts)
         planned = decisions.mapValues(\.wait)
+        // in the background (playing, or a relaunch): the charger's task asked for once something waits for it
+        if UIApplication.shared.applicationState == .background { askBackgroundTasks(always: false) }
         // the row's wait: what the library's songs wait for while none is fetched
         let libraryAsked = askedSongs.filter { (song: DownloadPlan.Asked) -> Bool in song.isLibrary }
         let fetching = libraryAsked.contains { (song: DownloadPlan.Asked) -> Bool in song.out }

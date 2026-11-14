@@ -30,6 +30,15 @@ import Foundation
 /// - **Tasks out** (after the review): at most `maxOut`, the hand units' first; the library's at most `libraryMaxOut`
 ///   and never more than the hand units leave - a library task beyond that is let go, its resume data kept, so a hand
 ///   download never queues behind the library's.
+/// - **Only while charging** (Phase 3, slice 3, phase3-autodownload.md 2.8; open question 11, literal): on, the
+///   library's units wait `charging` while the phone isn't - after the shared waits, before the room - their tasks out
+///   let go with their resume data kept (an unplug cancels what the app can). Hand units never wait for it. And while
+///   it is on, the library's tasks come from **one album at a time** (its first in the fill's order with a task out,
+///   else the first that may have one, within the library's 20): iOS may run them with the app suspended, when an
+///   unplug can't reach them - so an unplug overnight overruns by one album at most.
+/// - **A stalled task doesn't hold the batch** (slice 3's review): a task out that has brought nothing for `stallMs`
+///   (30 minutes - a background task can hang for days before it times out) is let go, its resume data kept, and made
+///   again at the next plan; an album whose every task out has stalled isn't the batch, so the library moves on.
 public enum DownloadPlan {
     /// What the phone must keep free: 2 GB (the plan's reserve), as iOS's Storage counts.
     public static let reserve: Int64 = 2_000_000_000
@@ -37,6 +46,9 @@ public enum DownloadPlan {
     public static let maxOut = 100
     /// Of those, the most your library's may have: the hand downloads always have slots.
     public static let libraryMaxOut = 20
+    /// (slice 3's review) A library task out that has brought nothing for this long is stalled: with Only while charging
+    /// on it is let go, its resume data kept, and the batch doesn't wait for it.
+    public static let stallMs: Int64 = 30 * 60_000
 
     /// One song asked for and not yet here.
     public struct Asked: Sendable, Equatable {
@@ -57,10 +69,13 @@ public enum DownloadPlan {
         public let resumable: Bool
         /// Its album's place in the fill's order, for a song the library alone wants.
         public let libraryRank: Int?
+        /// (slice 3's review) How long its task out has brought nothing, as far as this launch has seen (ms) - nil when
+        /// not known.
+        public let idleMs: Int64?
 
         public init(id: String, albumID: String, disc: Int? = nil, track: Int? = nil, wantedAt: Int64,
                     origins: Set<DownloadOrigin> = [.song], expected: Int64, received: Int64 = 0, out: Bool = false,
-                    resumable: Bool = false, libraryRank: Int? = nil) {
+                    resumable: Bool = false, libraryRank: Int? = nil, idleMs: Int64? = nil) {
             self.id = id
             self.albumID = albumID
             self.disc = disc
@@ -72,14 +87,20 @@ public enum DownloadPlan {
             self.out = out
             self.resumable = resumable
             self.libraryRank = libraryRank
+            self.idleMs = idleMs
         }
 
         /// A record asked for and not here, with its task's bytes so far.
-        public init(_ record: DownloadRecord, origins: Set<DownloadOrigin>, received: Int64 = 0, libraryRank: Int? = nil) {
+        public init(_ record: DownloadRecord, origins: Set<DownloadOrigin>, received: Int64 = 0, libraryRank: Int? = nil,
+                    idleMs: Int64? = nil) {
             self.init(id: record.id, albumID: record.albumID, disc: record.disc, track: record.track,
                       wantedAt: record.wantedAt, origins: origins, expected: record.expectedBytes, received: received,
-                      out: record.state == .fetching, resumable: record.resume != nil, libraryRank: libraryRank)
+                      out: record.state == .fetching, resumable: record.resume != nil, libraryRank: libraryRank,
+                      idleMs: idleMs)
         }
+
+        /// Its task is out and has brought nothing for `stallMs`.
+        public var stalled: Bool { out && (idleMs ?? 0) >= DownloadPlan.stallMs }
 
         /// The library alone wants it.
         public var isLibrary: Bool { DownloadOrigin.onlyLibrary(origins) }
@@ -113,9 +134,14 @@ public enum DownloadPlan {
         /// Someone is signed in (or logins are off): a 401 makes it false until they sign in again.
         public var signedIn: Bool
         public var over: DownloadOver
+        /// (Phase 3, slice 3) Only while charging is on.
+        public var onlyWhileCharging: Bool
+        /// The phone is charging, or full on the charger (PowerState.charging).
+        public var charging: Bool
 
         public init(bytesHere: Int64, libraryHere: Int64 = 0, limit: Int64?, freeSpace: Int64, reach: Reach = .online,
-                    path: NetworkPath = .wifiAtHome, signedIn: Bool = true, over: DownloadOver = .wifi) {
+                    path: NetworkPath = .wifiAtHome, signedIn: Bool = true, over: DownloadOver = .wifi,
+                    onlyWhileCharging: Bool = false, charging: Bool = false) {
             self.bytesHere = bytesHere
             self.libraryHere = libraryHere
             self.limit = limit
@@ -124,7 +150,12 @@ public enum DownloadPlan {
             self.path = path
             self.signedIn = signedIn
             self.over = over
+            self.onlyWhileCharging = onlyWhileCharging
+            self.charging = charging
         }
+
+        /// Only while charging holds the library's songs now: on, and the phone isn't charging.
+        public var libraryWaitsToCharge: Bool { onlyWhileCharging && !charging }
     }
 
     /// One song's part in the plan.
@@ -188,6 +219,12 @@ public enum DownloadPlan {
             let library = key.hasPrefix("library:")
             let need = unit.reduce(Int64(0)) { $0 + $1.remaining }
             let started = unit.contains(where: \.started)
+            // the library's, unplugged with Only while charging on: it waits for the charger, started or not, and holds
+            // no room meanwhile
+            if library, facts.libraryWaitsToCharge {
+                waits[key] = .charging
+                continue
+            }
             var fitWait: DownloadWait?
             if !started {
                 if library {
@@ -239,6 +276,9 @@ public enum DownloadPlan {
         // the library's tasks out that stay: the first of them in its order, within its slots - kept before any new
         // one is made, so a running task isn't let go for another
         var libraryKept = Set<String>()
+        // Only while charging on: the one album whose tasks may be out - its first with a task out, else the first that
+        // may make one (set as it is reached)
+        var batch: String?
         var made: [String: Decision] = [:]
         for key in walked.order {
             let library = key.hasPrefix("library:")
@@ -246,8 +286,20 @@ public enum DownloadPlan {
                 let cap = max(min(libraryMaxOut, maxOut - handOut), 0)
                 libraryCap = cap
                 if outsKept {
-                    let outs = walked.order.filter { $0.hasPrefix("library:") }.flatMap { (unit: String) -> [Asked] in
-                        walked.units[unit]!.filter(\.out).sorted { a, b in a.id < b.id }
+                    var units = walked.order.filter { (unit: String) -> Bool in
+                        unit.hasPrefix("library:") && walked.waits[unit] != .charging
+                    }
+                    if facts.onlyWhileCharging {
+                        // the batch: an album with a task out that hasn't stalled - one whose every task has, isn't
+                        batch = units.first { (unit: String) -> Bool in
+                            walked.units[unit]!.contains { (song: Asked) -> Bool in song.out && !song.stalled }
+                        }
+                        units = batch.map { [$0] } ?? []
+                    }
+                    let outs = units.flatMap { (unit: String) -> [Asked] in
+                        walked.units[unit]!.filter { (song: Asked) -> Bool in
+                            song.out && !(facts.onlyWhileCharging && song.stalled)
+                        }.sorted { a, b in a.id < b.id }
                     }
                     libraryKept = Set(outs.prefix(cap).map(\.id))
                 }
@@ -260,6 +312,11 @@ public enum DownloadPlan {
             }
             let fitWait = walked.waits[key]
             for song in unit {
+                if song.out, fitWait == .charging {
+                    // unplugged with Only while charging on: let go, its resume data kept
+                    made[song.id] = Decision(wait: shared ?? .charging, task: false)
+                    continue
+                }
                 if song.out {
                     // a task out stays out (but a sign-out's) - a library task only within the library's slots
                     let keep = outsKept && (!library || libraryKept.contains(song.id))
@@ -270,7 +327,12 @@ public enum DownloadPlan {
                     made[song.id] = Decision(wait: shared ?? fitWait, task: false)
                     continue
                 }
-                let mayMake = canMake && (library ? libraryOut < libraryCap! : handOut < maxOut)
+                var mayMake = canMake && (library ? libraryOut < libraryCap! : handOut < maxOut)
+                // Only while charging on: one album at a time - the first reached that may make a task is the batch
+                if mayMake, library, facts.onlyWhileCharging {
+                    if batch == nil { batch = key }
+                    mayMake = batch == key
+                }
                 if mayMake {
                     if library { libraryOut += 1 } else { handOut += 1 }
                 }

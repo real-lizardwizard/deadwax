@@ -9,9 +9,14 @@ import SwiftUI
 /// each engine it makes.
 ///
 /// Downloads go through one background URLSession (DownloadSession), made at every launch - a background relaunch for
-/// its events included, which `.backgroundTask(.urlSession(...))` holds open until the store has them.
+/// its events included, which `.backgroundTask(.urlSession(...))` holds open until the store has them, and (Phase 3,
+/// slice 3) until the plan has handed over the next batch.
+///
+/// Your library in the background (app 0.9, phase3-autodownload.md 2.9): the app delegate registers BackgroundWork's
+/// two tasks as the launch ends - SwiftUI's own background task for them is iOS 27's.
 @main
 struct DeadwaxApp: App {
+    @UIApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
     @State private var server: ServerModel
     @State private var player: PlayerModel
     @State private var navigation: AppNavigation
@@ -45,6 +50,8 @@ struct DeadwaxApp: App {
         let history = HistoryModel(server: server, reachability: reachability)
         history.downloads = downloads
         player.history = history
+        // the background tasks run DownloadModel's own (slice 3): set before the delegate registers them
+        BackgroundWork.shared.downloads = downloads
         let debug = DebugModel(server: server, player: player, downloads: downloads)
         let lyrics = LyricsModel(server: server, player: player, downloads: downloads, reachability: reachability)
         // the turntable's deck (turntable.md 2.1): beside the player for the app's run, as Now Playing's cover comes and goes
@@ -90,8 +97,21 @@ struct DeadwaxApp: App {
                 .tint(Palette.accent)
         }
         .backgroundTask(.urlSession(DownloadSession.identifier)) {
+            let began = ContinuousClock().now
             await Self.downloadSession.eventsDelivered()
+            // the events and the plan after them within one budget (slice 3's review)
+            await BackgroundWork.shared.eventsHandled(began: began)
         }
+    }
+}
+
+/// The app delegate, for BGTaskScheduler's one rule SwiftUI can't keep before iOS 27: every task registered before the
+/// launch ends (2.9).
+final class AppDelegate: NSObject, UIApplicationDelegate {
+    func application(_ application: UIApplication,
+                     didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil) -> Bool {
+        BackgroundWork.shared.register()
+        return true
     }
 }
 

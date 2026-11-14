@@ -26,7 +26,7 @@ import Testing
             .queued: "Waiting to download", .connection: "Waiting for a connection", .deadwax: "Waiting for deadwax",
             .signIn: "Waiting for you to sign in", .wifi: "Waiting for Wi-Fi", .hotspot: "Waiting - this Wi-Fi is a hotspot",
             .lowData: "Waiting - Low Data Mode is on", .room: "Waiting for room - the storage limit is reached",
-            .phoneFull: "Waiting for space on this phone",
+            .phoneFull: "Waiting for space on this phone", .charging: "Waiting for the phone to charge",
         ]
         for wait in DownloadWait.allCases {
             #expect(DownloadWords.wait(wait) == expected[wait])

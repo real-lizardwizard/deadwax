@@ -585,6 +585,8 @@ private struct DownloadsDebugSection: View {
 /// Phase 3's Your library (phase3-autodownload.md 3.5): what Download your library follows - its switch is You >
 /// Downloads' (slice 2) - and how much of it is read; the last check; the first read's time (R13, check L0a); what fits
 /// at the storage limit, as the last plan worked it out. The library's log lines are the Downloads section's.
+/// (slice 3) The phone's power as Only while charging reads it, and the last background runs - check 61's evidence
+/// that iOS ran one at all.
 private struct LibraryFollowDebugSection: View {
     @Environment(DownloadModel.self) private var downloads
 
@@ -597,6 +599,7 @@ private struct LibraryFollowDebugSection: View {
                 Text(LibraryFollowWords.notFollowing)
                     .foregroundStyle(Palette.quiet)
             }
+            backgroundRows()
         } header: {
             Text(LibraryFollowWords.section)
         } footer: {
@@ -676,5 +679,35 @@ private struct LibraryFollowDebugSection: View {
         }
         Button(LibraryFollowWords.checkNow) { follower.check(.byHand) }
             .disabled(follower.checking)
+    }
+
+    /// The power, Only while charging, the albums handed to iOS, and the background runs kept.
+    @ViewBuilder
+    private func backgroundRows() -> some View {
+        LabeledContent("Power") {
+            Text(LibraryFollowWords.power(downloads.power)
+                 + (downloads.onlyWhileCharging ? " \u{00B7} only while charging" : ""))
+                .font(.footnote)
+        }
+        LabeledContent("Albums out") {
+            Text(LibraryFollowWords.count(downloads.libraryAlbumsOut))
+                .font(.footnote.monospacedDigit())
+        }
+        VStack(alignment: .leading, spacing: 2) {
+            Text("In the background")
+            let now = ListenTracker.wallMs()
+            if downloads.backgroundRuns.isEmpty {
+                Text(LibraryFollowWords.noBackgroundRun)
+                    .font(.footnote)
+                    .foregroundStyle(Palette.quiet)
+            }
+            ForEach(Array(downloads.backgroundRuns.enumerated()), id: \.offset) {
+                (item: (offset: Int, element: LibraryBackground.Run)) in
+                Text(LibraryFollowWords.backgroundRun(item.element, now: now))
+                    .font(.footnote.monospacedDigit())
+                    .foregroundStyle(Palette.quiet)
+            }
+        }
+        .accessibilityElement(children: .combine)
     }
 }

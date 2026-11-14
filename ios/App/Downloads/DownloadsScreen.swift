@@ -335,6 +335,7 @@ private struct LibrarySection: View {
             }
             if follower.on {
                 fit(follower, scope: scope)
+                ChargingToggle(scope: scope)
                 if follower.asks, let held = follower.held,
                    let question = AutoDownloadWords.question(held, scope: scope, here: albumsHere(follower)) {
                     QuestionRow(question: question)
@@ -406,6 +407,33 @@ private struct LibrarySection: View {
             albums.insert(record.albumID)
         }
         return albums.count
+    }
+}
+
+/// (slice 3, 3.1's third row) Only while charging, under the fit line while Download your library is on - drawn as
+/// iOS's Settings draws a switch with an explanation, VoiceOver reading it as one.
+private struct ChargingToggle: View {
+    let scope: AlbumScope
+
+    @Environment(DownloadModel.self) private var downloads
+
+    var body: some View {
+        Toggle(isOn: Binding(get: { downloads.onlyWhileCharging },
+                             set: { (on: Bool) -> Void in downloads.onlyWhileCharging = on })) {
+            VStack(alignment: .leading, spacing: 3) {
+                Text(AutoDownloadWords.onlyWhileCharging)
+                Text(AutoDownloadWords.chargingNote(scope))
+                    .font(.footnote)
+                    .foregroundStyle(Palette.quiet)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(AutoDownloadWords.onlyWhileCharging)
+        .accessibilityHint(AutoDownloadWords.chargingNote(scope))
+        .accessibilityValue(downloads.onlyWhileCharging ? "On" : "Off")
+        .accessibilityAddTraits(.isButton)
+        .accessibilityAction { downloads.onlyWhileCharging.toggle() }
     }
 }
 
