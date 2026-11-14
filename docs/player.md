@@ -2513,13 +2513,14 @@ fixes that.
   seconds early for an app iOS closed in a pocket - keeps 2,000 songs at most, and from another app's queue
   only the songs, as a plain list. Amperfy keeps its own queue, which deadwax can't see. Going back to a song
   from long ago can make Up Next longer than that: it all plays, but a reload keeps 2,000 of it, from the 50 before
-  the song playing on, and the songs past them go (what you'd played of them shows above again). The native
-  [iPhone app](ios.md) doesn't know a going-back yet, nor does a deadwax tab opened before 2.1.18 (reload it):
-  opening a queue you went back in, they put it back as a plain list - every song, in order, at the song and second
-  you were at, nothing lost - but without Playing Next, the Shuffle chip or each song's own
-  [Normalization](#normalization) level (the setting's instead), as another app's queue comes back. And once the
-  iPhone app has saved the queue, songs brought back from before the album or list can show above as well as to
-  come, and tapping one there brings it back a second time - until it learns going back.
+  the song playing on, and the songs past them go (what you'd played of them shows above again). A deadwax tab
+  opened before 2.1.18 (reload it), and an [iPhone app](ios.md) build from before it learned going back, don't know
+  a going-back: opening a queue you went back in, they put it back as a plain list - every song, in order, at the
+  song and second you were at, nothing lost - but without Playing Next, the Shuffle chip or each song's own
+  [Normalization](#normalization) level (the setting's instead), as another app's queue comes back. And once such an
+  iPhone build has saved the queue, songs brought back from before the album or list can show above as well as to
+  come, and tapping one there brings it back a second time. The iPhone app's builds since go back as the web app
+  does.
 - **Up Next**'s History goes back 50 plays and starts again with each album or list you play (it doesn't
   reach back into the one before); Up Next has
   no "keep playing similar music" after the list, no ••• on album tiles (an album's ••• is on its page),

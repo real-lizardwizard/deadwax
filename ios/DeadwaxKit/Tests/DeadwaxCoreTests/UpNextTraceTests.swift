@@ -5,7 +5,10 @@ import Testing
 /// The Swift port replays what the web app's TypeScript did (Fixtures/upnext/, written by
 /// ios/scripts/export-traces.cjs): the same inputs, the same random numbers, and after every op the same queue,
 /// field by field - or the very queue it was given where the TypeScript handed that back. A failure names the trace
-/// (or scenario), the op and the field, and stops that trace: everything after it would differ too.
+/// (or scenario), the op and the field, and stops that trace: everything after it would differ too. (2.1.18) The
+/// roll-back's too: a jump's `back`, the rows an older row's tap brings back (`broughtBack`), the starts the queue holds
+/// (`heldStarts`) and the keys its rows stand for (`shownKeys`); each state's `reached`, its marks' `starts`, and its
+/// entries' levels where one isn't its song's in the table (`levels`: a row brought back at the setting's level).
 @Suite struct UpNextTraceTests {
     @Test func everyTraceReplays() throws {
         let file = try Fixtures.json("upnext/traces.json")
@@ -145,14 +148,22 @@ struct Replay {
         case "withoutKey": result = withoutKey(queue, op["key"]?.int ?? -99)
         case "movedKey": result = movedKey(queue, op["key"]?.int ?? -99, to: op["to"]?.int ?? 0)
         case "withoutAdded": result = withoutAdded(queue)
-        case "jumpedTo":
-            let jumped = jumpedTo(queue, op["key"]?.int ?? -99)
+        case "jumpedTo", "broughtBack":
+            let jumped: Jump?
+            if name == "jumpedTo" {
+                jumped = jumpedTo(queue, op["key"]?.int ?? -99, mode)
+            } else {
+                guard let rows = brought(op["rows"]) else { return "a row that can't be made" }
+                jumped = broughtBack(queue, rows, mode, floor: op["floor"]?.int)
+            }
             if op["result"]?.isNull == true {
                 return jumped == nil ? tape.problem : "jumped, where the TypeScript gave null"
             }
             guard let jumped else { return "null, where the TypeScript jumped" }
-            //? (2.1.3) the edit, then the index to move to - the next op (setIndex) makes the move
+            //? (2.1.3) the edit, then the index to move to - the next op (setIndex) makes the move; (2.1.18) and whether
+            //? it went back (a roll-back: the engine moves, or plays the queue afresh)
             if jumped.index != op["index"]?.int { return "a jump to \(jumped.index), the web's \(describe(op["index"]))" }
+            if jumped.back != op["back"]?.bool { return "back \(jumped.back), the web's \(describe(op["back"]))" }
             result = jumped.queue
         case "wentBack": result = wentBack(queue, op["index"]?.int ?? -99)
         case "withMore":
@@ -191,6 +202,12 @@ struct Replay {
             case .go(let index):
                 answer = expected?["kind"]?.string == "go" && expected?["index"]?.int == index ? nil : "go \(index), the web's \(describe(expected))"
             }
+        case "heldStarts":
+            let held = op["limit"]?.int.map { heldStarts(queue, limit: $0) } ?? heldStarts(queue)
+            answer = firstDifference("heldStarts", held.map { "\($0.id) \($0.at)" }, rowsOf(op["result"]))
+        case "shownKeys":
+            let keys = op["limit"]?.int.map { shownKeys(queue, limit: $0) } ?? shownKeys(queue)
+            answer = firstDifference("shownKeys", keys.sorted().map(String.init), (op["result"]?.array ?? []).map { describe($0) })
         case "historyRows":
             let rows = op["back"]?.int.map { historyRows(queue, back: $0) } ?? historyRows(queue)
             answer = firstDifference("history", rows.map { "\($0.key) \($0.track.id)" }, rowsOf(op["result"]))
@@ -216,15 +233,65 @@ struct Replay {
         return nil
     }
 
+    /// (2.1.18) The rows an older row's tap brings back, as recorded - each [id, level (null for none), starts, entry]:
+    /// the table's song at that level.
+    private func brought(_ json: JSONValue?) -> [Brought]? {
+        guard let rows = json?.array else { return nil }
+        let made = rows.compactMap { row -> Brought? in
+            guard let parts = row.array, parts.count == 4, var track = parts[0].string.flatMap({ songs[$0] }),
+                  let starts = moments(parts[2]) else { return nil }
+            track.level = parts[1].string.flatMap(Level.init(rawValue:))
+            if !parts[1].isNull && track.level == nil { return nil }
+            return Brought(track: track, starts: starts, entry: parts[3].int)
+        }
+        return made.count == rows.count ? made : nil
+    }
+
+    /// Recorded moments (a start's milliseconds), every one a whole number.
+    private func moments(_ json: JSONValue?) -> [Int64]? {
+        guard let list = json?.array else { return nil }
+        let made = list.compactMap { $0.double.flatMap { $0 == $0.rounded() ? Int64($0) : nil } }
+        return made.count == list.count ? made : nil
+    }
+
+    /// (2.1.18) The levels a state records ("a", "t", "-" per entry) as the entries' levels; nil for one that can't be.
+    private func levels(_ json: JSONValue?) -> [Level?]? {
+        guard let chars = json?.string else { return nil }
+        var made: [Level?] = []
+        for char in chars {
+            switch char {
+            case "a": made.append(.album)
+            case "t": made.append(.track)
+            case "-": made.append(nil)
+            default: return nil
+            }
+        }
+        return made
+    }
+
+    /// The songs a state's entries are: the table's, at the levels recorded where they are (`levels`).
+    private func entries(_ state: JSONValue) -> [QueueTrack]? {
+        guard var made = tracks(state["ids"]) else { return nil }
+        guard let recorded = state["levels"] else { return made }
+        guard let levels = levels(recorded), levels.count == made.count else { return nil }
+        for at in made.indices { made[at].level = levels[at] }
+        return made
+    }
+
     /// A queue from a recorded state (the `set` op): the songs from the table.
     func queueFrom(_ state: JSONValue) -> UpNextQueue? {
-        guard let index = state["index"]?.int, let tracks = tracks(state["ids"]) else { return nil }
+        guard let index = state["index"]?.int, let tracks = entries(state) else { return nil }
         guard let marks = state["marks"]?.array else { return UpNextQueue(tracks: tracks, index: index) }
+        var starts: [Int: [Int64]] = [:]
+        for held in state["starts"]?.array ?? [] {
+            guard let parts = held.array, parts.count == 2, let key = parts[0].int, let moments = moments(parts[1]) else { return nil }
+            starts[key] = moments
+        }
         let made = marks.compactMap { mark -> Mark? in
             guard let parts = mark.array, parts.count == 4, let key = parts[0].int, let from = parts[1].string,
                   let at = parts[2].int, let pass = parts[3].int else { return nil }
             let kind: MarkFrom? = from == "s" ? .source : from == "a" ? .added : from == "o" ? .one : nil
-            return kind.map { Mark(key: key, from: $0, at: at, pass: pass) }
+            return kind.map { Mark(key: key, from: $0, at: at, pass: pass, starts: starts[key]) }
         }
         guard made.count == marks.count, let source = self.tracks(state["source"]), let shuffle = state["shuffle"]?.bool,
               let nextKey = state["nextKey"]?.int, let startedAt = state["startedAt"]?.int else { return nil }
@@ -239,7 +306,8 @@ struct Replay {
             pagedRounds: state["pagedRounds"]?.array?.compactMap { held in
                 guard let pass = held["pass"]?.int, let kept = held["paged"].flatMap(paged) else { return nil }
                 return PagedRound(pass: pass, paged: kept)
-            }))
+            },
+            reached: state["reached"]?.int))
     }
 
     /// What differs between the queue and the recorded state, field by field - the first difference only, never two
@@ -249,8 +317,10 @@ struct Replay {
         if queue.index != state["index"]?.int { return "index \(queue.index), the web's \(describe(state["index"]))" }
         let ids = (state["ids"]?.array ?? []).compactMap(\.string)
         if let problem = firstDifference("ids", queue.ids, ids) { return problem }
-        for track in queue.tracks where songs[track.id] != track {
-            return "the song \(track.id) isn't the table's: \(track)"
+        //? (2.1.18) each entry the table's song - at the level recorded, where the state records levels
+        guard let expected = entries(state) else { return "levels that can't be read: \(describe(state["levels"]))" }
+        for (at, track) in queue.tracks.enumerated() where expected[at] != track {
+            return "the entry \(at) (\(track.id)) isn't the web's: \(track), the web's \(expected[at])"
         }
         guard let marks = state["marks"]?.array else {
             return queue.upNext == nil ? nil : "an Up Next account where the web has none"
@@ -262,6 +332,18 @@ struct Replay {
         }
         let ours = upNext.marks.map { "\($0.key) \($0.from.rawValue.prefix(1)) \($0.at) \($0.pass)" }
         if let problem = firstDifference("marks", ours, theirs) { return problem }
+        //? (2.1.18) the starts the rows brought back carry, and how far it had got
+        let theirStarts = (state["starts"]?.array ?? []).map { held -> String in
+            let parts = held.array ?? []
+            return "\(parts.first.map { describe($0) } ?? "?") \(parts.count > 1 ? describe(parts[1]) : "?")"
+        }
+        let ourStarts = upNext.marks.compactMap { mark -> String? in
+            mark.starts.map { "\(mark.key) [\($0.map(String.init).joined(separator: ", "))]" }
+        }
+        if let problem = firstDifference("starts", ourStarts, theirStarts) { return problem }
+        if upNext.reached != state["reached"]?.int || (upNext.reached == nil) != (state["reached"] == nil) {
+            return "reached \(upNext.reached.map(String.init) ?? "absent"), the web's \(describe(state["reached"]))"
+        }
         if let problem = firstDifference("source", upNext.source.map(\.id), (state["source"]?.array ?? []).compactMap(\.string)) {
             return problem
         }

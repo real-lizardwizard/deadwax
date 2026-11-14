@@ -100,16 +100,24 @@ struct ResumeSongs {
         return made.count == keys.count ? made : nil
     }
 
-    /// A queue from export-traces.cjs's queueRecord: song keys, the index, Up Next's account when it has one.
+    /// A queue from export-traces.cjs's queueRecord: song keys, the index, Up Next's account when it has one -
+    /// (2.1.18) with how far it had got (`reached`) and the starts its marks carry (`starts`, [key, moments]).
     func queue(_ record: JSONValue?) -> UpNextQueue? {
         guard let record, let index = record["index"]?.int, let tracks = tracks(record["tracks"]) else { return nil }
         guard let state = record["upNext"] else { return UpNextQueue(tracks: tracks, index: index) }
         guard let marks = state["marks"]?.array else { return nil }
+        var starts: [Int: [Int64]] = [:]
+        for held in state["starts"]?.array ?? [] {
+            guard let parts = held.array, parts.count == 2, let key = parts[0].int, let list = parts[1].array else { return nil }
+            let moments = list.compactMap { $0.double.flatMap { $0 == $0.rounded() ? Int64($0) : nil } }
+            guard moments.count == list.count, starts[key] == nil else { return nil }
+            starts[key] = moments
+        }
         let made = marks.compactMap { mark -> Mark? in
             guard let parts = mark.array, parts.count == 4, let key = parts[0].int, let from = parts[1].string,
                   let at = parts[2].int, let pass = parts[3].int else { return nil }
             let kind: MarkFrom? = from == "s" ? .source : from == "a" ? .added : from == "o" ? .one : nil
-            return kind.map { Mark(key: key, from: $0, at: at, pass: pass) }
+            return kind.map { Mark(key: key, from: $0, at: at, pass: pass, starts: starts[key]) }
         }
         guard made.count == marks.count, let source = self.tracks(state["source"]), let shuffle = state["shuffle"]?.bool,
               let nextKey = state["nextKey"]?.int, let startedAt = state["startedAt"]?.int,
@@ -130,9 +138,10 @@ struct ResumeSongs {
         }
         //? (2.1.15) the queue's id; null: one given a new id as it was read (the tests' `freshId`)
         guard let id = state["id"].flatMap({ $0 == .null ? Self.freshId : $0.string }) else { return nil }
+        if let reached = state["reached"], reached.int == nil { return nil }
         return UpNextQueue(tracks: tracks, index: index, upNext: UpNextState(
             id: id, marks: made, source: source, shuffle: shuffle, nextKey: nextKey, startedAt: startedAt, left: left,
-            paged: state["paged"].flatMap(paged), pagedRounds: rounds))
+            paged: state["paged"].flatMap(paged), pagedRounds: rounds, reached: state["reached"]?.int))
     }
 }
 
@@ -148,12 +157,16 @@ func queueDifference(_ ours: UpNextQueue?, _ theirs: UpNextQueue?) -> String? {
     }
     guard let a = ours.upNext, let b = theirs.upNext else { return "Up Next: \(ours.upNext == nil) vs \(theirs.upNext == nil)" }
     if a.id != b.id { return "id \(a.id) vs \(b.id)" }
-    if a.marks != b.marks { return "marks differ" }
+    if let at = a.marks.indices.first(where: { $0 < b.marks.count && a.marks[$0] != b.marks[$0] }) {
+        return "mark \(at): \(a.marks[at]) vs \(b.marks[at])"
+    }
+    if a.marks.count != b.marks.count { return "\(a.marks.count) marks vs \(b.marks.count)" }
     if a.source != b.source { return "source differs" }
     if a.shuffle != b.shuffle || a.nextKey != b.nextKey || a.startedAt != b.startedAt { return "shuffle/nextKey/startedAt" }
     if a.left != b.left { return "left differs" }
     if a.paged != b.paged { return "paged differs" }
     if a.pagedRounds != b.pagedRounds { return "pagedRounds differ" }
+    if a.reached != b.reached { return "reached \(a.reached.map(String.init) ?? "nil") vs \(b.reached.map(String.init) ?? "nil")" }
     return "differs elsewhere"
 }
 

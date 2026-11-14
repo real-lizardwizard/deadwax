@@ -17,10 +17,11 @@
  *   - withNewest and withOlder: history.sim.cjs's own cases, then seeded helds and pages;
  *   - countedIn, afterFailure, retryAfter, over their ranges;
  *   - EACH START DRAWN ONCE: 300 seeded runs of 50 moves - songs ending, Previous, a tap on Up Next's rows, on
- *     History's and on an older row's (Play Next, then the jump: the phone's play again), Play Next and Last,
- *     Shuffle, Repeat, a reload's round trip through the snapshot, another queue - a start recorded at every song
- *     begun; after every step a line of what queueShows and pastRows answer (limits 8 and 100 by turns), each run's
- *     lines as one FNV-1a digest, run 0's lines in full. The Swift test runs the same moves from the same Park-Miller
+ *     History's (2.1.18: a roll-back) and on an older row's (2.1.18: broughtBack with the rows from it down - rowsFrom
+ *     - and the floor, as Up Next's replayPast hands them), Play Next and Last, Shuffle, Repeat, a reload's round trip
+ *     through the snapshot, another queue - a start recorded at every song begun; after every step a line of what
+ *     queueShows (its keys and, 2.1.18, the starts it holds) and pastRows (each row's starts and entry) answer
+ *     (limits 8 and 100 by turns), each run's lines as one FNV-1a digest, run 0's lines in full. The Swift test runs the same moves from the same Park-Miller
  *     numbers through DeadwaxCore's own Up Next (held to the web's by export-traces.cjs) and must make every line.
  *
  * Every queue here is given its id (`q<run>-<n>`), so nothing calls queueId()'s clock or random - the export stops if
@@ -190,7 +191,7 @@ function propertyRun(run) {
   const recorded = []
   const begin = () => { clock += 1000; recorded.push(P.startOf(queue.tracks[queue.index], clock, queue)) }
   const jumpTo = (q, key) => {
-    const jump = U.jumpedTo(q, key)
+    const jump = U.jumpedTo(q, key, repeat)
     if (!jump) return false
     queue = U.toppedUp(at(jump.queue, jump.index), repeat, random)
     return true
@@ -214,11 +215,13 @@ function propertyRun(run) {
       const rows = U.historyRows(queue)
       if (rows.length) began = jumpTo(queue, rows[pick(rows.length)].key)
     } else if (op === 6) {
-      //? an older row tapped: Play Next, then the jump to it (the web's playNext and jumpTo, the phone's playAgain)
+      //? (2.1.18) an older row tapped: it and every older row below it brought back (rowsFrom), with the floor the rows
+      //? were read against - History's first row, else the song playing's - as Up Next's replayPast hands them
       const rows = P.pastRows(P.merged([], recorded), queue, limit)
       if (rows.length) {
-        const key = queue.upNext.nextKey
-        began = jumpTo(U.withNext(queue, [rows[pick(rows.length)].track]), key)
+        const back = P.rowsFrom(rows, rows[pick(rows.length)].key).map((row) => ({ track: row.track, starts: row.starts, entry: row.entry }))
+        const jump = U.broughtBack(queue, back, repeat, U.historyRows(queue)[0]?.key ?? queue.upNext.marks[queue.index].key)
+        if (jump) { queue = U.toppedUp({ ...jump.queue, index: jump.index }, repeat, random); began = true }
       }
     } else if (op === 7) {
       queue = (random() < 0.5 ? U.withNext : U.withLast)(queue, [track(`p${run}-${step}`)])
@@ -246,9 +249,10 @@ function propertyRun(run) {
     const plays = P.merged(pages, recorded)
     const shows = P.queueShows(queue, limit)
     const rows = P.pastRows(plays, queue, limit)
+    //? (2.1.18) the starts the queue holds (sorted: a Set's order is its own), each row's starts and its entry
     lines.push([
-      `${step}:${op}`, queue.index, shows.id ?? '-', [...shows.keys].sort((a, b) => a - b).join(','),
-      rows.map((r) => `${r.key}=${r.track.id}`).join(','), plays.filter((s) => s.counted).length, plays.length,
+      `${step}:${op}`, queue.index, shows.id ?? '-', [...shows.keys].sort((a, b) => a - b).join(','), [...shows.held].sort().join(','),
+      rows.map((r) => `${r.key}=${r.track.id}/${r.starts.join('.')}/${r.entry ?? '-'}`).join(','), plays.filter((s) => s.counted).length, plays.length,
     ].join('|'))
   }
   return { lines, starts: recorded.length }
@@ -285,9 +289,10 @@ function words() {
     earlierFailed: piece(/\nexport const EARLIER_FAILED = "([^"]+)"\n/g, 'EARLIER_FAILED'),
     tryAgain: piece(/onClick=\{history\?\.retry\}>\n\s*([^<\n]+?)\n/g, 'the older rows\' Try again'),
     //? an older row's name and a History row's, and what is said once its tap took - the title before and after
-    //? (", play now" is a list row's: the two rows that play a song again are History's and an older row's)
+    //? (", play now" is a list row's: the two rows above the song playing are History's and an older row's; 2.1.18,
+    //? both roll back, their words said by the one rolledTo)
     playAgain: piece(/aria-label=\{`\$\{row\.track\.title\}(, play again)`\}/g, 'a played row\'s name', 2),
-    playing: piece(/said: `([^`$]*)\$\{row\.track\.title\}`/g, 'a played row\'s words', 2),
+    playing: piece(/said: `([^`$]*)\$\{row\.track\.title\}`/g, 'a played row\'s words', 1),
   }
 }
 

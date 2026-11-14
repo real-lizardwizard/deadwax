@@ -6,7 +6,9 @@ import Testing
 /// playHistory.ts answers, written by ios/scripts/export-history.cjs (ui/test/ioshistory.sim.cjs keeps it current) -
 /// the numbers, keys, merged, withNewest and withOlder, countedIn, afterFailure, retryAfter, and each start drawn
 /// once: 300 seeded runs of moves made here again from the same Park-Miller numbers through DeadwaxCore's own Up Next,
-/// every step's line of what queueShows and pastRows answer digested as the web's were.
+/// every step's line of what queueShows and pastRows answer digested as the web's were. (2.1.18) A History row's tap
+/// rolls back; an older row's brings it and every older row below it back (rowsFrom, broughtBack with the floor); each
+/// line carries the starts the queue holds and each older row's starts and entry.
 @Suite struct HistoryVectorTests {
     let file: JSONValue
 
@@ -116,7 +118,7 @@ import Testing
         var starts = 0
         var unlike: [Int] = []
         var problems: [String] = []
-        var tally = (looked: 0, above: 0)
+        var tally = Tally()
         for run in 0..<runs {
             let made = propertyRun(run, steps: steps, problems: &problems, tally: &tally)
             starts += made.starts
@@ -130,16 +132,22 @@ import Testing
         }
         #expect(problems.isEmpty, "\(problems.prefix(5))")
         #expect(starts == property["starts"]?.int)
-        // the check made here, on the phone's own answers, saw both kinds of start, many times over
-        #expect(tally.looked > 100_000 && tally.above > 10_000, "\(tally)")
+        // the check made here, on the phone's own answers, saw both kinds of start, many times over - (2.1.18) and starts
+        // held by rows brought back
+        #expect(tally.looked > 100_000 && tally.above > 10_000 && tally.held > 1_000, "\(tally)")
         #expect(unlike.isEmpty, "\(unlike.count) runs unlike the web's, the first \(unlike.prefix(5))")
     }
 
     // MARK: - the runs
 
+    /// What the each-start check saw: starts looked at, those above History, (2.1.18) those held by a row brought back,
+    /// and those moved back down into Up Next past the rows drawn.
+    struct Tally {
+        var looked = 0, above = 0, held = 0, movedDown = 0
+    }
+
     /// export-history.cjs's propertyRun, move for move and number for number.
-    private func propertyRun(_ run: Int, steps: Int, problems: inout [String],
-                             tally: inout (looked: Int, above: Int)) -> (lines: [String], starts: Int) {
+    private func propertyRun(_ run: Int, steps: Int, problems: inout [String], tally: inout Tally) -> (lines: [String], starts: Int) {
         let random = Seeded(Int64(run) * 1_000_003 % 2_147_483_646 + 1)
         _ = random.next()
         let pick = { (count: Int) in random.pick(count) }
@@ -161,7 +169,7 @@ import Testing
             recorded.append(PlayHistory.startOf(queue.tracks[queue.index], at: clock, queue: queue))
         }
         func jumpTo(_ from: UpNextQueue, _ key: Int) -> Bool {
-            guard let jump = jumpedTo(from, key) else { return false }
+            guard let jump = jumpedTo(from, key, mode) else { return false }
             queue = toppedUp(jump.queue.at(jump.index), mode, random: random.next)
             return true
         }
@@ -189,10 +197,18 @@ import Testing
                 let rows = historyRows(queue)
                 if !rows.isEmpty { began = jumpTo(queue, rows[pick(rows.count)].key) }
             case 6:
-                //? an older row tapped: Play Next, then the jump to it (QueueController.playAgain's two steps)
+                //? (2.1.18) an older row tapped: it and every older row below it brought back (rowsFrom), with the floor
+                //? the rows were read against - History's first row, else the song playing's - as Up Next's pastRow hands
+                //? them (UpNextScreen)
                 let rows = PlayHistory.pastRows(PlayHistory.merged([], recorded), queue: queue, limit: limit)
-                if !rows.isEmpty, let key = queue.upNext?.nextKey {
-                    began = jumpTo(withNext(queue, [rows[pick(rows.count)].track]), key)
+                if !rows.isEmpty, let state = queue.upNext {
+                    let back = PlayHistory.rowsFrom(rows, rows[pick(rows.count)].key)
+                        .map { Brought(track: $0.track, starts: $0.starts, entry: $0.entry) }
+                    let floor = historyRows(queue).first?.key ?? state.marks[queue.index].key
+                    if let jump = broughtBack(queue, back, mode, floor: floor) {
+                        queue = toppedUp(jump.queue.at(jump.index), mode, random: random.next)
+                        began = true
+                    }
                 }
             case 7:
                 let song = simTrack("p\(run)-\(step)")
@@ -226,20 +242,28 @@ import Testing
             let plays = PlayHistory.merged(pages, recorded)
             let shows = PlayHistory.queueShows(queue, limit: limit)
             let rows = PlayHistory.pastRows(plays, queue: queue, limit: limit)
+            //? (2.1.18) the starts the queue holds (sorted by UTF-16 unit, as JavaScript's sort()), each row's starts and
+            //? its entry
+            let held = shows.held.sorted { $0.lexicographicallyPrecedes($1) }.map { String(decoding: $0, as: UTF16.self) }
             lines.append([
                 "\(step):\(op)", "\(queue.index)", shows.id ?? "-", shows.keys.sorted().map(String.init).joined(separator: ","),
-                rows.map { "\($0.key)=\($0.track.id)" }.joined(separator: ","), "\(plays.filter(\.counted).count)", "\(plays.count)",
+                held.joined(separator: ","),
+                rows.map { "\($0.key)=\($0.track.id)/\($0.starts.map(String.init).joined(separator: "."))/\($0.entry.map(String.init) ?? "-")" }
+                    .joined(separator: ","),
+                "\(plays.filter(\.counted).count)", "\(plays.count)",
             ].joined(separator: "|"))
         }
         return (lines, recorded.count)
     }
 
     /// EACH START DRAWN EXACTLY ONCE, judged here on the phone's own answers (history.sim's check, which the lines above
-    /// only replay): every start recorded is either the queue's - and then a row Up Next draws stands for its entry
-    /// (History's, the song playing's, the songs added, the list's first `limit`) and no older row claims it - or
-    /// exactly one older row's: the run of one song it falls in, drawn by pastRows, and its entry no row of the queue's.
+    /// only replay): every start recorded is either the queue's - its own entry's, or (2.1.18) held by a row brought
+    /// back with it (heldByQueue) - and then a row Up Next draws stands for that entry (History's, the song playing's,
+    /// the songs added, the list's first `limit`), or it was moved back down into Up Next (after the song playing, at or
+    /// before the furthest played), and no older row claims it - or exactly one older row's: the run of one song it
+    /// falls in, drawn by pastRows, and neither its entry nor a row holding it one of the queue's.
     private func drawnOnce(_ recorded: [Played], _ queue: UpNextQueue, _ mode: Repeat, limit: Int, at label: String,
-                           _ problems: inout [String], _ tally: inout (looked: Int, above: Int)) {
+                           _ problems: inout [String], _ tally: inout Tally) {
         guard let state = queue.upNext else { return }
         let shows = PlayHistory.queueShows(queue, limit: limit)
         let view = upNextView(queue, mode, limit: limit)
@@ -253,13 +277,25 @@ import Testing
         func drawnByQueue(_ place: Int) -> Bool {
             place >= 0 && (unitStart(place) == playingStart || viewKeys.contains(state.marks[unitStart(place)].key))
         }
+        //? (2.1.18) moved back down into Up Next: after the song playing, at or before the furthest song played - drawn as
+        //? a row, or past the rows drawn, counted in "And N more"
+        let reachAt = state.reached.flatMap { reached in state.marks.firstIndex { $0.key == reached } } ?? -1
+        func movedDown(_ place: Int) -> Bool {
+            place > queue.index && reachAt > queue.index && unitStart(place) <= reachAt
+        }
+        //? (2.1.18) the entry holding a start brought back with an older row - the song and the moment its mark carries
+        func holderOf(_ played: Played) -> Int {
+            state.marks.indices.first { at in
+                (state.marks[at].starts ?? []).contains(played.at) && WebText.same(queue.tracks[at].id, played.song.id)
+            } ?? -1
+        }
         let ordered = PlayHistory.merged([], recorded)
         let pastKeys = Set(PlayHistory.pastRows(ordered, queue: queue, limit: limit).map(\.key))
         // which older row stands for each start not the queue's: its run's first, walking oldest first
         var runOf: [String: String] = [:]
         var current = ""
         var lastSong: String?
-        for played in ordered.reversed() where !PlayHistory.shownByQueue(played, shows) {
+        for played in ordered.reversed() where !PlayHistory.heldByQueue(played, shows) {
             if lastSong.map({ !WebText.same(played.song.id, $0) }) ?? true {
                 current = PlayHistory.key(played)
                 lastSong = played.song.id
@@ -271,13 +307,28 @@ import Testing
             let key = PlayHistory.key(played)
             let ours = played.queue.map { WebText.same($0, state.id) } ?? false
             let place = ours ? (state.marks.firstIndex { $0.key == played.entry } ?? -1) : -1
-            if PlayHistory.shownByQueue(played, shows) {
-                if !drawnByQueue(place) { problems.append("\(label): \(key) the queue's, but no row of it draws it") }
+            let holder = holderOf(played)
+            if PlayHistory.heldByQueue(played, shows) {
+                let own = PlayHistory.shownByQueue(played, shows)
+                let at = own ? place : holder
+                if !own { tally.held += 1 }
+                if !drawnByQueue(at) {
+                    if movedDown(at) {
+                        tally.movedDown += 1
+                    } else {
+                        problems.append("\(label): \(key) the queue's, but no row of it draws it, nor is it to come")
+                    }
+                }
                 if runOf[key] != nil { problems.append("\(label): \(key) drawn twice") }
             } else {
                 tally.above += 1
                 if !pastKeys.contains(runOf[key] ?? "") { problems.append("\(label): \(key) drawn nowhere") }
-                if ours && drawnByQueue(place) { problems.append("\(label): \(key) above, and its entry a row of the queue's too") }
+                if ours && (drawnByQueue(place) || movedDown(place)) {
+                    problems.append("\(label): \(key) above, and its entry a row of the queue's too")
+                }
+                if holder >= 0 && (drawnByQueue(holder) || movedDown(holder)) {
+                    problems.append("\(label): \(key) above, and held by a row of the queue's too")
+                }
             }
         }
     }

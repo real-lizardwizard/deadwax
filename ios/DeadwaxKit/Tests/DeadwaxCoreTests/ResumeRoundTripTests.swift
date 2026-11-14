@@ -2,16 +2,19 @@ import Foundation
 import Testing
 @testable import DeadwaxCore
 
-// resume.sim.cjs's round trip (Fixtures/resume/roundtrip.json): 500 runs of 25 steps of Up Next, each step's
+// resume.sim.cjs's round trip (Fixtures/resume/roundtrip.json): 1,000 runs of 25 steps of Up Next, each step's
 // snapshot written by toSave and read back. The phone runs the same seeded generator over its own Up Next and must
 // write the web's very texts at every step (digested), the first 40 runs held whole - their queues, and each
-// snapshot read back as the web reads it.
+// snapshot read back as the web reads it. (2.1.18) A row's tap rolls back when it is History's, and every other run
+// brings older rows back (their starts carried, snapshot v2): each read back with how far it had got, Up Next the
+// same songs to come, holding the same starts.
 
 @Suite struct ResumeRoundTripTests {
     static let position = 12.5
 
     /// What toSave's snapshot must read back as: the window of the queue, its account whole - (2.1.3) startedAt past
-    /// the song playing's run, as an app before 2.1.3 saved it, lowered to the run.
+    /// the song playing's run, as an app before 2.1.3 saved it, lowered to the run; (2.1.18) how far it had got while
+    /// that is after the song playing and in the window, and the starts the window's marks carry (the marks whole).
     static func wanted(_ queue: UpNextQueue, _ saving: Saving) -> UpNextQueue {
         let state = queue.upNext!
         let range = saving.start..<(saving.start + saving.ids.count)
@@ -20,7 +23,34 @@ import Testing
         return UpNextQueue(tracks: Array(queue.tracks[range]), index: queue.index - saving.start, upNext: UpNextState(
             id: state.id, marks: Array(state.marks[range]), source: state.source, shuffle: state.shuffle, nextKey: state.nextKey,
             startedAt: min(max(0, state.startedAt - saving.start), run - saving.start), left: state.left, paged: state.paged,
-            pagedRounds: state.pagedRounds))
+            pagedRounds: state.pagedRounds, reached: keptReach(queue, saving)))
+    }
+
+    /// (2.1.18) How far the queue had got, as its snapshot keeps it: while that is after the song playing and in the
+    /// window.
+    static func keptReach(_ queue: UpNextQueue, _ saving: Saving) -> Int? {
+        guard let state = queue.upNext, let reached = state.reached,
+              let at = state.marks.firstIndex(where: { $0.key == reached }) else { return nil }
+        return at > queue.index && at < saving.start + saving.ids.count ? reached : nil
+    }
+
+    /// (2.1.18) The snapshot read back has Up Next's songs to come (every one, no cap) and the starts the queue holds
+    /// as the queue had them (nil), or what differs.
+    static func aheadBack(_ queue: UpNextQueue, _ saving: Saving, _ mode: Repeat) -> String? {
+        let range = saving.start..<(saving.start + saving.ids.count)
+        let bare = queue.tracks[range].map { track -> QueueTrack in
+            var plain = track
+            plain.level = nil
+            return plain
+        }
+        guard let back = fromSnapshot(saving.snapshot, tracks: bare, index: saving.index, setting: .auto) else { return "nothing read back" }
+        let ahead = { (q: UpNextQueue) -> [String] in
+            let view = upNextView(q, mode, limit: Int.max)
+            return (view.added + (view.list?.rows ?? [])).map { "\($0.key):\($0.track.id)" }
+        }
+        if ahead(back) != ahead(queue) { return "Up Next \(ahead(back)) for \(ahead(queue))" }
+        if heldStarts(back) != heldStarts(queue) { return "starts held \(heldStarts(back)) for \(heldStarts(queue))" }
+        return nil
     }
 
     /// Reads back whole at its own index, as the web's own check of itself: its window's songs with no level, Auto.
@@ -59,14 +89,16 @@ import Testing
         let digests = try #require(json["digests"]?.array)
         let songs = try ResumeSongs(json["songs"])
         let kept = try #require(json["states"]?.array)
-        #expect(runs == 500 && steps == 25 && digests.count == runs)
+        #expect(runs == 1000 && steps == 25 && digests.count == runs)
         var counts = (states: 0, behind: 0, paged: 0, left: 0, ones: 0, added: 0, shuffled: 0)
+        var kept2118 = (reached: 0, starts: 0, v2: 0)
+        var moves = Moves()
         var failures = 0
         var histories = 0
         for run in 0..<runs {
             let wantedDigests = try #require(digests[run].array)
             var step = 0
-            Self.generate(run: run, steps: steps) { queue in
+            Self.generate(run: run, steps: steps, moves: &moves) { queue, mode in
                 defer { step += 1 }
                 let saving = toSave(queue, position: Self.position)
                 let digest = saving.snapshot.map(unitHash)
@@ -78,6 +110,11 @@ import Testing
                 if state.marks.contains(where: { $0.from == .one }) { counts.ones += 1 }
                 if state.marks.contains(where: { $0.from == .added }) { counts.added += 1 }
                 if state.shuffle { counts.shuffled += 1 }
+                if Self.keptReach(queue, saving) != nil { kept2118.reached += 1 }
+                if state.marks[saving.start..<(saving.start + saving.ids.count)].contains(where: { $0.starts != nil }) {
+                    kept2118.starts += 1
+                }
+                if let text = saving.snapshot, text.hasPrefix("{\"v\":2,") { kept2118.v2 += 1 }
                 guard failures < 10 else { return }
                 if digest != wantedDigests[step].string {
                     failures += 1
@@ -94,6 +131,11 @@ import Testing
                 } else if !historyRows(queue).isEmpty {
                     histories += 1
                 }
+                //? (2.1.18) ...Up Next the same songs to come after it, holding the same starts
+                if let ahead = Self.aheadBack(queue, saving, mode) {
+                    failures += 1
+                    Issue.record("run \(run) step \(step): \(ahead)")
+                }
                 if run < kept.count / steps, let recorded = songs.queue(kept[run * steps + step]["queue"]),
                    let difference = queueDifference(queue, recorded) {
                     failures += 1
@@ -106,7 +148,16 @@ import Testing
         #expect(counts.states == c["states"]?.int && counts.behind == c["behind"]?.int && counts.paged == c["paged"]?.int)
         #expect(counts.left == c["left"]?.int && counts.ones == c["ones"]?.int && counts.added == c["added"]?.int)
         #expect(counts.shuffled == c["shuffled"]?.int)
+        #expect(moves.rolled == c["rolled"]?.int && moves.brought == c["brought"]?.int, "\(moves)")
+        #expect(kept2118.reached == c["reachedKept"]?.int && kept2118.starts == c["startsKept"]?.int && kept2118.v2 == c["v2"]?.int,
+                "\(kept2118)")
+        #expect(moves.rolled > 100 && moves.brought > 500 && kept2118.reached > 1000 && kept2118.starts > 1000, "\(moves) \(kept2118)")
         #expect(histories > 5_000, "\(histories) steps with a History")
+    }
+
+    /// (2.1.18) How many of the round trip's taps rolled back, and how many brought older rows back.
+    struct Moves {
+        var rolled = 0, brought = 0
     }
 
     /// The window read back has the History the queue had (nil), or the two as "key:id" lists.
@@ -124,10 +175,13 @@ import Testing
         return rows(back) == rows(queue) ? nil : "\(rows(back)) for \(rows(queue))"
     }
 
-    /// export-traces.cjs's round trip, step for step and draw for draw (its arguments drawn in JavaScript's order).
-    static func generate(run: Int, steps: Int, each: (UpNextQueue) -> Void) {
+    /// export-traces.cjs's round trip, step for step and draw for draw (its arguments drawn in JavaScript's order);
+    /// `each` is handed every step's queue and the Repeat it plays under.
+    static func generate(run: Int, steps: Int, moves: inout Moves, each: (UpNextQueue, Repeat) -> Void) {
         let random = Seeded(Int64(run + 7))
         _ = random.next()
+        //? (2.1.18) older rows brought back in every other run, the rest as before
+        let bringsBack = run % 2 == 0
         let pick = { (count: Int) in random.pick(count) }
         let level = { random.next() < 0.5 ? Level.album : Level.track }
         let size = 1 + pick(7)
@@ -144,8 +198,8 @@ import Testing
             defer { extra += 1 }
             return rTrack("\(prefix)\(extra)", level: level())
         }
-        for _ in 0..<steps {
-            let op = pick(12)
+        for step in 0..<steps {
+            let op = pick(13)
             let someKey = { () -> Int in
                 let keys = queue.upNext!.marks.dropFirst(queue.index + 1).map(\.key)
                 if !keys.isEmpty && random.next() < 0.85 { return keys[pick(keys.count)] }
@@ -176,7 +230,29 @@ import Testing
                 //? (2.1.3) a row's tap - of History's now and then (an entry before the song playing)
                 let before = queue.upNext!.marks.prefix(queue.index).map(\.key)
                 let key = !before.isEmpty && random.next() < 0.3 ? before[pick(before.count)] : someKey()
-                if let jumped = jumpedTo(queue, key) { queue = jumped.queue.at(jumped.index) }
+                if let jumped = jumpedTo(queue, key, mode) {
+                    queue = jumped.queue.at(jumped.index)
+                    if jumped.back { moves.rolled += 1 }
+                }
+            case 12 where bringsBack:
+                //? (2.1.18) older rows brought back: entries of the queue's (moved, while before History's floor) and
+                //? songs from elsewhere, each at a level of its own; their moments from the steps compared before this
+                //? one, in every run (resume.sim's `compared`)
+                let compared = Int64(run * steps + step)
+                let rows = (0..<(1 + pick(3))).map { i -> Brought in
+                    let starts = (0..<(1 + pick(2))).map { k in 1_800_000_000_000 + compared * 100 + Int64(i * 3 + k) }
+                    if queue.index > 0 && random.next() < 0.5 {
+                        let p = pick(queue.index)
+                        var track = queue.tracks[p]
+                        track.level = level()
+                        return Brought(track: track, starts: starts, entry: queue.upNext!.marks[p].key)
+                    }
+                    return Brought(track: made("b", level), starts: starts, entry: nil)
+                }
+                if let jumped = broughtBack(queue, rows, mode) {
+                    queue = jumped.queue
+                    moves.brought += 1
+                }
             case 9:
                 if let next = onward(queue) { queue = queue.at(next) }
             case 10:
@@ -188,7 +264,7 @@ import Testing
                 queue = queue.at(min(queue.index + 1, queue.tracks.count - 1))
             }
             queue = toppedUp(queue, mode, random: random.next)
-            each(queue)
+            each(queue, mode)
         }
     }
 }

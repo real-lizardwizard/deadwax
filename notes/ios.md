@@ -5530,3 +5530,135 @@ is now two `Rectangle`s (the track white at 0.2, the fill white at 0.85, as befo
 on it (the same eased grow, 0.15 s), no knob - as the web's phone bar since main's 2.1.20 (notes/app.md "Now
 Playing's bar, squared off and thicker"). The target is still the whole 44 pt row; nothing about how it seeks
 changed. Verified: CI's device build (ios.yml). Not seen: on the phone - with the next install.
+
+## Going back in Up Next, ported - and main's 2.1.18-2.1.21 merged (2026-11-14)
+
+Branch `rollback-port`, from ios (5aeb89a): the merge of main's 2.1.18 to 2.1.21 (a18acbc), then the port. The app
+stays 0.9 (9); src/__init__.py is main's 2.1.21, untouched.
+
+**Why one piece.** Main's 2.1.18 made a tap above the song playing ROLL BACK (James: "so it just moves back up the
+list"; notes/play-history.md): a History row moves the playing point up to it, and an older row of the play history
+brings it and every older row below it back into the queue ahead of History's songs - lib/upNext.ts, playHistory.ts
+and resume.ts (snapshot v2). 2.1.19 put the turntable's head on the bar (ARM_PARTS.lift a scale and a shadow), 2.1.20
+squared off Now Playing's bar, 2.1.21 sends each playlist's `smart`. The sims hold the phone to the web's own
+TypeScript - iostraces to upNext.ts and resume.ts, ioshistory to playHistory.ts, iosdeck to ARM_PARTS - so the merge
+alone left them red: the merge and the port are one piece, as notes/play-history.md's iPhone list said.
+
+### What the merge brought, besides going back
+
+- **The turntable's lift** (2.1.19): `TurntableGeometry.headLift` (scale 1.08, shadow 3, 0.14 s) is held to
+  turntable.json's `ARM_PARTS.lift` by TurntableGeometryTests, and `armLift` (5) is gone - see "The turntable's head
+  stays on the arm". `TurntablePalette.ttHeadShadow` is now one of the tokens, held to `--dw-tt-head-shadow`:
+  export-deck-vectors.cjs's TOKENS gained 'tt-head-shadow', and Fixtures/deck was made again on Node 20.12.2 (3063 KB
+  of its 3072 KB budget). export-deck-recording.cjs was run again too: its `--check` said the recording is the same,
+  so only web-script.made.json moved (turntable.ts's hash) - tests/test_ios_deck_recording.py had failed on it.
+- **Smart playlists** (2.1.21): summary() sends `smart`, so tests/test_ios_contract.py's `PLAYLIST_AHEAD` exemption
+  is gone, `assert_decodes`' `ahead` with it - the Playlist's keys are summary()'s exactly. The phone still reads it
+  loosely, false when absent: a deadwax before 2.1.21 says no playlist is smart.
+- **Now Playing's bar** (2.1.20) was the phone's already ("Now Playing's bar, squared off").
+
+### The port (DeadwaxCore), to the web's rules exactly
+
+- **UpNextTypes**: `Mark.starts` ([Int64]?, a row brought back's start moments) and `UpNextState.reached` (the
+  key of the furthest unit played, while after the song playing).
+- **UpNext.swift**: `layoutAt`/`layout` (the list runs on to the reach and through what was drawn after it then),
+  `reachedPlace`, `furthest`; passPlaying's fallback (no list song before: the round of the first after);
+  withRepeat's round the max with the reach's; withShuffle keeps the later rounds up to the reach's - each shuffled on
+  its own, never starting with the song that ends the last, or with Shuffle off sorted by place (Swift's sort isn't
+  stable: ties by offset, as Array.prototype.sort), the reach then on whichever moved-down unit is last; withoutKey
+  hands the reach to the unit before it; movedKey keeps each place's time round (recast) and the reach on the last
+  unit at or before it; `jumpedTo(queue, key, mode)` - History's row is `rolledBack` (`Jump.back`; copies after it
+  go outside Repeat One, `copyAfter`); `broughtBack(queue, rows, mode, floor:)` with `Brought` {track, starts,
+  entry}; `heldStarts`; shownKeys to the end of the reach's unit; wentBack names the furthest.
+- **PlayHistory**: `QueueShows.held` (each `at:id` the queue holds, as UTF-16 units), `heldByQueue`, pastRows (a run
+  of one song's starts all on its row; `entry` only when begun in this queue), `rowsFrom`.
+- **Resume**: `snapshotVersion` - 2 with `reached` or `starts`, else 1 when a list song is at or before the index,
+  else 2; toSave writes `v` by it, then `reached` (after the song playing, in the window) and `starts` last; a
+  snapshot of v 1 or 2 is read (`readable`); fromSnapshot reads `starts` (refusing a copy's, a key twice or not in the
+  window, an empty list, a negative or fractional moment) and `reached` (kept only after the index, not a copy).
+- **QueueController**: jumpTo hands jumpedTo the device's Repeat; `rollBack(rows, floor:)` replaces playAgain, and
+  playsAlone is gone; `jump(made:)`'s back path - the same entries: `move(to:)`, the engine's skip, as Previous moves;
+  other entries (copies let go, older rows brought back): the queue played afresh from the row. Never refused, never
+  held; a held edit still runs after it, as after every move.
+
+### The app
+
+- **PlayerModel.rollBack(rows, floor:)** replaces playAgain: each row's song at the setting's level for a song
+  (`levelFor(normalization, .songs)`), as a song's Play Next queues it, then QueueController.rollBack. Nothing with no
+  controller - the old fallback that played an older row as a queue of its own went with playsAlone, as the web's
+  broughtBack is null with nothing playing.
+- **UpNextScreen**: History's row - `player.jump(to:)`, then `rolledTo`; an older row - `PlayHistory.rowsFrom` of the
+  pastRows drawn, with the floor History's first row's key, else the song playing's (the web's replayPast). `rolledTo`
+  holds the scroll (the card is where the row was, under the finger), then - once drawn - moves VoiceOver to what
+  plays next (Playing Next's head, else the list's first, else Done) and says "Playing {title}".
+
+### Where the phone can't follow the web exactly
+
+- **No gesture unlock.** The web's back path calls `unlockSpare()` - iOS Safari unlocks each audio element from a
+  gesture, and Gapless has a second one. The phone's engine has no such rule, so nothing stands for it.
+- **A skip, or played afresh - decided by the entries, not the stream.** The web seeks within its one stream when it
+  still holds the song (moveInStream), else loads a new one from the row. The phone's engine holds every entry it was
+  given, so the same entries are always a skip (`move(to:)`), and other entries are always `engine.play` from the
+  row. The web can make a new stream with the songs unchanged (a stream begun after the row); the phone never needs to.
+- **Moments as integers.** The web takes a start's moment or `reached` as any JavaScript integer (`Number.isInteger`,
+  1e300 included); the phone's reader takes whole numbers under 9.2e18 only, so a snapshot holding a larger one is
+  refused where the web reads it. Moments are milliseconds since 1970 (1.8e12 now), so no real snapshot differs.
+- **QueueShows.held** is a Set of UTF-16 unit arrays where the web's is a Set of strings: the same comparison (the
+  web's `===`), another type - Swift's `==` on String would take "é" for "e\u{301}".
+
+### Fixtures and exporters
+
+- **export-traces.cjs**: stateOf records `reached`, `starts` and - where an entry's level isn't its song's in the
+  table (a row brought back at the setting's) - `levels`; Run.jumpedTo(key, repeat) records `back`; new ops
+  broughtBack (rows as [id, level, starts, entry]), heldStarts, shownKeys; `set` takes reached and starts. The 2.1.18
+  and review scenarios of upnext.sim, 69 scenarios in all; the property loop is upnext.sim's again (the seed's first
+  draw let go, one run in twenty a 55-74 song album, op 14 older rows), canonical() with reached, starts and levels;
+  the resume cases (v 1 or 2, starts and reached read or refused), and the round trip at 1,000 runs (older rows
+  brought back every other run), counting rolled, brought, reachedKept, startsKept and v2.
+  - **The 200-song scenario** (past Up Next's 100) is recorded as one `set` of the state the sim's song-by-song walk
+    reaches, held to that walk by the exporter (it stops if the two differ): its 210 ops made scenarios.json 896 KB.
+  - Sizes: scenarios.json 528 KB (263 before), traces.json 2.17 MB (1.99), resume/cases.json 1.40 MB (1.25),
+    roundtrip.json 1.30 MB (1.07).
+- **export-history.cjs**: the History tap's jump with Repeat; op 6 brings back rowsFrom with the floor; each line
+  carries the starts the queue holds and each older row's starts and entry; the words' `playing` once (one rolledTo
+  says it).
+- Every ios*.sim `--check` green.
+
+### Tests
+
+- **UpNextTraceTests**: the replay knows jumpedTo's mode and `back`, broughtBack, heldStarts and shownKeys, and
+  compares each state's reached, starts and levels; `set` reads them.
+- **UpNextPropertyTests**: upnext.sim's loop and checks again - a History tap the same queue at the row less its
+  copies, drawn as it was, Previous's walk to it with no copies; older rows each its own entry, first, in order,
+  moved or added, with their starts, the queue after them as it was; Up Next drawing every song up to the furthest
+  played. Its tallies: walkedTo > 300, brought > 500, broughtMoved > 200, broughtNew > 500, longRuns > 50.
+- **ResumeRoundTripTests**: 1,000 runs; `reached` in what reads back; Up Next to come and the starts held the same
+  after a reload; the counts. **ResumeCaseTests**: the counts.
+- **HistoryVectorTests**: the moves and lines as export-history's, and drawnOnce as history.sim's 2.1.18 check (a
+  start held by a row brought back is the queue's; one moved back down past the rows drawn is to come).
+- **UpNextTests**: every jump names Repeat; `historysTapRollsBack`, `aRollBackUnderRepeat`,
+  `pastUpNextsHundredTheRoundMovedBackDownIsHeld`, `aShuffleRolledBackKeepsItsOrder`, `olderRowsBroughtBack` and
+  `theFloorDrawnKeepsTheQueueFromThere` - upnext.sim's 2.1.18 section check by check; wentBack's `reached` and
+  Repeat keeping a round played in the 2.1.3 tests.
+- **QueueControllerTests**: History's tap a skip, nothing replaced, Playing Next kept after the song that was
+  playing; from a pause with a seek on its way, never refused; Repeat One's copies let go, played afresh - and kept
+  with Repeat One still on, a skip;
+  QueueControllerRollBackTests (an older row, a pause, the next song scheduled, the floor after the engine ran on,
+  nothing playing) in place of the play-again suite.
+- **Mutations**: 36 over the ported rules, each run alone (copyAfter both ways, shownKeys' reach, broughtBack's
+  floor, order, starts, startedAt and reach, withRepeat's and withShuffle's later rounds - kept, the song before, each
+  shuffled, the reach - withoutKey's and movedKey's reach and rounds, wentBack's and rolledBack's furthest,
+  passPlaying's fallback, layout's reach, the History tap's back, heldStarts, snapshotVersion both ways, v2 refused,
+  starts read and on a copy, reached written, heldByQueue, rowsFrom, pastRows' entry and starts, the back path's skip
+  and play, rollBack's floor, jumpTo's Repeat), all caught. The first run missed one, closed by a test: jumpTo handing
+  jumpedTo Repeat off always (`aRollBackUnderRepeatOneKeepsItsCopiesAndSkips`: with Repeat One still on, a History tap
+  keeps the copies and skips).
+
+### Verified, and not
+
+- Verified: `swift test` (DeadwaxKit, every target), the unsigned Release device build (Xcode 27.2 here),
+  ios/scripts/check_project.py, all 81 sims on Node 22 (iosdeck on Node 20.12.2 too), pytest's ios files and
+  test_source_bytes.py, the mutations.
+- Not verified: CI's Xcode 26.6 (an older Swift; the closures new here spell out their types). The app's halves -
+  rolledTo's scroll and focus, the floor handed from the screen - are compiled, not tested: they're the phone's
+  checks 85-91 in docs/ios.md, with the rest of going back on the phone, locked.

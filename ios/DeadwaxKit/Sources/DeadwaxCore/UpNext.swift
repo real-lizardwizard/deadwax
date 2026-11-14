@@ -23,9 +23,19 @@ import Foundation
 // two never disagree: from where listening began (`startedAt`; Previous back before it moves it down, wentBack) and
 // at most UpNext.historyBack entries back (what a reload keeps, so History after one is the same). A UNIT - an entry
 // and the Repeat One copies straight after it - is one row there as in Up Next, keyed by its first entry, and every
-// row either draws is reached by its tap (jumpedTo): Up Next's moves the place onto it, History's plays its song
-// again. A unit is ONE song: whatever takes a song out of the queue takes its copies with it (withShuffle,
-// withRepeat), or they'd join the row before them. UpNextPropertyTests holds all of it, by upnext.sim's property.
+// row either draws is reached by its tap (jumpedTo): Up Next's moves the place onto it. A unit is ONE song: whatever
+// takes a song out of the queue takes its copies with it (withShuffle, withRepeat), or they'd join the row before
+// them. UpNextPropertyTests holds all of it, by upnext.sim's property.
+//
+// A ROLL-BACK (the web's 2.1.18, James: "Instead of just playing a song in the history, I want to roll back to that
+// point"): Up Next's one list - the play history, History, the song playing, what plays after - keeps its order, and a
+// tap on a row above the song playing moves the playing point up to it. Every row below it is then to come, in the
+// order drawn; nothing is reshuffled. History's row (jumpedTo) is moved to, Previous's way - nothing added or copied,
+// the same tracks unless Repeat One's copies go (outside Repeat One a row plays once); an older row of the play history
+// (broughtBack) brings the rows from it down to History into the queue ahead of History's songs (Brought). The
+// furthest song played (`reached`) is what the list Up Next draws runs on to, whatever the time round, so every row a
+// roll-back moved down is drawn where it plays - and Previous (wentBack) sets it too, being the same move one row at
+// a time.
 //
 // RANDOMNESS comes in only through startUpNext, toppedUp and withShuffle, each as `random` (a number in [0, 1)),
 // drawn in exactly the TypeScript's order, so the same numbers make the same queue: ios/scripts/export-traces.cjs
@@ -143,15 +153,15 @@ func unitStart(_ state: UpNextState, _ index: Int) -> Int {
     return place
 }
 
-/// Where Repeat One's copies after the song playing end, where the songs added after them (Playing Next) end, and
+/// Where Repeat One's copies after the song at `index` end, where the songs added after them (Playing Next) end, and
 /// where the list Up Next draws after those ends - the shown round's songs, and any song added among them (Previous
-/// walked back across it: it plays where it played).
-func layout(_ queue: UpNextQueue, _ state: UpNextState) -> (copiesEnd: Int, addedEnd: Int, listEnd: Int) {
-    var copiesEnd = queue.index + 1
+/// walked back across it: it plays where it played) - with that song playing.
+func layoutAt(_ state: UpNextState, _ index: Int) -> (copiesEnd: Int, addedEnd: Int, listEnd: Int) {
+    var copiesEnd = index + 1
     while markAt(state.marks, copiesEnd)?.from == .one { copiesEnd += 1 }
     var addedEnd = copiesEnd
     while markAt(state.marks, addedEnd)?.from == .added { addedEnd = unitEnd(state, addedEnd) }
-    let shown = shownPass(queue)
+    let shown = shownPassAt(state, index)
     var listEnd = addedEnd
     while listEnd < state.marks.count {
         let mark = state.marks[listEnd]
@@ -159,6 +169,29 @@ func layout(_ queue: UpNextQueue, _ state: UpNextState) -> (copiesEnd: Int, adde
         listEnd = unitEnd(state, listEnd)
     }
     return (copiesEnd, addedEnd, listEnd)
+}
+
+/// The layout of Up Next for the song playing (layoutAt) - and (2.1.18) after a roll-back, the list running on to the
+/// furthest unit played (`reached`) and through what was drawn after it then, so the rows moved back down are drawn
+/// where they play, whatever their time round.
+func layout(_ queue: UpNextQueue, _ state: UpNextState) -> (copiesEnd: Int, addedEnd: Int, listEnd: Int) {
+    let own = layoutAt(state, queue.index)
+    let reach = reachedPlace(queue, state)
+    if reach < 0 { return own }
+    return (own.copiesEnd, own.addedEnd, max(own.listEnd, layoutAt(state, reach).listEnd))
+}
+
+/// (2.1.18) Where the furthest unit played is (`reached`), while it is after the song playing; -1 otherwise.
+func reachedPlace(_ queue: UpNextQueue, _ state: UpNextState) -> Int {
+    guard let reached = state.reached, let place = state.marks.firstIndex(where: { $0.key == reached }) else { return -1 }
+    return place > queue.index ? place : -1
+}
+
+/// (2.1.18) What `reached` becomes as the playing point moves back up the list: the furthest unit played so far - the
+/// one it names, while that is after the song playing, else the song playing's own unit.
+func furthest(_ queue: UpNextQueue, _ state: UpNextState) -> Int? {
+    if reachedPlace(queue, state) >= 0 { return state.reached }
+    return markAt(state.marks, unitStart(state, queue.index))?.key
 }
 
 /// The unit starts in [start, end).
@@ -183,10 +216,14 @@ func lastSourceAt(_ marks: [Mark], _ index: Int) -> Int {
 }
 
 /// The time round the song playing is in: the last of the list's songs at or before it (a song added, or a copy,
-/// is in the round of the list's song before it); -1 for none.
+/// is in the round of the list's song before it) - (2.1.18) with none before it (songs brought back from the play
+/// history ahead of the list's, broughtBack), the round of the first of the list's after it, which they lead into; -1
+/// for none at all.
 func passPlaying(_ marks: [Mark], _ index: Int) -> Int {
     let at = lastSourceAt(marks, index)
-    return at < 0 ? -1 : marks[at].pass
+    if at >= 0 { return marks[at].pass }
+    guard let first = marks.indices.first(where: { $0 > index && marks[$0].from == .source }) else { return -1 }
+    return marks[first].pass
 }
 
 /// The one album every song of the list is from, by name - or nil for a list of several. An album id the
@@ -297,7 +334,10 @@ public func toppedUp(_ queue: UpNextQueue, _ mode: Repeat, random: () -> Double 
 /// its own copies. The player then tops the queue up for the new mode (toppedUp).
 public func withRepeat(_ queue: UpNextQueue, _ mode: Repeat) -> UpNextQueue {
     guard let state = queue.upNext else { return queue }
-    let round = passPlaying(state.marks, queue.index)
+    //? (2.1.18) after a roll-back, the round of the furthest song played: the rounds it moved back down are songs that
+    //? played, drawn as rows to come - Repeat lets go of the rounds after it, never of them
+    let reach = reachedPlace(queue, state)
+    let round = max(passPlaying(state.marks, queue.index), reach < 0 ? -1 : passPlaying(state.marks, reach))
     //? (2.1.3 review) a later round's song goes with its own copies (Previous walked back across it): left, they'd
     //? join the row before them - History naming one song where Previous plays another
     func goes(_ mark: Mark, _ place: Int) -> Bool {
@@ -333,6 +373,12 @@ public func withRepeat(_ queue: UpNextQueue, _ mode: Repeat) -> UpNextQueue {
 ///   places taken out of it (`left`). Entries already queued for those places keep their keys.
 /// - OFF: the list's own order from the song playing's place in it - the places after the last of the list's songs
 ///   at or before it, less those taken out this round - as new entries.
+///
+/// (2.1.18) After a roll-back across Repeat All's rounds, the later rounds' songs it moved back down - after the song
+/// playing, up to the round of the furthest song played (`reached`) - are songs to come too: they stay, each with its
+/// copies, after the round playing's - each round's in a new order of its own with Shuffle on (so the rounds never go
+/// down; none starting with the song before it, as toppedUp's), in the list's order with it off. Only the rounds after
+/// the furthest go, as withRepeat lets them go; `reached` moves to whichever of the songs it had moved down is last now.
 ///
 /// (Part B) A library's shuffle is left as it is: its order IS the shuffle.
 public func withShuffle(_ queue: UpNextQueue, _ on: Bool, random: () -> Double = UpNext.systemRandom) -> UpNextQueue {
@@ -387,9 +433,58 @@ public func withShuffle(_ queue: UpNextQueue, _ on: Bool, random: () -> Double =
     }
     tracks += fresh.map { state.source[$0.at] }
     marks += fresh
+    //? (2.1.18) ...but the later rounds' songs a roll-back moved back down (up to the furthest played's round, as
+    //? withRepeat keeps them) come again after the round playing's, units whole: each round's shuffled on its own - as
+    //? toppedUp's new rounds, never starting with the song just before it, with any other to start with - or, Shuffle
+    //? off, in the list's order
+    let reach = reachedPlace(queue, state)
+    let reachRound = reach < 0 ? round : max(round, passPlaying(state.marks, reach))
+    var rounds: [Int: [Int]] = [:]
+    for start in unitsIn(state, index + 1, state.marks.count) {
+        let mark = state.marks[start]
+        if mark.from != .source || mark.pass <= round || mark.pass > reachRound { continue }
+        rounds[mark.pass, default: []].append(start)
+    }
+    for pass in rounds.keys.sorted() {
+        var starts = rounds[pass] ?? []
+        if on {
+            starts = shuffled(starts, random)
+            let ending = tracks.last?.id
+            if starts.count > 1, let ending, queue.tracks[starts[0]].id == ending {
+                let others = starts.indices.filter { $0 > 0 && queue.tracks[starts[$0]].id != ending }
+                //? the draw is made even with nothing to pick, as the web's `others[floor(r * 0)]`
+                let r = random()
+                let pick = Int((r * Double(others.count)).rounded(.down))
+                if pick < others.count { starts.swapAt(0, others[pick]) }
+            }
+        } else {
+            //? the list's order - Array.sort's, stable: ties (none a queue makes) kept as they were
+            starts = starts.enumerated().sorted { (a: (offset: Int, element: Int), b: (offset: Int, element: Int)) -> Bool in
+                let x = state.marks[a.element].at
+                let y = state.marks[b.element].at
+                return x != y ? x < y : a.offset < b.offset
+            }.map { $0.element }
+        }
+        for start in starts {
+            let end = unitEnd(state, start)
+            tracks += queue.tracks[start..<end]
+            marks += state.marks[start..<end]
+        }
+    }
+    //? the furthest played, its round reshuffled: whichever of the units it had moved back down is placed last now (as
+    //? movedKey hands it on), so the list Up Next draws, and the starts it holds, still run on past every one of them
+    //? (never the song playing's own copies, which aren't a song of their own)
+    var reachedNow: Int?
+    if reach >= 0 {
+        let played = Set(unitsIn(state, index + 1, reach + 1).filter { state.marks[$0].from != .one }.map { state.marks[$0].key })
+        for place in (index + 1)..<max(index + 1, marks.count) where played.contains(marks[place].key) {
+            reachedNow = marks[place].key
+        }
+    }
     return rebuilt(queue, state, tracks, marks) { next in
         next.shuffle = on
         next.nextKey = nextKey
+        if reach >= 0 { next.reached = reachedNow }
     }
 }
 
@@ -434,8 +529,13 @@ public func withoutKey(_ queue: UpNextQueue, _ key: Int) -> UpNextQueue {
     let gone = state.marks[group.place]
     let end = unitEnd(state, group.place)
     let (tracks, marks) = kept(queue, state) { $1 < group.place || $1 >= end }
+    //? (2.1.18) the furthest unit played, taken out: the unit before it in its group is now where the list runs on to
+    //? (none before it, or the song playing: nothing moved back down is left between)
+    let units = unitsIn(state, group.start, group.end)
+    let before = units.firstIndex(of: group.place).flatMap { $0 > 0 ? units[$0 - 1] : nil }
     return rebuilt(queue, state, tracks, marks) { next in
         if gone.from == .source { next.left.append(LeftOut(pass: gone.pass, at: gone.at)) }
+        if gone.key == state.reached { next.reached = before.map { state.marks[$0].key } }
     }
 }
 
@@ -449,12 +549,39 @@ public func movedKey(_ queue: UpNextQueue, _ key: Int, to: Int) -> UpNextQueue {
     if dest == from { return queue }
     var order = units.map { (start: $0, end: unitEnd(state, $0)) }
     order.insert(order.remove(at: from), at: dest)
-    func move<T>(_ list: [T]) -> [T] {
-        var out = Array(list[..<group.start])
-        for unit in order { out += list[unit.start..<unit.end] }
-        return out + Array(list[group.end...])
+    //? (2.1.18) a roll-back's list can run across times round (Repeat All's, moved back down): each of the list's places
+    //? keeps its time round, whichever song is moved to it, so the rounds never go down after the song playing - a song
+    //? moved up out of the later round is this round's now
+    let rounds = units.filter { state.marks[$0].from == .source }.map { state.marks[$0].pass }
+    var round = 0
+    var marks = Array(state.marks[..<group.start])
+    var tracks = Array(queue.tracks[..<group.start])
+    for unit in order {
+        var moved = Array(state.marks[unit.start..<unit.end])
+        if moved[0].from == .source {
+            let pass = rounds[round]
+            round += 1
+            if moved[0].pass != pass {
+                moved = moved.map { (mark: Mark) -> Mark in
+                    var recast = mark
+                    recast.pass = pass
+                    return recast
+                }
+            }
+        }
+        marks += moved
+        tracks += queue.tracks[unit.start..<unit.end]
     }
-    return rebuilt(queue, state, move(queue.tracks), move(state.marks))
+    marks += state.marks[group.end...]
+    tracks += queue.tracks[group.end...]
+    //? (2.1.18) the furthest unit played in this group: the list still runs on to every unit that was at or before it -
+    //? to whichever of them is now last
+    let reachAt = units.firstIndex { state.marks[$0].key == state.reached }
+    return rebuilt(queue, state, tracks, marks) { next in
+        guard let reachAt else { return }
+        let within = Set(units[...reachAt])
+        if let last = order.map({ $0.start }).filter({ within.contains($0) }).last { next.reached = state.marks[last].key }
+    }
 }
 
 /// Clear: Playing Next out - the songs added straight after the song playing, the group Clear heads (a song added
@@ -468,14 +595,33 @@ public func withoutAdded(_ queue: UpNextQueue) -> UpNextQueue {
 }
 
 /// A row's tap, as the player makes it: the queue to put in place first (an edit of what comes after the song
-/// playing, or the same queue), and the entry to move to then.
+/// playing, or the same queue), and the entry to move to then - or (2.1.18) `back`, a roll-back: `queue` is the whole
+/// queue, already at `index`, moved to as Previous moves (the same entries: the engine's skip; else played afresh from
+/// it, a tap's).
 public struct Jump: Sendable, Equatable {
     public let queue: UpNextQueue
     public let index: Int
+    public let back: Bool
 
-    public init(queue: UpNextQueue, index: Int) {
+    public init(queue: UpNextQueue, index: Int, back: Bool = false) {
         self.queue = queue
         self.index = index
+        self.back = back
+    }
+}
+
+/// (2.1.18) An older row of the play history, as a tap brings it back into the queue (broughtBack): its song - at the
+/// level it is queued at - the moments of the starts its row stood for, and the entry of THIS queue the row's first
+/// start was begun in, when it was (PlayHistory.swift PastRow).
+public struct Brought: Sendable, Equatable {
+    public let track: QueueTrack
+    public let starts: [Int64]
+    public let entry: Int?
+
+    public init(track: QueueTrack, starts: [Int64], entry: Int?) {
+        self.track = track
+        self.starts = starts
+        self.entry = entry
     }
 }
 
@@ -485,21 +631,25 @@ public struct Jump: Sendable, Equatable {
 /// - A row of the list: the place moves there; Playing Next goes straight after it (and its copies) - songs added
 ///   still play next - and the list's rows above it stay behind it, in their order, where Previous finds them.
 /// - A row of Playing Next: the place moves there; the songs added above it stay behind it.
-/// - A row of History (an entry before the song playing's unit): the song AGAIN - a new entry of it, a song added,
-///   straight after the song playing's copies (where Play Next goes), moved to; the songs after are as they were,
-///   and History is never rewritten: it is what played, and the song played again joins it as played.
+/// - (2.1.18) A row of History (an entry before the song playing's unit): a ROLL-BACK (James, 2026-11-14: "Everything
+///   between the selected song and the current song should be added to queue so it just moves back up the list") -
+///   the place moves back to its unit, nothing added or copied: History's rows after it, the song that was playing
+///   (from its start), Playing Next and the list are then to come, in that order, where they were - and Previous from
+///   it the row above. Outside Repeat One every copy after it goes (`mode`): a row plays once, as drawn. `reached`
+///   names the furthest unit played, so Up Next draws them all. A `back` jump.
 ///
 /// `index` is the entry to move to, in `queue`; the edit keeps `tracks[0...index]` of the queue it was given (the
-/// player's replaceUpcoming takes it as any edit). Nil for the song playing (or one of its copies), a key it doesn't
-/// have, a row Up Next doesn't draw (a later time round, a copy), or one History doesn't (before where listening
-/// began, past UpNext.historyBack) - every row drawn is one a tap reaches, and nothing else is.
-public func jumpedTo(_ queue: UpNextQueue, _ key: Int) -> Jump? {
+/// player's replaceUpcoming takes it as any edit) - a roll-back's `queue` is already there. Nil for the song playing
+/// (or one of its copies), a key it doesn't have, a row Up Next doesn't draw (a later time round, a copy), or one
+/// History doesn't (before where listening began, past UpNext.historyBack) - every row drawn is one a tap reaches, and
+/// nothing else is.
+public func jumpedTo(_ queue: UpNextQueue, _ key: Int, _ mode: Repeat) -> Jump? {
     guard let state = queue.upNext, queue.current != nil,
           let place = state.marks.firstIndex(where: { $0.key == key }) else { return nil }
     let (copiesEnd, addedEnd, _) = layout(queue, state)
     if place < unitStart(state, queue.index) {
         guard historyRows(queue).contains(where: { $0.key == key }) else { return nil }
-        return Jump(queue: added(queue, state, [queue.tracks[place]], at: copiesEnd), index: copiesEnd)
+        return rolledBack(queue, state, place, mode)
     }
     guard let group = groupOf(queue, state, key) else { return nil }
     if group.added || addedEnd == copiesEnd { return Jump(queue: queue, index: group.place) }
@@ -510,6 +660,88 @@ public func jumpedTo(_ queue: UpNextQueue, _ key: Int) -> Jump? {
         + Array(end..<max(end, state.marks.count))
     return Jump(queue: rebuilt(queue, state, places.map { queue.tracks[$0] }, places.map { state.marks[$0] }),
                 index: group.place - (addedEnd - copiesEnd))
+}
+
+/// (2.1.18) Outside Repeat One, whether the entry at `place` is a copy after `from` - which a roll-back lets go: the rows
+/// moved back down play once each, as drawn.
+private func copyAfter(_ state: UpNextState, _ mode: Repeat, _ from: Int, _ place: Int) -> Bool {
+    mode != .one && place > from && state.marks[place].from == .one
+}
+
+/// (2.1.18) History's row at `place` (a unit's first entry), rolled back to - jumpedTo's. The same tracks unless copies
+/// go, so the player's move is Previous's: the engine's skip.
+private func rolledBack(_ queue: UpNextQueue, _ state: UpNextState, _ place: Int, _ mode: Repeat) -> Jump {
+    let reached = furthest(queue, state)
+    var next = queue
+    next.index = place
+    if reached != state.reached { next.upNext?.reached = reached }
+    guard state.marks.indices.contains(where: { copyAfter(state, mode, place, $0) }) else {
+        return Jump(queue: next, index: place, back: true)
+    }
+    let (tracks, marks) = kept(queue, state) { !copyAfter(state, mode, place, $1) }
+    next.tracks = tracks
+    next.upNext?.marks = marks
+    return Jump(queue: next, index: place, back: true)
+}
+
+/// (2.1.18) An older row of the play history tapped - "Roll back everywhere" (James, 2026-11-14): the rows from it down
+/// to History (`rows`, oldest first - the tapped one first) come into the queue AHEAD of History's songs, in the order
+/// drawn, and the first plays. Everything played after it moves back down into Up Next - skips included, however many.
+///
+/// - Each row is ONE entry, its song once (a run of starts of one song is one row): the entry of this queue its first
+///   start was begun in, MOVED with its own mark and track, while the queue still holds it before History's floor (a
+///   long queue's songs past History's 50 - a roll-back in it then is History's, nothing copied) and after the last
+///   entry moved (so the list's songs keep their order, and their times round never go down); else a new entry, a
+///   song added at the level it was queued at - played once, never copied by Repeat All. Each carries the moments of
+///   its row's starts (Mark.starts), so while the queue holds it they are never drawn above as history: they moved
+///   down into Up Next. Each comes back into history as it plays again, as a new start; deadwax's log is never edited.
+/// - The queue from History's first row on stays, in its order (outside Repeat One, without its copies: a row plays
+///   once); what came before History's floor - never drawn, songs before where listening began or past the 50 - goes,
+///   so Previous from the song tapped starts it again: the queue holds nothing before it (the older rows above are
+///   tapped, never walked). The queue's id, its list, Shuffle, the songs taken out and a library's shuffle's pages are
+///   as they were; `startedAt` 0; `reached` the furthest unit played.
+///
+/// `floor` (the web's 2.1.18 review): the key of the first entry Up Next drew for this queue as it was tapped -
+/// History's first row, or the song playing's - which the rows were read against. The player catches up with a song
+/// the engine ran into just before the tap, and History's floor moves on one: the song at the floor drawn is kept all
+/// the same, the queue kept from the earlier of the two - else it would be in neither the rows nor what stays.
+///
+/// Nil without a song playing or with no rows. Always a `back` jump at 0, with other entries: played afresh, a tap's.
+public func broughtBack(_ queue: UpNextQueue, _ rows: [Brought], _ mode: Repeat, floor: Int? = nil) -> Jump? {
+    guard let state = queue.upNext, queue.current != nil, !rows.isEmpty else { return nil }
+    let drawn = floor.flatMap { key in state.marks.firstIndex { $0.key == key } } ?? -1
+    let shown = shownFrom(queue, state)
+    let from = drawn < 0 ? shown : min(shown, drawn)
+    let reached = furthest(queue, state)
+    var tracks: [QueueTrack] = []
+    var marks: [Mark] = []
+    var last = -1
+    var nextKey = state.nextKey
+    for row in rows {
+        let place = row.entry.flatMap { entry in state.marks.firstIndex { $0.key == entry } } ?? -1
+        //? the ids compared as the web compares them, by UTF-16 unit: a row's song came from deadwax's history
+        let held = place > last && place < from && state.marks[place].from != .one
+            && WebText.same(queue.tracks[place].id, row.track.id)
+        var mark: Mark
+        if held {
+            last = place
+            tracks.append(queue.tracks[place])
+            mark = state.marks[place]
+        } else {
+            tracks.append(row.track)
+            mark = Mark(key: nextKey, from: .added, at: -1, pass: -1)
+            nextKey += 1
+        }
+        mark.starts = row.starts
+        marks.append(mark)
+    }
+    let (keptTracks, keptMarks) = kept(queue, state) { $1 >= from && !copyAfter(state, mode, from - 1, $1) }
+    var next = state
+    next.marks = marks + keptMarks
+    next.nextKey = nextKey
+    next.startedAt = 0
+    next.reached = reached
+    return Jump(queue: UpNextQueue(tracks: tracks + keptTracks, index: 0, upNext: next), index: 0, back: true)
 }
 
 /// History: the units before the song playing's, oldest first - from `startedAt` (the list's songs before where
@@ -549,12 +781,15 @@ func shownFrom(_ queue: UpNextQueue, _ state: UpNextState) -> Int {
 /// rows. One run, from shownFrom to the end of the last list row drawn - NEVER a later time round (Repeat All's, which
 /// Up Next sums up in a line) or a list row past `limit` ("And N more songs"), though Previous can leave songs begun
 /// there. PlayHistory.swift draws a start of any other entry among the older plays above History, so each is drawn
-/// once. None with nothing playing.
+/// once. (2.1.18) After a roll-back the run goes on to the end of the furthest unit played (`reached`) even past the
+/// list's `limit`: every song begun there moved back down into Up Next ("And N more songs" counts it) and is never
+/// drawn above as history. None with nothing playing.
 public func shownKeys(_ queue: UpNextQueue, limit: Int = UpNext.drawn) -> Set<Int> {
     guard let state = queue.upNext, queue.current != nil else { return [] }
     let (_, addedEnd, listEnd) = layout(queue, state)
     let listed = unitsIn(state, addedEnd, listEnd)
-    let end = listed.count > limit ? listed[limit] : listEnd
+    let reach = reachedPlace(queue, state)
+    let end = max(listed.count > limit ? listed[limit] : listEnd, reach < 0 ? 0 : unitEnd(state, reach))
     var keys = Set<Int>()
     var place = shownFrom(queue, state)
     while place < end {
@@ -564,14 +799,43 @@ public func shownKeys(_ queue: UpNextQueue, limit: Int = UpNext.drawn) -> Set<In
     return keys
 }
 
+/// (2.1.18) One start the queue holds as a row brought back from the play history (Mark.starts): its song and moment.
+public struct HeldStart: Sendable, Equatable, Hashable {
+    public let id: String
+    public let at: Int64
+
+    public init(id: String, at: Int64) {
+        self.id = id
+        self.at = at
+    }
+}
+
+/// (2.1.18) The starts the queue holds as rows brought back from the play history (Mark.starts) - each entry's song and
+/// moments, for the entries Up Next's rows stand for (shownKeys, the same `limit`): while it draws them they are its,
+/// never drawn above again, as the queue's own starts are; an entry fallen past History's 50 - or a Shuffle put past
+/// the rows drawn - lets its go. None with nothing playing.
+public func heldStarts(_ queue: UpNextQueue, limit: Int = UpNext.drawn) -> [HeldStart] {
+    guard let state = queue.upNext, queue.current != nil else { return [] }
+    let shown = shownKeys(queue, limit: limit)
+    var held: [HeldStart] = []
+    for (place, mark) in state.marks.enumerated() where shown.contains(mark.key) {
+        for at in mark.starts ?? [] { held.append(HeldStart(id: queue.tracks[place].id, at: at)) }
+    }
+    return held
+}
+
 /// Previous's move: the queue at `index` - and, back before where listening began, `startedAt` moved down to the
-/// unit landed in, so History shows the songs played from there. The same tracks: the engine's skip still applies.
+/// unit landed in, so History shows the songs played from there. (2.1.18) Previous is a roll-back one row at a time,
+/// so `reached` names the furthest unit played, as History's tap's does: Up Next draws every row moved back down. The
+/// same tracks: the engine's skip still applies.
 public func wentBack(_ queue: UpNextQueue, _ index: Int) -> UpNextQueue {
     var next = queue
     next.index = index
     if let state = queue.upNext {
         let start = unitStart(state, index)
+        let reached = furthest(queue, state)
         if start < state.startedAt { next.upNext?.startedAt = start }
+        if reached != state.reached { next.upNext?.reached = reached }
     }
     return next
 }
@@ -613,7 +877,12 @@ public func pastCopies(_ queue: UpNextQueue, from: Int) -> Int? {
 /// The time round of the list Up Next shows: the first of the list's songs after the song playing's; -1 for none.
 public func shownPass(_ queue: UpNextQueue) -> Int {
     guard let state = queue.upNext else { return -1 }
-    var place = max(queue.index + 1, 0)
+    return shownPassAt(state, queue.index)
+}
+
+/// shownPass with the song at `index` playing.
+func shownPassAt(_ state: UpNextState, _ index: Int) -> Int {
+    var place = max(index + 1, 0)
     while place < state.marks.count {
         if state.marks[place].from == .source { return state.marks[place].pass }
         place += 1

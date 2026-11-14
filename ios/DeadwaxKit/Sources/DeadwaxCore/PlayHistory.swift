@@ -14,6 +14,11 @@ import Foundation
 //
 //   - while the queue still draws its entry - History (what Previous walks, the songs a tap passed included), the song
 //     playing, or a row still to play - it is the QUEUE's row;
+//   - (the web's 2.1.18) while one of the entries the queue's rows stand for holds it as a row brought back from the
+//     play history (a tap on an older row rolled the queue back to it: UpNext.swift broughtBack, Mark.starts,
+//     heldStarts), or its entry is ahead of the song playing up to the end of the furthest unit played (a roll-back or
+//     Previous moved it back down: `reached`, even past the list's limit), it is the queue's too - moved down into Up
+//     Next, never drawn above as history; it comes back into history as it plays again, a new start;
 //   - once its entry has fallen past History's 50, or isn't drawn ahead (Previous back out of Repeat All's next round,
 //     or past the list's first 100 rows), or the queue is another (an album tapped, a queue put back from another
 //     app), it is one of the older rows ABOVE History, in the order they were begun.
@@ -158,30 +163,40 @@ public struct HistoryTaken: Sendable, Equatable, Decodable {
     public let skipped: Int
 }
 
-/// One older row of Up Next's list: the first start of a run of one song - its key - and the song.
+/// One older row of Up Next's list: the first start of a run of one song - its key - and the song; (the web's 2.1.18)
+/// the moments of every start of the run, oldest first, and the entry of the queue playing its first start was begun
+/// in, when it was - what a tap on it brings back (UpNext.swift Brought).
 public struct PastRow: Sendable, Equatable, Hashable {
     public let key: String
     public let track: QueueTrack
+    public internal(set) var starts: [Int64]
+    public let entry: Int?
 
-    public init(key: String, track: QueueTrack) {
+    public init(key: String, track: QueueTrack, starts: [Int64], entry: Int?) {
         self.key = key
         self.track = track
+        self.starts = starts
+        self.entry = entry
     }
 }
 
 /// The entries of a queue whose starts its own rows draw - its id, and shownKeys(): History's, the song playing's, the
 /// songs added and the list's rows drawn (its first `limit`) - never a later time round or a row past the limit, whose
-/// starts are older rows above. None with nothing playing.
+/// starts are older rows above. (2.1.18) And `held`: the starts the queue holds as rows brought back from the play
+/// history (heldStarts) - of the entries its rows stand for, whatever queue they were begun in - each a start's key
+/// (PlayHistory.key) in UTF-16 units, as the web's Set of strings tells them apart. None with nothing playing.
 public struct QueueShows: Sendable, Equatable {
     public let id: String?
     public let keys: Set<Int>
+    public let held: Set<[UInt16]>
 
-    public init(id: String?, keys: Set<Int>) {
+    public init(id: String?, keys: Set<Int>, held: Set<[UInt16]> = []) {
         self.id = id
         self.keys = keys
+        self.held = held
     }
 
-    public static let none = QueueShows(id: nil, keys: [])
+    public static let none = QueueShows(id: nil, keys: [], held: [])
 }
 
 /// What the history model holds of deadwax's pages: every play they brought, newest first, each once; the cursor of
@@ -239,7 +254,8 @@ public enum PlayHistory {
 
     public static func queueShows(_ queue: UpNextQueue, limit: Int = UpNext.drawn) -> QueueShows {
         guard let state = queue.upNext, !state.id.isEmpty, queue.current != nil else { return .none }
-        return QueueShows(id: state.id, keys: shownKeys(queue, limit: limit))
+        let held = Set(heldStarts(queue, limit: limit).map { Array("\($0.at):\($0.id)".utf16) })
+        return QueueShows(id: state.id, keys: shownKeys(queue, limit: limit), held: held)
     }
 
     /// Whether `played` is one of the queue's own rows - begun in this queue, its entry one the queue's rows stand for.
@@ -247,6 +263,12 @@ public enum PlayHistory {
     public static func shownByQueue(_ played: Played, _ shows: QueueShows) -> Bool {
         guard let id = shows.id, let entry = played.entry, let queue = played.queue else { return false }
         return WebText.same(queue, id) && shows.keys.contains(entry)
+    }
+
+    /// (2.1.18) Whether the queue holds `played`: one of its own rows (shownByQueue), or a row brought back from the
+    /// play history that it holds (QueueShows.held) - moved down into Up Next. Either way never an older row above.
+    public static func heldByQueue(_ played: Played, _ shows: QueueShows) -> Bool {
+        shownByQueue(played, shows) || shows.held.contains(Array(key(played).utf16))
     }
 
     /// deadwax's pages and this phone's own starts as one list, newest first, each start once - `counted` ORed, since a
@@ -275,19 +297,31 @@ public enum PlayHistory {
     }
 
     /// The older rows above History, oldest first: every start (newest first, as `merged` gives them) the queue doesn't
-    /// show itself (`limit` the list's rows Up Next draws), a run of starts of one song one row - keyed by the run's
-    /// first start.
+    /// hold itself (`limit` the list's rows Up Next draws; heldByQueue), a run of starts of one song one row - keyed by
+    /// the run's first start, with every start's moment (2.1.18), and the entry its first start was begun in when that
+    /// was in the queue playing.
     public static func pastRows(_ plays: [Played], queue: UpNextQueue, limit: Int = UpNext.drawn) -> [PastRow] {
         let shows = queueShows(queue, limit: limit)
         var rows: [PastRow] = []
         var last: String?
         for played in plays.reversed() {
-            if shownByQueue(played, shows) { continue }
-            if let last, WebText.same(played.song.id, last) { continue }
+            if heldByQueue(played, shows) { continue }
+            if let last, WebText.same(played.song.id, last) {
+                rows[rows.count - 1].starts.append(played.at)
+                continue
+            }
             last = played.song.id
-            rows.append(PastRow(key: key(played), track: played.song))
+            let mine = shows.id.map { id in played.queue.map { WebText.same($0, id) } ?? false } ?? false
+            rows.append(PastRow(key: key(played), track: played.song, starts: [played.at], entry: mine ? played.entry : nil))
         }
         return rows
+    }
+
+    /// (2.1.18) An older row's tap: the rows from it (by its key) down to History's, oldest first - what comes back into
+    /// the queue, the tapped one first (UpNext.swift broughtBack). None for a key not among them.
+    public static func rowsFrom(_ rows: [PastRow], _ key: String) -> [PastRow] {
+        guard let at = rows.firstIndex(where: { WebText.same($0.key, key) }) else { return [] }
+        return Array(rows[at...])
     }
 
     /// Whether `a` comes after `b` in deadwax's order - its moment, then its song id (the page's ORDER BY).

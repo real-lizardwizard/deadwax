@@ -223,49 +223,56 @@ public final class QueueController {
 
     /// A row's tap: that song now, playing even from a pause - made now or not at all, never held. Nothing is dropped
     /// (2.1.3, jumpedTo): a row of Up Next moves the place onto it, the rows it passes left behind it where Previous
-    /// finds them; a row of History plays its song again, a new entry at the head of Playing Next. A key no row
-    /// draws does nothing. The engine skips to the jump's index - forward over several entries as Previous goes
-    /// back over one (`begin(at:)` starts any entry). An edit the engine can't take this moment (D4: the next song
-    /// already on a player node, which is every song's last ~2.5 s; or a seek on its way) is no bar, unlike the web's
-    /// "a seek on its way: nothing": the jump leaves the song heard anyway, so the queue is played afresh from the
-    /// row, as a skip would start it - nothing the listener stays on is cut. True when the jump was made - the
-    /// screen says what started only then.
+    /// finds them; (2.1.18) a row of History ROLLS BACK to it - the playing point moves up to it, everything after it
+    /// to come again (a `back` jump, moved to as Previous moves). A key no row draws does nothing. The engine skips to
+    /// the jump's index - forward over several entries as Previous goes back over one (`begin(at:)` starts any entry).
+    /// An edit the engine can't take this moment (D4: the next song already on a player node, which is every song's
+    /// last ~2.5 s; or a seek on its way) is no bar, unlike the web's "a seek on its way: nothing": the jump leaves the
+    /// song heard anyway, so the queue is played afresh from the row, as a skip would start it - nothing the listener
+    /// stays on is cut. True when the jump was made - the screen says what started only then.
     @discardableResult
     public func jumpTo(key: Int) -> Bool {
         catchUp()
-        return jump { jumpedTo($0, key) }
+        let mode = repeatMode
+        return jump { jumpedTo($0, key, mode) }
     }
 
-    /// (2.1.15) An older row's tap - a song played before, above History: that song again, now, as a History row's
-    /// tap plays its song - a new entry after the song playing's copies, moved to at once, the queue carrying on after
-    /// it. The web's two steps (Play Next, then a jump to the key it was given) as ONE edit, `withNext` then `jumpedTo`
-    /// its key, made as a row's tap is (jumpTo): never held, so the song never waits as Playing Next. With nothing to
-    /// play next to - nothing playing, or a queue played out with nothing after it - the song plays as a queue of its
-    /// own, as Play Next would start it (`playsAlone`: the app starts a new queue's engine keys for it). True when it
-    /// plays.
+    /// (2.1.18) An older row's tap - a song played before, above History: ROLLED BACK to, everywhere (broughtBack) - it
+    /// and every older row below it down to History's (`rows`, oldest first, the tapped one first: PlayHistory.rowsFrom,
+    /// their songs at the level they're queued at) come into the queue ahead of History's songs, and the first plays;
+    /// everything played since is to come again. `floor` is the key of the first entry Up Next drew as it was tapped -
+    /// History's first row, else the song playing's - which the rows were read against. Made as a row's tap is (jumpTo):
+    /// now or not at all, never held. Nothing with nothing playing (the web's broughtBack is null then: an older row is
+    /// tapped beside a queue). True when it plays.
     @discardableResult
-    public func playAgain(_ track: QueueTrack) -> Bool {
-        if playsAlone() {
-            playTracks([track], start: 0)
-            return queue.current != nil
-        }
-        return jump { queue in
-            guard let key = queue.upNext?.nextKey else { return nil }
-            return jumpedTo(withNext(queue, [track]), key)
-        }
-    }
-
-    /// Whether a song played again (playAgain) has nothing to play next to - nothing playing, or a queue played out
-    /// with nothing after it - and so plays as a queue of its own, as Play Next's would. The queue caught up first.
-    public func playsAlone() -> Bool {
+    public func rollBack(_ rows: [Brought], floor: Int?) -> Bool {
         catchUp()
-        return queue.current == nil || queue.upNext == nil || (engine.heard()?.ended == true && onward(queue) == nil)
+        let mode = repeatMode
+        return jump { broughtBack($0, rows, mode, floor: floor) }
     }
 
     /// A row's jump (`made`, from the queue as it is): moved to with the engine's skip, or - an edit it can't take this
-    /// moment - the queue played afresh from it, found again in the queue as it is by then.
+    /// moment - the queue played afresh from it, found again in the queue as it is by then. (2.1.18) A roll-back (`back`)
+    /// is the whole queue, already at its row: moved to as Previous moves - the engine's skip with the same entries
+    /// (History's row, nothing dropped), else played afresh from it, this being a tap (copies let go, or older rows
+    /// brought back: the entries before the one playing changed, which no replaceUpcoming can make) - never refused.
     private func jump(_ made: (UpNextQueue) -> Jump?) -> Bool {
         guard let jump = made(queue) else { return false }
+        if jump.back {
+            let same = Self.entries(jump.queue) == Self.entries(queue)
+            queue = jump.queue
+            //? a row's tap plays it, paused or not
+            intendsToPlay = true
+            if same {
+                move(to: jump.index)
+                return true
+            }
+            queue.index = jump.index
+            engine.play(Self.entries(queue), from: jump.index, at: 0)
+            changed()
+            runHeld()
+            return true
+        }
         if replaceUpcoming(jump.queue) {
             //? a row's tap plays it, paused or not - move() starts what the listener means to be playing
             intendsToPlay = true
