@@ -2,7 +2,7 @@ import { useLayoutEffect, useMemo, useRef, useState } from 'preact/hooks'
 
 import { panelIsModal, type PanelStyle } from '../lib/appFrame'
 import { dragOffset, dropIndex } from '../lib/pins'
-import { LOAD_WITHIN, pastRows, type PastRow } from '../lib/playHistory'
+import { LOAD_WITHIN, pastRows, rowsFrom, type PastRow } from '../lib/playHistory'
 import type { QueueTrack } from '../lib/playQueue'
 import { nextRepeat, repeatLabel, upNextView, type Mark, type UpNextQueue, type UpNextRow } from '../lib/upNext'
 import { Cover } from '../player/Cover'
@@ -54,11 +54,13 @@ type Refocus = { key: number | string; which: 'up' | 'down' | 'remove' | 'play' 
 interface Tap {
   from: UpNextQueue
   key: number | string
-  /** a row of History's, or (2.1.15) an older row's: the song again, a new entry */
-  again: boolean
+  /** (2.1.18) an older row's: brought back - the entry it lands on its own (`entry`, moved back) or a new one */
+  past: { entry: number | null } | null
   track: QueueTrack
-  anchor: Anchor
-  refocus: Refocus
+  /** where the view is held - its queue (`first`) read once the tap is taken, a roll-back's being another */
+  anchor: Omit<Anchor, 'first'>
+  /** (2.1.18) 'next': what plays next once the tap is taken - the first row after the card */
+  refocus: Refocus | 'next'
   said: string | null
 }
 
@@ -91,9 +93,11 @@ const plural = (count: number) => `And ${count.toLocaleString('en-US')} more ${c
  *
  * A ROW'S TAP plays it now (player.jumpTo, straight from the click - a tap, so it may start a stream as a song's
  * tap on an album does). Nothing is dropped (2.1.3, James: "6 and 7 stay behind 8"): the rows it passes stay where
- * they are, behind it, where Previous and History find them, and Playing Next stays next. A row of HISTORY's plays
- * its song again, now - the songs after it as they were. Rows are the queue's own keys, so a song in twice is two
- * rows, and a tap names the row even if the queue moved on under the finger - a key gone does nothing.
+ * they are, behind it, where Previous and History find them, and Playing Next stays next. A row ABOVE the song playing
+ * - History's, or the play history's older rows - ROLLS BACK to it (2.1.18, James: "so it just moves back up the
+ * list"): the one list keeps its order, the playing point moves up to the row, and every row below it is to come, as
+ * drawn - the row tapped becomes the card where it was, under the finger. Rows are the queue's own keys, so a song in
+ * twice is two rows, and a tap names the row even if the queue moved on under the finger - a key gone does nothing.
  *
  * WHERE IT OPENS, AND KEEPS ITS PLACE (2.1.3): every opening puts the song playing's card at the top of the
  * scroller, History above it, scrolled up to - as Apple Music opens its queue - on a phone's sheet and a desktop's
@@ -102,8 +106,8 @@ const plural = (count: number) => `And ${count.toLocaleString('en-US')} more ${c
  * rows and the card in view, by key). A change ABOVE the card - the song playing changed (History grew or shrank: a
  * song's end, Next, Previous, a tap), or Edit on or off (History hidden or back) - puts it back, so nothing moves under
  * the eye: a song ending by itself leaves whatever was topmost where it was (at the card, the new card stays at the
- * top - a panel left open doesn't creep a row a song), a History tap leaves the row tapped under the finger, and a
- * tap in the list or Playing Next brings the new card to the top, what plays next straight under it. A change below
+ * top - a panel left open doesn't creep a row a song), a tap above the card puts the card where the row tapped was,
+ * and a tap in the list or Playing Next brings the new card to the top, what plays next straight under it. A change below
  * it - Shuffle, Repeat, Clear, a song added, Edit's moves, drags and removals (2.1.3 review: following a row there
  * followed it out of view) - leaves the scroll where it is, as it always has. A tap the engine doesn't take (a key gone,
  * an edit the stream can't make this moment) moves, focuses and says nothing. The browser's own scroll anchoring is
@@ -120,8 +124,9 @@ const plural = (count: number) => `And ${count.toLocaleString('en-US')} more ${c
  * pastRows() leaves out every start the queue's own rows draw, so each is drawn once. Its next older page is asked for
  * as the scroller comes within LOAD_WITHIN of its height of the top - a spinner there while it comes, the error in a
  * listener's words with Try again if it can't - and a page landing above holds the view where it was, as History's
- * changes do. An older row's tap plays its song again, now, as History's does: Play Next's entry (queued at the
- * Normalization setting's level), moved to - the queue carrying on after it - in the click, nothing awaited.
+ * changes do. (2.1.18) An older row's tap rolls back to it, as History's does: it and every older row below it come
+ * back into the queue ahead of History's songs (lib/upNext.ts broughtBack - queued at the Normalization setting's
+ * level), and it plays - in the click, nothing awaited. They are drawn as songs to come, never above as well.
  *
  * EDIT, as Home's Pinned does it: each group's rows with Move up, Move down and Remove, and a grip to drag by
  * (lib/pins.ts dropIndex and dragOffset - only the grip takes the pointer, so the sheet still scrolls under a
@@ -145,7 +150,7 @@ export function UpNext({
   open: boolean
   opener?: { current: HTMLElement | null } | undefined
   onClose: () => void
-  player: Pick<Player, 'queue' | 'track' | 'playing' | 'shuffle' | 'repeat' | 'setShuffle' | 'setRepeat' | 'jumpTo' | 'playNext' | 'moveInQueue' | 'removeFromQueue' | 'clearPlayingNext'>
+  player: Pick<Player, 'queue' | 'track' | 'playing' | 'shuffle' | 'repeat' | 'setShuffle' | 'setRepeat' | 'jumpTo' | 'moveInQueue' | 'removeFromQueue' | 'clearPlayingNext'>
   /** (2.1.15) the songs played before History's: none without it */
   history?: Pick<PlayHistory, 'plays' | 'more' | 'loading' | 'error' | 'older' | 'retry'> | undefined
   /** how it is drawn: a sheet over Now Playing (a phone), or a desktop's side panel */
@@ -260,8 +265,8 @@ export function UpNext({
     const tap = tapped.current
     tapped.current = null
     if (tap && took(tap)) {
-      anchor.current = tap.anchor
-      refocus.current = tap.refocus
+      anchor.current = { ...tap.anchor, first: marks0() }
+      refocus.current = tap.refocus === 'next' ? nextRow() : tap.refocus
       if (tap.said) say(tap.said)
     }
     restore()
@@ -380,15 +385,21 @@ export function UpNext({
   }
 
   /** Whether the queue drawn now shows `tap` taken: another queue than the one it was made on, playing the row tapped -
-   *  or, for History's and (2.1.15) an older row's, a new entry of its song (or a new queue of it: Play Next on a queue
-   *  played out plays it from the first). */
+   *  or, for (2.1.18) an older row's, its song as the entry it was begun in (moved back) or a new one. */
   const took = (tap: Tap): boolean => {
     const queue = player.queue
     const mark = queue.upNext?.marks[queue.index]
     if (queue === tap.from || !mark) return false
-    if (!tap.again) return mark.key === tap.key
-    const fresh = queue.upNext?.id !== tap.from.upNext?.id
-    return (fresh || mark.key >= (tap.from.upNext?.nextKey ?? Infinity)) && queue.tracks[queue.index]?.id === tap.track.id
+    if (!tap.past) return mark.key === tap.key
+    const lands = mark.key === tap.past.entry || mark.key >= (tap.from.upNext?.nextKey ?? Infinity)
+    return lands && queue.tracks[queue.index]?.id === tap.track.id
+  }
+
+  /** (2.1.18) What plays next in the queue drawn now - the first row after the card - for focus; Done with none. */
+  const nextRow = (): Refocus => {
+    const now = upNextView(player.queue, player.repeat)
+    const first = now.added[0] ?? now.list?.rows[0]
+    return first ? { key: first.key, which: 'play' } : 'done'
   }
 
   /** A row's tap: it plays now, so it leaves the list - focus to what plays next: after a list row's, Playing Next's
@@ -398,40 +409,40 @@ export function UpNext({
   const jump = (group: Group, rows: readonly UpNextRow[], index: number) => {
     const row = rows[index]!
     const after = group === 'added' ? rows[index + 1] ?? groups[1]!.rows[0] : view.added[0] ?? rows[index + 1]
-    tapped.current = { from: player.queue, key: row.key, again: false, track: row.track, anchor: atCard(), refocus: after ? { key: after.key, which: 'play' } : 'done', said: null }
+    tapped.current = { from: player.queue, key: row.key, past: null, track: row.track, anchor: atCard(), refocus: after ? { key: after.key, which: 'play' } : 'done', said: null }
     player.jumpTo(row.key)
   }
 
-  /** (2.1.3) A row of History's tap: the song again, now. History isn't rewritten, so the row stays - held where it is
-   *  under the finger, focus kept on it - and since nothing in view moves, what started is said aloud; all once the tap
-   *  is taken, as a list row's. */
+  /** (2.1.18) A tap above the card, kept until it is taken: the card - the row tapped, now playing - to be held where the
+   *  row was under the finger (at the top, if it wasn't in view), so nothing above it moves; focus to what plays next;
+   *  what started said aloud. */
+  const rolledTo = (row: { key: number | string; track: QueueTrack }, past: Tap['past']): Tap => {
+    const under = placed().find((each) => each.seen && each.spot.to === row.key)
+    return {
+      from: player.queue, key: row.key, past, track: row.track,
+      anchor: { playing: undefined, editing, above, spots: [{ to: 'card', offset: under?.spot.offset ?? 0 }] },
+      refocus: 'next', said: `Playing ${row.track.title}`,
+    }
+  }
+
+  /** (2.1.3; 2.1.18) A row of History's tap: rolled back to - the playing point moves up to it, nothing added or copied,
+   *  and every row below it (the song that was playing among them) is to come, in the order drawn. */
   const replay = (row: UpNextRow) => {
-    const now = placed()
-    const under = now.find((each) => each.spot.to === row.key)
-    const spots = [...(under ? [under.spot] : []), ...now.filter((each) => each.seen).map((each) => each.spot)]
-    tapped.current = {
-      from: player.queue, key: row.key, again: true, track: row.track,
-      anchor: { first: marks0(), playing: undefined, editing, above, spots }, refocus: { key: row.key, which: 'play' }, said: `Playing ${row.track.title}`,
-    }
+    tapped.current = rolledTo(row, null)
     player.jumpTo(row.key)
   }
 
-  /** (2.1.15) An older row's tap: the song again, now - as History's, a new entry after the song playing's copies that
-   *  plays at once, the queue carrying on after it: Play Next's (queued at the setting's level, as a song's ••• queues
-   *  it) moved to by the key it is given. With nothing to play next to (a queue played out) Play Next plays it from the
-   *  first itself. An edit the stream can't take this moment is held, the key isn't there yet, and the song waits as
-   *  Playing Next - as a History tap's refusal leaves it. Held under the finger and said, once taken, as History's. */
+  /** (2.1.15; 2.1.18) An older row's tap: rolled back to, everywhere - it and every older row below it come back into the
+   *  queue ahead of History's songs, in the order drawn (rowsFrom; their songs queued at the setting's level, as a song's
+   *  ••• queues them), and it plays. `floor`, the first entry drawn for this queue (History's first row, or the song
+   *  playing's), goes with them: the rows were read against it, so the queue is kept from there even if the engine first
+   *  catches up with a song begun in the stream and History's floor moves on (the 2.1.18 review). */
   const replayPast = (row: PastRow) => {
-    const now = placed()
-    const under = now.find((each) => each.spot.to === row.key)
-    const spots = [...(under ? [under.spot] : []), ...now.filter((each) => each.seen).map((each) => each.spot)]
-    tapped.current = {
-      from: player.queue, key: row.key, again: true, track: row.track,
-      anchor: { first: marks0(), playing: undefined, editing, above, spots }, refocus: { key: row.key, which: 'play' }, said: `Playing ${row.track.title}`,
-    }
-    const key = player.queue.upNext?.nextKey
-    const began = player.playNext(queued([row.track], 'songs'))
-    if (!began && key !== undefined) player.jumpTo(key)
+    tapped.current = rolledTo(row, { entry: row.entry })
+    const floor = view.history[0]?.key ?? player.queue.upNext?.marks[player.queue.index]?.key
+    const back = rowsFrom(past, row.key)
+    const tracks = queued(back.map((each) => each.track), 'songs')
+    player.jumpTo(back.map((each, i) => ({ track: tracks[i]!, starts: each.starts, entry: each.entry })), floor)
   }
 
   /** (2.1.3) Inside History, one Tab stop: Up and Down to the row before and after, Home and End to its ends. */

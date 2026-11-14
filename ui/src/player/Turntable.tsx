@@ -14,6 +14,9 @@ import { Deck, deckReport, onDeckReport, wakeDeckAudio, type DeckHost } from './
 import { SpeedFader, type SpeedPlayer } from './SpeedFader'
 import { usePosition, type Player } from './usePlayer'
 
+/** The lifted head's shadow's blur (2.1.19). One id for every turntable on a page: each draws the same filter. */
+const HEAD_SHADOW = 'app-tt-head-shadow'
+
 /** What the drag says in place of the song's position - the time line under the song shows it. */
 export type TurntablePreview = Preview | null
 
@@ -434,6 +437,7 @@ export function Turntable({
   const lifted = drag?.kind === 'arm'
   const art = discArt && discArt !== failedArt ? discArt : null
   const { bar, head, weight } = ARM_PARTS
+  const headBox = { x: ARM.x + head.from, y: ARM.y - head.thick / 2, width: head.length, height: head.thick, rx: head.radius }
 
   return (
     <div class="app-tt">
@@ -483,17 +487,20 @@ export function Turntable({
         {fader && <SpeedFader player={fader} />}
 
         <svg class="app-tt-layer" viewBox={`0 0 ${STAGE.width} ${STAGE.height}`} aria-hidden="true">
+          <defs>
+            <filter id={HEAD_SHADOW} x="-50%" y="-50%" width="200%" height="200%">
+              <feGaussianBlur stdDeviation={ARM_PARTS.lift.shadow} />
+            </filter>
+          </defs>
           <g class={`app-tt-arm${lifted ? ' is-lifted' : ''}`} transform={`rotate(${+armAngle(shown, length).toFixed(3)} ${ARM.x} ${ARM.y})`}>
             <rect class="app-tt-weight" x={ARM.x + weight.from} y={ARM.y - weight.thick / 2} width={weight.length} height={weight.thick} rx={weight.radius} />
             <rect class="app-tt-bar" x={ARM.x} y={ARM.y - bar.thick / 2} width={ARM.reach} height={bar.thick} rx={bar.radius} />
-            <rect
-              class="app-tt-head"
-              x={ARM.x + head.from}
-              y={ARM.y - head.thick / 2 - (lifted ? ARM_PARTS.lift : 0)}
-              width={head.length}
-              height={head.thick}
-              rx={head.radius}
-            />
+            {/* the head and its shadow, grown together about the head's middle while the arm is held
+                (2.1.19) - never moved off the bar */}
+            <g class="app-tt-headset" style={lifted ? { transform: `scale(${ARM_PARTS.lift.scale})` } : undefined}>
+              <rect class="app-tt-head-shadow" filter={`url(#${HEAD_SHADOW})`} {...headBox} />
+              <rect class="app-tt-head" {...headBox} />
+            </g>
           </g>
           <circle class="app-tt-pivot" cx={ARM.x} cy={ARM.y} r={ARM_PARTS.base - ARM_PARTS.baseEdge / 2} stroke-width={ARM_PARTS.baseEdge} />
         </svg>

@@ -139,7 +139,8 @@ class Player(Navidrome):
                  smart: bool = False, sync: bool = False, comment: str = "") -> dict:
         """A playlist put in as Navidrome would hold it, its counter refreshed."""
         held = {"id": playlist_id, "name": name, "owner": owner, "public": public, "comment": comment,
-                "smart": smart, "sync": sync, "rows": list(rows), "created": self.tick(), "changed": self.tick()}
+                "smart": smart, "sync": sync, "rows": list(rows), "created": self.tick(), "changed": self.tick(),
+                "evaluated": False}
         self.refresh(held)
         self.playlists[playlist_id] = held
         return held
@@ -166,6 +167,9 @@ class Player(Navidrome):
                 "duration": sum(song.get("duration", 0) for song in songs) if entries else held["seconds"],
                 "created": held["created"], "changed": held["changed"],
                 "readonly": held["owner"].lower() != user or held["smart"] or held["sync"]}
+        #? (2.1.21) buildOSPlaylist: validUntil for a smart playlist alone, once it has been worked out (EvaluatedAt)
+        if held["smart"] and held["evaluated"]:
+            body["validUntil"] = "2026-11-14T12:05:00Z"
         if held["comment"]:
             body["comment"] = held["comment"]
         if held["public"]:
@@ -191,6 +195,8 @@ class Player(Navidrome):
         if held is None or not self.sees(user, held):
             return httpx.Response(200, json=failed(70, "playlist not found"))
         if endpoint == "getPlaylist":
+            #? GetWithTracks works a smart playlist out as it answers
+            held["evaluated"] = held["evaluated"] or held["smart"]
             return httpx.Response(200, json=ok(playlist=self.shown(user, held, True)))
         if user not in self.admins and held["owner"].lower() != user:
             return httpx.Response(200, json=failed(50, "user not authorized"))

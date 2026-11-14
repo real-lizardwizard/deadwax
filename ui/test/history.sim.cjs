@@ -6,11 +6,14 @@
  * What it pins:
  *
  *  - EACH START DRAWN ONCE, by property: 1,500 seeded runs of upnext.sim's moves - songs ending, Next, Previous (back
- *    before where listening began too), a tap on Up Next's rows and on History's, Play Next and Last, removals, moves,
- *    Shuffle and Repeat with their top-ups, a reload's round trip through the snapshot (the window cut), another queue
- *    now and then - a start recorded at every song begun, as the engine records it; after every step every start is
- *    either the queue's (its entry among the rows upNextView really draws - History's units, the song playing's, the
- *    songs added, the list's first rows: 8 of them for half the runs, so rows past the limit come up often) or one of
+ *    before where listening began too), a tap on Up Next's rows and on History's (2.1.18: a roll-back), (2.1.18) a tap
+ *    on an older row (broughtBack with the rows from it down, as Up Next hands them), Play Next and Last, removals,
+ *    moves, Shuffle and Repeat with their top-ups, a reload's round trip through the snapshot (the window cut, the
+ *    starts brought back with it), another queue now and then - a start recorded at every song begun, as the engine
+ *    records it; after every step every start is either the queue's - its entry's, or (2.1.18) held by an entry a row
+ *    was brought back as - and that entry among the rows upNextView really draws (History's units, the song playing's,
+ *    the songs added, the list's first rows: 8 of them for half the runs, so rows past the limit come up often) or
+ *    (2.1.18) moved back down into Up Next, at or before the furthest song played (counted in "And N more") - or one of
  *    the older rows above (exactly one, its run's), never both; and the queue's id the same through every edit, a new
  *    one only for a new queue.
  *  - The pure rules: queueId's shape and that it never calls startUpNext's `random` (a seeded shuffle the same with or
@@ -18,8 +21,10 @@
  *    one row keyed by its first start, the queue's own left out); withNewest (first page, joined, a gap started again
  *    from, the end, a full page after an empty first one); withOlder (appended, a stale cursor ignored); countedIn;
  *    afterFailure.
- *  - What the queue draws, and nothing more (the 2.1.15 review's probes): Repeat All into the next round, Previous
- *    twice - that start above; a long album, Previous back past the list's 100 rows - the starts past them above.
+ *  - What the queue draws, and nothing more (the 2.1.15 review's probes; 2.1.18, Previous a roll-back): Repeat All into
+ *    the next round, Previous twice - that start the queue's, drawn where it plays again; a long album, Previous back past
+ *    the list's 100 rows - the starts past them moved down too, counted in "And N more", none above; another queue's
+ *    older rows brought back - held, drawn below the card, never above, and above again once fallen past History's 50.
  *  - The outbox: a start kept and sent at once; one at a time, the next batch after the answer; at most 500 waiting
  *    (the oldest let go), so at most 500 a POST; no answer, a 5xx, a 408 or a 429 tried again 30 s on - doubling to
  *    10 min while it keeps failing, from 30 s again once one is taken - and at the next start; a 401 held - no timer -
@@ -111,7 +116,7 @@ const played = (id, at, queue = 'q-old', entry = 0, counted = false) => ({ at, c
       [a.tracks.map((t) => t.id).join() === b.tracks.map((t) => t.id).join(), b.upNext.id, a.upNext.id !== b.upNext.id], [true, 'given', true])
     const q = U.startUpNext(album(5), 1)
     const edited = U.toppedUp(U.withShuffle(U.withNext(U.withRepeat(q, 'all'), [track('a')]), true, seeded(3)), 'all')
-    const jumped = U.jumpedTo(edited, edited.upNext.marks[edited.index + 2].key)
+    const jumped = U.jumpedTo(edited, edited.upNext.marks[edited.index + 2].key, 'all')
     check('...every edit keeps it: Repeat, Play Next, Shuffle, the top-up, a jump', [edited.upNext.id === q.upNext.id, jumped.queue.upNext.id === q.upNext.id], [true, true])
   }
 
@@ -183,9 +188,9 @@ const played = (id, at, queue = 'q-old', entry = 0, counted = false) => ({ at, c
     for (let i = 0; i < 2; i++) q = U.wentBack(q, U.backward(q, 0).index)
     const view = U.upNextView(q, 'all')
     const viewKeys = [...view.history, ...view.added, ...(view.list?.rows ?? [])].map((row) => row.key)
-    check('Repeat All, the next round\'s first song, Previous twice: its entry no row of Up Next\'s, so not the queue\'s - an older row above',
+    check('Repeat All, the next round\'s first song, Previous twice: (2.1.18) moved back down - a row of Up Next\'s where it plays again, the queue\'s; nothing above',
       [q.index, viewKeys.includes(nextRound.entry), P.shownByQueue(nextRound, P.queueShows(q)), P.pastRows(P.merged([], starts), q).map((row) => row.track.id)],
-      [1, false, false, ['ra1']])
+      [1, true, true, []])
 
     //? a long album: played to its 156th song, then Previous back 105 - the list draws its next 100, and the songs begun
     //? past them are older rows above (with their own row once they are drawn again)
@@ -198,9 +203,29 @@ const played = (id, at, queue = 'q-old', entry = 0, counted = false) => ({ at, c
     for (let i = 0; i < 105; i++) long = U.wentBack(long, U.backward(long, 0).index)
     const shows = P.queueShows(long)
     const above = P.pastRows(P.merged([], longStarts), long).map((row) => row.track.id)
-    check('a long album, Previous back past the list\'s 100: History\'s 50 and the song playing the queue\'s, the next 100 too, the 5 begun past them above',
-      [long.index, U.upNextView(long, 'off').list.rows.length, above.length, above.slice(-5), longStarts.filter((s) => P.shownByQueue(s, shows)).length],
-      [50, U.UP_NEXT_DRAWN, 5, ['l152', 'l153', 'l154', 'l155', 'l156'], 151])
+    check('a long album, Previous back past the list\'s 100: History\'s 50, the song playing and the next 100 the queue\'s - (2.1.18) and the 5 begun past them, moved back down, among "And 9 more"; none above',
+      [long.index, U.upNextView(long, 'off').list.rows.length, U.upNextView(long, 'off').list.more, above.length, longStarts.filter((s) => P.shownByQueue(s, shows)).length],
+      [50, U.UP_NEXT_DRAWN, 9, 0, 156])
+
+    //? (2.1.18) another queue's older rows brought back: held - drawn as songs to come, never above - and above again once
+    //? the queue has played on past History's 50
+    const old = U.startUpNext(album(3, 'o'), 0)
+    let oq = old
+    const oldStarts = [P.startOf(oq.tracks[0], T, oq)]
+    for (let i = 1; i < 3; i++) { oq = { ...oq, index: i }; oldStarts.push(P.startOf(oq.tracks[i], T + i * 1000, oq)) }
+    let now = U.startUpNext(album(60, 'b'), 0)
+    const nowStarts = [...oldStarts, P.startOf(now.tracks[0], T + 5000, now)]
+    const rows = P.pastRows(P.merged([], nowStarts), now)
+    const brought = U.broughtBack(now, P.rowsFrom(rows, rows[1].key).map((row) => ({ track: row.track, starts: row.starts, entry: row.entry })), 'off')
+    now = brought.queue
+    const drawn = (q, plays) => P.pastRows(P.merged([], plays), q).map((row) => row.track.id)
+    check('another queue\'s o2 tapped: o2 plays, o3 and b1 to come; above, o1 alone - o2\'s and o3\'s starts held',
+      [now.tracks.slice(0, 3).map((t) => t.id), drawn(now, nowStarts), [...P.queueShows(now).held]], [['o2', 'o3', 'b1'], ['o1'], [`${T + 1000}:o2`, `${T + 2000}:o3`]])
+    nowStarts.push(P.startOf(now.tracks[0], T + 6000, now))
+    for (let i = 1; i < 60; i++) { now = { ...now, index: i }; nowStarts.push(P.startOf(now.tracks[i], T + 6000 + i * 1000, now)) }
+    const fallen = drawn(now, nowStarts)
+    check('...played on 59 songs: o2 and o3\'s entries past History\'s 50 - their starts, old and new, above again, in the order they were begun',
+      [fallen.slice(0, 6), [...P.queueShows(now).held]], [['o1', 'o2', 'o3', 'b1', 'o2', 'o3'], []])
   }
 
   console.log('\neach start drawn once - by property, over 1,500 runs of upnext.sim\'s moves')
@@ -209,9 +234,12 @@ const played = (id, at, queue = 'q-old', entry = 0, counted = false) => ({ at, c
     let starts = 0
     let fellAbove = 0
     let reloads = 0
+    let rolledBack = 0, broughtBack = 0, heldSeen = 0, movedDownSeen = 0
     const unitStart = (state, place) => { while (place > 0 && state.marks[place].from === 'one') place--; return place }
     for (let runNo = 0; runNo < 1500 && problems.length < 5; runNo++) {
       const random = seeded(runNo + 1)
+      //? (2.1.18) the seed's first draw let go: from a small seed it is always near 0 - every run had begun with Repeat off
+      random()
       //? the list's rows Up Next draws: 8 for half the runs, so the rows past it - never drawn - come up often
       const LIMIT = runNo < 750 ? 8 : U.UP_NEXT_DRAWN
       const pick = (n) => Math.floor(random() * n)
@@ -236,14 +264,24 @@ const played = (id, at, queue = 'q-old', entry = 0, counted = false) => ({ at, c
           const view = U.upNextView(queue, repeat, LIMIT)
           const rows = [...view.added, ...(view.list?.rows ?? [])]
           const row = rows[pick(rows.length)]
-          const jump = row && U.jumpedTo(queue, row.key)
+          const jump = row && U.jumpedTo(queue, row.key, repeat)
           if (jump) queue = U.toppedUp({ ...jump.queue, index: jump.index }, repeat, random)
           else began = false
-        } else if (roll < 0.64) {
+        } else if (roll < 0.61) {
+          //? (2.1.18) History's row: a roll-back
           const rows = U.historyRows(queue)
           const row = rows[pick(rows.length)]
-          const jump = row && U.jumpedTo(queue, row.key)
-          if (jump) queue = U.toppedUp({ ...jump.queue, index: jump.index }, repeat, random)
+          const jump = row && U.jumpedTo(queue, row.key, repeat)
+          if (jump) { queue = U.toppedUp({ ...jump.queue, index: jump.index }, repeat, random); rolledBack++ }
+          else began = false
+        } else if (roll < 0.64) {
+          //? (2.1.18) an older row: it and every older row below it brought back, as Up Next's replayPast hands them
+          const rows = P.pastRows(P.merged([], recorded), queue, LIMIT)
+          const row = rows[pick(rows.length)]
+          const back = row ? P.rowsFrom(rows, row.key).map((each) => ({ track: each.track, starts: each.starts, entry: each.entry })) : []
+          //? (2.1.18 review) with the floor the rows were read against, as replayPast passes it
+          const jump = U.broughtBack(queue, back, repeat, U.historyRows(queue)[0]?.key ?? queue.upNext.marks[queue.index].key)
+          if (jump) { queue = U.toppedUp({ ...jump.queue, index: jump.index }, repeat, random); broughtBack++ }
           else began = false
         } else if (roll < 0.70) {
           queue = (random() < 0.5 ? U.withNext : U.withLast)(queue, [track(`p${runNo}-${step}`)]); began = false
@@ -279,6 +317,12 @@ const played = (id, at, queue = 'q-old', entry = 0, counted = false) => ({ at, c
         const viewKeys = new Set([...view.history, ...view.added, ...(view.list?.rows ?? [])].map((row) => row.key))
         const playingStart = unitStart(state, queue.index)
         const drawnByQueue = (place) => place >= 0 && (unitStart(state, place) === playingStart || viewKeys.has(state.marks[unitStart(state, place)].key))
+        //? (2.1.18) moved back down into Up Next: after the song playing, at or before the furthest song played - drawn as a
+        //? row, or past the rows drawn, counted in "And N more"
+        const reachAt = state.marks.findIndex((mark) => mark.key === state.reached)
+        const movedDown = (place) => place > queue.index && reachAt > queue.index && unitStart(state, place) <= reachAt
+        //? (2.1.18) the entry holding a start brought back with an older row - the song and the moment its mark carries
+        const holderOf = (s) => state.marks.findIndex((mark, at) => (mark.starts ?? []).includes(s.at) && queue.tracks[at].id === s.song.id)
         const past = P.pastRows(P.merged([], recorded), queue, LIMIT)
         const pastKeys = new Set(past.map((row) => row.key))
         const ordered = P.merged([], recorded)
@@ -288,7 +332,7 @@ const played = (id, at, queue = 'q-old', entry = 0, counted = false) => ({ at, c
         let lastSong = null
         for (let i = ordered.length - 1; i >= 0; i--) {
           const s = ordered[i]
-          if (P.shownByQueue(s, shows)) continue
+          if (P.heldByQueue(s, shows)) continue
           if (s.song.id !== lastSong) { current = P.playedKey(s); lastSong = s.song.id }
           runOf.set(P.playedKey(s), current)
         }
@@ -296,18 +340,28 @@ const played = (id, at, queue = 'q-old', entry = 0, counted = false) => ({ at, c
           starts++
           const key = P.playedKey(s)
           const place = s.queue === state.id ? state.marks.findIndex((mark) => mark.key === s.entry) : -1
-          if (P.shownByQueue(s, shows)) {
-            if (!drawnByQueue(place)) problems.push(`run ${runNo} step ${step}: ${key} the queue's, but no row of it draws it`)
+          const holder = holderOf(s)
+          if (P.heldByQueue(s, shows)) {
+            const own = P.shownByQueue(s, shows)
+            const at = own ? place : holder
+            if (!own) heldSeen++
+            if (!drawnByQueue(at)) {
+              if (movedDown(at)) movedDownSeen++
+              else problems.push(`run ${runNo} step ${step}: ${key} the queue's, but no row of it draws it, nor is it to come`)
+            }
             if (runOf.has(key)) problems.push(`run ${runNo} step ${step}: ${key} drawn twice`)
           } else {
             fellAbove++
             if (!pastKeys.has(runOf.get(key))) problems.push(`run ${runNo} step ${step}: ${key} drawn nowhere`)
-            if (s.queue === state.id && drawnByQueue(place)) problems.push(`run ${runNo} step ${step}: ${key} above, and its entry a row of the queue's too`)
+            if (s.queue === state.id && (drawnByQueue(place) || movedDown(place))) problems.push(`run ${runNo} step ${step}: ${key} above, and its entry a row of the queue's too`)
+            if (holder >= 0 && (drawnByQueue(holder) || movedDown(holder))) problems.push(`run ${runNo} step ${step}: ${key} above, and held by a row of the queue's too`)
           }
         }
       }
     }
     check(`every start drawn once, at every step, judged by the view's own rows (${starts.toLocaleString('en-US')} looked at, ${fellAbove.toLocaleString('en-US')} of them above History; ${reloads} reloads)`, problems, [])
+    check(`...(2.1.18) History taps rolled back (${rolledBack}), older rows brought back (${broughtBack}); starts held by them (${heldSeen.toLocaleString('en-US')}) and moved down past the rows drawn (${movedDownSeen.toLocaleString('en-US')})`,
+      [rolledBack > 3000 || rolledBack, broughtBack > 3000 || broughtBack, heldSeen > 10000 || heldSeen, movedDownSeen > 1000 || movedDownSeen], [true, true, true, true])
   }
 
   console.log('\nthe outbox: this page\'s starts, sent to deadwax')

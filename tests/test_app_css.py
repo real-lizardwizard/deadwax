@@ -657,6 +657,16 @@ def test_the_bar_is_styles_thin_sunken_track_with_the_purple_fill():
     assert (fill["background"], fill["border-radius"]) == ("var(--dw-bar-purple)", "var(--dw-radius-fill)")
 
 
+def test_now_playings_bar_is_squared_off_and_thicker_with_no_thumb():
+    #? (2.1.20) James: "a squared off thicker bar for the play progress in the play page" - the iPhone
+    #? app's ScrubberView draws the same 12 and 16 points
+    player = tokens(PLAYER_CSS)
+    assert (player["--pl-scrub-track"], player["--pl-scrub-track-held"], player["--pl-scrub-radius"]) == ("12px", "16px", "0")
+    assert declarations(PLAYER_CSS, ".pl-scrub-track")["border-radius"] == "var(--pl-scrub-radius)"
+    assert declarations(PLAYER_CSS, ".pl-scrub.is-held .pl-scrub-track")["height"] == "var(--pl-scrub-track-held)"
+    assert declarations(PLAYER_CSS, ".pl-scrub-thumb")["visibility"] == "hidden"
+
+
 def test_the_tabs_count_is_opaque_over_its_icon():
     badge = declarations(APP, ".app-tab-badge")
     assert badge["position"] == "absolute" and declarations(APP, ".app-tab-art")["position"] == "relative"

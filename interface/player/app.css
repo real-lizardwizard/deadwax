@@ -1303,6 +1303,22 @@ html.app-viz-open { overflow: hidden; }
 
 .app-tt-bar { fill: var(--dw-tt-arm); }
 .app-tt-head { fill: var(--dw-tt-arm-head); }
+
+/* The head lifted while the arm is held (2.1.19): it stays on the bar and comes toward you - grown
+   about its own middle (lib/turntable.ts ARM_PARTS.lift.scale, inline) with a soft shadow round it
+   (the filter's blur, ARM_PARTS.lift.shadow), both eased so a tap doesn't flicker; under reduced
+   motion theme.css's block makes them a step. It was drawn 5 units up in the arm's turned frame -
+   sideways off the bar, so a tap read as the head knocked out of place. */
+.app-tt-headset {
+    transform-box: fill-box;
+    transform-origin: center;
+    transition: transform var(--dw-duration) var(--dw-ease);
+}
+.app-tt-head-shadow {
+    fill: transparent;
+    transition: fill var(--dw-duration) var(--dw-ease);
+}
+.app-tt-arm.is-lifted .app-tt-head-shadow { fill: var(--dw-tt-head-shadow); }
 .app-tt-weight { fill: var(--dw-tt-arm-weight); }
 .app-tt-pivot { fill: var(--dw-tt-pivot); stroke: var(--dw-tt-pivot-edge); }
 

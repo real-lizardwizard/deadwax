@@ -16,9 +16,14 @@
  *    through, down to its floor, each row naming the song Previous plays there (review); every copy of the song its
  *    run began with (review: Shuffle and Repeat left a list song's copies behind it); every row drawn - Up
  *    Next's and History's - reached by its tap and nothing else before the song playing; Up Next drawing every
- *    song before the next time round (after Previous, songs added among the list's included); an Up Next tap
- *    landing on its own key and keeping every song, a History tap adding exactly one song added - that song - and
- *    never rewriting History.
+ *    song before the next time round (after Previous, songs added among the list's included) - (2.1.18) and after a
+ *    roll-back every song up to the furthest played and what was drawn after it then, in order; an Up Next tap
+ *    landing on its own key and keeping every song. (2.1.18) A History tap ROLLS BACK: the same queue, the place moved
+ *    back to the row - outside Repeat One less the copies after it - every row from it on drawn as it was, now to come,
+ *    History above it the rows above, and with no copies exactly Previous's walk to it; older rows brought back
+ *    (broughtBack: entries of the queue before History's floor, out of order, copies, other songs, twice, and songs
+ *    from elsewhere) play first, each moved or new by the rule, carrying its starts, with History's songs, the song
+ *    that was playing and Up Next after them as drawn. Some runs are long albums, so History's 50 is in play.
  *  - Play Next and Play Last's places (after Repeat One's copies; Play Last after the songs added, still ahead
  *    of the list); a row out, moved within its group and refused across; Clear; (2.1.3) a jump into the list
  *    (the songs passed kept behind it in order, Playing Next carried after it, nothing noted as taken out) and
@@ -42,10 +47,12 @@
  *  - (2.1.3) James's walk (playing 5, tap 8: Previous plays 7, 6, 5, then Next 6), with a song added (still next
  *    after 8; after Previous drawn in the list where it plays, Clear not taking it); History's rows (from where
  *    listening began - Previous before it moving that down - a Repeat One run one row, Repeat All's earlier round
- *    as it played, HISTORY_BACK) and its tap (the song again as a song added after the copies, History not
- *    rewritten, Repeat One and Repeat All with it, a row History doesn't draw refused); Up Next rendered with
- *    History: opened at the song playing, History's heading and "play again" rows, the song's title a heading,
- *    one Tab stop and the arrow keys, a History tap keeping the row under the finger and saying what plays, a
+ *    as it played, HISTORY_BACK) and (2.1.18) its tap, a roll-back (James's B, C, D with D playing and songs added - they keep their
+ *    place; Previous from it the row above; Repeat One keeping copies, off and All letting them go; Repeat All's
+ *    earlier round, Repeat off then keeping what played; Shuffle on not reshuffling; a row History doesn't draw
+ *    refused) and older rows brought back (moved, new, a library's shuffle carrying on after them); Up Next rendered
+ *    with History: opened at the song playing, History's heading and "play again" rows, the song's title a heading,
+ *    one Tab stop and the arrow keys, a History tap holding the card where the row was and saying what plays, a
  *    list's or Playing Next's tap bringing the new card to the top with focus on what plays next, a song's end
  *    never creeping the view, Edit hiding History, a new queue opening at its card. (review) The scroller fake stops
  *    where the content ends, so: an album's last songs still opening at the card (.app-upnext-now) and never
@@ -54,10 +61,16 @@
  *  - (2.1.15) the play history above History (built and drawn only while open - those drawn as it closes kept until
  *    the queue changes): one list with no heading - the older rows, then History's - each start
  *    drawn once (the queue's own by its rows; one falling past HISTORY_BACK, or of another queue, above), one Tab stop
- *    across both, an older row's tap (Play Next with the song at the setting's level, then jumpTo the entry it made -
- *    said, the row held under the finger), Edit hiding them, the next older page asked within the scroller's height of
+ *    across both, an older row's tap ((2.1.18) jumpTo with it and every older row below it, their songs at the setting's
+ *    level, in the click - said, the card held where the row was, focus to what plays next), Edit hiding them, the next older page asked within the scroller's height of
  *    the top and a page landing above holding the view, the spinner while it comes, a failure in a listener's words
  *    with Try again and no more asks until it is pressed. (history.sim.cjs holds the rules by property.)
+ *  - (2.1.18 review) Shuffle after a roll-back across Repeat All's rounds: on, the later round's songs moved back down
+ *    kept after the round playing's, each round shuffled on its own (never starting with the song before it, over 200
+ *    orders), Repeat One's copies with their song; off, the list's order; Repeat off keeping them. An older row's tap
+ *    racing the engine's catchUp: the floor drawn goes with the rows (jumpTo's `floor`), so the song at History's top
+ *    as drawn is kept - in broughtBack and through UpNext's tap. The rows' songs are copies at a level of their own
+ *    (queued's), in the property too: a moved entry keeps its own track and level, a new one the row's.
  *  - (review) Up Next's focus as Edit starts and after a row's tap; the grip's drag; the player bar's Shuffle,
  *    Repeat and Up Next buttons, rendered (Repeat cycling off -> all -> one -> off, Shuffle pressed and toggling,
  *    aria-disabled during a library's shuffle; Up Next opening the panel, pressed while it shows).
@@ -211,18 +224,32 @@ console.log('\nthe invariant: 2,000 random runs of every edit, top-up and forwar
     }
     return null
   }
-  let walkedBack = 0, historyTaps = 0, drawnChecked = 0
+  //? (2.1.18) the key of the unit playing; the rows Up Next draws after it, every one (no cap); where History's rows begin
+  const playingKey = (q) => { let p = q.index; while (p > 0 && q.upNext.marks[p].from === 'one') p--; return q.upNext.marks[p].key }
+  const aheadKeys = (q, repeat) => { const v = U.upNextView(q, repeat, Infinity); return [...v.added, ...(v.list?.rows ?? [])].map((row) => row.key) }
+  const firstShown = (q) => {
+    const rows = U.historyRows(q)
+    if (rows.length) return q.upNext.marks.findIndex((m) => m.key === rows[0].key)
+    return q.upNext.marks.findIndex((m) => m.key === playingKey(q))
+  }
+  const strip = (q) => ({ tracks: q.tracks.map((t) => t.id), index: q.index, upNext: q.upNext })
+  let walkedBack = 0, historyTaps = 0, drawnChecked = 0, walkedTo = 0, brought = 0, broughtMoved = 0, broughtNew = 0, longRuns = 0
   for (let run = 0; run < 2000; run++) {
     const random = seeded(run + 1)
     let back = false
     const pick = (n) => Math.floor(random() * n)
-    const size = 1 + pick(6)
+    //? (2.1.18) the seed's first draw let go: from a small seed it is always near 0 - every run had been a one-song
+    //? album. And one run in twenty a long album, so History's 50 - and older rows of the queue before it - come in
+    random()
+    const long = run % 20 === 7
+    if (long) longRuns++
+    const size = long ? 55 + pick(20) : 1 + pick(6)
     let repeat = U.REPEATS[pick(3)]
     let queue = U.toppedUp(U.startUpNext(album(size), random() < 0.3 ? null : pick(size), random() < 0.5, random), repeat, random)
     let extra = 0
     for (let step = 0; step < 30; step++) {
       const before = queue
-      const op = pick(14)
+      const op = pick(15)
       let edit = true
       const rowKeys = () => queue.upNext.marks.slice(queue.index + 1).map((m) => m.key)
       const someKey = () => { const keys = rowKeys(); return keys.length && random() < 0.85 ? keys[pick(keys.length)] : pick(queue.upNext.nextKey + 2) }
@@ -244,32 +271,95 @@ console.log('\nthe invariant: 2,000 random runs of every edit, top-up and forwar
             : random() < 0.5 ? someKey() : queue.upNext.marks[pick(queue.upNext.marks.length)].key
           const place = queue.upNext.marks.findIndex((m) => m.key === key)
           const fromHistory = drawnHistory.some((row) => row.key === key)
-          const jumped = U.jumpedTo(queue, key)
-          if (jumped) {
+          const jumped = U.jumpedTo(queue, key, repeat)
+          if (jumped?.back) {
+            //? (2.1.18) a roll-back: History's rows alone, and the same queue with the place moved back to the row - outside
+            //? Repeat One less the copies after it (a row plays once) - the same objects, nothing added
+            if (!fromHistory) note(run, step, `entry ${place}, not drawn in History, rolled back to`)
+            historyTaps++
+            const keeps = (i) => !(repeat !== 'one' && i > place && queue.upNext.marks[i].from === 'one')
+            const wantTracks = queue.tracks.filter((_, i) => keeps(i)), wantMarks = queue.upNext.marks.filter((_, i) => keeps(i))
+            const j = jumped.queue
+            if (jumped.index !== place || j.index !== place || j.tracks.length !== wantTracks.length || j.tracks.some((t, i) => t !== wantTracks[i]) || j.upNext.marks.some((m, i) => m !== wantMarks[i]) || j.upNext.nextKey !== queue.upNext.nextKey) note(run, step, 'History\'s tap: not the same queue, moved back to the row')
+            //? ...every row from it on drawn as it was, now to come: the row tapped the card, then History's rows after it,
+            //? the song that was playing, Playing Next, the list - in that order
+            const tappedAt = drawnHistory.findIndex((row) => row.key === key)
+            const was = [...drawnHistory.slice(tappedAt).map((row) => row.key), playingKey(queue), ...aheadKeys(queue, repeat)]
+            const now = [playingKey(j), ...aheadKeys(j, repeat)]
+            if (was.join() !== now.join()) note(run, step, `History's tap: drawn ${now} where ${was} was`)
+            //? ...History above it the rows above the row tapped (and further back, the floor moving down with it)
+            const above = drawnHistory.slice(0, tappedAt).map((row) => row.key)
+            const nowHistory = U.historyRows(j).map((row) => row.key)
+            if (nowHistory.length < above.length || nowHistory.slice(nowHistory.length - above.length).join() !== above.join()) note(run, step, 'History\'s tap: History above it rewritten')
+            //? ...and with no copies anywhere, exactly Previous's walk to it, one row at a time
+            if (!queue.upNext.marks.some((m) => m.from === 'one')) {
+              let w = queue
+              while (w.index > place) { const b = U.backward(w, 0); if (b.kind !== 'go') break; w = U.wentBack(w, b.index) }
+              if (JSON.stringify(strip(w)) !== JSON.stringify(strip(j))) note(run, step, 'History\'s tap: not where Previous walks to')
+              walkedTo++
+            }
+            queue = j
+            back = true
+          } else if (jumped) {
+            if (fromHistory) note(run, step, 'a row History draws jumped to, not rolled back to')
             const kept = jumped.queue.index === queue.index &&
               jumped.queue.tracks.slice(0, queue.index + 1).every((t, i) => t === queue.tracks[i]) &&
               jumped.queue.upNext.marks.slice(0, queue.index + 1).every((m, i) => m === queue.upNext.marks[i])
             if (!kept) note(run, step, 'a jump\'s edit touched the song playing or before it')
             if (!(jumped.index > queue.index && jumped.index < jumped.queue.tracks.length)) note(run, step, `a jump to ${jumped.index} from ${queue.index}`)
-            if (fromHistory) {
-              historyTaps++
-              //? the song again: exactly one entry more, a song added, that very song - and History not rewritten (only
-              //? its oldest row may fall off the cap)
-              const again = jumped.queue.upNext.marks[jumped.index]
-              if (jumped.queue.tracks[jumped.index] !== queue.tracks[place] || again.from !== 'added' || jumped.queue.tracks.length !== queue.tracks.length + 1) note(run, step, 'History\'s tap: not that song again, as one song added')
-              const was = drawnHistory.map((row) => row.key)
-              const now = U.historyRows(at(jumped.queue, jumped.index)).map((row) => row.key)
-              const gone = was.filter((k) => !now.includes(k))
-              if (gone.some((k, i) => k !== was[i]) || now.slice(0, was.length - gone.length).join() !== was.slice(gone.length).join()) note(run, step, 'History\'s tap rewrote History')
-            } else {
-              if (place <= queue.index) note(run, step, `entry ${place}, not drawn in History, jumped to`)
-              //? an Up Next tap lands on its own key and drops no song
-              if (jumped.queue.upNext.marks[jumped.index].key !== key) note(run, step, 'an Up Next tap landed elsewhere')
-              const songs = (q) => q.tracks.map((t) => t.id).sort().join()
-              if (songs(jumped.queue) !== songs(queue)) note(run, step, 'an Up Next tap dropped or added a song')
-            }
+            if (place <= queue.index) note(run, step, `entry ${place}, not drawn in History, jumped to`)
+            //? an Up Next tap lands on its own key and drops no song
+            if (jumped.queue.upNext.marks[jumped.index].key !== key) note(run, step, 'an Up Next tap landed elsewhere')
+            const songs = (q) => q.tracks.map((t) => t.id).sort().join()
+            if (songs(jumped.queue) !== songs(queue)) note(run, step, 'an Up Next tap dropped or added a song')
             queue = at(jumped.queue, jumped.index)
           } else if (fromHistory) note(run, step, 'a row History draws refused')
+        } else if (op === 14) {
+          //? (2.1.18) older rows of the play history brought back, oldest first: entries of this queue (before History's
+          //? floor or not, in order or not, copies, another song than theirs, one twice) and songs from elsewhere
+          const from = firstShown(queue)
+          const { marks } = queue.upNext
+          const rows = Array.from({ length: 1 + pick(4) }, (_, i) => {
+            const starts = Array.from({ length: 1 + pick(2) }, (_, k) => run * 1000 + step * 10 + i * 3 + k)
+            if (random() < 0.6) {
+              const p = pick(Math.max(1, random() < 0.8 ? from : queue.tracks.length))
+              //? the row's song as UpNext.tsx passes it: queued(..., 'songs')'s copy, at a level of its own (the 2.1.18
+              //? review) - so a moved entry is seen keeping its own track, a new one the row's
+              return { track: random() < 0.9 ? { ...queue.tracks[p], level: random() < 0.5 ? 'album' : 'track' } : track(`x${extra++}`), starts, entry: marks[p].key }
+            }
+            return { track: track(`p${extra++}`), starts, entry: random() < 0.5 ? null : queue.upNext.nextKey + 5 }
+          })
+          const jump = U.broughtBack(queue, rows, repeat)
+          if (!jump || !jump.back || jump.index !== 0 || jump.queue.index !== 0) note(run, step, 'older rows: not a roll-back to the first')
+          else {
+            brought++
+            const j = jump.queue
+            //? each row its own entry, first, in order: moved - the entry it names, kept whole - while that is before
+            //? History's floor, not a copy, of the row's song and after the last moved; else a new song added; its starts
+            let last = -1
+            rows.forEach((row, i) => {
+              const p = row.entry === null ? -1 : marks.findIndex((m) => m.key === row.entry)
+              const moves = p > last && p < from && marks[p].from !== 'one' && queue.tracks[p].id === row.track.id
+              if (moves) last = p
+              const mark = j.upNext.marks[i]
+              const right = moves
+                ? mark.key === marks[p].key && mark.from === marks[p].from && mark.at === marks[p].at && mark.pass === marks[p].pass && j.tracks[i] === queue.tracks[p]
+                : mark.from === 'added' && mark.key >= queue.upNext.nextKey && mark.at === -1 && mark.pass === -1 && j.tracks[i] === row.track
+              if (moves) broughtMoved++; else broughtNew++
+              if (!right || JSON.stringify(mark.starts) !== JSON.stringify(row.starts)) note(run, step, `older row ${i}: not ${moves ? 'moved' : 'a new song added'} with its starts`)
+            })
+            //? ...then the queue from History's first row on, as it was - outside Repeat One less its copies
+            const keeps = (i) => i >= from && !(repeat !== 'one' && queue.upNext.marks[i].from === 'one')
+            const rest = queue.tracks.map((t, i) => [t, queue.upNext.marks[i]]).filter((_, i) => keeps(i))
+            if (j.tracks.length !== rows.length + rest.length || rest.some(([t, m], i) => j.tracks[rows.length + i] !== t || j.upNext.marks[rows.length + i] !== m)) note(run, step, 'older rows: the queue after them not as it was')
+            //? ...drawn as they play: the rows, History's songs, the song that was playing, then Up Next as it was
+            const was = [...j.upNext.marks.slice(0, rows.length).map((m) => m.key), ...U.historyRows(queue).map((row) => row.key), playingKey(queue), ...aheadKeys(queue, repeat)]
+            const now = [playingKey(j), ...aheadKeys(j, repeat)]
+            if (was.join() !== now.join()) note(run, step, `older rows: drawn ${now} where ${was} was`)
+            if (j.upNext.startedAt !== 0 || U.historyRows(j).length || j.upNext.id !== queue.upNext.id) note(run, step, 'older rows: History, startedAt or the queue\'s id not as they should be')
+            queue = j
+            back = true
+          }
         } else if (op === 9) { const next = U.onward(queue); if (next !== null) queue = at(queue, next) }
         else if (op === 13) {
           //? Previous, early: as the engine moves (wentBack - startedAt follows it down before where listening began)
@@ -328,21 +418,29 @@ console.log('\nthe invariant: 2,000 random runs of every edit, top-up and forwar
       if (view.history.some((row) => placeOf(row.key) >= queue.index) || ahead.some((row) => placeOf(row.key) <= queue.index)) note(run, step, 'a row on the wrong side of the song playing')
       if (new Set([...view.history, ...ahead].map((row) => row.key)).size !== view.history.length + ahead.length) note(run, step, 'a row drawn twice')
       //? ...and Up Next draws every song that plays before the next time round (up to its cap): none hidden behind a
-      //? song added that Previous walked back across
+      //? song added that Previous walked back across - (2.1.18) and after a roll-back (or Previous), every song up to the
+      //? furthest played and what was drawn after it while it played, whatever its time round: in order, each once
       {
-        const shown = U.shownPass(queue)
-        let p = queue.index + 1, want = 0
-        while (marks[p]?.from === 'one') p++
-        for (; p < marks.length; p++) {
-          if (marks[p].from === 'one') continue
-          if (marks[p].from === 'source' && marks[p].pass !== shown) break
-          want++
+        const end = (q) => {
+          const shown = U.shownPass(q)
+          let p = q.index + 1
+          while (q.upNext.marks[p]?.from === 'one') p++
+          for (; p < q.upNext.marks.length; p++) {
+            const m = q.upNext.marks[p]
+            if (m.from === 'source' && m.pass !== shown) break
+          }
+          return p
         }
+        const reachAt = marks.findIndex((m) => m.key === queue.upNext.reached)
+        const stop = Math.max(end(queue), reachAt > queue.index ? end(at(queue, reachAt)) : 0)
+        const want = []
+        for (let p = queue.index + 1; p < stop; p++) if (marks[p].from !== 'one') want.push(marks[p].key)
         const drawn = view.added.length + (view.list ? view.list.rows.length + view.list.more - (queue.upNext.paged ? Math.max(0, queue.upNext.paged.total - queue.upNext.paged.fetched) : 0) : 0)
-        if (drawn !== want) note(run, step, `Up Next draws ${drawn} of the ${want} songs before the next round`)
+        if (drawn !== want.length) note(run, step, `Up Next draws ${drawn} of the ${want.length} songs to come`)
+        if (aheadKeys(queue, repeat).join() !== want.join()) note(run, step, `Up Next draws ${aheadKeys(queue, repeat)} where ${want} play`)
       }
       for (const row of [...ahead, ...view.history]) {
-        const jumped = U.jumpedTo(queue, row.key)
+        const jumped = U.jumpedTo(queue, row.key, repeat)
         drawnChecked++
         if (!jumped || jumped.queue.tracks[jumped.index] !== row.track) { note(run, step, `row ${row.key} not reached by its tap`); break }
       }
@@ -355,6 +453,8 @@ console.log('\nthe invariant: 2,000 random runs of every edit, top-up and forwar
   }
   check('every step of every run keeps it', problems, [])
   check(`...the runs walked back (${walkedBack} times), tapped History (${historyTaps}) and checked every row drawn (${drawnChecked})`, [walkedBack > 500 || walkedBack, historyTaps > 500 || historyTaps, drawnChecked > 10000 || drawnChecked], [true, true, true])
+  check(`...(2.1.18) a History tap Previous's walk (${walkedTo}), older rows brought back (${brought}: ${broughtMoved} moved, ${broughtNew} new), long albums (${longRuns})`,
+    [walkedTo > 300 || walkedTo, brought > 500 || brought, broughtMoved > 200 || broughtMoved, broughtNew > 500 || broughtNew, longRuns > 50 || longRuns], [true, true, true, true, true])
 }
 
 /* ===== Play Next and Play Last ===== */
@@ -395,16 +495,16 @@ console.log('\na row out, a row moved, Clear')
 console.log('\na row\'s tap: jumped to')
 {
   const start = U.withLast(U.startUpNext(album(5), 0), [track('a'), track('b')])
-  const toList = U.jumpedTo(start, keyOf(start, '4'))
+  const toList = U.jumpedTo(start, keyOf(start, '4'), 'off')
   const moved = at(toList.queue, toList.index)
   check('(2.1.3) into the list: it plays, the songs passed kept behind it in order, Playing Next after it', [playing(moved), ids(moved), moved.index, after(moved)], ['4', ['1', '2', '3', '4', 'a', 'b', '5'], 3, ['a', 'b', '5']])
   check('...nothing noted as taken out of the round: the songs passed are behind it, not gone', toList.queue.upNext.left, [])
-  const toAdded = U.jumpedTo(start, keyOf(start, 'b'))
+  const toAdded = U.jumpedTo(start, keyOf(start, 'b'), 'off')
   const there = at(toAdded.queue, toAdded.index)
   check('(2.1.3) into Playing Next: the songs added above it kept behind it - the same queue, the place moved', [toAdded.queue === start, playing(there), ids(there).slice(0, there.index), after(there)], [true, 'b', ['1', 'a'], ['2', '3', '4', '5']])
-  check('the song playing, a copy, a key it doesn\'t have: null', [U.jumpedTo(start, start.upNext.marks[0].key), U.jumpedTo(U.toppedUp(start, 'one'), U.toppedUp(start, 'one').upNext.marks[1].key), U.jumpedTo(start, 77)], [null, null, null])
+  check('the song playing, a copy, a key it doesn\'t have: null', [U.jumpedTo(start, start.upNext.marks[0].key, 'off'), U.jumpedTo(U.toppedUp(start, 'one'), U.toppedUp(start, 'one').upNext.marks[1].key, 'one'), U.jumpedTo(start, 77, 'off')], [null, null, null])
   const one = U.toppedUp(U.startUpNext(album(3), 0), 'one')
-  const jumped = U.jumpedTo(one, keyOf(one, '3'))
+  const jumped = U.jumpedTo(one, keyOf(one, '3'), 'one')
   check('with Repeat One on: past the copies, onto the row', [playing(at(jumped.queue, jumped.index)), ids(jumped.queue)], ['3', ['1', '1', '1', '2', '3']])
 }
 
@@ -426,7 +526,7 @@ console.log('\nShuffle on: the songs not yet heard this round')
   check('the songs added keep their order, ahead of the list', after(kept).slice(0, 2), ['b', 'a'])
   const removed = U.withShuffle(U.withoutKey(at(start, 6), keyOf(start, '9')), true, seeded(3))
   check('a song taken out of the round isn\'t brought back', after(removed).includes('9'), false)
-  const jumped = U.jumpedTo(at(start, 6), keyOf(start, '10'))
+  const jumped = U.jumpedTo(at(start, 6), keyOf(start, '10'), 'off')
   const overJumped = U.withShuffle(at(jumped.queue, jumped.index), true, seeded(3))
   check('...nor songs jumped over (8 and 9) - (2.1.3) behind the song jumped to, heard this round as far as a shuffle goes',
     [playing(overJumped), after(overJumped).includes('8'), after(overJumped).includes('9'), ids(overJumped).slice(7, 9), after(overJumped).slice().sort((x, y) => x - y)], ['10', false, false, ['8', '9'], ['1', '2', '3', '4', '11', '12']])
@@ -570,7 +670,7 @@ const history = (queue) => U.historyRows(queue).map((row) => row.track.id)
 console.log('\n(2.1.3) James\'s walk: tap 8 while 5 plays - Previous plays 7, then 6, as on the album')
 {
   let q = at(U.startUpNext(album(12), 0), 4)
-  const jump = U.jumpedTo(q, keyOf(q, '8'))
+  const jump = U.jumpedTo(q, keyOf(q, '8'), 'off')
   check('nothing to edit - the same queue, and the place to move to: 8\'s', [jump.queue === q, jump.index], [true, 7])
   q = at(jump.queue, jump.index)
   check('8 plays; nothing moved, nothing dropped, nothing noted as taken out', [playing(q), ids(q).join(), q.upNext.left], ['8', '1,2,3,4,5,6,7,8,9,10,11,12', []])
@@ -583,7 +683,7 @@ console.log('\n(2.1.3) James\'s walk: tap 8 while 5 plays - Previous plays 7, th
 }
 {
   const start = U.withNext(at(U.startUpNext(album(12), 0), 4), [track('a', { album: 'Dummy', albumId: 'dum' })])
-  const jump = U.jumpedTo(start, keyOf(start, '8'))
+  const jump = U.jumpedTo(start, keyOf(start, '8'), 'off')
   let q = at(jump.queue, jump.index)
   check('with a song added: it goes after 8, still next', [jump.index, ids(q).slice(4, 10), U.upNextView(q, 'off').added.map((r) => r.track.id)], [7, ['5', '6', '7', '8', 'a', '9'], ['a']])
   q = previous(q)
@@ -591,7 +691,7 @@ console.log('\n(2.1.3) James\'s walk: tap 8 while 5 plays - Previous plays 7, th
   check('...Previous to 7: Up Next draws 8, the song added where it plays, then the rest - no Playing Next above them, no Clear to take what it doesn\'t head',
     [playing(q), v.added.length, v.list.title, v.list.rows.map((r) => r.track.id), U.withoutAdded(q) === q], ['7', 0, 'From Mezzanine', ['8', 'a', '9', '10', '11', '12'], true])
   const aKey = keyOf(q, 'a')
-  const tapA = U.jumpedTo(q, aKey)
+  const tapA = U.jumpedTo(q, aKey, 'off')
   check('...that row moves, comes out and is tapped like the list\'s', [after(U.movedKey(q, aKey, 0)).slice(0, 3), after(U.withoutKey(q, aKey)).slice(0, 2), tapA.queue === q, playing(at(tapA.queue, tapA.index))], [['a', '8', '9'], ['8', '9'], true, 'a'])
 }
 
@@ -605,7 +705,10 @@ console.log('\n(2.1.3) History: what is behind the song playing')
     [playing(back), back.upNext.startedAt, history(back), back.tracks === fromFive.tracks], ['4', 3, [], true])
   check('...once 4 has played: History 4', history(ended(back)), ['4'])
   const later = at(fromFive, 6)
-  check('wentBack at or after where listening began: only the place moves, the same account', [U.wentBack(later, 5).upNext === later.upNext, U.wentBack(later, 5).index], [true, 5])
+  const wb = U.wentBack(later, 5)
+  check('wentBack at or after where listening began: the place moves, the account the same but for how far it had got (2.1.18 reached, 7\'s key)',
+    [wb.index, wb.tracks === later.tracks, { ...wb.upNext, reached: undefined }, wb.upNext.reached], [5, true, { ...later.upNext, reached: undefined }, later.upNext.marks[6].key])
+  check('...and again from there: the same account, the furthest kept', U.wentBack(wb, 4).upNext === wb.upNext, true)
   const plainQueue = { tracks: album(3), index: 2 }
   const plainBack = U.wentBack(plainQueue, 1)
   check('...a plain queue: the place, nothing else', [plainBack.index, plainBack.tracks === plainQueue.tracks, 'upNext' in plainBack], [1, true, false])
@@ -649,47 +752,209 @@ console.log('\n(2.1.3) History: what is behind the song playing')
   r = U.toppedUp(previous(r), 'one')
   check('Repeat All into round two, Repeat One there, Previous into round one: the second round\'s 1 and its copies after 2', [playing(r), froms(r)], ['2', ['o', 'o', 's1', 'o', 'o', 's1']])
   //? (the player never asks for the mode it has - usePlayer's setRepeat - but the rule holds for any queue)
-  r = U.withRepeat(r, 'one')
-  check('...Repeat One asked of it: the later round goes, its copies with it - only the song playing\'s own left', [ids(r).slice(r.index), froms(r)], [['2', '2', '2'], ['o', 'o']])
+  //? (2.1.18) Previous walked back from the second round's 1, so that round played: Repeat lets go only of rounds after it
+  const kept = U.withRepeat(r, 'one')
+  check('...Repeat One asked of it: the second round\'s 1 played (Previous walked back from it), so it stays - the same object', kept === r, true)
+  const fresh = U.withRepeat({ ...r, upNext: { ...r.upNext, reached: undefined } }, 'one')
+  check('...a later round nobody reached goes, its copies with it - only the song playing\'s own left', [ids(fresh).slice(fresh.index), froms(fresh)], [['2', '2', '2'], ['o', 'o']])
 }
 
-console.log('\n(2.1.3) History\'s tap: the song again, then Up Next as it was')
+console.log('\n(2.1.18) History\'s tap rolls back: the playing point moves up the list, everything after it to come')
 {
-  let q = U.withNext(at(U.startUpNext(album(9), 0), 6), [track('a')])
-  const k3 = q.upNext.marks[2].key
-  const jump = U.jumpedTo(q, k3)
-  check('a new entry of song 3, a song added - the same song object - straight after the song playing, moved to',
-    [jump.index, ids(jump.queue).slice(6, 10), jump.queue.upNext.marks[jump.index].from, jump.queue.tracks[jump.index] === q.tracks[2], jump.queue.index], [7, ['7', '3', 'a', '8'], 'added', true, 6])
-  q = at(jump.queue, jump.index)
+  //? James's: A, B, C, D played, D playing, songs added waiting - "Keep their place": tap B, then B, C, D, the songs added, the rest
+  const abc = ['A', 'B', 'C', 'D', 'E', 'F'].map((id) => track(id))
+  let q = U.withNext(at(U.startUpNext(abc, 0), 3), [track('n1'), track('n2')])
+  const kB = q.upNext.marks[1].key
+  const jump = U.jumpedTo(q, kB, 'off')
+  check('tap B with D playing: a roll-back to B - the same songs, in the same order, the place moved back to it',
+    [jump.back, jump.index, jump.queue.index, ids(jump.queue), jump.queue.tracks === q.tracks, jump.queue.upNext.marks === q.upNext.marks], [true, 1, 1, ['A', 'B', 'C', 'D', 'n1', 'n2', 'E', 'F'], true, true])
+  q = jump.queue
   const v = U.upNextView(q, 'off')
-  check('...History not rewritten - 1 to 7, the row tapped still there; Up Next as it was: Playing Next, then 8',
-    [v.history.map((r) => r.track.id), v.history[2].key === k3, v.added.map((r) => r.track.id), v.list.rows[0].track.id], [['1', '2', '3', '4', '5', '6', '7'], true, ['a'], '8'])
-  check('...Previous early: back to the song that was playing; Next: Playing Next', [playing(previous(q)), playing(at(q, U.onward(q)))], ['7', 'a'])
-  q = at(q, U.onward(q))
-  check('...once it has played, History ends as it played: 7, then 3', history(q).slice(-2), ['7', '3'])
-  const one = U.toppedUp(at(U.startUpNext(album(4), 0), 2), 'one')
-  const again = U.jumpedTo(one, one.upNext.marks[0].key)
-  check('with Repeat One on: after the song playing\'s copies - they stay behind', [again.index, ids(again.queue)], [5, ['1', '2', '3', '3', '3', '1', '4']])
-  check('...and Repeat One repeats the song played again', ids(U.toppedUp(at(again.queue, again.index), 'one')), ['1', '2', '3', '3', '3', '1', '1', '1', '4'])
-  check('the song playing, its copies, a key gone: null', [U.jumpedTo(one, one.upNext.marks[2].key), U.jumpedTo(one, one.upNext.marks[3].key), U.jumpedTo(one, 99)], [null, null, null])
+  check('...Up Next: C, D, the songs added where they were, then the rest - History above it A',
+    [playing(q), v.history.map((r) => r.track.id), v.added.map((r) => r.track.id), v.list.rows.map((r) => r.track.id), v.list.title], ['B', ['A'], [], ['C', 'D', 'n1', 'n2', 'E', 'F'], 'From Mezzanine'])
+  check('...nothing above the card twice, nothing lost: every song after B is to come', [after(q)], [['C', 'D', 'n1', 'n2', 'E', 'F']])
+  check('...Previous from it: A, the row above; Next: C, then D (from its start - a new play)', [playing(previous(q)), playing(at(q, U.onward(q))), playing(ended(ended(q)))], ['A', 'C', 'D'])
+  check('...the furthest song played named (D), so the list runs on to it and past it', q.upNext.reached, q.upNext.marks[3].key)
+  let walk = q
+  const heard = []
+  for (let i = 0; i < 6; i++) { walk = ended(walk); heard.push(playing(walk)) }
+  check('...played on: C, D, n1, n2, E, F - and History grows as they play', [heard, history(walk)], [['C', 'D', 'n1', 'n2', 'E', 'F'], ['A', 'B', 'C', 'D', 'n1', 'n2', 'E']])
+  check('...the songs added keep their place: Clear above the card doesn\'t reach them (they play after D)', U.withoutAdded(q) === q, true)
+  //? a tap past it again, rolled back further, and forward: still one list
+  const deeper = U.jumpedTo(at(q, 2), q.upNext.marks[0].key, 'off')
+  check('C playing, tap A: the furthest played still D - the list to come B, C, D, the songs added, the rest',
+    [deeper.queue.upNext.reached, U.upNextView(deeper.queue, 'off').list.rows.map((r) => r.track.id)], [q.upNext.marks[3].key, ['B', 'C', 'D', 'n1', 'n2', 'E', 'F']])
+  check('...a list row tapped from there: the rows it passes behind it, as ever', ids(at(U.jumpedTo(deeper.queue, keyOf(deeper.queue, 'E'), 'off').queue, U.jumpedTo(deeper.queue, keyOf(deeper.queue, 'E'), 'off').index)).join(), 'A,B,C,D,n1,n2,E,F')
+}
+{
+  //? with no copies, a History tap is Previous's walk to it, one row at a time
+  const q = at(U.startUpNext(album(9), 0), 6)
+  let w = q
+  while (w.index > 2) w = previous(w)
+  const jump = U.jumpedTo(q, q.upNext.marks[2].key, 'off')
+  check('tap 3 with 7 playing: exactly where Previous, four times, lands - and Previous\'s account', JSON.stringify(jump.queue), JSON.stringify(w))
+  check('...a roll-back nothing changes but the place uses the queue\'s own tracks - a seek in the stream, not a new one', jump.queue.tracks === q.tracks, true)
+}
+{
+  //? Repeat One: the copies stay - the run played as drawn; off and All: a row plays once, the copies after it go
+  let one = U.toppedUp(at(U.startUpNext(album(4), 0), 1), 'one')
+  one = ended(one); one = U.toppedUp(one, 'one'); one = ended(one); one = U.toppedUp(one, 'one')
+  one = U.toppedUp(U.withRepeat(one, 'off'), 'off'); one = at(one, U.onward(one))
+  one = U.toppedUp(U.withRepeat(one, 'one'), 'one')
+  check('2 three times under Repeat One, then 3 under Repeat One again', [ids(one), playing(one)], [['1', '2', '2', '2', '3', '3', '3', '4'], '3'])
+  const kept = U.jumpedTo(one, one.upNext.marks[1].key, 'one')
+  check('...tap 2 with Repeat One on: back to 2, every copy kept - 2 three times, then 3 three times, then 4', [kept.index, ids(kept.queue)], [1, ['1', '2', '2', '2', '3', '3', '3', '4']])
+  const off = U.jumpedTo(U.toppedUp(U.withRepeat(one, 'off'), 'off'), one.upNext.marks[1].key, 'off')
+  check('...with Repeat off: back to 2, the copies after it gone - 2, 3, 4 once each', [off.index, ids(off.queue), U.upNextView(off.queue, 'off').list.rows.map((r) => r.track.id)], [1, ['1', '2', '3', '4'], ['3', '4']])
+  check('...the song playing, its copies, a key gone: null', [U.jumpedTo(one, one.upNext.marks[4].key, 'one'), U.jumpedTo(one, one.upNext.marks[5].key, 'one'), U.jumpedTo(one, 99, 'one')], [null, null, null])
   const fromFive = at(U.startUpNext(album(12), 4), 6)
-  check('an entry before where listening began (History doesn\'t draw it): null', U.jumpedTo(fromFive, fromFive.upNext.marks[1].key), null)
+  check('an entry before where listening began (History doesn\'t draw it): null', U.jumpedTo(fromFive, fromFive.upNext.marks[1].key, 'off'), null)
   const long = at(U.startUpNext(album(80), 0), 70)
-  const oldest = U.jumpedTo(long, long.upNext.marks[20].key)
-  check('past HISTORY_BACK: null; at it, the song again', [U.jumpedTo(long, long.upNext.marks[19].key), playing(at(oldest.queue, oldest.index))], [null, '21'])
+  const oldest = U.jumpedTo(long, long.upNext.marks[20].key, 'off')
+  check('past HISTORY_BACK: null; at it, rolled back - 22 to 80 to come, History reaching 50 back from 21',
+    [U.jumpedTo(long, long.upNext.marks[19].key, 'off'), playing(oldest.queue), after(oldest.queue).length, U.upNextView(oldest.queue, 'off').list.more, U.historyRows(oldest.queue).length], [null, '21', 59, 0, 20])
+}
+{
+  //? Repeat All: a roll-back into the earlier round - the rounds after it moved back down, drawn whole, Repeat off keeping them
   let rounds = U.toppedUp(at(U.startUpNext(album(3), 0), 2), 'all')
   rounds = U.toppedUp(ended(rounds), 'all')
-  const replay = U.jumpedTo(rounds, rounds.upNext.marks[0].key)
-  const replayed = at(replay.queue, replay.index)
-  check('Repeat All: the song played again is a song added (it plays once) - and Repeat off keeps the round playing',
-    [replayed.upNext.marks[replayed.index].from, after(U.withRepeat(replayed, 'off'))], ['added', ['2', '3']])
+  rounds = U.toppedUp(ended(rounds), 'all')
+  check('Repeat All, the second time round\'s 2 playing', [playing(rounds), froms(rounds)], ['2', ['s1', 's2', 's2', 's2']])
+  const back = U.jumpedTo(rounds, rounds.upNext.marks[0].key, 'all')
+  const v = U.upNextView(back.queue, 'all')
+  check('...tap 1 of the first time round: 2, 3, then the second round\'s 1 and 2 and the rest of it, 3 - one list, as drawn while 2 played',
+    [playing(back.queue), v.list.rows.map((r) => r.track.id), v.list.title], ['1', ['2', '3', '1', '2', '3'], 'From Mezzanine'])
+  const off = U.withRepeat(back.queue, 'off')
+  check('...Repeat off: what played stays (the second round\'s 1 and 2), the rounds after it go', [after(off), U.upNextView(off, 'off').list.rows.map((r) => r.track.id)], [['2', '3', '1', '2', '3'], ['2', '3', '1', '2', '3']])
+  check('...Repeat One from there: the same - what played stays, only copies are made', after(U.toppedUp(U.withRepeat(back.queue, 'one'), 'one')).slice(0, 7), ['1', '1', '2', '3', '1', '2', '3'])
+  const movedUp = U.movedKey(back.queue, back.queue.upNext.marks[3].key, 0)
+  check('...Edit moving the second round\'s 1 to the top of that one list: each place keeps its time round, so the rounds never go down - and every song is still drawn',
+    [after(movedUp).slice(0, 5), froms(movedUp).slice(0, 5), U.upNextView(movedUp, 'all').list.rows.map((r) => r.track.id)], [['1', '2', '3', '2', '3'], ['s0', 's0', 's1', 's1', 's1'], ['1', '2', '3', '2', '3']])
+  //? the furthest played (the second round's 2) taken out, or moved up: the list still runs on to every song that was
+  //? at or before it - the reach handed to the unit before it, or to the last of them now
+  const reachKey = back.queue.upNext.reached
+  const removed = U.withoutKey(back.queue, reachKey)
+  check('...Edit removing the furthest song played (the second round\'s 2): the second round\'s 1 the furthest now, and still drawn - 2, 3, 1, 3',
+    [removed.upNext.reached === back.queue.upNext.marks[3].key, U.upNextView(removed, 'all').list.rows.map((r) => r.track.id)], [true, ['2', '3', '1', '3']])
+  const reachUp = U.movedKey(back.queue, reachKey, 0)
+  check('...Edit moving it to the top: the furthest now the second round\'s 1, the last of those at or before it - every song still drawn',
+    [reachUp.upNext.reached === back.queue.upNext.marks[3].key, U.upNextView(reachUp, 'all').list.rows.map((r) => r.track.id)], [true, ['2', '2', '3', '1', '3']])
+  //? (2.1.18 review) Shuffle on after it: the second round's songs it moved back down - 1 and 2, and the rest of that
+  //? round, 3 - still to come, after the first round's 2 and 3; each round in a new order of its own (so the rounds never
+  //? go down), none starting with the song before it; then off: the list's order, both rounds; Repeat off keeps them
+  const turnedOn = U.withShuffle(back.queue, true, seeded(5))
+  check('(2.1.18 review) Shuffle on: 2 and 3 of the first round, then 1, 2 and 3 of the second - each round shuffled on its own, all drawn',
+    [playing(turnedOn), after(turnedOn).slice(0, 2).sort(), after(turnedOn).slice(2).sort(), froms(turnedOn), U.upNextView(turnedOn, 'all').list.rows.map((r) => r.track.id).join() === after(turnedOn).join(), turnedOn.upNext.shuffle],
+    ['1', ['2', '3'], ['1', '2', '3'], ['s0', 's0', 's1', 's1', 's1'], true, true])
+  //? (each seed's first draw let go: from a small seed it is always near 0)
+  const orders = Array.from({ length: 200 }, (_, seed) => { const random = seeded(seed + 1); random(); return after(U.withShuffle(back.queue, true, random)) })
+  check('...over 200 orders, each round in orders of its own - the first\'s 2 and 3 both ways, the second\'s all six - and the second never starting with the song that ends the first\'s (toppedUp\'s rule)',
+    [new Set(orders.map((a) => a.slice(0, 2).join())).size, new Set(orders.map((a) => a.slice(2).join())).size, orders.filter((a) => a[1] === a[2]).length], [2, 6, 0])
+  check('...Shuffle off again: the first round\'s 2 and 3, the second\'s 1, 2, 3 - the list\'s order; Repeat off from there keeps all five',
+    [after(U.withShuffle(turnedOn, false)), froms(U.withShuffle(turnedOn, false)), after(U.withRepeat(U.withShuffle(turnedOn, false), 'off'))],
+    [['2', '3', '1', '2', '3'], ['s0', 's0', 's1', 's1', 's1'], ['2', '3', '1', '2', '3']])
+  check('...Repeat off with Shuffle on: all five kept', after(U.withRepeat(turnedOn, 'off')).length, 5)
+  //? ...each unit whole: the second round's 1 three times over and its 2 twice (Repeat One), the first round's 2 tapped
+  {
+    let c = U.toppedUp(at(U.startUpNext(album(3), 0), 2), 'all')
+    c = U.toppedUp(U.withRepeat(ended(c), 'one'), 'one')
+    c = U.toppedUp(ended(c), 'one'); c = U.toppedUp(ended(c), 'one')
+    c = U.toppedUp(at(c, U.onward(c)), 'one')
+    const tapped = U.jumpedTo(c, c.upNext.marks[1].key, 'one').queue
+    const runs = (q) => after(q).reduce((list, id, i) => (i && q.upNext.marks[q.index + 1 + i].from === 'one' ? list.slice(0, -1).concat(`${list[list.length - 1]}${id}`) : [...list, id]), [])
+    const shuffles = Array.from({ length: 12 }, (_, seed) => runs(U.withShuffle(tapped, true, seeded(seed + 1))).slice(1).sort().join())
+    check('...Repeat One\'s copies in the second round: shuffled with their song - each order the same units, whole; off, the list\'s order',
+      [runs(tapped), [...new Set(shuffles)], runs(U.withShuffle(U.withShuffle(tapped, true, seeded(1)), false))],
+      [['3', '11111', '222', '3'], ['11111,222,3'], ['3', '11111', '222', '3']])
+  }
+  {
+    //? ...and past Up Next's 100: 200 songs under Repeat All begun at 150, played round to the second time's 10, the
+    //? first time's 200 tapped in History, then Shuffle on - 1-149 shuffled, then the second round: wherever its 1-10
+    //? (played, moved back down) land, the queue still holds every one (shownKeys - their starts never drawn above),
+    //? the furthest played moved to whichever of them is last now
+    let long = U.toppedUp(U.startUpNext(album(200), 149), 'all')
+    while (long.index < 209) long = U.toppedUp(ended(long), 'all')
+    const tapped = U.jumpedTo(long, long.upNext.marks[199].key, 'all').queue
+    const played = tapped.upNext.marks.slice(200, 210).map((m) => m.key)
+    const held = Array.from({ length: 6 }, (_, seed) => {
+      const on = U.withShuffle(tapped, true, seeded(seed + 11))
+      const shown = U.shownKeys(on)
+      const places = played.map((key) => on.upNext.marks.findIndex((m) => m.key === key))
+      return [played.every((key) => shown.has(key)), on.upNext.reached === on.upNext.marks[Math.max(...places)].key]
+    })
+    check('...past the 100 rows drawn, over six orders: the second round\'s 1-10 all held by the queue, the furthest played the last of them',
+      [playing(tapped), after(tapped).length, held], ['200', 200, Array.from({ length: 6 }, () => [true, true])])
+  }
+  //? Shuffle on: a roll-back never reshuffles - what the tap moved down comes in the order it played
+  const shuffledQ = at(U.startUpNext(album(6), 0, true, seeded(3)), 4)
+  const rolled = U.jumpedTo(shuffledQ, shuffledQ.upNext.marks[1].key, 'off')
+  check('a shuffle rolled back from its 5th song to its 2nd: its 3rd, 4th, 5th and 6th to come, in the shuffle\'s order, Shuffle still on',
+    [after(rolled.queue), rolled.queue.upNext.shuffle], [ids(shuffledQ).slice(2), true])
+  //? ...Shuffle turned on after one: the songs added keep their order; the list's songs to come, those moved back down
+  //? among them, in a new order (the song playing and those above it heard)
+  const plain = U.withNext(at(U.startUpNext(album(6), 0), 4), [track('a')])
+  const turned = U.withShuffle(U.jumpedTo(plain, plain.upNext.marks[1].key, 'off').queue, true, seeded(4))
+  check('...Shuffle on after rolling an album back from 5 to 2: 3-6 shuffled, the song added after 5 among them as Shuffle keeps songs added (first)',
+    [playing(turned), after(turned)[0], after(turned).slice(1).sort().join()], ['2', 'a', '3,4,5,6'])
+}
+{
+  //? older rows of the play history brought back - broughtBack
+  const q = at(U.startUpNext(album(80).map((t) => ({ ...t, level: 'album' })), 0), 70)
+  //? z played in another queue, then this album from its start - at 71 now, so its 1-20 are older rows (past History's 50);
+  //? each row's song as UpNext.tsx passes it, queued(..., 'songs')'s copy - at the track level here
+  const rows = Array.from({ length: 20 }, (_, i) => ({ track: { ...q.tracks[i], level: 'track' }, starts: [1000 + i], entry: q.upNext.marks[i].key }))
+  const elsewhere = { track: track('z', { album: 'Dummy', albumId: 'dum', level: 'track' }), starts: [900, 901], entry: null }
+  const jump = U.broughtBack(q, [elsewhere, ...rows], 'off')
+  const v = U.upNextView(jump.queue, 'off', Infinity)
+  check('an album at 71, older rows z (another queue\'s, played twice in a run) and 1-20 (this queue\'s, past History\'s 50): tap z - a roll-back to it',
+    [jump.back, jump.index, playing(jump.queue), ids(jump.queue).slice(0, 4), jump.queue.tracks.length], [true, 0, 'z', ['z', '1', '2', '3'], 81])
+  check('...z a song added; 1-20 moved - their own entries, the list\'s; each carrying the starts its row stood for',
+    jump.queue.upNext.marks.slice(0, 3).map((m) => [m.key, m.from, m.starts]), [[80, 'added', [900, 901]], [0, 'source', [1000]], [1, 'source', [1001]]])
+  check('(2.1.18 review) ...1-20 each their own track, the list\'s (its level, album) - not the row\'s copy at the track level; z the row\'s own',
+    [jump.queue.tracks.slice(1, 21).every((t, i) => t === q.tracks[i]), jump.queue.tracks[1].level, jump.queue.tracks[0] === elsewhere.track, jump.queue.tracks[0].level], [true, 'album', true, 'track'])
+  check('...to come, as drawn: 1-20, History\'s 21-70, 71 (the song that was playing), 72-80 - every song after it, in order',
+    v.list.rows.map((r) => r.track.id).join(), album(80).map((t) => t.id).join())
+  check('...the list\'s heading this time round\'s, as before the tap - not "again" (the round of the list\'s first song after the rows, which lead into it)',
+    [v.list.title, U.upNextView(jump.queue, 'off').list.title], [U.upNextView(q, 'off').list.title, 'From Mezzanine'])
+  check('...nothing before it: History empty, Previous the song again; where listening began, 0', [U.historyRows(jump.queue), U.backward(jump.queue, 0).kind, jump.queue.upNext.startedAt], [[], 'restart', 0])
+  check('...the queue the same queue (its id, its list)', [jump.queue.upNext.id === q.upNext.id, jump.queue.upNext.source === q.upNext.source], [true, true])
+  check('...the starts it holds, by song and moment', U.heldStarts(jump.queue).slice(0, 4), [{ id: 'z', at: 900 }, { id: 'z', at: 901 }, { id: '1', at: 1000 }, { id: '2', at: 1001 }])
+  const one = U.broughtBack(q, [rows[12]], 'off')
+  check('one older row, 13: it, then History\'s 21 on - the 1-12 and 14-20 never drawn below it go', [ids(one.queue).slice(0, 3), one.queue.tracks.length], [['13', '21', '22'], 61])
+  const out = U.broughtBack(q, [rows[2], rows[0]], 'off')
+  check('rows out of the queue\'s order: the first moved, the one before it a song added (the list keeps its order)', out.queue.upNext.marks.slice(0, 2).map((m) => m.from), ['source', 'added'])
+  check('no rows, or nothing playing: null', [U.broughtBack(q, [], 'off'), U.broughtBack(Q.EMPTY_QUEUE, rows, 'off')], [null, null])
+  //? a library's shuffle carries on: its pages still land at the end, and what is to come counts them
+  const paged = { token: 't1', total: 40, fetched: 3, scope: 'yours' }
+  const lib = at(U.startUpNext(album(3, 'p'), 0, false, Math.random, paged), 2)
+  const libBack = U.broughtBack(lib, [{ track: track('old'), starts: [5], entry: null }], 'off')
+  const more = U.withMore(libBack.queue, 't1', album(2, 'q'))
+  check('a library\'s shuffle rolled back to an older row: its pages carry on, at the end, counted',
+    [ids(more), U.upNextView(more, 'off').list.more, more.upNext.paged.fetched], [['old', 'p1', 'p2', 'p3', 'q1', 'q2'], 35, 5])
+}
+{
+  //? (2.1.18 review) the tap racing the engine's catchUp: History at its 50 (10-59, 60 playing), older rows 5-9 tapped -
+  //? and the stream had crossed into 61 before its timeupdate, so jumpTo's catchUp moves on first and History's floor
+  //? with it (11). The rows were read against 10's: `floor`, the first entry drawn, keeps the queue from there
+  const drawn = at(U.startUpNext(album(80), 0), 59)
+  const floor = U.historyRows(drawn)[0].key
+  const caught = at(drawn, 60)
+  const rows = [4, 5, 6, 7, 8].map((i) => ({ track: drawn.tracks[i], starts: [2000 + i], entry: drawn.upNext.marks[i].key }))
+  const withFloor = U.broughtBack(caught, rows, 'off', floor)
+  const without = U.broughtBack(caught, rows, 'off')
+  check('(2.1.18 review) a tap on 5 with 10-59 drawn, caught up to 61 first: with the floor drawn (10\'s), 5-80 in order, 10 once; without it, 10 lost',
+    [U.historyRows(drawn)[0].track.id, U.historyRows(caught)[0].track.id, ids(withFloor.queue).join() === album(80).slice(4).map((t) => t.id).join(), ids(without.queue).includes('10'), without.queue.tracks.length],
+    ['10', '11', true, false, 75])
+  check('...the floor at or after History\'s own (no race), or a key it hasn\'t: as without it - History\'s floor',
+    [ids(U.broughtBack(caught, rows, 'off', U.historyRows(caught)[0].key).queue).join() === ids(without.queue).join(), ids(U.broughtBack(caught, rows, 'off', caught.upNext.marks[70].key).queue).join() === ids(without.queue).join(),
+      ids(U.broughtBack(caught, rows, 'off', 999).queue).join() === ids(without.queue).join()], [true, true, true])
 }
 
 console.log('\n(2.1.3) Shuffle off after a jump in a shuffle: the album from that song\'s place')
 {
   const shuffled = U.startUpNext(album(6), 0, true, seeded(2))
   const order = ids(shuffled)
-  const jump = U.jumpedTo(shuffled, shuffled.upNext.marks[3].key)
+  const jump = U.jumpedTo(shuffled, shuffled.upNext.marks[3].key, 'off')
   const off = U.withShuffle(at(jump.queue, jump.index), false)
   check('the songs the tap passed behind it, as the shuffle played them; the album on from the song jumped to\'s place', [jump.queue === shuffled, ids(off).slice(0, 4), playing(off), after(off)],
     [true, order.slice(0, 4), order[3], album(6).map((t) => t.id).filter((id) => Number(id) > Number(order[3]))])
@@ -937,7 +1202,7 @@ console.log('\nUp Next\'s focus never left on nothing, and the grip\'s drag (2.0
     const player = upNextPlayer(queue)
     player.jumpTo = (key) => {
       player.calls.push(['jumpTo', key])
-      const jump = U.jumpedTo(player.queue, key)
+      const jump = U.jumpedTo(player.queue, key, player.repeat)
       if (jump) player.queue = { ...jump.queue, index: jump.index }
     }
     return player
@@ -1021,12 +1286,13 @@ console.log('\nUp Next\'s focus never left on nothing, and the grip\'s drag (2.0
 
 console.log('\n(2.1.3) Up Next drawn with History above the song playing, opened at the song playing')
 {
-  //? the engine's jump, as usePlayer's jumpTo makes it: jumpedTo's queue, then the entry it names
+  //? the engine's jump, as usePlayer's jumpTo makes it: jumpedTo's queue, then the entry it names (a roll-back's queue is
+  //? already there)
   const jumping = (queue) => {
     const player = upNextPlayer(queue)
     player.jumpTo = (key) => {
       player.calls.push(['jumpTo', key])
-      const jump = U.jumpedTo(player.queue, key)
+      const jump = U.jumpedTo(player.queue, key, player.repeat)
       if (jump) player.queue = { ...jump.queue, index: jump.index }
     }
     return player
@@ -1066,27 +1332,37 @@ console.log('\n(2.1.3) Up Next drawn with History above the song playing, opened
     check('...Down and Up move inside it, End and Home to its ends - each kept from scrolling the sheet; other keys left alone',
       [moved, keys], [['song 2, play again', 'song 1, play again', 'song 2, play again', 'song 1, play again'], [true, true, true, true, false]])
 
-    //? History's tap, the listener scrolled up into it
-    view.scroll(40)
+  }
+  {
+    //? (2.1.18) History's tap rolls back: 7 playing with a song added; scrolled up into History, 3 tapped
+    const player = jumping(U.withNext(at(U.startUpNext(album(12), 0), 6), [track('a')]))
+    const view = mountUpNext(player)
+    let tree = shown(view)
+    view.scroll(100)
+    const order = (key) => find((node) => (node.type === 'li' && node.props?.['data-key'] !== undefined) || node.props?.['data-playing'] !== undefined, view.tree).findIndex((node) => key === 'card' ? node.props['data-playing'] !== undefined : node.props['data-key'] === key)
+    const k3 = player.queue.upNext.marks[2].key, k4 = player.queue.upNext.marks[3].key
+    const rowTop = 100 + 56 * order(k3) - view.scrollTop
     const focused = []
-    const k1 = player.queue.upNext.marks[0].key
-    historyOf(tree)[0].props.onClick()
+    historyOf(tree)[2].props.onClick()
     tree = shown(view, focused)
     //? (review) its words come with the draw that shows it taken - the next one
     tree = shown(view)
-    check('a row of History\'s tap: jumpTo by its key - the song again, said aloud; the row still there, focus kept on it, the view where the listener left it',
-      [player.calls, status(tree), playing(player.queue), historyOf(tree).map((row) => row.props['aria-label']), focused, view.scrollTop],
-      [[['jumpTo', k1]], 'Playing song 1', '1', ['song 1, play again', 'song 2, play again', 'song 3, play again'], [`play:${k1}`], 40])
+    const ahead = find(byClass('app-result'), tree).slice(historyOf(tree).length).map((row) => row.props['aria-label'])
+    check('a row of History\'s tap (3, 7 playing): jumpTo by its key - rolled back to it, said aloud; History above it 1 and 2; what it moved down - 4 to 7, the song added, 8 to 12 - to come, "play now"',
+      [player.calls, status(tree), playing(player.queue), historyOf(tree).map((row) => row.props['aria-label']), ahead],
+      [[['jumpTo', k3]], 'Playing song 3', '3', ['song 1, play again', 'song 2, play again'], ['4', '5', '6', '7', 'a', '8', '9', '10', '11', '12'].map((id) => `song ${id}, play now`)])
+    check('...the card where the row was, under the finger - nothing above it moved; focus to what plays next (4)', [100 + 56 * order('card') - view.scrollTop, rowTop, view.scrollTop, focused], [rowTop, 112, 100, [`play:${k4}`]])
   }
   {
     const player = jumping(at(U.startUpNext(album(80), 0), 70))
     const view = mountUpNext(player)
     let tree = shown(view)
     const focused = []
+    const k22 = player.queue.upNext.marks[21].key
     historyOf(tree)[0].props.onClick()
     tree = shown(view, focused)
-    check('History\'s oldest row tapped at HISTORY_BACK: the song again, its row gone off the end - focus to Done',
-      [playing(player.queue), historyOf(tree).length, historyOf(tree)[0].props['aria-label'], focused], ['21', 50, 'song 22, play again', ['done']])
+    check('History\'s oldest row (21, at HISTORY_BACK) tapped out of view: rolled back to it - History 1 to 20 above it now, the card at the top, focus to 22',
+      [playing(player.queue), historyOf(tree).length, historyOf(tree)[0].props['aria-label'], view.scrollTop, focused], ['21', 20, 'song 1, play again', 20 * 56, [`play:${k22}`]])
   }
   {
     const player = jumping(U.withNext(at(U.startUpNext(album(6), 0), 2), [track('a')]))
@@ -1229,6 +1505,9 @@ console.log('\n(2.1.3) Up Next drawn with History above the song playing, opened
     tree = shown(view)
     tree = shown(view)
     const first = region()
+    //? (2.1.18) rolled back to 1, History is empty above it: once 1 has played, its row is there to tap again
+    player.queue = ended(player.queue)
+    tree = shown(view)
     historyOf(tree)[0].props.onClick()
     tree = shown(view)
     tree = shown(view)
@@ -1244,18 +1523,18 @@ console.log('\n(2.1.15) the play history above History: one list, no heading - e
   const L = require(path.join(OUT, 'lib/loudness.js'))
   const persisted = require(path.join(OUT, 'state/persisted.js'))
   const { LOADING_EARLIER } = require(path.join(OUT, 'app/UpNext.js'))
-  //? the engine's jump and Play Next, as usePlayer makes them
+  //? the engine's jump, as usePlayer makes it: a key (jumpedTo) or (2.1.18) older rows brought back (broughtBack)
+  //? (2.1.18 review) and the floor its rows were read against (player.floors); `catchUp` set, the engine's catchUp moving on
+  //? a song first, as when the stream crossed into the next before its timeupdate
   const replaying = (queue) => {
     const player = upNextPlayer(queue)
-    player.jumpTo = (key) => {
-      player.calls.push(['jumpTo', key])
-      const jump = U.jumpedTo(player.queue, key)
+    player.floors = []
+    player.jumpTo = (to, floor) => {
+      player.calls.push(['jumpTo', typeof to === 'number' ? to : to.map((row) => [row.track.id, row.track.level ?? null, row.starts, row.entry])])
+      if (typeof to !== 'number') player.floors.push(floor)
+      if (player.catchUp) player.queue = ended(player.queue)
+      const jump = typeof to === 'number' ? U.jumpedTo(player.queue, to, player.repeat) : U.broughtBack(player.queue, to, player.repeat, floor)
       if (jump) player.queue = { ...jump.queue, index: jump.index }
-    }
-    player.playNext = (tracks) => {
-      player.calls.push(['playNext', tracks.map((t) => t.id), tracks.map((t) => t.level ?? null)])
-      player.queue = U.withNext(player.queue, tracks)
-      return false
     }
     return player
   }
@@ -1295,7 +1574,7 @@ console.log('\n(2.1.15) the play history above History: one list, no heading - e
     check('...an older row, once focused', listOf(tree).map((row) => row.props.tabIndex), [-1, 0, -1, -1, -1])
     check('nothing more to ask for: no older page asked, however near the top', [history.asked, (view.scroll(0), history.asked)], [0, 0])
 
-    //? an older row's tap, scrolled so y is at the top
+    //? (2.1.18) an older row's tap, scrolled so y is at the top: rolled back to it, everywhere
     view.scroll(56)
     const focused = []
     const next = player.queue.upNext.nextKey
@@ -1303,17 +1582,58 @@ console.log('\n(2.1.15) the play history above History: one list, no heading - e
     tree = shown(view, focused)
     tree = shown(view)
     const level = L.levelled([track('y')], persisted.readPlayerNormalization(), 'songs')[0].level ?? null
-    check('an older row\'s tap: Play Next with its song (queued as songs are, at the setting\'s level), then jumpTo the entry it made - the song again, now',
-      [player.calls, playing(player.queue), U.historyRows(player.queue).map((row) => row.track.id)], [[['playNext', ['y'], [level]], ['jumpTo', next]], 'y', ['1', '2', '3']])
-    check('...said, focus kept on its row, the row under the finger: the view where it was',
-      [status(tree), focused, view.scrollTop], ['Playing song y', [`play:${T - 500}:y`], 56])
+    const ahead = () => find(byClass('app-result'), tree).slice(listOf(tree).length).map((row) => row.props['aria-label'].replace(', play now', ''))
+    check('an older row\'s tap (y): jumpTo with it and every older row below it (x, begun twice running), oldest first - each song at the setting\'s level, the starts it stood for - in the click, nothing else asked',
+      [player.calls], [[['jumpTo', [['y', level, [T - 500], null], ['x', level, [T - 400, T - 300], null]]]]])
+    check('...(2.1.18 review) and the first entry drawn for this queue (History\'s first row, 1)', player.floors, [0])
+    check('...y plays; x, then this queue\'s 1, 2, 3 (that was playing) and on, to come, in the order drawn; above, only z - nothing drawn twice',
+      [playing(player.queue), ahead(), labels(tree), pastKeys(tree), U.historyRows(player.queue)], ['y', ['song x', 'song 1', 'song 2', 'song 3', 'song 4', 'song 5', 'song 6'], ['song z'], [`${T - 600}:z`], []])
+    check('...said, the card where the row was (nothing above it moved), focus to what plays next (x)',
+      [status(tree), view.scrollTop, focused], ['Playing song y', 56, [`play:${next + 1}`]])
     history.plays = [start('y', T + 100, player.queue.upNext.id, next), ...history.plays]
     tree = shown(view)
-    check('...its new start, the song playing, drawn by the queue alone: the older rows as they were, History grown by the song it followed',
-      [labels(tree), pastKeys(tree), view.scrollTop], [['song z', 'song y', 'song x', 'song 1', 'song 2', 'song 3'], [`${T - 600}:z`, `${T - 500}:y`, `${T - 400}:x`], 56])
+    check('...its new start, the song playing, drawn by the queue alone: the older rows as they were',
+      [labels(tree), pastKeys(tree), view.scrollTop], [['song z'], [`${T - 600}:z`], 56])
+    player.queue = ended(player.queue)
+    history.plays = [start('x', T + 200, player.queue.upNext.id, next + 1), ...history.plays]
+    tree = shown(view)
+    check('...y played, x playing: y back in History as a new start - its old one still held below, x\'s two with it',
+      [labels(tree), pastKeys(tree), playing(player.queue)], [['song z', 'song y'], [`${T - 600}:z`], 'x'])
     find(byClass('app-upnext-edit'), tree)[0].props.onClick()
     tree = shown(view)
     check('Edit: the older rows hidden with History', find(byClass('app-upnext-history'), tree).length, 0)
+  }
+  {
+    //? (2.1.18) an older row of THIS queue's - a long album's first songs, begun past History's 50: the tap moves their own
+    //? entries back (an older key than any new one), and is known as taken by it - said, focus to what plays next
+    const player = replaying(at(U.startUpNext(album(60), 0), 55))
+    const id = player.queue.upNext.id
+    const history = book(Array.from({ length: 56 }, (_, i) => start(String(i + 1), T - (56 - i) * 100, id, i)).reverse())
+    const view = mountUpNext(player, { history })
+    let tree = shown(view)
+    check('a long album at 56: its first five, begun past History\'s 50, the older rows - this queue\'s',
+      pastKeys(tree), [1, 2, 3, 4, 5].map((n) => `${T - (57 - n) * 100}:${n}`))
+    const focused = []
+    listOf(tree).find((row) => row.props['aria-label'] === 'song 3, play again').props.onClick()
+    tree = shown(view, focused)
+    tree = shown(view)
+    check('...song 3\'s tapped: its own entry moved back, 4 and 5 with it, to come - taken: said, focus to what plays next (4)',
+      [playing(player.queue), player.queue.upNext.marks.slice(0, 3).map((m) => [m.key, m.from]), status(tree), focused, pastKeys(tree)],
+      ['3', [[2, 'source'], [3, 'source'], [4, 'source']], 'Playing song 3', ['play:3'], [1, 2].map((n) => `${T - (57 - n) * 100}:${n}`)])
+  }
+  {
+    //? (2.1.18 review) ...the same tap racing the engine's catchUp (the stream into 57 before its timeupdate): History's
+    //? first row as drawn (6) goes with the rows, so 6 still comes after 5 - nothing between the rows and History lost
+    const player = replaying(at(U.startUpNext(album(60), 0), 55))
+    const id = player.queue.upNext.id
+    const history = book(Array.from({ length: 56 }, (_, i) => start(String(i + 1), T - (56 - i) * 100, id, i)).reverse())
+    const view = mountUpNext(player, { history })
+    let tree = shown(view)
+    player.catchUp = true
+    listOf(tree).find((row) => row.props['aria-label'] === 'song 3, play again').props.onClick()
+    tree = shown(view)
+    check('(2.1.18 review) song 3 tapped as the engine catches up into 57: the floor drawn (6\'s key) passed; 3 playing, 4-60 after it in order - 6 kept',
+      [player.floors, playing(player.queue), after(player.queue).join() === album(60).slice(3).map((t) => t.id).join()], [[5], '3', true])
   }
   {
     //? (review) closed - Up Next stays mounted - the older rows are neither built nor drawn at a song's change: those

@@ -72,8 +72,10 @@ def cleaned_name(text) -> str:
 
 
 def snapshot_problem(text: str | None) -> str | None:
-    """Why a snapshot is refused (a 422), or None: it must be JSON, an object, of version 1. What is inside is the
-    page's own account, read back only by the page (lib/resume.ts fromSnapshot) - deadwax never acts on it."""
+    """Why a snapshot is refused (a 422), or None: it must be JSON, an object, of version 1 or (2.1.18) 2 - the same
+    keys, written for a queue a reader before 2.1.18 would read back wrong, so it puts back the plain list instead
+    (lib/resume.ts snapshotVersion). What is inside is the page's own account, read back only by the page
+    (lib/resume.ts fromSnapshot) - deadwax never acts on it."""
     if text is None:
         return None
     if len(text) > SNAPSHOT_MAX:
@@ -84,8 +86,8 @@ def snapshot_problem(text: str | None) -> str | None:
         return "The queue's account isn't JSON"
     if not isinstance(made, dict):
         return "The queue's account isn't an object"
-    if made.get("v") != 1 or isinstance(made.get("v"), bool):
-        return "The queue's account isn't one deadwax knows (v 1)"
+    if made.get("v") not in (1, 2) or isinstance(made.get("v"), bool):
+        return "The queue's account isn't one deadwax knows (v 1 or 2)"
     return None
 
 
