@@ -288,6 +288,19 @@ public struct DeadwaxClient: Sendable {
                       etag: response.header("ETag"))
     }
 
+    // MARK: app 0.10's playlists (Phase 4)
+
+    /// The asker's playlists and everyone's shared ones, in Navidrome's order (by name) - as the person signed in.
+    public func playlists() async throws -> [Playlist] {
+        try await call(Routes.playlists, as: PlaylistList.self).playlists
+    }
+
+    /// One playlist with its songs, as Navidrome has it now. A 404 - not the asker's and not shared, or deleted - is
+    /// thrown, for the page's gone line.
+    public func playlist(id: String) async throws -> PlaylistWithSongs {
+        try await call(Routes.playlist, path: ["playlist_id": id])
+    }
+
     // MARK: app 0.8's play history (server 2.1.14)
 
     /// A page of the person's plays, newest first: the newest (`before` nil), or the one before a page's last.

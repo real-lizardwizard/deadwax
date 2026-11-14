@@ -177,24 +177,28 @@ import Testing
             return
         }
         #expect(rawCases.count == cases.count)
-        //? a playlist's stub (`partial`) is Phase 4's: the routes' model hasn't the field, and Phase 1 plays none
+        //? a playlist's stub (`partial`, Phase 4): deadwax never sends the key, so the model reads the album and the stub
+        //? is made as PlaylistPlay.albums makes one - `partial` set on the phone
         var compared = 0
         var stubs: [String] = []
         for (each, rawCase) in zip(cases, rawCases) {
             guard let albumJSON = rawCase["album"], !albumJSON.isNull else { continue }
+            let data = try JSONEncoder().encode(Reencoded(albumJSON))
+            var album = try JSONDecoder().decode(Album.self, from: data)
+            #expect(!album.partial, "\(each.name)")
             if albumJSON["partial"]?.bool == true {
                 stubs.append(each.name)
-                continue
+                album = Album(id: album.id, name: album.name, artist: album.artist, artistId: album.artistId,
+                              coverArt: album.coverArt, songCount: album.songCount, year: album.year, song: album.song,
+                              discTitles: album.discTitles, recordLabels: album.recordLabels, partial: true)
             }
-            let data = try JSONEncoder().encode(Reencoded(albumJSON))
-            let album = try JSONDecoder().decode(Album.self, from: data)
             let details = each.details.map { AboutDetails(song: $0.song, present: $0.store?.present) }
             let about = AboutCard.about(track: each.track.aboutTrack, album: AboutAlbum(album: album), details: details, folders: each.folders)
             #expect(about == each.about, "\(each.name)")
             compared += 1
         }
         #expect(stubs == ["played from a playlist's stub", "a playlist's stub of two discs"])
-        #expect(compared >= 40)
+        #expect(compared >= 42)
     }
 
     @Test func aPressingRowIsTheBridgesRow() throws {

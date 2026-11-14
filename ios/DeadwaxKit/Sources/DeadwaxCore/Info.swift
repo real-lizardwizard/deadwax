@@ -382,13 +382,13 @@ extension SongDetails {
 }
 
 extension AboutAlbum {
-    /// The album answer the queue was played from, as the routes' model read it, for About. Nothing of a playlist's
-    /// stub in Phase 1 (`partial` nil). The model reads a disc title's `disc` as an Int or a string of digits,
+    /// The album answer the queue was played from, as the routes' model read it, for About - a playlist's stub of it
+    /// (Phase 4) `partial`, as the web's playlistAlbums marks one, else nil (deadwax never sends the key). The model reads a disc title's `disc` as an Int or a string of digits,
     /// narrower than About's own JS Number() reading - they agree on everything Navidrome sends.
     public init(album: Album) {
         self.init(id: album.id, name: album.name, artist: album.artist, year: album.year.map(Double.init),
                   coverArt: album.coverArt, songCount: album.songCount.map(Double.init),
-                  song: album.song?.map { SongDetails(song: $0) }, partial: nil,
+                  song: album.song?.map { SongDetails(song: $0) }, partial: album.partial ? true : nil,
                   discTitles: album.discTitles?.map { AboutDiscTitle(disc: $0.disc.map(Double.init), title: $0.title) },
                   artistId: album.artistId, recordLabels: album.recordLabels?.map { AboutAlbum.Label(name: $0.name) })
     }

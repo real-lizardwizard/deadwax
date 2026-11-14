@@ -25,6 +25,27 @@ enum AppRoute: Hashable {
     case debug
     /// You > Playback > EQ, and the EQ's own pages (eq.md 3.1-3.2): the EQ page, an output's, the presets.
     case eq(EQRoute)
+    /// The Library's Playlists (Phase 4, phase4-library.md 3.2): yours, shared with you, from files.
+    case playlists
+    /// One playlist's page (3.3), by Navidrome's playlist id.
+    case playlist(PlaylistRoute)
+}
+
+/// A playlist page's address: its id, and the row that opened it - the hero drawn at once while the playlist loads.
+/// Only `id` decides which playlist.
+struct PlaylistRoute: Hashable {
+    let id: String
+    var preview: Playlist?
+
+    init(id: String, preview: Playlist? = nil) {
+        self.id = id
+        self.preview = preview
+    }
+
+    /// A row of the Playlists screen.
+    init(_ playlist: Playlist) {
+        self.init(id: playlist.id, preview: playlist)
+    }
 }
 
 /// The album page's address: the album's id, and what the row that opened it already knew - drawn at once, while
@@ -196,6 +217,8 @@ extension View {
                 case .serverAddress: ServerAddressView()
                 case .debug: DebugView()
                 case .eq(let page): EQDestination(route: page)
+                case .playlists: PlaylistsScreen()
+                case .playlist(let playlist): PlaylistView(route: playlist)
                 }
             }
             .clearsPlayer()

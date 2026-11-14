@@ -28,6 +28,7 @@ struct DeadwaxApp: App {
     @State private var eq: EQModel
     @State private var deck: DeckController
     @State private var history: HistoryModel
+    @State private var playlists: PlaylistsModel
 
     /// The one background session, made before anything else can ask it.
     private static let downloadSession = DownloadSession()
@@ -44,6 +45,8 @@ struct DeadwaxApp: App {
         player.eq = eq
         let navigation = AppNavigation()
         let library = LibraryModel(server: server)
+        // Phase 4: the person's playlists, as they are on Navidrome
+        let playlists = PlaylistsModel(server: server)
         let downloads = DownloadModel(server: server, reachability: reachability, files: files, session: Self.downloadSession)
         player.connect(downloads: downloads, reachability: reachability)
         // play history (app 0.8): each song begun recorded by the player, kept and sent through the person's store
@@ -65,6 +68,7 @@ struct DeadwaxApp: App {
             debug.reset()
             lyrics.reset()
             history.reset()
+            playlists.reset()
         }
         _server = State(initialValue: server)
         _player = State(initialValue: player)
@@ -77,6 +81,7 @@ struct DeadwaxApp: App {
         _eq = State(initialValue: eq)
         _deck = State(initialValue: deck)
         _history = State(initialValue: history)
+        _playlists = State(initialValue: playlists)
     }
 
     var body: some Scene {
@@ -93,6 +98,7 @@ struct DeadwaxApp: App {
                 .environment(eq)
                 .environment(deck)
                 .environment(history)
+                .environment(playlists)
                 .preferredColorScheme(.dark)
                 .tint(Palette.accent)
         }

@@ -254,6 +254,10 @@ public struct Album: Codable, Sendable, Equatable, Identifiable {
     public let discTitles: [DiscTitle]?
     /// OpenSubsonic: the labels the files name.
     public let recordLabels: [RecordLabel]?
+    /// A stub made on the phone from a playlist's songs of the album (PlaylistPlay.albums, lib/playlists.ts
+    /// playlistAlbums): `song` holds only the playlist's, so Info counts none of the album's from it. Never sent by
+    /// deadwax - not a coding key, false for every answer read.
+    public let partial: Bool
 
     public struct RecordLabel: Codable, Sendable, Equatable, Hashable {
         public let name: String?
@@ -275,7 +279,7 @@ public struct Album: Codable, Sendable, Equatable, Identifiable {
                 coverArt: String? = nil, songCount: Int? = nil, duration: Double? = nil, year: Int? = nil,
                 genre: String? = nil, musicBrainzId: String? = nil, starred: String? = nil, created: String? = nil,
                 played: String? = nil, playCount: Int? = nil, song: [Song]? = nil, discTitles: [DiscTitle]? = nil,
-                recordLabels: [RecordLabel]? = nil) {
+                recordLabels: [RecordLabel]? = nil, partial: Bool = false) {
         self.id = id
         self.name = name
         self.artist = artist
@@ -293,6 +297,7 @@ public struct Album: Codable, Sendable, Equatable, Identifiable {
         self.song = song
         self.discTitles = discTitles
         self.recordLabels = recordLabels
+        self.partial = partial
     }
 
     public init(from decoder: any Decoder) throws {
@@ -314,6 +319,7 @@ public struct Album: Codable, Sendable, Equatable, Identifiable {
         song = fields.looseList(Song.self, .song)
         discTitles = fields.looseList(DiscTitle.self, .discTitles)
         recordLabels = fields.looseList(RecordLabel.self, .recordLabels)
+        partial = false
     }
 
     /// Whether the asker starred it - with logins on, whether it is in their library.
@@ -590,9 +596,9 @@ public struct LibraryRemoveBody: Codable, Sendable, Equatable {
     public init(navidromeId: String) { self.navidromeId = navidromeId }
 }
 
-// MARK: reading leniently
+// MARK: reading leniently (the module's: Playlists.swift reads its answers the same way)
 
-fileprivate extension KeyedDecodingContainer {
+extension KeyedDecodingContainer {
     /// The field, or nil when it is absent, null or of another type.
     func looseField<T: Decodable>(_ type: T.Type, _ key: Key) -> T? {
         (try? decodeIfPresent(type, forKey: key)) ?? nil
