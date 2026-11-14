@@ -80,10 +80,9 @@ import Testing
         #expect(PlaylistWords.files(3) == "From files (3)")
         #expect(PlaylistWords.openFailed("Try again.") == "Couldn't open this playlist. Try again.")
         #expect(PlaylistWords.refreshFailed("x") == "Couldn't update this playlist - showing it as it was. x")
-        #expect(PlaylistWords.firstSentence("One. Two.") == "One.")
-        #expect(PlaylistWords.firstSentence("No stop") == "No stop")
         // the vocabulary: none of the phone's own lines names what a listener never reads
-        for line in [PlaylistWords.offlineList, PlaylistWords.offlinePage, PlaylistWords.playlistEmptyNow] {
+        for line in [PlaylistWords.offlineList, PlaylistWords.offlinePage, PlaylistWords.newPlaylistTitle,
+                     PlaylistWords.songsHeading] {
             for banned in ["Navidrome", "the store", "Browse", "everything", "sync", "cache"] {
                 #expect(!line.contains(banned), "\(line)")
             }

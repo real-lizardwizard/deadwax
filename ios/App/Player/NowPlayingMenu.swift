@@ -1,8 +1,9 @@
 import DeadwaxCore
 import SwiftUI
 
-/// Now Playing's ••• (app/ActionMenu.tsx): Info, and Go to album for a song that names its album - left out, not
-/// greyed, for one that doesn't. Phase 1 has neither the web's Add to a playlist… nor its pin. The button's name says
+/// Now Playing's ••• (app/ActionMenu.tsx): Info, Add to a playlist… (Phase 4, slice 2 - the song playing, into one of
+/// your playlists: the picker opens over Now Playing; left out while deadwax can't be reached), and Go to album for a
+/// song that names its album - left out, not greyed, for one that doesn't. The web's pin isn't here. The button's name says
 /// what the menu holds (NowPlayingWords.more). A SwiftUI Menu on the button, opened from it, as the album page's •••
 /// are (QueueMenu): it was a confirmationDialog on the button until the queue menus moved, and a menu has no Cancel
 /// row - a tap anywhere else closes it. The order is fixed, Info first (after the speed's line, when it shows).
@@ -27,6 +28,8 @@ struct NowPlayingMenu: View {
     let saysSpeed: Bool
     let onInfo: () -> Void
     let onEQ: () -> Void
+    /// Add to a playlist… - nil leaves it out (deadwax out of reach).
+    let onPlaylist: (() -> Void)?
     let onAlbum: () -> Void
 
     @Environment(PlayerModel.self) private var player
@@ -46,6 +49,10 @@ struct NowPlayingMenu: View {
                 }
             }
             Button(NowPlayingWords.info, systemImage: DownloadWords.infoSymbol, action: onInfo)
+            if let onPlaylist {
+                Button(PlaylistWords.addToAPlaylistRow, systemImage: PlaylistWords.addSymbol,
+                       action: onPlaylist)
+            }
             if hasAlbum {
                 Button(NowPlayingWords.goToAlbum, systemImage: DownloadWords.goToAlbumSymbol, action: onAlbum)
             }
@@ -81,7 +88,8 @@ struct NowPlayingMenu: View {
         // drawn as the plain button it was (no tint): a button-styled menu with .buttonStyle, as Apple pairs them
         .menuStyle(.button)
         .buttonStyle(.plain)
-        .accessibilityLabel(NowPlayingWords.more(hasAlbum: hasAlbum, download: downloads.isOpen, eq: true))
+        .accessibilityLabel(NowPlayingWords.more(hasAlbum: hasAlbum, download: downloads.isOpen, eq: true,
+                                                 playlist: onPlaylist != nil))
     }
 
     /// Download Up Next: each song from the one playing on that isn't here or didn't download, asked for as a song.

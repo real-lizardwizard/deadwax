@@ -4,19 +4,24 @@
  * 2.1-2.3 and 7): ui/src/lib/playlists.ts and ui/src/lib/playedAlbums.ts compiled with the repo's TypeScript and run
  * over every case below - the words and limits, each playlist's group, row line, whose line and why it has no Edit, the
  * groups, the counts and lengths, the hidden line, the album stubs a playlist's songs are remembered under and what is
- * held over them, and the store of albums played from driven through its bounds. Written to
+ * held over them, and the store of albums played from driven through its bounds - and slice 2's: the playlists the
+ * picker offers and their order, what an add, a made playlist and the duplicate question say, Edit's rows, moves and
+ * removals, the one body Done sends (and when it sends none), the rearrangement rule, and Edit's and Delete's words.
+ * Written to
  *
  *   ios/DeadwaxKit/Tests/DeadwaxCoreTests/Fixtures/playlists/playlist-vectors.json
  *
  * which DeadwaxCoreTests' PlaylistVectorTests replays against DeadwaxCore's Playlists.swift, PlaylistPlay.swift and
- * PlayedAlbums.swift - the ports - so a rule changed on the web and not in the app (or the other way about) fails a test.
+ * PlayedAlbums.swift, and PlaylistChanges.swift - the ports - so a rule changed on the web and not in the app (or the
+ * other way about) fails a test.
  *
  *   node ios/scripts/export-playlist-vectors.cjs           writes the fixture
  *   node ios/scripts/export-playlist-vectors.cjs --check   fails when the fixture isn't what the TypeScript says now
  *                                                          (ui/test/iosplaylists.sim.cjs runs this in CI)
  *
- * Slice 1's rules only: Edit's, the picker's and the drag's (startEdit ... duplicateQuestion, edgeScroll) come with
- * slice 2. Every playlist and song here is invented. Needs ui/node_modules (npm install in ui/) and a writable TMPDIR.
+ * Not here: the desktop sidebar's list (sidebarPlaylists) and the web's own drag (edgeScroll, dragDistance) - the phone
+ * has no sidebar, and its drag is the List's own. Every playlist and song here is invented. Needs ui/node_modules (npm
+ * install in ui/) and a writable TMPDIR.
  */
 
 const { execFileSync } = require('child_process')
@@ -250,12 +255,151 @@ function playedVectors() {
   ]
 }
 
+/* ===== slice 2: the picker ======================================================================= */
+
+/** Lists the picker orders: changed last first, ties by name (case, accents and numbers in names), the list's own
+ *  order for a full tie, and only yours and editable - never shared, from a file, or somebody else's marked editable. */
+const pickable = (id, changed, name, over) => playlist(id, { changed, name, ...over })
+const PICKER_LISTS = {
+  'none': [],
+  'all of them (one changed, ties by name)': PLAYLISTS,
+  'by changed, newest first': [
+    pickable('p-old', '2026-01-01T10:00:00Z', 'Old'),
+    pickable('p-new', '2026-11-12T09:30:00.250Z', 'New'),
+    pickable('p-mid', '2026-06-15T00:00:00Z', 'Middle'),
+    pickable('p-newer', '2026-11-12T09:30:00.251Z', 'Newer'),
+    pickable('p-blank', '', 'Never changed'),
+  ],
+  'ties by name, case and accents folded': [
+    pickable('t-banana', '2026-11-01T10:00:00Z', 'Banana'),
+    pickable('t-apple', '2026-11-01T10:00:00Z', 'apple'),
+    pickable('t-eclairs', '2026-11-01T10:00:00Z', 'eclairs'),
+    pickable('t-eclair', '2026-11-01T10:00:00Z', '\u00c9clair'),
+    pickable('t-a10', '2026-11-01T10:00:00Z', 'a10'),
+    pickable('t-a2', '2026-11-01T10:00:00Z', 'a2'),
+    pickable('t-zed', '2026-11-01T10:00:00Z', 'Zed'),
+    pickable('t-late', '2026-11-02T10:00:00Z', 'zzz late'),
+  ],
+  'a full tie keeps the list order': [
+    pickable('same-2', '2026-11-01T10:00:00Z', 'Same'),
+    pickable('same-1', '2026-11-01T10:00:00Z', 'Same'),
+    pickable('same-3', '2026-11-01T10:00:00Z', 'Same'),
+  ],
+  'only yours and editable': [
+    pickable('x-shared', '2026-11-12T10:00:00Z', 'Shared', { mine: false, editable: false, owner: 'sam', public: true }),
+    pickable('x-file', '2026-11-11T10:00:00Z', 'From a file', { editable: false }),
+    pickable('x-odd', '2026-11-10T10:00:00Z', 'Somebody else editable', { mine: false, editable: true, owner: 'SAM' }),
+    pickable('x-yours', '2026-11-01T10:00:00Z', 'Yours'),
+  ],
+}
+
+function pickerVectors() {
+  return Object.entries(PICKER_LISTS).map(([name, list]) => ({ name, list, ids: P.pickerPlaylists(list).map((p) => p.id) }))
+}
+
+const entry = (id, title, artist) => (artist === undefined ? { id, title } : { id, title, artist })
+const PICKS = [
+  { name: 'one song', pick: { label: 'Roads', songs: [entry('s1', 'Roads', 'Portishead')] } },
+  { name: 'one song, artist empty', pick: { label: 'Roads', songs: [entry('s1', 'Roads', '')] } },
+  { name: 'one song, no artist', pick: { label: 'Roads', songs: [entry('s1', 'Roads')] } },
+  { name: 'two songs', pick: { label: 'Mezzanine', songs: [entry('m1', 'Angel', 'Massive Attack'), entry('m2', 'Risingson', 'Massive Attack')] } },
+  { name: 'an album of eleven', pick: { label: 'Dummy', songs: Array.from({ length: 11 }, (_, i) => entry(`d${i}`, `Track ${i}`, 'Portishead')) } },
+  { name: 'a song twice', pick: { label: 'Late night', songs: [entry('s1', 'Roads', 'Portishead'), entry('s1', 'Roads', 'Portishead')] } },
+  { name: 'none', pick: { label: 'Empty', songs: [] } },
+]
+const ANSWERS = [
+  { added: 0, already: 0 }, { added: 0, already: 1 }, { added: 0, already: 3 },
+  { added: 1, already: 0 }, { added: 1, already: 1 }, { added: 1, already: 2 },
+  { added: 2, already: 0 }, { added: 3, already: 1 }, { added: 3, already: 2 }, { added: 10, already: 1 },
+]
+const ASKED = [[1, 1], [0, 1], [2, 2], [3, 2], [1, 3], [2, 3], [1, 2], [5, 11], [11, 11]]
+
+function pickVectors() {
+  return PICKS.map(({ name, pick }) => ({
+    name,
+    pick,
+    pickLine: P.pickLine(pick),
+    madeWords: P.madeWords('Late night', pick),
+    added: ANSWERS.flatMap((answer) => ['ask', 'add', 'skip'].map((mode) => ({ ...answer, mode, text: P.addedWords(answer, mode, pick, 'Late night') }))),
+    questions: pick.songs.length ? ASKED.map(([already, asked]) => ({ already, asked, ...P.duplicateQuestion(already, asked, pick, 'Late night') })) : [],
+  }))
+}
+
+/* ===== slice 2: Edit ============================================================================= */
+
+const EDIT_SONGS = [
+  song('e1', { title: 'Roads', artist: 'Portishead' }),
+  song('e2', { title: 'Teardrop', artist: 'Massive Attack' }),
+  song('e1', { title: 'Roads', artist: 'Portishead' }),
+  song('e3', { title: 'Untitled artist' }),
+]
+const EDIT_PLAYLIST = playlist('edit', { name: 'Late night', comment: 'For after', public: false })
+
+function editVectors() {
+  const start = P.startEdit(EDIT_SONGS, EDIT_PLAYLIST)
+  const rows = start.rows
+  const moves = []
+  for (let from = -1; from <= rows.length; from++) {
+    for (let to = -2; to <= rows.length + 1; to++) moves.push({ from, to, keys: P.moveRow(rows, from, to).map((row) => row.key) })
+  }
+  const removes = []
+  for (let index = -1; index <= rows.length; index++) removes.push({ index, keys: P.removeRow(rows, index).map((row) => row.key) })
+
+  const swapped = P.moveRow(rows, 0, 2)
+  const NOW = {
+    'nothing changed': start,
+    'a row moved and moved back': { ...start, rows: P.moveRow(P.moveRow(rows, 0, 3), 3, 0) },
+    'a row moved': { ...start, rows: P.moveRow(rows, 3, 0) },
+    "a song's two rows swapped": { ...start, rows: P.moveRow(swapped, 1, 0) },
+    'a row removed': { ...start, rows: P.removeRow(rows, 1) },
+    'every row removed': { ...start, rows: [] },
+    'renamed': { ...start, name: 'Early morning' },
+    'renamed with spaces around': { ...start, name: '  Early morning \u00a0' },
+    'the same name with spaces around': { ...start, name: '\ufeff Late night\t\n' },
+    'a name JS does not trim': { ...start, name: 'Late night\u0085' },
+    'the name cleared': { ...start, name: '   ' },
+    'the description cleared': { ...start, comment: '' },
+    'the same description with spaces': { ...start, comment: ' For after ' },
+    'shared': { ...start, public: true },
+    'everything': { rows: P.removeRow(P.moveRow(rows, 2, 0), 3), name: 'New name', comment: 'New words', public: true },
+  }
+  const STARTS = {
+    'as drawn': start,
+    'a name with spaces of its own': { ...start, name: '  Late night  ', comment: '\u00a0For after' },
+    'empty': P.startEdit([], playlist('empty', { name: 'Empty', comment: '', public: true })),
+  }
+  const bodies = []
+  for (const [startName, from] of Object.entries(STARTS)) {
+    for (const [nowName, now] of Object.entries(NOW)) {
+      const state = startName === 'empty' ? { ...now, rows: nowName === 'every row removed' || nowName === 'nothing changed' ? [] : now.rows } : now
+      const body = P.editBody(from, state)
+      bodies.push({ name: `${startName}: ${nowName}`, start: from, now: state, changed: P.editChanged(from, state), body, keys: body ? Object.keys(body).sort() : null })
+    }
+  }
+  const REARRANGEMENTS = [
+    [[], []], [['a'], []], [[], ['a']], [['a', 'b', 'c'], ['c', 'a']], [['a', 'b'], ['a', 'b', 'a']], [['a', 'a', 'b'], ['a', 'b', 'a']],
+    [['a', 'a', 'b'], ['a', 'a', 'a']], [['a', 'b'], ['b', 'c']], [['a', 'b'], ['a', 'b']],
+  ]
+  return {
+    songs: EDIT_SONGS,
+    playlist: EDIT_PLAYLIST,
+    start,
+    moves,
+    removes,
+    bodies,
+    rearrangements: REARRANGEMENTS.map(([base, next]) => ({ base, next, is: P.isRearrangement(base, next) })),
+  }
+}
+
 function vectors() {
   return {
     made_from: 'ui/src/lib/playlists.ts and ui/src/lib/playedAlbums.ts (compiled)',
     words: {
       PLAYLISTS_EMPTY: P.PLAYLISTS_EMPTY, PLAYLISTS_EMPTY_HOW: P.PLAYLISTS_EMPTY_HOW, PLAYLIST_EMPTY: P.PLAYLIST_EMPTY,
       PLAYLIST_GONE: P.PLAYLIST_GONE, listFailed: P.listFailed('Why it failed.'),
+      PLAYLIST_CHANGED: P.PLAYLIST_CHANGED, SHARED_NOTE: P.SHARED_NOTE, NEEDS_A_NAME: P.NEEDS_A_NAME,
+      DISCARD_QUESTION: P.DISCARD_QUESTION,
+      deleteQuestion: ['Late night', '', 'Say "when"'].map((name) => ({ name, text: P.deleteQuestion(name) })),
     },
     constants: {
       PLAYLIST_NAME_MAX: P.PLAYLIST_NAME_MAX, PLAYLIST_COMMENT_MAX: P.PLAYLIST_COMMENT_MAX, PLAYLIST_SONGS_MAX: P.PLAYLIST_SONGS_MAX,
@@ -271,6 +415,10 @@ function vectors() {
     stubs: stubVectors(),
     withHeld: heldVectors(),
     played: playedVectors(),
+    hiddenEditWords: [-1, 0, 1, 2, 10].map((hidden) => ({ hidden, text: P.hiddenEditWords(hidden) })),
+    picker: pickerVectors(),
+    picks: pickVectors(),
+    edit: editVectors(),
   }
 }
 
@@ -283,7 +431,7 @@ const made = say(vectors())
 if (CHECK) {
   const committed = fs.existsSync(FIXTURE) ? fs.readFileSync(FIXTURE, 'utf8') : null
   if (committed !== made) {
-    console.error(`  FAIL  ${path.relative(REPO, FIXTURE)} isn't what the web's TypeScript answers today - run node ios/scripts/export-playlist-vectors.cjs, then port the change to DeadwaxCore's Playlists.swift, PlaylistPlay.swift or PlayedAlbums.swift and see PlaylistVectorTests pass`)
+    console.error(`  FAIL  ${path.relative(REPO, FIXTURE)} isn't what the web's TypeScript answers today - run node ios/scripts/export-playlist-vectors.cjs, then port the change to DeadwaxCore's Playlists.swift, PlaylistPlay.swift, PlayedAlbums.swift or PlaylistChanges.swift and see PlaylistVectorTests pass`)
     process.exit(1)
   }
   console.log(`${path.relative(REPO, FIXTURE)} is what the web's TypeScript answers today`)

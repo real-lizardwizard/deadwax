@@ -11,15 +11,34 @@ import SwiftUI
 /// meanwhile from what is in hand; a failure with a list in hand leaves the list and says so under the title; with
 /// none, why, and Try again. Pull to refresh asks now. While deadwax can't be reached nothing is asked: the list in hand
 /// draws, a playlist whose page isn't in hand with a song of it on this phone dimmed (it opens nothing), and with no list
-/// the screen says the playlists show once deadwax is back. New playlist is slice 2's.
+/// the screen says the playlists show once deadwax is back.
+///
+/// NEW PLAYLIST (slice 2, the web's PlaylistsPage.tsx): the bar's +, and the empty screen's button, open a sheet with
+/// the name (NewPlaylistFields); Create makes an empty playlist as the person signed in and, the screen still showing,
+/// opens its page - else the notice says it was made ("Made Late night"). Each opening of the sheet is its own: a slow
+/// Create answering after its sheet was swiped away and another opened closes nothing, and only says so
+/// (PlaylistEdit.made). Not offered while deadwax can't be reached.
 struct PlaylistsScreen: View {
+    /// One opening of New playlist's sheet.
+    struct NewSheet: Identifiable, Equatable {
+        let id = UUID()
+    }
+
     @Environment(PlaylistsModel.self) private var playlists
     @Environment(ServerModel.self) private var server
     @Environment(DownloadModel.self) private var downloads
     @Environment(Reachability.self) private var reachability
+    @Environment(AppNavigation.self) private var navigation
+    @Environment(PlayerModel.self) private var player
     @Environment(\.scenePhase) private var scenePhase
     /// From files opened - the screen's own: leaving it folds it again.
     @State private var filesOpen = false
+    /// New playlist's sheet, while it is up.
+    @State private var newSheet: NewSheet?
+    /// The playlist just made, opened once its sheet has gone.
+    @State private var made: PlaylistRoute?
+    /// The screen is on top of its tab: a playlist made opens; otherwise the notice says so.
+    @State private var shown = false
 
     var body: some View {
         let online = reachability.online
@@ -30,9 +49,19 @@ struct PlaylistsScreen: View {
                         .listRowSeparator(.hidden)
                 }
                 if list.isEmpty {
-                    Text(PlaylistWords.playlistsEmpty)
-                        .foregroundStyle(Palette.quiet)
-                        .listRowSeparator(.hidden)
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text(PlaylistWords.playlistsEmpty)
+                        Text(PlaylistWords.playlistsEmptyHow)
+                            .font(.subheadline)
+                            .fixedSize(horizontal: false, vertical: true)
+                        if online {
+                            Button(PlaylistWords.newPlaylist) { newSheet = NewSheet() }
+                                .buttonStyle(.bordered)
+                                .padding(.top, 4)
+                        }
+                    }
+                    .foregroundStyle(Palette.quiet)
+                    .listRowSeparator(.hidden)
                 } else {
                     groups(PlaylistRules.groups(list), online: online)
                 }
@@ -54,6 +83,33 @@ struct PlaylistsScreen: View {
         .listStyle(.plain)
         .navigationTitle(PlaylistWords.title)
         .navigationBarTitleDisplayMode(.large)
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                Button {
+                    newSheet = NewSheet()
+                } label: {
+                    Image(systemName: "plus")
+                }
+                .disabled(!online)
+                .accessibilityLabel(PlaylistWords.newPlaylist)
+            }
+        }
+        .sheet(item: $newSheet, onDismiss: openMade) { (sheet: NewSheet) in
+            NavigationStack {
+                List {
+                    NewPlaylistFields { name in
+                        try await make(name, from: sheet)
+                    } cancel: {
+                        if newSheet == sheet { newSheet = nil }
+                    }
+                }
+                .navigationTitle(PlaylistWords.newPlaylistTitle)
+                .navigationBarTitleDisplayMode(.inline)
+            }
+            .presentationDetents([.medium, .large])
+        }
+        .onAppear { shown = true }
+        .onDisappear { shown = false }
         .task(id: "\(server.person)|\(online)") {
             // shown (and shown again): asked afresh - nothing while deadwax can't be reached
             guard online else { return }
@@ -70,6 +126,39 @@ struct PlaylistsScreen: View {
             // the app back in front is the screen shown again (the web's): asked afresh
             guard phase == .active, reachability.online else { return }
             Task { await playlists.ask(fresh: true) }
+        }
+    }
+
+    /// New playlist's Create, from `sheet`: an empty playlist, made as the person signed in - opened once that sheet has
+    /// gone (or at once, it closed meanwhile with none opened since and the screen still showing), else said, closing
+    /// nothing. Refused: thrown, for the sheet to say.
+    private func make(_ name: String, from sheet: NewSheet) async throws {
+        let new: PlaylistWithSongs
+        do {
+            new = try await playlists.create(name: name, songIDs: [], picker: false)
+        } catch is PlaylistsModel.Superseded {
+            return
+        }
+        let route = PlaylistRoute(new.playlist)
+        switch PlaylistEdit.made(sentFrom: sheet, up: newSheet, shown: shown) {
+        case .closeThenOpen:
+            made = route
+            newSheet = nil
+        case .open:
+            navigation.open(.playlist(route))
+        case .say:
+            player.say(PlaylistWords.made(new.playlist.name))
+        }
+    }
+
+    /// The sheet gone: the playlist it made, opened.
+    private func openMade() {
+        guard let route = made else { return }
+        made = nil
+        if shown {
+            navigation.open(.playlist(route))
+        } else {
+            player.say(PlaylistWords.made(route.preview?.name ?? ""))
         }
     }
 

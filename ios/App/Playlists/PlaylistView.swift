@@ -4,19 +4,33 @@ import SwiftUI
 /// One playlist's page (Phase 4, phase4-library.md 3.3; the web's app/PlaylistPage.tsx), laid out as an album's page:
 /// Navidrome's 2x2 mosaic, the name, whose it is, why there is no Edit (when there is none), its description, the count
 /// and length, Play and Shuffle; the songs not listed just now; the songs, each with its own cover; the footer. The bar's
-/// ••• is the whole playlist's Play Next and Play Last.
+/// ••• is the whole playlist's Play Next, Play Last and Add to a playlist….
 ///
 /// PLAYING is PlayerModel.play(playlist:) with the songs in hand - from Play, Shuffle and a row's tap, in the tap,
 /// nothing awaited first (the gesture rule): each song with its own album, at the songs level, the albums its songs are
 /// on remembered first (PlaylistPlay: stubs, an album held whole kept as it is). A row's ••• is the song's own Play
-/// Next and Play Last and its download items; the bar's has no download items until a playlist downloads as one
-/// (slice 3, question 7).
+/// Next, Play Last, Add to a playlist… and its download items; the bar's has no download items until a playlist
+/// downloads as one (slice 3, question 7).
 ///
 /// ASKED as it opens (PlaylistPageModel) - drawn at once from the answer kept for it (PlaylistsModel), else the hero
-/// from the row that opened it - and again each time it shows, the app coming back to the front included; a refresh that fails keeps what is drawn and says so;
-/// a 404 says it has gone; nothing drawn and the first ask failing: why, and Try again. While deadwax can't be reached
-/// nothing is asked: what is in hand draws, the songs not on this phone dimmed, Play and Shuffle taking those that are.
-/// Edit, Delete and Add are slice 2's; Download a playlist slice 3's.
+/// from the row that opened it - and again each time it shows, the app coming back to the front included, and when a
+/// write here changed it (PlaylistsModel.lastChange); a refresh that fails keeps what is drawn and says so; a 404 says
+/// it has gone; nothing drawn and the first ask failing: why, and Try again. While deadwax can't be reached nothing is
+/// asked: what is in hand draws, the songs not on this phone dimmed, Play and Shuffle taking those that are. Download a
+/// playlist is slice 3's.
+///
+/// EDIT (slice 2, phase4-library.md 2.4) - yours, editable, at most 2,000 songs, offered once this page's own ask has
+/// answered and while deadwax is in reach: Edit in the bar, then the name, the description, "Shared with everyone"
+/// (SHARED_NOTE under it), the songs not listed just now and what Done does to them, the songs - each with its red (-)
+/// that takes it out, and the List's drag handle (Move up, Move down and Remove as VoiceOver's actions, what changed
+/// said: "Roads: 3 of 12", "Roads removed") - and Delete playlist, last. All of it is saved at once with Done, as the
+/// person signed in (PlaylistPageModel.done): nothing is drawn as saved before deadwax says it is. Changed in another
+/// app since Edit began: nothing saved, the playlist drawn as it is now and PLAYLIST_CHANGED said at its top. Refused:
+/// Edit stays open with why at the top of the form, the page scrolled to it. Cancel takes Back's place, and asks first
+/// when there are changes ("Discard your changes?"); the tab tapped again goes back no further than this page while Edit
+/// is open (AppNavigation.editing). Delete asks (deleteQuestion) - there is no undo - and, deleted (or answered gone),
+/// says so and goes back while the page is still what shows. The hero stays; Play, Shuffle and the ••• wait while Edit is
+/// open.
 struct PlaylistView: View {
     let route: PlaylistRoute
 
@@ -25,10 +39,29 @@ struct PlaylistView: View {
     @Environment(PlaylistsModel.self) private var playlists
     @Environment(DownloadModel.self) private var downloads
     @Environment(Reachability.self) private var reachability
+    @Environment(AppNavigation.self) private var navigation
     @Environment(\.scenePhase) private var scenePhase
     @State private var model: PlaylistPageModel
     /// The hero's title has scrolled away: the bar shows it.
     @State private var titleInBar = false
+    /// Cancel with changes: the question is up.
+    @State private var asksDiscard = false
+    /// Delete playlist: the question is up.
+    @State private var asksDelete = false
+    @AccessibilityFocusState private var focus: EditFocus?
+
+    /// Where VoiceOver's focus goes after a change in Edit - never dropped to the page's top.
+    enum EditFocus: Hashable {
+        case row(String)
+        case toggle
+        case delete
+        case top
+    }
+
+    /// The scroll places Done's outcomes go to.
+    private enum Place: Hashable {
+        case top, problem
+    }
 
     init(route: PlaylistRoute) {
         self.route = route
@@ -41,63 +74,156 @@ struct PlaylistView: View {
     var body: some View {
         let online = reachability.online
         let songs = model.songs
-        List {
-            PlaylistHero(model: model, playable: !playable.isEmpty,
-                         play: { play(at: 0) }, shuffle: { play(at: nil, shuffle: true) })
-                .listRowSeparator(.hidden)
-                .onAppear { setTitleInBar(false) }
-                .onDisappear { setTitleInBar(true) }
-
-            if model.hidden > 0 {
-                QuietLine(text: PlaylistRules.hiddenWords(model.hidden))
+        let editing = model.editing
+        ScrollViewReader { proxy in
+            List {
+                PlaylistHero(model: model, playable: !playable.isEmpty && !editing,
+                             play: { play(at: 0) }, shuffle: { play(at: nil, shuffle: true) })
                     .listRowSeparator(.hidden)
-            }
+                    .id(Place.top)
+                    .onAppear { setTitleInBar(false) }
+                    .onDisappear { setTitleInBar(true) }
 
-            if model.gone {
-                ErrorNote(text: PlaylistWords.playlistGone)
-                    .listRowSeparator(.hidden)
-            } else if model.answer == nil {
-                if let failure = model.failure {
-                    OpenFailedNote(failure: failure) {
-                        Task { await model.retry(client: server.client, playlists: playlists) }
+                // changed in another app while it was being edited: said where the playlist begins
+                if let note = model.note, !editing {
+                    ErrorNote(text: note)
+                        .listRowSeparator(.hidden)
+                        .accessibilityFocused($focus, equals: .top)
+                }
+
+                if editing {
+                    editSections()
+                } else {
+                    if model.hidden > 0 {
+                        QuietLine(text: PlaylistRules.hiddenWords(model.hidden))
+                            .listRowSeparator(.hidden)
                     }
-                    .listRowSeparator(.hidden)
-                } else if !online {
-                    QuietLine(text: PlaylistWords.offlinePage)
-                        .listRowSeparator(.hidden)
-                } else {
-                    ProgressView()
-                        .frame(maxWidth: .infinity)
-                        .accessibilityLabel(PlaylistWords.loading)
-                        .listRowSeparator(.hidden)
+                    pageRows(songs, online: online)
                 }
-            } else {
-                if online, let failure = model.failure {
-                    RefreshFailedNote(failure: failure)
-                        .listRowSeparator(.hidden)
+            }
+            .listStyle(.plain)
+            .environment(\.editMode, .constant(editing ? .active : .inactive))
+            .navigationTitle(model.name)
+            .navigationBarTitleDisplayMode(.inline)
+            .navigationBarBackButtonHidden(editing)
+            .toolbar { toolbar(proxy) }
+            .task(id: taskKey) {
+                model.online = reachability.online
+                await model.load(key: taskKey, client: server.client, playlists: playlists)
+            }
+            .task { await downloads.followProgress() }
+            .refreshable {
+                guard reachability.online else {
+                    reachability.tryNow()
+                    return
                 }
-                if songs.isEmpty {
-                    QuietLine(text: PlaylistWords.playlistEmptyNow)
-                        .listRowSeparator(.hidden)
-                } else {
-                    rows(songs, offline: !online)
-                    Text(PlaylistRules.songsLine(songs.count, seconds: PlaylistRules.total(songs)))
-                        .font(.footnote)
-                        .foregroundStyle(Palette.quiet)
-                        .listRowSeparator(.hidden, edges: .bottom)
+                await model.load(key: taskKey, client: server.client, playlists: playlists)
+            }
+            .onChange(of: reachability.online) { _, online in
+                model.online = online
+                // back: the playlist asked of deadwax now
+                guard online else { return }
+                Task { await model.load(key: taskKey, client: server.client, playlists: playlists) }
+            }
+            .onChange(of: scenePhase) { _, phase in
+                // the app back in front is the page shown again (the web's): the playlist asked again
+                guard phase == .active, reachability.online else { return }
+                Task { await model.load(key: taskKey, client: server.client, playlists: playlists) }
+            }
+            .onChange(of: playlists.lastChange) { _, change in
+                // a write here changed it (an add from the picker, its own Done): asked again
+                guard let change else { return }
+                Task { await model.changedHere(change, client: server.client, playlists: playlists) }
+            }
+            .onChange(of: model.refusals) { _, _ in
+                // Done refused, Edit open: to why, at the form's top - once the row saying it has been drawn
+                Task { @MainActor in
+                    withAnimation { proxy.scrollTo(Place.problem, anchor: .top) }
                 }
+            }
+            .onChange(of: model.editing) { _, editing in
+                navigation.editing(route.id, editing)
+            }
+            .onDisappear {
+                // popped, not covered: a tab tapped again needn't stop at it any more
+                navigation.pageGone(route.id)
             }
         }
-        .listStyle(.plain)
-        .navigationTitle(model.name)
-        .navigationBarTitleDisplayMode(.inline)
-        .toolbar {
-            ToolbarItem(placement: .principal) {
-                Text(model.name)
-                    .font(.headline)
-                    .lineLimit(1)
-                    .opacity(titleInBar ? 1 : 0)
-                    .accessibilityHidden(!titleInBar)
+    }
+
+    /// The page's songs out of Edit: gone, failed, offline, loading, empty, or the rows and their footer.
+    @ViewBuilder private func pageRows(_ songs: [Song], online: Bool) -> some View {
+        if model.gone {
+            ErrorNote(text: PlaylistWords.playlistGone)
+                .listRowSeparator(.hidden)
+        } else if model.answer == nil {
+            if let failure = model.failure {
+                OpenFailedNote(failure: failure) {
+                    Task { await model.retry(client: server.client, playlists: playlists) }
+                }
+                .listRowSeparator(.hidden)
+            } else if !online {
+                QuietLine(text: PlaylistWords.offlinePage)
+                    .listRowSeparator(.hidden)
+            } else {
+                ProgressView()
+                    .frame(maxWidth: .infinity)
+                    .accessibilityLabel(PlaylistWords.loading)
+                    .listRowSeparator(.hidden)
+            }
+        } else {
+            if online, let failure = model.failure {
+                RefreshFailedNote(failure: failure)
+                    .listRowSeparator(.hidden)
+            }
+            if songs.isEmpty {
+                QuietLine(text: PlaylistWords.playlistEmpty)
+                    .listRowSeparator(.hidden)
+            } else {
+                rows(songs, offline: !online)
+                Text(PlaylistRules.songsLine(songs.count, seconds: PlaylistRules.total(songs)))
+                    .font(.footnote)
+                    .foregroundStyle(Palette.quiet)
+                    .listRowSeparator(.hidden, edges: .bottom)
+            }
+        }
+    }
+
+    // MARK: the bar
+
+    @ToolbarContentBuilder private func toolbar(_ proxy: ScrollViewProxy) -> some ToolbarContent {
+        ToolbarItem(placement: .principal) {
+            Text(model.name)
+                .font(.headline)
+                .lineLimit(1)
+                .opacity(titleInBar ? 1 : 0)
+                .accessibilityHidden(!titleInBar)
+        }
+        if model.editing {
+            // Cancel in Back's place - asking first when Edit holds changes
+            ToolbarItem(placement: .cancellationAction) {
+                Button(PlaylistWords.cancel) {
+                    guard !model.busy else { return }
+                    if model.changed { asksDiscard = true } else { leaveEdit() }
+                }
+                .disabled(model.busy)
+                .confirmationDialog(PlaylistWords.discardQuestion, isPresented: $asksDiscard, titleVisibility: .visible) {
+                    Button(PlaylistWords.discard, role: .destructive) { leaveEdit() }
+                    Button(PlaylistWords.keepEditing, role: .cancel) { refocus(.toggle) }
+                }
+            }
+            ToolbarItem(placement: .confirmationAction) {
+                Button(model.saving ? PlaylistWords.saving : PlaylistWords.done) { done(proxy) }
+                    .disabled(model.busy || model.needsName)
+                    .accessibilityFocused($focus, equals: .toggle)
+            }
+        } else {
+            if model.editable {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button(PlaylistWords.edit) { beginEdit() }
+                        .disabled(!model.canBegin)
+                        .accessibilityFocused($focus, equals: .toggle)
+                }
             }
             ToolbarItem(placement: .topBarTrailing) {
                 QueueMenu(request: playlistMenu) {
@@ -105,29 +231,6 @@ struct PlaylistView: View {
                 }
                 .accessibilityLabel(PlaylistWords.moreForPlaylist)
             }
-        }
-        .task(id: taskKey) {
-            model.online = reachability.online
-            await model.load(key: taskKey, client: server.client, playlists: playlists)
-        }
-        .task { await downloads.followProgress() }
-        .refreshable {
-            guard reachability.online else {
-                reachability.tryNow()
-                return
-            }
-            await model.load(key: taskKey, client: server.client, playlists: playlists)
-        }
-        .onChange(of: reachability.online) { _, online in
-            model.online = online
-            // back: the playlist asked of deadwax now
-            guard online else { return }
-            Task { await model.load(key: taskKey, client: server.client, playlists: playlists) }
-        }
-        .onChange(of: scenePhase) { _, phase in
-            // the app back in front is the page shown again (the web's): the playlist asked again
-            guard phase == .active, reachability.online else { return }
-            Task { await model.load(key: taskKey, client: server.client, playlists: playlists) }
         }
     }
 
@@ -148,9 +251,11 @@ struct PlaylistView: View {
         }
     }
 
-    /// The bar's •••: the whole playlist, as songs - nil (the ••• dimmed) until its songs are in, and once gone.
+    /// The bar's •••: the whole playlist, as songs - nil (the ••• dimmed) until its songs are in, once gone, and while
+    /// Edit is open.
     private var playlistMenu: QueueMenuRequest? {
-        guard !model.gone, let pick = PlaylistPlay.pick(name: model.name, songs: model.songs) else { return nil }
+        guard !model.gone, !model.editing,
+              let pick = PlaylistPlay.pick(name: model.name, songs: model.songs) else { return nil }
         return QueueMenuRequest(pick: pick, album: nil, offersDownload: false)
     }
 
@@ -195,6 +300,250 @@ struct PlaylistView: View {
     private func setTitleInBar(_ shown: Bool) {
         guard titleInBar != shown else { return }
         withAnimation(.easeInOut(duration: 0.2)) { titleInBar = shown }
+    }
+
+    // MARK: Edit
+
+    /// Edit's form: why Done was refused (at its top, where Done scrolls to), the name, the description, sharing and its
+    /// note, the songs not listed just now and what Done does to them; the songs; Delete playlist, last.
+    @ViewBuilder private func editSections() -> some View {
+        if let edit = model.edit {
+            Section {
+                if let failure = model.editFailure {
+                    ErrorNote(failure)
+                        .id(Place.problem)
+                }
+                TextField(PlaylistWords.nameField, text: nameBinding)
+                    .textInputAutocapitalization(.sentences)
+                    .autocorrectionDisabled()
+                    .submitLabel(.done)
+                    .accessibilityLabel(PlaylistWords.nameField)
+                    .onChange(of: model.edit?.name) { (was: String?, typed: String?) -> Void in
+                        guard let was, let typed else { return }
+                        let kept = PlaylistEdit.typed(typed, was: was, max: PlaylistRules.nameMax)
+                        if kept != typed { model.edit?.name = kept }
+                    }
+                if model.needsName {
+                    Text(PlaylistWords.needsAName)
+                        .font(.footnote)
+                        .foregroundStyle(.red)
+                }
+                TextField(PlaylistWords.descriptionField, text: commentBinding, axis: .vertical)
+                    .lineLimit(2...6)
+                    .accessibilityLabel(PlaylistWords.descriptionField)
+                    .onChange(of: model.edit?.comment) { (was: String?, typed: String?) -> Void in
+                        guard let was, let typed else { return }
+                        let kept = PlaylistEdit.typed(typed, was: was, max: PlaylistRules.commentMax)
+                        if kept != typed { model.edit?.comment = kept }
+                    }
+                VStack(alignment: .leading, spacing: 6) {
+                    Toggle(PlaylistWords.sharedWithEveryone, isOn: publicBinding)
+                    Text(PlaylistWords.sharedNote)
+                        .font(.footnote)
+                        .foregroundStyle(Palette.quiet)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .accessibilityHidden(true)
+                }
+                .accessibilityElement(children: .combine)
+                .accessibilityHint(PlaylistWords.sharedNote)
+                if model.hidden > 0 {
+                    QuietLine(text: PlaylistRules.hiddenEditWords(model.hidden))
+                }
+            }
+            .disabled(model.busy)
+
+            Section {
+                ForEach(Array(edit.rows.enumerated()), id: \.element.key) { index, row in
+                    editRow(row, index: index, count: edit.rows.count)
+                        .accessibilityFocused($focus, equals: .row(row.key))
+                        .moveDisabled(model.busy)
+                }
+                .onMove { (source: IndexSet, destination: Int) -> Void in
+                    guard let from = source.first else { return }
+                    move(from: from, to: UpNextWords.movedTo(from: from, destination: destination))
+                }
+            } header: {
+                Text(PlaylistWords.songsHeading)
+                    .textCase(nil)
+                    .accessibilityAddTraits(.isHeader)
+            }
+
+            Section {
+                Button(role: .destructive) {
+                    guard !model.busy else { return }
+                    asksDelete = true
+                } label: {
+                    Text(model.deleting ? PlaylistWords.deleting : PlaylistWords.deletePlaylist)
+                }
+                .disabled(model.busy)
+                .accessibilityFocused($focus, equals: .delete)
+                .confirmationDialog(PlaylistRules.deleteQuestion(deleteName), isPresented: $asksDelete,
+                                    titleVisibility: .visible) {
+                    Button(PlaylistWords.deletePlaylist, role: .destructive) { deletePlaylist() }
+                    Button(PlaylistWords.keepIt, role: .cancel) { refocus(.delete) }
+                }
+                if let failure = model.deleteFailure {
+                    ErrorNote(failure)
+                }
+            }
+        }
+    }
+
+    /// A row in Edit (Up Next's, UpNextScreen.editRow): its red (-), which takes it out at once - Cancel puts it back,
+    /// nothing being saved before Done - and its title and artist; the List draws the drag handle. One VoiceOver
+    /// element, its (-) left out: Move up, Move down (none past an end) and Remove are its actions, so a double tap on
+    /// the row never takes a song out.
+    private func editRow(_ row: PlaylistEditRow, index: Int, count: Int) -> some View {
+        HStack(spacing: 8) {
+            Button {
+                remove(at: index)
+            } label: {
+                Image(systemName: "minus.circle.fill")
+                    .symbolRenderingMode(.palette)
+                    .foregroundStyle(.white, .red)
+                    .font(.title3)
+                    .frame(minWidth: 44, minHeight: 44)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.borderless)
+            .disabled(model.busy)
+            .accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(row.title)
+                    .foregroundStyle(.primary)
+                if !row.artist.isEmpty {
+                    Text(row.artist)
+                        .font(.footnote)
+                        .foregroundStyle(Palette.quiet)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel([row.title, row.artist].filter { !$0.isEmpty }.joined(separator: ", "))
+        .accessibilityActions {
+            if index > 0 {
+                Button(UpNextWords.moveUp(row.title)) { move(from: index, to: index - 1) }
+            }
+            if index < count - 1 {
+                Button(UpNextWords.moveDown(row.title)) { move(from: index, to: index + 1) }
+            }
+            Button(UpNextWords.remove(row.title)) { remove(at: index) }
+        }
+    }
+
+    /// The name as typed, taken as it is: the field's onChange then puts it back within its bound (PlaylistEdit.typed)
+    /// as a change of its own, so the field shows what was kept - a setter refusing the text would change nothing, and
+    /// the field would go on showing what the model never took.
+    private var nameBinding: Binding<String> {
+        Binding(get: { model.edit?.name ?? "" }, set: { (typed: String) -> Void in model.edit?.name = typed })
+    }
+
+    private var commentBinding: Binding<String> {
+        Binding(get: { model.edit?.comment ?? "" }, set: { (typed: String) -> Void in model.edit?.comment = typed })
+    }
+
+    private var publicBinding: Binding<Bool> {
+        Binding(get: { model.edit?.isPublic ?? false }, set: { (on: Bool) -> Void in model.edit?.isPublic = on })
+    }
+
+    /// Delete's question names the playlist as typed, else as it is (the web's `edit.name.trim() || name`).
+    private var deleteName: String {
+        let typed = PlaylistEdit.trimmed(model.edit?.name ?? "")
+        return typed.isEmpty ? model.name : typed
+    }
+
+    private func beginEdit() {
+        model.beginEdit()
+        guard model.editing else { return }
+        refocus(.toggle)
+    }
+
+    /// Edit closed, nothing sent - the playlist asked again after a Done that failed.
+    private func leaveEdit() {
+        if model.leaveEdit() {
+            Task { await model.load(key: taskKey, client: server.client, playlists: playlists) }
+        }
+        refocus(.toggle)
+    }
+
+    /// The row at `from` to `to`, said.
+    private func move(from: Int, to: Int) {
+        guard let rows = model.edit?.rows, rows.indices.contains(from), rows.indices.contains(to), to != from,
+              !model.busy else { return }
+        let row = rows[from]
+        model.move(from: from, to: to)
+        Notice.announce(UpNextWords.movedSaid(row.title, to: to, of: rows.count))
+        refocus(.row(row.key))
+    }
+
+    /// The row at `index` taken out, said - focus to the row after it, else the one before, else Done.
+    private func remove(at index: Int) {
+        guard let rows = model.edit?.rows, rows.indices.contains(index), !model.busy else { return }
+        let row = rows[index]
+        let next = rows.indices.contains(index + 1) ? rows[index + 1] : (index > 0 ? rows[index - 1] : nil)
+        model.remove(at: index)
+        Notice.announce(UpNextWords.removedSaid(row.title))
+        refocus(next.map { .row($0.key) } ?? .toggle)
+    }
+
+    /// Done: sent, and what came of it shown - the page at its top for a change made elsewhere, the form's top for why
+    /// it was refused.
+    private func done(_ proxy: ScrollViewProxy) {
+        Task { @MainActor in
+            let outcome = await model.done(playlists: playlists)
+            switch outcome {
+            case .saved:
+                refocus(.toggle)
+            case .unchanged:
+                refocus(.toggle)
+                // left after a Done that failed: what is drawn may be old - asked again before Edit is offered
+                if !model.fresh { await model.load(key: taskKey, client: server.client, playlists: playlists) }
+            case .changedElsewhere:
+                withAnimation { proxy.scrollTo(Place.top, anchor: .top) }
+                Notice.announce(PlaylistWords.playlistChanged)
+                refocus(.top)
+                await model.load(key: taskKey, client: server.client, playlists: playlists)
+            case .gone:
+                withAnimation { proxy.scrollTo(Place.top, anchor: .top) }
+                Notice.announce(PlaylistWords.playlistGone)
+            case .refused:
+                // (scrolled to why by the page's onChange of `refusals`, once its row is drawn)
+                if let failure = model.editFailure {
+                    Notice.announce(ErrorWords.of(failure, admin: server.access.seesDetail).said)
+                }
+            case .notSent:
+                break
+            }
+        }
+    }
+
+    /// Delete, answered: said in the notice, and back from the page while it is still what shows - a 404 (gone in
+    /// another app already) as a delete.
+    private func deletePlaylist() {
+        let name = model.name
+        Task { @MainActor in
+            switch await model.delete(playlists: playlists) {
+            case .deleted:
+                player.say(PlaylistWords.deleted(name))
+                navigation.leavePlaylist(route.id)
+            case .gone:
+                player.say(PlaylistWords.playlistGone)
+                navigation.leavePlaylist(route.id)
+            case .refused:
+                if let failure = model.deleteFailure {
+                    Notice.announce(ErrorWords.of(failure, admin: server.access.seesDetail).said)
+                }
+                refocus(.delete)
+            case .notSent:
+                break
+            }
+        }
+    }
+
+    /// VoiceOver's focus to `target` once the change has been drawn.
+    private func refocus(_ target: EditFocus) {
+        Task { @MainActor in focus = target }
     }
 }
 

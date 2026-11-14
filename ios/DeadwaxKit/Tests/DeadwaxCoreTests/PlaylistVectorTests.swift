@@ -98,13 +98,6 @@ enum PlaylistVectors {
         #expect(PlayedAlbums<Album>.queueAlbumsKept == vectors.constants.QUEUE_ALBUMS_KEPT)
     }
 
-    @Test func slice1sEmptyLineIsTheWebsFirstSentence() {
-        // the web's empty playlist line, up to its first full stop - the rest names Add to a playlist (slice 2)
-        #expect(PlaylistWords.playlistEmptyNow == "Nothing in this playlist yet.")
-        #expect(vectors.words.PLAYLIST_EMPTY.hasPrefix(PlaylistWords.playlistEmptyNow + " "))
-        #expect(vectors.words.PLAYLISTS_EMPTY == PlaylistWords.playlistsEmpty)
-    }
-
     @Test func eachPlaylistsGroupAndLines() {
         #expect(vectors.playlists.count >= 15)
         for one in vectors.playlists {

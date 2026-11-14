@@ -5,7 +5,25 @@
   "PLAYLISTS_EMPTY_HOW": "Make one here, or start one from a song's or an album's \u2022\u2022\u2022 menu, or from Now Playing: Add to a playlist.",
   "PLAYLIST_EMPTY": "Nothing in this playlist yet. Add songs from a song's or an album's \u2022\u2022\u2022 menu - Add to a playlist - or from Now Playing's \u2022\u2022\u2022 while a song plays.",
   "PLAYLIST_GONE": "This playlist isn't on Navidrome any more - deleted in another app, maybe.",
-  "listFailed": "Couldn't list your playlists. Why it failed."
+  "listFailed": "Couldn't list your playlists. Why it failed.",
+  "PLAYLIST_CHANGED": "This playlist changed in another app while you were editing it - here it is now. Your changes weren't saved.",
+  "SHARED_NOTE": "Everyone with an account on this Navidrome can find it and play it - in deadwax, Navidrome and their other apps. Only you can change it.",
+  "NEEDS_A_NAME": "A playlist needs a name.",
+  "DISCARD_QUESTION": "Discard your changes?",
+  "deleteQuestion": [
+   {
+    "name": "Late night",
+    "text": "Delete \"Late night\"? It goes from Navidrome for good - from Amperfy and every other app too, and for everyone it's shared with. The songs stay in the library."
+   },
+   {
+    "name": "",
+    "text": "Delete \"\"? It goes from Navidrome for good - from Amperfy and every other app too, and for everyone it's shared with. The songs stay in the library."
+   },
+   {
+    "name": "Say \"when\"",
+    "text": "Delete \"Say \"when\"\"? It goes from Navidrome for good - from Amperfy and every other app too, and for everyone it's shared with. The songs stay in the library."
+   }
+  ]
  },
  "constants": {
   "PLAYLIST_NAME_MAX": 200,
@@ -4134,5 +4152,6604 @@
     }
    ]
   }
- ]
+ ],
+ "hiddenEditWords": [
+  {
+   "hidden": -1,
+   "text": ""
+  },
+  {
+   "hidden": 0,
+   "text": ""
+  },
+  {
+   "hidden": 1,
+   "text": "1 song that isn't in the library just now will be dropped if you change the songs."
+  },
+  {
+   "hidden": 2,
+   "text": "2 songs that aren't in the library just now will be dropped if you change the songs."
+  },
+  {
+   "hidden": 10,
+   "text": "10 songs that aren't in the library just now will be dropped if you change the songs."
+  }
+ ],
+ "picker": [
+  {
+   "name": "none",
+   "list": [],
+   "ids": []
+  },
+  {
+   "name": "all of them (one changed, ties by name)",
+   "list": [
+    {
+     "id": "yours",
+     "name": "Playlist yours",
+     "comment": "",
+     "songCount": 12,
+     "duration": 2880,
+     "created": "2026-10-01T10:00:00Z",
+     "changed": "2026-11-01T10:00:00Z",
+     "owner": "james",
+     "public": false,
+     "coverArt": "pl-yours_abc",
+     "mine": true,
+     "editable": true
+    },
+    {
+     "id": "yours-public",
+     "name": "Playlist yours-public",
+     "comment": "",
+     "songCount": 12,
+     "duration": 2880,
+     "created": "2026-10-01T10:00:00Z",
+     "changed": "2026-11-01T10:00:00Z",
+     "owner": "james",
+     "public": true,
+     "coverArt": "pl-yours-public_abc",
+     "mine": true,
+     "editable": true
+    },
+    {
+     "id": "yours-one",
+     "name": "Playlist yours-one",
+     "comment": "",
+     "songCount": 1,
+     "duration": 251,
+     "created": "2026-10-01T10:00:00Z",
+     "changed": "2026-11-01T10:00:00Z",
+     "owner": "james",
+     "public": false,
+     "coverArt": "pl-yours-one_abc",
+     "mine": true,
+     "editable": true
+    },
+    {
+     "id": "yours-empty",
+     "name": "Playlist yours-empty",
+     "comment": "",
+     "songCount": 0,
+     "duration": 0,
+     "created": "2026-10-01T10:00:00Z",
+     "changed": "2026-11-01T10:00:00Z",
+     "owner": "james",
+     "public": false,
+     "coverArt": null,
+     "mine": true,
+     "editable": true
+    },
+    {
+     "id": "yours-long",
+     "name": "Playlist yours-long",
+     "comment": "",
+     "songCount": 340,
+     "duration": 81000,
+     "created": "2026-10-01T10:00:00Z",
+     "changed": "2026-11-01T10:00:00Z",
+     "owner": "james",
+     "public": false,
+     "coverArt": "pl-yours-long_abc",
+     "mine": true,
+     "editable": true
+    },
+    {
+     "id": "yours-hour",
+     "name": "Playlist yours-hour",
+     "comment": "",
+     "songCount": 15,
+     "duration": 3600,
+     "created": "2026-10-01T10:00:00Z",
+     "changed": "2026-11-01T10:00:00Z",
+     "owner": "james",
+     "public": false,
+     "coverArt": "pl-yours-hour_abc",
+     "mine": true,
+     "editable": true
+    },
+    {
+     "id": "yours-just-under",
+     "name": "Playlist yours-just-under",
+     "comment": "",
+     "songCount": 14,
+     "duration": 3569,
+     "created": "2026-10-01T10:00:00Z",
+     "changed": "2026-11-01T10:00:00Z",
+     "owner": "james",
+     "public": false,
+     "coverArt": "pl-yours-just-under_abc",
+     "mine": true,
+     "editable": true
+    },
+    {
+     "id": "yours-rounds-up",
+     "name": "Playlist yours-rounds-up",
+     "comment": "",
+     "songCount": 14,
+     "duration": 3570,
+     "created": "2026-10-01T10:00:00Z",
+     "changed": "2026-11-01T10:00:00Z",
+     "owner": "james",
+     "public": false,
+     "coverArt": "pl-yours-rounds-up_abc",
+     "mine": true,
+     "editable": true
+    },
+    {
+     "id": "shared",
+     "name": "Playlist shared",
+     "comment": "",
+     "songCount": 12,
+     "duration": 2880,
+     "created": "2026-10-01T10:00:00Z",
+     "changed": "2026-11-01T10:00:00Z",
+     "owner": "sam",
+     "public": true,
+     "coverArt": "pl-shared_abc",
+     "mine": false,
+     "editable": false
+    },
+    {
+     "id": "shared-no-owner",
+     "name": "Playlist shared-no-owner",
+     "comment": "",
+     "songCount": 12,
+     "duration": 2880,
+     "created": "2026-10-01T10:00:00Z",
+     "changed": "2026-11-01T10:00:00Z",
+     "owner": "",
+     "public": true,
+     "coverArt": "pl-shared-no-owner_abc",
+     "mine": false,
+     "editable": false
+    },
+    {
+     "id": "shared-short",
+     "name": "Playlist shared-short",
+     "comment": "",
+     "songCount": 2,
+     "duration": 29,
+     "created": "2026-10-01T10:00:00Z",
+     "changed": "2026-11-01T10:00:00Z",
+     "owner": "Ana Lu\u00eds",
+     "public": true,
+     "coverArt": "pl-shared-short_abc",
+     "mine": false,
+     "editable": false
+    },
+    {
+     "id": "shared-silent",
+     "name": "Playlist shared-silent",
+     "comment": "",
+     "songCount": 3,
+     "duration": 0,
+     "created": "2026-10-01T10:00:00Z",
+     "changed": "2026-11-01T10:00:00Z",
+     "owner": "sam",
+     "public": true,
+     "coverArt": "pl-shared-silent_abc",
+     "mine": false,
+     "editable": false
+    },
+    {
+     "id": "file",
+     "name": "Playlist file",
+     "comment": "",
+     "songCount": 12,
+     "duration": 2880,
+     "created": "2026-10-01T10:00:00Z",
+     "changed": "2026-11-01T10:00:00Z",
+     "owner": "james",
+     "public": false,
+     "coverArt": "pl-file_abc",
+     "mine": true,
+     "editable": false
+    },
+    {
+     "id": "file-public",
+     "name": "Playlist file-public",
+     "comment": "",
+     "songCount": 1,
+     "duration": 61,
+     "created": "2026-10-01T10:00:00Z",
+     "changed": "2026-11-01T10:00:00Z",
+     "owner": "james",
+     "public": true,
+     "coverArt": "pl-file-public_abc",
+     "mine": true,
+     "editable": false
+    },
+    {
+     "id": "file-empty",
+     "name": "Playlist file-empty",
+     "comment": "",
+     "songCount": 0,
+     "duration": 0,
+     "created": "2026-10-01T10:00:00Z",
+     "changed": "2026-11-01T10:00:00Z",
+     "owner": "james",
+     "public": false,
+     "coverArt": "pl-file-empty_abc",
+     "mine": true,
+     "editable": false
+    },
+    {
+     "id": "odd-owner",
+     "name": "Playlist odd-owner",
+     "comment": "",
+     "songCount": 12,
+     "duration": 2880,
+     "created": "2026-10-01T10:00:00Z",
+     "changed": "2026-11-01T10:00:00Z",
+     "owner": "SAM",
+     "public": true,
+     "coverArt": "pl-odd-owner_abc",
+     "mine": false,
+     "editable": true
+    }
+   ],
+   "ids": [
+    "yours",
+    "yours-empty",
+    "yours-hour",
+    "yours-just-under",
+    "yours-long",
+    "yours-one",
+    "yours-public",
+    "yours-rounds-up"
+   ]
+  },
+  {
+   "name": "by changed, newest first",
+   "list": [
+    {
+     "id": "p-old",
+     "name": "Old",
+     "comment": "",
+     "songCount": 12,
+     "duration": 2880,
+     "created": "2026-10-01T10:00:00Z",
+     "changed": "2026-01-01T10:00:00Z",
+     "owner": "james",
+     "public": false,
+     "coverArt": "pl-p-old_abc",
+     "mine": true,
+     "editable": true
+    },
+    {
+     "id": "p-new",
+     "name": "New",
+     "comment": "",
+     "songCount": 12,
+     "duration": 2880,
+     "created": "2026-10-01T10:00:00Z",
+     "changed": "2026-11-12T09:30:00.250Z",
+     "owner": "james",
+     "public": false,
+     "coverArt": "pl-p-new_abc",
+     "mine": true,
+     "editable": true
+    },
+    {
+     "id": "p-mid",
+     "name": "Middle",
+     "comment": "",
+     "songCount": 12,
+     "duration": 2880,
+     "created": "2026-10-01T10:00:00Z",
+     "changed": "2026-06-15T00:00:00Z",
+     "owner": "james",
+     "public": false,
+     "coverArt": "pl-p-mid_abc",
+     "mine": true,
+     "editable": true
+    },
+    {
+     "id": "p-newer",
+     "name": "Newer",
+     "comment": "",
+     "songCount": 12,
+     "duration": 2880,
+     "created": "2026-10-01T10:00:00Z",
+     "changed": "2026-11-12T09:30:00.251Z",
+     "owner": "james",
+     "public": false,
+     "coverArt": "pl-p-newer_abc",
+     "mine": true,
+     "editable": true
+    },
+    {
+     "id": "p-blank",
+     "name": "Never changed",
+     "comment": "",
+     "songCount": 12,
+     "duration": 2880,
+     "created": "2026-10-01T10:00:00Z",
+     "changed": "",
+     "owner": "james",
+     "public": false,
+     "coverArt": "pl-p-blank_abc",
+     "mine": true,
+     "editable": true
+    }
+   ],
+   "ids": [
+    "p-newer",
+    "p-new",
+    "p-mid",
+    "p-old",
+    "p-blank"
+   ]
+  },
+  {
+   "name": "ties by name, case and accents folded",
+   "list": [
+    {
+     "id": "t-banana",
+     "name": "Banana",
+     "comment": "",
+     "songCount": 12,
+     "duration": 2880,
+     "created": "2026-10-01T10:00:00Z",
+     "changed": "2026-11-01T10:00:00Z",
+     "owner": "james",
+     "public": false,
+     "coverArt": "pl-t-banana_abc",
+     "mine": true,
+     "editable": true
+    },
+    {
+     "id": "t-apple",
+     "name": "apple",
+     "comment": "",
+     "songCount": 12,
+     "duration": 2880,
+     "created": "2026-10-01T10:00:00Z",
+     "changed": "2026-11-01T10:00:00Z",
+     "owner": "james",
+     "public": false,
+     "coverArt": "pl-t-apple_abc",
+     "mine": true,
+     "editable": true
+    },
+    {
+     "id": "t-eclairs",
+     "name": "eclairs",
+     "comment": "",
+     "songCount": 12,
+     "duration": 2880,
+     "created": "2026-10-01T10:00:00Z",
+     "changed": "2026-11-01T10:00:00Z",
+     "owner": "james",
+     "public": false,
+     "coverArt": "pl-t-eclairs_abc",
+     "mine": true,
+     "editable": true
+    },
+    {
+     "id": "t-eclair",
+     "name": "\u00c9clair",
+     "comment": "",
+     "songCount": 12,
+     "duration": 2880,
+     "created": "2026-10-01T10:00:00Z",
+     "changed": "2026-11-01T10:00:00Z",
+     "owner": "james",
+     "public": false,
+     "coverArt": "pl-t-eclair_abc",
+     "mine": true,
+     "editable": true
+    },
+    {
+     "id": "t-a10",
+     "name": "a10",
+     "comment": "",
+     "songCount": 12,
+     "duration": 2880,
+     "created": "2026-10-01T10:00:00Z",
+     "changed": "2026-11-01T10:00:00Z",
+     "owner": "james",
+     "public": false,
+     "coverArt": "pl-t-a10_abc",
+     "mine": true,
+     "editable": true
+    },
+    {
+     "id": "t-a2",
+     "name": "a2",
+     "comment": "",
+     "songCount": 12,
+     "duration": 2880,
+     "created": "2026-10-01T10:00:00Z",
+     "changed": "2026-11-01T10:00:00Z",
+     "owner": "james",
+     "public": false,
+     "coverArt": "pl-t-a2_abc",
+     "mine": true,
+     "editable": true
+    },
+    {
+     "id": "t-zed",
+     "name": "Zed",
+     "comment": "",
+     "songCount": 12,
+     "duration": 2880,
+     "created": "2026-10-01T10:00:00Z",
+     "changed": "2026-11-01T10:00:00Z",
+     "owner": "james",
+     "public": false,
+     "coverArt": "pl-t-zed_abc",
+     "mine": true,
+     "editable": true
+    },
+    {
+     "id": "t-late",
+     "name": "zzz late",
+     "comment": "",
+     "songCount": 12,
+     "duration": 2880,
+     "created": "2026-10-01T10:00:00Z",
+     "changed": "2026-11-02T10:00:00Z",
+     "owner": "james",
+     "public": false,
+     "coverArt": "pl-t-late_abc",
+     "mine": true,
+     "editable": true
+    }
+   ],
+   "ids": [
+    "t-late",
+    "t-a10",
+    "t-a2",
+    "t-apple",
+    "t-banana",
+    "t-eclair",
+    "t-eclairs",
+    "t-zed"
+   ]
+  },
+  {
+   "name": "a full tie keeps the list order",
+   "list": [
+    {
+     "id": "same-2",
+     "name": "Same",
+     "comment": "",
+     "songCount": 12,
+     "duration": 2880,
+     "created": "2026-10-01T10:00:00Z",
+     "changed": "2026-11-01T10:00:00Z",
+     "owner": "james",
+     "public": false,
+     "coverArt": "pl-same-2_abc",
+     "mine": true,
+     "editable": true
+    },
+    {
+     "id": "same-1",
+     "name": "Same",
+     "comment": "",
+     "songCount": 12,
+     "duration": 2880,
+     "created": "2026-10-01T10:00:00Z",
+     "changed": "2026-11-01T10:00:00Z",
+     "owner": "james",
+     "public": false,
+     "coverArt": "pl-same-1_abc",
+     "mine": true,
+     "editable": true
+    },
+    {
+     "id": "same-3",
+     "name": "Same",
+     "comment": "",
+     "songCount": 12,
+     "duration": 2880,
+     "created": "2026-10-01T10:00:00Z",
+     "changed": "2026-11-01T10:00:00Z",
+     "owner": "james",
+     "public": false,
+     "coverArt": "pl-same-3_abc",
+     "mine": true,
+     "editable": true
+    }
+   ],
+   "ids": [
+    "same-2",
+    "same-1",
+    "same-3"
+   ]
+  },
+  {
+   "name": "only yours and editable",
+   "list": [
+    {
+     "id": "x-shared",
+     "name": "Shared",
+     "comment": "",
+     "songCount": 12,
+     "duration": 2880,
+     "created": "2026-10-01T10:00:00Z",
+     "changed": "2026-11-12T10:00:00Z",
+     "owner": "sam",
+     "public": true,
+     "coverArt": "pl-x-shared_abc",
+     "mine": false,
+     "editable": false
+    },
+    {
+     "id": "x-file",
+     "name": "From a file",
+     "comment": "",
+     "songCount": 12,
+     "duration": 2880,
+     "created": "2026-10-01T10:00:00Z",
+     "changed": "2026-11-11T10:00:00Z",
+     "owner": "james",
+     "public": false,
+     "coverArt": "pl-x-file_abc",
+     "mine": true,
+     "editable": false
+    },
+    {
+     "id": "x-odd",
+     "name": "Somebody else editable",
+     "comment": "",
+     "songCount": 12,
+     "duration": 2880,
+     "created": "2026-10-01T10:00:00Z",
+     "changed": "2026-11-10T10:00:00Z",
+     "owner": "SAM",
+     "public": false,
+     "coverArt": "pl-x-odd_abc",
+     "mine": false,
+     "editable": true
+    },
+    {
+     "id": "x-yours",
+     "name": "Yours",
+     "comment": "",
+     "songCount": 12,
+     "duration": 2880,
+     "created": "2026-10-01T10:00:00Z",
+     "changed": "2026-11-01T10:00:00Z",
+     "owner": "james",
+     "public": false,
+     "coverArt": "pl-x-yours_abc",
+     "mine": true,
+     "editable": true
+    }
+   ],
+   "ids": [
+    "x-yours"
+   ]
+  }
+ ],
+ "picks": [
+  {
+   "name": "one song",
+   "pick": {
+    "label": "Roads",
+    "songs": [
+     {
+      "id": "s1",
+      "title": "Roads",
+      "artist": "Portishead"
+     }
+    ]
+   },
+   "pickLine": "Roads \u00b7 Portishead",
+   "madeWords": "Made Late night with Roads",
+   "added": [
+    {
+     "added": 0,
+     "already": 0,
+     "mode": "ask",
+     "text": "Nothing added - Roads is in Late night already"
+    },
+    {
+     "added": 0,
+     "already": 0,
+     "mode": "add",
+     "text": "Nothing added - Roads is in Late night already"
+    },
+    {
+     "added": 0,
+     "already": 0,
+     "mode": "skip",
+     "text": "Nothing added - Roads is in Late night already"
+    },
+    {
+     "added": 0,
+     "already": 1,
+     "mode": "ask",
+     "text": "Nothing added - Roads is in Late night already"
+    },
+    {
+     "added": 0,
+     "already": 1,
+     "mode": "add",
+     "text": "Nothing added - Roads is in Late night already"
+    },
+    {
+     "added": 0,
+     "already": 1,
+     "mode": "skip",
+     "text": "Nothing added - Roads is in Late night already"
+    },
+    {
+     "added": 0,
+     "already": 3,
+     "mode": "ask",
+     "text": "Nothing added - Roads is in Late night already"
+    },
+    {
+     "added": 0,
+     "already": 3,
+     "mode": "add",
+     "text": "Nothing added - Roads is in Late night already"
+    },
+    {
+     "added": 0,
+     "already": 3,
+     "mode": "skip",
+     "text": "Nothing added - Roads is in Late night already"
+    },
+    {
+     "added": 1,
+     "already": 0,
+     "mode": "ask",
+     "text": "Added Roads to Late night"
+    },
+    {
+     "added": 1,
+     "already": 0,
+     "mode": "add",
+     "text": "Added Roads to Late night"
+    },
+    {
+     "added": 1,
+     "already": 0,
+     "mode": "skip",
+     "text": "Added Roads to Late night"
+    },
+    {
+     "added": 1,
+     "already": 1,
+     "mode": "ask",
+     "text": "Added Roads to Late night"
+    },
+    {
+     "added": 1,
+     "already": 1,
+     "mode": "add",
+     "text": "Added Roads to Late night"
+    },
+    {
+     "added": 1,
+     "already": 1,
+     "mode": "skip",
+     "text": "Added Roads to Late night - 1 was in it already"
+    },
+    {
+     "added": 1,
+     "already": 2,
+     "mode": "ask",
+     "text": "Added Roads to Late night"
+    },
+    {
+     "added": 1,
+     "already": 2,
+     "mode": "add",
+     "text": "Added Roads to Late night"
+    },
+    {
+     "added": 1,
+     "already": 2,
+     "mode": "skip",
+     "text": "Added Roads to Late night - 2 were in it already"
+    },
+    {
+     "added": 2,
+     "already": 0,
+     "mode": "ask",
+     "text": "Added 2 songs to Late night"
+    },
+    {
+     "added": 2,
+     "already": 0,
+     "mode": "add",
+     "text": "Added 2 songs to Late night"
+    },
+    {
+     "added": 2,
+     "already": 0,
+     "mode": "skip",
+     "text": "Added 2 songs to Late night"
+    },
+    {
+     "added": 3,
+     "already": 1,
+     "mode": "ask",
+     "text": "Added 3 songs to Late night"
+    },
+    {
+     "added": 3,
+     "already": 1,
+     "mode": "add",
+     "text": "Added 3 songs to Late night"
+    },
+    {
+     "added": 3,
+     "already": 1,
+     "mode": "skip",
+     "text": "Added 3 songs to Late night - 1 was in it already"
+    },
+    {
+     "added": 3,
+     "already": 2,
+     "mode": "ask",
+     "text": "Added 3 songs to Late night"
+    },
+    {
+     "added": 3,
+     "already": 2,
+     "mode": "add",
+     "text": "Added 3 songs to Late night"
+    },
+    {
+     "added": 3,
+     "already": 2,
+     "mode": "skip",
+     "text": "Added 3 songs to Late night - 2 were in it already"
+    },
+    {
+     "added": 10,
+     "already": 1,
+     "mode": "ask",
+     "text": "Added 10 songs to Late night"
+    },
+    {
+     "added": 10,
+     "already": 1,
+     "mode": "add",
+     "text": "Added 10 songs to Late night"
+    },
+    {
+     "added": 10,
+     "already": 1,
+     "mode": "skip",
+     "text": "Added 10 songs to Late night - 1 was in it already"
+    }
+   ],
+   "questions": [
+    {
+     "already": 1,
+     "asked": 1,
+     "text": "Roads is in Late night already.",
+     "yes": {
+      "label": "Add it again",
+      "mode": "add"
+     },
+     "no": {
+      "label": "Cancel",
+      "mode": null
+     }
+    },
+    {
+     "already": 0,
+     "asked": 1,
+     "text": "Roads is in Late night already.",
+     "yes": {
+      "label": "Add it again",
+      "mode": "add"
+     },
+     "no": {
+      "label": "Cancel",
+      "mode": null
+     }
+    },
+    {
+     "already": 2,
+     "asked": 2,
+     "text": "These 2 songs are all in Late night already.",
+     "yes": {
+      "label": "Add them again",
+      "mode": "add"
+     },
+     "no": {
+      "label": "Cancel",
+      "mode": null
+     }
+    },
+    {
+     "already": 3,
+     "asked": 2,
+     "text": "These 2 songs are all in Late night already.",
+     "yes": {
+      "label": "Add them again",
+      "mode": "add"
+     },
+     "no": {
+      "label": "Cancel",
+      "mode": null
+     }
+    },
+    {
+     "already": 1,
+     "asked": 3,
+     "text": "1 of these 3 songs is in Late night already.",
+     "yes": {
+      "label": "Add them all",
+      "mode": "add"
+     },
+     "no": {
+      "label": "Skip that one",
+      "mode": "skip"
+     }
+    },
+    {
+     "already": 2,
+     "asked": 3,
+     "text": "2 of these 3 songs are in Late night already.",
+     "yes": {
+      "label": "Add them all",
+      "mode": "add"
+     },
+     "no": {
+      "label": "Skip those 2",
+      "mode": "skip"
+     }
+    },
+    {
+     "already": 1,
+     "asked": 2,
+     "text": "1 of these 2 songs is in Late night already.",
+     "yes": {
+      "label": "Add them all",
+      "mode": "add"
+     },
+     "no": {
+      "label": "Skip that one",
+      "mode": "skip"
+     }
+    },
+    {
+     "already": 5,
+     "asked": 11,
+     "text": "5 of these 11 songs are in Late night already.",
+     "yes": {
+      "label": "Add them all",
+      "mode": "add"
+     },
+     "no": {
+      "label": "Skip those 5",
+      "mode": "skip"
+     }
+    },
+    {
+     "already": 11,
+     "asked": 11,
+     "text": "These 11 songs are all in Late night already.",
+     "yes": {
+      "label": "Add them again",
+      "mode": "add"
+     },
+     "no": {
+      "label": "Cancel",
+      "mode": null
+     }
+    }
+   ]
+  },
+  {
+   "name": "one song, artist empty",
+   "pick": {
+    "label": "Roads",
+    "songs": [
+     {
+      "id": "s1",
+      "title": "Roads",
+      "artist": ""
+     }
+    ]
+   },
+   "pickLine": "Roads",
+   "madeWords": "Made Late night with Roads",
+   "added": [
+    {
+     "added": 0,
+     "already": 0,
+     "mode": "ask",
+     "text": "Nothing added - Roads is in Late night already"
+    },
+    {
+     "added": 0,
+     "already": 0,
+     "mode": "add",
+     "text": "Nothing added - Roads is in Late night already"
+    },
+    {
+     "added": 0,
+     "already": 0,
+     "mode": "skip",
+     "text": "Nothing added - Roads is in Late night already"
+    },
+    {
+     "added": 0,
+     "already": 1,
+     "mode": "ask",
+     "text": "Nothing added - Roads is in Late night already"
+    },
+    {
+     "added": 0,
+     "already": 1,
+     "mode": "add",
+     "text": "Nothing added - Roads is in Late night already"
+    },
+    {
+     "added": 0,
+     "already": 1,
+     "mode": "skip",
+     "text": "Nothing added - Roads is in Late night already"
+    },
+    {
+     "added": 0,
+     "already": 3,
+     "mode": "ask",
+     "text": "Nothing added - Roads is in Late night already"
+    },
+    {
+     "added": 0,
+     "already": 3,
+     "mode": "add",
+     "text": "Nothing added - Roads is in Late night already"
+    },
+    {
+     "added": 0,
+     "already": 3,
+     "mode": "skip",
+     "text": "Nothing added - Roads is in Late night already"
+    },
+    {
+     "added": 1,
+     "already": 0,
+     "mode": "ask",
+     "text": "Added Roads to Late night"
+    },
+    {
+     "added": 1,
+     "already": 0,
+     "mode": "add",
+     "text": "Added Roads to Late night"
+    },
+    {
+     "added": 1,
+     "already": 0,
+     "mode": "skip",
+     "text": "Added Roads to Late night"
+    },
+    {
+     "added": 1,
+     "already": 1,
+     "mode": "ask",
+     "text": "Added Roads to Late night"
+    },
+    {
+     "added": 1,
+     "already": 1,
+     "mode": "add",
+     "text": "Added Roads to Late night"
+    },
+    {
+     "added": 1,
+     "already": 1,
+     "mode": "skip",
+     "text": "Added Roads to Late night - 1 was in it already"
+    },
+    {
+     "added": 1,
+     "already": 2,
+     "mode": "ask",
+     "text": "Added Roads to Late night"
+    },
+    {
+     "added": 1,
+     "already": 2,
+     "mode": "add",
+     "text": "Added Roads to Late night"
+    },
+    {
+     "added": 1,
+     "already": 2,
+     "mode": "skip",
+     "text": "Added Roads to Late night - 2 were in it already"
+    },
+    {
+     "added": 2,
+     "already": 0,
+     "mode": "ask",
+     "text": "Added 2 songs to Late night"
+    },
+    {
+     "added": 2,
+     "already": 0,
+     "mode": "add",
+     "text": "Added 2 songs to Late night"
+    },
+    {
+     "added": 2,
+     "already": 0,
+     "mode": "skip",
+     "text": "Added 2 songs to Late night"
+    },
+    {
+     "added": 3,
+     "already": 1,
+     "mode": "ask",
+     "text": "Added 3 songs to Late night"
+    },
+    {
+     "added": 3,
+     "already": 1,
+     "mode": "add",
+     "text": "Added 3 songs to Late night"
+    },
+    {
+     "added": 3,
+     "already": 1,
+     "mode": "skip",
+     "text": "Added 3 songs to Late night - 1 was in it already"
+    },
+    {
+     "added": 3,
+     "already": 2,
+     "mode": "ask",
+     "text": "Added 3 songs to Late night"
+    },
+    {
+     "added": 3,
+     "already": 2,
+     "mode": "add",
+     "text": "Added 3 songs to Late night"
+    },
+    {
+     "added": 3,
+     "already": 2,
+     "mode": "skip",
+     "text": "Added 3 songs to Late night - 2 were in it already"
+    },
+    {
+     "added": 10,
+     "already": 1,
+     "mode": "ask",
+     "text": "Added 10 songs to Late night"
+    },
+    {
+     "added": 10,
+     "already": 1,
+     "mode": "add",
+     "text": "Added 10 songs to Late night"
+    },
+    {
+     "added": 10,
+     "already": 1,
+     "mode": "skip",
+     "text": "Added 10 songs to Late night - 1 was in it already"
+    }
+   ],
+   "questions": [
+    {
+     "already": 1,
+     "asked": 1,
+     "text": "Roads is in Late night already.",
+     "yes": {
+      "label": "Add it again",
+      "mode": "add"
+     },
+     "no": {
+      "label": "Cancel",
+      "mode": null
+     }
+    },
+    {
+     "already": 0,
+     "asked": 1,
+     "text": "Roads is in Late night already.",
+     "yes": {
+      "label": "Add it again",
+      "mode": "add"
+     },
+     "no": {
+      "label": "Cancel",
+      "mode": null
+     }
+    },
+    {
+     "already": 2,
+     "asked": 2,
+     "text": "These 2 songs are all in Late night already.",
+     "yes": {
+      "label": "Add them again",
+      "mode": "add"
+     },
+     "no": {
+      "label": "Cancel",
+      "mode": null
+     }
+    },
+    {
+     "already": 3,
+     "asked": 2,
+     "text": "These 2 songs are all in Late night already.",
+     "yes": {
+      "label": "Add them again",
+      "mode": "add"
+     },
+     "no": {
+      "label": "Cancel",
+      "mode": null
+     }
+    },
+    {
+     "already": 1,
+     "asked": 3,
+     "text": "1 of these 3 songs is in Late night already.",
+     "yes": {
+      "label": "Add them all",
+      "mode": "add"
+     },
+     "no": {
+      "label": "Skip that one",
+      "mode": "skip"
+     }
+    },
+    {
+     "already": 2,
+     "asked": 3,
+     "text": "2 of these 3 songs are in Late night already.",
+     "yes": {
+      "label": "Add them all",
+      "mode": "add"
+     },
+     "no": {
+      "label": "Skip those 2",
+      "mode": "skip"
+     }
+    },
+    {
+     "already": 1,
+     "asked": 2,
+     "text": "1 of these 2 songs is in Late night already.",
+     "yes": {
+      "label": "Add them all",
+      "mode": "add"
+     },
+     "no": {
+      "label": "Skip that one",
+      "mode": "skip"
+     }
+    },
+    {
+     "already": 5,
+     "asked": 11,
+     "text": "5 of these 11 songs are in Late night already.",
+     "yes": {
+      "label": "Add them all",
+      "mode": "add"
+     },
+     "no": {
+      "label": "Skip those 5",
+      "mode": "skip"
+     }
+    },
+    {
+     "already": 11,
+     "asked": 11,
+     "text": "These 11 songs are all in Late night already.",
+     "yes": {
+      "label": "Add them again",
+      "mode": "add"
+     },
+     "no": {
+      "label": "Cancel",
+      "mode": null
+     }
+    }
+   ]
+  },
+  {
+   "name": "one song, no artist",
+   "pick": {
+    "label": "Roads",
+    "songs": [
+     {
+      "id": "s1",
+      "title": "Roads"
+     }
+    ]
+   },
+   "pickLine": "Roads",
+   "madeWords": "Made Late night with Roads",
+   "added": [
+    {
+     "added": 0,
+     "already": 0,
+     "mode": "ask",
+     "text": "Nothing added - Roads is in Late night already"
+    },
+    {
+     "added": 0,
+     "already": 0,
+     "mode": "add",
+     "text": "Nothing added - Roads is in Late night already"
+    },
+    {
+     "added": 0,
+     "already": 0,
+     "mode": "skip",
+     "text": "Nothing added - Roads is in Late night already"
+    },
+    {
+     "added": 0,
+     "already": 1,
+     "mode": "ask",
+     "text": "Nothing added - Roads is in Late night already"
+    },
+    {
+     "added": 0,
+     "already": 1,
+     "mode": "add",
+     "text": "Nothing added - Roads is in Late night already"
+    },
+    {
+     "added": 0,
+     "already": 1,
+     "mode": "skip",
+     "text": "Nothing added - Roads is in Late night already"
+    },
+    {
+     "added": 0,
+     "already": 3,
+     "mode": "ask",
+     "text": "Nothing added - Roads is in Late night already"
+    },
+    {
+     "added": 0,
+     "already": 3,
+     "mode": "add",
+     "text": "Nothing added - Roads is in Late night already"
+    },
+    {
+     "added": 0,
+     "already": 3,
+     "mode": "skip",
+     "text": "Nothing added - Roads is in Late night already"
+    },
+    {
+     "added": 1,
+     "already": 0,
+     "mode": "ask",
+     "text": "Added Roads to Late night"
+    },
+    {
+     "added": 1,
+     "already": 0,
+     "mode": "add",
+     "text": "Added Roads to Late night"
+    },
+    {
+     "added": 1,
+     "already": 0,
+     "mode": "skip",
+     "text": "Added Roads to Late night"
+    },
+    {
+     "added": 1,
+     "already": 1,
+     "mode": "ask",
+     "text": "Added Roads to Late night"
+    },
+    {
+     "added": 1,
+     "already": 1,
+     "mode": "add",
+     "text": "Added Roads to Late night"
+    },
+    {
+     "added": 1,
+     "already": 1,
+     "mode": "skip",
+     "text": "Added Roads to Late night - 1 was in it already"
+    },
+    {
+     "added": 1,
+     "already": 2,
+     "mode": "ask",
+     "text": "Added Roads to Late night"
+    },
+    {
+     "added": 1,
+     "already": 2,
+     "mode": "add",
+     "text": "Added Roads to Late night"
+    },
+    {
+     "added": 1,
+     "already": 2,
+     "mode": "skip",
+     "text": "Added Roads to Late night - 2 were in it already"
+    },
+    {
+     "added": 2,
+     "already": 0,
+     "mode": "ask",
+     "text": "Added 2 songs to Late night"
+    },
+    {
+     "added": 2,
+     "already": 0,
+     "mode": "add",
+     "text": "Added 2 songs to Late night"
+    },
+    {
+     "added": 2,
+     "already": 0,
+     "mode": "skip",
+     "text": "Added 2 songs to Late night"
+    },
+    {
+     "added": 3,
+     "already": 1,
+     "mode": "ask",
+     "text": "Added 3 songs to Late night"
+    },
+    {
+     "added": 3,
+     "already": 1,
+     "mode": "add",
+     "text": "Added 3 songs to Late night"
+    },
+    {
+     "added": 3,
+     "already": 1,
+     "mode": "skip",
+     "text": "Added 3 songs to Late night - 1 was in it already"
+    },
+    {
+     "added": 3,
+     "already": 2,
+     "mode": "ask",
+     "text": "Added 3 songs to Late night"
+    },
+    {
+     "added": 3,
+     "already": 2,
+     "mode": "add",
+     "text": "Added 3 songs to Late night"
+    },
+    {
+     "added": 3,
+     "already": 2,
+     "mode": "skip",
+     "text": "Added 3 songs to Late night - 2 were in it already"
+    },
+    {
+     "added": 10,
+     "already": 1,
+     "mode": "ask",
+     "text": "Added 10 songs to Late night"
+    },
+    {
+     "added": 10,
+     "already": 1,
+     "mode": "add",
+     "text": "Added 10 songs to Late night"
+    },
+    {
+     "added": 10,
+     "already": 1,
+     "mode": "skip",
+     "text": "Added 10 songs to Late night - 1 was in it already"
+    }
+   ],
+   "questions": [
+    {
+     "already": 1,
+     "asked": 1,
+     "text": "Roads is in Late night already.",
+     "yes": {
+      "label": "Add it again",
+      "mode": "add"
+     },
+     "no": {
+      "label": "Cancel",
+      "mode": null
+     }
+    },
+    {
+     "already": 0,
+     "asked": 1,
+     "text": "Roads is in Late night already.",
+     "yes": {
+      "label": "Add it again",
+      "mode": "add"
+     },
+     "no": {
+      "label": "Cancel",
+      "mode": null
+     }
+    },
+    {
+     "already": 2,
+     "asked": 2,
+     "text": "These 2 songs are all in Late night already.",
+     "yes": {
+      "label": "Add them again",
+      "mode": "add"
+     },
+     "no": {
+      "label": "Cancel",
+      "mode": null
+     }
+    },
+    {
+     "already": 3,
+     "asked": 2,
+     "text": "These 2 songs are all in Late night already.",
+     "yes": {
+      "label": "Add them again",
+      "mode": "add"
+     },
+     "no": {
+      "label": "Cancel",
+      "mode": null
+     }
+    },
+    {
+     "already": 1,
+     "asked": 3,
+     "text": "1 of these 3 songs is in Late night already.",
+     "yes": {
+      "label": "Add them all",
+      "mode": "add"
+     },
+     "no": {
+      "label": "Skip that one",
+      "mode": "skip"
+     }
+    },
+    {
+     "already": 2,
+     "asked": 3,
+     "text": "2 of these 3 songs are in Late night already.",
+     "yes": {
+      "label": "Add them all",
+      "mode": "add"
+     },
+     "no": {
+      "label": "Skip those 2",
+      "mode": "skip"
+     }
+    },
+    {
+     "already": 1,
+     "asked": 2,
+     "text": "1 of these 2 songs is in Late night already.",
+     "yes": {
+      "label": "Add them all",
+      "mode": "add"
+     },
+     "no": {
+      "label": "Skip that one",
+      "mode": "skip"
+     }
+    },
+    {
+     "already": 5,
+     "asked": 11,
+     "text": "5 of these 11 songs are in Late night already.",
+     "yes": {
+      "label": "Add them all",
+      "mode": "add"
+     },
+     "no": {
+      "label": "Skip those 5",
+      "mode": "skip"
+     }
+    },
+    {
+     "already": 11,
+     "asked": 11,
+     "text": "These 11 songs are all in Late night already.",
+     "yes": {
+      "label": "Add them again",
+      "mode": "add"
+     },
+     "no": {
+      "label": "Cancel",
+      "mode": null
+     }
+    }
+   ]
+  },
+  {
+   "name": "two songs",
+   "pick": {
+    "label": "Mezzanine",
+    "songs": [
+     {
+      "id": "m1",
+      "title": "Angel",
+      "artist": "Massive Attack"
+     },
+     {
+      "id": "m2",
+      "title": "Risingson",
+      "artist": "Massive Attack"
+     }
+    ]
+   },
+   "pickLine": "Mezzanine \u00b7 2 songs",
+   "madeWords": "Made Late night with 2 songs",
+   "added": [
+    {
+     "added": 0,
+     "already": 0,
+     "mode": "ask",
+     "text": "Nothing added - they're all in Late night already"
+    },
+    {
+     "added": 0,
+     "already": 0,
+     "mode": "add",
+     "text": "Nothing added - they're all in Late night already"
+    },
+    {
+     "added": 0,
+     "already": 0,
+     "mode": "skip",
+     "text": "Nothing added - they're all in Late night already"
+    },
+    {
+     "added": 0,
+     "already": 1,
+     "mode": "ask",
+     "text": "Nothing added - they're all in Late night already"
+    },
+    {
+     "added": 0,
+     "already": 1,
+     "mode": "add",
+     "text": "Nothing added - they're all in Late night already"
+    },
+    {
+     "added": 0,
+     "already": 1,
+     "mode": "skip",
+     "text": "Nothing added - they're all in Late night already"
+    },
+    {
+     "added": 0,
+     "already": 3,
+     "mode": "ask",
+     "text": "Nothing added - they're all in Late night already"
+    },
+    {
+     "added": 0,
+     "already": 3,
+     "mode": "add",
+     "text": "Nothing added - they're all in Late night already"
+    },
+    {
+     "added": 0,
+     "already": 3,
+     "mode": "skip",
+     "text": "Nothing added - they're all in Late night already"
+    },
+    {
+     "added": 1,
+     "already": 0,
+     "mode": "ask",
+     "text": "Added 1 song to Late night"
+    },
+    {
+     "added": 1,
+     "already": 0,
+     "mode": "add",
+     "text": "Added 1 song to Late night"
+    },
+    {
+     "added": 1,
+     "already": 0,
+     "mode": "skip",
+     "text": "Added 1 song to Late night"
+    },
+    {
+     "added": 1,
+     "already": 1,
+     "mode": "ask",
+     "text": "Added 1 song to Late night"
+    },
+    {
+     "added": 1,
+     "already": 1,
+     "mode": "add",
+     "text": "Added 1 song to Late night"
+    },
+    {
+     "added": 1,
+     "already": 1,
+     "mode": "skip",
+     "text": "Added 1 song to Late night - 1 was in it already"
+    },
+    {
+     "added": 1,
+     "already": 2,
+     "mode": "ask",
+     "text": "Added 1 song to Late night"
+    },
+    {
+     "added": 1,
+     "already": 2,
+     "mode": "add",
+     "text": "Added 1 song to Late night"
+    },
+    {
+     "added": 1,
+     "already": 2,
+     "mode": "skip",
+     "text": "Added 1 song to Late night - 2 were in it already"
+    },
+    {
+     "added": 2,
+     "already": 0,
+     "mode": "ask",
+     "text": "Added 2 songs to Late night"
+    },
+    {
+     "added": 2,
+     "already": 0,
+     "mode": "add",
+     "text": "Added 2 songs to Late night"
+    },
+    {
+     "added": 2,
+     "already": 0,
+     "mode": "skip",
+     "text": "Added 2 songs to Late night"
+    },
+    {
+     "added": 3,
+     "already": 1,
+     "mode": "ask",
+     "text": "Added 3 songs to Late night"
+    },
+    {
+     "added": 3,
+     "already": 1,
+     "mode": "add",
+     "text": "Added 3 songs to Late night"
+    },
+    {
+     "added": 3,
+     "already": 1,
+     "mode": "skip",
+     "text": "Added 3 songs to Late night - 1 was in it already"
+    },
+    {
+     "added": 3,
+     "already": 2,
+     "mode": "ask",
+     "text": "Added 3 songs to Late night"
+    },
+    {
+     "added": 3,
+     "already": 2,
+     "mode": "add",
+     "text": "Added 3 songs to Late night"
+    },
+    {
+     "added": 3,
+     "already": 2,
+     "mode": "skip",
+     "text": "Added 3 songs to Late night - 2 were in it already"
+    },
+    {
+     "added": 10,
+     "already": 1,
+     "mode": "ask",
+     "text": "Added 10 songs to Late night"
+    },
+    {
+     "added": 10,
+     "already": 1,
+     "mode": "add",
+     "text": "Added 10 songs to Late night"
+    },
+    {
+     "added": 10,
+     "already": 1,
+     "mode": "skip",
+     "text": "Added 10 songs to Late night - 1 was in it already"
+    }
+   ],
+   "questions": [
+    {
+     "already": 1,
+     "asked": 1,
+     "text": "Angel is in Late night already.",
+     "yes": {
+      "label": "Add it again",
+      "mode": "add"
+     },
+     "no": {
+      "label": "Cancel",
+      "mode": null
+     }
+    },
+    {
+     "already": 0,
+     "asked": 1,
+     "text": "Angel is in Late night already.",
+     "yes": {
+      "label": "Add it again",
+      "mode": "add"
+     },
+     "no": {
+      "label": "Cancel",
+      "mode": null
+     }
+    },
+    {
+     "already": 2,
+     "asked": 2,
+     "text": "These 2 songs are all in Late night already.",
+     "yes": {
+      "label": "Add them again",
+      "mode": "add"
+     },
+     "no": {
+      "label": "Cancel",
+      "mode": null
+     }
+    },
+    {
+     "already": 3,
+     "asked": 2,
+     "text": "These 2 songs are all in Late night already.",
+     "yes": {
+      "label": "Add them again",
+      "mode": "add"
+     },
+     "no": {
+      "label": "Cancel",
+      "mode": null
+     }
+    },
+    {
+     "already": 1,
+     "asked": 3,
+     "text": "1 of these 3 songs is in Late night already.",
+     "yes": {
+      "label": "Add them all",
+      "mode": "add"
+     },
+     "no": {
+      "label": "Skip that one",
+      "mode": "skip"
+     }
+    },
+    {
+     "already": 2,
+     "asked": 3,
+     "text": "2 of these 3 songs are in Late night already.",
+     "yes": {
+      "label": "Add them all",
+      "mode": "add"
+     },
+     "no": {
+      "label": "Skip those 2",
+      "mode": "skip"
+     }
+    },
+    {
+     "already": 1,
+     "asked": 2,
+     "text": "1 of these 2 songs is in Late night already.",
+     "yes": {
+      "label": "Add them all",
+      "mode": "add"
+     },
+     "no": {
+      "label": "Skip that one",
+      "mode": "skip"
+     }
+    },
+    {
+     "already": 5,
+     "asked": 11,
+     "text": "5 of these 11 songs are in Late night already.",
+     "yes": {
+      "label": "Add them all",
+      "mode": "add"
+     },
+     "no": {
+      "label": "Skip those 5",
+      "mode": "skip"
+     }
+    },
+    {
+     "already": 11,
+     "asked": 11,
+     "text": "These 11 songs are all in Late night already.",
+     "yes": {
+      "label": "Add them again",
+      "mode": "add"
+     },
+     "no": {
+      "label": "Cancel",
+      "mode": null
+     }
+    }
+   ]
+  },
+  {
+   "name": "an album of eleven",
+   "pick": {
+    "label": "Dummy",
+    "songs": [
+     {
+      "id": "d0",
+      "title": "Track 0",
+      "artist": "Portishead"
+     },
+     {
+      "id": "d1",
+      "title": "Track 1",
+      "artist": "Portishead"
+     },
+     {
+      "id": "d2",
+      "title": "Track 2",
+      "artist": "Portishead"
+     },
+     {
+      "id": "d3",
+      "title": "Track 3",
+      "artist": "Portishead"
+     },
+     {
+      "id": "d4",
+      "title": "Track 4",
+      "artist": "Portishead"
+     },
+     {
+      "id": "d5",
+      "title": "Track 5",
+      "artist": "Portishead"
+     },
+     {
+      "id": "d6",
+      "title": "Track 6",
+      "artist": "Portishead"
+     },
+     {
+      "id": "d7",
+      "title": "Track 7",
+      "artist": "Portishead"
+     },
+     {
+      "id": "d8",
+      "title": "Track 8",
+      "artist": "Portishead"
+     },
+     {
+      "id": "d9",
+      "title": "Track 9",
+      "artist": "Portishead"
+     },
+     {
+      "id": "d10",
+      "title": "Track 10",
+      "artist": "Portishead"
+     }
+    ]
+   },
+   "pickLine": "Dummy \u00b7 11 songs",
+   "madeWords": "Made Late night with 11 songs",
+   "added": [
+    {
+     "added": 0,
+     "already": 0,
+     "mode": "ask",
+     "text": "Nothing added - they're all in Late night already"
+    },
+    {
+     "added": 0,
+     "already": 0,
+     "mode": "add",
+     "text": "Nothing added - they're all in Late night already"
+    },
+    {
+     "added": 0,
+     "already": 0,
+     "mode": "skip",
+     "text": "Nothing added - they're all in Late night already"
+    },
+    {
+     "added": 0,
+     "already": 1,
+     "mode": "ask",
+     "text": "Nothing added - they're all in Late night already"
+    },
+    {
+     "added": 0,
+     "already": 1,
+     "mode": "add",
+     "text": "Nothing added - they're all in Late night already"
+    },
+    {
+     "added": 0,
+     "already": 1,
+     "mode": "skip",
+     "text": "Nothing added - they're all in Late night already"
+    },
+    {
+     "added": 0,
+     "already": 3,
+     "mode": "ask",
+     "text": "Nothing added - they're all in Late night already"
+    },
+    {
+     "added": 0,
+     "already": 3,
+     "mode": "add",
+     "text": "Nothing added - they're all in Late night already"
+    },
+    {
+     "added": 0,
+     "already": 3,
+     "mode": "skip",
+     "text": "Nothing added - they're all in Late night already"
+    },
+    {
+     "added": 1,
+     "already": 0,
+     "mode": "ask",
+     "text": "Added 1 song to Late night"
+    },
+    {
+     "added": 1,
+     "already": 0,
+     "mode": "add",
+     "text": "Added 1 song to Late night"
+    },
+    {
+     "added": 1,
+     "already": 0,
+     "mode": "skip",
+     "text": "Added 1 song to Late night"
+    },
+    {
+     "added": 1,
+     "already": 1,
+     "mode": "ask",
+     "text": "Added 1 song to Late night"
+    },
+    {
+     "added": 1,
+     "already": 1,
+     "mode": "add",
+     "text": "Added 1 song to Late night"
+    },
+    {
+     "added": 1,
+     "already": 1,
+     "mode": "skip",
+     "text": "Added 1 song to Late night - 1 was in it already"
+    },
+    {
+     "added": 1,
+     "already": 2,
+     "mode": "ask",
+     "text": "Added 1 song to Late night"
+    },
+    {
+     "added": 1,
+     "already": 2,
+     "mode": "add",
+     "text": "Added 1 song to Late night"
+    },
+    {
+     "added": 1,
+     "already": 2,
+     "mode": "skip",
+     "text": "Added 1 song to Late night - 2 were in it already"
+    },
+    {
+     "added": 2,
+     "already": 0,
+     "mode": "ask",
+     "text": "Added 2 songs to Late night"
+    },
+    {
+     "added": 2,
+     "already": 0,
+     "mode": "add",
+     "text": "Added 2 songs to Late night"
+    },
+    {
+     "added": 2,
+     "already": 0,
+     "mode": "skip",
+     "text": "Added 2 songs to Late night"
+    },
+    {
+     "added": 3,
+     "already": 1,
+     "mode": "ask",
+     "text": "Added 3 songs to Late night"
+    },
+    {
+     "added": 3,
+     "already": 1,
+     "mode": "add",
+     "text": "Added 3 songs to Late night"
+    },
+    {
+     "added": 3,
+     "already": 1,
+     "mode": "skip",
+     "text": "Added 3 songs to Late night - 1 was in it already"
+    },
+    {
+     "added": 3,
+     "already": 2,
+     "mode": "ask",
+     "text": "Added 3 songs to Late night"
+    },
+    {
+     "added": 3,
+     "already": 2,
+     "mode": "add",
+     "text": "Added 3 songs to Late night"
+    },
+    {
+     "added": 3,
+     "already": 2,
+     "mode": "skip",
+     "text": "Added 3 songs to Late night - 2 were in it already"
+    },
+    {
+     "added": 10,
+     "already": 1,
+     "mode": "ask",
+     "text": "Added 10 songs to Late night"
+    },
+    {
+     "added": 10,
+     "already": 1,
+     "mode": "add",
+     "text": "Added 10 songs to Late night"
+    },
+    {
+     "added": 10,
+     "already": 1,
+     "mode": "skip",
+     "text": "Added 10 songs to Late night - 1 was in it already"
+    }
+   ],
+   "questions": [
+    {
+     "already": 1,
+     "asked": 1,
+     "text": "Track 0 is in Late night already.",
+     "yes": {
+      "label": "Add it again",
+      "mode": "add"
+     },
+     "no": {
+      "label": "Cancel",
+      "mode": null
+     }
+    },
+    {
+     "already": 0,
+     "asked": 1,
+     "text": "Track 0 is in Late night already.",
+     "yes": {
+      "label": "Add it again",
+      "mode": "add"
+     },
+     "no": {
+      "label": "Cancel",
+      "mode": null
+     }
+    },
+    {
+     "already": 2,
+     "asked": 2,
+     "text": "These 2 songs are all in Late night already.",
+     "yes": {
+      "label": "Add them again",
+      "mode": "add"
+     },
+     "no": {
+      "label": "Cancel",
+      "mode": null
+     }
+    },
+    {
+     "already": 3,
+     "asked": 2,
+     "text": "These 2 songs are all in Late night already.",
+     "yes": {
+      "label": "Add them again",
+      "mode": "add"
+     },
+     "no": {
+      "label": "Cancel",
+      "mode": null
+     }
+    },
+    {
+     "already": 1,
+     "asked": 3,
+     "text": "1 of these 3 songs is in Late night already.",
+     "yes": {
+      "label": "Add them all",
+      "mode": "add"
+     },
+     "no": {
+      "label": "Skip that one",
+      "mode": "skip"
+     }
+    },
+    {
+     "already": 2,
+     "asked": 3,
+     "text": "2 of these 3 songs are in Late night already.",
+     "yes": {
+      "label": "Add them all",
+      "mode": "add"
+     },
+     "no": {
+      "label": "Skip those 2",
+      "mode": "skip"
+     }
+    },
+    {
+     "already": 1,
+     "asked": 2,
+     "text": "1 of these 2 songs is in Late night already.",
+     "yes": {
+      "label": "Add them all",
+      "mode": "add"
+     },
+     "no": {
+      "label": "Skip that one",
+      "mode": "skip"
+     }
+    },
+    {
+     "already": 5,
+     "asked": 11,
+     "text": "5 of these 11 songs are in Late night already.",
+     "yes": {
+      "label": "Add them all",
+      "mode": "add"
+     },
+     "no": {
+      "label": "Skip those 5",
+      "mode": "skip"
+     }
+    },
+    {
+     "already": 11,
+     "asked": 11,
+     "text": "These 11 songs are all in Late night already.",
+     "yes": {
+      "label": "Add them again",
+      "mode": "add"
+     },
+     "no": {
+      "label": "Cancel",
+      "mode": null
+     }
+    }
+   ]
+  },
+  {
+   "name": "a song twice",
+   "pick": {
+    "label": "Late night",
+    "songs": [
+     {
+      "id": "s1",
+      "title": "Roads",
+      "artist": "Portishead"
+     },
+     {
+      "id": "s1",
+      "title": "Roads",
+      "artist": "Portishead"
+     }
+    ]
+   },
+   "pickLine": "Late night \u00b7 2 songs",
+   "madeWords": "Made Late night with 2 songs",
+   "added": [
+    {
+     "added": 0,
+     "already": 0,
+     "mode": "ask",
+     "text": "Nothing added - they're all in Late night already"
+    },
+    {
+     "added": 0,
+     "already": 0,
+     "mode": "add",
+     "text": "Nothing added - they're all in Late night already"
+    },
+    {
+     "added": 0,
+     "already": 0,
+     "mode": "skip",
+     "text": "Nothing added - they're all in Late night already"
+    },
+    {
+     "added": 0,
+     "already": 1,
+     "mode": "ask",
+     "text": "Nothing added - they're all in Late night already"
+    },
+    {
+     "added": 0,
+     "already": 1,
+     "mode": "add",
+     "text": "Nothing added - they're all in Late night already"
+    },
+    {
+     "added": 0,
+     "already": 1,
+     "mode": "skip",
+     "text": "Nothing added - they're all in Late night already"
+    },
+    {
+     "added": 0,
+     "already": 3,
+     "mode": "ask",
+     "text": "Nothing added - they're all in Late night already"
+    },
+    {
+     "added": 0,
+     "already": 3,
+     "mode": "add",
+     "text": "Nothing added - they're all in Late night already"
+    },
+    {
+     "added": 0,
+     "already": 3,
+     "mode": "skip",
+     "text": "Nothing added - they're all in Late night already"
+    },
+    {
+     "added": 1,
+     "already": 0,
+     "mode": "ask",
+     "text": "Added 1 song to Late night"
+    },
+    {
+     "added": 1,
+     "already": 0,
+     "mode": "add",
+     "text": "Added 1 song to Late night"
+    },
+    {
+     "added": 1,
+     "already": 0,
+     "mode": "skip",
+     "text": "Added 1 song to Late night"
+    },
+    {
+     "added": 1,
+     "already": 1,
+     "mode": "ask",
+     "text": "Added 1 song to Late night"
+    },
+    {
+     "added": 1,
+     "already": 1,
+     "mode": "add",
+     "text": "Added 1 song to Late night"
+    },
+    {
+     "added": 1,
+     "already": 1,
+     "mode": "skip",
+     "text": "Added 1 song to Late night - 1 was in it already"
+    },
+    {
+     "added": 1,
+     "already": 2,
+     "mode": "ask",
+     "text": "Added 1 song to Late night"
+    },
+    {
+     "added": 1,
+     "already": 2,
+     "mode": "add",
+     "text": "Added 1 song to Late night"
+    },
+    {
+     "added": 1,
+     "already": 2,
+     "mode": "skip",
+     "text": "Added 1 song to Late night - 2 were in it already"
+    },
+    {
+     "added": 2,
+     "already": 0,
+     "mode": "ask",
+     "text": "Added 2 songs to Late night"
+    },
+    {
+     "added": 2,
+     "already": 0,
+     "mode": "add",
+     "text": "Added 2 songs to Late night"
+    },
+    {
+     "added": 2,
+     "already": 0,
+     "mode": "skip",
+     "text": "Added 2 songs to Late night"
+    },
+    {
+     "added": 3,
+     "already": 1,
+     "mode": "ask",
+     "text": "Added 3 songs to Late night"
+    },
+    {
+     "added": 3,
+     "already": 1,
+     "mode": "add",
+     "text": "Added 3 songs to Late night"
+    },
+    {
+     "added": 3,
+     "already": 1,
+     "mode": "skip",
+     "text": "Added 3 songs to Late night - 1 was in it already"
+    },
+    {
+     "added": 3,
+     "already": 2,
+     "mode": "ask",
+     "text": "Added 3 songs to Late night"
+    },
+    {
+     "added": 3,
+     "already": 2,
+     "mode": "add",
+     "text": "Added 3 songs to Late night"
+    },
+    {
+     "added": 3,
+     "already": 2,
+     "mode": "skip",
+     "text": "Added 3 songs to Late night - 2 were in it already"
+    },
+    {
+     "added": 10,
+     "already": 1,
+     "mode": "ask",
+     "text": "Added 10 songs to Late night"
+    },
+    {
+     "added": 10,
+     "already": 1,
+     "mode": "add",
+     "text": "Added 10 songs to Late night"
+    },
+    {
+     "added": 10,
+     "already": 1,
+     "mode": "skip",
+     "text": "Added 10 songs to Late night - 1 was in it already"
+    }
+   ],
+   "questions": [
+    {
+     "already": 1,
+     "asked": 1,
+     "text": "Roads is in Late night already.",
+     "yes": {
+      "label": "Add it again",
+      "mode": "add"
+     },
+     "no": {
+      "label": "Cancel",
+      "mode": null
+     }
+    },
+    {
+     "already": 0,
+     "asked": 1,
+     "text": "Roads is in Late night already.",
+     "yes": {
+      "label": "Add it again",
+      "mode": "add"
+     },
+     "no": {
+      "label": "Cancel",
+      "mode": null
+     }
+    },
+    {
+     "already": 2,
+     "asked": 2,
+     "text": "These 2 songs are all in Late night already.",
+     "yes": {
+      "label": "Add them again",
+      "mode": "add"
+     },
+     "no": {
+      "label": "Cancel",
+      "mode": null
+     }
+    },
+    {
+     "already": 3,
+     "asked": 2,
+     "text": "These 2 songs are all in Late night already.",
+     "yes": {
+      "label": "Add them again",
+      "mode": "add"
+     },
+     "no": {
+      "label": "Cancel",
+      "mode": null
+     }
+    },
+    {
+     "already": 1,
+     "asked": 3,
+     "text": "1 of these 3 songs is in Late night already.",
+     "yes": {
+      "label": "Add them all",
+      "mode": "add"
+     },
+     "no": {
+      "label": "Skip that one",
+      "mode": "skip"
+     }
+    },
+    {
+     "already": 2,
+     "asked": 3,
+     "text": "2 of these 3 songs are in Late night already.",
+     "yes": {
+      "label": "Add them all",
+      "mode": "add"
+     },
+     "no": {
+      "label": "Skip those 2",
+      "mode": "skip"
+     }
+    },
+    {
+     "already": 1,
+     "asked": 2,
+     "text": "1 of these 2 songs is in Late night already.",
+     "yes": {
+      "label": "Add them all",
+      "mode": "add"
+     },
+     "no": {
+      "label": "Skip that one",
+      "mode": "skip"
+     }
+    },
+    {
+     "already": 5,
+     "asked": 11,
+     "text": "5 of these 11 songs are in Late night already.",
+     "yes": {
+      "label": "Add them all",
+      "mode": "add"
+     },
+     "no": {
+      "label": "Skip those 5",
+      "mode": "skip"
+     }
+    },
+    {
+     "already": 11,
+     "asked": 11,
+     "text": "These 11 songs are all in Late night already.",
+     "yes": {
+      "label": "Add them again",
+      "mode": "add"
+     },
+     "no": {
+      "label": "Cancel",
+      "mode": null
+     }
+    }
+   ]
+  },
+  {
+   "name": "none",
+   "pick": {
+    "label": "Empty",
+    "songs": []
+   },
+   "pickLine": "Empty \u00b7 0 songs",
+   "madeWords": "Made Late night with 0 songs",
+   "added": [
+    {
+     "added": 0,
+     "already": 0,
+     "mode": "ask",
+     "text": "Nothing added - they're all in Late night already"
+    },
+    {
+     "added": 0,
+     "already": 0,
+     "mode": "add",
+     "text": "Nothing added - they're all in Late night already"
+    },
+    {
+     "added": 0,
+     "already": 0,
+     "mode": "skip",
+     "text": "Nothing added - they're all in Late night already"
+    },
+    {
+     "added": 0,
+     "already": 1,
+     "mode": "ask",
+     "text": "Nothing added - they're all in Late night already"
+    },
+    {
+     "added": 0,
+     "already": 1,
+     "mode": "add",
+     "text": "Nothing added - they're all in Late night already"
+    },
+    {
+     "added": 0,
+     "already": 1,
+     "mode": "skip",
+     "text": "Nothing added - they're all in Late night already"
+    },
+    {
+     "added": 0,
+     "already": 3,
+     "mode": "ask",
+     "text": "Nothing added - they're all in Late night already"
+    },
+    {
+     "added": 0,
+     "already": 3,
+     "mode": "add",
+     "text": "Nothing added - they're all in Late night already"
+    },
+    {
+     "added": 0,
+     "already": 3,
+     "mode": "skip",
+     "text": "Nothing added - they're all in Late night already"
+    },
+    {
+     "added": 1,
+     "already": 0,
+     "mode": "ask",
+     "text": "Added 1 song to Late night"
+    },
+    {
+     "added": 1,
+     "already": 0,
+     "mode": "add",
+     "text": "Added 1 song to Late night"
+    },
+    {
+     "added": 1,
+     "already": 0,
+     "mode": "skip",
+     "text": "Added 1 song to Late night"
+    },
+    {
+     "added": 1,
+     "already": 1,
+     "mode": "ask",
+     "text": "Added 1 song to Late night"
+    },
+    {
+     "added": 1,
+     "already": 1,
+     "mode": "add",
+     "text": "Added 1 song to Late night"
+    },
+    {
+     "added": 1,
+     "already": 1,
+     "mode": "skip",
+     "text": "Added 1 song to Late night - 1 was in it already"
+    },
+    {
+     "added": 1,
+     "already": 2,
+     "mode": "ask",
+     "text": "Added 1 song to Late night"
+    },
+    {
+     "added": 1,
+     "already": 2,
+     "mode": "add",
+     "text": "Added 1 song to Late night"
+    },
+    {
+     "added": 1,
+     "already": 2,
+     "mode": "skip",
+     "text": "Added 1 song to Late night - 2 were in it already"
+    },
+    {
+     "added": 2,
+     "already": 0,
+     "mode": "ask",
+     "text": "Added 2 songs to Late night"
+    },
+    {
+     "added": 2,
+     "already": 0,
+     "mode": "add",
+     "text": "Added 2 songs to Late night"
+    },
+    {
+     "added": 2,
+     "already": 0,
+     "mode": "skip",
+     "text": "Added 2 songs to Late night"
+    },
+    {
+     "added": 3,
+     "already": 1,
+     "mode": "ask",
+     "text": "Added 3 songs to Late night"
+    },
+    {
+     "added": 3,
+     "already": 1,
+     "mode": "add",
+     "text": "Added 3 songs to Late night"
+    },
+    {
+     "added": 3,
+     "already": 1,
+     "mode": "skip",
+     "text": "Added 3 songs to Late night - 1 was in it already"
+    },
+    {
+     "added": 3,
+     "already": 2,
+     "mode": "ask",
+     "text": "Added 3 songs to Late night"
+    },
+    {
+     "added": 3,
+     "already": 2,
+     "mode": "add",
+     "text": "Added 3 songs to Late night"
+    },
+    {
+     "added": 3,
+     "already": 2,
+     "mode": "skip",
+     "text": "Added 3 songs to Late night - 2 were in it already"
+    },
+    {
+     "added": 10,
+     "already": 1,
+     "mode": "ask",
+     "text": "Added 10 songs to Late night"
+    },
+    {
+     "added": 10,
+     "already": 1,
+     "mode": "add",
+     "text": "Added 10 songs to Late night"
+    },
+    {
+     "added": 10,
+     "already": 1,
+     "mode": "skip",
+     "text": "Added 10 songs to Late night - 1 was in it already"
+    }
+   ],
+   "questions": []
+  }
+ ],
+ "edit": {
+  "songs": [
+   {
+    "id": "e1",
+    "title": "Roads",
+    "artist": "Portishead"
+   },
+   {
+    "id": "e2",
+    "title": "Teardrop",
+    "artist": "Massive Attack"
+   },
+   {
+    "id": "e1",
+    "title": "Roads",
+    "artist": "Portishead"
+   },
+   {
+    "id": "e3",
+    "title": "Untitled artist"
+   }
+  ],
+  "playlist": {
+   "id": "edit",
+   "name": "Late night",
+   "comment": "For after",
+   "songCount": 12,
+   "duration": 2880,
+   "created": "2026-10-01T10:00:00Z",
+   "changed": "2026-11-01T10:00:00Z",
+   "owner": "james",
+   "public": false,
+   "coverArt": "pl-edit_abc",
+   "mine": true,
+   "editable": true
+  },
+  "start": {
+   "rows": [
+    {
+     "key": "0:e1",
+     "id": "e1",
+     "title": "Roads",
+     "artist": "Portishead"
+    },
+    {
+     "key": "1:e2",
+     "id": "e2",
+     "title": "Teardrop",
+     "artist": "Massive Attack"
+    },
+    {
+     "key": "2:e1",
+     "id": "e1",
+     "title": "Roads",
+     "artist": "Portishead"
+    },
+    {
+     "key": "3:e3",
+     "id": "e3",
+     "title": "Untitled artist",
+     "artist": ""
+    }
+   ],
+   "name": "Late night",
+   "comment": "For after",
+   "public": false
+  },
+  "moves": [
+   {
+    "from": -1,
+    "to": -2,
+    "keys": [
+     "0:e1",
+     "1:e2",
+     "2:e1",
+     "3:e3"
+    ]
+   },
+   {
+    "from": -1,
+    "to": -1,
+    "keys": [
+     "0:e1",
+     "1:e2",
+     "2:e1",
+     "3:e3"
+    ]
+   },
+   {
+    "from": -1,
+    "to": 0,
+    "keys": [
+     "0:e1",
+     "1:e2",
+     "2:e1",
+     "3:e3"
+    ]
+   },
+   {
+    "from": -1,
+    "to": 1,
+    "keys": [
+     "0:e1",
+     "1:e2",
+     "2:e1",
+     "3:e3"
+    ]
+   },
+   {
+    "from": -1,
+    "to": 2,
+    "keys": [
+     "0:e1",
+     "1:e2",
+     "2:e1",
+     "3:e3"
+    ]
+   },
+   {
+    "from": -1,
+    "to": 3,
+    "keys": [
+     "0:e1",
+     "1:e2",
+     "2:e1",
+     "3:e3"
+    ]
+   },
+   {
+    "from": -1,
+    "to": 4,
+    "keys": [
+     "0:e1",
+     "1:e2",
+     "2:e1",
+     "3:e3"
+    ]
+   },
+   {
+    "from": -1,
+    "to": 5,
+    "keys": [
+     "0:e1",
+     "1:e2",
+     "2:e1",
+     "3:e3"
+    ]
+   },
+   {
+    "from": 0,
+    "to": -2,
+    "keys": [
+     "0:e1",
+     "1:e2",
+     "2:e1",
+     "3:e3"
+    ]
+   },
+   {
+    "from": 0,
+    "to": -1,
+    "keys": [
+     "0:e1",
+     "1:e2",
+     "2:e1",
+     "3:e3"
+    ]
+   },
+   {
+    "from": 0,
+    "to": 0,
+    "keys": [
+     "0:e1",
+     "1:e2",
+     "2:e1",
+     "3:e3"
+    ]
+   },
+   {
+    "from": 0,
+    "to": 1,
+    "keys": [
+     "1:e2",
+     "0:e1",
+     "2:e1",
+     "3:e3"
+    ]
+   },
+   {
+    "from": 0,
+    "to": 2,
+    "keys": [
+     "1:e2",
+     "2:e1",
+     "0:e1",
+     "3:e3"
+    ]
+   },
+   {
+    "from": 0,
+    "to": 3,
+    "keys": [
+     "1:e2",
+     "2:e1",
+     "3:e3",
+     "0:e1"
+    ]
+   },
+   {
+    "from": 0,
+    "to": 4,
+    "keys": [
+     "1:e2",
+     "2:e1",
+     "3:e3",
+     "0:e1"
+    ]
+   },
+   {
+    "from": 0,
+    "to": 5,
+    "keys": [
+     "1:e2",
+     "2:e1",
+     "3:e3",
+     "0:e1"
+    ]
+   },
+   {
+    "from": 1,
+    "to": -2,
+    "keys": [
+     "1:e2",
+     "0:e1",
+     "2:e1",
+     "3:e3"
+    ]
+   },
+   {
+    "from": 1,
+    "to": -1,
+    "keys": [
+     "1:e2",
+     "0:e1",
+     "2:e1",
+     "3:e3"
+    ]
+   },
+   {
+    "from": 1,
+    "to": 0,
+    "keys": [
+     "1:e2",
+     "0:e1",
+     "2:e1",
+     "3:e3"
+    ]
+   },
+   {
+    "from": 1,
+    "to": 1,
+    "keys": [
+     "0:e1",
+     "1:e2",
+     "2:e1",
+     "3:e3"
+    ]
+   },
+   {
+    "from": 1,
+    "to": 2,
+    "keys": [
+     "0:e1",
+     "2:e1",
+     "1:e2",
+     "3:e3"
+    ]
+   },
+   {
+    "from": 1,
+    "to": 3,
+    "keys": [
+     "0:e1",
+     "2:e1",
+     "3:e3",
+     "1:e2"
+    ]
+   },
+   {
+    "from": 1,
+    "to": 4,
+    "keys": [
+     "0:e1",
+     "2:e1",
+     "3:e3",
+     "1:e2"
+    ]
+   },
+   {
+    "from": 1,
+    "to": 5,
+    "keys": [
+     "0:e1",
+     "2:e1",
+     "3:e3",
+     "1:e2"
+    ]
+   },
+   {
+    "from": 2,
+    "to": -2,
+    "keys": [
+     "2:e1",
+     "0:e1",
+     "1:e2",
+     "3:e3"
+    ]
+   },
+   {
+    "from": 2,
+    "to": -1,
+    "keys": [
+     "2:e1",
+     "0:e1",
+     "1:e2",
+     "3:e3"
+    ]
+   },
+   {
+    "from": 2,
+    "to": 0,
+    "keys": [
+     "2:e1",
+     "0:e1",
+     "1:e2",
+     "3:e3"
+    ]
+   },
+   {
+    "from": 2,
+    "to": 1,
+    "keys": [
+     "0:e1",
+     "2:e1",
+     "1:e2",
+     "3:e3"
+    ]
+   },
+   {
+    "from": 2,
+    "to": 2,
+    "keys": [
+     "0:e1",
+     "1:e2",
+     "2:e1",
+     "3:e3"
+    ]
+   },
+   {
+    "from": 2,
+    "to": 3,
+    "keys": [
+     "0:e1",
+     "1:e2",
+     "3:e3",
+     "2:e1"
+    ]
+   },
+   {
+    "from": 2,
+    "to": 4,
+    "keys": [
+     "0:e1",
+     "1:e2",
+     "3:e3",
+     "2:e1"
+    ]
+   },
+   {
+    "from": 2,
+    "to": 5,
+    "keys": [
+     "0:e1",
+     "1:e2",
+     "3:e3",
+     "2:e1"
+    ]
+   },
+   {
+    "from": 3,
+    "to": -2,
+    "keys": [
+     "3:e3",
+     "0:e1",
+     "1:e2",
+     "2:e1"
+    ]
+   },
+   {
+    "from": 3,
+    "to": -1,
+    "keys": [
+     "3:e3",
+     "0:e1",
+     "1:e2",
+     "2:e1"
+    ]
+   },
+   {
+    "from": 3,
+    "to": 0,
+    "keys": [
+     "3:e3",
+     "0:e1",
+     "1:e2",
+     "2:e1"
+    ]
+   },
+   {
+    "from": 3,
+    "to": 1,
+    "keys": [
+     "0:e1",
+     "3:e3",
+     "1:e2",
+     "2:e1"
+    ]
+   },
+   {
+    "from": 3,
+    "to": 2,
+    "keys": [
+     "0:e1",
+     "1:e2",
+     "3:e3",
+     "2:e1"
+    ]
+   },
+   {
+    "from": 3,
+    "to": 3,
+    "keys": [
+     "0:e1",
+     "1:e2",
+     "2:e1",
+     "3:e3"
+    ]
+   },
+   {
+    "from": 3,
+    "to": 4,
+    "keys": [
+     "0:e1",
+     "1:e2",
+     "2:e1",
+     "3:e3"
+    ]
+   },
+   {
+    "from": 3,
+    "to": 5,
+    "keys": [
+     "0:e1",
+     "1:e2",
+     "2:e1",
+     "3:e3"
+    ]
+   },
+   {
+    "from": 4,
+    "to": -2,
+    "keys": [
+     "0:e1",
+     "1:e2",
+     "2:e1",
+     "3:e3"
+    ]
+   },
+   {
+    "from": 4,
+    "to": -1,
+    "keys": [
+     "0:e1",
+     "1:e2",
+     "2:e1",
+     "3:e3"
+    ]
+   },
+   {
+    "from": 4,
+    "to": 0,
+    "keys": [
+     "0:e1",
+     "1:e2",
+     "2:e1",
+     "3:e3"
+    ]
+   },
+   {
+    "from": 4,
+    "to": 1,
+    "keys": [
+     "0:e1",
+     "1:e2",
+     "2:e1",
+     "3:e3"
+    ]
+   },
+   {
+    "from": 4,
+    "to": 2,
+    "keys": [
+     "0:e1",
+     "1:e2",
+     "2:e1",
+     "3:e3"
+    ]
+   },
+   {
+    "from": 4,
+    "to": 3,
+    "keys": [
+     "0:e1",
+     "1:e2",
+     "2:e1",
+     "3:e3"
+    ]
+   },
+   {
+    "from": 4,
+    "to": 4,
+    "keys": [
+     "0:e1",
+     "1:e2",
+     "2:e1",
+     "3:e3"
+    ]
+   },
+   {
+    "from": 4,
+    "to": 5,
+    "keys": [
+     "0:e1",
+     "1:e2",
+     "2:e1",
+     "3:e3"
+    ]
+   }
+  ],
+  "removes": [
+   {
+    "index": -1,
+    "keys": [
+     "0:e1",
+     "1:e2",
+     "2:e1",
+     "3:e3"
+    ]
+   },
+   {
+    "index": 0,
+    "keys": [
+     "1:e2",
+     "2:e1",
+     "3:e3"
+    ]
+   },
+   {
+    "index": 1,
+    "keys": [
+     "0:e1",
+     "2:e1",
+     "3:e3"
+    ]
+   },
+   {
+    "index": 2,
+    "keys": [
+     "0:e1",
+     "1:e2",
+     "3:e3"
+    ]
+   },
+   {
+    "index": 3,
+    "keys": [
+     "0:e1",
+     "1:e2",
+     "2:e1"
+    ]
+   },
+   {
+    "index": 4,
+    "keys": [
+     "0:e1",
+     "1:e2",
+     "2:e1",
+     "3:e3"
+    ]
+   }
+  ],
+  "bodies": [
+   {
+    "name": "as drawn: nothing changed",
+    "start": {
+     "rows": [
+      {
+       "key": "0:e1",
+       "id": "e1",
+       "title": "Roads",
+       "artist": "Portishead"
+      },
+      {
+       "key": "1:e2",
+       "id": "e2",
+       "title": "Teardrop",
+       "artist": "Massive Attack"
+      },
+      {
+       "key": "2:e1",
+       "id": "e1",
+       "title": "Roads",
+       "artist": "Portishead"
+      },
+      {
+       "key": "3:e3",
+       "id": "e3",
+       "title": "Untitled artist",
+       "artist": ""
+      }
+     ],
+     "name": "Late night",
+     "comment": "For after",
+     "public": false
+    },
+    "now": {
+     "rows": [
+      {
+       "key": "0:e1",
+       "id": "e1",
+       "title": "Roads",
+       "artist": "Portishead"
+      },
+      {
+       "key": "1:e2",
+       "id": "e2",
+       "title": "Teardrop",
+       "artist": "Massive Attack"
+      },
+      {
+       "key": "2:e1",
+       "id": "e1",
+       "title": "Roads",
+       "artist": "Portishead"
+      },
+      {
+       "key": "3:e3",
+       "id": "e3",
+       "title": "Untitled artist",
+       "artist": ""
+      }
+     ],
+     "name": "Late night",
+     "comment": "For after",
+     "public": false
+    },
+    "changed": false,
+    "body": null,
+    "keys": null
+   },
+   {
+    "name": "as drawn: a row moved and moved back",
+    "start": {
+     "rows": [
+      {
+       "key": "0:e1",
+       "id": "e1",
+       "title": "Roads",
+       "artist": "Portishead"
+      },
+      {
+       "key": "1:e2",
+       "id": "e2",
+       "title": "Teardrop",
+       "artist": "Massive Attack"
+      },
+      {
+       "key": "2:e1",
+       "id": "e1",
+       "title": "Roads",
+       "artist": "Portishead"
+      },
+      {
+       "key": "3:e3",
+       "id": "e3",
+       "title": "Untitled artist",
+       "artist": ""
+      }
+     ],
+     "name": "Late night",
+     "comment": "For after",
+     "public": false
+    },
+    "now": {
+     "rows": [
+      {
+       "key": "0:e1",
+       "id": "e1",
+       "title": "Roads",
+       "artist": "Portishead"
+      },
+      {
+       "key": "1:e2",
+       "id": "e2",
+       "title": "Teardrop",
+       "artist": "Massive Attack"
+      },
+      {
+       "key": "2:e1",
+       "id": "e1",
+       "title": "Roads",
+       "artist": "Portishead"
+      },
+      {
+       "key": "3:e3",
+       "id": "e3",
+       "title": "Untitled artist",
+       "artist": ""
+      }
+     ],
+     "name": "Late night",
+     "comment": "For after",
+     "public": false
+    },
+    "changed": false,
+    "body": null,
+    "keys": null
+   },
+   {
+    "name": "as drawn: a row moved",
+    "start": {
+     "rows": [
+      {
+       "key": "0:e1",
+       "id": "e1",
+       "title": "Roads",
+       "artist": "Portishead"
+      },
+      {
+       "key": "1:e2",
+       "id": "e2",
+       "title": "Teardrop",
+       "artist": "Massive Attack"
+      },
+      {
+       "key": "2:e1",
+       "id": "e1",
+       "title": "Roads",
+       "artist": "Portishead"
+      },
+      {
+       "key": "3:e3",
+       "id": "e3",
+       "title": "Untitled artist",
+       "artist": ""
+      }
+     ],
+     "name": "Late night",
+     "comment": "For after",
+     "public": false
+    },
+    "now": {
+     "rows": [
+      {
+       "key": "3:e3",
+       "id": "e3",
+       "title": "Untitled artist",
+       "artist": ""
+      },
+      {
+       "key": "0:e1",
+       "id": "e1",
+       "title": "Roads",
+       "artist": "Portishead"
+      },
+      {
+       "key": "1:e2",
+       "id": "e2",
+       "title": "Teardrop",
+       "artist": "Massive Attack"
+      },
+      {
+       "key": "2:e1",
+       "id": "e1",
+       "title": "Roads",
+       "artist": "Portishead"
+      }
+     ],
+     "name": "Late night",
+     "comment": "For after",
+     "public": false
+    },
+    "changed": true,
+    "body": {
+     "base": [
+      "e1",
+      "e2",
+      "e1",
+      "e3"
+     ],
+     "song_ids": [
+      "e3",
+      "e1",
+      "e2",
+      "e1"
+     ]
+    },
+    "keys": [
+     "base",
+     "song_ids"
+    ]
+   },
+   {
+    "name": "as drawn: a song's two rows swapped",
+    "start": {
+     "rows": [
+      {
+       "key": "0:e1",
+       "id": "e1",
+       "title": "Roads",
+       "artist": "Portishead"
+      },
+      {
+       "key": "1:e2",
+       "id": "e2",
+       "title": "Teardrop",
+       "artist": "Massive Attack"
+      },
+      {
+       "key": "2:e1",
+       "id": "e1",
+       "title": "Roads",
+       "artist": "Portishead"
+      },
+      {
+       "key": "3:e3",
+       "id": "e3",
+       "title": "Untitled artist",
+       "artist": ""
+      }
+     ],
+     "name": "Late night",
+     "comment": "For after",
+     "public": false
+    },
+    "now": {
+     "rows": [
+      {
+       "key": "2:e1",
+       "id": "e1",
+       "title": "Roads",
+       "artist": "Portishead"
+      },
+      {
+       "key": "1:e2",
+       "id": "e2",
+       "title": "Teardrop",
+       "artist": "Massive Attack"
+      },
+      {
+       "key": "0:e1",
+       "id": "e1",
+       "title": "Roads",
+       "artist": "Portishead"
+      },
+      {
+       "key": "3:e3",
+       "id": "e3",
+       "title": "Untitled artist",
+       "artist": ""
+      }
+     ],
+     "name": "Late night",
+     "comment": "For after",
+     "public": false
+    },
+    "changed": true,
+    "body": {
+     "base": [
+      "e1",
+      "e2",
+      "e1",
+      "e3"
+     ],
+     "song_ids": [
+      "e1",
+      "e2",
+      "e1",
+      "e3"
+     ]
+    },
+    "keys": [
+     "base",
+     "song_ids"
+    ]
+   },
+   {
+    "name": "as drawn: a row removed",
+    "start": {
+     "rows": [
+      {
+       "key": "0:e1",
+       "id": "e1",
+       "title": "Roads",
+       "artist": "Portishead"
+      },
+      {
+       "key": "1:e2",
+       "id": "e2",
+       "title": "Teardrop",
+       "artist": "Massive Attack"
+      },
+      {
+       "key": "2:e1",
+       "id": "e1",
+       "title": "Roads",
+       "artist": "Portishead"
+      },
+      {
+       "key": "3:e3",
+       "id": "e3",
+       "title": "Untitled artist",
+       "artist": ""
+      }
+     ],
+     "name": "Late night",
+     "comment": "For after",
+     "public": false
+    },
+    "now": {
+     "rows": [
+      {
+       "key": "0:e1",
+       "id": "e1",
+       "title": "Roads",
+       "artist": "Portishead"
+      },
+      {
+       "key": "2:e1",
+       "id": "e1",
+       "title": "Roads",
+       "artist": "Portishead"
+      },
+      {
+       "key": "3:e3",
+       "id": "e3",
+       "title": "Untitled artist",
+       "artist": ""
+      }
+     ],
+     "name": "Late night",
+     "comment": "For after",
+     "public": false
+    },
+    "changed": true,
+    "body": {
+     "base": [
+      "e1",
+      "e2",
+      "e1",
+      "e3"
+     ],
+     "song_ids": [
+      "e1",
+      "e1",
+      "e3"
+     ]
+    },
+    "keys": [
+     "base",
+     "song_ids"
+    ]
+   },
+   {
+    "name": "as drawn: every row removed",
+    "start": {
+     "rows": [
+      {
+       "key": "0:e1",
+       "id": "e1",
+       "title": "Roads",
+       "artist": "Portishead"
+      },
+      {
+       "key": "1:e2",
+       "id": "e2",
+       "title": "Teardrop",
+       "artist": "Massive Attack"
+      },
+      {
+       "key": "2:e1",
+       "id": "e1",
+       "title": "Roads",
+       "artist": "Portishead"
+      },
+      {
+       "key": "3:e3",
+       "id": "e3",
+       "title": "Untitled artist",
+       "artist": ""
+      }
+     ],
+     "name": "Late night",
+     "comment": "For after",
+     "public": false
+    },
+    "now": {
+     "rows": [],
+     "name": "Late night",
+     "comment": "For after",
+     "public": false
+    },
+    "changed": true,
+    "body": {
+     "base": [
+      "e1",
+      "e2",
+      "e1",
+      "e3"
+     ],
+     "song_ids": []
+    },
+    "keys": [
+     "base",
+     "song_ids"
+    ]
+   },
+   {
+    "name": "as drawn: renamed",
+    "start": {
+     "rows": [
+      {
+       "key": "0:e1",
+       "id": "e1",
+       "title": "Roads",
+       "artist": "Portishead"
+      },
+      {
+       "key": "1:e2",
+       "id": "e2",
+       "title": "Teardrop",
+       "artist": "Massive Attack"
+      },
+      {
+       "key": "2:e1",
+       "id": "e1",
+       "title": "Roads",
+       "artist": "Portishead"
+      },
+      {
+       "key": "3:e3",
+       "id": "e3",
+       "title": "Untitled artist",
+       "artist": ""
+      }
+     ],
+     "name": "Late night",
+     "comment": "For after",
+     "public": false
+    },
+    "now": {
+     "rows": [
+      {
+       "key": "0:e1",
+       "id": "e1",
+       "title": "Roads",
+       "artist": "Portishead"
+      },
+      {
+       "key": "1:e2",
+       "id": "e2",
+       "title": "Teardrop",
+       "artist": "Massive Attack"
+      },
+      {
+       "key": "2:e1",
+       "id": "e1",
+       "title": "Roads",
+       "artist": "Portishead"
+      },
+      {
+       "key": "3:e3",
+       "id": "e3",
+       "title": "Untitled artist",
+       "artist": ""
+      }
+     ],
+     "name": "Early morning",
+     "comment": "For after",
+     "public": false
+    },
+    "changed": true,
+    "body": {
+     "base": [
+      "e1",
+      "e2",
+      "e1",
+      "e3"
+     ],
+     "song_ids": [
+      "e1",
+      "e2",
+      "e1",
+      "e3"
+     ],
+     "name": "Early morning"
+    },
+    "keys": [
+     "base",
+     "name",
+     "song_ids"
+    ]
+   },
+   {
+    "name": "as drawn: renamed with spaces around",
+    "start": {
+     "rows": [
+      {
+       "key": "0:e1",
+       "id": "e1",
+       "title": "Roads",
+       "artist": "Portishead"
+      },
+      {
+       "key": "1:e2",
+       "id": "e2",
+       "title": "Teardrop",
+       "artist": "Massive Attack"
+      },
+      {
+       "key": "2:e1",
+       "id": "e1",
+       "title": "Roads",
+       "artist": "Portishead"
+      },
+      {
+       "key": "3:e3",
+       "id": "e3",
+       "title": "Untitled artist",
+       "artist": ""
+      }
+     ],
+     "name": "Late night",
+     "comment": "For after",
+     "public": false
+    },
+    "now": {
+     "rows": [
+      {
+       "key": "0:e1",
+       "id": "e1",
+       "title": "Roads",
+       "artist": "Portishead"
+      },
+      {
+       "key": "1:e2",
+       "id": "e2",
+       "title": "Teardrop",
+       "artist": "Massive Attack"
+      },
+      {
+       "key": "2:e1",
+       "id": "e1",
+       "title": "Roads",
+       "artist": "Portishead"
+      },
+      {
+       "key": "3:e3",
+       "id": "e3",
+       "title": "Untitled artist",
+       "artist": ""
+      }
+     ],
+     "name": "  Early morning \u00a0",
+     "comment": "For after",
+     "public": false
+    },
+    "changed": true,
+    "body": {
+     "base": [
+      "e1",
+      "e2",
+      "e1",
+      "e3"
+     ],
+     "song_ids": [
+      "e1",
+      "e2",
+      "e1",
+      "e3"
+     ],
+     "name": "Early morning"
+    },
+    "keys": [
+     "base",
+     "name",
+     "song_ids"
+    ]
+   },
+   {
+    "name": "as drawn: the same name with spaces around",
+    "start": {
+     "rows": [
+      {
+       "key": "0:e1",
+       "id": "e1",
+       "title": "Roads",
+       "artist": "Portishead"
+      },
+      {
+       "key": "1:e2",
+       "id": "e2",
+       "title": "Teardrop",
+       "artist": "Massive Attack"
+      },
+      {
+       "key": "2:e1",
+       "id": "e1",
+       "title": "Roads",
+       "artist": "Portishead"
+      },
+      {
+       "key": "3:e3",
+       "id": "e3",
+       "title": "Untitled artist",
+       "artist": ""
+      }
+     ],
+     "name": "Late night",
+     "comment": "For after",
+     "public": false
+    },
+    "now": {
+     "rows": [
+      {
+       "key": "0:e1",
+       "id": "e1",
+       "title": "Roads",
+       "artist": "Portishead"
+      },
+      {
+       "key": "1:e2",
+       "id": "e2",
+       "title": "Teardrop",
+       "artist": "Massive Attack"
+      },
+      {
+       "key": "2:e1",
+       "id": "e1",
+       "title": "Roads",
+       "artist": "Portishead"
+      },
+      {
+       "key": "3:e3",
+       "id": "e3",
+       "title": "Untitled artist",
+       "artist": ""
+      }
+     ],
+     "name": "\ufeff Late night\t\n",
+     "comment": "For after",
+     "public": false
+    },
+    "changed": false,
+    "body": null,
+    "keys": null
+   },
+   {
+    "name": "as drawn: a name JS does not trim",
+    "start": {
+     "rows": [
+      {
+       "key": "0:e1",
+       "id": "e1",
+       "title": "Roads",
+       "artist": "Portishead"
+      },
+      {
+       "key": "1:e2",
+       "id": "e2",
+       "title": "Teardrop",
+       "artist": "Massive Attack"
+      },
+      {
+       "key": "2:e1",
+       "id": "e1",
+       "title": "Roads",
+       "artist": "Portishead"
+      },
+      {
+       "key": "3:e3",
+       "id": "e3",
+       "title": "Untitled artist",
+       "artist": ""
+      }
+     ],
+     "name": "Late night",
+     "comment": "For after",
+     "public": false
+    },
+    "now": {
+     "rows": [
+      {
+       "key": "0:e1",
+       "id": "e1",
+       "title": "Roads",
+       "artist": "Portishead"
+      },
+      {
+       "key": "1:e2",
+       "id": "e2",
+       "title": "Teardrop",
+       "artist": "Massive Attack"
+      },
+      {
+       "key": "2:e1",
+       "id": "e1",
+       "title": "Roads",
+       "artist": "Portishead"
+      },
+      {
+       "key": "3:e3",
+       "id": "e3",
+       "title": "Untitled artist",
+       "artist": ""
+      }
+     ],
+     "name": "Late night\u0085",
+     "comment": "For after",
+     "public": false
+    },
+    "changed": true,
+    "body": {
+     "base": [
+      "e1",
+      "e2",
+      "e1",
+      "e3"
+     ],
+     "song_ids": [
+      "e1",
+      "e2",
+      "e1",
+      "e3"
+     ],
+     "name": "Late night\u0085"
+    },
+    "keys": [
+     "base",
+     "name",
+     "song_ids"
+    ]
+   },
+   {
+    "name": "as drawn: the name cleared",
+    "start": {
+     "rows": [
+      {
+       "key": "0:e1",
+       "id": "e1",
+       "title": "Roads",
+       "artist": "Portishead"
+      },
+      {
+       "key": "1:e2",
+       "id": "e2",
+       "title": "Teardrop",
+       "artist": "Massive Attack"
+      },
+      {
+       "key": "2:e1",
+       "id": "e1",
+       "title": "Roads",
+       "artist": "Portishead"
+      },
+      {
+       "key": "3:e3",
+       "id": "e3",
+       "title": "Untitled artist",
+       "artist": ""
+      }
+     ],
+     "name": "Late night",
+     "comment": "For after",
+     "public": false
+    },
+    "now": {
+     "rows": [
+      {
+       "key": "0:e1",
+       "id": "e1",
+       "title": "Roads",
+       "artist": "Portishead"
+      },
+      {
+       "key": "1:e2",
+       "id": "e2",
+       "title": "Teardrop",
+       "artist": "Massive Attack"
+      },
+      {
+       "key": "2:e1",
+       "id": "e1",
+       "title": "Roads",
+       "artist": "Portishead"
+      },
+      {
+       "key": "3:e3",
+       "id": "e3",
+       "title": "Untitled artist",
+       "artist": ""
+      }
+     ],
+     "name": "   ",
+     "comment": "For after",
+     "public": false
+    },
+    "changed": true,
+    "body": {
+     "base": [
+      "e1",
+      "e2",
+      "e1",
+      "e3"
+     ],
+     "song_ids": [
+      "e1",
+      "e2",
+      "e1",
+      "e3"
+     ],
+     "name": ""
+    },
+    "keys": [
+     "base",
+     "name",
+     "song_ids"
+    ]
+   },
+   {
+    "name": "as drawn: the description cleared",
+    "start": {
+     "rows": [
+      {
+       "key": "0:e1",
+       "id": "e1",
+       "title": "Roads",
+       "artist": "Portishead"
+      },
+      {
+       "key": "1:e2",
+       "id": "e2",
+       "title": "Teardrop",
+       "artist": "Massive Attack"
+      },
+      {
+       "key": "2:e1",
+       "id": "e1",
+       "title": "Roads",
+       "artist": "Portishead"
+      },
+      {
+       "key": "3:e3",
+       "id": "e3",
+       "title": "Untitled artist",
+       "artist": ""
+      }
+     ],
+     "name": "Late night",
+     "comment": "For after",
+     "public": false
+    },
+    "now": {
+     "rows": [
+      {
+       "key": "0:e1",
+       "id": "e1",
+       "title": "Roads",
+       "artist": "Portishead"
+      },
+      {
+       "key": "1:e2",
+       "id": "e2",
+       "title": "Teardrop",
+       "artist": "Massive Attack"
+      },
+      {
+       "key": "2:e1",
+       "id": "e1",
+       "title": "Roads",
+       "artist": "Portishead"
+      },
+      {
+       "key": "3:e3",
+       "id": "e3",
+       "title": "Untitled artist",
+       "artist": ""
+      }
+     ],
+     "name": "Late night",
+     "comment": "",
+     "public": false
+    },
+    "changed": true,
+    "body": {
+     "base": [
+      "e1",
+      "e2",
+      "e1",
+      "e3"
+     ],
+     "song_ids": [
+      "e1",
+      "e2",
+      "e1",
+      "e3"
+     ],
+     "comment": ""
+    },
+    "keys": [
+     "base",
+     "comment",
+     "song_ids"
+    ]
+   },
+   {
+    "name": "as drawn: the same description with spaces",
+    "start": {
+     "rows": [
+      {
+       "key": "0:e1",
+       "id": "e1",
+       "title": "Roads",
+       "artist": "Portishead"
+      },
+      {
+       "key": "1:e2",
+       "id": "e2",
+       "title": "Teardrop",
+       "artist": "Massive Attack"
+      },
+      {
+       "key": "2:e1",
+       "id": "e1",
+       "title": "Roads",
+       "artist": "Portishead"
+      },
+      {
+       "key": "3:e3",
+       "id": "e3",
+       "title": "Untitled artist",
+       "artist": ""
+      }
+     ],
+     "name": "Late night",
+     "comment": "For after",
+     "public": false
+    },
+    "now": {
+     "rows": [
+      {
+       "key": "0:e1",
+       "id": "e1",
+       "title": "Roads",
+       "artist": "Portishead"
+      },
+      {
+       "key": "1:e2",
+       "id": "e2",
+       "title": "Teardrop",
+       "artist": "Massive Attack"
+      },
+      {
+       "key": "2:e1",
+       "id": "e1",
+       "title": "Roads",
+       "artist": "Portishead"
+      },
+      {
+       "key": "3:e3",
+       "id": "e3",
+       "title": "Untitled artist",
+       "artist": ""
+      }
+     ],
+     "name": "Late night",
+     "comment": " For after ",
+     "public": false
+    },
+    "changed": false,
+    "body": null,
+    "keys": null
+   },
+   {
+    "name": "as drawn: shared",
+    "start": {
+     "rows": [
+      {
+       "key": "0:e1",
+       "id": "e1",
+       "title": "Roads",
+       "artist": "Portishead"
+      },
+      {
+       "key": "1:e2",
+       "id": "e2",
+       "title": "Teardrop",
+       "artist": "Massive Attack"
+      },
+      {
+       "key": "2:e1",
+       "id": "e1",
+       "title": "Roads",
+       "artist": "Portishead"
+      },
+      {
+       "key": "3:e3",
+       "id": "e3",
+       "title": "Untitled artist",
+       "artist": ""
+      }
+     ],
+     "name": "Late night",
+     "comment": "For after",
+     "public": false
+    },
+    "now": {
+     "rows": [
+      {
+       "key": "0:e1",
+       "id": "e1",
+       "title": "Roads",
+       "artist": "Portishead"
+      },
+      {
+       "key": "1:e2",
+       "id": "e2",
+       "title": "Teardrop",
+       "artist": "Massive Attack"
+      },
+      {
+       "key": "2:e1",
+       "id": "e1",
+       "title": "Roads",
+       "artist": "Portishead"
+      },
+      {
+       "key": "3:e3",
+       "id": "e3",
+       "title": "Untitled artist",
+       "artist": ""
+      }
+     ],
+     "name": "Late night",
+     "comment": "For after",
+     "public": true
+    },
+    "changed": true,
+    "body": {
+     "base": [
+      "e1",
+      "e2",
+      "e1",
+      "e3"
+     ],
+     "song_ids": [
+      "e1",
+      "e2",
+      "e1",
+      "e3"
+     ],
+     "public": true
+    },
+    "keys": [
+     "base",
+     "public",
+     "song_ids"
+    ]
+   },
+   {
+    "name": "as drawn: everything",
+    "start": {
+     "rows": [
+      {
+       "key": "0:e1",
+       "id": "e1",
+       "title": "Roads",
+       "artist": "Portishead"
+      },
+      {
+       "key": "1:e2",
+       "id": "e2",
+       "title": "Teardrop",
+       "artist": "Massive Attack"
+      },
+      {
+       "key": "2:e1",
+       "id": "e1",
+       "title": "Roads",
+       "artist": "Portishead"
+      },
+      {
+       "key": "3:e3",
+       "id": "e3",
+       "title": "Untitled artist",
+       "artist": ""
+      }
+     ],
+     "name": "Late night",
+     "comment": "For after",
+     "public": false
+    },
+    "now": {
+     "rows": [
+      {
+       "key": "2:e1",
+       "id": "e1",
+       "title": "Roads",
+       "artist": "Portishead"
+      },
+      {
+       "key": "0:e1",
+       "id": "e1",
+       "title": "Roads",
+       "artist": "Portishead"
+      },
+      {
+       "key": "1:e2",
+       "id": "e2",
+       "title": "Teardrop",
+       "artist": "Massive Attack"
+      }
+     ],
+     "name": "New name",
+     "comment": "New words",
+     "public": true
+    },
+    "changed": true,
+    "body": {
+     "base": [
+      "e1",
+      "e2",
+      "e1",
+      "e3"
+     ],
+     "song_ids": [
+      "e1",
+      "e1",
+      "e2"
+     ],
+     "name": "New name",
+     "comment": "New words",
+     "public": true
+    },
+    "keys": [
+     "base",
+     "comment",
+     "name",
+     "public",
+     "song_ids"
+    ]
+   },
+   {
+    "name": "a name with spaces of its own: nothing changed",
+    "start": {
+     "rows": [
+      {
+       "key": "0:e1",
+       "id": "e1",
+       "title": "Roads",
+       "artist": "Portishead"
+      },
+      {
+       "key": "1:e2",
+       "id": "e2",
+       "title": "Teardrop",
+       "artist": "Massive Attack"
+      },
+      {
+       "key": "2:e1",
+       "id": "e1",
+       "title": "Roads",
+       "artist": "Portishead"
+      },
+      {
+       "key": "3:e3",
+       "id": "e3",
+       "title": "Untitled artist",
+       "artist": ""
+      }
+     ],
+     "name": "  Late night  ",
+     "comment": "\u00a0For after",
+     "public": false
+    },
+    "now": {
+     "rows": [
+      {
+       "key": "0:e1",
+       "id": "e1",
+       "title": "Roads",
+       "artist": "Portishead"
+      },
+      {
+       "key": "1:e2",
+       "id": "e2",
+       "title": "Teardrop",
+       "artist": "Massive Attack"
+      },
+      {
+       "key": "2:e1",
+       "id": "e1",
+       "title": "Roads",
+       "artist": "Portishead"
+      },
+      {
+       "key": "3:e3",
+       "id": "e3",
+       "title": "Untitled artist",
+       "artist": ""
+      }
+     ],
+     "name": "Late night",
+     "comment": "For after",
+     "public": false
+    },
+    "changed": false,
+    "body": null,
+    "keys": null
+   },
+   {
+    "name": "a name with spaces of its own: a row moved and moved back",
+    "start": {
+     "rows": [
+      {
+       "key": "0:e1",
+       "id": "e1",
+       "title": "Roads",
+       "artist": "Portishead"
+      },
+      {
+       "key": "1:e2",
+       "id": "e2",
+       "title": "Teardrop",
+       "artist": "Massive Attack"
+      },
+      {
+       "key": "2:e1",
+       "id": "e1",
+       "title": "Roads",
+       "artist": "Portishead"
+      },
+      {
+       "key": "3:e3",
+       "id": "e3",
+       "title": "Untitled artist",
+       "artist": ""
+      }
+     ],
+     "name": "  Late night  ",
+     "comment": "\u00a0For after",
+     "public": false
+    },
+    "now": {
+     "rows": [
+      {
+       "key": "0:e1",
+       "id": "e1",
+       "title": "Roads",
+       "artist": "Portishead"
+      },
+      {
+       "key": "1:e2",
+       "id": "e2",
+       "title": "Teardrop",
+       "artist": "Massive Attack"
+      },
+      {
+       "key": "2:e1",
+       "id": "e1",
+       "title": "Roads",
+       "artist": "Portishead"
+      },
+      {
+       "key": "3:e3",
+       "id": "e3",
+       "title": "Untitled artist",
+       "artist": ""
+      }
+     ],
+     "name": "Late night",
+     "comment": "For after",
+     "public": false
+    },
+    "changed": false,
+    "body": null,
+    "keys": null
+   },
+   {
+    "name": "a name with spaces of its own: a row moved",
+    "start": {
+     "rows": [
+      {
+       "key": "0:e1",
+       "id": "e1",
+       "title": "Roads",
+       "artist": "Portishead"
+      },
+      {
+       "key": "1:e2",
+       "id": "e2",
+       "title": "Teardrop",
+       "artist": "Massive Attack"
+      },
+      {
+       "key": "2:e1",
+       "id": "e1",
+       "title": "Roads",
+       "artist": "Portishead"
+      },
+      {
+       "key": "3:e3",
+       "id": "e3",
+       "title": "Untitled artist",
+       "artist": ""
+      }
+     ],
+     "name": "  Late night  ",
+     "comment": "\u00a0For after",
+     "public": false
+    },
+    "now": {
+     "rows": [
+      {
+       "key": "3:e3",
+       "id": "e3",
+       "title": "Untitled artist",
+       "artist": ""
+      },
+      {
+       "key": "0:e1",
+       "id": "e1",
+       "title": "Roads",
+       "artist": "Portishead"
+      },
+      {
+       "key": "1:e2",
+       "id": "e2",
+       "title": "Teardrop",
+       "artist": "Massive Attack"
+      },
+      {
+       "key": "2:e1",
+       "id": "e1",
+       "title": "Roads",
+       "artist": "Portishead"
+      }
+     ],
+     "name": "Late night",
+     "comment": "For after",
+     "public": false
+    },
+    "changed": true,
+    "body": {
+     "base": [
+      "e1",
+      "e2",
+      "e1",
+      "e3"
+     ],
+     "song_ids": [
+      "e3",
+      "e1",
+      "e2",
+      "e1"
+     ]
+    },
+    "keys": [
+     "base",
+     "song_ids"
+    ]
+   },
+   {
+    "name": "a name with spaces of its own: a song's two rows swapped",
+    "start": {
+     "rows": [
+      {
+       "key": "0:e1",
+       "id": "e1",
+       "title": "Roads",
+       "artist": "Portishead"
+      },
+      {
+       "key": "1:e2",
+       "id": "e2",
+       "title": "Teardrop",
+       "artist": "Massive Attack"
+      },
+      {
+       "key": "2:e1",
+       "id": "e1",
+       "title": "Roads",
+       "artist": "Portishead"
+      },
+      {
+       "key": "3:e3",
+       "id": "e3",
+       "title": "Untitled artist",
+       "artist": ""
+      }
+     ],
+     "name": "  Late night  ",
+     "comment": "\u00a0For after",
+     "public": false
+    },
+    "now": {
+     "rows": [
+      {
+       "key": "2:e1",
+       "id": "e1",
+       "title": "Roads",
+       "artist": "Portishead"
+      },
+      {
+       "key": "1:e2",
+       "id": "e2",
+       "title": "Teardrop",
+       "artist": "Massive Attack"
+      },
+      {
+       "key": "0:e1",
+       "id": "e1",
+       "title": "Roads",
+       "artist": "Portishead"
+      },
+      {
+       "key": "3:e3",
+       "id": "e3",
+       "title": "Untitled artist",
+       "artist": ""
+      }
+     ],
+     "name": "Late night",
+     "comment": "For after",
+     "public": false
+    },
+    "changed": true,
+    "body": {
+     "base": [
+      "e1",
+      "e2",
+      "e1",
+      "e3"
+     ],
+     "song_ids": [
+      "e1",
+      "e2",
+      "e1",
+      "e3"
+     ]
+    },
+    "keys": [
+     "base",
+     "song_ids"
+    ]
+   },
+   {
+    "name": "a name with spaces of its own: a row removed",
+    "start": {
+     "rows": [
+      {
+       "key": "0:e1",
+       "id": "e1",
+       "title": "Roads",
+       "artist": "Portishead"
+      },
+      {
+       "key": "1:e2",
+       "id": "e2",
+       "title": "Teardrop",
+       "artist": "Massive Attack"
+      },
+      {
+       "key": "2:e1",
+       "id": "e1",
+       "title": "Roads",
+       "artist": "Portishead"
+      },
+      {
+       "key": "3:e3",
+       "id": "e3",
+       "title": "Untitled artist",
+       "artist": ""
+      }
+     ],
+     "name": "  Late night  ",
+     "comment": "\u00a0For after",
+     "public": false
+    },
+    "now": {
+     "rows": [
+      {
+       "key": "0:e1",
+       "id": "e1",
+       "title": "Roads",
+       "artist": "Portishead"
+      },
+      {
+       "key": "2:e1",
+       "id": "e1",
+       "title": "Roads",
+       "artist": "Portishead"
+      },
+      {
+       "key": "3:e3",
+       "id": "e3",
+       "title": "Untitled artist",
+       "artist": ""
+      }
+     ],
+     "name": "Late night",
+     "comment": "For after",
+     "public": false
+    },
+    "changed": true,
+    "body": {
+     "base": [
+      "e1",
+      "e2",
+      "e1",
+      "e3"
+     ],
+     "song_ids": [
+      "e1",
+      "e1",
+      "e3"
+     ]
+    },
+    "keys": [
+     "base",
+     "song_ids"
+    ]
+   },
+   {
+    "name": "a name with spaces of its own: every row removed",
+    "start": {
+     "rows": [
+      {
+       "key": "0:e1",
+       "id": "e1",
+       "title": "Roads",
+       "artist": "Portishead"
+      },
+      {
+       "key": "1:e2",
+       "id": "e2",
+       "title": "Teardrop",
+       "artist": "Massive Attack"
+      },
+      {
+       "key": "2:e1",
+       "id": "e1",
+       "title": "Roads",
+       "artist": "Portishead"
+      },
+      {
+       "key": "3:e3",
+       "id": "e3",
+       "title": "Untitled artist",
+       "artist": ""
+      }
+     ],
+     "name": "  Late night  ",
+     "comment": "\u00a0For after",
+     "public": false
+    },
+    "now": {
+     "rows": [],
+     "name": "Late night",
+     "comment": "For after",
+     "public": false
+    },
+    "changed": true,
+    "body": {
+     "base": [
+      "e1",
+      "e2",
+      "e1",
+      "e3"
+     ],
+     "song_ids": []
+    },
+    "keys": [
+     "base",
+     "song_ids"
+    ]
+   },
+   {
+    "name": "a name with spaces of its own: renamed",
+    "start": {
+     "rows": [
+      {
+       "key": "0:e1",
+       "id": "e1",
+       "title": "Roads",
+       "artist": "Portishead"
+      },
+      {
+       "key": "1:e2",
+       "id": "e2",
+       "title": "Teardrop",
+       "artist": "Massive Attack"
+      },
+      {
+       "key": "2:e1",
+       "id": "e1",
+       "title": "Roads",
+       "artist": "Portishead"
+      },
+      {
+       "key": "3:e3",
+       "id": "e3",
+       "title": "Untitled artist",
+       "artist": ""
+      }
+     ],
+     "name": "  Late night  ",
+     "comment": "\u00a0For after",
+     "public": false
+    },
+    "now": {
+     "rows": [
+      {
+       "key": "0:e1",
+       "id": "e1",
+       "title": "Roads",
+       "artist": "Portishead"
+      },
+      {
+       "key": "1:e2",
+       "id": "e2",
+       "title": "Teardrop",
+       "artist": "Massive Attack"
+      },
+      {
+       "key": "2:e1",
+       "id": "e1",
+       "title": "Roads",
+       "artist": "Portishead"
+      },
+      {
+       "key": "3:e3",
+       "id": "e3",
+       "title": "Untitled artist",
+       "artist": ""
+      }
+     ],
+     "name": "Early morning",
+     "comment": "For after",
+     "public": false
+    },
+    "changed": true,
+    "body": {
+     "base": [
+      "e1",
+      "e2",
+      "e1",
+      "e3"
+     ],
+     "song_ids": [
+      "e1",
+      "e2",
+      "e1",
+      "e3"
+     ],
+     "name": "Early morning"
+    },
+    "keys": [
+     "base",
+     "name",
+     "song_ids"
+    ]
+   },
+   {
+    "name": "a name with spaces of its own: renamed with spaces around",
+    "start": {
+     "rows": [
+      {
+       "key": "0:e1",
+       "id": "e1",
+       "title": "Roads",
+       "artist": "Portishead"
+      },
+      {
+       "key": "1:e2",
+       "id": "e2",
+       "title": "Teardrop",
+       "artist": "Massive Attack"
+      },
+      {
+       "key": "2:e1",
+       "id": "e1",
+       "title": "Roads",
+       "artist": "Portishead"
+      },
+      {
+       "key": "3:e3",
+       "id": "e3",
+       "title": "Untitled artist",
+       "artist": ""
+      }
+     ],
+     "name": "  Late night  ",
+     "comment": "\u00a0For after",
+     "public": false
+    },
+    "now": {
+     "rows": [
+      {
+       "key": "0:e1",
+       "id": "e1",
+       "title": "Roads",
+       "artist": "Portishead"
+      },
+      {
+       "key": "1:e2",
+       "id": "e2",
+       "title": "Teardrop",
+       "artist": "Massive Attack"
+      },
+      {
+       "key": "2:e1",
+       "id": "e1",
+       "title": "Roads",
+       "artist": "Portishead"
+      },
+      {
+       "key": "3:e3",
+       "id": "e3",
+       "title": "Untitled artist",
+       "artist": ""
+      }
+     ],
+     "name": "  Early morning \u00a0",
+     "comment": "For after",
+     "public": false
+    },
+    "changed": true,
+    "body": {
+     "base": [
+      "e1",
+      "e2",
+      "e1",
+      "e3"
+     ],
+     "song_ids": [
+      "e1",
+      "e2",
+      "e1",
+      "e3"
+     ],
+     "name": "Early morning"
+    },
+    "keys": [
+     "base",
+     "name",
+     "song_ids"
+    ]
+   },
+   {
+    "name": "a name with spaces of its own: the same name with spaces around",
+    "start": {
+     "rows": [
+      {
+       "key": "0:e1",
+       "id": "e1",
+       "title": "Roads",
+       "artist": "Portishead"
+      },
+      {
+       "key": "1:e2",
+       "id": "e2",
+       "title": "Teardrop",
+       "artist": "Massive Attack"
+      },
+      {
+       "key": "2:e1",
+       "id": "e1",
+       "title": "Roads",
+       "artist": "Portishead"
+      },
+      {
+       "key": "3:e3",
+       "id": "e3",
+       "title": "Untitled artist",
+       "artist": ""
+      }
+     ],
+     "name": "  Late night  ",
+     "comment": "\u00a0For after",
+     "public": false
+    },
+    "now": {
+     "rows": [
+      {
+       "key": "0:e1",
+       "id": "e1",
+       "title": "Roads",
+       "artist": "Portishead"
+      },
+      {
+       "key": "1:e2",
+       "id": "e2",
+       "title": "Teardrop",
+       "artist": "Massive Attack"
+      },
+      {
+       "key": "2:e1",
+       "id": "e1",
+       "title": "Roads",
+       "artist": "Portishead"
+      },
+      {
+       "key": "3:e3",
+       "id": "e3",
+       "title": "Untitled artist",
+       "artist": ""
+      }
+     ],
+     "name": "\ufeff Late night\t\n",
+     "comment": "For after",
+     "public": false
+    },
+    "changed": false,
+    "body": null,
+    "keys": null
+   },
+   {
+    "name": "a name with spaces of its own: a name JS does not trim",
+    "start": {
+     "rows": [
+      {
+       "key": "0:e1",
+       "id": "e1",
+       "title": "Roads",
+       "artist": "Portishead"
+      },
+      {
+       "key": "1:e2",
+       "id": "e2",
+       "title": "Teardrop",
+       "artist": "Massive Attack"
+      },
+      {
+       "key": "2:e1",
+       "id": "e1",
+       "title": "Roads",
+       "artist": "Portishead"
+      },
+      {
+       "key": "3:e3",
+       "id": "e3",
+       "title": "Untitled artist",
+       "artist": ""
+      }
+     ],
+     "name": "  Late night  ",
+     "comment": "\u00a0For after",
+     "public": false
+    },
+    "now": {
+     "rows": [
+      {
+       "key": "0:e1",
+       "id": "e1",
+       "title": "Roads",
+       "artist": "Portishead"
+      },
+      {
+       "key": "1:e2",
+       "id": "e2",
+       "title": "Teardrop",
+       "artist": "Massive Attack"
+      },
+      {
+       "key": "2:e1",
+       "id": "e1",
+       "title": "Roads",
+       "artist": "Portishead"
+      },
+      {
+       "key": "3:e3",
+       "id": "e3",
+       "title": "Untitled artist",
+       "artist": ""
+      }
+     ],
+     "name": "Late night\u0085",
+     "comment": "For after",
+     "public": false
+    },
+    "changed": true,
+    "body": {
+     "base": [
+      "e1",
+      "e2",
+      "e1",
+      "e3"
+     ],
+     "song_ids": [
+      "e1",
+      "e2",
+      "e1",
+      "e3"
+     ],
+     "name": "Late night\u0085"
+    },
+    "keys": [
+     "base",
+     "name",
+     "song_ids"
+    ]
+   },
+   {
+    "name": "a name with spaces of its own: the name cleared",
+    "start": {
+     "rows": [
+      {
+       "key": "0:e1",
+       "id": "e1",
+       "title": "Roads",
+       "artist": "Portishead"
+      },
+      {
+       "key": "1:e2",
+       "id": "e2",
+       "title": "Teardrop",
+       "artist": "Massive Attack"
+      },
+      {
+       "key": "2:e1",
+       "id": "e1",
+       "title": "Roads",
+       "artist": "Portishead"
+      },
+      {
+       "key": "3:e3",
+       "id": "e3",
+       "title": "Untitled artist",
+       "artist": ""
+      }
+     ],
+     "name": "  Late night  ",
+     "comment": "\u00a0For after",
+     "public": false
+    },
+    "now": {
+     "rows": [
+      {
+       "key": "0:e1",
+       "id": "e1",
+       "title": "Roads",
+       "artist": "Portishead"
+      },
+      {
+       "key": "1:e2",
+       "id": "e2",
+       "title": "Teardrop",
+       "artist": "Massive Attack"
+      },
+      {
+       "key": "2:e1",
+       "id": "e1",
+       "title": "Roads",
+       "artist": "Portishead"
+      },
+      {
+       "key": "3:e3",
+       "id": "e3",
+       "title": "Untitled artist",
+       "artist": ""
+      }
+     ],
+     "name": "   ",
+     "comment": "For after",
+     "public": false
+    },
+    "changed": true,
+    "body": {
+     "base": [
+      "e1",
+      "e2",
+      "e1",
+      "e3"
+     ],
+     "song_ids": [
+      "e1",
+      "e2",
+      "e1",
+      "e3"
+     ],
+     "name": ""
+    },
+    "keys": [
+     "base",
+     "name",
+     "song_ids"
+    ]
+   },
+   {
+    "name": "a name with spaces of its own: the description cleared",
+    "start": {
+     "rows": [
+      {
+       "key": "0:e1",
+       "id": "e1",
+       "title": "Roads",
+       "artist": "Portishead"
+      },
+      {
+       "key": "1:e2",
+       "id": "e2",
+       "title": "Teardrop",
+       "artist": "Massive Attack"
+      },
+      {
+       "key": "2:e1",
+       "id": "e1",
+       "title": "Roads",
+       "artist": "Portishead"
+      },
+      {
+       "key": "3:e3",
+       "id": "e3",
+       "title": "Untitled artist",
+       "artist": ""
+      }
+     ],
+     "name": "  Late night  ",
+     "comment": "\u00a0For after",
+     "public": false
+    },
+    "now": {
+     "rows": [
+      {
+       "key": "0:e1",
+       "id": "e1",
+       "title": "Roads",
+       "artist": "Portishead"
+      },
+      {
+       "key": "1:e2",
+       "id": "e2",
+       "title": "Teardrop",
+       "artist": "Massive Attack"
+      },
+      {
+       "key": "2:e1",
+       "id": "e1",
+       "title": "Roads",
+       "artist": "Portishead"
+      },
+      {
+       "key": "3:e3",
+       "id": "e3",
+       "title": "Untitled artist",
+       "artist": ""
+      }
+     ],
+     "name": "Late night",
+     "comment": "",
+     "public": false
+    },
+    "changed": true,
+    "body": {
+     "base": [
+      "e1",
+      "e2",
+      "e1",
+      "e3"
+     ],
+     "song_ids": [
+      "e1",
+      "e2",
+      "e1",
+      "e3"
+     ],
+     "comment": ""
+    },
+    "keys": [
+     "base",
+     "comment",
+     "song_ids"
+    ]
+   },
+   {
+    "name": "a name with spaces of its own: the same description with spaces",
+    "start": {
+     "rows": [
+      {
+       "key": "0:e1",
+       "id": "e1",
+       "title": "Roads",
+       "artist": "Portishead"
+      },
+      {
+       "key": "1:e2",
+       "id": "e2",
+       "title": "Teardrop",
+       "artist": "Massive Attack"
+      },
+      {
+       "key": "2:e1",
+       "id": "e1",
+       "title": "Roads",
+       "artist": "Portishead"
+      },
+      {
+       "key": "3:e3",
+       "id": "e3",
+       "title": "Untitled artist",
+       "artist": ""
+      }
+     ],
+     "name": "  Late night  ",
+     "comment": "\u00a0For after",
+     "public": false
+    },
+    "now": {
+     "rows": [
+      {
+       "key": "0:e1",
+       "id": "e1",
+       "title": "Roads",
+       "artist": "Portishead"
+      },
+      {
+       "key": "1:e2",
+       "id": "e2",
+       "title": "Teardrop",
+       "artist": "Massive Attack"
+      },
+      {
+       "key": "2:e1",
+       "id": "e1",
+       "title": "Roads",
+       "artist": "Portishead"
+      },
+      {
+       "key": "3:e3",
+       "id": "e3",
+       "title": "Untitled artist",
+       "artist": ""
+      }
+     ],
+     "name": "Late night",
+     "comment": " For after ",
+     "public": false
+    },
+    "changed": false,
+    "body": null,
+    "keys": null
+   },
+   {
+    "name": "a name with spaces of its own: shared",
+    "start": {
+     "rows": [
+      {
+       "key": "0:e1",
+       "id": "e1",
+       "title": "Roads",
+       "artist": "Portishead"
+      },
+      {
+       "key": "1:e2",
+       "id": "e2",
+       "title": "Teardrop",
+       "artist": "Massive Attack"
+      },
+      {
+       "key": "2:e1",
+       "id": "e1",
+       "title": "Roads",
+       "artist": "Portishead"
+      },
+      {
+       "key": "3:e3",
+       "id": "e3",
+       "title": "Untitled artist",
+       "artist": ""
+      }
+     ],
+     "name": "  Late night  ",
+     "comment": "\u00a0For after",
+     "public": false
+    },
+    "now": {
+     "rows": [
+      {
+       "key": "0:e1",
+       "id": "e1",
+       "title": "Roads",
+       "artist": "Portishead"
+      },
+      {
+       "key": "1:e2",
+       "id": "e2",
+       "title": "Teardrop",
+       "artist": "Massive Attack"
+      },
+      {
+       "key": "2:e1",
+       "id": "e1",
+       "title": "Roads",
+       "artist": "Portishead"
+      },
+      {
+       "key": "3:e3",
+       "id": "e3",
+       "title": "Untitled artist",
+       "artist": ""
+      }
+     ],
+     "name": "Late night",
+     "comment": "For after",
+     "public": true
+    },
+    "changed": true,
+    "body": {
+     "base": [
+      "e1",
+      "e2",
+      "e1",
+      "e3"
+     ],
+     "song_ids": [
+      "e1",
+      "e2",
+      "e1",
+      "e3"
+     ],
+     "public": true
+    },
+    "keys": [
+     "base",
+     "public",
+     "song_ids"
+    ]
+   },
+   {
+    "name": "a name with spaces of its own: everything",
+    "start": {
+     "rows": [
+      {
+       "key": "0:e1",
+       "id": "e1",
+       "title": "Roads",
+       "artist": "Portishead"
+      },
+      {
+       "key": "1:e2",
+       "id": "e2",
+       "title": "Teardrop",
+       "artist": "Massive Attack"
+      },
+      {
+       "key": "2:e1",
+       "id": "e1",
+       "title": "Roads",
+       "artist": "Portishead"
+      },
+      {
+       "key": "3:e3",
+       "id": "e3",
+       "title": "Untitled artist",
+       "artist": ""
+      }
+     ],
+     "name": "  Late night  ",
+     "comment": "\u00a0For after",
+     "public": false
+    },
+    "now": {
+     "rows": [
+      {
+       "key": "2:e1",
+       "id": "e1",
+       "title": "Roads",
+       "artist": "Portishead"
+      },
+      {
+       "key": "0:e1",
+       "id": "e1",
+       "title": "Roads",
+       "artist": "Portishead"
+      },
+      {
+       "key": "1:e2",
+       "id": "e2",
+       "title": "Teardrop",
+       "artist": "Massive Attack"
+      }
+     ],
+     "name": "New name",
+     "comment": "New words",
+     "public": true
+    },
+    "changed": true,
+    "body": {
+     "base": [
+      "e1",
+      "e2",
+      "e1",
+      "e3"
+     ],
+     "song_ids": [
+      "e1",
+      "e1",
+      "e2"
+     ],
+     "name": "New name",
+     "comment": "New words",
+     "public": true
+    },
+    "keys": [
+     "base",
+     "comment",
+     "name",
+     "public",
+     "song_ids"
+    ]
+   },
+   {
+    "name": "empty: nothing changed",
+    "start": {
+     "rows": [],
+     "name": "Empty",
+     "comment": "",
+     "public": true
+    },
+    "now": {
+     "rows": [],
+     "name": "Late night",
+     "comment": "For after",
+     "public": false
+    },
+    "changed": true,
+    "body": {
+     "base": [],
+     "song_ids": [],
+     "name": "Late night",
+     "comment": "For after",
+     "public": false
+    },
+    "keys": [
+     "base",
+     "comment",
+     "name",
+     "public",
+     "song_ids"
+    ]
+   },
+   {
+    "name": "empty: a row moved and moved back",
+    "start": {
+     "rows": [],
+     "name": "Empty",
+     "comment": "",
+     "public": true
+    },
+    "now": {
+     "rows": [
+      {
+       "key": "0:e1",
+       "id": "e1",
+       "title": "Roads",
+       "artist": "Portishead"
+      },
+      {
+       "key": "1:e2",
+       "id": "e2",
+       "title": "Teardrop",
+       "artist": "Massive Attack"
+      },
+      {
+       "key": "2:e1",
+       "id": "e1",
+       "title": "Roads",
+       "artist": "Portishead"
+      },
+      {
+       "key": "3:e3",
+       "id": "e3",
+       "title": "Untitled artist",
+       "artist": ""
+      }
+     ],
+     "name": "Late night",
+     "comment": "For after",
+     "public": false
+    },
+    "changed": true,
+    "body": {
+     "base": [],
+     "song_ids": [
+      "e1",
+      "e2",
+      "e1",
+      "e3"
+     ],
+     "name": "Late night",
+     "comment": "For after",
+     "public": false
+    },
+    "keys": [
+     "base",
+     "comment",
+     "name",
+     "public",
+     "song_ids"
+    ]
+   },
+   {
+    "name": "empty: a row moved",
+    "start": {
+     "rows": [],
+     "name": "Empty",
+     "comment": "",
+     "public": true
+    },
+    "now": {
+     "rows": [
+      {
+       "key": "3:e3",
+       "id": "e3",
+       "title": "Untitled artist",
+       "artist": ""
+      },
+      {
+       "key": "0:e1",
+       "id": "e1",
+       "title": "Roads",
+       "artist": "Portishead"
+      },
+      {
+       "key": "1:e2",
+       "id": "e2",
+       "title": "Teardrop",
+       "artist": "Massive Attack"
+      },
+      {
+       "key": "2:e1",
+       "id": "e1",
+       "title": "Roads",
+       "artist": "Portishead"
+      }
+     ],
+     "name": "Late night",
+     "comment": "For after",
+     "public": false
+    },
+    "changed": true,
+    "body": {
+     "base": [],
+     "song_ids": [
+      "e3",
+      "e1",
+      "e2",
+      "e1"
+     ],
+     "name": "Late night",
+     "comment": "For after",
+     "public": false
+    },
+    "keys": [
+     "base",
+     "comment",
+     "name",
+     "public",
+     "song_ids"
+    ]
+   },
+   {
+    "name": "empty: a song's two rows swapped",
+    "start": {
+     "rows": [],
+     "name": "Empty",
+     "comment": "",
+     "public": true
+    },
+    "now": {
+     "rows": [
+      {
+       "key": "2:e1",
+       "id": "e1",
+       "title": "Roads",
+       "artist": "Portishead"
+      },
+      {
+       "key": "1:e2",
+       "id": "e2",
+       "title": "Teardrop",
+       "artist": "Massive Attack"
+      },
+      {
+       "key": "0:e1",
+       "id": "e1",
+       "title": "Roads",
+       "artist": "Portishead"
+      },
+      {
+       "key": "3:e3",
+       "id": "e3",
+       "title": "Untitled artist",
+       "artist": ""
+      }
+     ],
+     "name": "Late night",
+     "comment": "For after",
+     "public": false
+    },
+    "changed": true,
+    "body": {
+     "base": [],
+     "song_ids": [
+      "e1",
+      "e2",
+      "e1",
+      "e3"
+     ],
+     "name": "Late night",
+     "comment": "For after",
+     "public": false
+    },
+    "keys": [
+     "base",
+     "comment",
+     "name",
+     "public",
+     "song_ids"
+    ]
+   },
+   {
+    "name": "empty: a row removed",
+    "start": {
+     "rows": [],
+     "name": "Empty",
+     "comment": "",
+     "public": true
+    },
+    "now": {
+     "rows": [
+      {
+       "key": "0:e1",
+       "id": "e1",
+       "title": "Roads",
+       "artist": "Portishead"
+      },
+      {
+       "key": "2:e1",
+       "id": "e1",
+       "title": "Roads",
+       "artist": "Portishead"
+      },
+      {
+       "key": "3:e3",
+       "id": "e3",
+       "title": "Untitled artist",
+       "artist": ""
+      }
+     ],
+     "name": "Late night",
+     "comment": "For after",
+     "public": false
+    },
+    "changed": true,
+    "body": {
+     "base": [],
+     "song_ids": [
+      "e1",
+      "e1",
+      "e3"
+     ],
+     "name": "Late night",
+     "comment": "For after",
+     "public": false
+    },
+    "keys": [
+     "base",
+     "comment",
+     "name",
+     "public",
+     "song_ids"
+    ]
+   },
+   {
+    "name": "empty: every row removed",
+    "start": {
+     "rows": [],
+     "name": "Empty",
+     "comment": "",
+     "public": true
+    },
+    "now": {
+     "rows": [],
+     "name": "Late night",
+     "comment": "For after",
+     "public": false
+    },
+    "changed": true,
+    "body": {
+     "base": [],
+     "song_ids": [],
+     "name": "Late night",
+     "comment": "For after",
+     "public": false
+    },
+    "keys": [
+     "base",
+     "comment",
+     "name",
+     "public",
+     "song_ids"
+    ]
+   },
+   {
+    "name": "empty: renamed",
+    "start": {
+     "rows": [],
+     "name": "Empty",
+     "comment": "",
+     "public": true
+    },
+    "now": {
+     "rows": [
+      {
+       "key": "0:e1",
+       "id": "e1",
+       "title": "Roads",
+       "artist": "Portishead"
+      },
+      {
+       "key": "1:e2",
+       "id": "e2",
+       "title": "Teardrop",
+       "artist": "Massive Attack"
+      },
+      {
+       "key": "2:e1",
+       "id": "e1",
+       "title": "Roads",
+       "artist": "Portishead"
+      },
+      {
+       "key": "3:e3",
+       "id": "e3",
+       "title": "Untitled artist",
+       "artist": ""
+      }
+     ],
+     "name": "Early morning",
+     "comment": "For after",
+     "public": false
+    },
+    "changed": true,
+    "body": {
+     "base": [],
+     "song_ids": [
+      "e1",
+      "e2",
+      "e1",
+      "e3"
+     ],
+     "name": "Early morning",
+     "comment": "For after",
+     "public": false
+    },
+    "keys": [
+     "base",
+     "comment",
+     "name",
+     "public",
+     "song_ids"
+    ]
+   },
+   {
+    "name": "empty: renamed with spaces around",
+    "start": {
+     "rows": [],
+     "name": "Empty",
+     "comment": "",
+     "public": true
+    },
+    "now": {
+     "rows": [
+      {
+       "key": "0:e1",
+       "id": "e1",
+       "title": "Roads",
+       "artist": "Portishead"
+      },
+      {
+       "key": "1:e2",
+       "id": "e2",
+       "title": "Teardrop",
+       "artist": "Massive Attack"
+      },
+      {
+       "key": "2:e1",
+       "id": "e1",
+       "title": "Roads",
+       "artist": "Portishead"
+      },
+      {
+       "key": "3:e3",
+       "id": "e3",
+       "title": "Untitled artist",
+       "artist": ""
+      }
+     ],
+     "name": "  Early morning \u00a0",
+     "comment": "For after",
+     "public": false
+    },
+    "changed": true,
+    "body": {
+     "base": [],
+     "song_ids": [
+      "e1",
+      "e2",
+      "e1",
+      "e3"
+     ],
+     "name": "Early morning",
+     "comment": "For after",
+     "public": false
+    },
+    "keys": [
+     "base",
+     "comment",
+     "name",
+     "public",
+     "song_ids"
+    ]
+   },
+   {
+    "name": "empty: the same name with spaces around",
+    "start": {
+     "rows": [],
+     "name": "Empty",
+     "comment": "",
+     "public": true
+    },
+    "now": {
+     "rows": [
+      {
+       "key": "0:e1",
+       "id": "e1",
+       "title": "Roads",
+       "artist": "Portishead"
+      },
+      {
+       "key": "1:e2",
+       "id": "e2",
+       "title": "Teardrop",
+       "artist": "Massive Attack"
+      },
+      {
+       "key": "2:e1",
+       "id": "e1",
+       "title": "Roads",
+       "artist": "Portishead"
+      },
+      {
+       "key": "3:e3",
+       "id": "e3",
+       "title": "Untitled artist",
+       "artist": ""
+      }
+     ],
+     "name": "\ufeff Late night\t\n",
+     "comment": "For after",
+     "public": false
+    },
+    "changed": true,
+    "body": {
+     "base": [],
+     "song_ids": [
+      "e1",
+      "e2",
+      "e1",
+      "e3"
+     ],
+     "name": "Late night",
+     "comment": "For after",
+     "public": false
+    },
+    "keys": [
+     "base",
+     "comment",
+     "name",
+     "public",
+     "song_ids"
+    ]
+   },
+   {
+    "name": "empty: a name JS does not trim",
+    "start": {
+     "rows": [],
+     "name": "Empty",
+     "comment": "",
+     "public": true
+    },
+    "now": {
+     "rows": [
+      {
+       "key": "0:e1",
+       "id": "e1",
+       "title": "Roads",
+       "artist": "Portishead"
+      },
+      {
+       "key": "1:e2",
+       "id": "e2",
+       "title": "Teardrop",
+       "artist": "Massive Attack"
+      },
+      {
+       "key": "2:e1",
+       "id": "e1",
+       "title": "Roads",
+       "artist": "Portishead"
+      },
+      {
+       "key": "3:e3",
+       "id": "e3",
+       "title": "Untitled artist",
+       "artist": ""
+      }
+     ],
+     "name": "Late night\u0085",
+     "comment": "For after",
+     "public": false
+    },
+    "changed": true,
+    "body": {
+     "base": [],
+     "song_ids": [
+      "e1",
+      "e2",
+      "e1",
+      "e3"
+     ],
+     "name": "Late night\u0085",
+     "comment": "For after",
+     "public": false
+    },
+    "keys": [
+     "base",
+     "comment",
+     "name",
+     "public",
+     "song_ids"
+    ]
+   },
+   {
+    "name": "empty: the name cleared",
+    "start": {
+     "rows": [],
+     "name": "Empty",
+     "comment": "",
+     "public": true
+    },
+    "now": {
+     "rows": [
+      {
+       "key": "0:e1",
+       "id": "e1",
+       "title": "Roads",
+       "artist": "Portishead"
+      },
+      {
+       "key": "1:e2",
+       "id": "e2",
+       "title": "Teardrop",
+       "artist": "Massive Attack"
+      },
+      {
+       "key": "2:e1",
+       "id": "e1",
+       "title": "Roads",
+       "artist": "Portishead"
+      },
+      {
+       "key": "3:e3",
+       "id": "e3",
+       "title": "Untitled artist",
+       "artist": ""
+      }
+     ],
+     "name": "   ",
+     "comment": "For after",
+     "public": false
+    },
+    "changed": true,
+    "body": {
+     "base": [],
+     "song_ids": [
+      "e1",
+      "e2",
+      "e1",
+      "e3"
+     ],
+     "name": "",
+     "comment": "For after",
+     "public": false
+    },
+    "keys": [
+     "base",
+     "comment",
+     "name",
+     "public",
+     "song_ids"
+    ]
+   },
+   {
+    "name": "empty: the description cleared",
+    "start": {
+     "rows": [],
+     "name": "Empty",
+     "comment": "",
+     "public": true
+    },
+    "now": {
+     "rows": [
+      {
+       "key": "0:e1",
+       "id": "e1",
+       "title": "Roads",
+       "artist": "Portishead"
+      },
+      {
+       "key": "1:e2",
+       "id": "e2",
+       "title": "Teardrop",
+       "artist": "Massive Attack"
+      },
+      {
+       "key": "2:e1",
+       "id": "e1",
+       "title": "Roads",
+       "artist": "Portishead"
+      },
+      {
+       "key": "3:e3",
+       "id": "e3",
+       "title": "Untitled artist",
+       "artist": ""
+      }
+     ],
+     "name": "Late night",
+     "comment": "",
+     "public": false
+    },
+    "changed": true,
+    "body": {
+     "base": [],
+     "song_ids": [
+      "e1",
+      "e2",
+      "e1",
+      "e3"
+     ],
+     "name": "Late night",
+     "public": false
+    },
+    "keys": [
+     "base",
+     "name",
+     "public",
+     "song_ids"
+    ]
+   },
+   {
+    "name": "empty: the same description with spaces",
+    "start": {
+     "rows": [],
+     "name": "Empty",
+     "comment": "",
+     "public": true
+    },
+    "now": {
+     "rows": [
+      {
+       "key": "0:e1",
+       "id": "e1",
+       "title": "Roads",
+       "artist": "Portishead"
+      },
+      {
+       "key": "1:e2",
+       "id": "e2",
+       "title": "Teardrop",
+       "artist": "Massive Attack"
+      },
+      {
+       "key": "2:e1",
+       "id": "e1",
+       "title": "Roads",
+       "artist": "Portishead"
+      },
+      {
+       "key": "3:e3",
+       "id": "e3",
+       "title": "Untitled artist",
+       "artist": ""
+      }
+     ],
+     "name": "Late night",
+     "comment": " For after ",
+     "public": false
+    },
+    "changed": true,
+    "body": {
+     "base": [],
+     "song_ids": [
+      "e1",
+      "e2",
+      "e1",
+      "e3"
+     ],
+     "name": "Late night",
+     "comment": "For after",
+     "public": false
+    },
+    "keys": [
+     "base",
+     "comment",
+     "name",
+     "public",
+     "song_ids"
+    ]
+   },
+   {
+    "name": "empty: shared",
+    "start": {
+     "rows": [],
+     "name": "Empty",
+     "comment": "",
+     "public": true
+    },
+    "now": {
+     "rows": [
+      {
+       "key": "0:e1",
+       "id": "e1",
+       "title": "Roads",
+       "artist": "Portishead"
+      },
+      {
+       "key": "1:e2",
+       "id": "e2",
+       "title": "Teardrop",
+       "artist": "Massive Attack"
+      },
+      {
+       "key": "2:e1",
+       "id": "e1",
+       "title": "Roads",
+       "artist": "Portishead"
+      },
+      {
+       "key": "3:e3",
+       "id": "e3",
+       "title": "Untitled artist",
+       "artist": ""
+      }
+     ],
+     "name": "Late night",
+     "comment": "For after",
+     "public": true
+    },
+    "changed": true,
+    "body": {
+     "base": [],
+     "song_ids": [
+      "e1",
+      "e2",
+      "e1",
+      "e3"
+     ],
+     "name": "Late night",
+     "comment": "For after"
+    },
+    "keys": [
+     "base",
+     "comment",
+     "name",
+     "song_ids"
+    ]
+   },
+   {
+    "name": "empty: everything",
+    "start": {
+     "rows": [],
+     "name": "Empty",
+     "comment": "",
+     "public": true
+    },
+    "now": {
+     "rows": [
+      {
+       "key": "2:e1",
+       "id": "e1",
+       "title": "Roads",
+       "artist": "Portishead"
+      },
+      {
+       "key": "0:e1",
+       "id": "e1",
+       "title": "Roads",
+       "artist": "Portishead"
+      },
+      {
+       "key": "1:e2",
+       "id": "e2",
+       "title": "Teardrop",
+       "artist": "Massive Attack"
+      }
+     ],
+     "name": "New name",
+     "comment": "New words",
+     "public": true
+    },
+    "changed": true,
+    "body": {
+     "base": [],
+     "song_ids": [
+      "e1",
+      "e1",
+      "e2"
+     ],
+     "name": "New name",
+     "comment": "New words"
+    },
+    "keys": [
+     "base",
+     "comment",
+     "name",
+     "song_ids"
+    ]
+   }
+  ],
+  "rearrangements": [
+   {
+    "base": [],
+    "next": [],
+    "is": true
+   },
+   {
+    "base": [
+     "a"
+    ],
+    "next": [],
+    "is": true
+   },
+   {
+    "base": [],
+    "next": [
+     "a"
+    ],
+    "is": false
+   },
+   {
+    "base": [
+     "a",
+     "b",
+     "c"
+    ],
+    "next": [
+     "c",
+     "a"
+    ],
+    "is": true
+   },
+   {
+    "base": [
+     "a",
+     "b"
+    ],
+    "next": [
+     "a",
+     "b",
+     "a"
+    ],
+    "is": false
+   },
+   {
+    "base": [
+     "a",
+     "a",
+     "b"
+    ],
+    "next": [
+     "a",
+     "b",
+     "a"
+    ],
+    "is": true
+   },
+   {
+    "base": [
+     "a",
+     "a",
+     "b"
+    ],
+    "next": [
+     "a",
+     "a",
+     "a"
+    ],
+    "is": false
+   },
+   {
+    "base": [
+     "a",
+     "b"
+    ],
+    "next": [
+     "b",
+     "c"
+    ],
+    "is": false
+   },
+   {
+    "base": [
+     "a",
+     "b"
+    ],
+    "next": [
+     "a",
+     "b"
+    ],
+    "is": true
+   }
+  ]
+ }
 }

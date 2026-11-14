@@ -27,8 +27,12 @@ struct QueueMenuRequest {
 /// A choice is carried out in its tap, nothing awaited first (the gesture rule - Play Next with nothing playing starts
 /// the music): `PlayerModel.choose`, which queues the songs at the level QueuePick.choose says (an album's ••• as an
 /// album, a song's as a song), remembers the album, and says the notice (D11, "Playing next: Roads") only when the
-/// music didn't start from it - when it did, the mini player says so. The menu closes either way. Playlists' "Add to
-/// a playlist…" is Phase 4's slice 2.
+/// music didn't start from it - when it did, the mini player says so. The menu closes either way.
+///
+/// Phase 4, slice 2: "Add to a playlist…", third, as the web's - the same songs into one of your playlists: the menu
+/// closes and the picker opens over the tabs (AppNavigation.playlistPick, PlaylistPicker) with them in hand. It plays
+/// nothing. Left out while deadwax can't be reached (a playlist is Navidrome's, written through deadwax) and for an
+/// album gone from the collection.
 ///
 /// `request` is nil while there is nothing to queue (the album's songs not in yet): the ••• is then dimmed and opens
 /// nothing. The label is the •••, drawn by the caller; its VoiceOver name is the caller's too ("More for Roads").
@@ -44,6 +48,7 @@ struct QueueMenu<Label: View>: View {
     @Environment(PlayerModel.self) private var player
     @Environment(DownloadModel.self) private var downloads
     @Environment(Reachability.self) private var reachability
+    @Environment(AppNavigation.self) private var navigation
 
     var body: some View {
         Menu {
@@ -53,6 +58,11 @@ struct QueueMenu<Label: View>: View {
                         ForEach(QueueChoice.allCases, id: \.self) { choice in
                             Button(choice.label, systemImage: Self.symbol(choice)) {
                                 player.choose(choice, pick, album: request.album)
+                            }
+                        }
+                        if reachability.online, !request.gone, !request.pick.tracks.isEmpty {
+                            Button(PlaylistWords.addToAPlaylistRow, systemImage: PlaylistWords.addSymbol) {
+                                navigation.playlistPick = PlaylistPickRequest(PlaylistPick(request.pick))
                             }
                         }
                     }

@@ -9,8 +9,8 @@ sliders, nine presets and AutoEq's corrections, kept per output) and the turntab
 record you can scrub by hand, heard as you turn it, and its speed fader, 0.25x to 2x), and play history
 in Up Next (every song you played, here and on the web, scrolled up past the song playing), and
 Phase 3's library downloaded by itself, as much as fits - only while charging if you like, and in the
-background when iOS allows - and the start of Phase 4, your playlists read and played, kept on the
-`ios` branch while it's being built. Nothing of Phase 2, the lyrics, the EQ, the turntable, play
+background when iOS allows - and the start of Phase 4, your playlists read and played, made, added
+to, edited and deleted, kept on the `ios` branch while it's being built. Nothing of Phase 2, the lyrics, the EQ, the turntable, play
 history, Phase 3 or playlists has been seen on an iPhone yet.
 Phase 0's test screen lives on in the app's Debug.
 
