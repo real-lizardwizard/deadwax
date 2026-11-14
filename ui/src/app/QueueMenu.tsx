@@ -40,7 +40,7 @@ export function QueueMenu({
   pick: QueuePick<AlbumWithSongs> | null
   opener?: { current: HTMLElement | null } | undefined
   onClose: () => void
-  player: Pick<Player, 'playNext' | 'playLast'>
+  player: Pick<Player, 'playNext' | 'playLast' | 'queue'>
   /** (2.0.0-player.58) Add to a playlist… with what it was opened with; null (or left out) for none */
   onPlaylist?: ((pick: QueuePick<AlbumWithSongs>) => void) | null
 }) {
@@ -49,7 +49,8 @@ export function QueueMenu({
 
   const add = (how: 'next' | 'last') => {
     if (!pick || !pick.tracks.length) return
-    rememberAdded(pick.albums)
+    //? (2.1.16) with the queue's songs, so none of its albums is let go to make room for these
+    rememberAdded(pick.albums, player.queue.tracks)
     //? (2.0.0-player.62) an album's own ••• queues it as an album, anything else as songs (Normalization)
     const started = how === 'next' ? player.playNext(queued(pick.tracks, pick.as ?? 'songs')) : player.playLast(queued(pick.tracks, pick.as ?? 'songs'))
     onClose()

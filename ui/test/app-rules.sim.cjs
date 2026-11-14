@@ -2450,7 +2450,7 @@ console.log('\nUp Next, shuffle and repeat (2.0.0-player.57): each new action fr
   const feed = code(read('app/useShuffleFeed.ts'))
   const add = /const add = \(how: 'next' \| 'last'\) => \{([\s\S]*?)\n  \}/.exec(menu)?.[1] ?? ''
   check('the song menu\'s rows: the albums remembered, then Play Next or Play Last with the songs in hand - nothing awaited first',
-    [/rememberAdded\(pick\.albums\)\s*(\/\/\?[^\n]*\n\s*)?const started = how === 'next' \? player\.playNext\(queued\(pick\.tracks, pick\.as \?\? 'songs'\)\) : player\.playLast\(queued\(pick\.tracks, pick\.as \?\? 'songs'\)\)/.test(add), /\bawait\b|\.then\(/.test(add.split('player.playNext')[0] ?? ''),
+    [/rememberAdded\(pick\.albums, player\.queue\.tracks\)\s*(\/\/\?[^\n]*\n\s*)?const started = how === 'next' \? player\.playNext\(queued\(pick\.tracks, pick\.as \?\? 'songs'\)\) : player\.playLast\(queued\(pick\.tracks, pick\.as \?\? 'songs'\)\)/.test(add), /\bawait\b|\.then\(/.test(add.split('player.playNext')[0] ?? ''),
       /onClick=\{\(\) => add\('next'\)\}/.test(menu), /onClick=\{\(\) => add\('last'\)\}/.test(menu)], [true, false, true, true])
   check('...its notice only when the songs were queued, not when the music started from them', /onClose\(\)\s*if \(!started\) sayPins\(queuedWords\(how, pick\.label\)\)/.test(add), true)
   //? (review) through jump(), which says first where focus goes once the row has left the list - nothing awaited
@@ -3010,7 +3010,7 @@ console.log('\nresume what was playing (2.0.0-player.64): restoreQueue from its 
     [/const request = asks\.begin\(\)\s*resumeQueue\(request\.signal\)/.test(hook), /if \(!request\.current\(\)\) return/.test(hook),
       /if \(queue !== asked \|\| playing\) return/.test(hook)], [true, true, true])
   check('...the song\'s album asked through latestOnly() too, remembered only while that song still shows',
-    /const request = albums\.begin\(\)\s*album\(song\.albumId, request\.signal\)\.then\(\(found\) => \{\s*if \(request\.current\(\) && queue && current\(queue\)\?\.id === song\.id\) rememberAdded\(\[found\]\)/.test(hook), true)
+    /const request = albums\.begin\(\)\s*album\(song\.albumId, request\.signal\)\.then\(\(found\) => \{\s*if \(request\.current\(\) && queue && current\(queue\)\?\.id === song\.id\) rememberAdded\(\[found\], queue\.tracks\)/.test(hook), true)
   check('the beacon: sendBeacon with a JSON Blob, a keepalive fetch where it is missing or refuses',
     [/navigator\.sendBeacon\(address, new Blob\(\[text\], \{ type: 'application\/json' \}\)\)/.test(api), /if \(!sent\) \{\s*fetch\(address, \{ method: 'POST', keepalive: true/.test(api)], [true, true])
   check('the hook\'s listeners are removed as it goes', ['visibilitychange', 'pageshow', 'focus', 'pagehide'].map((name) =>

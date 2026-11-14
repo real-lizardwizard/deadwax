@@ -264,7 +264,7 @@ export function createResume(): Resume {
     if (song?.albumId && !playedAlbum(song.albumId)) {
       const request = albums.begin()
       album(song.albumId, request.signal).then((found) => {
-        if (request.current() && queue && current(queue)?.id === song.id) rememberAdded([found])
+        if (request.current() && queue && current(queue)?.id === song.id) rememberAdded([found], queue.tracks)
       }, () => {})
     }
   }

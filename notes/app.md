@@ -2225,3 +2225,26 @@ it landed as 2.1.5 (notes/player.md "Lyrics by song id (2.1.5)").
   of it in a real browser or on the phone - W1-W17 and D1-D5 in notes/app-lyrics.md section 6 are what is asked; the
   touch-action inside the sheet (W10), VoiceOver's focus on a line holding following (W13), a smooth scrollTo's feel,
   the mask in WebKit, the on-its-side room (W11), and a real Navidrome's answer.
+
+### The queue's albums kept for Info when songs are added (2.1.16)
+
+The iPhone app's Phase 4 review found that its album store let go of a queue's LAST album to play once it held its
+bound (64) and another album came in, and that the web's lib/playedAlbums.ts did the same, only more narrowly: the web
+calls `also()` only for Play Next, Play Last and resume (`rememberAdded`), never for an album page shown. So a 64-album
+playlist or artist Play followed by one Play Next - or a 30-album queue followed by Play Next from 35 other albums - let
+go of an album still to play, and its songs' Info, the turntable's disc art and Go to album had only the queue's few
+fields when they came round.
+
+Now `also(album, keeping)` is told which albums to keep: `rememberAdded(albums, queued)` passes the queue's songs as
+they stand (QueueMenu: `player.queue.tracks`; useResume: the queue put back), and their albums plus the ones being
+added are never let go there. Past the bound the oldest OTHER album goes; when everything left is kept, the store holds
+more than its bound until the queue stops naming them (a new queue's `remember`/`rememberQueue` sets its own floor
+again). Without `keeping` it behaves exactly as before - which is what the iPhone app's playlist vectors are made from
+(ios/scripts/export-playlist-vectors.cjs), so they are unchanged. The phone's port (PlayedAlbums.swift, on `ios`) passes
+the same set, and also when an album page is shown.
+
+Verified: info.sim's three new cases (a full queue then Play Next; 30 then 40 added; every other album kept), upnext's
+song menu handing the queue's albums over, app-rules' two regexes; every sim on Node 22; mutations of the store's two
+rules (the kept ids passed over; the album just put kept) each fail info.sim. Not covered by a test: rememberAdded's own
+adding of the added albums to the set (api.ts is stubbed in the sims) - it matters only when one tap adds songs of
+several albums.

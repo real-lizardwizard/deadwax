@@ -426,10 +426,14 @@ export function rememberQueue(albums: readonly AlbumWithSongs[]): void {
 /**
  * (2.0.0-player.57) The albums of songs added to Up Next - Play Next and Play Last, from the song menu - in the
  * tap, before the player is called: each kept beside the queue's, which stay (lib/playedAlbums.ts `also`), so
- * Info and the turntable know an added song's album as they know the queue's.
+ * Info and the turntable know an added song's album as they know the queue's. (2.1.16) `queued` is the queue's
+ * songs as they stand: none of their albums is let go to make room, whatever the bound.
  */
-export function rememberAdded(albums: readonly AlbumWithSongs[]): void {
-  for (const album of albums) played.also(album)
+export function rememberAdded(albums: readonly AlbumWithSongs[], queued: readonly { albumId: string | null }[] = []): void {
+  const keeping = new Set<string>()
+  for (const track of queued) if (track.albumId) keeping.add(track.albumId)
+  for (const album of albums) keeping.add(album.id)
+  for (const album of albums) played.also(album, keeping)
 }
 
 /** The answer a song's album was played from, exactly as Navidrome sent it; null when not in hand. */
