@@ -512,7 +512,11 @@ until you press play - iOS starts sound only from a tap. Play - on the mini play
 turntable, the desktop's player bar, Space in the visualizer, the lock screen - carries on from that second,
 the way any song plays: Gapless's one stream, FLAC in an MP4 on an iPhone, the resampled copy and
 Normalization all as they would be. Next, Previous, the scrubber, a song tapped in Up Next and Play Next work on
-it as on any paused queue, and anything else you play simply replaces it.
+it as on any paused queue, and anything else you play simply replaces it. A queue you
+[went back in](#up-next-shuffle-and-repeat) comes back with every song you'd played on to still to come (deadwax
+2.1.18 to 2.1.22 could lose them: going back a second time, after a change to Up Next made while the furthest song
+you'd got to was playing, it came back - reopened, or on another device - without the songs played since the one
+you went back to).
 
 **It follows you.** It's kept as your **play queue in Navidrome** - with logins on, your own, as you - with
 deadwax's account of Up Next beside it in its own database (Navidrome keeps only the songs, which one is

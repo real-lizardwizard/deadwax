@@ -125,8 +125,8 @@ interface SnapshotV1 {
   left: [number, number][]
   paged?: Paged
   pagedRounds?: { pass: number; paged: Paged }[]
-  /** (2.1.18) UpNextState.reached, written only while it is after the song playing and in the window - so a queue never
-   *  rolled back is saved as it was before */
+  /** (2.1.18) UpNextState.reached, written only while it is in the window and (2.1.23) the song playing's unit or after
+   *  it - so a queue never rolled back is saved as it was before */
   reached?: number
   /** (2.1.18) the window's entries brought back from the play history: [key, the moments of their row's starts] - the
    *  marks stay four apiece, which the iPhone app reads */
@@ -222,11 +222,19 @@ export function toSave(queue: UpNextQueue, position: number): Saving {
   const { source, marks, left } = savedList(state, start, end)
   const extra: Record<string, QueueTrack> = {}
   for (const track of source) if (!inWindow.has(track.id) && !(track.id in extra)) extra[track.id] = bare(track)
-  //? (2.1.18) where the list runs on to after a roll-back, while it means something here; the rows brought back's starts
-  const reachedAt = marks.findIndex((mark) => mark.key === state.reached)
+  //? (2.1.18) where the list runs on to after a roll-back, while it means something here; the rows brought back's starts.
+  //? (2.1.23) From the song playing's own unit on, not only after it: a move back up the list that leaves the reach
+  //? where it was - History's tap or Previous, playing the furthest unit again - changes no more than the song, so it
+  //? is saved by its position alone, and deadwax's record is THIS snapshot at the song moved back to, which must carry
+  //? the reach (the reviewer's: tapped twice, a save between while the reach played, came back without the rounds moved
+  //? down). Played past it, it is left out: any move back from there names a new furthest, a change saved in full
+  let unit = index
+  while (unit > 0 && marks[unit]!.from === 'one') unit--
+  const found = marks.findIndex((mark) => mark.key === state.reached)
+  const reachedAt = found >= unit ? found : -1
   const starts = marks.filter((mark) => mark.starts?.length).map((mark): [number, number[]] => [mark.key, [...mark.starts!]])
   const made: SnapshotV1 = {
-    v: snapshotVersion(marks, index, reachedAt > index, starts.length > 0),
+    v: snapshotVersion(marks, index, reachedAt >= 0, starts.length > 0),
     id: state.id,
     levels: entries.map((track) => levelChar(track.level)).join(''),
     marks: marks.map((mark) => [mark.key, fromChar(mark.from), mark.at, mark.pass]),
@@ -239,7 +247,7 @@ export function toSave(queue: UpNextQueue, position: number): Saving {
     left: left.map((gone) => [gone.pass, gone.at]),
     ...(state.paged ? { paged: state.paged } : {}),
     ...(state.pagedRounds ? { pagedRounds: state.pagedRounds } : {}),
-    ...(reachedAt > index ? { reached: state.reached! } : {}),
+    ...(reachedAt >= 0 ? { reached: state.reached! } : {}),
     ...(starts.length ? { starts } : {}),
   }
   const snapshot = JSON.stringify(made)

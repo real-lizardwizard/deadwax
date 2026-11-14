@@ -397,3 +397,43 @@ after the row tapped moves back down into Up Next, skips included, even hundreds
   **Not verified**: the iPhone and Safari (the seek in the one stream on iOS, the tap locked, VoiceOver through a
   roll-back); the desktop frame in a browser (the same component, drawn by upnext.sim); a real Navidrome; the old
   readers on a real device - the web's run from its frozen copy, the iPhone's Resume.swift read, not run.
+
+### Gone back twice: the reach saved while it plays (2.1.23)
+
+The iPhone port's review (HIGH; in main's 2.1.18 as much as the phone's port): a second roll-back could be saved by its
+position alone, and deadwax's record lost `reached`.
+
+- **How.** rolledBack and wentBack set `reached` only when the furthest unit differs from it, keeping the same
+  `upNext` object otherwise; changedSince compares the queue's objects, so a move that keeps them is a song change
+  (`'song'`), saved by its position - deadwax's record is then the last full save's snapshot at the new index. And
+  toSave wrote `reached` only while it was AFTER the song playing. So: roll back (reached set, saved in full); play on
+  until the reach's song plays; any full save then (an Up Next edit, Repeat's top-up) left `reached` out; tap History
+  or press Previous again - furthest() the same key, the state unchanged, the index alone saved. The record: a v1
+  snapshot with no reach, at a song before it. The reviewer's Core probe: Repeat All, 3 songs, the second round's 2
+  playing; the first 1 tapped; played back to that 2; Play Next x; the first 1 tapped again - read back under Repeat
+  off as `1 2 3 x` (the later round's 1 and 2, moved back down, gone; a full save gives `1 2 3 1 2 x 3`), and under
+  Repeat All Up Next drew `2 3` with the later round summed in one line. Another device, the web and the phone after a
+  relaunch all take deadwax's record.
+- **The fix, the writer's** (lib/resume.ts toSave): `reached` is written while it names the song playing's own unit
+  or a later one - `found >= unit`, the unit's first entry found by walking back over Repeat One's copies - and
+  snapshotVersion follows it (v2). Played past the reach it is still left out: a move back from there names a new
+  furthest - a new `upNext`, a change saved in full. So every index a position save can move the record to is one the
+  snapshot already describes. The reader is unchanged: it keeps `reached` only while it is after the song playing,
+  so read at the song it was saved at it reads as before.
+- **Why the writer and not changedSince** (the review's other way: a full save when the reach has come into place
+  since the save measured from): changedSince would have to know what the record's snapshot left out - an index-
+  dependent rule of toSave's - in useResume.ts and in the phone's ResumeController alike; the snapshot itself is the
+  thing a position save reinterprets, so it is the one made to hold at every index it can be moved to. The cost: a
+  queue saved while its reach plays is v2 where it was v1, so a reader before 2.1.18 puts back the plain list - as it
+  does for every roll-back - instead of reading at the new index a v1 that loses the songs moved down.
+- **resume.sim**: the reviewer's probe, step by step (the second tap a `'song'` change; the save between carrying the
+  reach, v2; the record put back at the song tapped equal to a full save under Repeat off, One and All, Up Next under
+  All drawing `2 3 1 2 x 3`; 2.1.17's frozen reader the plain list; played past the reach, left out). And a property
+  over the 1,000 seeded runs, drawing nothing of `random`: at every step History's first row tapped and Previous, and
+  each move changedSince calls a song change (9,611 of them, every one back before the reach - any other move back
+  names a new furthest) read back from that step's snapshot as a full save of the move would: the reach, Up Next's
+  songs to come, and what restoreQueue keeps under each Repeat (All's time round shuffled by one seeded draw each).
+  Four mutations, each caught: 2.1.18's rule (the property and the probe), the song playing alone instead of its unit
+  (the property alone: a copy of the reach's song playing), written whenever it is in the window, and the version not
+  following it.
+- **Not changed**: the iPhone app's Resume.swift has the same rule; its port is on `ios`.
