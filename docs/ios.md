@@ -323,7 +323,8 @@ back to the Library tab or the app, and when you pull down.
 - **The artist's name**, in purple, opens [their page](#artists). An album that names no artist to go to
   shows the name in grey, and it opens nothing. While the album is still loading, and the list you came
   from didn't say who its artist is, the name is purple but can't be tapped yet, so it never changes
-  colour as the album comes in.
+  colour as the album comes in. If the album doesn't come - it couldn't be loaded, it's gone, or deadwax
+  can't be reached and it isn't on the phone - the name is grey.
 
 **Downloading it** (see [Downloads](#downloads)):
 
@@ -572,7 +573,8 @@ the rest). With logins off every album is ticked. **Tap an album** to open its p
 
 **Offline**, the Artists page lists what it last listed, an artist with nothing on this phone dimmed (it
 opens nothing). With no list in hand it lists the artists of the albums on the phone, under "Only the
-artists of downloaded albums show until deadwax is back." An artist's page that's one of the last 20 you
+artists of downloaded albums show until deadwax is back." - each named as most of their albums here name
+them, so an album they made with someone else ("Portishead & Tricky") doesn't rename them. An artist's page that's one of the last 20 you
 opened since the app started shows their albums as it last had them - any other, the ones on the phone -
 with the albums not on the phone dimmed, and Play and Shuffle playing only the songs here ("Only
 downloaded albums play until deadwax is back.").
@@ -2407,14 +2409,17 @@ order and Grid or list are in the Library's •••, and All music is a submen
   Shuffle dimmed for a moment under "Getting the songs of the 3 albums you have…" ("in the collection" with
   logins on), then "Plays the 3 albums you have". Their albums are newest first, the undated last, each
   "1994 · in your library" with a green tick - or "in the collection", no tick, for one that isn't in your
-  library. Tap one: its page. Back: the page as it was, nothing fetched again.
+  library. Tap one: its page. Back: the page as it was, nothing fetched again. Go back to the list and
+  open them again: their albums at once, and "Getting the songs…" or "Plays…" at once under Play - never
+  "None of their albums are here to play." while their albums are listed.
 - **107 Play and Shuffle.** Play: the newest album from its first song, then the next album, and so on -
   Up Next lists them in the page's order. Shuffle: songs from every album, in no order, with Shuffle on.
   Does the music start the moment you tap, both times? With Normalization on Automatic, Info says Play's
   songs are levelled as an album, Shuffle's as songs.
 - **108 The album's artist.** On an album's page the artist is purple: tap it - their page. An album from
   Up Next or Now Playing's Go to the album: the same. Does the name ever flash from grey to purple as the
-  page loads?
+  page loads? In Airplane Mode, Now Playing's Go to the album for a song that isn't downloaded: the name
+  grey, not a purple one that can't be tapped.
 - **109 Cut off.** Open an artist with many albums and turn on Airplane Mode before the line says
   "Plays…": "Only downloaded albums play until deadwax is back.", the albums not on the phone dimmed.
   Airplane Mode off: in a moment, "Plays the 5 albums you have" - the albums that didn't come are asked
@@ -2423,7 +2428,8 @@ order and Grid or list are in the Library's •••, and All music is a submen
 - **110 Offline.** Airplane Mode: the Artists page lists as before, an artist with nothing downloaded
   dimmed. Force-quit and open in Airplane Mode: the artists of your downloaded albums, under "Only the
   artists of downloaded albums show until deadwax is back." Open one: their downloaded albums, Play and
-  Shuffle playing only those songs, "Only downloaded albums play until deadwax is back."
+  Shuffle playing only those songs, "Only downloaded albums play until deadwax is back." An artist with a
+  downloaded album made with someone else ("A & B") and more of their own is listed by their own name.
 - **111 VoiceOver.** The switch reads Albums, Playlists and Artists; an artist's row "Portishead, 2
   albums"; an album row on their page "Dummy, 1994 · in your library"; the ••• has Album order and Show as
   list on Albums, Artist order on Artists.

@@ -80,8 +80,11 @@ final class AlbumModel {
     var artist: String { album.map { $0.artist ?? "" } ?? route.artist ?? "" }
     var coverArt: String? { album.map(\.coverArt) ?? route.coverArt }
     /// (Phase 4, slice 4) The artist line's link to the artist's page (ArtistLink, AlbumPage.tsx's): the album's own
-    /// artist id once it has answered, else the opener's - pending while it might still become one.
-    var artistLink: ArtistLink { ArtistLink.of(album: album, opened: route.artistId, name: artist) }
+    /// artist id once it has answered, else the opener's - pending while it might still become one, plain once no
+    /// answer is coming (the load failed or found nothing, or deadwax can't be reached and nothing of it is here).
+    var artistLink: ArtistLink {
+        ArtistLink.of(album: album, opened: route.artistId, name: artist, coming: !albumFailed && online)
+    }
     /// The line under the artist: genre, year and the songs' one format (the opener's genre and year until the album
     /// answers, so the line only gains the format when it does).
     var meta: String {

@@ -53,9 +53,9 @@ final class ArtistPageModel {
 
     // MARK: asking
 
-    /// The page's task: the kept answer drawn at once, the artist asked of deadwax (once a page's life - again after a
-    /// failure, and on a pull: `again`), and their albums' songs asked as the albums are known. `key` is who and which
-    /// artist.
+    /// The page's task: the kept answer drawn at once and its albums' songs asked, the artist asked of deadwax (once a
+    /// page's life - again after a failure, and on a pull: `again`), and the songs of any other albums its answer names.
+    /// `key` is who and which artist.
     func load(key: String, client: DeadwaxClient?, online: Bool, artists: ArtistsModel, again: Bool = false) async {
         if key != self.key {
             self.key = key
@@ -68,6 +68,10 @@ final class ArtistPageModel {
         }
         if answer == nil, let kept = artists.keptArtist(route.id) { answer = kept }
         guard online, let client else { return }
+        // the albums in hand (a kept answer, or the page opened offline from one and deadwax back) asked at once, as the
+        // web's are from its kept rows - not only once deadwax's answer comes, up to its 8 s, with the line saying none
+        // of theirs are here meanwhile. The asks are keyed on the albums, so the answer naming the same asks no more.
+        if answer != nil { askAlbums(client) }
         if again { fresh = false }
         if !fresh {
             artistAsks += 1

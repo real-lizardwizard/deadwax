@@ -558,30 +558,74 @@ public enum ArtistOffline {
     }
 
     /// The Artists page with no list in hand: an artist per album artist of the albums on this phone, in the albums'
-    /// order, named as the first album names them, uncounted and pictureless (Navidrome's list would say).
+    /// order (where each first appears), uncounted and pictureless (Navidrome's list would say).
+    ///
+    /// An album names its album artist only as its display line (`album.artist`), which is the credit - "A & B" for
+    /// an album A made with B, under A's id. So each artist is named as most of their albums here name them, a tie
+    /// going to the shortest name (the credit holding the most is the longest), then to the first seen; an album
+    /// naming nobody (nil or "") counts for none, and an artist only such albums name has no name.
     public static func artists(_ downloaded: [IndexAlbum]) -> [Artist] {
-        var seen = Set<String>()
-        return downloaded.compactMap { (album: IndexAlbum) -> Artist? in
-            guard let id = album.artistId, !id.isEmpty, seen.insert(id).inserted else { return nil }
-            return Artist(id: id, name: album.artist)
+        var order: [String] = []
+        var names: [String: [(name: String, albums: Int)]] = [:]
+        for album in downloaded {
+            guard let id = album.artistId, !id.isEmpty else { continue }
+            if names[id] == nil {
+                order.append(id)
+                names[id] = []
+            }
+            guard let name = album.artist, !name.isEmpty else { continue }
+            if let place = names[id]?.firstIndex(where: { (each: (name: String, albums: Int)) -> Bool in each.name == name }) {
+                names[id]?[place].albums += 1
+            } else {
+                names[id]?.append((name, 1))
+            }
         }
+        return order.map { (id: String) -> Artist in
+            Artist(id: id, name: name(among: names[id] ?? []))
+        }
+    }
+
+    /// The name most albums give, a tie to the shortest, then to the first seen; nil for none.
+    static func name(among tally: [(name: String, albums: Int)]) -> String? {
+        var best: (name: String, albums: Int)?
+        for each in tally {
+            guard let chosen = best else {
+                best = each
+                continue
+            }
+            if each.albums > chosen.albums || (each.albums == chosen.albums && each.name.count < chosen.name.count) {
+                best = each
+            }
+        }
+        return best?.name
+    }
+}
+
+/// The Artists page with no list to draw (the app's ArtistsScreen): why, said with Try again - the artists' ask failed,
+/// or, for Your artists, the ask for your albums (whose artists they are, and their counts) - or nil while both may
+/// still come (the spinner). Your albums' failure counts only for Your artists: All artists and Artists don't need them.
+public enum ArtistsWaiting {
+    public static func failure(artists: (any Error)?, yourAlbums: (any Error)?, yours: Bool) -> (any Error)? {
+        artists ?? (yours ? yourAlbums : nil)
     }
 }
 
 /// The album page's artist line (AlbumPage.tsx): a link to the artist when the album names one and their name; plain
-/// once the album has answered without one; and, while it might still become a link, drawn as one would be but not
-/// tappable - so it never flashes from grey to the link's colour.
+/// once the album has answered without one, or once no answer is coming (it failed, it is gone, or deadwax can't be
+/// reached with nothing of it on this phone - the web's `shown = preview` without an id); and, while it might still
+/// become a link, drawn as one would be but not tappable - so it never flashes from grey to the link's colour.
 public enum ArtistLink: Sendable, Equatable {
     case link(id: String)
     case pending
     case plain
 
     /// `album`: the album's answer (nil while it hasn't come); `opened`: the artist id the opener knew; `name` the
-    /// line's words.
-    public static func of(album: Album?, opened: String?, name: String) -> ArtistLink {
+    /// line's words; `coming`: with no answer in hand, whether one may still come (false once the album's load failed,
+    /// it is gone, or deadwax can't be reached and nothing of it is on this phone).
+    public static func of(album: Album?, opened: String?, name: String, coming: Bool) -> ArtistLink {
         // `shown?.artistId ?? album?.artistId`, shown = album ?? preview: the album's own once it has answered
         let id = album != nil ? album?.artistId : opened
         if let id, !id.isEmpty, !name.isEmpty { return .link(id: id) }
-        return album == nil ? .pending : .plain
+        return album == nil && coming ? .pending : .plain
     }
 }

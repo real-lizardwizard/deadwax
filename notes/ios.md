@@ -6235,3 +6235,67 @@ Not verified - only the phone can tell (the spec's section 9; docs/ios.md's chec
 - The artist line's 44 pt button in the hero's row beside the title, and that it never flashes.
 - Offline: the list from downloads after a force-quit; the dimming.
 - CI's Xcode 26.6 (the older Swift): the new code spells out its closures' types.
+
+## Phase 4, slice 4, after its review (2026-11-14)
+
+The review of 8fbf50e found nothing serious, and four smaller bugs. All four are fixed in one commit on
+`phase4-artists`, with Core holding each rule it can. The app stays 0.9 (9).
+
+### What was wrong, and the fix
+
+1. **Reopening an artist said "None of their albums are here to play."** while their albums were listed. A kept
+   answer drew the albums at once, but ArtistPageModel asked their songs only after deadwax's answer to the artist
+   came - up to the transport's 8 s. Until then the asks had no albums and the library was `.done`, so Play and
+   Shuffle were dimmed under the wrong line. The same happened when deadwax came back to a page opened offline from
+   a kept answer. The web asks the songs from its kept rows at once. Now `load` asks the albums in hand as soon as
+   deadwax can be reached, before the artist's ask. ArtistAlbumAsks is keyed on the albums' sorted ids, so deadwax's
+   answer naming the same albums asks nothing more, and one naming another album asks only it.
+2. **Your artists could spin for ever.** With a library of your own and nothing of yours in hand (a first sign-in,
+   another person), a failed first `/album_index?scope=yours` left no list to draw and no artists' failure. Only
+   LibraryModel's `failures[.yours]` was set, and the page never read it. So the spinner stayed, with no Try again,
+   and the pull shuffles - only the •••'s Refresh got out. Now `ArtistsWaiting.failure` (Core) says the artists'
+   failure, or, for Your artists only, your albums', with Try again asking both.
+3. **An album's artist line could stay purple and untappable for good.** An album opened without its artist's id
+   (Now Playing's Go to the album, Downloads' `AlbumRoute(id:)`) whose load failed, found nothing, or wasn't asked
+   (deadwax out of reach, nothing of it on the phone) stayed `.pending`. The web draws it plain then. `ArtistLink.of`
+   now takes `coming`: with no album in hand and none coming, `.plain`. AlbumModel passes `!albumFailed && online`.
+   With the opener's id the line still links, as the web's preview does.
+4. **Offline, an artist could be named after a collaboration.** `ArtistOffline.artists` named each artist as the
+   first downloaded album naming their id did, by its display line - the credit, so an "A & B" album listed first
+   named artist A "A & B" for the sort, Find and their page's title. **Now each artist is named as most of their
+   albums here name them; a tie goes to the shortest name, then to the first seen.** The shortest, because a
+   collaboration's credit holds the artist's own name and more, so of two credits given equally often the shorter
+   is the likelier to be the artist alone. An album naming nobody (nil or "") counts for none; an artist only such
+   albums name has no name. The order is still where each artist first appears. Considered and not taken: a
+   kept artist answer's name (Navidrome's own) - the stand-in is drawn only with no list in hand, when there
+   is almost never one.
+
+Also: the spec's own copy of check 97 now says to restart the deadwax container, as docs/ios.md's does.
+
+### Tests
+
+- **ArtistTests** (17 + 4):
+  - `aKeptAnswersAsksCarryOverToDeadwaxsAnswer`: what the line said before the albums were asked; the kept answer's
+    albums asked at once; deadwax's answer with the same albums (another title, another order) asking nothing, the
+    kept round's answers counting; one more album asking only it.
+  - `offlineAnArtistIsNamedAsMostOfTheirAlbumsNameThem` and `offlineArtistsByProperty` (300 seeded downloads of
+    credits): each artist once where they first appear, named by a name one of their albums gives, no other given
+    more often or as often and shorter, nameless only when no album names them.
+  - `nothingToDrawSaysWhichAskFailed`: your albums' failure for Your artists only, the artists' own first.
+  - `theAlbumsArtistLineLinksWhenItCan`: every case both ways of `coming`; with nothing coming and no id, plain.
+- Fix 1's call order is the app's (ArtistPageModel); Core holds what it relies on.
+- **Mutations**: 11 over the three Core rules - `coming` dropped and turned over; the name by the fewest albums, a tie
+  to the longest, a full tie to the last seen, the first album's as before, an empty name counted, each album counted
+  once; your albums' failure for every list, never read, and before the artists' - all caught.
+
+### Verified, and not
+
+Verified on the fixes' commit:
+- `swift test` of the artists', the switch's, the index's and the client's suites: 74 (70 + 4).
+- The unsigned Debug and Release device builds: no warnings.
+- `check_project.py` ok.
+- The 11 mutants.
+
+Not verified - on the phone (docs/ios.md's checks 106, 108 and 110 now ask for each): the reopened artist's line,
+the grey line in Airplane Mode, the collaboration's name offline. Fix 2 needs a first sign-in with deadwax's album
+index failing, which no check asks for.

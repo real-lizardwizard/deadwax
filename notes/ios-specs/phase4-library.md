@@ -726,8 +726,8 @@ Slice 3b's:
 - **96 Past the first 200** (the phase's). With the shuffle playing, skip ahead with Next 160 times or so (or let it
   play an evening): Up Next keeps going, never ending at 200; with Repeat off it ends only once every song of your
   library has played. With Repeat All, at the end a new round starts with a different song.
-- **97 Started over.** Shuffle, then restart deadwax (or leave the phone a day) and skip ahead past 150: "Your shuffle
-  started over - deadwax no longer had its order", once, and the music carries on.
+- **97 Started over.** Shuffle, then restart the deadwax container (or leave the phone a day) and press Next past
+  150: "Your shuffle started over - deadwax no longer had its order", once, and the music carries on.
 - **98 Offline.** Airplane Mode: the Library on Downloaded's albums under the same switch; ••• > Shuffle downloads, and
   the pull's "Release to shuffle your downloads": only songs on the phone, every one of them in time. ••• > Your albums
   is the way back. With nothing downloaded: no Shuffle, and the pull says "Nothing on this phone to shuffle".

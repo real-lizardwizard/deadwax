@@ -310,6 +310,26 @@ import Testing
         #expect(none.line(library: .done, personal: false) == "None of their albums are here to play.")
     }
 
+    /// The review's first finding: a kept answer drew the albums, but their songs weren't asked until deadwax's answer
+    /// came - the line said "None of their albums are here to play." meanwhile. Now the kept answer's albums are asked at
+    /// once; deadwax's answer naming the same albums (other names, another order) asks nothing more, one more only it.
+    @Test func aKeptAnswersAsksCarryOverToDeadwaxsAnswer() {
+        let kept = [Album(id: "al-1", name: "Dummy", year: 1994), Album(id: "al-2", name: "Third", year: 2008)]
+        let fresh = [Album(id: "al-2", name: "Third (Remastered)", year: 2008), Album(id: "al-1", name: "Dummy", year: 1994)]
+        var asks = ArtistAlbumAsks<String>()
+        #expect(asks.line(library: .done, personal: false) == "None of their albums are here to play.",
+                "what the page said before its albums were asked")
+        let first = asks.want(ArtistPage.playOrder(ArtistPage.rows(kept)))
+        #expect(first.map(\.id) == ["al-2", "al-1"])
+        #expect(asks.line(library: .done, personal: false) == "Getting the songs of the 2 albums you have\u{2026}")
+        #expect(asks.want(ArtistPage.playOrder(ArtistPage.rows(fresh))).isEmpty, "the same albums: nothing more asked")
+        _ = asks.answered(first[0], with: "Third")
+        _ = asks.answered(first[1], with: "Dummy")
+        #expect(asks.playable && asks.answers == ["Third", "Dummy"], "the kept round's answers count")
+        let more = fresh + [Album(id: "al-3", name: "Roseland NYC Live", year: 1998)]
+        #expect(asks.want(ArtistPage.playOrder(ArtistPage.rows(more))).map(\.id) == ["al-3"], "one more: only it")
+    }
+
     @Test func everyInterleavingSettlesWithEachAlbumInHandOrLeftOut() {
         var random = Seeded(state: 11)
         for _ in 0..<150 {
@@ -374,10 +394,68 @@ import Testing
         let plays = ArtistOffline.playable(["al-4", "al-2", "al-1", "al-9"], album: { kept[$0] }, here: { here.contains($0) })
         #expect(plays.map(\.id) == ["al-4", "al-1"], "in the page's order, an album with nothing here left out")
         #expect(plays.map { (album: Album) -> [String] in (album.song ?? []).map(\.id) } == [["s4", "s5"], ["s2"]])
-        let index = [IndexAlbum(id: "1", artist: "Portishead", artistId: "ar-1"), IndexAlbum(id: "2", artist: "Beth", artistId: "ar-1"),
+        let index = [IndexAlbum(id: "1", artist: "Portishead", artistId: "ar-1"), IndexAlbum(id: "2", artist: "Portishead", artistId: "ar-1"),
                      IndexAlbum(id: "3", artist: "Nobody"), IndexAlbum(id: "4", artist: "Tricky", artistId: "ar-3"),
                      IndexAlbum(id: "5", artistId: "")]
         #expect(ArtistOffline.artists(index) == [Artist(id: "ar-1", name: "Portishead"), Artist(id: "ar-3", name: "Tricky")])
+    }
+
+    /// The review's fourth finding: an album names its album artist only by its credit, so an "A & B" album listed first
+    /// named artist A "A & B" for the sort, Find and their page's title.
+    @Test func offlineAnArtistIsNamedAsMostOfTheirAlbumsNameThem() {
+        let index = [
+            IndexAlbum(id: "1", artist: "Portishead & Tricky", artistId: "ar-1"),
+            IndexAlbum(id: "2", artist: "Massive Attack & Tricky", artistId: "ar-2"),
+            IndexAlbum(id: "3", artist: "Portishead", artistId: "ar-1"),
+            IndexAlbum(id: "4", artist: "Massive Attack", artistId: "ar-2"),
+            IndexAlbum(id: "5", artist: "Portishead", artistId: "ar-1"),
+            IndexAlbum(id: "6", artist: "Xy", artistId: "ar-3"), IndexAlbum(id: "7", artist: "Zw", artistId: "ar-3"),
+            IndexAlbum(id: "8", artistId: "ar-4"), IndexAlbum(id: "9", artist: "", artistId: "ar-4"),
+            IndexAlbum(id: "10", artist: "Nobody's", artistId: ""), IndexAlbum(id: "11", artist: "Nobody's"),
+        ]
+        #expect(ArtistOffline.artists(index) == [
+            Artist(id: "ar-1", name: "Portishead"),
+            Artist(id: "ar-2", name: "Massive Attack"),
+            Artist(id: "ar-3", name: "Xy"),
+            Artist(id: "ar-4", name: nil),
+        ], "most albums' name; a tie the shortest, then the first; an album naming nobody none")
+        #expect(ArtistOffline.artists([]) == [])
+    }
+
+    @Test func offlineArtistsByProperty() {
+        var random = Seeded(state: 41)
+        let credits: [String?] = ["A", "A & B", "B", "Bb", "A, B & C", "", nil, "C"]
+        for _ in 0..<300 {
+            let count = Int(random.next() % 14)
+            let index = (0..<count).map { (at: Int) -> IndexAlbum in
+                let id: String? = random.next() % 7 == 0 ? (random.next() % 2 == 0 ? nil : "") : "ar-\(random.next() % 4)"
+                return IndexAlbum(id: "al-\(at)", artist: credits[Int(random.next() % UInt64(credits.count))], artistId: id)
+            }
+            let artists = ArtistOffline.artists(index)
+            let ids = index.compactMap { (album: IndexAlbum) -> String? in
+                guard let id = album.artistId, !id.isEmpty else { return nil }
+                return id
+            }
+            var firsts: [String] = []
+            for id in ids where !firsts.contains(id) { firsts.append(id) }
+            #expect(artists.map(\.id) == firsts, "each artist once, where they first appear")
+            for artist in artists {
+                let given = index.compactMap { (album: IndexAlbum) -> String? in
+                    guard album.artistId == artist.id, let name = album.artist, !name.isEmpty else { return nil }
+                    return name
+                }
+                guard let name = artist.name else {
+                    #expect(given.isEmpty, "no name only when no album gives one")
+                    continue
+                }
+                let albums = given.filter { (each: String) -> Bool in each == name }.count
+                #expect(albums > 0, "a name one of their albums gives")
+                for other in Set(given) {
+                    let theirs = given.filter { (each: String) -> Bool in each == other }.count
+                    #expect(theirs < albums || (theirs == albums && other.count >= name.count), "\(name) over \(other)")
+                }
+            }
+        }
     }
 
     // MARK: the album page's artist line
@@ -385,12 +463,39 @@ import Testing
     @Test func theAlbumsArtistLineLinksWhenItCan() {
         let named = Album(id: "al-1", artist: "Portishead", artistId: "ar-1")
         let nameless = Album(id: "al-2", artist: "Various")
-        #expect(ArtistLink.of(album: named, opened: nil, name: "Portishead") == .link(id: "ar-1"))
-        #expect(ArtistLink.of(album: nameless, opened: "ar-9", name: "Various") == .plain, "the album's own once it answers")
-        #expect(ArtistLink.of(album: nil, opened: "ar-1", name: "Portishead") == .link(id: "ar-1"), "the opener's meanwhile")
-        #expect(ArtistLink.of(album: nil, opened: nil, name: "Portishead") == .pending, "it might yet become a link")
-        #expect(ArtistLink.of(album: nil, opened: "", name: "Portishead") == .pending)
-        #expect(ArtistLink.of(album: named, opened: nil, name: "") == .plain, "no name, nothing to link")
-        #expect(ArtistLink.of(album: Album(id: "x", artistId: ""), opened: "ar-1", name: "A") == .plain)
+        for coming in [true, false] {
+            #expect(ArtistLink.of(album: named, opened: nil, name: "Portishead", coming: coming) == .link(id: "ar-1"))
+            #expect(ArtistLink.of(album: nameless, opened: "ar-9", name: "Various", coming: coming) == .plain,
+                    "the album's own once it answers")
+            #expect(ArtistLink.of(album: nil, opened: "ar-1", name: "Portishead", coming: coming) == .link(id: "ar-1"),
+                    "the opener's meanwhile - and after a failure, as the web's preview")
+            #expect(ArtistLink.of(album: named, opened: nil, name: "", coming: coming) == .plain, "no name, nothing to link")
+            #expect(ArtistLink.of(album: Album(id: "x", artistId: ""), opened: "ar-1", name: "A", coming: coming) == .plain)
+        }
+        #expect(ArtistLink.of(album: nil, opened: nil, name: "Portishead", coming: true) == .pending,
+                "it might yet become a link")
+        #expect(ArtistLink.of(album: nil, opened: "", name: "Portishead", coming: true) == .pending)
+        // the review's third finding: opened without the artist's id (Go to the album, Downloads), and no answer coming
+        // - failed, gone, or offline with nothing here - it stayed purple and still for good; the web draws it plain
+        #expect(ArtistLink.of(album: nil, opened: nil, name: "Portishead", coming: false) == .plain)
+        #expect(ArtistLink.of(album: nil, opened: "", name: "Portishead", coming: false) == .plain)
+    }
+
+    // MARK: the Artists page with nothing to draw
+
+    struct Refused: Error, Equatable { let why: String }
+
+    /// The review's second finding: Your artists with nothing of yours in hand and your albums' first ask failed spun for
+    /// ever - only the artists' own failure was read.
+    @Test func nothingToDrawSaysWhichAskFailed() {
+        let artists = Refused(why: "artists")
+        let albums = Refused(why: "albums")
+        func said(_ artistsFailed: Refused?, _ albumsFailed: Refused?, yours: Bool) -> Refused? {
+            ArtistsWaiting.failure(artists: artistsFailed, yourAlbums: albumsFailed, yours: yours) as? Refused
+        }
+        #expect(said(nil, albums, yours: true) == albums, "your albums failing: said, with Try again")
+        #expect(said(nil, albums, yours: false) == nil, "All artists doesn't need your albums: still asking")
+        #expect(said(artists, albums, yours: true) == artists && said(artists, nil, yours: false) == artists)
+        #expect(said(nil, nil, yours: true) == nil && said(nil, nil, yours: false) == nil, "both may still come")
     }
 }

@@ -18,7 +18,7 @@ import SwiftUI
 /// The list is asked as the screen shows and each time it shows again (the page the switch shows, the app back in front
 /// on it, a page over it gone) - as the web's - and Your artists' albums with it (LibraryModel's, kept and shared); drawn
 /// meanwhile from what is in hand. A failure with a list in hand leaves the list and says so at the top; with none,
-/// why, and Try again. Choosing an order or typing into Find goes back to the top; tapping the Library tab again scrolls
+/// why, and Try again - Your artists' albums failing among them (ArtistsWaiting). Choosing an order or typing into Find goes back to the top; tapping the Library tab again scrolls
 /// the page shown to its top.
 ///
 /// While deadwax can't be reached (3.1's rule) nothing is asked: the list in hand draws, an artist with nothing on this
@@ -238,7 +238,10 @@ struct ArtistsScreen: View {
             } else {
                 rows(drawn, personal: personal, online: online)
             }
-        } else if let failure = artists.failure {
+        } else if let failure = ArtistsWaiting.failure(artists: artists.failure, yourAlbums: library.failures[.yours],
+                                                       yours: yours) {
+            // nothing to draw and an ask failed - the artists', or (Your artists) your albums': a first sign-in's
+            // failed album index would otherwise leave the spinner for ever, the pull shuffling
             VStack(alignment: .leading, spacing: 10) {
                 ErrorNote(failure, retry: true)
                 Button(LibraryWords.tryAgain) {
