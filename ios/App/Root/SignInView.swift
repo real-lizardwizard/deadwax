@@ -64,8 +64,7 @@ struct SignInView: View {
                 } label: {
                     Text(lines.button).frame(maxWidth: .infinity)
                 }
-                .buttonStyle(.borderedProminent)
-                .controlSize(.large)
+                .buttonStyle(PrimaryFace(large: true))
                 .disabled(lines.disabled)
                 if !over { address }
             }

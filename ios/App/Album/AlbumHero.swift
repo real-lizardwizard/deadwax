@@ -129,7 +129,7 @@ struct HeldBadge: View {
     }
 }
 
-/// Play (filled) and Shuffle (plain), side by side - one above the other at the largest text sizes. An album's page's,
+/// Play (the primary pill) and Shuffle (the secondary), side by side - one above the other at the largest text sizes. An album's page's,
 /// and a playlist's (Phase 4).
 struct PlayButtons: View {
     let enabled: Bool
@@ -151,15 +151,13 @@ struct PlayButtons: View {
                 .font(.body.weight(.semibold))
                 .frame(maxWidth: .infinity)
         }
-        .buttonStyle(.borderedProminent)
-        .controlSize(.large)
+        .buttonStyle(PrimaryFace(large: true))
 
         Button(action: shuffle) {
             Label("Shuffle", systemImage: "shuffle")
                 .font(.body.weight(.semibold))
                 .frame(maxWidth: .infinity)
         }
-        .buttonStyle(.bordered)
-        .controlSize(.large)
+        .buttonStyle(SecondaryPill(large: true))
     }
 }

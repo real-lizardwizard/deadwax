@@ -98,6 +98,12 @@ public enum Routes {
     public static let addToPlaylist = Endpoint(method: "POST", path: "/deadwax/navidrome/playlists/{playlist_id}/add", query: [])
     public static let editPlaylist = Endpoint(method: "POST", path: "/deadwax/navidrome/playlists/{playlist_id}/edit", query: [])
     public static let deletePlaylist = Endpoint(method: "POST", path: "/deadwax/navidrome/playlists/{playlist_id}/delete", query: [])
+    // slice 3b's (phase4-library.md 2.8): the Library's Shuffle of your whole library - a new order of every song of a
+    // scope with its first page (`ShuffleStart`; `playing` the order the last tap played, for deadwax to claim; `claim`
+    // the feed's fresh order, played at once), and a page of an order from `offset` (`ShufflePage`; a 404 once deadwax
+    // no longer holds it)
+    public static let shuffle = Endpoint(method: "GET", path: "/deadwax/navidrome/shuffle", query: ["scope", "playing", "claim"])
+    public static let shufflePage = Endpoint(method: "GET", path: "/deadwax/navidrome/shuffle/{token}", query: ["offset"])
 
     /// The levels spec's name for `levelAlbum`: the album's levels warmed before its first play.
     public static var warmLevels: Endpoint { levelAlbum }
@@ -114,6 +120,7 @@ public enum Routes {
         scrub, discArt,
         history, recordHistory,
         playlists, playlist, createPlaylist, addToPlaylist, editPlaylist, deletePlaylist,
+        shuffle, shufflePage,
     ]
 
     /// The routes given longer than the transport's own 8 seconds to answer, in seconds: the album index reads every

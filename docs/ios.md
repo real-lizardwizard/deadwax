@@ -26,7 +26,8 @@ phone is charging if you choose, and with the app in the background when iOS all
 on this phone](#your-library-on-this-phone)). Phase 4 has begun with **playlists**: yours and those
 shared with you, in the Library, played as the web app plays them, and made, added to, edited and
 deleted on the phone as in the web app, and downloaded to play with no connection, kept in step as they
-change (see [Playlists](#playlists)).
+change (see [Playlists](#playlists)); and with the Library's switch - Albums | Playlists, swiped between,
+in the order you choose - and a pull down that shuffles your whole library (see [The Library](#the-library)).
 Artists, songs, Search and the rest come next (see [What it can't do yet](#what-it-cant-do-yet)).
 
 **Nothing of Phase 2, the lyrics, the EQ, the turntable, play history, your library downloaded or
@@ -184,10 +185,31 @@ and every screen scrolls far enough for its last row to come up above it.
 
 ## The Library
 
-With logins on, the Library is **Your albums**: the albums in your library, as the web app's Library
-has them ([sharing deadwax](sharing.md) says how an album gets there). Above them, **All music >
-All albums** is the whole collection. With logins off, and for the break-glass `deadwax` sign-in,
-the Library is **Albums**: the whole collection.
+The Library opens on its pages, side by side: **Albums** and **Playlists** (Artists and Songs join them
+later in Phase 4). The switch at the top - Albums | Playlists - picks one, or swipe left and right between
+them, the switch moving with you. The Library opens on the first page each time the app starts, and when
+someone else signs in; after that it stays on the page you left it on. Tap the Library tab while you're on
+it, and the page goes back to its top. Nothing sits above the albums but their count.
+
+With logins on, **Albums** is **Your albums**: the albums in your library, as the web app's Library has them
+([sharing deadwax](sharing.md) says how an album gets there), and ••• > **All music** is the whole
+collection's. With logins off, and for the break-glass `deadwax` sign-in, Albums is the whole collection.
+**Playlists** is your playlists (see [Playlists](#playlists)).
+
+**The •••** at the top right (VoiceOver reads it "More for the Library"):
+
+- **Shuffle**: your whole library, shuffled - see [Shuffling your library](#shuffling-your-library). Until
+  it's ready it reads "Getting ready…", dimmed.
+- **Downloaded**: what's on this phone (below).
+- **All music**: the whole collection's albums, with a library of your own.
+- **Refresh**: your albums and your playlists asked for again now.
+- **Edit order**: the pages as rows - drag them by their handles into the order you want, and **Done**. The
+  Library opens on the first, and this phone remembers the order.
+
+Beside the ••• are the page's own buttons: on Albums, the order and Grid or list; on Playlists, **+** for
+[New playlist](#playlists).
+
+On the Albums page:
 
 - **Grid or list**: the button at the top right switches between covers and rows. It starts as a
   grid, and this phone remembers your choice.
@@ -196,39 +218,71 @@ the Library is **Albums**: the whole collection.
   start with a letter come last, under #), the month it was added ("Date unknown" when deadwax
   doesn't know), or the year ("No year"). In Your albums, Recently added means when the album came
   into your library; in All albums, when the collection got it. This phone remembers the order.
-- **Find** at the top keeps the albums whose title or artist holds every word you type, in any order
-  and anywhere in a word ("eat" finds the Beatles). The count above the albums then says "12 of
-  3012 albums".
+- **Find**, under the switch, keeps the albums whose title or artist holds every word you type, in any
+  order and anywhere in a word ("eat" finds the Beatles). The count above the albums then says "12 of
+  3012 albums". Each page keeps its own words in Find.
 - **The index** down the right edge, once a list has 50 albums or more: A to Z and # for Artist and
   Title, decades for the two Year orders. There's none for Recently added, or while you're finding.
   Touch or slide along it to jump.
 - **New** marks an album that came into your library and that you haven't opened yet, here or on the
   web app. Opening it clears the mark, on both.
-- **Playlists**, the first row above the albums, opens your playlists (see [Playlists](#playlists)).
-- **Tap an album** to open its page. Nothing plays from the Library itself.
+- **Tap an album** to open its page. Nothing plays from the Library itself, but the pull.
 
 The list is kept on the phone, so the Library shows at once when the app opens, and is asked for
-again when it's more than a minute old. Pull down to ask now. If deadwax can't be asked, the list
-stays as it was, under "Couldn't update this list - showing it as it was." deadwax lists at most
-10,000 albums; past that, the Library says "Showing the first 10000 albums - deadwax reads at most
-that many."
+again when it's more than a minute old, each time the Library comes into view; ••• > Refresh asks now.
+If deadwax can't be asked, the list stays as it was, under "Couldn't update this list - showing it as it
+was." deadwax lists at most 10,000 albums; past that, the Library says "Showing the first 10000 albums -
+deadwax reads at most that many."
 
 An empty Your albums says "Nothing in your library yet.", with **See All music** to add some from
 the collection. (Its words mention Search and Get: those are the web app's, for now.)
 
-**Keep your library on this phone?** The first time the Library has albums to show, a card at its top
-asks whether to [download your library](#your-library-on-this-phone) by itself ("Keep the collection on
-this phone?" with logins off), as much as fits in your storage limit. **Turn On** turns it on; **Not
-Now** puts the card away. Either way it doesn't come back, and the setting is in You > Downloads.
+### Shuffling your library
 
-**Downloaded.** Once anything is downloaded, on its way or didn't download, the top of the Library has
-**On this phone > Downloaded**, with how many albums. It's every album with a song on this phone,
-whoever's library it's in, drawn as the other lists are: the same orders, Find, headers and index.
-An album your library is downloading by itself shows there once a song of it is here or downloading,
-never while it only waits its turn.
+**Pull down** on either page, a good way past its top: a ring round the shuffle mark fills as
+you pull, the mark growing and turning, "Pull to shuffle" under it. At the line the phone ticks, the ring
+becomes a purple disc, and it says "Release to shuffle" - let go then, and your library plays shuffled
+("Shuffling"). Push back up a little before you let go and it's the ring again (pull down again for
+another tick); let go before the line and nothing plays. A pull never refreshes the Library now: it asks
+for itself as it comes into view, and ••• > Refresh asks now. The lists opened from the ••• - All albums,
+Downloaded, Downloaded playlists - still refresh when pulled.
+
+It's deadwax's shuffle, the web app's Library > Shuffle: every song of your library (of the collection,
+without a library of your own) once, in an order deadwax makes, played from the first. Its first 200
+songs are fetched before you ask - as the Library comes into view, and again when that was more than ten
+minutes ago - so the music starts the moment you let go. More are added to the end of Up Next as it plays,
+whenever fewer than 50 of its songs are left after the one playing, until every song is in. With Repeat
+All, once they've all played, a new order begins, never with the song that just ended. If deadwax no
+longer has the order (it restarted, or a day went by), a new one carries on and the app says "Your
+shuffle started over - deadwax no longer had its order", once. With Normalization on, each song is
+levelled on its own, as a playlist's are.
+
+Until its first songs are here, the ring fills but never turns purple, and says "Getting ready…". If
+deadwax couldn't get them ready, it says "Couldn't get your songs ready to shuffle" - or, for a library of
+more than 200,000 songs, "Your library is too big to shuffle here" - and tries again the next time the
+Library comes into view, or with ••• > Refresh. With no songs at all, there's no Shuffle in the ••• and
+nothing to pull.
+
+While deadwax can't be reached, it shuffles the songs on this phone instead: ••• > **Shuffle downloads**,
+or the pull's "Pull to shuffle your downloads". With nothing downloaded there's no Shuffle in the •••, and
+the pull says "Nothing on this phone to shuffle".
+
+With **Reduce Motion** on, the mark doesn't grow, turn or spin; the ring still fills as you pull, and the
+states change at once. **VoiceOver** and Switch Control use ••• > Shuffle; the pull's graphic isn't read.
+On **iOS 17** there's no pull, only ••• > Shuffle.
+
+**Downloaded** (in the •••) is every album with a song on this phone, whoever's library it's in, drawn as
+the other lists are: the same orders, Find, headers and index. An album your library is downloading by
+itself shows there once a song of it is here or downloading, never while it only waits its turn.
 Its **Recently added** means downloaded to this phone, newest first. Each album there has a third
 line: "12 songs", "3 of 12 songs", "Downloading", "Waiting", or, in amber, "Didn't download". With
-nothing on the phone it says "Nothing downloaded yet."
+nothing on the phone it says "Nothing downloaded yet." At its top, **Downloaded playlists** when you've
+[downloaded a playlist](#downloading-a-playlist).
+
+**Keep your library on this phone?** The first time you open Downloaded while your library has albums, a
+card at its top asks whether to [download your library](#your-library-on-this-phone) by itself ("Keep the
+collection on this phone?" with logins off), as much as fits in your storage limit. **Turn On** turns it
+on; **Not Now** puts the card away. Either way it doesn't come back, and the setting is in You > Downloads.
 
 **The download marks**, at the end of an album's artist line on every list (and on a song's row on an
 album's page): a filled arrow for downloaded (all of it, or some of its songs), a dotted one while it
@@ -237,7 +291,7 @@ words after the artist: "Downloaded", "Partly downloaded", "Downloading", "Waiti
 "Didn't download".
 
 **The Library needs Navidrome**: it's the albums Navidrome lists, through deadwax. If deadwax can't
-reach Navidrome, or hasn't been told where it is, the Library says so instead of showing albums (see
+reach Navidrome, or hasn't been told where it is, the Library says so in place of its pages (see
 [When something goes wrong](#when-something-goes-wrong)) - with **On this phone > Downloaded** under
 it when anything is downloaded, since those play from the phone. It checks again each time you come
 back to the Library tab or the app, and when you pull down.
@@ -249,7 +303,7 @@ back to the Library tab or the app, and when you pull down.
   your library** or only **In the collection**. With logins off, and for the break-glass `deadwax`
   sign-in, every album reads In your library.
 - **Play** plays the album from its first song. **Shuffle** plays it in a random order, with Shuffle
-  on.
+  on. Play is the web app's purple button, white on purple; Shuffle beside it the web app's grey one.
 - **The songs**, under a heading for each disc when there's more than one, or a disc has a title
   ("Disc 2", or "Disc 2 · Live" with its title). The song playing has moving bars instead of its
   number. **Tap a song** to play the album from it. Under the songs: how many and how long ("10
@@ -300,7 +354,7 @@ yet, so its first song is less likely to wait when you play it.
 
 ## Playlists
 
-**Library > Playlists** lists your playlists as Navidrome keeps them - the same ones the web app,
+**The Library's Playlists page** (the switch's) lists your playlists as Navidrome keeps them - the same ones the web app,
 Amperfy and Navidrome show you. With logins on they're read as you, so someone else's private
 playlist never shows; with logins off (and for the break-glass `deadwax` sign-in), they're those of
 the Navidrome account deadwax uses:
@@ -310,10 +364,13 @@ the Navidrome account deadwax uses:
 - **Shared with you**: other people's playlists they've shared, with whose they are ("Sam · 12 songs ·
   48 min").
 - **From files (3)**, folded: playlists Navidrome made from files in the music folders ("From a file ·
-  12 songs"). Tap the row to open it out; it folds again when you leave the screen.
+  12 songs"). Tap the row to open it out; it stays open until the app is closed, or deadwax goes out of reach and comes back.
 
 Each group is in Navidrome's order, by name, and shows only when it has playlists. The list is asked
-for each time you open it, and when you come back to the app with it open; pull down to ask now. If deadwax can't be asked, it says "Couldn't list your
+for each time the page comes into view, and when you come back to the app on it; ••• > Refresh asks now
+(a pull down [shuffles your library](#shuffling-your-library), as on Albums). **Find**, under the switch,
+keeps the playlists whose name holds every word you type, in any order, From files opened while it
+finds; with none, "No playlists match “…”." If deadwax can't be asked, it says "Couldn't list your
 playlists." and why - over the list as it was, or with **Try again** when there's no list to show.
 With none at all: "No playlists yet.", how to make one, and **New playlist**. **Tap a playlist** to
 open its page. Nothing plays from the list itself.
@@ -455,8 +512,8 @@ with a song on the phone opens if its page is one of the last eight you opened s
 the songs not on the phone are dimmed, and Play and Shuffle play the ones that are. The others are
 dimmed in the list and open nothing. With no list in hand, Playlists lists your downloaded ones ("Your
 downloaded playlists - the rest show once deadwax is back."), or says "Your playlists show here once
-deadwax is back." with none. The Playlists row is on the Downloaded list the Library opens on while
-deadwax can't be reached, too, with Downloaded playlists under it.
+deadwax is back." with none. While deadwax can't be reached the Albums page is Downloaded, with
+Downloaded playlists at its top.
 
 Nothing is made or changed while deadwax can't be reached: Add to a playlist… isn't in the ••• menus
 or Now Playing's, and **+** and **Edit** are dimmed. Nothing is kept to send later - a playlist can be
@@ -1482,11 +1539,14 @@ says so in an amber strip at the top of each page - "Offline - showing what's on
 "Can't reach deadwax - showing what's on this phone". Tap it for more, and, when deadwax isn't
 answering, **Try again**. It goes by itself once deadwax answers.
 
-- **The Library opens on Downloaded.** It changes only when you're not looking at it (another tab, an
-  album open over it, the app in the background), so it never moves under your finger; until then the
-  list you were on stays, with every album not on the phone dimmed. At the top, **Your albums** (or
-  **Albums**, without a library of your own) takes you to the full list, dimmed but for what's here. A pull down checks whether
-  deadwax is back.
+- **The Library's Albums page is Downloaded**, under the same switch: headed Downloaded, with
+  Downloaded playlists and "Only downloaded albums play until deadwax is back." at its top. It changes
+  only when you're not looking at it (another tab, an album open over it, the app in the background), so
+  it never moves under your finger; until then the list you were on stays, with every album not on the
+  phone dimmed. ••• > **Your albums** (or **Albums**, without a library of your own) takes you to the full
+  list, dimmed but for what's here; ••• > Refresh checks whether deadwax is back; ••• > **Shuffle
+  downloads**, or a pull, shuffles the songs on the phone (see [Shuffling your
+  library](#shuffling-your-library)).
 - **Up Next** dims the songs that aren't on the phone; a tap on one does nothing (see [Up Next](#up-next)).
 - **An album's page** shows what's on the phone, dims the rest, and Play and Shuffle play only the
   songs here. An album with nothing here says "This album isn't on this phone - it plays once deadwax
@@ -2218,13 +2278,59 @@ later. Use an album of a dozen songs, headphones on, with the web app open besid
 - **91 VoiceOver.** Tap a song above the song playing with VoiceOver on: it says "Playing" and the title,
   and VoiceOver is on the song that plays next (Done, at the end of the queue).
 
+### The Library's switch's checks (92-101)
+
+These come with the build that adds the Library's switch, its pull to shuffle and the web app's Play
+button (still app 0.9). Earlier checks' "Library > Playlists" is now the switch's Playlists page, and
+"Downloaded" is in the Library's •••.
+
+- **92 The switch.** The Library opens on Albums, with nothing above the albums but their count, and
+  Albums | Playlists at the top. Swipe left: Playlists - the switch, the buttons and Find follow as the page
+  settles; swipe halfway and let go: it springs back, and nothing else changes. Tap Albums: back. Go to
+  You and back: the same page. Scroll a long way down and tap the Library tab: the page goes to its top.
+  Force-quit and open: Albums. Scrolling up and down never swipes to the other page.
+- **93 Edit order.** ••• > Edit order: drag Playlists above Albums, Done. The switch reads Playlists |
+  Albums at once; force-quit and open: the Library opens on Playlists. (Put it back as you like it.)
+- **94 The •••.** Downloaded opens what's on the phone - with the card asking whether to keep your library
+  on this phone at its top, once, if you never answered it. All music opens All albums (with a library
+  of your own). Make a playlist in the web app, then ••• > Refresh: it's on Playlists. Shuffle plays your
+  library shuffled.
+- **95 Pull to shuffle.** On Albums, pull down slowly: the ring fills and the mark grows and turns, "Pull
+  to shuffle". At the line: a tick, the purple disc, "Release to shuffle". Push back up a little: the
+  ring again, no tick; down again: another tick. Let go armed: "Shuffling", and your library plays - the
+  mini player shows a song from anywhere in it. Let go before the line: nothing plays. The same on
+  Playlists. A fast fling up to the top shows nothing. Pull to the purple disc, then pull down
+  Notification Center (or ask Siri, or take a call) before letting go: nothing plays. Does the graphic sit
+  in the gap the pull opens, at your text size? Does the music start the moment you let go?
+- **96 Past the first 200** (the phase's). With the shuffle playing, press Next 160 times or so (or let it
+  play an evening): Up Next keeps going, never ending at 200. With Repeat off it ends only once every song
+  of your library has played; with Repeat All, at the end a new order begins with a different song. Lock
+  the phone mid-shuffle for an hour: does it keep going?
+- **97 Started over.** Shuffle, then restart deadwax (or leave the phone a day) and press Next past 150:
+  "Your shuffle started over - deadwax no longer had its order", once, and the music carries on.
+- **98 Offline.** Airplane Mode: the Library's Albums page is Downloaded, under the same switch; ••• >
+  Shuffle downloads, and a pull ("Release to shuffle your downloads"), play only songs on the phone -
+  every one of them in time. ••• > Your albums is the way back. With nothing downloaded: no Shuffle in the
+  •••, and the pull says "Nothing on this phone to shuffle".
+- **99 The Play button.** An album's page and a playlist's: Play is the web app's purple, its white
+  triangle and word plainly readable; Shuffle beside it the web app's grey, the same height and corners.
+  Pressed, Play darkens, its word staying white, and Shuffle's shading turns over, as the web app's do. The
+  other purple buttons - Add to my library, the EQ's Use for, Create in the
+  picker, Sign in, Try again - the same purple. Does it look like the web app's Play on your screen?
+- **100 Find on Playlists.** On Playlists, type part of a playlist's name: only the playlists that hold
+  it; nonsense: "No playlists match “…”." Back on Albums, Find holds the albums' own words.
+- **101 VoiceOver and Reduce Motion.** VoiceOver reads the switch as the Library's pages, Albums and
+  Playlists; the ••• as "More for the Library", with Shuffle first. With Reduce Motion on (Settings >
+  Accessibility > Motion), the pull's mark doesn't grow or turn, the states change at once, and a tap on
+  the switch moves the page without sliding.
+
 ## What it can't do yet
 
 These are the web app's for now. Most of them come to the phone in the next phases:
 
 - **The visualizer**: it stays the web app's, on a desktop.
 
-- **Artist pages** and a **songs list**, and the Library's **Shuffle** of your whole library.
+- **Artist pages** and a **songs list**.
 - **Search**, **Get** and **Requests**.
 - **Home** and **pins**.
 - **Looking after deadwax**: People, Server settings, the event log, Needs a look, Library care, the
@@ -2244,8 +2350,8 @@ These are the web app's for now. Most of them come to the phone in the next phas
 | The sign-in comes up over the app, with a reason ("Your sign-in ran out after 30 days without use - sign in again.") | Sign in again. The music plays on underneath. |
 | Library: **"Your music isn't available right now"** (an admin sees **"Can't reach Navidrome"**) | deadwax can't reach Navidrome. Check Navidrome is running, then **Try again**. |
 | Library: **"Your music isn't available yet"** (an admin sees **"Connect Navidrome"**) | deadwax hasn't been told where Navidrome is. An admin's **Set up Navidrome** opens the web app in Safari: set it up in Server settings (Connections), then come back. |
-| Library: **"Couldn't update this list - showing it as it was."** | deadwax didn't answer just then. Pull down to try again. |
-| An album's page: **"This album isn't here any more - it may have been moved or deleted."** | Go back, and pull down on the Library to bring it up to date. |
+| Library: **"Couldn't update this list - showing it as it was."** | deadwax didn't answer just then. ••• > Refresh to try again (pull down, on a list opened from the •••). |
+| An album's page: **"This album isn't here any more - it may have been moved or deleted."** | Go back, and ••• > Refresh in the Library to bring it up to date. |
 | A song's line says **"The connection dropped while this song was loading"**, or the next song's says **"Skipped "..." - it wouldn't play"** | The app asks for a song once more after a moment, then goes on past it. Check the phone's network. |
 | **"This device couldn't play this song's audio"**, or **"Skipped "..." - this device couldn't play its audio"** | The file is damaged, or in a form iPhones can't play. Try it on the web app; an admin finds the details in You > Debug > Playing. |
 | Info's Normalization: **"Not this time - the album's volume couldn't be checked"** ("the song's" for a song levelled on its own) | deadwax is older than 2.1.1, or didn't answer in time. The song plays as it is; with 2.1.1 or later, the album's next play is levelled. |

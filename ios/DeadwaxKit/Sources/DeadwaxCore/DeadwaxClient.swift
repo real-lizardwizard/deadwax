@@ -332,6 +332,24 @@ public struct DeadwaxClient: Sendable {
         _ = try await call(Routes.deletePlaylist, as: PlaylistDeleted.self, path: ["playlist_id": id])
     }
 
+    // MARK: the Library's Shuffle (Phase 4, slice 3b)
+
+    /// A new order of every song of `scope`, its token, its total and its first page - asked ahead as the Library shows
+    /// (`playing`: the order the last tap played, which deadwax claims), or by the feed for a fresh order that plays at
+    /// once (`claim`).
+    public func shuffleStart(scope: PagedScope, playing: String? = nil, claim: Bool = false) async throws -> ShuffleStart {
+        var query = [("scope", scope.rawValue)]
+        if let playing, !playing.isEmpty { query.append(("playing", playing)) }
+        if claim { query.append(("claim", "true")) }
+        return try await call(Routes.shuffle, query: query)
+    }
+
+    /// A page of the order `token` from `offset`. A 404 - deadwax no longer holds it - is thrown, for the feed to start
+    /// over.
+    public func shufflePage(token: String, offset: Int) async throws -> ShufflePage {
+        try await call(Routes.shufflePage, path: ["token": token], query: [("offset", String(offset))])
+    }
+
     // MARK: app 0.8's play history (server 2.1.14)
 
     /// A page of the person's plays, newest first: the newest (`before` nil), or the one before a page's last.

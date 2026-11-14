@@ -42,6 +42,12 @@ four writes: NewPlaylistBody, PlaylistAddBody and PlaylistEditBody to the extra=
 key the phone sends one the server declares, every one it requires sent), the duplicates the phone names the route's
 own, PlaylistAddAnswer and PlaylistDeleted to what the add and the delete return, create and edit answering a playlist
 with its songs, and the statuses the phone reads (409 changed, 404 gone, 403 not yours) where the routes raise them.
+
+And slice 3b's Library Shuffle (phase4-library.md 2.7, 2.8): ShuffleStart and ShufflePage to what /shuffle and
+/shuffle/{token} return, their songs' fields among SHUFFLE_FIELDS, PagedScope the scopes /shuffle takes, the 404 the
+feed starts over on and the 413's words; and the numbers and words the phone holds by hand from the web (question 24) -
+SHUFFLE_FRESH_MS, FEED_BELOW, FEED_RETRY_MS and the Shuffle's three sentences, read from ShuffleSongs.tsx and
+useShuffleFeed.ts - with SHUFFLE_FRESH_MS the route's SHUFFLE_LIST_TTL_S.
 """
 
 import importlib.util
@@ -76,7 +82,7 @@ from src.store import JobStore  # noqa: E402
 
 CORE = Path(__file__).resolve().parent.parent / "ios" / "DeadwaxKit" / "Sources" / "DeadwaxCore"
 ENDPOINT = re.compile(r'Endpoint\(method: "(\w+)", path: "([^"]+)", query: \[([^\]]*)\]\)')
-ROUTE_COUNT = 36
+ROUTE_COUNT = 38
 RAW_OPENING = re.compile(r'#+"')
 HASHES = re.compile(r"#*")
 
@@ -1019,3 +1025,91 @@ def test_the_playlist_writes_answer_what_the_app_decodes():
     writable = inspect.getsource(navidrome._writable)
     assert "status_code=404, detail=playlist_rules.GONE" in writable
     assert "status_code=403, detail=playlist_rules.NOT_YOURS" in writable
+
+
+# ---------------------------------------------------------------------------- slice 3b's Library Shuffle
+
+WEB_APP = Path(__file__).resolve().parent.parent / "ui" / "src" / "app"
+
+
+def web_constant(file: str, name: str):
+    """`export const <name> = <number or string>` in a ui/src/app file: an int (underscores allowed) or the string."""
+    text = (WEB_APP / file).read_text(encoding="utf-8")
+    found = re.search(r"^export const " + name + r"\s*=\s*(.+?)\s*$", text, re.M)
+    assert found, f"no {name} in {file}"
+    value = found.group(1)
+    if re.fullmatch(r"[\d_]+", value):
+        return int(value.replace("_", ""))
+    quoted = re.fullmatch(r"'([^']*)'|\"([^\"]*)\"", value)
+    assert quoted, f"{file} {name} is {value}"
+    return quoted.group(1) if quoted.group(1) is not None else quoted.group(2)
+
+
+def swift_words(file: str, holder: str, name: str) -> str:
+    """`public static let <name> = "<words>"` inside `<holder>` of a DeadwaxCore file, its \\u{...} escapes read."""
+    text = (CORE / file).read_text(encoding="utf-8")
+    start = re.search(r"public (?:enum|struct) " + holder + r"\b", text)
+    assert start, f"no {holder} in {file}"
+    body = text[start.end():text.index("\n}\n", start.end())]
+    found = re.search(r'public static let ' + name + r' = "((?:[^"\\]|\\.)*)"\n', body)
+    assert found, f"no {holder}.{name} in {file}"
+    return re.sub(r"\\u\{([0-9A-Fa-f]+)\}", lambda m: chr(int(m.group(1), 16)), found.group(1)).replace('\\"', '"')
+
+
+def swift_struct_constant(file: str, holder: str, name: str) -> int:
+    """`public static let <name> = <int>` inside `public struct <holder>` (swift_constant reads enums)."""
+    text = (CORE / file).read_text(encoding="utf-8")
+    start = re.search(r"public struct " + holder + r"\b", text)
+    assert start, f"no {holder} in {file}"
+    body = text[start.end():text.index("\n}\n", start.end())]
+    found = re.search(r"public static let " + name + r" = ([\d_]+)\b", body)
+    assert found, f"no {holder}.{name} in {file}"
+    return int(found.group(1).replace("_", ""))
+
+
+def test_the_shuffle_answers_are_what_the_app_decodes(monkeypatch):
+    # /shuffle answers its token, total and first page; /shuffle/{token} its total and the page - the phone reads
+    # exactly those keys, and can't do without the token (a first page with none couldn't be paged)
+    (start_answer,) = returned_literals(navidrome.shuffle)
+    (page_answer,) = returned_literals(navidrome.shuffle_more)
+    assert set(fields("ShuffleStart")) == literal_keys(start_answer) == {"token", "total", "songs"}
+    assert set(fields("ShufflePage")) == literal_keys(page_answer) == {"total", "songs"}
+    assert not literal_nulls(start_answer) and not literal_nulls(page_answer)
+    shuffle_code = _code((CORE / "Shuffle.swift").read_text(encoding="utf-8"))
+    assert "token = try fields.decode(String.self, forKey: .token)" in shuffle_code
+    # the songs are trimmed to SHUFFLE_FIELDS, and the phone makes its entries with shuffledTrack, which reads only
+    # those (test_the_queue_answer_is_what_get_queue_sends holds it): the feed's own track() goes through it
+    assert '"songs": _shuffle_page(held, 0)' in start_answer and '"songs": _shuffle_page(held, offset)' in page_answer
+    assert "shuffledTrack(song)" in swift_function("Shuffle.swift", "track")
+    # PagedScope is the scope /shuffle takes - and /album_index's, the same two
+    monkeypatch.setattr(Config, "AUTH_MODE", None)
+    routes = app_routes()
+    shuffle = routes[("GET", "/deadwax/navidrome/shuffle")]
+    scope = next(field for field in shuffle.dependant.query_params if field.alias == "scope")
+    assert swift_raw_values("UpNextTypes.swift", "PagedScope") == set(typing.get_args(scope.field_info.annotation)) \
+        == {"yours", "store"}
+    claim = next(field for field in shuffle.dependant.query_params if field.alias == "claim")
+    assert claim.field_info.annotation is bool and '("claim", "true")' in swift_function("DeadwaxClient.swift", "shuffleStart")
+    # the offset the feed asks from is how many songs it has, never past the order's total - within the route's bounds
+    assert bounds(routes[("GET", "/deadwax/navidrome/shuffle/{token}")], "offset") == (0, navidrome.SHUFFLE_MAX)
+    # an order deadwax no longer holds is the 404 the feed starts over on; a library too big, the 413 whose words the
+    # phone says as they come
+    assert 'raise HTTPException(status_code=404, detail="gone")' in inspect.getsource(navidrome.shuffle_more)
+    assert "raise HTTPException(status_code=413, detail=SHUFFLE_TOO_BIG)" in inspect.getsource(navidrome._shuffle_songs)
+    assert "if status == 413, let detail, !detail.isEmpty { return detail }" in shuffle_code
+
+
+def test_the_shuffles_numbers_and_words_are_the_webs():
+    # held by hand until slice 5's exporter (question 24): each read here from the web's own source
+    assert swift_struct_constant("Shuffle.swift", "ShuffleAhead", "freshSeconds") * 1000 \
+        == web_constant("ShuffleSongs.tsx", "SHUFFLE_FRESH_MS")
+    assert swift_struct_constant("Shuffle.swift", "ShuffleAhead", "freshSeconds") == navidrome.SHUFFLE_LIST_TTL_S
+    assert swift_constant("Shuffle.swift", "ShuffleFeed", "below") == web_constant("useShuffleFeed.ts", "FEED_BELOW")
+    assert swift_constant("Shuffle.swift", "ShuffleFeed", "retrySeconds") * 1000 \
+        == web_constant("useShuffleFeed.ts", "FEED_RETRY_MS")
+    assert swift_words("Shuffle.swift", "ShuffleWords", "gettingReady") \
+        == web_constant("ShuffleSongs.tsx", "SHUFFLE_GETTING_READY") == "Getting ready\u2026"
+    assert swift_words("Shuffle.swift", "ShuffleWords", "unready") == web_constant("ShuffleSongs.tsx", "SHUFFLE_UNREADY")
+    assert swift_words("Shuffle.swift", "ShuffleWords", "startedOver") \
+        == web_constant("useShuffleFeed.ts", "SHUFFLE_STARTED_OVER")
+    assert navidrome.SHUFFLE_TOO_BIG == "Your library is too big to shuffle here"

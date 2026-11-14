@@ -221,6 +221,10 @@ final class PlayerModel {
     @ObservationIgnored private var skipRun = OfflinePlay.SkipRun()
     /// The Up Next entry the listener tapped: offline, a song not here is stopped on, never passed over.
     @ObservationIgnored private var chosenKey: Int?
+    /// (Phase 4, slice 3b) The library's shuffle's feed (useShuffleFeed.ts): Core's ShuffleFeedLoop - when it looks, what
+    /// each answer does to the queue, what a stop lets go - its asks made here, and its retry's timer.
+    @ObservationIgnored private let feed = ShuffleFeedLoop()
+    @ObservationIgnored private var feedRetry: Task<Void, Never>?
 
     /// The speed, and what the engine was told (Core's SpeedControl: exact again at 1x on a let-go).
     private var speedControl = SpeedControl(speed: PlaySpeed.read(UserDefaults.standard.string(forKey: PlaySpeed.storageKey)))
@@ -245,6 +249,10 @@ final class PlayerModel {
         session.onInterruption = { [weak self] began, shouldResume in self?.interruption(began: began, shouldResume: shouldResume) }
         session.onOldDeviceGone = { [weak self] in self?.pause() }
         session.onReset = { [weak self] in self?.mediaReset() }
+        feed.send = { [weak self] (ask: FeedAsk) -> Void in self?.feedSend(ask) }
+        feed.adding = { [weak self] (songs: [Song]) -> Void in self?.shelve(songs) }
+        feed.say = { [weak self] (words: String) -> Void in self?.say(words) }
+        feed.retry = { [weak self] (on: Bool) -> Void in self?.feedRetryTimer(on) }
         nowPlaying.connect(.init(
             play: { [weak self] in self?.resume() },
             pause: { [weak self] in self?.pause() },
@@ -281,6 +289,17 @@ final class PlayerModel {
         played.rememberQueue(plan.albums, keeping: QueueAlbums.named(plan.tracks))
         shelve(songs)
         startQueue { $0.playTracks(plan.tracks, start: index, shuffle: shuffle) }
+    }
+
+    /// (Phase 4, slice 3b) The Library's Shuffle - the •••'s tap, the pull's release (phase4-library.md 2.8;
+    /// ShuffleSongs.tsx's tap): the first page asked ahead, played from its first song as a library's shuffle (`paged`:
+    /// the order's token and total, the songs fetched, the scope, the level the first song got) - the feed brings in the
+    /// rest as it plays. Its songs are shelved for Info and the stream cache, as resume's are; no album is remembered
+    /// (each track names its own, and Info asks). Call it in the tap, nothing awaited first.
+    func play(shuffled taken: ShuffleAhead.Taken) {
+        guard !taken.tracks.isEmpty else { return }
+        shelve(taken.songs)
+        startQueue { $0.playTracks(taken.tracks, start: 0, shuffle: false, paged: taken.paged) }
     }
 
     /// Play Next from a ••• menu: the pick queued straight after the song playing's copies (pick.choose(.next,
@@ -516,6 +535,7 @@ final class PlayerModel {
     /// Stops and forgets the queue: the mini player goes.
     func stop() {
         cancelRetry()
+        feed.stopped()
         reporter.stop()
         link?.stop()
         controller = nil
@@ -714,6 +734,57 @@ final class PlayerModel {
     private func repeatChanged(_ mode: Repeat) {
         repeatMode = mode
         UserDefaults.standard.set(mode.rawValue, forKey: Repeat.storageKey)
+        if let controller { feed.look(controller) }
+    }
+
+    // MARK: the library's shuffle's feed (Phase 4, slice 3b - phase4-library.md 2.8; useShuffleFeed.ts)
+
+    /// The feed's ask (ShuffleFeedLoop.send): made of deadwax as the person signed in, in an unstructured task, its
+    /// answer handed back to the loop with the queue's controller as it is then. It only ever adds to the queue.
+    private func feedSend(_ ask: FeedAsk) {
+        guard let client = server.client else {
+            feed.failed(ask, into: controller)
+            return
+        }
+        Task { [weak self] in
+            switch ask.kind {
+            case .page(let offset):
+                do {
+                    let page = try await client.shufflePage(token: ask.token, offset: offset)
+                    guard let self else { return }
+                    self.feed.page(ask, songs: page.songs, into: self.controller)
+                } catch let failure as APIFailure where failure.status == 404 {
+                    // the order gone from deadwax (it restarted, or a day untouched): a fresh one, as the rest of this round
+                    guard let self else { return }
+                    self.feed.gone(ask, into: self.controller)
+                } catch {
+                    guard let self else { return }
+                    self.feed.failed(ask, into: self.controller)
+                }
+            case .fresh:
+                do {
+                    let first = try await client.shuffleStart(scope: ask.scope, claim: true)
+                    guard let self else { return }
+                    self.feed.fresh(ask, first, into: self.controller)
+                } catch {
+                    guard let self else { return }
+                    self.feed.failed(ask, into: self.controller)
+                }
+            }
+        }
+    }
+
+    /// The retry's timer (ShuffleFeedLoop.retry): started afresh, FEED_RETRY_MS long, or called off.
+    private func feedRetryTimer(_ on: Bool) {
+        feedRetry?.cancel()
+        feedRetry = nil
+        guard on else { return }
+        feedRetry = Task { [weak self] in
+            try? await Task.sleep(for: .seconds(ShuffleFeed.retrySeconds))
+            guard !Task.isCancelled, let self else { return }
+            self.feedRetry = nil
+            self.feed.retryDue(self.hasQueue ? self.controller : nil)
+        }
     }
 
     // MARK: the speed (notes/ios-specs/turntable.md 5)
@@ -818,6 +889,7 @@ final class PlayerModel {
         keepAndPrefetch()
         observeResume()
         showNowPlaying()
+        if let controller { feed.look(controller) }
     }
 
     /// Another entry is heard: its words and its retry start afresh (usePlayer.ts at every load and join), and its

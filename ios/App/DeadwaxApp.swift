@@ -29,6 +29,7 @@ struct DeadwaxApp: App {
     @State private var deck: DeckController
     @State private var history: HistoryModel
     @State private var playlists: PlaylistsModel
+    @State private var shuffles: ShuffleModel
 
     /// The one background session, made before anything else can ask it.
     private static let downloadSession = DownloadSession()
@@ -47,6 +48,8 @@ struct DeadwaxApp: App {
         let library = LibraryModel(server: server)
         // Phase 4: the person's playlists, as they are on Navidrome
         let playlists = PlaylistsModel(server: server)
+        // Phase 4, slice 3b: the Library's Shuffle's first page, asked ahead
+        let shuffles = ShuffleModel(server: server)
         let downloads = DownloadModel(server: server, reachability: reachability, files: files, session: Self.downloadSession)
         player.connect(downloads: downloads, reachability: reachability)
         // Phase 4, slice 3: a write here to a downloaded playlist keeps it in step at once
@@ -73,6 +76,7 @@ struct DeadwaxApp: App {
             lyrics.reset()
             history.reset()
             playlists.reset()
+            shuffles.reset()
         }
         _server = State(initialValue: server)
         _player = State(initialValue: player)
@@ -86,6 +90,7 @@ struct DeadwaxApp: App {
         _deck = State(initialValue: deck)
         _history = State(initialValue: history)
         _playlists = State(initialValue: playlists)
+        _shuffles = State(initialValue: shuffles)
     }
 
     var body: some Scene {
@@ -103,6 +108,7 @@ struct DeadwaxApp: App {
                 .environment(deck)
                 .environment(history)
                 .environment(playlists)
+                .environment(shuffles)
                 .preferredColorScheme(.dark)
                 .tint(Palette.accent)
         }
