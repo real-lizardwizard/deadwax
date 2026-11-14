@@ -5139,3 +5139,143 @@ Not verified - only the phone can tell (docs/ios.md's checks 71, 73 and 75 now a
 - The tab tapped again during Edit.
 - New playlist's sheet swiped away and opened again.
 - A second opening of the picker saying "Adding…" over Now Playing.
+
+## Phase 4, slice 3: Download a playlist (2026-11-14)
+
+The third of Phase 4's five slices (notes/ios-specs/phase4-library.md 2.5 and 6.3; 6.8 points here), on
+`phase4-library` from `ios` 2fb2ecb (slice 2, its review and main's 2.1.16-2.1.17 merged). **The app stays 0.9 (9)**;
+src/__init__.py untouched; **no server change**: slice 1's two read routes (the list, and one playlist with its
+songs) answer everything keeping a playlist in step needs. ROUTE_COUNT stays 32.
+
+### Core (DeadwaxCore)
+
+- **PlaylistDownloads.swift** (new):
+  - **`DownloadOrigin.playlist(id)`** is `.other("playlist:<id>")`, the raw Phase 2 reserved - one representation,
+    so every switch over DownloadOrigin and every row a store already holds read as before. `playlistID`,
+    `playlists(_:)` (sorted), `keptInStep` (only the library's or playlists'), `onlyPlaylists`.
+  - **`DownloadRemoval`**: what each Remove Download takes - a song's `[.song, .album(its album)]`, an album's those
+    and `.library`, a playlist's its own origin alone - and `stays(origins, removing:)` (none kept reads as `[.song]`,
+    as the store's rules read it).
+  - **`KeptPlaylist`**: a row of the store's `playlist` table - the last answer (nil when it can't be read) and its
+    body as deadwax sent it, `readAt`, `missingSince`, `left` (song id to the first read without it), `askedAt`;
+    `songIDs` (each once), `leftAgreed`, `secondReadAt`.
+  - **`PlaylistDownloads`**, the rules: `started`; `listed` (listed: no longer missing, read when its `changed`
+    moved or its answer couldn't be read; not listed: marked, let go once a list 10 minutes on agrees; an empty list
+    believes nothing and reads every one; one downloaded after the list was asked is left alone); `missing` (a read's
+    404 is a list without it); `read` (a song carried and not in the answer marked by its first read; `here` - this
+    phone's Edit - marks it agreed already; a song back unmarked; an emptied answer not taken in while a mark is
+    unagreed); `actions` (ask the songs not carrying the origin, each once, in order; take the agreed-left ones the
+    answer doesn't list; nothing from an unreadable answer); `orphans`; `dueReads`, `nextLook`, `due` (the library
+    follower's cadence, and on the minute when a second read or a missing mark is due); and for the screens
+    `shelf`, `keeping`, `state`, `choices`, `progress`.
+  - **`PlaylistDownloadWords`** (spec 6.3's words, and `heroLine`, `downloadingRow`, `count`, `removeAllToo`).
+- **DownloadPlan**: `Asked.unit` is `playlist:<id>` (the first by id) for a song a downloaded playlist wants and no
+  album download does - **planned whole**, the storage limit and the 2 GB reserve checked for all of it at once
+  (question 14). Hand units, as before: never given way, never evicted.
+- **DownloadRules**: `DownloadChoice.forSong(_:staying:)` and `forSongs(_:gone:staying:)`, Phase 3's `keptByLibrary`
+  forms now calling them.
+- **DownloadDatabase version 6**: the `playlist` table (id, json, read_at, missing_since, left_songs, asked_at);
+  `playlists()` (in the order downloaded; a row whose answer can't be read, or is another playlist's, kept with no
+  answer - never left out, or its songs' origin would read as an orphan's), `putPlaylist`, `deletePlaylist`; Remove
+  All takes the table with the songs.
+- **Playlists.swift**: `PlaylistWithSongs` is Codable (it encodes back to what reads the same). **DeadwaxClient**:
+  `playlistAnswered(id:)` - the answer and its body as sent; `playlist(id:)` through it.
+
+### The app
+
+- **PlaylistKeeper** (App/Downloads, new): DownloadModel's `playlists`, beside the library's follower, opened and
+  closed with the store. It holds the downloaded playlists in memory; everything it asks for and lets go goes through
+  DownloadModel's own `want` (origin `.playlist(id)`) and `removeOrigins` (DownloadRemoval.playlist). At open: the
+  rows read back, orphans' origins taken, each playlist's asks and takes made, a look. A look (PlaylistDownloads.due)
+  lists the playlists, saves the marks, lets go what two lists agree on, then reads those the list says to and those
+  due a second read - one at a time, each once a run, only while deadwax can be asked; a 404 is `missing`. A timer
+  every minute while the app lives. **Download**: the row written, then the songs asked for, then a read. **Remove**:
+  the row deleted, then the origin taken. **A write here** (PlaylistsModel's new `wrote`): an add or a write's 404
+  reads it; Edit's Done takes in the answer it was given with `here`; a delete (or a Delete answered 404) lets it go
+  at once. **A page's answer** (PlaylistPageModel's new `heard`) is taken in as a read - so opening the playlist twice
+  ten minutes apart agrees on a song gone - and its 404 reads it. A read answered after a newer answer was taken in
+  is dropped (`takenIn`), or a read sent before an Edit here would bring back what the Edit took out.
+- **DownloadModel**: `playlists`, wired in init; `staysAfterRemove(_:album:)` (DownloadRemoval.stays) for the
+  choices - a song's Remove Download offered only when it would take something, an album's only when a song of it
+  would go - and `keepingPlaylist(_:album:)`, the header's name; Remove Download's sets are DownloadRemoval's; the
+  playlist's `download`, `remove`, `tryAgain`, `carrying`, `playlistState`, `keptPlaylist`, `playlistPlaysOffline`,
+  `playlistProgress`, `playlistHere`, `playlistAnswered`, `playlistGone`, `playlistWritten`; the keeper told of
+  open, close, the front, deadwax back and Remove All.
+- **DownloadControl.swift**: **PlaylistDownloadControl** (the arrow; downloaded, the mark opening a menu titled with
+  the playlist's line - "This playlist is downloaded - it plays with no connection." and its size once all are here)
+  and **PlaylistDownloadMenuSection** (Download, or Download Again and Remove Download), also the bar •••'s second
+  section (QueueMenuRequest's new `playlist`). DownloadMenuSection's header says "Downloaded with Late night" for
+  songs a downloaded playlist keeps with nothing to remove; the album control's title too.
+- **PlaylistView**: the control beside the •••; the hero's download line (AlbumHero's DownloadLine, made internal;
+  `heroLine`); the page drawn first from the stored answer (`stored` ?? the page kept in memory), so a downloaded
+  playlist opens with no connection after a launch.
+- **Downloaded playlists** (question 15): AppRoute `.downloadedPlaylists`, DownloadedPlaylistsScreen (PlaylistsScreen.
+  swift) - the downloaded ones by name, a pull looking now. Its row is on the Downloaded screen, pushed or as the
+  root, with a count ("3 playlists" to VoiceOver; PlaceRow's new `counted`) - not a place of its own above the
+  albums. The root's On this phone shows with only a playlist downloaded; Downloaded's "nothing downloaded" note
+  doesn't show under a downloaded playlist's row. The Playlists screen, offline with no list in hand, lists the
+  downloaded ones; offline, a downloaded playlist's row is never dimmed while a song of it is here.
+- **You > Downloads**: Downloading's album rows leave out songs only the library and playlists want (`keptInStep`),
+  each downloaded playlist with songs to come having its own row ("3 of 12 songs to go", or its wait; the bar while
+  fetching); Downloaded's album rows leave out songs only playlists want (`onlyPlaylists`), each downloaded playlist
+  with songs here listed first ("12 songs · 412 MB"); a playlist row opens its page and swipes to Remove. Didn't
+  download's row has no swipe when its Remove would take nothing. Remove All's question adds `removeAllToo`. The
+  pull looks at the playlists too. Storage's counts still count every song.
+
+### Decided here (the spec was silent, or this departs from it)
+
+- **The place** (question 15): Downloaded > Downloaded playlists, as the coordinator relayed James's redesign of the
+  Library (slice 3b, the Library's switch, moves Downloaded into the Library's •••): not On this phone > Playlists.
+- **Planned whole** (question 14), as an album is.
+- **Remove Download elsewhere**: a song's or an album's is never offered when it would take nothing (it would look
+  like it did nothing); "Downloaded with …" says why instead. A song your library keeps keeps Phase 3's rule.
+- **The page's answers count as reads**, and the Edit's own answer is taken in rather than asked for again.
+- **A Delete answered 404 here** lets the download go at once, as a Delete answered (`gone(_:deletedHere:)`); a 404
+  anywhere else waits for two answers 10 minutes apart. The page says it has gone meanwhile; its songs stay.
+- **Crash order**: Download writes the row before asking; Remove deletes the row before taking - an origin left
+  without its row is an orphan, taken as the store opens. A just-downloaded playlist isn't judged by a list asked
+  before it (`askedAt`).
+- **The mosaic isn't kept** (question 15): it is a cover of its own on Navidrome with no file to keep; offline, the
+  cover cache's or the empty cover.
+- **An empty playlist** can be downloaded: it is "downloaded", and gains songs as they come.
+
+### Tests
+
+- **PlaylistDownloadTests** (new, 24): the origin's raw form and reading it back (an empty id none); kept in step and
+  only playlists; the library's `gives` never a playlist's; what each Remove takes and what stays; the staying
+  choices; the planner's unit and a playlist planned whole under the limit and the reserve; listed (changed moved,
+  unreadable, missing twice 10 minutes apart and at the bound, downloaded after the list, an empty list); a 404; a
+  song gained asked once in order; a song lost agreed at 10 minutes and not a millisecond before, back in it
+  unmarked, two marks' second read; an Edit here at once; an emptied answer held, agreed, emptied here (an empty or
+  unreadable kept one replaced at once); only a read
+  takes, a song the kept answer lists never; orphans; due, next look; keeping and the shelf by folded name; the
+  control's state, items and hero line; Downloading's progress and words; the words' banned list; the body kept as
+  sent.
+- **PlaylistDatabaseTests** (new, 5): written and read back in order; an unreadable row kept; Remove All; a
+  playlist's origin taken alone; **a real version-5 file** (made with `upTo: 5`, every table holding rows - song,
+  origin with a raw `playlist:p1`, album and its cover, loudness, lyrics, play, start, queue, library with its left
+  songs, meta) brought to 6 with every row kept, and the orphan it holds found.
+- LibraryDatabaseTests' version check is `DownloadDatabase.version`; LibraryDownloadsTests and DownloadRulesTests
+  use `.playlist(_:)`.
+- **Mutations**: 74, over PlaylistDownloads, DownloadRemoval, the planner's unit, the staying choices and the store's
+  version 6 - all caught. The first run missed 6: two were equivalent (`listed` and `read` asked the same thing twice,
+  so the code was made plainer), and four were closed by tests - no origins kept reading as a song's, the second read
+  due from the latest mark, a song the kept answer still lists never taken, and an unreadable row (whose test crashed
+  on an index rather than failing, so it `#require`s the count first). A rerun missed one more - an emptied answer held
+  whatever the kept one was - closed by a kept answer that was empty, or couldn't be read, being replaced at once.
+
+### Verified, and not
+
+Verified: `swift test` - Core 1268 (1239 + 29), Audio 158, Turntable 11; the unsigned Release device build (Xcode,
+`generic/platform=iOS`), so the App's wiring compiles; `check_project.py` ok; the iOS pytest files and
+test_source_bytes, 170 passed and 1 skipped; the 11 ios sims on Node 22.
+
+Not verified - none of the App's wiring has a test, and only a phone can tell (docs/ios.md's checks 77-83):
+- That a downloaded playlist plays offline after a force quit, from the stored answer, each song with its own cover.
+- That Navidrome's real `changed` moves on a change in another app, so a look reads the playlist (the page's own ask
+  takes it in either way).
+- That a menu with a header and no items (a song's download section with only "Downloaded with …") shows its header.
+- That the control sits beside the ••• as the album's does, and its menu's title reads as the album's.
+- That a playlist's songs from many albums download in the background and locked, as an album's do; how long a
+  playlist of a few hundred songs takes to be asked for and planned.
+- The swipes on You > Downloads' playlist rows, and Remove All's longer question.

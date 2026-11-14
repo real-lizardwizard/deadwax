@@ -75,7 +75,7 @@ struct AlbumHero: View {
 /// The hero's download line (3.2): the album's line in the "In the collection" style - caption, semibold, quiet, no box
 /// - its mark in front (amber, and amber words, for didn't); centred, wrapping at the largest sizes. Not a button: the
 /// control in the bar is. VoiceOver reads it after the badge, the words alone.
-private struct DownloadLine: View {
+struct DownloadLine: View {
     let download: AlbumDownload
     let line: String
 

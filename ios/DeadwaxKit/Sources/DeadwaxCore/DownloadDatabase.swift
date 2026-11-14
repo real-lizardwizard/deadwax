@@ -24,12 +24,17 @@ import Foundation
 ///   marks (missing since, removed here, kept off); the list's ETag, scope and held reason in `meta`. Not downloads:
 ///   Remove All leaves it. Version 5 (Phase 3, after the review) adds `left_songs`: the songs a read found had left the
 ///   album, each with when (FollowedAlbum.left).
+/// - `playlist` (version 6, Phase 4 slice 3): the downloaded playlists (phase4-library.md 2.5) - each one's last answer
+///   (`GET /navidrome/playlists/{id}`'s body as it came), when it was read, when it went missing, the songs a read found
+///   had left it (KeptPlaylist.left) and when it was downloaded - so it opens and plays offline, and is kept in step.
+///   Downloads: Remove All takes it with the songs.
 ///
 /// Not thread-safe: one owner (the App's DownloadStore) calls it from one place at a time.
 public final class DownloadDatabase {
     /// The schema's version (`PRAGMA user_version`): 1, Phase 2's (app 0.3); 2, the lyrics (app 0.4); 3, the play
-    /// history's starts (app 0.8); 4, your library followed (Phase 3); 5, the songs that left its albums (Phase 3).
-    public static let version = 5
+    /// history's starts (app 0.8); 4, your library followed (Phase 3); 5, the songs that left its albums (Phase 3); 6,
+    /// the downloaded playlists (Phase 4).
+    public static let version = 6
 
     /// SQLite said no: its own words, for whoever runs deadwax.
     public struct Failure: Error, Equatable, CustomStringConvertible {
@@ -173,9 +178,23 @@ public final class DownloadDatabase {
     /// (song id to ms), NULL for none.
     static let leftSchema: [String] = ["ALTER TABLE library ADD COLUMN left_songs BLOB"]
 
+    /// Version 6's (Phase 4, slice 3): the downloaded playlists - `json` the answer's body, `left_songs` KeptPlaylist.left's
+    /// JSON (song id to ms, NULL for none), the times in ms.
+    static let playlistSchema: [String] = [
+        """
+        CREATE TABLE playlist (
+          id TEXT PRIMARY KEY,
+          json BLOB NOT NULL,
+          read_at INTEGER NOT NULL,
+          missing_since INTEGER,
+          left_songs BLOB,
+          asked_at INTEGER NOT NULL)
+        """,
+    ]
+
     /// The schema brought from the file's version up to `target` (the newest, but in a test), in one transaction: made
     /// from nothing (version 0), or an older file - every row kept - given what came after it: a version-1 file (Phase
-    /// 2's) the lyrics table, a version-2 file the starts' table.
+    /// 2's) the lyrics table, a version-2 file the starts' table, and so on - a version-5 file the playlists'.
     private func migrate(to target: Int) throws {
         let current = try integer("PRAGMA user_version") ?? 0
         guard current < target else { return }
@@ -194,6 +213,9 @@ public final class DownloadDatabase {
             }
             if current < 5, target >= 5 {
                 for statement in Self.leftSchema { try execute(statement) }
+            }
+            if current < 6, target >= 6 {
+                for statement in Self.playlistSchema { try execute(statement) }
             }
             try execute("PRAGMA user_version = \(target)")
         }
@@ -601,6 +623,44 @@ public final class DownloadDatabase {
         }
     }
 
+    // MARK: downloaded playlists (version 6, phase4-library.md 2.5)
+
+    /// The downloaded playlists, in the order they were downloaded. A row's answer that can't be read is kept unread
+    /// (`answer` nil - read again; nothing asked or taken by it), never left out: its songs' origin would read as an
+    /// orphan's. Marks that can't be read are none.
+    public func playlists() throws -> [KeptPlaylist] {
+        let decoder = JSONDecoder()
+        return try query("""
+            SELECT id, json, read_at, missing_since, left_songs, asked_at FROM playlist ORDER BY asked_at, id
+            """) { row in
+            guard let id = row.text(0), let json = row.blob(1) else { return nil }
+            let answer = (try? decoder.decode(PlaylistWithSongs.self, from: json))
+                .flatMap { (read: PlaylistWithSongs) -> PlaylistWithSongs? in read.playlist.id == id ? read : nil }
+            let left = row.blob(4).flatMap { (data: Data) -> [String: Int64]? in
+                try? decoder.decode([String: Int64].self, from: data)
+            } ?? [:]
+            return KeptPlaylist(id: id, answer: answer, body: json, readAt: row.int(2) ?? 0, missingSince: row.int(3),
+                                left: left, askedAt: row.int(5) ?? 0)
+        }
+    }
+
+    /// A downloaded playlist written whole (made, or replaced).
+    public func putPlaylist(_ kept: KeptPlaylist) throws {
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.sortedKeys]
+        let left: Data? = try kept.left.isEmpty ? nil : encoder.encode(kept.left)
+        try run("""
+            INSERT OR REPLACE INTO playlist (id, json, read_at, missing_since, left_songs, asked_at)
+            VALUES (?, ?, ?, ?, ?, ?)
+            """, [.text(kept.id), .blob(kept.body), .int(kept.readAt), .int(kept.missingSince), .blob(left),
+                  .int(kept.askedAt)])
+    }
+
+    /// A downloaded playlist's row gone (its songs' origin is taken after it, by removeOrigins).
+    public func deletePlaylist(_ id: String) throws {
+        try run("DELETE FROM playlist WHERE id = ?", [.text(id)])
+    }
+
     // MARK: meta
 
     public func meta(_ key: String) throws -> String? {
@@ -617,11 +677,12 @@ public final class DownloadDatabase {
 
     // MARK: everything
 
-    /// Remove All Downloads: every song, origin, album and loudness, and (by the trigger) every song's lyrics - the
-    /// plays, the starts, the queue save and the library followed kept (they aren't downloads).
+    /// Remove All Downloads: every song, origin, album and loudness, every downloaded playlist (Phase 4), and (by the
+    /// trigger) every song's lyrics - the plays, the starts, the queue save and the library followed kept (they aren't
+    /// downloads).
     public func removeAll() throws {
         try transaction {
-            for table in ["origin", "song", "album", "loudness"] { try execute("DELETE FROM \(table)") }
+            for table in ["origin", "song", "album", "loudness", "playlist"] { try execute("DELETE FROM \(table)") }
         }
     }
 

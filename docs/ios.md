@@ -25,7 +25,8 @@ much as fits your storage limit, kept in step with what you star and unstar anyw
 phone is charging if you choose, and with the app in the background when iOS allows (see [Your library
 on this phone](#your-library-on-this-phone)). Phase 4 has begun with **playlists**: yours and those
 shared with you, in the Library, played as the web app plays them, and made, added to, edited and
-deleted on the phone as in the web app (see [Playlists](#playlists)) - not yet downloaded as one.
+deleted on the phone as in the web app, and downloaded to play with no connection, kept in step as they
+change (see [Playlists](#playlists)).
 Artists, songs, Search and the rest come next (see [What it can't do yet](#what-it-cant-do-yet)).
 
 **Nothing of Phase 2, the lyrics, the EQ, the turntable, play history, your library downloaded or
@@ -334,7 +335,9 @@ playlist…**. If it can't be made, the sheet stays open and says why.
   songs: how many and how long.
 - **•••** at the end of a song's row has **Play Next**, **Play Last** and **Add to a playlist…** for
   that song, and **Download** (or **Remove Download**, or **Download Again**) for it alone; the **•••**
-  at the top has Play Next, Play Last and Add to a playlist… for the whole playlist.
+  at the top has Play Next, Play Last and Add to a playlist… for the whole playlist, and **Download**
+  for the playlist as one (see [Downloading a playlist](#downloading-a-playlist)), as the arrow beside
+  it does.
 - When Navidrome counts songs it isn't listing just now: "2 songs in this playlist aren't in the
   library just now - deleted, or being moved."
 - A playlist deleted elsewhere says "This playlist isn't on Navidrome any more - deleted in another
@@ -404,19 +407,51 @@ songs stay in the library." - **Delete playlist**, or **Keep it**. There's no un
 closes and the app says "Deleted Late night". If it had gone already - deleted in another app - the
 page closes all the same, saying so.
 
+### Downloading a playlist
+
+**Download** a playlist with the arrow at the top right of its page, beside its •••, or with
+**Download** in that •••. Its songs come as an album's do - each the very file deadwax has - and the
+whole playlist is planned at once: it waits for room under the storage limit, or for space on the
+phone, as one, never half of it. The playlist itself is kept on the phone, so it opens and plays with
+no connection. While its songs come, the arrow is a ring and the page says how far it has got
+("Downloading - 4 of 12 songs"); once they're all here, "This playlist is downloaded - it plays with no
+connection." Tap the mark for what it's doing, with **Remove Download** - and **Download Again** for
+songs that didn't come.
+
+- **It keeps in step.** Change it anywhere - add a song in the web app or Amperfy - and the phone
+  follows. The app looks when it opens, when you come back to it, when deadwax is back, every 15
+  minutes while it runs, and whenever you open the playlist. A song added comes. A song taken out goes
+  from the phone only once two looks ten minutes apart agree it has gone, so a moment when Navidrome is
+  busy never deletes anything - taken out with **Edit** on this phone, it goes at once. Deleted here,
+  the download goes with it; deleted in another app, it goes once two looks ten minutes apart can't
+  find it.
+- **What stays.** A song you downloaded yourself, with its album, with your library, or with another
+  downloaded playlist stays when the playlist's download goes, or when the song leaves the playlist.
+  While a downloaded playlist keeps a song, the song's **•••** has no Remove Download - it says
+  "Downloaded with Late night" instead; remove the playlist's download. Your library never removes a
+  playlist's songs.
+- **Where.** The Library's **Downloaded** (under On this phone) has **Downloaded playlists**, with how
+  many - a list of them that opens with no connection too. In You > Downloads, **Downloading** has a
+  row for each one with songs to come ("3 of 12 songs to go", or what they wait for), and
+  **Downloaded** lists each one first, with its songs here and their size. Tap one to open it; swipe it
+  to **Remove** its download. **Remove All Downloads** takes them too, and says so: the playlists
+  themselves stay in Navidrome.
+- **Its picture.** A playlist's mosaic isn't downloaded with it: with no connection it shows only if
+  the phone still has it from before.
+
 ### Playlists offline
 
-**Offline**, a playlist with a song on the phone opens if its page is one of the last eight you opened
-since the app started: the songs not on the phone are dimmed, and Play and Shuffle play the ones that
-are. The others are dimmed in the list and open nothing. With no list in hand, Playlists says "Your playlists show here once deadwax is
-back." The Playlists row is on the Downloaded list the Library opens on while deadwax can't be reached,
-too. Playlists are kept only while the app runs, until a later build downloads them.
+**Offline**, a downloaded playlist opens and plays the songs of it on the phone. Any other playlist
+with a song on the phone opens if its page is one of the last eight you opened since the app started:
+the songs not on the phone are dimmed, and Play and Shuffle play the ones that are. The others are
+dimmed in the list and open nothing. With no list in hand, Playlists lists your downloaded ones ("Your
+downloaded playlists - the rest show once deadwax is back."), or says "Your playlists show here once
+deadwax is back." with none. The Playlists row is on the Downloaded list the Library opens on while
+deadwax can't be reached, too, with Downloaded playlists under it.
 
 Nothing is made or changed while deadwax can't be reached: Add to a playlist… isn't in the ••• menus
 or Now Playing's, and **+** and **Edit** are dimmed. Nothing is kept to send later - a playlist can be
 changed from any app, and a change sent later could land on one that has changed since.
-
-Not yet on the phone (a later build): downloading a playlist as one.
 
 ## Playing
 
@@ -1316,15 +1351,22 @@ normalization as a stream.
 - **Downloading**: each album on its way - "4 of 12 songs", or what it waits for, with a bar while it
   downloads. While your library is downloading, one row says so for all of it: "Your library - 38 of
   412 albums to go · 12.4 GB", or what it waits for, with a bar; a tap opens the Library's Downloaded.
+  Each [downloaded playlist](#downloading-a-playlist) with songs to come has one row too: "Late night -
+  3 of 12 songs to go", or what they wait for; a tap opens it.
   **Didn't download**: each album with songs that didn't, why, and **Try again** (**Try all again** when
   there's more than one); swipe a row to **Remove** them - for an album your library downloaded, that
   leaves the album off the phone, as its Remove Download does, though songs of it you downloaded
   yourself stay. When songs of it are already here, it asks first - "Leave Dummy off this phone?",
-  saying those go too - with **Remove Download** and Cancel. **Downloaded**: every album on the phone, largest first,
+  saying those go too - with **Remove Download** and Cancel. A row of songs only a downloaded playlist
+  wants has no swipe: remove the playlist's download. **Downloaded**: each downloaded playlist first
+  ("12 songs · 412 MB"), then every album on the phone, largest first,
   with its size and its check - **Checked** (for a file that isn't FLAC, its size is all there is
-  to check), **Checked by size** (a FLAC that carries no fingerprint), or **Checking…**. Tap a row for its album; swipe it to **Remove**.
+  to check), **Checked by size** (a FLAC that carries no fingerprint), or **Checking…**. A song only a
+  downloaded playlist wants is under the playlist's row, not an album's. Tap a row for its album or
+  playlist; swipe it to **Remove**.
 - **Remove All Downloads**, which asks first. With Download your library on, it's turned off too (the
-  question says so), or your library would download it all again.
+  question says so), or your library would download it all again. Downloaded playlists go too (it says
+  so); they stay in Navidrome.
 
 ### Your library on this phone
 
@@ -2075,14 +2117,49 @@ one.
   Playing's, and **+** and Edit dimmed. With VoiceOver in Edit: each song's actions (Move up, Move
   down, Remove), and what's said ("Roads: 3 of 12", "Roads removed").
 
+### Downloaded playlists' checks (77-83)
+
+These come with the build that downloads a playlist (still app 0.9). Use a test playlist of a dozen
+songs from a few albums, on Wi-Fi, with the web app open beside the phone.
+
+- **77 Download one and play it offline** (the phase's). On its page, tap the arrow beside the •••: it
+  becomes a ring, the page says "Downloading - 4 of 12 songs" as they come, and You > Downloads has its
+  row ("3 of 12 songs to go") with a bar. Once all are here: "This playlist is downloaded - it plays with
+  no connection." Then Airplane Mode, force-quit the app and open it again: in the Library (it may open
+  on Downloaded), Downloaded has **Downloaded playlists** with its count; the playlist opens, every song
+  is bright, and Play, Shuffle and a song's tap play it - across albums, each with its own cover. Library
+  > Playlists, still in Airplane Mode: it's listed, bright.
+- **78 Kept in step.** Add a song to it in the web app, then open it on the phone: the song comes (the
+  ring, then here). Take a song out in the web app and open it again at once: the song has left the
+  page, but it's still on the phone - the song count under Storage in You > Downloads hasn't dropped;
+  ten minutes or more later (open it again, or leave the app open) it's gone from the phone. Take a song
+  out with **Edit** on the phone, Done: it's gone from the phone at once.
+- **79 What stays.** Download a song of the playlist by hand first (its •••), and an album one of its
+  songs is on. Download the playlist; then a song only the playlist brought: its ••• says "Downloaded
+  with …" and has no Remove Download. **Remove Download** on the playlist (the mark, or its •••): the song
+  you downloaded yourself and the album's songs stay; the rest go. With Download your library on and an
+  album of your library in the playlist, turn the switch off: the playlist's songs stay.
+- **80 Where it is.** Library > Downloaded > **Downloaded playlists**: the playlist, by name. You >
+  Downloads > Downloaded: the playlist first, "12 songs · 412 MB", its songs not under an album row of
+  their own; tap it for its page; swipe it to Remove. **Remove All Downloads**: does the question say the
+  downloaded playlists go too and stay in your playlists? Afterwards, Downloaded playlists is empty and
+  the playlist is still in the web app.
+- **81 Deleted.** Delete a downloaded playlist with Edit > Delete playlist: its songs go from the phone
+  at once (those you downloaded yourself stay). Delete another in the web app: on the phone it stays,
+  playable, for ten minutes or more, then goes with the app's next look.
+- **82 Room.** Set the storage limit below what's on the phone plus the playlist, and download it: the
+  whole playlist waits ("Waiting for room - the storage limit is reached"), none of it half-fetched;
+  raise the limit and it comes.
+- **83 VoiceOver.** The arrow reads "Download"; while it downloads, its value says how far; downloaded,
+  the mark opens its menu with what it is and Remove Download. A Downloading row reads as one ("Late
+  night, 3 of 12 songs to go, 75 percent").
+
 ## What it can't do yet
 
 These are the web app's for now. Most of them come to the phone in the next phases:
 
 - **The visualizer**: it stays the web app's, on a desktop.
 
-- **Downloading a playlist** as one. The phone reads, plays, makes and changes them (see
-  [Playlists](#playlists)).
 - **Artist pages** and a **songs list**, and the Library's **Shuffle** of your whole library.
 - **Search**, **Get** and **Requests**.
 - **Home** and **pins**.

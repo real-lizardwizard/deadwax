@@ -212,6 +212,10 @@ struct AlbumDownloadControl: View {
             first = DownloadWords.failure(failure, songID: song.id, server: server.address,
                                           admin: server.access.seesDetail).text
         }
+        // (slice 3) every song of it a downloaded playlist keeps: no Remove Download here - the title says whose it is
+        if case .downloaded = state, let album, let name = downloads.keepingPlaylist(songs, album: album.id) {
+            return "\(PlaylistDownloadWords.downloadedWith(name))\n\(Bytes.words(downloads.here(songs).bytes))"
+        }
         if case .downloaded = state, let album, downloads.libraryMark(album: album.id) == .withLibrary {
             return AutoDownloadWords.controlMenuTitle(downloads.libraryScope, bytesHere: downloads.here(songs).bytes)
         }
@@ -279,6 +283,9 @@ struct DownloadMenuSection: View {
                 if songs.count == 1, case .failed(let failure) = downloads.state(songs[0].id) {
                     Text(DownloadWords.failure(failure, songID: songs[0].id, server: server.address,
                                                admin: server.access.seesDetail).text)
+                } else if let name = downloads.keepingPlaylist(songs, album: album?.id) {
+                    // (slice 3) kept by a downloaded playlist: why there is no Remove Download
+                    Text(PlaylistDownloadWords.downloadedWith(name))
                 }
             }
         }
@@ -299,5 +306,129 @@ struct DownloadMenuSection: View {
             if let album { downloads.remove(album: album.id) } else { downloads.remove(songs: songs.map(\.id)) }
             player.say(DownloadWords.removed(name))
         }
+    }
+}
+
+// MARK: a playlist's (Phase 4, slice 3)
+
+/// A playlist page's download control, in the bar beside its ••• - the album's (AlbumDownloadControl), for the playlist
+/// as one (phase4-library.md 2.5): the accent arrow downloads it at once - kept on this phone, its songs fetched, kept in
+/// step as it changes; once downloaded, a menu from the control itself, titled with the playlist's line, with Download
+/// Again (its songs that didn't download) and Remove Download (its songs downloaded any other way stay). Dimmed until
+/// the playlist's songs are in, and for one gone. VoiceOver: "Download", its value the playlist's line.
+struct PlaylistDownloadControl: View {
+    /// The playlist with its songs - nil while they aren't in (the control dimmed).
+    let answer: PlaylistWithSongs?
+    let id: String
+    let gone: Bool
+
+    @Environment(DownloadModel.self) private var downloads
+
+    var body: some View {
+        let state = downloads.playlistState(id)
+        Group {
+            if let state {
+                Menu {
+                    PlaylistDownloadMenuSection(answer: answer, id: id, titled: true)
+                } label: {
+                    DownloadMark(mark: DownloadWords.mark(state, control: true) ?? .control,
+                                 fraction: DownloadWords.Mark.fraction(state), font: .body, lineWidth: 2, control: true)
+                }
+                .menuOrder(.fixed)
+            } else {
+                Button {
+                    guard let answer else { return }
+                    downloads.download(playlist: answer)
+                } label: {
+                    DownloadMark(mark: .control, font: .body, lineWidth: 2, control: true)
+                }
+                .disabled(answer == nil || gone)
+            }
+        }
+        .disabled(!downloads.isOpen)
+        .accessibilityLabel(DownloadWords.controlLabel)
+        .accessibilityValue(state.flatMap { (shown: AlbumDownload) -> String? in DownloadWords.controlValue(shown) } ?? "")
+        .accessibilityAddTraits(isFetching(state) ? .updatesFrequently : [])
+        .accessibilityShowsLargeContentViewer {
+            Label(DownloadWords.controlLabel, systemImage: DownloadWords.Mark.control.rawValue)
+        }
+    }
+
+    private func isFetching(_ state: AlbumDownload?) -> Bool {
+        if case .downloading? = state { return true }
+        return false
+    }
+}
+
+/// A playlist's download items (PlaylistDownloads.choices) - its control's menu (`titled`: the playlist's line over
+/// them) and its bar •••'s second section, carried out in the tap through DownloadModel. A download never starts the
+/// music, so nothing here is on the gesture rule's allowlist. Nothing while this phone's downloads can't be used, nor -
+/// for Download - before the songs are in.
+struct PlaylistDownloadMenuSection: View {
+    let answer: PlaylistWithSongs?
+    let id: String
+    /// The control's menu: headed with the playlist's line.
+    var titled = false
+
+    @Environment(DownloadModel.self) private var downloads
+    @Environment(ServerModel.self) private var server
+    @Environment(PlayerModel.self) private var player
+
+    init(answer: PlaylistWithSongs?, id: String? = nil, titled: Bool = false) {
+        self.answer = answer
+        self.id = id ?? answer?.playlist.id ?? ""
+        self.titled = titled
+    }
+
+    var body: some View {
+        if downloads.isOpen, !id.isEmpty {
+            let state = downloads.playlistState(id)
+            let choices = PlaylistDownloads.choices(state).filter { (choice: DownloadChoice) -> Bool in
+                choice != .download || answer != nil
+            }
+            Section {
+                ForEach(choices, id: \.self) { choice in
+                    Button(choice.label, systemImage: choice.symbol, role: choice.isDestructive ? .destructive : nil) {
+                        act(choice)
+                    }
+                }
+            } header: {
+                if titled, let state { Text(title(state)) }
+            }
+        }
+    }
+
+    /// The control's menu title: the playlist's line, and a second - the setting a wait is for, the first reason a song
+    /// didn't download, or the size once downloaded.
+    private func title(_ state: AlbumDownload) -> String {
+        guard let entry = downloads.playlists.entry(id) else { return "" }
+        var first: String?
+        if case .failed(_, let failure) = state,
+           let song = entry.songIDs.first(where: { (songID: String) -> Bool in isFailed(downloads.state(songID)) }) {
+            first = DownloadWords.failure(failure, songID: song, server: server.address,
+                                          admin: server.access.seesDetail).text
+        }
+        let bytes = downloads.playlistHere(entry).bytes
+        if case .downloaded = state { return "\(PlaylistDownloadWords.playsOffline)\n\(Bytes.words(bytes))" }
+        return DownloadWords.controlMenuTitle(state, limit: downloads.storageLimit, bytesHere: bytes, firstFailure: first)
+    }
+
+    private func act(_ choice: DownloadChoice) {
+        let name = answer?.playlist.name ?? downloads.playlists.entry(id)?.name ?? ""
+        switch choice {
+        case .download:
+            guard let answer else { return }
+            downloads.download(playlist: answer)
+        case .downloadAgain:
+            downloads.tryAgain(playlist: id)
+        case .remove:
+            downloads.remove(playlist: id)
+            player.say(DownloadWords.removed(name.isEmpty ? PlayerWords.untitled : name))
+        }
+    }
+
+    private func isFailed(_ state: SongDownload) -> Bool {
+        if case .failed = state { return true }
+        return false
     }
 }

@@ -49,6 +49,10 @@ struct DeadwaxApp: App {
         let playlists = PlaylistsModel(server: server)
         let downloads = DownloadModel(server: server, reachability: reachability, files: files, session: Self.downloadSession)
         player.connect(downloads: downloads, reachability: reachability)
+        // Phase 4, slice 3: a write here to a downloaded playlist keeps it in step at once
+        playlists.wrote = { [weak downloads] (id: String, kind: PlaylistsModel.Wrote) -> Void in
+            downloads?.playlistWritten(id, kind)
+        }
         // play history (app 0.8): each song begun recorded by the player, kept and sent through the person's store
         let history = HistoryModel(server: server, reachability: reachability)
         history.downloads = downloads

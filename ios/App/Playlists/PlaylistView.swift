@@ -9,15 +9,19 @@ import SwiftUI
 /// PLAYING is PlayerModel.play(playlist:) with the songs in hand - from Play, Shuffle and a row's tap, in the tap,
 /// nothing awaited first (the gesture rule): each song with its own album, at the songs level, the albums its songs are
 /// on remembered first (PlaylistPlay: stubs, an album held whole kept as it is). A row's ••• is the song's own Play
-/// Next, Play Last, Add to a playlist… and its download items; the bar's has no download items until a playlist
-/// downloads as one (slice 3, question 7).
+/// Next, Play Last, Add to a playlist… and its download items; the bar's has the playlist's own, as one (slice 3,
+/// question 7) - Download, Download Again, Remove Download - as the control beside it (PlaylistDownloadControl).
 ///
 /// ASKED as it opens (PlaylistPageModel) - drawn at once from the answer kept for it (PlaylistsModel), else the hero
 /// from the row that opened it - and again each time it shows, the app coming back to the front included, and when a
 /// write here changed it (PlaylistsModel.lastChange); a refresh that fails keeps what is drawn and says so; a 404 says
 /// it has gone; nothing drawn and the first ask failing: why, and Try again. While deadwax can't be reached nothing is
-/// asked: what is in hand draws, the songs not on this phone dimmed, Play and Shuffle taking those that are. Download a
-/// playlist is slice 3's.
+/// asked: what is in hand draws, the songs not on this phone dimmed, Play and Shuffle taking those that are.
+///
+/// DOWNLOAD (slice 3, phase4-library.md 2.5): the control in the bar beside the •••, the hero's download line once it
+/// is downloaded; a downloaded playlist draws first from the answer this phone keeps (`stored`, so it opens with no
+/// connection after a launch), and each answer the page is given - or its 404 - is told to the downloads (`heard`),
+/// which keep it in step.
 ///
 /// EDIT (slice 2, phase4-library.md 2.4) - yours, editable, at most 2,000 songs, offered once this page's own ask has
 /// answered and while deadwax is in reach: Edit in the bar, then the name, the description, "Shared with everyone"
@@ -77,7 +81,8 @@ struct PlaylistView: View {
         let editing = model.editing
         ScrollViewReader { proxy in
             List {
-                PlaylistHero(model: model, playable: !playable.isEmpty && !editing,
+                PlaylistHero(model: model, download: model.gone ? nil : downloads.playlistState(route.id),
+                             playable: !playable.isEmpty && !editing,
                              play: { play(at: 0) }, shuffle: { play(at: nil, shuffle: true) })
                     .listRowSeparator(.hidden)
                     .id(Place.top)
@@ -109,6 +114,13 @@ struct PlaylistView: View {
             .toolbar { toolbar(proxy) }
             .task(id: taskKey) {
                 model.online = reachability.online
+                // (slice 3) a downloaded playlist drawn from this phone, and kept in step by what the page is answered
+                let downloads = downloads
+                model.stored = { (id: String) -> PlaylistWithSongs? in downloads.keptPlaylist(id) }
+                let id = route.id
+                model.heard = { (answer: PlaylistWithSongs?) -> Void in
+                    if let answer { downloads.playlistAnswered(answer) } else { downloads.playlistGone(id) }
+                }
                 await model.load(key: taskKey, client: server.client, playlists: playlists)
             }
             .task { await downloads.followProgress() }
@@ -225,6 +237,10 @@ struct PlaylistView: View {
                         .accessibilityFocused($focus, equals: .toggle)
                 }
             }
+            // (slice 3) before the •••, as the album page's download control sits beside its own
+            ToolbarItem(placement: .topBarTrailing) {
+                PlaylistDownloadControl(answer: model.gone ? nil : model.answer, id: route.id, gone: model.gone)
+            }
             ToolbarItem(placement: .topBarTrailing) {
                 QueueMenu(request: playlistMenu) {
                     Image(systemName: "ellipsis.circle")
@@ -251,12 +267,12 @@ struct PlaylistView: View {
         }
     }
 
-    /// The bar's •••: the whole playlist, as songs - nil (the ••• dimmed) until its songs are in, once gone, and while
-    /// Edit is open.
+    /// The bar's •••: the whole playlist, as songs, with the playlist's own download items (slice 3) - nil (the •••
+    /// dimmed) until its songs are in, once gone, and while Edit is open.
     private var playlistMenu: QueueMenuRequest? {
         guard !model.gone, !model.editing,
               let pick = PlaylistPlay.pick(name: model.name, songs: model.songs) else { return nil }
-        return QueueMenuRequest(pick: pick, album: nil, offersDownload: false)
+        return QueueMenuRequest(pick: pick, album: nil, playlist: model.answer)
     }
 
     /// What Play and Shuffle take: the songs - offline, those on this phone, in the playlist's order.
@@ -552,6 +568,8 @@ struct PlaylistView: View {
 /// length, and Play and Shuffle, live once there are songs to play. Drawn at once from the row that opened the page.
 private struct PlaylistHero: View {
     let model: PlaylistPageModel
+    /// (slice 3) The playlist's download, once downloaded - its line under the count.
+    let download: AlbumDownload?
     let playable: Bool
     let play: () -> Void
     let shuffle: () -> Void
@@ -608,6 +626,13 @@ private struct PlaylistHero: View {
                 .foregroundStyle(Palette.quiet)
                 .padding(.top, 6)
                 .accessibilityHidden(line.isEmpty)
+
+            // (slice 3) downloaded: the album's line, its own - and, all here, that it plays with no connection
+            if let download, let words = PlaylistDownloadWords.heroLine(download) {
+                DownloadLine(download: download, line: words)
+                    .padding(.top, 6)
+                    .transition(.opacity)
+            }
 
             PlayButtons(enabled: playable && !model.gone, play: play, shuffle: shuffle)
                 .padding(.top, 16)

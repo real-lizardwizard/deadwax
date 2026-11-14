@@ -298,7 +298,14 @@ public struct DeadwaxClient: Sendable {
     /// One playlist with its songs, as Navidrome has it now. A 404 - not the asker's and not shared, or deleted - is
     /// thrown, for the page's gone line.
     public func playlist(id: String) async throws -> PlaylistWithSongs {
-        try await call(Routes.playlist, path: ["playlist_id": id])
+        try await playlistAnswered(id: id).playlist
+    }
+
+    /// The same, with the body as deadwax sent it - a downloaded playlist keeps it (slice 3), so the copy kept is the
+    /// answer, not a re-encoding of it.
+    public func playlistAnswered(id: String) async throws -> (playlist: PlaylistWithSongs, body: Data) {
+        let response = try await answer(request(Routes.playlist, path: ["playlist_id": id]))
+        return (try decode(PlaylistWithSongs.self, response), response.body)
     }
 
     /// A new playlist of the asker's, private, with `songIDs` in their order (none: an empty one) - answered whole.

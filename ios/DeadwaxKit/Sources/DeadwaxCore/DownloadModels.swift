@@ -137,7 +137,8 @@ public enum DownloadOrigin: Sendable, Hashable, Comparable {
     case song
     /// Asked for with its album - the album page's control, its •••.
     case album(String)
-    /// One a later phase writes ('library', 'playlist:<id>'), kept as it is.
+    /// One a later phase writes, kept as it is: your library's (`library`, Phase 3) and a downloaded playlist's
+    /// (`playlist(_:)`, `playlist:<id>`, Phase 4 - PlaylistDownloads.swift).
     case other(String)
 
     public var raw: String {

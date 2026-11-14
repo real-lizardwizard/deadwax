@@ -151,7 +151,7 @@ private func record(_ id: String = "s1", album: String = "al-1", size: Int64? = 
     }
 
     @Test func originsAndFailuresRoundTripThroughTheirColumns() {
-        for origin in [DownloadOrigin.song, .album("al-1"), .other("library"), .other("playlist:p")] {
+        for origin in [DownloadOrigin.song, .album("al-1"), .other("library"), .playlist("p")] {
             #expect(DownloadOrigin(raw: origin.raw) == origin)
         }
         #expect(DownloadOrigin(raw: "album:") == .other("album:"))

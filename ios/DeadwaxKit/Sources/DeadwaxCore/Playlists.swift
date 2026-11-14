@@ -98,8 +98,9 @@ public struct PlaylistList: Decodable, Sendable, Equatable {
 }
 
 /// `GET /deadwax/navidrome/playlists/{id}` (and what a new playlist and Edit's Done answer): one playlist with its songs -
-/// Navidrome's own, as they are, a song twice listed twice - and how many of them it isn't listing just now.
-public struct PlaylistWithSongs: Decodable, Sendable, Equatable {
+/// Navidrome's own, as they are, a song twice listed twice - and how many of them it isn't listing just now. Encodable
+/// too (slice 3): a playlist downloaded from the answer in hand is kept as it is encoded until its first read.
+public struct PlaylistWithSongs: Codable, Sendable, Equatable {
     public let playlist: Playlist
     public let songs: [Song]
     /// The songs Navidrome counts but isn't listing just now (deleted, or being moved) - an editable playlist's only.

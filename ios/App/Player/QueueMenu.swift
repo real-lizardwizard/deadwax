@@ -14,6 +14,9 @@ struct QueueMenuRequest {
     var gone = false
     /// The download items under Play Next and Play Last.
     var offersDownload = true
+    /// (Phase 4, slice 3) The whole playlist the songs are - its page's bar •••: the playlist's own download items
+    /// (PlaylistDownloadMenuSection) in place of the songs'.
+    var playlist: PlaylistWithSongs?
 }
 
 /// The queue menu (screens.md 5; the web's app/QueueMenu.tsx): Play Next and Play Last, opened FROM the ••• tapped -
@@ -41,6 +44,9 @@ struct QueueMenuRequest {
 /// (DownloadMenuSection), and every item carries its symbol, as Apple's menus do. While deadwax can't be reached, Play
 /// Next and Play Last queue only what is on this phone - and are left out for a song that isn't - while Download stays
 /// (it waits for deadwax).
+///
+/// Phase 4, slice 3: a playlist page's bar ••• (`request.playlist`) has the playlist's own download items instead -
+/// Download, Download Again, Remove Download - the same as the control beside it.
 struct QueueMenu<Label: View>: View {
     let request: QueueMenuRequest?
     @ViewBuilder let label: () -> Label
@@ -67,7 +73,9 @@ struct QueueMenu<Label: View>: View {
                         }
                     }
                 }
-                if request.offersDownload {
+                if let playlist = request.playlist {
+                    PlaylistDownloadMenuSection(answer: playlist)
+                } else if request.offersDownload {
                     DownloadMenuSection(songs: request.pick.tracks,
                                         album: request.pick.queuedAs == .album ? request.album : nil,
                                         gone: request.gone, name: request.pick.title)
