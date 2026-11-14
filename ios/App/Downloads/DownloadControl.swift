@@ -212,6 +212,9 @@ struct AlbumDownloadControl: View {
             first = DownloadWords.failure(failure, songID: song.id, server: server.address,
                                           admin: server.access.seesDetail).text
         }
+        if case .downloaded = state, let album, downloads.libraryMark(album: album.id) == .withLibrary {
+            return AutoDownloadWords.controlMenuTitle(downloads.libraryScope, bytesHere: downloads.here(songs).bytes)
+        }
         return DownloadWords.controlMenuTitle(state, limit: downloads.storageLimit,
                                               bytesHere: downloads.here(songs).bytes, firstFailure: first)
     }
@@ -265,7 +268,7 @@ struct DownloadMenuSection: View {
         if downloads.isOpen, !songs.isEmpty {
             // one song's own items - but a song of an album gone from the collection is offered no Download
             let choices = songs.count == 1 && album == nil && !gone
-                ? downloads.choices(song: songs[0].id) : downloads.choices(songs: songs, gone: gone)
+                ? downloads.choices(song: songs[0].id) : downloads.choices(songs: songs, gone: gone, alone: album == nil)
             Section {
                 ForEach(choices, id: \.self) { choice in
                     Button(choice.label, systemImage: choice.symbol, role: choice.isDestructive ? .destructive : nil) {

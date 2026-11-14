@@ -351,7 +351,7 @@ actions, its title the label.
 
 ## 5. The machinery (for the builders)
 
-### 5.1 The store: `PRAGMA user_version = 4`
+### 5.1 The store: `PRAGMA user_version = 4` (5 after the review)
 
 ```sql
 CREATE TABLE library (              -- your library as this phone follows it (2.1)
@@ -363,11 +363,14 @@ CREATE TABLE library (              -- your library as this phone follows it (2.
   missing_since INTEGER,            -- the first believed list without it (ms)
   removed_here  INTEGER,            -- Remove from my library in this app, answered (ms)
   kept_off      INTEGER);           -- Remove Download on it: left off this phone until downloaded again (ms)
+-- version 5 (after the review, 6.6):
+ALTER TABLE library ADD COLUMN left_songs BLOB;  -- songs a read found had left it: {song id: first read without it}
 ```
 
 Meta keys: `library_scope`, `library_etag` (the last list's, for that scope), `library_held` (why its absences weren't
-believed), `library_checked_at`. A version-3 file gains the table with every row of the others kept; `removeAll`
-leaves it (2.7).
+believed), `library_checked_at`, and after the review `library_removed` as JSON (each album removed and not yet let
+go, with the songs it was last read with). A version-3 file gains the table with every row of the others kept, a
+version-4 file the column; `removeAll` leaves it (2.7).
 
 ### 5.2 Core, and the App
 
@@ -430,7 +433,92 @@ this spec was silent, each kept for slices 2 and 3 unless James says otherwise:
   again, so they aren't counted as room.
 - **A play dated ahead of now counts as now** (2.5) - a server clock a little ahead shouldn't drop a play.
 - **The album page refreshing an album's kept songs** (2.4's last point) waits for slice 2, where it matters (in
-  slice 1 nothing is planned from the songs).
+  slice 1 nothing is planned from the songs). Built after the review (6.6), with a weekly re-read.
+
+### 6.5 Slice 2, built (2026-11-13)
+
+Written up in notes/ios.md, "Phase 3, slice 2: downloading your library". Open questions 1-10, 12, 13 and 15 are built
+as recommended (11 is slice 3's; 14 waits for L0a). What the build decided, or did differently:
+
+- **Remove on the question (2.3) doesn't act on that list.** It makes the next checks believe a held list
+  (`believing`, kept in meta), whose absences are marked missing and removed only by a second check 10 minutes or
+  more on - the same rule as any removal. A list that isn't held ends it. Keep Them keeps everything and puts the
+  question away until a list isn't held again.
+- **Removed here** (open question 9) goes when the next list confirms it - a check is made as soon as Remove from my
+  library answers.
+- **Another scope** now drops only the ETag, not the list (6.4's first point is replaced): the drop rule judges the
+  next list, so a scope change that empties it is held.
+- **Nothing new is asked from a kept list until a check has answered** since the store opened or the switch went on.
+- **At most 10 albums on their way at once**, the next as those arrive, and **nothing asked below an album whose
+  songs are still to be read**.
+- **A song your library keeps offers no Remove Download of its own**; a failed library song's swipe lets it go and keeps
+  its album off - the library lets go of the rest of the album, and its songs downloaded by hand stay.
+- **The Library's Downloaded** lists a library album only once a song of it is here or on its way (open question 15).
+- **Debug's switch is retired**: You > Downloads' Download your library replaces it.
+
+### 6.6 After the review of slices 1-2 (2026-11-13)
+
+The review found nothing that breaks the hard rules (only `[.library]` is ever taken; the empty, drop and truncated
+lists hold; two checks 10 minutes apart; the migration; nothing crosses people), and thirteen real problems in the
+fill, the planner and the edges. Each is now a Core rule with a test, and each test was seen failing with its rule
+broken (notes/ios.md, "Phase 3, after the review"). What changed, against the sections above:
+
+- **An album's own cover is its own** (2.6). An album only your library wants counts its kept cover in what it takes
+  and in what it has here - 1 MB until its answer is kept - not as a hand download's bytes. So keepAlbum writing the
+  cover no longer pushes an album at the edge out of the fill, which then deleted it, and asked for it again, in a loop.
+  Album rows and lyrics are a few KB in SQLite and aren't counted in what's used. The margin covers them.
+- **Hysteresis** (2.6): an album new to the phone fits only with a margin to spare: 50 MB, or 1% of the limit if that
+  is more. One already asked for or here keeps its place while it fits at all. The band lies *below* the limit, so
+  nothing is ever over it (the review suggested letting a held album run over by the margin; this keeps the limit
+  exact, with the same band).
+- **The phone's budget** (replaces 2.6's second point for the phone): new albums fit only into `free - handToCome -
+  reserve`, less what the albums already held have yet to receive, with the margin. An album here never needs more of
+  the phone, so a new star above it never pushes it out. Albums here give way only when the phone itself is short -
+  `free - handToCome < reserve` - from the bottom, only as much as it is short, and only once plans at least 3 minutes
+  apart have both seen it (`deficitConfirmMs`, on the uptime clock): one bad or momentary free-space reading never
+  deletes anything.
+- **One number for what the library can give back** (2.7): `LibraryFill.givable` (the bytes here of albums the fill
+  can give way: read, or kept off), used as the planner's `libraryHere` and in the fill's fixed bytes alike. An album
+  being read again, or a library song on no album of the library, isn't credited to a hand download any more.
+- **A hand download on a full phone waits for the room**: taken on with the library's bytes credited (counted in
+  `handToCome`, so the fill makes room), but its tasks are made only once the phone has the room as it is - so a hand
+  download never takes the phone under 2 GB waiting for the library. It waits "the phone is full" for the 3 minutes
+  the deficit takes to be believed.
+- **Tasks out** (2.7's "the same 100"): your library has at most 20 of the 100. The hand downloads' are counted first,
+  and a library task beyond its share is let go, its resume data kept. So a hand album never queues behind the
+  library's.
+- **A song leaves its album only on two reads** (2.4, 2.7): a read without a song the library has of it marks it
+  (`left`, kept in the `library` row's new `left_songs` - store version 5) with the time of the first read without it.
+  It goes only when a read 10 minutes or more after that agrees. An empty answer is never taken in (Navidrome
+  mid-rescan): the album stays as it was. Until the second read, the song is still read on that album.
+- **Kept song lists are read again** (2.4's last point, now built): a list a week old is read again, the oldest
+  first, up to 20 a check within the four-at-a-time reads; an album due its second read is read then; and an album
+  page opened online reads its album again from the page's own answer (no second request). Songs that left go only
+  by the two-read rule.
+- **A read that fails is skipped and the reads go on**, up to 12 failures a run. An album that failed is read after
+  the rest at the next check, and never more than once a check.
+- **Turning the switch off asks first** (3.1) when it would delete anything: "Remove the 412 albums downloaded with
+  your library?", with "They go from this phone (12.4 GB). What you downloaded yourself stays.", **Turn Off and
+  Remove** and Cancel. VoiceOver's action asks the same. Turning it off with nothing of it here asks nothing. Remove
+  All still turns it off in its own question.
+- **Didn't download's swipe on a library album** asks first when keeping the album off would delete songs of it
+  already here: "Leave Dummy off this phone?", "Your library leaves it off until you download it again. Its 9 songs
+  already here go too; songs of it you downloaded yourself stay.", **Remove Download** and Cancel.
+- **Remove on the question survives a check already out**: a 304 of the held list keeps it, and a check that was out
+  when Remove was answered keeps it and asks the next list afresh.
+- **Removing your last album here** removes it: the empty-list question counts only albums not removed here.
+- **A removed album's songs go by id too**: the songs each removed album was last read with are kept with it (meta
+  `library_removed`, now JSON; slice 2's lines still read), so a song asked from a queue with no album id goes with
+  its album. A song a retag moved onto an album still in the library stays with that album.
+- **Phase 2's paths the library now runs far more often**: removeOrigins forgets kept albums only from a read of the
+  songs that answered (a failed read had deleted every kept album's answer, cover and loudness), and settle sweeps
+  song files no row names. That means only the store's own song names (`<id>.<suffix>`), only in its own music
+  folder, and only from a read of the rows that answered. A crash after a row's delete commits no longer leaves its
+  audio for ever.
+- **A failed check changes nothing**, not even when the last one began, so the next minute's timer is due again (as
+  6.4's notes always said; the code had set it before the fetch). **The 10-minute rules use the wall clock**: a phone
+  whose clock is moved forward by 10 minutes or more between two checks could have them agree early. That is a
+  known limit, left as it is. The deficit's 3 minutes are on the uptime clock, which Settings can't move.
 
 ## 7. Tests (Swift Testing; Core's on Linux and macOS)
 

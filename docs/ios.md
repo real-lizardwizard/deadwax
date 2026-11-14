@@ -20,7 +20,9 @@ deck's does - and at 1x the song exactly as it is (see [The speed](#the-speed)).
 which adds play history**: scroll up in Up Next, past the song playing, and it goes on back through
 every song you've played - on the phone and in the web app, one list, as the web app's Up Next has it
 - and the phone's own plays now go into the web app's too (see [Up Next](#up-next) and [What you've
-played](#what-youve-played)). Playlists, Search and the rest come in the next phases (see [What it can't do
+played](#what-youve-played)). Being built on its own branch, not yet in a build of the app: your
+library downloaded by itself, as much as fits (see [Your library on this
+phone](#your-library-on-this-phone)). Playlists, Search and the rest come in the next phases (see [What it can't do
 yet](#what-it-cant-do-yet)).
 
 **Nothing of Phase 2, the lyrics, the EQ, the turntable or play history has been seen on an iPhone
@@ -208,9 +210,16 @@ that many."
 An empty Your albums says "Nothing in your library yet.", with **See All music** to add some from
 the collection. (Its words mention Search and Get: those are the web app's, for now.)
 
+**Keep your library on this phone?** The first time the Library has albums to show, a card at its top
+asks whether to [download your library](#your-library-on-this-phone) by itself ("Keep the collection on
+this phone?" with logins off), as much as fits in your storage limit. **Turn On** turns it on; **Not
+Now** puts the card away. Either way it doesn't come back, and the setting is in You > Downloads.
+
 **Downloaded.** Once anything is downloaded, on its way or didn't download, the top of the Library has
 **On this phone > Downloaded**, with how many albums. It's every album with a song on this phone,
 whoever's library it's in, drawn as the other lists are: the same orders, Find, headers and index.
+An album your library is downloading by itself shows there once a song of it is here or downloading,
+never while it only waits its turn.
 Its **Recently added** means downloaded to this phone, newest first. Each album there has a third
 line: "12 songs", "3 of 12 songs", "Downloading", "Waiting", or, in amber, "Didn't download". With
 nothing on the phone it says "Nothing downloaded yet."
@@ -264,6 +273,20 @@ back to the Library tab or the app, and when you pull down.
 - An album that's gone from the collection, with songs of it still on the phone, says "This album
   isn't in the collection any more - the songs on this phone still play.", and its button has only
   Remove Download.
+
+With [Download your library](#your-library-on-this-phone) on:
+
+- An album it downloaded has the same button, its menu headed "Downloaded with your library". **Remove
+  Download** removes it, and your library then leaves it off this phone - the page says "You removed
+  this download - your library leaves it off this phone." - until you download it again with the arrow.
+- An album of your library that doesn't fit says, under the title, "Your library doesn't all fit in 20
+  GB - this one waits for room." The arrow downloads it anyway, as yours: first in line, and never
+  removed to make room.
+- A song your library downloaded has no Remove Download of its own (it would only come back): remove
+  its album instead.
+- **Remove from my library**, when your library downloaded the album and you downloaded none of it
+  yourself, says "Its download goes from this phone too." - and it does, as soon as deadwax's list
+  agrees, usually at once.
 
 With Normalization on, opening an album that has FLAC songs asks deadwax to measure it, if it hasn't
 yet, so its first song is less likely to wait when you play it.
@@ -690,13 +713,11 @@ Debug is where Phase 0's test screen lives now:
   deadwax; plays waiting to be sent, and songs started that deadwax hasn't taken into your play history
   yet (**Starts waiting to be sent**); how long the sound checks took; and the last 50 download events
   (a backlog of starts sent, or one deadwax refused or couldn't take, is one of them).
-- **Your library**: the first part of downloading your library by itself - in this build it only
-  follows your library and works out what would fit. **It never downloads or deletes anything.**
-  **Follow your library** is off unless you turn it on (the phone remembers it). On, it asks deadwax
-  for your library - the albums you've added, or with logins off every album deadwax holds - and
-  reads each album's songs, four at a time, in the order they would come onto the phone: the album
-  you added or played most recently first (a play counts for 30 days). Turning it off forgets what it
-  followed, so turning it on again reads every album from the start.
+- **Your library**: what [Download your library](#your-library-on-this-phone) follows - it's turned
+  on and off in You > Downloads (this section had its own switch while that was being built). On, it
+  asks deadwax for your library - the albums you've added, or with logins off every album deadwax
+  holds - and reads each album's songs, four at a time, in the order they come onto the phone: the
+  album you added or played most recently first (a play counts for 30 days).
   - **Following**: your library, or the collection.
   - **Albums**, and **Songs read**: of the albums listed, how many have had their songs read
     ("reading 4" while it reads).
@@ -704,13 +725,18 @@ Debug is where Phase 0's test screen lives now:
     more after the first that missed it, agrees - "1 (the first 3 min ago)". An album you remove with
     **Remove from my library** goes at once.
   - **Held back**: "No", or why the last list's missing albums weren't believed: deadwax listed none,
-    more than half went at once, or the list stopped at 10,000 albums. Nothing goes then.
+    more than half went at once, or the list stopped at 10,000 albums. Nothing goes then. "believing
+    (Remove)" after you answered Remove to You > Downloads' question, "kept them" after Keep Them.
+  - **Removed, to let go**: albums a check removed whose downloads haven't gone yet (usually 0).
+  - **Leaving their albums**: songs a read found had left their album, waiting for the second read
+    ten minutes on ("None", or "3 songs on 2 albums").
   - **Last check**: "200 · 3,010 albums" (a new list), "unchanged (304)" (the same list as last
     time - one small request), or "failed:" and why; how long it took; when.
   - **First read**: how long reading every album's songs took the first time, and the time per album.
-  - Then what would fit: "412 of 3,010 fit in 20 GB" at your storage limit, after everything you've
+  - Then what fits: "412 of 3,010 fit in 20 GB" at your storage limit, after everything you've
     downloaded yourself, and under it what those take and why the rest wait (over the limit, no room
-    on the phone, not read yet).
+    on the phone, not read yet, removed by you). When the phone is under its 2 GB, in amber, by how much:
+    "500 MB under the reserve · confirming" for the first few minutes, then "· giving way".
   - **Check now** checks at once. It also checks by itself: as it's turned on, as the app opens, when
     you come back to the app (if the last check was a minute or more ago), every 15 minutes while the
     app is open or playing, when deadwax answers again after it couldn't be reached, and straight after
@@ -1138,19 +1164,89 @@ normalization as a stream.
 
 - **Storage**: what's downloaded ("2.1 GB of 20 GB"), a bar, and "12 albums · 148 songs · 41.2 GB
   free on this phone". **Storage limit**: 5, 10, **20 GB** (the default), 50, 100 GB, or No limit.
-  Lowering it below what's here removes nothing: new downloads wait for room, and it says so in
-  amber. The 2 GB of songs kept from streaming are apart from it. With other accounts' downloads on
+  Lowering it below what's here removes nothing you downloaded yourself: new downloads wait for
+  room, and it says so in amber. (Albums [your library](#your-library-on-this-phone) downloaded by
+  itself make way, from the bottom.) The 2 GB of songs kept from streaming are apart from it. With other accounts' downloads on
   the phone, **Other accounts on this phone** has their size and **Remove** (it asks first).
+- **Your library** ("The collection" with logins off): **Download your library**, and what it's doing
+  - see [Your library on this phone](#your-library-on-this-phone).
 - **Download over**: **Wi-Fi only** (the default) - never mobile data, a phone's hotspot or Low Data
   Mode - or **Wi-Fi and cellular**. Under them, what the phone is on now ("On mobile data now -
   downloads wait for Wi-Fi."), in amber while a download waits for it. Changing it applies at once.
   Both settings are kept on this phone.
 - **Downloading**: each album on its way - "4 of 12 songs", or what it waits for, with a bar while it
-  downloads. **Didn't download**: each album with songs that didn't, why, and **Try again** (**Try
-  all again** when there's more than one). **Downloaded**: every album on the phone, largest first,
+  downloads. While your library is downloading, one row says so for all of it: "Your library - 38 of
+  412 albums to go · 12.4 GB", or what it waits for, with a bar; a tap opens the Library's Downloaded.
+  **Didn't download**: each album with songs that didn't, why, and **Try again** (**Try all again** when
+  there's more than one); swipe a row to **Remove** them - for an album your library downloaded, that
+  leaves the album off the phone, as its Remove Download does, though songs of it you downloaded
+  yourself stay. When songs of it are already here, it asks first - "Leave Dummy off this phone?",
+  saying those go too - with **Remove Download** and Cancel. **Downloaded**: every album on the phone, largest first,
   with its size and its check - **Checked** (for a file that isn't FLAC, its size is all there is
   to check), **Checked by size** (a FLAC that carries no fingerprint), or **Checking…**. Tap a row for its album; swipe it to **Remove**.
-- **Remove All Downloads**, which asks first.
+- **Remove All Downloads**, which asks first. With Download your library on, it's turned off too (the
+  question says so), or your library would download it all again.
+
+### Your library on this phone
+
+**Download your library** (You > Downloads, off until you turn it on - or Turn On on the Library's
+card) keeps your library on the phone by itself: the albums you've added, newest first, as many as
+fit in your storage limit. With logins off, and for the break-glass `deadwax` sign-in, it's **Download
+the collection**: every album deadwax holds, newest first. The phone remembers the setting, for
+whoever is signed in. This is being built: it's on the `phase3-autodownload` branch, not yet in a
+release.
+
+- **What comes first**: the album you added or played most recently (a play counts for 30 days).
+  Whole albums only, and only after everything you downloaded yourself: what you download is never
+  removed to make room for your library, and it always has most of the downloads at once (your
+  library has at most 20 of the 100). A new album comes onto the phone only with a little to spare
+  (50 MB, or 1% of the limit if that's more), so one at the edge isn't downloaded and then removed
+  again when its cover arrives; an album already here keeps its place while it fits at all.
+- **What it says**: "All 212 albums fit in 20 GB.", or, in amber, "1,240 of 3,010 albums fit in 20 GB.
+  Raise the limit or download fewer." With No limit, the phone's own space decides ("1,240 of 3,010
+  albums fit on this phone."), always keeping 2 GB free. While it reads each new album's songs from
+  deadwax it says "Reading your library - 1,240 of 3,010 albums" with a bar. Under it, "Checked 3
+  minutes ago" - or "Couldn't check with deadwax - showing what was there last time."
+- **When it checks**: as the app opens, when you come back to it after a minute or more, every 15
+  minutes while it's open or playing, when deadwax answers again, straight after Add to or Remove from
+  my library - and when you pull down on You > Downloads. A check that fails doesn't put off the
+  next one. It downloads ten albums at a time, and the next as those arrive.
+- **Keeping up with deadwax**: each album's songs are read once, then again when its album page is
+  opened, and once a week (up to 20 each check), so a song deadwax re-tags under a new id is
+  followed. An album that can't be read is skipped, and read after the others at the next check.
+- **What it removes, and when**: only what it downloaded itself, never a song you downloaded yourself
+  (or, later, one in a downloaded playlist), and never a play waiting to be sent.
+  - An album you **remove from your library elsewhere** (the web app, Amperfy) goes when a second
+    check, ten minutes or more after the first that missed it, agrees - so a star that flickers while
+    deadwax re-tags an album costs nothing. One you remove **in the app** goes as soon as deadwax's list
+    agrees.
+  - **Lowering the storage limit**: the albums at the bottom make way, whole. Raise the limit and they
+    come back.
+  - **The phone falling under 2 GB free**, or **downloading something yourself on a full phone**: the
+    albums at the bottom make way, whole - only as many as the phone needs, and only once it has been
+    short for a few minutes, so one odd reading of the phone's free space never removes anything.
+    Meanwhile what you downloaded waits ("the phone is full"), and starts as the room is made. A new
+    album never pushes out one already here.
+  - **A song that left its album** (deadwax re-tagged it, or it was replaced) goes only when a second
+    read of the album, ten minutes or more after the first that missed it, agrees. A read that comes
+    back empty, as one can while Navidrome rescans, changes nothing.
+  - **Remove Download** on one of its albums: it goes, and stays off until you download it again.
+  - **Turning it off**: everything it downloaded goes (what you downloaded yourself stays). With any of
+    it on the phone, it asks first - "Remove the 412 albums downloaded with your library?", with what
+    they take - with **Turn Off and Remove** and Cancel. It remembers your library, so turning it on
+    again says what fits at once.
+- **When deadwax's list looks wrong** - empty while the phone has albums of your library, or missing
+  more than half of them at once (more than 10) - **nothing goes**. You > Downloads asks instead, in
+  amber: "deadwax says your library is empty. Remove the 212 albums downloaded with it from this
+  phone?", with **Keep Them** and **Remove**. Keep Them keeps them and puts the question away. Remove
+  doesn't remove anything at once either: they go only if deadwax still says the same at a check ten
+  minutes or more later. A list that stopped at deadwax's 10,000 albums is never believed. Removing
+  the last album of your library in the app removes it, without the question.
+- **The ten minutes are by the phone's clock**: moving the clock forward in Settings between two checks
+  could make them agree early. The few minutes of "the phone is full" go by the phone's own running
+  time, which Settings can't move.
+- **Covers, lyrics and normalization** of the albums it downloads are kept as for any download.
+- Only while charging, and downloading with the app in the background, come in the next build.
 
 ## Offline
 
@@ -1242,6 +1338,11 @@ The tests can't reach these either. Note what happens.
   Running it this way installs a Debug build over the app (everything on the phone stays), so run
   install.sh afterwards to put the Release build back.
 - **Sign out, then sign in as someone else.** Their Library, and nothing of the first person's queue.
+- **Download your library on a phone with little space left.** It keeps 2 GB free by the phone's own
+  measure of free space, the one iOS uses for what it would make room for. Does Settings > General >
+  iPhone Storage agree with what You > Downloads says, and does anything else on the phone complain?
+  When the phone dips under 2 GB, Debug says "under the reserve · confirming", then after a few minutes
+  "giving way" - does only the bottom album go, and only as much as was needed?
 
 ### Phase 2's checks: downloads
 
@@ -1656,10 +1757,11 @@ the Mac, signed in as you.
 
 ### Your library's first checks (L0a-L0g)
 
-These come with the build that adds [Debug's Your library](#debug), the first part of downloading
-your library by itself. **Nothing downloads in this build.** You > Debug > **Your library**, with
-**Follow your library** on. The web app is deadwax's own page (`/player/`) in Safari or on the Mac,
-signed in as you.
+These came with the build that added [Debug's Your library](#debug), the first part of downloading
+your library by itself, when nothing downloaded yet. You > Debug > **Your library**, with **Follow
+your library** on - in the build after it, that switch is You > Downloads' **Download your library**,
+which downloads too (see [the next checks](#your-librarys-checks-50-53-55-60)). The web app is
+deadwax's own page (`/player/`) in Safari or on the Mac, signed in as you.
 
 - **L0a The first read.** At home on Wi-Fi, turn **Follow your library** on and keep the app in front
   (Auto-Lock off helps): **Albums** says how many your library has - the same as the web app's
@@ -1684,6 +1786,46 @@ signed in as you.
   the line says fewer fit in 5 GB. Back to 20 GB: as before.
 - **L0g Nothing else moved.** You > Downloads is as it was, nothing is downloading that you didn't ask
   for, and Debug's Downloads counts haven't moved.
+
+### Your library's checks (50-53, 55-60)
+
+These come with the build that downloads your library by itself. Debug's own switch is gone: **You >
+Downloads > Download your library** does what it did, and downloads too, so L0a-L0f above now run
+with it (L0g no longer holds: things download). Note what you see for each; the Downloads events in
+You > Debug have a "library" line for everything it asks for and lets go, and why.
+
+- **50 Overnight.** At home on Wi-Fi, turn on Download your library with the phone on charge, the app
+  open and Auto-Lock off (it downloads in the background only once started, and starting by itself in
+  the background comes in the next build): in the morning your library is downloaded - or as much as
+  fits, said in numbers in You > Downloads. Note the time it took, and the size.
+- **51 A star elsewhere.** Add an album in the web app (or star one in Amperfy): within 15 minutes of
+  the app being open, or straight away when you come back to it, it starts downloading.
+- **52 An unstar.** Remove an album from your library in the web app: it stays on the phone at the
+  first check that misses it, and goes at the next check ten minutes or more later (pull down on You >
+  Downloads to check now). Try it once more with an album you'd also downloaded a song of yourself:
+  that song stays.
+- **53 Add and Remove here.** **Add to my library** on an album's page: it starts downloading within
+  seconds (if it fits). **Remove from my library** on one it downloaded: the line under the button says
+  "Its download goes from this phone too.", and it goes within seconds.
+- **55 The limit lowered.** With your library filling 20 GB, set Storage limit to 10 GB: the albums at
+  the bottom go, whole, and nothing you downloaded yourself; the line says what fits now, in amber.
+  Back to 20 GB: they come back.
+- **56 A hand download on a full phone.** With your library filling the limit, download another album
+  yourself: it downloads, and an album at the bottom of your library makes way.
+- **57 Remove Download on a library album.** It goes, and doesn't come back at the next check (pull
+  down); its page says "You removed this download - your library leaves it off this phone." Tap its
+  arrow: it comes back, as yours.
+- **58 The first ask.** On a phone that has never been asked (or after deleting and reinstalling the
+  app): the card at the top of the Library. Not Now puts it away for good; next time, try Turn On.
+- **59 Remove All** with it on: the question says Download your library is turned off too; afterwards
+  nothing downloads again, and You > Downloads shows it off.
+- **60 An empty list.** Only if it can be arranged safely - unstar everything on a test account, or
+  stop Navidrome's music folder from mounting: nothing goes from the phone, and You > Downloads asks.
+  Keep Them keeps them, and the question goes. If you try Remove: still nothing goes at once, and the
+  albums go only if a check ten minutes or more later says the same.
+
+54 and 61-63 (only while charging, the background, VoiceOver and the largest text) come with the next
+build.
 
 ## What it can't do yet
 

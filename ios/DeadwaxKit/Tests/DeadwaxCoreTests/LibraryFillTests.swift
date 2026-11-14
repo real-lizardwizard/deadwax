@@ -59,12 +59,18 @@ private func facts(hand: Int64 = 0, toCome: Int64 = 0, limit: StorageLimit = .gb
     }
 
     @Test func theLibrarysBytesHereAreThePhonesToGive() {
-        // the phone is 1 GB free, under its reserve - but 8 GB of the library is here, so 7 GB is the library's
-        let plan = LibraryFill.plan([album("a", 4 * gb, here: 4 * gb), album("b", 3 * gb, here: 3 * gb),
-                                     album("c", 2 * gb, here: 1 * gb)], facts(free: 1 * gb))
+        // the phone is 1 GB free, under its reserve - 8 GB of the library is here: the bottom gives the 1 GB short
+        let albums = [album("a", 4 * gb, here: 4 * gb), album("b", 3 * gb, here: 3 * gb), album("c", 2 * gb, here: 1 * gb)]
+        var short = facts(free: 1 * gb)
+        short.deficitConfirmed = true
+        let plan = LibraryFill.plan(albums, short)
+        #expect(plan.deficit == 1 * gb)
         #expect(plan.fits == ["a", "b"])
         #expect(plan.waits == ["c": .phoneFull])
         #expect(plan.giveWay == ["c"], "the phone under its reserve takes from the bottom")
+        // seen once: nothing gives way yet
+        let once = LibraryFill.plan(albums, facts(free: 1 * gb))
+        #expect(once.fits == ["a", "b", "c"] && once.giveWay.isEmpty && once.deficit == 1 * gb)
     }
 
     @Test func anAlbumHereNeedsNoMoreOfThePhone() {

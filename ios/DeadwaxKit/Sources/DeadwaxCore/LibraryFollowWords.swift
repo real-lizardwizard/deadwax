@@ -30,10 +30,10 @@ public struct LibraryCheckRecord: Sendable, Equatable {
 /// deadwax: Debug is an admin's.
 public enum LibraryFollowWords {
     public static let section = "Your library"
-    public static let follow = "Follow your library"
-    public static let followNote = "Follows your library with deadwax and works out what would fit on this phone. Nothing downloads and nothing is deleted. Turning it off forgets what it followed, so turning it on again reads every album from the start."
+    /// (slice 2) Debug shows what Download your library follows; it is turned on and off in You > Downloads.
+    public static let followNote = "What Download your library follows, what fits on this phone, and the last check. It is turned on and off in You > Downloads; the library's log lines are the Downloads section's."
     public static let checkNow = "Check now"
-    public static let notFollowing = "Not following: turn it on to read your library."
+    public static let notFollowing = "Off: Download your library is turned off in You > Downloads."
     public static let noCheckYet = "No check yet"
 
     /// What is followed.
@@ -125,6 +125,21 @@ public enum LibraryFollowWords {
         if keptOff > 0 { parts.append("\(count(keptOff)) kept off") }
         if !plan.giveWay.isEmpty { parts.append("\(count(plan.giveWay.count)) would give way") }
         return parts.joined(separator: " \u{00B7} ")
+    }
+
+    /// (after the review) "500 MB under the reserve · confirming" while one plan has seen it, "· giving way" once plans
+    /// minutes apart have (LibraryFill.deficitConfirmed).
+    public static func underReserve(_ bytes: Int64, confirmed: Bool) -> String {
+        "\(Bytes.words(bytes)) under the reserve \u{00B7} \(confirmed ? "giving way" : "confirming")"
+    }
+
+    /// (after the review) "3 songs on 2 albums" - songs a read found had left their album, waiting for the second read
+    /// (or agreed and about to go); "None".
+    public static func leaving(_ albums: [FollowedAlbum]) -> String {
+        let marked = albums.filter { !$0.left.isEmpty }
+        let songs = marked.reduce(0) { $0 + $1.left.count }
+        guard songs > 0 else { return "None" }
+        return "\(count(songs)) song\(songs == 1 ? "" : "s") on \(count(marked.count)) album\(marked.count == 1 ? "" : "s")"
     }
 
     /// The downloads log's line for a check: "library front: 200, 3,010 albums, 1 added, 1 missing, 2 removed (0.84 s)".

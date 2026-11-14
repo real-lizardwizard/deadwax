@@ -582,19 +582,16 @@ private struct DownloadsDebugSection: View {
     }
 }
 
-/// Phase 3's Your library (phase3-autodownload.md 3.5, slice 1): your library followed onto this phone, read-only -
-/// its own switch, off by default; what is followed and how much of it is read; the last check; the first read's time
-/// (R13, check L0a); and what would fit at the storage limit. The library's log lines are the Downloads section's.
+/// Phase 3's Your library (phase3-autodownload.md 3.5): what Download your library follows - its switch is You >
+/// Downloads' (slice 2) - and how much of it is read; the last check; the first read's time (R13, check L0a); what fits
+/// at the storage limit, as the last plan worked it out. The library's log lines are the Downloads section's.
 private struct LibraryFollowDebugSection: View {
     @Environment(DownloadModel.self) private var downloads
-    @State private var freeSpace: Int64?
 
     var body: some View {
         let follower = downloads.follower
         Section {
-            Toggle(LibraryFollowWords.follow, isOn: Binding(get: { follower.following },
-                                                           set: { follower.following = $0 }))
-            if follower.following {
+            if follower.on {
                 facts(follower)
             } else {
                 Text(LibraryFollowWords.notFollowing)
@@ -604,13 +601,6 @@ private struct LibraryFollowDebugSection: View {
             Text(LibraryFollowWords.section)
         } footer: {
             Text(LibraryFollowWords.followNote)
-        }
-        .task {
-            // the phone's free space, read now and then (a file system call)
-            while !Task.isCancelled {
-                freeSpace = DownloadStore.freeSpace()
-                try? await Task.sleep(for: .seconds(5))
-            }
         }
     }
 
@@ -640,8 +630,18 @@ private struct LibraryFollowDebugSection: View {
                 .font(.footnote.monospacedDigit())
         }
         LabeledContent("Held back") {
-            Text(LibraryFollowWords.held(follower.held))
+            Text(LibraryFollowWords.held(follower.held)
+                 + (follower.believing ? " \u{00B7} believing (Remove)" : "")
+                 + (follower.keptThem ? " \u{00B7} kept them" : ""))
                 .font(.footnote)
+        }
+        LabeledContent("Removed, to let go") {
+            Text(LibraryFollowWords.count(follower.removed.count))
+                .font(.footnote.monospacedDigit())
+        }
+        LabeledContent("Leaving their albums") {
+            Text(LibraryFollowWords.leaving(albums))
+                .font(.footnote.monospacedDigit())
         }
         LabeledContent("Last check") {
             Text(follower.checking ? "Checking\u{2026}"
@@ -654,13 +654,17 @@ private struct LibraryFollowDebugSection: View {
                     .font(.footnote.monospacedDigit())
             }
         }
-        if let freeSpace {
-            let plan = follower.wouldFit(limit: downloads.storageLimit, hand: downloads.handBytes(), freeSpace: freeSpace)
+        if let plan = downloads.libraryFill {
             VStack(alignment: .leading, spacing: 2) {
                 Text(LibraryFollowWords.wouldFit(plan, limit: downloads.storageLimit))
                 Text(LibraryFollowWords.fitDetail(plan))
                     .font(.footnote)
                     .foregroundStyle(Palette.quiet)
+                if plan.deficit > 0 {
+                    Text(LibraryFollowWords.underReserve(plan.deficit, confirmed: downloads.libraryDeficitConfirmed))
+                        .font(.footnote)
+                        .foregroundStyle(Palette.amber)
+                }
             }
             .accessibilityElement(children: .combine)
         }

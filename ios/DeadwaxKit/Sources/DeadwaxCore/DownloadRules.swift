@@ -247,6 +247,15 @@ public enum DownloadRules {
         return (kept, deleted.sorted())
     }
 
+    /// (Phase 3, after the review) The files of the store's music folder no song row names - audio a crash left between
+    /// a row's delete and its file's (removeOrigins deletes the row first): swept as the store settles. Only names the
+    /// store itself gives a song (`<id>.<suffix>`, LocalFiles' rule) - never a part (the settle's own rule has those),
+    /// nor anything else. `named`: every row's file name, from a read of the database that succeeded - with none, the
+    /// caller sweeps nothing.
+    public static func unnamedFiles(_ fileNames: [String], named: Set<String>) -> [String] {
+        fileNames.filter { StreamCache.isSongName($0) && !named.contains($0) }.sorted()
+    }
+
     // MARK: offline
 
     /// Whether a song plays while deadwax can't be reached: only from the phone.
@@ -356,6 +365,21 @@ public enum DownloadChoice: String, Sendable, CaseIterable {
         case .waiting, .fetching, .done: return [.remove]
         case .failed: return [.downloadAgain, .remove]
         }
+    }
+
+    /// (Phase 3) One song's items when your library keeps it (it carries the library's origin): no Remove Download of the
+    /// song alone - the library would ask for it again at once. Its album's Remove Download keeps the album off.
+    public static func forSong(_ state: SongDownload, keptByLibrary: Bool) -> [DownloadChoice] {
+        let choices = forSong(state)
+        return keptByLibrary ? choices.filter { $0 != .remove } : choices
+    }
+
+    /// (Phase 3) Several songs asked for each alone (Up Next, a selection - not an album): Remove Download only when a
+    /// song that isn't your library's is asked for or here; `keptByLibrary` beside `states`.
+    public static func forSongs(_ states: [SongDownload], gone: Bool = false, keptByLibrary: [Bool]) -> [DownloadChoice] {
+        let choices = forSongs(states, gone: gone)
+        let removable = zip(states, keptByLibrary).contains { pair in pair.0 != .none && !pair.1 }
+        return removable ? choices : choices.filter { $0 != .remove }
     }
 
     /// Several songs' (an album, Up Next): Download when any is none or failed - and the album is still in the

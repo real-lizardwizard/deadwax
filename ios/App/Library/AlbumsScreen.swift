@@ -74,7 +74,7 @@ struct AlbumsScreen: View {
                         .frame(height: 0)
                         .id(ShelfAnchor.top)
                     if root && !finding {
-                        places(personal: personal, online: online)
+                        places(personal: personal, online: online, hasAlbums: drawn?.albums.isEmpty == false)
                     }
                     if let drawn, !drawn.view.countText.isEmpty, !(list == .downloaded && drawn.albums.isEmpty) {
                         Text(drawn.view.countText)
@@ -169,9 +169,13 @@ struct AlbumsScreen: View {
     // MARK: the places above the root's albums (5.2, 5.4)
 
     @ViewBuilder
-    private func places(personal: Bool, online: Bool) -> some View {
+    private func places(personal: Bool, online: Bool, hasAlbums: Bool) -> some View {
         switch list {
         case .scope(let scope):
+            // the first ask (phase3-autodownload.md 3.2): once deadwax answered with albums to download
+            if hasAlbums && online {
+                FirstAskCard()
+            }
             if scope == .yours && personal {
                 PlaceGroup(title: LibraryWords.allMusic) {
                     PlaceRow(symbol: "square.stack", label: LibraryWords.allAlbums, route: .albums(.store))
@@ -355,6 +359,50 @@ private struct LibraryLayoutSwitch: View {
 /// One group of the root's places (app/LibraryHome.tsx's groups): All music with a library of your own, On this phone
 /// once anything is downloaded, on its way or failed (5.2) - each a header and its rows, so the groups read as one list
 /// of places, as Apple Music's Library lists Downloaded among its own.
+/// The first ask (phase3-autodownload.md 3.2, open question 1): a card at the top of the Library's root, once per
+/// phone, not a dialog at launch - the app opens to music. Its title, its line with the storage limit, Turn On (the
+/// accent) and Not Now; either answer puts it away for good (AutoDownload.askedKey). Not shown while downloads can't be
+/// used, or with the switch already on. The setting is in You > Downloads either way.
+struct FirstAskCard: View {
+    @Environment(DownloadModel.self) private var downloads
+    @AppStorage(AutoDownload.askedKey) private var asked = false
+
+    var body: some View {
+        if !asked, downloads.isOpen, !downloads.follower.on {
+            let scope = downloads.libraryScope
+            VStack(alignment: .leading, spacing: 10) {
+                Text(AutoDownloadWords.askTitle(scope))
+                    .font(.headline)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .accessibilityAddTraits(.isHeader)
+                Text(AutoDownloadWords.askLine(scope, limit: downloads.storageLimit))
+                    .font(.subheadline)
+                    .foregroundStyle(Palette.quiet)
+                    .fixedSize(horizontal: false, vertical: true)
+                ViewThatFits(in: .horizontal) {
+                    HStack(spacing: 12) { buttons }
+                    VStack(alignment: .leading, spacing: 10) { buttons }
+                }
+            }
+            .padding(14)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(Palette.toggledFill))
+            .accessibilityElement(children: .contain)
+        }
+    }
+
+    @ViewBuilder
+    private var buttons: some View {
+        Button(AutoDownloadWords.turnOn) {
+            asked = true
+            downloads.follower.on = true
+        }
+        .buttonStyle(.borderedProminent)
+        Button(AutoDownloadWords.notNow) { asked = true }
+            .buttonStyle(.bordered)
+    }
+}
+
 struct PlaceGroup<Rows: View>: View {
     let title: String
     @ViewBuilder let rows: () -> Rows

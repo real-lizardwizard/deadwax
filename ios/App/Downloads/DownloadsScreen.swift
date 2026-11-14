@@ -2,7 +2,8 @@ import DeadwaxCore
 import SwiftUI
 
 /// You > Downloads (notes/ios-specs/phase2-downloads.md 6), an inset-grouped list, top to bottom: Storage - what's
-/// used, the bar, the storage limit under it, other accounts' downloads; Download over - its two choices and the
+/// used, the bar, the storage limit under it, other accounts' downloads; Your library (Phase 3, phase3-autodownload.md
+/// 3.1) - its switch, what fits, the last check, the question an empty list asks; Download over - its two choices and the
 /// network in use now; Downloading and Didn't download, only while there is something in them; Downloaded, every album
 /// with a song on the phone, largest first; Remove All Downloads; and the last footer. With nothing downloaded,
 /// waiting or failed, the lists give way to the Library's own empty words, the settings staying above them: they are
@@ -23,6 +24,9 @@ struct DownloadsScreen: View {
         let shelf = DownloadShelf(downloads, server: server)
         List {
             StorageSection(shelf: shelf, free: free)
+            if downloads.storeProblem == nil {
+                LibrarySection()
+            }
             DownloadOverSection(waitingForIt: shelf.waitingForNetwork)
             if downloads.storeProblem != nil {
                 // downloads are off for this launch: no list to draw, nothing to remove
@@ -44,7 +48,7 @@ struct DownloadsScreen: View {
                     Text(DownloadWords.lastFooter)
                 }
             } else {
-                if !shelf.downloading.isEmpty {
+                if !shelf.downloading.isEmpty || downloads.libraryProgress != nil {
                     DownloadingSection(rows: shelf.downloading, allWaitForWifi: shelf.allWaitForWifi)
                 }
                 if !shelf.failed.isEmpty {
@@ -68,7 +72,10 @@ struct DownloadsScreen: View {
                             player.say(DownloadWords.removedAll)
                         }
                     } message: {
-                        Text(DownloadWords.removeAllMessage(songs: shelf.songsHere, bytes: downloads.bytesHere))
+                        let scope = downloads.follower.scope ?? AlbumScope.albums(for: server.me)
+                        Text([DownloadWords.removeAllMessage(songs: shelf.songsHere, bytes: downloads.bytesHere),
+                              downloads.follower.on ? AutoDownloadWords.removeAllToo(scope) : nil]
+                            .compactMap { $0 }.joined(separator: " "))
                     }
                 } footer: {
                     Text(DownloadWords.lastFooter)
@@ -78,6 +85,15 @@ struct DownloadsScreen: View {
         .listStyle(.insetGrouped)
         .navigationTitle(DownloadWords.downloads)
         .animation(.default, value: shelf.isEmpty)
+        .refreshable {
+            // a pull checks your library now (`byHand`), held until the check has answered
+            let follower = downloads.follower
+            guard follower.on else { return }
+            follower.check(.byHand)
+            for _ in 0..<100 where follower.checking {
+                try? await Task.sleep(nanoseconds: 200_000_000)
+            }
+        }
         .task { await downloads.followProgress() }
         .task(id: downloads.bytesHere) { free = DownloadStore.freeSpace() ?? free }
     }
@@ -122,10 +138,13 @@ private struct DownloadShelf {
     /// Something waits for a network Download over doesn't allow (Download over's footer, amber).
     let waitingForNetwork: Bool
 
-    var isEmpty: Bool { downloading.isEmpty && failed.isEmpty && downloaded.isEmpty }
+    let library: Bool
+
+    var isEmpty: Bool { downloading.isEmpty && failed.isEmpty && downloaded.isEmpty && !library }
 
     @MainActor
     init(_ downloads: DownloadModel, server: ServerModel) {
+        library = downloads.libraryProgress != nil
         let going = downloads.downloading
         let waits = going.map { downloads.state($0.id) }
         downloading = Self.byAlbum(going).map { albumID, records in
@@ -274,6 +293,193 @@ private struct StorageSection: View {
     }
 }
 
+// MARK: Your library (phase3-autodownload.md 3.1)
+
+/// Between Storage and Download over - the library is what fills the storage: the switch, its note under it (drawn as
+/// iOS's Settings draws a switch with an explanation); on, the fit line (amber when not all fit) or, while albums' songs
+/// are read, the reading line and its bar; the question an empty list or a large drop asks, as an amber row with its
+/// two buttons; and the footer - when it was checked, or that it couldn't be (ErrorNote's split).
+private struct LibrarySection: View {
+    @Environment(DownloadModel.self) private var downloads
+    @Environment(ServerModel.self) private var server
+    /// Turning it off with albums of it here asks first (after the review): what goes, with Cancel.
+    @State private var askingOff = false
+    @State private var offAlbums = 0
+    @State private var offBytes: Int64 = 0
+
+    var body: some View {
+        let follower = downloads.follower
+        let scope = follower.scope ?? AlbumScope.albums(for: server.me)
+        Section {
+            Toggle(isOn: Binding(get: { follower.on }, set: { turn($0) })) {
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(AutoDownloadWords.switchName(scope))
+                    Text(AutoDownloadWords.note(scope))
+                        .font(.footnote)
+                        .foregroundStyle(Palette.quiet)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(AutoDownloadWords.switchName(scope))
+            .accessibilityHint(AutoDownloadWords.note(scope))
+            .accessibilityValue(follower.on ? "On" : "Off")
+            .accessibilityAddTraits(.isButton)
+            .accessibilityAction { turn(!follower.on) }
+            // from the switch itself, so it comes up from it
+            .confirmationDialog(AutoDownloadWords.offTitle(scope, albums: offAlbums), isPresented: $askingOff,
+                                titleVisibility: .visible) {
+                Button(AutoDownloadWords.offAndRemove, role: .destructive) { follower.on = false }
+            } message: {
+                Text(AutoDownloadWords.offMessage(bytes: offBytes))
+            }
+            if follower.on {
+                fit(follower, scope: scope)
+                if follower.asks, let held = follower.held,
+                   let question = AutoDownloadWords.question(held, scope: scope, here: albumsHere(follower)) {
+                    QuestionRow(question: question)
+                }
+            }
+        } header: {
+            Text(AutoDownloadWords.header(scope))
+        } footer: {
+            if follower.on { footer(follower) }
+        }
+    }
+
+    /// The switch, turned: on at once; off at once only with nothing of it here - else asked first, and nothing goes
+    /// until Turn Off and Remove (the switch stays on meanwhile, and on Cancel).
+    private func turn(_ on: Bool) {
+        let follower = downloads.follower
+        guard !on, follower.on else {
+            follower.on = on
+            return
+        }
+        let loses = downloads.switchOffLoses
+        guard loses.albums > 0 else {
+            follower.on = false
+            return
+        }
+        offAlbums = loses.albums
+        offBytes = loses.bytes
+        askingOff = true
+    }
+
+    @ViewBuilder
+    private func fit(_ follower: LibraryFollower, scope: AlbumScope) -> some View {
+        let reading = follower.reading
+        if follower.readsPending, reading.of > 0 {
+            VStack(alignment: .leading, spacing: 6) {
+                Text(AutoDownloadWords.reading(scope, read: reading.read, of: reading.of))
+                    .fixedSize(horizontal: false, vertical: true)
+                DownloadBar(fraction: Double(reading.read) / Double(reading.of))
+            }
+            .padding(.vertical, 2)
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(AutoDownloadWords.reading(scope, read: reading.read, of: reading.of))
+            .accessibilityAddTraits(.updatesFrequently)
+        } else if let plan = downloads.libraryFill {
+            Text(AutoDownloadWords.fit(plan, limit: downloads.storageLimit, bytes: plan.bytes))
+                .foregroundStyle(plan.allFit ? Color.primary : Palette.amber)
+                .fixedSize(horizontal: false, vertical: true)
+                .accessibilityElement(children: .combine)
+        }
+    }
+
+    @ViewBuilder
+    private func footer(_ follower: LibraryFollower) -> some View {
+        if let error = follower.lastError {
+            ErrorNote(error, failed: AutoDownloadWords.couldntCheck)
+                .foregroundStyle(Palette.amber)
+        } else {
+            // read again every half minute, so "3 minutes ago" moves
+            TimelineView(.periodic(from: .now, by: 30)) { _ in
+                Text(AutoDownloadWords.checked(follower.lastAnswered, now: ListenTracker.wallMs()))
+            }
+        }
+    }
+
+    /// The library's albums with a song on this phone - the empty list's question names them.
+    private func albumsHere(_ follower: LibraryFollower) -> Int {
+        var albums = Set<String>()
+        for record in downloads.records.values where record.state == .done && downloads.keptByLibrary(record.id) {
+            albums.insert(record.albumID)
+        }
+        return albums.count
+    }
+}
+
+/// The empty list's or the large drop's question (2.3), amber, with Keep Them and Remove - Remove asking nothing more:
+/// the question is the asking, and what it lets go still waits for a check ten minutes on to agree.
+private struct QuestionRow: View {
+    let question: String
+
+    @Environment(DownloadModel.self) private var downloads
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text(question)
+                .foregroundStyle(Palette.amber)
+                .fixedSize(horizontal: false, vertical: true)
+            Text(AutoDownloadWords.questionNote)
+                .font(.footnote)
+                .foregroundStyle(Palette.quiet)
+                .fixedSize(horizontal: false, vertical: true)
+            HStack(spacing: 12) {
+                Button(AutoDownloadWords.keepThem) { downloads.follower.keepThem() }
+                    .buttonStyle(.bordered)
+                Button(AutoDownloadWords.remove, role: .destructive) { downloads.follower.removeThem() }
+                    .buttonStyle(.bordered)
+            }
+        }
+        .padding(.vertical, 4)
+    }
+}
+
+/// Downloading's one row for your library (3.3): its name, "38 of 412 albums to go · 12.4 GB" or what it waits for,
+/// and the bar; a tap opens the Library's Downloaded. One VoiceOver element ("Your library, 38 of 412 albums to go,
+/// 12.4 GB, 40 percent").
+private struct LibraryDownloadingRow: View {
+    let progress: LibraryDownloads.Progress
+
+    @Environment(DownloadModel.self) private var downloads
+    @Environment(ServerModel.self) private var server
+    @Environment(AppNavigation.self) private var navigation
+
+    var body: some View {
+        let scope = downloads.follower.scope ?? AlbumScope.albums(for: server.me)
+        let line = downloads.libraryWait.map { DownloadWords.wait($0) } ?? AutoDownloadWords.downloadingRow(progress)
+        Button {
+            navigation.open(.downloaded)
+        } label: {
+            HStack(alignment: .center, spacing: 12) {
+                Image(systemName: DownloadWords.downloadSymbol)
+                    .font(.title3)
+                    .foregroundStyle(Palette.accent)
+                    .frame(minWidth: 44)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(AutoDownloadWords.downloadingTitle(scope))
+                        .foregroundStyle(.primary)
+                    Text(line)
+                        .font(.subheadline)
+                        .foregroundStyle(Palette.quiet)
+                        .fixedSize(horizontal: false, vertical: true)
+                    DownloadBar(fraction: progress.fraction)
+                        .padding(.top, 4)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .padding(.vertical, 2)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(downloads.libraryWait.map { "\(AutoDownloadWords.downloadingTitle(scope)), \(DownloadWords.wait($0))" }
+                            ?? AutoDownloadWords.downloadingSpoken(scope, progress))
+        .accessibilityAddTraits([.isButton, .updatesFrequently])
+    }
+}
+
 // MARK: Download over (6.4)
 
 /// Drawn as Normalization is (PlaybackSection): one row per choice, its note under it, the accent checkmark on the
@@ -340,6 +546,9 @@ private struct DownloadingSection: View {
 
     var body: some View {
         Section {
+            if let progress = downloads.libraryProgress {
+                LibraryDownloadingRow(progress: progress)
+            }
             ForEach(rows) { row in
                 AlbumLine(album: row.album, albumID: row.id, spoken: spoken(row), updates: row.fraction != nil) {
                     Text(row.line)
@@ -376,42 +585,11 @@ private struct FailedSection: View {
     let rows: [DownloadShelf.Failed]
 
     @Environment(DownloadModel.self) private var downloads
-    @Environment(ServerModel.self) private var server
 
     var body: some View {
         Section {
             ForEach(rows) { row in
-                VStack(alignment: .leading, spacing: 6) {
-                    AlbumLine(album: row.album, albumID: row.id, spoken: spoken(row), tryAgain: { tryAgain(row) }) {
-                        HStack(alignment: .firstTextBaseline, spacing: 4) {
-                            DownloadMark(mark: .failed, font: .caption)
-                            Text(DownloadWords.didntDownload(row.records.count))
-                                .font(.subheadline.weight(.medium))
-                                .foregroundStyle(Palette.amber)
-                        }
-                        Text(row.reason.said)
-                            .font(.footnote)
-                            .foregroundStyle(Palette.quiet)
-                            .fixedSize(horizontal: false, vertical: true)
-                    } trailing: {
-                        Button(DownloadWords.tryAgain) { tryAgain(row) }
-                            .buttonStyle(.borderless)
-                            .font(.subheadline.weight(.semibold))
-                    }
-                    // the raw words for whoever runs deadwax - ErrorNote's split, its own element
-                    if server.access.seesDetail, let detail = row.reason.detail, !detail.isEmpty {
-                        DisclosureGroup(ErrorWords.forWhoever) {
-                            Text(detail)
-                                .font(.footnote.monospaced())
-                                .foregroundStyle(Palette.quiet)
-                                .textSelection(.enabled)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                        }
-                        .font(.footnote)
-                        .padding(.leading, AlbumLineInset.text)
-                    }
-                }
-                .removable(name: row.album?.name) { downloads.remove(songs: row.records.map(\.id)) }
+                FailedRow(row: row)
             }
             if rows.count > 1 {
                 Button {
@@ -425,12 +603,91 @@ private struct FailedSection: View {
             Text(DownloadWords.didntDownloadHeader)
         }
     }
+}
 
-    private func tryAgain(_ row: DownloadShelf.Failed) {
+/// One album of Didn't download: its songs that failed, why, Try Again - and its Remove, which on an album your library
+/// keeps with songs of it here asks first (after the review): keeping it off lets go of those too.
+private struct FailedRow: View {
+    let row: DownloadShelf.Failed
+
+    @Environment(DownloadModel.self) private var downloads
+    @Environment(ServerModel.self) private var server
+    @Environment(PlayerModel.self) private var player
+    @State private var askingKeepOff = false
+    @State private var songsHere = 0
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            AlbumLine(album: row.album, albumID: row.id, spoken: spoken, tryAgain: { tryAgain() }) {
+                HStack(alignment: .firstTextBaseline, spacing: 4) {
+                    DownloadMark(mark: .failed, font: .caption)
+                    Text(DownloadWords.didntDownload(row.records.count))
+                        .font(.subheadline.weight(.medium))
+                        .foregroundStyle(Palette.amber)
+                }
+                Text(row.reason.said)
+                    .font(.footnote)
+                    .foregroundStyle(Palette.quiet)
+                    .fixedSize(horizontal: false, vertical: true)
+            } trailing: {
+                Button(DownloadWords.tryAgain) { tryAgain() }
+                    .buttonStyle(.borderless)
+                    .font(.subheadline.weight(.semibold))
+            }
+            // the raw words for whoever runs deadwax - ErrorNote's split, its own element
+            if server.access.seesDetail, let detail = row.reason.detail, !detail.isEmpty {
+                DisclosureGroup(ErrorWords.forWhoever) {
+                    Text(detail)
+                        .font(.footnote.monospaced())
+                        .foregroundStyle(Palette.quiet)
+                        .textSelection(.enabled)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                .font(.footnote)
+                .padding(.leading, AlbumLineInset.text)
+            }
+        }
+        .removable(name: row.album?.name, asks: asks, ask: ask) { remove() }
+        // keeping a library album off lets go of its songs already here too: said, with Cancel
+        .confirmationDialog(AutoDownloadWords.keepOffTitle(name), isPresented: $askingKeepOff,
+                            titleVisibility: .visible) {
+            Button(DownloadWords.removeDownload, role: .destructive) {
+                remove()
+                player.say(DownloadWords.removed(name))
+            }
+        } message: {
+            Text(AutoDownloadWords.keepOffMessage(downloads.libraryScope, songsHere: songsHere))
+        }
+    }
+
+    private var name: String { row.album?.name ?? PlayerWords.untitled }
+
+    /// A song of the row your library keeps: its Remove keeps the album off - else the library would ask for it again.
+    private var keepsOff: Bool { row.records.contains { downloads.keptByLibrary($0.id) } }
+
+    /// Its Remove asks first: the album would be kept off with songs of it here only the library wants.
+    private var asks: Bool { keepsOff && downloads.keptOffLoses(album: row.id) > 0 }
+
+    private func ask() {
+        songsHere = downloads.keptOffLoses(album: row.id)
+        askingKeepOff = true
+    }
+
+    /// The Remove: the failed songs let go - and with a song your library keeps, the album kept off (its songs
+    /// downloaded by hand stay).
+    private func remove() {
+        if keepsOff {
+            downloads.remove(failed: row.records.map(\.id), album: row.id)
+        } else {
+            downloads.remove(songs: row.records.map(\.id))
+        }
+    }
+
+    private func tryAgain() {
         for record in row.records { downloads.tryAgain(record.id) }
     }
 
-    private func spoken(_ row: DownloadShelf.Failed) -> String {
+    private var spoken: String {
         [row.album?.name, row.album?.artist, DownloadWords.didntDownload(row.records.count), row.reason.said]
             .compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: ", ")
     }
@@ -587,22 +844,32 @@ extension AlbumLine where Trailing == EmptyView {
 
 private extension View {
     /// The row's swipe: Remove (destructive, `trash`), which VoiceOver has as an action; its notice names the album.
-    func removable(name: String?, remove: @escaping () -> Void) -> some View {
-        modifier(Removable(name: name, remove: remove))
+    /// `asks`: the Remove asks first (`ask`) - drawn red without the destructive role, so a full swipe doesn't take the
+    /// row out before the answer.
+    func removable(name: String?, asks: Bool = false, ask: @escaping () -> Void = {},
+                   remove: @escaping () -> Void) -> some View {
+        modifier(Removable(name: name, asks: asks, ask: ask, remove: remove))
     }
 }
 
 private struct Removable: ViewModifier {
     let name: String?
+    let asks: Bool
+    let ask: () -> Void
     let remove: () -> Void
 
     @Environment(PlayerModel.self) private var player
 
     func body(content: Content) -> some View {
         content.swipeActions(edge: .trailing, allowsFullSwipe: true) {
-            Button(DownloadWords.remove, systemImage: "trash", role: .destructive) {
-                remove()
-                player.say(DownloadWords.removed(name ?? PlayerWords.untitled))
+            if asks {
+                Button(DownloadWords.remove, systemImage: "trash") { ask() }
+                    .tint(.red) // the destructive swipe's own red
+            } else {
+                Button(DownloadWords.remove, systemImage: "trash", role: .destructive) {
+                    remove()
+                    player.say(DownloadWords.removed(name ?? PlayerWords.untitled))
+                }
             }
         }
     }

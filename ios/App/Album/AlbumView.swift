@@ -45,6 +45,15 @@ struct AlbumView: View {
         self.init(route: AlbumRoute(id: id, name: name, artist: artist, coverArt: coverArt))
     }
 
+    /// What your library says of this album on its page, if anything: it waits for room, or you removed its download.
+    private var libraryLine: String? {
+        switch downloads.libraryMark(album: route.id) {
+        case .waitsForRoom: return AutoDownloadWords.waitsForRoom(downloads.libraryScope, limit: downloads.storageLimit)
+        case .keptOff: return AutoDownloadWords.keptOff(downloads.libraryScope)
+        case .none, .withLibrary: return nil
+        }
+    }
+
     /// Who and which album: a new person, or a library of their own come or gone, asks everything again.
     private var taskKey: String { "\(server.person)|\(server.access.hasLibrary)|\(route.id)" }
 
@@ -74,7 +83,14 @@ struct AlbumView: View {
                           act: { action in
                               Task { await model.change(action, client: server.client, library: library, downloads: downloads) }
                           },
-                          noteFocused: $noteFocused)
+                          noteFocused: $noteFocused,
+                          goesToo: downloads.goesWithLibrary(album: route.id))
+                    .listRowSeparator(.hidden)
+            }
+
+            // your library and this album (phase3-autodownload.md 3.4): waiting for room, or kept off - said quietly
+            if let line = libraryLine {
+                QuietNote(text: line)
                     .listRowSeparator(.hidden)
             }
 

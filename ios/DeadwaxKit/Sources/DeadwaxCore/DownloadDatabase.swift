@@ -22,13 +22,14 @@ import Foundation
 /// - `library` (version 4, Phase 3): your library as this phone follows it (phase3-autodownload.md 2.1, 5.1) - each
 ///   album deadwax last listed, its place, the list's entry for it, its songs as the fill reads them once read, and its
 ///   marks (missing since, removed here, kept off); the list's ETag, scope and held reason in `meta`. Not downloads:
-///   Remove All leaves it.
+///   Remove All leaves it. Version 5 (Phase 3, after the review) adds `left_songs`: the songs a read found had left the
+///   album, each with when (FollowedAlbum.left).
 ///
 /// Not thread-safe: one owner (the App's DownloadStore) calls it from one place at a time.
 public final class DownloadDatabase {
     /// The schema's version (`PRAGMA user_version`): 1, Phase 2's (app 0.3); 2, the lyrics (app 0.4); 3, the play
-    /// history's starts (app 0.8); 4, your library followed (Phase 3).
-    public static let version = 4
+    /// history's starts (app 0.8); 4, your library followed (Phase 3); 5, the songs that left its albums (Phase 3).
+    public static let version = 5
 
     /// SQLite said no: its own words, for whoever runs deadwax.
     public struct Failure: Error, Equatable, CustomStringConvertible {
@@ -168,6 +169,10 @@ public final class DownloadDatabase {
         """,
     ]
 
+    /// Version 5's (Phase 3, after the review): the songs a read of the album no longer had - FollowedAlbum.left's JSON
+    /// (song id to ms), NULL for none.
+    static let leftSchema: [String] = ["ALTER TABLE library ADD COLUMN left_songs BLOB"]
+
     /// The schema brought from the file's version up to `target` (the newest, but in a test), in one transaction: made
     /// from nothing (version 0), or an older file - every row kept - given what came after it: a version-1 file (Phase
     /// 2's) the lyrics table, a version-2 file the starts' table.
@@ -186,6 +191,9 @@ public final class DownloadDatabase {
             }
             if current < 4, target >= 4 {
                 for statement in Self.librarySchema { try execute(statement) }
+            }
+            if current < 5, target >= 5 {
+                for statement in Self.leftSchema { try execute(statement) }
             }
             try execute("PRAGMA user_version = \(target)")
         }
@@ -499,22 +507,32 @@ public final class DownloadDatabase {
     public static let libraryHeldKey = "library_held"
     public static let libraryCheckedKey = "library_checked_at"
     public static let libraryFirstReadKey = "library_first_read"
-    static let libraryKeys = [libraryScopeKey, libraryETagKey, libraryHeldKey, libraryCheckedKey, libraryFirstReadKey]
+    /// (slice 2) You said Remove to the empty list's or the large drop's question: such a list is believed until a list
+    /// that needs no believing comes ("1").
+    public static let libraryBelieveKey = "library_believe"
+    /// (slice 2) You said Keep Them: the question is put away until a list is believed again ("1").
+    public static let libraryHeldKeptKey = "library_held_kept"
+    /// (slice 2) The albums checks removed whose library downloads haven't been let go yet (ids, one per line) - kept with
+    /// the list that removed them, so a quit between the two loses nothing.
+    public static let libraryRemovedKey = "library_removed"
+    static let libraryKeys = [libraryScopeKey, libraryETagKey, libraryHeldKey, libraryCheckedKey, libraryFirstReadKey,
+                              libraryBelieveKey, libraryHeldKeptKey, libraryRemovedKey]
 
     /// Your library as this phone follows it, in its place. A row whose entry can't be read is left out (the next list
     /// adds it again); songs that can't be read are unread.
     public func library() throws -> [FollowedAlbum] {
         let decoder = JSONDecoder()
         return try query("""
-            SELECT album_id, position, entry, songs, read_at, missing_since, removed_here, kept_off
+            SELECT album_id, position, entry, songs, read_at, missing_since, removed_here, kept_off, left_songs
             FROM library ORDER BY position, album_id
             """) { row in
             guard let id = row.text(0), let entry = row.blob(2),
                   let album = try? decoder.decode(IndexAlbum.self, from: entry), album.id == id else { return nil }
             let songs = row.blob(3).flatMap { try? decoder.decode([FollowedSong].self, from: $0) }
+            let left = row.blob(8).flatMap { try? decoder.decode([String: Int64].self, from: $0) } ?? [:]
             return FollowedAlbum(album: album, position: Int(row.int(1) ?? 0), songs: songs,
                                  readAt: songs == nil ? nil : row.int(4), missingSince: row.int(5),
-                                 removedHere: row.int(6), keptOff: row.int(7))
+                                 removedHere: row.int(6), keptOff: row.int(7), left: left)
         }
     }
 
@@ -533,24 +551,27 @@ public final class DownloadDatabase {
             }
             for entry in albums where before[entry.id] != entry {
                 let songs = try entry.songs.map { try encoder.encode($0) }
+                let left: Data? = try entry.left.isEmpty ? nil : encoder.encode(entry.left)
                 try run("""
                     INSERT OR REPLACE INTO library
-                      (album_id, position, entry, songs, read_at, missing_since, removed_here, kept_off)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                      (album_id, position, entry, songs, read_at, missing_since, removed_here, kept_off, left_songs)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """, [.text(entry.id), .int(Int64(entry.position)), .blob(try encoder.encode(entry.album)),
                           .blob(songs), .int(songs == nil ? nil : entry.readAt), .int(entry.missingSince),
-                          .int(entry.removedHere), .int(entry.keptOff)])
+                          .int(entry.removedHere), .int(entry.keptOff), .blob(left)])
             }
         }
     }
 
-    /// An album's songs, read at `at` - kept only while the album is in the library. Whether it was.
+    /// An album's songs, read at `at`, and the songs found to have left it (LibraryFollow.read) - kept only while the
+    /// album is in the library. Whether it was.
     @discardableResult
-    public func setLibrarySongs(album: String, songs: [FollowedSong], at: Int64) throws -> Bool {
+    public func setLibrarySongs(album: String, songs: [FollowedSong], left: [String: Int64] = [:], at: Int64) throws -> Bool {
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.sortedKeys]
-        try run("UPDATE library SET songs = ?, read_at = ? WHERE album_id = ?",
-                [.blob(try encoder.encode(songs)), .int(at), .text(album)])
+        let marks: Data? = try left.isEmpty ? nil : encoder.encode(left)
+        try run("UPDATE library SET songs = ?, read_at = ?, left_songs = ? WHERE album_id = ?",
+                [.blob(try encoder.encode(songs)), .int(at), .blob(marks), .text(album)])
         return sqlite3_changes(db) > 0
     }
 
@@ -559,6 +580,14 @@ public final class DownloadDatabase {
     @discardableResult
     public func setRemovedHere(album: String, at: Int64) throws -> Bool {
         try run("UPDATE library SET removed_here = ? WHERE album_id = ?", [.int(at), .text(album)])
+        return sqlite3_changes(db) > 0
+    }
+
+    /// (slice 2) Remove Download on an album of the library at `at` (ms): left off this phone - or nil, downloaded again.
+    /// Whether the album was in the library.
+    @discardableResult
+    public func setKeptOff(album: String, at: Int64?) throws -> Bool {
+        try run("UPDATE library SET kept_off = ? WHERE album_id = ?", [.int(at), .text(album)])
         return sqlite3_changes(db) > 0
     }
 
@@ -650,7 +679,8 @@ public final class DownloadDatabase {
         Failure(words: "\(what): \(String(cString: sqlite3_errmsg(db)))")
     }
 
-    private func execute(_ sql: String) throws {
+    /// Internal (not private) for the migration tests, which write an older version's rows as it wrote them.
+    func execute(_ sql: String) throws {
         var message: UnsafeMutablePointer<CChar>?
         guard sqlite3_exec(db, sql, nil, nil, &message) == SQLITE_OK else {
             let words = message.map { String(cString: $0) } ?? "SQLite said no"
