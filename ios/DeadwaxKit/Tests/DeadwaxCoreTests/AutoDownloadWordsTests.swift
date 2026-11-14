@@ -25,16 +25,17 @@ private func plan(_ sizes: [Int64], limit: StorageLimit, free: Int64 = 10_000 * 
     @Test func theFitLine() {
         let all = plan(Array(repeating: 400_000_000, count: 212), limit: .gb100)
         #expect(AutoDownloadWords.fit(all, limit: .gb100, bytes: all.bytes) == "All 212 albums fit in 100 GB.")
-        let some = plan(Array(repeating: gb / 10, count: 3_010), limit: .gb20)
+        // 99 MB each: 200 of them leave the 200 MB a new album must leave spare under 20 GB
+        let some = plan(Array(repeating: 99_000_000, count: 3_010), limit: .gb20)
         #expect(some.fit == 200)
         #expect(AutoDownloadWords.fit(some, limit: .gb20, bytes: some.bytes)
                 == "200 of 3,010 albums fit in 20 GB. Raise the limit or download fewer.")
         let none = plan(Array(repeating: 50 * gb, count: 3), limit: .none, free: 10_000 * gb)
         #expect(AutoDownloadWords.fit(none, limit: .none, bytes: none.bytes) == "All 3 albums, 150 GB.")
-        let phone = plan(Array(repeating: 4 * gb, count: 3_010), limit: .none, free: 42 * gb)
+        let phone = plan(Array(repeating: 4 * gb, count: 3_010), limit: .none, free: 42_100_000_000)
         #expect(AutoDownloadWords.fit(phone, limit: .none, bytes: phone.bytes) == "10 of 3,010 albums fit on this phone.")
         // the limit not reached, the phone short as well
-        let both = plan([5 * gb, 5 * gb, 5 * gb, 30 * gb], limit: .gb20, free: 12 * gb)
+        let both = plan([5 * gb, 5 * gb, 5 * gb, 30 * gb], limit: .gb20, free: 12_200_000_000)
         #expect(AutoDownloadWords.fit(both, limit: .gb20, bytes: both.bytes)
                 == "2 of 4 albums fit in 20 GB - 1 wait for space on this phone. Raise the limit or download fewer.")
         #expect(AutoDownloadWords.fit(plan([], limit: .gb20), limit: .gb20, bytes: 0) == "Nothing to download yet.")

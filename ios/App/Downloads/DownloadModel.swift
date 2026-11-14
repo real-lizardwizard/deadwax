@@ -64,6 +64,9 @@ final class DownloadModel {
     private(set) var libraryProgress: LibraryDownloads.Progress?
     /// What its songs wait for, while none of them is being fetched (the row says it in place of its progress).
     private(set) var libraryWait: DownloadWait?
+    /// (after the review) The phone has been under its reserve on plans minutes apart: albums here give way for it.
+    /// Debug's - the fill's `deficit` says how far under.
+    private(set) var libraryDeficitConfirmed = false
     /// Bytes each task has brought, while a screen follows progress.
     private(set) var received: [String: Int64] = [:]
     /// The albums' kept answers (`GET /navidrome/albums/{id}` as answered), by id.
@@ -121,6 +124,14 @@ final class DownloadModel {
     @ObservationIgnored private var cachedCopies: [String: URL] = [:]
     /// The kept covers' lengths, by file - counted in what's used (6.3), read from disk once each.
     @ObservationIgnored private var coverLengths: [String: Int64] = [:]
+    /// (after the review) Each kept album answer's cover bytes (0 for one kept with none), by album id - the fill counts
+    /// an album the library's alone with its own cover (LibraryDownloads.inputs).
+    @ObservationIgnored private var keptCoverBytes: [String: Int64] = [:]
+    /// When the plans first saw the phone under its reserve (ProcessInfo's uptime, ms) - nil while it isn't
+    /// (LibraryFill.deficitSince).
+    @ObservationIgnored private var deficitSince: Int64?
+    /// A plan asked for once the deficit can be confirmed, so it is looked at again without anything else happening.
+    @ObservationIgnored private var deficitLook: Task<Void, Never>?
     @ObservationIgnored private var planQueued = false
     @ObservationIgnored private var planning = false
     @ObservationIgnored private var planAgain = false
@@ -166,6 +177,7 @@ final class DownloadModel {
         follower.note = { [weak self] line in self?.note(line) }
         follower.changed = { [weak self] in self?.replan() }
         follower.switchedOff = { [weak self] in self?.libraryOff() }
+        follower.librarySongs = { [weak self] entry in self?.librarySongs(of: entry) ?? [] }
         let center = NotificationCenter.default
         observers.append(center.addObserver(forName: UIApplication.didBecomeActiveNotification, object: nil, queue: .main) { [weak self] _ in
             MainActor.assumeIsolated { self?.becameActive() }
@@ -375,6 +387,8 @@ final class DownloadModel {
     /// back - a queue entry carries no size) the size it lacked: the planner counts it at its real bytes, not a
     /// transcode's 320 kbps estimate (a FLAC is three times that), and its copy's length is checked against it.
     func albumAnswered(_ album: Album, body: Data) {
+        // an album of your library read again with it (after the review): a retag's new song ids followed
+        follower.pageRead(album)
         guard let store, songsOfAlbum[album.id] != nil else { return }
         try? store.database.putAlbum(id: album.id, json: body, fetchedAt: ListenTracker.wallMs())
         albums[album.id] = album
@@ -755,6 +769,14 @@ final class DownloadModel {
             let id = part.deletingPathExtension().deletingPathExtension().lastPathComponent
             if records[id]?.state != .fetching { try? FileManager.default.removeItem(at: part) }
         }
+        // (after the review) a song's file no row names - its row deleted, the app gone before the file was: swept,
+        // only the store's own song names in its own folder, and only from a read of the rows that answered
+        if let rows = try? opened.database.songs() {
+            let named = Set(rows.compactMap(\.fileName))
+            let unnamed = DownloadRules.unnamedFiles(parts.map(\.lastPathComponent), named: named)
+            for name in unnamed { try? FileManager.default.removeItem(at: opened.music.appendingPathComponent(name)) }
+            if !unnamed.isEmpty { note("settle: \(unnamed.count) files no song names, removed") }
+        }
         for record in records.values where record.state == .done && record.check == .unchecked {
             queueCheck(record.id)
         }
@@ -800,6 +822,33 @@ final class DownloadModel {
         follower.changedHere(album: album, removed: removed, at: ListenTracker.wallMs())
     }
 
+    /// What turning the switch off would delete (its confirmation, after the review): the albums with a song here only
+    /// the library wants, and their bytes.
+    var switchOffLoses: (albums: Int, bytes: Int64) {
+        LibraryDownloads.switchOffLoses(LibraryDownloads.songs(Array(records.values), origins: origins,
+                                                               library: follower.ordered))
+    }
+
+    /// What keeping an album off would delete (Didn't download's swipe on a library album, after the review): its songs
+    /// here only the library wants. Read from the album's own songs (a row asks it as it draws) - one also read on
+    /// another album of the library is counted, so the words never say less goes than does.
+    func keptOffLoses(album albumID: String) -> Int {
+        let entry = follower.on ? follower.ordered.first { $0.id == albumID } : nil
+        let ids = Set((songsOfAlbum[albumID] ?? []) + (entry?.songs ?? []).map(\.id) + (entry?.left.keys.sorted() ?? []))
+        let songs = LibraryDownloads.songs(ids.compactMap { records[$0] }, origins: origins,
+                                           library: entry.map { [$0] } ?? [])
+        return LibraryDownloads.keptOffLoses(albumID, songs: songs)
+    }
+
+    /// The songs the store has under the library's origin for an album (LibraryFollower.librarySongs): those of its
+    /// last read, those found to have left it, and those asked for with it.
+    private func librarySongs(of entry: FollowedAlbum) -> Set<String> {
+        var ids = Set<String>()
+        let candidates = (entry.songs ?? []).map(\.id) + entry.left.keys.sorted() + (songsOfAlbum[entry.id] ?? [])
+        for id in candidates where origins[id]?.contains(.library) == true { ids.insert(id) }
+        return ids
+    }
+
     /// The switch went off: the library's origin taken from every song that carries it - those left with none
     /// deleted, through Phase 2's removeOrigins as every library removal is.
     private func libraryOff() {
@@ -808,6 +857,10 @@ final class DownloadModel {
         libraryFill = nil
         libraryProgress = nil
         libraryWait = nil
+        libraryDeficitConfirmed = false
+        deficitSince = nil
+        deficitLook?.cancel()
+        deficitLook = nil
         guard !actions.take.isEmpty else { return }
         note("library: switched off - \(actions.take.count) songs let go")
         removeOrigins(LibraryDownloads.gives, from: actions.take)
@@ -944,11 +997,16 @@ final class DownloadModel {
             if let file = store.fileURL(record) { try? FileManager.default.removeItem(at: file) }
             if let part = store.partURL(record) { try? FileManager.default.removeItem(at: part) }
         }
-        // an album with no song left goes, its cover with it
-        let left = Set(((try? store.database.songs()) ?? []).map(\.albumID))
-        for kept in (try? store.database.albums()) ?? [] where !left.contains(kept.id) {
-            if let cover = kept.cover { try? FileManager.default.removeItem(at: store.covers.appendingPathComponent(cover)) }
-            try? store.database.deleteAlbum(kept.id)
+        // an album with no song left goes, its cover with it - only from a read of the songs that answered: one that
+        // failed would read as no album having any (after the review)
+        if let rows = try? store.database.songs() {
+            let left = Set(rows.map(\.albumID))
+            for kept in (try? store.database.albums()) ?? [] where !left.contains(kept.id) {
+                if let cover = kept.cover {
+                    try? FileManager.default.removeItem(at: store.covers.appendingPathComponent(cover))
+                }
+                try? store.database.deleteAlbum(kept.id)
+            }
         }
         note("removed: \(deleted.count)")
         reload()
@@ -957,6 +1015,33 @@ final class DownloadModel {
     }
 
     // MARK: the plan (8.5)
+
+    /// Whether the phone under its reserve (`short`, at this plan) has been so on plans minutes apart - on the uptime
+    /// clock, which a clock changed in Settings doesn't move (LibraryFill.deficitSince, deficitConfirmed). Until it
+    /// has, a plan is asked for once it can be, so it is looked at again without anything else happening.
+    private func deficitConfirmed(_ short: Bool) -> Bool {
+        let now = Int64(ProcessInfo.processInfo.systemUptime * 1000)
+        let was = deficitSince
+        deficitSince = LibraryFill.deficitSince(deficitSince, deficit: short, now: now)
+        if was == nil, deficitSince != nil { note("library: the phone is under its reserve - looked at again in 3 minutes") }
+        let confirmed = LibraryFill.deficitConfirmed(since: deficitSince, now: now)
+        if confirmed != libraryDeficitConfirmed { libraryDeficitConfirmed = confirmed }
+        if let since = deficitSince, !confirmed {
+            if deficitLook == nil {
+                let wait = max(LibraryFill.deficitConfirmMs - (now - since), 0) + 1_000
+                deficitLook = Task { [weak self] in
+                    try? await Task.sleep(for: .milliseconds(wait))
+                    guard !Task.isCancelled else { return }
+                    self?.deficitLook = nil
+                    self?.replan()
+                }
+            }
+        } else {
+            deficitLook?.cancel()
+            deficitLook = nil
+        }
+        return confirmed
+    }
 
     /// A plan run soon: every ask, finish, failure, setting change, path and reachability change, and coming to the front.
     private func replan() {
@@ -984,10 +1069,12 @@ final class DownloadModel {
         }
         let asked = records.values.filter { $0.state == .wanted || $0.state == .fetching }
         let freeSpace = DownloadStore.freeSpace() ?? Int64.max / 4
-        // your library (Phase 3): the store's songs as its rules read them, its albums' places in the fill's order
+        // your library (Phase 3): the store's songs as its rules read them, its albums' places in the fill's order -
+        // and what of it the library could give back, the one number the fill and the planner both count
         let library = follower.on ? follower.ordered : []
         let storeSongs = LibraryDownloads.songs(Array(records.values), origins: origins, library: library)
-        let libraryHere = LibraryDownloads.fillInputs(storeSongs).libraryHere
+        let inputs = LibraryDownloads.inputs(library, songs: storeSongs, covers: keptCoverBytes)
+        let libraryHere = inputs.givable
         var rank: [String: Int] = [:]
         for (place, entry) in library.enumerated() where rank[entry.id] == nil { rank[entry.id] = place }
         var albumOf: [String: String] = [:]
@@ -1005,10 +1092,13 @@ final class DownloadModel {
         if follower.on {
             // what the library asks for and gives back, before anything is planned: a plan follows whatever it does
             let removedAlbums = follower.removed
-            let turn = LibraryDownloads.turn(library, removed: removedAlbums, songs: storeSongs, bytesHere: bytesHere,
-                                             handToCome: DownloadPlan.handToCome(askedSongs, facts),
-                                             limit: storageLimit.bytes, freeSpace: freeSpace,
-                                             readsPending: follower.readsPending)
+            let handToCome = DownloadPlan.handToCome(askedSongs, facts)
+            let confirmed = deficitConfirmed(LibraryFill.deficit(freeSpace: freeSpace, handToCome: handToCome,
+                                                                 reserve: DownloadPlan.reserve) > 0)
+            let turn = LibraryDownloads.turn(library, inputs: inputs, removed: removedAlbums,
+                                             removedSongs: follower.removedSongs, songs: storeSongs, bytesHere: bytesHere,
+                                             handToCome: handToCome, limit: storageLimit.bytes, freeSpace: freeSpace,
+                                             readsPending: follower.readsPending, deficitConfirmed: confirmed)
             if turn.fill != libraryFill { libraryFill = turn.fill }
             let progress = LibraryDownloads.progress(library, fill: turn.fill, songs: storeSongs)
             if progress != libraryProgress { libraryProgress = progress }
@@ -1487,13 +1577,17 @@ final class DownloadModel {
         playable.set(urls)
         var keptAlbums: [String: Album] = [:]
         var covers: [String: URL] = [:]
+        var coverBytes: [String: Int64] = [:]
         for answer in (try? store.database.albums()) ?? [] {
-            if let file = answer.cover { bytes += coverLength(file, in: store) }
+            let length = answer.cover.map { coverLength($0, in: store) } ?? 0
+            bytes += length
+            coverBytes[answer.id] = length
             guard let album = albums[answer.id] ?? (try? JSONDecoder().decode(Album.self, from: answer.json)) else { continue }
             keptAlbums[answer.id] = album
             if let cover = album.coverArt, let file = answer.cover { covers[cover] = store.covers.appendingPathComponent(file) }
         }
         if keptAlbums != albums { albums = keptAlbums }
+        keptCoverBytes = coverBytes
         // what's used is the songs' bytes and their covers', as the planner counts them (6.3, 8.5)
         if bytes != bytesHere { bytesHere = bytes }
         KeptCovers.shared.set(covers)

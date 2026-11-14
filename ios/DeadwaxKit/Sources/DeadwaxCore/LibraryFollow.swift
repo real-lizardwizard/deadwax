@@ -64,9 +64,13 @@ public struct FollowedAlbum: Sendable, Equatable, Identifiable {
     public var removedHere: Int64?
     /// Remove Download on it (slice 2): left off this phone until downloaded again (ms).
     public var keptOff: Int64?
+    /// (after the review) Songs the library has of it that a read no longer had, each with when the first read without
+    /// it was (ms): one is taken only once a read 10 minutes or more after that agrees (`leftAgreed`).
+    public var left: [String: Int64]
 
     public init(album: IndexAlbum, position: Int, songs: [FollowedSong]? = nil, readAt: Int64? = nil,
-                missingSince: Int64? = nil, removedHere: Int64? = nil, keptOff: Int64? = nil) {
+                missingSince: Int64? = nil, removedHere: Int64? = nil, keptOff: Int64? = nil,
+                left: [String: Int64] = [:]) {
         self.album = album
         self.position = position
         self.songs = songs
@@ -74,6 +78,7 @@ public struct FollowedAlbum: Sendable, Equatable, Identifiable {
         self.missingSince = missingSince
         self.removedHere = removedHere
         self.keptOff = keptOff
+        self.left = left
     }
 
     public var id: String { album.id }
@@ -83,6 +88,18 @@ public struct FollowedAlbum: Sendable, Equatable, Identifiable {
 
     /// What its songs take on the phone; nil until they are read.
     public var bytes: Int64? { songs?.reduce(Int64(0)) { $0 + $1.bytes } }
+
+    /// The songs two reads at least 10 minutes apart agree have left it: the first without each, and the last read.
+    public var leftAgreed: Set<String> {
+        guard let readAt else { return [] }
+        return Set(left.filter { readAt - $0.value >= LibraryFollow.confirmAfterMs }.keys)
+    }
+
+    /// When a song found to have left is due its second read - the earliest not yet agreed, 10 minutes on; nil for none.
+    public var secondReadAt: Int64? {
+        let waiting = left.values.filter { (readAt ?? 0) - $0 < LibraryFollow.confirmAfterMs }
+        return waiting.min().map { $0 + LibraryFollow.confirmAfterMs }
+    }
 }
 
 /// Why the app checks your library with deadwax (2.2).
@@ -117,6 +134,12 @@ public enum LibraryFollow {
     public static let dropAtLeast = 10
     /// Albums' songs read at once (2.4).
     public static let readsAtOnce = 4
+    /// (after the review) An album's kept songs are read again once this old (2.4's last point)...
+    public static let refreshAfterMs: Int64 = 7 * 24 * 3_600_000
+    /// ...a few each check, the longest ago first: a library read on one evening isn't read again all at once.
+    public static let refreshesPerCheck = 20
+    /// A run of reads stops after this many failures (deadwax refusing them all): the rest wait for the next check.
+    public static let readFailuresPerRun = 12
 
     /// What deadwax answered: a list (a 200), or the last list again (a 304). A check that failed changes nothing, so
     /// it never comes here.
@@ -217,6 +240,8 @@ public enum LibraryFollow {
     /// own (`listed` and not `believed`) ends it - so does a check that leaves nothing missing (what it let go is gone).
     /// So it is spent on the list it was answered for, and a later empty list is asked about again.
     public static func keepsBelieving(_ out: Outcome, listed: Bool) -> Bool {
+        // a 304 of the held list - one asked before the Remove: the list it was answered for, still to be read afresh
+        if !listed && out.held != nil { return true }
         if listed && !out.believed { return false }
         return out.albums.contains { !$0.isListed }
     }
@@ -261,8 +286,9 @@ public enum LibraryFollow {
         var believed = false
         if list.truncated {
             held = .truncated
-        } else if albums.isEmpty && !kept.isEmpty {
-            held = .empty(kept: kept.count)
+        } else if albums.isEmpty && kept.contains(where: { $0.removedHere == nil }) {
+            // empty while albums are kept - but not the last one you removed here: that list is the one you asked for
+            held = .empty(kept: kept.filter { $0.removedHere == nil }.count)
         } else if newlyGone > dropAtLeast && newlyGone * 2 > wasListed.count {
             held = .drop(gone: newlyGone, of: wasListed.count)
         }
@@ -374,9 +400,72 @@ public enum LibraryFollow {
         }.map(\.entry)
     }
 
-    /// The albums whose songs are still to be read, in `ordered`'s order: listed, not read, and not among `failed`
-    /// (asked this check and refused - asked again at the next).
-    public static func toRead(_ ordered: [FollowedAlbum], failed: Set<String> = []) -> [String] {
+    /// The albums whose songs aren't read yet, in `ordered`'s order: listed, not read, and not among `failed` (asked
+    /// this check and refused - asked again at the next).
+    public static func unread(_ ordered: [FollowedAlbum], failed: Set<String> = []) -> [String] {
         ordered.filter { $0.songs == nil && $0.isListed && !failed.contains($0.id) }.map(\.id)
+    }
+
+    /// The albums to read now, in turn: those not read yet (`unread` - those that failed at an earlier check,
+    /// `retryLast`, after the rest, so a few unreadable albums never hold up the others); with `now`, those whose songs
+    /// were found to have left and are due their second read (`secondReadAt`); then up to `refreshing` whose kept songs
+    /// are `refreshAfterMs` old, the longest ago first. None of them among `failed`, nor missing.
+    public static func toRead(_ ordered: [FollowedAlbum], failed: Set<String> = [], retryLast: Set<String> = [],
+                              now: Int64? = nil, refreshing: Int = 0) -> [String] {
+        let first = unread(ordered, failed: failed)
+        var out = first.filter { !retryLast.contains($0) } + first.filter { retryLast.contains($0) }
+        guard let now else { return out }
+        var seen = Set(out)
+        let candidates = ordered.filter { $0.isListed && $0.songs != nil && !failed.contains($0.id) }
+        for entry in candidates where !seen.contains(entry.id) {
+            guard let due = entry.secondReadAt, now >= due else { continue }
+            out.append(entry.id)
+            seen.insert(entry.id)
+        }
+        let stale = candidates.filter { !seen.contains($0.id) && now - ($0.readAt ?? 0) >= refreshAfterMs }
+            .sorted { a, b in (a.readAt ?? 0) != (b.readAt ?? 0) ? (a.readAt ?? 0) < (b.readAt ?? 0) : a.id < b.id }
+        out += stale.prefix(max(refreshing, 0)).map(\.id)
+        return out
+    }
+
+    /// An album's songs as a read answered them (2.4; after the review), in place of the last read - or nil, an empty
+    /// answer never being taken in (Navidrome mid-rescan, a retag under way): the album stays as it was, read again at
+    /// the next check. `library`: the songs the store has under the library's origin for it - each the answer no longer
+    /// has is marked as left, dated by the first read without it, and goes only once a read 10 minutes or more after
+    /// that agrees (`leftAgreed`). One back on the album is no longer marked.
+    public static func read(_ entry: FollowedAlbum, songs: [FollowedSong], library: Set<String>,
+                            at: Int64) -> FollowedAlbum? {
+        guard !songs.isEmpty else { return nil }
+        var out = entry
+        out.songs = songs
+        out.readAt = at
+        let ids = Set(songs.map(\.id))
+        var left: [String: Int64] = [:]
+        for id in library where !ids.contains(id) { left[id] = min(entry.left[id] ?? at, at) }
+        out.left = left
+        return out
+    }
+
+    // MARK: the removed albums kept (the store's meta `library_removed`)
+
+    /// The albums checks removed and not yet let go, each with the songs it was last read with, as the meta keeps
+    /// them: JSON, keys sorted; nil for none.
+    public static func removedRaw(_ removed: [String: [String]]) -> String? {
+        guard !removed.isEmpty else { return nil }
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.sortedKeys]
+        guard let data = try? encoder.encode(removed) else { return nil }
+        return String(decoding: data, as: UTF8.self)
+    }
+
+    /// ...read back - or slice 2's, one album id a line, with no songs (they go by their album, as they did).
+    public static func removed(raw: String?) -> [String: [String]] {
+        guard let raw, !raw.isEmpty else { return [:] }
+        if raw.hasPrefix("{"), let map = try? JSONDecoder().decode([String: [String]].self, from: Data(raw.utf8)) {
+            return map
+        }
+        var out: [String: [String]] = [:]
+        for line in raw.split(separator: "\n") where !line.isEmpty { out[String(line)] = [] }
+        return out
     }
 }

@@ -143,6 +143,33 @@ public enum AutoDownloadWords {
         "\(switchName(scope)) is turned off too, or it would download them again."
     }
 
+    // MARK: what deletes asks first (after the review)
+
+    /// Turning the switch off with albums of it here: "Remove the 412 albums downloaded with your library?"
+    public static func offTitle(_ scope: AlbumScope, albums n: Int) -> String {
+        let what = scope == .yours ? "your library" : "the collection"
+        return n == 1 ? "Remove the album downloaded with \(what)?" : "Remove the \(albums(n)) downloaded with \(what)?"
+    }
+
+    /// Its message: what goes, and what stays.
+    public static func offMessage(bytes: Int64) -> String {
+        "They go from this phone (\(Bytes.words(bytes))). What you downloaded yourself stays."
+    }
+
+    /// Its destructive button.
+    public static let offAndRemove = "Turn Off and Remove"
+
+    /// Didn't download's Remove on an album your library downloaded, with songs of it here: what else goes.
+    public static func keepOffTitle(_ name: String) -> String { "Leave \(name) off this phone?" }
+
+    public static func keepOffMessage(_ scope: AlbumScope, songsHere n: Int) -> String {
+        let what = scope == .yours ? "Your library" : "The collection"
+        let songs = n == 1 ? "Its 1 song already here goes too" : "Its \(UpNextWords.grouped(n)) songs already here go too"
+        return "\(what) leaves it off until you download it again. \(songs); songs of it you downloaded yourself stay."
+    }
+
+    // its destructive button is DownloadWords.removeDownload
+
     // MARK: the first ask (3.2)
 
     public static func askTitle(_ scope: AlbumScope) -> String {
@@ -161,7 +188,8 @@ public enum AutoDownloadWords {
 
     /// Every line, both scopes, for the ban list.
     public static var everyLine: [String] {
-        var lines: [String] = [couldntCheck, questionNote, keepThem, remove, goesToo, turnOn, notNow]
+        var lines: [String] = [couldntCheck, questionNote, keepThem, remove, goesToo, turnOn, notNow, offAndRemove,
+                               offMessage(bytes: 12_400_000_000), keepOffTitle("Album")]
         let plan = LibraryFill.plan([.init(id: "a", bytes: 1), .init(id: "b", bytes: 30_000_000_000)],
                                     .init(limit: StorageLimit.gb20.bytes, freeSpace: 25_000_000_000))
         for scope in AlbumScope.allCases {
@@ -170,7 +198,9 @@ public enum AutoDownloadWords {
                       menuTitle(scope), controlMenuTitle(scope, bytesHere: 412_000_000), removeAllToo(scope), askTitle(scope), askLine(scope, limit: .gb20),
                       askLine(scope, limit: .none),
                       downloadingSpoken(scope, LibraryDownloads.Progress(toGo: 38, of: 412, bytes: 12_400_000_000)),
-                      youFooter(scope, LibraryDownloads.Progress(toGo: 38, of: 412, bytes: 12_400_000_000))]
+                      youFooter(scope, LibraryDownloads.Progress(toGo: 38, of: 412, bytes: 12_400_000_000)),
+                      offTitle(scope, albums: 412), offTitle(scope, albums: 1), keepOffMessage(scope, songsHere: 9),
+                      keepOffMessage(scope, songsHere: 1)]
             lines += [LibraryFollow.Held.empty(kept: 212), .drop(gone: 1_240, of: 3_010)]
                 .compactMap { question($0, scope: scope, here: 212) }
         }

@@ -56,10 +56,18 @@ private func facts(here: Int64 = 0, libraryHere: Int64 = 0, limit: StorageLimit 
         // 19 GB here, 15 of it the library's: a 2 GB hand album fits the 20 GB limit
         let plan = DownloadPlan.plan(hand("h", at: 1), facts(here: 19 * gb, libraryHere: 15 * gb))
         #expect(plan["h-1"]?.task == true)
-        // and on a phone with 1 GB free, the library's 15 GB here are counted as the room it will make
-        let phone = DownloadPlan.plan(hand("h", at: 1), facts(here: 19 * gb, libraryHere: 15 * gb, limit: .none, free: gb))
-        #expect(phone["h-1"]?.task == true)
-        #expect(DownloadPlan.plan(hand("h", at: 1), facts(here: 19 * gb, limit: .none, free: gb))["h-1"]?.wait == .phoneFull)
+        // and on a phone with 1 GB free, the library's 15 GB here are counted as the room it will make: it is taken
+        // on (the fill sees it to come, and makes the library give way) - its tasks wait for that room
+        let credited = facts(here: 19 * gb, libraryHere: 15 * gb, limit: .none, free: gb)
+        let phone = DownloadPlan.plan(hand("h", at: 1), credited)
+        #expect(phone["h-1"] == DownloadPlan.Decision(wait: .phoneFull, task: false))
+        #expect(DownloadPlan.handToCome(hand("h", at: 1), credited) == 2 * gb)
+        let given = DownloadPlan.plan(hand("h", at: 1), facts(here: 19 * gb, libraryHere: 15 * gb, limit: .none,
+                                                              free: 5 * gb))
+        #expect(given["h-1"]?.task == true, "once the library has given way, it goes")
+        let none = facts(here: 19 * gb, limit: .none, free: gb)
+        #expect(DownloadPlan.plan(hand("h", at: 1), none)["h-1"]?.wait == .phoneFull)
+        #expect(DownloadPlan.handToCome(hand("h", at: 1), none) == 0, "nothing to give back: not taken on")
     }
 
     @Test func aLibraryUnitWaitsForTheHandDownloadsAheadOfItOnThePhone() {
@@ -75,13 +83,15 @@ private func facts(here: Int64 = 0, libraryHere: Int64 = 0, limit: StorageLimit 
         #expect(plan["l-1"]?.task == true)
     }
 
-    @Test func libraryUnitsShareTheWaitsAndTheHundredTasks() {
+    @Test func libraryUnitsShareTheWaitsAndHaveTwentyOfTheHundredTasks() {
         let offline = DownloadPlan.plan(library("l", rank: 0), facts(reach: .unreachable))
         #expect(offline["l-1"] == DownloadPlan.Decision(wait: .deadwax, task: false))
         let many = (0..<60).flatMap { library("l\($0)", rank: $0) } + hand("h", songs: 50, each: 1, at: 1)
         let plan = DownloadPlan.plan(many, facts(limit: .none))
-        #expect(plan.values.filter(\.task).count == DownloadPlan.maxOut)
         #expect((1...50).allSatisfy { plan["h-\($0)"]?.task == true }, "the hand's first")
+        #expect(plan.values.filter(\.task).count == 50 + DownloadPlan.libraryMaxOut)
+        #expect(plan["l0-1"]?.task == true && plan["l9-2"]?.task == true && plan["l10-1"]?.task == false,
+                "the library's in its order")
     }
 
     @Test func handToComeIsWhatTheHandUnitsThatFitHaveYetToReceive() {

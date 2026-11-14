@@ -639,6 +639,10 @@ private struct LibraryFollowDebugSection: View {
             Text(LibraryFollowWords.count(follower.removed.count))
                 .font(.footnote.monospacedDigit())
         }
+        LabeledContent("Leaving their albums") {
+            Text(LibraryFollowWords.leaving(albums))
+                .font(.footnote.monospacedDigit())
+        }
         LabeledContent("Last check") {
             Text(follower.checking ? "Checking\u{2026}"
                  : follower.lastCheck.map { LibraryFollowWords.lastCheck($0, now: now) } ?? LibraryFollowWords.noCheckYet)
@@ -656,6 +660,11 @@ private struct LibraryFollowDebugSection: View {
                 Text(LibraryFollowWords.fitDetail(plan))
                     .font(.footnote)
                     .foregroundStyle(Palette.quiet)
+                if plan.deficit > 0 {
+                    Text(LibraryFollowWords.underReserve(plan.deficit, confirmed: downloads.libraryDeficitConfirmed))
+                        .font(.footnote)
+                        .foregroundStyle(Palette.amber)
+                }
             }
             .accessibilityElement(children: .combine)
         }

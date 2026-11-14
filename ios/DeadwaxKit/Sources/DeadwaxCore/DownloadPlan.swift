@@ -23,13 +23,20 @@ import Foundation
 /// - **Your library's units** (Phase 3, phase3-autodownload.md 2.7): a song wanted by the library alone is planned
 ///   with its album in a unit of the library's, after every hand unit, in the fill's order (`libraryRank`). Its room
 ///   under the limit is the fill's (LibraryFill) - only the phone's reserve is checked here. A hand unit's fit counts
-///   the hand downloads alone: the library's bytes here (`libraryHere`) are the library's to give back, so a hand
-///   download on a full phone fits, and the fill makes the library give way for it.
+///   the hand downloads alone: what the library could give back (`libraryHere` - LibraryFill.givable, the fill's own
+///   number) is credited to it, so a hand download on a full phone is taken on (counted in `handToCome`) and the fill
+///   makes the library give way for it - but its tasks are made only once the phone has the room as it is (after the
+///   review), so a hand download never takes the phone under its reserve waiting for the library.
+/// - **Tasks out** (after the review): at most `maxOut`, the hand units' first; the library's at most `libraryMaxOut`
+///   and never more than the hand units leave - a library task beyond that is let go, its resume data kept, so a hand
+///   download never queues behind the library's.
 public enum DownloadPlan {
     /// What the phone must keep free: 2 GB (the plan's reserve), as iOS's Storage counts.
     public static let reserve: Int64 = 2_000_000_000
     /// The most tasks out at once: an album's worth many times over, and no Up Next of thousands handed to iOS at once.
     public static let maxOut = 100
+    /// Of those, the most your library's may have: the hand downloads always have slots.
+    public static let libraryMaxOut = 20
 
     /// One song asked for and not yet here.
     public struct Asked: Sendable, Equatable {
@@ -151,9 +158,11 @@ public enum DownloadPlan {
         return nil
     }
 
-    /// The units in the order they are planned, and why each that doesn't fit waits - the room and the phone's
-    /// reserve, before any shared wait.
-    static func walk(_ songs: [Asked], _ facts: Facts) -> (order: [String], units: [String: [Asked]], waits: [String: DownloadWait]) {
+    /// The units in the order they are planned, why each that doesn't fit waits - the room and the phone's reserve,
+    /// before any shared wait - and the hand units taken on (`taken`: they fit, the library's bytes here credited),
+    /// some of which may still wait for the phone's room as it is.
+    static func walk(_ songs: [Asked], _ facts: Facts)
+        -> (order: [String], units: [String: [Asked]], waits: [String: DownloadWait], taken: Set<String>) {
         var units: [String: [Asked]] = [:]
         for song in songs { units[song.unit, default: []].append(song) }
         func rank(_ key: String) -> Int { units[key]!.compactMap(\.libraryRank).min() ?? Int.max }
@@ -168,40 +177,48 @@ public enum DownloadPlan {
             let x = units[a]!.map(\.wantedAt).min() ?? 0, y = units[b]!.map(\.wantedAt).min() ?? 0
             return x != y ? x < y : a < b
         }
-        // the hand downloads' room: the library's bytes here are the library's to give back
-        var committed = facts.bytesHere - max(facts.libraryHere, 0)
+        // the hand downloads' room: what the library could give back is the library's to give
+        let credit = max(facts.libraryHere, 0)
+        var committed = facts.bytesHere - credit
         var pending: Int64 = 0
         var waits: [String: DownloadWait] = [:]
+        var taken = Set<String>()
         for key in order {
             let unit = units[key]!
             let library = key.hasPrefix("library:")
             let need = unit.reduce(Int64(0)) { $0 + $1.remaining }
+            let started = unit.contains(where: \.started)
             var fitWait: DownloadWait?
-            if !unit.contains(where: \.started) {
+            if !started {
                 if library {
                     // its room under the limit is the fill's: only the phone, as it is now
                     if facts.freeSpace - pending - need < reserve { fitWait = .phoneFull }
                 } else if let limit = facts.limit, committed + need > limit {
                     fitWait = .room
-                } else if facts.freeSpace + max(facts.libraryHere, 0) - pending - need < reserve {
+                } else if facts.freeSpace + credit - pending - need < reserve {
                     fitWait = .phoneFull
                 }
             }
             if let fitWait {
                 waits[key] = fitWait
-            } else {
-                if !library { committed += need }
-                pending += need
+                continue
             }
+            if !library {
+                committed += need
+                taken.insert(key)
+                // taken on with the library's bytes credited: its tasks wait until the phone has the room as it is
+                if !started, facts.freeSpace - pending - need < reserve { waits[key] = .phoneFull }
+            }
+            pending += need
         }
-        return (order, units, waits)
+        return (order, units, waits, taken)
     }
 
     /// What the hand downloads that fit have yet to receive - the fill's `handToCome` (LibraryFill.Facts).
     public static func handToCome(_ songs: [Asked], _ facts: Facts) -> Int64 {
         let walked = walk(songs, facts)
         var total: Int64 = 0
-        for key in walked.order where !key.hasPrefix("library:") && walked.waits[key] == nil {
+        for key in walked.order where walked.taken.contains(key) {
             total += walked.units[key]!.reduce(Int64(0)) { $0 + $1.remaining }
         }
         return total
@@ -213,9 +230,29 @@ public enum DownloadPlan {
         // a task is out, and stays out, under any wait but a sign-out's: a running task has its own answer
         let outsKept = shared != .signIn
         let walked = walk(songs, facts)
-        var out = outsKept ? songs.filter(\.out).count : 0
+        let canMake = shared == nil || shared!.isTheNetwork
+        // the hand units' tasks first (they come first in the order) - those out counted from the start, as Phase 2
+        // counts them - then the library's, in what they leave
+        var handOut = outsKept ? songs.filter { (song: Asked) -> Bool in song.out && !song.isLibrary }.count : 0
+        var libraryOut = 0
+        var libraryCap: Int?
+        // the library's tasks out that stay: the first of them in its order, within its slots - kept before any new
+        // one is made, so a running task isn't let go for another
+        var libraryKept = Set<String>()
         var made: [String: Decision] = [:]
         for key in walked.order {
+            let library = key.hasPrefix("library:")
+            if library, libraryCap == nil {
+                let cap = max(min(libraryMaxOut, maxOut - handOut), 0)
+                libraryCap = cap
+                if outsKept {
+                    let outs = walked.order.filter { $0.hasPrefix("library:") }.flatMap { (unit: String) -> [Asked] in
+                        walked.units[unit]!.filter(\.out).sorted { a, b in a.id < b.id }
+                    }
+                    libraryKept = Set(outs.prefix(cap).map(\.id))
+                }
+                libraryOut = libraryKept.count
+            }
             let unit = walked.units[key]!.sorted { a, b in
                 if (a.disc ?? 0) != (b.disc ?? 0) { return (a.disc ?? 0) < (b.disc ?? 0) }
                 if (a.track ?? 0) != (b.track ?? 0) { return (a.track ?? 0) < (b.track ?? 0) }
@@ -224,15 +261,19 @@ public enum DownloadPlan {
             let fitWait = walked.waits[key]
             for song in unit {
                 if song.out {
-                    made[song.id] = Decision(wait: shared ?? .queued, task: outsKept)
+                    // a task out stays out (but a sign-out's) - a library task only within the library's slots
+                    let keep = outsKept && (!library || libraryKept.contains(song.id))
+                    made[song.id] = Decision(wait: shared ?? .queued, task: keep)
                     continue
                 }
                 if let fitWait {
                     made[song.id] = Decision(wait: shared ?? fitWait, task: false)
                     continue
                 }
-                let mayMake = (shared == nil || shared!.isTheNetwork) && out < maxOut
-                if mayMake { out += 1 }
+                let mayMake = canMake && (library ? libraryOut < libraryCap! : handOut < maxOut)
+                if mayMake {
+                    if library { libraryOut += 1 } else { handOut += 1 }
+                }
                 made[song.id] = Decision(wait: shared ?? .queued, task: mayMake)
             }
         }

@@ -728,12 +728,15 @@ Debug is where Phase 0's test screen lives now:
     more than half went at once, or the list stopped at 10,000 albums. Nothing goes then. "believing
     (Remove)" after you answered Remove to You > Downloads' question, "kept them" after Keep Them.
   - **Removed, to let go**: albums a check removed whose downloads haven't gone yet (usually 0).
+  - **Leaving their albums**: songs a read found had left their album, waiting for the second read
+    ten minutes on ("None", or "3 songs on 2 albums").
   - **Last check**: "200 · 3,010 albums" (a new list), "unchanged (304)" (the same list as last
     time - one small request), or "failed:" and why; how long it took; when.
   - **First read**: how long reading every album's songs took the first time, and the time per album.
   - Then what fits: "412 of 3,010 fit in 20 GB" at your storage limit, after everything you've
     downloaded yourself, and under it what those take and why the rest wait (over the limit, no room
-    on the phone, not read yet, removed by you).
+    on the phone, not read yet, removed by you). When the phone is under its 2 GB, in amber, by how much:
+    "500 MB under the reserve · confirming" for the first few minutes, then "· giving way".
   - **Check now** checks at once. It also checks by itself: as it's turned on, as the app opens, when
     you come back to the app (if the last check was a minute or more ago), every 15 minutes while the
     app is open or playing, when deadwax answers again after it couldn't be reached, and straight after
@@ -1177,7 +1180,8 @@ normalization as a stream.
   **Didn't download**: each album with songs that didn't, why, and **Try again** (**Try all again** when
   there's more than one); swipe a row to **Remove** them - for an album your library downloaded, that
   leaves the album off the phone, as its Remove Download does, though songs of it you downloaded
-  yourself stay. **Downloaded**: every album on the phone, largest first,
+  yourself stay. When songs of it are already here, it asks first - "Leave Dummy off this phone?",
+  saying those go too - with **Remove Download** and Cancel. **Downloaded**: every album on the phone, largest first,
   with its size and its check - **Checked** (for a file that isn't FLAC, its size is all there is
   to check), **Checked by size** (a FLAC that carries no fingerprint), or **Checking…**. Tap a row for its album; swipe it to **Remove**.
 - **Remove All Downloads**, which asks first. With Download your library on, it's turned off too (the
@@ -1194,7 +1198,10 @@ release.
 
 - **What comes first**: the album you added or played most recently (a play counts for 30 days).
   Whole albums only, and only after everything you downloaded yourself: what you download is never
-  removed to make room for your library.
+  removed to make room for your library, and it always has most of the downloads at once (your
+  library has at most 20 of the 100). A new album comes onto the phone only with a little to spare
+  (50 MB, or 1% of the limit if that's more), so one at the edge isn't downloaded and then removed
+  again when its cover arrives; an album already here keeps its place while it fits at all.
 - **What it says**: "All 212 albums fit in 20 GB.", or, in amber, "1,240 of 3,010 albums fit in 20 GB.
   Raise the limit or download fewer." With No limit, the phone's own space decides ("1,240 of 3,010
   albums fit on this phone."), always keeping 2 GB free. While it reads each new album's songs from
@@ -1202,26 +1209,42 @@ release.
   minutes ago" - or "Couldn't check with deadwax - showing what was there last time."
 - **When it checks**: as the app opens, when you come back to it after a minute or more, every 15
   minutes while it's open or playing, when deadwax answers again, straight after Add to or Remove from
-  my library - and when you pull down on You > Downloads. It downloads ten albums at a time, and the
-  next as those arrive.
+  my library - and when you pull down on You > Downloads. A check that fails doesn't put off the
+  next one. It downloads ten albums at a time, and the next as those arrive.
+- **Keeping up with deadwax**: each album's songs are read once, then again when its album page is
+  opened, and once a week (up to 20 each check), so a song deadwax re-tags under a new id is
+  followed. An album that can't be read is skipped, and read after the others at the next check.
 - **What it removes, and when**: only what it downloaded itself, never a song you downloaded yourself
   (or, later, one in a downloaded playlist), and never a play waiting to be sent.
   - An album you **remove from your library elsewhere** (the web app, Amperfy) goes when a second
     check, ten minutes or more after the first that missed it, agrees - so a star that flickers while
     deadwax re-tags an album costs nothing. One you remove **in the app** goes as soon as deadwax's list
     agrees.
-  - **Lowering the storage limit**, or the phone falling under 2 GB free, or **downloading something
-    yourself on a full phone**: the albums at the bottom make way, whole. Raise the limit and they come
-    back.
+  - **Lowering the storage limit**: the albums at the bottom make way, whole. Raise the limit and they
+    come back.
+  - **The phone falling under 2 GB free**, or **downloading something yourself on a full phone**: the
+    albums at the bottom make way, whole - only as many as the phone needs, and only once it has been
+    short for a few minutes, so one odd reading of the phone's free space never removes anything.
+    Meanwhile what you downloaded waits ("the phone is full"), and starts as the room is made. A new
+    album never pushes out one already here.
+  - **A song that left its album** (deadwax re-tagged it, or it was replaced) goes only when a second
+    read of the album, ten minutes or more after the first that missed it, agrees. A read that comes
+    back empty, as one can while Navidrome rescans, changes nothing.
   - **Remove Download** on one of its albums: it goes, and stays off until you download it again.
-  - **Turning it off**: everything it downloaded goes (what you downloaded yourself stays). It
-    remembers your library, so turning it on again says what fits at once.
+  - **Turning it off**: everything it downloaded goes (what you downloaded yourself stays). With any of
+    it on the phone, it asks first - "Remove the 412 albums downloaded with your library?", with what
+    they take - with **Turn Off and Remove** and Cancel. It remembers your library, so turning it on
+    again says what fits at once.
 - **When deadwax's list looks wrong** - empty while the phone has albums of your library, or missing
   more than half of them at once (more than 10) - **nothing goes**. You > Downloads asks instead, in
   amber: "deadwax says your library is empty. Remove the 212 albums downloaded with it from this
   phone?", with **Keep Them** and **Remove**. Keep Them keeps them and puts the question away. Remove
   doesn't remove anything at once either: they go only if deadwax still says the same at a check ten
-  minutes or more later. A list that stopped at deadwax's 10,000 albums is never believed.
+  minutes or more later. A list that stopped at deadwax's 10,000 albums is never believed. Removing
+  the last album of your library in the app removes it, without the question.
+- **The ten minutes are by the phone's clock**: moving the clock forward in Settings between two checks
+  could make them agree early. The few minutes of "the phone is full" go by the phone's own running
+  time, which Settings can't move.
 - **Covers, lyrics and normalization** of the albums it downloads are kept as for any download.
 - Only while charging, and downloading with the app in the background, come in the next build.
 
@@ -1318,6 +1341,8 @@ The tests can't reach these either. Note what happens.
 - **Download your library on a phone with little space left.** It keeps 2 GB free by the phone's own
   measure of free space, the one iOS uses for what it would make room for. Does Settings > General >
   iPhone Storage agree with what You > Downloads says, and does anything else on the phone complain?
+  When the phone dips under 2 GB, Debug says "under the reserve · confirming", then after a few minutes
+  "giving way" - does only the bottom album go, and only as much as was needed?
 
 ### Phase 2's checks: downloads
 

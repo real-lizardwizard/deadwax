@@ -22,9 +22,11 @@ private func entry(_ id: String) -> IndexAlbum {
 
 /// An album of the library, its songs read.
 private func followed(_ id: String, _ position: Int = 0, songs: [FollowedSong]? = nil, missingSince: Int64? = nil,
-                      removedHere: Int64? = nil, keptOff: Int64? = nil, unread: Bool = false) -> FollowedAlbum {
+                      removedHere: Int64? = nil, keptOff: Int64? = nil, unread: Bool = false,
+                      left: [String: Int64] = [:]) -> FollowedAlbum {
     FollowedAlbum(album: entry(id), position: position, songs: unread ? nil : (songs ?? read(id)),
-                  readAt: unread ? nil : t0, missingSince: missingSince, removedHere: removedHere, keptOff: keptOff)
+                  readAt: unread ? nil : t0, missingSince: missingSince, removedHere: removedHere, keptOff: keptOff,
+                  left: left)
 }
 
 private func library(_ ids: [String]) -> [FollowedAlbum] {
@@ -84,16 +86,19 @@ private func deleted(_ turn: LibraryDownloads.Turn, _ songs: [StoreSong]) -> [St
             }
         }
         songs += here("removed") + here("gave") + here("kept") + here("notOn")
+        // every song of notOn found to have left it, by two reads ten minutes apart
+        var gone: [String: Int64] = [:]
+        for song in songs where song.albumID == "notOn" && song.isLibrary { gone[song.id] = t0 - 10 * minute }
         let ordered = [followed("gave", 0, songs: read("gave", 2, bytes: 30 * gb)), followed("kept", 1, keptOff: t0),
-                       followed("notOn", 2, songs: [])]
+                       followed("notOn", 2, songs: [FollowedSong(id: "notOn-stays")], left: gone)]
         let fill = LibraryFill.plan(LibraryFill.albums(ordered), .init(limit: StorageLimit.gb20.bytes, freeSpace: 500 * gb))
         let actions = LibraryDownloads.actions(ordered, fill: fill, removed: ["removed"], songs: songs)
         #expect(actions.why == ["removed": .removed, "gave": .gaveWay, "kept": .keptOff, "notOn": .notOnAlbum])
-        let gone = Set(LibraryDownloads.deleted(actions, songs: songs))
-        #expect(gone == Set(["removed-1", "removed-2", "gave-1", "gave-2", "kept-1", "kept-2", "notOn-1", "notOn-2"]))
+        let deletedNow = Set(LibraryDownloads.deleted(actions, songs: songs))
+        #expect(deletedNow == Set(["removed-1", "removed-2", "gave-1", "gave-2", "kept-1", "kept-2", "notOn-1", "notOn-2"]))
         // nothing deleted carried another origin; nothing without the library's was even touched
         let byID = Dictionary(uniqueKeysWithValues: songs.map { ($0.id, $0) })
-        for id in gone { #expect(byID[id]?.origins == [.library], "\(id) carried another origin") }
+        for id in deletedNow { #expect(byID[id]?.origins == [.library], "\(id) carried another origin") }
         for id in actions.take { #expect(byID[id]?.isLibrary == true, "\(id) wasn't the library's to take") }
     }
 
@@ -296,9 +301,12 @@ private func deleted(_ turn: LibraryDownloads.Turn, _ songs: [StoreSong]) -> [St
         let ordered = [followed("top", 0, songs: read("top", 2, bytes: 2 * gb)),
                        followed("bottom", 1, songs: read("bottom", 2, bytes: 2 * gb))]
         let songs = here("top", bytes: 2 * gb) + here("bottom", bytes: 2 * gb)
-        // 3 GB free, the library's 8 GB here its to give; a 5 GB hand download to come: 4 GB left over the reserve
-        let turn = LibraryDownloads.turn(ordered, removed: [], songs: songs, bytesHere: 8 * gb, handToCome: 5 * gb,
+        // 3 GB free and a 5 GB hand download to come: 4 GB under the reserve once it arrives
+        let seen = LibraryDownloads.turn(ordered, removed: [], songs: songs, bytesHere: 8 * gb, handToCome: 5 * gb,
                                          limit: nil, freeSpace: 3 * gb)
+        #expect(seen.fill.deficit == 4 * gb && seen.actions.take.isEmpty, "not until it holds on plans minutes apart")
+        let turn = LibraryDownloads.turn(ordered, removed: [], songs: songs, bytesHere: 8 * gb, handToCome: 5 * gb,
+                                         limit: nil, freeSpace: 3 * gb, deficitConfirmed: true)
         #expect(turn.fill.fits == ["top"] && turn.fill.waits == ["bottom": .phoneFull])
         #expect(turn.actions.why == ["bottom": .gaveWay])
     }
@@ -329,10 +337,16 @@ private func deleted(_ turn: LibraryDownloads.Turn, _ songs: [StoreSong]) -> [St
     }
 
     @Test func aSongNoLongerOnItsAlbumGoesAndTheRestStay() {
-        let ordered = [followed("a", 0, songs: [read("a")[0]])]
         let songs = here("a")
+        // two reads ten minutes apart agree a-2 left
+        let ordered = [followed("a", 0, songs: [read("a")[0]], left: ["a-2": t0 - 10 * minute])]
         let actions = LibraryDownloads.actions(ordered, fill: roomy(ordered), removed: [], songs: songs)
         #expect(actions.take == ["a-2"] && actions.why == ["a": .notOnAlbum])
+        // one read, or two nine minutes apart, or none marking it: nothing goes
+        for left in [["a-2": t0], ["a-2": t0 - 10 * minute + 1], [:]] as [[String: Int64]] {
+            let early = [followed("a", 0, songs: [read("a")[0]], left: left)]
+            #expect(LibraryDownloads.actions(early, fill: roomy(early), removed: [], songs: songs).take.isEmpty)
+        }
     }
 
     @Test func anAlbumWhoseSongsAreReadAgainKeepsEverything() {
@@ -399,9 +413,12 @@ private func deleted(_ turn: LibraryDownloads.Turn, _ songs: [StoreSong]) -> [St
 
     @Test func theFillCountsSongsWantedByHandAsHandDownloads() {
         let songs = here("a") + here("b", [.library, .song]) + here("c", state: .wanted)
-        let inputs = LibraryDownloads.fillInputs(songs)
+        let kept = ["a": Int64(0), "b": 0, "c": 0]
+        let inputs = LibraryDownloads.inputs(library(["a", "b", "c"]), songs: songs, covers: kept)
         #expect(inputs.hand == ["b-1", "b-2"])
-        #expect(inputs.here == ["a": 200 * mb] && inputs.libraryHere == 200 * mb)
+        #expect(inputs.albums.map(\.here) == [200 * mb, 0, 0] && inputs.givable == 200 * mb)
+        #expect(inputs.albums.map(\.bytes) == [200 * mb, 0, 200 * mb], "b's songs are the hand download's")
+        #expect(inputs.albums.map(\.held) == [true, true, true] && inputs.albums.map(\.toCome) == [0, 0, 200 * mb])
     }
 
     @Test func storeSongsAreReadOnTheAlbumOfTheLibraryThatHasThem() {

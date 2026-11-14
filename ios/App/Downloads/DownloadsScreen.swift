@@ -302,12 +302,16 @@ private struct StorageSection: View {
 private struct LibrarySection: View {
     @Environment(DownloadModel.self) private var downloads
     @Environment(ServerModel.self) private var server
+    /// Turning it off with albums of it here asks first (after the review): what goes, with Cancel.
+    @State private var askingOff = false
+    @State private var offAlbums = 0
+    @State private var offBytes: Int64 = 0
 
     var body: some View {
         let follower = downloads.follower
         let scope = follower.scope ?? AlbumScope.albums(for: server.me)
         Section {
-            Toggle(isOn: Binding(get: { follower.on }, set: { follower.on = $0 })) {
+            Toggle(isOn: Binding(get: { follower.on }, set: { turn($0) })) {
                 VStack(alignment: .leading, spacing: 3) {
                     Text(AutoDownloadWords.switchName(scope))
                     Text(AutoDownloadWords.note(scope))
@@ -321,7 +325,14 @@ private struct LibrarySection: View {
             .accessibilityHint(AutoDownloadWords.note(scope))
             .accessibilityValue(follower.on ? "On" : "Off")
             .accessibilityAddTraits(.isButton)
-            .accessibilityAction { follower.on.toggle() }
+            .accessibilityAction { turn(!follower.on) }
+            // from the switch itself, so it comes up from it
+            .confirmationDialog(AutoDownloadWords.offTitle(scope, albums: offAlbums), isPresented: $askingOff,
+                                titleVisibility: .visible) {
+                Button(AutoDownloadWords.offAndRemove, role: .destructive) { follower.on = false }
+            } message: {
+                Text(AutoDownloadWords.offMessage(bytes: offBytes))
+            }
             if follower.on {
                 fit(follower, scope: scope)
                 if follower.asks, let held = follower.held,
@@ -334,6 +345,24 @@ private struct LibrarySection: View {
         } footer: {
             if follower.on { footer(follower) }
         }
+    }
+
+    /// The switch, turned: on at once; off at once only with nothing of it here - else asked first, and nothing goes
+    /// until Turn Off and Remove (the switch stays on meanwhile, and on Cancel).
+    private func turn(_ on: Bool) {
+        let follower = downloads.follower
+        guard !on, follower.on else {
+            follower.on = on
+            return
+        }
+        let loses = downloads.switchOffLoses
+        guard loses.albums > 0 else {
+            follower.on = false
+            return
+        }
+        offAlbums = loses.albums
+        offBytes = loses.bytes
+        askingOff = true
     }
 
     @ViewBuilder
@@ -556,50 +585,11 @@ private struct FailedSection: View {
     let rows: [DownloadShelf.Failed]
 
     @Environment(DownloadModel.self) private var downloads
-    @Environment(ServerModel.self) private var server
 
     var body: some View {
         Section {
             ForEach(rows) { row in
-                VStack(alignment: .leading, spacing: 6) {
-                    AlbumLine(album: row.album, albumID: row.id, spoken: spoken(row), tryAgain: { tryAgain(row) }) {
-                        HStack(alignment: .firstTextBaseline, spacing: 4) {
-                            DownloadMark(mark: .failed, font: .caption)
-                            Text(DownloadWords.didntDownload(row.records.count))
-                                .font(.subheadline.weight(.medium))
-                                .foregroundStyle(Palette.amber)
-                        }
-                        Text(row.reason.said)
-                            .font(.footnote)
-                            .foregroundStyle(Palette.quiet)
-                            .fixedSize(horizontal: false, vertical: true)
-                    } trailing: {
-                        Button(DownloadWords.tryAgain) { tryAgain(row) }
-                            .buttonStyle(.borderless)
-                            .font(.subheadline.weight(.semibold))
-                    }
-                    // the raw words for whoever runs deadwax - ErrorNote's split, its own element
-                    if server.access.seesDetail, let detail = row.reason.detail, !detail.isEmpty {
-                        DisclosureGroup(ErrorWords.forWhoever) {
-                            Text(detail)
-                                .font(.footnote.monospaced())
-                                .foregroundStyle(Palette.quiet)
-                                .textSelection(.enabled)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                        }
-                        .font(.footnote)
-                        .padding(.leading, AlbumLineInset.text)
-                    }
-                }
-                .removable(name: row.album?.name) {
-                    // a song your library keeps is let go with its album kept off - else the library would ask for it
-                    // again; the album's songs downloaded by hand stay
-                    if row.records.contains(where: { downloads.keptByLibrary($0.id) }) {
-                        downloads.remove(failed: row.records.map(\.id), album: row.id)
-                    } else {
-                        downloads.remove(songs: row.records.map(\.id))
-                    }
-                }
+                FailedRow(row: row)
             }
             if rows.count > 1 {
                 Button {
@@ -613,12 +603,91 @@ private struct FailedSection: View {
             Text(DownloadWords.didntDownloadHeader)
         }
     }
+}
 
-    private func tryAgain(_ row: DownloadShelf.Failed) {
+/// One album of Didn't download: its songs that failed, why, Try Again - and its Remove, which on an album your library
+/// keeps with songs of it here asks first (after the review): keeping it off lets go of those too.
+private struct FailedRow: View {
+    let row: DownloadShelf.Failed
+
+    @Environment(DownloadModel.self) private var downloads
+    @Environment(ServerModel.self) private var server
+    @Environment(PlayerModel.self) private var player
+    @State private var askingKeepOff = false
+    @State private var songsHere = 0
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            AlbumLine(album: row.album, albumID: row.id, spoken: spoken, tryAgain: { tryAgain() }) {
+                HStack(alignment: .firstTextBaseline, spacing: 4) {
+                    DownloadMark(mark: .failed, font: .caption)
+                    Text(DownloadWords.didntDownload(row.records.count))
+                        .font(.subheadline.weight(.medium))
+                        .foregroundStyle(Palette.amber)
+                }
+                Text(row.reason.said)
+                    .font(.footnote)
+                    .foregroundStyle(Palette.quiet)
+                    .fixedSize(horizontal: false, vertical: true)
+            } trailing: {
+                Button(DownloadWords.tryAgain) { tryAgain() }
+                    .buttonStyle(.borderless)
+                    .font(.subheadline.weight(.semibold))
+            }
+            // the raw words for whoever runs deadwax - ErrorNote's split, its own element
+            if server.access.seesDetail, let detail = row.reason.detail, !detail.isEmpty {
+                DisclosureGroup(ErrorWords.forWhoever) {
+                    Text(detail)
+                        .font(.footnote.monospaced())
+                        .foregroundStyle(Palette.quiet)
+                        .textSelection(.enabled)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                .font(.footnote)
+                .padding(.leading, AlbumLineInset.text)
+            }
+        }
+        .removable(name: row.album?.name, asks: asks, ask: ask) { remove() }
+        // keeping a library album off lets go of its songs already here too: said, with Cancel
+        .confirmationDialog(AutoDownloadWords.keepOffTitle(name), isPresented: $askingKeepOff,
+                            titleVisibility: .visible) {
+            Button(DownloadWords.removeDownload, role: .destructive) {
+                remove()
+                player.say(DownloadWords.removed(name))
+            }
+        } message: {
+            Text(AutoDownloadWords.keepOffMessage(downloads.libraryScope, songsHere: songsHere))
+        }
+    }
+
+    private var name: String { row.album?.name ?? PlayerWords.untitled }
+
+    /// A song of the row your library keeps: its Remove keeps the album off - else the library would ask for it again.
+    private var keepsOff: Bool { row.records.contains { downloads.keptByLibrary($0.id) } }
+
+    /// Its Remove asks first: the album would be kept off with songs of it here only the library wants.
+    private var asks: Bool { keepsOff && downloads.keptOffLoses(album: row.id) > 0 }
+
+    private func ask() {
+        songsHere = downloads.keptOffLoses(album: row.id)
+        askingKeepOff = true
+    }
+
+    /// The Remove: the failed songs let go - and with a song your library keeps, the album kept off (its songs
+    /// downloaded by hand stay).
+    private func remove() {
+        if keepsOff {
+            downloads.remove(failed: row.records.map(\.id), album: row.id)
+        } else {
+            downloads.remove(songs: row.records.map(\.id))
+        }
+    }
+
+    private func tryAgain() {
         for record in row.records { downloads.tryAgain(record.id) }
     }
 
-    private func spoken(_ row: DownloadShelf.Failed) -> String {
+    private var spoken: String {
         [row.album?.name, row.album?.artist, DownloadWords.didntDownload(row.records.count), row.reason.said]
             .compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: ", ")
     }
@@ -775,22 +844,32 @@ extension AlbumLine where Trailing == EmptyView {
 
 private extension View {
     /// The row's swipe: Remove (destructive, `trash`), which VoiceOver has as an action; its notice names the album.
-    func removable(name: String?, remove: @escaping () -> Void) -> some View {
-        modifier(Removable(name: name, remove: remove))
+    /// `asks`: the Remove asks first (`ask`) - drawn red without the destructive role, so a full swipe doesn't take the
+    /// row out before the answer.
+    func removable(name: String?, asks: Bool = false, ask: @escaping () -> Void = {},
+                   remove: @escaping () -> Void) -> some View {
+        modifier(Removable(name: name, asks: asks, ask: ask, remove: remove))
     }
 }
 
 private struct Removable: ViewModifier {
     let name: String?
+    let asks: Bool
+    let ask: () -> Void
     let remove: () -> Void
 
     @Environment(PlayerModel.self) private var player
 
     func body(content: Content) -> some View {
         content.swipeActions(edge: .trailing, allowsFullSwipe: true) {
-            Button(DownloadWords.remove, systemImage: "trash", role: .destructive) {
-                remove()
-                player.say(DownloadWords.removed(name ?? PlayerWords.untitled))
+            if asks {
+                Button(DownloadWords.remove, systemImage: "trash") { ask() }
+                    .tint(.red) // the destructive swipe's own red
+            } else {
+                Button(DownloadWords.remove, systemImage: "trash", role: .destructive) {
+                    remove()
+                    player.say(DownloadWords.removed(name ?? PlayerWords.untitled))
+                }
             }
         }
     }

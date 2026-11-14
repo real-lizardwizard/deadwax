@@ -71,7 +71,12 @@ final class LibraryFollower {
     /// The store couldn't be read or written: its words.
     private(set) var problem: String?
     /// The albums checks removed whose library downloads DownloadModel hasn't let go yet.
-    private(set) var removed: Set<String> = []
+    var removed: Set<String> { Set(removedSongIDs.keys) }
+    /// (after the review) The songs those albums were last read with: taken by id too, so a song kept under another
+    /// album id (asked from a queue with none) goes with its album.
+    var removedSongs: Set<String> { Set(removedSongIDs.values.flatMap { $0 }) }
+    /// Each removed album and its songs - kept in the store's meta (LibraryFollow.removedRaw).
+    private(set) var removedSongIDs: [String: [String]] = [:]
     /// The last check's failure, for You > Downloads' footer (ErrorNote's split) - nil once one answers.
     private(set) var lastError: (any Error)?
     /// A check has answered since the store opened or the switch went on: until then the kept list may be days old, so
@@ -82,7 +87,7 @@ final class LibraryFollower {
     var asks: Bool { on && LibraryFollow.asks(held, keptThem: keptThem) }
 
     /// Albums' songs are still being read this run: nothing is asked for below the first one (LibraryDownloads.actions).
-    var readsPending: Bool { running && !LibraryFollow.toRead(ordered).isEmpty }
+    var readsPending: Bool { running && !LibraryFollow.unread(ordered).isEmpty }
 
     /// (read, of): the listed albums whose songs are read, of every listed album - "Reading your library - 1,240 of
     /// 3,010 albums" while some aren't.
@@ -101,6 +106,9 @@ final class LibraryFollower {
     @ObservationIgnored var changed: () -> Void = {}
     /// The switch went off: DownloadModel takes the library's origin from every song.
     @ObservationIgnored var switchedOff: () -> Void = {}
+    /// The songs the store has under the library's origin for an album - those of its last read, those found to have
+    /// left it, and those asked for with it (DownloadModel's): what a read marks as left when the answer hasn't them.
+    @ObservationIgnored var librarySongs: (FollowedAlbum) -> Set<String> = { _ in [] }
     @ObservationIgnored private var store: DownloadStore?
     @ObservationIgnored private var etag: String?
     /// When the last check began (ms) - `due`'s.
@@ -115,6 +123,11 @@ final class LibraryFollower {
     @ObservationIgnored private var firstReadBegan: ContinuousClock.Instant?
     @ObservationIgnored private var firstReadAlbums = 0
     @ObservationIgnored private var wasOnline = true
+    /// Albums whose read failed at an earlier check: read after the rest at the next (LibraryFollow.toRead's
+    /// `retryLast`), so a few unreadable albums never hold up the others.
+    @ObservationIgnored private var failedBefore: Set<String> = []
+    /// Bumped by the question's Remove: a check already out when it was answered keeps it standing.
+    @ObservationIgnored private var believeToken = 0
 
     init(server: ServerModel, reachability: Reachability) {
         self.server = server
@@ -230,6 +243,7 @@ final class LibraryFollower {
         believing = true
         keptThem = false
         etag = nil
+        believeToken += 1
         note("library: remove them - believed from the next list")
         check(.byHand)
     }
@@ -237,14 +251,38 @@ final class LibraryFollower {
     /// DownloadModel let go of the library downloads of these removed albums (or they had none).
     func removalsDone(_ albums: Set<String>) {
         guard let store, !albums.isDisjoint(with: removed) else { return }
-        let left = removed.subtracting(albums)
+        let left = removedSongIDs.filter { !albums.contains($0.key) }
         do {
-            try store.database.setMeta(DownloadDatabase.libraryRemovedKey, Self.joined(left))
+            try store.database.setMeta(DownloadDatabase.libraryRemovedKey, LibraryFollow.removedRaw(left))
         } catch {
             say("couldn't keep the removals: \(error)")
             return
         }
-        removed = left
+        removedSongIDs = left
+    }
+
+    /// (after the review) An album page's fresh answer (DownloadModel.albumAnswered): an album of the library read
+    /// again with it - its songs and what left them as a check's read keeps them (LibraryFollow.read), so a retag's new
+    /// song ids are followed when the album is opened.
+    func pageRead(_ album: Album) {
+        guard on, let store, let index = ordered.firstIndex(where: { $0.id == album.id }), ordered[index].isListed,
+              let songs = album.song else { return }
+        let entry = ordered[index]
+        let at = ListenTracker.wallMs()
+        let followed = songs.map { (song: Song) -> FollowedSong in FollowedSong(song) }
+        guard let next = LibraryFollow.read(entry, songs: followed, library: librarySongs(entry), at: at) else { return }
+        do {
+            guard try store.database.setLibrarySongs(album: album.id, songs: followed, left: next.left, at: at) else { return }
+        } catch {
+            say("couldn't keep an album's songs: \(error)")
+            return
+        }
+        let changedSongs = next.songs != entry.songs || next.left != entry.left
+        ordered[index] = next
+        if changedSongs {
+            note("library: \(album.id) read again from its page")
+            changed()
+        }
     }
 
     // MARK: the run
@@ -263,7 +301,10 @@ final class LibraryFollower {
         }
         running = true
         let mine = generation
+        // this check's: albums refused (not asked again until the next), reads refused in all, stale lists read again
         var failed = Set<String>()
+        var failures = 0
+        var refreshed = 0
         defer {
             running = false
             // the reads ended: what was held for them is asked for now
@@ -275,45 +316,71 @@ final class LibraryFollower {
             if let reason = pending {
                 pending = nil
                 failed = []
+                failures = 0
+                refreshed = 0
                 await checkNow(reason, generation: mine)
                 continue
             }
             guard canAsk, let client = server.client else { return }
-            let unread = LibraryFollow.toRead(ordered, failed: failed)
-            guard !unread.isEmpty else {
+            let now = ListenTracker.wallMs()
+            let next = LibraryFollow.toRead(ordered, failed: failed, retryLast: failedBefore, now: now,
+                                            refreshing: LibraryFollow.refreshesPerCheck - refreshed)
+            guard !next.isEmpty else {
                 firstReadEnded()
                 return
             }
-            let batch = Array(unread.prefix(LibraryFollow.readsAtOnce))
+            let batch = Array(next.prefix(LibraryFollow.readsAtOnce))
+            // a read of an album read before and not due its second read is a stale list read again
+            refreshed += batch.filter { (id: String) -> Bool in
+                guard let entry = ordered.first(where: { $0.id == id }), entry.songs != nil else { return false }
+                return entry.secondReadAt.map { now < $0 } ?? true
+            }.count
             readingNow = batch.count
             let results = await read(batch, client: client)
             readingNow = 0
             guard mine == generation, let store else { return }
             let at = ListenTracker.wallMs()
-            var refused = 0
             for (id, outcome) in results {
+                guard let index = ordered.firstIndex(where: { $0.id == id }) else { continue }
                 switch outcome {
                 case .success(let songs):
+                    // an empty answer is never taken in (Navidrome mid-rescan): read again at the next check
+                    guard let read = LibraryFollow.read(ordered[index], songs: songs,
+                                                        library: librarySongs(ordered[index]), at: at) else {
+                        failed.insert(id)
+                        failedBefore.insert(id)
+                        failures += 1
+                        note(LibraryFollowWords.readFailed(id, "no songs in the answer"))
+                        continue
+                    }
                     do {
-                        guard try store.database.setLibrarySongs(album: id, songs: songs, at: at) else { continue }
+                        guard try store.database.setLibrarySongs(album: id, songs: songs, left: read.left, at: at) else {
+                            continue
+                        }
                     } catch {
                         say("couldn't keep an album's songs: \(error)")
                         return
                     }
-                    if let index = ordered.firstIndex(where: { $0.id == id }) {
-                        ordered[index].songs = songs
-                        ordered[index].readAt = at
+                    if !read.left.isEmpty, read.left != ordered[index].left {
+                        note("library: \(id) - \(read.left.count) no longer on it, read again in 10 minutes")
                     }
+                    ordered[index] = read
+                    failedBefore.remove(id)
                 case .failure(let error):
                     if APIFailure.isCancellation(error) { return }
                     failed.insert(id)
-                    refused += 1
+                    failedBefore.insert(id)
+                    failures += 1
                     note(LibraryFollowWords.readFailed(id, String(describing: error)))
                 }
             }
             changed()
-            // every one of a batch refused: deadwax or the network is the matter - the next check reads on
-            if refused == batch.count { return }
+            // the failed ones are skipped and the reads go on - but only so far: past that, deadwax or the network is
+            // the matter, and the next check reads on (each album asked at most once a check, so nothing hammers)
+            if failures >= LibraryFollow.readFailuresPerRun {
+                note("library: \(failures) reads failed - the rest at the next check")
+                return
+            }
         }
     }
 
@@ -336,7 +403,10 @@ final class LibraryFollower {
             self.scope = scope
         }
         let began = ListenTracker.wallMs()
+        // set as it goes out, so a moment while it is out doesn't ask another; put back if it fails (below)
+        let beganBefore = lastBegan
         lastBegan = began
+        let token = believeToken
         checking = true
         defer { checking = false }
         let clock = ContinuousClock()
@@ -359,10 +429,18 @@ final class LibraryFollower {
                 answer = .unchanged
             }
             let out = LibraryFollow.sync(ordered, answer: answer, held: held, at: began, believing: believing)
-            let stillBelieving = believing && LibraryFollow.keepsBelieving(out, listed: answer != .unchanged)
-            // removed and not yet let go - an album back in the list is no longer among them
-            var nextRemoved = removed.union(out.removed)
-            nextRemoved.subtract(out.albums.map(\.id))
+            // the question's Remove answered while this was out: it stands, and the next list is asked afresh
+            let removeAnswered = believeToken != token
+            if removeAnswered { nextETag = nil }
+            let stillBelieving = removeAnswered
+                || (believing && LibraryFollow.keepsBelieving(out, listed: answer != .unchanged))
+            // removed and not yet let go - with the songs each was last read with; one back in the list no longer
+            var nextRemoved = removedSongIDs
+            for id in out.removed where nextRemoved[id] == nil {
+                let entry = ordered.first { $0.id == id }
+                nextRemoved[id] = ((entry?.songs ?? []).map(\.id) + (entry?.left.keys.sorted() ?? [])).sorted()
+            }
+            for album in out.albums { nextRemoved[album.id] = nil }
             let nextKept = keptThem && out.held != nil
             do {
                 try store.database.transaction {
@@ -372,7 +450,7 @@ final class LibraryFollower {
                     try store.database.setMeta(DownloadDatabase.libraryCheckedKey, String(began))
                     try store.database.setMeta(DownloadDatabase.libraryBelieveKey, stillBelieving ? "1" : nil)
                     try store.database.setMeta(DownloadDatabase.libraryHeldKeptKey, nextKept ? "1" : nil)
-                    try store.database.setMeta(DownloadDatabase.libraryRemovedKey, Self.joined(nextRemoved))
+                    try store.database.setMeta(DownloadDatabase.libraryRemovedKey, LibraryFollow.removedRaw(nextRemoved))
                 }
             } catch {
                 say("couldn't keep the library: \(error)")
@@ -382,7 +460,7 @@ final class LibraryFollower {
             held = out.held
             believing = stillBelieving
             keptThem = nextKept
-            removed = nextRemoved
+            removedSongIDs = nextRemoved
             lastAnswered = began
             lastError = nil
             fresh = true
@@ -398,6 +476,8 @@ final class LibraryFollower {
             }
             changed()
         } catch {
+            // a check that fails changes nothing - not even when the last began, so the next minute's timer is due
+            if lastBegan == began { lastBegan = beganBefore }
             guard mine == generation, !APIFailure.isCancellation(error) else { return }
             let record = LibraryCheckRecord(reason: reason, result: .failed(String(describing: error)), began: began,
                                             seconds: Self.seconds(clock.now - start))
@@ -444,7 +524,7 @@ final class LibraryFollower {
             held = LibraryFollow.Held(raw: try store.database.meta(DownloadDatabase.libraryHeldKey))
             believing = try store.database.meta(DownloadDatabase.libraryBelieveKey) == "1"
             keptThem = try store.database.meta(DownloadDatabase.libraryHeldKeptKey) == "1"
-            removed = Self.split(try store.database.meta(DownloadDatabase.libraryRemovedKey))
+            removedSongIDs = LibraryFollow.removed(raw: try store.database.meta(DownloadDatabase.libraryRemovedKey))
             lastAnswered = try store.database.meta(DownloadDatabase.libraryCheckedKey).flatMap { Int64($0) }
             firstRead = Self.firstRead(try store.database.meta(DownloadDatabase.libraryFirstReadKey))
             ordered = LibraryFollow.ordered(kept, scope: keptScope ?? .store, now: ListenTracker.wallMs())
@@ -470,7 +550,8 @@ final class LibraryFollower {
         held = nil
         keptThem = false
         believing = false
-        removed = []
+        removedSongIDs = [:]
+        failedBefore = []
         etag = nil
         lastCheck = nil
         lastError = nil
@@ -488,7 +569,7 @@ final class LibraryFollower {
 
     /// The first read's end: every listed album's songs read - its time kept (Debug's, R13).
     private func firstReadEnded() {
-        guard let began = firstReadBegan, LibraryFollow.toRead(ordered).isEmpty else { return }
+        guard let began = firstReadBegan, LibraryFollow.unread(ordered).isEmpty else { return }
         let seconds = Self.seconds(ContinuousClock.now - began)
         firstReadBegan = nil
         firstRead = (seconds, firstReadAlbums)
@@ -500,12 +581,6 @@ final class LibraryFollower {
         guard let parts = kept?.split(separator: " "), parts.count == 2, let seconds = Double(parts[0]),
               let albums = Int(parts[1]) else { return nil }
         return (seconds, albums)
-    }
-
-    private static func joined(_ ids: Set<String>) -> String? { ids.isEmpty ? nil : ids.sorted().joined(separator: "\n") }
-
-    private static func split(_ kept: String?) -> Set<String> {
-        Set((kept ?? "").split(separator: "\n").map(String.init))
     }
 
     /// A check every minute while the app is alive (in front, or playing): one is made when 15 minutes have passed

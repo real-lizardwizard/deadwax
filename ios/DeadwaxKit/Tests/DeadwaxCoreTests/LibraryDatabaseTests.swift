@@ -3,7 +3,7 @@ import Testing
 @testable import DeadwaxCore
 
 // The download store's version 4 (phase3-autodownload.md 5.1, its tests 7): your library as this phone follows it, in
-// the `library` table, on a temp file.
+// the `library` table, on a temp file - and version 5's `left_songs` (after the review).
 
 private func withFolder(_ body: (String) throws -> Void) throws {
     let folder = FileManager.default.temporaryDirectory.appendingPathComponent("deadwax-library-\(UUID().uuidString)", isDirectory: true)
@@ -136,7 +136,7 @@ private func followed(_ id: String, _ position: Int, songs: [FollowedSong]? = ni
                 #expect(throws: DownloadDatabase.Failure.self) { _ = try v3.library() }
             }
             let v4 = try DownloadDatabase(path: path)
-            #expect(try v4.userVersion() == 4)
+            #expect(try v4.userVersion() == DownloadDatabase.version)
             #expect(try v4.songs() == [song])
             #expect(try v4.origins() == ["a": [.album("al")]])
             #expect(try v4.albums().map(\.id) == ["al"])
@@ -146,6 +146,42 @@ private func followed(_ id: String, _ position: Int, songs: [FollowedSong]? = ni
             #expect(try v4.library().isEmpty)
             try v4.putLibrary([followed("x", 0)], replacing: [])
             #expect(try v4.library().map(\.id) == ["x"])
+        }
+    }
+
+    // MARK: version 5 (after the review): the songs a read found had left their album
+
+    @Test func theSongsFoundToHaveLeftAreKeptWithTheRow() throws {
+        try withDatabase { db in
+            var album = followed("a", 0, songs: songs, readAt: 10)
+            album.left = ["s3": 9, "s4": 10]
+            try db.putLibrary([album, followed("b", 1)], replacing: [])
+            #expect(try db.library() == [album, followed("b", 1)])
+            #expect(try db.library().last?.left.isEmpty == true)
+            // a read sets them with the songs, and a read that finds none left clears them
+            #expect(try db.setLibrarySongs(album: "b", songs: songs, left: ["s9": 40], at: 40))
+            #expect(try db.library().last?.left == ["s9": 40])
+            #expect(try db.setLibrarySongs(album: "b", songs: songs, at: 50))
+            #expect(try db.library().last?.left.isEmpty == true && db.library().last?.readAt == 50)
+        }
+    }
+
+    @Test func aVersionFourFileIsGivenTheLeftColumnEveryRowKept() throws {
+        try withFolder { folder in
+            let path = folder + "/v4.sqlite"
+            let album = followed("a", 0, songs: songs, readAt: 10, missingSince: 11, removedHere: 12, keptOff: 13)
+            do {
+                let v4 = try DownloadDatabase(path: path, upTo: 4)
+                #expect(try v4.userVersion() == 4)
+                try v4.execute("INSERT INTO library (album_id, position, entry, songs, read_at, missing_since, removed_here, kept_off) VALUES ('a', 0, '\(String(decoding: try JSONEncoder().encode(album.album), as: UTF8.self))', '\(String(decoding: try JSONEncoder().encode(songs), as: UTF8.self))', 10, 11, 12, 13)")
+                try v4.setMeta("library_etag", "\"e1\"")
+            }
+            let v5 = try DownloadDatabase(path: path)
+            #expect(try v5.userVersion() == 5)
+            #expect(try v5.library() == [album], "the row kept, nothing found to have left it")
+            #expect(try v5.meta("library_etag") == "\"e1\"")
+            #expect(try v5.setLibrarySongs(album: "a", songs: songs, left: ["s3": 20], at: 20))
+            #expect(try v5.library().first?.left == ["s3": 20])
         }
     }
 }

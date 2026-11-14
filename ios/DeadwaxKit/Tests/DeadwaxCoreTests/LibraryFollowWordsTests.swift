@@ -56,7 +56,7 @@ private let gb: Int64 = 1_000_000_000
         let none = LibraryFill.plan([], .init(limit: nil, freeSpace: 100 * gb))
         #expect(LibraryFollowWords.wouldFit(none, limit: .none) == "0 of 0 fit on this phone")
         let full = LibraryFill.plan([.init(id: "a", bytes: 5 * gb, here: gb), .init(id: "b", bytes: 1, keptOff: true)],
-                                    .init(limit: nil, freeSpace: 2 * gb))
+                                    .init(limit: nil, freeSpace: 1_500_000_000, deficitConfirmed: true))
         #expect(LibraryFollowWords.fitDetail(full) == "They take 0 MB \u{00B7} 1 wait for room on the phone \u{00B7} 1 kept off \u{00B7} 1 would give way")
     }
 

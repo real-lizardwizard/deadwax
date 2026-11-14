@@ -4147,3 +4147,142 @@ overnight fill and its time, a star and an unstar elsewhere, Add and Remove here
 on a full phone, Remove Download kept off, the first ask, Remove All, an empty list asked. Nor whether the phone's
 free-space reading agrees with Settings near the 2 GB floor, nor what a library of thousands costs the plan, which
 now builds the store's songs at every turn. Nothing drawn has been seen.
+
+## Phase 3, after the review of slices 1-2 (2026-11-13)
+
+The review of 481c736 and 5fa6cf4 found nothing that breaks the hard rules: only `[.library]` is ever taken, the
+empty, drop and truncated lists hold, two checks 10 minutes apart, the migration is safe, nothing crosses people. It
+found thirteen real problems in the fill, the planner and the edges. Each is fixed below, and each that can be is a
+Core rule with a test seen failing with the rule broken. The spec's 6.6 says what changed against its sections;
+docs/ios.md says it for James.
+
+### What was wrong, and the fix
+
+1. **An album's own cover pushed it out of the fill, in a loop (HIGH).** `bytesHere` counts every kept cover; the
+   fill counted the bytes here minus the library's songs as hand bytes. So an album that fit with less than its
+   cover to spare was asked for, its cover kept (keepAlbum), and then didn't fit. It was given way (audio deleted,
+   cover removed), fit again, and was asked again: a loop that deleted audio and asked deadwax for the album, cover,
+   level and loudness each time. Fix: `LibraryDownloads.inputs` counts an album that only the library wants with its
+   own cover, in what it takes and what it has here (`LibraryFill.albumAllowance`, 1 MB, until its answer is kept;
+   DownloadModel's `keptCoverBytes` from reload). An album with a hand song leaves its cover to the hand download.
+   And **hysteresis**: a new album fits only with `margin` spare (50 MB, or 1% of the limit if more); a held one
+   (`AlbumFacts.held`: a song of it asked or here under the library) keeps its place while it fits at all. **A
+   deliberate variant**: the review suggested a held album keep its place until the shortfall passes the margin
+   (over the limit). This puts the same band below the limit, so the limit is never exceeded.
+   `anAlbumAtTheEdgeIsNeverAskedAndGivenWayInALoop` runs the store turn after turn (a `Store` simulation: takes by
+   Phase 2's rule, covers written as keepAlbum writes them, a 3 MB cover - more than the allowance). Inside the
+   margin, the album is asked for once and never taken in six turns. With only 200 KB to spare it waits `room`
+   every turn, never asked.
+2. **The phone's budget evicted albums here while it had room (MEDIUM).** It credited the library's bytes here as
+   room, so a new star above albums here could push them out on one reading of the free space (2.5 GB free, b and c
+   here at 5 GB each, a 1 GB star above them: c went). Fix (LibraryFill.plan's second pass): new albums fit into
+   `free - handToCome - reserve`, less what the held albums have yet to receive (their claim first), with the
+   margin. Held albums are never judged against the phone. Only `deficit = reserve - (free - handToCome)`, when
+   positive, makes albums here give way: from the bottom, only until the deficit is freed, and only with
+   `deficitConfirmed` - two plans at least `deficitConfirmMs` (3 minutes) apart both saw a deficit
+   (`deficitSince`/`deficitConfirmed`, kept by DownloadModel on `ProcessInfo.systemUptime`, a plan asked for when it
+   can be confirmed). A plan without a deficit forgets it.
+3. **Hand downloads queued behind the library's tasks (MEDIUM).** Outs were kept and counted against the 100, so 100
+   library tasks out left a hand album none. Fix: `DownloadPlan.libraryMaxOut = 20`. Hand outs are counted first, as
+   Phase 2 counts them. The library's share is min(20, 100 - hand outs). Its outs beyond that, after the first in the
+   fill's order, are let go with their resume data kept.
+4. **A song "no longer on its album" went on one read, even an empty one (MEDIUM).** Fix: `LibraryFollow.read`
+   takes in an answer only if it has songs (nil otherwise: the album stays as it was, a failed read). It marks each
+   library song the answer hasn't got in `FollowedAlbum.left` with the first read without it (store version 5's
+   `left_songs`). `actions` takes `notOnAlbum` only for `leftAgreed`: a read 10 minutes or more after that mark
+   still without it. Until then the song is read on that album (`LibraryDownloads.songs` maps the left marks). One
+   back on the album loses its mark. The old test that expected the deletion on `songs: []` now expects agreed marks.
+5. **Bulk deletes without a confirmation (LOW-MEDIUM).** The switch off (and VoiceOver's action) now asks when
+   `switchOffLoses` finds anything here: "Remove the 412 albums downloaded with your library?", "They go from this
+   phone (12.4 GB). What you downloaded yourself stays.", Turn Off and Remove, Cancel. The switch stays on until the
+   answer. Didn't download's swipe on a library album keeps its behaviour (the failed songs go, the album is kept
+   off). When `keptOffLoses` > 0 it asks first ("Leave Dummy off this phone?" - "Its 9 songs already here go too"),
+   its button red without the destructive role, so a full swipe doesn't take the row before the answer
+   (`FailedRow`, split out of FailedSection, whose body the type checker gave up on).
+6. **Kept song lists were never refreshed (LOW-MEDIUM).** Fix: `toRead(now:refreshing:)` adds, after the unread and
+   the second reads due (`secondReadAt`), up to `refreshesPerCheck` (20) albums whose songs are `refreshAfterMs`
+   (7 days) old, the oldest first, within the four-at-a-time reads. An album page's fresh answer reads its album
+   again (`LibraryFollower.pageRead`, from DownloadModel.albumAnswered, before its guard). Songs that left go only by
+   fix 4's rule.
+7. **Remove on the question could be undone by a check in flight (LOW).** `keepsBelieving` keeps it on a 304 of a
+   held list, and `removeThem` bumps `believeToken`: a check out when Remove was answered keeps believing and drops
+   its ETag, so the next list is asked afresh.
+8. **Removing your last album here asked the empty-list question (LOW).** The empty list is held only while an album
+   not removed here is kept, and counts only those. This is a little stricter than the review's
+   `isListed && removedHere == nil`: a missing album removed here doesn't hold an empty list either.
+9. **A removed album's songs matched by album id only (LOW).** The follower keeps each removed album with the songs
+   it was last read with (and its left marks) - `removedSongIDs`, meta `library_removed` as JSON via
+   `LibraryFollow.removedRaw` / `removed(raw:)`, slice 2's lines still read. `actions` takes `removedSongs` by id,
+   but not a song read on an album still in the library (a retag that moved it).
+10. **Four unreadable albums stalled every later read (LOW).** Failed reads are skipped and the reads go on, up to
+   `readFailuresPerRun` (12) a run. An album fails at most once a check (`failed`). One that failed at an earlier
+   check is read after the rest (`retryLast`, the follower's `failedBefore`).
+11. **A hand download could go below the floor (LOW).** The planner credited the library's bytes the fill never
+   gives back. Fix: `LibraryFill.givable(albums)`, the bytes here of read or kept-off albums, is the one number: the
+   planner's `Facts.libraryHere` and the fill's fixed bytes (`bytesHere - givable`). And a hand unit taken on with
+   that credit, but short of the phone's room as it is, waits `phoneFull` with no task (still in `handToCome`, so the
+   fill makes room): a hand download never takes the phone under its reserve waiting for the library. So on a full
+   phone it waits the deficit's 3 minutes.
+12. **Phase 2's paths, run far more often by the library (LOW).** removeOrigins forgets kept albums only from a read
+   of the songs that answered (a failed read had read as no song left, deleting every kept answer, cover and
+   loudness). settle sweeps `DownloadRules.unnamedFiles`: song names (`StreamCache.isSongName`, never a part) in the
+   store's own music folder that no row names, only after a read of the rows that answered.
+13. **lastBegan and the wall clock (LOW / docs).** The notes said a failed check changes nothing, not even
+   `lastBegan`; the code set it before the fetch. Now it is set as the check goes out (a moment meanwhile doesn't
+   ask another) and put back when it fails. The 10-minute rules stay on the wall clock: a clock moved forward between
+   two checks could agree early. Noted (docs/ios.md), not built. The deficit's 3 minutes are on the uptime clock.
+
+### Core
+
+- **LibraryFill** rewritten: `AlbumFacts.toCome`/`held`, `Facts.deficitConfirmed`, `margin(limit:)`,
+  `albumAllowance`, `deficitConfirmMs`, `deficit`, `deficitSince`, `deficitConfirmed`, `givable`; `Plan.deficit`.
+  The two passes as above.
+- **LibraryDownloads**: `inputs(ordered, songs:, covers:)` -> `Inputs { albums, hand, givable }` (`fillInputs`
+  retired); `turn` from songs and covers, or from inputs, with `removedSongs` and `deficitConfirmed`; `actions` with
+  `removedSongs` and `leftAgreed`; `switchOffLoses`, `keptOffLoses`; `songs` reads left marks onto their album.
+- **DownloadPlan**: `libraryMaxOut`; `walk` returns the units `taken`; `handToCome` sums those; a credited unit short
+  of the phone's room waits `phoneFull`; the library's share of tasks out.
+- **LibraryFollow**: `FollowedAlbum.left`, `leftAgreed`, `secondReadAt`; `read`, `unread`,
+  `toRead(failed:retryLast:now:refreshing:)`; `refreshAfterMs`, `refreshesPerCheck`, `readFailuresPerRun`; the 304
+  in `keepsBelieving`; the empty list's count; `removedRaw`/`removed(raw:)`.
+- **DownloadDatabase** version 5: `left_songs`, read and written by `library()`, `putLibrary` and
+  `setLibrarySongs(album:songs:left:at:)`; `execute` internal for the migration test. **DownloadRules.unnamedFiles.**
+  **AutoDownloadWords**: `offTitle`, `offMessage`, `offAndRemove`, `keepOffTitle`, `keepOffMessage` (in `everyLine`).
+  **LibraryFollowWords**: Debug's `underReserve`, `leaving`.
+
+### The app
+
+DownloadModel: `keptCoverBytes`, the inputs built once per plan (their `givable` the planner's `libraryHere`), the
+deficit clock and its replan (`deficitConfirmed(_:)`, `libraryDeficitConfirmed` for Debug), `removedSongs` passed,
+`librarySongs(of:)` given to the follower, `pageRead` from `albumAnswered`, the guarded cleanup in removeOrigins, the
+sweep in settle, `switchOffLoses` and `keptOffLoses(album:)` for the confirmations. LibraryFollower: the removed map,
+the reads through `LibraryFollow.read`, failures skipped and capped, stale and second reads, `failedBefore`,
+`believeToken`, `lastBegan` put back, `pageRead`. DownloadsScreen: the switch's confirmation, `FailedRow` and its
+confirmation, `removable(asks:ask:)`. Debug: Leaving their albums, and the deficit under the fit line.
+
+### Tests
+
+Core 1160 (from 1136): **LibraryReviewTests** 22, one or more for each fix (the cover loop run turn after turn;
+a new star never pushing an album here out; the deficit only, and only once confirmed; its state machine; the
+planner's credit and the hand hold; a hand album's tasks with a hundred of the library's out; reads marking what left,
+a second read 10 minutes on agreeing, an empty read refused; the second read due; stale lists read a few a check,
+the oldest first; failures last; a 304 keeping Remove; the last album removed here; removed songs by id and not from
+an album still in the library; the removed map's codec; what the confirmations count and say; Debug's words; the
+sweep's names), **LibraryDatabaseTests** +2 (`left_songs` round trip; a version-4 file migrated, its row kept).
+Slice 2's tests changed where the rules did: the notOnAlbum cases take agreed marks, the phone's give-way takes a
+confirmed deficit (and a once-seen case gives nothing), the credited hand unit waits `phoneFull`, 50 hand songs with
+120 of the library's make 50 + 20 tasks, the fit lines leave the margin.
+
+**Mutations, 36, each caught by a failing test, none by a build error** (scratchpad mutate_review.py, every file
+restored byte for byte, sha-256 checked): a new album needing no margin; a held one needing it too; an album's cover counted as the hand downloads'; no cover in an album's need; a held album judged against the phone like a new one; the held albums' claim not first; new albums fitting without the hand downloads to come; the deficit giving way unconfirmed; everything here giving way rather than the deficit; a plan without the deficit not forgetting it; no library cap on tasks out; every library task out kept; library outs counted against the hand's; not on its album on one read; an empty read taken in; agreed at the first read; the first read's time not kept; a left song read on its record's album; stale lists read again uncapped; stale lists newest first; the second read before it is due; an album that failed before read first; a 304 of the held list ending believing; the empty check counting albums removed here; the removed albums' songs ignored; taken by id from an album still in the library; slice 2's removed lines not read; givable counting an album being read again; a credited hand unit's tasks made at once; handToCome counting units not taken on; any file no row names swept; named files swept; turning off counting songs wanted by hand; keeping off counting them; `left_songs` not written; a read's left marks not written.
+
+### Verified, and not
+
+Verified (2026-11-13, this Mac, Xcode's toolchain): `swift test` - Core 1160, DeadwaxAudio 158, DeadwaxTurntable
+11, all pass; the mutations; the unsigned Release device build with no warnings; check_project.py with the .xcodeproj
+unchanged; `pytest tests/test_ios_*.py tests/test_source_bytes.py`; the ios sims on Node 22. Not run: Core on Linux.
+
+Not verified: anything on a phone, and the App-side wiring that has no Core test: the deficit's replan firing 3
+minutes on, the sweep at settle, the guarded cleanup, `pageRead` from an album page, the failure cap and the
+`retryLast` order in the run, `believeToken` with a check really in flight, `lastBegan` put back. Nor are the two
+confirmations, as drawn and spoken: a full swipe on a row that asks should spring back while the question shows.

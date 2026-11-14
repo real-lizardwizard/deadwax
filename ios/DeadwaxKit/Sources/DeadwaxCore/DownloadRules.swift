@@ -247,6 +247,15 @@ public enum DownloadRules {
         return (kept, deleted.sorted())
     }
 
+    /// (Phase 3, after the review) The files of the store's music folder no song row names - audio a crash left between
+    /// a row's delete and its file's (removeOrigins deletes the row first): swept as the store settles. Only names the
+    /// store itself gives a song (`<id>.<suffix>`, LocalFiles' rule) - never a part (the settle's own rule has those),
+    /// nor anything else. `named`: every row's file name, from a read of the database that succeeded - with none, the
+    /// caller sweeps nothing.
+    public static func unnamedFiles(_ fileNames: [String], named: Set<String>) -> [String] {
+        fileNames.filter { StreamCache.isSongName($0) && !named.contains($0) }.sorted()
+    }
+
     // MARK: offline
 
     /// Whether a song plays while deadwax can't be reached: only from the phone.
