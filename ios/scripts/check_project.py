@@ -34,8 +34,8 @@ from pathlib import Path
 IOS = Path(__file__).resolve().parent.parent
 PROJECT = IOS / "Deadwax.xcodeproj"
 BUNDLE_ID = "net.lizardlounge.deadwax"
-MARKETING_VERSION = "0.9"
-BUILD = "9"
+MARKETING_VERSION = "0.10"
+BUILD = "10"
 DEPLOYMENT_TARGET = "17.0"
 BACKGROUND_MODES = ["audio", "fetch", "processing"]
 IGNORED_BESIDE_LOCAL = ("NSAllowsLocalNetworking", "NSAllowsArbitraryLoadsForMedia", "NSAllowsArbitraryLoadsInWebContent")

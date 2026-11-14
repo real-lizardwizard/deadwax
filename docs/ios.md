@@ -1,4 +1,4 @@
-# The iPhone app (early: app 0.9, downloads, lyrics, the EQ, the turntable, play history and your library)
+# The iPhone app (early: app 0.10, downloads, lyrics, the EQ, the turntable, play history, your library and the Library)
 
 deadwax is getting a native iPhone app, built with SwiftUI and its own audio engine, for what a web
 page can't do well: seamless joins and normalization done on the phone, downloads to play offline,
@@ -20,23 +20,25 @@ deck's does - and at 1x the song exactly as it is (see [The speed](#the-speed)).
 history: scroll up in Up Next, past the song playing, and it goes on back through every song you've
 played - on the phone and in the web app, one list, as the web app's Up Next has it - and the phone's
 own plays go into the web app's too (see [Up Next](#up-next) and [What you've
-played](#what-youve-played)). **This is app 0.9, which adds your library downloaded by itself**, as
-much as fits your storage limit, kept in step with what you star and unstar anywhere - only while the
-phone is charging if you choose, and with the app in the background when iOS allows (see [Your library
-on this phone](#your-library-on-this-phone)). Phase 4 has begun with **playlists**: yours and those
-shared with you, in the Library, played as the web app plays them, and made, added to, edited and
-deleted on the phone as in the web app, and downloaded to play with no connection, kept in step as they
-change (see [Playlists](#playlists)); with the Library's switch - Albums | Playlists | Artists, swiped
-between, in the order you choose - and a pull down that shuffles your whole library (see [The
-Library](#the-library)); and with **artists**: your artists, and an artist's page with their albums, Play
-and Shuffle (see [Artists](#artists)). Songs, Search and the rest come next (see [What it can't do
+played](#what-youve-played)). App 0.9 added your library downloaded by itself, as much as fits your
+storage limit, kept in step with what you star and unstar anywhere - only while the phone is charging if
+you choose, and with the app in the background when iOS allows (see [Your library on this
+phone](#your-library-on-this-phone)). **This is app 0.10, Phase 4's Library**: **playlists** - yours and
+those shared with you, played as the web app plays them, and made, added to, edited and deleted on the
+phone as in the web app, and downloaded to play with no connection, kept in step as they change (see
+[Playlists](#playlists)); the Library's switch - Albums | Playlists | Artists, and Songs with logins off
+(with them on, every song is under All music > All songs), swiped between, in the order you choose - and
+a pull down that shuffles your whole library (see [The
+Library](#the-library)); **artists** - your artists, and an artist's page with their albums, Play and
+Shuffle (see [Artists](#artists)); and **songs** - every song, a page at a time, each opening its album
+(see [Songs](#songs)). Search, Get and the rest come next (see [What it can't do
 yet](#what-it-cant-do-yet)).
 
 **Nothing of Phase 2, the lyrics, the EQ, the turntable, play history, your library downloaded,
-playlists or artists has been seen on an iPhone yet.** It's built and tested on a Mac, and what only a
-phone can tell is what [the checks](#the-checks) are for. Until they're answered, read everything about
-downloads, lyrics, the EQ, the turntable, play history, your library, playlists and artists below as what
-the app is built to do.
+playlists, artists or songs has been seen on an iPhone yet.** It's built and tested on a Mac, and what
+only a phone can tell is what [the checks](#the-checks) are for. Until they're answered, read everything
+about downloads, lyrics, the EQ, the turntable, play history, your library, playlists, artists and songs
+below as what the app is built to do.
 
 The app talks only to deadwax, never to Navidrome, through deadwax's own routes, so the phone never
 needs the Navidrome account deadwax itself uses. With logins on, you sign in with your own Navidrome
@@ -141,7 +143,7 @@ old one. It also uses up one of the few new app ids a free account may register 
 It pulls the latest code, asks GitHub whether the app's checks passed on it (and asks you before
 building one that failed or is still running), builds it (Release), and installs it **over** the app
 on the phone, so everything on the phone stays. Then it opens the app and says how long the new
-install runs: `Installed deadwax 0.9 (9), runs until Wed 18 Nov, 14:02`. It also says how long it
+install runs: `Installed deadwax 0.10 (10), runs until Wed 18 Nov, 14:02`. It also says how long it
 took and the Mac's free space before and after. Xcode doesn't need to be open.
 
 | option | what it does |
@@ -187,33 +189,39 @@ and every screen scrolls far enough for its last row to come up above it.
 
 ## The Library
 
-The Library opens on its pages, side by side: **Albums**, **Playlists** and **Artists** (Songs joins them
-later in Phase 4). The switch at the top - Albums | Playlists | Artists - picks one, or swipe left and
-right between them, the switch moving with you. The Library opens on the first page each time the app
+The Library opens on its pages, side by side: **Albums**, **Playlists**, **Artists** and - without a
+library of your own - **Songs**. The switch at the top - Albums | Playlists | Artists, and Songs where it's a
+page - picks one,
+or swipe left and right between them, the switch moving with you. The Library opens on the first page each time the app
 starts, and when someone else signs in; after that it stays on the page you left it on. Tap the Library
 tab while you're on it, and the page goes back to its top. Nothing sits above the albums but their count.
 
 With logins on, **Albums** is **Your albums**: the albums in your library, as the web app's Library has them
 ([sharing deadwax](sharing.md) says how an album gets there), and ••• > **All music** > **All albums** is
 the whole collection's. With logins off, and for the break-glass `deadwax` sign-in, Albums is the whole
-collection. **Playlists** is your playlists (see [Playlists](#playlists)), and **Artists** the artists of
-your albums (see [Artists](#artists)).
+collection. **Playlists** is your playlists (see [Playlists](#playlists)), **Artists** the artists of
+your albums (see [Artists](#artists)), and **Songs**, with logins off and for the break-glass sign-in, every
+song in the collection (see [Songs](#songs)). With logins on there's no Songs page: Navidrome can't list
+your library's songs alone, so every song is the collection's, under ••• > **All music** > **All songs**.
 
 **The •••** at the top right (VoiceOver reads it "More for the Library"):
 
 - **Shuffle**: your whole library, shuffled - see [Shuffling your library](#shuffling-your-library). Until
   it's ready it reads "Getting ready…", dimmed.
 - **The page's own**: on Albums, **Album order** (showing the one chosen - below) and **Show as list**
-  (or **Show as grid**); on Artists, **Artist order**. Playlists has none.
+  (or **Show as grid**); on Artists, **Artist order**. Playlists and Songs have none.
 - **Downloaded**: what's on this phone (below).
-- **All music**, with a library of your own: **All albums** and **All artists**, the whole collection's.
-- **Refresh**: your albums, your playlists and the artists asked for again now.
+- **All music**, with a library of your own: **All albums**, **All artists** and **All songs**, the whole
+  collection's.
+- **Refresh**: your albums, your playlists and the artists asked for again now - and the Songs page, once
+  you've opened it, from its top.
 - **Edit order**: the pages as rows - drag them by their handles into the order you want, and **Done**. The
   Library opens on the first, and this phone remembers the order. A page that's new since you last
-  arranged them (Artists, for an order arranged before it came) joins at the end.
+  arranged them (Artists and Songs, for an order arranged before they came) joins at the end. With logins
+  on, Songs isn't a page, so it isn't listed, and keeps its place for a sign-in without a library.
 
 Beside the ••• is Playlists' **+**, for [New playlist](#playlists), on that page. The orders and Grid or
-list moved into the ••• when Artists joined, so three pages - four, with Songs - fit beside it.
+list moved into the ••• when Artists joined, so the four pages fit beside it.
 
 On the Albums page:
 
@@ -251,7 +259,7 @@ becomes a purple disc, and it says "Release to shuffle" - let go then, and your 
 ("Shuffling"). Push back up a little before you let go and it's the ring again (pull down again for
 another tick); let go before the line and nothing plays. A pull never refreshes the Library now: it asks
 for itself as it comes into view, and ••• > Refresh asks now. The lists opened from the ••• - All albums,
-All artists, Downloaded, Downloaded playlists - still refresh when pulled.
+All artists, All songs, Downloaded, Downloaded playlists - still refresh when pulled.
 
 It's deadwax's shuffle, the web app's Library > Shuffle: every song of your library (of the collection,
 without a library of your own) once, in an order deadwax makes, played from the first. Its first 200
@@ -579,6 +587,38 @@ opened since the app started shows their albums as it last had them - any other,
 with the albums not on the phone dimmed, and Play and Shuffle playing only the songs here ("Only
 downloaded albums play until deadwax is back.").
 
+## Songs
+
+**Songs** is every song in the collection, as the web app's Library > Songs has it: in Navidrome's order,
+100 at a time, the next 100 fetched as you scroll near the end of them. With logins off, and for the
+break-glass `deadwax` sign-in, it's the switch's fourth page. With logins on, Navidrome can't list the songs
+of your library alone, so they're the collection's: ••• > **All music** > **All songs**, beside All albums
+and All artists, rather than a page among your own albums and artists.
+
+- **A row** is the song's cover, its title, and its artist and album ("Portishead · Dummy"). **Tap it** to
+  open its album's page, and play it from there - nothing plays from the list but the pull and Shuffle. Its
+  **•••** is the song's own menu, as on an album's page: Play Next, Play Last, Add to a playlist…, and
+  Download.
+- **Find**, under the switch (or All songs' own), asks Navidrome for the songs that match what you type -
+  by title, artist or album, as Navidrome's own search matches them - a moment after you stop typing. The
+  songs come 100 at a time, so the phone can't look through the ones it hasn't fetched; Find here is
+  Navidrome's search, not the other pages' filter. Nothing found says "No songs match “…”."
+- **The count**, "12480 songs" at the top, shows once every song has been fetched, as the web app's does.
+- **All songs' Shuffle**, at its top: every song of the collection once, in an order deadwax makes, played
+  as the Library's Shuffle plays your library (see [Shuffling your library](#shuffling-your-library)) -
+  its first songs fetched as All songs opens, so it plays the moment you tap. Until then it reads "Getting
+  ready…", dimmed; if deadwax couldn't get them ready, it stays dimmed with why under it ("Couldn't get your
+  songs ready to shuffle"), and tries again the next time All songs opens. The Library's own Shuffle still
+  shuffles only your library. On the Songs page (logins off) the ••• Shuffle and the pull shuffle the
+  collection, as on the other pages.
+- The songs are fetched the first time Songs opens, and kept while the app runs, with your place in them.
+  ••• > Refresh (the Songs page) or a pull (All songs) fetches them again from the top. If the next 100
+  can't be fetched, the songs so far stay, with why and **Try again** under them; if a refresh can't be,
+  "Couldn't update this list - showing it as it was." With no songs at all: "No songs yet."
+- **Offline**, the songs already fetched stay, the ones not on this phone dimmed (they open nothing), and no
+  more are fetched until deadwax is back - then the next 100 come, if you had got near the end. With none
+  fetched yet: "Songs show here once deadwax is back."
+
 ## Playing
 
 **The mini player**, above the tabs: the cover, the song and its artist, play/pause and next, and a
@@ -899,7 +939,7 @@ album.
   If deadwax can't be reached, it says "Couldn't reach deadwax, so you're still signed in - try
   again." Changing your password is the web app's, for now.
 - **About**: deadwax's version, whether logins are on (for an admin), and the app's own version,
-  **0.9 (9)**.
+  **0.10 (10)**.
 - **This phone**: deadwax's address, **Change address**, and **Debug**, for an admin (with logins
   off, everyone is one).
 
@@ -1621,6 +1661,8 @@ answering, **Try again**. It goes by itself once deadwax answers.
 - **An album's page** shows what's on the phone, dims the rest, and Play and Shuffle play only the
   songs here. An album with nothing here says "This album isn't on this phone - it plays once deadwax
   is back."
+- **Songs**: the songs already fetched stay, the ones not on the phone dimmed, and no more are fetched (see
+  [Songs](#songs)).
 - **Playlists**: one with a song on the phone, among the last eight you opened since the app started,
   opens with the songs not on the phone dimmed; the others are dimmed and open nothing. None is made or
   changed: Add to a playlist… is left out of the ••• menus, and New playlist and Edit are dimmed (see
@@ -2444,14 +2486,57 @@ order and Grid or list are in the Library's •••, and All music is a submen
   albums"; an album row on their page "Dummy, 1994 · in your library"; the ••• has Album order and Show as
   list on Albums, Artist order on Artists.
 
+### Songs' checks (112-120)
+
+**Not done yet.** These come with the build that adds Songs and All songs' Shuffle - **app 0.10 (10)**,
+the end of Phase 4. Check 113 on wants a few hundred songs or more; 117 wants logins off, or the
+break-glass `deadwax` sign-in.
+
+- **112 The version.** install.sh says "Installed deadwax 0.10 (10), runs until …", and You > About reads
+  0.10 (10). The Library opens as before: the order you'd arranged, the page you were on.
+- **113 All songs.** With logins on, the switch is still Albums | Playlists | Artists, and Edit order lists
+  those three. ••• > All music: All albums, All artists, All songs. All songs: every song, each with its
+  cover, title and "artist · album", in the web app's Library > All songs order. Scroll a long way, fast:
+  more songs come before you reach the end, never stopping at 100 or 200. At the very end, "12480 songs"
+  (your count) at the top - the web app's number.
+- **114 A row.** Tap a song: its album's page. Back: All songs where you left it, nothing fetched again.
+  A song's •••: Play Next - Up Next has it next; Play Last; Add to a playlist… adds it; Download downloads
+  it. Does the music start from Play Next with nothing playing?
+- **115 Find.** On All songs, type "roads": the songs Navidrome finds for it, by title, artist or album -
+  songs further down the list than you've scrolled among them. Type a word quickly: one list, not one a
+  letter. Clear Find: every song again, from the top - a spinner first, never "No songs yet.". Nonsense:
+  "No songs match “…”."; type on from it: the line keeps naming what was searched until the new words are.
+- **116 All songs' Shuffle.** Open All songs: Shuffle at its top ("Getting ready…" for a moment the first
+  time). Tap it: the collection shuffled - songs of albums not in your library among them - starting the
+  moment you tap. Press Next 160 times or so: it keeps going past 200. Then ••• > Shuffle on the Library:
+  only your library's songs. Pull down on All songs: it refreshes, no shuffle - the spinner staying until
+  the songs are back.
+- **117 Songs as a page** (logins off, or the break-glass `deadwax`). The switch reads Albums | Playlists |
+  Artists | Songs - Songs at the end of an order you'd arranged before. Swipe to Songs: every song. Pull
+  down: the collection shuffles, as on the other pages. The ••• has no order or layout on Songs; Refresh
+  fetches it again from the top. Edit order lists four: drag Songs first, Done, force-quit and open - the
+  Library opens on Songs. Sign in with logins on again: no Songs page, the others in your order, and the
+  Library on the first of them.
+- **118 Find on the Songs page.** Type part of a title: Navidrome's songs for it; switch to Albums and back:
+  each page keeps its own words, and Songs' list is still the found one.
+- **119 Offline.** With All songs scrolled some way, turn on Airplane Mode: the songs stay, those not
+  downloaded dimmed (a tap does nothing); scrolling to the end fetches no more and shows no spinner.
+  Shuffle reads "Shuffle downloads" and plays only songs on the phone. The Library's ••• has no All
+  music offline, so for the empty page use logins off (117's): force-quit, open in Airplane Mode and
+  swipe to Songs - "Songs show here once deadwax is back." And at the very end of what All songs has
+  fetched, turn on Airplane Mode, wait, and turn it off without scrolling: more songs come.
+- **120 VoiceOver.** A row reads "Roads, Portishead · Dummy, opens its album" (a song with no album, its
+  title and line alone), its ••• "More for Roads", and a dimmed one adds "Not on this phone". All songs'
+  Shuffle reads "Shuffle". With logins off the switch reads Albums, Playlists, Artists and Songs.
+
 ## What it can't do yet
 
 These are the web app's for now. Most of them come to the phone in the next phases:
 
 - **The visualizer**: it stays the web app's, on a desktop.
 
-- A **songs list**, and on an artist's page their **discography** from MusicBrainz, the **description**
-  and the artist's managing (pictures, names).
+- On an artist's page their **discography** from MusicBrainz, the **description** and the artist's
+  managing (pictures, names).
 - **Search**, **Get** and **Requests**.
 - **Home** and **pins**.
 - **Looking after deadwax**: People, Server settings, the event log, Needs a look, Library care, the

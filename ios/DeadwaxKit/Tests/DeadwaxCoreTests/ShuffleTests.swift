@@ -4,7 +4,8 @@ import Testing
 
 /// The Library's Shuffle (phase4-library.md 2.7, 2.8): its first page asked ahead (ShuffleSongs.tsx's rules), the feed
 /// that brings in the rest (useShuffleFeed.ts's - driven as ui/test/shuffle.sim.cjs drives the hook), the two answers,
-/// the two calls, and the offline shuffle of what's on the phone. Held by hand until slice 5's exporter (question 24).
+/// the two calls, and the offline shuffle of what's on the phone. Since slice 5 the feed is also held to the web's by
+/// ShuffleVectorTests (question 24).
 @Suite struct ShuffleTests {
     private static func song(_ n: Int) -> Song {
         Song(id: "s\(n)", title: "Song \(n)", album: "Album \(n % 7)", albumId: "al\(n % 7)", artist: "Artist", duration: 200,
@@ -64,8 +65,15 @@ import Testing
         #expect(Self.ids(ShuffleFeed.startingElsewhere(three, ending: "s9")) == ["s1", "s2", "s3"])
         #expect(Self.ids(ShuffleFeed.startingElsewhere([three[0]], ending: "s1")) == ["s1"])
         #expect(Self.ids(ShuffleFeed.startingElsewhere(three, ending: "s1", random: { () -> Double in 0.99 })) == ["s3", "s2", "s1"])
-        #expect(Self.ids(ShuffleFeed.startingElsewhere(three, ending: "s1", random: { () -> Double in 1 })) == ["s3", "s2", "s1"],
-                "a random of 1 stays in range")
+        #expect(Self.ids(ShuffleFeed.startingElsewhere(three, ending: "s1", random: { () -> Double in 1 })) == ["s1", "s2", "s3"],
+                "a random of 1 swaps nothing - the web's pick out of range, undefined (slice 5's vectors)")
+        var draws = 0
+        let counted = { () -> Double in
+            draws += 1
+            return 0
+        }
+        _ = ShuffleFeed.startingElsewhere([three[0], three[0]], ending: "s1", random: counted)
+        #expect(draws == 1, "drawn with nothing else to start with, as the web draws")
         #expect(Self.ids(ShuffleFeed.startingElsewhere(three, ending: nil)) == ["s1", "s2", "s3"])
         let same = [three[0], three[0]]
         #expect(Self.ids(ShuffleFeed.startingElsewhere(same, ending: "s1")) == ["s1", "s1"], "nothing else to start with")
@@ -297,13 +305,24 @@ import Testing
         let answer = ShuffleStart(token: "t2", total: 450, songs: Array(Self.order.prefix(200)))
         let landed = feed.fresh(round, answer, repeat: .off)
         #expect(landed == .nothing, "its answer, landing anyway: dropped")
-        // landing before the look has caught up: dropped unless Repeat is All now
-        var racing = ShuffleFeedRun()
-        guard let raced = racing.look(whole, repeat: .all) else { return }
-        let early = racing.fresh(raced, answer, repeat: .one)
-        #expect(early == .nothing)
-        let again = racing.look(whole, repeat: .all)
-        #expect(again?.kind == .fresh(startedOver: false), "Repeat All again: asked afresh")
+        // landing before the look has caught up: dropped unless Repeat is All now - Off or One
+        for mode in [Repeat.off, Repeat.one] {
+            var racing = ShuffleFeedRun()
+            guard let raced = racing.look(whole, repeat: .all) else { return }
+            let early = racing.fresh(raced, answer, repeat: mode)
+            #expect(early == .nothing, "Repeat \(mode)")
+            let again = racing.look(whole, repeat: .all)
+            #expect(again?.kind == .fresh(startedOver: false), "Repeat All again: asked afresh")
+        }
+        // ...and under All, the next round
+        var still = ShuffleFeedRun()
+        guard let kept = still.look(whole, repeat: .all) else { return }
+        let next = still.fresh(kept, answer, repeat: .all, random: { () -> Double in 0 })
+        guard case .extend(_, let tracks, _, let notice) = next else {
+            Issue.record("the next round: \(next)")
+            return
+        }
+        #expect(tracks.count == 200 && notice == nil)
     }
 
     // MARK: the first page, asked ahead (ShuffleSongs.tsx)

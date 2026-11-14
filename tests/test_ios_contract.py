@@ -1105,7 +1105,8 @@ def test_the_shuffle_answers_are_what_the_app_decodes(monkeypatch):
 
 
 def test_the_shuffles_numbers_and_words_are_the_webs():
-    # held by hand until slice 5's exporter (question 24): each read here from the web's own source
+    # each read here from the web's own source - and since slice 5 (question 24) the feed's behaviour is held too, by
+    # ios/scripts/export-shuffle-vectors.cjs, which drives useShuffleFeed.ts itself (ShuffleVectorTests)
     assert swift_struct_constant("Shuffle.swift", "ShuffleAhead", "freshSeconds") * 1000 \
         == web_constant("ShuffleSongs.tsx", "SHUFFLE_FRESH_MS")
     assert swift_struct_constant("Shuffle.swift", "ShuffleAhead", "freshSeconds") == navidrome.SHUFFLE_LIST_TTL_S
