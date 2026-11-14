@@ -87,6 +87,35 @@ import Testing
         #expect(events.isEmpty && pull.phase == .idle)
     }
 
+    @Test func aTouchTheSystemTookNeverShuffles() {
+        var pull = PullShuffle()
+        let armed = drive(&pull, [40, 120])
+        #expect(armed == [.armed])
+        pull.interrupted()
+        #expect(pull.phase == .idle && !pull.shown, "a call or Siri over an armed pull: nothing drawn")
+        let lifted = pull.lifted(ready: true)
+        #expect(lifted == nil, "and the finger's going shuffles nothing")
+        // pulling, interrupted: the same
+        var half = PullShuffle()
+        _ = drive(&half, [60])
+        half.interrupted()
+        #expect(half.phase == .idle)
+        // released already: the shuffle has started, and stays so until the page is at rest
+        var done = PullShuffle()
+        _ = drive(&done, [120])
+        let started = done.lifted(ready: true)
+        #expect(started == .shuffle)
+        done.interrupted()
+        #expect(done.phase == .released)
+        // after it, a pull from rest starts afresh
+        var again = PullShuffle()
+        _ = drive(&again, [120])
+        again.interrupted()
+        let rest = drive(&again, [0])
+        let afresh = drive(&again, [30, 115])
+        #expect(rest.isEmpty && afresh == [.armed])
+    }
+
     @Test func aBounceNoFingerMadeNeverPulls() {
         var pull = PullShuffle()
         var events = drive(&pull, [20, 140, 60], touching: false)

@@ -13,8 +13,15 @@ extension Palette {
     /// --dw-primary-bg: #a24ef2 to #8a2ee0, top to bottom.
     static let primaryFill = LinearGradient(colors: [colour(PrimaryButton.top), colour(PrimaryButton.bottom)],
                                             startPoint: .top, endPoint: .bottom)
+    /// The same while pressed: darkened by brightness(0.92), as the web's filter does - the fill alone, so the label
+    /// stays white (slice 3b's review; PrimaryButton.pressed).
+    static let primaryFillPressed = LinearGradient(colors: [colour(PrimaryButton.pressedTop),
+                                                            colour(PrimaryButton.pressedBottom)],
+                                                   startPoint: .top, endPoint: .bottom)
     /// --dw-primary-border #7c3aed.
     static let primaryEdge = colour(PrimaryButton.edge)
+    /// The edge while pressed, darkened with the fill.
+    static let primaryEdgePressed = colour(PrimaryButton.pressedEdge)
     /// --dw-primary-highlight: white at 0.22, a 1 pt line inside the top edge.
     static let primaryHighlight = colour(PrimaryButton.highlight)
     /// --dw-text: the primary's label and glyph.
@@ -24,8 +31,9 @@ extension Palette {
 }
 
 /// The primary button: one main action - an album's and a playlist's Play (`large`, the web's 48 pt pill), Add to my
-/// library, Use for, Create, Sign in, Try again, Set up Navidrome, Turn On. Darkened while pressed (brightness 0.92, the
-/// web's filter), faded to Palette.off while it can't be used.
+/// library, Use for, Create, Sign in, Try again, Set up Navidrome, Turn On. Its fill and edge darkened while pressed
+/// (brightness 0.92, the web's filter) and its label left white - the web's filter darkens the label too, under AA at
+/// its top; faded to Palette.off while it can't be used.
 struct PrimaryFace: ButtonStyle {
     var large = false
 
@@ -35,8 +43,9 @@ struct PrimaryFace: ButtonStyle {
 }
 
 /// The secondary pill (.pl-pill): the action beside a primary one - an album's and a playlist's Shuffle, Not Now, Cancel,
-/// Change address - so the pair is one shape. The look button's face (--dw-secondary-bg), lightening as pressed
-/// (--dw-secondary-bg-active, the same gradient reversed).
+/// Change address - so the pair is one shape. The look button's face (--dw-secondary-bg), its gradient turned over
+/// while pressed - lit from below, as if pressed in (--dw-secondary-bg-active, .pl-pill:active): neither lighter nor
+/// darker, as the web's isn't.
 struct SecondaryPill: ButtonStyle {
     var large = false
 
@@ -56,6 +65,11 @@ private struct ButtonFace: View {
     private static let height: CGFloat = 36
     private static let hairline: CGFloat = 1
 
+    private func edge(_ pressed: Bool) -> Color {
+        guard primary else { return Palette.secondaryEdge }
+        return pressed ? Palette.primaryEdgePressed : Palette.primaryEdge
+    }
+
     var body: some View {
         let radius = CGFloat(PrimaryButton.radius)
         let shape = RoundedRectangle(cornerRadius: radius)
@@ -69,7 +83,7 @@ private struct ButtonFace: View {
             .frame(minHeight: large ? CGFloat(PrimaryButton.largeHeight) : Self.height)
             .background {
                 if primary {
-                    shape.fill(Palette.primaryFill)
+                    shape.fill(pressed ? Palette.primaryFillPressed : Palette.primaryFill)
                 } else {
                     shape.fill(pressed ? Palette.secondaryFillPressed : Palette.secondaryFill)
                 }
@@ -80,9 +94,7 @@ private struct ButtonFace: View {
                     .stroke(primary ? Palette.primaryHighlight : Palette.highlight, lineWidth: Self.hairline)
                     .mask(alignment: .top) { Rectangle().frame(height: radius) }
             }
-            .overlay(shape.strokeBorder(primary ? Palette.primaryEdge : Palette.secondaryEdge, lineWidth: Self.hairline))
-            // brightness(0.92) over the whole button, the primary's press (--dw-primary-pressed)
-            .colorMultiply(primary && pressed ? Color(white: PrimaryButton.pressed) : .white)
+            .overlay(shape.strokeBorder(edge(pressed), lineWidth: Self.hairline))
             .opacity(isEnabled ? 1 : Palette.off)
             .contentShape(shape)
     }

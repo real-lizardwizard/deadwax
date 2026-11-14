@@ -4,8 +4,10 @@ James: "the color of the play button on the album page doesn't show the play ico
 SwiftUI's `.borderedProminent` under the app's tint (#C084FC, the web's accent for text on black) and a white glyph -
 2.64:1. It now draws the web's primary button, as player.css's `.pl-pill.is-primary` and app.css's primary buttons do:
 theme.css's --dw-primary-bg gradient, --dw-primary-border edge, --dw-primary-highlight line, a --dw-text label, 4 pt
-corners (--dw-radius-control), brightness(0.92) while pressed (--dw-primary-pressed), and the album's and playlist's
-pills 48 pt tall (--pl-pill-height). PrimaryButton (ios/DeadwaxKit/Sources/DeadwaxCore/PrimaryButton.swift) holds those
+corners (--dw-radius-control), and the album's and playlist's pills 48 pt tall (--pl-pill-height). Pressed, its fill
+and edge are darkened by brightness(0.92) (--dw-primary-pressed) and its label left white - the web's filter darkens the
+label too, under AA at its top (slice 3b's review) - and the secondary pill beside it turns its gradient over
+(--dw-secondary-bg-active), as the web's .pl-pill does. PrimaryButton (ios/DeadwaxKit/Sources/DeadwaxCore/PrimaryButton.swift) holds those
 numbers for the app's PrimaryFace; this reads both sides, so a change on either fails here. (The deck's tokens.json
 holds the turntable's colours; the primary's are held here instead, so the deck's fixtures need no regenerating.)
 The contrast its label was measured with is PrimaryButtonTests' (Swift), from these same numbers.
@@ -106,12 +108,39 @@ def test_the_players_primary_pill_is_drawn_from_these_tokens():
 
 
 def test_no_button_in_the_app_is_drawn_with_the_tint():
-    # every `.borderedProminent` took the primary face (2.8): one left would be the tint under a white label again
+    # every `.borderedProminent` took the primary face (2.8): one left would be the tint under a white label again -
+    # however it is spelled (slice 3b's review): `.buttonStyle(.borderedProminent)`, `BorderedProminentButtonStyle()`,
+    # a style chosen by a ternary, anywhere in the app's code (its comments may name it)
     app = REPO / "ios" / "App"
-    left = [str(path.relative_to(app)) for path in sorted(app.rglob("*.swift"))
-            if ".buttonStyle(.borderedProminent)" in path.read_text(encoding="utf-8")]
+    tint = re.compile(r"\bborderedProminent\b|\bBorderedProminentButtonStyle\b")
+    left = [f"{path.relative_to(app)}:{number}" for path in sorted(app.rglob("*.swift"))
+            for number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1)
+            if tint.search(line.split("//", 1)[0])]
     assert not left, left
     faces = REPO / "ios" / "App" / "Shared" / "ButtonFaces.swift"
     text = faces.read_text(encoding="utf-8")
-    for name in ("top", "bottom", "edge", "highlight", "label", "pressed", "radius", "largeHeight"):
-        assert f"PrimaryButton.{name}" in text, f"the app's face doesn't draw PrimaryButton.{name}"
+    for name in ("top", "bottom", "edge", "highlight", "label", "pressedTop", "pressedBottom", "pressedEdge",
+                 "radius", "largeHeight"):
+        assert re.search(rf"\bPrimaryButton\.{name}\b", text), f"the app's face doesn't draw PrimaryButton.{name}"
+    # the label is never darkened with the fill: no multiply over the whole button
+    assert "colorMultiply" not in text and ".brightness(" not in text
+
+
+def test_the_secondary_pill_turns_its_gradient_over_when_pressed():
+    # the web's pressed pill (.pl-pill:active) is its gradient reversed, neither lighter nor darker: so is the phone's
+    rest = re.fullmatch(r"linear-gradient\(to bottom, (rgba\([^)]*\)), (rgba\([^)]*\))\)",
+                        token(THEME_CSS, "dw-secondary-bg"))
+    active = re.fullmatch(r"linear-gradient\(to bottom, (rgba\([^)]*\)), (rgba\([^)]*\))\)",
+                          token(THEME_CSS, "dw-secondary-bg-active"))
+    assert rest and active, (token(THEME_CSS, "dw-secondary-bg"), token(THEME_CSS, "dw-secondary-bg-active"))
+    assert (active.group(1), active.group(2)) == (rest.group(2), rest.group(1))
+    assert token(PLAYER_CSS, "pl-secondary-bg-active") == "var(--dw-secondary-bg-active)"
+    assert ".pl-pill:active:not(:disabled) { background: var(--pl-secondary-bg-active); }" in PLAYER_CSS.read_text(
+        encoding="utf-8")
+    palette = (REPO / "ios" / "App" / "DeadwaxApp.swift").read_text(encoding="utf-8")
+    pressed = re.search(r"static let secondaryFillPressed = LinearGradient\(colors: \[([^\]]*)\]", palette)
+    assert pressed, "DeadwaxApp.swift has no secondaryFillPressed"
+    stops = re.findall(r"TurntablePalette\.(\w+)", pressed.group(1))
+    assert stops == ["secondaryFillBottom", "secondaryFillTop"], stops
+    faces = (REPO / "ios" / "App" / "Shared" / "ButtonFaces.swift").read_text(encoding="utf-8")
+    assert "pressed ? Palette.secondaryFillPressed : Palette.secondaryFill" in faces

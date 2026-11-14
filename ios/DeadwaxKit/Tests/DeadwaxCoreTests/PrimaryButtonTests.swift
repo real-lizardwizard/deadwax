@@ -48,12 +48,24 @@ import Testing
         #expect(Self.near(Contrast.ratio(white, PrimaryButton.edge), 5.699))
     }
 
-    @Test func pressedItReadsBetter() {
+    @Test func pressedTheFillDarkensAndTheLabelStaysWhite() {
+        // what is drawn pressed: the label, white, on the fill darkened by brightness(0.92) - the edge with it
         let white = PrimaryButton.label
-        let top = Contrast.brightness(PrimaryButton.top, PrimaryButton.pressed)
-        let bottom = Contrast.brightness(PrimaryButton.bottom, PrimaryButton.pressed)
-        #expect(top == DeckRGBA(0x95, 0x48, 0xDF) && bottom == DeckRGBA(0x7F, 0x2A, 0xCE))
-        #expect(Self.near(Contrast.ratio(white, top), 4.918) && Self.near(Contrast.ratio(white, bottom), 6.720))
+        #expect(PrimaryButton.pressedTop == DeckRGBA(0x95, 0x48, 0xDF) && PrimaryButton.pressedBottom == DeckRGBA(0x7F, 0x2A, 0xCE))
+        #expect(PrimaryButton.pressedEdge == DeckRGBA(0x72, 0x35, 0xDA))
+        #expect(PrimaryButton.pressedFill(at: 0) == PrimaryButton.pressedTop && PrimaryButton.pressedFill(at: 1) == PrimaryButton.pressedBottom)
+        #expect(Self.near(Contrast.ratio(white, PrimaryButton.pressedTop), 4.918))
+        #expect(Self.near(Contrast.ratio(white, PrimaryButton.pressedBottom), 6.720))
+        for step in 0...10 {
+            let ratio = Contrast.ratio(white, PrimaryButton.pressedFill(at: Double(step) / 10))
+            #expect(ratio >= 4.5, "AA all the way down, pressed: \(step) \(ratio)")
+        }
+        // the web's whole-button brightness would darken the label too: under AA where a label's top line is drawn
+        let dimmed = Contrast.brightness(white, PrimaryButton.pressed)
+        #expect(dimmed == DeckRGBA(235, 235, 235))
+        #expect(Self.near(Contrast.ratio(dimmed, PrimaryButton.pressedTop), 4.125))
+        #expect(Contrast.ratio(dimmed, PrimaryButton.pressedFill(at: 0.2)) < 4.5)
+        #expect(Self.near(Contrast.ratio(dimmed, PrimaryButton.pressedBottom), 5.637))
         #expect(Contrast.brightness(DeckRGBA(250, 250, 250, 0.5), 2) == DeckRGBA(255, 255, 255, 0.5), "clamped, alpha kept")
     }
 

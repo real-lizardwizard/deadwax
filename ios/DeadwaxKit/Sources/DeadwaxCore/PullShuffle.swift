@@ -97,6 +97,13 @@ public struct PullShuffle: Sendable, Equatable {
         phase = .idle
     }
 
+    /// The system took the touch (slice 3b's review) - a call, Siri, the app leaving the front: the finger's going is
+    /// no release, so nothing shuffles; the graphic goes, and the next move from rest starts afresh. A release already
+    /// made stays released.
+    public mutating func interrupted() {
+        if phase != .released { phase = .idle }
+    }
+
     /// `pull` towards the line - only ever asked of a pull past the top and under the line, so above 0 and under 1.
     static func towards(_ pull: Double) -> Double {
         pull / line

@@ -65,7 +65,9 @@ final class DownloadModel {
     // MARK: what the screens read
 
     /// Every song asked for or here, by id.
-    private(set) var records: [String: DownloadRecord] = [:]
+    private(set) var records: [String: DownloadRecord] = [:] {
+        didSet { hereVersion += 1 }
+    }
     /// Why each was asked for.
     private(set) var origins: [String: Set<DownloadOrigin>] = [:]
     /// The planner's latest wait for each song not here - the shared reasons (network, sign-in) said at once.
@@ -82,7 +84,13 @@ final class DownloadModel {
     /// Bytes each task has brought, while a screen follows progress.
     private(set) var received: [String: Int64] = [:]
     /// The albums' kept answers (`GET /navidrome/albums/{id}` as answered), by id.
-    private(set) var albums: [String: Album] = [:]
+    private(set) var albums: [String: Album] = [:] {
+        didSet { hereVersion += 1 }
+    }
+    /// (slice 3b's review) songsHere as last made, and what it was made from: one more at every change of the records
+    /// or the albums, and the kept playlists' ids, reads and sizes.
+    @ObservationIgnored private var hereVersion = 0
+    @ObservationIgnored private var hereKept: (version: Int, playlists: [String], songs: [Song])?
     /// Every album with a song asked for or here: its songs' ids.
     private(set) var songsOfAlbum: [String: [String]] = [:]
     /// The bytes of every copy here.
@@ -384,11 +392,19 @@ final class DownloadModel {
     }
 
     /// (Phase 4, slice 3b) Every song on this phone, each once - as its album's kept answer has it, or a downloaded
-    /// playlist's for one whose album isn't kept: the Library's Shuffle while deadwax can't be reached (ShuffleHere).
+    /// playlist's for one whose album isn't kept: the Library's Shuffle while deadwax can't be reached (ShuffleHere),
+    /// and its readiness (slice 3b's review: a song with no answer to play it by isn't counted). Kept until the records,
+    /// the albums or the kept playlists change - each read every time, so a view reading this is redrawn by them.
     var songsHere: [Song] {
+        let records = self.records
+        _ = albums
+        let playlistsKey = playlists.kept.map { (kept: KeptPlaylist) -> String in
+            "\(kept.id)@\(kept.readAt)#\((kept.answer?.songs ?? []).count)"
+        }
+        if let kept = hereKept, kept.version == hereVersion, kept.playlists == playlistsKey { return kept.songs }
         let ids = records.values.filter { $0.state == .done }.map(\.id)
         var fromPlaylists: [String: Song]?
-        return ShuffleHere.songs(ids) { (id: String) -> Song? in
+        let songs = ShuffleHere.songs(ids) { (id: String) -> Song? in
             if let found = song(id) { return found }
             if fromPlaylists == nil {
                 var made: [String: Song] = [:]
@@ -399,10 +415,9 @@ final class DownloadModel {
             }
             return fromPlaylists?[id]
         }
+        hereKept = (version: hereVersion, playlists: playlistsKey, songs: songs)
+        return songs
     }
-
-    /// How many songs are on this phone (the Shuffle's offline count).
-    var songsHereCount: Int { records.values.reduce(0) { $0 + ($1.state == .done ? 1 : 0) } }
 
     /// You > Downloads' Downloading section: every song asked for and not here or failed, in the order they go - but
     /// not your library's own (its one row is `libraryProgress`'s, 3.3).

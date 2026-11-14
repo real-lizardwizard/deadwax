@@ -3,7 +3,7 @@ import Foundation
 /// The web's primary button (Phase 4, slice 3b - notes/ios-specs/phase4-library.md 2.8; James: "the color of the play
 /// button on the album page doesn't show the play icon"): theme.css's --dw-primary-* as app.css's .app-rg-get and
 /// player.css's .pl-pill.is-primary draw it - a purple gradient, a 1 pt edge, a highlight inside its top edge, a white
-/// label, 4 pt corners, darkened while pressed. The app's Palette and PrimaryFace turn these into SwiftUI; they replace
+/// label, 4 pt corners, its fill darkened while pressed. The app's Palette and PrimaryFace turn these into SwiftUI; they replace
 /// `.borderedProminent`, whose fill was the app's tint (#C084FC, the web's accent for text on black) under a white
 /// label - 2.64:1. tests/test_ios_palette.py holds every number here to theme.css and player.css.
 public enum PrimaryButton {
@@ -16,8 +16,15 @@ public enum PrimaryButton {
     public static let highlight = DeckRGBA(255, 255, 255, 0.22)
     /// --dw-text: the label and its glyph.
     public static let label = DeckRGBA(255, 255, 255)
-    /// --dw-primary-pressed: brightness(0.92), over the whole button.
+    /// --dw-primary-pressed: brightness(0.92). The web darkens the whole button by it, its label too - white made
+    /// #ebebeb, 4.13:1 at the top of the pressed fill, under AA where a label's top line is drawn. The phone darkens the
+    /// fill and the edge alone (slice 3b's review), so the label stays white: 4.92:1 at the top pressed, 6.72:1 at the
+    /// foot. A small, deliberate difference from the web, for the label's sake.
     public static let pressed = 0.92
+    /// The fill's two ends and the edge while pressed: each darkened by `pressed`, as CSS's brightness() does.
+    public static let pressedTop = Contrast.brightness(top, pressed)
+    public static let pressedBottom = Contrast.brightness(bottom, pressed)
+    public static let pressedEdge = Contrast.brightness(edge, pressed)
     /// --dw-radius-control.
     public static let radius = 4.0
     /// --pl-pill-height: the album's and the playlist's Play and Shuffle.
@@ -27,6 +34,11 @@ public enum PrimaryButton {
     /// rounded.
     public static func fill(at: Double) -> DeckRGBA {
         Contrast.mix(top, bottom, at)
+    }
+
+    /// The pressed fill's colour `at`, the same way.
+    public static func pressedFill(at: Double) -> DeckRGBA {
+        Contrast.mix(pressedTop, pressedBottom, at)
     }
 }
 

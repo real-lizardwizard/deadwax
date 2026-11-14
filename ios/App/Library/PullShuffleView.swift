@@ -1,5 +1,8 @@
+import AVFAudio
+import Combine
 import DeadwaxCore
 import SwiftUI
+import UIKit
 
 /// Pull to shuffle (Phase 4, slice 3b - phase4-library.md 2.8, 3.5; James: "if you drag down far enough there can be a
 /// cool little shuffle graphic that changes as you pull down, and then once you go far enough, it changes, and starts
@@ -32,6 +35,13 @@ final class ShufflePull {
     func reset() {
         touching = false
         pull.reset()
+    }
+
+    /// The system took the touch (slice 3b's review) - a call, Siri, Notification Center, the app leaving the front:
+    /// the finger's going that follows is no release, and shuffles nothing.
+    func interrupted() {
+        touching = false
+        pull.interrupted()
     }
 }
 
@@ -67,6 +77,18 @@ extension View {
 private struct PullsToShuffle: ViewModifier {
     let pulling: PullShuffling
 
+    @Environment(\.scenePhase) private var scenePhase
+
+    /// The system taking the touch, as iOS says it: the app about to leave the front (said before the scene's phase),
+    /// or the audio session interrupted - a call, Siri, an alarm.
+    private static let resigning = NotificationCenter.default.publisher(for: UIApplication.willResignActiveNotification)
+    private static let audioInterrupted = NotificationCenter.default
+        .publisher(for: AVAudioSession.interruptionNotification)
+        .filter { (note: Notification) -> Bool in
+            (note.userInfo?[AVAudioSessionInterruptionTypeKey] as? UInt) == AVAudioSession.InterruptionType.began.rawValue
+        }
+        .receive(on: DispatchQueue.main)
+
     func body(content: Content) -> some View {
         let state = pulling.state
         content
@@ -79,8 +101,18 @@ private struct PullsToShuffle: ViewModifier {
             }
             .onScrollPhaseChange { (_: ScrollPhase, phase: ScrollPhase) -> Void in
                 guard pulling.on else { return }
+                // the touch ending while the app isn't in front is the system's taking it, not the finger's lift
+                if phase != .interacting, UIApplication.shared.applicationState != .active {
+                    state.interrupted()
+                    return
+                }
                 if state.phase(interacting: phase == .interacting, ready: pulling.can.starts) { pulling.start() }
             }
+            .onChange(of: scenePhase) { (_: ScenePhase, now: ScenePhase) -> Void in
+                if now != .active { state.interrupted() }
+            }
+            .onReceive(Self.resigning) { (_: Notification) -> Void in state.interrupted() }
+            .onReceive(Self.audioInterrupted) { (_: Notification) -> Void in state.interrupted() }
             .sensoryFeedback(.impact(weight: .light), trigger: state.ticks)
             .onChange(of: pulling.on) { (_: Bool, on: Bool) -> Void in
                 if !on { state.reset() }

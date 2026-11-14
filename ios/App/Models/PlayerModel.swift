@@ -221,9 +221,9 @@ final class PlayerModel {
     @ObservationIgnored private var skipRun = OfflinePlay.SkipRun()
     /// The Up Next entry the listener tapped: offline, a song not here is stopped on, never passed over.
     @ObservationIgnored private var chosenKey: Int?
-    /// (Phase 4, slice 3b) The library's shuffle's feed (useShuffleFeed.ts, Core's ShuffleFeedRun): the rest of the order
-    /// brought in as it plays - and the retry of a page that wouldn't come.
-    @ObservationIgnored private var feedRun = ShuffleFeedRun()
+    /// (Phase 4, slice 3b) The library's shuffle's feed (useShuffleFeed.ts): Core's ShuffleFeedLoop - when it looks, what
+    /// each answer does to the queue, what a stop lets go - its asks made here, and its retry's timer.
+    @ObservationIgnored private let feed = ShuffleFeedLoop()
     @ObservationIgnored private var feedRetry: Task<Void, Never>?
 
     /// The speed, and what the engine was told (Core's SpeedControl: exact again at 1x on a let-go).
@@ -249,6 +249,10 @@ final class PlayerModel {
         session.onInterruption = { [weak self] began, shouldResume in self?.interruption(began: began, shouldResume: shouldResume) }
         session.onOldDeviceGone = { [weak self] in self?.pause() }
         session.onReset = { [weak self] in self?.mediaReset() }
+        feed.send = { [weak self] (ask: FeedAsk) -> Void in self?.feedSend(ask) }
+        feed.adding = { [weak self] (songs: [Song]) -> Void in self?.shelve(songs) }
+        feed.say = { [weak self] (words: String) -> Void in self?.say(words) }
+        feed.retry = { [weak self] (on: Bool) -> Void in self?.feedRetryTimer(on) }
         nowPlaying.connect(.init(
             play: { [weak self] in self?.resume() },
             pause: { [weak self] in self?.pause() },
@@ -530,7 +534,7 @@ final class PlayerModel {
     /// Stops and forgets the queue: the mini player goes.
     func stop() {
         cancelRetry()
-        feedStop()
+        feed.stopped()
         reporter.stop()
         link?.stop()
         controller = nil
@@ -729,24 +733,16 @@ final class PlayerModel {
     private func repeatChanged(_ mode: Repeat) {
         repeatMode = mode
         UserDefaults.standard.set(mode.rawValue, forKey: Repeat.storageKey)
-        feedLook()
+        if let controller { feed.look(controller) }
     }
 
     // MARK: the library's shuffle's feed (Phase 4, slice 3b - phase4-library.md 2.8; useShuffleFeed.ts)
 
-    /// The queue or Repeat changed (or a retry is due): the ask the feed makes now, if any - made of deadwax as the
-    /// person signed in, in an unstructured task, its answer handed back to the feed, whose step is carried out here.
-    /// It only ever adds to the queue: nothing in it plays.
-    private func feedLook() {
-        guard let ask = feedRun.look(queue, repeat: repeatMode) else { return }
-        feedSend(ask)
-    }
-
+    /// The feed's ask (ShuffleFeedLoop.send): made of deadwax as the person signed in, in an unstructured task, its
+    /// answer handed back to the loop with the queue's controller as it is then. It only ever adds to the queue.
     private func feedSend(_ ask: FeedAsk) {
-        feedRetry?.cancel()
-        feedRetry = nil
         guard let client = server.client else {
-            carry(feedRun.failed(ask), songs: [])
+            feed.failed(ask, into: controller)
             return
         }
         Task { [weak self] in
@@ -755,60 +751,39 @@ final class PlayerModel {
                 do {
                     let page = try await client.shufflePage(token: ask.token, offset: offset)
                     guard let self else { return }
-                    self.carry(self.feedRun.page(ask, songs: page.songs), songs: page.songs)
+                    self.feed.page(ask, songs: page.songs, into: self.controller)
                 } catch let failure as APIFailure where failure.status == 404 {
                     // the order gone from deadwax (it restarted, or a day untouched): a fresh one, as the rest of this round
                     guard let self else { return }
-                    self.carry(self.feedRun.gone(ask), songs: [])
+                    self.feed.gone(ask, into: self.controller)
                 } catch {
                     guard let self else { return }
-                    self.carry(self.feedRun.failed(ask), songs: [])
+                    self.feed.failed(ask, into: self.controller)
                 }
             case .fresh:
                 do {
                     let first = try await client.shuffleStart(scope: ask.scope, claim: true)
                     guard let self else { return }
-                    self.carry(self.feedRun.fresh(ask, first, repeat: self.repeatMode), songs: first.songs)
+                    self.feed.fresh(ask, first, into: self.controller)
                 } catch {
                     guard let self else { return }
-                    self.carry(self.feedRun.failed(ask), songs: [])
+                    self.feed.failed(ask, into: self.controller)
                 }
             }
         }
     }
 
-    /// A step of the feed's carried out: songs added to the shuffle (shelved, for Info and the stream cache), a fresh
-    /// order asked, or the look made again in FEED_RETRY_MS while the queue has songs.
-    private func carry(_ step: FeedStep, songs: [Song]) {
-        switch step {
-        case .extend(let token, let tracks, let next, let notice):
-            guard let controller else { return }
-            shelve(songs)
-            follow()
-            controller.extendQueue(token: token, tracks: tracks, next: next)
-            if let notice { say(notice) }
-        case .ask(let ask):
-            feedSend(ask)
-        case .retry:
-            feedRetry?.cancel()
-            feedRetry = Task { [weak self] in
-                try? await Task.sleep(for: .seconds(ShuffleFeed.retrySeconds))
-                guard !Task.isCancelled, let self else { return }
-                self.feedRetry = nil
-                self.feedRun.retried()
-                guard self.hasQueue else { return }
-                self.feedLook()
-            }
-        case .nothing:
-            break
-        }
-    }
-
-    /// The player stopped, or a new person: every ask of the feed's let go.
-    private func feedStop() {
+    /// The retry's timer (ShuffleFeedLoop.retry): started afresh, FEED_RETRY_MS long, or called off.
+    private func feedRetryTimer(_ on: Bool) {
         feedRetry?.cancel()
         feedRetry = nil
-        feedRun.reset()
+        guard on else { return }
+        feedRetry = Task { [weak self] in
+            try? await Task.sleep(for: .seconds(ShuffleFeed.retrySeconds))
+            guard !Task.isCancelled, let self else { return }
+            self.feedRetry = nil
+            self.feed.retryDue(self.hasQueue ? self.controller : nil)
+        }
     }
 
     // MARK: the speed (notes/ios-specs/turntable.md 5)
@@ -913,7 +888,7 @@ final class PlayerModel {
         keepAndPrefetch()
         observeResume()
         showNowPlaying()
-        feedLook()
+        if let controller { feed.look(controller) }
     }
 
     /// Another entry is heard: its words and its retry start afresh (usePlayer.ts at every load and join), and its

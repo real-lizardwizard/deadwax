@@ -2241,7 +2241,8 @@ button (still app 0.9). Earlier checks' "Library > Playlists" is now the switch'
 "Downloaded" is in the Library's •••.
 
 - **85 The switch.** The Library opens on Albums, with nothing above the albums but their count, and
-  Albums | Playlists at the top. Swipe left: Playlists, the switch moving with it; tap Albums: back. Go to
+  Albums | Playlists at the top. Swipe left: Playlists - the switch, the buttons and Find follow as the page
+  settles; swipe halfway and let go: it springs back, and nothing else changes. Tap Albums: back. Go to
   You and back: the same page. Scroll a long way down and tap the Library tab: the page goes to its top.
   Force-quit and open: Albums. Scrolling up and down never swipes to the other page.
 - **86 Edit order.** ••• > Edit order: drag Playlists above Albums, Done. The switch reads Playlists |
@@ -2254,8 +2255,9 @@ button (still app 0.9). Earlier checks' "Library > Playlists" is now the switch'
   to shuffle". At the line: a tick, the purple disc, "Release to shuffle". Push back up a little: the
   ring again, no tick; down again: another tick. Let go armed: "Shuffling", and your library plays - the
   mini player shows a song from anywhere in it. Let go before the line: nothing plays. The same on
-  Playlists. A fast fling up to the top shows nothing. Does the graphic sit in the gap the pull opens, at
-  your text size? Does the music start the moment you let go?
+  Playlists. A fast fling up to the top shows nothing. Pull to the purple disc, then pull down
+  Notification Center (or ask Siri, or take a call) before letting go: nothing plays. Does the graphic sit
+  in the gap the pull opens, at your text size? Does the music start the moment you let go?
 - **89 Past the first 200** (the phase's). With the shuffle playing, press Next 160 times or so (or let it
   play an evening): Up Next keeps going, never ending at 200. With Repeat off it ends only once every song
   of your library has played; with Repeat All, at the end a new order begins with a different song. Lock
@@ -2268,7 +2270,8 @@ button (still app 0.9). Earlier checks' "Library > Playlists" is now the switch'
   •••, and the pull says "Nothing on this phone to shuffle".
 - **92 The Play button.** An album's page and a playlist's: Play is the web app's purple, its white
   triangle and word plainly readable; Shuffle beside it the web app's grey, the same height and corners.
-  Pressed, both darken. The other purple buttons - Add to my library, the EQ's Use for, Create in the
+  Pressed, Play darkens, its word staying white, and Shuffle's shading turns over, as the web app's do. The
+  other purple buttons - Add to my library, the EQ's Use for, Create in the
   picker, Sign in, Try again - the same purple. Does it look like the web app's Play on your screen?
 - **93 Find on Playlists.** On Playlists, type part of a playlist's name: only the playlists that hold
   it; nonsense: "No playlists match “…”." Back on Albums, Find holds the albums' own words.

@@ -40,8 +40,15 @@ struct LibraryView: View {
     @State private var rootList: LibraryRootList?
     /// The pages' order, as this phone keeps it (LibraryPages: read with care).
     @AppStorage(LibraryPages.storageKey) private var savedOrder = ""
-    /// The page shown - nil until the Library first draws, when it is the first of the order.
+    /// The page shown - nil until the Library first draws, when it is the first of the order. The settled page (slice
+    /// 3b's review): a swipe changes it only once the pager is at rest, so the switch, the bar, Find and the pulls never
+    /// change under a finger, and a half swipe let go changes nothing.
     @State private var page: LibraryPage?
+    /// The page at the pager's centre as it scrolls (its scrollPosition) - `page` follows it once at rest.
+    @State private var scrolled: LibraryPage?
+    /// The pager is moving: a finger on it, or settling (iOS 18's scroll phase; never on iOS 17, where `page` follows
+    /// `scrolled` at once - at the swipe's halfway, the centre anchor's).
+    @State private var paging = false
     /// Each page's own words in Find.
     @State private var findAlbums = ""
     @State private var findPlaylists = ""
@@ -58,7 +65,7 @@ struct LibraryView: View {
         root
             .onAppear {
                 look()
-                if page == nil { page = LibraryPages.first(order) }
+                if page == nil { show(LibraryPages.first(order)) }
                 guard !shownOnce else { return }
                 shownOnce = true
                 if reachability.online { shown() }
@@ -85,7 +92,7 @@ struct LibraryView: View {
             }
             .onChange(of: server.person) { _, _ in
                 // a new person opens on the first page, Find empty
-                page = LibraryPages.first(order)
+                show(LibraryPages.first(order))
                 findAlbums = ""
                 findPlaylists = ""
                 shown()
@@ -157,10 +164,25 @@ struct LibraryView: View {
     /// The page shown.
     private var shownPage: LibraryPage { page ?? LibraryPages.first(order) }
 
-    /// What the Shuffle can do now (ShuffleCan): play the first page in hand, shuffle the downloads, or why not.
+    /// What the Shuffle can do now (ShuffleCan): play the first page in hand, shuffle the downloads, or why not. The
+    /// songs on this phone are read only while deadwax can't be reached (slice 3b's review), so a download coming in
+    /// doesn't redraw the pager online - and they are the very list the shuffle plays, so a pull never arms with
+    /// nothing to play.
     private var shuffleCan: ShuffleCan {
-        ShuffleCan.of(online: reachability.online, ready: shuffles.ready, empty: shuffles.empty,
-                      failed: shuffles.failure, songsHere: downloads.songsHereCount)
+        let online = reachability.online
+        return ShuffleCan.of(online: online, ready: shuffles.ready, empty: shuffles.empty,
+                             failed: shuffles.failure, songsHere: online ? 0 : downloads.songsHere.count)
+    }
+
+    /// The page shown set, the pager moved to it with it (the switch's tap, the first draw, a new person).
+    private func show(_ chosen: LibraryPage) {
+        page = chosen
+        scrolled = chosen
+    }
+
+    /// The pager at rest (iOS 18): the page is the one at its centre.
+    private func settled() {
+        if let scrolled, scrolled != page { page = scrolled }
     }
 
     /// The pages side by side under the switch, a swipe between them; Find, the bar and the ••• the switch's.
@@ -181,8 +203,16 @@ struct LibraryView: View {
             .scrollTargetLayout()
         }
         .scrollTargetBehavior(.paging)
-        .scrollPosition(id: $page)
-        .scrollIndicators(.hidden)
+        // the page at the centre, not the leading edge: a sliver of the next one isn't it
+        .scrollPosition(id: $scrolled, anchor: .center)
+        // the pager's own indicator only: the pages' lists keep theirs (the environment would carry it to them)
+        .scrollIndicators(.hidden, axes: .horizontal)
+        .pagerPhase(moving: $paging, settled: settled)
+        .onChange(of: scrolled) { (_: LibraryPage?, now: LibraryPage?) -> Void in
+            // at rest - iOS 17 always, iOS 18 a move no finger made (a layout's) - the page follows at once
+            guard !paging, let now, now != page else { return }
+            page = now
+        }
         .navigationTitle("Library")
         .navigationBarTitleDisplayMode(.inline)
         .searchable(text: shownPage == .albums ? $findAlbums : $findPlaylists,
@@ -238,9 +268,9 @@ struct LibraryView: View {
     private func switcher(_ order: [LibraryPage]) -> some View {
         Picker(LibrarySwitchWords.switchLabel, selection: Binding(get: { shownPage }, set: { (chosen: LibraryPage) in
             if reduceMotion {
-                page = chosen
+                show(chosen)
             } else {
-                withAnimation(.snappy) { page = chosen }
+                withAnimation(.snappy) { show(chosen) }
             }
         })) {
             ForEach(order) { (each: LibraryPage) in
@@ -302,7 +332,13 @@ struct LibraryView: View {
             guard let taken = shuffles.take(level: PlaylistPlay.songsLevel(player.normalization)) else { return }
             player.play(shuffled: taken)
         case .downloads:
-            player.play(playlist: downloads.songsHere, at: nil, shuffle: true)
+            // the list the readiness counted; should it have emptied since (a removal), said, as the pull would
+            let here = downloads.songsHere
+            guard !here.isEmpty else {
+                player.say(PullShuffleWords.nothingHere)
+                return
+            }
+            player.play(playlist: here, at: nil, shuffle: true)
         case .gettingReady, .failed, .nothingHere, .none:
             break
         }
@@ -414,5 +450,22 @@ struct NavidromeGateView: View {
         }
         .navigationTitle("Library")
         .refreshable { await library.checkNavidrome() }
+    }
+}
+
+private extension View {
+    /// (slice 3b's review) The pager's scroll phase, iOS 18's: `moving` while a finger is on it or it settles, and
+    /// `settled` called as it comes to rest. iOS 17 has no phase: neither is touched, and the page follows the centre
+    /// at once.
+    @ViewBuilder
+    func pagerPhase(moving: Binding<Bool>, settled: @escaping () -> Void) -> some View {
+        if #available(iOS 18.0, *) {
+            onScrollPhaseChange { (_: ScrollPhase, now: ScrollPhase) -> Void in
+                moving.wrappedValue = now != .idle
+                if now == .idle { settled() }
+            }
+        } else {
+            self
+        }
     }
 }

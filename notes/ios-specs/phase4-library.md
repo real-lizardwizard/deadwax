@@ -273,7 +273,10 @@ doesn't show the play icon."
   once and the page shown stays shown.
 - **Which page shows**: the first of the order as the app opens and when the person changes; after that the one
   last shown (another tab and back, the app back in front). The switch and the swipe set it and each follows the
-  other. The Library tab tapped at its root scrolls the page shown to its top, as the root list did.
+  other - a swipe once the pager is at rest (slice 3b's review: the page shown is the settled page, the one at the
+  pager's centre when it stops, so the switch, the bar, Find and the pulls never change under a finger and a half
+  swipe let go changes nothing; iOS 17, with no scroll phase, follows at the swipe's halfway). The Library tab tapped
+  at its root scrolls the page shown to its top, as the root list did.
 - **Find** is the switch's: one field under the bar, each page with its own words in it. Albums' as before; on
   Playlists it keeps the playlists whose name holds every word typed, in any order and anywhere (Find's folding,
   `PlaylistRules.found`), the groups drawn as before - and none: "No playlists match “…”." (`Find.noMatchText`).
@@ -284,6 +287,10 @@ doesn't show the play icon."
   **pulling** again (no tick) -> the finger lifts while armed: **released**, and the shuffle starts in that same call,
   nothing awaited first - then released until the page is back at rest (0), idle after. Lifted while pulling: no
   shuffle; the graphic follows the page back to rest. A pull no finger made (a fling's bounce at the top) stays idle.
+  A touch the system takes (slice 3b's review: a call, Siri, Notification Center, the app leaving the front - told by
+  the app resigning active, the scene's phase, the audio session's interruption, or the app not active at the lift)
+  is **interrupted**: idle, and the finger's going shuffles nothing (`PullShuffle.interrupted`; a release already
+  made stays released).
   It arms only when a shuffle can start (`ready`); otherwise the graphic reaches its full ring and says why, and a
   lift does nothing. Every page of the switch pulls the same shuffle (question 21): no page refreshes on a pull now.
   The lists pushed over the switch - All albums, Downloaded, Downloaded playlists - keep their pull to refresh.
@@ -319,7 +326,9 @@ doesn't show the play icon."
   phone - a queue of its own (not paged: every one is in hand), in a random order, each song with its own album, at
   the songs level, as a playlist's Shuffle is. The ••• says "Shuffle downloads"; the pull "Pull to shuffle your
   downloads" and "Release to shuffle your downloads". Nothing on the phone: no Shuffle in the •••, and the pull says
-  "Nothing on this phone to shuffle" and never arms.
+  "Nothing on this phone to shuffle" and never arms. Whether there is something is the very list the shuffle plays
+  (slice 3b's review): a song here with no kept answer to play it by isn't counted, and a list emptied between the
+  draw and the release says "Nothing on this phone to shuffle" and plays nothing. It is read only while offline.
 - **The Library's •••** (`LibraryMenu`, its items Core's): Shuffle (or "Getting ready…", dimmed; offline "Shuffle
   downloads"; none with nothing to shuffle); then Downloaded - or, offline, where the Albums page is Downloaded, the
   way back to the albums ("Your albums", "Albums" without a library of your own); All music (with a library of your
@@ -329,7 +338,9 @@ doesn't show the play icon."
   web's (app.css .app-rg-get, player.css .pl-pill.is-primary) - --dw-primary-bg, #a24ef2 to #8a2ee0 top to bottom;
   a 1 pt edge of --dw-primary-border #7c3aed; --dw-primary-highlight, a 1 pt line of white at 0.22 inside the top
   edge; --dw-radius-control's 4 pt corners; the label white (--dw-text), semibold; pressed, --dw-primary-pressed
-  (brightness 0.92 over the whole button); disabled, faded to 0.45 (Palette.off). The large one is the web's pill,
+  (brightness 0.92) on the fill and the edge, the label left white (slice 3b's review: the web's filter darkens the
+  whole button, its label to #ebebeb - 4.13:1 at the pressed top and under 4.5:1 a fifth down - so the phone departs
+  from it there, for the label); disabled, faded to 0.45 (Palette.off). The large one is the web's pill,
   48 pt (--pl-pill-height). It replaces `.borderedProminent`, whose fill was the app's tint, #C084FC - the web's
   accent for text on black - under a white label: 2.64:1. Measured (`Contrast`, WCAG 2's relative luminance; Core,
   tested): white on #8a2ee0 5.92:1, on the middle of the gradient 5.05:1, a fifth of the way down - the top of a
@@ -338,7 +349,9 @@ doesn't show the play icon."
   the play glyph - a graphic, 3:1 - everywhere. Every `.borderedProminent` in the app takes it (the album's and the
   playlist's Play, Your library's Add, the EQ's Use for, the picker's Create, the sign-in, Try again on the
   unreachable and Navidrome gates, Set up Navidrome); a `.bordered` button beside one in the same pair takes the
-  web's secondary pill (--dw-secondary-bg, the look button's face) so the pair is one shape (question 25).
+  web's secondary pill (--dw-secondary-bg, the look button's face) so the pair is one shape (question 25). Pressed,
+  the pill's gradient turns over (--dw-secondary-bg-active, .pl-pill:active: lit from below, neither lighter nor
+  darker).
 
 ## 3. The screens
 
@@ -412,7 +425,7 @@ once while the page settles. Not ready: the ring and the mark as pulling, never 
 "Couldn't get your songs ready to shuffle" (or the server's words), "Nothing on this phone to shuffle". Offline, its
 words are the downloads' (2.8). Nothing at all is drawn with no songs to shuffle. **Reduce Motion**: the mark keeps its
 size and doesn't turn or go round; the ring still fills with the finger (a measure, not a motion) and the states swap
-at once. **VoiceOver** doesn't read it - the ••• Shuffle is the way there (and Switch Control's); the haptic is only
+at once. A touch the system takes (2.8) leaves nothing drawn. **VoiceOver** doesn't read it - the ••• Shuffle is the way there (and Switch Control's); the haptic is only
 the touch's. **iOS 17** can't read how far a List or a ScrollView is pulled without iOS 18's scroll geometry, so
 there is no pull on 17, only the ••• Shuffle (the app's target is 17; James's phone is on 27).
 
@@ -444,7 +457,7 @@ step (it is: Navidrome moves it on every add and removal, `notes/playlists.md`),
 | slice 2: `PlaylistChanges.swift` - the four writes' bodies and answers, the picker's order, the picks, the add words and question, `PlaylistEdit` (Edit's rows, moves, removes, the body, a refusal's meaning); 4 routes (36) | `PlaylistsModel`'s writes (each telling the list and the pages, `lastChange`), `PlaylistPageModel`'s Edit and Delete, `PlaylistPicker` (MainTabs' sheet, and Now Playing's own), `NewPlaylistFields`, New on Playlists |
 | slice 3: `DownloadOrigin.playlist`, `PlaylistDownloads` (the keeping-in-step rules, the control, the rows), `DownloadRemoval`; store v6 | `PlaylistKeeper` (DownloadModel's), the playlist's control and ••• items, Downloaded > Downloaded playlists, You > Downloads' rows |
 | slice 4: the artist sorts and lines; 2 routes | Artists, an artist's page |
-| slice 3b: `LibraryPage`/`LibraryPages`, `PullShuffle`, `ShuffleAhead`, `ShuffleFeed`/`ShuffleFeedRun`, `ShuffleHere`, `PlaylistRules.found`, `PrimaryButton`/`Contrast`; 2 routes (38) and `DeadwaxClient.shuffleStart`/`shufflePage` | the switch and its pages (LibraryView, AlbumsScreen as a page, PlaylistsPage), the ••• and Edit order, the pull's graphic, `ShuffleModel`, `PlayerModel.play(shuffled:)` and the feed, the primary and secondary button styles |
+| slice 3b: `LibraryPage`/`LibraryPages`, `PullShuffle`, `ShuffleAhead`, `ShuffleFeed`/`ShuffleFeedRun` (and, since its review, `ShuffleFeedLoop`: PlayerModel's feed carried out over a QueueController), `ShuffleHere`, `PlaylistRules.found`, `PrimaryButton`/`Contrast`; 2 routes (38) and `DeadwaxClient.shuffleStart`/`shufflePage` | the switch and its pages (LibraryView, AlbumsScreen as a page, PlaylistsPage), the ••• and Edit order, the pull's graphic, `ShuffleModel`, `PlayerModel.play(shuffled:)` and the feed, the primary and secondary button styles |
 | slice 5: Songs; the feed held to the web (5.2) | Songs, All songs' Shuffle |
 
 ### 5.2 Held to the web
@@ -594,7 +607,10 @@ came of it.
   dropped, the whole order in under Off and One nothing and under All a fresh claimed round never starting with the
   song ending - at once when a short last page leaves the music near its end - a 404 starting over said once (not for
   an empty order), a failure retried only when its retry is due (and a retry due after another ask letting nothing
-  go), a page queued at the shuffle's level, Repeat turned off with a round on its way; `startingElsewhere` and `songsAhead` by hand over the web's own cases (shuffle.sim.cjs). The two
+  go), a page queued at the shuffle's level, Repeat turned off with a round on its way; and (slice 3b's review)
+  `ShuffleFeedLoop` over the real QueueController and a fake engine, answers late or failing, retries, held edits, Play
+  Next and Repeat moving - every song once a round under Off and All, no round beginning with the song ending the last
+  - with a lost order started over said once and a stop letting every ask and the retry go; `startingElsewhere` and `songsAhead` by hand over the web's own cases (shuffle.sim.cjs). The two
   answers decoded (leniently), the two calls (paths, `scope`, `playing`, `claim`, `offset`). Offline: every song here,
   each once. Find on playlists. The contrast: WCAG's own pairs, and the primary's numbers in 2.8.
 - **The contract** (slice 3b): ROUTE_COUNT 38; `ShuffleStart`'s and `ShufflePage`'s fields what the routes return;
@@ -602,7 +618,9 @@ came of it.
   ShuffleSongs.tsx's SHUFFLE_FRESH_MS; `ShuffleFeed.below` and `retrySeconds` useShuffleFeed.ts's FEED_BELOW and
   FEED_RETRY_MS; "Getting ready…", the unready line and the started-over notice the web's own constants; the 413's
   words the route's own. tests/test_ios_palette.py: `PrimaryButton`'s colours, edge, highlight, pressed, corner and
-  height theme.css's and player.css's.
+  height theme.css's and player.css's; no `borderedProminent` however spelled in ios/App's code; the secondary pill's
+  pressed gradient theme.css's reversed. The pull interrupted: idle, nothing shuffled. Pressed, white on the darkened
+  fill AA all the way down, and the web's darkened label not.
 
 ## 8. James's checks (on his iPhone)
 
@@ -685,7 +703,8 @@ docs/ios.md's "Downloaded playlists' checks (77-84)" holds them as James reads t
 Slice 3b's:
 
 - **85 The switch.** The Library opens on Albums, with nothing above the albums but their count; Albums | Playlists in
-  the bar. Swipe left: Playlists, the switch moving with it; tap Albums: back. Leave for You and come back: the same
+  the bar. Swipe left: Playlists, the switch, the bar and Find following as the page settles; half a swipe let go
+  springs back and changes nothing; tap Albums: back. Leave for You and come back: the same
   page. Scroll down a long way and tap the Library tab: the page shown goes to its top. Force-quit and open: Albums.
 - **86 Edit order.** ••• > Edit order: drag Playlists above Albums, Done. The switch reads Playlists | Albums; force-quit
   and open: the Library opens on Playlists.
@@ -695,7 +714,8 @@ Slice 3b's:
 - **88 Pull to shuffle.** On Albums, pull down slowly: the ring fills and the mark grows and turns, "Pull to shuffle";
   at the line a tick, the purple disc, "Release to shuffle"; push back up a little: the ring again, no tick; down again:
   a tick. Let go armed: "Shuffling", and your library plays shuffled - the mini player, a song from anywhere in it. Let
-  go before the line: nothing plays. The same on Playlists. A fast fling to the top shows nothing.
+  go before the line: nothing plays. The same on Playlists. A fast fling to the top shows nothing. Armed, then pull
+  down Notification Center (or ask Siri, or take a call) before letting go: nothing plays.
 - **89 Past the first 200** (the phase's). With the shuffle playing, skip ahead with Next 160 times or so (or let it
   play an evening): Up Next keeps going, never ending at 200; with Repeat off it ends only once every song of your
   library has played. With Repeat All, at the end a new round starts with a different song.
@@ -705,7 +725,8 @@ Slice 3b's:
   the pull's "Release to shuffle your downloads": only songs on the phone, every one of them in time. ••• > Your albums
   is the way back. With nothing downloaded: no Shuffle, and the pull says "Nothing on this phone to shuffle".
 - **92 The Play button.** An album's page and a playlist's: Play is the web's purple with a white triangle and word,
-  plainly readable; Shuffle beside it the web's grey pill, the same height and corners. Pressed, both darken. The other
+  plainly readable; Shuffle beside it the web's grey pill, the same height and corners. Pressed, Play darkens, its
+  label staying white, and Shuffle's shading turns over, as the web's do. The other
   purple buttons - Add to my library, the EQ's Use for, Create in the picker, Sign in, Try again - the same purple.
 - **93 Find on Playlists.** On Playlists type part of a name: only the playlists that hold it; nonsense: "No playlists
   match “…”."; back on Albums, Find holds its own words.
@@ -744,6 +765,11 @@ docs/ios.md's "The Library's switch's checks (85-94)" holds them as James reads 
   then; that the tick lands at the line and not twice; that the graphic sits in the room the pull opens on every
   text size; that the feed's asks are answered on a locked phone mid-shuffle (the phone runs while it plays); and the
   primary's purple on James's screen as the web's.
+- Slice 3b's review: that iOS 18's scroll phase reaches `.idle` once a swipe settles (the page shown follows only
+  then) and that a layout's move at rest is followed; that the system taking a touch is told before the scroll's
+  phase leaves `.interacting` - the app resigning, the scene's phase, the audio session's interruption, or the app's
+  state at the lift - and so a pull a call or Siri cut short shuffles nothing; a banner call over an active app, with
+  no audio interruption, can't be told from a lift.
 
 ## 10. Open questions (each with what the build does until James answers)
 
