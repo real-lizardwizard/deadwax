@@ -964,6 +964,8 @@ docs/ios.md's "The Library's switch's checks (92-101)" holds them as James reads
     on and then off never has its order rearranged; the page shown, when it was Songs and Songs goes, is the first of
     those shown. The alternative, if James wants Songs as a page with a library of your own too: the switch's fourth
     page, titled All songs, the collection's.
+    **James, 2026-11-14: "Three pages is okay"** - kept as built: with a library of your own the switch is Albums |
+    Playlists | Artists, and Songs is All music > All songs.
 33. **Find on Songs** (slice 5). The web's Songs has no Find. The other pages filter what is in hand; Songs is paged,
     100 at a time, so a filter would say "No songs match" of songs not yet asked. *Recommend, and built*: Find on
     Songs asks Navidrome's own search (search3, `q` what is typed, trimmed), paged as the list is, once typing pauses
