@@ -66,8 +66,8 @@ deadwax.
 with deadwax 2.1.0. install.sh builds whichever branch is checked out, so to try Phase 1, switch to
 `ios` once (step 1 of [Once](#once)).
 
-deadwax 2.1.24 adds the route the app's Search will draw covers from for the albums you don't have
-yet, the ones it finds on MusicBrainz. deadwax fetches the album's front cover from the Cover Art
+deadwax 2.1.24 adds the route the app's Search draws covers from for the albums you don't have
+yet, the ones it finds on MusicBrainz (with an older deadwax they're drawn as an empty square). deadwax fetches the album's front cover from the Cover Art
 Archive the first time it's asked for and passes it on, so the app still talks only to deadwax. It
 keeps each cover it fetched, up to 128 MB, in a folder of its own beside the player's cache
 (`deadwax-covers`, in [`PLAYER_CACHE_PATH`](configuration.md#paths) or the container's temporary
@@ -634,43 +634,82 @@ and All artists, rather than a page among your own albums and artists.
 ## Search
 
 **Search** is the tab between Library and You. Its field is always there at the top - tap it to type -
-with "Search your library." under it while it's empty ("Search your library and the collection." with a
-library of your own). It searches what deadwax has, as the web app's Search does: **this half of Search
-is your library's**. Albums you don't have yet, from MusicBrainz, and Get come later (see [What it can't
-do yet](#what-it-cant-do-yet)).
+with "Search your library and albums you don't have yet." under it while it's empty ("Search your
+library, the collection, and albums nobody has yet." with a library of your own). It searches what
+deadwax has, as the web app's Search does, and the albums you don't have yet from MusicBrainz. Artists
+and songs you don't have, and Get, come later (see [What it can't do yet](#what-it-cant-do-yet)).
 
 A fifth of a second after you stop typing - or at once when you press **Search** on the keyboard - it
 asks Navidrome, and shows **one list**, the web app's:
 
 - **Top results**: the three best matches of any kind, as the web app picks them - the album or artist
   your words name first ("dummy portishead" and "portishead dummy" both lead with Dummy), then what fits
-  best.
-- Then **Artists** (the first 2), **Albums** (3) and **Songs** (3), each with **See all**. With a library
+  best, an album you don't have among them when it fits best.
+- Then **Artists** (the first 2), **Albums** and **Songs** (3 each), each with **See all**. With a library
   of your own, the rows of your library come first in each, and each row says whose it is: "in your
   library", or "in the collection" for one of an album you haven't added.
+- **Albums you don't have** come after yours in Albums: up to 3 of them, each with its cover, its kind
+  when it isn't a plain album ("EP", "Live", "Compilation"), its artist and year ("Portishead · 2008").
+  They're asked for once you've stopped typing for longer (seven tenths of a second, three letters or more)
+  or pressed Search. An album a folder of yours may already be - its name matches, but it has no
+  MusicBrainz ids - says "maybe in your library". The albums you already have aren't listed again.
+- Words that name an artist you have, alone ("portishead"), find **their studio albums and EPs**, with
+  "Studio albums and EPs - See all for everything they made." under them; **See all** finds everything.
+- Under three letters, "Type a little more, or press Search, to find albums you don't have yet." - press
+  Search to ask anyway.
 - **The chips** under the field - **All**, **Artists**, **Albums**, **Songs** - show one kind in full: up
   to 50 artists or albums, or 100 songs, with **More from your library** ("More from the collection")
-  when there are more. **All** puts the list back as it was.
+  when there are more. **Albums** lists the albums you don't have after yours. **All** puts the list
+  back as it was.
 
-**The list is drawn once for the words.** Typing on keeps it where it is until the new words' list is
-in, and that takes its place whole - nothing moves under your finger while you watch. What changes in
-place is a row's line (whose it is). Clearing the field brings the hint back.
+**The list is drawn once for the words, and nothing moves under your finger.** Your library answers in a
+fraction of a second and MusicBrainz in a second or more, so the list comes in steps, as the web app's
+does: Top results first (with a place kept for a pick still to come), "Searching…" where the sections will
+go, then the sections once the albums are in - or a second and a half on, with "Searching…" in Albums'
+place, the albums landing there when they come (or, if something you could tap is already under them,
+behind **Show 2 more albums**). If your library is slow, the list is drawn without it after a second and a
+half, "Searching your library…" at its top, then **Show 5 from your library** to draw it in. Each of those
+places is one line of one height whatever it holds - "Searching…", a Show button, why there's nothing, or
+what went wrong with **Try again** at its end - so nothing below it moves when it changes, at any text size.
+Typing on keeps the list where it is until the new words' list is in. Clearing the field brings the hint
+back.
 
 - **A song**: tap it to play it, with its album's songs after it in Up Next. The phone fetches the albums
   of the first songs found as the list comes in, so a song with **▶** after it plays the moment you tap.
   One without (its album not fetched yet) opens its album's page instead. Its **•••** is the song's own
   menu: Play Next, Play Last, Add to a playlist… and Download.
 - **An album** opens its page; **an artist**, theirs. Back takes you to the list as you left it.
+- **An album you don't have** opens its page: its cover, its title and artist, "2008 · Album · not in your
+  library", then **Pressing** - tap it for every pressing MusicBrainz knows, the usual one ticked, each
+  with its format, year, country and label, how it compares with the usual tracklist ("+1 bonus track: …"), and
+  "In your library" for one you have; an album of more than 30 pressings has a filter ("JP, CD, a label or
+  catalogue no."). Under it the chosen pressing's facts (its catalogue number and barcode), then its
+  **tracklist**: what it is against the usual one ("The usual tracklist, shared by 9 of 10 pressings", or
+  "This pressing adds 3 tracks"), each track marked where it differs (**Bonus**, **Other version**,
+  **Renamed**), and **Not on this pressing** for what it leaves out. The artist is a link when one artist of
+  your library is theirs. **Get** comes to this page in the next phase; for now get it in the web app.
+- **An album of yours MusicBrainz finds** that Navidrome's search didn't list is drawn among yours, "in
+  your library", and opens your album's page. Finding that page can take a moment (the row shows it's
+  working); open something else, or go to another tab, meanwhile and it doesn't open over what you went to.
 - Nothing found says "No results for “…”." and "Check the spelling or try a new search." (a chip's:
-  "No albums for “…”."). If Navidrome couldn't be asked, why, and **Try again**. If deadwax can't reach
+  "No albums for “…”."). If Navidrome couldn't be asked, why, and **Try again**. If MusicBrainz couldn't be,
+  "Searching for more isn't working right now - try again in a few minutes." (or "Too many searches just now -
+  try again in a moment.") and **Try again**, your library's rows still there. If deadwax can't reach
   Navidrome at all, the Library's words for it ("Can't reach Navidrome", or "Your music isn't available right
-  now") stand above the list, with Try again once Navidrome is set up.
-- **Offline**, a list already drawn for the words stays, the songs not on this phone dimmed (a tap does
-  nothing) and the ones on it playing; albums and artists with nothing here dimmed. New words say "Search
-  works once deadwax is back." and are searched once it is.
+  now") stand above the list, with Try again once Navidrome is set up; albums you don't have are still found.
+- **Covers** of albums you don't have come from the Cover Art Archive, through deadwax: they need deadwax
+  2.1.24 or later (`:experimental` for now), and show as an empty square on an older one - see
+  [the troubleshooting page](troubleshooting.md#the-iphone-app-shows-no-cover-for-an-album-you-dont-have).
+  A cover that couldn't load while deadwax was out of reach loads as soon as it's back.
+- **Offline**, a list already drawn for the words stays, without the albums you don't have, the songs not
+  on this phone dimmed (a tap does nothing) and the ones on it playing; albums and artists with nothing here
+  dimmed. New words say "Search works once deadwax is back." - never an empty list - and are searched once
+  it is, your library's rows in the list with the rest. An album you
+  don't have's page keeps what it has shown; one that hasn't loaded its pressings says "This album's
+  pressings load once deadwax is back." and loads them when it is.
 - **VoiceOver** reads a row as one: its title, its line, and for a song "plays it from its album" or "opens
-  its album". The list is announced as it comes in ("In your library: 1 artist, 2 albums, 11 songs."), and
-  a chip as it's chosen ("Showing albums.").
+  its album". The list is announced as it comes in ("In your library: 1 artist, 2 albums, 11 songs.", then
+  "Also found: 3 albums."), and a chip as it's chosen ("Showing albums.").
 
 ## Playing
 
@@ -2616,6 +2655,59 @@ is the one to compare with: it should give the same lists.
   in Top results), and "plays it from its album" (or "opens its album"); the list found is announced ("In
   your library: 1 artist, 2 albums, 11 songs."); a chip as it's chosen ("Showing albums.").
 
+### Search's checks, slice 2 (130-143)
+
+**Not done yet.** These come with the build that adds MusicBrainz's albums to Search, and the album you don't
+have (still app 0.10). Check 137 wants deadwax 2.1.24 or later (`:experimental` for now) and then 2.1.23; the
+rest work on either. As with 121-129, the web app's Search is the one to compare with.
+
+- **130 The hint.** Search shows "Search your library and albums you don't have yet." (with logins on and a
+  library of your own, "Search your library, the collection, and albums nobody has yet.").
+- **131 An album you don't have** (the plan's second check). Type an album you don't have, with its artist:
+  a moment after you stop typing it's in Albums, after yours, with its cover, its artist and year. Tap it: its
+  page opens - the cover, the title and artist, "1994 · Album · not in your library" (its own year), Pressing,
+  and the tracklist. Back: the list as you left it.
+- **132 Pressings.** On that page tap **Pressing**: every pressing, the usual one ticked, each with its format,
+  year, country and label and how it compares ("+1 bonus track: …"). Pick another: its facts and tracklist
+  under Pressing, a track it adds marked **Bonus**, one it leaves out under "Not on this pressing", the line
+  above the tracklist saying what it is ("This pressing adds 1 track"). An album of more than 30 pressings
+  (a famous one): the filter; type "JP" and it says how many match.
+- **133 Held, and maybe.** An album of yours with no MusicBrainz ids (a folder never matched to a release):
+  its MusicBrainz row says "maybe in your library", and its page "maybe in your library" dashed after its
+  line, with "You may already have this - …" under Pressing. If MusicBrainz finds an album of yours that
+  Navidrome's search didn't list, it's drawn among yours, "in your library"; tap it: your album's page.
+- **134 The moments, as the web's.** Type "portishead" (or an artist of yours) and watch: Top results
+  first, "Searching…" where the sections go, then the sections - nothing moving under your finger. The same
+  words in the web app: the same steps and, once they're in, the same rows.
+- **135 An artist alone.** "portishead": Albums ends with "Studio albums and EPs - See all for everything
+  they made."; See all under Albums: everything MusicBrainz has of theirs, live albums and compilations too,
+  after yours.
+- **136 Short words.** Type "ab": your library's rows, and "Type a little more, or press Search, to find
+  albums you don't have yet." where the albums would go. Press Search: the albums are asked, and land.
+- **137 Covers.** On deadwax 2.1.24 or later: the albums you don't have show their covers, in the list and on
+  their page. On 2.1.23: the empty square in their place - nothing else changes, and nothing says an error.
+- **138 Offline.** With a list drawn, turn on Airplane Mode: the albums you don't have go, yours stay. On an
+  album you don't have's page, Airplane Mode on: the page stays as it was, and Pressing still chooses among
+  its pressings. Airplane Mode off: the albums you don't have are back in the list.
+- **139 VoiceOver.** An album you don't have's row reads its title and its line ("Portishead · 2008"); the list
+  is announced as it comes in ("In your library: …", then "Also found: 3 albums."). On its page, **Pressing**
+  reads the pressing chosen; in the picker, the one ticked reads as selected.
+- **140 Typing offline.** Airplane Mode on, type new words ("portishead", then "ab"), and wait a few seconds:
+  "Search works once deadwax is back." stays - never an empty list. Airplane Mode off: the words are searched,
+  your library's rows drawn in the list, never left behind "Show 3 from your library".
+- **141 The places hold their height.** Words whose albums are slow to come (a busy evening for MusicBrainz,
+  or the Wi-Fi throttled): watch the "Searching…" line in Albums become the albums, **Show 2 more albums**, or
+  the failure with **Try again** at its end - the sections below never move. The same at the largest text size
+  (Settings, Accessibility, Larger Text): one line, the words cut short with "…", Try again still on it.
+- **142 A held album, left.** Tap an album of yours that MusicBrainz found (the row spins), and before it opens
+  tap the Library tab: Library stays as it was, and back in Search nothing has opened. Tap one again and,
+  while it spins, open another row: only that row's page opens.
+- **143 Covers, back online.** Airplane Mode on: scroll the Library's Albums to ones whose covers haven't shown
+  yet (empty squares), and on an album you don't have's page pick a pressing you haven't looked at (the album's
+  cover stays). Airplane Mode off: those covers load where you are, without scrolling away or leaving the page,
+  the pressing's own cover in place of the album's if it has one. An album with no cover at all stays the empty
+  square.
+
 ## What it can't do yet
 
 These are the web app's for now. Most of them come to the phone in the next phases:
@@ -2624,8 +2716,9 @@ These are the web app's for now. Most of them come to the phone in the next phas
 
 - On an artist's page their **discography** from MusicBrainz, the **description** and the artist's
   managing (pictures, names).
-- In **Search**, albums, artists and songs you don't have yet (MusicBrainz's), and what's saved of
-  MusicBrainz's answers; **Get** and **Requests**.
+- In **Search**, artists and songs you don't have yet (MusicBrainz's), and what's saved of MusicBrainz's
+  answers; **Get** (an album you don't have shows its pressings, but is got in the web app) and
+  **Requests**.
 - **Home** and **pins**.
 - **Looking after deadwax**: People, Server settings, the event log, Needs a look, Library care, the
   editors, and changing your password. For an admin, **Set up Navidrome** opens the web app in Safari.
@@ -2660,6 +2753,8 @@ These are the web app's for now. Most of them come to the phone in the next phas
 | The app's notice: **"Couldn't add to Late night."** and why | An add you'd closed Add to a playlist on was refused, or its answer didn't come back. Try again: if the songs did get in, it asks before adding them twice. |
 | **Lyrics** is dimmed | The song has none - none on LRCLIB, or none fetched yet (**Get lyrics** in the album's Edit, on the web app). Offline, "Lyrics - not on this phone": none were kept for it, which happens to a song downloaded with app 0.3 until the app has been opened with deadwax in reach. |
 | The EQ's correction picker: **"Something went wrong."**, with **Try again** | deadwax answered with an error. If it's every search, deadwax may be older than 2.1.7, which has no AutoEq for the app (an admin sees why, folded under it). |
+| Search: **"Searching for more isn't working right now - try again in a few minutes."** (or **"Too many searches just now - try again in a moment."**), or an album you don't have says **"This album's details can't be loaded right now - try again in a few minutes."** | MusicBrainz is away, or turning searches away, for a while - it does, for minutes at a time. Your library's rows are still there; **Try again** in a minute. **"That took too long."** is the same, MusicBrainz slow enough that the phone stopped waiting. [The troubleshooting page](troubleshooting.md#the-apps-search-says-it-cant-search-for-more-or-keeps-searching) has the rest. |
+| Search: an album you don't have shows an **empty square** for its cover | Its cover comes from the Cover Art Archive through deadwax, which needs deadwax 2.1.24 or later - see [the troubleshooting page](troubleshooting.md#the-iphone-app-shows-no-cover-for-an-album-you-dont-have). |
 | An album stays on **"Waiting for Wi-Fi"** | Download over is Wi-Fi only (You > Downloads): join a Wi-Fi network that isn't a phone's hotspot, with Low Data Mode off - or choose Wi-Fi and cellular. |
 | **"Waiting for room - the storage limit is reached"** | Raise the Storage limit in You > Downloads, or remove something there (largest first). |
 | Your library's albums stay on **"Waiting for the phone to charge"** | Only while charging is on (You > Downloads, under Download your library): plug the phone in, or turn it off. Albums you download yourself don't wait for it. |

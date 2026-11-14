@@ -588,6 +588,28 @@ minutes at a time; **Try again** later. *Couldn't get the cover.* is a problem o
 runs deadwax sees what went wrong after it, in brackets; anyone else is told to tell them if it keeps
 happening.
 
+## The iPhone app shows no cover for an album you don't have
+
+The [iPhone app](ios.md#search)'s Search draws the albums it finds on MusicBrainz - the ones you don't have
+yet - with their covers from the Cover Art Archive, which deadwax fetches and passes on: the app talks only to
+deadwax. An empty square in a cover's place, in the list or on the album's page, is one of these:
+
+- **deadwax is older than 2.1.24**, which has no route for those covers: every album you don't have shows the
+  empty square, and nothing else is wrong - Search and the album's page work as they should. 2.1.24 is in
+  `:experimental` until it's released: pull the image and recreate the container.
+- **The album has no front cover on the Cover Art Archive.** Plenty of releases have none; the web app's
+  Search shows none for it either. Nothing to do.
+- **The Cover Art Archive is away**, as it is for minutes at a time. deadwax doesn't keep the phone waiting
+  on it - it says within seconds there's nothing to pass on - and the phone asks again a minute later at
+  the soonest: search again, or open the album's page again, in a few minutes.
+- **deadwax's container can't reach `coverartarchive.org` and `archive.org`** (a firewall, a proxy, DNS):
+  every cover is missing on the phone, and **Get cover** fails too (see [No cover](#no-cover-or-the-cover-art-archive-has-no-front-cover-for-that-release)).
+  The web app's own Search still shows covers, because the browser fetches them from the Archive itself -
+  so that it does isn't a sign deadwax can.
+
+A cover deadwax has fetched is kept (up to 128 MB, in a `deadwax-covers` folder beside the player's cache),
+so once one has shown it shows again without asking the Archive.
+
 ## Lyrics are missing, or land late
 
 - LRCLIB doesn't have every song, and instrumentals get no `.lrc` by design. When LRCLIB is under

@@ -40,6 +40,27 @@ enum AppRoute: Hashable {
     /// (slice 5, question 32) Every song of the collection, pushed: All music's All songs, from the Library's ••• with a
     /// library of your own (without one, Songs is a page of the switch).
     case allSongs
+    /// (Phase 5, slice 2) The album you don't have (phase5-search.md 3.6): a MusicBrainz album's page, by its release
+    /// group's id - from Search's MusicBrainz rows.
+    case group(GroupRoute)
+}
+
+/// The album you don't have's address: its release group's id as MusicBrainz gave it (lowercase - deadwax's routes take
+/// no other), and the album Search showed, drawn at once while its pressings load (ReleaseGroupPage.tsx's `preview`).
+/// Only `id` decides which album.
+struct GroupRoute: Hashable {
+    let id: String
+    var preview: ReleaseGroup?
+
+    init(id: String, preview: ReleaseGroup? = nil) {
+        self.id = id
+        self.preview = preview
+    }
+
+    /// A Search row's album.
+    init(_ group: ReleaseGroup) {
+        self.init(id: group.id, preview: group)
+    }
 }
 
 /// An artist page's address: Navidrome's artist id, and what opened it - the name and picture drawn at once while the
@@ -321,6 +342,7 @@ extension View {
                 case .artist(let artist): ArtistView(route: artist)
                 case .artists(let scope): ArtistsScreen(scope: scope)
                 case .allSongs: SongsScreen()
+                case .group(let group): GroupView(route: group)
                 }
             }
             .clearsPlayer()

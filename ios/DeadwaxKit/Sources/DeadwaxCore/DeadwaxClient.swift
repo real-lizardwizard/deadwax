@@ -371,6 +371,61 @@ public struct DeadwaxClient: Sendable {
         try await fetch(Routes.libraryOwned, as: OwnedAnswer.self, ifNoneMatch: etag)
     }
 
+    // MARK: Phase 5, slice 2: MusicBrainz's albums
+
+    /// MusicBrainz's albums for `query` (`Routes.fullySearch`): `limit` of them, no releases walked, with Search's
+    /// patience (`quick` - a 400 said as words, MusicBrainz shedding said as busy). A 503 is MusicBrainz away, a 422
+    /// with words a search it refused.
+    public func fullySearch(_ query: String, limit: Int = SearchAlbums.limit) async throws -> FullySearchAnswer {
+        try await call(Routes.fullySearch, as: FullySearchAnswer.self,
+                       query: [("query", query), ("limit", String(limit)), ("releases", "false"), ("quick", "true")])
+    }
+
+    /// One album's every pressing with its tracklist (`Routes.releaseGroup`) - `problem` when MusicBrainz failed part
+    /// way, or before the first page. `mbid` as MusicBrainz gave it (the route takes lowercase only).
+    public func releaseGroup(mbid: String) async throws -> ReleaseGroupAnswer {
+        try await call(Routes.releaseGroup, as: ReleaseGroupAnswer.self, query: [("release_group_mbid", mbid)])
+    }
+
+    /// A Cover Art Archive front through deadwax (`Routes.archiveCover`, server 2.1.24).
+    public func archiveCoverRequest(_ cover: ArchiveCoverID, size: Int) -> HTTPRequest {
+        var built = request(Routes.archiveCover, path: ["kind": cover.kind.rawValue, "mbid": cover.mbid],
+                            query: [("size", String(size))])
+        built.headers["Accept"] = "image/*"
+        return built
+    }
+
+    /// A front's bytes, `.unchanged` for the copy kept (its ETag `ifNoneMatch`) - nil for anything else deadwax
+    /// answers: no front (404), the Archive away (502, 504), or a server before 2.1.24 that has no such route (its
+    /// 404). The phone draws the empty cover for those; only the transport failing is thrown.
+    public func archiveCover(_ cover: ArchiveCoverID, size: Int, ifNoneMatch etag: String? = nil) async throws -> Fetched<Data>? {
+        var built = archiveCoverRequest(cover, size: size)
+        if let etag, !etag.isEmpty { built.headers["If-None-Match"] = etag }
+        let response = try await send(built)
+        switch response.status {
+        case 200: return .fresh(response.body, etag: response.header("ETag"))
+        case 304 where built.headers["If-None-Match"] != nil: return .unchanged
+        default: return nil
+        }
+    }
+
+    /// The id bridge by a release you hold (`Routes.storeAlbum` with `release_mbid`): Navidrome's album for it - nil
+    /// when Navidrome doesn't have it, or can't be asked.
+    public func navidromeAlbum(releaseMbid: String) async throws -> String? {
+        let answer = try await call(Routes.storeAlbum, as: StoreAlbum.self, query: [("release_mbid", releaseMbid)])
+        guard let id = answer.navidromeId, !id.isEmpty else { return nil }
+        return id
+    }
+
+    /// Navidrome's album for the first of `releases` it has (api/store.ts `navidromeAlbumFor`), asked in turn - nil
+    /// when none.
+    public func navidromeAlbum(releases: [String]) async throws -> String? {
+        for release in releases {
+            if let id = try await navidromeAlbum(releaseMbid: release) { return id }
+        }
+        return nil
+    }
+
     // MARK: Phase 4, slice 4: artists
 
     /// Every artist in the collection, in Navidrome's order (getArtists, its index flattened by deadwax).

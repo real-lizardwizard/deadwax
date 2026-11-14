@@ -1,18 +1,22 @@
 import DeadwaxCore
 import SwiftUI
 
-/// Search, your library's half (Phase 5, slice 1 - notes/ios-specs/phase5-search.md 3.1-3.5; the web's app/Search.tsx
-/// and SearchRows.tsx): one list, Apple Music's way - Top results, then Artists, Albums and Songs, yours first in each -
-/// from Navidrome's search3. The box is the navigation bar's (always drawn, question 2), the chips under it while it has
-/// words; every rule and word is Core's (SearchState, SearchList, SearchWords) and SearchModel makes the asks.
+/// Search (Phase 5, slices 1 and 2 - notes/ios-specs/phase5-search.md 3.1-3.6; the web's app/Search.tsx and
+/// SearchRows.tsx): one list, Apple Music's way - Top results, then Artists, Albums and Songs, yours first in each - from
+/// Navidrome's search3, and MusicBrainz's albums you don't have after yours. The box is the navigation bar's (always
+/// drawn, question 2), the chips under it while it has words; every rule and word is Core's (SearchState, SearchList,
+/// SearchWords) and SearchModel makes the asks.
 ///
-/// - All: the list as drawn for the words - frozen once drawn, its lines (whose a row is) changing in place - each
-///   section's first rows with See all; a kind view: that kind in full, More from your library when it is full.
+/// - All: the list as drawn for the words in its moments - Top results' decided picks first with a place for the rest,
+///   the sections where the asking line stood once MusicBrainz answers or the cap passes, a late answer landing in its
+///   section's slot or folded behind "Show 2 more albums" - frozen once drawn, its lines (whose a row is) changing in
+///   place; the library's place kept at the top when it was late; Type a little more, the all-failed foot, nothing found.
+/// - A kind view: that kind in full, More from your library when it is full; the Albums view MusicBrainz's albums below.
 /// - A song plays from its tap when its album's songs are in hand (▶), else its album's page opens (question 10); its
 ///   ••• is the album page's song menu, or the song's own before its album is in hand (question 11). An artist and an
-///   album open their pages, pushed on this tab's stack.
-/// - While deadwax can't be reached (question 5) nothing is asked: a list drawn for the words stays, songs not on this
-///   phone dimmed; for new words, "Search works once deadwax is back."
+///   album open their pages; a MusicBrainz album the album you don't have - or yours, held (the id bridge).
+/// - While deadwax can't be reached (question 5) nothing is asked: a list drawn for the words stays without
+///   MusicBrainz's part, songs not on this phone dimmed; for new words, "Search works once deadwax is back."
 /// - Navidrome known not to be there: the Library's gate words above the list, nothing asked of it.
 struct SearchScreen: View {
     @Environment(SearchModel.self) private var search
@@ -54,7 +58,15 @@ struct SearchScreen: View {
         .onSubmit(of: .search) { search.submitted() }
         .onAppear { search.shown() }
         .onChange(of: navigation.tab) { _, tab in
-            if tab == .search { search.shown() }
+            // another tab: a held album's row asking the id bridge lets go, so its answer opens nothing there
+            if tab == .search { search.shown() } else { search.standDown() }
+        }
+        .onChange(of: navigation.search) { _, _ in
+            // a page pushed or popped over the list: the same
+            search.standDown()
+        }
+        .onChange(of: navigation.nowPlayingShown) { _, shown in
+            if shown { search.standDown() }
         }
         .onChange(of: scenePhase) { _, phase in
             if phase == .active, navigation.tab == .search { search.shown() }
@@ -122,41 +134,19 @@ struct SearchScreen: View {
             DrawnList(drawn: drawn)
         } else if !online {
             ShelfNote(SearchWords.offline)
-        } else if search.navidromeAway == nil {
-            AskingLine(personal: search.personal)
+        } else {
+            AskingLine(personal: search.personal, musicBrainz: state.drawnMusicBrainz(state.query))
         }
     }
 
-    /// A kind view: the chip's own search3, its rows in its order.
+    /// A kind view (Search.tsx `kindView`): its heading, the library's late place, the asking line, its library's
+    /// failure, its rows (the chip's own search3, its order) and More from your library - then, the Albums view,
+    /// MusicBrainz's albums below them - and "No albums for …" when nothing at all was found.
     @ViewBuilder private func kindView(_ kind: SearchKind) -> some View {
-        let state = search.state
-        if let own = state.kindShown {
-            switch own.state {
-            case .asking:
-                AskingLine(personal: search.personal)
-            case .failed:
-                FailureNote(failure: search.kindFailure) { search.tryKindAgain() }
-            case .skipped:
-                EmptyView()
-            case .answered:
-                // each key once (search3 can name a song twice)
-                let rows: [SearchRow] = SearchList.drawable(SearchList.kindRows(
-                    kind, rows: own.rows, text: state.query, allResults: state.results,
-                    ownedArtists: search.owned?.artists ?? [], artistList: artists.list))
-                if rows.isEmpty {
-                    ShelfNote(SearchWords.nothing(SearchView(kind), state.query))
-                } else {
-                    SectionHead(kind: kind, seeAll: false)
-                    let marks = search.marks
-                    ForEach(rows) { (row: SearchRow) in
-                        SearchRowView(row: row, marks: marks, top: false)
-                    }
-                    if own.full || own.more != .idle {
-                        MoreButton(own: own, personal: search.personal)
-                    }
-                }
-            }
-        } else if !reachability.online {
+        let online = reachability.online
+        if let shown = search.kindView, online || shown.own != nil {
+            KindViewDrawn(shown: shown, online: online)
+        } else if !online {
             ShelfNote(SearchWords.offline)
         } else if search.navidromeAway == nil {
             AskingLine(personal: search.personal)
@@ -164,17 +154,125 @@ struct SearchScreen: View {
     }
 }
 
-/// The list as drawn for some words: its failure or "nothing found", Top results, and each section's first rows with
-/// See all - each row's line read from the marks as they are now.
-private struct DrawnList: View {
-    let drawn: SearchList.Drawn
+/// A kind view as Core's `kindView` says it stands.
+private struct KindViewDrawn: View {
+    let shown: KindView
+    let online: Bool
 
     @Environment(SearchModel.self) private var search
 
     var body: some View {
+        let personal = search.personal
         let marks = search.marks
+        let query = search.state.query
+        SectionHead(kind: shown.kind, seeAll: false)
+        if online, let late = shown.lateSlot {
+            LibraryLateSlot(slot: late, text: query, failure: search.kindFailure,
+                            show: { search.showKindLibrary() }, retry: { search.tryKindAgain() })
+        }
+        if shown.searching {
+            AskingLine(personal: personal, musicBrainz: shown.searchingMusicBrainz)
+        }
+        if shown.libraryFailed {
+            FailureNote(failure: search.kindFailure) { search.tryKindAgain() }
+        }
+        ForEach(SearchList.drawable(shown.libraryRows)) { (row: SearchRow) in
+            SearchRowView(row: row, marks: marks, top: false)
+        }
+        if let own = shown.own, own.state == .answered, own.full || own.more != .idle {
+            MoreButton(own: own, personal: personal)
+        }
+        if online, let foot = shown.foot {
+            KindFoot(foot: foot, marks: marks)
+        }
+        if shown.nothing {
+            ShelfNote(SearchWords.nothing(SearchView(shown.kind), query))
+        }
+    }
+}
+
+/// MusicBrainz's part of a kind view, below the library's.
+private struct KindFoot: View {
+    let foot: KindView.Foot
+    let marks: SearchMarks
+
+    @Environment(SearchModel.self) private var search
+
+    var body: some View {
+        switch foot {
+        case .typeMore:
+            ShelfNote(SearchWords.typeMore)
+                .padding(.top, 6)
+        case .searching:
+            AskingLine(personal: search.personal, musicBrainz: true)
+        case .failed(let failure):
+            MusicBrainzFailure(failure: failure, short: false) { search.tryKindMusicBrainzAgain() }
+        case .rows(let rows):
+            ForEach(SearchList.drawable(rows)) { (row: SearchRow) in
+                SearchRowView(row: row, marks: marks, top: false)
+            }
+        case .said(let words):
+            ShelfNote(words)
+        }
+    }
+}
+
+/// The list as drawn for some words (Search.tsx `allView`): the library's place kept at the top, its failure, Top
+/// results with a place kept for the picks still to come, the asking line where the sections will go - or each
+/// section's rows with See all, a late kind's slot and the studio line - then Type a little more, the all-failed foot,
+/// or "No results for …". Each row's line read from the marks as they are now. While deadwax can't be reached,
+/// nothing of MusicBrainz's: its rows, slots and words left out, a section only of them gone.
+private struct DrawnList: View {
+    let drawn: SearchList.Drawn
+
+    @Environment(SearchModel.self) private var search
+    @Environment(Reachability.self) private var reachability
+
+    var body: some View {
+        let marks = search.marks
+        let online = reachability.online
+        let personal = search.personal
+        let top: [SearchRow] = online ? drawn.top : drawn.top.filter { (row: SearchRow) -> Bool in !row.isMusicBrainz }
+        let sections: [SearchList.Drawn.Section]? = online ? drawn.sections : drawn.sections.map(Self.offline)
+        if online, let late = search.state.libraryLateSlot {
+            LibraryLateSlot(slot: late, text: drawn.text, failure: search.failure,
+                            show: { search.showLibrary() }, retry: { search.tryAgain() })
+        }
         if drawn.failed {
             FailureNote(failure: search.failure) { search.tryAgain() }
+        }
+        if !top.isEmpty || (online && drawn.topPlace) {
+            Text(SearchWords.topResults)
+                .font(.title3.weight(.semibold))
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.top, 10)
+                .padding(.bottom, 2)
+                .accessibilityAddTraits(.isHeader)
+            ForEach(SearchList.drawable(top)) { (row: SearchRow) in
+                SearchRowView(row: row, marks: marks, top: true)
+            }
+            if online && drawn.topPlace {
+                TopPlace()
+            }
+        }
+        if let sections {
+            ForEach(sections) { (section: SearchList.Drawn.Section) in
+                DrawnSection(section: section, studio: online && section.kind == .albums && drawn.studio, marks: marks)
+            }
+            if online && !drawn.musicBrainz {
+                ShelfNote(SearchWords.typeMore)
+                    .padding(.top, 10)
+            }
+            if online, let failure = drawn.allFailed {
+                MusicBrainzFailure(failure: failure, short: false,
+                                   above: drawn.holdsLibrary ? SearchWords.libraryAbove(personal: personal) : "") {
+                    search.tryMusicBrainzAgain()
+                }
+                .padding(.top, 10)
+            }
+        } else if online {
+            // where the sections will go: one asking line
+            AskingLine(personal: personal, musicBrainz: true)
         }
         if drawn.nothing {
             VStack(alignment: .leading, spacing: 6) {
@@ -187,23 +285,232 @@ private struct DrawnList: View {
             }
             .padding(.top, 12)
         }
-        if !drawn.top.isEmpty {
-            Text(SearchWords.topResults)
-                .font(.title3.weight(.semibold))
+    }
+
+    /// The sections as drawn offline: MusicBrainz's rows and its slots left out, a section left with none of the
+    /// library's gone.
+    private static func offline(_ sections: [SearchList.Drawn.Section]) -> [SearchList.Drawn.Section] {
+        sections.compactMap { (section: SearchList.Drawn.Section) -> SearchList.Drawn.Section? in
+            let rows = section.rows.filter { (row: SearchRow) -> Bool in !row.isMusicBrainz }
+            return rows.isEmpty ? nil : SearchList.Drawn.Section(kind: section.kind, rows: rows)
+        }
+    }
+}
+
+/// One section as drawn: its heading with See all, its rows, a late kind's slot, and - Albums, when the studio clause
+/// asked them - the studio line.
+private struct DrawnSection: View {
+    let section: SearchList.Drawn.Section
+    let studio: Bool
+    let marks: SearchMarks
+
+    var body: some View {
+        SectionHead(kind: section.kind, seeAll: true)
+        ForEach(SearchList.drawable(section.rows)) { (row: SearchRow) in
+            SearchRowView(row: row, marks: marks, top: false)
+        }
+        if let slot = section.slot {
+            SectionSlot(kind: section.kind, slot: slot)
+        }
+        if studio {
+            Text(SearchWords.studioNote)
+                .font(.footnote)
+                .foregroundStyle(Palette.quiet)
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(.top, 6)
+        }
+    }
+}
+
+/// Top results' place for the picks still to come (SearchRows.tsx `topPlace`): one row's height, empty - hidden from
+/// VoiceOver.
+private struct TopPlace: View {
+    var body: some View {
+        HStack(spacing: 12) {
+            RoundedRectangle(cornerRadius: 4, style: .continuous)
+                .fill(Palette.coverEmpty)
+                .frame(width: LibraryRow.cover, height: LibraryRow.cover)
+            Spacer()
+        }
+        .padding(.vertical, 8)
+        .opacity(0.6)
+        .accessibilityHidden(true)
+    }
+}
+
+/// A slot's one height (app.css `--app-search-slot`: a finger-tall row and a little room above and below), whatever
+/// it holds - scaled with the text, so it holds at the accessibility sizes too.
+enum SearchSlotMetrics {
+    static let height: CGFloat = 60
+}
+
+/// A slot's frame (app.css `.app-search-slot`): one fixed height whatever it holds - the asking line, then what lands in
+/// it - and one line, a line too long for it ending in an ellipsis rather than wrapping, so nothing below it moves under
+/// a finger when its answer lands.
+private struct SlotFrame<Content: View>: View {
+    private let content: Content
+
+    @ScaledMetric(relativeTo: .body) private var height: CGFloat = SearchSlotMetrics.height
+
+    init(@ViewBuilder content: () -> Content) {
+        self.content = content()
+    }
+
+    var body: some View {
+        content
+            .lineLimit(1)
+            .truncationMode(.tail)
+            .frame(maxWidth: .infinity, minHeight: height, maxHeight: height, alignment: .leading)
+    }
+}
+
+/// A slot's asking line: the sweep and its words, on the slot's one row.
+private struct SlotAsking: View {
+    let words: String
+
+    var body: some View {
+        HStack(spacing: 10) {
+            ProgressView()
+            Text(words)
+                .foregroundStyle(Palette.quiet)
+        }
+        .accessibilityElement(children: .combine)
+    }
+}
+
+/// A slot's failure on its one row (app.css `.app-search-slot.is-row`): the words, ellipsized, and Try again at its end
+/// - nothing asked while deadwax can't be reached, whether it is back instead.
+private struct SlotFailure: View {
+    let words: String
+    let tryAgain: Bool
+    let retry: () -> Void
+
+    @Environment(Reachability.self) private var reachability
+
+    var body: some View {
+        HStack(spacing: 12) {
+            Text(words)
+                .foregroundStyle(Palette.quiet)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.top, 10)
-                .padding(.bottom, 2)
-                .accessibilityAddTraits(.isHeader)
-            ForEach(SearchList.drawable(drawn.top)) { (row: SearchRow) in
-                SearchRowView(row: row, marks: marks, top: true)
+            if tryAgain {
+                Button(SearchWords.tryAgain) {
+                    if reachability.online { retry() } else { reachability.tryNow() }
+                }
+                .fixedSize()
+                .disabled(reachability.probing)
             }
         }
-        ForEach(drawn.sections) { (section: SearchList.Drawn.Section) in
-            SectionHead(kind: section.kind, seeAll: true)
-            ForEach(SearchList.drawable(section.rows)) { (row: SearchRow) in
-                SearchRowView(row: row, marks: marks, top: false)
+    }
+}
+
+/// A late kind's slot in its section (SearchRows.tsx `slot`), one height whatever it holds: still asking; folded
+/// behind "Show 2 more albums"; why there is nothing; its failure, with Try again unless the words were refused.
+private struct SectionSlot: View {
+    let kind: SearchKind
+    let slot: SearchList.Drawn.Slot
+
+    @Environment(SearchModel.self) private var search
+
+    var body: some View {
+        SlotFrame {
+            switch slot {
+            case .asking:
+                SlotAsking(words: SearchWords.searching(personal: search.personal, musicBrainz: true))
+            case .show(let rows):
+                Button(SearchWords.fold(kind, rows.count).button) { search.showFolded(kind) }
+                    .buttonStyle(SecondaryPill())
+            case .said(let words):
+                Text(words)
+                    .foregroundStyle(Palette.quiet)
+            case .failed:
+                let failure = albumsFailure
+                SlotFailure(words: SearchWords.failure(failure, short: true), tryAgain: !failure.refused) {
+                    search.tryMusicBrainzAgain()
+                }
             }
         }
+    }
+
+    /// The albums' failure as the state holds it - else (never, as the state draws it) MusicBrainz away.
+    private var albumsFailure: MBFailure {
+        if case .failed(_, _, let failure) = search.state.albums { return failure }
+        return MBFailure(message: SearchWords.moreUnsearched, unavailable: true)
+    }
+}
+
+/// The library's place kept at the top of a list drawn without it (Search.tsx's `lateSlot`), as it stands: asking;
+/// its failure and Try again; not searched (Navidrome away); "Show 3 from your library"; or that it found nothing.
+private struct LibraryLateSlot: View {
+    let slot: SearchState.LateSlot
+    let text: String
+    let failure: (any Error)?
+    let show: () -> Void
+    let retry: () -> Void
+
+    @Environment(SearchModel.self) private var search
+    @Environment(ServerModel.self) private var server
+    @Environment(Reachability.self) private var reachability
+
+    var body: some View {
+        let personal = search.personal
+        SlotFrame {
+            switch slot {
+            case .asking:
+                SlotAsking(words: SearchWords.searching(personal: personal, musicBrainz: false))
+            case .failed:
+                SlotFailure(words: failureWords, tryAgain: true, retry: retry)
+            case .skipped:
+                Text(SearchWords.librarySkipped(personal: personal))
+                    .foregroundStyle(Palette.quiet)
+            case .show(let count):
+                Button(SearchWords.libraryLate([.artists: count], personal: personal, text: text).button ?? "", action: show)
+                    .buttonStyle(SecondaryPill())
+            case .nothing:
+                Text(SearchWords.libraryLate([:], personal: personal, text: text).line)
+                    .foregroundStyle(Palette.quiet)
+            }
+        }
+    }
+
+    /// The library's failure in a listener's words, on the slot's one line (the web's `late.message`) - the raw detail
+    /// whoever runs deadwax sees in a FailureNote not drawn here: a slot has no room for it, and the web's has none.
+    private var failureWords: String {
+        guard let failure else { return reachability.online ? ErrorWords.other : SearchWords.offline }
+        return ErrorWords.of(failure, admin: server.access.seesDetail, retry: true).said
+    }
+}
+
+/// MusicBrainz's failure, in its words (`failureWords` - `short` for a slot): a refusal's own, busy, away; Try again
+/// unless refused. The all-failed foot adds what is above it.
+private struct MusicBrainzFailure: View {
+    let failure: MBFailure
+    let short: Bool
+    let above: String
+    let retry: () -> Void
+
+    @Environment(Reachability.self) private var reachability
+
+    init(failure: MBFailure, short: Bool, above: String = "", retry: @escaping () -> Void) {
+        self.failure = failure
+        self.short = short
+        self.above = above
+        self.retry = retry
+    }
+
+    var body: some View {
+        let words = SearchWords.failure(failure, short: short)
+        VStack(alignment: .leading, spacing: 8) {
+            Text(above.isEmpty ? words : "\(words) \(above)")
+                .foregroundStyle(Palette.quiet)
+                .fixedSize(horizontal: false, vertical: true)
+            if !failure.refused {
+                Button(SearchWords.tryAgain) {
+                    if reachability.online { retry() } else { reachability.tryNow() }
+                }
+                .disabled(reachability.probing)
+            }
+        }
+        .padding(.vertical, 6)
     }
 }
 
@@ -230,14 +537,15 @@ private struct SectionHead: View {
     }
 }
 
-/// The line while the library is asked.
+/// The asking line: the library's words while only it is asked, "Searching…" once MusicBrainz is in it.
 private struct AskingLine: View {
     let personal: Bool
+    var musicBrainz = false
 
     var body: some View {
         HStack(spacing: 10) {
             ProgressView()
-            Text(SearchWords.searching(personal: personal))
+            Text(SearchWords.searching(personal: personal, musicBrainz: musicBrainz))
                 .foregroundStyle(Palette.quiet)
         }
         .accessibilityElement(children: .combine)
@@ -364,7 +672,52 @@ struct SearchRowView: View {
                  dimmed: dims(album: album.id))
         case .song(let song):
             songRow(song, line)
+        case .group(let group):
+            groupRow(group, line)
+        case .mbArtist:
+            // a MusicBrainz artist (Top results' family, an album's credited artist the library hasn't): their page is
+            // slice 3's (question 9) - drawn, opening nothing yet (question 14)
+            face(line, round: true, cover: nil, plays: false)
+                .accessibilityElement(children: .combine)
+                .accessibilityLabel(spoken(line))
         }
+    }
+
+    /// A MusicBrainz album's row: the album you don't have - or, held, yours by the id bridge (busy while it asks).
+    private func groupRow(_ group: ReleaseGroup, _ line: SearchList.Line) -> some View {
+        let busy: Bool = search.opening == group.id
+        return Button {
+            search.open(group)
+        } label: {
+            groupFace(group, line, busy: busy)
+        }
+        .buttonStyle(.plain)
+        .disabled(busy || !reachability.online)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(spoken(line))
+        .accessibilityValue(busy ? SearchWords.loading : "")
+    }
+
+    private func groupFace(_ group: ReleaseGroup, _ line: SearchList.Line, busy: Bool) -> some View {
+        let large: Bool = typeSize.isAccessibilitySize
+        return HStack(spacing: 12) {
+            ArchiveCover(addresses: ArchiveCoverID.addresses(release: nil, group: group.id), size: ArchiveCoverSize.row)
+                .frame(width: LibraryRow.cover, height: LibraryRow.cover)
+                .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
+            VStack(alignment: .leading, spacing: 1) {
+                Text(row.title)
+                    .foregroundStyle(.primary)
+                    .lineLimit(large ? 3 : 1)
+                lineText(line, large: large)
+            }
+            Spacer(minLength: 8)
+            if busy {
+                ProgressView()
+                    .accessibilityHidden(true)
+            }
+        }
+        .padding(.vertical, 8)
+        .contentShape(Rectangle())
     }
 
     /// An artist's or an album's row: its page pushed on Search's stack.

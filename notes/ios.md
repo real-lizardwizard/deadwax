@@ -7073,7 +7073,8 @@ patch before Search's slice 2. The web doesn't change.
 - **The outage hold** is global and short: it makes the second wave of a list quick during an outage, at the price
   of a 30 s gap after one bad answer from the Archive's servers.
 - **No troubleshooting entry yet**: nothing calls the route until the phone's slice 2, so no listener can see it
-  fail; slice 2 should add one with what the phone shows.
+  fail; slice 2 should add one with what the phone shows. (It did: troubleshooting.md's "The iPhone app shows no
+  cover for an album you don't have".)
 
 ### Verified, and not
 
@@ -7095,3 +7096,298 @@ patch before Search's slice 2. The web doesn't change.
 - **Not seen**: deadwax itself has never asked the real Archive through this route - every answer it has read is the
   MockTransport's. How long the chain takes from James's server, what an outage really answers (a 503, a hang, a
   404), and the phone drawing them (slice 2) are unwatched.
+
+## Phase 5, slice 2: albums you don't have (2026-11-14)
+
+notes/ios-specs/phase5-search.md 2.7, 3.6 and 6.2, and questions 8 and 14-23 (6.6 points here). The second slice of
+Phase 5: MusicBrainz's albums in Search's one list, after yours, with the web's moments - the list drawn in steps
+and nothing moving under a finger - and the album you don't have, its pressings and tracklists, opening from them.
+MusicBrainz's artists and songs are slice 3; what's saved and the kept answers slice 4; Get is Phase 6.
+
+On `phase5-search` at `ios` d15bb82 (slice 1 merged, and main's 2.1.24, the Cover Art Archive relay, merged in). src/
+__init__.py untouched; the app stays 0.10 (10); the .xcodeproj unchanged (the new files joined the synchronized App
+folder). ROUTE_COUNT 41 -> 44: `/search_musicbrainz/fully_search`, `/search_musicbrainz/release_group` and
+`/coverart/{kind}/{mbid}`, with `/store/album` taking `release_mbid` (question 15). It builds and runs against 2.1.23:
+the covers' route answering an older server's 404 is the empty cover.
+
+### Core (DeadwaxCore)
+
+- **MusicBrainz.swift** (new): `ReleaseGroup` (id required, everything else lenient - a field of the wrong shape is
+  absent), `FullySearchAnswer` (`release-groups`, `count`), `ReleaseGroupAnswer` (`{id, releases, problem}`) and its
+  `PageRelease`s with their media and tracks, `Credits` (the credit as written, `sole`), `MBID.isOne` (the routes'
+  MBID_PATTERN spelled out), `ArchiveCoverID` and its `Kind` (`release`, `release-group`).
+- **SearchAlbums.swift** (new), searchResults.ts, idBridge.ts and artistPage.ts: `limit` (12, MUSICBRAINZ_LIMIT),
+  a group's `year`, `kind` and section `word`; `held`, `place`, `yours`, `maybe`; `notInLibrary` and `heldUnlisted` (a
+  held album never shows nowhere); `studioOrder`; `allAlbumsQuery` (an artist you have alone is their studio albums
+  and EPs, never Various Artists); `heldInOrder` and `heldReleases` (the id bridge's order); `libraryArtist`
+  (libraryArtistFor).
+- **Pressings.swift** (new), pressings.ts and tracklistDiff.ts: each pressing's format, year, country, label and
+  facts; the usual tracklist (`representative`) and the default; the picker's rows, its fold and its filter
+  (`filterMin` 30, `filterWords`, `moreWords`); `summary`; the tracklist as the chosen pressing has it, each track's
+  mark (Bonus, Other version, Renamed) and what it leaves out; `header`, `metaLine`, `holding`, `place`, `maybeLine`;
+  `GroupPage` (the page as drawn from what is in hand); `KeptPressings` (the last 20 complete lists, a list with a
+  problem never kept - question 20).
+- **SearchList.swift**, slice 2's half of searchList.ts: the pool with MusicBrainz's albums (`SearchKindPool`:
+  library, brought, musicbrainz), `sectionRows` and `lateRows` with both caps (3 of yours and 3 of MusicBrainz's, a
+  phone's), the candidates' sources (yours 0, the collection's 1, MusicBrainz's 2), the phantoms and `decidedTop` (Top
+  results decided before MusicBrainz lands, a place kept for the pick still to come), `decidedPrefix`; the moments -
+  `sectionsReady`, `lateKinds`, `drawInOrFold`, `nextBehind` (Behind); a group's line; `MBFailure` (failureOf) and the
+  words (`searching` with MusicBrainz in it, `allHeld`, `typeMore`, `studioNote`, `musicBrainz`, `failure`, `fold`,
+  `empty`, `libraryLate`, `librarySkipped`, the hint's slice 2 words).
+- **SearchReading.swift**: `typeFilter`, `asksMusicBrainzBySettling` (three UTF-16 units), `musicBrainzOnTyping`
+  (clear, settle, drop, keep).
+- **SearchState.swift**, the rest of Search.tsx's state: MusicBrainz's albums asked (`askingMusicBrainz`, its token,
+  the studio clause, the fallback to the plain words), answered (`albumsAnswered`: the studio clause's in studio order,
+  only the newest ask's) or failed; the run's moments (`advance` drawing Top results at the library's moment, the
+  sections when they're ready or the cap passes, a late kind's slot drawn in or folded, `showFolded`); the late
+  library (`libraryLateSlot`, `showLibrary`); Behind across runs (`noteBehind`); a kind view's MusicBrainz part below
+  its own and its late clock (`kindView`, `kindLatePassed`); `resumed` (a paused search picking up).
+- **Routes and the client**: the three routes; `fullySearch` asked with `releases=false` and `quick=true` (the web's
+  Search's), `releaseGroup(mbid:)`, `archiveCover(_:size:ifNoneMatch:)` (a 200 as `.fresh`, a 304 as `.unchanged`,
+  anything else nil), `navidromeAlbum(releaseMbid:)` and `navidromeAlbum(releases:)` (the first Navidrome has).
+  `fullySearch` given 20 s and `releaseGroup` 60 s (question 22); `ArchiveCoverSize` row 250, hero 1200 (question 19).
+- **export-search-albums-vectors.cjs** (new) compiles lib/searchList.ts, lib/pressings.ts, lib/idBridge.ts and
+  lib/artistPage.ts with tsc, reads MUSICBRAINZ_LIMIT, OWNED_WAIT_MS and the all-failed foot's words from Search.tsx
+  and PRESSINGS_KEPT from pressingLists.ts, and writes a second fixture, Fixtures/search/search-albums-vectors.json
+  (1.3 MB, plain ASCII, seeded): the numbers (7) and words; typing (6 filters, 21 settling texts, 147 typing steps, 44
+  readings' album queries); 21 groups; 5 folder lists' holding and 5 studio orders; every combination of the moments
+  (48 ready, 16 late, 36 landing, 10 behind); 95 whole searches with MusicBrainz's albums in hand (the pool, every
+  candidate, the phantoms, decidedTop, Top results with and without the prefix fixed, the sections capped and in full,
+  a late answer's rows, every line); and 5 pressing lists (tests/fixtures/pressings/'s real groups and a made one) read
+  as the page draws them, with 36 meta lines, the disc headings, the holding and the covers.
+  **ui/test/iossearchalbums.sim.cjs** runs its `--check`.
+
+### Where the phone can't follow the web exactly
+
+- **Albums only** (question 14): the Artists and Songs views ask no MusicBrainz yet, so the moments wait on the albums
+  alone, and a kind view's late clock is armed only for Albums.
+- **The album you don't have** (questions 17 and 18): no description, no MusicBrainz links, no editors' sentence, and
+  Get's place empty; the picker a sheet.
+- **Offline** (question 21) is the phone's own: nothing of MusicBrainz's is drawn offline.
+- **How long it waits** (question 22): the phone stops waiting before deadwax would on a hung connection.
+- **Covers**: the relay's, never the Archive's own address (the web's `<img>` goes to coverartarchive.org).
+
+### The app
+
+- **SearchModel** gains MusicBrainz's half:
+  - Typing: MusicBrainz asked 700 ms after typing pauses, only for words the reading says may (three letters, and
+    `musicBrainzOnTyping`'s settle) and not asked already; under three letters the albums in hand are dropped; an empty
+    box lets everything go (`letGo`: every task and clock cancelled).
+  - The keyboard's Search: the library, a kind view's own and MusicBrainz asked at once, the words read again
+    (`reread`), the late library's clock armed.
+  - `askMusicBrainz`: the first query (the studio clause for an artist alone, or the plain words in the Albums view),
+    then the plain words when a fielded read found nothing and the ask is still the newest; it waits up to 1.5 s for
+    `/library/owned` (OWNED_WAIT_MS) so what you hold is known before the albums are placed; a failure as `MBFailure`.
+  - The clocks: the sections' cap (RESULTS_WAIT_MS, 1.5 s after MusicBrainz is asked, once per run), the late
+    library (LIBRARY_LATE_MS, 1.5 s), a kind view's late clock (once per words and kind).
+  - `draw` advances the state, announces what it said ("In your library: …", then "Also found: 3 albums." or the
+    failure's words), notes Behind and re-arms the cap.
+  - `open(_ group:)`: a held album through the id bridge (question 16) - `heldReleases`, then
+    `navidromeAlbum(releases:)` with the row's `opening` set; your album's page when found, else the album you don't
+    have's.
+  - `resumed()`: a search paused offline picks up - the library, the kind view, and MusicBrainz for words the pause
+    would have asked.
+- **SearchScreen**: the drawn list's moments - Top results with `TopPlace` (the place kept), "Searching…" where the
+  sections will go, `DrawnSection` with its `SectionSlot` (Searching…, Show N more albums, nothing found, a short
+  failure) and the studio line, `LibraryLateSlot` at the top (Searching your library…, Show N from your library,
+  nothing found, skipped), the foot (`typeMore`, the all-failed `MusicBrainzFailure` with Try again and "What's in
+  your library is above."); a kind view's MusicBrainz part below its own with its foot (`KindFoot`). Offline, every
+  MusicBrainz row, slot and word is filtered out of a drawn list. A MusicBrainz album's row (`groupRow`): its
+  `ArchiveCover`, its title and line; a spinner while it's opening yours; dimmed and inert offline.
+- **GroupView** (new, `AppRoute.group` on Search's stack, `GroupRoute` carrying the row's group as its preview so the
+  title and cover draw at once) and **GroupPageModel** (new): the hero cover (the chosen pressing's front, then the
+  group's), the title, the credit (a link to your library's artist when one is theirs), the meta line with "maybe in
+  your library" dashed, Pressing and its facts, Get's place (empty), the maybe sentence, then the summary and the
+  tracklist with its disc headings and "Not on this pressing" - or Loading…, the trouble (Pressings.trouble for a 503
+  or a problem, the listener's words for anything else, "That link isn't an album." for an id that isn't one) with
+  Try again, or the offline line. The title moves into the bar once the hero scrolls away. Answers kept in
+  `KeptPressings` for the session.
+- **PressingPickerSheet** (new): the picker as a sheet (medium and large), each row ticked when chosen with its label,
+  facts, compared note (amber when it differs) and "In your library"; the fold; the filter over 30 pressings, its words
+  announced; Done.
+- **ArchiveCover** (new) and **CoverCache.loadArchive**: a list of addresses tried in turn through the relay, each
+  kept in the same memory cache as Navidrome's covers (`archive/<kind>/<mbid>` keys, never a Navidrome id's shape), a
+  failure not asked again within a minute, never kept on the phone; the empty cover for anything but a front.
+
+### Decided here (the spec was silent, or this departs from it)
+
+Questions 14-23 in the spec, each built to its recommendation:
+- 14, albums only;
+- 15, three routes, not four;
+- 16, a held album through the id bridge;
+- 17, what the page leaves out;
+- 18, the picker a sheet;
+- 19, the cover sizes;
+- 20, twenty pressing lists kept;
+- 21, nothing of MusicBrainz offline;
+- 22, how long the phone waits;
+- 23, slice 1's stand-ins replaced by the web's.
+
+And smaller ones, not worth a question:
+- the timeouts held by the contract test above deadwax's own give-up while MusicBrainz is busy, not by a guess;
+- no ETag sent for a cover yet, so the relay never answers the phone a 304 - the memory cache holds what it fetched,
+  and `archiveCover` reads a 304 as `.unchanged` for when one is;
+- the row's cover, like a library album's, hidden from VoiceOver (the row reads its title and line).
+
+### Tests
+
+- **SearchAlbumsVectorTests** (13): every vector of search-albums-vectors.json - the numbers and words, typing and the
+  queries, a group's year, kind and credit, what is held, the studio order, the moments, every search with albums, and
+  the pressings (each pressing, the usual tracklist and the default, the picker, each page with its summary, the
+  page's words).
+- **SearchAlbumsTests** (16), by hand: an album nobody has leading Top results once it lands; the cap drawing the
+  sections with a slot; the studio clause's answer in studio order and its fallback's as MusicBrainz gave it; a late
+  answer drawn in last, and one with nothing saying so; everything held said, a failure drawn with Try again (and
+  busy only as a 503 says it); the late library's place and Show them; short words dropping the albums; a fielded read
+  asking the plain words; the Albums view's MusicBrainz part below its own; the page drawn from what's in hand; a held
+  album opening yours by its releases in order; twenty pressing lists kept, the newest last; MusicBrainz's answers read
+  leniently; the client's three calls (asked quickly without pressings, the cover through deadwax and anything but a
+  front nil, the id bridge release by release).
+- **SearchTests** and **SearchVectorTests** (slice 1's) drawn through MusicBrainz's half: the albums answered at once
+  with nothing, so the library's tests draw whole ("… Nothing more found.").
+- **ClientTests**: `Routes.all` 44; `fullySearch` (20 s) and `releaseGroup` (60 s) among the routes given longer.
+  **FixtureFiles**: the new fixture read from the checkout.
+- **tests/test_ios_contract.py**: ROUTE_COUNT 44; five new tests - `/fully_search` asked as the web's Search asks it
+  and its answer's keys FullySearchAnswer's; `/release_group`'s `{id, releases, problem}` and the MBID pattern; the
+  relay's kinds and sizes the app sends within its Literals, and anything but a 200 nil; the timeouts above deadwax's
+  give-up while MusicBrainz is busy (and the pressings' above the search's); a held album found by its release
+  through `/store/album`.
+- **Mutations**: 19, each applied alone with the four Search suites run. 16 were caught at first; the 3 that lived
+  were closed and caught when run again:
+  - 16, "leaves out" said "removes": no view the fixture asked chose a pressing that leaves a track out. Closed by
+    each pressing's own summary in the fixture (`pages[].summary`, every clause met - adds, leaves out, renames,
+    another version).
+  - 17, busy read without a 503: no failure said busy on another status. Closed by a 500 saying `busy: true` - not
+    busy, as failureOf reads it.
+  - 18, the fallback's answer read in studio order: no test answered the plain words after the studio clause. Closed
+    by `theStudioClausesAnswerIsInStudioOrderAndItsFallbacksAsMusicBrainzGaveIt`.
+
+  The 19:
+  1. the albums asked for 11, not 12;
+  2. 19 pressing lists kept, not 20;
+  3. a plain album said "Album" in a section;
+  4. held albums not taken out of MusicBrainz's;
+  5. a held album search3 listed brought in again;
+  6. an artist's EPs before their albums;
+  7. the pressing filter from 31, not 30;
+  8. a pressing list with a problem kept;
+  9. the sections drawn only once every kind is in (no cap);
+  10. a late kind drawn in above a tappable foot;
+  11. Behind ended by a superseded search;
+  12. MusicBrainz asked by the pause from four letters;
+  13. Top results decided past a phantom;
+  14. the editors' sentence on the phone;
+  15. "not in your library" left unsaid;
+  16. "leaves out" said "removes";
+  17. busy read without a 503;
+  18. the fallback's answer read in studio order;
+  19. a pressing asked for that the album hasn't, chosen.
+
+### Verified, and not
+
+Verified:
+- `swift test`: Core 1468, Audio 158, Turntable 12 (FixtureFiles and the two album suites again after the new
+  fixture joined FixtureFiles: 31). No new warnings.
+- The unsigned Debug and Release device builds (Xcode, `generic/platform=iOS`): no warnings but the usual
+  appintentsmetadataprocessor line; no change to the .xcodeproj (the four App files joined the synchronized folder).
+- `check_project.py` ok.
+- `npm run build` and all 85 sims on Node 22.23.4, iossearchalbums' `--check` among them.
+- The full pytest suite: 4508 passed, 1 skipped (test_ios_contract's five new tests, and test_compose_example's docs rule, among
+  them).
+- The mutations above.
+
+Not verified - only the phone can tell (docs/ios.md's checks 130-139, beside the spec's section 9):
+- The moments' timing over WireGuard - 700 ms before MusicBrainz is asked, the 1.5 s cap, a late answer drawn in or
+  folded - and that nothing moves under a finger as the albums land.
+- The pressing picker's sheet, its filter (`.searchable` in a sheet's NavigationStack) and its detents on iOS 27.
+- The covers through a real relay from the real Archive (the relay's notes: deadwax has never asked it), at both
+  sizes; 2.1.23's 404 drawn as the empty cover.
+- A held album opening yours through `/store/album?release_mbid=` against James's store index.
+- VoiceOver's rows, the page's Pressing button and the picker's selected row; "Also found: 3 albums." announced.
+- Offline's filtering of MusicBrainz's rows, and the page staying as it was.
+- CI's Xcode 26.6 (the older Swift): the new code spells out its closures' types, as slice 1's.
+
+## Phase 5, slice 2, after its review (2026-11-14)
+
+The review of 2fc64f1 found three bugs in the app's wiring and one small one. All four are fixed in one commit on
+`phase5-search`. Core gains one rule (`SearchState.libraryUnplaced`) and a test; the rest is the app's. The app stays
+0.10 (10); no server change.
+
+### What was wrong, and the fix
+
+1. **Offline, new words went blank after a second and a half.** `settled()` armed the library's late clock with no
+   online check, and the clock drew when it ran out. In Airplane Mode, "portishead" drew moment 1 with `libraryLate`
+   set and an empty list (the offline filter takes MusicBrainz's part out). All then showed that blank DrawnList, not
+   "Search works once deadwax is back.". Short words did the same through the whole branch. Once deadwax was back,
+   `libraryLate` stayed set, so moment 2 left the person's own rows behind "Show N from your library". That undid
+   slice 1's check 128.
+   - **SearchModel**: `armLibraryLate()` returns while deadwax can't be reached, and the clock checks again before
+     `libraryLatePassed`, so a clock running out offline is dropped. Offline, `advance` then draws nothing, and the
+     offline line stands.
+   - **`resumed()` arms the late clock whenever it asks the library.** It asks again after a failure or a skip
+     (`state.resumed()`), or for the first time for words typed while away (`wantsLibrary`). It also arms the clock
+     when the library is still out with no place kept for it (Core's `libraryUnplaced`): an ask in flight whose clock
+     was dropped offline. The list is then drawn with the library, or a place for it, never without both.
+2. **Slots grew when their answer landed.** `SectionSlot` and `LibraryLateSlot` had a 44 pt minimum height. A
+   MusicBrainz failure (words over a button) or the library's FailureNote replaced a 44 pt asking line with 64-86 pt,
+   and the sections below jumped.
+   - **One fixed height, one row (the web's `.app-search-slot`)**:
+     - `SlotFrame` holds 60 pt (`--app-search-slot`, 44 + 2 x 8) through a `@ScaledMetric(relativeTo: .body)`, so it
+       holds at the accessibility sizes.
+     - Everything in a slot is one line ending in "…": the asking line (`SlotAsking`, the sweep and its words), a
+       Show button, its words, or a failure as one row (`SlotFailure`, the web's `is-row`). The failure's words fill
+       the row and Try again sits at its end, with none for words MusicBrainz refused.
+     - The library's failure says its listener's line (`ErrorWords.of(...).said`, the web's `late.message`). The raw
+       detail an admin sees in a FailureNote has no room in a slot, and the web's slot has none either.
+     - The all-failed foot and a kind view's foot are not slots, and keep MusicBrainzFailure.
+3. **The id bridge's answer opened on whatever was showing when it landed.** `open(_ group:)` pushed with
+   `navigation.open`, which appends to the current tab's stack, and only typing or a reset stood the ask down. While a
+   held album's row spun (up to 8 s a release), tapping another row or switching to Library got the album page pushed
+   over that page or into that tab.
+   - **The answer opens only on the list it was tapped on**: `open` captures the tab and the Search stack at the tap.
+     The answer opens only if both are unchanged and Now Playing isn't over them; otherwise it lets `opening` go and
+     drops the answer.
+   - **`standDown()`** (the web's, which lets its heldRequests go when the tab's root stops showing) cancels the ask.
+     SearchScreen calls it when the tab changes away from Search, when the Search stack changes (a page pushed or
+     popped), and when Now Playing opens.
+4. **Covers stayed empty after coming back online.** CoverImage's and ArchiveCover's `.task(id:)` keys held nothing
+   about reachability. A cover asked offline (short-circuited to the empty square) wasn't asked again until its key
+   changed, even though `CoverCache.reach` had cleared the failure.
+   - **The load's id adds `reachability.online`.** Reachability's `whenChanged` clears the failures before SwiftUI
+     restarts the tasks, so a cover on screen asks once more as deadwax comes back. What is drawn stays under the key
+     without it, so going offline never blanks a cover the view holds.
+   - **The 60 s memory of an answer is kept.** `reach` used to forget every failure. CoverCache now marks the ones
+     that were deadwax not reached (`unreached`): asked offline, or a transport failure (thrown by `archiveCover`, or
+     anything but `APIFailure.answered` from `cover`). It forgets only those. A 404, or the relay's 502 or 504, keeps
+     its minute. `forgetFailures()` (the app back to the front) still forgets all of them.
+
+### Tests
+
+- **SearchAlbumsTests** (+1, 17): `wordsTypedWhileDeadwaxIsAwayDrawNothingAndTheLibraryOnceBack`. Words typed with
+  nothing asked draw nothing. Once back, `resumed()` has nothing failed to ask again, but the words want the library
+  and have no place for it (`libraryUnplaced`). Asked and answered, the list is drawn with the library: no
+  `libraryLate`, no late slot, "In your library: …" said. The contrast: a clock run out while away draws the list
+  without the library, `libraryUnplaced` false (a place is kept), and the answer goes behind `.show(3)`.
+- **Mutations**: 3, each applied alone with SearchAlbumsTests run, all caught:
+  1. `libraryUnplaced` without its place clause;
+  2. without its settled clause;
+  3. always false.
+- The model's wiring (the online guards, the stand-down, the tab and stack check), the slots' frame and the covers'
+  ids have no test. They are the app's, untested off a phone, as every model and view is.
+
+### Verified, and not
+
+Verified, on the fixed tree before its commit:
+- `swift test`: Core 1469, Audio 158, Turntable 12.
+- The unsigned Debug and Release device builds: no warnings but the usual appintentsmetadataprocessor line; the
+  .xcodeproj unchanged.
+- `check_project.py` ok.
+- `npm run build` and all 85 sims on Node 22.23.4.
+- The full pytest suite: 4508 passed, 1 skipped.
+- The 3 mutations above.
+
+Not verified - only the phone can tell (docs/ios.md's checks 140-143):
+- Typing in Airplane Mode keeps the offline line, and the library's rows are drawn in the list once back.
+- The slots holding their height as their answer lands, at the largest text size too.
+- A held album's row left before its answer, by another tab or another row.
+- Covers loading in place once back online.

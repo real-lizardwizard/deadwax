@@ -80,7 +80,9 @@ from src.api.navidrome_endpoint import CLIENT_NAME  # noqa: E402
 from src.config import Config  # noqa: E402
 from src.routes import eq as eq_route  # noqa: E402
 from src.routes import library as library_route  # noqa: E402
-from src.routes import my_library, navidrome, store_album  # noqa: E402
+from src.api import musicbrainz_endpoint  # noqa: E402
+from src.routes import coverart as coverart_route  # noqa: E402
+from src.routes import my_library, navidrome, search_musicbrainz, store_album  # noqa: E402
 from src.routes import play_history as history_route  # noqa: E402
 from src.routes.auth import SignIn  # noqa: E402
 from src.routes.download import FindCandidatesRequest  # noqa: E402
@@ -88,7 +90,7 @@ from src.store import JobStore  # noqa: E402
 
 CORE = Path(__file__).resolve().parent.parent / "ios" / "DeadwaxKit" / "Sources" / "DeadwaxCore"
 ENDPOINT = re.compile(r'Endpoint\(method: "(\w+)", path: "([^"]+)", query: \[([^\]]*)\]\)')
-ROUTE_COUNT = 41
+ROUTE_COUNT = 44
 RAW_OPENING = re.compile(r'#+"')
 HASHES = re.compile(r"#*")
 
@@ -1196,3 +1198,70 @@ def test_the_box_is_never_longer_than_the_route_takes(monkeypatch):
     query = next(f for f in search.dependant.query_params if f.alias == "q")
     lengths = {type(rule).__name__: rule for rule in query.field_info.metadata}
     assert swift_constant("SearchReading.swift", "SearchReading", "maxCharacters") == lengths["MaxLen"].max_length == 200
+
+
+# ---------------------------------------------------------------------------- Phase 5, slice 2: albums you don't have
+
+def test_musicbrainzs_albums_are_asked_and_read_as_the_server_answers(monkeypatch):
+    # /fully_search asked as the web's Search asks it - quick (a search's patience, a 400 said as words, MusicBrainz
+    # shedding said as busy), no pressings walked - and its answer's two keys under the names FullySearchAnswer reads
+    monkeypatch.setattr(Config, "AUTH_MODE", None)
+    body = swift_function("DeadwaxClient.swift", "fullySearch")
+    assert '("releases", "false")' in body and '("quick", "true")' in body and '("limit", String(limit))' in body
+    route = app_routes()[("GET", "/deadwax/search_musicbrainz/fully_search")]
+    low, high = bounds(route, "limit")
+    assert low <= swift_constant("SearchAlbums.swift", "SearchAlbums", "limit") <= high
+    source = inspect.getsource(musicbrainz_endpoint.MusicBrainzClient.fully_search)
+    assert 'return {"release-groups": release_groups["release-groups"], "best-match-releases": [], **counted}' in source
+    assert 'counted = {"count": count}' in source
+    assert set(fields("FullySearchAnswer")) == {"release-groups", "count"}
+    assert required_fields("ReleaseGroup") == {"id"}
+    assert set(fields("ReleaseGroup")) == {"id", "title", "first-release-date", "primary-type", "secondary-types",
+                                           "artist-credit"}
+
+
+def test_an_albums_pressings_are_read_as_the_route_answers_them():
+    # /release_group's {id, releases, problem} - `problem` the page's trouble, never a short list passed off as the
+    # album's pressings
+    (answer,) = returned_literals(search_musicbrainz.release_group)
+    assert literal_keys(answer) == {"id", "releases", "problem"} == set(fields("ReleaseGroupAnswer"))
+    assert "release_group_mbid" in swift_function("DeadwaxClient.swift", "releaseGroup")
+    # the ids the app tells apart from a cold address are the ones the routes take (MBID.isOne spells the pattern out)
+    text = (CORE / "MusicBrainz.swift").read_text(encoding="utf-8")
+    assert search_musicbrainz.MBID_PATTERN == "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+    assert "/" + search_musicbrainz.MBID_PATTERN + "/" in text
+
+
+def test_the_cover_relay_is_asked_for_a_kind_and_a_size_it_takes(monkeypatch):
+    # the app's two sizes and two kinds within the relay's Literals - another would be a 422, drawn as the empty cover
+    # for every MusicBrainz album
+    monkeypatch.setattr(Config, "AUTH_MODE", None)
+    route = app_routes()[("GET", "/deadwax/coverart/{kind}/{mbid}")]
+    taken = {field.alias: set(typing.get_args(field.field_info.annotation)) for field in
+             route.dependant.query_params + route.dependant.path_params if field.alias in ("kind", "size")}
+    assert {str(swift_constant("Routes.swift", "ArchiveCoverSize", name)) for name in ("row", "hero")} <= taken["size"]
+    assert swift_raw_values("MusicBrainz.swift", "Kind") == taken["kind"] == {"release", "release-group"}
+    # anything but a front (none, the Archive away, a server before 2.1.24 that answers the route's own 404) is nil
+    body = swift_function("DeadwaxClient.swift", "archiveCover")
+    assert "case 200:" in body and "default: return nil" in body
+    assert coverart_route.COVER_CACHE == "private, max-age=604800"
+
+
+def test_the_app_waits_for_musicbrainz_as_long_as_deadwax_does():
+    # a quick search gives up after SEARCH_PATIENCE's attempts and the rate limiter's turns; an album's pressings are
+    # several pages of MusicBrainz's browse - the phone's transport's own 8 s would give up before deadwax answers
+    text = (CORE / "Routes.swift").read_text(encoding="utf-8")
+    literal = re.search(r"public static let timeouts: \[Endpoint: Double\] = \[([^\]]*)\]", text)
+    timeouts = {name: float(seconds) for name, seconds in re.findall(r"(\w+): ([\d.]+)", literal.group(1))}
+    patience = musicbrainz_endpoint.SEARCH_PATIENCE
+    window = musicbrainz_endpoint.RateLimit.time_window
+    assert timeouts["fullySearch"] > patience.attempts * patience.busy_pause + window
+    assert timeouts["releaseGroup"] > timeouts["fullySearch"]
+
+
+def test_a_held_album_is_found_by_its_release():
+    # the id bridge asked by a release you hold (DeadwaxClient.navidromeAlbum(releaseMbid:)), its navidrome_id read
+    text = _code((CORE / "DeadwaxClient.swift").read_text(encoding="utf-8"))
+    assert 'call(Routes.storeAlbum, as: StoreAlbum.self, query: [("release_mbid", releaseMbid)])' in text
+    assert "release_mbid" in inspect.signature(store_album.store_album).parameters
+    assert "navidrome_id" in fields("StoreAlbum")

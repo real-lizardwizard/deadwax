@@ -57,8 +57,9 @@ struct DeadwaxApp: App {
         let artists = ArtistsModel(server: server)
         // Phase 4, slice 5: every song of the collection, a page at a time
         let songs = SongsModel(server: server)
-        // Phase 5, slice 1: Search, your library's half
-        let search = SearchModel(server: server, library: library, artists: artists, reachability: reachability)
+        // Phase 5: Search - your library's half (slice 1), MusicBrainz's albums and the album you don't have (slice 2)
+        let search = SearchModel(server: server, library: library, artists: artists, reachability: reachability,
+                                 navigation: navigation)
         let downloads = DownloadModel(server: server, reachability: reachability, files: files, session: Self.downloadSession)
         player.connect(downloads: downloads, reachability: reachability)
         // Phase 4, slice 3: a write here to a downloaded playlist keeps it in step at once
