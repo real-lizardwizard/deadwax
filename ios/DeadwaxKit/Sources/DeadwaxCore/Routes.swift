@@ -91,6 +91,13 @@ public enum Routes {
     // app 0.10's (Phase 4, phase4-library.md 0): Navidrome's own playlists, as the person signed in
     public static let playlists = Endpoint(method: "GET", path: "/deadwax/navidrome/playlists", query: [])
     public static let playlist = Endpoint(method: "GET", path: "/deadwax/navidrome/playlists/{playlist_id}", query: [])
+    // and slice 2's writes, each as the person signed in (the owner check is deadwax's): a new playlist
+    // (`NewPlaylistBody` -> `PlaylistWithSongs`), songs added at its end (`PlaylistAddBody` -> `PlaylistAddAnswer`),
+    // Edit's Done (`PlaylistEditBody` -> `PlaylistWithSongs`) and a delete (no body -> `PlaylistDeleted`)
+    public static let createPlaylist = Endpoint(method: "POST", path: "/deadwax/navidrome/playlists", query: [])
+    public static let addToPlaylist = Endpoint(method: "POST", path: "/deadwax/navidrome/playlists/{playlist_id}/add", query: [])
+    public static let editPlaylist = Endpoint(method: "POST", path: "/deadwax/navidrome/playlists/{playlist_id}/edit", query: [])
+    public static let deletePlaylist = Endpoint(method: "POST", path: "/deadwax/navidrome/playlists/{playlist_id}/delete", query: [])
 
     /// The levels spec's name for `levelAlbum`: the album's levels warmed before its first play.
     public static var warmLevels: Endpoint { levelAlbum }
@@ -106,7 +113,7 @@ public enum Routes {
         autoEqSearch, autoEqProfile,
         scrub, discArt,
         history, recordHistory,
-        playlists, playlist,
+        playlists, playlist, createPlaylist, addToPlaylist, editPlaylist, deletePlaylist,
     ]
 
     /// The routes given longer than the transport's own 8 seconds to answer, in seconds: the album index reads every

@@ -4702,3 +4702,279 @@ Not verified - only the phone can tell:
 - That `scenePhase` reaches a page pushed under another (a page in the stack asks too: one request, harmless).
 - Check 65's new step: a dozen album pages opened while a playlist plays, and Info still naming its last songs'
   albums.
+
+## Phase 4, slice 2: Add to a playlist, New, Edit, Delete (2026-11-13)
+
+The second of Phase 4's five slices (notes/ios-specs/phase4-library.md 2.4 and 6.2; 6.7 points here), on
+`phase4-library` from `ios` 7cb2f2b (slice 1 and its review merged). **The app stays 0.9 (9)**; src/__init__.py
+untouched; **no server change**: the web's four write routes (src/routes/navidrome.py's create, add, edit and delete;
+notes/playlists.md) answer everything the phone needs, asked as the person signed in (the session's cookie, as every
+route). **The owner check is the server's** (`_writable`: 404 GONE, 403 NOT_YOURS, 403 FROM_FILE); the phone reads
+only a playlist's `editable`, to offer Edit and to list it in the picker. **Nothing is optimistic**: every write is
+drawn from its answer, and a refusal leaves what is drawn as the server last said it was.
+
+### Core (DeadwaxCore)
+
+- **PlaylistChanges.swift** (new). The writes' bodies, each matching the extra="forbid" model it is posted to:
+  `NewPlaylistBody` {name, song_ids}, `PlaylistAddBody` {song_ids, duplicates} and `PlaylistEditBody` {base, song_ids,
+  tried?, name?, comment?, public?}. A nil is left out of the JSON, and `trying(_:)` puts `tried` on. `PlaylistDuplicates`
+  (ask, add, skip) is the route's Literal. Their answers: `PlaylistAddAnswer` (`done` required; `already` read
+  leniently and at least 0; `added` and `asked` leniently) and `PlaylistDeleted`.
+- **PlaylistRules**, the web's adding half (lib/playlists.ts):
+  - `picker` (pickerPlaylists): mine and editable, `changed` newest first, ties by name (see "Decided here").
+  - `pickLine`, `addedWords`, `madeWords`, `hiddenEditWords` and `deleteQuestion`.
+  - `duplicateQuestion`: a `PlaylistQuestion` - the text and two choices, each its label and the mode it sends (nil
+    for Cancel).
+  - The phone's `outcome(of:mode:pick:name:)`: an answer as `.asks(already:asked:)` (`asked` the answer's, else the
+    songs sent) or `.added(words)`.
+  - `PlaylistPick`, a label and the songs (each its id, title and artist), made from a QueuePick of songs or from the
+    song playing.
+- **PlaylistEdit**, the web's Edit half:
+  - `start` keys the rows `index:id`, so a song listed twice is two rows.
+  - `move` (moveRow) clamps the target into the rows. A move to where the row already is, or from outside the rows,
+    leaves the rows as they were.
+  - `remove` (removeRow) and `changed` (editChanged).
+  - `body` (editBody): `base` is the ids as Edit began and `song_ids` the ids now. The name, description and sharing
+    are sent only when they changed, trimmed as JS trims. nil when nothing changed.
+  - `isRearrangement`.
+  - The phone's own:
+    - `Refusal` and `refusal(of:)`: a 409 is changed elsewhere, a 404 gone, the rest refused.
+    - `needsName`.
+    - `trimmed` (WebText.trim, JS's `.trim()`).
+    - `clamped`: within a bound counted in UTF-16 units, as an HTML field's maxLength counts, never splitting a
+      character.
+- **PlaylistWords**:
+  - From lib/playlists.ts: PLAYLIST_CHANGED, SHARED_NOTE, "A playlist needs a name." and "Discard your changes?".
+  - From the web's TSX:
+    - the picker's lines;
+    - the menus' "Add to a playlist…";
+    - NewPlaylistForm's;
+    - PlaylistsPage's "Made Late night";
+    - PlaylistPage's Edit, Done, Saving…, Description, Shared with everyone, Discard, Keep editing, Delete playlist,
+      Keep it, Deleting… and "Deleted Late night".
+  - The phone's own two: the New playlist sheet's title and Edit's "Songs".
+- **Playlists.swift**: `playlistEmptyNow` and `firstSentence` are gone. The empty lines are whole now (question 6,
+  done): "No playlists yet." with PLAYLISTS_EMPTY_HOW under it, and the whole PLAYLIST_EMPTY.
+- **Routes** `createPlaylist`, `addToPlaylist`, `editPlaylist` and `deletePlaylist`, each a POST (Routes.all 36).
+- **The client**:
+  - `createPlaylist(name:songIDs:)`, `addToPlaylist(id:songIDs:duplicates:)` and `editPlaylist(id:body:)`;
+  - `deletePlaylist(id:)`, with no body, since the route takes none.
+- **Info.swift**: `more(…playlist:)`. Now Playing's ••• label says "add to a playlist" when the menu has the row.
+
+### The app
+
+- **PlaylistsModel's four writes**: `create`, `add`, `edit` and `delete`.
+  - Each is asked as the person signed in, through one `write` - an unstructured Task, so leaving a screen never
+    calls a write off.
+  - `Superseded` is thrown when the person or the generation changed meanwhile, so nothing of that write is kept or
+    said.
+  - A written answer goes through `changed`, the web's announcePlaylistChanged:
+    - the kept page is given the answer, or let go of;
+    - the list is asked afresh;
+    - `lastChange` moves on, so a page showing that playlist draws it (`PlaylistPageModel.changedHere`).
+  - An add that wrote nothing (`done` false) changes nothing. `gone(_:)` is called for a 404 from any write.
+- **PlaylistPicker** (new; the web's PlaylistPicker), a sheet. Where it opens:
+  - MainTabs' `navigation.playlistPick`, from QueueMenu's "Add to a playlist…": the album page's bar and rows, and a
+    playlist's bar and rows. Only for songs, never for a gone album's, and only while deadwax can be reached.
+  - Now Playing's own sheet, from its ••• ("Add to a playlist…" after Info).
+
+  What it shows:
+  - The head is `pickLine`; "No playlists yet - make one:" when there are none.
+  - New playlist… opens `NewPlaylistFields` in its row's place: Name, Create / Creating… and Cancel. The name is
+    trimmed and clamped at 200.
+  - Then `PlaylistRules.picker`'s rows, "Adding…" on the one being written. The list is asked afresh as the sheet
+    opens.
+
+  How it behaves:
+  - **One write at a time** (question 13): every row and New playlist… wait for the write that is out.
+  - Written: the sheet closes and the notice says `addedWords` or `madeWords`.
+  - Some songs there already: the question takes the list's place, with two choices and Cancel back to the list.
+  - Refused: ErrorNote under the head, also announced. A 404 asks the list again.
+  - Closed while an add is out: the add goes on, and the notice says how it went - "Nothing added - some are in X
+    already" for the question it can no longer ask, or "Couldn't add to X." and why.
+- **PlaylistsScreen**:
+  - The bar's + (dimmed offline) opens a sheet of NewPlaylistFields (medium and large detents).
+  - Create makes an empty playlist and opens its page once the sheet has gone. If the screen isn't showing by then,
+    the notice says it was made instead.
+  - Empty, the screen shows PLAYLISTS_EMPTY_HOW and a New playlist button.
+- **PlaylistView's Edit**, through PlaylistPageModel:
+  - **Edit in the bar**, for an editable playlist, can be tapped only once this page's own ask has answered (`fresh`)
+    and deadwax can be reached (`canBegin`).
+  - **In Edit**: `editMode` is active, and the hero, the hidden line, the bar's ••• and the back button are put away.
+  - **The form**:
+    - Name, with "A playlist needs a name." under a blank one;
+    - Description, two to six lines;
+    - Shared with everyone, SHARED_NOTE as its hint;
+    - `hiddenEditWords`.
+  - **Songs**: each row its title and artist.
+    - One tap on the red minus removes it; the drag handle moves it.
+    - VoiceOver's Move up, Move down and Remove.
+    - Each change is said ("Roads: 3 of 12", "Roads removed") and the focus is kept on the row, as Up Next's Edit
+      does.
+  - **Delete playlist** last.
+  - **Cancel** asks "Discard your changes?" when something changed.
+  - **Done**:
+    - nothing changed: Edit closes;
+    - a blank name: nothing is sent;
+    - otherwise it sends `body.trying(tried)`, showing Saving….
+    - Saved: the server's answer is drawn and kept, and the list told.
+    - **409**: Edit closes and nothing is saved. PLAYLIST_CHANGED shows over the page, scrolled to its top, and the
+      playlist is asked again, so the next Edit's base is the fresh one.
+    - **404**: the gone line, and the list forgets it.
+    - **Anything else** (403 not yours or from a file, 422 only rearranges, 502 part saved or saved unread, no
+      connection): Edit stays open with why at the form's top - ErrorWords, the server's own words.
+      - The next Done sends `tried`, the songs this one sent, as the web does (notes/playlists.md, the review's
+        "A Done refused can't be retried as it stood").
+      - Leaving Edit after such a failure asks the playlist again before Edit is offered again.
+  - **Delete**: `deleteQuestion` (Delete playlist / Keep it), then Deleting….
+    - Deleted: the notice says "Deleted X", the page is popped if it is still on top (`navigation.leavePlaylist`),
+      and the list is told.
+    - Refused: why, under the button, with Edit still open.
+- **AppNavigation**: `playlistPick` and `leavePlaylist(_:)`, both cleared on reset.
+
+### Decided here (the spec was silent, or this departs from it)
+
+- **Questions 9-13 built as recommended** (the spec's section 10):
+  - one tap on the minus, not a swipe;
+  - no writes offline, none queued;
+  - Delete inside Edit, last;
+  - New as a sheet from +, and in place in the picker;
+  - one write at a time in the picker.
+- **Name ties in the picker.** The web breaks a `changed` tie with ICU's `localeCompare`. The phone compares by:
+  - first, the names with case and accents folded (Fold.findText), by UTF-16;
+  - then the whole name, by UTF-16;
+  - then the list's order.
+
+  They agree on every tie the fixture holds. They differ only for names equal once folded: the web puts "same"
+  before "Same", the phone "Same" first. That needs two of your playlists changed in the same millisecond.
+  PlaylistChangeTests pins the phone's rule.
+- **A gone album's songs get no Add row** (the album page's `goneButHere`): they may not be Navidrome's any more.
+- **Every 409 is "changed elsewhere"**, TOO_LONG included (a playlist grown past 2,000 songs in another app since Edit
+  began), as on the web. Nothing is saved and the page is drawn as it is now - which then says why there is no Edit.
+- **Typed text is clamped by UTF-16 units**, as the web's maxLength counts (200 and 1,000), so the server never
+  refuses a name the phone sends for its length.
+- **The picker over Now Playing is Now Playing's own sheet**: a sheet on MainTabs doesn't show over its full-screen
+  cover.
+- **A deleted page pops only while it is on top**; under another page, it shows the gone line when you come back to
+  it.
+- **No write is called off by leaving**: Navidrome may have it already, and the notice says how it went.
+
+### Tests
+
+Core 1224 (from 1204):
+- **PlaylistChangeVectorTests**, 8: the web's own answers replayed from the slice 1 fixture file, which
+  ios/scripts/export-playlist-vectors.cjs now also fills with slice 2's vectors:
+  - the words;
+  - `hiddenEditWords` at -1, 0, 1, 2 and 10;
+  - `pickerPlaylists` over six lists: none, every slice 1 playlist, changed to the millisecond, one never changed,
+    ties by name with case and accents folded, a whole tie keeping the list's order, and shared, from-a-file and
+    not-mine-but-editable playlists left out;
+  - `pickLine`, `madeWords`, `addedWords` (ten answers, every mode) and `duplicateQuestion` (nine already-of-asked
+    pairs) over seven picks;
+  - `startEdit` over four songs, one listed twice;
+  - every `moveRow` from -1 to 4, to -2 to 5;
+  - every `removeRow`;
+  - `editBody` and `editChanged` over fifteen changes from three starts, each body's JSON keys among them. The
+    changes include spaces round a name (a BOM, a no-break space, a tab), U+0085 (which JS keeps), a song's two rows
+    swapped, and everything at once;
+  - `isRearrangement` over nine pairs.
+- **PlaylistChangeTests**, 13, by hand:
+  - the bodies' JSON keys, none sent for nil;
+  - the add's three answers decoded, leniently, `already` below 0 read as 0;
+  - the four calls: POST, the cookie, the paths, the delete with no body;
+  - a refusal's words through ErrorWords (409, 403, 422);
+  - `outcome`, a done false never read as written;
+  - `refusal`;
+  - the picker's tie on names equal once folded;
+  - the picks from a QueuePick and from the song playing;
+  - Edit's rows;
+  - `needsName` and `trimmed`: a BOM and a no-break space trimmed, U+0085 kept;
+  - `clamped`: at the bound, and a character of two UTF-16 units across it;
+  - the words and Now Playing's ••• label.
+- PlaylistVectorTests loses slice 1's empty-line test, and PlaylistPlayTests' vocabulary check takes the phone's
+  four own lines. ClientTests' route count is 36.
+- **tests/test_ios_contract.py**: ROUTE_COUNT 36, and two new tests:
+  - `test_the_playlist_writes_send_what_the_server_declares`:
+    - the three bodies' keys are exactly the extra="forbid" models' fields;
+    - every required field is sent, and only fields with a default are optional;
+    - the duplicates are the route's Literal;
+    - the name, description and song bounds are the server's.
+  - `test_the_playlist_writes_answer_what_the_app_decodes`:
+    - the add's three answers and the delete's are within what the app decodes;
+    - create and edit answer a playlist with its songs;
+    - 409 CHANGED, 404 GONE and 403 NOT_YOURS are where the routes raise them.
+
+**Mutations: 42, each caught by a failing test, none by a build error.** The scratchpad's mutate_s2.py applied each
+alone and ran `swift test --filter Playlist`, then put the file back byte for byte, checked by sha-256.
+- The picker:
+  - newest last;
+  - others' playlists offered;
+  - read-only ones offered;
+  - the folded names left out;
+  - the whole name left out;
+  - the last tie reversed.
+- The words:
+  - a lone song's empty artist said;
+  - a song's title for one of many;
+  - nothing added read as added;
+  - "already" said for Add them again;
+  - was and were swapped;
+  - all there read as some;
+  - one asked read as many;
+  - "Skip that one" for many;
+  - made counting two.
+- An add's answer:
+  - the question asking one when the answer names none;
+  - no `added` read as all;
+  - a done false read as done when none was there;
+  - `already` below 0 kept;
+  - a song with no title named by its id.
+- Edit:
+  - `hiddenEditWords`' verb, and its none;
+  - a row keyed by its id;
+  - a move past the end, or above the top, not clamped;
+  - remove taking the next row;
+  - a removed last row not seen;
+  - rows compared by id, not key;
+  - the base taken from now;
+  - the name and the description sent untrimmed;
+  - the name compared untrimmed;
+  - sharing always sent;
+  - a body for nothing changed;
+  - `trying` dropping `tried`.
+- A refused Done:
+  - a 409 read as refused;
+  - a 404 read as refused.
+- `isRearrangement`: a song added, or repeated.
+- A name of spaces passing.
+- `clamped`: counting characters, and stopping one short.
+
+The first pass missed four, and each was fixed:
+- No test reached the raw-name tie: PlaylistChangeTests pins it.
+- No answer had done false with none there already.
+- No answer had `already` below 0.
+- One mutation crashed on an empty pick: reworded.
+
+### Verified, and not
+
+Verified (2026-11-13, this Mac, Xcode's toolchain):
+- `swift test`: Core 1224, DeadwaxAudio 158 and DeadwaxTurntable 11, all pass.
+- The 42 mutations.
+- The unsigned Release device build, with no warnings but appintentsmetadataprocessor's "Metadata extraction
+  skipped".
+- check_project.py, with the .xcodeproj unchanged.
+- `pytest tests/test_ios_*.py tests/test_source_bytes.py` (170 passed, 1 skipped) and the full suite (4357 passed,
+  1 skipped).
+- The 11 ios sims on Node 22, iosplaylists' `--check` of the regenerated fixture among them.
+
+Not run: Core on Linux (ios.yml's ubuntu job will).
+
+Not verified - none of the App's wiring has a test, and only a phone can tell (docs/ios.md's checks 70-76):
+- That TextFields and a Toggle take typing and taps inside a List in edit mode.
+- That the red minus (a borderless button in an edit-mode row) takes one tap and doesn't open the row.
+- That a sheet opens from a Menu's action (the picker from every •••), and over Now Playing's full-screen cover.
+- That the confirmation dialogs from the bar's Cancel and from Delete playlist show where they should.
+- That the notice over Now Playing shows.
+- That Navidrome's real `changed` moves on every write, so the picker's order and the 409 behave as they do against
+  the fakes.
+- That an add's notice, made after the sheet has closed, is seen.

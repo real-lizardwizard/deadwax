@@ -27,6 +27,10 @@ struct MainTabs: View {
         .sheet(isPresented: $navigation.eqImportSheet) {
             EQSheet()
         }
+        // Add to a playlist from a page's ••• (Phase 4, slice 2) - Now Playing's opens over Now Playing
+        .sheet(item: $navigation.playlistPick) { (request: PlaylistPickRequest) in
+            PlaylistPicker(request: request)
+        }
         .onChange(of: player.hasQueue) { _, queued in
             if !queued { navigation.nowPlayingShown = false }
         }

@@ -23,8 +23,8 @@ public struct Playlist: Codable, Sendable, Equatable, Hashable, Identifiable {
     /// Seconds.
     public let duration: Double
     public let created: String
-    /// Moved by Navidrome on every add and removal - the picker's order (slice 2), and how a downloaded playlist is
-    /// kept in step (slice 3).
+    /// Moved by Navidrome on every add and removal - the picker's order (PlaylistRules.picker), and how a downloaded
+    /// playlist is kept in step (slice 3).
     public let changed: String
     /// The owner's Navidrome user name, as Navidrome has it.
     public let owner: String
@@ -97,7 +97,7 @@ public struct PlaylistList: Decodable, Sendable, Equatable {
     }
 }
 
-/// `GET /deadwax/navidrome/playlists/{id}` (and, from slice 2, what a write answers): one playlist with its songs -
+/// `GET /deadwax/navidrome/playlists/{id}` (and what a new playlist and Edit's Done answer): one playlist with its songs -
 /// Navidrome's own, as they are, a song twice listed twice - and how many of them it isn't listing just now.
 public struct PlaylistWithSongs: Decodable, Sendable, Equatable {
     public let playlist: Playlist
@@ -239,7 +239,7 @@ public enum PlaylistRules {
         }
     }
 
-    /// Whether a playlist page offers Edit (slice 2).
+    /// Whether a playlist page offers Edit - once its own ask has answered (PlaylistPageModel.fresh).
     public static func canEdit(_ playlist: Playlist, songs: Int) -> Bool {
         readOnlyWords(playlist, songs: songs) == nil
     }
@@ -271,8 +271,8 @@ public enum PlaylistRules {
 }
 
 /// The words of the Playlists screen and a playlist's page: the web's lib/playlists.ts constants (held to the
-/// fixture), the TSX's own (copied, their source named), and the phone's own for what the web hasn't (offline, and the
-/// empty lines until Add and New come in slice 2 - the spec's 1.2 and question 6).
+/// fixture), the TSX's own (copied, their source named), and the phone's own for what the web hasn't (offline - the
+/// spec's 1.2). Slice 2's - the picker's, New playlist's, Edit's and Delete's - are in PlaylistChanges.swift.
 public enum PlaylistWords {
     // lib/playlists.ts
     public static let playlistsEmpty = "No playlists yet."
@@ -282,10 +282,6 @@ public enum PlaylistWords {
 
     /// "Couldn't list your playlists. <why>" - `why` a listener's words (ErrorWords' sentence and advice).
     public static func listFailed(_ why: String) -> String { "Couldn't list your playlists. \(why)" }
-
-    /// Slice 1's empty playlist: PLAYLIST_EMPTY's first sentence alone - its second names Add to a playlist, which
-    /// comes with slice 2.
-    public static var playlistEmptyNow: String { firstSentence(playlistEmpty) }
 
     // PlaylistsPage.tsx
     public static let title = "Playlists"
@@ -312,10 +308,4 @@ public enum PlaylistWords {
     public static let offlineList = "Your playlists show here once deadwax is back."
     /// A playlist's page with nothing in hand while deadwax can't be reached.
     public static let offlinePage = "This playlist opens once deadwax is back."
-
-    /// Up to and including the first ". " - the sentence a line opens with.
-    static func firstSentence(_ text: String) -> String {
-        guard let end = text.range(of: ". ") else { return text }
-        return String(text[..<end.lowerBound]) + "."
-    }
 }

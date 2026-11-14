@@ -52,6 +52,9 @@ struct NowPlayingView: View {
     @State private var dragY: CGFloat = 0
     /// The look the button switched to while this stays open; nil: as You > Playback says (the web's, reset as it opens).
     @State private var switched: TurntableSettings.Look?
+    /// Add to a playlist, from the •••: the picker over Now Playing, with the song playing (Phase 4, slice 2).
+    @State private var playlistPick: PlaylistPickRequest?
+    @Environment(Reachability.self) private var reachability
 
     /// The cover's scale while paused (--pl-paused-scale).
     private static let pausedScale: CGFloat = 0.82
@@ -92,6 +95,7 @@ struct NowPlayingView: View {
         .sheet(isPresented: $showsUpNext, onDismiss: eqAfterSheet) { UpNextScreen() }
         .sheet(isPresented: $showsInfo, onDismiss: eqAfterSheet) { InfoView() }
         .sheet(isPresented: $showsEQ) { EQSheet() }
+        .sheet(item: $playlistPick) { (request: PlaylistPickRequest) in PlaylistPicker(request: request) }
         .onAppear { lyrics.opened() }
         // the deck told what shows as it opens and as the look changes - and that it doesn't, as it closes (2.1)
         .onChange(of: turntable, initial: true) { (_: Bool, now: Bool) -> Void in deck.screen(turntable: now) }
@@ -424,7 +428,8 @@ struct NowPlayingView: View {
             }
             Spacer()
             NowPlayingMenu(hasAlbum: route != nil, saysSpeed: menuSaysSpeed,
-                           onInfo: { showsInfo = true }, onEQ: { showsEQ = true }) {
+                           onInfo: { showsInfo = true }, onEQ: { showsEQ = true },
+                           onPlaylist: reachability.online ? { playlistPick = PlaylistPickRequest(PlaylistPick(playing: track)) } : nil) {
                 if let route { navigation.openAlbum(route) }
             }
         }

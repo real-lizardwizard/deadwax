@@ -121,6 +121,9 @@ final class AppNavigation {
     var eqImportSheet = false
     /// A preview is drawn (EQImportSheetContent says so).
     var eqPreviewUp = false
+    /// Add to a playlist (Phase 4, slice 2), opened from a page's ••• (QueueMenu): the picker over the tabs, with the
+    /// songs in hand. Now Playing opens its own, over itself.
+    var playlistPick: PlaylistPickRequest?
 
     /// A file shared to deadwax (`.onOpenURL`): shown by the preview that is up, in place - else by the EQ sheet,
     /// opened over Now Playing (by Now Playing) or over the tabs (here).
@@ -176,6 +179,17 @@ final class AppNavigation {
         open(.album(album))
     }
 
+    /// A playlist's page gone from the top of the tab shown (deleted on it, Phase 4 slice 2) - only while it is still
+    /// what shows: a delete answering after another page was opened over it pops nothing (App.tsx playlistDeleted).
+    func leavePlaylist(_ id: String) {
+        switch tab {
+        case .library:
+            if case .playlist(let shown)? = library.last, shown.id == id { library.removeLast() }
+        case .you:
+            if case .playlist(let shown)? = you.last, shown.id == id { you.removeLast() }
+        }
+    }
+
     /// Back to the EQ page a page was pushed from ("Use for …", eq.md 3.7): every page over the topmost EQ page on the
     /// tab shown popped at once. Nothing when the tab holds no EQ page.
     func backToEQPage() {
@@ -198,6 +212,7 @@ final class AppNavigation {
         you.removeAll()
         nowPlayingShown = false
         eqImportSheet = false
+        playlistPick = nil
         importAnswered()
         tab = .library
     }

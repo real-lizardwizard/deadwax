@@ -24,9 +24,9 @@ played](#what-youve-played)). **This is app 0.9, which adds your library downloa
 much as fits your storage limit, kept in step with what you star and unstar anywhere - only while the
 phone is charging if you choose, and with the app in the background when iOS allows (see [Your library
 on this phone](#your-library-on-this-phone)). Phase 4 has begun with **playlists**: yours and those
-shared with you, in the Library, played as the web app plays them (see [Playlists](#playlists)) - not
-yet made, changed or downloaded on the phone. Artists, songs, Search and the rest come next (see [What
-it can't do yet](#what-it-cant-do-yet)).
+shared with you, in the Library, played as the web app plays them, and made, added to, edited and
+deleted on the phone as in the web app (see [Playlists](#playlists)) - not yet downloaded as one.
+Artists, songs, Search and the rest come next (see [What it can't do yet](#what-it-cant-do-yet)).
 
 **Nothing of Phase 2, the lyrics, the EQ, the turntable, play history, your library downloaded or
 playlists has been seen on an iPhone yet.** It's built and tested on a Mac, and what only a phone can
@@ -253,9 +253,10 @@ back to the Library tab or the app, and when you pull down.
   ("Disc 2", or "Disc 2 · Live" with its title). The song playing has moving bars instead of its
   number. **Tap a song** to play the album from it. Under the songs: how many and how long ("10
   songs, 42 min").
-- **•••** at the end of a song's row has **Play Next** and **Play Last** for that song; the **•••**
-  at the top has them for the whole album (see [Up Next](#up-next)). Each menu opens from the •••
-  you tapped, and a tap anywhere else closes it.
+- **•••** at the end of a song's row has **Play Next**, **Play Last** and **Add to a playlist…** for
+  that song; the **•••** at the top has them for the whole album (see [Up Next](#up-next) and [Add to
+  a playlist](#add-to-a-playlist)). Each menu opens from the ••• you tapped, and a tap anywhere else
+  closes it.
 - **Add to my library** and **Remove from my library**, with logins on. Removing takes the album out
   of your library only: "it's still in the collection, and nothing was deleted."
 - The artist's name is plain text for now: artist pages come in a later phase.
@@ -313,8 +314,12 @@ the Navidrome account deadwax uses:
 Each group is in Navidrome's order, by name, and shows only when it has playlists. The list is asked
 for each time you open it, and when you come back to the app with it open; pull down to ask now. If deadwax can't be asked, it says "Couldn't list your
 playlists." and why - over the list as it was, or with **Try again** when there's no list to show.
-With none at all: "No playlists yet." **Tap a playlist** to open its page. Nothing plays from the list
-itself.
+With none at all: "No playlists yet.", how to make one, and **New playlist**. **Tap a playlist** to
+open its page. Nothing plays from the list itself.
+
+**New playlist** is the **+** at the top of Playlists: type its name (up to 200 letters) and
+**Create**. It's made in Navidrome, as you, empty, and its page opens - add songs to it with **Add to a
+playlist…**. If it can't be made, the sheet stays open and says why.
 
 **A playlist's page** is laid out as an album's:
 
@@ -327,13 +332,14 @@ itself.
 - **The songs**, each with its own album's cover, and its artist and album under its title; the song
   playing has moving bars over its cover. A song that's in the playlist twice is there twice. Under the
   songs: how many and how long.
-- **•••** at the end of a song's row has **Play Next** and **Play Last** for that song, and
-  **Download** (or **Remove Download**, or **Download Again**) for it alone; the **•••** at the top has
-  Play Next and Play Last for the whole playlist.
+- **•••** at the end of a song's row has **Play Next**, **Play Last** and **Add to a playlist…** for
+  that song, and **Download** (or **Remove Download**, or **Download Again**) for it alone; the **•••**
+  at the top has Play Next, Play Last and Add to a playlist… for the whole playlist.
 - When Navidrome counts songs it isn't listing just now: "2 songs in this playlist aren't in the
   library just now - deleted, or being moved."
 - A playlist deleted elsewhere says "This playlist isn't on Navidrome any more - deleted in another
-  app, maybe." An empty one says "Nothing in this playlist yet."
+  app, maybe." An empty one says "Nothing in this playlist yet. Add songs from a song's or an album's
+  ••• menu - Add to a playlist - or from Now Playing's ••• while a song plays."
 - The page shows at once when you go back to it, or open one of the last few again, and is asked for
   again as it shows, and when you come back to the app with it open. If that fails it stays as it was, under "Couldn't update this playlist - showing it
   as it was."; with nothing to show: "Couldn't open this playlist." and why, with **Try again**.
@@ -345,15 +351,66 @@ playlist's songs of that album. With Normalization on **Automatic**, each song i
 as the web app levels a playlist (Info says "Song volume matching, ..."): a playlist isn't an album.
 **By song**, **By album** and **Off** do what they always do.
 
+### Add to a playlist
+
+**Add to a playlist…** is in every song's and every album's **•••** - an album's page, a playlist's
+page, and each of their songs - and in Now Playing's **•••** for the song playing. It opens your
+playlists under what you're adding ("Dummy · 11 songs", "Roads · Portishead"), the one changed last
+at the top - only the ones you can change: never one shared with you, or one Navidrome made from a
+file. **Tap one**: it closes, and the app says what happened ("Added 11 songs to Late night").
+
+When some of them are in it already, nothing is added yet, and it asks:
+
+- "These 11 songs are all in Late night already." - **Add them again**, or **Cancel**.
+- "3 of these 11 songs are in Late night already." - **Add them all**, or **Skip those 3** (which adds
+  the other 8: "Added 8 songs to Late night - 3 were in it already").
+- "Roads is in Late night already." - **Add it again**, or **Cancel**.
+
+**Cancel** goes back to your playlists. **New playlist…** at the top makes one with them: a name, then
+**Create** ("Made Late night with Roads"). One tap adds once: the playlists wait ("Adding…") until
+Navidrome has answered. Close it while an add is on its way and the add carries on, and the app still
+says how it went. If it couldn't be added, it says why over your playlists.
+
+### Edit and Delete
+
+**Edit**, at the top of a playlist of yours, changes it. It isn't there for one shared with you, or
+one from a file, or one of more than 2,000 songs - the page says why instead - and it can be tapped
+once the page has been brought up to date. In Edit:
+
+- **Name** (a playlist needs one: "A playlist needs a name.", and Done waits), **Description**, and
+  **Shared with everyone**: everyone with an account on this Navidrome can find it and play it - in
+  deadwax, Navidrome and their other apps. Only you can change it.
+- **The songs**: drag one by its handle to move it, and tap its red minus to take it out - one tap,
+  as in Up Next. With VoiceOver, each song has Move up, Move down and Remove. Edit only takes songs
+  out and reorders them; add them with Add to a playlist.
+- **Cancel** leaves it as it was (asking "Discard your changes?" first, if you'd changed anything).
+  **Done** saves it ("Saving…"), and the page then shows it as Navidrome has it. Nothing is saved
+  until Done.
+- If it changed in another app since you tapped Edit - a song added in Amperfy, say - Done saves
+  nothing: "This playlist changed in another app while you were editing it - here it is now. Your
+  changes weren't saved." Tap Edit and make them again. If Done is refused for any other reason, Edit
+  stays open with why, and **Done** tries again.
+- When Navidrome counts songs it isn't listing just now: "2 songs that aren't in the library just now
+  will be dropped if you change the songs."
+
+**Delete playlist** is at the bottom of Edit. It asks first: "Delete "Late night"? It goes from
+Navidrome for good - from Amperfy and every other app too, and for everyone it's shared with. The
+songs stay in the library." - **Delete playlist**, or **Keep it**. There's no undo. Deleted, the page
+closes and the app says "Deleted Late night".
+
+### Playlists offline
+
 **Offline**, a playlist with a song on the phone opens if its page is one of the last eight you opened
 since the app started: the songs not on the phone are dimmed, and Play and Shuffle play the ones that
 are. The others are dimmed in the list and open nothing. With no list in hand, Playlists says "Your playlists show here once deadwax is
 back." The Playlists row is on the Downloaded list the Library opens on while deadwax can't be reached,
 too. Playlists are kept only while the app runs, until a later build downloads them.
 
-Not yet on the phone (the next builds): New playlist, **Add to a playlist** from the ••• menus, Edit
-and Delete, and downloading a playlist as one. Do those in the web app or Amperfy for now: the phone
-shows them the next time it asks.
+Nothing is made or changed while deadwax can't be reached: Add to a playlist… isn't in the ••• menus
+or Now Playing's, and **+** and **Edit** are dimmed. Nothing is kept to send later - a playlist can be
+changed from any app, and a change sent later could land on one that has changed since.
+
+Not yet on the phone (a later build): downloading a playlist as one.
 
 ## Playing
 
@@ -369,7 +426,8 @@ thin line along it for how far in the song is. Tap it for Now Playing.
   first 3 seconds; after that, or on the first song, it starts the song again. Repeat goes from off to
   **Repeat all** to **Repeat one** and back to off, and this phone remembers it.
 - **Lyrics**, **AirPlay**, **Up Next**, and **•••** along the bottom. **Lyrics** (the speech bubble) shows
-  the song's lyrics in the cover's place (see [Lyrics](#lyrics)). The **•••** menu has **Info**, **Go to album**, **Download** (or
+  the song's lyrics in the cover's place (see [Lyrics](#lyrics)). The **•••** menu has **Info**, **Add
+  to a playlist…** for the song playing (while deadwax can be reached), **Go to album**, **Download** (or
   Remove Download) for the song playing, **Download Up Next** - every song still to play that
   isn't on the phone, when that's two or more - and last **EQ**, with the output's setting under it
   ("Off", "Bass Boost"), which opens the [EQ](#eq) over Now Playing. Go to album closes Now Playing
@@ -1365,8 +1423,9 @@ answering, **Try again**. It goes by itself once deadwax answers.
   songs here. An album with nothing here says "This album isn't on this phone - it plays once deadwax
   is back."
 - **Playlists**: one with a song on the phone, among the last eight you opened since the app started,
-  opens with the songs not on the phone dimmed; the others are dimmed and open nothing (see
-  [Playlists](#playlists)).
+  opens with the songs not on the phone dimmed; the others are dimmed and open nothing. None is made or
+  changed: Add to a playlist… is left out of the ••• menus, and New playlist and Edit are dimmed (see
+  [Playlists offline](#playlists-offline)).
 - **Playing**: a song that isn't on the phone is passed over to the next one that is ("Skipped "Roads"
   - it isn't on this phone"). With nothing left that's here, the player stops on it, paused: "Not on
   this phone - it plays once deadwax is back." Play tries it again.
@@ -1973,14 +2032,46 @@ first - one with songs from several albums - and, if you can, one someone else s
   dimmed. Also: a playlist of a
   few hundred songs - does it scroll smoothly? And with VoiceOver, is each row read as one?
 
+### Playlists' changes' checks (70-76)
+
+These come with the build that adds Add to a playlist, New, Edit and Delete (still app 0.9). Have the
+web app open beside the phone, and Amperfy if you use it. Make a test playlist for these: 75 deletes
+one.
+
+- **70 Make one.** Library > Playlists > **+**: a name, **Create** - its page opens, empty, saying how
+  to add songs. Then it's in the web app's Playlists, and Amperfy's, under the same name.
+- **71 Add to a playlist.** From an album's •••, a song's on an album page, a song's and the top one
+  on a playlist's page, and Now Playing's •••: **Add to a playlist…** opens your playlists - does it
+  say what you're adding, with the one changed last at the top? Tap one: it closes and says "Added 11
+  songs to …". Then **New playlist…** in it: a name, Create - "Made … with …". In the web app, the songs
+  are there, in that order.
+- **72 Already in it.** Add the same album to the same playlist again: "These 11 songs are all in …
+  already." - try Add them again, then remove the copies in Edit. Add an album with one song of it in
+  the playlist: "1 of these 11 songs is in … already." - Skip that one adds the other 10. One song
+  that's there: "… is in … already." Does each button do what it says?
+- **73 Edit.** On a playlist of yours: Edit - rename it, change the description, turn on Shared with
+  everyone, drag a song, take one out with its red minus (does one tap do it?), Done. It says Saving…,
+  then shows it saved; the web app agrees, and Amperfy after a refresh. Clear the name: "A playlist
+  needs a name." and Done dimmed. Change something and Cancel: it asks "Discard your changes?". Do the
+  fields take typing, and the switch a tap, while the songs can be dragged?
+- **74 Changed elsewhere.** Tap Edit on the phone, add a song to that playlist in the web app, then
+  change something on the phone and tap Done: it says the playlist changed in another app and your
+  changes weren't saved, and shows it with the web app's song.
+- **75 Delete.** Edit > Delete playlist: the question, then Delete playlist. Back on Playlists, "Deleted
+  …", and it's gone from the web app and Amperfy.
+- **76 Only yours, and offline.** A playlist shared with you, or one from a file: no Edit, and Add to
+  a playlist… never lists it. In Airplane Mode: no Add to a playlist… in the ••• menus or Now
+  Playing's, and **+** and Edit dimmed. With VoiceOver in Edit: each song's actions (Move up, Move
+  down, Remove), and what's said ("Roads: 3 of 12", "Roads removed").
+
 ## What it can't do yet
 
 These are the web app's for now. Most of them come to the phone in the next phases:
 
 - **The visualizer**: it stays the web app's, on a desktop.
 
-- **Making and changing playlists**: New playlist, Add to a playlist, Edit and Delete - and
-  downloading a playlist as one. The phone reads and plays them (see [Playlists](#playlists)).
+- **Downloading a playlist** as one. The phone reads, plays, makes and changes them (see
+  [Playlists](#playlists)).
 - **Artist pages** and a **songs list**, and the Library's **Shuffle** of your whole library.
 - **Search**, **Get** and **Requests**.
 - **Home** and **pins**.
@@ -2008,6 +2099,11 @@ These are the web app's for now. Most of them come to the phone in the next phas
 | Info's Normalization: **"Not this time - the album's volume couldn't be checked"** ("the song's" for a song levelled on its own) | deadwax is older than 2.1.1, or didn't answer in time. The song plays as it is; with 2.1.1 or later, the album's next play is levelled. |
 | Lyrics: **"Couldn't load the lyrics."** | deadwax, or Navidrome behind it, couldn't give them just then: **Try again**. If it's every song, deadwax may be older than 2.1.5, which has no lyrics for the app (an admin sees why, folded under it). |
 | Lyrics: **"This song isn't here any more - it may have been moved or deleted."** | Navidrome no longer has the song the queue names (a rescan moved it). Play it again from its album. |
+| A playlist has no **Edit**: "Only Sam can change this playlist." | It's Sam's: only they can change it. A playlist from a file, or one of more than 2,000 songs, says why there's no Edit too - change those in Amperfy or Navidrome. |
+| Edit: **"This playlist changed in another app while you were editing it - here it is now. Your changes weren't saved."** | It was changed elsewhere after you tapped Edit, so nothing was saved. Tap Edit and make your changes again on the playlist as it is now. |
+| Edit: **"The songs were saved, but Navidrome didn't take the name, description or sharing."** | Edit stays open: **Done** again saves the rest. |
+| Edit: **"Saved - but Navidrome didn't answer when deadwax asked for the playlist again."** | It's saved. **Done** again, or **Cancel**, and the page asks for it again. |
+| The app's notice: **"Couldn't add to Late night."** and why | An add you'd closed Add to a playlist on was refused, or its answer didn't come back. Try again: if the songs did get in, it asks before adding them twice. |
 | **Lyrics** is dimmed | The song has none - none on LRCLIB, or none fetched yet (**Get lyrics** in the album's Edit, on the web app). Offline, "Lyrics - not on this phone": none were kept for it, which happens to a song downloaded with app 0.3 until the app has been opened with deadwax in reach. |
 | The EQ's correction picker: **"Something went wrong."**, with **Try again** | deadwax answered with an error. If it's every search, deadwax may be older than 2.1.7, which has no AutoEq for the app (an admin sees why, folded under it). |
 | An album stays on **"Waiting for Wi-Fi"** | Download over is Wi-Fi only (You > Downloads): join a Wi-Fi network that isn't a phone's hotspot, with Low Data Mode off - or choose Wi-Fi and cellular. |

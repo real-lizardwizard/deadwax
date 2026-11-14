@@ -37,7 +37,11 @@ batch it sends within the route's bounds.
 
 And app 0.10's playlists (Phase 4, notes/ios-specs/phase4-library.md): Playlist, PlaylistList and PlaylistWithSongs to
 what src/playlists.py's summary() and with_songs() build and the two read routes send - every field the phone reads one
-they send, and every one it can't do without there and not null, Navidrome's fields left out included.
+they send, and every one it can't do without there and not null, Navidrome's fields left out included. And slice 2's
+four writes: NewPlaylistBody, PlaylistAddBody and PlaylistEditBody to the extra="forbid" models they are posted to (every
+key the phone sends one the server declares, every one it requires sent), the duplicates the phone names the route's
+own, PlaylistAddAnswer and PlaylistDeleted to what the add and the delete return, create and edit answering a playlist
+with its songs, and the statuses the phone reads (409 changed, 404 gone, 403 not yours) where the routes raise them.
 """
 
 import importlib.util
@@ -72,7 +76,7 @@ from src.store import JobStore  # noqa: E402
 
 CORE = Path(__file__).resolve().parent.parent / "ios" / "DeadwaxKit" / "Sources" / "DeadwaxCore"
 ENDPOINT = re.compile(r'Endpoint\(method: "(\w+)", path: "([^"]+)", query: \[([^\]]*)\]\)')
-ROUTE_COUNT = 32
+ROUTE_COUNT = 36
 RAW_OPENING = re.compile(r'#+"')
 HASHES = re.compile(r"#*")
 
@@ -961,3 +965,51 @@ def test_the_playlist_answers_are_what_the_app_decodes():
     assert '{"playlists": [playlist_rules.summary(' in inspect.getsource(navidrome.playlists)
     assert "return _answer(found, counter, asker)" in inspect.getsource(navidrome.playlist)
     assert "playlist_rules.with_songs(" in inspect.getsource(navidrome._answer)
+
+
+def test_the_playlist_writes_send_what_the_server_declares():
+    # each body is extra="forbid": a key the server doesn't declare is a 422 for every write, and so is one it requires
+    # left out - and a Swift nil is left out of the JSON, so only a field with a default may be optional
+    for struct, model in (("NewPlaylistBody", navidrome.NewPlaylist), ("PlaylistAddBody", navidrome.PlaylistAdd),
+                          ("PlaylistEditBody", navidrome.PlaylistEdit)):
+        assert model.model_config.get("extra") == "forbid", struct
+        assert sent_fields(struct) == set(fields(struct)) == set(model.model_fields), \
+            f"{struct}: {sorted(set(fields(struct)) ^ set(model.model_fields))}"
+        needed = {name for name, field in model.model_fields.items() if field.is_required()}
+        assert needed <= required_fields(struct), f"{struct} may leave out {sorted(needed - required_fields(struct))}"
+        assert optional_fields(struct) <= set(model.model_fields) - needed
+    assert optional_fields("PlaylistEditBody") == {"tried", "name", "comment", "public"}
+    assert required_fields("PlaylistEditBody") == {"base", "song_ids"}
+    # the duplicates the phone can name are the route's own
+    enum = re.search(r"public enum PlaylistDuplicates\b[^{]*\{\s*case ([^\n]+)", (CORE / "PlaylistChanges.swift").read_text(
+        encoding="utf-8"))
+    assert enum, "no PlaylistDuplicates in PlaylistChanges.swift"
+    named = {case.strip() for case in enum.group(1).split(",")}
+    assert named == set(typing.get_args(navidrome.PlaylistAdd.model_fields["duplicates"].annotation)) == {"ask", "add", "skip"}
+    # the bounds the phone keeps a typed name and description within are the server's
+    assert swift_constant("Playlists.swift", "PlaylistRules", "nameMax") == playlist_rules.PLAYLIST_NAME_MAX
+    assert swift_constant("Playlists.swift", "PlaylistRules", "commentMax") == playlist_rules.PLAYLIST_COMMENT_MAX
+    assert swift_constant("Playlists.swift", "PlaylistRules", "songsMax") == playlist_rules.PLAYLIST_SONGS_MAX
+
+
+def test_the_playlist_writes_answer_what_the_app_decodes():
+    # the add: three answers, each with done and already - asked when nothing was written, added when it was
+    literals = returned_literals(navidrome.add_to_playlist)
+    assert len(literals) == 3
+    assert set().union(*(literal_keys(one) for one in literals)) == set(fields("PlaylistAddAnswer"))
+    assert required_fields("PlaylistAddAnswer") == {"done", "already"}
+    assert all(required_fields("PlaylistAddAnswer") <= literal_keys(one) for one in literals)
+    assert not any(literal_nulls(one) for one in literals)
+    # the delete: {"deleted": True}
+    (deleted,) = returned_literals(navidrome.delete_playlist)
+    assert literal_keys(deleted) == set(fields("PlaylistDeleted")) == {"deleted"}
+    # a new playlist and Edit's Done answer the playlist with its songs, as the read does
+    assert "return playlist_rules.with_songs(found, asked_as(client), 0)" in inspect.getsource(navidrome.create_playlist)
+    assert "return _answer(found, counter, asker)" in inspect.getsource(navidrome.edit_playlist)
+    # the statuses the phone reads: 409 changed in another app (nothing written - the page draws it as it is now), 404
+    # gone, 403 not the asker's - ErrorWords says the server's own words for each
+    edit = inspect.getsource(navidrome.edit_playlist)
+    assert "status_code=409, detail=playlist_rules.CHANGED" in edit
+    writable = inspect.getsource(navidrome._writable)
+    assert "status_code=404, detail=playlist_rules.GONE" in writable
+    assert "status_code=403, detail=playlist_rules.NOT_YOURS" in writable

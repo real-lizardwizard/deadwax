@@ -104,8 +104,8 @@ From the web's TSX (copied with their source named, as Phase 1's were): "Playlis
 
 | where | line |
 | --- | --- |
-| an empty playlist (slice 1) | "Nothing in this playlist yet." - the web's PLAYLIST_EMPTY's first sentence; its second ("Add songs from a song's or an album's ••• menu - Add to a playlist...") comes with slice 2, when it is true here |
-| the list, empty (slice 1) | "No playlists yet." alone - PLAYLISTS_EMPTY_HOW ("Make one here, or start one from...") with slice 2 |
+| an empty playlist | "Nothing in this playlist yet." alone in slice 1 - the web's PLAYLIST_EMPTY's first sentence; since slice 2, when it is true here, the whole of it ("... Add songs from a song's or an album's ••• menu - Add to a playlist - or from Now Playing's ••• while a song plays.") |
+| the list, empty | "No playlists yet." alone in slice 1; since slice 2 with PLAYLISTS_EMPTY_HOW under it ("Make one here, or start one from a song's or an album's ••• menu, or from Now Playing: Add to a playlist.") and New playlist |
 | the list, deadwax out of reach, none in hand | "Your playlists show here once deadwax is back." |
 | a playlist, out of reach, not in hand | "This playlist opens once deadwax is back." |
 | a playlist, out of reach, in hand | the songs not on this phone dimmed (as an album's are), Play and Shuffle taking only those that are |
@@ -115,7 +115,11 @@ Roads", `addedWords`, `duplicateQuestion` with "Add it again" / "Add them again"
 "Skip those 3" / "Cancel"), Edit, Done, Saving…, Cancel, "Discard your changes?" (Discard / Keep editing), Name,
 Description, "Shared with everyone" with SHARED_NOTE, "A playlist needs a name.", PLAYLIST_CHANGED, `hiddenEditWords`,
 Delete playlist with `deleteQuestion` (Delete playlist / Keep it, Deleting…), Move up / Move down / Remove, "Roads: 3
-of 12" and "Roads removed" (VoiceOver). Slice 3's: section 6.3. Slice 4's: `playsLine` ("Plays the 2 albums you have",
+of 12" and "Roads removed" (VoiceOver). As built, also the web's: the picker's "Add to a playlist" (its title), "New
+playlist…", "No playlists yet - make one:", "Adding…", "Nothing added - some are in Late night already" and "Couldn't add
+to Late night." (both said in the notice when the sheet has closed meanwhile), the menus' "Add to a playlist…",
+NewPlaylistForm's Name / Create / Creating… / Cancel, PlaylistsPage's "Made Late night" and PlaylistPage's "Deleted Late
+night"; and two of the phone's own: the New playlist sheet's title ("New playlist") and Edit's "Songs" heading. Slice 3's: section 6.3. Slice 4's: `playsLine` ("Plays the 2 albums you have",
 "Getting the songs of the 2 albums you have…", "Plays 1 of the 2 albums you have - the rest didn't load",
 "Couldn't load their songs.", "None of their albums are here to play."), "Artists", "Your artists", "All artists",
 "Name" / "Most albums", the album count line. Slice 5's: "Songs" / "All songs", "Shuffle", "Getting ready…",
@@ -176,10 +180,17 @@ As the web, rule for rule: the picker lists `pickerPlaylists` (yours and editabl
 by name), adds with `duplicates: ask` first and asks the duplicate question from the answer, New playlist from the
 picker makes one with the songs (`madeWords`). Edit (yours, editable, at most 2,000 songs; offered only once this
 page's own ask has answered): the name, the description, sharing, the songs removed or reordered (the List's own
-`onMove` and swipe to delete, with Move up / Move down / Remove as VoiceOver actions), Done sending `editBody` (`base`
+`onMove` and one tap on a row's red minus, as Up Next's Edit - question 9 - with Move up / Move down / Remove as
+VoiceOver actions), Done sending `editBody` (`base`
 the songs as drawn when Edit began, `tried` after a Done that failed); 409 -> drawn as it is now with
 PLAYLIST_CHANGED, the page at its top; Cancel with changes asks; Delete asks, there is no undo. `startEdit`,
 `moveRow`, `removeRow`, `editChanged`, `editBody`, `isRearrangement` ported and held to the fixture.
+
+As built (PlaylistChanges.swift), beside those: `PlaylistRules.outcome` (an add's answer as the question or the
+notice's words), `PlaylistEdit.refusal` (a refused Done: 409 changed elsewhere, 404 gone, anything else refused - Edit
+open with why, the next Done sending `tried`), `needsName` and `trimmed` (the web's `.trim()`), `clamped` (a typed name or
+description kept within 200 or 1,000 UTF-16 units, as an HTML field's maxLength counts, never cutting a character),
+and the picks the menus make (`PlaylistPick` from a QueuePick of songs, or from the song playing).
 
 ### 2.5 Downloading a playlist (slice 3)
 
@@ -235,7 +246,9 @@ beside it.
 Large title "Playlists"; Yours, Shared with you (each a heading and its rows), From files (N) as a disclosure row
 opening its rows in place for the screen's life. A row: the cover (Navidrome's 2x2 mosaic, or the playlist symbol on a
 quiet square for none) at the rows' 48 pt, the name, `rowLine`, the chevron; a tap opens the playlist, nothing plays.
-Pull to refresh asks now. Empty: "No playlists yet." Slice 2 adds New playlist to the bar.
+Pull to refresh asks now. Empty: "No playlists yet." Slice 2 adds New playlist to the bar - built as the bar's +
+(dimmed while deadwax can't be reached), opening a sheet with the name: Create makes an empty playlist and opens its
+page once the sheet has gone (question 12); and, empty, PLAYLISTS_EMPTY_HOW and a New playlist button under the line.
 
 ### 3.3 A playlist (slice 1)
 
@@ -246,6 +259,14 @@ for the song playing, its title, "artist · album", the download slot (as an alb
 state), its time, its ••• (Play Next, Play Last, the song's download items). The bar: the title once the hero's has
 scrolled away, and the ••• for the whole playlist (Play Next, Play Last; no download items until slice 3 - question
 7). Gone: the gone line alone. Slice 2 adds Edit to the bar; slice 3 the download control beside the •••.
+
+Slice 2's Edit, as built: Edit in the bar (yours and editable only; dimmed until this page's own ask has answered,
+and while deadwax can't be reached); in Edit the hero and the hidden line give way to a form - the name, "A playlist
+needs a name." under a blank one, the description (two to six lines), Shared with everyone (its note the hint), and
+`hiddenEditWords` - then "Songs", each row its title and artist with the red minus and the drag handle, then Delete
+playlist last (question 11); the bar has Cancel (asking `discardQuestion` when anything changed) and Done (Saving…;
+dimmed with a blank name), the back button hidden while Edit is open. Nothing is saved until Done answers, and the page
+then draws the server's answer, never what was typed.
 
 ### 3.4 VoiceOver and Dynamic Type
 
@@ -273,7 +294,7 @@ every add and removal, `notes/playlists.md`), so no new "changed since" route.
 | `PlayedAlbums.swift` - lib/playedAlbums.ts | `PlayerModel`'s albums for Info, Go to album and the turntable |
 | `Album.partial`, `AboutAlbum(album:)` passing it | Info, unchanged |
 | `Routes.playlists`, `Routes.playlist`; `DeadwaxClient.playlists()`, `playlist(id:)` | `PlaylistsScreen`, `PlaylistView`, `AppRoute.playlists` / `.playlist`, the root's row |
-| slice 2: the edit rules and the add words; 4 routes | the picker sheet, New, Edit, Delete |
+| slice 2: `PlaylistChanges.swift` - the four writes' bodies and answers, the picker's order, the picks, the add words and question, `PlaylistEdit` (Edit's rows, moves, removes, the body, a refusal's meaning); 4 routes (36) | `PlaylistsModel`'s writes (each telling the list and the pages, `lastChange`), `PlaylistPageModel`'s Edit and Delete, `PlaylistPicker` (MainTabs' sheet, and Now Playing's own), `NewPlaylistFields`, New on Playlists |
 | slice 3: `DownloadOrigin.playlist`, the keeping-in-step rules; store v6 | Download a playlist, On this phone > Playlists |
 | slice 4: the artist sorts and lines; 2 routes | Artists, an artist's page |
 | slice 5: the shuffle feed's rules; 2 routes | Songs, the Shuffle button, the feed |
@@ -299,7 +320,7 @@ downloads of a playlist, the app's version left at 0.9.
 The picker (a sheet: New playlist at its top, then `pickerPlaylists`; the duplicate question; the notice), from a
 song's and an album's ••• (the album page's rows and bar, a playlist's rows and bar) and Now Playing's •••; New playlist
 on the Playlists screen (a name, then its page); Edit and Delete on a playlist's page; the full empty words. The list
-and the kept pages told of every write (the web's `announcePlaylistChanged`).
+and the kept pages told of every write (the web's `announcePlaylistChanged`). Built: 6.7.
 
 ### 6.3 Slice 3 - Download a playlist
 
@@ -326,6 +347,11 @@ and README for the phase.
 What slice 1 is, as built, is in notes/ios.md's "Phase 4, slice 1: playlists, read and play" - what Core and the app
 hold, what was decided where this spec was silent, the tests and what was verified.
 
+### 6.7 Slice 2, built (2026-11-13)
+
+What slice 2 is, as built, is in notes/ios.md's "Phase 4, slice 2: Add to a playlist, New, Edit, Delete" - Core and the
+app, what was decided here, the tests and mutations, and what was verified. Questions 9-13 came of it.
+
 ## 7. Tests (Swift Testing; Core's on Linux and macOS)
 
 - **The fixture's replay** (slice 1): every rule of 2.1 and 2.3 over the web's own answers - groups, every line under
@@ -340,6 +366,24 @@ hold, what was decided where this spec was silent, the tests and what was verifi
   what `summary()` and `with_songs()` send.
 - **Mutations** run by hand and caught (notes/ios.md lists each): the groups swapped, the songs level made the album
   level, `withHeld` putting a stub over a whole album, `rememberQueue`'s floor, a song with no album id keeping "".
+- **Slice 2's fixture** (the same file): `pickerPlaylists` over six lists - none; every slice 1 playlist; changed to the
+  millisecond, one never changed; ties by name with case and accents folded, a whole tie keeping the list's order, and shared, from-a-file
+  and not-mine-but-editable playlists left out; `pickLine`, `madeWords`, `addedWords` (ten answers, every mode) and
+  `duplicateQuestion` (nine already-of-asked pairs) over seven picks - one song (with an artist, an empty one, none),
+  two songs, eleven, a song twice, no songs; `hiddenEditWords` at -1, 0, 1, 2 and 10; `startEdit` over four songs with one
+  listed twice, every `moveRow` from -1 to 4 to -2 to 5, every `removeRow` from -1 to 4, `editBody` and `editChanged`
+  over fifteen changes from three starts (renamed, spaces round a name - a BOM, a no-break space, a tab - and U+0085,
+  which JS keeps; a description cleared; shared; rows moved, moved back, removed, all removed; a twice-listed song's two
+  rows swapped; everything at once), and `isRearrangement` over nine pairs. The one rule the fixture can't hold, the
+  picker's tie on names equal once folded (ICU's and the phone's differ there), is held by hand.
+- **Slice 2 by hand**: the bodies' JSON keys (none sent for nil), the add's three answers decoded (leniently), the four
+  calls (POST, the cookie, the paths, the delete with no body), a refusal's words through ErrorWords (409, 403, 422),
+  `outcome`, `refusal`, the picks from a QueuePick and the song playing, Edit's rows, `needsName` and `trimmed` (a
+  BOM and a no-break space trimmed, U+0085 kept), `clamped` (at the bound, and a character of two UTF-16 units across
+  it).
+- **The contract** (slice 2): the three bodies' keys exactly the extra="forbid" models' fields, the required sent, only
+  fields with a default optional; the duplicates the route's Literal; the bounds the server's; the add's three answers
+  and the delete's within what the app decodes; the statuses the phone reads where the routes raise them.
 
 ## 8. James's checks (on his iPhone)
 
@@ -365,9 +409,35 @@ Numbered after Phase 3's 63. Slice 1's:
 
 docs/ios.md's "Playlists' checks (64-69)" holds them as James reads them.
 
-The phase's (the plan's three, with slices 2, 3 and 5): **70** make a playlist on the phone and see it in the web app
-and Amperfy; **71** download it and play it offline; **72** shuffle the whole library and let it run past the first
-200 songs. Each slice adds its own.
+The phase's (the plan's three, with slices 2, 3 and 5): make a playlist on the phone and see it in the web app and
+Amperfy (slice 2's **70**); download it and play it offline; shuffle the whole library and let it run past the first
+200 songs - the last two numbered with slices 3 and 5 (this said 71 and 72 before slice 2 was built; each slice
+numbers its own after the last). Each slice adds its own.
+
+Slice 2's:
+
+- **70 Make one** (the phase's). Library > Playlists > +: a name, Create - its page opens, empty, with the whole
+  empty line. Then it is in the web app's Playlists and Amperfy's, under the same name.
+- **71 Add to a playlist.** An album's •••, an album page's song's, a playlist's song's and its bar's, and Now Playing's
+  •••: Add to a playlist… opens the picker, its head what it adds ("Dummy · 11 songs", "Roads · Portishead"), your
+  playlists the one changed last first; a tap closes it and the notice says "Added 11 songs to Late night". New
+  playlist… in the picker makes one with them ("Made Late night with Roads"). In the web app, the songs are there.
+- **72 Already in it.** Add the same album again: "These 11 songs are all in Late night already." (Add them again /
+  Cancel); with one of them there: "1 of these 11 songs is in Late night already." (Add them all / Skip that one); one
+  song: "Roads is in Late night already." (Add it again / Cancel). Each does what it says.
+- **73 Edit.** On a playlist of yours: Edit - rename it, change the description, share it, drag a song, take one out
+  with its red minus (one tap), Done: Saving…, then the page as Navidrome has it; the web app agrees. A blank name
+  says "A playlist needs a name." and Done is dimmed. Cancel after a change asks "Discard your changes?".
+- **74 Changed elsewhere.** Open Edit on the phone, add a song to that playlist in the web app, then change something
+  on the phone and Done: it says the playlist changed in another app and your changes weren't saved, and shows it with
+  the web app's song.
+- **75 Delete.** Edit > Delete playlist > the question > Delete playlist: back on Playlists, "Deleted Late night", and
+  it has gone from the web app and Amperfy.
+- **76 Only yours, and offline.** A playlist shared with you, or from a file: no Edit, and the picker never lists it.
+  In Airplane Mode: no Add to a playlist… in the ••• menus or Now Playing's, and + and Edit dimmed. With VoiceOver, in
+  Edit: each song's actions (Move up, Move down, Remove), and what is said ("Roads: 3 of 12", "Roads removed").
+
+docs/ios.md's "Playlists' changes' checks (70-76)" holds them as James reads them.
 
 ## 9. What only the phone can tell
 
@@ -376,6 +446,11 @@ and Amperfy; **71** download it and play it offline; **72** shuffle the whole li
 - That a playlist of a few hundred songs draws and scrolls smoothly (a plain List of rows, each with its own cover).
 - That the lock screen and the mini player show each song's own album cover as a playlist plays across albums.
 - That Navidrome's real `changed` and `owner` (its case, an admin's view) group the playlists as the web does.
+- Slice 2's: that TextFields and a Toggle answer inside a List in edit mode; that the red minus (a borderless button
+  in an edit-mode row) takes one tap and doesn't open the row; that a sheet opens from a Menu's action (the picker from
+  every •••) and from Now Playing's full-screen cover; that confirmation dialogs anchored on the bar's Cancel and on
+  Delete playlist show where they should; the notice over Now Playing; and Navidrome's real `changed` moving on every
+  write, so the picker's order and the 409 behave as against the fakes.
 
 ## 10. Open questions (each with what the build does until James answers)
 
@@ -395,10 +470,25 @@ and Amperfy; **71** download it and play it offline; **72** shuffle the whole li
    memory, and only its songs on this phone; slice 3's downloaded playlists are kept on disk and open offline.
 6. **The empty words in slice 1.** The web's how-lines name Add to a playlist and New playlist, which slice 1 hasn't.
    *Recommend, and built*: their first sentences alone until slice 2 ("No playlists yet.", "Nothing in this playlist
-   yet.").
+   yet."). Slice 2 built: the whole lines now.
 7. **The bar's ••• and downloads in slice 1.** *Recommend, and built*: no download items for the whole playlist until
    slice 3, so a playlist's songs are never downloaded as loose songs that slice 3 couldn't tell from hand downloads; a
    row's ••• keeps the song's own items (a hand download of that song).
 8. **The album page's own album for Info.** The phone has kept the album a page shows for Info since Phase 1; the web
    remembers only on play. *Recommend, and built*: kept as `also`, so showing an album page never lets go of a
    playlist's albums mid-play.
+9. **Removing a song in Edit.** The spec said swipe to delete; iOS draws no swipe in a List in edit mode, and Up
+   Next's Edit (James's choice, Phase 1) is one tap on a red minus. *Recommend, and built*: the same one tap - nothing
+   is saved until Done, and Cancel puts everything back, so a mistaken tap costs nothing.
+10. **Writes while deadwax can't be reached.** *Recommend, and built*: none are queued for later - Add to a playlist…
+    is left out of the ••• menus and Now Playing's while offline, and New (+) and Edit are dimmed; a playlist is
+    Navidrome's, changed from other apps too, and a write held for later could land on a playlist that has changed
+    since.
+11. **Where Delete lives.** *Recommend, and built*: inside Edit, last, as the web has it - two deliberate steps and a
+    question before a deletion there is no undo for; not in the bar's •••, which plays and queues.
+12. **New playlist on the Playlists screen.** The web opens its form in place. *Recommend, and built*: the bar's +
+    opens a sheet with the name (the phone's way); Create makes an empty playlist and opens its page. In the picker,
+    New playlist… opens the name in place of its row, as the web's.
+13. **One write at a time in the picker.** The web lets a playlist's tap through while a New playlist… is being made.
+    *Recommend, and built*: every row and New playlist… wait for the write that is out, so one tap is one write and a
+    second tap never adds the songs twice.

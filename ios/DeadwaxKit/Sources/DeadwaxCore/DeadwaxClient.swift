@@ -301,6 +301,30 @@ public struct DeadwaxClient: Sendable {
         try await call(Routes.playlist, path: ["playlist_id": id])
     }
 
+    /// A new playlist of the asker's, private, with `songIDs` in their order (none: an empty one) - answered whole.
+    /// A blank name, or one too long, is refused in the server's words (a 422).
+    public func createPlaylist(name: String, songIDs: [String]) async throws -> PlaylistWithSongs {
+        try await call(Routes.createPlaylist, sending: NewPlaylistBody(name: name, songIds: songIDs))
+    }
+
+    /// `songIDs` added at the playlist's end. With `.ask`, some there already writes nothing (`done` false).
+    public func addToPlaylist(id: String, songIDs: [String], duplicates: PlaylistDuplicates) async throws
+        -> PlaylistAddAnswer {
+        try await call(Routes.addToPlaylist, path: ["playlist_id": id],
+                       sending: PlaylistAddBody(songIds: songIDs, duplicates: duplicates))
+    }
+
+    /// Edit's Done: the playlist as Navidrome has it after the write. A 409 is a change made in another app since Edit
+    /// began (nothing written); a 404, gone; a 403, not the asker's to change.
+    public func editPlaylist(id: String, body: PlaylistEditBody) async throws -> PlaylistWithSongs {
+        try await call(Routes.editPlaylist, path: ["playlist_id": id], sending: body)
+    }
+
+    /// The asker's playlist deleted, for good - Navidrome has no undo.
+    public func deletePlaylist(id: String) async throws {
+        _ = try await call(Routes.deletePlaylist, as: PlaylistDeleted.self, path: ["playlist_id": id])
+    }
+
     // MARK: app 0.8's play history (server 2.1.14)
 
     /// A page of the person's plays, newest first: the newest (`before` nil), or the one before a page's last.
