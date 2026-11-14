@@ -42,8 +42,9 @@ final class PlaylistsModel {
     enum Wrote {
         /// Songs added at its end (the picker's).
         case added
-        /// This phone's Edit, saved: the answer Done was given - what it took out goes from the phone at once.
-        case edited(PlaylistWithSongs)
+        /// This phone's Edit, saved: the answer Done was given, and the songs it took out (PlaylistEditBody.removed) -
+        /// those, and only those, go from the phone at once.
+        case edited(PlaylistWithSongs, removed: Set<String>)
         /// Deleted here, for good.
         case deleted
         /// A write answered it gone (a 404).
@@ -185,7 +186,7 @@ final class PlaylistsModel {
             try await client.editPlaylist(id: id, body: body)
         }
         changed(id, now: saved)
-        wrote(id, .edited(saved))
+        wrote(id, .edited(saved, removed: body.removed))
         return saved
     }
 

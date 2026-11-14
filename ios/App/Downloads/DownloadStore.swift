@@ -142,9 +142,11 @@ final class DownloadStore {
     }
 
     /// Everything downloaded deleted - the songs, the albums, their covers - keeping the plays and the queue save
-    /// waiting to be sent (they are the person's, not the downloads').
-    func removeEverything() throws {
+    /// waiting to be sent (they are the person's, not the downloads'). `emptied` is told once the database is (slice 3's
+    /// review): what memory holds of it goes then, even if a folder can't be made again after.
+    func removeEverything(emptied: () -> Void = {}) throws {
         try database.removeAll()
+        emptied()
         let manager = FileManager.default
         for folder in [music, covers] {
             try? manager.removeItem(at: folder)

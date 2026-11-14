@@ -82,6 +82,7 @@ struct PlaylistView: View {
         ScrollViewReader { proxy in
             List {
                 PlaylistHero(model: model, download: model.gone ? nil : downloads.playlistState(route.id),
+                             smart: downloads.playlistIsSmart(route.id, answer: model.answer),
                              playable: !playable.isEmpty && !editing,
                              play: { play(at: 0) }, shuffle: { play(at: nil, shuffle: true) })
                     .listRowSeparator(.hidden)
@@ -570,6 +571,9 @@ private struct PlaylistHero: View {
     let model: PlaylistPageModel
     /// (slice 3) The playlist's download, once downloaded - its line under the count.
     let download: AlbumDownload?
+    /// (slice 3's review) A smart playlist: no Download, and the line says why - or, downloaded, that it is kept as it
+    /// was.
+    let smart: Bool
     let playable: Bool
     let play: () -> Void
     let shuffle: () -> Void
@@ -627,11 +631,19 @@ private struct PlaylistHero: View {
                 .padding(.top, 6)
                 .accessibilityHidden(line.isEmpty)
 
-            // (slice 3) downloaded: the album's line, its own - and, all here, that it plays with no connection
-            if let download, let words = PlaylistDownloadWords.heroLine(download) {
+            // (slice 3) downloaded: the album's line, its own - and, all here, that it plays with no connection (a smart
+            // one's, that it stays as it was); a smart one not downloaded: why there is no Download
+            if let download, let words = PlaylistDownloadWords.heroLine(download, smart: smart) {
                 DownloadLine(download: download, line: words)
                     .padding(.top, 6)
                     .transition(.opacity)
+            } else if !model.gone, let words = PlaylistDownloadWords.heroLine(download, smart: smart) {
+                Text(words)
+                    .font(.footnote)
+                    .foregroundStyle(Palette.quiet)
+                    .multilineTextAlignment(.center)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(.top, 6)
             }
 
             PlayButtons(enabled: playable && !model.gone, play: play, shuffle: shuffle)

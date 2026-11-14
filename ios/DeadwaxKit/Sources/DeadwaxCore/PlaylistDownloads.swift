@@ -166,7 +166,8 @@ public enum PlaylistDownloads {
     /// once a list 10 minutes or more after the first without it agrees. An EMPTY list is never believed on its own (a
     /// Navidrome mid-rescan, a list that failed quietly): it marks nothing, and every downloaded playlist is read instead
     /// - a read answered 404 being a list without it (`missing`). One downloaded after the list was asked for is left as
-    /// it is: the list can't speak for it.
+    /// it is: the list can't speak for it. One the list says is smart (slice 3's review) is kept as it was, never read
+    /// again (`frozen`) - though gone from two lists, it is let go as any is.
     public static func listed(_ kept: [KeptPlaylist], list: [Playlist], at: Int64) -> ListOutcome {
         var byID: [String: Playlist] = [:]
         for playlist in list where byID[playlist.id] == nil { byID[playlist.id] = playlist }
@@ -175,6 +176,10 @@ public enum PlaylistDownloads {
             var entry = entry
             if entry.askedAt > at {
                 out.kept.append(entry)
+            } else if let listed = byID[entry.id], listed.smart {
+                // never read: its `changed` moves each time Navidrome works it out again
+                let smartAlready = entry.answer?.playlist.smart == true
+                out.kept.append(smartAlready ? noLongerMissing(entry) : frozen(entry, as: listed, at: at))
             } else if let listed = byID[entry.id] {
                 entry.missingSince = nil
                 // (an answer that couldn't be read has no `changed`: it is read too)
@@ -206,33 +211,84 @@ public enum PlaylistDownloads {
         return (entry, at - since >= confirmAfterMs)
     }
 
+    static func noLongerMissing(_ entry: KeptPlaylist) -> KeptPlaylist {
+        var out = entry
+        out.missingSince = nil
+        return out
+    }
+
     // MARK: a read
 
     /// The playlist after a read answered at `at` (ms, when it was asked). `carrying`: the songs the store has under its
     /// origin. Found, it is no longer missing. A song carrying the origin that the answer hasn't is marked as left, dated
     /// by the first read without it - taken only once a read 10 minutes or more after that agrees - and one back in the
-    /// playlist is no longer marked. `here`: the read follows this phone's own Edit, so what it took out is taken at once
-    /// (marked as agreed already). An EMPTY answer is never taken in on its own: while a song it would take hasn't been
-    /// agreed, the answer kept stays (the page draws it, nothing is taken) - unless it follows an Edit here.
+    /// playlist is no longer marked. `edited`: the songs this phone's own Edit took out (PlaylistEditBody.removed) - the
+    /// answer is its Done's - each taken at once (marked as agreed already); nothing else is (slice 3's review: a Done
+    /// that changed only the name is no reason to take a song Navidrome is hiding).
+    ///
+    /// **Songs Navidrome is hiding** (slice 3's review): the answer's `hidden` counts songs still in the playlist that it
+    /// isn't listing just now (a file being moved, a rescan). While `hidden` is at least the songs carried that the
+    /// answer lacks (the Edit's own aside), any of them may be one, so none of them is marked - they stay, and are
+    /// marked only once a read lacks more songs than Navidrome is hiding.
+    ///
+    /// An EMPTY answer is never taken in on its own: while a song it would take hasn't been agreed, or Navidrome is
+    /// hiding the songs it lacks, the answer kept stays (the page draws it, nothing is taken) - unless the Edit here
+    /// emptied it.
+    ///
+    /// **A smart playlist** (slice 3's review, James: "No Download for them"): one found to be smart is kept as it was -
+    /// its songs as last taken in, its marks dropped, read no more, nothing asked or taken by it again (`actions`).
     public static func read(_ entry: KeptPlaylist, answer: PlaylistWithSongs, body: Data, carrying: Set<String>,
-                            at: Int64, here: Bool) -> KeptPlaylist {
+                            at: Int64, edited: Set<String> = []) -> KeptPlaylist {
+        if answer.playlist.smart { return frozen(entry, as: answer.playlist, at: at) }
         var out = entry
         out.missingSince = nil
         out.readAt = at
         let ids = Set(answer.songs.map(\.id))
+        let lacking = carrying.subtracting(ids)
+        let unexplained = lacking.subtracting(edited)
+        let hiding = !unexplained.isEmpty && answer.hidden >= unexplained.count
         var left: [String: Int64] = [:]
-        for id in carrying where !ids.contains(id) {
-            left[id] = here ? at - confirmAfterMs : min(entry.left[id] ?? at, at)
+        for id in lacking {
+            if edited.contains(id) {
+                left[id] = at - confirmAfterMs
+            } else if !hiding {
+                left[id] = min(entry.left[id] ?? at, at)
+            }
         }
         out.left = left
-        // (after an Edit here every mark is agreed already, so an answer it emptied is taken in)
+        // (after an Edit here every mark it made is agreed already, so an answer it emptied is taken in)
         let emptied = answer.songs.isEmpty && !(entry.answer?.songs.isEmpty ?? true)
-        if emptied && left.values.contains(where: { (mark: Int64) -> Bool in at - mark < confirmAfterMs }) {
+        if emptied && (hiding || left.values.contains(where: { (mark: Int64) -> Bool in at - mark < confirmAfterMs })) {
             return out
         }
         out.answer = answer
         out.body = body
         return out
+    }
+
+    /// A downloaded playlist found to be a smart one (`summary`, a list's or a read's), at `at` (ms): kept as it was -
+    /// the songs last taken in, under that summary marked smart - no longer missing, its marks dropped. Its body is the
+    /// kept answer encoded again, so the store keeps it as smart.
+    static func frozen(_ entry: KeptPlaylist, as summary: Playlist, at: Int64) -> KeptPlaylist {
+        var out = entry
+        out.missingSince = nil
+        out.readAt = at
+        out.left = [:]
+        let songs = entry.answer?.songs ?? []
+        let kept = PlaylistWithSongs(playlist: summary.asSmart(songs: songs.count), songs: songs,
+                                     hidden: entry.answer?.hidden ?? 0)
+        out.answer = kept
+        out.body = (try? JSONEncoder().encode(kept)) ?? entry.body
+        return out
+    }
+
+    /// Whether a playlist may be downloaded: anything but a smart playlist (slice 3's review).
+    public static func downloadable(_ playlist: Playlist) -> Bool { !playlist.smart }
+
+    /// Whether a playlist's page treats it as smart: deadwax's answer in hand says so, or the answer kept here does (a
+    /// downloaded one found smart is kept smart - `frozen`).
+    public static func isSmart(_ answer: PlaylistWithSongs?, kept: KeptPlaylist?) -> Bool {
+        answer?.playlist.smart == true || kept?.answer?.playlist.smart == true
     }
 
     /// What the playlist does to the store now.
@@ -252,10 +308,11 @@ public enum PlaylistDownloads {
     }
 
     /// What `entry` asks of the store, `carrying` being the songs under its origin: its songs that don't carry it, and the
-    /// agreed-left songs that do. Nothing at all while its kept answer can't be read. A song carrying the origin that
-    /// the answer hasn't and no read has marked is kept: only a read takes anything.
+    /// agreed-left songs that do. Nothing at all while its kept answer can't be read, nor for a smart playlist (kept as
+    /// it was). A song carrying the origin that the answer hasn't and no read has marked is kept: only a read takes
+    /// anything.
     public static func actions(_ entry: KeptPlaylist, carrying: Set<String>) -> Actions {
-        guard let answer = entry.answer else { return Actions() }
+        guard let answer = entry.answer, !answer.playlist.smart else { return Actions() }
         var seen = Set<String>()
         var ask: [Song] = []
         for song in answer.songs where seen.insert(song.id).inserted && !carrying.contains(song.id) { ask.append(song) }
@@ -343,12 +400,47 @@ public enum PlaylistDownloads {
         return AlbumDownload.of(asked)
     }
 
-    /// The playlist's download items (the control's menu, its •••): Download while it isn't downloaded; Download Again
-    /// (its songs that didn't download) and Remove Download once some didn't; else Remove Download.
-    public static func choices(_ state: AlbumDownload?) -> [DownloadChoice] {
-        guard let state else { return [.download] }
+    /// The playlist's download items (the control's menu, its •••): Download while it isn't downloaded - never for a
+    /// smart playlist (slice 3's review); Download Again (its songs that didn't download) and Remove Download once some
+    /// didn't; else Remove Download - a downloaded one found to be smart keeps both, its songs as they were.
+    public static func choices(_ state: AlbumDownload?, smart: Bool = false) -> [DownloadChoice] {
+        guard let state else { return smart ? [] : [.download] }
         if case .failed = state { return [.downloadAgain, .remove] }
         return [.remove]
+    }
+
+    /// Each downloaded playlist's songs as its kept answer lists them, by playlist id - made once a draw, for
+    /// drawnWithPlaylists.
+    public static func listing(_ kept: [KeptPlaylist]) -> [String: Set<String>] {
+        var out: [String: Set<String>] = [:]
+        for entry in kept { out[entry.id] = Set(entry.songIDs) }
+        return out
+    }
+
+    /// (slice 3's review) Whether a song is drawn under its downloaded playlists' rows in You > Downloads: one of the
+    /// playlists whose origin it carries lists it in its kept answer (`listing`). A song one no longer lists (marked,
+    /// still coming, or one Navidrome is hiding) is drawn under its album's row instead, so it is always somewhere.
+    public static func drawnWithPlaylists(_ song: String, origins: Set<DownloadOrigin>,
+                                          listing: [String: Set<String>]) -> Bool {
+        origins.contains { (origin: DownloadOrigin) -> Bool in
+            guard let id = origin.playlistID else { return false }
+            return listing[id]?.contains(song) == true
+        }
+    }
+
+    /// Downloading's album rows: a song asked for any other way (by hand, with an album) - and one only this phone keeps
+    /// in step (keptInStep) that neither your library's row (it carries `.library`) nor a downloaded playlist's draws.
+    public static func inDownloadingAlbumRow(_ song: String, origins: Set<DownloadOrigin>,
+                                             listing: [String: Set<String>]) -> Bool {
+        guard DownloadOrigin.keptInStep(origins) else { return true }
+        return !origins.contains(.library) && !drawnWithPlaylists(song, origins: origins, listing: listing)
+    }
+
+    /// Downloaded's album rows: a song kept any way but downloaded playlists' alone (onlyPlaylists) - and one only they
+    /// keep that none of their rows draws.
+    public static func inDownloadedAlbumRow(_ song: String, origins: Set<DownloadOrigin>,
+                                            listing: [String: Set<String>]) -> Bool {
+        !DownloadOrigin.onlyPlaylists(origins) || !drawnWithPlaylists(song, origins: origins, listing: listing)
     }
 
     /// Downloading's row for a downloaded playlist: its songs still to come (each once - waiting, fetching, or not yet
@@ -389,11 +481,17 @@ public enum PlaylistDownloadWords {
     public static func downloadedWith(_ name: String) -> String { "Downloaded with \(name)" }
     /// The hero's line once every song of it is here.
     public static let playsOffline = "This playlist is downloaded - it plays with no connection."
+    /// (slice 3's review, James: "No Download for them") A smart playlist's page, where Download would be.
+    public static let smartOnline = "Smart playlists are worked out again each time, so this one plays only while deadwax can be reached."
+    /// A smart playlist downloaded before deadwax said it was one, once every song of it is here: kept as it was.
+    public static let smartKept = "Smart playlists are worked out again each time, so this download stays as it was when you made it."
 
     /// A downloaded playlist's hero line: the album's line (DownloadWords.albumLine) while its songs come or some didn't,
-    /// and `playsOffline` once they are all here.
-    public static func heroLine(_ state: AlbumDownload) -> String? {
-        if case .downloaded = state { return playsOffline }
+    /// and `playsOffline` once they are all here (`smartKept` for a smart one); not downloaded, a smart playlist's
+    /// `smartOnline`, else none.
+    public static func heroLine(_ state: AlbumDownload?, smart: Bool = false) -> String? {
+        guard let state else { return smart ? smartOnline : nil }
+        if case .downloaded = state { return smart ? smartKept : playsOffline }
         return DownloadWords.albumLine(state)
     }
     /// The Library's On this phone place, and its screen's title.
@@ -430,7 +528,7 @@ public enum PlaylistDownloadWords {
     /// Every line, for the vocabulary's test.
     public static var everyLine: [String] {
         let progress = PlaylistDownloads.Progress(toGo: 3, of: 12)
-        return [downloadedWith("Late night"), playsOffline, place, noneYet, noneYetHow, offlineDownloaded,
+        return [downloadedWith("Late night"), playsOffline, smartOnline, smartKept, place, noneYet, noneYetHow, offlineDownloaded,
                 downloadingRow(progress, wait: nil), downloadingRow(progress, wait: .wifi),
                 downloadingSpoken("Late night", progress, wait: nil), count(1), count(3),
                 removeAllToo(playlists: 1) ?? "", removeAllToo(playlists: 3) ?? ""]

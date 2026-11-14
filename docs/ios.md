@@ -412,17 +412,19 @@ page closes all the same, saying so.
 **Download** a playlist with the arrow at the top right of its page, beside its •••, or with
 **Download** in that •••. Its songs come as an album's do - each the very file deadwax has - and the
 whole playlist is planned at once: it waits for room under the storage limit, or for space on the
-phone, as one, never half of it. The playlist itself is kept on the phone, so it opens and plays with
-no connection. While its songs come, the arrow is a ring and the page says how far it has got
-("Downloading - 4 of 12 songs"); once they're all here, "This playlist is downloaded - it plays with no
-connection." Tap the mark for what it's doing, with **Remove Download** - and **Download Again** for
-songs that didn't come.
+phone, as one, never half of it. A song of it already on its way - one you were downloading yourself,
+say - carries on, and the rest wait together. The playlist itself is kept on the phone, so it opens
+and plays with no connection. While its songs come, the arrow is a ring and the page says how far it
+has got ("Downloading - 4 of 12 songs"); once they're all here, "This playlist is downloaded - it plays
+with no connection." Tap the mark for what it's doing, with **Remove Download** - and **Download
+Again** for songs that didn't come.
 
 - **It keeps in step.** Change it anywhere - add a song in the web app or Amperfy - and the phone
   follows. The app looks when it opens, when you come back to it, when deadwax is back, every 15
   minutes while it runs, and whenever you open the playlist. A song added comes. A song taken out goes
   from the phone only once two looks ten minutes apart agree it has gone, so a moment when Navidrome is
-  busy never deletes anything - taken out with **Edit** on this phone, it goes at once. Deleted here,
+  busy never deletes anything - taken out with **Edit** on this phone, it goes at once (only the songs
+  you took out: one Navidrome isn't showing just then, while its file is moved, stays). Deleted here,
   the download goes with it; deleted in another app, it goes once two looks ten minutes apart can't
   find it.
 - **What stays.** A song you downloaded yourself, with its album, with your library, or with another
@@ -438,6 +440,13 @@ songs that didn't come.
   themselves stay in Navidrome.
 - **Its picture.** A playlist's mosaic isn't downloaded with it: with no connection it shows only if
   the phone still has it from before.
+- **Smart playlists can't be downloaded.** Navidrome works a smart playlist out again each time, so
+  there's no arrow on its page and nothing to download in its •••; the page says "Smart playlists are
+  worked out again each time, so this one plays only while deadwax can be reached." Playlists made from
+  an .m3u file download as any other. One you downloaded before deadwax could tell it was smart stays
+  on the phone as it was - nothing added, nothing taken - and says so; **Remove Download** takes it off
+  as any playlist's. (deadwax tells the phone which playlists are smart from its 2.1.x on; before that,
+  none is treated as smart.)
 
 ### Playlists offline
 
@@ -2120,7 +2129,7 @@ one.
   Playing's, and **+** and Edit dimmed. With VoiceOver in Edit: each song's actions (Move up, Move
   down, Remove), and what's said ("Roads: 3 of 12", "Roads removed").
 
-### Downloaded playlists' checks (77-83)
+### Downloaded playlists' checks (77-84)
 
 These come with the build that downloads a playlist (still app 0.9). Use a test playlist of a dozen
 songs from a few albums, on Wi-Fi, with the web app open beside the phone.
@@ -2152,10 +2161,17 @@ songs from a few albums, on Wi-Fi, with the web app open beside the phone.
   playable, for ten minutes or more, then goes with the app's next look.
 - **82 Room.** Set the storage limit below what's on the phone plus the playlist, and download it: the
   whole playlist waits ("Waiting for room - the storage limit is reached"), none of it half-fetched;
-  raise the limit and it comes.
+  raise the limit and it comes. Then, the limit low again: download a big song of another playlist by
+  hand, and while it's still coming download that playlist - the song finishes, and the rest of the
+  playlist waits for room.
 - **83 VoiceOver.** The arrow reads "Download"; while it downloads, its value says how far; downloaded,
   the mark opens its menu with what it is and Remove Download. A Downloading row reads as one ("Late
   night, 3 of 12 songs to go, 75 percent").
+- **84 Smart playlists** (once deadwax is on the version that says which playlists are smart). Open a
+  smart playlist: no arrow beside the •••, nothing to download in the •••, and under its count "Smart
+  playlists are worked out again each time, so this one plays only while deadwax can be reached." An
+  .m3u playlist still has its arrow. If you downloaded a smart playlist on an earlier build: it's still
+  on the phone, its line says it stays as it was when you made it, and Remove Download takes it off.
 
 ## What it can't do yet
 

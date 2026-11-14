@@ -76,7 +76,7 @@ struct DownloadsScreen: View {
                         let scope = downloads.follower.scope ?? AlbumScope.albums(for: server.me)
                         Text([DownloadWords.removeAllMessage(songs: shelf.songsHere, bytes: downloads.bytesHere),
                               downloads.follower.on ? AutoDownloadWords.removeAllToo(scope) : nil,
-                              PlaylistDownloadWords.removeAllToo(playlists: downloads.playlists.kept.count)]
+                              PlaylistDownloadWords.removeAllToo(playlists: PlaylistDownloads.shelf(downloads.playlists.kept).count)]
                             .compactMap { $0 }.joined(separator: " "))
                     }
                 } footer: {
@@ -167,9 +167,12 @@ private struct DownloadShelf {
         library = downloads.libraryProgress != nil
         let going = downloads.downloading
         let waits = going.map { downloads.state($0.id) }
-        // (slice 3) a downloaded playlist's songs are its own row's - not an album's, unless asked for another way too
+        // (slice 3) a downloaded playlist's songs are its own row's - not an album's, unless asked for another way too,
+        // or (its review) the playlist's answer no longer lists it: then its album's, so it is on some row
+        let listing = PlaylistDownloads.listing(downloads.playlists.kept)
         let ownRows = going.filter { (record: DownloadRecord) -> Bool in
-            !DownloadOrigin.keptInStep(downloads.origins[record.id] ?? [.song])
+            PlaylistDownloads.inDownloadingAlbumRow(record.id, origins: downloads.origins[record.id] ?? [.song],
+                                                    listing: listing)
         }
         let shelf = PlaylistDownloads.shelf(downloads.playlists.kept)
         let entries = shelf.compactMap { (playlist: Playlist) -> KeptPlaylist? in
@@ -221,9 +224,11 @@ private struct DownloadShelf {
         let done = downloads.downloaded
         songsHere = done.count
         albumsHere = Set(done.map(\.albumID)).count
-        // (slice 3) a song only downloaded playlists keep is under its playlist's row, not an album's
+        // (slice 3) a song only downloaded playlists keep is under its playlist's row, not an album's - unless (its
+        // review) none of them lists it now
         let albumRows = done.filter { (record: DownloadRecord) -> Bool in
-            !DownloadOrigin.onlyPlaylists(downloads.origins[record.id] ?? [.song])
+            PlaylistDownloads.inDownloadedAlbumRow(record.id, origins: downloads.origins[record.id] ?? [.song],
+                                                   listing: listing)
         }
         let here = Self.byAlbum(albumRows).map { albumID, records -> Here in
             let album = downloads.keptAlbum(albumID)

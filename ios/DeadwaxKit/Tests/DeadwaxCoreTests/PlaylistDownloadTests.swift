@@ -132,6 +132,67 @@ private func listed(_ id: String, changed: String = "c1") -> Playlist {
         #expect(unit([.album("a"), .playlist("p")]) == "album:a", "an album asked for keeps its own unit")
         #expect(unit([.library]) == "library:al")
         #expect(unit([.song]) == "song:s")
+        // (slice 3's review) a playlist's song already started goes on as itself
+        for started in [DownloadPlan.Asked(id: "s", albumID: "al", wantedAt: 1, origins: [.playlist("p")], expected: 2, out: true),
+                        DownloadPlan.Asked(id: "s", albumID: "al", wantedAt: 1, origins: [.playlist("p")], expected: 2, received: 1),
+                        DownloadPlan.Asked(id: "s", albumID: "al", wantedAt: 1, origins: [.playlist("p")], expected: 2,
+                                           resumable: true)] {
+            #expect(started.unit == "song:s")
+        }
+        #expect(DownloadPlan.Asked(id: "s", albumID: "al", wantedAt: 1, origins: [.album("a"), .playlist("p")], expected: 2,
+                                   out: true).unit == "album:a", "an album's unit as it was")
+    }
+
+    /// Slice 3's review (HIGH): a song of the playlist already fetching - asked for by hand, or the library's - never
+    /// lets the rest of the playlist past the limit or the 2 GB the phone keeps.
+    @Test func aStartedSongNeverLetsItsPlaylistPastTheLimitOrTheReserve() {
+        let rest = (1...3).map { (n: Int) -> DownloadPlan.Asked in
+            DownloadPlan.Asked(id: "p-\(n)", albumID: "al-\(n)", wantedAt: 2, origins: [.playlist("p")], expected: 3 * gb)
+        }
+        let origins: [Set<DownloadOrigin>] = [[.song, .playlist("p")], [.library, .playlist("p")]]
+        for its in origins {
+            let fetching = DownloadPlan.Asked(id: "f", albumID: "al-f", wantedAt: 1, origins: its, expected: 2 * gb,
+                                              received: gb, out: true)
+            // 12 GB here, f's 1 to come and the rest's 9: over 20 - f goes on, the rest waits for room, whole
+            let facts = DownloadPlan.Facts(bytesHere: 12 * gb, limit: StorageLimit.gb20.bytes, freeSpace: 100 * gb)
+            let room = DownloadPlan.plan([fetching] + rest, facts)
+            #expect(room["f"] == DownloadPlan.Decision(wait: .queued, task: true))
+            #expect(rest.allSatisfy { (asked: DownloadPlan.Asked) -> Bool in room[asked.id] == DownloadPlan.Decision(wait: .room, task: false) })
+            // the hand downloads' still to come are f's alone: the library gives way for nothing more
+            #expect(DownloadPlan.handToCome([fetching] + rest, facts) == gb)
+            // the reserve: 11 GB free, less f's 1 and the rest's 9, leaves 1
+            let full = DownloadPlan.plan([fetching] + rest, DownloadPlan.Facts(bytesHere: 0, limit: nil, freeSpace: 11 * gb))
+            #expect(full["f"]?.task == true)
+            #expect(rest.allSatisfy { (asked: DownloadPlan.Asked) -> Bool in full[asked.id] == DownloadPlan.Decision(wait: .phoneFull, task: false) })
+        }
+        // a song added to a playlist already downloading is checked with the rest of what hasn't started
+        let going = DownloadPlan.Asked(id: "p-0", albumID: "al-0", wantedAt: 1, origins: [.playlist("p")], expected: 3 * gb,
+                                       received: gb, out: true)
+        let added = DownloadPlan.Asked(id: "new", albumID: "al-n", wantedAt: 9, origins: [.playlist("p")], expected: 9 * gb)
+        let plan = DownloadPlan.plan([going, added], DownloadPlan.Facts(bytesHere: 10 * gb, limit: StorageLimit.gb20.bytes,
+                                                                        freeSpace: 100 * gb))
+        #expect(plan["p-0"]?.task == true && plan["new"] == DownloadPlan.Decision(wait: .room, task: false))
+    }
+
+    /// Slice 3's review (HIGH): a song two downloaded playlists share, mid-fetch, goes on as itself - the playlist that
+    /// sorts first no longer takes it, so the older playlist doesn't stop half-way while the newer goes past the limit.
+    @Test func aSongTwoPlaylistsShareGoesOnAloneAndEachPlaylistIsJudgedOnItsOwn() {
+        let shared = DownloadPlan.Asked(id: "both", albumID: "al", wantedAt: 1, origins: [.playlist("p0"), .playlist("p1")],
+                                        expected: 2 * gb, received: gb, out: true)
+        let older = (1...2).map { (n: Int) -> DownloadPlan.Asked in
+            DownloadPlan.Asked(id: "p1-\(n)", albumID: "a\(n)", wantedAt: 1, origins: [.playlist("p1")], expected: gb)
+        }
+        let newer = (1...2).map { (n: Int) -> DownloadPlan.Asked in
+            DownloadPlan.Asked(id: "p0-\(n)", albumID: "b\(n)", wantedAt: 5, origins: [.playlist("p0")], expected: 4 * gb)
+        }
+        #expect(shared.unit == "song:both")
+        // 12 here: the shared song's 1 and p1's 2 fit under 20; p0's 8 more don't
+        let plan = DownloadPlan.plan([shared] + older + newer, DownloadPlan.Facts(bytesHere: 12 * gb,
+                                                                                limit: StorageLimit.gb20.bytes,
+                                                                                freeSpace: 100 * gb))
+        #expect(plan["both"]?.task == true)
+        #expect(older.allSatisfy { (asked: DownloadPlan.Asked) -> Bool in plan[asked.id]?.task == true }, "not half-way")
+        #expect(newer.allSatisfy { (asked: DownloadPlan.Asked) -> Bool in plan[asked.id] == DownloadPlan.Decision(wait: .room, task: false) })
     }
 
     @Test func aDownloadedPlaylistIsPlannedWholeUnderTheLimitAndTheReserve() {
@@ -201,7 +262,7 @@ private func listed(_ id: String, changed: String = "c1") -> Playlist {
         #expect(PlaylistDownloads.missing(first.entry, at: t0 + 10 * minute).gone)
         // a read that finds it again ends the mark
         let found = PlaylistDownloads.read(first.entry, answer: answer(["s1"]), body: Data(), carrying: ["s1"],
-                                           at: t0 + minute, here: false)
+                                           at: t0 + minute)
         #expect(found.missingSince == nil)
     }
 
@@ -209,7 +270,7 @@ private func listed(_ id: String, changed: String = "c1") -> Playlist {
 
     @Test func aSongThePlaylistGainedIsAskedForOnceInItsOrder() {
         let read = PlaylistDownloads.read(kept(["s1"]), answer: answer(["s3", "s1", "s2", "s3"]), body: Data("b".utf8),
-                                          carrying: ["s1"], at: t0 + minute, here: false)
+                                          carrying: ["s1"], at: t0 + minute)
         #expect(read.answer == answer(["s3", "s1", "s2", "s3"]) && read.body == Data("b".utf8) && read.readAt == t0 + minute)
         let actions = PlaylistDownloads.actions(read, carrying: ["s1"])
         #expect(actions.ask.map(\.id) == ["s3", "s2"], "a song listed twice is asked for once")
@@ -223,27 +284,27 @@ private func listed(_ id: String, changed: String = "c1") -> Playlist {
     @Test func aSongItLostGoesOnlyOnceTwoReadsTenMinutesApartAgree() {
         let carrying: Set<String> = ["s1", "s2"]
         let first = PlaylistDownloads.read(kept(["s1", "s2"]), answer: answer(["s1"]), body: Data(), carrying: carrying,
-                                           at: t0, here: false)
+                                           at: t0)
         #expect(first.left == ["s2": t0])
         #expect(first.answer == answer(["s1"]), "the page draws the playlist as it is")
         #expect(PlaylistDownloads.actions(first, carrying: carrying).take.isEmpty, "one read never takes anything")
         let soon = PlaylistDownloads.read(first, answer: answer(["s1"]), body: Data(), carrying: carrying,
-                                          at: t0 + 10 * minute - 1, here: false)
+                                          at: t0 + 10 * minute - 1)
         #expect(soon.left == ["s2": t0] && PlaylistDownloads.actions(soon, carrying: carrying).take.isEmpty)
         #expect(soon.secondReadAt == t0 + 10 * minute)
         let agreed = PlaylistDownloads.read(soon, answer: answer(["s1"]), body: Data(), carrying: carrying,
-                                            at: t0 + 10 * minute, here: false)
+                                            at: t0 + 10 * minute)
         #expect(PlaylistDownloads.actions(agreed, carrying: carrying).take == ["s2"])
         #expect(agreed.secondReadAt == nil)
         // back in the playlist before the second read: no longer marked, nothing taken
         let back = PlaylistDownloads.read(first, answer: answer(["s1", "s2"]), body: Data(), carrying: carrying,
-                                          at: t0 + 11 * minute, here: false)
+                                          at: t0 + 11 * minute)
         #expect(back.left.isEmpty && PlaylistDownloads.actions(back, carrying: carrying).isEmpty)
         // once taken, the song no longer carries the origin: nothing more to do
         #expect(PlaylistDownloads.actions(agreed, carrying: ["s1"]).isEmpty)
         // two songs found gone at two reads: the second read is due by the first of them
         let twice = PlaylistDownloads.read(first, answer: answer([]), body: Data(), carrying: ["s1", "s2"],
-                                           at: t0 + 4 * minute, here: false)
+                                           at: t0 + 4 * minute)
         #expect(twice.left == ["s1": t0 + 4 * minute, "s2": t0])
         #expect(twice.secondReadAt == t0 + 10 * minute)
     }
@@ -258,41 +319,122 @@ private func listed(_ id: String, changed: String = "c1") -> Playlist {
     @Test func anEditHereTakesWhatItTookOutAtOnce() {
         let carrying: Set<String> = ["s1", "s2", "s3"]
         let edited = PlaylistDownloads.read(kept(["s1", "s2", "s3"]), answer: answer(["s1"]), body: Data(),
-                                            carrying: carrying, at: t0, here: true)
+                                            carrying: carrying, at: t0, edited: ["s2", "s3"])
         #expect(PlaylistDownloads.actions(edited, carrying: carrying).take == ["s2", "s3"])
         #expect(edited.secondReadAt == nil, "nothing waits for a second read")
         // a read elsewhere marks first
         let elsewhere = PlaylistDownloads.read(kept(["s1", "s2", "s3"]), answer: answer(["s1"]), body: Data(),
-                                               carrying: carrying, at: t0, here: false)
+                                               carrying: carrying, at: t0)
         #expect(PlaylistDownloads.actions(elsewhere, carrying: carrying).take.isEmpty)
+    }
+
+    /// Slice 3's review (MEDIUM): an Edit takes at once only the songs it took out - never one Navidrome is hiding, which
+    /// Done's answer doesn't list either - and a read never marks songs Navidrome's `hidden` may account for.
+    @Test func anEditTakesOnlyWhatItTookOutAndASongNavidromeIsHidingStays() {
+        func hiding(_ ids: [String], _ hidden: Int) -> PlaylistWithSongs {
+            let listed = answer(ids)
+            return PlaylistWithSongs(playlist: listed.playlist, songs: listed.songs, hidden: hidden)
+        }
+        // a Done that changed only the name, s2's file being moved: its answer lacks s2, and nothing is taken
+        let renamed = PlaylistDownloads.read(kept(["s1", "s2"]), answer: hiding(["s1"], 1), body: Data(),
+                                             carrying: ["s1", "s2"], at: t0, edited: [])
+        #expect(renamed.left.isEmpty && PlaylistDownloads.actions(renamed, carrying: ["s1", "s2"]).isEmpty)
+        // an Edit that took s3 out with s2 hidden: s3 at once, s2 kept and unmarked
+        let edited = PlaylistDownloads.read(kept(["s1", "s2", "s3"]), answer: hiding(["s1"], 1), body: Data(),
+                                            carrying: ["s1", "s2", "s3"], at: t0, edited: ["s3"])
+        #expect(PlaylistDownloads.actions(edited, carrying: ["s1", "s2", "s3"]).take == ["s3"])
+        #expect(edited.left["s2"] == nil)
+        // ordinary reads: two answers ten minutes apart listing nothing with both hidden take nothing - the kept answer
+        // stays, drawn, and a mark made before the hiding is dropped
+        let carrying: Set<String> = ["s1", "s2"]
+        let first = PlaylistDownloads.read(kept(["s1", "s2"], left: ["s2": t0 - 20 * minute]), answer: hiding([], 2),
+                                           body: Data("e".utf8), carrying: carrying, at: t0)
+        let second = PlaylistDownloads.read(first, answer: hiding([], 2), body: Data("e".utf8), carrying: carrying,
+                                            at: t0 + 10 * minute)
+        #expect(first.left.isEmpty && second.left.isEmpty)
+        #expect(PlaylistDownloads.actions(second, carrying: carrying).isEmpty)
+        #expect(second.answer == answer(["s1", "s2"]), "the answer kept stays while Navidrome hides them")
+        // hidden at least the songs lacking: none marked; fewer: all marked, as Navidrome can't say which
+        let some = PlaylistDownloads.read(kept(["s1", "s2", "s3"]), answer: hiding(["s1"], 2), body: Data(),
+                                          carrying: ["s1", "s2", "s3"], at: t0)
+        #expect(some.left.isEmpty)
+        let more = PlaylistDownloads.read(kept(["s1", "s2", "s3"]), answer: hiding(["s1"], 1), body: Data(),
+                                          carrying: ["s1", "s2", "s3"], at: t0)
+        #expect(more.left == ["s2": t0, "s3": t0])
+        // a song the Edit took out isn't one Navidrome's count accounts for: s3 taken, s2 (hidden 1) kept
+        let both = PlaylistDownloads.read(kept(["s1", "s2", "s3"]), answer: hiding(["s1"], 1), body: Data(),
+                                          carrying: ["s1", "s2", "s3"], at: t0, edited: ["s3"])
+        #expect(both.left.keys.sorted() == ["s3"])
+        // an Edit's own removals: in the songs it began with and nowhere now - one listed twice and taken out once stays
+        let body = PlaylistEditBody(base: ["s1", "s2", "s2", "s3"], songIds: ["s2", "s1"])
+        #expect(body.removed == ["s3"])
+    }
+
+    /// Slice 3's review (test gaps): a mark dated after the read (the phone's clock moved back) is dated by the read, so
+    /// a song isn't kept marked for ever; and a playlist downloaded at the very moment the list was asked is the list's.
+    @Test func aMarkFromTheFutureIsTheReadsAndAListAtTheMomentOfADownloadSpeaksForIt() {
+        let ahead = kept(["s1", "s2"], left: ["s2": t0 + 30 * minute])
+        let read = PlaylistDownloads.read(ahead, answer: answer(["s1"]), body: Data(), carrying: ["s1", "s2"], at: t0)
+        #expect(read.left == ["s2": t0])
+        var now = kept(["s1"])
+        now.askedAt = t0
+        let other = Playlist(id: "p9", name: "x")
+        #expect(PlaylistDownloads.listed([now], list: [other], at: t0).kept.first?.missingSince == t0)
+        now.askedAt = t0 + 1
+        #expect(PlaylistDownloads.listed([now], list: [other], at: t0).kept.first?.missingSince == nil)
+    }
+
+    /// Slice 3's review (LOW): a song carrying a playlist's origin is drawn with the playlist only while its kept answer
+    /// lists it - one marked gone, or hidden, still coming, is drawn under its album.
+    @Test func aSongIsDrawnWithItsPlaylistOnlyWhileItsAnswerListsIt() {
+        let listing = PlaylistDownloads.listing([kept(["s1"]), kept(["s5"], id: "p2")])
+        #expect(listing == ["p1": ["s1"], "p2": ["s5"]])
+        #expect(PlaylistDownloads.drawnWithPlaylists("s1", origins: [.playlist("p1")], listing: listing))
+        #expect(!PlaylistDownloads.drawnWithPlaylists("s2", origins: [.playlist("p1")], listing: listing))
+        #expect(PlaylistDownloads.drawnWithPlaylists("s5", origins: [.playlist("p1"), .playlist("p2")], listing: listing))
+        #expect(!PlaylistDownloads.drawnWithPlaylists("s5", origins: [.playlist("p1")], listing: listing), "another's list")
+        #expect(!PlaylistDownloads.drawnWithPlaylists("s1", origins: [.song], listing: listing))
+        #expect(!PlaylistDownloads.drawnWithPlaylists("s1", origins: [.playlist("p3")], listing: listing), "not kept")
+
+        // Downloading's album rows: a song asked another way, or kept in step with no other row drawing it
+        #expect(PlaylistDownloads.inDownloadingAlbumRow("s1", origins: [.song, .playlist("p1")], listing: listing))
+        #expect(!PlaylistDownloads.inDownloadingAlbumRow("s1", origins: [.playlist("p1")], listing: listing))
+        #expect(!PlaylistDownloads.inDownloadingAlbumRow("s2", origins: [.library, .playlist("p1")], listing: listing),
+                "your library's row draws it")
+        #expect(PlaylistDownloads.inDownloadingAlbumRow("s2", origins: [.playlist("p1")], listing: listing),
+                "its playlist no longer lists it: its album's row")
+        // Downloaded's: a song kept any way but playlists alone, or one no playlist's row draws
+        #expect(PlaylistDownloads.inDownloadedAlbumRow("s1", origins: [.library, .playlist("p1")], listing: listing))
+        #expect(!PlaylistDownloads.inDownloadedAlbumRow("s1", origins: [.playlist("p1")], listing: listing))
+        #expect(PlaylistDownloads.inDownloadedAlbumRow("s2", origins: [.playlist("p1")], listing: listing))
+        #expect(PlaylistDownloads.inDownloadedAlbumRow("s9", origins: [.song], listing: listing))
     }
 
     @Test func anEmptyAnswerIsNeverTakenInOnItsOwn() {
         let carrying: Set<String> = ["s1", "s2"]
         let first = PlaylistDownloads.read(kept(["s1", "s2"]), answer: answer([]), body: Data("empty".utf8),
-                                           carrying: carrying, at: t0, here: false)
+                                           carrying: carrying, at: t0)
         #expect(first.answer == answer(["s1", "s2"]) && first.body == Data("{}".utf8), "the kept answer stays, drawn offline")
         #expect(first.left == ["s1": t0, "s2": t0] && first.readAt == t0)
         #expect(PlaylistDownloads.actions(first, carrying: carrying).isEmpty)
         // a second empty read ten minutes on agrees: taken in, and the songs go
         let agreed = PlaylistDownloads.read(first, answer: answer([]), body: Data("empty".utf8), carrying: carrying,
-                                            at: t0 + 10 * minute, here: false)
+                                            at: t0 + 10 * minute)
         #expect(agreed.answer == answer([]) && agreed.body == Data("empty".utf8))
         #expect(PlaylistDownloads.actions(agreed, carrying: carrying).take == ["s1", "s2"])
         // emptied by this phone's own Edit: at once
         let here = PlaylistDownloads.read(kept(["s1", "s2"]), answer: answer([]), body: Data(), carrying: carrying,
-                                          at: t0, here: true)
+                                          at: t0, edited: ["s1", "s2"])
         #expect(here.answer == answer([]) && PlaylistDownloads.actions(here, carrying: carrying).take == ["s1", "s2"])
         // a playlist empty already stays empty
-        let none = PlaylistDownloads.read(kept([]), answer: answer([]), body: Data("e".utf8), carrying: [], at: t0, here: false)
+        let none = PlaylistDownloads.read(kept([]), answer: answer([]), body: Data("e".utf8), carrying: [], at: t0)
         #expect(none.answer == answer([]) && none.body == Data("e".utf8))
         // a kept answer empty already, or one that couldn't be read, is replaced by the empty one at once - the hold keeps
         // listed songs drawn, and it has none - while a song still carried waits for a second read to go
         var unreadable = kept(["s1"])
         unreadable.answer = nil
         for before in [kept([]), unreadable] {
-            let empty = PlaylistDownloads.read(before, answer: answer([]), body: Data("e".utf8), carrying: ["s1"], at: t0,
-                                               here: false)
+            let empty = PlaylistDownloads.read(before, answer: answer([]), body: Data("e".utf8), carrying: ["s1"], at: t0)
             #expect(empty.answer == answer([]) && empty.body == Data("e".utf8) && empty.left == ["s1": t0])
             #expect(PlaylistDownloads.actions(empty, carrying: ["s1"]).isEmpty)
         }

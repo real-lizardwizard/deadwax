@@ -540,7 +540,8 @@ final class DownloadModel {
     // MARK: a downloaded playlist (Phase 4, slice 3)
 
     /// A playlist's Download (its page's control, its •••): kept on this phone as it is in hand, its songs asked for
-    /// under its origin - planned whole, as an album is - and kept in step with deadwax from then on.
+    /// under its origin - planned whole, as an album is - and kept in step with deadwax from then on. Never a smart
+    /// playlist's (the keeper refuses one: PlaylistKeeping.download).
     func download(playlist answer: PlaylistWithSongs) {
         playlists.download(answer)
     }
@@ -573,6 +574,12 @@ final class DownloadModel {
     func playlistState(_ id: String) -> AlbumDownload? {
         let entry = playlists.entry(id)
         return PlaylistDownloads.state(downloaded: entry != nil, songs: (entry?.songIDs ?? []).map { facts(id: $0) })
+    }
+
+    /// (slice 3's review) The playlist is smart (PlaylistDownloads.isSmart): no Download, its page saying why - or, one
+    /// downloaded before deadwax said so, kept as it was.
+    func playlistIsSmart(_ id: String, answer: PlaylistWithSongs?) -> Bool {
+        PlaylistDownloads.isSmart(answer, kept: playlists.entry(id))
     }
 
     /// The downloaded playlist's kept answer - its page drawn from it with no connection.
@@ -614,13 +621,13 @@ final class DownloadModel {
 
     /// A playlist's page drew deadwax's answer: a downloaded one takes it in as a read (PlaylistDownloads.read).
     func playlistAnswered(_ answer: PlaylistWithSongs) {
-        playlists.took(answer, here: false)
+        playlists.took(answer)
     }
 
     /// A playlist's page was answered gone (a 404): a downloaded one is read, and let go only once two answers ten
     /// minutes apart agree.
     func playlistGone(_ id: String) {
-        playlists.read(id, here: false)
+        playlists.read(id)
     }
 
     /// A write here changed a playlist (PlaylistsModel's): a downloaded one is kept in step at once.
@@ -654,8 +661,8 @@ final class DownloadModel {
         verifyQueue = []
         Task { _ = await session.cancel(tasks, resume: false) }
         do {
-            try store.removeEverything()
-            playlists.removedAll()
+            // the playlists kept in memory let go as soon as the database is emptied, before the folders are made again
+            try store.removeEverything(emptied: { playlists.removedAll() })
             note("removed everything")
         } catch {
             note("remove all failed: \(error)")

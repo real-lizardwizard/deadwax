@@ -192,7 +192,8 @@ struct AlbumsScreen: View {
                 }
             }
         case .downloaded:
-            let downloadedPlaylists = downloads.playlists.kept.count
+            // the playlists its screen lists (the shelf: those whose answer can be read), never an unreadable row's
+            let downloadedPlaylists = PlaylistDownloads.shelf(downloads.playlists.kept).count
             if root || downloadedPlaylists > 0 {
                 VStack(alignment: .leading, spacing: 0) {
                     if root {

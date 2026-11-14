@@ -315,7 +315,8 @@ struct DownloadMenuSection: View {
 /// as one (phase4-library.md 2.5): the accent arrow downloads it at once - kept on this phone, its songs fetched, kept in
 /// step as it changes; once downloaded, a menu from the control itself, titled with the playlist's line, with Download
 /// Again (its songs that didn't download) and Remove Download (its songs downloaded any other way stay). Dimmed until
-/// the playlist's songs are in, and for one gone. VoiceOver: "Download", its value the playlist's line.
+/// the playlist's songs are in, and for one gone. None at all for a smart playlist not downloaded (slice 3's review,
+/// James: "No Download for them") - its hero says why. VoiceOver: "Download", its value the playlist's line.
 struct PlaylistDownloadControl: View {
     /// The playlist with its songs - nil while they aren't in (the control dimmed).
     let answer: PlaylistWithSongs?
@@ -335,7 +336,7 @@ struct PlaylistDownloadControl: View {
                                  fraction: DownloadWords.Mark.fraction(state), font: .body, lineWidth: 2, control: true)
                 }
                 .menuOrder(.fixed)
-            } else {
+            } else if !downloads.playlistIsSmart(id, answer: answer) {
                 Button {
                     guard let answer else { return }
                     downloads.download(playlist: answer)
@@ -363,7 +364,7 @@ struct PlaylistDownloadControl: View {
 /// A playlist's download items (PlaylistDownloads.choices) - its control's menu (`titled`: the playlist's line over
 /// them) and its bar •••'s second section, carried out in the tap through DownloadModel. A download never starts the
 /// music, so nothing here is on the gesture rule's allowlist. Nothing while this phone's downloads can't be used, nor -
-/// for Download - before the songs are in.
+/// for Download - before the songs are in, nor for a smart playlist (its choices: none until it is downloaded).
 struct PlaylistDownloadMenuSection: View {
     let answer: PlaylistWithSongs?
     let id: String
@@ -383,24 +384,27 @@ struct PlaylistDownloadMenuSection: View {
     var body: some View {
         if downloads.isOpen, !id.isEmpty {
             let state = downloads.playlistState(id)
-            let choices = PlaylistDownloads.choices(state).filter { (choice: DownloadChoice) -> Bool in
+            let smart = downloads.playlistIsSmart(id, answer: answer)
+            let choices = PlaylistDownloads.choices(state, smart: smart).filter { (choice: DownloadChoice) -> Bool in
                 choice != .download || answer != nil
             }
-            Section {
-                ForEach(choices, id: \.self) { choice in
-                    Button(choice.label, systemImage: choice.symbol, role: choice.isDestructive ? .destructive : nil) {
-                        act(choice)
+            if !choices.isEmpty {
+                Section {
+                    ForEach(choices, id: \.self) { choice in
+                        Button(choice.label, systemImage: choice.symbol, role: choice.isDestructive ? .destructive : nil) {
+                            act(choice)
+                        }
                     }
+                } header: {
+                    if titled, let state { Text(title(state, smart: smart)) }
                 }
-            } header: {
-                if titled, let state { Text(title(state)) }
             }
         }
     }
 
     /// The control's menu title: the playlist's line, and a second - the setting a wait is for, the first reason a song
-    /// didn't download, or the size once downloaded.
-    private func title(_ state: AlbumDownload) -> String {
+    /// didn't download, or the size once downloaded (a smart one's own line over it).
+    private func title(_ state: AlbumDownload, smart: Bool) -> String {
         guard let entry = downloads.playlists.entry(id) else { return "" }
         var first: String?
         if case .failed(_, let failure) = state,
@@ -409,7 +413,9 @@ struct PlaylistDownloadMenuSection: View {
                                           admin: server.access.seesDetail).text
         }
         let bytes = downloads.playlistHere(entry).bytes
-        if case .downloaded = state { return "\(PlaylistDownloadWords.playsOffline)\n\(Bytes.words(bytes))" }
+        if case .downloaded = state, let line = PlaylistDownloadWords.heroLine(state, smart: smart) {
+            return "\(line)\n\(Bytes.words(bytes))"
+        }
         return DownloadWords.controlMenuTitle(state, limit: downloads.storageLimit, bytesHere: bytes, firstFailure: first)
     }
 
