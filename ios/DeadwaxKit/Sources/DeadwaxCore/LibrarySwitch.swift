@@ -1,12 +1,14 @@
 import Foundation
 
 /// The Library's switch (Phase 4, slice 3b - notes/ios-specs/phase4-library.md 2.8 and 3.1, James's of 2026-11-14): the
-/// Library opens on its pages, side by side - Albums | Playlists, Artists and Songs joining in slices 4 and 5 - in an
-/// order kept per phone, swiped between, with nothing above the albums. These are its rules and words; the app draws
+/// Library opens on its pages, side by side - Albums | Playlists | Artists since slice 4, Songs joining in slice 5 - in
+/// an order kept per phone, swiped between, with nothing above the albums. These are its rules and words; the app draws
 /// them (LibraryView).
 public enum LibraryPage: String, CaseIterable, Sendable, Hashable, Identifiable {
     case albums
     case playlists
+    /// (slice 4) Your artists - or Artists, without a library of your own.
+    case artists
 
     public var id: String { rawValue }
 
@@ -15,6 +17,7 @@ public enum LibraryPage: String, CaseIterable, Sendable, Hashable, Identifiable 
         switch self {
         case .albums: return "Albums"
         case .playlists: return "Playlists"
+        case .artists: return ArtistWords.artists
         }
     }
 }
@@ -98,16 +101,23 @@ public enum ShuffleCan: Sendable, Equatable {
 public enum LibraryMenuItem: Sendable, Equatable {
     /// the Shuffle, as it can be just now (never `.nothingHere` or `.none`: then there is no item)
     case shuffle(ShuffleCan)
+    /// (slice 4, question 26) the page's order - Albums' or Artists': a submenu of its orders
+    case order(LibraryPage)
+    /// (slice 4, question 26) Albums' tiles or rows: `grid` while it is tiles
+    case layout(grid: Bool)
     /// Downloaded, pushed
     case downloaded
-    /// the way back to the albums while the Albums page is Downloaded: the scope's albums, pushed
+    /// the way back to the albums while the Albums page is Downloaded: the scope's albums, pushed - and All music's
+    /// All albums (the store's)
     case albums(AlbumScope)
-    /// All music: the store's albums, pushed
+    /// All music: a submenu of the collection's lists (`LibraryMenu.allMusic`) since slice 4
     case allMusic
+    /// (slice 4) All music's All artists: the store's artists, pushed
+    case artists(AlbumScope)
     case refresh
     case editOrder
 
-    /// The item's words - `personal`: a library of your own (the albums' title).
+    /// The item's words - `personal`: a library of your own (the lists' titles).
     public func words(personal: Bool) -> String {
         switch self {
         case .shuffle(let can):
@@ -117,9 +127,12 @@ public enum LibraryMenuItem: Sendable, Equatable {
             case .failed(let why): return why
             default: return ShuffleWords.shuffle
             }
+        case .order(let page): return page == .artists ? ArtistWords.sortLabel : LibraryWords.sortLabel
+        case .layout(let grid): return grid ? LibrarySwitchWords.showAsList : LibrarySwitchWords.showAsGrid
         case .downloaded: return DownloadWords.downloadedTitle
         case .albums(let scope): return LibraryWords.title(scope, personal: personal)
         case .allMusic: return LibraryWords.allMusic
+        case .artists(let scope): return ArtistWords.title(scope, personal: personal)
         case .refresh: return LibrarySwitchWords.refresh
         case .editOrder: return LibrarySwitchWords.editOrder
         }
@@ -132,16 +145,27 @@ public enum LibraryMenuItem: Sendable, Equatable {
     }
 }
 
-/// The Library's ••• (2.8): what it holds, in its sections.
+/// The Library's ••• (2.8): what it holds, in its sections. Since slice 4 (question 26: three pages and their buttons
+/// crowd the bar) the page's own order and Albums' Grid or list are its second section - Playlists keeps its + in the
+/// bar - and All music is a submenu of the collection's albums and artists.
 public enum LibraryMenu {
-    /// `shuffle`: what the Shuffle can do; `albumsPage`: the list the Albums page is (Downloaded while deadwax couldn't be
-    /// reached as it was last drawn); `scope`, `personal`, `online`: the person's and the connection's.
-    public static func sections(shuffle: ShuffleCan, albumsPage: LibraryRootList, scope: AlbumScope, personal: Bool,
-                                online: Bool) -> [[LibraryMenuItem]] {
+    /// All music's submenu: the collection's albums and artists, each pushed.
+    public static let allMusic: [LibraryMenuItem] = [.albums(.store), .artists(.store)]
+
+    /// `shuffle`: what the Shuffle can do; `page`: the page shown, `grid`: Albums drawn as tiles; `albumsPage`: the list
+    /// the Albums page is (Downloaded while deadwax couldn't be reached as it was last drawn); `scope`, `personal`,
+    /// `online`: the person's and the connection's.
+    public static func sections(shuffle: ShuffleCan, page: LibraryPage, grid: Bool, albumsPage: LibraryRootList,
+                                scope: AlbumScope, personal: Bool, online: Bool) -> [[LibraryMenuItem]] {
         var sections: [[LibraryMenuItem]] = []
         switch shuffle {
         case .nothingHere, .none: break
         default: sections.append([.shuffle(shuffle)])
+        }
+        switch page {
+        case .albums: sections.append([.order(.albums), .layout(grid: grid)])
+        case .artists: sections.append([.order(.artists)])
+        case .playlists: break
         }
         var places: [LibraryMenuItem] = [albumsPage == .downloaded ? .albums(scope) : .downloaded]
         if online && personal && scope == .yours { places.append(.allMusic) }
@@ -158,6 +182,9 @@ public enum LibrarySwitchWords {
     public static let shuffleDownloads = "Shuffle downloads"
     public static let refresh = "Refresh"
     public static let editOrder = "Edit order"
+    /// (slice 4) Albums' layout, in the ••• since question 26 - what the bar's button said (LibraryLayout).
+    public static let showAsList = "Show as list"
+    public static let showAsGrid = "Show as grid"
     /// Edit order's sheet: its title, its footer and its one button.
     public static let orderTitle = "Edit order"
     public static let orderFooter = "Drag the pages into the order you want. The Library opens on the first."

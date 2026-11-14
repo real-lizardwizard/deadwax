@@ -51,6 +51,23 @@ public enum ShelfIndex {
         kind(sort) != nil && !Find.finding(typed) && count >= minimum
     }
 
+    /// (Phase 4, slice 4) `indexKind` of an artist order: the letters for Name, none for Most albums.
+    public static func kind(_ order: ArtistOrder) -> Kind? {
+        order == .name ? .letters : nil
+    }
+
+    /// `showsIndex` of an artist order: Name, nothing typed into Find, and at least `minimum` artists in the SORTED
+    /// list.
+    public static func shows(_ order: ArtistOrder, count: Int, typed: String) -> Bool {
+        kind(order) != nil && !Find.finding(typed) && count >= minimum
+    }
+
+    /// `indexEntries` of an artist order: the 27 letters for Name, as the albums' letter sorts have them; none for Most
+    /// albums.
+    public static func entries(_ groups: [ShelfGroup], _ order: ArtistOrder) -> [Entry] {
+        entries(groups, kind: kind(order))
+    }
+
     /// How many entries a strip `height` points tall has room for.
     public static func slots(height: Double) -> Int {
         guard height.isFinite, height > 0 else { return 1 }
@@ -61,7 +78,12 @@ public enum ShelfIndex {
     /// after it, or the last group when there is none after. Decades: one per decade present, in the sort's
     /// direction, labelled with its first year, jumping to its first group; "No year" gets none. No groups, none.
     public static func entries(_ groups: [ShelfGroup], _ sort: AlbumSort) -> [Entry] {
-        guard let kind = kind(sort), !groups.isEmpty else { return [] }
+        entries(groups, kind: kind(sort))
+    }
+
+    /// The entries of an index of `kind` over `groups`: none for no kind, or no groups.
+    static func entries(_ groups: [ShelfGroup], kind: Kind?) -> [Entry] {
+        guard let kind, !groups.isEmpty else { return [] }
         switch kind {
         case .letters:
             func rank(_ label: String?) -> Int {

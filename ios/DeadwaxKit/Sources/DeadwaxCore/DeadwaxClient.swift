@@ -350,6 +350,21 @@ public struct DeadwaxClient: Sendable {
         try await call(Routes.shufflePage, path: ["token": token], query: [("offset", String(offset))])
     }
 
+    // MARK: Phase 4, slice 4: artists
+
+    /// Every artist in the collection, in Navidrome's order (getArtists, its index flattened by deadwax).
+    public func artists() async throws -> [Artist] {
+        try await call(Routes.artists, as: ArtistList.self).artists
+    }
+
+    /// One artist and the albums Navidrome has of theirs, as it has them now; nil when Navidrome answers `{}` (no
+    /// artist by that id). A 404 is thrown.
+    public func artist(id: String) async throws -> ArtistWithAlbums? {
+        let response = try await answer(request(Routes.artist, path: ["artist_id": id]))
+        if Self.isEmptyObject(response.body) { return nil }
+        return try decode(ArtistWithAlbums.self, response)
+    }
+
     // MARK: app 0.8's play history (server 2.1.14)
 
     /// A page of the person's plays, newest first: the newest (`before` nil), or the one before a page's last.

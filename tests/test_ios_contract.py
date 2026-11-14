@@ -48,6 +48,11 @@ And slice 3b's Library Shuffle (phase4-library.md 2.7, 2.8): ShuffleStart and Sh
 feed starts over on and the 413's words; and the numbers and words the phone holds by hand from the web (question 24) -
 SHUFFLE_FRESH_MS, FEED_BELOW, FEED_RETRY_MS and the Shuffle's three sentences, read from ShuffleSongs.tsx and
 useShuffleFeed.ts - with SHUFFLE_FRESH_MS the route's SHUFFLE_LIST_TTL_S.
+
+And slice 4's artists (phase4-library.md 2.6): ArtistList, Artist and ArtistWithAlbums to what /artists (getArtists'
+index flattened under "artists") and /artists/{id} (getArtist's artist as Navidrome sent it, `{}` for none) return -
+every field the phone reads one Navidrome sends, the id the one it can't do without - over the routes' own tests'
+answers (tests/test_navidrome_artists.py).
 """
 
 import importlib.util
@@ -82,7 +87,7 @@ from src.store import JobStore  # noqa: E402
 
 CORE = Path(__file__).resolve().parent.parent / "ios" / "DeadwaxKit" / "Sources" / "DeadwaxCore"
 ENDPOINT = re.compile(r'Endpoint\(method: "(\w+)", path: "([^"]+)", query: \[([^\]]*)\]\)')
-ROUTE_COUNT = 38
+ROUTE_COUNT = 40
 RAW_OPENING = re.compile(r'#+"')
 HASHES = re.compile(r"#*")
 
@@ -1113,3 +1118,35 @@ def test_the_shuffles_numbers_and_words_are_the_webs():
     assert swift_words("Shuffle.swift", "ShuffleWords", "startedOver") \
         == web_constant("useShuffleFeed.ts", "SHUFFLE_STARTED_OVER")
     assert navidrome.SHUFFLE_TOO_BIG == "Your library is too big to shuffle here"
+
+
+# ---------------------------------------------------------------------------- slice 4's artists
+
+def test_the_artist_answers_are_what_the_app_decodes():
+    # /artists flattens getArtists' index into one list under "artists"; /artists/{id} hands getArtist's artist back as
+    # Navidrome sent it, {} for none (the phone's nil) - each read leniently, only the id needed
+    from tests import test_navidrome_artists as answers
+
+    assert fields("ArtistList") == {"artists": False}
+    (listed,) = returned_literals(navidrome.artists)
+    assert literal_keys(listed) == {"artists"}
+    assert 'return body.get("artist") or {}' in inspect.getsource(navidrome.artist)
+    assert "if Self.isEmptyObject(" in swift_function("DeadwaxClient.swift", "artist")
+    assert fields("Artist") == {"id": False, "name": True, "albumCount": True, "coverArt": True, "musicBrainzId": True}
+    assert set(fields("ArtistWithAlbums")) == set(fields("Artist")) | {"album"}
+    # `album` is a list in Swift, read leniently - absent or unreadable is none, so only the id is needed of an answer
+    assert required_fields("ArtistWithAlbums") == {"id", "album"}
+    artists_code = _code((CORE / "Artists.swift").read_text(encoding="utf-8"))
+    assert "album = fields.looseList(Album.self, .album) ?? []" in artists_code
+    assert "artists = fields.looseList(Artist.self, .artists) ?? []" in artists_code
+    # Navidrome's own answers, as the routes' tests have them: every field the phone reads is one getArtists and
+    # getArtist send, and the id is always there
+    for initial in answers.INDEX["index"]:
+        for one in initial["artist"]:
+            assert set(one) <= set(fields("Artist")), one
+            assert {"id"} <= set(one)
+    assert_decodes("Artist", answers.PORTISHEAD)
+    assert set(fields("ArtistWithAlbums")) == set(answers.ARTIST)
+    for album in answers.ARTIST["album"]:
+        assert set(album) <= set(fields("Album")), album
+        assert required_fields("Album") <= set(album)

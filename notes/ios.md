@@ -6068,3 +6068,170 @@ Verified on the merged tree:
 
 Not verified: CI's Xcode 26.6, which has the older Swift. The new tests spell out their closures' types. Nothing has
 run on a phone: checks 85-101.
+
+## Phase 4, slice 4: Artists (2026-11-14)
+
+notes/ios-specs/phase4-library.md 2.6, 3.1 and 6.4, and question 4 (6.10 points here): Artists joins the Library's
+switch - Your artists, or Artists without a library of your own, and All music's All artists - and an artist's page:
+their picture and name, their albums newest first with yours marked, Play and Shuffle over every album, and the album
+page's artist line becoming the link to it. No discography, description, pins or managing (question 4: nothing of
+MusicBrainz's on the phone's artist page). On `phase4-artists` from `ios` 8a26431. **The app stays 0.9 (9)**;
+src/__init__.py untouched; **no server change**: the two routes are the web's own, `GET /deadwax/navidrome/artists`
+and `/artists/{artist_id}` (2.0.0-player.17). ROUTE_COUNT 40.
+
+### Core (DeadwaxCore)
+
+- **Artists.swift** (new), the web's pure rules ported - lib/shelves.ts's artists, lib/artistPage.ts, lib/yourLibrary.ts
+  `yourArtists`, ArtistPage.tsx's prefetch:
+  - `Artist` (id required; name, albumCount, coverArt, musicBrainzId read leniently, `counting(_:)` for your count),
+    `ArtistList` and `ArtistWithAlbums` (an unreadable artist or album left out of its list, not the list lost).
+  - `ArtistOrder` - Name and Most albums, kept per phone under the web's `deadwax-player-artist-order`, anything else
+    read as Name.
+  - `ArtistShelf` - `sorted` (Name: Fold's key, "#" last, a tie in Navidrome's order; Most albums: most first, an
+    uncounted artist as none, a tie in Navidrome's order), `groups` (letters for Name, one unlabelled group for Most
+    albums), `filter` (every word typed, Find's folding), and `view` - the order, groups, index and count line one
+    page draws, the sorted list passed back in so Find doesn't sort again.
+  - `YourArtists.of` - Navidrome's artists your albums name as album artist, each counting your albums of theirs.
+  - `ArtistWords` - the web's words verbatim (titles, Find's placeholder, the sort label, the empty and no-match lines,
+    `albumCountLine`) and the phone's own `offlineList`.
+  - `ArtistPage` - `atOnce` 4 (PREFETCH_AT_ONCE), `kept` 20 (ARTISTS_KEPT); `rows` (artistRows over Navidrome's albums
+    alone: each album once, the newest year first, the undated last, then the folded title, then the row's key),
+    `line`, `marked`, `playOrder` (each album once, an empty id none), `playsLine` (every albums, in hand, settled,
+    library and personal case).
+  - `InTurns` - inTurns as a state the app drives (`begin`, `settled`), at least one at a time, only while going.
+  - `ArtistAlbumAsks` - the prefetch: the albums Play plays asked four at a time in the page's order, asked anew only
+    when they are other albums (the web's `playKey`, the ids sorted), what is in hand kept, only the newest round's
+    answers and failures counting, Try again asking those that didn't come; `settled`, `playable`, `someMissing`,
+    `answers`, `line`.
+  - `ArtistPlay.plan` - every album in hand in the page's order, each song with its own album; Play at the album level
+    from the first song, Shuffle at the songs level anywhere; nil with no song.
+  - `ArtistOffline` - 3.1's rule for artists: `albums` (the answer in hand, else the downloads naming them),
+    `playable` (only the songs on this phone, an album with none left out), `artists` (the artists of the downloaded
+    albums, for the list when none was ever had).
+  - `ArtistLink` - the album's artist line: a link once an id and a name are known; plain when the album answered
+    without one; and while it might still become one, drawn as a link but not tappable (`pending`), so it never
+    flashes from grey to purple.
+- **ShelfIndex**: `kind`, `shows` and `entries` for an artist order (letters for Name, none for Most albums; shown at
+  50 or more sorted, nothing typed) over the albums' own entries.
+- **LibrarySwitch**: `LibraryPage.artists`, joining a saved order at its end (question 23's rule, already built);
+  question 26 built - `LibraryMenuItem.order(page)` and `.layout(grid:)` are the •••'s second section (Albums: its
+  order and Show as list/grid; Artists: its order; Playlists: neither), and `.allMusic` is a submenu,
+  `LibraryMenu.allMusic` (All albums, All artists).
+- **Routes**: `artists` and `artist` - 40. **DeadwaxClient**: `artists()`, `artist(id:)` (nil for the route's `{}`).
+- **export-artist-vectors.cjs** (new) compiles shelves.ts, artistPage.ts, yourLibrary.ts, appFrame.ts and whose.ts and
+  reads the words and numbers that live in components (LibrarySection.tsx, ArtistPage.tsx, persisted.ts), writing
+  Fixtures/artists/artist-vectors.json: lists of artists (fixed awkward names and seeded random ones either side of
+  the index's 50) under both orders with Find's for several words, yourArtists, rows, playOrder over rows as they
+  come, every playsLine, inTurns driven step by step, and the words. **ui/test/iosartists.sim.cjs** runs its `--check`.
+
+### Where the phone can't follow the web exactly
+
+The web breaks an artist page's last two ties - two albums of one year - with `localeCompare`, ICU's collation, which
+Linux's Foundation hasn't. The phone compares the folded titles by code unit (the same for every pair whose folding
+leaves ASCII) and the rows' keys as ICU collates ASCII (`asciiCollate`: case folded first, then lowercase first). Two
+albums of one year titled in other scripts may stand in another order than the web's. The exporter checks every row
+vector is one where the two agree, and throws rather than write one the port can't meet. The year is compared as the
+web compares it, as words ("999" before "2008").
+
+### The app
+
+- **The Artists page** (ArtistsScreen.swift, new), drawn as the switch's page or pushed (All music's All artists):
+  rows, as the web's `Shelf kind="list"` - the round picture (48 pt, a person in its place), the name, "2 albums" (or
+  "12 albums in the collection" on All artists), the chevron - under letter headers, the index down the edge at 50 or
+  more (ShelfIndexStrip without years), Find's binding the page's own, "No artists match “…”.", the empty lines, the
+  pull to shuffle on the page and pull to refresh pushed. Asked each time the page becomes the one shown, and as the
+  app comes back to it; your albums asked with it, for your counts. Offline, an artist with nothing downloaded is
+  dimmed.
+- **ArtistsModel** (new, an environment object made with the server, reset for a new person): the one list, the
+  newest ask's only, its failure; the order (UserDefaults); the drawn views per kind - all, yours, here - cached on
+  what they're made from, built on the main actor; the artists' answers kept in memory, the last 20 opened (the web's
+  ARTISTS_KEPT).
+- **The artist page** (Artist/ArtistView.swift and ArtistPageModel, new): the round picture (200 pt), the name under
+  it and in the bar once scrolled away, Play and Shuffle (PlayButtons, dimmed until `playable`), the line under them,
+  Try again when some didn't come; then "Albums": each row's cover, title, the green tick when `marked`, "1994 · in
+  your library", the chevron, opening the album with the artist's id handed on. The kept answer draws at once and is
+  asked again as the page opens; a `{}` or a 404 draws "This artist isn't here any more…" (ErrorWords.artistGone) and
+  forgets them; another failure keeps what was in hand. The album asks run in unstructured tasks (they carry on
+  while the page is covered, so coming back finds them in hand), a generation guard dropping a landing for another
+  artist. Pull to refresh asks the artist again, and Try again the albums. Back online, it asks again by itself.
+- **PlayerModel**: `play(artist:shuffle:)` - ArtistPlay's plan, every album remembered (rememberQueue), the songs
+  shelved for Info, in the tap.
+- **The album page's artist line** (AlbumHero, AlbumModel's `artistLink`, AlbumRoute's `artistId` from the album the
+  opener had): ArtistLink's three - a purple button opening the artist (at least 44 pt tall), purple and still while
+  pending, grey when plain. A Button, not a NavigationLink: inside the hero's List row a NavigationLink takes the
+  whole row.
+- **LibraryView**: the third page; Find's binding and prompt the page shown's; the bar holds the switch, Playlists'
+  + and the •••; the •••'s second section the page's order (a Picker in a Menu, showing the one chosen) and Albums'
+  Show as list/grid; All music a submenu; Refresh asks the artists too. AlbumsScreen's EmptyLibraryNote,
+  RefreshProblemNote and ShelfNote are shared with the Artists page.
+- **AppRoute**: `.artists(scope)` and `.artist(ArtistRoute)` (the id, and the artist the opener had, drawn first).
+
+### Decided here (the spec was silent, or this departs from it)
+
+Questions 27-31 in the spec, each built to its recommendation: the artist page's picture round and centred, not the
+web's full-bleed hero (27); every album Navidrome has a row and played, two pressings both (28); an album whose ask
+answers `{}` left out as one that didn't load (29); Playlists' + kept in the bar (30); the artists list kept in memory,
+not on disk (31). Question 26 is built as recommended. And:
+
+- **Rows, not tiles**: the spec's 6.4 said "tiles or rows"; the web's artists are rows (`Shelf kind="list"`).
+- **All music is a submenu** (All albums, All artists), not two more items in the •••.
+- **No re-ask on coming back to an artist's page**: the asks carried on while it was covered; only back online, Pull
+  to refresh and Try again ask again.
+- **The line under Play isn't announced** by VoiceOver as it changes (the web's is `aria-live="polite"`): it changes
+  as the page opens, where an announcement would talk over the page being read; the buttons' dimming says the same,
+  and the line is read where it stands.
+
+### Tests
+
+- **ArtistTests** (17): the list and one artist read leniently (an unreadable artist or album left out), and `{}`;
+  your count; Name's order a permutation with "#" last and ties in Navidrome's order, and Most albums' (property tests
+  over seeded lists); Find keeping exactly the artists holding every word; the order as kept; rows newest first, the
+  undated last, each album once, their ties, ASCII as ICU collates it, and their order as a property; inTurns never
+  running more than its limit; the asks four at a time in order, others asking only what isn't in hand (an older
+  round's answer and failure dropped), and every interleaving of answers and failures (150 seeded) settling with each
+  album in hand or left out, never more than four out, Try again asking exactly those; Play and Shuffle's plan and
+  levels; offline's albums, play and artists; the album's artist line.
+- **ArtistVectorTests** (8): every vector of artist-vectors.json - the words and numbers, both orders' sorts, groups and
+  index over 10 lists, Find's, yourArtists, rows and lines, playOrder over rows as they come, every playsLine (192),
+  inTurns' steps.
+- **LibrarySwitchTests** (9): three pages read and moved as the List moves them; the •••'s sections and words on each
+  page, with All music's submenu.
+- **ClientTests**: the two routes among Routes.all (40).
+- **tests/test_ios_contract.py**: ROUTE_COUNT 40; `test_the_artist_answers_are_what_the_app_decodes` - ArtistList,
+  Artist and ArtistWithAlbums within what /artists and /artists/{id} return (navidrome.py's keys, `{}` for a missing
+  artist, the fields `Artist` reads, only the id required), and tests/test_navidrome_artists.py's fixtures within
+  them.
+- **Mutations**: 61 over Artists.swift, LibrarySwitch, ShelfIndex's artist half and the client's `{}`; 56 caught by a
+  failing test at first. The 5 missed, each closed:
+  - the index while Find keeps 50 or more - closed by a Find word, "e", added to the random lists' vectors (every
+    find had kept fewer than 50, so the index was hidden by the count as much as by the typing);
+  - an artist with an empty id counted as yours - a yours vector with one;
+  - Play's order keeping an album twice - `playOrders`, the web's playOrder over rows as they come (artistRows already
+    keeps each album once), which also drop an empty id: the phone didn't, and now does;
+  - an old round's failure taken - a test of a failure landing after its album was asked again;
+  - `stop()` keeping its key - `stop()` is gone: the app never called it (another artist gets a new ArtistAlbumAsks
+    behind the page model's generation).
+  Run again - the five, an empty id played in stop's place - all caught.
+
+### Verified, and not
+
+Verified:
+- `swift test`: Core 1370, Audio 158, Turntable 12.
+- The unsigned Debug and Release device builds (Xcode, `generic/platform=iOS`): no warnings but the usual
+  appintentsmetadataprocessor line; no change to the .xcodeproj (the new files and Artist/ joined the synchronized
+  App folder).
+- `check_project.py` ok.
+- `npm run build` and all 82 sims on Node 22.23.4, iosartists' `--check` among them.
+- The full pytest suite: 4378 passed, 1 skipped (test_compose_example's docs rule among them: check 97 reads as on
+  `ios`).
+- The mutations above.
+
+Not verified - only the phone can tell (the spec's section 9; docs/ios.md's checks 102-111):
+- The Artists page's pictures (the cover art Navidrome names for each artist) on a real Navidrome; that the counts
+  match the web's.
+- The three pages in the pager, and the bar at the largest text size with the switch, Playlists' + and the •••.
+- The •••'s Picker submenus on iOS 17 and 18; All music's submenu.
+- The album asks four at a time against a real Navidrome, and on a locked phone; Play and Shuffle starting in the tap.
+- The artist line's 44 pt button in the hero's row beside the title, and that it never flashes.
+- Offline: the list from downloads after a force-quit; the dimming.
+- CI's Xcode 26.6 (the older Swift): the new code spells out its closures' types.
