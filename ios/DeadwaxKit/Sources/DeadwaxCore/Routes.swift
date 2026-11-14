@@ -88,11 +88,11 @@ public enum Routes {
     /// Songs started, kept for the person: a batch of at most `PlayHistory.postMax` (`HistoryPost`) -> `HistoryTaken`.
     public static let recordHistory = Endpoint(method: "POST", path: "/deadwax/me/history", query: [])
 
-    /// The levels spec's name for `levelAlbum`: the album's levels warmed before its first play.
     // app 0.10's (Phase 4, phase4-library.md 0): Navidrome's own playlists, as the person signed in
     public static let playlists = Endpoint(method: "GET", path: "/deadwax/navidrome/playlists", query: [])
     public static let playlist = Endpoint(method: "GET", path: "/deadwax/navidrome/playlists/{playlist_id}", query: [])
 
+    /// The levels spec's name for `levelAlbum`: the album's levels warmed before its first play.
     public static var warmLevels: Endpoint { levelAlbum }
 
     /// Every route the app calls - what the contract test checks.

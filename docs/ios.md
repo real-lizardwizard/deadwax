@@ -311,7 +311,7 @@ the Navidrome account deadwax uses:
   12 songs"). Tap the row to open it out; it folds again when you leave the screen.
 
 Each group is in Navidrome's order, by name, and shows only when it has playlists. The list is asked
-for each time you open it; pull down to ask now. If deadwax can't be asked, it says "Couldn't list your
+for each time you open it, and when you come back to the app with it open; pull down to ask now. If deadwax can't be asked, it says "Couldn't list your
 playlists." and why - over the list as it was, or with **Try again** when there's no list to show.
 With none at all: "No playlists yet." **Tap a playlist** to open its page. Nothing plays from the list
 itself.
@@ -335,7 +335,7 @@ itself.
 - A playlist deleted elsewhere says "This playlist isn't on Navidrome any more - deleted in another
   app, maybe." An empty one says "Nothing in this playlist yet."
 - The page shows at once when you go back to it, or open one of the last few again, and is asked for
-  again as it shows. If that fails it stays as it was, under "Couldn't update this playlist - showing it
+  again as it shows, and when you come back to the app with it open. If that fails it stays as it was, under "Couldn't update this playlist - showing it
   as it was."; with nothing to show: "Couldn't open this playlist." and why, with **Try again**.
 
 **Playing a playlist**, each song plays as itself, with its own album: the mini player, Now Playing and
@@ -1958,7 +1958,8 @@ first - one with songs from several albums - and, if you can, one someone else s
 - **65 Playing one.** Open a playlist of songs from several albums: Play plays it in order; Shuffle in a
   random order; a song's tap from that song. Each song shows its own album's cover in the mini player,
   Now Playing and on the lock screen. Info > About on a song names its own album and year, and says
-  "Track 5" alone - no "of 12", and no disc line.
+  "Track 5" alone - no "of 12", and no disc line. Then, while it plays, open a dozen album pages or more
+  from the Library, and skip to the playlist's last songs: Info still names each one's album and year.
 - **66 Normalization.** With Normalization on Automatic, play a playlist: Info > About > Sound >
   Normalization says "Song volume matching, ..." for each song, never "Album volume matching".
 - **67 Play Next from a playlist.** A song's •••: Play Next and Play Last queue that song; the •••

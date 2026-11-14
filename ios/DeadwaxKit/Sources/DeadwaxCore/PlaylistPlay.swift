@@ -82,6 +82,14 @@ public enum PlaylistPlay {
         (tracks(songs, level: songsLevel(setting)), withHeld(albums(songs), held: held))
     }
 
+    /// A row's tap while deadwax can't be reached: where in the songs on this phone (OfflineAlbum.playable, in the
+    /// playlist's order) the play starts - the row's place among them, counted rather than looked up by id, since a song
+    /// listed twice is two rows. Nil for a row not on this phone, or no such row.
+    public static func offlineStart(row: Int, songs: [Song], here: (String) -> Bool) -> Int? {
+        guard songs.indices.contains(row), here(songs[row].id) else { return nil }
+        return songs[..<row].filter { (song: Song) -> Bool in here(song.id) }.count
+    }
+
     /// The bar's ••• - the whole playlist, queued as songs (no `queuedAs`), its albums remembered as just added.
     public static func pick(name: String, songs: [Song]) -> QueuePick<Song>? {
         guard !songs.isEmpty else { return nil }

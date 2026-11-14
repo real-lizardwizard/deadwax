@@ -13,7 +13,7 @@ import SwiftUI
 /// (slice 3, question 7).
 ///
 /// ASKED as it opens (PlaylistPageModel) - drawn at once from the answer kept for it (PlaylistsModel), else the hero
-/// from the row that opened it - and again each time it shows; a refresh that fails keeps what is drawn and says so;
+/// from the row that opened it - and again each time it shows, the app coming back to the front included; a refresh that fails keeps what is drawn and says so;
 /// a 404 says it has gone; nothing drawn and the first ask failing: why, and Try again. While deadwax can't be reached
 /// nothing is asked: what is in hand draws, the songs not on this phone dimmed, Play and Shuffle taking those that are.
 /// Edit, Delete and Add are slice 2's; Download a playlist slice 3's.
@@ -25,6 +25,7 @@ struct PlaylistView: View {
     @Environment(PlaylistsModel.self) private var playlists
     @Environment(DownloadModel.self) private var downloads
     @Environment(Reachability.self) private var reachability
+    @Environment(\.scenePhase) private var scenePhase
     @State private var model: PlaylistPageModel
     /// The hero's title has scrolled away: the bar shows it.
     @State private var titleInBar = false
@@ -123,6 +124,11 @@ struct PlaylistView: View {
             guard online else { return }
             Task { await model.load(key: taskKey, client: server.client, playlists: playlists) }
         }
+        .onChange(of: scenePhase) { _, phase in
+            // the app back in front is the page shown again (the web's): the playlist asked again
+            guard phase == .active, reachability.online else { return }
+            Task { await model.load(key: taskKey, client: server.client, playlists: playlists) }
+        }
     }
 
     /// The songs: Navidrome's own, as they are - a song twice is two rows. `offline`: a song not on this phone is dimmed.
@@ -171,8 +177,8 @@ struct PlaylistView: View {
             play(at: row)
             return
         }
-        guard downloads.isHere(songs[row].id) else { return }
-        play(at: songs[..<row].filter { downloads.isHere($0.id) }.count)
+        guard let start = PlaylistPlay.offlineStart(row: row, songs: songs, here: downloads.isHere) else { return }
+        play(at: start)
     }
 
     /// A row's VoiceOver action - the song's ••• download items.
@@ -412,7 +418,7 @@ private struct RefreshFailedNote: View {
     @Environment(ServerModel.self) private var server
 
     var body: some View {
-        let line = ErrorWords.of(failure, admin: server.access.seesDetail, retry: true)
+        let line = ErrorWords.of(failure, admin: server.access.seesDetail, retry: false)
         ErrorNote(text: PlaylistWords.refreshFailed(line.said), detail: line.detail)
             .padding(.vertical, 4)
     }

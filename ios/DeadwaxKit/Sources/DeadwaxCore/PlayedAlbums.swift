@@ -9,7 +9,14 @@ import Foundation
 /// or songs added to Up Next (`also`: in as the newest, letting go of nothing held, up to `queueKept`). An album's own
 /// Play is `remember`: the floor back to none, the last 8.
 ///
-/// `forget` is the phone's own (the web never lets one go by hand): an album its page found gone.
+/// Two things are the phone's own (phase4-library.md 2.3; notes/ios.md "Phase 4, slice 1, after its review"):
+/// - **`keeping`**: every write takes the ids of the albums the queue names (QueueAlbums.named), and the trim never
+///   lets one of them go - nor the album just put. With none passed, the store answers exactly as the web's: the
+///   fixture's runs pass none. The phone needs it because it calls `also` for every album page shown (question 8),
+///   so the floor climbs with each one, and past the bound the oldest album held goes - which, after a playlist's
+///   `rememberQueue` (put in reverse), is the playlist's LAST album, still to play. The web has the same eviction, but
+///   only past 64 albums held by Play Next and Play Last, which is all it calls `also` for.
+/// - **`forget`**: an album its page found gone, let go of at once (the web never lets one go by hand).
 public struct PlayedAlbums<Album: Identifiable & Sendable>: Sendable where Album.ID == String {
     /// PLAYED_KEPT and QUEUE_ALBUMS_KEPT.
     public static var playedKept: Int { 8 }
@@ -34,29 +41,31 @@ public struct PlayedAlbums<Album: Identifiable & Sendable>: Sendable where Album
     /// The ids held, oldest first (for the tests).
     public var ids: [String] { order }
 
-    /// An album's own Play: put in as the newest, the floor back to none.
-    public mutating func remember(_ album: Album) {
+    /// An album's own Play: put in as the newest, the floor back to none. `keeping`: albums never let go of here.
+    public mutating func remember(_ album: Album, keeping: Set<String> = []) {
         floor = 0
         put(album)
-        trim()
+        trim(keeping: keeping.union([album.id]))
     }
 
     /// A queue of several albums started (a playlist's Play): every one kept, up to `queueKept`, until the next queue -
-    /// the first to play remembered last, so it is the newest and the last to be let go.
-    public mutating func rememberQueue(_ list: [Album]) {
+    /// the first to play remembered last, so it is the newest and the last to be let go. `keeping`: albums never let
+    /// go of here (the phone passes the new queue's, so a queue of more than `queueKept` albums keeps them all).
+    public mutating func rememberQueue(_ list: [Album], keeping: Set<String> = []) {
         floor = Swift.min(Set(list.map(\.id)).count, Swift.max(1, queueKept))
         for album in list.reversed() { put(album) }
-        trim()
+        trim(keeping: keeping)
     }
 
-    /// Songs added to Up Next (Play Next, Play Last), with their album's answer: in as the newest, letting go of
-    /// nothing held (up to `queueKept`) - one more kept for an album not held already.
-    public mutating func also(_ album: Album) {
+    /// Songs added to Up Next (Play Next, Play Last) - and, on the phone, an album page shown - with their album's
+    /// answer: in as the newest, letting go of nothing held (up to `queueKept`) - one more kept for an album not held
+    /// already. `keeping`: albums never let go of here (the phone passes the queue's, and those being added).
+    public mutating func also(_ album: Album, keeping: Set<String> = []) {
         if albums[album.id] == nil {
             floor = Swift.min(Swift.max(floor, albums.count) + 1, Swift.max(1, queueKept))
         }
         put(album)
-        trim()
+        trim(keeping: keeping.union([album.id]))
     }
 
     /// The answer for that album id, or nil when it was never played from (or has been let go of).
@@ -78,10 +87,30 @@ public struct PlayedAlbums<Album: Identifiable & Sendable>: Sendable where Album
         order.append(album.id)
     }
 
-    private mutating func trim() {
-        while order.count > Swift.max(1, kept, floor) {
-            let oldest = order.removeFirst()
-            albums.removeValue(forKey: oldest)
+    /// Past the bound, the oldest let go first - passing over every album in `keeping`, so with all that is left kept
+    /// the store holds more than its bound until the queue no longer names them. With `keeping` empty, the web's trim.
+    private mutating func trim(keeping: Set<String>) {
+        let bound = Swift.max(1, kept, floor)
+        var index = 0
+        while order.count > bound, index < order.count {
+            let id = order[index]
+            if keeping.contains(id) {
+                index += 1
+                continue
+            }
+            order.remove(at: index)
+            albums.removeValue(forKey: id)
         }
+    }
+}
+
+/// The albums a queue names - what PlayedAlbums' `keeping` takes (phase4-library.md 2.3): each track's album id, none
+/// for a track that names none.
+public enum QueueAlbums {
+    public static func named(_ tracks: [QueueTrack]) -> Set<String> {
+        Set(tracks.compactMap { (track: QueueTrack) -> String? in
+            guard let id = track.albumId, !id.isEmpty else { return nil }
+            return id
+        })
     }
 }

@@ -59,6 +59,7 @@ const PLAYLISTS = [
   playlist('shared', { owner: 'sam', mine: false, editable: false, public: true }),
   playlist('shared-no-owner', { owner: '', mine: false, editable: false, public: true }),
   playlist('shared-short', { owner: 'Ana Lu\u00eds', mine: false, editable: false, public: true, songCount: 2, duration: 29 }),
+  playlist('shared-silent', { owner: 'sam', mine: false, editable: false, public: true, songCount: 3, duration: 0 }),
   playlist('file', { editable: false }),
   playlist('file-public', { editable: false, public: true, songCount: 1, duration: 61 }),
   playlist('file-empty', { editable: false, songCount: 0, duration: 0 }),
@@ -178,18 +179,24 @@ function heldVectors() {
 
 /* ===== the albums played from ===================================================================== */
 
-/** A run of operations on one store, each step what `get` finds of every id the run names. */
+/** A run of operations on one store, each step what `get` finds of every id the run names: which answer, by the
+ *  step that put it (`tag` - "s3", or "s3.1" for a queue's second album), so a put that left an older answer in place
+ *  fails as surely as one that let the album go. */
 function playedRun(name, kept, queueKept, steps) {
   const store = kept === null ? PA.createPlayedAlbums() : PA.createPlayedAlbums(kept, queueKept)
   const ids = [...new Set(steps.flatMap(([, list]) => list))].sort()
   return {
     name, kept, queueKept,
-    steps: steps.map(([op, list]) => {
-      const albums = list.map((id) => ({ id }))
+    steps: steps.map(([op, list], step) => {
+      const albums = list.map((id, at) => ({ id, tag: at === 0 ? `s${step}` : `s${step}.${at}` }))
       if (op === 'remember') store.remember(albums[0])
       else if (op === 'queue') store.rememberQueue(albums)
       else if (op === 'also') store.also(albums[0])
-      return { op, ids: list, held: ids.filter((id) => store.get(id) !== null) }
+      const held = ids.flatMap((id) => {
+        const found = store.get(id)
+        return found === null ? [] : [{ id, tag: found.tag }]
+      })
+      return { op, ids: list, held }
     }),
   }
 }
@@ -229,6 +236,16 @@ function playedVectors() {
     playedRun('a queue with an album twice', null, null, [
       ['queue', ['a001', 'a002', 'a001', 'a003']],
       ...range(10, 18).map((id) => ['remember', [id]]),
+    ]),
+    playedRun('an empty queue', null, null, [
+      ['queue', range(0, 12)],
+      ['queue', []],
+      ['also', ['a100']],
+      ['remember', ['a101']],
+      ['queue', []],
+    ]),
+    playedRun('the same album put again', 2, 3, [
+      ['remember', ['a001']], ['also', ['a001']], ['queue', ['a002', 'a001']], ['also', ['a002']], ['remember', ['a001']],
     ]),
   ]
 }

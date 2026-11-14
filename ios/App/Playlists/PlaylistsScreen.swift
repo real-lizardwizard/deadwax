@@ -6,7 +6,8 @@ import SwiftUI
 /// Navidrome's order (by name) and drawn only when it has something (PlaylistRules.groups). A row OPENS its playlist and
 /// plays nothing (the gesture rule). Every word and line is Core's (PlaylistRules, PlaylistWords).
 ///
-/// The list is PlaylistsModel's, one per person: asked afresh as the screen shows and each time it shows again, drawn
+/// The list is PlaylistsModel's, one per person: asked afresh as the screen shows and each time it shows again (the app
+/// coming back to the front included), drawn
 /// meanwhile from what is in hand; a failure with a list in hand leaves the list and says so under the title; with
 /// none, why, and Try again. Pull to refresh asks now. While deadwax can't be reached nothing is asked: the list in hand
 /// draws, a playlist whose page isn't in hand with a song of it on this phone dimmed (it opens nothing), and with no list
@@ -16,6 +17,7 @@ struct PlaylistsScreen: View {
     @Environment(ServerModel.self) private var server
     @Environment(DownloadModel.self) private var downloads
     @Environment(Reachability.self) private var reachability
+    @Environment(\.scenePhase) private var scenePhase
     /// From files opened - the screen's own: leaving it folds it again.
     @State private var filesOpen = false
 
@@ -63,6 +65,11 @@ struct PlaylistsScreen: View {
                 return
             }
             await playlists.ask(fresh: true)
+        }
+        .onChange(of: scenePhase) { _, phase in
+            // the app back in front is the screen shown again (the web's): asked afresh
+            guard phase == .active, reachability.online else { return }
+            Task { await playlists.ask(fresh: true) }
         }
     }
 

@@ -139,7 +139,8 @@ final class PlayerModel {
 
     /// An album a queue came from, as its page last loaded it - or, for a playlist's songs, the stub made from them
     /// (PlaylistPlay.albums) - for Info's album lines, Go to album and the turntable. Kept as the web keeps them
-    /// (PlayedAlbums: the last 8, or every album of a playlist up to 64).
+    /// (PlayedAlbums: the last 8, or every album of a playlist up to 64), and every album the queue names kept while it
+    /// names it (`keeping`).
     func playedAlbum(id: String) -> Album? { played.get(id) }
 
     /// Each entry of the queue's level as decided (levels.md 4.3, LevelDecisions) - by Up Next's key; Info reads
@@ -276,7 +277,8 @@ final class PlayerModel {
     func play(playlist songs: [Song], at index: Int?, shuffle: Bool = false) {
         guard !songs.isEmpty else { return }
         let plan = PlaylistPlay.plan(songs, setting: normalization) { [played] (id: String) -> Album? in played.get(id) }
-        played.rememberQueue(plan.albums)
+        // every album the new queue names kept while it does (PlayedAlbums' `keeping`), past the 64 too
+        played.rememberQueue(plan.albums, keeping: QueueAlbums.named(plan.tracks))
         shelve(songs)
         startQueue { $0.playTracks(plan.tracks, start: index, shuffle: shuffle) }
     }
@@ -305,13 +307,15 @@ final class PlayerModel {
             tracks = queued.tracks.map { QueueTrack(song: $0, albumId: album.id, albumName: album.name ?? "",
                                                     albumArtist: album.artist, albumCoverArt: album.coverArt,
                                                     level: queued.level) }
-            played.also(album)
+            played.also(album, keeping: QueueAlbums.named(entries.map(\.track) + tracks))
         } else {
             tracks = PlaylistPlay.tracks(queued.tracks, level: queued.level)
             let held = PlaylistPlay.withHeld(PlaylistPlay.albums(queued.tracks)) { [played] (id: String) -> Album? in
                 played.get(id)
             }
-            for each in held { played.also(each) }
+            // the queue's albums and every one being added kept: none of them lets another go
+            let keeping = QueueAlbums.named(entries.map(\.track) + tracks)
+            for each in held { played.also(each, keeping: keeping) }
         }
         shelve(queued.tracks)
         var started = false
@@ -552,8 +556,8 @@ final class PlayerModel {
     /// The album page showed `album` with its songs: kept for Info, and - when Normalization will level them
     /// (AlbumPageLines.warms) - its loudness asked for and its levels warmed (the LoudnessBook).
     func albumShown(_ album: Album) {
-        // `also` (phase4-library.md question 8): kept for Info without letting go of a playlist's albums mid-play
-        played.also(album)
+        // `also` (phase4-library.md question 8), the queue's albums kept: a page shown never lets go of one still to play
+        played.also(album, keeping: QueueAlbums.named(entries.map(\.track)))
         guard AlbumPageLines.warms(normalization, songs: album.song) else { return }
         book.wantPage(album.id)
     }

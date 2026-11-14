@@ -39,7 +39,8 @@ enum PlaylistVectors {
         }
         struct StubCase: Decodable { let name: String; let songs: [Song]; let albums: [Stub]; let stubFor: [Stub] }
         struct HeldCase: Decodable { let name: String; let songs: [Song]; let held: [Stub]; let albums: [Stub] }
-        struct PlayedStep: Decodable { let op: String; let ids: [String]; let held: [String] }
+        struct Held: Decodable, Equatable { let id: String; let tag: String }
+        struct PlayedStep: Decodable { let op: String; let ids: [String]; let held: [Held] }
         struct PlayedRun: Decodable { let name: String; let kept: Int?; let queueKept: Int?; let steps: [PlayedStep] }
 
         let words: Words
@@ -71,8 +72,8 @@ enum PlaylistVectors {
               song: held.songs.map { Song(id: $0, albumId: held.id) }, partial: held.partial)
     }
 
-    /// The album a store run names, by id alone.
-    struct Named: Identifiable, Sendable { let id: String }
+    /// The album a store run names: its id, and which step put this answer (`s3`, `s3.1` for a queue's second).
+    struct Named: Identifiable, Sendable { let id: String; var tag = "" }
 }
 
 @Suite struct PlaylistVectorTests {
@@ -161,14 +162,19 @@ enum PlaylistVectors {
                 ?? PlayedAlbums<PlaylistVectors.Named>()
             let named = Set(run.steps.flatMap(\.ids))
             for (index, step) in run.steps.enumerated() {
-                let albums = step.ids.map { PlaylistVectors.Named(id: $0) }
+                let albums = step.ids.enumerated().map { (at: Int, id: String) -> PlaylistVectors.Named in
+                    PlaylistVectors.Named(id: id, tag: at == 0 ? "s\(index)" : "s\(index).\(at)")
+                }
                 switch step.op {
                 case "remember": store.remember(albums[0])
                 case "queue": store.rememberQueue(albums)
                 case "also": store.also(albums[0])
                 default: Issue.record("an op the test doesn't know: \(step.op)")
                 }
-                let held = named.filter { store.get($0) != nil }.sorted()
+                // which answer get returns, not only that it returns one: a put that left the old one fails here
+                let held = named.sorted().compactMap { (id: String) -> PlaylistVectors.Vectors.Held? in
+                    store.get(id).map { PlaylistVectors.Vectors.Held(id: id, tag: $0.tag) }
+                }
                 #expect(held == step.held, "\(run.name), step \(index) (\(step.op))")
                 #expect(store.count == step.held.count, "\(run.name), step \(index)")
             }

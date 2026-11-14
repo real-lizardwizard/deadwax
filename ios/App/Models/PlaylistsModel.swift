@@ -26,6 +26,9 @@ final class PlaylistsModel {
     @ObservationIgnored private var answeredAt: Date?
     /// Each ask takes the next number; only the newest one's answer is kept.
     @ObservationIgnored private var asks = 0
+    /// Moves on with every `reset` (a new person): an answer asked for under an older one is neither kept nor drawn -
+    /// a page's load, run from a task nothing cancels at a sign-out, never keeps one person's playlist under the next.
+    @ObservationIgnored private(set) var generation = 0
     /// The pages' answers, by playlist id - oldest first in `keptOrder`.
     @ObservationIgnored private var keptPages: [String: PlaylistWithSongs] = [:]
     @ObservationIgnored private var keptOrder: [String] = []
@@ -42,6 +45,7 @@ final class PlaylistsModel {
         asks += 1
         let asked = asks
         let person = server.person
+        let under = generation
         let task = Task { () -> Result<[Playlist], any Error> in
             do {
                 return .success(try await client.playlists())
@@ -50,7 +54,7 @@ final class PlaylistsModel {
             }
         }
         let result = await task.value
-        guard asked == asks, person == server.person else { return }
+        guard asked == asks, under == generation, person == server.person else { return }
         switch result {
         case .success(let playlists):
             list = playlists
@@ -66,8 +70,11 @@ final class PlaylistsModel {
     func kept(_ id: String) -> PlaylistWithSongs? { keptPages[id] }
 
     /// A page's answer kept, the newest last, the oldest let go past PlaylistRules.kept (the web's keepPlaylist). The
-    /// list isn't changed by it: a row says what the list's own last answer said.
-    func keep(_ answer: PlaylistWithSongs) {
+    /// list isn't changed by it: a row says what the list's own last answer said. `asked`: the generation the answer was
+    /// asked under - an older one's is dropped (false).
+    @discardableResult
+    func keep(_ answer: PlaylistWithSongs, asked: Int) -> Bool {
+        guard asked == generation else { return false }
         let id = answer.playlist.id
         keptPages[id] = answer
         keptOrder.removeAll { $0 == id }
@@ -75,6 +82,7 @@ final class PlaylistsModel {
         while keptOrder.count > PlaylistRules.kept {
             keptPages.removeValue(forKey: keptOrder.removeFirst())
         }
+        return true
     }
 
     /// A playlist gone (its page's 404): its kept answer let go, and the list asked again when it next shows.
@@ -93,6 +101,7 @@ final class PlaylistsModel {
     /// The person changed: nothing of the last one's kept, and an answer still out for them dropped.
     func reset() {
         asks += 1
+        generation += 1
         list = nil
         failure = nil
         answeredAt = nil
@@ -147,15 +156,16 @@ final class PlaylistPageModel {
         guard let client, online else { return }
         asks += 1
         let asked = asks
+        // who asked: a sign-out meanwhile (PlaylistsModel.reset) drops the answer, kept and drawn alike
+        let generation = playlists.generation
         do {
             let found = try await client.playlist(id: route.id)
-            guard asked == asks else { return }
-            playlists.keep(found)
+            guard asked == asks, playlists.keep(found, asked: generation) else { return }
             answer = found
             gone = false
             failure = nil
         } catch {
-            guard asked == asks, !APIFailure.isCancellation(error) else { return }
+            guard asked == asks, generation == playlists.generation, !APIFailure.isCancellation(error) else { return }
             if ErrorWords.kind(of: error) == .notFound {
                 playlists.forget(route.id)
                 gone = true

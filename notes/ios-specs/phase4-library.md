@@ -158,10 +158,17 @@ of 12" and "Roads removed" (VoiceOver). Slice 3's: section 6.3. Slice 4's: `play
   (`lib/playedAlbums.ts`), ported: `remember` (an album's Play: floor 0, the last 8), `rememberQueue` (a queue of
   several albums: every one kept, up to 64, until the next queue), `also` (Play Next or Last: in as the newest, letting
   go of nothing held, up to 64). The album page showing its album is `also` on the phone (the web remembers only on
-  play; the phone has kept the page's album for Info since Phase 1 - `also` keeps that without letting go of a
-  playlist's albums).
+  play; the phone has kept the page's album for Info since Phase 1). **The phone's own rule (after slice 1's
+  review): an album the queue names is never let go.** Every write takes `keeping` - the queue's album ids
+  (`QueueAlbums.named`), and those being added - and the trim passes over them, and over the album just put; so a
+  page shown, or a Play Next, never lets go of a playlist's album still to play, and a playlist of more than 64 albums
+  keeps them all. With `keeping` empty the store is the web's, which the fixture holds. (`also` alone climbs the floor
+  by one per page shown, and past 64 lets the oldest go: after `rememberQueue`, the playlist's last album. The web
+  has the same eviction, but calls `also` only for Play Next and Play Last.)
 - **The gesture rule**: every play is in the tap, the songs in hand, nothing awaited first.
-- **Offline**: Play and Shuffle take only the songs on this phone, in the playlist's order; the rest are dimmed.
+- **Offline**: Play and Shuffle take only the songs on this phone, in the playlist's order; the rest are dimmed. A
+  row's tap starts at its place among them (`PlaylistPlay.offlineStart`: counted, since a song listed twice is two
+  rows; nil for a row not on this phone).
 
 ### 2.4 Add, New, Edit, Delete (slice 2)
 
@@ -343,7 +350,8 @@ Numbered after Phase 3's 63. Slice 1's:
 - **65 Playing one.** Open a playlist of songs from several albums: Play plays it in order; Shuffle in a random order;
   a song's tap from that song. Each song shows its own album's cover in the mini player and on the lock screen.
   Info > About on a song names its own album and year, and says "Track 5" alone - no "of 12", and no disc line,
-  since the app holds only the playlist's songs of that album.
+  since the app holds only the playlist's songs of that album. Then, playing, open a dozen album pages or more and skip
+  to the playlist's last songs: Info still names each one's album (2.3's `keeping`).
 - **66 Normalization.** With Normalization on Automatic, play a playlist: Info > About > Sound > Normalization says
   "Song volume matching, ..." for each song, never "Album volume matching".
 - **67 Play Next from a playlist.** A row's •••: Play Next and Play Last queue that song; the bar's ••• queues the whole
