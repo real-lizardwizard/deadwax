@@ -211,6 +211,8 @@ ROUTES = {
     #? (2.1.7) AutoEq's corrections for the iPhone app's EQ - tests/test_autoeq.py
     ("GET", "/deadwax/eq/autoeq"): "user",
     ("GET", "/deadwax/eq/autoeq/{id}"): "user",
+    #? (2.1.24) the Cover Art Archive's front covers for the iPhone app - tests/test_coverart_relay.py
+    ("GET", "/deadwax/coverart/{kind}/{mbid}"): "user",
     #? each user's own library - their starred albums - and the admin's "held by nobody" (2.0.0-player.51,
     #? step 5 - tests/test_personal_libraries.py)
     ("GET", "/deadwax/me/library"): "user",
@@ -366,7 +368,8 @@ def signed_in(on, name: str) -> TestClient:
 def concrete(path: str) -> str:
     return path.replace("{job_id}", "1").replace("{album_id}", "al-1").replace("{artist_id}", "ar-1") \
         .replace("{song_id}", "so-1").replace("{cover_id}", "co-1").replace("{flag_id}", "1") \
-        .replace("{token}", "tok-1").replace("{playlist_id}", "pl-1").replace("{person_id}", "id-ethan")
+        .replace("{token}", "tok-1").replace("{playlist_id}", "pl-1").replace("{person_id}", "id-ethan") \
+        .replace("{kind}", "release-group").replace("{mbid}", "b1392450-e666-3926-a536-22c65f834433")
 
 
 def app_routes(app) -> set[tuple[str, str]]:
@@ -532,6 +535,32 @@ def test_a_user_reaches_what_is_theirs(on):
     assert ethan.get("/deadwax/me/preferences").status_code == 200
     assert ethan.get("/deadwax/me/pins").status_code == 200
     assert ethan.get("/deadwax/download/jobs").status_code == 200
+
+
+def test_the_cover_relay_is_refused_signed_out_and_the_archive_never_asked(on, monkeypatch, tmp_path):
+    """(2.1.24) GET /deadwax/coverart/{kind}/{mbid} with logins on: a 401 without a session, before anything is asked of
+    the Archive - and a signed-in person's cover passed on (tests/test_coverart_relay.py holds the rest)."""
+    from src.api.coverart_endpoint import archive_fronts
+
+    asked = []
+
+    def archive(request: httpx.Request) -> httpx.Response:
+        asked.append(request.url.host)
+        return httpx.Response(200, headers={"content-type": "image/jpeg"}, content=b"\xff\xd8" + b"\x00" * 2000)
+
+    monkeypatch.setattr(Config, "PLAYER_CACHE_PATH", str(tmp_path))
+    monkeypatch.setattr(archive_fronts, "_client",
+                        httpx.AsyncClient(transport=httpx.MockTransport(archive), follow_redirects=False))
+    path = "/deadwax/coverart/release/30702389-5c67-4438-9ea0-2351c8de0f1d"
+
+    refused = on.client.get(path)
+    assert refused.status_code == 401
+    assert asked == []
+
+    ethan = signed_in(on, "ethan")
+    answer = ethan.get(path)
+    assert answer.status_code == 200 and answer.headers["content-type"] == "image/jpeg"
+    assert asked == ["coverartarchive.org"]
 
 
 def test_an_admin_reaches_the_admin_routes(on):

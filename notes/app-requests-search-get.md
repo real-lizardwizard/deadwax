@@ -126,6 +126,8 @@ persistent all the time".
   encoded), the phone fetching it itself; `JobCover` remembers which address failed, as `Cover`
   does, so offline or no picture is the plain tile (`--dw-empty-cover` with the board's edge), and
   the next pressing is still asked. Lazy: a hidden pane fetches nothing. Pending rows have none.
+  (2.1.24: the web still fetches the Archive itself; the iPhone app gets the same fronts through deadwax,
+  `GET /deadwax/coverart/{kind}/{mbid}` - notes/ios.md "The Cover Art Archive relay (2.1.24)".)
 - **The ✕ asks first, IN the card - never `window.confirm()`** (review). This page plays the music,
   and a blocking dialog holds its JavaScript: a song ending while it was up waited for the answer
   (the engine starts the next one from `ended`), a stream stopped being fed, and on a locked phone

@@ -51,7 +51,7 @@ from pathlib import Path
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
 
-from src import __version__, musicbrainz_cache, player_cache
+from src import __version__, coverart_cache, musicbrainz_cache, player_cache
 from src.api.musicbrainz_endpoint import MusicBrainzClient
 from src.config import (COVER_ART_SIZES, DEFAULT_MUSICBRAINZ_CACHE_MB, DEFAULT_PLAYER_CACHE_MB, LYRICS_LEAD_LIMIT_MS,
                         MUSICBRAINZ_CACHE_FILE, MUSICBRAINZ_CACHE_MB_RANGE, PLAYER_CACHE_MB_RANGE,
@@ -368,20 +368,23 @@ def _player_cache_rows() -> list[dict]:
             )
     folder = player_cache.cache.directory
     where = f" ({folder})" if folder is not None else ""
+    #? (2.1.24) the Cover Art Archive's covers for the iPhone app, kept in a folder of their own beside the player's
+    covers = (f"the Cover Art Archive's covers deadwax passes on to the iPhone app in another beside it, "
+              f"{coverart_cache.FOLDER_NAME} ({coverart_cache.KEPT_MAX_BYTES >> 20} MB at most)")
     if configured:
         path_effect = (
             f"Where the player keeps the copies of songs it prepares from Navidrome's files - so "
             f"iPhones and Safari seek exactly, Gapless joins songs, and hi-res or levelled songs play "
-            f"as you chose - in a private folder of its own inside this one{where}. deadwax touches "
-            f"nothing else there. Best on a fast disk (an SSD). {PLAYER_CACHE_IS}"
+            f"as you chose - in a private folder of its own inside this one{where}, and {covers}. "
+            f"deadwax touches nothing else there. Best on a fast disk (an SSD). {PLAYER_CACHE_IS}"
         )
     else:
         path_effect = (
             f"Unset: the player keeps the copies of songs it prepares - so iPhones and Safari seek "
             f"exactly, Gapless joins songs, and hi-res or levelled songs play as you chose - in the "
-            f"container's temporary space{where}, which starts empty with every new container. Set "
-            f"it to a folder mounted from a fast disk (an SSD) to keep them there; deadwax makes a "
-            f"private folder of its own inside it. {PLAYER_CACHE_IS}"
+            f"container's temporary space{where}, which starts empty with every new container, and "
+            f"{covers}. Set it to a folder mounted from a fast disk (an SSD) to keep them there; deadwax "
+            f"makes private folders of its own inside it. {PLAYER_CACHE_IS}"
         )
 
     megabytes = parse_player_cache_mb(Config.PLAYER_CACHE_MB)

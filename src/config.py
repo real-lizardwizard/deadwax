@@ -561,9 +561,11 @@ class Config:
 
     #? Where the player keeps the MP4s it makes of FLAC songs for Safari, whose seeks land only in
     #? an MP4 (1.1.0, src/player_cache.py). Empty is the container's temporary space. deadwax makes
-    #? a folder of its own inside it, deadwax-player, private to it, and touches nothing else there
-    #? - so this can be a folder other things use too. Asked for so the cache can go on an SSD. Only
-    #? ever a cache: anything in it is made again from Navidrome when it is next played.
+    #? a folder of its own inside it, deadwax-player, private to it - and (2.1.24) deadwax-covers beside
+    #? it, the Cover Art Archive's covers for the iPhone app (src/coverart_cache.py) - and touches
+    #? nothing else there - so this can be a folder other things use too. Asked for so the cache can
+    #? go on an SSD. Only ever a cache: anything in it is made again from Navidrome when it is next
+    #? played.
     PLAYER_CACHE_PATH = _env("PLAYER_CACHE_PATH")
 
     #? How much that cache may hold, in MB (MiB): the songs played longest ago go first past it.
