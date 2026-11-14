@@ -469,23 +469,16 @@ final class PlayerModel {
 
     /// (the web's 2.1.18) An older row of Up Next's tapped - a song played before, above History: ROLLED BACK to,
     /// everywhere (QueueController.rollBack: the web's jumpTo with Brought rows) - it and every older row below it down
-    /// to History's (`rows`, PlayHistory.rowsFrom) come into the queue ahead of History's songs, and it plays; everything
-    /// played since is to come again. Their songs queued at the setting's level for a song (levelFor(normalization,
-    /// .songs)), as a song's Play Next queues it. `floor` the key of the first entry Up Next drew as it was tapped
-    /// (History's first row, else the song playing's). Nothing with nothing playing - an older row is a queue's. True
-    /// when it plays: the screen says what started only then.
+    /// to History's come into the queue ahead of History's songs, and it plays; everything played since is to come
+    /// again. `rows` and `floor` as PlayHistory.brought makes them (the rows from the one tapped, their songs at the
+    /// setting's level for a song; the key of the first entry Up Next drew as it was tapped). Nothing with nothing
+    /// playing - an older row is a queue's. True when it plays: the screen says what started only then.
     @discardableResult
-    func rollBack(_ rows: [PastRow], floor: Int?) -> Bool {
+    func rollBack(_ rows: [Brought], floor: Int?) -> Bool {
         guard let controller else { return false }
-        let level = levelFor(normalization, .songs)
-        let brought = rows.map { row -> Brought in
-            var song = row.track
-            if let level { song.level = level }
-            return Brought(track: song, starts: row.starts, entry: row.entry)
-        }
         cancelRetry()
         var took = false
-        act { took = controller.rollBack(brought, floor: floor) }
+        act { took = controller.rollBack(rows, floor: floor) }
         if took {
             // the song tapped (Phase 2's OfflinePlay.chosen): its new entry, stopped on offline rather than passed over
             let played = QueueController.entries(controller.queue)

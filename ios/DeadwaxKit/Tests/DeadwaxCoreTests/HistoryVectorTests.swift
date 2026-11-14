@@ -8,7 +8,8 @@ import Testing
 /// once: 300 seeded runs of moves made here again from the same Park-Miller numbers through DeadwaxCore's own Up Next,
 /// every step's line of what queueShows and pastRows answer digested as the web's were. (2.1.18) A History row's tap
 /// rolls back; an older row's brings it and every older row below it back (rowsFrom, broughtBack with the floor); each
-/// line carries the starts the queue holds and each older row's starts and entry.
+/// line carries the starts the queue holds and each older row's starts and entry - and (review of the port) what an
+/// older row's tap hands the roll-back, PlayHistory.brought: the web's replayPast made from its own parts.
 @Suite struct HistoryVectorTests {
     let file: JSONValue
 
@@ -105,6 +106,52 @@ import Testing
         #expect(waits.count == 28)
         for item in waits {
             #expect(PlayHistory.retryAfter(try #require(item["failures"]?.int)) == Int64(try #require(item["ms"]?.int)), "\(item)")
+        }
+    }
+
+    /// The settings by turns, as export-history.cjs's SETTINGS.
+    static let settings: [Normalization] = [.auto, .song, .album, .off]
+
+    /// What a roll-back is handed, as export-history.cjs's handedLine writes it: the floor, then each row's song, its
+    /// level, its starts and its entry.
+    static func handedLine(_ handed: (rows: [Brought], floor: Int?)) -> String {
+        let rows = handed.rows.map { row in
+            "\(row.track.id):\(row.track.level?.rawValue ?? "-")/\(row.starts.map(String.init).joined(separator: "."))/"
+                + (row.entry.map(String.init) ?? "-")
+        }
+        return "\(handed.floor.map(String.init) ?? "-")>" + rows.joined(separator: ",")
+    }
+
+    /// (review of the port) What an older row's tap hands the roll-back - PlayHistory.brought, as the web's replayPast
+    /// (app/UpNext.tsx) makes it from rowsFrom, queued() and the floor: rows given whole (a song's own level among them,
+    /// kept under Off), every setting, a key no row has, a queue with History, one without, a plain queue. And
+    /// replayPast's text as this port follows it: a new hash means it changed - port it, then take the hash.
+    @Test func whatAnOlderRowsTapHandsTheRollBack() throws {
+        #expect(file["replayPast"]?.string == "64993629b47120872dad4bf2d87df4bf9aa39e9372e7f728535489d544fa2e3a",
+                "app/UpNext.tsx replayPast changed: port it to PlayHistory.brought")
+        let brought = try #require(file["brought"])
+        var past: [PastRow] = []
+        for item in brought["past"]?.array ?? [] {
+            let row = try #require(item.array)
+            var song = simTrack(try #require(row[1].string))
+            song.level = row[2].string.flatMap(Level.init(rawValue:))
+            let starts = try #require(row[3].array).compactMap { $0.int.map(Int64.init) }
+            past.append(PastRow(key: try #require(row[0].string), track: song, starts: starts, entry: row[4].int))
+        }
+        #expect(past.count == 4 && past.contains { $0.track.level == .album } && past.contains { $0.track.level == nil })
+        let queues: [String: UpNextQueue] = [
+            "history": startUpNext(simAlbum(4), start: 0, id: "qb-1").at(2),
+            "none": startUpNext(simAlbum(4), start: 1, id: "qb-2"),
+            "plain": UpNextQueue(tracks: simAlbum(2), index: 1),
+        ]
+        #expect(brought["queues"]?.array?.compactMap(\.string).sorted() == queues.keys.sorted())
+        let cases = brought["cases"]?.array ?? []
+        #expect(cases.count == 48)
+        for item in cases {
+            let queue = try #require(queues[item["queue"]?.string ?? ""], "\(item)")
+            let setting = try #require(item["setting"]?.string.flatMap(Normalization.init(rawValue:)), "\(item)")
+            let handed = PlayHistory.brought(rows: past, queue: queue, key: try #require(item["key"]?.string), setting: setting)
+            #expect(Self.handedLine(handed) == item["out"]?.string, "\(item)")
         }
     }
 
@@ -245,12 +292,17 @@ import Testing
             //? (2.1.18) the starts the queue holds (sorted by UTF-16 unit, as JavaScript's sort()), each row's starts and
             //? its entry
             let held = shows.held.sorted { $0.lexicographicallyPrecedes($1) }.map { String(decoding: $0, as: UTF16.self) }
+            //? (review of the port) the middle row of Up Next's as drawn tapped: what PlayHistory.brought hands the
+            //? roll-back, at a setting by turns - nothing drawn
+            let drawn = PlayHistory.pastRows(plays, queue: queue)
+            let handed = drawn.isEmpty ? "-" : Self.handedLine(PlayHistory.brought(
+                plays, queue: queue, key: drawn[drawn.count / 2].key, setting: Self.settings[step % 4]))
             lines.append([
                 "\(step):\(op)", "\(queue.index)", shows.id ?? "-", shows.keys.sorted().map(String.init).joined(separator: ","),
                 held.joined(separator: ","),
                 rows.map { "\($0.key)=\($0.track.id)/\($0.starts.map(String.init).joined(separator: "."))/\($0.entry.map(String.init) ?? "-")" }
                     .joined(separator: ","),
-                "\(plays.filter(\.counted).count)", "\(plays.count)",
+                "\(plays.filter(\.counted).count)", "\(plays.count)", handed,
             ].joined(separator: "|"))
         }
         return (lines, recorded.count)

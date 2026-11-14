@@ -628,7 +628,11 @@ already played:
   record of what you played is never changed). Previous from a song you went back to plays the one above
   it (from one from before the album or list, the song again). VoiceOver calls each row "play again",
   says "Playing" and its title once it starts, and moves to the song that plays next. It reads the songs
-  as one list with no heading, then the song playing's title as a heading.
+  as one list with no heading, then the song playing's title as a heading. With a deadwax before 2.1.18,
+  which refuses Up Next's account of a queue you went back in, the app saves that queue as just its
+  songs, the one playing and the second (it used to try again every 30 seconds and keep nothing):
+  [picked up](#picking-up-where-you-left-off) it comes back as that plain list, every song in order,
+  without Playing Next or the Shuffle chip.
   What goes in it, and where it's kept: [What you've played](#what-youve-played).
 - **The song playing**, where Up Next opens - and with Repeat One on, "Repeat one: this song plays again
   until you skip it." Under it, **Shuffle** and **Repeat**, the same settings as on Now Playing.
@@ -1301,6 +1305,12 @@ notice says where it came from ("Picked up from your Mac", "Picked up from Symfo
 off, "Picked up from a Mac"). Nothing is fetched until you press play. It's put back with this phone's
 Repeat and Normalization. The web app picks up the phone's queue the same way ("Picked up from your
 iPhone", or "Picked up from an iPhone" with logins off).
+
+A whole library's shuffle comes back however many songs in it is - its order, and its next songs
+coming as before (until this build, one some 750 songs in came back as the songs fetched so far, which
+then stopped). A queue you went back in comes back with every song you'd played on to still to come,
+going back a second time included (until this build, going back again after changing Up Next while
+the furthest song you'd got to played could come back without the songs played since).
 
 Coming back to the app while paused, it looks again (at most every 15 seconds). With logins on, it
 takes what another device saved since this phone last did. With logins off everyone shares one queue,

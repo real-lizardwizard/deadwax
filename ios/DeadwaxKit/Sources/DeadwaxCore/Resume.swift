@@ -181,10 +181,38 @@ public func snapshotVersion(_ marks: ArraySlice<Mark>, index: Int, reached: Bool
     return marks.enumerated().contains { $0.offset <= index && $0.element.from == .source } ? 1 : 2
 }
 
+/// (the web's 2.1.22) The list a snapshot keeps, and the window's marks - entries [start, end) - and `left` placed in
+/// it. A list as played is kept whole: Repeat All's rounds and Shuffle are made from it. A library's shuffle (`paged`)
+/// is made from nothing of its list - toppedUp and withShuffle leave it to its feed, which appends each page at the
+/// end, to the list and the entries alike, and asks for the next by `paged.fetched` - so its list is only where its
+/// entries are: every song it has fetched, played or not, a page longer each time. Kept whole, the songs before the
+/// window each whole in `extra`, it outgrew Resume.snapshotMax some 750 songs in, and the queue came back a plain list
+/// with no `paged`, whose feed asks no more - Repeat All going round the songs it had. So it keeps the songs the
+/// window's marks name (a copy names its song's place - its song's own entry may be before the window), in the list's
+/// order, each place renumbered to it: the same queue to every reader, the web's 2.1.17 and this app's before the port
+/// too, and never more songs than the window's. Its `left` goes: what it took out has no place among those (withoutKey
+/// takes a song out with its copies, and each place of a library's shuffle is one song's), and nothing reads it
+/// (withShuffle leaves a library's shuffle be).
+func savedList(_ state: UpNextState, _ start: Int, _ end: Int) -> (source: [QueueTrack], marks: [Mark], left: [LeftOut]) {
+    let marks = Array(sliced(state.marks, start, end))
+    guard state.paged != nil else { return (state.source, marks, state.left) }
+    let places = Set(marks.filter { $0.at >= 0 }.map(\.at)).sorted()
+    var placed: [Int: Int] = [:]
+    for (place, at) in places.enumerated() { placed[at] = place }
+    let renumbered = marks.map { mark -> Mark in
+        guard mark.at >= 0 else { return mark }
+        var moved = mark
+        moved.at = placed[mark.at]!
+        return moved
+    }
+    return (places.map { state.source[$0] }, renumbered, [])
+}
+
 /// What a full save sends of a queue: its window - entries [start, end), the index and `startedAt` moved down by
-/// `start` (startedAt floored at 0), the marks sliced with them - and the snapshot of its Up Next, `left`, `source`,
-/// `paged` as they are; (2.1.18) `reached` while it is after the song playing in the window, and the window's rows
-/// brought back from the play history with their starts.
+/// `start` (startedAt floored at 0), the marks sliced with them - and the snapshot of its Up Next, `left`, `source`
+/// (a library's shuffle's, savedList's), `paged` as they are; (2.1.18) `reached` while it is in the window and (the
+/// web's 2.1.23) the song playing's unit or after it, and the window's rows brought back from the play history with
+/// their starts.
 public func toSave(_ queue: UpNextQueue, position: Double) -> Saving {
     let (start, end) = windowOf(queue.tracks.count, queue.index)
     let entries = Array(sliced(queue.tracks, start, end))
@@ -195,31 +223,39 @@ public func toSave(_ queue: UpNextQueue, position: Double) -> Saving {
     //? true for an object's own names too (constructor, toString...) - such a song is never kept whole there, so
     //? here neither: the same text, and the web reads it as it reads its own
     let inWindow = Set(ids)
+    let (source, window, left) = savedList(state, start, end)
     var extraOrder: [String] = []
     var extra: [String: QueueTrack] = [:]
-    for track in state.source where !inWindow.contains(track.id) && extra[track.id] == nil
+    for track in source where !inWindow.contains(track.id) && extra[track.id] == nil
         && !WebJSON.prototypeNames.contains(track.id) {
         extra[track.id] = bare(track)
         extraOrder.append(track.id)
     }
-    let window = sliced(state.marks, start, end)
     //? (2.1.18) where the list runs on to after a roll-back, while it means something here; the rows brought back's
-    //? starts
-    let reachedAt = window.firstIndex { $0.key == state.reached }.map { $0 - window.startIndex } ?? -1
+    //? starts. (the web's 2.1.23) From the song playing's own unit on, not only after it: a move back up the list that
+    //? leaves the reach where it was - History's tap or Previous, playing the furthest unit again - changes no more than
+    //? the song, so it is saved by its position alone, and deadwax's record is THIS snapshot at the song moved back to,
+    //? which must carry the reach (the review's probe: tapped twice, a save between while the reach played, came back
+    //? without the rounds moved down). Played past it, it is left out: any move back from there names a new furthest, a
+    //? change saved in full
+    var unit = index
+    while unit > 0 && unit < window.count && window[unit].from == .one { unit -= 1 }
+    let found = window.firstIndex { $0.key == state.reached } ?? -1
+    let reachedAt = found >= unit ? found : -1
     let starts = window.filter { !($0.starts ?? []).isEmpty }
-    let version = snapshotVersion(window, index: index, reached: reachedAt > index, starts: !starts.isEmpty)
+    let version = snapshotVersion(window[...], index: index, reached: reachedAt >= 0, starts: !starts.isEmpty)
     var made = WebJSON.Writer()
     made.open()
     made.member("v", first: true) { $0.int(version) }
     made.member("id") { $0.string(state.id) }
     made.member("levels") { $0.string(entries.map { levelChar($0.level) }.joined()) }
     made.member("marks") { writer in
-        writer.array(Array(window)) { item, mark in
+        writer.array(window) { item, mark in
             item.raw("[\(mark.key),\"\(fromChar(mark.from))\",\(mark.at),\(mark.pass)]")
         }
     }
-    made.member("source") { $0.array(state.source) { item, track in item.string(track.id) } }
-    made.member("sourceLevels") { $0.string(state.source.map { levelChar($0.level) }.joined()) }
+    made.member("source") { $0.array(source) { item, track in item.string(track.id) } }
+    made.member("sourceLevels") { $0.string(source.map { levelChar($0.level) }.joined()) }
     made.member("extra") { writer in
         writer.open()
         for (place, id) in WebJSON.ordered(extraOrder).enumerated() {
@@ -230,7 +266,7 @@ public func toSave(_ queue: UpNextQueue, position: Double) -> Saving {
     made.member("shuffle") { $0.bool(state.shuffle) }
     made.member("nextKey") { $0.int(state.nextKey) }
     made.member("startedAt") { $0.int(max(0, state.startedAt - start)) }
-    made.member("left") { $0.array(state.left) { item, gone in item.raw("[\(gone.pass),\(gone.at)]") } }
+    made.member("left") { $0.array(left) { item, gone in item.raw("[\(gone.pass),\(gone.at)]") } }
     if let paged = state.paged { made.member("paged") { $0.paged(paged) } }
     if let rounds = state.pagedRounds {
         made.member("pagedRounds") { writer in
@@ -242,7 +278,7 @@ public func toSave(_ queue: UpNextQueue, position: Double) -> Saving {
             }
         }
     }
-    if reachedAt > index, let reached = state.reached { made.member("reached") { $0.int(reached) } }
+    if reachedAt >= 0, let reached = state.reached { made.member("reached") { $0.int(reached) } }
     if !starts.isEmpty {
         made.member("starts") { writer in
             writer.array(starts) { item, mark in
