@@ -346,8 +346,21 @@ public struct PressingTrack: Sendable, Equatable, Identifiable {
     /// m:ss, or "" when MusicBrainz has no length.
     public let length: String
     public let mark: Mark?
+    /// The song the album was opened from (slice 3, Search's songs): marked, and brought into view once.
+    public let song: Bool
 
     public var id: String { key }
+
+    public init(key: String, heading: String?, number: String, title: String, length: String, mark: Mark?,
+                song: Bool = false) {
+        self.key = key
+        self.heading = heading
+        self.number = number
+        self.title = title
+        self.length = length
+        self.mark = mark
+        self.song = song
+    }
 }
 
 public enum Pressings {
@@ -643,8 +656,10 @@ public enum Pressings {
         return named.isEmpty ? "Disc \(position)" : "Disc \(position) \u{00B7} \(named)"
     }
 
-    /// The chosen pressing's tracklist, row by row, with its differences from the usual one marked (`trackRows`).
-    public static func trackRows(_ release: PageRelease?, _ diff: TracklistDiff?) -> [PressingTrack] {
+    /// The chosen pressing's tracklist, row by row, with its differences from the usual one marked (`trackRows`) - and
+    /// `isSong`, which tracks are the song the album was opened from (SongSearch.matcher), none without one.
+    public static func trackRows(_ release: PageRelease?, _ diff: TracklistDiff?,
+                                 isSong: ((MBTrack) -> Bool)? = nil) -> [PressingTrack] {
         guard let release else { return [] }
         let media = release.media.filter { !$0.tracks.isEmpty }
         let headings = media.count > 1 || media.contains { !JSText.trim($0.title ?? "").isEmpty }
@@ -675,7 +690,7 @@ public enum Pressings {
                                           number: String(onDisc + 1),
                                           title: Credits.first(track.title, track.recording?.title),
                                           length: Tracklist.clock(Tracklist.seconds(track.length ?? track.recording?.length)),
-                                          mark: mark))
+                                          mark: mark, song: isSong?(track) ?? false))
             }
         }
         return rows
@@ -768,10 +783,14 @@ public struct GroupPage: Sendable, Equatable {
     }
 
     /// The page for album `id` (lowercase), from `answer` (nil while it loads), `preview` (the album Search showed),
-    /// `index` (nil until `/library/owned` answers), the pressing picked (nil: the default).
+    /// `index` (nil until `/library/owned` answers), the pressing picked (nil: the default) - and `song`, the recordings
+    /// of the song it was opened from (slice 3): the pressing shown, unless one is picked, is one with the song
+    /// (`songPressing`), and the song's tracks are marked (`songMatcher`).
     public init(id: String, answer: ReleaseGroupAnswer?, preview: ReleaseGroup?, index: OwnedIndex?, picked: String?,
-                personal: Bool, editors: Bool, fallbackTitle: String = "") {
+                personal: Bool, editors: Bool, fallbackTitle: String = "", song: [String] = []) {
         let releases = answer?.releases ?? []
+        let asked = picked ?? (song.isEmpty ? nil : SongSearch.pressing(releases, song))
+        let isSong = song.isEmpty ? nil : SongSearch.matcher(releases, song)
         let credited = preview ?? releases.first(where: { $0.releaseGroup != nil })?.releaseGroup
         let ownership = index.map { (index: OwnedIndex) -> (held: [OwnedAlbum], guessed: [OwnedAlbum]) in
             OwnedIndex.forGroup(index, groupId: id, releaseIds: releases.map(\.id),
@@ -786,7 +805,7 @@ public struct GroupPage: Sendable, Equatable {
         }
         let heldIds = releaseIds(holding ?? [])
         let yoursIds: Set<String>? = personal ? releaseIds((holding ?? []).filter { $0.yours != false }) : nil
-        let view = releases.isEmpty ? nil : Pressings.view(releases, asked: picked, held: heldIds, yours: yoursIds)
+        let view = releases.isEmpty ? nil : Pressings.view(releases, asked: asked, held: heldIds, yours: yoursIds)
         let chosen = releases.first { (release: PageRelease) -> Bool in view?.chosenId.map { WebText.same(release.id, $0) } == true }
         let place = Pressings.place(personal: personal, holding: holding ?? [], chosenId: view?.chosenId)
         let header = Pressings.header(releases, chosen: chosen, preview: preview)
@@ -815,7 +834,7 @@ public struct GroupPage: Sendable, Equatable {
         self.view = view
         facts = view?.chosen?.facts ?? ""
         summary = view.map { Pressings.summary($0, releaseCount: releases.count) }
-        tracks = Pressings.trackRows(chosen, diff)
+        tracks = Pressings.trackRows(chosen, diff, isSong: isSong)
         missing = Pressings.leftOut(diff)
         chosenId = chosen?.id
     }
@@ -846,4 +865,7 @@ public struct KeptPressings: Sendable {
     }
 
     public var count: Int { order.count }
+
+    /// Every album's pressings kept, by id - what says a pressing you hold has a song (`SongEvidence.pressings`).
+    public var releases: [String: [PageRelease]] { answers.mapValues(\.releases) }
 }

@@ -22,14 +22,16 @@ import Testing
                                        artistCredit: credit)
     static let marks = SearchMarks(personal: false, index: OwnedIndex([]))
 
-    /// A state with `text` typed, the library asked and answered with `results`, and MusicBrainz asked.
+    /// A state with `text` typed, the library asked and answered with `results`, and MusicBrainz asked - its artists and
+    /// songs answered at once with nothing (slice 3's are SearchSongsTests'), its albums' ask returned.
     static func asked(_ text: String, _ results: LibraryResults?) throws -> (SearchState, SearchState.AlbumsAsk) {
         var state = SearchState()
         state.typed(text)
         let token = state.askingLibrary()
         if let results { state.libraryAnswered(token, state.query, results) }
-        let askMade = state.askingMusicBrainz(state.query, view: .all)
-        let ask = try #require(askMade)
+        let asks = state.askingMusicBrainz(state.query, view: .all)
+        let ask = try #require(asks.albums)
+        SearchTests.answerEmpty(&state, asks, albums: false)
         return (state, ask)
     }
 
@@ -145,13 +147,24 @@ import Testing
         //? held, but its folder isn't search3's: brought in - so it isn't "everything held" but a row folded in
         #expect(said.drawn.sections?[1].slot == .show([.group(Self.third)]))
 
-        // the albums fail before the cap: every kind asked failed - the foot's words and Try again, MusicBrainz away
-        var (failing, failingAsk) = try Self.asked("portishead", found)
+        // the albums and the artists fail before the cap: every kind asked failed - the foot's words and Try again,
+        // MusicBrainz away (an artist's name asks no songs)
+        var failing = SearchState()
+        failing.typed("portishead")
+        let failingToken = failing.askingLibrary()
+        failing.libraryAnswered(failingToken, failing.query, found)
+        let failingAsks = failing.askingMusicBrainz(failing.query, view: .all)
+        let failingAsk = try #require(failingAsks.albums)
+        let failingArtists = try #require(failingAsks.artists)
+        #expect(failingAsks.songs == nil)
         _ = Self.draw(&failing)
         let away = MBFailure.of(APIFailure.answered(.init(status: 503, method: "GET", path: "/search_musicbrainz/fully_search")),
                                 admin: false)
         #expect(away.unavailable && !away.busy && !away.refused)
         failing.albumsFailed(failingAsk, away)
+        let notAll = Self.draw(&failing)
+        #expect(notAll?.drawn.allFailed == nil, "the artists are still out")
+        failing.artistsFailed(failingArtists, away)
         let drawnMade = Self.draw(&failing)
         let drawn = try #require(drawnMade)
         #expect(drawn.drawn.allFailed == away && drawn.drawn.holdsLibrary)
@@ -161,7 +174,7 @@ import Testing
         // Try again: drawn afresh, the albums asked again
         failing.tryMusicBrainzAgain()
         let askedAgain = failing.askingMusicBrainz(failing.query, view: .all)
-        #expect(askedAgain != nil)
+        #expect(askedAgain.albums != nil)
 
         // refused (a 422 with words): its words, no Try again, never Behind
         let refused = MBFailure.of(APIFailure.answered(.init(status: 422, method: "GET", path: "/x", detail: "Too long.")),
@@ -178,8 +191,9 @@ import Testing
         var state = SearchState()
         state.typed("roseland")
         let token = state.askingLibrary()
-        let askMade = state.askingMusicBrainz("roseland", view: .all)
-        let ask = try #require(askMade)
+        let asks = state.askingMusicBrainz("roseland", view: .all)
+        let ask = try #require(asks.albums)
+        SearchTests.answerEmpty(&state, asks, albums: false)
         state.albumsAnswered(ask, FullySearchAnswer(releaseGroups: [Self.roseland]), query: ask.first, index: Self.marks.index)
         let unsettled = Self.draw(&state)
         #expect(unsettled == nil, "the library hasn't settled")
@@ -255,12 +269,15 @@ import Testing
         let drawn = try #require(drawnMade)
         #expect(!drawn.drawn.musicBrainz && drawn.drawn.sections?.map(\.kind) == [.artists], "drawn at once, the library alone")
         #expect(!drawn.drawn.nothing, "the foot says to type more instead")
-        // what each view asks: albums alone in slice 2
+        // what each view asks (slice 3): an artist's name asks their albums and artists by the name - no songs
         let plan = try #require(SearchReading.read("portishead", names: SearchReading.artistNames(["Portishead"])))
-        #expect(SearchState.wantedKinds(plan, view: .all) == [.albums] && SearchState.wantedKinds(plan, view: .songs).isEmpty)
+        let all = SearchState.wantedKinds("portishead", plan, view: .all)
+        let songsView = SearchState.wantedKinds("portishead", plan, view: .songs)
+        #expect(all == [.artists, .albums] && songsView.isEmpty)
         #expect(SearchState.keyFor(.albums, "portishead", plan, view: .albums) == "portishead\nalbums:\(plan.query)")
         #expect(SearchState.keyFor(.albums, "portishead", plan, view: .all)?.contains("primarytype") == true)
-        #expect(SearchState.keyFor(.artists, "portishead", plan, view: .all) == nil)
+        #expect(SearchState.keyFor(.artists, "portishead", plan, view: .all) == "portishead\nartists:portishead")
+        #expect(SearchState.keyFor(.songs, "portishead", plan, view: .all) == nil)
     }
 
     @Test func aFieldedReadAsksThePlainWordsWhenItFindsNothing() throws {
@@ -268,18 +285,18 @@ import Testing
         state.ownedArtists = ["Portishead"]
         state.typed("portishead  third")
         let askMade = state.askingMusicBrainz(state.query, view: .all)
-        let ask = try #require(askMade)
+        let ask = try #require(askMade.albums)
         #expect(ask.plan.kind == .albumByArtist && ask.fallback == "portishead third" && !ask.studio)
         state.typed("dummy")
         let freeMade = state.askingMusicBrainz("dummy", view: .all)
-        let free = try #require(freeMade)
+        let free = try #require(freeMade.albums)
         #expect(free.plan.kind == .free && free.fallback == nil)
         #expect(!state.isNewestAlbums(ask.token) && state.isNewestAlbums(free.token))
         let kept = state.albumsAnswered(ask, FullySearchAnswer(releaseGroups: [Self.third]), query: ask.first, index: nil)
         #expect(!kept, "an older ask's answer counts for nothing")
         // the same words in the same view aren't asked twice
         let twice = state.askingMusicBrainz("dummy", view: .all)
-        #expect(twice == nil)
+        #expect(twice.isEmpty)
     }
 
     @Test func theStudioClausesAnswerIsInStudioOrderAndItsFallbacksAsMusicBrainzGaveIt() throws {
@@ -287,7 +304,7 @@ import Testing
         state.ownedArtists = ["Portishead"]
         state.typed("portishead")
         let askMade = state.askingMusicBrainz(state.query, view: .all)
-        let ask = try #require(askMade)
+        let ask = try #require(askMade.albums)
         #expect(ask.studio && ask.fallback == "portishead")
         let ep = ReleaseGroup(id: "a4a5b1c6-0b43-3d1a-8e0b-3b0f9a1d0e04", title: "Glory Times", firstReleaseDate: "1995",
                               primaryType: "EP", secondaryTypes: [], artistCredit: Self.credit)
@@ -316,18 +333,22 @@ import Testing
         let early = try #require(state.kindView(artistList: nil, marks: Self.marks))
         #expect(early.searching && early.searchingMusicBrainz && early.foot == nil)
         let askMade = state.askingMusicBrainz("roseland", view: .albums)
-        let ask = try #require(askMade)
+        let ask = try #require(askMade.albums)
+        #expect(askMade.artists == nil && askMade.songs == nil, "a kind view asks its own kind alone")
         #expect(ask.first == ask.plan.query && !ask.studio, "the Albums view asks the words as read, no studio clause")
         state.kindAnswered(asked.token, LibraryResults())
         state.albumsAnswered(ask, FullySearchAnswer(releaseGroups: [Self.roseland]), query: ask.first, index: Self.marks.index)
         let view = try #require(state.kindView(artistList: nil, marks: Self.marks))
         #expect(view.foot == .rows([.group(Self.roseland)]) && !view.nothing)
-        // the Artists view asks no MusicBrainz in slice 2: no foot, and nothing found is "No artists"
+        // the Artists view asks MusicBrainz's artists since slice 3: none found, and nothing in the library, is "No artists"
         state.choose(.artists)
         let artistsMade = state.askingKind()
         let artists = try #require(artistsMade)
-        #expect(!artists.armLate)
+        #expect(artists.armLate)
         state.kindAnswered(artists.token, LibraryResults())
+        let artistAsks = state.askingMusicBrainz("roseland", view: .artists)
+        let artistAsk = try #require(artistAsks.artists)
+        state.artistsAnswered(artistAsk, ArtistSearchAnswer())
         let none = try #require(state.kindView(artistList: nil, marks: Self.marks))
         #expect(none.foot == nil && none.nothing)
         // a short word in the Albums view: Type a little more

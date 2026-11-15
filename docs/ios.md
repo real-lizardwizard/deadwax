@@ -636,8 +636,8 @@ and All artists, rather than a page among your own albums and artists.
 **Search** is the tab between Library and You. Its field is always there at the top - tap it to type -
 with "Search your library and albums you don't have yet." under it while it's empty ("Search your
 library, the collection, and albums nobody has yet." with a library of your own). It searches what
-deadwax has, as the web app's Search does, and the albums you don't have yet from MusicBrainz. Artists
-and songs you don't have, and Get, come later (see [What it can't do yet](#what-it-cant-do-yet)).
+deadwax has, as the web app's Search does, and the artists, albums and songs you don't have yet from
+MusicBrainz. Get comes later (see [What it can't do yet](#what-it-cant-do-yet)).
 
 A fifth of a second after you stop typing - or at once when you press **Search** on the keyboard - it
 asks Navidrome, and shows **one list**, the web app's:
@@ -653,6 +653,14 @@ asks Navidrome, and shows **one list**, the web app's:
   They're asked for once you've stopped typing for longer (seven tenths of a second, three letters or more)
   or pressed Search. An album a folder of yours may already be - its name matches, but it has no
   MusicBrainz ids - says "maybe in your library". The albums you already have aren't listed again.
+- **Artists you don't have** come after yours in Artists, each with what tells them apart ("Bristol trip
+  hop group · Group · GB", and "as Kanye West" for one found by a name they also go by). An artist of yours
+  MusicBrainz finds is drawn once, as yours - never twice.
+  Words read as an album by an artist you have ("dummy portishead") ask for no other artists.
+- **Songs you don't have** come after yours in Songs, each take of a song by one artist as one row, its
+  line naming the album it's on ("Massive Attack · Mezzanine"). A song you have isn't listed again. Words
+  that are an artist's name alone find no songs you don't have: the Songs chip then says "Type a song's
+  title with the artist (“roads portishead”) to find songs you don't have yet."
 - Words that name an artist you have, alone ("portishead"), find **their studio albums and EPs**, with
   "Studio albums and EPs - See all for everything they made." under them; **See all** finds everything.
 - Under three letters, "Type a little more, or press Search, to find albums you don't have yet." - press
@@ -688,6 +696,21 @@ back.
   "This pressing adds 3 tracks"), each track marked where it differs (**Bonus**, **Other version**,
   **Renamed**), and **Not on this pressing** for what it leaves out. The artist is a link when one artist of
   your library is theirs. **Get** comes to this page in the next phase; for now get it in the web app.
+- **A song you don't have** opens under itself the albums it's on, the studio album first, each with its
+  kind and year ("Live album · Bootleg · 2008") and "in your library" for one you have it on; compilations,
+  live albums and soundtracks are folded behind **On 4 compilations and live albums** - tap it to show them.
+  Tap an album: its page opens with a pressing that has the song chosen, the song's track tinted, and
+  brought into view if it's further down (only if you haven't scrolled the page yourself). One of yours
+  opens your album's page. In Top results a song you don't have opens the album its line names.
+- **An artist you don't have** opens their page: their name, who they are ("Group · Bristol · since
+  1991"), and **Albums** - their albums from MusicBrainz, newest first, each with its cover and "1994 · in
+  your library · 2 pressings" or "2008 · Live album · not in your library", the one you have ticked.
+  **Studio only** (on until you turn it off, kept for each artist) leaves out live albums, compilations and
+  the like; off, it lists everything. Tap an album: the album you don't have's page, or yours. An artist with
+  over 500 says "Showing their first 500 albums."; if MusicBrainz couldn't list them, "Their other albums
+  can't be shown right now - try again in a few minutes." and **Try again**. Their description and links
+  come later. On an album you don't have's page the artist is a link to theirs when they aren't in your
+  library.
 - **An album of yours MusicBrainz finds** that Navidrome's search didn't list is drawn among yours, "in
   your library", and opens your album's page. Finding that page can take a moment (the row shows it's
   working); open something else, or go to another tab, meanwhile and it doesn't open over what you went to.
@@ -704,12 +727,16 @@ back.
 - **Offline**, a list already drawn for the words stays, without the albums you don't have, the songs not
   on this phone dimmed (a tap does nothing) and the ones on it playing; albums and artists with nothing here
   dimmed. New words say "Search works once deadwax is back." - never an empty list - and are searched once
-  it is, your library's rows in the list with the rest. An album you
+  it is, your library's rows in the list with the rest. The artists, albums and songs you don't have
+  leave the list while deadwax is away and come back with it. An album you
   don't have's page keeps what it has shown; one that hasn't loaded its pressings says "This album's
-  pressings load once deadwax is back." and loads them when it is.
+  pressings load once deadwax is back." and loads them when it is. An artist you don't have's page says
+  "Their albums show once deadwax is back." where their albums go, and lists them once it is.
 - **VoiceOver** reads a row as one: its title, its line, and for a song "plays it from its album" or "opens
-  its album". The list is announced as it comes in ("In your library: 1 artist, 2 albums, 11 songs.", then
-  "Also found: 3 albums."), and a chip as it's chosen ("Showing albums.").
+  its album" - for a song you don't have, "Shows the albums it's on." (or "Hides…" once open). The list is
+  announced as it comes in ("In your library: 1 artist, 2 albums, 11 songs.", then "Also found: 2 artists, 3
+  albums, 4 songs."), and a chip as it's chosen ("Showing albums."). On an album opened from a song, its
+  track reads "…, the song you searched for".
 
 ## Playing
 
@@ -2708,6 +2735,58 @@ rest work on either. As with 121-129, the web app's Search is the one to compare
   the pressing's own cover in place of the album's if it has one. An album with no cover at all stays the empty
   square.
 
+### Search's checks, slice 3 (144-155)
+
+**Not done yet.** These come with the build that adds MusicBrainz's artists and songs to Search, and an
+artist you don't have's page (still app 0.10). Compare with the web app's Search, as for 121-143.
+
+- **144 An artist you don't have.** Type an artist none of whose albums you have: Artists lists them after
+  yours, their line saying who they are ("Bristol trip hop group · Group · GB"). Tap them: their page - their
+  name, "Group · Bristol · since 1988" under it, then Albums with **Studio only** on, their studio albums
+  newest first, each with its cover and "1998 · not in your library". The same artist in the web app: the
+  same albums in the same order. Tap one: the album you don't have's page. With the largest text size (Settings >
+  Accessibility > Display & Text Size > Larger Text), open another artist's page: Albums doesn't move down as
+  the line under their name comes in.
+- **145 An artist you have, once.** Type an artist you have ("portishead"): Artists shows yours once, with
+  its albums in your library - never a second row for them from MusicBrainz - and other artists of that name
+  below it. Type "dummy portishead": no artists you don't have.
+- **146 Studio only.** On that page turn **Studio only** off: their live albums and compilations join the list
+  ("2008 · Live album · not in your library"), the list on screen until they're in. Go back and open the page
+  again: Studio only as you left it, and the albums there at once. An artist with only live albums, Studio only
+  on: "No studio albums found - turn off Studio only to see them all."
+- **147 Their albums you have.** On an album you don't have's page whose artist isn't in your library, tap the
+  artist: their page. On a MusicBrainz artist's page, an album you have is ticked, "in your library" (with "2
+  pressings" if you have two); tap it: the row spins, then your album's page.
+- **148 A song you don't have.** Type a song you don't have with its artist ("teardrop massive attack"): Songs
+  lists it after yours, "Massive Attack · Mezzanine". Tap it: the albums it's on open under it, the studio
+  album first ("Album · 1998"), compilations and live albums behind **On 4 compilations and live albums**;
+  tap that and they show. Tap the song again: they fold away. The same words in the web app: the same song,
+  the same albums in the same order.
+- **149 The song on its album.** Tap one of those albums: its page opens with a pressing that has the song
+  chosen, the song's track tinted with a bar at its edge, brought into view if it's below the screen. Choose
+  another pressing: your choice stays, the song marked wherever it's on it. On a slow connection, open
+  another song's album and scroll down before its tracklist comes: the page stays where you put it. Open
+  another, switch to the Library tab before its tracklist comes, then come back to Search: the song is
+  brought into view as you do.
+- **150 A song you have, once.** Type "roads portishead" (a song of yours with its artist): Songs shows your
+  Roads with ▶, and no Roads by Portishead from MusicBrainz under it. Type "portishead" and tap the Songs
+  chip: your songs, then "Type a song's title with the artist (“roads portishead”) to find songs you don't
+  have yet."
+- **151 A song in Top results.** Type a song you don't have with its artist, and wait for it to lead Top
+  results: "Song · Massive Attack · Mezzanine". Tap it: Mezzanine's page, the song marked.
+- **152 A song's album you have.** A song MusicBrainz finds on an album of yours (one Navidrome's search
+  doesn't list): under the song, that album says "in your library"; tap it: the row spins, then your album's
+  page. Tap it and switch to the Library tab before it opens: nothing opens there, nor back in Search.
+- **153 Offline.** With a list drawn, Airplane Mode on: the artists and songs you don't have leave it, yours
+  stay; off: they're back. On a MusicBrainz artist's page, Airplane Mode on: "Their albums show once deadwax
+  is back." where the albums were, and no Studio only; off: their albums again.
+- **154 Left before it opens.** On a MusicBrainz artist's page tap an album you have (it spins) and, before
+  it opens, switch tab or open Now Playing: nothing opens over what you went to, nor when you come back.
+- **155 VoiceOver.** A song you don't have reads its title and line, then "Shows the albums it's on."; open,
+  "Hides the albums it's on."; its fold, "Shows them.". On the album opened from it, the song's track reads
+  "…, the song you searched for". On an artist's page, a row reads its title and line ("Mezzanine, 1998 ·
+  not in your library"), and Studio only says whether it's on.
+
 ## What it can't do yet
 
 These are the web app's for now. Most of them come to the phone in the next phases:
@@ -2716,9 +2795,9 @@ These are the web app's for now. Most of them come to the phone in the next phas
 
 - On an artist's page their **discography** from MusicBrainz, the **description** and the artist's
   managing (pictures, names).
-- In **Search**, artists and songs you don't have yet (MusicBrainz's), and what's saved of MusicBrainz's
-  answers; **Get** (an album you don't have shows its pressings, but is got in the web app) and
-  **Requests**.
+- In **Search**, what's saved of MusicBrainz's answers, and **More** for the artists, albums and songs you
+  don't have; **Get** (an album you don't have shows its pressings, but is got in the web app) and
+  **Requests**. An artist you don't have's page lists their albums, without their description or links.
 - **Home** and **pins**.
 - **Looking after deadwax**: People, Server settings, the event log, Needs a look, Library care, the
   editors, and changing your password. For an admin, **Set up Navidrome** opens the web app in Safari.

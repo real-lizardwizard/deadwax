@@ -1,9 +1,9 @@
 import DeadwaxCore
 import SwiftUI
 
-/// Search (Phase 5, slices 1 and 2 - notes/ios-specs/phase5-search.md 3.1-3.6; the web's app/Search.tsx and
+/// Search (Phase 5, slices 1-3 - notes/ios-specs/phase5-search.md 3.1-3.6 and 6.3; the web's app/Search.tsx and
 /// SearchRows.tsx): one list, Apple Music's way - Top results, then Artists, Albums and Songs, yours first in each - from
-/// Navidrome's search3, and MusicBrainz's albums you don't have after yours. The box is the navigation bar's (always
+/// Navidrome's search3, and MusicBrainz's artists, albums and songs nobody has after yours. The box is the navigation bar's (always
 /// drawn, question 2), the chips under it while it has words; every rule and word is Core's (SearchState, SearchList,
 /// SearchWords) and SearchModel makes the asks.
 ///
@@ -11,10 +11,13 @@ import SwiftUI
 ///   the sections where the asking line stood once MusicBrainz answers or the cap passes, a late answer landing in its
 ///   section's slot or folded behind "Show 2 more albums" - frozen once drawn, its lines (whose a row is) changing in
 ///   place; the library's place kept at the top when it was late; Type a little more, the all-failed foot, nothing found.
-/// - A kind view: that kind in full, More from your library when it is full; the Albums view MusicBrainz's albums below.
+/// - A kind view: that kind in full, More from your library when it is full; MusicBrainz's of the kind below - the Songs
+///   view, under an artist's name alone, says a title is needed with it.
 /// - A song plays from its tap when its album's songs are in hand (▶), else its album's page opens (question 10); its
 ///   ••• is the album page's song menu, or the song's own before its album is in hand (question 11). An artist and an
-///   album open their pages; a MusicBrainz album the album you don't have - or yours, held (the id bridge).
+///   album open their pages; a MusicBrainz album the album you don't have - or yours, held (the id bridge); a
+///   MusicBrainz artist their page; a MusicBrainz song, in its section, opens onto the albums it is on (in Top results,
+///   its named album) - each album yours when you hold the song on it, else the album you don't have, the song marked.
 /// - While deadwax can't be reached (question 5) nothing is asked: a list drawn for the words stays without
 ///   MusicBrainz's part, songs not on this phone dimmed; for new words, "Search works once deadwax is back."
 /// - Navidrome known not to be there: the Library's gate words above the list, nothing asked of it.
@@ -202,6 +205,9 @@ private struct KindFoot: View {
         switch foot {
         case .typeMore:
             ShelfNote(SearchWords.typeMore)
+                .padding(.top, 6)
+        case .needATitle:
+            ShelfNote(SongSearch.needATitle)
                 .padding(.top, 6)
         case .searching:
             AskingLine(personal: search.personal, musicBrainz: true)
@@ -423,7 +429,7 @@ private struct SectionSlot: View {
                 Text(words)
                     .foregroundStyle(Palette.quiet)
             case .failed:
-                let failure = albumsFailure
+                let failure = kindFailure
                 SlotFailure(words: SearchWords.failure(failure, short: true), tryAgain: !failure.refused) {
                     search.tryMusicBrainzAgain()
                 }
@@ -431,10 +437,9 @@ private struct SectionSlot: View {
         }
     }
 
-    /// The albums' failure as the state holds it - else (never, as the state draws it) MusicBrainz away.
-    private var albumsFailure: MBFailure {
-        if case .failed(_, _, let failure) = search.state.albums { return failure }
-        return MBFailure(message: SearchWords.moreUnsearched, unavailable: true)
+    /// The slot's kind's failure as the state holds it - else (never, as the state draws it) MusicBrainz away.
+    private var kindFailure: MBFailure {
+        search.state.failure(of: kind) ?? MBFailure(message: SearchWords.moreUnsearched, unavailable: true)
     }
 }
 
@@ -674,13 +679,24 @@ struct SearchRowView: View {
             songRow(song, line)
         case .group(let group):
             groupRow(group, line)
-        case .mbArtist:
-            // a MusicBrainz artist (Top results' family, an album's credited artist the library hasn't): their page is
-            // slice 3's (question 9) - drawn, opening nothing yet (question 14)
-            face(line, round: true, cover: nil, plays: false)
-                .accessibilityElement(children: .combine)
-                .accessibilityLabel(spoken(line))
+        case .mbArtist(let match):
+            mbArtistRow(match, line)
+        case .mbSong(let song):
+            if top, let album = Self.named(song, marks) {
+                // Top results go to the best guess: its named album, the song marked
+                songAlbumRow(song, album, line)
+            } else {
+                // a section looks closer: the albums it is on
+                SongDisclosure(song: song, line: line, marks: marks)
+            }
+        case .songAlbum(let song, let album):
+            songAlbumRow(song, album, line)
         }
+    }
+
+    /// The album a MusicBrainz song's row names (`namedAlbum`) - nil for a song on none (never, as songs are grouped).
+    static func named(_ song: FoundSong, _ marks: SearchMarks) -> SongAlbum? {
+        song.albums.isEmpty ? nil : SongSearch.namedAlbum(song, marks.index, marks.evidence).album
     }
 
     /// A MusicBrainz album's row: the album you don't have - or, held, yours by the id bridge (busy while it asks).
@@ -689,7 +705,7 @@ struct SearchRowView: View {
         return Button {
             search.open(group)
         } label: {
-            groupFace(group, line, busy: busy)
+            archiveFace(group.id, line, busy: busy)
         }
         .buttonStyle(.plain)
         .disabled(busy || !reachability.online)
@@ -698,17 +714,46 @@ struct SearchRowView: View {
         .accessibilityValue(busy ? SearchWords.loading : "")
     }
 
-    private func groupFace(_ group: ReleaseGroup, _ line: SearchList.Line, busy: Bool) -> some View {
+    /// A MusicBrainz artist's row: their page.
+    private func mbArtistRow(_ match: MBArtistMatch, _ line: SearchList.Line) -> some View {
+        Button {
+            search.openArtist(match)
+        } label: {
+            face(line, round: true, cover: nil, plays: false)
+        }
+        .buttonStyle(.plain)
+        .disabled(!reachability.online || match.mbid.isEmpty)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(spoken(line))
+    }
+
+    /// An album a MusicBrainz song is on, as a row (Top results' song, and its named album): yours when you hold the song
+    /// on it, else the album you don't have with the song marked - busy while it asks.
+    private func songAlbumRow(_ song: FoundSong, _ album: SongAlbum, _ line: SearchList.Line) -> some View {
+        let busy: Bool = search.opening == SearchModel.songAlbumKey(song, album)
+        return Button {
+            search.openSongAlbum(song, album)
+        } label: {
+            archiveFace(album.id, line, busy: busy)
+        }
+        .buttonStyle(.plain)
+        .disabled(busy || !reachability.online)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(spoken(line))
+        .accessibilityValue(busy ? SearchWords.loading : "")
+    }
+
+    private func archiveFace(_ group: String, _ line: SearchList.Line, busy: Bool) -> some View {
         let large: Bool = typeSize.isAccessibilitySize
         return HStack(spacing: 12) {
-            ArchiveCover(addresses: ArchiveCoverID.addresses(release: nil, group: group.id), size: ArchiveCoverSize.row)
+            ArchiveCover(addresses: ArchiveCoverID.addresses(release: nil, group: group), size: ArchiveCoverSize.row)
                 .frame(width: LibraryRow.cover, height: LibraryRow.cover)
                 .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
             VStack(alignment: .leading, spacing: 1) {
                 Text(row.title)
                     .foregroundStyle(.primary)
                     .lineLimit(large ? 3 : 1)
-                lineText(line, large: large)
+                SearchLineText(line: line, large: large)
             }
             Spacer(minLength: 8)
             if busy {
@@ -854,7 +899,7 @@ struct SearchRowView: View {
                 Text(row.title)
                     .foregroundStyle(.primary)
                     .lineLimit(titleLines)
-                lineText(line, large: large)
+                SearchLineText(line: line, large: large)
             }
             Spacer(minLength: 8)
             trailing(plays: plays)
@@ -874,9 +919,29 @@ struct SearchRowView: View {
         }
     }
 
-    /// The line under the title: the facts take the ellipsis, the place is never cut - at accessibility sizes, both
-    /// as one, wrapping.
-    @ViewBuilder private func lineText(_ line: SearchList.Line, large: Bool) -> some View {
+    /// ▶ for a song that plays from its tap, › for an artist (the library's or MusicBrainz's).
+    @ViewBuilder private func trailing(plays: Bool) -> some View {
+        if plays {
+            Image(systemName: "play.fill")
+                .font(.caption2)
+                .foregroundStyle(Palette.quiet)
+                .accessibilityHidden(true)
+        } else if row.kind == .artists {
+            Image(systemName: "chevron.right")
+                .font(.footnote.weight(.semibold))
+                .foregroundStyle(.tertiary)
+                .accessibilityHidden(true)
+        }
+    }
+}
+
+/// The line under a row's title: the facts take the ellipsis, the place is never cut - at accessibility sizes, both as
+/// one, wrapping.
+struct SearchLineText: View {
+    let line: SearchList.Line
+    let large: Bool
+
+    var body: some View {
         if line.said.isEmpty {
             EmptyView()
         } else if large {
@@ -902,19 +967,142 @@ struct SearchRowView: View {
             .foregroundStyle(Palette.quiet)
         }
     }
+}
 
-    /// ▶ for a song that plays from its tap, › for an artist.
-    @ViewBuilder private func trailing(plays: Bool) -> some View {
-        if plays {
-            Image(systemName: "play.fill")
-                .font(.caption2)
-                .foregroundStyle(Palette.quiet)
-                .accessibilityHidden(true)
-        } else if case .artist = row {
-            Image(systemName: "chevron.right")
-                .font(.footnote.weight(.semibold))
-                .foregroundStyle(.tertiary)
-                .accessibilityHidden(true)
+/// A MusicBrainz song in a section (SearchRows.tsx `songDisclosure`): its row - its named album's cover, its title and
+/// line, a chevron - a disclosure onto the albums it is on: Albums, EPs and Singles listed, the rest under one fold that
+/// opens ("2 live albums and 1 compilation"), or, with nothing else to list, the fold's words as its caption and its
+/// albums at once. Each album opens yours when you hold the song on it, else the album you don't have, the song marked.
+private struct SongDisclosure: View {
+    let song: FoundSong
+    let line: SearchList.Line
+    let marks: SearchMarks
+
+    @Environment(SearchModel.self) private var search
+    @Environment(\.dynamicTypeSize) private var typeSize
+
+    var body: some View {
+        let open: Bool = search.openSongs.contains(song.key)
+        VStack(alignment: .leading, spacing: 0) {
+            head(open: open)
+            if open {
+                albums
+                    .padding(.leading, LibraryRow.textInset)
+                    .padding(.bottom, 6)
+            }
         }
+    }
+
+    private func head(open: Bool) -> some View {
+        let large: Bool = typeSize.isAccessibilitySize
+        let said: String = [song.title, line.said].filter { (part: String) -> Bool in !part.isEmpty }.joined(separator: ", ")
+        let named: String = SearchRowView.named(song, marks)?.id ?? ""
+        return Button {
+            search.toggleSong(song.key)
+        } label: {
+            HStack(spacing: 12) {
+                ArchiveCover(addresses: ArchiveCoverID.addresses(release: nil, group: named), size: ArchiveCoverSize.row)
+                    .frame(width: LibraryRow.cover, height: LibraryRow.cover)
+                    .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(song.title)
+                        .foregroundStyle(.primary)
+                        .lineLimit(large ? 3 : 1)
+                    SearchLineText(line: line, large: large)
+                }
+                Spacer(minLength: 8)
+                Image(systemName: "chevron.down")
+                    .font(.footnote.weight(.semibold))
+                    .foregroundStyle(Palette.quiet)
+                    .rotationEffect(.degrees(open ? 180 : 0))
+                    .accessibilityHidden(true)
+            }
+            .padding(.vertical, 8)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(said)
+        .accessibilityHint(SongSearch.disclosureHint(open: open))
+    }
+
+    @ViewBuilder private var albums: some View {
+        let bands: (listed: [SongAlbum], folded: [SongAlbum]) = SongSearch.bands(song)
+        let foldOpen: Bool = bands.listed.isEmpty || search.openFolds.contains(song.key)
+        ForEach(bands.listed) { (album: SongAlbum) in
+            SongAlbumRow(song: song, album: album, marks: marks)
+        }
+        if !bands.folded.isEmpty {
+            if bands.listed.isEmpty {
+                // nothing else to list: the fold's words as its caption, its albums listed at once
+                Text(SongSearch.foldLabel(bands.folded))
+                    .font(.footnote)
+                    .foregroundStyle(Palette.quiet)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(.vertical, 6)
+            } else {
+                Button(SongSearch.foldLabel(bands.folded)) { search.toggleFold(song.key) }
+                    .font(.footnote)
+                    .padding(.vertical, 8)
+                    .accessibilityHint(SongSearch.foldHint(open: foldOpen))
+            }
+            if foldOpen {
+                ForEach(bands.folded) { (album: SongAlbum) in
+                    SongAlbumRow(song: song, album: album, marks: marks)
+                }
+            }
+        }
+    }
+}
+
+/// An album a MusicBrainz song is on, under the song (SearchRows.tsx `albumRow`): its cover, its title, and its line
+/// ("Live album · Bootleg · 2008 · 6:06 · in your library") - busy while it asks.
+private struct SongAlbumRow: View {
+    let song: FoundSong
+    let album: SongAlbum
+    let marks: SearchMarks
+
+    @Environment(SearchModel.self) private var search
+    @Environment(Reachability.self) private var reachability
+    @Environment(\.dynamicTypeSize) private var typeSize
+
+    private static let cover: CGFloat = 36
+
+    var body: some View {
+        let busy: Bool = search.opening == SearchModel.songAlbumKey(song, album)
+        let line: String = SongSearch.albumLine(album, song, marks.index, personal: marks.personal, marks.evidence)
+        let large: Bool = typeSize.isAccessibilitySize
+        Button {
+            search.openSongAlbum(song, album)
+        } label: {
+            HStack(spacing: 10) {
+                ArchiveCover(addresses: ArchiveCoverID.addresses(release: nil, group: album.id), size: ArchiveCoverSize.row)
+                    .frame(width: Self.cover, height: Self.cover)
+                    .clipShape(RoundedRectangle(cornerRadius: 3, style: .continuous))
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(album.title)
+                        .foregroundStyle(.primary)
+                        .lineLimit(large ? 3 : 1)
+                    if !line.isEmpty {
+                        Text(line)
+                            .font(.footnote)
+                            .foregroundStyle(Palette.quiet)
+                            .lineLimit(large ? 3 : 1)
+                    }
+                }
+                Spacer(minLength: 8)
+                if busy {
+                    ProgressView()
+                        .accessibilityHidden(true)
+                }
+            }
+            .padding(.vertical, 6)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .disabled(busy || !reachability.online)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel([album.title, line].filter { (part: String) -> Bool in !part.isEmpty }.joined(separator: ", "))
+        .accessibilityValue(busy ? SearchWords.loading : "")
     }
 }

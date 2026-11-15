@@ -315,15 +315,21 @@ public struct ReleaseGroupAnswer: Decodable, Sendable, Equatable {
     }
 }
 
-/// A MusicBrainz artist as a row of the list (`ArtistMatch`) - in slice 2 only one made from a credit, Top results'
-/// relative of a MusicBrainz album (`creditArtist`: no disambiguation, type or country).
-public struct MBArtistMatch: Sendable, Equatable, Hashable {
+/// A MusicBrainz artist as a row of the list (`ArtistMatch`): one `/artists` found (src/artists.py's artist_match),
+/// or one made from a credit, Top results' relative of a MusicBrainz album (`creditArtist`: no disambiguation, type
+/// or country). Read leniently, every field "" when absent or of the wrong shape.
+public struct MBArtistMatch: Decodable, Sendable, Equatable, Hashable {
     public let mbid: String
     public let name: String
     public let disambiguation: String
     public let country: String
     public let type: String
     public let matchedAs: String
+
+    enum CodingKeys: String, CodingKey {
+        case mbid, name, disambiguation, country, type
+        case matchedAs = "matched_as"
+    }
 
     public init(mbid: String, name: String, disambiguation: String = "", country: String = "", type: String = "",
                 matchedAs: String = "") {
@@ -333,6 +339,16 @@ public struct MBArtistMatch: Sendable, Equatable, Hashable {
         self.country = country
         self.type = type
         self.matchedAs = matchedAs
+    }
+
+    public init(from decoder: any Decoder) throws {
+        let fields = try decoder.container(keyedBy: CodingKeys.self)
+        mbid = fields.looseField(String.self, .mbid) ?? ""
+        name = fields.looseField(String.self, .name) ?? ""
+        disambiguation = fields.looseField(String.self, .disambiguation) ?? ""
+        country = fields.looseField(String.self, .country) ?? ""
+        type = fields.looseField(String.self, .type) ?? ""
+        matchedAs = fields.looseField(String.self, .matchedAs) ?? ""
     }
 
     /// Its line (artistManage.ts `matchLine`): "as …" when matched by another name, its disambiguation, its type and

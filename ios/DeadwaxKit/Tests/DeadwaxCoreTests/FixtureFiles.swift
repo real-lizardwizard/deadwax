@@ -47,7 +47,8 @@ enum Fixtures {
                      "upnext/traces.json", "you/you.json", "gate/navidrome.json", "lyrics/lyrics-vectors.json",
                      "lyrics/answers.json", "autoeq/answers.json",
                      "playlists/playlist-vectors.json", "artists/artist-vectors.json", "shuffle/shuffle-vectors.json",
-                     "search/search-vectors.json", "search/search-albums-vectors.json"] {
+                     "search/search-vectors.json", "search/search-albums-vectors.json",
+                     "search/search-songs-vectors.json"] {
             #expect(try Fixtures.url(path) == Fixtures.checkout.appendingPathComponent(path), "\(path)")
         }
     }

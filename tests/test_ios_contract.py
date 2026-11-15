@@ -72,6 +72,7 @@ from fastapi.testclient import TestClient
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from src import auth, autoeq, levels, loudness, lyrics, users  # noqa: E402
+from src.artists import artist_match  # noqa: E402
 from src import play_history as history_rules  # noqa: E402
 from src import playlists as playlist_rules  # noqa: E402
 from src import play_queue as queue_rules  # noqa: E402
@@ -90,7 +91,7 @@ from src.store import JobStore  # noqa: E402
 
 CORE = Path(__file__).resolve().parent.parent / "ios" / "DeadwaxKit" / "Sources" / "DeadwaxCore"
 ENDPOINT = re.compile(r'Endpoint\(method: "(\w+)", path: "([^"]+)", query: \[([^\]]*)\]\)')
-ROUTE_COUNT = 44
+ROUTE_COUNT = 48
 RAW_OPENING = re.compile(r'#+"')
 HASHES = re.compile(r"#*")
 
@@ -1265,3 +1266,109 @@ def test_a_held_album_is_found_by_its_release():
     assert 'call(Routes.storeAlbum, as: StoreAlbum.self, query: [("release_mbid", releaseMbid)])' in text
     assert "release_mbid" in inspect.signature(store_album.store_album).parameters
     assert "navidrome_id" in fields("StoreAlbum")
+
+
+# ---------------------------------------------------------------------------- Phase 5, slice 3: artists and songs
+
+SONGS = Path(__file__).resolve().parent / "fixtures" / "songs"
+
+
+def _hyphenated_keys(literal: str) -> set[str]:
+    """literal_keys for MusicBrainz's own names ("release-groups"), which carry hyphens."""
+    return set(re.findall(r'"([\w-]+)":', _top_level(literal)))
+
+
+def test_musicbrainzs_artists_and_songs_are_asked_within_the_routes_bounds(monkeypatch):
+    # /artists and /songs asked with the app's own page - the server's default, which the web's searchList.ts keeps
+    # too - under the routes' ceilings; the name the box can hold within /artists', and the longest song query the app
+    # builds from it within /songs': a title and an artist out of the box's 200 characters, each quote and backslash
+    # escaped (doubled), the artist named twice, and the fielded query's own 45 characters
+    monkeypatch.setattr(Config, "AUTH_MODE", None)
+    routes = app_routes()
+    artists = routes[("GET", "/deadwax/search_musicbrainz/artists")]
+    songs = routes[("GET", "/deadwax/search_musicbrainz/songs")]
+    artist_limit = swift_constant("MBArtist.swift", "MBArtistSearch", "limit")
+    song_limit = swift_constant("SongSearch.swift", "SongSearch", "limit")
+    low, high = bounds(artists, "limit")
+    assert low <= artist_limit <= high and artist_limit == search_musicbrainz.ARTIST_SEARCH_LIMIT
+    low, high = bounds(songs, "limit")
+    assert low <= song_limit <= high and song_limit == search_musicbrainz.SONG_SEARCH_LIMIT
+    box = swift_constant("SearchReading.swift", "SearchReading", "maxCharacters")
+    assert search_musicbrainz.ARTIST_SEARCH_NAME_MAX >= box
+    shell = len('recording:"" AND (artist:"" OR artistname:"")')
+    assert shell == 45
+    assert search_musicbrainz.SONG_SEARCH_QUERY_MAX >= 4 * box + shell
+    assert '"recording:\\(SearchReading.quoteTerm(title)) AND (artist:\\(artist) OR artistname:\\(artist))"' in \
+        swift_function("SongSearch.swift", "fieldedQuery")
+    # the words go as they are: the server asks MusicBrainz for the name and its aliases itself
+    assert '("name", name), ("limit", String(limit))' in swift_function("DeadwaxClient.swift", "searchArtists")
+    assert '("query", query), ("limit", String(limit))' in swift_function("DeadwaxClient.swift", "searchSongs")
+
+
+def test_musicbrainzs_artists_and_songs_are_read_as_the_server_answers_them():
+    # /artists' {matches, count}, each match artist_match's - the score left unread (the list is MusicBrainz's order)
+    search = inspect.getsource(search_musicbrainz.artists)
+    assert '"matches": [artist_match(artist, name)' in search and '"count": count' in search
+    assert set(fields("ArtistSearchAnswer")) == {"matches", "count"}
+    assert set(fields("MBArtistMatch")) == set(artist_match({}, "")) - {"score"}
+    # /songs' {recordings, count}: MusicBrainz's recordings as it gave them, each with every release it is on
+    source = inspect.getsource(musicbrainz_endpoint.MusicBrainzClient.search_recordings)
+    assert 'return {"recordings": found["recordings"], **counted}' in source
+    assert set(fields("SongSearchAnswer")) == {"recordings", "count"}
+    # ...so what the app reads of a recording is what MusicBrainz's real answers carry (tests/fixtures/songs, recorded)
+    seen = {"recording": set(), "release": set(), "medium": set(), "track": set()}
+    for path in sorted(SONGS.glob("*.json")):
+        for recording in json.loads(path.read_text(encoding="utf-8")).get("recordings", []):
+            seen["recording"] |= set(recording)
+            for release in recording.get("releases", []):
+                seen["release"] |= set(release)
+                for medium in release.get("media", []):
+                    seen["medium"] |= set(medium)
+                    for track in medium.get("track", []):
+                        seen["track"] |= set(track)
+    assert all(seen.values()), "no recorded song search under tests/fixtures/songs"
+    assert set(fields("MBRecording")) <= seen["recording"]
+    assert set(fields("MBRecordingRelease")) <= seen["release"]
+    assert set(fields("MBRecordingMedium")) <= seen["medium"]
+    assert set(fields("MBRecordingTrack")) <= seen["track"]
+    # read leniently: a recording, a release, a medium or a track missing any of it is still one
+    for struct in ("MBRecording", "MBRecordingRelease", "MBRecordingMedium", "MBRecordingTrack", "MBArtistMatch"):
+        assert "fields.loose" in swift_struct(struct), struct
+
+
+def test_a_musicbrainz_artists_page_is_asked_and_read_as_the_routes_answer():
+    # who they are: /artist's fields, the line under the name reading only some of them
+    assert set(fields("MBArtistFacts")) <= set(search_musicbrainz.ARTIST_FACT_FIELDS)
+    assert {"type", "area", "began", "ended_on", "ended"} <= set(fields("MBArtistFacts"))
+    assert '("mbid", mbid)' in swift_function("DeadwaxClient.swift", "artistFacts")
+    # their albums: /discography as the web's artist page asks it - albums, the studio ones alone with Studio only -
+    # under the names the route answers with, `problem` the trouble (never a short list passed off as their albums)
+    body = swift_function("DeadwaxClient.swift", "discography")
+    assert '("artist_mbid", mbid), ("types", "album")' in body and '("studio_only", "true")' in body
+    assert "album" in search_musicbrainz.DISCOGRAPHY_TYPES
+    taken = inspect.signature(search_musicbrainz.discography).parameters
+    assert {"artist_mbid", "types", "studio_only"} <= set(taken)
+    answers = returned_literals(musicbrainz_endpoint.MusicBrainzClient.get_artist_release_groups)
+    assert answers and all({"release-groups", "truncated", "problem"} <= _hyphenated_keys(one) for one in answers)
+    assert set(fields("DiscographyAnswer")) == {"release-groups", "truncated", "problem"}
+
+
+def test_the_app_waits_for_an_artists_page_as_long_as_deadwax_does():
+    # /artists and /songs are quick searches, as /fully_search is; /artist is one lookup with deadwax's ten attempts,
+    # each turned away for 3 s while MusicBrainz is busy, with the rate limiter's turns; /discography a browse of up to
+    # five pages, as an album's pressings are
+    text = (CORE / "Routes.swift").read_text(encoding="utf-8")
+    literal = re.search(r"public static let timeouts: \[Endpoint: Double\] = \[([^\]]*)\]", text)
+    timeouts = {name: float(seconds) for name, seconds in re.findall(r"(\w+): ([\d.]+)", literal.group(1))}
+    patience = musicbrainz_endpoint.SEARCH_PATIENCE
+    window = musicbrainz_endpoint.RateLimit.time_window
+    for name in ("searchArtists", "searchSongs"):
+        assert timeouts[name] > patience.attempts * patience.busy_pause + window, name
+    for route in (search_musicbrainz.artists, search_musicbrainz.songs):
+        assert "quick=True" in inspect.getsource(route)
+    client = musicbrainz_endpoint.MusicBrainzClient
+    assert "await asyncio.sleep(3.0)" in inspect.getsource(client._ask)
+    assert "patience" not in inspect.getsource(client.get_artist)
+    assert timeouts["artistFacts"] > client.RETRIES * 3.0 + window
+    assert client.DISCOGRAPHY_MAX // client.DISCOGRAPHY_PAGE == 5
+    assert timeouts["discography"] >= timeouts["releaseGroup"] > timeouts["fullySearch"]

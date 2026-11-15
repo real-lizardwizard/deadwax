@@ -124,7 +124,24 @@ the keyboard's key.
 
 Slice 2 adds the web's MusicBrainz words (searchList.ts:1053-1135 - `musicBrainzWords`, `failureWords`, `foldWords`,
 `emptyWords`, `libraryLateWords`, `TYPE_MORE`, `STUDIO_NOTE`; searchResults.ts' group kinds and years; the album you
-don't have's, pressings.ts). Slice 3 adds songs.ts' and the artists' (`SONGS_NEED_A_TITLE`, the disclosure's).
+don't have's, pressings.ts). Slice 3's, as built (the web's searchList.ts, songs.ts, artistPage.ts, ArtistPage.tsx
+and ReleaseGroupPage.tsx, held by search-songs-vectors.json, but where it says the phone's own):
+
+| where | words | source |
+| --- | --- | --- |
+| an artist MusicBrainz knows | Bristol trip hop group · Group · GB - "as Kanye West" first for one found by an alias; Top results "Artist" first | searchList.ts `rowLine`, artists.py `matched_as` |
+| a song MusicBrainz knows | Massive Attack · Mezzanine, then where a pressing with it is held ("in your library"); the album's length between when the song's own; Top results: Song · Massive Attack · Mezzanine | searchList.ts `rowLine`, songs.ts `namedAlbum` |
+| an album a song is on | Album · 1998 / Live album · Bootleg · 2008 · 6:06, then "in your library" or "a pressing in your library"; Top results' named album: its kind first | songs.ts `songAlbumLine`, `songAlbumWords` |
+| the fold | On 1 compilation / On 11 compilations, live albums and soundtracks | songs.ts `foldLabel` |
+| the disclosure (VoiceOver) | Shows the albums it's on. / Hides the albums it's on.; the fold: Shows them. / Hides them. | the phone's own, question 25 |
+| the Songs view under an artist's name alone | Type a song's title with the artist (“roads portishead”) to find songs you don't have yet. | searchList.ts `SONGS_NEED_A_TITLE` |
+| songs found, none on an album | Found songs called “…”, but none is on an album yet - there's nothing to get. | Search.tsx `noReleaseWords` |
+| what MusicBrainz found (announced) | Also found: 2 artists, 3 albums, 4 songs. | searchList.ts `musicBrainzWords` |
+| the song on its album (VoiceOver) | “…, the song you searched for” | ReleaseGroupPage.tsx `SONG_WORDS` |
+| a MusicBrainz artist: who | Group · Bristol · since 1991 / 1965 to 2014 / 1991, ended / until 2014 | artistPage.ts `factsLine` |
+| ...their albums | Albums; Studio only; 1994 · in your library · 2 pressings / 2008 · Live album · not in your library | ArtistPage.tsx, artistPage.ts `rowLine` |
+| ...asking, trouble, the cut, none | Loading their albums…; Their other albums can't be shown right now - try again in a few minutes. and Try again; Showing their first 500 albums.; No studio albums found - turn off Studio only to see them all. / No other albums found. | ArtistPage.tsx |
+| ...offline | Their albums show once deadwax is back. | the phone's own, question 24 |
 
 ## 2. The rules (DeadwaxCore: pure, tested on Linux)
 
@@ -413,6 +430,15 @@ relay, on main as 2.1.24); questions 14-23 came of it. docs/ios.md's checks 130-
 (offline words drawn blank, slots growing as their answer lands, the id bridge's answer opening on whatever showed,
 covers left empty after offline): "Phase 5, slice 2, after its review", with checks 140-143.
 
+### 6.7 Slice 3, built (2026-11-14)
+
+What slice 3 is, as built, is in notes/ios.md's "Phase 5, slice 3: artists and songs from MusicBrainz" - Core
+(SongSearch.swift, MBArtist.swift, Collation.swift, and slice 3's half of SearchList.swift, SearchState.swift and
+Pressings.swift, held to the web by export-search-songs-vectors.cjs and its third fixture), the app (SearchModel's
+artists and songs, the songs' disclosure in SearchScreen, MBArtistModel and MBArtistView, GroupView's song marked),
+what was decided here, the tests and mutations, and what was verified. Question 9 was built with it; questions
+24-27 came of it. docs/ios.md's checks 144-155 are its.
+
 ## 7. Tests (Swift Testing; Core's on Linux and macOS)
 
 - **The fixture's replay** (slice 1): every rule of 2.1-2.5 over the web's own answers - readings of every shape (a
@@ -428,7 +454,7 @@ covers left empty after offline): "Phase 5, slice 2, after its review", with che
   drawn list's freeze (marks changing in place, a new text's answer replacing it only once settled, an empty box),
   `KindLibrary`'s More (appending without repeats, full again only when the page was full and new), the prefetch's
   choice, the song tap's rule (in hand, among them, not, offline and on this phone), the pacing's numbers.
-- **The contract** (tests/test_ios_contract.py): ROUTE_COUNT 41 (44 with slice 2); `/library/owned` named with the fields the app reads
+- **The contract** (tests/test_ios_contract.py): ROUTE_COUNT 41 (44 with slice 2, 48 with slice 3); `/library/owned` named with the fields the app reads
   within `OWNED_FIELDS` and `yours`; `LibraryResults`' keys within what the route returns; every count and offset the
   app sends within the route's bounds; the box's limit at most `q`'s 200.
 - **Mutations** run by hand and caught (notes/ios.md lists each).
@@ -468,7 +494,11 @@ each slice numbers its own after the last. Slice 2's are 130-143 (docs/ios.md's 
 held and maybe, the moments beside the web's, an artist alone and the studio line, short words, covers on 2.1.24
 and 2.1.23, offline, VoiceOver - and, from its review, typing offline (the offline line stays, never an empty list,
 and once back the library's rows in the list), the slots holding their height (at the largest text size too), a
-held album's row left before it opens, and covers loading once back online.
+held album's row left before it opens, and covers loading once back online. Slice 3's are 144-155 (docs/ios.md's
+"Search's checks, slice 3 (144-155)"): an artist you don't have and their page, one of yours drawn once, Studio
+only, their albums you have, a song you don't have and its albums, the song on its album, one of yours drawn once
+and the Songs view's words under an artist's name, a song in Top results, a song's album you have, offline, a row
+left before it opens, VoiceOver.
 
 ## 9. What only the phone can tell
 
@@ -519,7 +549,17 @@ held album's row left before it opens, and covers loading once back online.
    included, so it runs on 2.1.23.
 9. **A MusicBrainz artist's page** (slice 3). The web's artist page opened from MusicBrainz (`mb:<mbid>`) is their
    discography and description. *Recommend*: their release groups in the web's order, each opening the album you
-   don't have (or yours), and the description in Phase 7's links if at all. Not built (slice 3).
+   don't have (or yours), and the description in Phase 7's links if at all. Built (slice 3): a page of its own on
+   the tab's stack (`AppRoute.mbArtist`), opened from Search's MusicBrainz artists and from the credit of an album
+   you don't have when no artist of your library is theirs - their picture's place (round, empty: MusicBrainz has no
+   pictures), their name, who they are in a line (`/artist`'s facts; left out, quietly, when it fails, as the web
+   does), and Albums: `/discography?types=album` - studio ones alone with Studio only, on until turned off and kept
+   for each artist (the web's) - newest first, each with its cover through the relay, ticked and "in your library"
+   from `/library/owned`, opening the album you don't have or yours through the id bridge. The session keeps 20
+   artists' answers (ARTISTS_KEPT). No description, no links, no Play, and no Navidrome albums merged in (the web's
+   page for an artist Navidrome also knows lists their library albums too; on the phone that artist opens their
+   library page, Search bringing them in rather than drawing them twice) - Phase 7's. Studio only is a button at
+   the Albums heading's end, hidden offline.
 10. **A song's album not yet in hand.** *Recommend, and built*: as the web - its album's page opens (a tap that waited
     for the album and then played would start the music outside the tap, which iOS refuses on a locked phone).
 
@@ -584,3 +624,24 @@ held album's row left before it opens, and covers loading once back online.
     not asked, `TYPE_MORE` where the albums would go; the late library drawn after 1.5 s with its place kept at the
     top ("Searching your library…", then Show 5 from your library, or that it found nothing); and nothing found
     with Navidrome not there says "No results for “…”." as the web does.
+
+24. **A MusicBrainz artist's page offline** (slice 3, beside question 21). *Recommend, and built*: their name and
+    who they are (when it came, kept for the session) stay; their albums are not drawn - "Their albums show once
+    deadwax is back." (the phone's own words, question 5's shape) in their place, and Studio only hidden - since
+    every row opens a page that needs deadwax; once back, they're asked, or drawn at once from the session's. The
+    other way: draw kept albums offline, dimmed, as an album page keeps its pressings.
+25. **The songs' disclosure for VoiceOver** (slice 3). The web's says it through `aria-expanded`. *Recommend, and
+    built*: a hint saying what a tap does now - "Shows the albums it's on." / "Hides the albums it's on.", and the
+    fold's "Shows them." / "Hides them." - the row reading its title and line as every row does.
+26. **A MusicBrainz artist's albums before the library answers** (slice 3). The web holds the rows until every
+    answer is in or 1.5 s has passed (`ROWS_WAIT_MS`), so nothing changes once drawn. *Recommend, and built*: the
+    rows drawn as `/discography` lands, their library words ("in your library", the tick) filling in place when
+    `/library/owned` answers - usually already in hand from Search, so nothing fills in at all. Each row is one line
+    whatever it says and the order never depends on what's held, so nothing moves. The phone's page asks no Navidrome
+    and no description, the other answers the web waits for.
+27. **How long the phone waits for an artist's page** (slice 3, beside question 22). *Recommend, and built*: 20 s
+    for `/artists` and `/songs` (quick searches, as `/fully_search` is); 60 s for `/artist` (one lookup, but with
+    deadwax's ten attempts, three seconds apart while MusicBrainz is busy) and for `/discography` (up to five of
+    MusicBrainz's pages, as an album's pressings) - each held by the contract test above deadwax's own waits where
+    they're bounded. A facts answer given up on leaves the line out; albums given up on say "That took too long."
+    with Try again.

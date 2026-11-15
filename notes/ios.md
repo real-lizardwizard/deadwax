@@ -7391,3 +7391,381 @@ Not verified - only the phone can tell (docs/ios.md's checks 140-143):
 - The slots holding their height as their answer lands, at the largest text size too.
 - A held album's row left before its answer, by another tab or another row.
 - Covers loading in place once back online.
+
+## Phase 5, slice 3: artists and songs from MusicBrainz (2026-11-14)
+
+notes/ios-specs/phase5-search.md 6.3, and questions 9 and 24-27 (6.7 points here). The third slice of Phase 5:
+MusicBrainz's artists and songs in Search's one list, after yours, through the moments slice 2 built; a song's
+albums opening under it, and the album it names opening with the song marked; and a MusicBrainz artist's page.
+What's saved, the kept answers and More from MusicBrainz are slice 4; Get is Phase 6; a description and links
+Phase 7.
+
+On `phase5-search` at `ios` b451241 (slice 2 and its review merged, and CI's type-checking fix). src/__init__.py
+untouched; the app stays 0.10 (10); the .xcodeproj unchanged (the two new App files joined the synchronized folder).
+ROUTE_COUNT 44 -> 48: `/search_musicbrainz/artists`, `/search_musicbrainz/songs`, `/search_musicbrainz/artist` and
+`/search_musicbrainz/discography`, all on the server since before 2.1.23 - no server change.
+
+### Core (DeadwaxCore)
+
+- **SongSearch.swift** (new), songs.ts and searchQuery.ts' song queries:
+  - `/songs`' answer read leniently: `SongSearchAnswer`, `MBRecording`, `MBRecordingRelease`, `MBRecordingMedium`,
+    `MBRecordingTrack`.
+  - The songs: `key` (songKey), `group` (groupSongs: every take of one title by one credit one `FoundSong`, its
+    albums unioned and ordered so the studio album leads - `band`, `sortAlbums`), `bands` and `foldLabel` (the
+    disclosure: the albums listed, the rest folded, "On 11 compilations, live albums and soundtracks").
+  - What's held: `holding` (songAlbumHolding: a pressing the song was found on, one whose kept tracklist has it, one
+    the library's own search shows it on, and one nothing vouches for), `held`, `heldReleases` (the id bridge's
+    order), `heldWords`, `albumWords`, `namedAlbum` (the first album you have the song on, yours before the
+    collection's, else the first it's on), `albumLine`. `SongEvidence` is the web's `evidence`: the library half's
+    songs, and the album pressings the session keeps.
+  - The album opened from a song: `ids` (songIds - lowercase MBIDs, each once, at most 8), `matcher` (songMatcher:
+    one of its recordings, or a track titled as one of those is), `pressing` (songPressing).
+  - The queries: `query` (songSearchQuery - nothing for an artist's name alone), `titleQuery` (songTitleQuery, the
+    fallback), `fieldedQuery`. `limit` 25, `rowsShown` 3, `idsKept` 8.
+  - The words: `needATitle`, `noRelease`, `songWords`; `disclosureHint` and `foldHint` (the phone's own, question
+    25).
+- **MBArtist.swift** (new): `MBArtistSearch.limit` (10), `ArtistSearchAnswer`, `MBArtistFacts` (the fields the line
+  reads), `DiscographyAnswer` (`brokenOff` when `problem` is said: never their albums); `MBArtistPage` - artistPage.ts
+  for a MusicBrainz artist alone: `rows` (artistRows([], groups, index): each group once, newest year first, the
+  undated last, then by folded title in localeCompare's order), `line` (rowLine), `marked`, `asksBridge` (openRow),
+  `factsLine`; `kept` (20, ARTISTS_KEPT) and ArtistPage.tsx's words.
+- **Collation.swift** (new): `WebCollation.compare`, JavaScript's `localeCompare` as ICU's root collation answers it
+  - letters first with accents and case away, then accents, then case lowercase first, punctuation weighed in ICU's
+  order before digits and letters. Linux has no ICU tables, so it's an approximation, built from what Node's ICU
+  answers for the characters titles carry; the fixture's 364 titles and 600 seeded pairs hold it. songs.ts sorts an
+  album's pressings, and artistPage.ts an artist's albums, by localeCompare: a bootleg's "1984-09-24" stands before
+  "1984‐09‐15" there because a hyphen-minus weighs less than a hyphen, which no code-point order gets.
+- **MusicBrainz.swift**: `MBArtistMatch` (artist_match less its score, read leniently) and its `line` ("as Kanye
+  West", disambiguation, type, country).
+- **SearchList.swift**, slice 3's half of searchList.ts: the rows `.mbArtist`, `.mbSong` and `.songAlbum`; the pool
+  with MusicBrainz's artists and songs - `newArtists` (a library artist answering to a match, by its MusicBrainz id or
+  by a name only one match answers to, brought in - never drawn twice) and `newSongs` (a song whose title and credit
+  are a library song's dropped; one held on an album it's on brought in); their candidates, Top results' relatives and
+  `decidedTop` over three kinds; `sectionRows` with both caps for each kind; every new row's line; `hasAside`.
+- **SearchState.swift**: MusicBrainz's three kinds, each its own `Answer` (`albums`, `artists`, `songs`: idle,
+  searching, done or failed, only the newest ask's): `wantedKinds` and `keyFor` (the web's - artists not asked under the
+  album-by-artist reading, songs not for an artist's name alone); `askingMusicBrainz` returns `MusicBrainzAsks`, one
+  ask a kind not in hand or on its way (the songs' with its fallback, the box's words as one title, for a title beside
+  an artist); `artistsAnswered`, `songsAnswered` (the recordings made songs) and their failures; `failure(of:)`; the
+  moments over the kinds asked. A kind view asks its own kind (the Songs view under an artist's name alone says
+  `needATitle`).
+- **Pressings.swift**: the album opened from a song - `GroupPage` takes `song` (the recording ids) and a
+  `fallbackTitle` (drawn while the pressings load: the route carries the album's title, no preview); the default
+  pressing is one with the song (`SongSearch.pressing`), and `trackRows` marks its tracks (`song`). `KeptPressings`
+  gives the session's releases by album, for `SongEvidence`.
+- **Routes and the client**: the four routes; `searchArtists` (`name`, `limit`), `searchSongs` (`query`, `limit`),
+  `artistFacts(mbid:)` and `discography(mbid:studioOnly:)` (`types=album`, `studio_only=true` with Studio only).
+  `/artists` and `/songs` given 20 s; `/artist` and `/discography` 60 s (question 27).
+- **export-search-songs-vectors.cjs** (new) compiles lib/searchList.ts, lib/songs.ts, lib/artistPage.ts,
+  lib/pressings.ts and lib/idBridge.ts with tsc, reads noReleaseWords from Search.tsx, SONG_WORDS from
+  ReleaseGroupPage.tsx and ARTISTS_KEPT and the discography's words from ArtistPage.tsx, and writes a third fixture,
+  Fixtures/search/search-songs-vectors.json (2.4 MB, plain ASCII, seeded): the numbers (5) and words; 76 readings'
+  song queries; the 7 recorded song searches in tests/fixtures/songs/ grouped (each recording's key, the songs in
+  full, their bands and folds); every album's holding over 5 to 7 folder lists and 4 kinds of evidence (the last list, the song's first album the
+  collection's alone and a later one yours, added for mutation 17); The Slow Rush's
+  pressings opened from a song (tests/fixtures/songs/slow-rush-pressings.json: ids, matcher, pressing, the tracks
+  marked); 68 whole searches with MusicBrainz's artists, albums and songs in hand (23 worked, 45 seeded: the pool,
+  Top results, the sections, every line, every song's disclosure); 16 artist pages and 8 facts lines; and
+  localeCompare over 364 titles and 600 pairs. **ui/test/iossearchsongs.sim.cjs** runs its `--check`.
+
+### Where the phone can't follow the web exactly
+
+- **A MusicBrainz artist's page** (question 9): their albums only - no description, links, Play or Navidrome albums
+  merged in; Studio only a button at the heading's end.
+- **Their rows before the library answers** (question 26): drawn as the discography lands, the library's words filling
+  in place, where the web waits up to 1.5 s.
+- **Offline** (question 24): the artist page's albums not drawn.
+- **VoiceOver's disclosure** (question 25): hints, where the web has `aria-expanded`.
+- **localeCompare**: WebCollation is ICU's order as far as the recorded answers and the seeded titles reach; two
+  titles in another script tying on everything before them could stand in another order than the web's. (Its tables
+  are made from ICU since the review - "Phase 5, slice 3, after its review" says what it still can't follow.)
+
+### The app
+
+- **SearchModel** gains the artists and songs:
+  - `askMusicBrainz` sends each ask `askingMusicBrainz` returns - `askAlbums`, `askArtists`, `askSongs` - each
+    waiting up to 1.5 s for `/library/owned` before it draws, as the albums do. `askSongs` asks the fallback (the
+    words as one title) when a title beside an artist found no recording, the ask still the newest, and closes
+    every song's albums and fold as an answer lands.
+  - `marks` carries `evidence`: All's search3 songs and `GroupPageModel.keptReleases`.
+  - `openSongAlbum` (Search.tsx's openSongAlbum, in its order): a pressing the song was found on, or whose kept
+    tracklist has it - yours through the id bridge, the row busy; a pressing the library's own search shows it on -
+    that album, at once; only a pressing nothing vouches for, its pressings not kept - they are asked (busy) and kept
+    for the page, then the bridge if a held pressing has the song; else the album you don't have (`GroupRoute(album)`,
+    its title and the song's recording ids). It runs on `askingHeld`, so `standDown()` covers it, and opens only on
+    the list it was tapped on (the tab, the Search stack, Now Playing not over it, the same epoch).
+  - `openArtist` pushes `AppRoute.mbArtist`; `toggleSong` and `toggleFold` keep which songs are open.
+  - `letGo` and the `drop` effect cancel all three asks and close every song.
+- **SearchScreen**: a MusicBrainz artist's row (its line, a chevron; dimmed and inert offline); a MusicBrainz song's
+  row in a section as `SongDisclosure` - its title and line, a chevron turning as it opens onto `SongAlbumRow`s (a
+  36 pt cover through the relay, `albumLine`, busy while the bridge is asked), the fold's button or caption, the hints
+  for VoiceOver; in Top results a song's row opens its named album. `KindFoot` says `needATitle`; `SectionSlot`
+  reads each kind's failure (`failure(of:)`).
+- **Routes**: `AppRoute.mbArtist(MBArtistRoute)` (mbid, name); `GroupRoute` gains `title` and `song` (`init(_ album:
+  SongAlbum)`), so the album opened from a song draws its title at once and marks the song.
+- **GroupView**: `GroupPage` given the route's title and song; the pick rule keeps any pick on a page opened from a
+  song (the default chosen again would otherwise hand the choice back to the song); the song's tracks tinted
+  (`Palette.pressed`, a 3 pt accent bar, an 8 pt bleed - app.css's `--app-rg-mark-bleed` and `--app-song-bar`), its
+  title in the accent, ", the song you searched for" for VoiceOver alone; brought into view once, as first drawn,
+  only while the page is the one shown and not scrolled (`ScrollViewReader`, the least scroll - the web's
+  `scrollIntoView({block: 'nearest'})`). The credit opens the library artist's page, else (one MusicBrainz artist
+  credited) their MusicBrainz page, else words.
+- **MBArtistModel** (new) and **MBArtistView** (new): `load` asks the facts and the albums together; `browse` - the
+  session's at once (unless Try again), else `/discography`, `brokenOff` or a 503 said as `MBArtistPage.away`, any
+  other failure in a listener's words with Try again; a re-browse keeps the last answer on screen, and a failure keeps
+  it only when it answered the same question; facts that fail leave the line out. Studio only on unless turned off,
+  kept per artist; the session keeps 20 artists' facts, albums and Studio only (the oldest let go). A row's tap:
+  `asksBridge` - the id bridge, the row busy, opening yours only on the page it was tapped on (the tab, its stack, Now
+  Playing not over it) - else the album you don't have; `standDown()` on another tab, Now Playing, or the page
+  leaving. The hero's facts line is held with a space while it loads; the rows are one line each, so nothing below
+  moves as an answer lands. Offline: the hero, and "Their albums show once deadwax is back." - asked again as deadwax
+  comes back.
+
+### Decided here (the spec was silent, or this departs from it)
+
+Question 9 built to its recommendation (a MusicBrainz artist's page, their albums alone), and questions 24-27 in the
+spec, each built to its recommendation:
+- 24, nothing of their albums offline;
+- 25, the disclosure's hints for VoiceOver;
+- 26, rows drawn as the discography lands;
+- 27, how long the phone waits for the four routes.
+
+And smaller ones, not worth a question:
+- `/artist`'s timeout raised from 20 s to 60 s while writing the contract test: get_artist takes deadwax's ten
+  attempts (no search patience), 3 s apart on a 503, which 20 s would give up before;
+- the album a song names opens with its title and no preview, as the web's `{id, title}` does - the cover and
+  credit come with the pressings;
+- an album Search's `openSongAlbum` fetched is kept in `KeptPressings` for its page, so the page draws at once;
+- the song's tint and bar are the web's `.is-song` sizes, under the phone's own palette.
+
+### Tests
+
+- **SearchSongsVectorTests** (10): every vector of search-songs-vectors.json - the numbers and words, the queries,
+  titles and bands, the recorded songs grouped, the holding, the pressings opened from a song, every whole search,
+  the artist pages and facts lines, and the collation (each title's place, each pair's sign).
+- **SearchSongsTests** (8), by hand: each kind asked by the reading (artists not under album-by-artist, songs not for
+  a name alone, the fallback only for a title beside an artist); an answer keeping what was asked and an older one
+  dropped; the Artists view bringing in the library's artist once and MusicBrainz's others below; the Songs view
+  saying it can't ask (`needATitle`) and what it found nothing of (`noRelease` beside a library song, "No songs for"
+  with none); the album opened from a song showing a pressing with it and marking it; a MusicBrainz artist's page
+  listing their albums newest first with what's held; the answers read leniently; the four calls asked as the web
+  asks them (the query items, the timeouts, a 503 an `APIFailure`).
+- **SearchTests** and **SearchVectorTests** answer every kind asked with nothing (`answerEmpty`), so the earlier
+  slices' tests draw whole with three kinds asked; **SearchAlbumsTests** answers the artists and songs so, its
+  every-kind-failed test failing the artists too, and what each view asks is slice 3's (an artist's name: their
+  albums and artists, no songs).
+- **ClientTests**: `Routes.all` 48; the four among the routes given longer. **FixtureFiles**: the new fixture read
+  from the checkout.
+- **tests/test_ios_contract.py**: ROUTE_COUNT 48; four new tests - `/artists` and `/songs` asked within their bounds
+  with the server's own page sizes, the name within `/artists`' and the longest song query the box can make (4 x 200
+  + 45) within `/songs`'; their answers' keys (ArtistSearchAnswer, MBArtistMatch less `score`, SongSearchAnswer) and a
+  recording's fields within what MusicBrainz's recorded answers carry; `/artist`'s fields within ARTIST_FACT_FIELDS
+  and `/discography` asked with `types=album` and `studio_only`, its every answer carrying `release-groups`,
+  `truncated` and `problem`; the timeouts above deadwax's own waits (the searches' patience, `/artist`'s ten 3 s
+  pauses, the discography's five pages as the pressings').
+- **Mutations**: 18, each applied alone with the six Search suites run (ios/DeadwaxKit's `--filter Search`). 16 were
+  caught at first; the 2 that lived were closed and caught when run again:
+  - 5, the tick only for yours even without a library of your own: the tick's rule is ArtistPage.tsx's, a
+    component the exporter doesn't compile, and no by-hand row was held by the collection alone. Closed in
+    `aMusicBrainzArtistsPageListsTheirAlbumsNewestFirstWithWhatIsHeld` (ticked without a library of your own, not
+    with one, "in the collection").
+  - 17, the named album not yours first: no folder list held the song's first album by the collection alone and a
+    later one by you. Closed by that list in the exporter (the fixture regenerated; 122 cases then failed).
+
+  The 18:
+  1. the song search asks 24, not 25;
+  2. 19 artist pages kept, not 20;
+  3. an address keeps 7 recording ids;
+  4. an artist's albums oldest first;
+  5. the tick only for yours, even without a library of your own;
+  6. an ended artist said "since";
+  7. a library artist matched by name alone never brought in;
+  8. a song you have drawn again from MusicBrainz;
+  9. "a pressing" left out of an album held without the song;
+  10. artists asked under album-by-artist;
+  11. songs asked for an artist's name alone;
+  12. a hyphen weighed before a hyphen-minus (WebCollation);
+  13. the fielded song query without `artistname`;
+  14. no fallback to the title alone;
+  15. the song never marked on its album;
+  16. the fold always plural;
+  17. the named album not yours first;
+  18. an album heard holding the song said as only a pressing.
+
+### Verified, and not
+
+Verified, on the tree before its commit:
+- `swift test`: Core 1487, Audio 158, Turntable 12. No new warnings.
+- The unsigned Debug and Release device builds (Xcode, `generic/platform=iOS`): no warnings but the usual
+  appintentsmetadataprocessor line; the .xcodeproj unchanged (MBArtistModel and MBArtistView joined the
+  synchronized folder).
+- `check_project.py` ok.
+- `npm run build` and all 86 sims on Node 22.23.4, iossearchsongs' `--check` among them.
+- The full pytest suite: 4516 passed, 1 skipped (test_ios_contract's four new tests and the four new routes' parameter
+  checks among them, and test_compose_example's docs rule).
+- The 18 mutations above, the 2 that lived closed and caught.
+
+Not verified - only the phone can tell (docs/ios.md's checks 144-155, beside the spec's section 9):
+- The rows' timing over WireGuard with three kinds asked: the artists and songs landing in their slots, nothing moving.
+- A song's disclosure opening and folding in a LazyVStack, and the album page bringing the song into view
+  (`ScrollViewReader` in a lazy stack, a 50 ms wait for the layout).
+- `Toggle` in `.button` style as Studio only, and how VoiceOver reads it.
+- The id bridge from a song's album and from an artist page's row against James's store index; `/release_group` asked
+  first for a song only a pressing nothing vouches for is on.
+- `/artists`, `/songs`, `/artist` and `/discography` against real MusicBrainz through deadwax (the contract test reads
+  the server's code; the recorded answers are MusicBrainz's own, from the web's work).
+- WebCollation against ICU for titles outside the recorded answers.
+- CI's Xcode 26.6 (the older Swift): the new code spells out its closures' types and keeps each `#expect` small.
+
+## Phase 5, slice 3, after its review (2026-11-14)
+
+The review of 9a38566 found nothing high or medium, and three low findings. All three are fixed in one commit on
+`phase5-search`. The app stays 0.10 (10); no server change. Not fixed, as asked: the Songs view's "none is on an
+album yet" when every MusicBrainz song was dropped as yours. It is Search.tsx's `kindView` word for word, and the
+phone keeps the web's wording.
+
+### What was wrong, and the fix
+
+1. **The song was never brought into view if its tracks first drew while the page wasn't shown.** `showSong` set
+   `songShown` before its "is this page shown" guard. So: open a song's album (`/release_group` loading), switch to
+   Library, the pressings land, come back to Search - the page never scrolled to the song.
+   - **GroupView**: `songShown` is set only once the page is the one shown (`isShown`: the top of the tab shown's
+     stack, Now Playing not over it), as ReleaseGroupPage's `shown` does. `showSong` is called again as the page
+     shows: `.onAppear`, a change of `navigation.tab`, and Now Playing closing.
+   - The scrolled check stays inside the 50 ms wait, so it reads the hero's own `onAppear` after the page comes
+     back: a page scrolled before it left is still left where it is.
+2. **A MusicBrainz artist's facts line could grow from one line to two.** The placeholder was `" "` but the line was
+   `lineLimit(2)`, so at large Dynamic Type the albums moved down when the facts landed. That contradicted question
+   26's "nothing moves".
+   - **MBArtistView**: `lineLimit(2, reservesSpace: true)`. The web's `.app-artist-facts` wraps freely, so two lines
+     held matches its line better than one truncated.
+3. **WebCollation ordered some titles differently from ICU.** The reviewer ran 208 awkward titles against Node's
+   `Intl.Collator('en-US')` and got 792 disagreeing ordered pairs. The causes were kana by code point, the modifier
+   letters as letters, ə and ŧ after z, punctuation the table didn't list after every symbol, currency before the
+   other symbols, and ™ against "TM".
+   - **The tables are now made from ICU**, by **ios/scripts/collation-tables.cjs** (new), written between
+     Collation.swift's `BEGIN collation-tables.cjs` and `END` lines:
+     - `variables`: 1,880 punctuation and symbols in ICU's order, with their ties. Most are from ASCII, Latin-1,
+       the modifier letters, general punctuation, letterlike symbols, arrows, maths, box drawing, shapes, dingbats
+       and CJK's; every currency sign is included. Punctuation runs up to "`", symbols up to "¤", then currency.
+     - `unlistedSymbolsBefore`: where an emoji stands. ICU puts every symbol the table doesn't list after its own
+       symbols but before CJK's symbols and the modifier letters it weighs as symbols (ː, ゝ, ー).
+     - `marks`: ICU's order at the second level, with their ties.
+     - `letterPlaces`: each Latin letter beyond a-z, placed after the letter ICU puts it after.
+     - `variants`: ø, đ, ð, ł, ħ and the rest. Each is its letter plus a mark of its own, placed among the marks.
+     - `middleDotAfterL`: ICU weighs "l·" as an l with a mark, and so ŀ.
+     - `markLetters`: the combining letters, weighed as their letter a level down ("t" < "tͭ" < "T").
+     - `numbers`: ❽, ⓰, 〨 and the rest, weighed as the digits of their value a level down.
+     - `scriptLetters`: Greek, Cyrillic, Georgian, Armenian, Hebrew and Arabic's letters, in ICU's order.
+     - `contractions`: й, and Arabic's alef with a hamza or madda, which ICU weighs as letters of their own though
+       they decompose.
+     - `ignorableMarks`: the combining grapheme joiner and the like.
+   - **Collation.swift**:
+     - The first level is in bands in ICU's order: punctuation, symbols, the last symbols, currency, digits, Latin,
+       the other alphabets, Hangul's jamo, kana, Bopomofo, Yi, Han. In each band, a character a table lists goes by
+       its rank there, and any other by code point after them.
+     - A string is decomposed canonically first, so a character the same as another is weighed as that one (Greek's
+       oxia as ´), and contractions are read from that.
+     - **Kana**: hiragana and katakana are alike at the first level, and a small kana is weighed as its letter. At
+       the third level the order is small hiragana, hiragana, small katakana, katakana, then halfwidth ("カタカナ" <
+       "きた", "ぁ" < "あ" < "ァ" < "ア" < "ｱ").
+     - **A compatibility symbol's parts** take their own case at the third level, so "tm" < "tM" < "Tm" < "TM" <
+       "™".
+     - **Greek's final sigma** is its sigma a level down ("σ" < "Σ" < "ς" < "σa").
+     - Unchanged: æ, œ and ß as their two letters (ß as "ss") with a mark of their own, and the digits by value.
+   - **The generator's `--check`** makes the tables again and compares them with Collation.swift, but only when
+     this Node's ICU is the one the tables were made with (78.3, Node 22.23.4). Another ICU would make other tables,
+     not wrong ones, so then it says which ICU and passes. **ui/test/iossearchsongs.sim.cjs** runs it beside the
+     exporter's `--check`.
+   - **The exporter's collation list** gains 100 titles, one or more with each of these characters. The list is now
+     464 titles and 600 seeded pairs (only the fixture's `collation` vector changed).
+     - From the review: kana, the modifier letters (Hawaiʻi beside Hawai'i, Hawai’i and Hawaii), ə and ŧ, CJK's
+       brackets and ⁄, currency against ♥ ☆ ♫ ✓, and ™ against TM, Tm, tM.
+     - From what the measuring below found: final sigma, й ("йа" beside "иб"), Catalan's l·l, ❽ and 〨, a combining
+       letter, emoji, Hangul beside Ethiopic and Khmer, and "Don't Stop" beside "Don’s Song" (an apostrophe and a
+       right quote tie at the first level).
+     - The vectors made under ICU 74.2 (Node 20) come out the same as under 78.3.
+
+### Measured against ICU
+
+The reviewer's 208 titles weren't kept, so the measuring here used a Swift harness: Collation.swift compiled with a
+small main, run over every ordered pair of titles against Node 22's `Intl.Collator('en-US')` signs.
+
+| titles | old disagreements | new disagreements |
+| --- | --- | --- |
+| 962 awkward titles: each of the review's characters, alone, after "a", before "a" and inside "x…y", among Latin variants, quotes, dashes, symbols, currency, scripts and digits | 62,630 of 925,444 | 52 |
+| 800 random strings of 1 to 4 characters, over Latin, punctuation, symbols, emoji, other alphabets, kana, Hangul, Han, marks and modifier letters | 16,148 of 640,000 | 8 |
+| 700 random strings over Latin, punctuation, marks and modifier letters | 55,806 of 490,000 | 24 |
+| 700 random strings over other alphabets, CJK and symbols | 5,614 of 490,000 | 42 |
+| 700 random strings over the whole pool, another seed | 11,086 of 490,000 | 232 |
+| the fixture's own 464 titles, every pair | 454 misplaced in the sorted list | 0 |
+
+### What it still can't follow, and why
+
+- **Han beyond its first block.** ICU orders Han by radical and stroke count. Extension A (㐀) and B (𠀀) interleave
+  with the core block, and the core block itself strays from code-point order in about 0.6% of pairs. Matching that
+  would take Unihan's radical-stroke data for 98,000 characters; even as runs it is thousands of entries. So Han
+  stays in code-point order. All of the 52 left in the first measure are this.
+- **Bopomofo's later letters** (ㄪ, ㄫ, ㄬ) stand by their phonetic place in ICU, not by code point.
+- **Scripts the tables don't list**, such as Thai, Devanagari, Ethiopic, Khmer and Cherokee, stand after the listed
+  alphabets by code point. That keeps them between Arabic and Hangul as ICU does, but not always in ICU's order among
+  themselves.
+  - Devanagari's and Bengali's vowel signs are weighed as marks, where ICU gives them letters' weights.
+  - Thai's and Lao's prevowels are not swapped with the consonant after them.
+- **Symbols outside the table's blocks**, such as Cyrillic's ҂ and some musical and technical ones, go after the
+  listed symbols with the emoji. ICU spreads them through its symbols.
+- **The finer third-level steps.** Halfwidth small kana tie with halfwidth kana ("ｫ" against "ｵ").
+- **Numbers outside the table's blocks** that ICU weighs as their own (𝍠, ↀ) stand as symbols.
+- **The rare letters that expand** (ʣ for "dz", ỻ for "ll") are placed as one letter, so a word continuing past them
+  can stand on the wrong side.
+- **A string of marks alone** (no letter under them) ties where ICU orders the marks.
+
+None of these reaches the recorded answers or the fixture's titles.
+
+### Tests
+
+- **SearchSongsVectorTests**' collation test holds the 464 titles' order and the 600 pairs (the fixture
+  regenerated).
+- **Mutations**: 19 on the new collation, each applied alone to a copy of Collation.swift and compiled with the
+  test's harness (the fixture's sorted titles and pairs). 16 were caught at first. The 3 that lived were closed by
+  titles added to the exporter, and caught when run again:
+  - no contractions, closed by "йа" and "иб";
+  - the quote ties given primaries of their own, closed by "Don't Stop" and "Don’s Song";
+  - Hangul among the other scripts, closed by Ethiopic's ሀ and Khmer's ក.
+
+  The 19:
+  1. katakana not as hiragana;
+  2. katakana before hiragana at the third level;
+  3. small kana not as their letter;
+  4. emoji after the last symbols;
+  5. a symbol's parts all lowercase;
+  6. no contractions;
+  7. no l·;
+  8. final sigma by code point;
+  9. the combining letters as marks;
+  10. the numbers as symbols;
+  11. the other alphabets by code point;
+  12. the Latin places ignored;
+  13. the variants without their mark;
+  14. the quote ties given primaries of their own;
+  15. the quote ties the same at the second level;
+  16. the marks unranked;
+  17. no canonical decomposition first;
+  18. Hangul among the other scripts;
+  19. Han among the other scripts.
+
+### Verified, and not
+
+Verified, on the tree before its commit:
+- `swift test`: Core 1487, Audio 158, Turntable 12. No warnings.
+- The unsigned Debug and Release device builds: no warnings; the .xcodeproj unchanged (collation-tables.cjs is a
+  script, not in the project).
+- `check_project.py` ok.
+- `npm run build` and all 86 sims on Node 22.23.4 (ICU 78.3), iossearchsongs running both `--check`s. Under Node 20
+  (ICU 74.2) the exporter's vectors came out the same, and the tables' check said which ICU and passed.
+- The full pytest suite: 4516 passed, 1 skipped.
+- The 19 mutations above, the 3 that lived closed and caught.
+
+Not verified - only the phone can tell (docs/ios.md's checks 144 and 149 gain a sentence each):
+- The song brought into view on coming back to the tab. The 50 ms wait has to cover the hero's `onAppear`.
+- The facts line's two lines held at the largest text size.

@@ -374,7 +374,7 @@ func sentJSON(_ request: HTTPRequest?) throws -> [String: SentValue] {
     }
 
     @Test func everyRouteIsDeadwaxsOwn() {
-        #expect(Routes.all.count == 44)
+        #expect(Routes.all.count == 48)
         #expect(Set(Routes.all).count == Routes.all.count)
         for endpoint in Routes.all {
             #expect(endpoint.path.hasPrefix("/deadwax/"))
@@ -394,8 +394,12 @@ func sentJSON(_ request: HTTPRequest?) throws -> [String: SentValue] {
         // (Phase 5) /library/owned, 30 s: it walks the library when the saved scan is behind (src/routes/library.py)
         // (Phase 5, slice 2) /fully_search, 20 s: a quick search's patience and the rate limiter's turns; /release_group,
         // 60 s: several pages of MusicBrainz's browse (test_ios_contract.py holds both above deadwax's own waits)
+        // (slice 3) /artists and /songs, 20 s, quick searches as /fully_search is; /artist, 60 s, one request with
+        // MusicBrainz's ten attempts; /discography, 60 s, a browse of up to five pages
         let longer: [Endpoint: Double] = [Routes.albumIndex: 30, Routes.autoEqSearch: 20, Routes.autoEqProfile: 20,
-                                          Routes.libraryOwned: 30, Routes.fullySearch: 20, Routes.releaseGroup: 60]
+                                          Routes.libraryOwned: 30, Routes.fullySearch: 20, Routes.releaseGroup: 60,
+                                          Routes.searchArtists: 20, Routes.searchSongs: 20, Routes.artistFacts: 60,
+                                          Routes.discography: 60]
         #expect(Routes.timeouts == longer)
         for endpoint in Routes.all {
             // each path parameter filled in: a brace left in a path is no URL
