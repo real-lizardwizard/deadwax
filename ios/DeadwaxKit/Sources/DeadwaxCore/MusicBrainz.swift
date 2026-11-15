@@ -110,26 +110,39 @@ public struct FullySearchAnswer: Decodable, Sendable, Equatable {
 }
 
 /// A track of a pressing (tracklistDiff.ts `MbTrack`): its number as printed, its running position, its title and
-/// length (milliseconds), and its recording's.
+/// length (milliseconds), and its recording's. And (Phase 6, slice 2) what a Get sends of it (releasePayload.ts
+/// `RawTrack`): the track's own credit, and its recording's credit and video flag - nil where MusicBrainz gave none,
+/// an empty credit kept as one (JavaScript's `[]` is truthy: a track credited to nobody is "N/A", not its recording's).
 public struct MBTrack: Decodable, Sendable, Equatable, Hashable {
     public struct Recording: Decodable, Sendable, Equatable, Hashable {
         public let id: String?
         public let title: String?
         public let length: Double?
+        public let artistCredit: [MBArtistCredit]?
+        /// MusicBrainz's own word that the recording is a video - never an audio file (release.ts `isVideoTrack`).
+        public let video: Bool?
 
-        public init(id: String? = nil, title: String? = nil, length: Double? = nil) {
+        public init(id: String? = nil, title: String? = nil, length: Double? = nil, artistCredit: [MBArtistCredit]? = nil,
+                    video: Bool? = nil) {
             self.id = id
             self.title = title
             self.length = length
+            self.artistCredit = artistCredit
+            self.video = video
         }
 
-        enum CodingKeys: String, CodingKey { case id, title, length }
+        enum CodingKeys: String, CodingKey {
+            case id, title, length, video
+            case artistCredit = "artist-credit"
+        }
 
         public init(from decoder: any Decoder) throws {
             let fields = try decoder.container(keyedBy: CodingKeys.self)
             id = fields.looseField(String.self, .id)
             title = fields.looseField(String.self, .title)
             length = fields.looseField(Double.self, .length)
+            artistCredit = fields.looseList(MBArtistCredit.self, .artistCredit)
+            video = fields.looseField(Bool.self, .video)
         }
     }
 
@@ -138,17 +151,22 @@ public struct MBTrack: Decodable, Sendable, Equatable, Hashable {
     public let title: String?
     public let length: Double?
     public let recording: Recording?
+    public let artistCredit: [MBArtistCredit]?
 
     public init(number: String? = nil, position: Int? = nil, title: String? = nil, length: Double? = nil,
-                recording: Recording? = nil) {
+                recording: Recording? = nil, artistCredit: [MBArtistCredit]? = nil) {
         self.number = number
         self.position = position
         self.title = title
         self.length = length
         self.recording = recording
+        self.artistCredit = artistCredit
     }
 
-    enum CodingKeys: String, CodingKey { case number, position, title, length, recording }
+    enum CodingKeys: String, CodingKey {
+        case number, position, title, length, recording
+        case artistCredit = "artist-credit"
+    }
 
     public init(from decoder: any Decoder) throws {
         let fields = try decoder.container(keyedBy: CodingKeys.self)
@@ -157,6 +175,7 @@ public struct MBTrack: Decodable, Sendable, Equatable, Hashable {
         title = fields.looseField(String.self, .title)
         length = fields.looseField(Double.self, .length)
         recording = fields.looseField(Recording.self, .recording)
+        artistCredit = fields.looseList(MBArtistCredit.self, .artistCredit)
     }
 }
 
@@ -229,12 +248,17 @@ public struct PageRelease: Decodable, Sendable, Equatable, Hashable, Identifiabl
     public let media: [MBMedium]
     /// The first of its release events' dates - what a pressing without a `date` is dated by.
     public let eventDates: [String?]
+    /// (Phase 6, slice 2) Each release event's country - its area's first ISO 3166-1 code, as a Get sends it
+    /// (releasePayload.ts `country`): the raw code, "XE" and "XW" included.
+    public let eventCountries: [String?]
+    /// "Box", "Jewel Case" - a Box is a box set (release.ts `detectEditionTags`).
+    public let packaging: String?
     public let labelInfo: [LabelInfo]
     public let artistCredit: [MBArtistCredit]?
     public let releaseGroup: ReleaseGroup?
 
     enum CodingKeys: String, CodingKey {
-        case id, title, status, date, country, barcode, disambiguation, media
+        case id, title, status, date, country, barcode, disambiguation, media, packaging
         case releaseEvents = "release-events"
         case labelInfo = "label-info"
         case artistCredit = "artist-credit"
@@ -243,17 +267,31 @@ public struct PageRelease: Decodable, Sendable, Equatable, Hashable, Identifiabl
 
     private struct Event: Decodable {
         let date: String?
+        let country: String?
 
-        enum CodingKeys: String, CodingKey { case date }
+        enum CodingKeys: String, CodingKey { case date, area }
+
+        private struct Area: Decodable {
+            let codes: [String]?
+
+            enum CodingKeys: String, CodingKey { case codes = "iso-3166-1-codes" }
+
+            init(from decoder: any Decoder) throws {
+                codes = try decoder.container(keyedBy: CodingKeys.self).looseList(String.self, .codes)
+            }
+        }
 
         init(from decoder: any Decoder) throws {
-            date = try decoder.container(keyedBy: CodingKeys.self).looseField(String.self, .date)
+            let fields = try decoder.container(keyedBy: CodingKeys.self)
+            date = fields.looseField(String.self, .date)
+            country = fields.looseField(Area.self, .area)?.codes?.first
         }
     }
 
     public init(id: String, title: String? = nil, status: String? = nil, date: String? = nil, country: String? = nil,
                 barcode: String? = nil, disambiguation: String? = nil, media: [MBMedium] = [], eventDates: [String?] = [],
-                labelInfo: [LabelInfo] = [], artistCredit: [MBArtistCredit]? = nil, releaseGroup: ReleaseGroup? = nil) {
+                labelInfo: [LabelInfo] = [], artistCredit: [MBArtistCredit]? = nil, releaseGroup: ReleaseGroup? = nil,
+                eventCountries: [String?] = [], packaging: String? = nil) {
         self.id = id
         self.title = title
         self.status = status
@@ -263,6 +301,8 @@ public struct PageRelease: Decodable, Sendable, Equatable, Hashable, Identifiabl
         self.disambiguation = disambiguation
         self.media = media
         self.eventDates = eventDates
+        self.eventCountries = eventCountries
+        self.packaging = packaging
         self.labelInfo = labelInfo
         self.artistCredit = artistCredit
         self.releaseGroup = releaseGroup
@@ -278,7 +318,10 @@ public struct PageRelease: Decodable, Sendable, Equatable, Hashable, Identifiabl
         barcode = fields.looseField(String.self, .barcode)
         disambiguation = fields.looseField(String.self, .disambiguation)
         media = fields.looseList(MBMedium.self, .media) ?? []
-        eventDates = (fields.looseList(Event.self, .releaseEvents) ?? []).map(\.date)
+        let events = fields.looseList(Event.self, .releaseEvents) ?? []
+        eventDates = events.map(\.date)
+        eventCountries = events.map(\.country)
+        packaging = fields.looseField(String.self, .packaging)
         labelInfo = fields.looseList(LabelInfo.self, .labelInfo) ?? []
         artistCredit = fields.looseList(MBArtistCredit.self, .artistCredit)
         releaseGroup = fields.looseField(ReleaseGroup.self, .releaseGroup)

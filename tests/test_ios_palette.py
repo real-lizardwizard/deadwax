@@ -277,6 +277,43 @@ def test_the_requests_badge_is_the_webs():
     assert ".accessibilityLabel(spoken)" in tabs
 
 
+
+def gradient(css: str) -> list[tuple[int, int, int, float]]:
+    """A `linear-gradient(to bottom, #a, #b)` token's two colours, top first."""
+    found = re.fullmatch(r"linear-gradient\(to bottom,\s*(#[0-9a-fA-F]{6}),\s*(#[0-9a-fA-F]{6})\)", css)
+    assert found, css
+    return [hex_colour(found.group(1)), hex_colour(found.group(2))]
+
+
+def test_the_sources_sheet_is_drawn_in_the_webs_colours():
+    # (Phase 6, slice 2) a source's card and the store line's box (.app-source, .app-store-box): --dw-card under a
+    # --dw-border edge, the best match's --dw-best; the speed's bars --dw-bar-green and --dw-bar-grey; a signal under 40
+    # and a red edition word STYLE.md's red badge; the facts' labels --dw-text-label-color
+    assert palette_rgb("card") == hex_colour(token(THEME_CSS, "dw-card"))[:3]
+    assert palette_rgb("best") == hex_colour(token(THEME_CSS, "dw-best"))[:3]
+    assert palette_rgb("label") == hex_colour(token(THEME_CSS, "dw-text-label-color"))[:3]
+    palette = (APP / "DeadwaxApp.swift").read_text(encoding="utf-8")
+    for name, css in (("barGreen", "dw-bar-green"), ("barGrey", "dw-bar-grey")):
+        top, bottom = gradient(token(THEME_CSS, css))
+        declared = palette[palette.index(f"static let {name} = LinearGradient("):]
+        declared = declared[:declared.index("startPoint:")]
+        drawn = [tuple(int(part, 16) for part in found)
+                 for found in re.findall(r"Color\(red: 0x([0-9A-F]{2}) / 255, green: 0x([0-9A-F]{2}) / 255, "
+                                         r"blue: 0x([0-9A-F]{2}) / 255\)", declared)]
+        assert drawn == [top[:3], bottom[:3]], name
+    assert token(THEME_CSS, "dw-badge-red-bg") == "rgba(248, 113, 113, 0.14)"
+    assert token(THEME_CSS, "dw-badge-red-border") == "rgba(252, 165, 165, 0.3)"
+    assert "static let dangerFill = Color(red: 248 / 255, green: 113 / 255, blue: 113 / 255).opacity(0.14)\n" in palette
+    assert "static let dangerEdge = Color(red: 252 / 255, green: 165 / 255, blue: 165 / 255).opacity(0.3)\n" in palette
+    # and drawn where the web draws them
+    card = (APP / "Get" / "SourceCardView.swift").read_text(encoding="utf-8")
+    for drawn in ("Palette.card", "Palette.best", "Palette.border", "Palette.barGreen", "Palette.barGrey",
+                  "Palette.dangerFill", "Palette.dangerEdge", "Palette.label", "Palette.well", "Palette.toggledFill",
+                  "Palette.toggledEdge", "Palette.accentText", "PrimaryFace()"):
+        assert drawn in card, drawn
+    box = (APP / "Get" / "StoreLineView.swift").read_text(encoding="utf-8")
+    assert "Palette.card" in box and "Palette.border" in box and "Palette.held" in box
+
 def test_the_play_bar_is_the_tab_bars_top():
     # 15 Nov, James: "merge the play bar with the bottom bar so it doesn't look like it's floating", "opaque the whole
     # way", "get rid of the skip forward button", "let's make sure the play/pause isn't right up against the edge". The

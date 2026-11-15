@@ -6,8 +6,8 @@ import SwiftUI
 /// Search. Top to bottom: its cover (the chosen pressing's front, else the album's - through deadwax's relay), its title,
 /// its credit (a link to the library's artist when exactly one answers to its sole credited artist - question 19), the
 /// meta line ("1994 · Album · not in your library", or a dashed "maybe in your library"); the pressing picker (a sheet,
-/// question 17) and the chosen pressing's facts; where Phase 6's Get will go, nothing; the maybe said in words; then
-/// the chosen pressing's tracklist - the summary against the usual tracklist, each track with what differs marked, and
+/// question 17) and the chosen pressing's facts; Get the album and the store line under it (Phase 6, below); the maybe
+/// said in words; then the chosen pressing's tracklist - the summary against the usual tracklist, each track with what differs marked, and
 /// what it leaves out. Loading… while the pressings come, their trouble with Try again, "There are no pressings of this
 /// album to get." for none.
 ///
@@ -20,6 +20,17 @@ import SwiftUI
 /// tracks marked (tinted, an accent bar, and ", the song you searched for" for VoiceOver) and brought into view once, as
 /// they are first drawn on the page shown (or as it shows, drawn while it wasn't), only from the top. The credit with no
 /// library artist of theirs opens their MusicBrainz page.
+///
+/// (Phase 6, slice 2 - phase6-get-requests.md 3.4; ReleaseGroupPage.tsx's Get) Once a pressing is chosen: **Get the
+/// album**, the screen's one primary button, opening the Sources sheet for that pressing (GetRelease.build - what the
+/// web's Get sends); without Get albums, the web's GET_OFF in its place. Under it the store line - what the store and
+/// the downloads already have of the pressing (`/download/store_state`, which searches nothing) - asked as the pressing
+/// is chosen, as an album is filed (RequestsModel.filed), and as the page comes back into view (its tab current, the
+/// sheet closed, the app in front), so after a Get or a cancel in Requests it says so; asked again for the same
+/// pressing, the last answer stays until the new one lands, and another pressing's never stands for this one. Its
+/// answer also says whose each folder is, so the meta line never disagrees with it (GroupPage `store`). While deadwax
+/// can't be reached: no Get, and "Getting albums works once deadwax is back." in the line's place. A Get asked for from
+/// the sheet closes it and shows Requests' root, the new row already up.
 struct GroupView: View {
     let route: GroupRoute
 
@@ -28,12 +39,23 @@ struct GroupView: View {
     @Environment(ArtistsModel.self) private var artists
     @Environment(Reachability.self) private var reachability
     @Environment(AppNavigation.self) private var navigation
+    @Environment(RequestsModel.self) private var requests
+    @Environment(GetSettingsModel.self) private var getSettings
+    @Environment(\.scenePhase) private var scenePhase
     @State private var model: GroupPageModel
     @State private var picking = false
     /// The hero's title has scrolled away: the bar shows it.
     @State private var titleInBar = false
     /// The song it was opened from has been brought into view (once).
     @State private var songShown = false
+    /// (Phase 6) The store line's last answer, and the pressing it was for.
+    @State private var store: StoreSaid?
+    /// The Get whose Sources sheet is up.
+    @State private var getting: GetRequest?
+    /// One more for every Get: each sheet searches afresh.
+    @State private var gets = 0
+    /// A download was asked for from the sheet: Requests shows once it has gone.
+    @State private var queued = false
 
     private static let edge: CGFloat = 16
 
@@ -46,7 +68,22 @@ struct GroupView: View {
     private var page: GroupPage {
         GroupPage(id: route.id, answer: model.answer, preview: route.preview, index: search.ownedIndex,
                   picked: model.picked, personal: server.access.hasLibrary, editors: false,
-                  fallbackTitle: route.title ?? "", song: route.song)
+                  fallbackTitle: route.title ?? "", song: route.song,
+                  store: store.map { (said: StoreSaid) in (id: said.id, answer: said.answer) })
+    }
+
+    /// The chosen pressing as MusicBrainz sent it - nil until the pressings are in.
+    private func chosen(_ page: GroupPage) -> PageRelease? {
+        guard let id = page.chosenId else { return nil }
+        return model.answer?.releases.first { (release: PageRelease) -> Bool in release.id == id }
+    }
+
+    /// What Get would download: the chosen pressing, built from the album's group (`getGroup`, `buildDownloadRelease`).
+    private func download(_ page: GroupPage) -> GetRelease? {
+        guard let chosen = chosen(page) else { return nil }
+        let group = GetRelease.group(id: route.id, preview: route.preview, releases: model.answer?.releases ?? [],
+                                     chosen: chosen)
+        return GetRelease.build(group: group, release: chosen)
     }
 
     var body: some View {
@@ -91,9 +128,29 @@ struct GroupView: View {
                 }
             }
         }
+        .sheet(item: $getting, onDismiss: {
+            // a download asked for: Requests at its root once the sheet has gone (App.tsx `gotten`)
+            guard queued else { return }
+            queued = false
+            navigation.showRequestsRoot()
+        }) { (request: GetRequest) in
+            SourcesSheet(request: request) {
+                queued = true
+                getting = nil
+            }
+        }
         .task(id: server.person) {
             search.refreshOwned()
             await model.load(client: server.client, online: reachability.online)
+        }
+        // the store line asked as the pressing is chosen, as an album is filed, and as the page shows again
+        .task(id: StoreAsk(pressing: page.chosenId, filed: requests.filed, shown: storeShown,
+                           online: reachability.online, person: server.person)) {
+            await askStore(page)
+        }
+        // the quality floor's word, for somebody else's download in the line (useGetSettings(shown))
+        .onChange(of: storeShown, initial: true) { _, shown in
+            if shown { getSettings.ask() }
         }
         .onChange(of: reachability.online) { _, online in
             // back: what couldn't be asked is asked now
@@ -109,6 +166,38 @@ struct GroupView: View {
     /// The page is the one shown: the top of its tab's stack, the tab shown, Now Playing not over it.
     private var isShown: Bool {
         navigation.shownStack.last == .group(route) && !navigation.nowPlayingShown
+    }
+
+    /// (Phase 6) The store line may be asked: the page shown, the Sources sheet closed, the app in front.
+    private var storeShown: Bool {
+        isShown && getting == nil && scenePhase == .active
+    }
+
+    /// What the store line is asked again on.
+    private struct StoreAsk: Equatable {
+        let pressing: String?
+        let filed: Int
+        let shown: Bool
+        let online: Bool
+        let person: Int
+    }
+
+    /// The store asked what it already has of the chosen pressing - no search. A newer ask lets this one go; one that
+    /// can't be made says nothing (Get asks again, and the server refuses a second copy).
+    private func askStore(_ page: GroupPage) async {
+        guard storeShown, reachability.online, let client = server.client, let pressing = page.chosenId,
+              let release = download(page) else { return }
+        guard let answer = try? await client.storeState(release), !Task.isCancelled else { return }
+        store = StoreSaid(id: pressing, answer: answer)
+    }
+
+    /// Get the album: the Sources sheet for the chosen pressing.
+    private func get(_ page: GroupPage) {
+        guard let release = download(page), let pressing = chosen(page) else { return }
+        let title = Pressings.header(model.answer?.releases ?? [], chosen: pressing, preview: route.preview).title
+        gets += 1
+        getting = GetRequest(id: gets, release: release,
+                             subtitle: SourcesWords.subtitle(title: title, pressing: Pressings.label(pressing)))
     }
 
     /// The song brought into view as its tracks are first drawn - once for the page, counted only once the page is the
@@ -265,7 +354,7 @@ struct GroupView: View {
                     .lineLimit(2, reservesSpace: true)
                     .accessibilityHidden(true)
             }
-            // Phase 6's Get the album goes here
+            getAndStore(page)
             if !page.maybeNote.isEmpty {
                 Text(page.maybeNote)
                     .font(Typeface.footnote)
@@ -274,6 +363,50 @@ struct GroupView: View {
             }
         }
         .padding(.top, 18)
+    }
+
+    /// (Phase 6) Get the album and the store line under it - where a line landing late moves nothing a finger is reaching
+    /// for. Nothing before a pressing is chosen: there is nothing it could get.
+    @ViewBuilder private func getAndStore(_ page: GroupPage) -> some View {
+        if download(page) != nil {
+            let allowed = server.access.can(.request)
+            if !allowed {
+                Text(RequestWords.getOff)
+                    .font(Typeface.footnote)
+                    .foregroundStyle(Palette.quiet)
+                    .fixedSize(horizontal: false, vertical: true)
+            } else if reachability.online {
+                Button {
+                    get(page)
+                } label: {
+                    HStack(spacing: 8) {
+                        Image(systemName: "arrow.down.to.line")
+                            .font(Typeface.symbol(.body).weight(.semibold))
+                            .accessibilityHidden(true)
+                        Text(SourcesWords.getTheAlbum)
+                    }
+                    .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(PrimaryFace(large: true))
+                .padding(.top, 4)
+            }
+            if reachability.online {
+                let status = StoreLine.drawn(known(page), floor: getSettings.settings?.floor)
+                StoreLineView(status: status, notes: known(page).map { StoreLine.notes($0) } ?? [])
+                    .onChange(of: status?.title) { _, title in
+                        // what the line now says, for VoiceOver - only on the page shown (the web's aria-live)
+                        if let title, isShown { Notice.announce(title) }
+                    }
+            } else if allowed {
+                ShelfNote(StoreLine.offline)
+            }
+        }
+    }
+
+    /// The store line's answer for the pressing shown - another pressing's never stands for it.
+    private func known(_ page: GroupPage) -> StoreStateAnswer? {
+        guard let said = store, let id = page.chosenId, said.id == id else { return nil }
+        return said.answer
     }
 
     // MARK: the tracklist
@@ -360,6 +493,12 @@ struct GroupView: View {
             }
         }
     }
+}
+
+/// (Phase 6) The store line's answer, and the pressing it was asked for.
+private struct StoreSaid: Equatable {
+    let id: String
+    let answer: StoreStateAnswer
 }
 
 /// One track of a pressing's tracklist (ReleaseGroupPage.tsx's `app-rg-track`): its number, its title with what marks

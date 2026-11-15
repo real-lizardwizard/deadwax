@@ -34,6 +34,7 @@ struct DeadwaxApp: App {
     @State private var songs: SongsModel
     @State private var search: SearchModel
     @State private var requests: RequestsModel
+    @State private var getSettings: GetSettingsModel
 
     /// The one background session, made before anything else can ask it.
     private static let downloadSession = DownloadSession()
@@ -65,6 +66,8 @@ struct DeadwaxApp: App {
         let requests = RequestsModel(server: server, reachability: reachability, navigation: navigation, library: library,
                                      search: search)
         reachability.whenChanged { [weak requests] in requests?.reachChanged() }
+        // Phase 6, slice 2: You > Getting albums as kept on deadwax - the Format a search is scored by, the floor
+        let getSettings = GetSettingsModel(server: server)
         let downloads = DownloadModel(server: server, reachability: reachability, files: files, session: Self.downloadSession)
         player.connect(downloads: downloads, reachability: reachability)
         // Phase 4, slice 3: a write here to a downloaded playlist keeps it in step at once
@@ -96,6 +99,7 @@ struct DeadwaxApp: App {
             songs.reset()
             search.reset()
             requests.reset()
+            getSettings.reset()
         }
         _server = State(initialValue: server)
         _player = State(initialValue: player)
@@ -114,6 +118,7 @@ struct DeadwaxApp: App {
         _songs = State(initialValue: songs)
         _search = State(initialValue: search)
         _requests = State(initialValue: requests)
+        _getSettings = State(initialValue: getSettings)
     }
 
     var body: some Scene {
@@ -136,6 +141,7 @@ struct DeadwaxApp: App {
                 .environment(songs)
                 .environment(search)
                 .environment(requests)
+                .environment(getSettings)
                 .preferredColorScheme(.dark)
                 .tint(Palette.accent)
                 // (Noto Sans, 15 Nov) the words of every Text and control that sets no font of its own
@@ -229,6 +235,27 @@ enum Palette {
     static let badgeEdge = Color(red: 192 / 255, green: 132 / 255, blue: 252 / 255).opacity(0.4)
     /// --dw-text-2 #a3a3b8: a segment of the switch not chosen.
     static let text2 = Color(red: 0xA3 / 255, green: 0xA3 / 255, blue: 0xB8 / 255)
+
+    // The Sources sheet's (Phase 6, slice 2 - app.css .app-source, .app-store-box, as the web draws them).
+
+    /// --dw-card #24222c: a source's card, and the store line's box.
+    static let card = Color(red: 0x24 / 255, green: 0x22 / 255, blue: 0x2C / 255)
+    /// --dw-text-label-color #9d9db2: a source's Speed, Tracks, Quality, Size and Starts, the query's Search for.
+    static let label = Color(red: 0x9D / 255, green: 0x9D / 255, blue: 0xB2 / 255)
+    /// --dw-best #7e4bb8: the best match's card edge.
+    static let best = Color(red: 0x7E / 255, green: 0x4B / 255, blue: 0xB8 / 255)
+    /// --dw-bar-green (#5ee39a to #34c47f, top to bottom): a speed deadwax measured, its bar.
+    static let barGreen = LinearGradient(colors: [Color(red: 0x5E / 255, green: 0xE3 / 255, blue: 0x9A / 255),
+                                                  Color(red: 0x34 / 255, green: 0xC4 / 255, blue: 0x7F / 255)],
+                                         startPoint: .top, endPoint: .bottom)
+    /// --dw-bar-grey (#c8c8d4 to #9a9aa8, top to bottom): a peer's usual speed, its bar.
+    static let barGrey = LinearGradient(colors: [Color(red: 0xC8 / 255, green: 0xC8 / 255, blue: 0xD4 / 255),
+                                                 Color(red: 0x9A / 255, green: 0x9A / 255, blue: 0xA8 / 255)],
+                                        startPoint: .top, endPoint: .bottom)
+    /// --dw-badge-red-bg rgba(248, 113, 113, 0.14): a signal under 40, a red edition word.
+    static let dangerFill = Color(red: 248 / 255, green: 113 / 255, blue: 113 / 255).opacity(0.14)
+    /// --dw-badge-red-border rgba(252, 165, 165, 0.3).
+    static let dangerEdge = Color(red: 252 / 255, green: 165 / 255, blue: 165 / 255).opacity(0.3)
 
     // The turntable's look button (turntable.md 2.1, 2.14), from Core's TurntablePalette - the web's tokens' values,
     // held to theme.css there. The plinth's own colours are drawn by DeadwaxTurntable from the same table.

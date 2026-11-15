@@ -535,6 +535,31 @@ public struct DeadwaxClient: Sendable {
         try await call(Routes.clearJobs)
     }
 
+    // MARK: Phase 6, slice 2: Get
+
+    /// What the store and the downloads already have of a pressing - held whole or in part, downloading, other
+    /// pressings - searching nothing: the store line under Get the album.
+    public func storeState(_ release: GetRelease) async throws -> StoreStateAnswer {
+        try await call(Routes.storeState, sending: release)
+    }
+
+    /// Soulseek searched for a pressing, its folders ranked against its tracklist - or, for one held whole or
+    /// downloading whole, nothing searched and the store's word instead.
+    public func findCandidates(_ body: FindCandidatesBody) async throws -> FindCandidatesAnswer {
+        try await call(Routes.findCandidates, sending: body)
+    }
+
+    /// A folder asked for: the job, or (logins on) the download of the same pressing somebody else asked for, joined.
+    /// A 409 is deadwax's "already downloading" or "already in your library", in its words; a 502 slskd's refusal.
+    public func enqueue(_ body: EnqueueBody) async throws -> EnqueueAnswer {
+        try await call(Routes.enqueue, sending: body)
+    }
+
+    /// You > Getting albums as kept on deadwax, read leniently - the defaults for anything it doesn't say.
+    public func getSettings() async throws -> GetSettings {
+        try await call(Routes.preferences)
+    }
+
     /// The id bridge by a pressing, whole (`Routes.storeAlbum` with `release_mbid`): Navidrome's album for it and the
     /// store's folders of it - a Done row's album, and why it can't be opened (RequestWords.note).
     public func storeAlbum(releaseMbid: String) async throws -> StoreAlbum {

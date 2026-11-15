@@ -283,6 +283,15 @@ final class AppNavigation {
         }
     }
 
+    /// (Phase 6, slice 2) A download asked for from the Sources sheet (App.tsx `gotten`, `router.root('requests')`):
+    /// Requests shown at its root, its new row already up - Now Playing closed, and a playlist being edited there kept,
+    /// as the tab tapped again keeps it.
+    func showRequestsRoot() {
+        nowPlayingShown = false
+        tab = .requests
+        backToRoot(&requests)
+    }
+
     /// Every page popped - but none of a playlist being edited, nor the pages under it.
     private func backToRoot(_ stack: inout [AppRoute]) {
         let ids = stack.map { (route: AppRoute) -> String? in
