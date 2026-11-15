@@ -116,7 +116,7 @@ public enum Routes {
     // `releases=false` and `quick=true`, `SearchAlbums.limit` of them), one album's every pressing with its tracklist
     // (`ReleaseGroupAnswer`, the album you don't have), and its front cover from the Cover Art Archive through deadwax
     // (server 2.1.24; a 404 for an older server's missing route is drawn as the empty cover)
-    public static let fullySearch = Endpoint(method: "GET", path: "/deadwax/search_musicbrainz/fully_search", query: ["query", "limit", "releases", "quick"])
+    public static let fullySearch = Endpoint(method: "GET", path: "/deadwax/search_musicbrainz/fully_search", query: ["query", "limit", "releases", "offset", "quick"])
     public static let releaseGroup = Endpoint(method: "GET", path: "/deadwax/search_musicbrainz/release_group", query: ["release_group_mbid"])
     public static let archiveCover = Endpoint(method: "GET", path: "/deadwax/coverart/{kind}/{mbid}", query: ["size"])
     // Phase 5, slice 3's (phase5-search.md 6.3): MusicBrainz's artists going by the box's words (`ArtistSearchAnswer`,
@@ -126,6 +126,10 @@ public enum Routes {
     public static let searchSongs = Endpoint(method: "GET", path: "/deadwax/search_musicbrainz/songs", query: ["query", "limit", "offset"])
     public static let artistFacts = Endpoint(method: "GET", path: "/deadwax/search_musicbrainz/artist", query: ["mbid"])
     public static let discography = Endpoint(method: "GET", path: "/deadwax/search_musicbrainz/discography", query: ["artist_mbid", "types", "studio_only"])
+    // Phase 5, slice 4's (phase5-search.md 6.4): what MusicBrainz's answers saved on deadwax hold matching the words
+    // (`SavedSearchAnswer`, server 2.0.0-player.56) - asked beside the library as the words settle, given up after
+    // `SearchSaved.waitMs`; the three searches above take `offset` for More from MusicBrainz
+    public static let savedSearch = Endpoint(method: "GET", path: "/deadwax/search_musicbrainz/saved", query: ["words"])
 
     /// The levels spec's name for `levelAlbum`: the album's levels warmed before its first play.
     public static var warmLevels: Endpoint { levelAlbum }
@@ -147,6 +151,7 @@ public enum Routes {
         libraryOwned,
         fullySearch, releaseGroup, archiveCover,
         searchArtists, searchSongs, artistFacts, discography,
+        savedSearch,
     ]
 
     /// The routes given longer than the transport's own 8 seconds to answer, in seconds: the album index reads every

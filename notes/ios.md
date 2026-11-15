@@ -7769,3 +7769,309 @@ Verified, on the tree before its commit:
 Not verified - only the phone can tell (docs/ios.md's checks 144 and 149 gain a sentence each):
 - The song brought into view on coming back to the tab. The 50 ms wait has to cover the hero's `onAppear`.
 - The facts line's two lines held at the largest text size.
+
+## Phase 5, slice 4: what's saved, the kept answers, More from MusicBrainz, the app as 0.11 (2026-11-14)
+
+notes/ios-specs/phase5-search.md 5.1 and 6.4, and questions 28-33 (6.8 points here). The last slice of Phase 5.
+Before it, the phone asked MusicBrainz afresh for every search: words searched a minute before waited for it again,
+and what deadwax had saved of MusicBrainz's earlier answers - for anyone's search - wasn't drawn until MusicBrainz
+answered. A kind view had no way past MusicBrainz's first page. Now:
+- what's saved is drawn at the library's moment, and MusicBrainz's answer adds only what isn't there;
+- the session's last 24 answers are used with no request;
+- a kind view pages on with More from MusicBrainz.
+
+Get is Phase 6; a description and links Phase 7.
+
+On `phase5-search` at `ios` 540cfcc (slice 3 and its review merged). src/__init__.py untouched. The app is **0.11
+(11)**: Base.xcconfig, check_project.py, ios.yml, test_ios_install.py, YouView's comment, ios/README.md, docs/ios.md
+and the README pinned to it, as 0.10 was. The .xcodeproj is unchanged (no new App files). ROUTE_COUNT 48 -> 49:
+`/search_musicbrainz/saved`, on the server since 2.0.0-player.56. There is no server change.
+
+### Core (DeadwaxCore)
+
+- **SearchSaved.swift** (new), slice 4's half of searchList.ts, searchResults.ts, songs.ts and app/searchAnswers.ts:
+  - **What's saved.**
+    - `SavedSearchAnswer` reads `/saved`'s answer leniently (`looseField`): a kind missing or of the wrong shape is
+      none, and a missing `available` means nothing was searched.
+    - `SavedFound` is the answer in hand, its songs grouped as they land.
+    - `SearchSaved`:
+      - `waitMs` 400 (SAVED_WAIT_MS);
+      - `artistAlbums` 12;
+      - `studioGroup`;
+      - `savedFor`, what's saved for a view's reading: artists, albums and songs for the kinds the view asks. For an
+        artist's name alone, their credited albums in studio order, at most 12. The studio's alone where the web's
+        studio query asks. Held albums are left out as they're drawn, never as they land.
+  - **A kind view's rows kept in place.** `KindArea.arrange` (kindArea) keeps, by key, what a kind view drew below its
+    library's rows, and as what (saved or MusicBrainz's): each row stays where it was first drawn, and new rows go
+    below it. After a failure or a MusicBrainz row, what's saved lands below too, never above what's there.
+  - **The kept answers.** `KeptSearchAnswer` and `SearchAnswersKept`:
+    - `count` 24, `keep` (delete then set, so the oldest goes first);
+    - keys of route, words and page size (`albumsKey`, `artistsKey`, `songsKey`);
+    - `albums(ask)` and `songs(ask)`: an answer kept for the first query, else, when that one found nothing, for its
+      fallback. A fielded reading needs both kept.
+  - **More.** `SearchMore`:
+    - `offsetMax` 1000 (FULLY_SEARCH_OFFSET_MAX);
+    - `pages` (morePages: `.more`, `.end`, or `.far` past the furthest offset);
+    - `appendPage` (the groups not already got, the held left out as the first page leaves them);
+    - `pageWords` (morePageWords, "in the collection" with a library of your own);
+    - `artistsSaid` (the page's own count);
+    - `appendSongs` (every page regrouped, the songs drawn kept in their places, a later take adding its albums in
+      place) and `songsWords`;
+    - `button`, `far`.
+  - **The words.** `SearchWords.saved` ("Found earlier: 1 album."), `savedAwaySaid`, `musicBrainz(_:answered:saved:)`
+    ("More found: …" under what's saved), `savedAway` (MusicBrainz's failure under what's saved: "Showing earlier
+    results…", a refusal's own words as ever) and `nothingMore`.
+- **SearchList.swift**:
+  - The pool takes `saved` (a `SavedAnswer`). Its blocks are what's saved first, then MusicBrainz's answer less
+    what's saved. Artists are read as one list by `newArtists`, so a library artist is brought in once. Each
+    `SearchPlaced` says whether it is from what's saved.
+  - Candidates carry `saved`, ranked at `Source.saved`. `familyMarked` marks a family's rows as saved with their
+    row. A song's named album counts too, when it is a group of what's saved.
+  - `decidedTop` and `topResults` say which picks are saved (`savedPicks`).
+  - `sectionRows` and `lateRows` lead MusicBrainz's rows with what's saved. A late slot adds only what isn't drawn
+    above it already.
+  - The drawn list carries what's saved as key sets: `Section.saved` and `holdsSaved`, and `Drawn.topSaved`. That way
+    a late answer knows what it adds to, and the words know what to say.
+- **SearchState.swift**:
+  - **What's saved.** `Saved` (idle, asking, done, none). `askingSaved` asks once per words. `savedAnswered` and
+    `savedFailed` act only on the newest ask. `savedGaveUp` lets the answer go past `waitMs`. `savedSettled` is what
+    the library's moment waits on. `savedOf` gives what's saved for a view's reading, only once MusicBrainz is for
+    the words.
+  - **The moments.** The first draw waits for `savedSettled` beside the library. What's saved is drawn in its
+    sections and Top results. MusicBrainz's answer then adds only what isn't there, and its words say so: "Found
+    earlier: …" with the first draw, "More found: …" or "Nothing more found." with the answer. Every kind failing
+    under what's saved says these are earlier results.
+  - **`takeKept`** takes every kind the view would ask that a kept answer holds, with no request. Its words must be
+    asked for, or ask by settling.
+  - **More.** `askingMoreMusicBrainz` returns a `MoreAsk` (the kind's token, key, words and offset), and only while
+    `pages` says `.more`. The token is the kind's own, so new words let it go. `moreAnswered` (albums, artists or
+    songs) appends the page and returns what to announce. `moreFailed` keeps the failure until Try again.
+    `MorePage`: idle, asking, failed, added.
+  - **`kindView(artistList:marks:before:)`.** The rows are: what's saved (`savedRows`), the foot, the rows landed
+    after it (`below`), More (`KindView.More`: the note, the failure, the pages, the button's label) and the area to
+    keep (`area`). MusicBrainz's rows are held (`mbHeld`) while what's saved is still asking for these words. The
+    view's region words (`KindView.Said`) are its library's, then MusicBrainz's with what's saved's. `kindAreaKey` is
+    the key to keep the area by.
+- **Routes and the client**: `Routes.savedSearch` (49); `savedSearch(_:)` (`words`). `fullySearch`, `searchArtists`
+  and `searchSongs` take `offset`, sent only above 0, so a first page is asked exactly as before.
+- **export-search-saved-vectors.cjs** (new) compiles lib/searchList.ts, lib/songs.ts, lib/searchResults.ts and
+  app/searchAnswers.ts with tsc, and reads More's buttons and the far note from Search.tsx. It writes a fourth
+  fixture, Fixtures/search/search-saved-vectors.json (2.8 MB, plain ASCII, seed 5454):
+  - the numbers and the words;
+  - 42 groups, 5 folder lists and the 7 recorded song searches;
+  - studioGroup over the 42;
+  - 135 saved answers read for a view (15 worked, 120 seeded);
+  - 70 kind views' runs (270 steps), each a kindArea fed what landed next;
+  - 1485 morePages counts;
+  - 90 pages of albums appended;
+  - 41 runs of songs' pages and the defaults. The 41st is made, not seeded: a song's first take on no release, so
+    never drawn, then a take of it on one;
+  - 6 runs of kept answers;
+  - 82 whole searches with what's saved and MusicBrainz's answer in hand (12 worked, 70 seeded). Each holds the
+    pool, the candidates, the decided prefix, the moment's Top results and sections, the full list, the late rows,
+    the counts and every row's family.
+
+  **ui/test/iossearchsaved.sim.cjs** runs its `--check`.
+
+### Held to the web: by the exporter, or by hand
+
+The exporter holds the web's real code for these:
+- savedFor, studioGroup and kindArea;
+- the pool with what's saved, the candidates, decidedTop and topResults with the saved marks, familyOf's marks,
+  sectionRows, lateRows and drawnCounts;
+- appendPage, morePages and morePageWords; appendSongs and moreSongsWords;
+- keepAnswer and keptAnswer;
+- the saved words and More's.
+
+Search.tsx's state is a component the exporter can't compile, so its rules are held by hand (SearchSavedTests),
+from reading it:
+- askSaved, once per words, and its SAVED_WAIT_MS give-up;
+- savedSettled holding the library's moment;
+- what's saved drawn only once MusicBrainz is for the words;
+- takeKept at the library's moment, and only for words MusicBrainz is asked for;
+- the More asks, their offsets, their staleness under new words, and never in All;
+- the kind view's held rows and its area across answers;
+- the words each moment says, the answers decoded, and the client.
+
+### Where the phone can't follow the web exactly
+
+- **The kept answers' keys** are route, words and page size, where the web's are the request's path. Each names the
+  same request. They live for the app's life and outlast a sign-out (question 28).
+- **More's last page under VoiceOver** (question 32): announced, but no focus move.
+- **A kind view's words** (question 33): said through the app's announcement, each once per words and kind, where the
+  web's is a live region.
+
+### The app
+
+- **SearchModel**:
+  - `askSaved` asks `/saved` when typing settles on words MusicBrainz is to be asked for, and beside every
+    `askMusicBrainz` (the keyboard's Search on fewer than three letters). Its own clock (`savedClock`, `waitMs`) gives
+    it up and draws without it.
+  - `kept` is static on the type: the session's kept answers, which survive `reset()`. `keptAlbums`, `keptArtists`
+    and `keptSongs` answer from it, else ask and keep the answer. A kept answer doesn't wait for `/library/owned`, as
+    the web's doesn't. `takeKept` runs as the library answers, fails or is skipped, and as a chip is pressed. It runs
+    only online, and then asks `/library/owned` again to mark rows in place.
+  - `moreMusicBrainz` asks the next page through the kind's token on `askingMoreMusicBrainz`. `letGo` (a new
+    person, the box cleared) cancels it, and new words cancel it and drop its page. It announces what came.
+  - `standDown()` is unchanged. It lets go of what would open a page, and none of slice 4's asks opens one: each
+    draws into the list only if it is still the newest ask for its words and kind.
+  - `kindView` keeps each view's area (`kindAreas`, by "kind\nwords"). Typing lets go of other words' areas.
+  - `announceKind` says the view's region words, each once. A chip drawn at once says "Showing albums." with them.
+  - Nothing asks while deadwax can't be reached, and none of it opens a page.
+- **SearchScreen**:
+  - `KindMusicBrainz` (was `KindFoot`) draws a kind view's MusicBrainz part: Type a little more, or a title needed.
+    Else, in order, what's saved, the asking line or the failure, MusicBrainz's rows or why there are none, the rows
+    landed after, and `MusicBrainzMore`.
+  - `MusicBrainzMore` draws the page's note, the failure, the button (`SecondaryPill`: the kind's words, "Loading…"
+    and disabled while asking, "Try again"), or the far note.
+  - `SectionSlot` and `MusicBrainzFailure` take `saved` and say `savedAway`'s words under what's saved.
+  - All of it is drawn only online. More is at the list's foot, so its lines growing move nothing above them.
+
+### Decided here (the spec was silent, or this departs from it)
+
+Questions 28-33 in the spec, each built to its recommendation:
+- 28, the kept answers' life, keys, and sharing across people;
+- 29, SAVED_WAIT_MS kept at 400 ms on the phone;
+- 30, what's saved offline;
+- 31, More's wait;
+- 32, More's last page under VoiceOver;
+- 33, a kind view's words.
+
+Question 5's search of what's downloaded while offline was not built in this slice either: the spec says so, and
+docs/ios.md's "What it can't do yet" says it.
+
+And smaller ones, not worth a question:
+- the saved rows ride in the drawn list as key sets, not a second row type, so every slice-1-3 rule over rows holds
+  unchanged;
+- the kind view's area is the model's, kept by the view's words and kind, as the web keeps a ref;
+- the kept answers' wait for `/library/owned` is skipped, as the web skips it (`!found.kept`).
+
+### Tests
+
+- **SearchSavedVectorTests** (10): every vector of search-saved-vectors.json:
+  - the numbers and the words;
+  - studioGroup;
+  - savedFor;
+  - the kind views' runs;
+  - morePages;
+  - the album pages and songs' pages appended;
+  - the kept answers;
+  - every whole search: the pool, Top results at the moment and in full, the sections, the late rows, the counts
+    and the families.
+- **SearchSavedTests** (17), by hand, for Search.tsx's state:
+  - what's saved asked once per words, and given up past its wait;
+  - what's saved drawn only once MusicBrainz is for the words;
+  - leading at the library's moment, with MusicBrainz adding only what isn't there;
+  - every kind failing under it, and a late answer bringing nothing new;
+  - the answers read leniently;
+  - a kind view's saved rows leading, landing late, and failing;
+  - the kept answers taken with no request, a fielded reading's needing its fallback kept, and 24 kept;
+  - More asked, appended, failed and retried, dropped by new words and never in All, the furthest page narrowed;
+  - the client's two new asks.
+- **SearchTests, SearchAlbumsTests and SearchSongsTests** run unchanged. What's saved is idle unless asked, so the
+  earlier slices' moments draw as before.
+- **ClientTests**: `Routes.all` 49. **FixtureFiles**: the new fixture read from the checkout.
+- **tests/test_ios_contract.py**: ROUTE_COUNT 49, and two new tests:
+  - `/saved` is asked by `words`, the box's 200 characters within its bound. Its answer's kinds are the app's,
+    `available` is in every answer, it is read leniently, and its page of each kind (SAVED_ARTISTS, SAVED_ALBUMS,
+    SAVED_SONGS) is the app's own, with `artistAlbums` within SAVED_CREDITED;
+  - More's `offsetMax` is FULLY_SEARCH_OFFSET_MAX, within `/fully_search`'s, `/artists`' and `/songs`' `offset`,
+    sent only past the first page.
+- **Mutations**: 26, each applied alone with the eight Search suites run (`--filter Search`). 22 were caught at
+  first. Of the 4 that lived, 3 were closed and caught when run again:
+  - 14, appendSongs keeping the songs in groupSongs' order rather than as drawn. The seeded runs never drew a song
+    out of groupSongs' order. Closed by the made run in the exporter (the fixture written again; 6 tests then
+    failed).
+  - 19, the kept answers taken for words MusicBrainz isn't asked for. The by-hand test had no answer kept for the
+    short words. Closed in `theKeptAnswersAreTakenAtTheLibrarysMomentWithNoRequest`: "ro" kept from the keyboard's
+    Search, then typed again.
+  - 20, a page of albums landing on the kind's newer ask of the same words. The test only changed the words. Closed
+    in `moreFromMusicBrainzIsDroppedByNewWordsAndNeverAskedInAll`: back to the words, their first page answered again
+    (as a kept answer is, at once), then the old page.
+
+  The fourth, 16 (`savedAway` without its refusal line), is equivalent: `MBFailure.of` never makes a failure both
+  refused (a 422) and busy or away (a 503).
+
+  The 26:
+  1. what's saved waited 401 ms;
+  2. 23 answers kept, not 24;
+  3. an answer kept again keeps its old place;
+  4. what's saved not narrowed to the studio's;
+  5. an artist's saved albums 13, not 12;
+  6. an artist's saved albums not from the credited;
+  7. what's saved after a failure drawn above it;
+  8. a kind view's row kept as saved whatever it was;
+  9. an empty last page not the end;
+  10. the furthest page itself narrowed;
+  11. a page of albums repeating what was got;
+  12. a page held said "in your library" with a library of your own;
+  13. the songs drawn gaining albums, unsaid;
+  14. the songs drawn not kept in their drawn places;
+  15. "Also found" under what's saved;
+  16. a refusal said as earlier results under what's saved;
+  17. the library's moment not waiting for what's saved;
+  18. what's saved asked again for the same words;
+  19. kept answers taken for words MusicBrainz isn't asked for;
+  20. a page of albums landing whatever was asked since;
+  21. the next offset a full page on, whatever came;
+  22. a kind view's MusicBrainz rows not held for what's saved;
+  23. a late slot repeating what was drawn above it;
+  24. what's saved ranked as MusicBrainz's;
+  25. MusicBrainz's albums repeating what's saved;
+  26. a song's named album not marked saved as a saved group.
+
+### Verified, and not
+
+Verified, on the tree before its commit:
+- `swift test`: Core 1514 (27 new), Audio 158, Turntable 12. No new warnings.
+- The unsigned Debug and Release device builds (Xcode, `generic/platform=iOS`) succeeded, with no warnings but the
+  usual appintentsmetadataprocessor line. The .xcodeproj is unchanged.
+- `check_project.py` ok, with the app as 0.11 (11).
+- `npm run build` and all 87 sims on Node 22.23.4, iossearchsaved's `--check` among them.
+- The full pytest suite: 4519 passed, 1 skipped (test_ios_contract's two new tests, test_ios_install at 0.11, and
+  test_compose_example's docs rule among them).
+- The 26 mutations above: the 3 that lived closed and caught, the fourth equivalent.
+
+Not verified - only the phone can tell (docs/ios.md's checks 156-165, beside the spec's section 9):
+- `/saved` inside its 400 ms over WireGuard, and how often it is given up there (question 29).
+- What `/saved` finds against James's saved answers, beside the web's Search for the same words. The fakes are the
+  web's.
+- A kind view's rows holding their places at accessibility sizes as what's saved, MusicBrainz and More's pages land.
+- Where VoiceOver's cursor goes as More's button goes (question 32), and how the announcements queue with a chip's.
+- More against real MusicBrainz through deadwax: its offsets, `count`, and the furthest page.
+- The kept answers across a sign-out on a real phone, and how much memory 24 answers take there.
+- CI's Xcode 26.6 (the older Swift). The new code spells out its closures' types and keeps each `#expect` small.
+
+## Phase 5 as a whole (2026-11-14)
+
+Search on the phone is the web app's Search: one list, the web's rules ported to Core and held to its own
+TypeScript.
+- Your library through search3. MusicBrainz's albums, artists and songs after yours, deduped against what you
+  hold.
+- Top results picked as the web picks them.
+- The moments that keep anything from moving under a finger.
+- The album you don't have, with its pressings and tracklists. A song's albums, and the album it names, with the
+  song marked. A MusicBrainz artist's page.
+- What's saved, the kept answers, and More.
+
+Four slices, each with its review. The app is 0.11 (11).
+
+- **Routes**: 40 -> 49. `/library/owned`, `/fully_search`, `/release_group`, `/coverart/{kind}/{mbid}` (the
+  relay, main's 2.1.24 - the phase's one server change), `/artists`, `/songs`, `/artist`, `/discography` and
+  `/saved`.
+- **Held to the web**: four fixtures, about 8 MB:
+  - search-vectors.json (1.4 MB);
+  - search-albums-vectors.json (1.3 MB);
+  - search-songs-vectors.json (2.4 MB);
+  - search-saved-vectors.json (2.8 MB).
+
+  Each is written by its exporter from lib/searchList.ts and the files beside it, and checked by its sim:
+  iossearch, iossearchalbums, iossearchsongs (with the collation tables' check) and iossearchsaved. Search.tsx's own
+  state is held by hand in SearchTests, SearchAlbumsTests, SearchSongsTests and SearchSavedTests.
+- **Questions**: 1-33 in the spec, each built to its recommendation unless it says otherwise.
+- **James's checks**: 121-165 in docs/ios.md. None has been done on the phone yet.
+- **Not in Phase 5**:
+  - Get and Requests (Phase 6);
+  - an artist's description and links (Phase 7), and Home and pins (a later phase);
+  - a search of what's downloaded while deadwax can't be reached (question 5: not built - offline, a list
+    already drawn stays, and new words wait for deadwax).

@@ -1,7 +1,7 @@
 import DeadwaxCore
 import SwiftUI
 
-/// Search (Phase 5, slices 1-3 - notes/ios-specs/phase5-search.md 3.1-3.6 and 6.3; the web's app/Search.tsx and
+/// Search (Phase 5, slices 1-4 - notes/ios-specs/phase5-search.md 3.1-3.6, 6.3 and 6.4; the web's app/Search.tsx and
 /// SearchRows.tsx): one list, Apple Music's way - Top results, then Artists, Albums and Songs, yours first in each - from
 /// Navidrome's search3, and MusicBrainz's artists, albums and songs nobody has after yours. The box is the navigation bar's (always
 /// drawn, question 2), the chips under it while it has words; every rule and word is Core's (SearchState, SearchList,
@@ -12,7 +12,8 @@ import SwiftUI
 ///   section's slot or folded behind "Show 2 more albums" - frozen once drawn, its lines (whose a row is) changing in
 ///   place; the library's place kept at the top when it was late; Type a little more, the all-failed foot, nothing found.
 /// - A kind view: that kind in full, More from your library when it is full; MusicBrainz's of the kind below - the Songs
-///   view, under an artist's name alone, says a title is needed with it.
+///   view, under an artist's name alone, says a title is needed with it - (slice 4) what's saved leading them, drawn
+///   as MusicBrainz's own rows are, and More from MusicBrainz under them while there is another page.
 /// - A song plays from its tap when its album's songs are in hand (▶), else its album's page opens (question 10); its
 ///   ••• is the album page's song menu, or the song's own before its album is in hand (question 11). An artist and an
 ///   album open their pages; a MusicBrainz album the album you don't have - or yours, held (the id bridge); a
@@ -185,8 +186,8 @@ private struct KindViewDrawn: View {
         if let own = shown.own, own.state == .answered, own.full || own.more != .idle {
             MoreButton(own: own, personal: personal)
         }
-        if online, let foot = shown.foot {
-            KindFoot(foot: foot, marks: marks)
+        if online {
+            KindMusicBrainz(shown: shown, marks: marks)
         }
         if shown.nothing {
             ShelfNote(SearchWords.nothing(SearchView(shown.kind), query))
@@ -194,32 +195,94 @@ private struct KindViewDrawn: View {
     }
 }
 
-/// MusicBrainz's part of a kind view, below the library's.
-private struct KindFoot: View {
-    let foot: KindView.Foot
+/// MusicBrainz's part of a kind view, below the library's (Search.tsx's kindView): Type a little more, or a title
+/// needed; else what's saved (slice 4), then the asking line or MusicBrainz's failure with the rows that landed after
+/// it below it - or MusicBrainz's rows, or why there are none - and More from MusicBrainz. Drawn only while deadwax can
+/// be reached.
+private struct KindMusicBrainz: View {
+    let shown: KindView
     let marks: SearchMarks
 
     @Environment(SearchModel.self) private var search
 
     var body: some View {
-        switch foot {
-        case .typeMore:
+        switch shown.foot {
+        case .typeMore?:
             ShelfNote(SearchWords.typeMore)
                 .padding(.top, 6)
-        case .needATitle:
+        case .needATitle?:
             ShelfNote(SongSearch.needATitle)
                 .padding(.top, 6)
-        case .searching:
-            AskingLine(personal: search.personal, musicBrainz: true)
-        case .failed(let failure):
-            MusicBrainzFailure(failure: failure, short: false) { search.tryKindMusicBrainzAgain() }
-        case .rows(let rows):
-            ForEach(SearchList.drawable(rows)) { (row: SearchRow) in
+        default:
+            ForEach(SearchList.drawable(shown.savedRows)) { (row: SearchRow) in
                 SearchRowView(row: row, marks: marks, top: false)
             }
-        case .said(let words):
-            ShelfNote(words)
+            switch shown.foot {
+            case .searching?:
+                AskingLine(personal: search.personal, musicBrainz: true)
+            case .failed(let failure)?:
+                //? under what's saved: MusicBrainz isn't answering, and these are earlier results
+                MusicBrainzFailure(failure: failure, short: false, saved: !shown.savedRows.isEmpty) {
+                    search.tryKindMusicBrainzAgain()
+                }
+            case .rows(let rows)?:
+                ForEach(SearchList.drawable(rows)) { (row: SearchRow) in
+                    SearchRowView(row: row, marks: marks, top: false)
+                }
+            case .said(let words)?:
+                ShelfNote(words)
+            default:
+                EmptyView()
+            }
+            //? what landed after the asking line or the failure was drawn: below it, never pushing it down
+            ForEach(SearchList.drawable(shown.below)) { (row: SearchRow) in
+                SearchRowView(row: row, marks: marks, top: false)
+            }
+            if let more = shown.more {
+                MusicBrainzMore(more: more)
+            }
         }
+    }
+}
+
+/// More from MusicBrainz under a kind view's rows (slice 4): what its last page brought, its failure, and the button -
+/// "Loading…" while it asks, "Try again" after a failure - or, past the furthest page, a word more is the way on.
+private struct MusicBrainzMore: View {
+    let more: KindView.More
+
+    @Environment(SearchModel.self) private var search
+    @Environment(Reachability.self) private var reachability
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            if let note = more.note {
+                Text(note)
+                    .foregroundStyle(Palette.quiet)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            if let failure = more.failure {
+                Text(SearchWords.failure(failure))
+                    .foregroundStyle(Palette.quiet)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            switch more.pages {
+            case .more:
+                Button {
+                    if reachability.online { search.moreMusicBrainz() } else { reachability.tryNow() }
+                } label: {
+                    Text(more.label)
+                }
+                .buttonStyle(SecondaryPill())
+                .disabled(more.asking)
+            case .far:
+                Text(SearchMore.far)
+                    .foregroundStyle(Palette.quiet)
+                    .fixedSize(horizontal: false, vertical: true)
+            case .end:
+                EmptyView()
+            }
+        }
+        .padding(.top, 14)
     }
 }
 
@@ -270,7 +333,9 @@ private struct DrawnList: View {
                     .padding(.top, 10)
             }
             if online, let failure = drawn.allFailed {
-                MusicBrainzFailure(failure: failure, short: false,
+                //? (slice 4) what's saved drawn above: one line saying MusicBrainz is away and these are earlier
+                //? results - "What's in your library is above." only when something of the library's is
+                MusicBrainzFailure(failure: failure, short: false, saved: drawn.holdsSaved,
                                    above: drawn.holdsLibrary ? SearchWords.libraryAbove(personal: personal) : "") {
                     search.tryMusicBrainzAgain()
                 }
@@ -316,7 +381,7 @@ private struct DrawnSection: View {
             SearchRowView(row: row, marks: marks, top: false)
         }
         if let slot = section.slot {
-            SectionSlot(kind: section.kind, slot: slot)
+            SectionSlot(kind: section.kind, slot: slot, saved: section.holdsSaved)
         }
         if studio {
             Text(SearchWords.studioNote)
@@ -414,6 +479,8 @@ private struct SlotFailure: View {
 private struct SectionSlot: View {
     let kind: SearchKind
     let slot: SearchList.Drawn.Slot
+    /// (Slice 4) Rows from what's saved are drawn above it: its failure says these are earlier results.
+    let saved: Bool
 
     @Environment(SearchModel.self) private var search
 
@@ -430,7 +497,8 @@ private struct SectionSlot: View {
                     .foregroundStyle(Palette.quiet)
             case .failed:
                 let failure = kindFailure
-                SlotFailure(words: SearchWords.failure(failure, short: true), tryAgain: !failure.refused) {
+                SlotFailure(words: saved ? SearchWords.savedAway(failure, short: true) : SearchWords.failure(failure, short: true),
+                            tryAgain: !failure.refused) {
                     search.tryMusicBrainzAgain()
                 }
             }
@@ -485,25 +553,28 @@ private struct LibraryLateSlot: View {
     }
 }
 
-/// MusicBrainz's failure, in its words (`failureWords` - `short` for a slot): a refusal's own, busy, away; Try again
-/// unless refused. The all-failed foot adds what is above it.
+/// MusicBrainz's failure, in its words (`failureWords` - `short` for a slot): a refusal's own, busy, away - under what's
+/// saved (`saved`, slice 4), that these are earlier results (`savedAwayWords`); Try again unless refused. The all-failed
+/// foot adds what is above it.
 private struct MusicBrainzFailure: View {
     let failure: MBFailure
     let short: Bool
+    let saved: Bool
     let above: String
     let retry: () -> Void
 
     @Environment(Reachability.self) private var reachability
 
-    init(failure: MBFailure, short: Bool, above: String = "", retry: @escaping () -> Void) {
+    init(failure: MBFailure, short: Bool, saved: Bool = false, above: String = "", retry: @escaping () -> Void) {
         self.failure = failure
         self.short = short
+        self.saved = saved
         self.above = above
         self.retry = retry
     }
 
     var body: some View {
-        let words = SearchWords.failure(failure, short: short)
+        let words = saved ? SearchWords.savedAway(failure, short: short) : SearchWords.failure(failure, short: short)
         VStack(alignment: .leading, spacing: 8) {
             Text(above.isEmpty ? words : "\(words) \(above)")
                 .foregroundStyle(Palette.quiet)

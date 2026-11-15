@@ -91,7 +91,7 @@ from src.store import JobStore  # noqa: E402
 
 CORE = Path(__file__).resolve().parent.parent / "ios" / "DeadwaxKit" / "Sources" / "DeadwaxCore"
 ENDPOINT = re.compile(r'Endpoint\(method: "(\w+)", path: "([^"]+)", query: \[([^\]]*)\]\)')
-ROUTE_COUNT = 48
+ROUTE_COUNT = 49
 RAW_OPENING = re.compile(r'#+"')
 HASHES = re.compile(r"#*")
 
@@ -1372,3 +1372,49 @@ def test_the_app_waits_for_an_artists_page_as_long_as_deadwax_does():
     assert timeouts["artistFacts"] > client.RETRIES * 3.0 + window
     assert client.DISCOGRAPHY_MAX // client.DISCOGRAPHY_PAGE == 5
     assert timeouts["discography"] >= timeouts["releaseGroup"] > timeouts["fullySearch"]
+
+
+# ---------------------------------------------------------------------------- Phase 5, slice 4: what's saved, More
+
+
+def test_whats_saved_is_asked_and_read_as_the_route_answers_it(monkeypatch):
+    # /saved by the words typed - the box's 200 characters within its bound, never nothing - answering each kind in
+    # the shape of the route the app already reads it from, and `available` (false: nothing searched, never an error)
+    monkeypatch.setattr(Config, "AUTH_MODE", None)
+    route = app_routes()[("GET", "/deadwax/search_musicbrainz/saved")]
+    words = next(f for f in route.dependant.query_params if f.alias == "words")
+    lengths = {type(rule).__name__: rule for rule in words.field_info.metadata}
+    box = swift_constant("SearchReading.swift", "SearchReading", "maxCharacters")
+    assert lengths["MinLen"].min_length == 1
+    assert lengths["MaxLen"].max_length >= box
+    assert '("words", words)' in swift_function("DeadwaxClient.swift", "savedSearch")
+    assert set(fields("SavedSearchAnswer")) == {"artists", "albums", "songs", "credited", "available"}
+    answers = returned_literals(search_musicbrainz.saved)
+    assert answers and all("available" in literal_keys(one) for one in answers)
+    source = inspect.getsource(search_musicbrainz.saved)
+    for kind in ("artists", "albums", "songs", "credited"):
+        assert f'"{kind}":' in source, kind
+    # read leniently: a kind missing or of the wrong shape is none, a missing `available` nothing searched
+    assert "looseField" in swift_struct("SavedSearchAnswer")
+    # ...and bounded to the app's own page of each, which the app's kinds draw as MusicBrainz's would be
+    from src import saved_index
+    assert saved_index.SAVED_ARTISTS == swift_constant("MBArtist.swift", "MBArtistSearch", "limit")
+    assert saved_index.SAVED_ALBUMS == swift_constant("SearchAlbums.swift", "SearchAlbums", "limit")
+    assert saved_index.SAVED_SONGS == swift_constant("SongSearch.swift", "SongSearch", "limit")
+    # the artist reading draws at most a page of an artist's saved albums, from the credited list (50)
+    assert swift_constant("SearchSaved.swift", "SearchSaved", "artistAlbums") <= saved_index.SAVED_CREDITED
+
+
+def test_more_from_musicbrainz_asks_within_the_routes_offsets(monkeypatch):
+    # More asks the next page by offset - never past SearchMore.offsetMax (morePages says narrow it instead), which
+    # every search route takes; sent only past the first page, so the first is asked as it always was
+    monkeypatch.setattr(Config, "AUTH_MODE", None)
+    routes = app_routes()
+    furthest = swift_constant("SearchSaved.swift", "SearchMore", "offsetMax")
+    assert furthest == search_musicbrainz.FULLY_SEARCH_OFFSET_MAX
+    for path in ("fully_search", "artists", "songs"):
+        low, high = bounds(routes[("GET", f"/deadwax/search_musicbrainz/{path}")], "offset")
+        assert low <= 0 and furthest <= high, path
+    for name in ("fullySearch", "searchArtists", "searchSongs"):
+        body = swift_function("DeadwaxClient.swift", name)
+        assert 'if offset > 0 { fields.append(("offset", String(offset))) }' in body, name
