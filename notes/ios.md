@@ -7477,7 +7477,8 @@ ROUTE_COUNT 44 -> 48: `/search_musicbrainz/artists`, `/search_musicbrainz/songs`
 - **Offline** (question 24): the artist page's albums not drawn.
 - **VoiceOver's disclosure** (question 25): hints, where the web has `aria-expanded`.
 - **localeCompare**: WebCollation is ICU's order as far as the recorded answers and the seeded titles reach; two
-  titles in another script tying on everything before them could stand in another order than the web's.
+  titles in another script tying on everything before them could stand in another order than the web's. (Its tables
+  are made from ICU since the review - "Phase 5, slice 3, after its review" says what it still can't follow.)
 
 ### The app
 
@@ -7615,3 +7616,156 @@ Not verified - only the phone can tell (docs/ios.md's checks 144-155, beside the
   the server's code; the recorded answers are MusicBrainz's own, from the web's work).
 - WebCollation against ICU for titles outside the recorded answers.
 - CI's Xcode 26.6 (the older Swift): the new code spells out its closures' types and keeps each `#expect` small.
+
+## Phase 5, slice 3, after its review (2026-11-14)
+
+The review of 9a38566 found nothing high or medium, and three low findings. All three are fixed in one commit on
+`phase5-search`. The app stays 0.10 (10); no server change. Not fixed, as asked: the Songs view's "none is on an
+album yet" when every MusicBrainz song was dropped as yours. It is Search.tsx's `kindView` word for word, and the
+phone keeps the web's wording.
+
+### What was wrong, and the fix
+
+1. **The song was never brought into view if its tracks first drew while the page wasn't shown.** `showSong` set
+   `songShown` before its "is this page shown" guard. So: open a song's album (`/release_group` loading), switch to
+   Library, the pressings land, come back to Search - the page never scrolled to the song.
+   - **GroupView**: `songShown` is set only once the page is the one shown (`isShown`: the top of the tab shown's
+     stack, Now Playing not over it), as ReleaseGroupPage's `shown` does. `showSong` is called again as the page
+     shows: `.onAppear`, a change of `navigation.tab`, and Now Playing closing.
+   - The scrolled check stays inside the 50 ms wait, so it reads the hero's own `onAppear` after the page comes
+     back: a page scrolled before it left is still left where it is.
+2. **A MusicBrainz artist's facts line could grow from one line to two.** The placeholder was `" "` but the line was
+   `lineLimit(2)`, so at large Dynamic Type the albums moved down when the facts landed. That contradicted question
+   26's "nothing moves".
+   - **MBArtistView**: `lineLimit(2, reservesSpace: true)`. The web's `.app-artist-facts` wraps freely, so two lines
+     held matches its line better than one truncated.
+3. **WebCollation ordered some titles differently from ICU.** The reviewer ran 208 awkward titles against Node's
+   `Intl.Collator('en-US')` and got 792 disagreeing ordered pairs. The causes were kana by code point, the modifier
+   letters as letters, ə and ŧ after z, punctuation the table didn't list after every symbol, currency before the
+   other symbols, and ™ against "TM".
+   - **The tables are now made from ICU**, by **ios/scripts/collation-tables.cjs** (new), written between
+     Collation.swift's `BEGIN collation-tables.cjs` and `END` lines:
+     - `variables`: 1,880 punctuation and symbols in ICU's order, with their ties. Most are from ASCII, Latin-1,
+       the modifier letters, general punctuation, letterlike symbols, arrows, maths, box drawing, shapes, dingbats
+       and CJK's; every currency sign is included. Punctuation runs up to "`", symbols up to "¤", then currency.
+     - `unlistedSymbolsBefore`: where an emoji stands. ICU puts every symbol the table doesn't list after its own
+       symbols but before CJK's symbols and the modifier letters it weighs as symbols (ː, ゝ, ー).
+     - `marks`: ICU's order at the second level, with their ties.
+     - `letterPlaces`: each Latin letter beyond a-z, placed after the letter ICU puts it after.
+     - `variants`: ø, đ, ð, ł, ħ and the rest. Each is its letter plus a mark of its own, placed among the marks.
+     - `middleDotAfterL`: ICU weighs "l·" as an l with a mark, and so ŀ.
+     - `markLetters`: the combining letters, weighed as their letter a level down ("t" < "tͭ" < "T").
+     - `numbers`: ❽, ⓰, 〨 and the rest, weighed as the digits of their value a level down.
+     - `scriptLetters`: Greek, Cyrillic, Georgian, Armenian, Hebrew and Arabic's letters, in ICU's order.
+     - `contractions`: й, and Arabic's alef with a hamza or madda, which ICU weighs as letters of their own though
+       they decompose.
+     - `ignorableMarks`: the combining grapheme joiner and the like.
+   - **Collation.swift**:
+     - The first level is in bands in ICU's order: punctuation, symbols, the last symbols, currency, digits, Latin,
+       the other alphabets, Hangul's jamo, kana, Bopomofo, Yi, Han. In each band, a character a table lists goes by
+       its rank there, and any other by code point after them.
+     - A string is decomposed canonically first, so a character the same as another is weighed as that one (Greek's
+       oxia as ´), and contractions are read from that.
+     - **Kana**: hiragana and katakana are alike at the first level, and a small kana is weighed as its letter. At
+       the third level the order is small hiragana, hiragana, small katakana, katakana, then halfwidth ("カタカナ" <
+       "きた", "ぁ" < "あ" < "ァ" < "ア" < "ｱ").
+     - **A compatibility symbol's parts** take their own case at the third level, so "tm" < "tM" < "Tm" < "TM" <
+       "™".
+     - **Greek's final sigma** is its sigma a level down ("σ" < "Σ" < "ς" < "σa").
+     - Unchanged: æ, œ and ß as their two letters (ß as "ss") with a mark of their own, and the digits by value.
+   - **The generator's `--check`** makes the tables again and compares them with Collation.swift, but only when
+     this Node's ICU is the one the tables were made with (78.3, Node 22.23.4). Another ICU would make other tables,
+     not wrong ones, so then it says which ICU and passes. **ui/test/iossearchsongs.sim.cjs** runs it beside the
+     exporter's `--check`.
+   - **The exporter's collation list** gains 100 titles, one or more with each of these characters. The list is now
+     464 titles and 600 seeded pairs (only the fixture's `collation` vector changed).
+     - From the review: kana, the modifier letters (Hawaiʻi beside Hawai'i, Hawai’i and Hawaii), ə and ŧ, CJK's
+       brackets and ⁄, currency against ♥ ☆ ♫ ✓, and ™ against TM, Tm, tM.
+     - From what the measuring below found: final sigma, й ("йа" beside "иб"), Catalan's l·l, ❽ and 〨, a combining
+       letter, emoji, Hangul beside Ethiopic and Khmer, and "Don't Stop" beside "Don’s Song" (an apostrophe and a
+       right quote tie at the first level).
+     - The vectors made under ICU 74.2 (Node 20) come out the same as under 78.3.
+
+### Measured against ICU
+
+The reviewer's 208 titles weren't kept, so the measuring here used a Swift harness: Collation.swift compiled with a
+small main, run over every ordered pair of titles against Node 22's `Intl.Collator('en-US')` signs.
+
+| titles | old disagreements | new disagreements |
+| --- | --- | --- |
+| 962 awkward titles: each of the review's characters, alone, after "a", before "a" and inside "x…y", among Latin variants, quotes, dashes, symbols, currency, scripts and digits | 62,630 of 925,444 | 52 |
+| 800 random strings of 1 to 4 characters, over Latin, punctuation, symbols, emoji, other alphabets, kana, Hangul, Han, marks and modifier letters | 16,148 of 640,000 | 8 |
+| 700 random strings over Latin, punctuation, marks and modifier letters | 55,806 of 490,000 | 24 |
+| 700 random strings over other alphabets, CJK and symbols | 5,614 of 490,000 | 42 |
+| 700 random strings over the whole pool, another seed | 11,086 of 490,000 | 232 |
+| the fixture's own 464 titles, every pair | 454 misplaced in the sorted list | 0 |
+
+### What it still can't follow, and why
+
+- **Han beyond its first block.** ICU orders Han by radical and stroke count. Extension A (㐀) and B (𠀀) interleave
+  with the core block, and the core block itself strays from code-point order in about 0.6% of pairs. Matching that
+  would take Unihan's radical-stroke data for 98,000 characters; even as runs it is thousands of entries. So Han
+  stays in code-point order. All of the 52 left in the first measure are this.
+- **Bopomofo's later letters** (ㄪ, ㄫ, ㄬ) stand by their phonetic place in ICU, not by code point.
+- **Scripts the tables don't list**, such as Thai, Devanagari, Ethiopic, Khmer and Cherokee, stand after the listed
+  alphabets by code point. That keeps them between Arabic and Hangul as ICU does, but not always in ICU's order among
+  themselves.
+  - Devanagari's and Bengali's vowel signs are weighed as marks, where ICU gives them letters' weights.
+  - Thai's and Lao's prevowels are not swapped with the consonant after them.
+- **Symbols outside the table's blocks**, such as Cyrillic's ҂ and some musical and technical ones, go after the
+  listed symbols with the emoji. ICU spreads them through its symbols.
+- **The finer third-level steps.** Halfwidth small kana tie with halfwidth kana ("ｫ" against "ｵ").
+- **Numbers outside the table's blocks** that ICU weighs as their own (𝍠, ↀ) stand as symbols.
+- **The rare letters that expand** (ʣ for "dz", ỻ for "ll") are placed as one letter, so a word continuing past them
+  can stand on the wrong side.
+- **A string of marks alone** (no letter under them) ties where ICU orders the marks.
+
+None of these reaches the recorded answers or the fixture's titles.
+
+### Tests
+
+- **SearchSongsVectorTests**' collation test holds the 464 titles' order and the 600 pairs (the fixture
+  regenerated).
+- **Mutations**: 19 on the new collation, each applied alone to a copy of Collation.swift and compiled with the
+  test's harness (the fixture's sorted titles and pairs). 16 were caught at first. The 3 that lived were closed by
+  titles added to the exporter, and caught when run again:
+  - no contractions, closed by "йа" and "иб";
+  - the quote ties given primaries of their own, closed by "Don't Stop" and "Don’s Song";
+  - Hangul among the other scripts, closed by Ethiopic's ሀ and Khmer's ក.
+
+  The 19:
+  1. katakana not as hiragana;
+  2. katakana before hiragana at the third level;
+  3. small kana not as their letter;
+  4. emoji after the last symbols;
+  5. a symbol's parts all lowercase;
+  6. no contractions;
+  7. no l·;
+  8. final sigma by code point;
+  9. the combining letters as marks;
+  10. the numbers as symbols;
+  11. the other alphabets by code point;
+  12. the Latin places ignored;
+  13. the variants without their mark;
+  14. the quote ties given primaries of their own;
+  15. the quote ties the same at the second level;
+  16. the marks unranked;
+  17. no canonical decomposition first;
+  18. Hangul among the other scripts;
+  19. Han among the other scripts.
+
+### Verified, and not
+
+Verified, on the tree before its commit:
+- `swift test`: Core 1487, Audio 158, Turntable 12. No warnings.
+- The unsigned Debug and Release device builds: no warnings; the .xcodeproj unchanged (collation-tables.cjs is a
+  script, not in the project).
+- `check_project.py` ok.
+- `npm run build` and all 86 sims on Node 22.23.4 (ICU 78.3), iossearchsongs running both `--check`s. Under Node 20
+  (ICU 74.2) the exporter's vectors came out the same, and the tables' check said which ICU and passed.
+- The full pytest suite: 4516 passed, 1 skipped.
+- The 19 mutations above, the 3 that lived closed and caught.
+
+Not verified - only the phone can tell (docs/ios.md's checks 144 and 149 gain a sentence each):
+- The song brought into view on coming back to the tab. The 50 ms wait has to cover the hero's `onAppear`.
+- The facts line's two lines held at the largest text size.

@@ -2744,7 +2744,9 @@ artist you don't have's page (still app 0.10). Compare with the web app's Search
   yours, their line saying who they are ("Bristol trip hop group · Group · GB"). Tap them: their page - their
   name, "Group · Bristol · since 1988" under it, then Albums with **Studio only** on, their studio albums
   newest first, each with its cover and "1998 · not in your library". The same artist in the web app: the
-  same albums in the same order. Tap one: the album you don't have's page.
+  same albums in the same order. Tap one: the album you don't have's page. With the largest text size (Settings >
+  Accessibility > Display & Text Size > Larger Text), open another artist's page: Albums doesn't move down as
+  the line under their name comes in.
 - **145 An artist you have, once.** Type an artist you have ("portishead"): Artists shows yours once, with
   its albums in your library - never a second row for them from MusicBrainz - and other artists of that name
   below it. Type "dummy portishead": no artists you don't have.
@@ -2763,7 +2765,9 @@ artist you don't have's page (still app 0.10). Compare with the web app's Search
 - **149 The song on its album.** Tap one of those albums: its page opens with a pressing that has the song
   chosen, the song's track tinted with a bar at its edge, brought into view if it's below the screen. Choose
   another pressing: your choice stays, the song marked wherever it's on it. On a slow connection, open
-  another song's album and scroll down before its tracklist comes: the page stays where you put it.
+  another song's album and scroll down before its tracklist comes: the page stays where you put it. Open
+  another, switch to the Library tab before its tracklist comes, then come back to Search: the song is
+  brought into view as you do.
 - **150 A song you have, once.** Type "roads portishead" (a song of yours with its artist): Songs shows your
   Roads with ▶, and no Roads by Portishead from MusicBrainz under it. Type "portishead" and tap the Songs
   chip: your songs, then "Type a song's title with the artist (“roads portishead”) to find songs you don't

@@ -88,12 +88,13 @@ struct MBArtistView: View {
                 .lineLimit(3)
                 .padding(.top, 18)
                 .accessibilityAddTraits(.isHeader)
-            // who they are: its line held while it loads, so nothing below moves as it lands
+            // who they are: wrapping as the web's line does, its two lines held from the first (at any text size), so
+            // nothing below moves as it lands or as it turns out longer than one
             Text(about.isEmpty ? " " : about)
                 .font(.subheadline)
                 .foregroundStyle(Palette.quiet)
                 .multilineTextAlignment(.center)
-                .lineLimit(2)
+                .lineLimit(2, reservesSpace: true)
                 .padding(.top, 4)
                 .accessibilityHidden(about.isEmpty)
         }

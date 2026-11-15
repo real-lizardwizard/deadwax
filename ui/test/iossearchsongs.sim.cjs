@@ -14,6 +14,10 @@
  * TypeScript as it is today and compared byte for byte with the committed file. So a web rule changed here fails here
  * until the vectors are written again - and then the phone's Swift tests fail until the change is ported.
  *
+ * And ios/scripts/collation-tables.cjs with --check: Collation.swift's tables made again from this Node's ICU and
+ * compared with what is there (slice 3's review) - when this Node's ICU is the one they were made with; another ICU's
+ * would differ without being wrong, so then it says so and passes.
+ *
  * Run it with:  TMPDIR=<writable> node ui/test/iossearchsongs.sim.cjs
  */
 
@@ -21,17 +25,22 @@ const { execFileSync } = require('child_process')
 const path = require('path')
 
 const REPO = path.resolve(__dirname, '..', '..')
-const SCRIPT = path.join(REPO, 'ios', 'scripts', 'export-search-songs-vectors.cjs')
+const SCRIPTS = [
+  ['export-search-songs-vectors.cjs', "Search's song and artist vectors are not what the web's TypeScript answers today"],
+  ['collation-tables.cjs', "Collation.swift's tables are not what this Node's ICU answers"],
+]
 
 let failures = 0
-try {
-  const said = execFileSync(process.execPath, [SCRIPT, '--check'], { cwd: REPO, encoding: 'utf8' })
-  console.log(`  PASS  ${said.trim()}`)
-} catch (error) {
-  failures++
-  process.stdout.write(error.stdout || '')
-  process.stderr.write(error.stderr || '')
-  console.log(`  FAIL  Search's song and artist vectors are not what the web's TypeScript answers today (exit ${error.status})`)
+for (const [script, failed] of SCRIPTS) {
+  try {
+    const said = execFileSync(process.execPath, [path.join(REPO, 'ios', 'scripts', script), '--check'], { cwd: REPO, encoding: 'utf8' })
+    console.log(`  PASS  ${said.trim()}`)
+  } catch (error) {
+    failures++
+    process.stdout.write(error.stdout || '')
+    process.stderr.write(error.stderr || '')
+    console.log(`  FAIL  ${failed} (exit ${error.status})`)
+  }
 }
 
 console.log(failures ? `\n${failures} FAILED` : '\nall passed')

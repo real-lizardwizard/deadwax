@@ -18,7 +18,8 @@ import SwiftUI
 /// (Slice 3) Opened from a song (`route.song`, its recordings): its title drawn while the pressings load, the pressing
 /// shown one with the song (unless one is picked - a pick then always kept, so the song never overrules it), the song's
 /// tracks marked (tinted, an accent bar, and ", the song you searched for" for VoiceOver) and brought into view once, as
-/// they are first drawn, only from the top. The credit with no library artist of theirs opens their MusicBrainz page.
+/// they are first drawn on the page shown (or as it shows, drawn while it wasn't), only from the top. The credit with no
+/// library artist of theirs opens their MusicBrainz page.
 struct GroupView: View {
     let route: GroupRoute
 
@@ -65,6 +66,10 @@ struct GroupView: View {
             .onChange(of: page.tracks.first(where: \.song)?.key, initial: true) { _, key in
                 showSong(key, proxy)
             }
+            // drawn while the page wasn't shown (another tab, Now Playing over it): brought into view as it shows
+            .onAppear { showSong(page.tracks.first(where: \.song)?.key, proxy) }
+            .onChange(of: navigation.tab) { _, _ in showSong(page.tracks.first(where: \.song)?.key, proxy) }
+            .onChange(of: navigation.nowPlayingShown) { _, _ in showSong(page.tracks.first(where: \.song)?.key, proxy) }
         }
         .navigationTitle(page.title)
         .navigationBarTitleDisplayMode(.inline)
@@ -101,14 +106,19 @@ struct GroupView: View {
         Task { await model.load(client: server.client, online: reachability.online) }
     }
 
-    /// The song brought into view as its tracks are first drawn - once for the page, only while it is the page shown,
-    /// and only from the top: a page scrolled meanwhile is left where it is. The least scroll that shows it (`nearest`).
+    /// The page is the one shown: the top of its tab's stack, the tab shown, Now Playing not over it.
+    private var isShown: Bool {
+        navigation.shownStack.last == .group(route) && !navigation.nowPlayingShown
+    }
+
+    /// The song brought into view as its tracks are first drawn - once for the page, counted only once the page is the
+    /// one shown (its tracks drawn while it wasn't are brought into view as it shows, the web's `shown`), and only from
+    /// the top: a page scrolled meanwhile is left where it is. The least scroll that shows it (`nearest`).
     private func showSong(_ key: String?, _ proxy: ScrollViewProxy) {
-        guard let key, !songShown else { return }
+        guard let key, !songShown, isShown else { return }
         songShown = true
-        guard !titleInBar, navigation.shownStack.last == .group(route) else { return }
         Task { @MainActor in
-            // a frame for the tracklist to be laid out
+            // a frame for the tracklist to be laid out, and for the hero's own onAppear coming back to the page
             try? await Task.sleep(nanoseconds: 50_000_000)
             guard !titleInBar else { return }
             withAnimation { proxy.scrollTo(key, anchor: nil) }

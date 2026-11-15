@@ -185,7 +185,15 @@ function collation() {
     'a\\b', 'a&b', 'a#b', 'a%b', 'a`b', 'a^b', 'a+b', 'a<b', 'a=b', 'a>b', 'a|b', 'a~b', 'a$b', 'a1b', 'a…', 'a...', 'ａ', 'Ａ',
     'ﬁ', 'fi', '²', '2', '10', '9', '١', 'α', 'а', 'א', '一', 'あ', 'ア', '가', '½', 'Ⅰ', 'I', 'ª', 'º', '™', 'tm', 'µ', 'ʼ',
     '1984-09-24: Deutchlandhalle', '1984‐09‐15: The Jewels', 'Live (1977)', 'Live 1977', 'Live: 1977', 'Live - 1977', 'Live, 1977']
-  const all = [...new Set([...recorded, ...made].filter((title) => typeof title === 'string'))]
+  // slice 3's review: kana, the modifier letters, ə and ŧ, CJK's brackets and ⁄, currency after the other symbols, ™
+  // against TM - and final sigma, й, Catalan's l·l, the numbers drawn as digits, the combining letters, emoji, Hangul
+  const reviewed = ['カタカナ', 'きた', 'か', 'カ', 'が', 'ガ', 'ぁ', 'ァ', 'ｱ', 'ｶ', 'ー', 'あー', 'ああ', 'ゝ', 'ヽ', 'ゞ', 'ヴ', 'ゔ',
+    'ん', 'ʻ', 'ˈ', 'ʹ', 'ʼa', 'ʿ', 'ʾ', 'Hawaiʻi', 'Hawai’i', "Hawai'i", 'Hawaii', 'ə', 'Ə', 'əa', 'ez', 'f', 'ŧ', 'Ŧ', 'tz',
+    't', 'u', 'ʒ', 'ɐ', 'ʃ', 'ɛ', '『a』', '【a】', '「a」', '〃', '⁄', '1⁄2', '〜', '♥', '☆', '★', '♫', '♪', '✓', '$', '€', '£',
+    '¥', '¢', '₩', '$5', '♥5', '™', 'TM', 'Tm', 'tM', 'SM', '℠', 'σ', 'ς', 'Σ', 'й', 'и', 'к', 'ё', 'е', 'Мой', 'Мои',
+    'col·lecció', 'colla', 'collecció', 'ŀ', '❽', '8', '〨', 'tͭ', '🔥', '😀', '〄', 'ː', '가', '한국', '中国', 'ㄅ', 'йа', 'иб',
+    "Don't Stop", 'Don’s Song', 'ሀ', 'ក']
+  const all = [...new Set([...recorded, ...made, ...reviewed].filter((title) => typeof title === 'string'))]
   const pairs = []
   for (let n = 0; n < 600; n++) {
     const a = pick(all), b = pick(all)
