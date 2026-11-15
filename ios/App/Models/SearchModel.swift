@@ -2,7 +2,7 @@ import DeadwaxCore
 import Foundation
 import Observation
 
-/// Search (Phase 5, slices 1-3 - notes/ios-specs/phase5-search.md 2.6-2.9, 6.2 and 6.3; the web's app/Search.tsx):
+/// Search (Phase 5, slices 1-4 - notes/ios-specs/phase5-search.md 2.6-2.9, 6.2-6.4; the web's app/Search.tsx):
 /// Core's SearchState kept here, and the requests it says to make - All's search3 once typing pauses
 /// (`SearchReading.librarySettleMs`) or at once on the keyboard's Search, a kind view's own beside it, More by offset,
 /// the albums a song plays from, `/library/owned` as Search shows; and MusicBrainz's albums once typing pauses longer
@@ -29,6 +29,12 @@ import Observation
 ///   as a new answer of songs lands); an album it is on opens yours when you hold the song on it, else the album you
 ///   don't have with the song marked (`openSongAlbum`, the web's order); a MusicBrainz artist opens their page
 ///   (`AppRoute.mbArtist`). Every late answer that opens a page opens it only on the list it was tapped from.
+/// - (Slice 4) What's saved (`/search_musicbrainz/saved`) asked once per words beside the library, given up after
+///   `SearchSaved.waitMs` - the library's moment waits for it that long at most; the session's last 24 MusicBrainz
+///   search answers kept (`kept`, across people: MusicBrainz's data is nobody's), each first page answered from them
+///   with no request, and taken whole as the library lands (`takeKept`); More from MusicBrainz in a kind view
+///   (`moreMusicBrainz`); and a kind view's region saying what it drew, once each (`announceKind`). None of it asks
+///   while deadwax can't be reached, and none of it opens a page.
 ///
 /// `reset()` - a new person - lets everything go, and nothing asked before it lands after it.
 @MainActor
@@ -70,6 +76,19 @@ final class SearchModel {
     @ObservationIgnored private var askingArtists: Task<Void, Never>?
     @ObservationIgnored private var askingSongs: Task<Void, Never>?
     @ObservationIgnored private var askingHeld: Task<Void, Never>?
+    @ObservationIgnored private var askingSaved: Task<Void, Never>?
+    @ObservationIgnored private var savedClock: Task<Void, Never>?
+    /// More from MusicBrainz's ask in flight, one for each kind (Search.tsx's latestOnly for each - slice 4's review):
+    /// asking one kind's More never cancels another's.
+    @ObservationIgnored private var askingMoreMusicBrainz: [SearchKind: Task<Void, Never>] = [:]
+    /// What each kind view drew below its library's rows for the box's words (Search.tsx `kindAreas`), by
+    /// `SearchState.kindAreaKey` - kept as the view is read, so what lands late never moves what was drawn.
+    @ObservationIgnored private var kindAreas: [String: KindArea] = [:]
+    /// What a kind view's region has said for its key (Search.tsx `kindSaid`): its library's words, MusicBrainz's.
+    @ObservationIgnored private var kindSaid: (key: String, library: Bool, musicBrainz: Bool) = ("", false, false)
+    /// The session's MusicBrainz search answers (app/searchAnswers.ts): the last `SearchAnswersKept.count`, kept across
+    /// people - MusicBrainz's data is nobody's own.
+    private static var kept = SearchAnswersKept()
     @ObservationIgnored private var prefetching: [Task<Void, Never>] = []
     @ObservationIgnored private var ownedTag: String?
     @ObservationIgnored private var askingOwned = false
@@ -114,8 +133,14 @@ final class SearchModel {
         return nil
     }
 
-    /// A kind view as it stands (Core's `kindView`) - nil in All.
-    var kindView: KindView? { state.kindView(artistList: artists.list, marks: marks) }
+    /// A kind view as it stands (Core's `kindView`) - nil in All. What it drew below its library's rows is kept for its
+    /// words as it is read (the web's ref), so a late answer lands below it.
+    var kindView: KindView? {
+        let key = state.kindAreaKey
+        let shown = state.kindView(artistList: artists.list, marks: marks, before: key.flatMap { kindAreas[$0] })
+        if let key, let area = shown?.area { kindAreas[key] = area }
+        return shown
+    }
 
     // MARK: what the screen tells it
 
@@ -149,12 +174,17 @@ final class SearchModel {
         let clamped = Self.clamped(typed)
         text = clamped
         guard let effect = state.typed(clamped) else { return }
+        // More's asks let go by any new words (Core's `typed` set every kind's More idle again)
+        cancelMore()
         // the clocks of the words before let go: a text the library was once late for is late again only by its own
         lateClock?.cancel()
         settling?.cancel()
         settlingMusicBrainz?.cancel()
         askingHeld?.cancel()
         opening = nil
+        //? a kind view's areas for other words let go
+        let words = state.query
+        kindAreas = kindAreas.filter { (each: (key: String, value: KindArea)) -> Bool in each.key.hasSuffix("\n\(words)") }
         if effect == .clear {
             letGo()
             return
@@ -201,13 +231,20 @@ final class SearchModel {
     /// asked for the kinds the view needs that nobody has asked, when it was asked for these words.
     func choose(_ view: SearchView) {
         guard state.choose(view) else { return }
-        Notice.announce(SearchWords.view(view))
-        guard !state.query.isEmpty else { return }
+        let words = SearchWords.view(view)
+        guard !state.query.isEmpty else {
+            Notice.announce(words)
+            return
+        }
         if view != .all, state.libraryAskedForQuery {
             // the words asked already: the kind's own at once (else with the pause)
             askKind()
         }
+        // what an answer kept from before holds for this view, taken now
+        takeKept(state.query)
         if state.askedForQuery { askMusicBrainz(view: view) }
+        // a kind view drawn at once says what it drew with "Showing albums."
+        if view == .all { Notice.announce(words) } else { announceKind(after: words) }
         draw()
     }
 
@@ -238,6 +275,41 @@ final class SearchModel {
         askMusicBrainz(view: state.view)
     }
 
+    /// More from MusicBrainz in a kind view (Search.tsx `askMore`, `askMoreArtists`, `askMoreSongs`): the next page of
+    /// the same search, by offset, appended below the rows drawn - nothing above them moves - and what it brought
+    /// announced. Through the kind's own token, so new words let it go; it opens nothing.
+    func moreMusicBrainz() {
+        guard reachability.online, let client = server.client, let ask = state.askingMoreMusicBrainz() else { return }
+        //? this kind's alone: Core asks a kind's More only while none is asking, so nothing of it is let go here
+        askingMoreMusicBrainz[ask.kind]?.cancel()
+        let epoch = self.epoch
+        let admin = server.access.seesDetail
+        let personal = self.personal
+        askingMoreMusicBrainz[ask.kind] = Task { [weak self] in
+            do {
+                let said: String?
+                switch ask.kind {
+                case .albums:
+                    let page = try await client.fullySearch(ask.words, offset: ask.offset)
+                    guard let self, epoch == self.epoch else { return }
+                    said = self.state.moreAnswered(ask, albums: page, index: self.ownedIndex, personal: personal)
+                case .artists:
+                    let page = try await client.searchArtists(ask.words, offset: ask.offset)
+                    guard let self, epoch == self.epoch else { return }
+                    said = self.state.moreAnswered(ask, artists: page)
+                case .songs:
+                    let page = try await client.searchSongs(ask.words, offset: ask.offset)
+                    guard let self, epoch == self.epoch else { return }
+                    said = self.state.moreAnswered(ask, songs: page)
+                }
+                if let said { Notice.announce(said) }
+            } catch {
+                guard let self, epoch == self.epoch, !APIFailure.isCancellation(error) else { return }
+                self.state.moreFailed(ask, MBFailure.of(error, admin: admin))
+            }
+        }
+    }
+
     /// "Show 3 from your library": the list drawn afresh, whole, the library in it.
     func showLibrary() {
         state.showLibrary()
@@ -247,6 +319,7 @@ final class SearchModel {
     /// A kind view's "Show N from your library".
     func showKindLibrary() {
         state.showKindLibrary()
+        announceKind()
     }
 
     /// "Show 2 more albums": a folded kind's rows opened in place.
@@ -430,9 +503,10 @@ final class SearchModel {
 
     // MARK: the asks
 
-    /// The pause passed: All's search3 for the words, a kind view's own, the library's late clock - and the list drawn,
-    /// should the words' answer be in hand already.
+    /// The pause passed: what's saved for the words (words MusicBrainz is to be asked for), All's search3, a kind view's
+    /// own, the library's late clock - and the list drawn, should the words' answer be in hand already.
     private func settled() {
+        if SearchReading.asksMusicBrainzBySettling(state.query) || state.askedForQuery { askSaved(state.query) }
         askLibrary()
         askKind()
         armLibraryLate()
@@ -444,6 +518,7 @@ final class SearchModel {
         guard state.wantsLibrary, reachability.online, let client = server.client else { return }
         if navidromeAway != nil {
             state.librarySkipped()
+            takeKept(state.query)
             draw()
             return
         }
@@ -456,6 +531,8 @@ final class SearchModel {
                 let found = try await client.searchLibrary(words, counts: SearchPacing.all)
                 guard let self, epoch == self.epoch else { return }
                 guard self.state.libraryAnswered(token, words, found) else { return }
+                // what answers kept from before hold for the words: in hand now, so the list draws whole
+                self.takeKept(words)
                 self.prefetch(self.state.albumsWanted(words, found, artistList: self.artists.list, marks: self.marks),
                               library: token)
                 self.draw()
@@ -463,6 +540,7 @@ final class SearchModel {
                 guard let self, epoch == self.epoch, !APIFailure.isCancellation(error) else { return }
                 guard self.state.libraryFailed(token, words) else { return }
                 self.failure = error
+                self.takeKept(words)
                 self.draw()
             }
         }
@@ -508,9 +586,13 @@ final class SearchModel {
                     let ready = self.state.ready
                     self.prefetch(SearchPacing.albumsToPrefetch(found.songs).filter { ready[$0] == nil }, kind: ask.token)
                 }
+                self.announceKind()
             } catch {
                 guard let self, epoch == self.epoch, !APIFailure.isCancellation(error) else { return }
-                if self.state.kindFailed(ask.token) { self.kindFailure = error }
+                if self.state.kindFailed(ask.token) {
+                    self.kindFailure = error
+                    self.announceKind()
+                }
             }
         }
     }
@@ -525,7 +607,7 @@ final class SearchModel {
             try? await Task.sleep(nanoseconds: UInt64(SearchPacing.libraryLateMs) * 1_000_000)
             guard !Task.isCancelled, let self else { return }
             if self.kindLateClock?.key == key { self.kindLateClock = nil }
-            self.state.kindLatePassed(words, kind)
+            if self.state.kindLatePassed(words, kind) { self.announceKind() }
         }
         kindLateClock = (key, task)
     }
@@ -538,6 +620,8 @@ final class SearchModel {
         let words = state.query
         askOwned()
         let asks = state.askingMusicBrainz(words, view: view, reread: reread)
+        // what's saved beside it, if these words haven't had it (the keyboard's Search on fewer than three characters)
+        if state.askedForQuery { askSaved(words) }
         syncCap()
         let admin = server.access.seesDetail
         if let ask = asks.albums { askAlbums(ask, client: client, admin: admin) }
@@ -552,13 +636,14 @@ final class SearchModel {
         askingAlbums = Task { [weak self] in
             do {
                 var query = ask.first
-                var found = try await client.fullySearch(query)
+                var (found, kept) = try await Self.keptAlbums(query, client)
                 if found.releaseGroups.isEmpty, let fallback = ask.fallback, !fallback.isEmpty {
                     guard let self, epoch == self.epoch, self.state.isNewestAlbums(ask.token) else { return }
                     query = fallback
-                    found = try await client.fullySearch(query)
+                    (found, kept) = try await Self.keptAlbums(query, client)
                 }
-                await self?.waitForOwned()
+                // an answer kept from before draws at once - no wait for /library/owned (the web's `!found.kept`)
+                if !kept { await self?.waitForOwned() }
                 guard !Task.isCancelled, let self, epoch == self.epoch else { return }
                 guard self.state.albumsAnswered(ask, found, query: query, index: self.ownedIndex) else { return }
                 self.draw()
@@ -576,8 +661,8 @@ final class SearchModel {
         let epoch = self.epoch
         askingArtists = Task { [weak self] in
             do {
-                let found = try await client.searchArtists(ask.name)
-                await self?.waitForOwned()
+                let (found, kept) = try await Self.keptArtists(ask.name, client)
+                if !kept { await self?.waitForOwned() }
                 guard !Task.isCancelled, let self, epoch == self.epoch else { return }
                 guard self.state.artistsAnswered(ask, found) else { return }
                 self.draw()
@@ -598,13 +683,13 @@ final class SearchModel {
         askingSongs = Task { [weak self] in
             do {
                 var query = ask.first
-                var found = try await client.searchSongs(query)
+                var (found, kept) = try await Self.keptSongs(query, client)
                 if found.recordings.isEmpty, let fallback = ask.fallback, !fallback.isEmpty {
                     guard let self, epoch == self.epoch, self.state.isNewestSongs(ask.token) else { return }
                     query = fallback
-                    found = try await client.searchSongs(query)
+                    (found, kept) = try await Self.keptSongs(query, client)
                 }
-                await self?.waitForOwned()
+                if !kept { await self?.waitForOwned() }
                 guard !Task.isCancelled, let self, epoch == self.epoch else { return }
                 guard self.state.songsAnswered(ask, found, query: query) else { return }
                 self.openSongs = []
@@ -616,6 +701,100 @@ final class SearchModel {
                 self.draw()
             }
         }
+    }
+
+    /// The kept answer for this ask, else asked - and kept when it answers (searchAnswers.ts `keptOr`); `kept` when it
+    /// was in hand. A failure is never kept, nor a More's page; one kept over `SearchAnswersKept.lifetime` ago is asked
+    /// again (by `Monotonic`, which counts the phone asleep).
+    private static func keptAlbums(_ query: String, _ client: DeadwaxClient) async throws -> (FullySearchAnswer, Bool) {
+        let key = SearchAnswersKept.albumsKey(query)
+        if case .albums(let found)? = kept.kept(key, at: Monotonic.seconds()) { return (found, true) }
+        let found = try await client.fullySearch(query)
+        kept.keep(key, .albums(found), at: Monotonic.seconds())
+        return (found, false)
+    }
+
+    private static func keptArtists(_ name: String, _ client: DeadwaxClient) async throws -> (ArtistSearchAnswer, Bool) {
+        let key = SearchAnswersKept.artistsKey(name)
+        if case .artists(let found)? = kept.kept(key, at: Monotonic.seconds()) { return (found, true) }
+        let found = try await client.searchArtists(name)
+        kept.keep(key, .artists(found), at: Monotonic.seconds())
+        return (found, false)
+    }
+
+    private static func keptSongs(_ query: String, _ client: DeadwaxClient) async throws -> (SongSearchAnswer, Bool) {
+        let key = SearchAnswersKept.songsKey(query)
+        if case .songs(let found)? = kept.kept(key, at: Monotonic.seconds()) { return (found, true) }
+        let found = try await client.searchSongs(query)
+        kept.keep(key, .songs(found), at: Monotonic.seconds())
+        return (found, false)
+    }
+
+    /// Every kind's More let go (new words, a new person, the box cleared) - Core's `typed` and a new state set them
+    /// idle, so a page from one of them lands on nothing.
+    private func cancelMore() {
+        for task in askingMoreMusicBrainz.values { task.cancel() }
+        askingMoreMusicBrainz = [:]
+    }
+
+    /// Every kind the view would ask MusicBrainz that a kept answer holds (Core's `takeKept`), taken with no request -
+    /// as the library answers, fails or is skipped, and as a chip is pressed - then `/library/owned` asked again to
+    /// mark rows in place. Nothing taken while deadwax can't be reached (nothing of MusicBrainz's is drawn then).
+    private func takeKept(_ words: String) {
+        guard reachability.online else { return }
+        let taken = state.takeKept(words, view: state.view, kept: Self.kept, now: Monotonic.seconds(), index: ownedIndex)
+        guard taken.took else { return }
+        if taken.songs {
+            openSongs = []
+            openFolds = []
+        }
+        askOwned()
+    }
+
+    /// What's saved for the words (Search.tsx `askSaved`): once per words, given up after `SearchSaved.waitMs` - the
+    /// library's moment waits for it that long at most - and its answer drawn as it lands.
+    private func askSaved(_ words: String) {
+        guard reachability.online, let client = server.client, let token = state.askingSaved(words) else { return }
+        askingSaved?.cancel()
+        savedClock?.cancel()
+        let epoch = self.epoch
+        savedClock = Task { [weak self] in
+            try? await Task.sleep(nanoseconds: UInt64(SearchSaved.waitMs) * 1_000_000)
+            guard !Task.isCancelled, let self, epoch == self.epoch, self.state.savedGaveUp(words) else { return }
+            self.askingSaved?.cancel()
+            self.draw()
+        }
+        askingSaved = Task { [weak self] in
+            do {
+                let answer = try await client.savedSearch(words)
+                guard let self, epoch == self.epoch, self.state.savedAnswered(token, answer) else { return }
+                self.draw()
+            } catch {
+                guard let self, epoch == self.epoch, !APIFailure.isCancellation(error) else { return }
+                if self.state.savedFailed(token) { self.draw() }
+            }
+        }
+    }
+
+    /// A kind view's region (Search.tsx's layout effect): its library's words once its rows are drawn, then
+    /// MusicBrainz's - what's saved's with them - once it has answered or failed, each once for the view's words and
+    /// kind; `after` (a chip's "Showing albums.") said with them.
+    private func announceKind(after words: String? = nil) {
+        var told: [String] = words.map { [$0] } ?? []
+        if let shown = kindView {
+            let said = shown.said
+            if kindSaid.key != said.key { kindSaid = (said.key, false, false) }
+            if !kindSaid.library, let library = said.library {
+                kindSaid.library = true
+                told.append(library)
+            }
+            if !kindSaid.musicBrainz, let musicBrainz = said.musicBrainz {
+                kindSaid.musicBrainz = true
+                told.append(musicBrainz)
+            }
+        }
+        let joined = told.filter { !$0.isEmpty }.joined(separator: " ")
+        if !joined.isEmpty { Notice.announce(joined) }
     }
 
     /// `/library/owned`'s ask in flight, waited on for `ownedWaitMs` at most.
@@ -681,6 +860,9 @@ final class SearchModel {
     /// The All view's next draw, when the state has one - announced as it draws; then Behind noted and the cap timed,
     /// as the web's layout effect does after every draw.
     private func draw() {
+        if state.view != .all {
+            announceKind()
+        }
         if let drawing = state.advance(artistList: artists.list, marks: marks) {
             let drawn = drawing.drawn
             // the failure's words kept while a list drawn with it stands - let go only as one without it takes its place
@@ -706,6 +888,9 @@ final class SearchModel {
         askingArtists?.cancel()
         askingSongs?.cancel()
         askingHeld?.cancel()
+        askingSaved?.cancel()
+        savedClock?.cancel()
+        cancelMore()
         lateClock?.cancel()
         kindLateClock?.task.cancel()
         kindLateClock = nil
@@ -719,6 +904,8 @@ final class SearchModel {
         opening = nil
         openSongs = []
         openFolds = []
+        kindAreas = [:]
+        kindSaid = ("", false, false)
     }
 
     /// At most `SearchReading.maxCharacters` - counted as the server's `q` counts them, by Unicode scalar.

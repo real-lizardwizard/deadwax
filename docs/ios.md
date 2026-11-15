@@ -1,4 +1,4 @@
-# The iPhone app (early: app 0.10, downloads, lyrics, the EQ, the turntable, play history, your library, the Library and Search)
+# The iPhone app (early: app 0.11, downloads, lyrics, the EQ, the turntable, play history, your library, the Library and Search)
 
 deadwax is getting a native iPhone app, built with SwiftUI and its own audio engine, for what a web
 page can't do well: seamless joins and normalization done on the phone, downloads to play offline,
@@ -23,7 +23,7 @@ own plays go into the web app's too (see [Up Next](#up-next) and [What you've
 played](#what-youve-played)). App 0.9 added your library downloaded by itself, as much as fits your
 storage limit, kept in step with what you star and unstar anywhere - only while the phone is charging if
 you choose, and with the app in the background when iOS allows (see [Your library on this
-phone](#your-library-on-this-phone)). **This is app 0.10, Phase 4's Library**: **playlists** - yours and
+phone](#your-library-on-this-phone)). App 0.10 added Phase 4's Library: **playlists** - yours and
 those shared with you, played as the web app plays them, and made, added to, edited and deleted on the
 phone as in the web app, and downloaded to play with no connection, kept in step as they change (see
 [Playlists](#playlists)); the Library's switch - Albums | Playlists | Artists, and Songs with logins off
@@ -31,9 +31,12 @@ phone as in the web app, and downloaded to play with no connection, kept in step
 a pull down that shuffles your whole library (see [The
 Library](#the-library)); **artists** - your artists, and an artist's page with their albums, Play and
 Shuffle (see [Artists](#artists)); and **songs** - every song, a page at a time, each opening its album
-(see [Songs](#songs)). Phase 5's Search has begun: its first half searches your library, as the web app's
-Search does (see [Search](#search)); albums you don't have, Get and the rest come next (see [What it
-can't do yet](#what-it-cant-do-yet)).
+(see [Songs](#songs)). **This is app 0.11, Phase 5's Search**: your library and MusicBrainz searched as the
+web app's Search searches them, in one list - Top results, then artists, albums and songs, yours first - a song
+playing from its tap; the albums, artists and songs you don't have yet, each opening its page (an album's
+pressings and tracklists, an artist's albums); what deadwax has saved of MusicBrainz's answers, drawn with your
+library at once; and **More** from MusicBrainz, a page at a time (see [Search](#search)). Get, Requests and the
+rest come next (see [What it can't do yet](#what-it-cant-do-yet)).
 
 **Nothing of Phase 2, the lyrics, the EQ, the turntable, play history, your library downloaded,
 playlists, artists, songs or Search has been seen on an iPhone yet.** It's built and tested on a Mac, and what
@@ -155,7 +158,7 @@ old one. It also uses up one of the few new app ids a free account may register 
 It pulls the latest code, asks GitHub whether the app's checks passed on it (and asks you before
 building one that failed or is still running), builds it (Release), and installs it **over** the app
 on the phone, so everything on the phone stays. Then it opens the app and says how long the new
-install runs: `Installed deadwax 0.10 (10), runs until Wed 18 Nov, 14:02`. It also says how long it
+install runs: `Installed deadwax 0.11 (11), runs until Wed 18 Nov, 14:02`. It also says how long it
 took and the Mac's free space before and after. Xcode doesn't need to be open.
 
 | option | what it does |
@@ -682,6 +685,34 @@ what went wrong with **Try again** at its end - so nothing below it moves when i
 Typing on keeps the list where it is until the new words' list is in. Clearing the field brings the hint
 back.
 
+**What's saved.** deadwax keeps every answer MusicBrainz has given it, for anyone's search, and searches them
+too. For words MusicBrainz is asked for (three letters or more, or Search pressed), what it has saved of the
+artists, albums and songs you don't have is drawn with your library, at its moment, before MusicBrainz has
+answered - so an album found before can lead Top results at once. The list waits at most four tenths of a
+second for it; slower than that, it's left out for those words, and MusicBrainz's answer comes as it would
+without it. Until deadwax knows which albums your library holds (the first look after the deadwax container
+starts can take a while on a sleeping disk), saved albums wait - saved artists and songs don't - and
+MusicBrainz's albums come as ever. MusicBrainz's answer adds only what isn't there already, and nothing drawn moves; VoiceOver says "Found earlier: 1 album." as
+the list is drawn, then "More found: 2 albums." (or "Nothing more found."). If MusicBrainz can't be asked, what's
+saved stays, and where MusicBrainz's rows would be: "Showing earlier results - searching for more isn't working
+right now." (or "…try again in a moment for more."), with **Try again**.
+
+**Words searched before.** The phone keeps the last 24 answers MusicBrainz gave it, each for an hour from when it
+came (as long as deadwax keeps one in memory), and words searched again - typed again, gone back to, or a chip
+chosen - are drawn from them whole as your library answers, nothing asked of MusicBrainz. After the hour the words
+are asked again. They're kept for whoever signs in next, as MusicBrainz's data is nobody's.
+
+**More from MusicBrainz.** A chip's view - Artists, Albums or Songs - ends, once MusicBrainz has answered and
+has more, with **More artists**, **More albums** or **More songs**: the next page of the same search, added below
+the rows already there, nothing above them moving. It says "Loading…" while it asks, and "Try again" if it
+couldn't, with why above it. Each chip's More is its own: asking More songs leaves More albums asking. Typing new
+words lets any More still asking go - its page never lands under them. A page that brings nothing new says so - "The next 3 albums found are all in your
+library already." ("…in the collection already." with a library of your own), "No new songs - 2 more albums
+for the songs above.", or "No more results." - and VoiceOver says what came ("11 more albums found"). A thousand
+results in, it stops: "That's all for this search - add a word to narrow it." In a chip's view what's saved leads
+MusicBrainz's rows, and rows that come after something was drawn go below it. New words let a More still asking
+go.
+
 - **A song**: tap it to play it, with its album's songs after it in Up Next. The phone fetches the albums
   of the first songs found as the list comes in, so a song with **▶** after it plays the moment you tap.
   One without (its album not fetched yet) opens its album's page instead. Its **•••** is the song's own
@@ -727,16 +758,18 @@ back.
 - **Offline**, a list already drawn for the words stays, without the albums you don't have, the songs not
   on this phone dimmed (a tap does nothing) and the ones on it playing; albums and artists with nothing here
   dimmed. New words say "Search works once deadwax is back." - never an empty list - and are searched once
-  it is, your library's rows in the list with the rest. The artists, albums and songs you don't have
-  leave the list while deadwax is away and come back with it. An album you
+  it is, your library's rows in the list with the rest. The artists, albums and songs you don't have - what's
+  saved of them, and More, with them - leave the list while deadwax is away and come back with it; nothing is
+  asked of MusicBrainz meanwhile, nor taken from the answers kept. An album you
   don't have's page keeps what it has shown; one that hasn't loaded its pressings says "This album's
   pressings load once deadwax is back." and loads them when it is. An artist you don't have's page says
   "Their albums show once deadwax is back." where their albums go, and lists them once it is.
 - **VoiceOver** reads a row as one: its title, its line, and for a song "plays it from its album" or "opens
   its album" - for a song you don't have, "Shows the albums it's on." (or "Hides…" once open). The list is
   announced as it comes in ("In your library: 1 artist, 2 albums, 11 songs.", then "Also found: 2 artists, 3
-  albums, 4 songs."), and a chip as it's chosen ("Showing albums."). On an album opened from a song, its
-  track reads "…, the song you searched for".
+  albums, 4 songs."), and a chip as it's chosen ("Showing albums."). A chip's view says what it drew as it
+  comes in: "In your library: 2 albums.", then "Found earlier: 1 album. More found: 3 albums." (each once for
+  the words). On an album opened from a song, its track reads "…, the song you searched for".
 
 ## Playing
 
@@ -1058,7 +1091,7 @@ album.
   If deadwax can't be reached, it says "Couldn't reach deadwax, so you're still signed in - try
   again." Changing your password is the web app's, for now.
 - **About**: deadwax's version, whether logins are on (for an admin), and the app's own version,
-  **0.10 (10)**.
+  **0.11 (11)**.
 - **This phone**: deadwax's address, **Change address**, and **Debug**, for an admin (with logins
   off, everyone is one).
 
@@ -2787,6 +2820,47 @@ artist you don't have's page (still app 0.10). Compare with the web app's Search
   "…, the song you searched for". On an artist's page, a row reads its title and line ("Mezzanine, 1998 ·
   not in your library"), and Studio only says whether it's on.
 
+### Search's checks, slice 4 (156-165)
+
+**Not done yet.** These come with the build that adds what's saved, the kept answers and More from MusicBrainz -
+**app 0.11 (11)**, the end of Phase 5. Compare with the web app's Search, as for 121-155.
+
+- **156 The version.** install.sh says "Installed deadwax 0.11 (11), runs until …", and You > About reads
+  0.11 (11). Search opens as before: the field, and the hint under it.
+- **157 What's saved, at once.** In the web app search an album you don't have ("roseland nyc live"), so deadwax
+  has MusicBrainz's answer saved. On the phone type the same words: the album is in the list with your library's
+  rows, before "Searching…" would have gone - in Top results if it fits best, and in Albums. VoiceOver: "Found
+  earlier: 1 album.", then "More found: …" or "Nothing more found." once MusicBrainz has answered. Nothing drawn
+  moves when it does.
+- **158 Saved, then more.** Type words for which deadwax has some albums saved and MusicBrainz finds more: the
+  saved ones are drawn first, MusicBrainz's after them, none twice. The same words in the web app: the same
+  rows in the same order.
+- **159 MusicBrainz away under what's saved.** With deadwax unable to reach MusicBrainz (or past its rate
+  limit), type saved words: what's saved drawn, and under it "Showing earlier results - searching for more isn't
+  working right now." with **Try again**; tap it once MusicBrainz is back: its rows added below.
+- **160 A chip's rows stay put.** Type an album's words and tap **Albums** at once, then watch while MusicBrainz
+  answers: what's saved first, MusicBrainz's albums below it, and a row once drawn never moves - at the largest
+  text size too. Tap **All** and **Albums** again: the same rows, in the same places.
+- **161 More albums.** In the Albums view of words with many albums ("live"): at the foot, **More albums**; tap it:
+  "Loading…", then up to 12 more below, nothing above them moving, VoiceOver saying "12 more albums found" (fewer
+  when some are yours; a page all of yours says "The next 3 albums found are all in your library already."). Keep tapping: the list grows a page
+  at a time; at the end "No more results." or "That's all for this search - add a word to narrow it." The same
+  in Artists (**More artists**) and Songs (**More songs**).
+- **162 More, left behind.** Tap **More albums** and type a letter before it comes: the page doesn't land under
+  the new words, and nothing is said of it; delete the letter: **More albums** again, not "Loading…". On a slow
+  connection, tap **More albums**, then the **Songs** chip and **More songs**, then **Albums** again: More albums
+  still asking, then its page - never stuck on "Loading…". On a slow connection, tap **More albums** and, with
+  "Loading…" showing, Airplane Mode on: the button and MusicBrainz's rows go; off: they're back, More with Try
+  again or the page.
+- **163 Words searched before.** Search some words, then others, then the first again: the first list is drawn
+  whole as your library's rows come, with no "Searching…" for MusicBrainz. An hour later (or after closing the app
+  by swiping it away), the same words: "Searching…" again, MusicBrainz asked afresh.
+- **164 Offline.** Airplane Mode on, type words searched earlier this session: "Search works once deadwax is
+  back." - nothing drawn from the answers kept; off: searched, your library's rows with the rest.
+- **165 VoiceOver in a chip's view.** Tap **Albums** with words typed: "Showing albums.", then "In your library: 2
+  albums.", then what MusicBrainz and what's saved brought ("Found earlier: 1 album. More found: 3 albums."), each
+  once. More's button reads its words ("More albums", "Loading…", "Try again").
+
 ## What it can't do yet
 
 These are the web app's for now. Most of them come to the phone in the next phases:
@@ -2795,9 +2869,10 @@ These are the web app's for now. Most of them come to the phone in the next phas
 
 - On an artist's page their **discography** from MusicBrainz, the **description** and the artist's
   managing (pictures, names).
-- In **Search**, what's saved of MusicBrainz's answers, and **More** for the artists, albums and songs you
-  don't have; **Get** (an album you don't have shows its pressings, but is got in the web app) and
-  **Requests**. An artist you don't have's page lists their albums, without their description or links.
+- In **Search**, **Get** (an album you don't have shows its pressings, but is got in the web app) and
+  **Requests**. An artist you don't have's page lists their albums, without their description or links. A
+  search of what's downloaded while deadwax can't be reached isn't built: offline, Search keeps a list already
+  drawn, and new words wait for deadwax.
 - **Home** and **pins**.
 - **Looking after deadwax**: People, Server settings, the event log, Needs a look, Library care, the
   editors, and changing your password. For an admin, **Set up Navidrome** opens the web app in Safari.

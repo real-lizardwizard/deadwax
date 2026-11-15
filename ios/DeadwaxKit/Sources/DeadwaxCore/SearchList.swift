@@ -383,31 +383,41 @@ public enum SearchWhose {
 
 // MARK: the pool and the sections
 
-/// A row in its place: whose block, and its index in its own answer (-1 for the artist the box named, who leads).
+/// A row in its place: whose block, and its index in its own answer (-1 for the artist the box named, who leads) -
+/// `saved` when that answer is what's saved (slice 4: a row brought in through it ranks as what's saved does).
 public struct SearchPlaced: Sendable, Equatable {
     public let row: SearchRow
     public let holder: SearchHolder
     public let position: Int
+    public let saved: Bool
 
-    public init(row: SearchRow, holder: SearchHolder, position: Int) {
+    public init(row: SearchRow, holder: SearchHolder, position: Int, saved: Bool = false) {
         self.row = row
         self.holder = holder
         self.position = position
+        self.saved = saved
     }
 }
 
-/// One kind's rows in hand (searchList.ts `KindPool`): the library's (search3, in its order), those MusicBrainz brought
-/// in (held, but not listed by search3), and MusicBrainz's own. What's saved (slice 4) isn't in it yet.
+/// One kind's rows in hand (searchList.ts `KindPool`): the library's (search3, in its order), those brought in through
+/// MusicBrainz's answer or what's saved (held, but not listed by search3), what's saved (slice 4) and MusicBrainz's own.
 public struct SearchKindPool: Sendable, Equatable {
     public var library: [SearchPlaced]
     public var brought: [SearchPlaced]
+    public var saved: [SearchPlaced]
     public var musicbrainz: [SearchPlaced]
 
-    public init(library: [SearchPlaced] = [], brought: [SearchPlaced] = [], musicbrainz: [SearchPlaced] = []) {
+    public init(library: [SearchPlaced] = [], brought: [SearchPlaced] = [], saved: [SearchPlaced] = [],
+                musicbrainz: [SearchPlaced] = []) {
         self.library = library
         self.brought = brought
+        self.saved = saved
         self.musicbrainz = musicbrainz
     }
+
+    /// The keys of the rows from what's saved (searchList.ts `isSaved` - a row brought in through it isn't one: it is
+    /// the library's).
+    public var savedKeys: Set<String> { Set(saved.map(\.row.key)) }
 }
 
 /// Each kind's rows in hand (searchList.ts `pool`): each thing once, in its block.
@@ -470,10 +480,13 @@ public enum SearchList {
     /// library has brought in (`newArtists`); MusicBrainz's albums less those the library holds (`shown`), and those it
     /// holds that search3 didn't list brought into their holder's block (`heldUnlisted`) - a group found held only since
     /// its answer landed stays in MusicBrainz's block, marked in place; MusicBrainz's songs less the library's, one held
-    /// on an album it is on brought in (`newSongs`).
+    /// on an album it is on brought in (`newSongs`). (Slice 4) What's saved (`saved`, as the view draws it) leads each
+    /// kind's MusicBrainz rows, deduped against the library as MusicBrainz's are, and MusicBrainz's answer deduped
+    /// against it - artists by id, read as one list with MusicBrainz's; albums by id; songs by key.
     public static func pool(reading: SearchPlan, library: LibraryResults?, artistList: [Artist]?,
                             marks: SearchMarks, albums found: SearchAlbumsInHand? = nil,
-                            artists matches: [MBArtistMatch]? = nil, songs foundSongs: [FoundSong]? = nil) -> SearchPool {
+                            artists matches: [MBArtistMatch]? = nil, songs foundSongs: [FoundSong]? = nil,
+                            saved: SavedAnswer? = nil) -> SearchPool {
         let listedArtists = library?.artists ?? []
         let known = knownArtists(artistList, listedArtists)
         let named = namedArtist(reading, known)
@@ -486,15 +499,31 @@ public enum SearchList {
             artists.library.append(SearchPlaced(row: .artist(artist), holder: SearchHolder(SearchWhose.artist(artist, marks)),
                                                 position: position))
         }
-        if let matches {
+        //? what's saved first, then MusicBrainz's answer less what's saved (by id) - read as ONE list by newArtists, so a
+        //? library artist is brought in once, and "answers to that name" counts both
+        let savedMatches = saved?.matches ?? []
+        if !savedMatches.isEmpty || matches != nil {
+            let savedIds = Set(savedMatches.map(\.mbid))
+            //? each live match with its place in MusicBrainz's answer
+            let live: [(match: MBArtistMatch, at: Int)] = (matches ?? []).enumerated()
+                .filter { !savedIds.contains($0.element.mbid) }
+                .map { (each: (offset: Int, element: MBArtistMatch)) -> (match: MBArtistMatch, at: Int) in (each.element, each.offset) }
             let listed = named.map { listedArtists + [$0] } ?? listedArtists
-            let split = newArtists(matches, known: known, index: marks.index, listed: listed)
-            artists.musicbrainz = split.musicbrainz.map { (each: (match: MBArtistMatch, position: Int)) -> SearchPlaced in
-                SearchPlaced(row: .mbArtist(each.match), holder: .yours, position: each.position)
+            let split = newArtists(savedMatches + live.map(\.match), known: known, index: marks.index, listed: listed)
+            func fromSaved(_ position: Int) -> Bool { position < savedMatches.count }
+            func at(_ position: Int) -> Int { fromSaved(position) ? position : live[position - savedMatches.count].at }
+            for each in split.musicbrainz {
+                if fromSaved(each.position) {
+                    artists.saved.append(SearchPlaced(row: .mbArtist(each.match), holder: .yours, position: each.position,
+                                                      saved: true))
+                } else {
+                    artists.musicbrainz.append(SearchPlaced(row: .mbArtist(each.match), holder: .yours,
+                                                            position: at(each.position)))
+                }
             }
             artists.brought = split.brought.map { (each: (artist: Artist, position: Int)) -> SearchPlaced in
                 SearchPlaced(row: .artist(each.artist), holder: SearchHolder(SearchWhose.artist(each.artist, marks)),
-                             position: each.position)
+                             position: at(each.position), saved: fromSaved(each.position))
             }
         }
         let libraryAlbums = library?.albums ?? []
@@ -502,15 +531,39 @@ public enum SearchList {
             SearchPlaced(row: .album(each.element), holder: SearchHolder(SearchWhose.album(each.element, marks)),
                          position: each.offset)
         })
+        let savedGroups = saved?.groups ?? []
+        //? only the saved albums this pool DRAWS - shown, or brought in as held - are left out of MusicBrainz's answer
+        //? (the web's 2.1.25, found reviewing this port): before the library's index is in, what's saved draws none of
+        //? its albums (`shown`), so leaving out every saved one drew an album both had found nowhere at all
+        var savedDrawn = Set<String>()
+        if !savedGroups.isEmpty {
+            var at: [String: Int] = [:]
+            for (position, group) in savedGroups.enumerated() { at[group.id] = position }
+            let savedShown = saved?.shown ?? []
+            albums.saved = savedShown.map { (group: ReleaseGroup) -> SearchPlaced in
+                SearchPlaced(row: .group(group), holder: .yours, position: at[group.id] ?? 0, saved: true)
+            }
+            let shown = Set(savedShown.map(\.id))
+            let brought = SearchAlbums.heldUnlisted(savedGroups, marks.index, libraryAlbums)
+                .filter { !shown.contains($0.id) }
+            albums.brought = brought.map { (group: ReleaseGroup) -> SearchPlaced in
+                SearchPlaced(row: .group(group), holder: SearchHolder(SearchAlbums.yours(group, marks)),
+                             position: at[group.id] ?? 0, saved: true)
+            }
+            for group in savedShown + brought { savedDrawn.insert(group.id) }
+        }
         if let found {
             //? a Map of id -> position: a group named twice keeps its last position, as JavaScript's Map does
             var at: [String: Int] = [:]
             for (position, group) in found.groups.enumerated() { at[group.id] = position }
-            albums.musicbrainz = found.shown.map { (group: ReleaseGroup) -> SearchPlaced in
+            let groups = found.groups.filter { !savedDrawn.contains($0.id) }
+            albums.musicbrainz = found.shown.filter { !savedDrawn.contains($0.id) }.map { (group: ReleaseGroup) -> SearchPlaced in
                 SearchPlaced(row: .group(group), holder: .yours, position: at[group.id] ?? 0)
             }
+            //? MusicBrainz's block is the one worked out as its answer landed (`shown`); a group found held only since
+            //? stays in it, marked in place - never brought in as well
             let shown = Set(found.shown.map(\.id))
-            albums.brought = SearchAlbums.heldUnlisted(found.groups, marks.index, libraryAlbums)
+            albums.brought += SearchAlbums.heldUnlisted(groups, marks.index, libraryAlbums)
                 .filter { !shown.contains($0.id) }
                 .map { (group: ReleaseGroup) -> SearchPlaced in
                     SearchPlaced(row: .group(group), holder: SearchHolder(SearchAlbums.yours(group, marks)),
@@ -522,15 +575,28 @@ public enum SearchList {
             SearchPlaced(row: .song(each.element), holder: SearchHolder(SearchWhose.song(each.element, marks)),
                          position: each.offset)
         })
+        let savedSongs = saved?.songs ?? []
+        let savedKeys = Set(savedSongs.map { FoldKey($0.key) })
+        if !savedSongs.isEmpty {
+            let split = newSongs(savedSongs, library: librarySongs, index: marks.index, evidence: marks.evidence)
+            songs.saved = split.musicbrainz.map { (each: (song: FoundSong, position: Int)) -> SearchPlaced in
+                SearchPlaced(row: .mbSong(each.song), holder: .yours, position: each.position, saved: true)
+            }
+            songs.brought = split.brought.map { (each: (song: FoundSong, position: Int, yours: Bool)) -> SearchPlaced in
+                SearchPlaced(row: .mbSong(each.song), holder: marks.personal && !each.yours ? .store : .yours,
+                             position: each.position, saved: true)
+            }
+        }
         if let foundSongs {
             //? a Map of key -> position, as the albums' ids: a key named twice keeps its last
             var at: [FoldKey: Int] = [:]
             for (position, song) in foundSongs.enumerated() { at[FoldKey(song.key)] = position }
-            let split = newSongs(foundSongs, library: librarySongs, index: marks.index, evidence: marks.evidence)
+            let live = foundSongs.filter { !savedKeys.contains(FoldKey($0.key)) }
+            let split = newSongs(live, library: librarySongs, index: marks.index, evidence: marks.evidence)
             songs.musicbrainz = split.musicbrainz.map { (each: (song: FoundSong, position: Int)) -> SearchPlaced in
                 SearchPlaced(row: .mbSong(each.song), holder: .yours, position: at[FoldKey(each.song.key)] ?? 0)
             }
-            songs.brought = split.brought.map { (each: (song: FoundSong, position: Int, yours: Bool)) -> SearchPlaced in
+            songs.brought += split.brought.map { (each: (song: FoundSong, position: Int, yours: Bool)) -> SearchPlaced in
                 SearchPlaced(row: .mbSong(each.song), holder: marks.personal && !each.yours ? .store : .yours,
                              position: at[FoldKey(each.song.key)] ?? 0)
             }
@@ -611,7 +677,8 @@ public enum SearchList {
     public static func sectionRows(_ kind: SearchKindPool, cap: (Int, Int)? = nil) -> [SearchRow] {
         let held = kind.library + kind.brought
         let library = held.filter { $0.holder == .yours }.map(\.row) + held.filter { $0.holder == .store }.map(\.row)
-        let musicbrainz = kind.musicbrainz.map(\.row)
+        //? (slice 4) what's saved leads MusicBrainz's rows, the preview's cap for MusicBrainz's taking both
+        let musicbrainz = (kind.saved + kind.musicbrainz).map(\.row)
         guard let cap else { return library + musicbrainz }
         return Array(library.prefix(max(0, cap.0))) + Array(musicbrainz.prefix(max(0, cap.1)))
     }
@@ -623,7 +690,8 @@ public enum SearchList {
         func fresh(_ each: SearchPlaced) -> Bool { !drawn.contains(each.row.key) }
         let brought = (kind.brought.filter { $0.holder == .yours } + kind.brought.filter { $0.holder == .store })
             .filter(fresh).map(\.row)
-        let musicbrainz = kind.musicbrainz.filter(fresh).map(\.row)
+        //? (slice 4) what's saved may be drawn above the slot already: MusicBrainz's answer adds only what isn't
+        let musicbrainz = (kind.saved + kind.musicbrainz).filter(fresh).map(\.row)
         guard let cap else { return brought + musicbrainz }
         return Array(brought.prefix(max(0, cap.0))) + Array(musicbrainz.prefix(max(0, cap.1)))
     }
@@ -656,8 +724,11 @@ public enum SearchList {
         public let source: Double
         public let position: Double
         public let phantom: Bool
+        /// Its row is from what's saved (searchList.ts `isSaved`) - drawn as MusicBrainz's would be; what the words say
+        /// of it differs.
+        public let saved: Bool
 
-        public init(row: SearchRow, tier: Int, source: Double, position: Double) {
+        public init(row: SearchRow, tier: Int, source: Double, position: Double, saved: Bool = false) {
             self.row = row
             key = row.key
             kind = row.kind
@@ -665,6 +736,7 @@ public enum SearchList {
             self.source = source
             self.position = position
             phantom = false
+            self.saved = saved
         }
 
         /// A MusicBrainz kind still out (`phantom`): the best tier its kind can reach under the reading, MusicBrainz's
@@ -677,6 +749,7 @@ public enum SearchList {
             source = Source.musicbrainz
             position = -Double.infinity
             phantom = true
+            saved = false
         }
     }
 
@@ -732,17 +805,18 @@ public enum SearchList {
     }
 
     /// Top results' candidates from the pool (`candidatesOf`): the library's (yours 0, the collection's 1, by the whose
-    /// known now), and MusicBrainz's AND what MusicBrainz brought in (2, at their MusicBrainz positions) - so a decision
-    /// taken before MusicBrainz answered stays sound.
+    /// known now), what's saved and what it brought in (1.5), and MusicBrainz's AND what MusicBrainz brought in (2, at
+    /// their MusicBrainz positions) - so a decision taken before MusicBrainz answered stays sound.
     public static func candidates(_ pool: SearchPool, box: String, reading: SearchPlan) -> [Candidate] {
         SearchKind.allCases.flatMap { (kind: SearchKind) -> [Candidate] in
-            func add(_ placed: SearchPlaced, _ source: Double) -> Candidate {
+            func add(_ placed: SearchPlaced, _ source: Double, saved: Bool = false) -> Candidate {
                 Candidate(row: placed.row, tier: matchTier(placed.row, box: box, reading: reading), source: source,
-                          position: Double(placed.position))
+                          position: Double(placed.position), saved: saved)
             }
             let rows = pool[kind]
             return rows.library.map { add($0, $0.holder == .store ? Source.store : Source.yours) }
-                + rows.brought.map { add($0, Source.musicbrainz) }
+                + rows.brought.map { add($0, $0.saved ? Source.saved : Source.musicbrainz) }
+                + rows.saved.map { add($0, Source.saved, saved: true) }
                 + rows.musicbrainz.map { add($0, Source.musicbrainz) }
         }
     }
@@ -769,6 +843,36 @@ public enum SearchList {
     public static func family(of row: SearchRow, library: LibraryResults?, artistList: [Artist]?,
                               index: OwnedIndex? = nil, groups: [ReleaseGroup] = [],
                               evidence: SongEvidence = .none) -> [SearchRow] {
+        familyMarked(of: row, library: library, artistList: artistList, index: index, groups: groups,
+                     evidence: evidence).map(\.row)
+    }
+
+    /// ...each relative with whether it is from what's saved (slice 4): a relative made of what's saved - a saved row's
+    /// own album or artist, a saved group (`saved`, the ids of the groups in hand that are what's saved) - is marked so,
+    /// when it is MusicBrainz's (a library artist made of a credit is the library's).
+    public static func familyMarked(of row: SearchRow, rowSaved: Bool = false, library: LibraryResults?,
+                                    artistList: [Artist]?, index: OwnedIndex? = nil, groups: [ReleaseGroup] = [],
+                                    saved: Set<String> = [], evidence: SongEvidence = .none)
+        -> [(row: SearchRow, saved: Bool)] {
+        let relatives = relatives(of: row, library: library, artistList: artistList, index: index, groups: groups,
+                                  evidence: evidence)
+        return relatives.map { (relative: SearchRow) -> (row: SearchRow, saved: Bool) in
+            switch row {
+            case .mbSong:
+                //? its named album: saved with the row, or as a group of what's saved; its artist with the row
+                if case .group(let group) = relative, saved.contains(group.id) { return (relative, true) }
+                return (relative, rowSaved && relative.isMusicBrainz)
+            case .group:
+                return (relative, rowSaved && relative.isMusicBrainz)
+            default:
+                return (relative, false)
+            }
+        }
+    }
+
+    /// What the best match belongs to (`familyOf`), unmarked.
+    static func relatives(of row: SearchRow, library: LibraryResults?, artistList: [Artist]?, index: OwnedIndex?,
+                          groups: [ReleaseGroup], evidence: SongEvidence) -> [SearchRow] {
         func libraryArtist(_ id: String?, _ name: String?) -> SearchRow? {
             guard let id, !id.isEmpty else { return nil }
             let listed: Artist? = library?.artists.first(where: { (artist: Artist) -> Bool in artist.id == id })
@@ -807,10 +911,15 @@ public enum SearchList {
 
     /// Top results' rows (`topResults`, its picks' rows - a phantom picked has none, and is left out).
     public static func topResults(_ candidates: [Candidate], n: Int, library: LibraryResults?, artistList: [Artist]?,
-                                  index: OwnedIndex? = nil, groups: [ReleaseGroup] = [], evidence: SongEvidence = .none,
-                                  fixed: [SearchRow] = []) -> [SearchRow] {
+                                  index: OwnedIndex? = nil, groups: [ReleaseGroup] = [], saved: Set<String> = [],
+                                  evidence: SongEvidence = .none, fixed: [SearchRow] = []) -> [SearchRow] {
         topPicks(candidates, n: n, library: library, artistList: artistList, index: index, groups: groups,
-                 evidence: evidence, fixed: fixed).compactMap(\.row)
+                 saved: saved, evidence: evidence, fixed: fixed).compactMap(\.row)
+    }
+
+    /// The keys of Top results' picks that are from what's saved (slice 4) - what the all-failed foot's words read.
+    public static func savedPicks(_ picks: [Candidate]) -> Set<String> {
+        Set(picks.filter { $0.saved && !$0.phantom }.map(\.key))
     }
 
     /// Top results decided before MusicBrainz has answered, without anything moving (`decidedTop`): the picks over what
@@ -819,11 +928,13 @@ public enum SearchList {
     /// the rest. A phantom first: no prefix.
     public static func decidedTop(_ candidates: [Candidate], phantoms: [Candidate], n: Int, library: LibraryResults?,
                                   artistList: [Artist]?, index: OwnedIndex? = nil, groups: [ReleaseGroup] = [],
-                                  evidence: SongEvidence = .none) -> (prefix: [SearchRow], place: Bool) {
+                                  saved: Set<String> = [], evidence: SongEvidence = .none)
+        -> (prefix: [SearchRow], place: Bool, saved: Set<String>) {
         let picks = topPicks(candidates + phantoms, n: n, library: library, artistList: artistList, index: index,
-                             groups: groups, evidence: evidence)
-        guard let first = picks.firstIndex(where: \.phantom) else { return (picks.compactMap(\.row), false) }
-        return (picks[..<first].compactMap(\.row), true)
+                             groups: groups, saved: saved, evidence: evidence)
+        guard let first = picks.firstIndex(where: \.phantom) else { return (picks.compactMap(\.row), false, savedPicks(picks)) }
+        let decided = Array(picks[..<first])
+        return (decided.compactMap(\.row), true, savedPicks(decided))
     }
 
     /// Top results' picks (`topResults`): `n`, continuing `fixed` as if those were picked first. Without any: the best,
@@ -831,9 +942,10 @@ public enum SearchList {
     /// than the round taking its best left, until there are `n` (fewer candidates, fewer picks). A phantom picked is
     /// returned as one - decidedTop stops there.
     public static func topPicks(_ candidates: [Candidate], n: Int, library: LibraryResults?, artistList: [Artist]?,
-                                index: OwnedIndex? = nil, groups: [ReleaseGroup] = [], evidence: SongEvidence = .none,
-                                fixed: [SearchRow] = []) -> [Candidate] {
-        var picked: [Candidate] = fixed.map { Candidate(row: $0, tier: 0, source: 0, position: 0) }
+                                index: OwnedIndex? = nil, groups: [ReleaseGroup] = [], saved: Set<String> = [],
+                                evidence: SongEvidence = .none, fixed: [SearchRow] = [],
+                                fixedSaved: Set<String> = []) -> [Candidate] {
+        var picked: [Candidate] = fixed.map { Candidate(row: $0, tier: 0, source: 0, position: 0, saved: fixedSaved.contains($0.key)) }
         var keys = Set(fixed.map(\.key))
         //? JavaScript's sort is stable: equal candidates keep their order
         let left = candidates.enumerated()
@@ -851,11 +963,11 @@ public enum SearchList {
         if picked.isEmpty, let best = left.first {
             take(best)
             if let row = best.row {
-                for relative in family(of: row, library: library, artistList: artistList, index: index, groups: groups,
-                                       evidence: evidence) {
+                for relative in familyMarked(of: row, rowSaved: best.saved, library: library, artistList: artistList,
+                                             index: index, groups: groups, saved: saved, evidence: evidence) {
                     if picked.count >= n { break }
-                    if keys.contains(relative.key) { continue }
-                    take(Candidate(row: relative, tier: 3, source: 2, position: 0))
+                    if keys.contains(relative.row.key) { continue }
+                    take(Candidate(row: relative.row, tier: 3, source: 2, position: 0, saved: relative.saved))
                 }
             }
         }
@@ -968,13 +1080,32 @@ public enum SearchList {
             public let kind: SearchKind
             public let rows: [SearchRow]
             public let slot: Slot?
+            /// (Slice 4) The keys of its rows from what's saved (Search.tsx `fromSaved`), its folded rows' too - read only
+            /// against the rows drawn.
+            public let saved: Set<String>
+            /// Rows from what's saved were among its rows as it was drawn (Search.tsx `DrawnSection.saved`) - kept as a
+            /// late kind lands in it: its failure then says these are earlier results, and MusicBrainz's words that it
+            /// found more.
+            public let holdsSaved: Bool
 
             public var id: SearchKind { kind }
 
-            public init(kind: SearchKind, rows: [SearchRow], slot: Slot? = nil) {
+            public init(kind: SearchKind, rows: [SearchRow], slot: Slot? = nil, saved: Set<String> = [],
+                        holdsSaved: Bool? = nil) {
                 self.kind = kind
                 self.rows = rows
                 self.slot = slot
+                self.saved = saved
+                self.holdsSaved = holdsSaved ?? rows.contains { saved.contains($0.key) }
+            }
+
+            /// Its rows from what's saved, as drawn now.
+            public var savedRows: [SearchRow] { rows.filter { saved.contains($0.key) } }
+
+            /// The same section with these rows and this slot, what's saved kept (`landed`: the keys from what's saved
+            /// among rows added).
+            public func with(rows: [SearchRow]? = nil, slot: Slot?, landed: Set<String> = []) -> Section {
+                Section(kind: kind, rows: rows ?? self.rows, slot: slot, saved: saved.union(landed), holdsSaved: holdsSaved)
             }
         }
 
@@ -983,6 +1114,8 @@ public enum SearchList {
         /// The run it was drawn for: a new run's first draw is a new list.
         public let run: Int
         public let top: [SearchRow]
+        /// (Slice 4) The keys of Top results' rows from what's saved.
+        public let topSaved: Set<String>
         /// A place kept at Top results' foot for the picks still to come.
         public let topPlace: Bool
         /// Nil at moment 1: the asking line stands where they will go.
@@ -1002,12 +1135,13 @@ public enum SearchList {
         /// What search3 found, by kind.
         public let counts: [SearchKind: Int]
 
-        public init(text: String, run: Int = 0, top: [SearchRow], topPlace: Bool = false, sections: [Section]?,
-                    libraryLate: Bool = false, failed: Bool, skipped: Bool = false, musicBrainz: Bool = false,
-                    studio: Bool = false, allFailed: MBFailure? = nil, counts: [SearchKind: Int]) {
+        public init(text: String, run: Int = 0, top: [SearchRow], topSaved: Set<String> = [], topPlace: Bool = false,
+                    sections: [Section]?, libraryLate: Bool = false, failed: Bool, skipped: Bool = false,
+                    musicBrainz: Bool = false, studio: Bool = false, allFailed: MBFailure? = nil, counts: [SearchKind: Int]) {
             self.text = text
             self.run = run
             self.top = top
+            self.topSaved = topSaved
             self.topPlace = topPlace
             self.sections = sections
             self.libraryLate = libraryLate
@@ -1020,11 +1154,12 @@ public enum SearchList {
         }
 
         /// The same list with other sections, top or place - everything else as drawn.
-        func with(top: [SearchRow]? = nil, topPlace: Bool? = nil, sections: [Section]?, studio: Bool? = nil,
-                  allFailed: MBFailure?? = nil) -> Drawn {
-            Drawn(text: text, run: run, top: top ?? self.top, topPlace: topPlace ?? self.topPlace, sections: sections,
-                  libraryLate: libraryLate, failed: failed, skipped: skipped, musicBrainz: musicBrainz,
-                  studio: studio ?? self.studio, allFailed: allFailed ?? self.allFailed, counts: counts)
+        func with(top: [SearchRow]? = nil, topSaved: Set<String>? = nil, topPlace: Bool? = nil, sections: [Section]?,
+                  studio: Bool? = nil, allFailed: MBFailure?? = nil) -> Drawn {
+            Drawn(text: text, run: run, top: top ?? self.top, topSaved: topSaved ?? self.topSaved,
+                  topPlace: topPlace ?? self.topPlace, sections: sections, libraryLate: libraryLate, failed: failed,
+                  skipped: skipped, musicBrainz: musicBrainz, studio: studio ?? self.studio,
+                  allFailed: allFailed ?? self.allFailed, counts: counts)
         }
 
         /// Nothing at all found (Search.tsx's `nothing`): the sections drawn, none and no Top results, nothing failed,
@@ -1034,9 +1169,16 @@ public enum SearchList {
             return top.isEmpty && sections.isEmpty && allFailed == nil && musicBrainz && !failed && !libraryLate
         }
 
-        /// Whether a row of the library's is drawn - what the all-failed foot says is above.
+        /// Whether a row of the library's is drawn - what the all-failed foot says is above: under it every kind failed,
+        /// so a row not from what's saved is the library's (or one it brought in).
         public var holdsLibrary: Bool {
-            top.contains { !$0.isMusicBrainz } || (sections ?? []).contains { $0.rows.contains { !$0.isMusicBrainz } }
+            top.contains { !topSaved.contains($0.key) }
+                || (sections ?? []).contains { (section: Section) -> Bool in section.rows.contains { !section.saved.contains($0.key) } }
+        }
+
+        /// Whether anything from what's saved is drawn - the all-failed foot then says these are earlier results.
+        public var holdsSaved: Bool {
+            !topSaved.isEmpty || (sections ?? []).contains(where: \.holdsSaved)
         }
     }
 
@@ -1044,13 +1186,15 @@ public enum SearchList {
     /// `decidedPrefix`) - whose songs' albums are asked for first, so a song at the top plays from its first tap.
     /// `musicBrainz`: MusicBrainz is to be asked for the words (a phantom stands for each kind it is asked).
     public static func decidedPrefix(_ text: String, results: LibraryResults, ownedArtists: [String],
-                                     artistList: [Artist]?, marks: SearchMarks, musicBrainz: Bool) -> [SearchRow] {
+                                     artistList: [Artist]?, marks: SearchMarks, musicBrainz: Bool,
+                                     reading kept: SearchPlan? = nil, saved: SavedAnswer? = nil) -> [SearchRow] {
         let names = SearchReading.artistNames(knownNames(ownedArtists, results))
-        guard let reading = SearchReading.read(text, names: names) else { return [] }
-        let pool = self.pool(reading: reading, library: results, artistList: artistList, marks: marks)
+        guard let reading = kept ?? SearchReading.read(text, names: names) else { return [] }
+        let pool = self.pool(reading: reading, library: results, artistList: artistList, marks: marks, saved: saved)
         let phantoms = musicBrainz ? SearchState.wantedKinds(text, reading, view: .all).compactMap { phantom($0, reading) } : []
+        //? (slice 4) a song's named album may be a saved group's - the web's family here has no `saved` and no evidence
         return decidedTop(candidates(pool, box: text, reading: reading), phantoms: phantoms, n: SearchPacing.topResults,
-                          library: results, artistList: artistList, index: marks.index).prefix
+                          library: results, artistList: artistList, index: marks.index, groups: saved?.groups ?? []).prefix
     }
 
     // MARK: the moments
@@ -1285,14 +1429,6 @@ public enum SearchWords {
 
     /// A kind's slot's words when searching for what you don't have failed - short, to fit one row (`MORE_UNSEARCHED`).
     public static let moreUnsearched = "Can't search for more right now."
-
-    /// What is announced for MusicBrainz once every kind asked has settled (`musicBrainzWords`): "Also found: 3 albums."
-    /// - or that searching for more isn't working, when no kind answered.
-    public static func musicBrainz(_ counts: [SearchKind: Int], answered: Bool) -> String {
-        if !answered { return moreUnsearched }
-        let said = count(counts)
-        return said.isEmpty ? "Nothing more found." : "Also found: \(said)."
-    }
 
     /// A MusicBrainz failure's words (`failureWords`): refused - its words; busy; away (`short` for a slot).
     public static func failure(_ failure: MBFailure, short: Bool = false) -> String {

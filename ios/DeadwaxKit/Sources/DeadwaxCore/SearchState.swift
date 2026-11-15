@@ -1,6 +1,6 @@
 import Foundation
 
-/// Search's state for one person (Phase 5, slices 1-3 - notes/ios-specs/phase5-search.md 2.6-2.7; the web's
+/// Search's state for one person (Phase 5, slices 1-4 - notes/ios-specs/phase5-search.md 2.6-2.7, 6.4; the web's
 /// app/Search.tsx: its `library`, `musicbrainz`, `artists`, `songs`, `drawn`, `kindLibrary`, `ready`, `view`, runs,
 /// `lateFor` and Behind):
 /// what the box says, what has been asked for which words, the list drawn - frozen once drawn - and a kind view's own.
@@ -19,7 +19,11 @@ import Foundation
 ///   in the asking line's place once MusicBrainz answers or `resultsWaitMs` passes, a late kind landing in its slot.
 ///   A chip, See all and Back to All draw afresh.
 /// - A kind view asks its own (`wantsKind`), kept for its words and kind; More by offset (`askingMore`); MusicBrainz's
-///   rows of its kind below its own (`kindView`).
+///   rows of its kind below its own (`kindView`), and More from MusicBrainz by offset (`askingMoreMusicBrainz`).
+/// - (Slice 4) What's saved is asked once per words beside the library (`askingSaved`), and the library's moment waits
+///   for it `SearchSaved.waitMs` at most (`savedGaveUp`); it leads MusicBrainz's rows, MusicBrainz's answer adding only
+///   what isn't there. Answers kept from before (`SearchAnswersKept`, the model's) are taken with no request as the
+///   library lands (`takeKept`).
 /// - The albums asked for so a song plays (`ready`), kept for the box's life: cleared with the box.
 public struct SearchState: Sendable {
     /// Where All's search3 stands for the words it was last asked for (`libraryText`).
@@ -79,6 +83,16 @@ public struct SearchState: Sendable {
 
     public typealias Albums = Answer<AlbumsFound>
 
+    /// More from MusicBrainz for a kind's answer (Search.tsx `more`): not asked, asking, failed - or a page added:
+    /// `added` the rows it brought, `other` the albums it found held (albums) or the albums the songs drawn gained
+    /// (songs).
+    public enum MorePage: Sendable, Equatable {
+        case idle
+        case asking
+        case failed(MBFailure)
+        case added(Int, other: Int)
+    }
+
     /// MusicBrainz's albums answer: its groups in the order drawn (the studio clause's in studioOrder), the block shown
     /// (the groups less those held, worked out once as it landed), what MusicBrainz was asked (`query` - the words
     /// typed, when a fielded read found nothing), the studio clause on.
@@ -86,11 +100,15 @@ public struct SearchState: Sendable {
         public let text: String
         public let key: String
         public let plan: SearchPlan
-        public let groups: [ReleaseGroup]
-        public let shown: [ReleaseGroup]
+        public internal(set) var groups: [ReleaseGroup]
+        public internal(set) var shown: [ReleaseGroup]
         public let query: String
         public let studio: Bool
-        public let count: Int?
+        public internal(set) var count: Int?
+        /// (Slice 4) Where More's next page starts (every answer so far, held ones too), the last page's size, More.
+        public internal(set) var nextOffset: Int
+        public internal(set) var last: Int
+        public internal(set) var more: MorePage = .idle
     }
 
     /// MusicBrainz's artists answer (Search.tsx `Artists`): the name asked (the words typed, single-spaced) and the
@@ -99,8 +117,11 @@ public struct SearchState: Sendable {
         public let text: String
         public let key: String
         public let name: String
-        public let matches: [MBArtistMatch]
-        public let count: Int?
+        public internal(set) var matches: [MBArtistMatch]
+        public internal(set) var count: Int?
+        public internal(set) var nextOffset: Int
+        public internal(set) var last: Int
+        public internal(set) var more: MorePage = .idle
     }
 
     /// MusicBrainz's songs answer (Search.tsx `Songs`): what was asked (`query` - the words as one title, when a title by
@@ -109,9 +130,12 @@ public struct SearchState: Sendable {
         public let text: String
         public let key: String
         public let query: String
-        public let recordings: [MBRecording]
-        public let songs: [FoundSong]
-        public let count: Int?
+        public internal(set) var recordings: [MBRecording]
+        public internal(set) var songs: [FoundSong]
+        public internal(set) var count: Int?
+        public internal(set) var nextOffset: Int
+        public internal(set) var last: Int
+        public internal(set) var more: MorePage = .idle
     }
 
     /// An ask of MusicBrainz's albums, as the model makes it: the first query, and the words to ask again when a
@@ -161,6 +185,34 @@ public struct SearchState: Sendable {
         }
 
         public var isEmpty: Bool { albums == nil && artists == nil && songs == nil }
+    }
+
+    /// More from MusicBrainz asked (Search.tsx `askMore`, `askMoreArtists`, `askMoreSongs`): the kind, the answer it adds
+    /// to (`key`), what is asked again - the albums' query, the artists' name, the songs' query - and from where.
+    public struct MoreAsk: Sendable, Equatable {
+        public let token: Int
+        public let kind: SearchKind
+        public let key: String
+        public let words: String
+        public let offset: Int
+    }
+
+    /// What's saved for some words (Search.tsx `Saved`): asked as the words settle, beside the library; `none` when there
+    /// was nothing to search, it failed, or it missed `SearchSaved.waitMs` - given up for the words: MusicBrainz's answer
+    /// alone.
+    public enum Saved: Sendable, Equatable {
+        case idle
+        case asking(String)
+        case done(String, SavedFound)
+        case none(String)
+
+        /// The words it is for - nil while idle.
+        public var text: String? {
+            switch self {
+            case .idle: return nil
+            case .asking(let text), .done(let text, _), .none(let text): return text
+            }
+        }
     }
 
     /// A run of a text's moments (Search.tsx `Run`): new words, Try again, Back to All - the list is drawn once per run.
@@ -214,6 +266,8 @@ public struct SearchState: Sendable {
     public private(set) var songs: Answer<SongsFound> = .idle
     /// The words MusicBrainz was asked for - nil when nothing is, or dropped.
     public private(set) var asked: String?
+    /// (Slice 4) What's saved, for the words it was last asked for.
+    public private(set) var saved: Saved = .idle
     /// The run being drawn.
     public private(set) var run = Run(id: 0, text: "", phantoms: true, asked: false, capPassed: false, behind: false,
                                       outcome: nil)
@@ -237,6 +291,7 @@ public struct SearchState: Sendable {
     private var albumsToken = 0
     private var artistsToken = 0
     private var songsToken = 0
+    private var savedToken = 0
 
     public init() {}
 
@@ -250,6 +305,10 @@ public struct SearchState: Sendable {
         let next = JSText.trim(text)
         guard !WebText.same(next, query) else { return nil }
         query = next
+        //? (slice 4's review) a More still asking is let go by ANY new words - its page lands on nothing, said or drawn,
+        //? and More can be asked again - where the web's latestOnly lets it land until the kind is asked for the new
+        //? words (a settling pause, about 700 ms, or never under three letters)
+        for each in SearchKind.allCases { moreLetGo(each) }
         let effect = SearchReading.musicBrainzOnTyping(next, asked: asked)
         //? a text the library was once late for is late again only by its own clock, never by an old one
         lateFor = nil
@@ -266,6 +325,8 @@ public struct SearchState: Sendable {
             allToken += 1
             kindToken += 1
             dropMusicBrainz()
+            savedToken += 1
+            saved = .idle
             startRun("", phantoms: true)
             return .clear
         }
@@ -573,23 +634,20 @@ public struct SearchState: Sendable {
         var asks = MusicBrainzAsks()
         let wanted = Self.wantedKinds(term, plan, view: inView)
         if wanted.contains(.albums), let key = Self.keyFor(.albums, term, plan, view: inView), !albums.asked(key) {
-            let (first, studio) = inView == .albums ? (plan.query, false) : SearchAlbums.allAlbumsQuery(plan)
             albumsToken += 1
             albums = .searching(text: term, key: key)
-            asks.albums = AlbumsAsk(token: albumsToken, text: term, key: key, plan: plan, first: first, studio: studio,
-                                    fallback: plan.kind == .free ? nil : Self.words1(term))
+            asks.albums = albumsAsk(term, plan, view: inView, key: key, token: albumsToken)
         }
         if wanted.contains(.artists), let key = Self.keyFor(.artists, term, plan, view: .all), !artists.asked(key) {
             artistsToken += 1
             artists = .searching(text: term, key: key)
             asks.artists = ArtistsAsk(token: artistsToken, text: term, key: key, plan: plan, name: Self.words1(term))
         }
-        if wanted.contains(.songs), let first = SongSearch.query(term, plan),
-           let key = Self.keyFor(.songs, term, plan, view: .all), !songs.asked(key) {
+        if wanted.contains(.songs), let key = Self.keyFor(.songs, term, plan, view: .all), !songs.asked(key),
+           let ask = songsAsk(term, plan, key: key, token: songsToken + 1) {
             songsToken += 1
             songs = .searching(text: term, key: key)
-            asks.songs = SongsAsk(token: songsToken, text: term, key: key, plan: plan, first: first,
-                                  fallback: plan.kind == .albumByArtist ? SongSearch.titleQuery(term) : nil)
+            asks.songs = ask
         }
         if inView == .all { armCap(term) }
         return asks
@@ -615,11 +673,7 @@ public struct SearchState: Sendable {
     public mutating func albumsAnswered(_ ask: AlbumsAsk, _ found: FullySearchAnswer, query: String,
                                         index: OwnedIndex?) -> Bool {
         guard ask.token == albumsToken else { return false }
-        let studio = ask.studio && query == ask.first
-        let groups = studio ? SearchAlbums.studioOrder(found.releaseGroups) : found.releaseGroups
-        albums = .done(AlbumsFound(text: ask.text, key: ask.key, plan: ask.plan, groups: groups,
-                                   shown: SearchAlbums.notInLibrary(groups, index), query: query, studio: studio,
-                                   count: found.count))
+        albums = .done(Self.albumsFound(ask, found, query: query, index: index))
         return true
     }
 
@@ -634,8 +688,7 @@ public struct SearchState: Sendable {
     @discardableResult
     public mutating func artistsAnswered(_ ask: ArtistsAsk, _ found: ArtistSearchAnswer) -> Bool {
         guard ask.token == artistsToken else { return false }
-        artists = .done(ArtistsFound(text: ask.text, key: ask.key, name: ask.name, matches: found.matches,
-                                     count: found.count))
+        artists = .done(Self.artistsFound(ask, found))
         return true
     }
 
@@ -651,8 +704,7 @@ public struct SearchState: Sendable {
     @discardableResult
     public mutating func songsAnswered(_ ask: SongsAsk, _ found: SongSearchAnswer, query: String) -> Bool {
         guard ask.token == songsToken else { return false }
-        songs = .done(SongsFound(text: ask.text, key: ask.key, query: query, recordings: found.recordings,
-                                 songs: SongSearch.group(found.recordings), count: found.count))
+        songs = .done(Self.songsFound(ask, found, query: query))
         return true
     }
 
@@ -674,6 +726,266 @@ public struct SearchState: Sendable {
         albums = .idle
         artists = .idle
         songs = .idle
+    }
+
+    /// An answer as it is kept (`albumsDone`): the studio clause's in studio order, the block shown worked out now from
+    /// `index` (all of them before it has answered), More's next page after every group it brought.
+    static func albumsFound(_ ask: AlbumsAsk, _ found: FullySearchAnswer, query: String, index: OwnedIndex?) -> AlbumsFound {
+        let studio = ask.studio && query == ask.first
+        let groups = studio ? SearchAlbums.studioOrder(found.releaseGroups) : found.releaseGroups
+        return AlbumsFound(text: ask.text, key: ask.key, plan: ask.plan, groups: groups,
+                           shown: SearchAlbums.notInLibrary(groups, index), query: query, studio: studio,
+                           count: found.count, nextOffset: found.releaseGroups.count, last: found.releaseGroups.count)
+    }
+
+    static func artistsFound(_ ask: ArtistsAsk, _ found: ArtistSearchAnswer) -> ArtistsFound {
+        ArtistsFound(text: ask.text, key: ask.key, name: ask.name, matches: found.matches, count: found.count,
+                     nextOffset: found.matches.count, last: found.matches.count)
+    }
+
+    static func songsFound(_ ask: SongsAsk, _ found: SongSearchAnswer, query: String) -> SongsFound {
+        SongsFound(text: ask.text, key: ask.key, query: query, recordings: found.recordings,
+                   songs: SongSearch.group(found.recordings), count: found.count, nextOffset: found.recordings.count,
+                   last: found.recordings.count)
+    }
+
+    // MARK: what's saved (slice 4)
+
+    /// What's saved is asked for `term` (Search.tsx `askSaved`): ONCE for the words, whatever it answered - given up or
+    /// failed, it stays so until the words change (else, asked again by a chip, Enter or Try again, a saved answer
+    /// landing late went above MusicBrainz's rows already drawn). Its token - nil when it isn't asked. The caller arms
+    /// `SearchSaved.waitMs`, then `savedGaveUp`.
+    public mutating func askingSaved(_ term: String) -> Int? {
+        guard !term.isEmpty else { return nil }
+        if let text = saved.text, WebText.same(text, term) { return nil }
+        savedToken += 1
+        saved = .asking(term)
+        return savedToken
+    }
+
+    /// What's saved answered: kept for its words when it is the newest ask's - `none` when nothing could be searched.
+    /// What is held is left out as it is DRAWN (`savedOf`), never here as it lands (an album you have drawn twice, else,
+    /// when `/library/owned` hadn't answered yet).
+    @discardableResult
+    public mutating func savedAnswered(_ token: Int, _ answer: SavedSearchAnswer) -> Bool {
+        guard token == savedToken, case .asking(let term) = saved else { return false }
+        saved = answer.available ? .done(term, SavedFound(answer)) : .none(term)
+        return true
+    }
+
+    /// What's saved failed: given up for the words (MusicBrainz's answer alone) when it is the newest ask's.
+    @discardableResult
+    public mutating func savedFailed(_ token: Int) -> Bool {
+        guard token == savedToken, case .asking(let term) = saved else { return false }
+        saved = .none(term)
+        return true
+    }
+
+    /// `SearchSaved.waitMs` passed for `term`: still asking, it is given up for the words (its answer let go). True when
+    /// it was.
+    @discardableResult
+    public mutating func savedGaveUp(_ term: String) -> Bool {
+        guard case .asking(let text) = saved, WebText.same(text, term) else { return false }
+        savedToken += 1
+        saved = .none(term)
+        return true
+    }
+
+    /// The library's moment waits for what's saved while it is being asked for these words (`savedSettled`) - never
+    /// longer than `SearchSaved.waitMs`, which gives it up.
+    public func savedSettled(_ term: String) -> Bool {
+        if case .asking(let text) = saved, WebText.same(text, term) { return false }
+        return true
+    }
+
+    /// What's saved for these words, as a view reading them this way draws it (`savedOf`): only when MusicBrainz is
+    /// drawn for them, the kinds the view asks.
+    public func savedOf(_ term: String, _ plan: SearchPlan, view inView: SearchView, index: OwnedIndex?) -> SavedAnswer? {
+        guard case .done(let text, let found) = saved, WebText.same(text, term), drawnMusicBrainz(term) else { return nil }
+        let studio = inView == .all && SearchAlbums.allAlbumsQuery(plan).studio
+        return SearchSaved.savedFor(plan, found, kinds: Self.wantedKinds(term, plan, view: inView), studio: studio,
+                                    index: index)
+    }
+
+    // MARK: the kept answers (slice 4)
+
+    /// Every kind a view would ask MusicBrainz that a kept answer holds (Search.tsx `takeKept`), taken now with no
+    /// request - as the library answers, fails or is skipped, and as a chip is pressed - so the list is drawn whole at
+    /// the library's moment; what is held worked out from `index`. Only for words MusicBrainz is to be asked for, and a
+    /// kind not in hand or on its way for its key (a failure is taken over). `took` when any was (the caller asks
+    /// `/library/owned` again, to mark rows in place); `songs` when songs were (it closes every song's disclosure).
+    public mutating func takeKept(_ term: String, view inView: SearchView, kept: SearchAnswersKept, now: Double,
+                                  index: OwnedIndex?) -> (took: Bool, songs: Bool) {
+        guard !term.isEmpty,
+              asked.map({ WebText.same($0, term) }) == true || SearchReading.asksMusicBrainzBySettling(term),
+              let plan = planFor(term) else { return (false, false) }
+        var took = false
+        var tookSongs = false
+        for kind in Self.wantedKinds(term, plan, view: inView) {
+            guard let key = Self.keyFor(kind, term, plan, view: inView) else { continue }
+            switch kind {
+            case .albums:
+                guard !albums.asked(key) else { continue }
+                let ask = albumsAsk(term, plan, view: inView, key: key, token: albumsToken + 1)
+                guard let hit = kept.albums(ask, at: now) else { continue }
+                albumsToken += 1
+                albums = .done(Self.albumsFound(ask, hit.found, query: hit.query, index: index))
+                took = true
+            case .artists:
+                guard !artists.asked(key) else { continue }
+                let ask = ArtistsAsk(token: artistsToken + 1, text: term, key: key, plan: plan, name: Self.words1(term))
+                guard let found = kept.artists(ask, at: now) else { continue }
+                artistsToken += 1
+                artists = .done(Self.artistsFound(ask, found))
+                took = true
+            case .songs:
+                guard !songs.asked(key), let ask = songsAsk(term, plan, key: key, token: songsToken + 1),
+                      let hit = kept.songs(ask, at: now) else { continue }
+                songsToken += 1
+                songs = .done(Self.songsFound(ask, hit.found, query: hit.query))
+                took = true
+                tookSongs = true
+            }
+        }
+        return (took, tookSongs)
+    }
+
+    /// The albums' ask for these words in this view (`askAlbums`'s): the Albums view the words as read, All the studio
+    /// clause's query for an artist's name alone; the words typed again when a fielded read finds nothing.
+    private func albumsAsk(_ term: String, _ plan: SearchPlan, view inView: SearchView, key: String, token: Int) -> AlbumsAsk {
+        let (first, studio) = inView == .albums ? (plan.query, false) : SearchAlbums.allAlbumsQuery(plan)
+        return AlbumsAsk(token: token, text: term, key: key, plan: plan, first: first, studio: studio,
+                         fallback: plan.kind == .free ? nil : Self.words1(term))
+    }
+
+    /// The songs' ask (`askSongs`'s) - nil for an artist's name alone, which asks no song.
+    private func songsAsk(_ term: String, _ plan: SearchPlan, key: String, token: Int) -> SongsAsk? {
+        guard let first = SongSearch.query(term, plan) else { return nil }
+        return SongsAsk(token: token, text: term, key: key, plan: plan, first: first,
+                        fallback: plan.kind == .albumByArtist ? SongSearch.titleQuery(term) : nil)
+    }
+
+    // MARK: More from MusicBrainz (slice 4)
+
+    /// A kind view's More from MusicBrainz (Search.tsx `askMore`, `askMoreArtists`, `askMoreSongs`): the next page of
+    /// the same search, by offset, through the kind's own token - nil unless its answer for the view's key is in hand,
+    /// isn't asking already, and has another page.
+    public mutating func askingMoreMusicBrainz() -> MoreAsk? {
+        guard let wanted = view.kind, !query.isEmpty, let plan = planFor(query),
+              let key = Self.keyFor(wanted, query, plan, view: view) else { return nil }
+        switch wanted {
+        case .albums:
+            guard var found = albums.found, found.key == key, found.more != .asking,
+                  SearchMore.pages(next: found.nextOffset, count: found.count, last: found.last,
+                                   limit: SearchAlbums.limit) == .more else { return nil }
+            albumsToken += 1
+            found.more = .asking
+            albums = .done(found)
+            return MoreAsk(token: albumsToken, kind: .albums, key: key, words: found.query, offset: found.nextOffset)
+        case .artists:
+            guard var found = artists.found, found.key == key, found.more != .asking,
+                  SearchMore.pages(next: found.nextOffset, count: found.count, last: found.last,
+                                   limit: MBArtistSearch.limit) == .more else { return nil }
+            artistsToken += 1
+            found.more = .asking
+            artists = .done(found)
+            return MoreAsk(token: artistsToken, kind: .artists, key: key, words: found.name, offset: found.nextOffset)
+        case .songs:
+            guard var found = songs.found, found.key == key, found.more != .asking,
+                  SearchMore.pages(next: found.nextOffset, count: found.count, last: found.last,
+                                   limit: SongSearch.limit) == .more else { return nil }
+            songsToken += 1
+            found.more = .asking
+            songs = .done(found)
+            return MoreAsk(token: songsToken, kind: .songs, key: key, words: found.query, offset: found.nextOffset)
+        }
+    }
+
+    /// More's page of albums landed: appended below the rows drawn - the held left out as the first page leaves them
+    /// (`appendPage`) - and what it brought, in words, to be announced. Nil when it isn't the newest ask's, or the
+    /// answer it was asked of has gone.
+    public mutating func moreAnswered(_ ask: MoreAsk, albums page: FullySearchAnswer, index: OwnedIndex?,
+                                      personal: Bool) -> String? {
+        guard ask.kind == .albums, ask.token == albumsToken, var found = albums.found, found.key == ask.key,
+              found.more == .asking else { return nil }
+        let appended = SearchMore.appendPage(found.groups, found.shown, page.releaseGroups, index)
+        found.groups = appended.groups
+        found.shown = appended.shown
+        found.nextOffset += page.releaseGroups.count
+        found.last = page.releaseGroups.count
+        found.count = page.count ?? found.count
+        found.more = .added(appended.added, other: appended.held)
+        albums = .done(found)
+        return SearchMore.pageWords(added: appended.added, held: appended.held, personal: personal).said
+    }
+
+    /// ...a page of artists: the ones not got already appended.
+    public mutating func moreAnswered(_ ask: MoreAsk, artists page: ArtistSearchAnswer) -> String? {
+        guard ask.kind == .artists, ask.token == artistsToken, var found = artists.found, found.key == ask.key,
+              found.more == .asking else { return nil }
+        let known = Set(found.matches.map(\.mbid))
+        let fresh = page.matches.filter { !known.contains($0.mbid) }
+        found.matches += fresh
+        found.nextOffset += page.matches.count
+        found.last = page.matches.count
+        found.count = page.count ?? found.count
+        found.more = .added(fresh.count, other: 0)
+        artists = .done(found)
+        return SearchMore.artistsSaid(page.matches.count)
+    }
+
+    /// ...a page of songs: merged in (`appendSongs`) - a later take of a song shown adding its albums to it in place, a
+    /// new song after the rest.
+    public mutating func moreAnswered(_ ask: MoreAsk, songs page: SongSearchAnswer) -> String? {
+        guard ask.kind == .songs, ask.token == songsToken, var found = songs.found, found.key == ask.key,
+              found.more == .asking else { return nil }
+        let merged = SearchMore.appendSongs(found.recordings, page.recordings, drawn: found.songs)
+        found.recordings = merged.recordings
+        found.songs = merged.songs
+        found.nextOffset += page.recordings.count
+        found.last = page.recordings.count
+        found.count = page.count ?? found.count
+        found.more = .added(merged.added, other: merged.grown)
+        songs = .done(found)
+        return SearchMore.songsWords(added: merged.added, grown: merged.grown).said
+    }
+
+    /// More's ask failed: its words under the rows, and Try again in the button.
+    public mutating func moreFailed(_ ask: MoreAsk, _ failure: MBFailure) {
+        switch ask.kind {
+        case .albums:
+            guard ask.token == albumsToken, var found = albums.found, found.key == ask.key, found.more == .asking else { return }
+            found.more = .failed(failure)
+            albums = .done(found)
+        case .artists:
+            guard ask.token == artistsToken, var found = artists.found, found.key == ask.key, found.more == .asking else { return }
+            found.more = .failed(failure)
+            artists = .done(found)
+        case .songs:
+            guard ask.token == songsToken, var found = songs.found, found.key == ask.key, found.more == .asking else { return }
+            found.more = .failed(failure)
+            songs = .done(found)
+        }
+    }
+
+    /// A kind's More let go (slice 4's review) - new words (`typed`), or its ask cancelled: asking, it is idle again, so
+    /// More can be asked again, and the page or failure of the ask let go lands on nothing (`moreAnswered` and
+    /// `moreFailed` take only an ask still asking). Anything else is left as it is.
+    public mutating func moreLetGo(_ kind: SearchKind) {
+        switch kind {
+        case .albums:
+            guard var found = albums.found, found.more == .asking else { return }
+            found.more = .idle
+            albums = .done(found)
+        case .artists:
+            guard var found = artists.found, found.more == .asking else { return }
+            found.more = .idle
+            artists = .done(found)
+        case .songs:
+            guard var found = songs.found, found.more == .asking else { return }
+            found.more = .idle
+            songs = .done(found)
+        }
     }
 
     /// Whether a kind's answer for these words, in this view, has landed (`inHandFor`): answered or failed.
@@ -725,15 +1037,19 @@ public struct SearchState: Sendable {
         guard view == .all, !query.isEmpty, WebText.same(run.text, query) else { return nil }
         let term = run.text
         guard let plan = planFor(term) else { return nil }
-        let settled = librarySettled(term) || lateFor.map { WebText.same($0, term) } == true
+        //? (slice 4) ...and what's saved, while it is asked for (at most SearchSaved.waitMs)
+        let settled = (librarySettled(term) || lateFor.map { WebText.same($0, term) } == true) && savedSettled(term)
         let musicBrainz = drawnMusicBrainz(term)
         let wanted = musicBrainz ? Self.wantedKinds(term, plan, view: .all) : []
         let out = SearchList.lateKinds(wanted) { inHand($0, term, plan, view: .all) }
         let n = SearchPacing.topResults
-        //? Top results' family (`familyFor`): a song's named album is MusicBrainz's albums answer's own group when it holds it
-        let groups = albums.found.map { (found: AlbumsFound) -> [ReleaseGroup] in
+        //? Top results' family (`familyFor`): a song's named album is a saved group's, or MusicBrainz's albums answer's
+        //? own group, when either holds it - marked as saved when it is what's saved's
+        let kept = savedOf(term, plan, view: .all, index: marks.index)?.groups ?? []
+        let groups = kept + (albums.found.map { (found: AlbumsFound) -> [ReleaseGroup] in
             WebText.same(found.text, term) ? found.groups : []
-        } ?? []
+        } ?? [])
+        let savedGroups = Set(kept.map(\.id))
 
         guard let was = drawn, was.run == run.id else {
             guard settled else { return nil }
@@ -750,28 +1066,30 @@ public struct SearchState: Sendable {
             let runId = run.id
             let candidates = SearchList.candidates(pool, box: term, reading: plan)
             let libraryWords = SearchWords.library(counts, personal: marks.personal)
-            func base(top: [SearchRow], topPlace: Bool, sections: [SearchList.Drawn.Section]?, studio: Bool,
-                      allFailed: MBFailure?) -> SearchList.Drawn {
-                SearchList.Drawn(text: term, run: runId, top: top, topPlace: topPlace, sections: sections,
-                                 libraryLate: libraryLate, failed: failedNow, skipped: skippedNow,
+            func base(top: [SearchRow], topSaved: Set<String>, topPlace: Bool, sections: [SearchList.Drawn.Section]?,
+                      studio: Bool, allFailed: MBFailure?) -> SearchList.Drawn {
+                SearchList.Drawn(text: term, run: runId, top: top, topSaved: topSaved, topPlace: topPlace,
+                                 sections: sections, libraryLate: libraryLate, failed: failedNow, skipped: skippedNow,
                                  musicBrainz: musicBrainz, studio: studio, allFailed: allFailed, counts: counts)
             }
             if whole {
-                let top = SearchList.topResults(candidates, n: n, library: results, artistList: artistList,
-                                                index: marks.index, groups: groups, evidence: marks.evidence)
+                let picks = SearchList.topPicks(candidates, n: n, library: results, artistList: artistList,
+                                                index: marks.index, groups: groups, saved: savedGroups,
+                                                evidence: marks.evidence)
                 let (sections, allFailed) = sectionsOf(term, plan, pool, out: out)
-                let next = base(top: top, topPlace: false, sections: sections, studio: studioOn(term, plan, out: out),
-                                allFailed: allFailed)
+                let next = base(top: picks.compactMap(\.row), topSaved: SearchList.savedPicks(picks), topPlace: false,
+                                sections: sections, studio: studioOn(term, plan, out: out), allFailed: allFailed)
                 let settledAll = out.isEmpty && !wanted.isEmpty
-                return draw(next, said: [libraryWords, settledAll ? mbWords(term, plan, pool, wanted: wanted) : ""])
+                return draw(next, said: [libraryWords, Self.savedSaid(sections),
+                                         settledAll ? mbWords(term, plan, pool, wanted: wanted, sections: sections) : ""])
             }
             let phantoms = out.compactMap { SearchList.phantom($0, plan) }
             let decided = SearchList.decidedTop(candidates, phantoms: phantoms, n: n, library: results,
                                                 artistList: artistList, index: marks.index, groups: groups,
-                                                evidence: marks.evidence)
+                                                saved: savedGroups, evidence: marks.evidence)
             //? a phantom first: no prefix - and then no Top results at all, no heading and no place, until moment 2
-            return draw(base(top: decided.prefix, topPlace: decided.place && !decided.prefix.isEmpty, sections: nil,
-                             studio: false, allFailed: nil), said: [libraryWords])
+            return draw(base(top: decided.prefix, topSaved: decided.saved, topPlace: decided.place && !decided.prefix.isEmpty,
+                             sections: nil, studio: false, allFailed: nil), said: [libraryWords])
         }
 
         let withLibrary = !was.libraryLate && librarySettled(term) && isAnswered
@@ -783,16 +1101,22 @@ public struct SearchState: Sendable {
                 return nil
             }
             let pool = poolFor(term, plan, results: results, artistList: artistList, marks: marks)
-            let top = was.topPlace || was.top.isEmpty
-                ? SearchList.topResults(SearchList.candidates(pool, box: term, reading: plan), n: n, library: results,
-                                        artistList: artistList, index: marks.index, groups: groups,
-                                        evidence: marks.evidence, fixed: was.top)
-                : was.top
+            var top = was.top
+            var topSaved = was.topSaved
+            if was.topPlace || was.top.isEmpty {
+                let picks = SearchList.topPicks(SearchList.candidates(pool, box: term, reading: plan), n: n,
+                                                library: results, artistList: artistList, index: marks.index,
+                                                groups: groups, saved: savedGroups, evidence: marks.evidence,
+                                                fixed: was.top, fixedSaved: was.topSaved)
+                top = picks.compactMap(\.row)
+                topSaved = SearchList.savedPicks(picks)
+            }
             let (sections, allFailed) = sectionsOf(term, plan, pool, out: out)
             let settledAll = out.isEmpty && !wanted.isEmpty
-            return draw(was.with(top: top, topPlace: false, sections: sections, studio: studioOn(term, plan, out: out),
-                                 allFailed: allFailed),
-                        said: [settledAll ? mbWords(term, plan, pool, wanted: wanted) : ""])
+            return draw(was.with(top: top, topSaved: topSaved, topPlace: false, sections: sections,
+                                 studio: studioOn(term, plan, out: out), allFailed: allFailed),
+                        said: [Self.savedSaid(sections),
+                               settledAll ? mbWords(term, plan, pool, wanted: wanted, sections: sections) : ""])
         }
 
         //? moment 2 drawn: a late kind landing in its slot
@@ -805,9 +1129,9 @@ public struct SearchState: Sendable {
             changed = true
             let kind = section.kind
             let order = sections.map(\.kind)
-            func replaced(_ slot: SearchList.Drawn.Slot?, rows: [SearchRow]? = nil) {
+            func replaced(_ slot: SearchList.Drawn.Slot?, rows: [SearchRow]? = nil, landed: Set<String> = []) {
                 sections = sections.map { (each: SearchList.Drawn.Section) -> SearchList.Drawn.Section in
-                    each.kind == kind ? SearchList.Drawn.Section(kind: kind, rows: rows ?? each.rows, slot: slot) : each
+                    each.kind == kind ? each.with(rows: rows, slot: slot, landed: landed) : each
                 }
             }
             if failure(kind, term, plan, view: .all) != nil {
@@ -815,15 +1139,18 @@ public struct SearchState: Sendable {
                 continue
             }
             let cap = SearchPacing.cap(kind)
+            //? (slice 4) what's saved may be drawn above the slot already: MusicBrainz's answer adds only what isn't,
+            //? each part's cap less what it has drawn
             let (libraryDrawn, musicBrainzDrawn) = SearchList.drawnCounts(pool[kind], section.rows)
             let landing = SearchList.lateRows(pool[kind], cap: (max(0, cap.0 - libraryDrawn), max(0, cap.1 - musicBrainzDrawn)),
                                               drawn: Set(section.rows.map(\.key)))
+            let landedSaved = pool[kind].savedKeys.intersection(landing.map(\.key))
             let landed = SearchList.drawInOrFold(kind, order)
             if !landing.isEmpty {
                 if landed == .into {
-                    replaced(nil, rows: section.rows + landing)
+                    replaced(nil, rows: section.rows + landing, landed: landedSaved)
                 } else {
-                    replaced(.show(landing))
+                    replaced(.show(landing), landed: landedSaved)
                     folded = SearchWords.fold(kind, landing.count).said
                 }
             } else if landed == .into {
@@ -833,14 +1160,17 @@ public struct SearchState: Sendable {
                     replaced(nil)
                 }
             } else {
-                replaced(.said(emptyKindWords(kind, term, plan, personal: marks.personal)))
+                //? nothing new, under rows MusicBrainz's answer already holds (what's saved): never "No albums on
+                //? MusicBrainz"
+                replaced(.said(section.savedRows.isEmpty ? emptyKindWords(kind, term, plan, personal: marks.personal)
+                                                         : SearchWords.nothingMore(kind, term)))
             }
         }
         guard changed else { return nil }
         let settledAll = out.isEmpty && !wanted.isEmpty
         //? the studio line was decided with the sections: never added below them as albums land
         return draw(was.with(sections: sections),
-                    said: [folded, settledAll ? mbWords(term, plan, pool, wanted: wanted) : ""])
+                    said: [folded, settledAll ? mbWords(term, plan, pool, wanted: wanted, sections: sections) : ""])
     }
 
     private mutating func draw(_ next: SearchList.Drawn, said: [String]) -> Drawing {
@@ -856,7 +1186,7 @@ public struct SearchState: Sendable {
             return nil
         }
         drawn = was.with(sections: sections.map { (each: SearchList.Drawn.Section) -> SearchList.Drawn.Section in
-            each.kind == kind ? SearchList.Drawn.Section(kind: kind, rows: each.rows + rows, slot: nil) : each
+            each.kind == kind ? each.with(rows: each.rows + rows, slot: nil) : each
         })
         return rows.first
     }
@@ -868,11 +1198,13 @@ public struct SearchState: Sendable {
             .map { SearchAlbumsInHand(groups: $0.groups, shown: $0.shown) }
         return SearchList.pool(reading: plan, library: results, artistList: artistList, marks: marks, albums: albums,
                                artists: foundArtists(term, plan, view: .all)?.matches,
-                               songs: foundSongs(term, plan, view: .all)?.songs)
+                               songs: foundSongs(term, plan, view: .all)?.songs,
+                               saved: savedOf(term, plan, view: .all, index: marks.index))
     }
 
     /// The sections for a draw (`sectionsOf`): each kind with rows, a slot for a kind still out, or its failure while
-    /// another kind answered. Every kind asked failed (none late, none refused): the foot's block.
+    /// another kind answered - each with which of its rows are what's saved. Every kind asked failed (none late, none
+    /// refused): the foot's block.
     private func sectionsOf(_ term: String, _ plan: SearchPlan, _ pool: SearchPool,
                             out: [SearchKind]) -> ([SearchList.Drawn.Section], MBFailure?) {
         let wanted = drawnMusicBrainz(term) ? Self.wantedKinds(term, plan, view: .all) : []
@@ -886,7 +1218,8 @@ public struct SearchState: Sendable {
             let late = out.contains(kind)
             let failing = failed.contains(kind) && allFailed == nil
             if rows.isEmpty && !late && !failing { continue }
-            sections.append(SearchList.Drawn.Section(kind: kind, rows: rows, slot: late ? .asking : failing ? .failed : nil))
+            sections.append(SearchList.Drawn.Section(kind: kind, rows: rows, slot: late ? .asking : failing ? .failed : nil,
+                                                     saved: pool[kind].savedKeys.intersection(rows.map(\.key))))
         }
         return (sections, allFailed)
     }
@@ -911,24 +1244,38 @@ public struct SearchState: Sendable {
     }
 
     /// What is announced of MusicBrainz once every kind asked has settled (`mbWords`): what it brought to the list as
-    /// drawn - or a refusal's words, every kind refused.
-    private func mbWords(_ term: String, _ plan: SearchPlan, _ pool: SearchPool, wanted: [SearchKind]) -> String {
+    /// drawn - more than what's saved above it, when that is drawn (`sections`) - or a refusal's words, every kind
+    /// refused.
+    private func mbWords(_ term: String, _ plan: SearchPlan, _ pool: SearchPool, wanted: [SearchKind],
+                         sections: [SearchList.Drawn.Section]) -> String {
         let answered = wanted.contains { self.answered($0, term, plan, view: .all) }
         let failures = wanted.compactMap { failure($0, term, plan, view: .all) }
         if !answered, let first = failures.first, failures.allSatisfy(\.refused) { return SearchWords.failure(first) }
         var counts: [SearchKind: Int] = [:]
         for kind in SearchKind.allCases {
-            counts[kind] = min(pool[kind].musicbrainz.count, SearchPacing.previewMusicBrainz(kind))
+            let cap = SearchPacing.previewMusicBrainz(kind)
+            let left = max(0, cap - min(pool[kind].saved.count, cap))
+            counts[kind] = min(pool[kind].musicbrainz.count, left)
         }
-        return SearchWords.musicBrainz(counts, answered: answered)
+        return SearchWords.musicBrainz(counts, answered: answered, saved: sections.contains(where: \.holdsSaved))
+    }
+
+    /// What is announced of what's saved, as the sections holding it are drawn (`savedSaid`): "Found earlier: 1 song."
+    static func savedSaid(_ sections: [SearchList.Drawn.Section]) -> String {
+        var counts: [SearchKind: Int] = [:]
+        for section in sections { counts[section.kind] = section.savedRows.count }
+        return SearchWords.saved(counts)
     }
 
     /// The albums to ask for as All's answer lands, so a song's tap plays (Search.tsx's askLibrary): the songs of Top
     /// results' decided picks first, then the answer's - those not in hand already.
     public func albumsWanted(_ text: String, _ results: LibraryResults, artistList: [Artist]?,
                              marks: SearchMarks) -> [String] {
+        //? read as MusicBrainz is asked (`planFor`), what's saved in the pool (slice 4): a saved song may lead Top results
+        let plan = planFor(text)
         let top = SearchList.decidedPrefix(text, results: results, ownedArtists: ownedArtists, artistList: artistList,
-                                           marks: marks, musicBrainz: drawnMusicBrainz(text))
+                                           marks: marks, musicBrainz: drawnMusicBrainz(text), reading: plan,
+                                           saved: plan.flatMap { savedOf(text, $0, view: .all, index: marks.index) })
         return SearchPacing.albumsToPrefetch(results.songs, preferred: SearchPacing.preferredSongs(top))
             .filter { ready[$0] == nil }
     }
@@ -1056,9 +1403,17 @@ public struct SearchState: Sendable {
 
     // MARK: a kind view as drawn
 
+    /// The key a kind view's area is kept by (Search.tsx `areaKey`): its kind and the box's words - nil in All.
+    public var kindAreaKey: String? {
+        guard let wanted = view.kind, !query.isEmpty else { return nil }
+        return "\(wanted.rawValue)\n\(query)"
+    }
+
     /// What a kind view holds as it stands (Search.tsx `kindModel`): its library's rows (its chip's own search3), then
-    /// MusicBrainz's of its kind, the library's left out. Nil for All, or an empty box.
-    public func kindView(artistList: [Artist]?, marks: SearchMarks) -> KindView? {
+    /// (slice 4) what's saved and MusicBrainz's of its kind, the library's left out - each row once drawn kept in its
+    /// place, and as what it was drawn as, as later answers land (`before`: the area drawn for these words last, which
+    /// the caller keeps from the view's `area`, `kindArea`). Nil for All, or an empty box.
+    public func kindView(artistList: [Artist]?, marks: SearchMarks, before: KindArea? = nil) -> KindView? {
         guard let wanted = view.kind, !query.isEmpty else { return nil }
         let plan = planFor(query)
         let lib = kindShown
@@ -1086,61 +1441,86 @@ public struct SearchState: Sendable {
             mine = nil
         }
         let mbAllowed = libSettled || kindLateFor == lateKey
+        let libraryOf = lib?.rows ?? []
+        let libraryAlbums = libraryOf.compactMap { (row: SearchRow) -> Album? in
+            if case .album(let album) = row { return album }
+            return nil
+        }
+        let librarySongs = libraryOf.compactMap { (row: SearchRow) -> Song? in
+            if case .song(let song) = row { return song }
+            return nil
+        }
+        //? the library's artists of the view, and the one the box named - who MusicBrainz's are told apart from
+        let listed = (libraryOf + answeredRows).compactMap { (row: SearchRow) -> Artist? in
+            if case .artist(let artist) = row { return artist }
+            return nil
+        }
+        //? MusicBrainz's rows of this kind, in its order, the library's left out
         var mbRows: [SearchRow] = []
         var groups: [ReleaseGroup] = []
         var recordings = 0
         if mbAllowed, mine == .done {
-            let libraryOf = lib?.rows ?? []
             switch wanted {
             case .albums:
-                guard let found = albums.found else { break }
-                groups = found.groups
-                let libraryAlbums = libraryOf.compactMap { (row: SearchRow) -> Album? in
-                    if case .album(let album) = row { return album }
-                    return nil
+                if let found = albums.found {
+                    groups = found.groups
+                    mbRows = Self.albumRows(found.groups, shown: found.shown, index: marks.index, library: libraryAlbums)
                 }
-                let held = Set(SearchAlbums.heldUnlisted(found.groups, marks.index, libraryAlbums).map(\.id))
-                let shown = Set(found.shown.map(\.id))
-                mbRows = found.groups.filter { shown.contains($0.id) || held.contains($0.id) }.map { SearchRow.group($0) }
             case .artists:
-                guard let found = artists.found else { break }
-                //? the library's artists of the view, and the one the box named - who MusicBrainz's are told apart from
-                let listed = (libraryOf + answeredRows).compactMap { (row: SearchRow) -> Artist? in
-                    if case .artist(let artist) = row { return artist }
-                    return nil
-                }
-                let split = SearchList.newArtists(found.matches, known: SearchList.knownArtists(artistList, listed),
-                                                  index: marks.index, listed: listed)
-                var brought: [Int: Artist] = [:]
-                for each in split.brought { brought[each.position] = each.artist }
-                var kept: [Int: MBArtistMatch] = [:]
-                for each in split.musicbrainz { kept[each.position] = each.match }
-                for at in found.matches.indices {
-                    if let artist = brought[at] {
-                        mbRows.append(.artist(artist))
-                    } else if let match = kept[at] {
-                        mbRows.append(.mbArtist(match))
-                    }
+                if let found = artists.found {
+                    mbRows = Self.artistRows(found.matches, artistList: artistList, index: marks.index, listed: listed).rows
                 }
             case .songs:
-                guard let found = songs.found else { break }
-                recordings = found.recordings.count
-                let librarySongs = libraryOf.compactMap { (row: SearchRow) -> Song? in
-                    if case .song(let song) = row { return song }
-                    return nil
+                if let found = songs.found {
+                    recordings = found.recordings.count
+                    mbRows = Self.songRows(found.songs, library: librarySongs, marks: marks)
                 }
-                let split = SearchList.newSongs(found.songs, library: librarySongs, index: marks.index,
-                                                evidence: marks.evidence)
-                let kept = Set(split.musicbrainz.map { FoldKey($0.song.key) } + split.brought.map { FoldKey($0.song.key) })
-                mbRows = found.songs.filter { kept.contains(FoldKey($0.key)) }.map { SearchRow.mbSong($0) }
             }
         }
+        //? (slice 4) what's saved leads MusicBrainz's rows - deduped against the library's as MusicBrainz's are, and
+        //? MusicBrainz's answer against it by key: drawn as soon as the view's library is, MusicBrainz's added below.
+        //? `savedMarked`: the rows that are what's saved's own (a library artist brought in through it is the library's)
+        var savedRows: [SearchRow] = []
+        var savedMarked = Set<String>()
+        if mbAllowed, let plan, let kept = savedOf(query, plan, view: view, index: marks.index) {
+            switch wanted {
+            case .albums:
+                savedRows = Self.albumRows(kept.groups, shown: kept.shown, index: marks.index, library: libraryAlbums)
+                savedMarked = Set(savedRows.map(\.key))
+            case .artists:
+                let made = Self.artistRows(kept.matches, artistList: artistList, index: marks.index, listed: listed)
+                savedRows = made.rows
+                savedMarked = made.musicBrainz
+            case .songs:
+                savedRows = Self.songRows(kept.songs, library: librarySongs, marks: marks)
+                savedMarked = Set(savedRows.map(\.key))
+            }
+        }
+        var failed: MBFailure?
+        if case .failed(let failure)? = mine { failed = failure }
+        let landed = mine == .done || failed != nil
+        //? MusicBrainz's rows held while what's saved is still being asked for these words (SearchSaved.waitMs at most,
+        //? then given up): the two drawn together, saved first - its failure as its rows - never once any of them is
+        //? drawn below (taken away again, they would move everything below)
+        let mbHeld = !savedSettled(query) && landed && (before?.rest.isEmpty ?? true) && !(before?.problem ?? false)
+        //? ...and what is drawn kept where it is as answers land after it: a late saved answer goes below - below
+        //? MusicBrainz's failure too, once that is drawn (else its Try again moved down under the finger)
+        let problem = mbAllowed && !mbHeld && failed != nil
+        let arranged = KindArea.arrange(before, saved: savedRows, musicbrainz: mbHeld ? [] : mbRows,
+                                        above: Set(answeredRows.map(\.key)), problem: problem)
+        let lead = arranged.lead
+        let rest = arranged.rest
+        func fromSaved(_ row: SearchRow) -> Bool {
+            arranged.area.from[row.key] == .saved && savedMarked.contains(row.key)
+        }
+        let savedCount = (lead + rest).filter(fromSaved).count
         //? an artist read before a title asks MusicBrainz nothing of artists: the artist named is the library's
         let noMusicBrainz = wanted == .artists && plan?.kind == .albumByArtist
         let searching = !late && !libSettled
-        let nothing = libSettled && lib?.state != .failed && answeredRows.isEmpty
-            && (noMusicBrainz || (mine == .done && mbRows.isEmpty && !(wanted == .albums && !groups.isEmpty)))
+        let nothing = libSettled && lib?.state != .failed && answeredRows.isEmpty && lead.isEmpty && !mbHeld
+            && (noMusicBrainz || (mine == .done && rest.isEmpty && !(wanted == .albums && !groups.isEmpty)))
         var foot: KindView.Foot?
+        var more: KindView.More?
         if !noMusicBrainz {
             if !musicBrainz && mine == nil {
                 foot = .typeMore
@@ -1148,25 +1528,35 @@ public struct SearchState: Sendable {
                 //? an artist's name alone asks no song: a title is needed with it
                 foot = .needATitle
             } else if mbAllowed {
-                switch mine {
-                case .none, .searching?:
-                    foot = musicBrainz || mine != nil ? .searching : nil
-                case .failed(let failure)?:
-                    foot = .failed(failure)
-                case .done?:
-                    if !mbRows.isEmpty {
-                        foot = .rows(mbRows)
-                    } else if !nothing {
-                        if wanted == .albums && !groups.isEmpty {
-                            foot = .said(SearchWords.allHeld(personal: marks.personal))
-                        } else if wanted == .songs && recordings > 0 {
-                            foot = .said(SongSearch.noRelease(query))
-                        } else {
-                            foot = .said(SearchWords.empty(wanted, query))
+                if mbHeld {
+                    foot = .searching
+                } else {
+                    switch mine {
+                    case .none, .searching?:
+                        foot = musicBrainz || mine != nil ? .searching : nil
+                    case .failed(let failure)?:
+                        foot = .failed(failure)
+                    case .done?:
+                        if !rest.isEmpty {
+                            foot = .rows(rest)
+                        } else if !nothing && lead.isEmpty {
+                            if wanted == .albums && !groups.isEmpty {
+                                foot = .said(SearchWords.allHeld(personal: marks.personal))
+                            } else if wanted == .songs && recordings > 0 {
+                                foot = .said(SongSearch.noRelease(query))
+                            } else {
+                                foot = .said(SearchWords.empty(wanted, query))
+                            }
                         }
+                        more = moreOf(wanted, personal: marks.personal)
                     }
                 }
             }
+        }
+        var below: [SearchRow] = []
+        switch foot {
+        case .searching?, .failed?: below = rest
+        default: break
         }
         var lateSlot: LateSlot?
         if late {
@@ -1177,10 +1567,110 @@ public struct SearchState: Sendable {
             case .answered?: lateSlot = (lib?.rows ?? []).isEmpty ? .nothing : .show(lib?.rows.count ?? 0)
             }
         }
+        //? the view's region (Search.tsx's layout effect): its library's rows as they draw, then MusicBrainz's or its
+        //? failure - what's saved said with MusicBrainz's words, drawn above them
+        var libraryWords: String?
+        if showLib {
+            let words = SearchWords.library([wanted: libraryRows.count], personal: marks.personal)
+            //? a view that asks MusicBrainz nothing (Artists under album-by-artist) and found nothing says so
+            libraryWords = words.isEmpty && noMusicBrainz && nothing ? SearchWords.nothing(SearchView(wanted), query) : words
+        }
+        var musicBrainzWords: String?
+        if mbAllowed && !mbHeld && !noMusicBrainz && landed {
+            var parts: [String] = []
+            if savedCount > 0 { parts.append(SearchWords.saved([wanted: savedCount])) }
+            if let failed {
+                parts.append(savedCount > 0 ? SearchWords.savedAway(failed, short: true) : SearchWords.failure(failed, short: true))
+            } else {
+                let fresh = rest.filter { (row: SearchRow) -> Bool in !fromSaved(row) }.count
+                parts.append(SearchWords.musicBrainz([wanted: fresh], answered: true, saved: savedCount > 0))
+            }
+            musicBrainzWords = parts.filter { !$0.isEmpty }.joined(separator: " ")
+        }
         return KindView(kind: wanted, lateSlot: lateSlot, searching: searching,
                         searchingMusicBrainz: musicBrainz && keyNow != nil && !noMusicBrainz,
                         libraryFailed: lib?.state == .failed && !late,
-                        libraryRows: libraryRows, own: showLib ? lib : nil, foot: foot, nothing: nothing)
+                        libraryRows: libraryRows, own: showLib ? lib : nil, foot: foot, nothing: nothing,
+                        savedRows: lead, below: below, more: more, savedCount: savedCount,
+                        said: KindView.Said(key: "\(lateKey)\n\(keyNow ?? "")", library: libraryWords,
+                                            musicBrainz: musicBrainzWords),
+                        area: mbAllowed ? arranged.area : nil)
+    }
+
+    /// A kind view's MusicBrainz albums, in MusicBrainz's order: those shown, and those held that its own search didn't
+    /// list (`heldUnlisted`) - marked in place.
+    static func albumRows(_ groups: [ReleaseGroup], shown: [ReleaseGroup], index: OwnedIndex?,
+                          library: [Album]) -> [SearchRow] {
+        let held = Set(SearchAlbums.heldUnlisted(groups, index, library).map(\.id))
+        let shownIds = Set(shown.map(\.id))
+        return groups.filter { shownIds.contains($0.id) || held.contains($0.id) }.map { SearchRow.group($0) }
+    }
+
+    /// ...its artists, in MusicBrainz's order: a library artist answering to the name brought in at their place,
+    /// MusicBrainz's others - `musicBrainz` the keys of MusicBrainz's own.
+    static func artistRows(_ matches: [MBArtistMatch], artistList: [Artist]?, index: OwnedIndex?,
+                           listed: [Artist]) -> (rows: [SearchRow], musicBrainz: Set<String>) {
+        let split = SearchList.newArtists(matches, known: SearchList.knownArtists(artistList, listed), index: index,
+                                          listed: listed)
+        var brought: [Int: Artist] = [:]
+        for each in split.brought { brought[each.position] = each.artist }
+        var kept: [Int: MBArtistMatch] = [:]
+        for each in split.musicbrainz { kept[each.position] = each.match }
+        var rows: [SearchRow] = []
+        var theirs = Set<String>()
+        for at in matches.indices {
+            if let artist = brought[at] {
+                rows.append(.artist(artist))
+            } else if let match = kept[at] {
+                let row = SearchRow.mbArtist(match)
+                rows.append(row)
+                theirs.insert(row.key)
+            }
+        }
+        return (rows, theirs)
+    }
+
+    /// ...its songs, in the order found: those nobody has, and those on an album held that the library didn't list.
+    static func songRows(_ found: [FoundSong], library: [Song], marks: SearchMarks) -> [SearchRow] {
+        let split = SearchList.newSongs(found, library: library, index: marks.index, evidence: marks.evidence)
+        let kept = Set(split.musicbrainz.map { FoldKey($0.song.key) } + split.brought.map { FoldKey($0.song.key) })
+        return found.filter { kept.contains(FoldKey($0.key)) }.map { SearchRow.mbSong($0) }
+    }
+
+    /// More from MusicBrainz as a kind view draws it under its answer (Search.tsx's kindView): what its last page
+    /// brought, its failure, and the button while there is another page - or the far note. Nil when there is nothing
+    /// to draw.
+    private func moreOf(_ wanted: SearchKind, personal: Bool) -> KindView.More? {
+        let next: Int
+        let count: Int?
+        let last: Int
+        let limit: Int
+        let page: MorePage
+        var note: String?
+        switch wanted {
+        case .albums:
+            guard let found = albums.found else { return nil }
+            (next, count, last, limit, page) = (found.nextOffset, found.count, found.last, SearchAlbums.limit, found.more)
+            if case .added(let added, let held) = page {
+                note = SearchMore.pageWords(added: added, held: held, personal: personal).note
+            }
+        case .artists:
+            guard let found = artists.found else { return nil }
+            (next, count, last, limit, page) = (found.nextOffset, found.count, found.last, MBArtistSearch.limit, found.more)
+        case .songs:
+            guard let found = songs.found else { return nil }
+            (next, count, last, limit, page) = (found.nextOffset, found.count, found.last, SongSearch.limit, found.more)
+            if case .added(let added, let grown) = page {
+                note = SearchMore.songsWords(added: added, grown: grown).note
+            }
+        }
+        let pages = SearchMore.pages(next: next, count: count, last: last, limit: limit)
+        var failure: MBFailure?
+        if case .failed(let failed) = page { failure = failed }
+        guard note != nil || failure != nil || pages != .end else { return nil }
+        let asking = page == .asking
+        let label = asking ? SearchWords.loading : failure != nil ? SearchWords.tryAgain : SearchMore.button(wanted)
+        return KindView.More(note: note, failure: failure, pages: pages, asking: asking, label: label)
     }
 
     /// A kind's answer as a kind view reads it, whatever it found.
@@ -1206,22 +1696,42 @@ public protocol SearchFound: Sendable, Equatable {
 }
 
 /// A kind view as drawn (Search.tsx's kindView): the place kept for its late library, the asking line before its
-/// library lands, its library's failure, its rows and More, then MusicBrainz's part below - and "No albums for …" when
-/// nothing at all was found.
+/// library lands, its library's failure, its rows and More, then MusicBrainz's part below - what's saved leading it
+/// (slice 4), More from MusicBrainz at its foot - and "No albums for …" when nothing at all was found.
 public struct KindView: Sendable, Equatable {
-    /// MusicBrainz's part, below the library's (the Albums view).
+    /// MusicBrainz's part, below the library's (and below what's saved).
     public enum Foot: Sendable, Equatable {
         /// MusicBrainz not asked yet: `SearchWords.typeMore`.
         case typeMore
         /// The Songs view under the artist reading: no song is asked by an artist's name alone (`SONGS_NEED_A_TITLE`).
         case needATitle
-        /// "Searching…"
+        /// "Searching…" - `below` drawn under it.
         case searching
-        /// Its words, and Try again unless refused.
+        /// Its words (earlier results', under what's saved), and Try again unless refused - `below` drawn under it.
         case failed(MBFailure)
         case rows([SearchRow])
         /// Why there are none: everything held, or nothing else found.
         case said(String)
+    }
+
+    /// More from MusicBrainz, under its answer's rows (slice 4): what its last page brought (`note`), its last ask's
+    /// failure, and the button while there is another page (`pages` `.more`, its `label` "More albums", "Loading…" or
+    /// "Try again") - or, past the furthest page MusicBrainz serves (`.far`), `SearchMore.far`.
+    public struct More: Sendable, Equatable {
+        public let note: String?
+        public let failure: MBFailure?
+        public let pages: SearchMore.Pages
+        public let asking: Bool
+        public let label: String
+    }
+
+    /// What the view's region says (Search.tsx's layout effect), each once for its `key` (its words, kind and the
+    /// query it asks): its library's words once they are drawn, and MusicBrainz's - what's saved's with them - once it
+    /// has answered or failed. Nil while not yet; "" for nothing to say.
+    public struct Said: Sendable, Equatable {
+        public let key: String
+        public let library: String?
+        public let musicBrainz: String?
     }
 
     public let kind: SearchKind
@@ -1238,4 +1748,15 @@ public struct KindView: Sendable, Equatable {
     public let foot: Foot?
     /// Nothing at all found: "No albums for …".
     public let nothing: Bool
+    /// (Slice 4) What's saved, leading MusicBrainz's part; the rows that landed after the asking line or the failure
+    /// was drawn, under it (`below` - with `.rows`, they are its rows).
+    public let savedRows: [SearchRow]
+    public let below: [SearchRow]
+    public let more: More?
+    /// How many rows drawn are what's saved's.
+    public let savedCount: Int
+    public let said: Said
+    /// What is drawn below its library's rows, to keep for these words (`kindArea`) - nil while MusicBrainz's part
+    /// isn't drawn.
+    public let area: KindArea?
 }

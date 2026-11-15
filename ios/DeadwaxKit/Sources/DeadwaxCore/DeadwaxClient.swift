@@ -376,9 +376,11 @@ public struct DeadwaxClient: Sendable {
     /// MusicBrainz's albums for `query` (`Routes.fullySearch`): `limit` of them, no releases walked, with Search's
     /// patience (`quick` - a 400 said as words, MusicBrainz shedding said as busy). A 503 is MusicBrainz away, a 422
     /// with words a search it refused.
-    public func fullySearch(_ query: String, limit: Int = SearchAlbums.limit) async throws -> FullySearchAnswer {
-        try await call(Routes.fullySearch, as: FullySearchAnswer.self,
-                       query: [("query", query), ("limit", String(limit)), ("releases", "false"), ("quick", "true")])
+    public func fullySearch(_ query: String, limit: Int = SearchAlbums.limit, offset: Int = 0) async throws -> FullySearchAnswer {
+        //? (slice 4) More from MusicBrainz asks the next page by `offset` - sent only past the first, as the web's
+        var fields = [("query", query), ("limit", String(limit)), ("releases", "false"), ("quick", "true")]
+        if offset > 0 { fields.append(("offset", String(offset))) }
+        return try await call(Routes.fullySearch, as: FullySearchAnswer.self, query: fields)
     }
 
     /// One album's every pressing with its tracklist (`Routes.releaseGroup`) - `problem` when MusicBrainz failed part
@@ -389,13 +391,24 @@ public struct DeadwaxClient: Sendable {
 
     /// MusicBrainz's artists going by a name (`Routes.searchArtists`): the words typed, never a query - deadwax asks
     /// for the name and its aliases. A 503 is MusicBrainz away, a 422 with words a search it refused.
-    public func searchArtists(_ name: String, limit: Int = MBArtistSearch.limit) async throws -> ArtistSearchAnswer {
-        try await call(Routes.searchArtists, as: ArtistSearchAnswer.self, query: [("name", name), ("limit", String(limit))])
+    public func searchArtists(_ name: String, limit: Int = MBArtistSearch.limit, offset: Int = 0) async throws -> ArtistSearchAnswer {
+        var fields = [("name", name), ("limit", String(limit))]
+        if offset > 0 { fields.append(("offset", String(offset))) }
+        return try await call(Routes.searchArtists, as: ArtistSearchAnswer.self, query: fields)
     }
 
     /// MusicBrainz's recordings for a query (`Routes.searchSongs`), each with every release it is on.
-    public func searchSongs(_ query: String, limit: Int = SongSearch.limit) async throws -> SongSearchAnswer {
-        try await call(Routes.searchSongs, as: SongSearchAnswer.self, query: [("query", query), ("limit", String(limit))])
+    public func searchSongs(_ query: String, limit: Int = SongSearch.limit, offset: Int = 0) async throws -> SongSearchAnswer {
+        var fields = [("query", query), ("limit", String(limit))]
+        if offset > 0 { fields.append(("offset", String(offset))) }
+        return try await call(Routes.searchSongs, as: SongSearchAnswer.self, query: fields)
+    }
+
+    /// What MusicBrainz's answers saved on deadwax hold matching the words (`Routes.savedSearch`, server
+    /// 2.0.0-player.56): artists, albums, songs and the albums credited to exactly the words, each in its own route's
+    /// shape - `available` false when nothing could be searched (never an error: MusicBrainz's answer alone, then).
+    public func savedSearch(_ words: String) async throws -> SavedSearchAnswer {
+        try await call(Routes.savedSearch, as: SavedSearchAnswer.self, query: [("words", words)])
     }
 
     /// Who a MusicBrainz artist is (`Routes.artistFacts`) - a 503 when MusicBrainz can't say.

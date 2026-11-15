@@ -2,7 +2,7 @@
 
 The native iPhone app: a SwiftUI app over the `DeadwaxKit` Swift package (its `DeadwaxCore` logic,
 tested on Linux, its `DeadwaxAudio` engine and its `DeadwaxTurntable` drawing), built on a Mac with
-Xcode and a free Apple account. It is early: app 0.10 - Phase 1's player (your library, album pages,
+Xcode and a free Apple account. It is early: app 0.11 - Phase 1's player (your library, album pages,
 Up Next, Now Playing, normalization on the phone, the lock screen, plays and picking up where you
 left off), Phase 2's albums and songs downloaded to play offline, lyrics on Now Playing, the EQ (ten
 sliders, nine presets and AutoEq's corrections, kept per output) and the turntable on Now Playing (a
@@ -13,10 +13,11 @@ background when iOS allows - and Phase 4's Library: your playlists read and play
 to, edited, deleted and downloaded, the Library's switch between its pages (Albums, Playlists and
 Artists - and Songs with logins off; with them on, every song is under All music > All songs - in an
 order you choose, a pull down shuffling your library), artists and their pages, and
-every song, a page at a time - and Phase 5's Search, begun: your library searched as the web app's
-Search searches it, one list with Top results, a song playing from its tap, and the albums you don't
-have yet from MusicBrainz after yours, each opening its pressings and their tracklists - kept on the
-`ios` branch while it's being built. Nothing of Phase 2, the lyrics, the EQ, the turntable, play history, Phase 3,
+every song, a page at a time - and Phase 5's Search: your library and MusicBrainz searched as the web
+app's Search searches them, one list with Top results, a song playing from its tap, the albums, artists
+and songs you don't have yet after yours (an album opening its pressings and their tracklists, an artist
+their albums), what deadwax has saved of MusicBrainz's answers drawn at once, and More from MusicBrainz a
+page at a time - kept on the `ios` branch while it's being built. Nothing of Phase 2, the lyrics, the EQ, the turntable, play history, Phase 3,
 Phase 4 or Search has been seen on an iPhone yet.
 Phase 0's test screen lives on in the app's Debug.
 

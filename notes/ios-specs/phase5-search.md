@@ -363,7 +363,7 @@ the empty cover.
 | slice 1: `LibraryResults` (lenient), `Routes.libraryOwned` (41), `Routes.search` with `artistOffset` and `albumOffset`; `DeadwaxClient.searchLibrary(_:counts:offsets:)`, `owned(ifNoneMatch:)` | `AppTab.search`, its stack in `AppNavigation`, MainTabs' third tab |
 | slice 2: MusicBrainz's groups (`ReleaseGroup` lenient), searchResults.ts' kinds and years, `notInLibrary`, `heldUnlisted`, the moments (`decidedTop`, `sectionsReady`, `lateKinds`, `drawInOrFold`, `nextBehind`), pressings.ts' page rules; 3 routes (44) | the moments as drawn, the album you don't have (`AppRoute.group`), Get's place |
 | slice 3: songs.ts (`groupSongs`, `namedAlbum`, `newSongs`, the disclosure), `newArtists`, MusicBrainz artists; 4 routes (48) | the songs' disclosure, a MusicBrainz artist's page |
-| slice 4: `savedFor`, `SAVED_WAIT_MS`, the kept answers (24), More from MusicBrainz; 1 route (49); the app 0.11 (11) | the saved rows, the kept answers |
+| slice 4: `savedFor`, `SAVED_WAIT_MS`, the kept answers (24), More from MusicBrainz; 1 route (49); the app 0.11 (11) | the saved rows, the kept answers, More's button, a kind view's region words |
 
 ### 5.2 Held to the web
 
@@ -439,6 +439,19 @@ artists and songs, the songs' disclosure in SearchScreen, MBArtistModel and MBAr
 what was decided here, the tests and mutations, and what was verified. Question 9 was built with it; questions
 24-27 came of it. docs/ios.md's checks 144-155 are its.
 
+### 6.8 Slice 4, built (2026-11-14)
+
+What slice 4 is, as built, is in notes/ios.md's "Phase 5, slice 4: what's saved, the kept answers, More from
+MusicBrainz, the app as 0.11" - Core (SearchSaved.swift, and slice 4's half of SearchList.swift and SearchState.swift,
+held to the web by export-search-saved-vectors.cjs and its fourth fixture, and by hand where the web's rule is
+Search.tsx's own state), the app (SearchModel's saved ask and its clock, the kept answers, More, a kind view's area
+and its words; SearchScreen's saved rows and MusicBrainzMore), what was decided here, the tests and mutations, and
+what was verified. Questions 28-33 came of it, and 34 of its review; question 5's search of what's downloaded while offline was not built
+(it stays the web's way: a list drawn stays, new words wait for deadwax). docs/ios.md's checks 156-165 are its. With
+it Phase 5 is built: the app is 0.11 (11), and that section of notes/ios.md ends with the phase as a whole. Its
+review's fixes (each kind's More its own ask, and let go by new words; the kept answers' hour): "Phase 5, slice 4,
+after its review", with question 34 and question 28 updated.
+
 ## 7. Tests (Swift Testing; Core's on Linux and macOS)
 
 - **The fixture's replay** (slice 1): every rule of 2.1-2.5 over the web's own answers - readings of every shape (a
@@ -454,9 +467,12 @@ what was decided here, the tests and mutations, and what was verified. Question 
   drawn list's freeze (marks changing in place, a new text's answer replacing it only once settled, an empty box),
   `KindLibrary`'s More (appending without repeats, full again only when the page was full and new), the prefetch's
   choice, the song tap's rule (in hand, among them, not, offline and on this phone), the pacing's numbers.
-- **The contract** (tests/test_ios_contract.py): ROUTE_COUNT 41 (44 with slice 2, 48 with slice 3); `/library/owned` named with the fields the app reads
+- **The contract** (tests/test_ios_contract.py): ROUTE_COUNT 41 (44 with slice 2, 48 with slice 3, 49 with slice 4); `/library/owned` named with the fields the app reads
   within `OWNED_FIELDS` and `yours`; `LibraryResults`' keys within what the route returns; every count and offset the
-  app sends within the route's bounds; the box's limit at most `q`'s 200.
+  app sends within the route's bounds; the box's limit at most `q`'s 200. (Slice 4) `/saved` asked by `words`, the box's
+  limit within its bound, its answer's kinds the app's, `available` in every answer, read leniently, and its page of
+  each kind the app's own; More's furthest offset `FULLY_SEARCH_OFFSET_MAX`, within each search route's `offset`, sent
+  only past the first page.
 - **Mutations** run by hand and caught (notes/ios.md lists each).
 
 ## 8. James's checks (on his iPhone)
@@ -498,7 +514,11 @@ held album's row left before it opens, and covers loading once back online. Slic
 "Search's checks, slice 3 (144-155)"): an artist you don't have and their page, one of yours drawn once, Studio
 only, their albums you have, a song you don't have and its albums, the song on its album, one of yours drawn once
 and the Songs view's words under an artist's name, a song in Top results, a song's album you have, offline, a row
-left before it opens, VoiceOver.
+left before it opens, VoiceOver. Slice 4's are 156-165 (docs/ios.md's "Search's checks, slice 4 (156-165)"): the
+version (0.11 (11)), what's saved drawn at the library's moment, saved then more beside the web's, MusicBrainz away
+under what's saved, a chip's rows staying put, More (albums, artists, songs, the end and the furthest page), More left
+behind by new words or offline, words searched before drawn from the kept answers, offline, VoiceOver in a chip's
+view.
 
 ## 9. What only the phone can tell
 
@@ -513,6 +533,10 @@ left before it opens, VoiceOver.
 - That the segmented chips under the field fit at 320 points and at accessibility sizes (four short words).
 - That Navidrome's real search3 orders and matches as the fakes do (the starts of words) - the worked examples come
   from the web's fixtures, not James's library.
+- (Slice 4) How often `/saved` answers inside its 400 ms over WireGuard (question 29), and that what it finds is
+  what the web's Search draws for the same words against James's saved answers - the fakes are the web's.
+- (Slice 4) That a kind view's rows hold their places at accessibility sizes as what's saved, MusicBrainz's answer
+  and More's pages land, and where VoiceOver's cursor goes as More's button goes (question 32).
 
 ## 10. Open questions (each with what the build does until James answers)
 
@@ -533,7 +557,9 @@ left before it opens, VoiceOver.
 5. **Offline.** The plan: Search says it needs deadwax and shows nothing stale as if live. *Recommend, and built*: a
    list drawn for words stays (it is that search's answer, not a stale one), songs not on this phone dimmed and a song
    on it playing; new words, or none drawn: "Search works once deadwax is back." A search of what is downloaded while
-   offline is not built - it could come in slice 4.
+   offline is not built - it could come in slice 4. (Slice 4) Not built there either: Phase 5 ends with offline as
+   above. A search of the phone's downloads would be the phone's own (the web has none to hold it to) - a later
+   phase's, if James wants it.
 6. **`/library/owned` on the phone.** It is the reading's names and the marks' last word, and the web asks it as
    Search shows; on the phone it is about 300 bytes an album. *Recommend, and built*: asked as Search shows, kept in
    memory per person with its ETag (a 304 each time after), never on disk - Search needs deadwax anyway. Its failure
@@ -645,3 +671,41 @@ left before it opens, VoiceOver.
     MusicBrainz's pages, as an album's pressings) - each held by the contract test above deadwax's own waits where
     they're bounded. A facts answer given up on leaves the line out; albums given up on say "That took too long."
     with Try again.
+
+28. **Where the kept answers live** (slice 4). The web keeps its last 24 MusicBrainz search answers for the page's
+    life (app/searchAnswers.ts), by the request's path. *Recommend, and built*: the same 24, in memory, by route,
+    words and page size; a failure, and a More's page, never kept. They are kept across a sign-out and for whoever
+    signs in next - MusicBrainz's data is nobody's own, and nothing in an answer says who asked - and never taken
+    while deadwax can't be reached, when nothing of MusicBrainz's is drawn. (Slice 4's review) Each is answered from
+    for **an hour** from when it landed - deadwax's own in-memory hour (`ResponseCache`'s `ttl_seconds`, held by the
+    contract test) - and is missing after it. The web's are the page's life, but an iPhone app's life runs to days
+    (only a force-quit ends it), and a search repeated days later would be answered from memory with no request, its
+    More's offsets following that old first page. The hour runs on the app's `Monotonic` clock, which counts the
+    phone asleep. The other way: let them go with the person, as `/library/owned` goes.
+29. **What's saved's wait on the phone** (slice 4). The web gives what's saved 400 ms (`SAVED_WAIT_MS`) before the
+    library's moment draws without it - a desktop's LAN. *Recommend, and built*: the same 400 ms; past it the
+    answer is let go for those words, and MusicBrainz's answer draws as it would without it. Over WireGuard it may
+    be given up more often (Debug doesn't time it yet - section 9). The other way: a longer wait on the phone, which
+    would hold the library's moment back on every search.
+30. **What's saved offline** (slice 4, beside question 21). *Recommend, and built*: not asked while deadwax can't be
+    reached, and its rows leave a drawn list with MusicBrainz's - each opens a page that needs deadwax; back
+    online, drawn again where they were. Nothing kept is drawn offline either (question 28).
+31. **How long the phone waits for More** (slice 4, beside questions 22 and 27). *Recommend, and built*: the
+    route's own wait, as for its first page (20 s for each of `/fully_search`, `/artists` and `/songs`); given up
+    on, "That took too long." over the button, which says Try again.
+32. **More's last page under VoiceOver** (slice 4). The web moves focus, when More had it and its page takes the
+    button away (the end, or the furthest page), to the first row the page brought, or to the note in its place.
+    *Recommend, and built*: not ported - the page is announced ("3 more albums found", "No more results.") and
+    VoiceOver's cursor goes where iOS puts it as the button goes. The other way: `AccessibilityFocusState` on the
+    first new row, once the phone shows how VoiceOver lands.
+33. **A kind view's words for VoiceOver** (slice 4). The web's kind view says, through its live region, its
+    library's rows once they're drawn, then MusicBrainz's (with what's saved: "Found earlier: 1 album. More found: 3
+    albums.") once it has answered or failed, each once for the view's words. *Recommend, and built*: the same
+    words, each once for the view's words and kind, through the app's announcement; a chip drawn at once says
+    "Showing albums." with them.
+34. **A More asking as new words are typed** (slice 4's review). The web gives each kind's More its own latestOnly,
+    so a page asked before new words were typed still lands - appended and announced - until that kind is asked for
+    the new words (a settling pause, about 700 ms; under three letters, not until Search). *Built, as the review
+    asked*: any new words let every kind's More go (Core's `typed`, `moreLetGo`) - the page lands on nothing, said or
+    drawn, and More is idle again, so it can be asked again on coming back to the words. Each kind's More is its own
+    ask, as the web's: asking one never cancels another's.
