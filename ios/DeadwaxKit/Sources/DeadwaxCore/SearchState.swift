@@ -305,6 +305,10 @@ public struct SearchState: Sendable {
         let next = JSText.trim(text)
         guard !WebText.same(next, query) else { return nil }
         query = next
+        //? (slice 4's review) a More still asking is let go by ANY new words - its page lands on nothing, said or drawn,
+        //? and More can be asked again - where the web's latestOnly lets it land until the kind is asked for the new
+        //? words (a settling pause, about 700 ms, or never under three letters)
+        for each in SearchKind.allCases { moreLetGo(each) }
         let effect = SearchReading.musicBrainzOnTyping(next, asked: asked)
         //? a text the library was once late for is late again only by its own clock, never by an old one
         lateFor = nil
@@ -810,7 +814,7 @@ public struct SearchState: Sendable {
     /// the library's moment; what is held worked out from `index`. Only for words MusicBrainz is to be asked for, and a
     /// kind not in hand or on its way for its key (a failure is taken over). `took` when any was (the caller asks
     /// `/library/owned` again, to mark rows in place); `songs` when songs were (it closes every song's disclosure).
-    public mutating func takeKept(_ term: String, view inView: SearchView, kept: SearchAnswersKept,
+    public mutating func takeKept(_ term: String, view inView: SearchView, kept: SearchAnswersKept, now: Double,
                                   index: OwnedIndex?) -> (took: Bool, songs: Bool) {
         guard !term.isEmpty,
               asked.map({ WebText.same($0, term) }) == true || SearchReading.asksMusicBrainzBySettling(term),
@@ -823,20 +827,20 @@ public struct SearchState: Sendable {
             case .albums:
                 guard !albums.asked(key) else { continue }
                 let ask = albumsAsk(term, plan, view: inView, key: key, token: albumsToken + 1)
-                guard let hit = kept.albums(ask) else { continue }
+                guard let hit = kept.albums(ask, at: now) else { continue }
                 albumsToken += 1
                 albums = .done(Self.albumsFound(ask, hit.found, query: hit.query, index: index))
                 took = true
             case .artists:
                 guard !artists.asked(key) else { continue }
                 let ask = ArtistsAsk(token: artistsToken + 1, text: term, key: key, plan: plan, name: Self.words1(term))
-                guard let found = kept.artists(ask) else { continue }
+                guard let found = kept.artists(ask, at: now) else { continue }
                 artistsToken += 1
                 artists = .done(Self.artistsFound(ask, found))
                 took = true
             case .songs:
                 guard !songs.asked(key), let ask = songsAsk(term, plan, key: key, token: songsToken + 1),
-                      let hit = kept.songs(ask) else { continue }
+                      let hit = kept.songs(ask, at: now) else { continue }
                 songsToken += 1
                 songs = .done(Self.songsFound(ask, hit.found, query: hit.query))
                 took = true
@@ -902,7 +906,8 @@ public struct SearchState: Sendable {
     /// answer it was asked of has gone.
     public mutating func moreAnswered(_ ask: MoreAsk, albums page: FullySearchAnswer, index: OwnedIndex?,
                                       personal: Bool) -> String? {
-        guard ask.kind == .albums, ask.token == albumsToken, var found = albums.found, found.key == ask.key else { return nil }
+        guard ask.kind == .albums, ask.token == albumsToken, var found = albums.found, found.key == ask.key,
+              found.more == .asking else { return nil }
         let appended = SearchMore.appendPage(found.groups, found.shown, page.releaseGroups, index)
         found.groups = appended.groups
         found.shown = appended.shown
@@ -916,9 +921,8 @@ public struct SearchState: Sendable {
 
     /// ...a page of artists: the ones not got already appended.
     public mutating func moreAnswered(_ ask: MoreAsk, artists page: ArtistSearchAnswer) -> String? {
-        guard ask.kind == .artists, ask.token == artistsToken, var found = artists.found, found.key == ask.key else {
-            return nil
-        }
+        guard ask.kind == .artists, ask.token == artistsToken, var found = artists.found, found.key == ask.key,
+              found.more == .asking else { return nil }
         let known = Set(found.matches.map(\.mbid))
         let fresh = page.matches.filter { !known.contains($0.mbid) }
         found.matches += fresh
@@ -933,7 +937,8 @@ public struct SearchState: Sendable {
     /// ...a page of songs: merged in (`appendSongs`) - a later take of a song shown adding its albums to it in place, a
     /// new song after the rest.
     public mutating func moreAnswered(_ ask: MoreAsk, songs page: SongSearchAnswer) -> String? {
-        guard ask.kind == .songs, ask.token == songsToken, var found = songs.found, found.key == ask.key else { return nil }
+        guard ask.kind == .songs, ask.token == songsToken, var found = songs.found, found.key == ask.key,
+              found.more == .asking else { return nil }
         let merged = SearchMore.appendSongs(found.recordings, page.recordings, drawn: found.songs)
         found.recordings = merged.recordings
         found.songs = merged.songs
@@ -949,16 +954,36 @@ public struct SearchState: Sendable {
     public mutating func moreFailed(_ ask: MoreAsk, _ failure: MBFailure) {
         switch ask.kind {
         case .albums:
-            guard ask.token == albumsToken, var found = albums.found, found.key == ask.key else { return }
+            guard ask.token == albumsToken, var found = albums.found, found.key == ask.key, found.more == .asking else { return }
             found.more = .failed(failure)
             albums = .done(found)
         case .artists:
-            guard ask.token == artistsToken, var found = artists.found, found.key == ask.key else { return }
+            guard ask.token == artistsToken, var found = artists.found, found.key == ask.key, found.more == .asking else { return }
             found.more = .failed(failure)
             artists = .done(found)
         case .songs:
-            guard ask.token == songsToken, var found = songs.found, found.key == ask.key else { return }
+            guard ask.token == songsToken, var found = songs.found, found.key == ask.key, found.more == .asking else { return }
             found.more = .failed(failure)
+            songs = .done(found)
+        }
+    }
+
+    /// A kind's More let go (slice 4's review) - new words (`typed`), or its ask cancelled: asking, it is idle again, so
+    /// More can be asked again, and the page or failure of the ask let go lands on nothing (`moreAnswered` and
+    /// `moreFailed` take only an ask still asking). Anything else is left as it is.
+    public mutating func moreLetGo(_ kind: SearchKind) {
+        switch kind {
+        case .albums:
+            guard var found = albums.found, found.more == .asking else { return }
+            found.more = .idle
+            albums = .done(found)
+        case .artists:
+            guard var found = artists.found, found.more == .asking else { return }
+            found.more = .idle
+            artists = .done(found)
+        case .songs:
+            guard var found = songs.found, found.more == .asking else { return }
+            found.more = .idle
             songs = .done(found)
         }
     }

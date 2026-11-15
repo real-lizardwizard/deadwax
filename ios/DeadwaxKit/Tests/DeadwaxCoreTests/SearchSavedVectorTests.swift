@@ -555,9 +555,11 @@ enum SearchSavedVectors {
             }
             for (number, step) in each.steps.enumerated() {
                 let what = "kept \(run), step \(number)"
+                //? a second a step: every run well inside the phone's hour, which the web's page has no end to
+                let now = Double(number)
                 if let key = step.keep {
                     let value = try #require(step.value)
-                    kept.keep(key, .albums(FullySearchAnswer(count: value)))
+                    kept.keep(key, .albums(FullySearchAnswer(count: value)), at: now)
                     let wanted = Set(try #require(step.present))
                     let present = Set(kept.keys)
                     #expect(present == wanted, "\(what): kept")
@@ -565,7 +567,7 @@ enum SearchSavedVectors {
                 } else {
                     let key = try #require(step.look)
                     var value: Int? = nil
-                    if case .albums(let answer)? = kept.kept(key) { value = answer.count }
+                    if case .albums(let answer)? = kept.kept(key, at: now) { value = answer.count }
                     #expect(value == step.found, "\(what): \(key)")
                 }
             }

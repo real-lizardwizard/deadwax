@@ -7896,7 +7896,10 @@ from reading it:
 ### Where the phone can't follow the web exactly
 
 - **The kept answers' keys** are route, words and page size, where the web's are the request's path. Each names the
-  same request. They live for the app's life and outlast a sign-out (question 28).
+  same request. They outlast a sign-out, and since the review each lasts an hour, where the web's last the page's life
+  (question 28).
+- **A More asking as new words are typed** (question 34, since the review): let go at once, where the web's lands
+  until the kind is asked for the new words.
 - **More's last page under VoiceOver** (question 32): announced, but no focus move.
 - **A kind view's words** (question 33): said through the app's announcement, each once per words and kind, where the
   web's is a live region.
@@ -8042,6 +8045,85 @@ Not verified - only the phone can tell (docs/ios.md's checks 156-165, beside the
 - The kept answers across a sign-out on a real phone, and how much memory 24 answers take there.
 - CI's Xcode 26.6 (the older Swift). The new code spells out its closures' types and keeps each `#expect` small.
 
+## Phase 5, slice 4, after its review (2026-11-14)
+
+The review of slice 4 found one medium-low bug and three low ones. This fixes three of them, in a commit of its own
+on `phase5-search`. The second (an album both what's saved and MusicBrainz found drawn nowhere in All while
+`/library/owned` isn't in hand) is the web's rule too: it is fixed in searchList.ts on main, and ported here once
+that reaches ios.
+
+### What was wrong, and the fix
+
+1. **One More task was shared by all three kinds** (medium-low).
+   - What happened: SearchModel held a single `askingMoreMusicBrainz` task and cancelled it before each More. A
+     cancelled URL load ends as a CancellationError, which `isCancellation` passes over in silence. So the kind it
+     belonged to stayed `.asking`, and Core's `askingMoreMusicBrainz()` (`found.more != .asking`) refused every
+     later More for that kind.
+   - The scenario: in Albums, tap More albums while MusicBrainz is slow, then go to Songs and tap More songs. Back
+     in Albums, the button says "Loading…", disabled, until the words change.
+   - The web gives each kind its own latestOnly (Search.tsx's askMore, askMoreArtists, askMoreSongs).
+   - Fix: the model keeps one task for each kind (`askingMoreMusicBrainz: [SearchKind: Task]`), so asking one
+     kind's More never cancels another's. Core gains `moreLetGo(kind)`: a kind asking is idle again. `moreAnswered`
+     and `moreFailed` now take only an ask that is still asking, so the page or failure of an ask let go lands on
+     nothing. Every cancel of a More (`cancelMore()`: new words, a new person, the box cleared) comes with Core's
+     let-go, so a cancelled More can always be asked again.
+3. **A More page that landed after new words were typed was still appended and announced** (low).
+   - What happened: `type()` cancelled More only on `.drop`, and `moreAnswered` checked only the token and the key.
+     So in the window before MusicBrainz was asked for the new words (`.settle`, about 700 ms), the old page landed
+     under them. The slice 4 notes said new words cancel it, and for `.settle` they didn't.
+   - Fix: Core's `typed` lets every kind's More go on any new words, and the model cancels every More task. The note
+     is now true. This departs from the web, whose page lands until the kind is asked again (question 34).
+4. **Kept answers "for the app's life"** (low, design). An iPhone app's life runs to days, since only a force-quit
+   ends it. A search repeated days later was answered from memory with no request, and its More's offsets followed
+   that old first page. docs/ios.md said closing the app lets them go, which is only true of a force-quit.
+   - Fix: each kept answer is stamped with when it landed, and is missing after `SearchAnswersKept.lifetime`, an
+     hour. That is deadwax's own in-memory hour (ResponseCache's `ttl_seconds`), and the contract test holds the two
+     equal.
+   - The model stamps and reads by `Monotonic.seconds()`. That is a ContinuousClock, which counts the phone asleep
+     and doesn't move when the wall clock is set.
+   - `kept(_:at:)`, `keep(_:_:at:)`, `albums/artists/songs(_:at:)` and `takeKept(…now:…)` take the time, so Core
+     stays pure and its tests inject the clock.
+   - Question 28 says so (the web's last the page's life, the phone's an hour), and docs/ios.md is corrected.
+
+### Tests
+
+- **SearchSavedTests**, four new:
+  - `aMoreLetGoCanBeAskedAgainAndItsPageLandsOnNothing`: asking, let go, idle. The old ask's page and failure land
+    on nothing, More asks again at the same offset, its page lands, and a let-go with nothing asking leaves the page's
+    words.
+  - `oneKindsMoreLeavesAnothersAsking`: Albums' More asking, Songs' asked, Albums' still asking, and its page lands.
+  - `newWordsLetAMoreGoBeforeMusicBrainzIsAskedForThem`: More asked, then "roseland n" typed (`.settle`). The old
+    page is neither said nor appended, More is idle, and back on "roseland" More asks again.
+  - `aKeptAnswerIsAnsweredFromForAnHourThenAskedAgain`, with an injected clock. The answer is there at once and at
+    the last second of the hour, missing a second past it and days on. The library's moment takes it inside the hour
+    and not past it, and kept again, the hour runs from then.
+- The kept answers' earlier tests and the vector replay pass times. The replay steps a second at a time, well inside
+  the hour, which the web's page has no end to.
+- **tests/test_ios_contract.py**: `test_the_apps_kept_answers_last_deadwaxs_own_hour`, which checks
+  `SearchAnswersKept.lifetime` against ResponseCache's `ttl_seconds` default.
+- **Mutations**: 5, each applied alone with the Search suites run, and all caught:
+  1. new words leaving a More asking;
+  2. an albums' More let go staying asking;
+  3. a let-go albums page still appended;
+  4. a kept answer answered from for ever;
+  5. an hour less a second.
+
+### Verified, and not
+
+Verified, on the tree before its commit:
+- `swift test`: Core 1518 (4 new), Audio 158, Turntable 12. One warning, and not a new one:
+  SearchSavedVectorTests.swift:432's `#require(each.studio)` is ambiguous (an optional Bool). It has been there since
+  slice 4, whose full run compiled nothing new and so didn't print it - its "No new warnings" missed it.
+- The unsigned Debug and Release device builds (Xcode, `generic/platform=iOS`) succeeded. The .xcodeproj is unchanged.
+- `check_project.py` ok.
+- `npm run build` and all 87 sims on Node 22.23.4.
+- The full pytest suite: 4520 passed, 1 skipped (test_ios_contract's new hour test among them).
+- The 5 mutations above, all caught.
+
+Not verified - only the phone can tell (checks 162 and 163 gain a sentence each):
+- More on two chips over a slow connection.
+- A kept answer asked again after an hour with the phone asleep in between.
+
 ## Phase 5 as a whole (2026-11-14)
 
 Search on the phone is the web app's Search: one list, the web's rules ported to Core and held to its own
@@ -8068,7 +8150,7 @@ Four slices, each with its review. The app is 0.11 (11).
   Each is written by its exporter from lib/searchList.ts and the files beside it, and checked by its sim:
   iossearch, iossearchalbums, iossearchsongs (with the collation tables' check) and iossearchsaved. Search.tsx's own
   state is held by hand in SearchTests, SearchAlbumsTests, SearchSongsTests and SearchSavedTests.
-- **Questions**: 1-33 in the spec, each built to its recommendation unless it says otherwise.
+- **Questions**: 1-34 in the spec, each built to its recommendation unless it says otherwise.
 - **James's checks**: 121-165 in docs/ios.md. None has been done on the phone yet.
 - **Not in Phase 5**:
   - Get and Requests (Phase 6);

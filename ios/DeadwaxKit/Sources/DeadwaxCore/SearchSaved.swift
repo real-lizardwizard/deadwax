@@ -207,26 +207,38 @@ public enum KeptSearchAnswer: Sendable, Equatable {
 }
 
 /// Search's kept MusicBrainz answers (app/searchAnswers.ts): the last `count` search answers - albums, artists and
-/// songs - by the exact ask (its route, words and page), successes only, for the app's life, so words searched before
-/// (cut back from "portishead third" to "portishead", Back, a chip there and back) are answered with no request at all
-/// - drawn whole at the library's moment. Only first pages are kept: More from MusicBrainz always asks.
+/// songs - by the exact ask (its route, words and page), successes only, so words searched before (cut back from
+/// "portishead third" to "portishead", Back, a chip there and back) are answered with no request at all - drawn whole at
+/// the library's moment. Only first pages are kept: More from MusicBrainz always asks.
+///
+/// Each for `lifetime` from when it landed (slice 4's review, question 28): the web's are kept for the page's life, but
+/// an iPhone app's life runs to days, and a search asked again then would be answered from memory - and its More's
+/// offsets follow that old first page. The hour is deadwax's own in memory (`ResponseCache`'s `ttl_seconds`). Times are
+/// the caller's clock, in seconds - the app's `Monotonic`, which counts the phone asleep.
 public struct SearchAnswersKept: Sendable {
     /// How many are kept (`SEARCH_ANSWERS_KEPT`).
     public static let count = 24
 
+    /// How long one is answered from, in seconds: deadwax's in-memory hour.
+    public static let lifetime: Double = 3600
+
     private var order: [String] = []
-    private var answers: [String: KeptSearchAnswer] = [:]
+    private var answers: [String: (at: Double, answer: KeptSearchAnswer)] = [:]
 
     public init() {}
 
-    /// The answer kept for this ask (`keptAnswer`) - nil when none is.
-    public func kept(_ key: String) -> KeptSearchAnswer? { answers[key] }
+    /// The answer kept for this ask (`keptAnswer`) - nil when none is, or when the one kept landed over `lifetime`
+    /// before `now` (deadwax's own rule: older than its hour, asked again).
+    public func kept(_ key: String, at now: Double) -> KeptSearchAnswer? {
+        guard let kept = answers[key], now - kept.at <= Self.lifetime else { return nil }
+        return kept.answer
+    }
 
-    /// Keep a success as the newest (`keepAnswer`); the oldest goes past `count`.
-    public mutating func keep(_ key: String, _ answer: KeptSearchAnswer) {
+    /// Keep a success as the newest (`keepAnswer`), landed `at`; the oldest goes past `count`.
+    public mutating func keep(_ key: String, _ answer: KeptSearchAnswer, at time: Double) {
         order.removeAll { $0 == key }
         order.append(key)
-        answers[key] = answer
+        answers[key] = (time, answer)
         while order.count > Self.count {
             answers[order.removeFirst()] = nil
         }
@@ -242,25 +254,25 @@ public struct SearchAnswersKept: Sendable {
 
     /// The albums kept for an ask (Search.tsx `keptAlbums`): its first query's, and - a reading that wasn't free words
     /// finding nothing - its fallback's. Nil when either answer needed isn't kept; the query that answered with it.
-    public func albums(_ ask: SearchState.AlbumsAsk) -> (found: FullySearchAnswer, query: String)? {
-        guard case .albums(let first)? = kept(Self.albumsKey(ask.first)) else { return nil }
+    public func albums(_ ask: SearchState.AlbumsAsk, at now: Double) -> (found: FullySearchAnswer, query: String)? {
+        guard case .albums(let first)? = kept(Self.albumsKey(ask.first), at: now) else { return nil }
         guard first.releaseGroups.isEmpty, let fallback = ask.fallback, !fallback.isEmpty else { return (first, ask.first) }
-        guard case .albums(let again)? = kept(Self.albumsKey(fallback)) else { return nil }
+        guard case .albums(let again)? = kept(Self.albumsKey(fallback), at: now) else { return nil }
         return (again, fallback)
     }
 
     /// The artists kept for an ask (`keptArtists`).
-    public func artists(_ ask: SearchState.ArtistsAsk) -> ArtistSearchAnswer? {
-        guard case .artists(let found)? = kept(Self.artistsKey(ask.name)) else { return nil }
+    public func artists(_ ask: SearchState.ArtistsAsk, at now: Double) -> ArtistSearchAnswer? {
+        guard case .artists(let found)? = kept(Self.artistsKey(ask.name), at: now) else { return nil }
         return found
     }
 
     /// The songs kept for an ask (`keptSongs`): its query's, and - a title beside an artist finding no song - its
     /// fallback's.
-    public func songs(_ ask: SearchState.SongsAsk) -> (found: SongSearchAnswer, query: String)? {
-        guard case .songs(let first)? = kept(Self.songsKey(ask.first)) else { return nil }
+    public func songs(_ ask: SearchState.SongsAsk, at now: Double) -> (found: SongSearchAnswer, query: String)? {
+        guard case .songs(let first)? = kept(Self.songsKey(ask.first), at: now) else { return nil }
         guard first.recordings.isEmpty, let fallback = ask.fallback, !fallback.isEmpty else { return (first, ask.first) }
-        guard case .songs(let again)? = kept(Self.songsKey(fallback)) else { return nil }
+        guard case .songs(let again)? = kept(Self.songsKey(fallback), at: now) else { return nil }
         return (again, fallback)
     }
 }

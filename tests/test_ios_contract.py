@@ -1418,3 +1418,16 @@ def test_more_from_musicbrainz_asks_within_the_routes_offsets(monkeypatch):
     for name in ("fullySearch", "searchArtists", "searchSongs"):
         body = swift_function("DeadwaxClient.swift", name)
         assert 'if offset > 0 { fields.append(("offset", String(offset))) }' in body, name
+
+
+def test_the_apps_kept_answers_last_deadwaxs_own_hour():
+    # (slice 4's review) the phone answers a search again from what it kept for as long as deadwax answers it from
+    # memory - ResponseCache's hour - so a search repeated days later is asked again, never answered from the morning's
+    from src.api.musicbrainz_endpoint import ResponseCache
+    hour = inspect.signature(ResponseCache.__init__).parameters["ttl_seconds"].default
+    text = (CORE / "SearchSaved.swift").read_text(encoding="utf-8")
+    body = re.search(r"public struct SearchAnswersKept\b[^{]*\{(.*?)\n\}", text, re.S)
+    assert body, "no SearchAnswersKept in SearchSaved.swift"
+    found = re.search(r"public static let lifetime: Double = ([\d_]+)\b", body.group(1))
+    assert found, "no SearchAnswersKept.lifetime"
+    assert float(found.group(1).replace("_", "")) == hour

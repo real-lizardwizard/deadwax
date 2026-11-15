@@ -695,14 +695,16 @@ the list is drawn, then "More found: 2 albums." (or "Nothing more found."). If M
 saved stays, and where MusicBrainz's rows would be: "Showing earlier results - searching for more isn't working
 right now." (or "…try again in a moment for more."), with **Try again**.
 
-**Words searched before.** The phone keeps the last 24 answers MusicBrainz gave it while the app runs, and words
-searched again - typed again, gone back to, or a chip chosen - are drawn from them whole as your library
-answers, nothing asked of MusicBrainz. They're kept for whoever signs in next, as MusicBrainz's data is nobody's; closing the app lets them go.
+**Words searched before.** The phone keeps the last 24 answers MusicBrainz gave it, each for an hour from when it
+came (as long as deadwax keeps one in memory), and words searched again - typed again, gone back to, or a chip
+chosen - are drawn from them whole as your library answers, nothing asked of MusicBrainz. After the hour the words
+are asked again. They're kept for whoever signs in next, as MusicBrainz's data is nobody's.
 
 **More from MusicBrainz.** A chip's view - Artists, Albums or Songs - ends, once MusicBrainz has answered and
 has more, with **More artists**, **More albums** or **More songs**: the next page of the same search, added below
 the rows already there, nothing above them moving. It says "Loading…" while it asks, and "Try again" if it
-couldn't, with why above it. A page that brings nothing new says so - "The next 3 albums found are all in your
+couldn't, with why above it. Each chip's More is its own: asking More songs leaves More albums asking. Typing new
+words lets any More still asking go - its page never lands under them. A page that brings nothing new says so - "The next 3 albums found are all in your
 library already." ("…in the collection already." with a library of your own), "No new songs - 2 more albums
 for the songs above.", or "No more results." - and VoiceOver says what came ("11 more albums found"). A thousand
 results in, it stops: "That's all for this search - add a word to narrow it." In a chip's view what's saved leads
@@ -2843,11 +2845,14 @@ artist you don't have's page (still app 0.10). Compare with the web app's Search
   at a time; at the end "No more results." or "That's all for this search - add a word to narrow it." The same
   in Artists (**More artists**) and Songs (**More songs**).
 - **162 More, left behind.** Tap **More albums** and type a letter before it comes: the page doesn't land under
-  the new words. On a slow connection, tap it and, with "Loading…" showing, Airplane Mode on: the button and
-  MusicBrainz's rows go; off: they're back, More with Try again or the page.
+  the new words, and nothing is said of it; delete the letter: **More albums** again, not "Loading…". On a slow
+  connection, tap **More albums**, then the **Songs** chip and **More songs**, then **Albums** again: More albums
+  still asking, then its page - never stuck on "Loading…". On a slow connection, tap **More albums** and, with
+  "Loading…" showing, Airplane Mode on: the button and MusicBrainz's rows go; off: they're back, More with Try
+  again or the page.
 - **163 Words searched before.** Search some words, then others, then the first again: the first list is drawn
-  whole as your library's rows come, with no "Searching…" for MusicBrainz. Close the app (swipe it away) and open it: the same words
-  ask again.
+  whole as your library's rows come, with no "Searching…" for MusicBrainz. An hour later (or after closing the app
+  by swiping it away), the same words: "Searching…" again, MusicBrainz asked afresh.
 - **164 Offline.** Airplane Mode on, type words searched earlier this session: "Search works once deadwax is
   back." - nothing drawn from the answers kept; off: searched, your library's rows with the rest.
 - **165 VoiceOver in a chip's view.** Tap **Albums** with words typed: "Showing albums.", then "In your library: 2

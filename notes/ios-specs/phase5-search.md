@@ -446,9 +446,11 @@ MusicBrainz, the app as 0.11" - Core (SearchSaved.swift, and slice 4's half of S
 held to the web by export-search-saved-vectors.cjs and its fourth fixture, and by hand where the web's rule is
 Search.tsx's own state), the app (SearchModel's saved ask and its clock, the kept answers, More, a kind view's area
 and its words; SearchScreen's saved rows and MusicBrainzMore), what was decided here, the tests and mutations, and
-what was verified. Questions 28-33 came of it; question 5's search of what's downloaded while offline was not built
+what was verified. Questions 28-33 came of it, and 34 of its review; question 5's search of what's downloaded while offline was not built
 (it stays the web's way: a list drawn stays, new words wait for deadwax). docs/ios.md's checks 156-165 are its. With
-it Phase 5 is built: the app is 0.11 (11), and that section of notes/ios.md ends with the phase as a whole.
+it Phase 5 is built: the app is 0.11 (11), and that section of notes/ios.md ends with the phase as a whole. Its
+review's fixes (each kind's More its own ask, and let go by new words; the kept answers' hour): "Phase 5, slice 4,
+after its review", with question 34 and question 28 updated.
 
 ## 7. Tests (Swift Testing; Core's on Linux and macOS)
 
@@ -671,11 +673,15 @@ view.
     with Try again.
 
 28. **Where the kept answers live** (slice 4). The web keeps its last 24 MusicBrainz search answers for the page's
-    life (app/searchAnswers.ts), by the request's path. *Recommend, and built*: the same 24, in memory for the app's
-    life (closing it lets them go), by route, words and page size; a failure, and a More's page, never kept. They
-    are kept across a sign-out and for whoever signs in next - MusicBrainz's data is nobody's own, and nothing in
-    an answer says who asked - and never taken while deadwax can't be reached, when nothing of MusicBrainz's is
-    drawn. The other way: let them go with the person, as `/library/owned` goes.
+    life (app/searchAnswers.ts), by the request's path. *Recommend, and built*: the same 24, in memory, by route,
+    words and page size; a failure, and a More's page, never kept. They are kept across a sign-out and for whoever
+    signs in next - MusicBrainz's data is nobody's own, and nothing in an answer says who asked - and never taken
+    while deadwax can't be reached, when nothing of MusicBrainz's is drawn. (Slice 4's review) Each is answered from
+    for **an hour** from when it landed - deadwax's own in-memory hour (`ResponseCache`'s `ttl_seconds`, held by the
+    contract test) - and is missing after it. The web's are the page's life, but an iPhone app's life runs to days
+    (only a force-quit ends it), and a search repeated days later would be answered from memory with no request, its
+    More's offsets following that old first page. The hour runs on the app's `Monotonic` clock, which counts the
+    phone asleep. The other way: let them go with the person, as `/library/owned` goes.
 29. **What's saved's wait on the phone** (slice 4). The web gives what's saved 400 ms (`SAVED_WAIT_MS`) before the
     library's moment draws without it - a desktop's LAN. *Recommend, and built*: the same 400 ms; past it the
     answer is let go for those words, and MusicBrainz's answer draws as it would without it. Over WireGuard it may
@@ -697,3 +703,9 @@ view.
     albums.") once it has answered or failed, each once for the view's words. *Recommend, and built*: the same
     words, each once for the view's words and kind, through the app's announcement; a chip drawn at once says
     "Showing albums." with them.
+34. **A More asking as new words are typed** (slice 4's review). The web gives each kind's More its own latestOnly,
+    so a page asked before new words were typed still lands - appended and announced - until that kind is asked for
+    the new words (a settling pause, about 700 ms; under three letters, not until Search). *Built, as the review
+    asked*: any new words let every kind's More go (Core's `typed`, `moreLetGo`) - the page lands on nothing, said or
+    drawn, and More is idle again, so it can be asked again on coming back to the words. Each kind's More is its own
+    ask, as the web's: asking one never cancels another's.

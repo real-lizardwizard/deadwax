@@ -78,7 +78,9 @@ final class SearchModel {
     @ObservationIgnored private var askingHeld: Task<Void, Never>?
     @ObservationIgnored private var askingSaved: Task<Void, Never>?
     @ObservationIgnored private var savedClock: Task<Void, Never>?
-    @ObservationIgnored private var askingMoreMusicBrainz: Task<Void, Never>?
+    /// More from MusicBrainz's ask in flight, one for each kind (Search.tsx's latestOnly for each - slice 4's review):
+    /// asking one kind's More never cancels another's.
+    @ObservationIgnored private var askingMoreMusicBrainz: [SearchKind: Task<Void, Never>] = [:]
     /// What each kind view drew below its library's rows for the box's words (Search.tsx `kindAreas`), by
     /// `SearchState.kindAreaKey` - kept as the view is read, so what lands late never moves what was drawn.
     @ObservationIgnored private var kindAreas: [String: KindArea] = [:]
@@ -172,6 +174,8 @@ final class SearchModel {
         let clamped = Self.clamped(typed)
         text = clamped
         guard let effect = state.typed(clamped) else { return }
+        // More's asks let go by any new words (Core's `typed` set every kind's More idle again)
+        cancelMore()
         // the clocks of the words before let go: a text the library was once late for is late again only by its own
         lateClock?.cancel()
         settling?.cancel()
@@ -189,7 +193,6 @@ final class SearchModel {
             askingAlbums?.cancel()
             askingArtists?.cancel()
             askingSongs?.cancel()
-            askingMoreMusicBrainz?.cancel()
         }
         // words whose answer is in hand already (back to them inside the pause): drawn now - the web's advance runs on
         // every render; nothing is drawn unless the library has settled for the box's words
@@ -277,11 +280,12 @@ final class SearchModel {
     /// announced. Through the kind's own token, so new words let it go; it opens nothing.
     func moreMusicBrainz() {
         guard reachability.online, let client = server.client, let ask = state.askingMoreMusicBrainz() else { return }
-        askingMoreMusicBrainz?.cancel()
+        //? this kind's alone: Core asks a kind's More only while none is asking, so nothing of it is let go here
+        askingMoreMusicBrainz[ask.kind]?.cancel()
         let epoch = self.epoch
         let admin = server.access.seesDetail
         let personal = self.personal
-        askingMoreMusicBrainz = Task { [weak self] in
+        askingMoreMusicBrainz[ask.kind] = Task { [weak self] in
             do {
                 let said: String?
                 switch ask.kind {
@@ -700,29 +704,37 @@ final class SearchModel {
     }
 
     /// The kept answer for this ask, else asked - and kept when it answers (searchAnswers.ts `keptOr`); `kept` when it
-    /// was in hand. A failure is never kept, nor a More's page.
+    /// was in hand. A failure is never kept, nor a More's page; one kept over `SearchAnswersKept.lifetime` ago is asked
+    /// again (by `Monotonic`, which counts the phone asleep).
     private static func keptAlbums(_ query: String, _ client: DeadwaxClient) async throws -> (FullySearchAnswer, Bool) {
         let key = SearchAnswersKept.albumsKey(query)
-        if case .albums(let found)? = kept.kept(key) { return (found, true) }
+        if case .albums(let found)? = kept.kept(key, at: Monotonic.seconds()) { return (found, true) }
         let found = try await client.fullySearch(query)
-        kept.keep(key, .albums(found))
+        kept.keep(key, .albums(found), at: Monotonic.seconds())
         return (found, false)
     }
 
     private static func keptArtists(_ name: String, _ client: DeadwaxClient) async throws -> (ArtistSearchAnswer, Bool) {
         let key = SearchAnswersKept.artistsKey(name)
-        if case .artists(let found)? = kept.kept(key) { return (found, true) }
+        if case .artists(let found)? = kept.kept(key, at: Monotonic.seconds()) { return (found, true) }
         let found = try await client.searchArtists(name)
-        kept.keep(key, .artists(found))
+        kept.keep(key, .artists(found), at: Monotonic.seconds())
         return (found, false)
     }
 
     private static func keptSongs(_ query: String, _ client: DeadwaxClient) async throws -> (SongSearchAnswer, Bool) {
         let key = SearchAnswersKept.songsKey(query)
-        if case .songs(let found)? = kept.kept(key) { return (found, true) }
+        if case .songs(let found)? = kept.kept(key, at: Monotonic.seconds()) { return (found, true) }
         let found = try await client.searchSongs(query)
-        kept.keep(key, .songs(found))
+        kept.keep(key, .songs(found), at: Monotonic.seconds())
         return (found, false)
+    }
+
+    /// Every kind's More let go (new words, a new person, the box cleared) - Core's `typed` and a new state set them
+    /// idle, so a page from one of them lands on nothing.
+    private func cancelMore() {
+        for task in askingMoreMusicBrainz.values { task.cancel() }
+        askingMoreMusicBrainz = [:]
     }
 
     /// Every kind the view would ask MusicBrainz that a kept answer holds (Core's `takeKept`), taken with no request -
@@ -730,7 +742,7 @@ final class SearchModel {
     /// mark rows in place. Nothing taken while deadwax can't be reached (nothing of MusicBrainz's is drawn then).
     private func takeKept(_ words: String) {
         guard reachability.online else { return }
-        let taken = state.takeKept(words, view: state.view, kept: Self.kept, index: ownedIndex)
+        let taken = state.takeKept(words, view: state.view, kept: Self.kept, now: Monotonic.seconds(), index: ownedIndex)
         guard taken.took else { return }
         if taken.songs {
             openSongs = []
@@ -878,7 +890,7 @@ final class SearchModel {
         askingHeld?.cancel()
         askingSaved?.cancel()
         savedClock?.cancel()
-        askingMoreMusicBrainz?.cancel()
+        cancelMore()
         lateClock?.cancel()
         kindLateClock?.task.cancel()
         kindLateClock = nil
