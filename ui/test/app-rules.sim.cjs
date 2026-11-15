@@ -1096,7 +1096,9 @@ console.log('\nSearch: a song plays from the tap, with its album in hand; the ne
   check('...and what MusicBrainz found is left out once, as it lands - never filtered again as the library\'s answer changes - and drawn from that',
     [/shown: notInLibrary\(groups, ownedNow\(\)\?\.index \?\? null\)/.test(askAlbums), /albums: albums \? \{ groups: albums\.groups, shown: albums\.shown \} : null/.test(search),
       //? (2.0.0-player.56) less what's saved, by id - MusicBrainz's answer adds only what isn't drawn above it
-      /albums\.musicbrainz = input\.albums\.shown\.filter\(\(group\) => !savedGroupIds\.has\(group\.id\)\)\s*\.map\(/.test(code(read('lib/searchList.ts')))],
+      //? (2.1.25) less only what's saved DRAWS - its shown and the held it brings in - never every saved album
+      /albums\.musicbrainz = input\.albums\.shown\.filter\(\(group\) => !savedDrawn\.has\(group\.id\)\)\s*\.map\(/.test(code(read('lib/searchList.ts')))
+        && /for \(const group of \[\.\.\.\(saved\?\.shown \?\? \[\]\), \.\.\.brought\]\) savedDrawn\.add\(group\.id\)/.test(code(read('lib/searchList.ts')))],
     [true, true, true])
   const picker = code(read('app/PressingPicker.tsx'))
   check('the pressing list is brought into view as it opens, and focus going nowhere doesn\'t close it',
@@ -1252,7 +1254,7 @@ console.log('\nsearch like Apple Music (2.0.0-player.55): one list, its rows sta
   //? the end of its holder's block - marked, no Get, opening the album you have
   check('a held album search3 didn\'t list: brought in to the yours (or the store\'s) block, never MusicBrainz\'s - with no Get',
     //? (2.0.0-player.56) what's saved's held albums brought in the same way, MusicBrainz's answer's after them
-    [/albums\.brought = heldUnlisted\(savedGroups, index, libraryAlbums\)/.test(list) && /albums\.brought\.push\(\.\.\.heldUnlisted\(groups, index, libraryAlbums\)/.test(list),
+    [/const brought = heldUnlisted\(savedGroups, index, libraryAlbums\)/.test(list) && /albums\.brought = brought\s*\.map\(/.test(list) && /albums\.brought\.push\(\.\.\.heldUnlisted\(groups, index, libraryAlbums\)/.test(list),
       /const ofHolder = \(who: 'yours' \| 'store'\) => \[\.\.\.kind\.library, \.\.\.kind\.brought\]\.filter\(\(each\) => each\.holder === who\)/.test(list),
       /if \(row\.type === 'group'\) \{\s*if \(groupHeld\(context\.index, row\.group\.id\)\) return null/.test(rows),
       /const openAnyGroup = \(group: ReleaseGroup\) => \(groupHeld\(owned\?\.index \?\? null, group\.id\) \? openGroup\(group\) : onOpenGroup\(group\)\)/.test(search)],
