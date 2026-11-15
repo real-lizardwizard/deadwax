@@ -218,38 +218,17 @@ struct LibraryView: View {
 
     /// The pages side by side under the Library's own top (the squared look), a swipe between them; Find, the switch and
     /// the ••• the top's, the navigation bar hidden; the offline banner between the top and the pages.
+    ///
+    /// One above the other in a VStack (15 Nov, James: "on the app the top bar is obstructed by the Dynamic Island"):
+    /// the top, the banner, the pager. A VStack is laid out in the safe area whatever its children do, so the top's row
+    /// always starts under the status bar and the Dynamic Island, where an inset on the pager - a scroll view, free to
+    /// run under the status bar - put it in the island's strip; only the top's own fill reaches up behind the status bar
+    /// (LibraryTop). The pages end at the top's foot rather than scrolling under it.
     private func pager(albums: AlbumList) -> some View {
         let order = shownOrder
         let can = shuffleCan
         let shownPage = self.shownPage
-        return ScrollView(.horizontal) {
-            HStack(spacing: 0) {
-                // identified by the page itself, not its `id` string: scrollPosition(id:) matches the views' ids against
-                // its binding's type, LibraryPage
-                ForEach(order, id: \.self) { (each: LibraryPage) in
-                    pageView(each, albums: albums, can: can, current: each == shownPage)
-                        .containerRelativeFrame([.horizontal, .vertical])
-                }
-            }
-            .scrollTargetLayout()
-        }
-        .scrollTargetBehavior(.paging)
-        // the page at the centre, not the leading edge: a sliver of the next one isn't it
-        .scrollPosition(id: $scrolled, anchor: .center)
-        // the pager's own indicator only: the pages' lists keep theirs (the environment would carry it to them)
-        .scrollIndicators(.hidden, axes: .horizontal)
-        .pagerPhase(moving: $paging, settled: settled)
-        .onChange(of: scrolled) { (_: LibraryPage?, now: LibraryPage?) -> Void in
-            // at rest - iOS 17 always, iOS 18 a move no finger made (a layout's) - the page follows at once
-            guard !paging, let now, now != page else { return }
-            page = now
-        }
-        // the title the pages pushed over it go back to; the bar itself is the Library's own top
-        .navigationTitle("Library")
-        .toolbar(.hidden, for: .navigationBar)
-        // the banner under the top, not over it: TabStack leaves the Library's to it
-        .showsOfflineBanner()
-        .safeAreaInset(edge: .top, spacing: 0) {
+        return VStack(spacing: 0) {
             LibraryTop(finding: finding, findLabel: findPrompt(shownPage), openFind: { openFind() }) {
                 findField(shownPage)
             } switcher: {
@@ -257,7 +236,34 @@ struct LibraryView: View {
             } more: {
                 more(albums: albums, can: can, page: shownPage)
             }
+            // the banner under the top, not over it: TabStack leaves the Library's to it
+            OfflineBanner()
+            ScrollView(.horizontal) {
+                HStack(spacing: 0) {
+                    // identified by the page itself, not its `id` string: scrollPosition(id:) matches the views' ids
+                    // against its binding's type, LibraryPage
+                    ForEach(order, id: \.self) { (each: LibraryPage) in
+                        pageView(each, albums: albums, can: can, current: each == shownPage)
+                            .containerRelativeFrame([.horizontal, .vertical])
+                    }
+                }
+                .scrollTargetLayout()
+            }
+            .scrollTargetBehavior(.paging)
+            // the page at the centre, not the leading edge: a sliver of the next one isn't it
+            .scrollPosition(id: $scrolled, anchor: .center)
+            // the pager's own indicator only: the pages' lists keep theirs (the environment would carry it to them)
+            .scrollIndicators(.hidden, axes: .horizontal)
+            .pagerPhase(moving: $paging, settled: settled)
+            .onChange(of: scrolled) { (_: LibraryPage?, now: LibraryPage?) -> Void in
+                // at rest - iOS 17 always, iOS 18 a move no finger made (a layout's) - the page follows at once
+                guard !paging, let now, now != page else { return }
+                page = now
+            }
         }
+        // the title the pages pushed over it go back to; the bar itself is the Library's own top
+        .navigationTitle("Library")
+        .toolbar(.hidden, for: .navigationBar)
         .sheet(isPresented: $editingOrder) {
             EditOrderSheet(saved: $savedOrder, personal: server.access.hasLibrary)
         }

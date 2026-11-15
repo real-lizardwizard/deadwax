@@ -9998,3 +9998,32 @@ read inside the timeline alone, the clocks' Equatable view, the ticker and what 
 **Verified**: swift test, the unsigned Debug and Release device builds, check_project, npm run build, the sims and
 pytest. **Not verified** - only the phone can tell: that it looks smooth, that the frames cost nothing a listener
 notices (no warmth, no stutter), the stop on pause, and the landings (docs/ios.md check 248).
+
+## The Library's top, clear of the Dynamic Island (15 Nov)
+
+James: "on the app the top bar is obstructed by the Dynamic Island" - the Library's own top (the round search button,
+the switch, the round •••), on his iPhone 17 Pro on iOS 27.2.
+
+- **How it was**: LibraryTop was a `.safeAreaInset(edge: .top)` on the pager - a horizontal ScrollView whose pages are
+  `.containerRelativeFrame([.horizontal, .vertical])` - with the offline banner a second inset inside it, under
+  `.toolbar(.hidden, for: .navigationBar)`. An inset is placed against the safe area the modified view has, and a
+  scroll view is free to run under the status bar; which of the two put the row in the island's strip on iOS 27.2
+  was not found out - no simulator here, by the rules - and it didn't need to be: the new layout doesn't depend on it.
+- **How it is**: the pager's page is a `VStack(spacing: 0)` of LibraryTop, then the OfflineBanner, then the pager. A
+  VStack is laid out inside the safe area, whatever its children do, so the row starts under the status bar and the
+  island on every iPhone (notch, island, none), and the banner and the pages follow it down; only LibraryTop's own
+  background, Palette.tabBar, ignores the top safe area, filling up behind the status bar so nothing of the pages
+  shows there. The pages now end at the row's foot instead of scrolling under it (it was opaque, so nothing showed
+  through it anyway); the pull to shuffle measures from the list's own inset (`contentOffset.y + contentInsets.top`),
+  so it is the same either way. Find still opens under the switch, inside LibraryTop, and the pager gives it the room.
+- **The other pages**: the Library is the only page that hides iOS's navigation bar; every other page's top is iOS's
+  own bar. The other views that reach under the status bar are fills alone: RootView's background, and Now Playing's
+  black and its blurred cover - its content stays in the safe area.
+
+**Tests**: `test_the_librarys_top_sits_under_the_status_bar` (tests/test_ios_palette.py) holds the VStack's order
+(the top, the banner, the pager), no top inset left in LibraryView, LibraryTop's one ignore on its background, the
+Library as the only page hiding the navigation bar, and the four views that reach under the status bar, all fills.
+
+**Verified**: swift test, the unsigned Debug and Release device builds, check_project, npm run build, the sims and
+pytest. **Not verified** - only the phone can tell: the row clear of the island, the fill behind the status bar, Find
+and the banner under the row, at the normal and the largest text sizes (docs/ios.md check 249).

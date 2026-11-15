@@ -3577,6 +3577,19 @@ with Wi-Fi off. 237-243 want logins on, and 241 two accounts (one an admin); 244
   largest text size. With VoiceOver on, the line and the bar still read their time ("0:12 of 5:00") without
   repeating it as the song plays. Say whether anything feels slower or warmer than before.
 
+### The Library's top under the Dynamic Island's check (249)
+
+**Not done yet.** This comes with the build that lays the Library's top out under the status bar (still app 0.13
+(13)).
+
+- **249 Clear of the Dynamic Island.** Open the Library: the magnifying glass, the switch and the ••• sit wholly
+  below the Dynamic Island and the status bar's time and battery, none of them touching it, with the bar's colour
+  running up behind the status bar and nothing of the pages showing there. Scroll a page up: it goes under the row's
+  foot, never up behind the status bar. Tap the magnifying glass: Find's field opens under the row, the keyboard up,
+  and the row stays put; type, Cancel. Swipe between the pages, and tap the switch: as before. Turn off Wi-Fi and
+  WireGuard: the offline banner shows under the row, not over it. Do it all again at the largest text size. If you
+  can, try a phone with a notch, or an SE.
+
 ## What it can't do yet
 
 These are the web app's for now:

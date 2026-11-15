@@ -390,6 +390,40 @@ def test_the_bars_run_smooth_only_while_the_song_plays():
     assert "player.clock()" in (APP / "Player" / "LyricsView.swift").read_text(encoding="utf-8")
 
 
+def test_the_librarys_top_sits_under_the_status_bar():
+    # 15 Nov, James: "on the app the top bar is obstructed by the Dynamic Island". The Library's own top was an inset on
+    # its pager, a scroll view free to run under the status bar; now the top, the offline banner and the pager stand
+    # in a VStack, which is laid out in the safe area whatever they do, and only the top's fill reaches up behind the
+    # status bar. The Library is the only page that hides iOS's navigation bar, and every other view that reaches
+    # under the status bar is a fill.
+    library = (APP / "Library" / "LibraryView.swift").read_text(encoding="utf-8")
+    pager = library[library.index("private func pager(albums: AlbumList)"):library.index("private func pageView(")]
+    assert ".safeAreaInset(edge: .top" not in library and ".showsOfflineBanner()" not in pager
+    order = [pager.index(part) for part in ("return VStack(spacing: 0) {", "LibraryTop(", "OfflineBanner()",
+                                             "ScrollView(.horizontal)", ".containerRelativeFrame([.horizontal, .vertical])",
+                                             ".toolbar(.hidden, for: .navigationBar)")]
+    assert order == sorted(order)
+    top = (APP / "Library" / "LibraryTop.swift").read_text(encoding="utf-8")
+    assert top.count("ignoresSafeArea") == 1
+    assert ".background {\n            Palette.tabBar\n                .ignoresSafeArea(.container, edges: .top)\n" in top
+    sources = {path.relative_to(APP).as_posix(): path.read_text(encoding="utf-8") for path in APP.rglob("*.swift")}
+    assert [name for name, text in sources.items() if ".toolbar(.hidden, for: .navigationBar)" in text] == [
+        "Library/LibraryView.swift"]
+    # what reaches the top edge (any ignore but the bottom's alone): the Library top's fill, RootView's background, Now
+    # Playing's black and its blurred cover - a new one must be a fill too, or keep its content in the safe area
+    reaching = {}
+    for name, text in sources.items():
+        for line in text.splitlines():
+            if ".ignoresSafeArea(" in line and "edges: .bottom" not in line:
+                reaching[name] = reaching.get(name, 0) + 1
+    assert reaching == {"Library/LibraryTop.swift": 1, "Root/RootView.swift": 1, "Player/NowPlayingView.swift": 2}
+    now_playing = sources["Player/NowPlayingView.swift"]
+    assert "Color.black.ignoresSafeArea()" in now_playing
+    backdrop = now_playing[now_playing.index("private struct Backdrop"):]
+    assert ".ignoresSafeArea()" in backdrop and "CoverImage(" in backdrop
+    assert ".background(Color(.systemBackground).ignoresSafeArea())" in sources["Root/RootView.swift"]
+
+
 # Noto Sans (15 Nov): James chose "Noto Sans (the web's)". The phone's four faces are the web's own seven files made into
 # one font per weight (ios/scripts/make-fonts.py), named by Info.plist's UIAppFonts, and every text style the app sets is
 # ios/App/Shared/Typeface.swift's - nothing in ios/App names a system text font of its own. A symbol drawn alone keeps
