@@ -241,7 +241,7 @@ private struct AppTabButton: View {
     var body: some View {
         Button(action: action) {
             VStack(spacing: Self.gap) {
-                Image(systemName: tab.symbol)
+                symbol
                     .symbolVariant(.fill)
                     .font(Typeface.symbol(.title2))
                     .frame(height: symbolBox)
@@ -260,7 +260,24 @@ private struct AppTabButton: View {
         .accessibilityLabel(spoken)
         .accessibilityAddTraits(shown ? .isSelected : [])
         .accessibilityShowsLargeContentViewer {
-            Label(spoken, systemImage: tab.symbol)
+            if let sharp = tab.sharp {
+                Label {
+                    Text(spoken)
+                } icon: {
+                    Image(uiImage: sharp.image)
+                }
+            } else {
+                Label(spoken, systemImage: tab.symbol)
+            }
+        }
+    }
+
+    /// The tab's symbol: the Library's squared stack (SharpGlyph), the others iOS's own.
+    @ViewBuilder private var symbol: some View {
+        if let sharp = tab.sharp {
+            SharpSymbol(sharp)
+        } else {
+            Image(systemName: tab.symbol)
         }
     }
 }

@@ -174,7 +174,11 @@ struct PlayButtons: View {
 
     @ViewBuilder private var buttons: some View {
         Button(action: play) {
-            Label("Play", systemImage: "play.fill")
+            Label {
+                Text("Play")
+            } icon: {
+                SharpSymbol(.play)
+            }
                 .font(Typeface.body.weight(.semibold))
                 .frame(maxWidth: .infinity)
         }

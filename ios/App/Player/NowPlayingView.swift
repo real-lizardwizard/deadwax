@@ -367,7 +367,7 @@ struct NowPlayingView: View {
                 if turntable { deck.wake() }
                 player.previous()
             } label: {
-                Image(systemName: "backward.fill").font(Typeface.symbol(.title))
+                SharpSymbol(.previous).font(Typeface.symbol(.title))
                     .frame(minWidth: 56, minHeight: 56)
                     .contentShape(Rectangle())
             }
@@ -378,7 +378,7 @@ struct NowPlayingView: View {
                 if turntable { deck.toggle() } else { player.toggle() }
             } label: {
                 ZStack {
-                    Image(systemName: player.isPlaying ? "pause.fill" : "play.fill")
+                    PlayPauseGlyph(playing: player.isPlaying)
                         .font(Typeface.symbol(size: 44))
                         .opacity(player.isLoading ? 0.35 : 1)
                     if player.isLoading { ProgressView().controlSize(.large) }
@@ -392,7 +392,7 @@ struct NowPlayingView: View {
                 if turntable { deck.wake() }
                 player.next()
             } label: {
-                Image(systemName: "forward.fill").font(Typeface.symbol(.title))
+                SharpSymbol(.next).font(Typeface.symbol(.title))
                     .frame(minWidth: 56, minHeight: 56)
                     .contentShape(Rectangle())
             }

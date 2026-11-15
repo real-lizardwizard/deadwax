@@ -301,7 +301,7 @@ struct DoneRowView: View {
             }
             if row.release != nil && row.plays {
                 Button(action: onPlay) {
-                    Image(systemName: "play.fill")
+                    SharpSymbol(.play)
                         .font(Typeface.symbol(.footnote).weight(.semibold))
                         .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
                         .foregroundStyle(Palette.primaryLabel)
@@ -313,7 +313,11 @@ struct DoneRowView: View {
                 .buttonStyle(.borderless)
                 .accessibilityLabel(RequestWords.playLabel(row))
                 .accessibilityShowsLargeContentViewer {
-                    Label(RequestWords.playLabel(row), systemImage: "play.fill")
+                    Label {
+                        Text(RequestWords.playLabel(row))
+                    } icon: {
+                        Image(uiImage: SharpGlyph.play.image)
+                    }
                 }
             }
         }

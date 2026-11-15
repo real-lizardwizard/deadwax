@@ -68,7 +68,7 @@ struct MiniPlayerView: View {
                 Button { player.toggle() } label: {
                     ZStack {
                         // the glyph keeps its room under the spinner, so the button doesn't change size as it loads
-                        Image(systemName: player.isPlaying ? "pause.fill" : "play.fill")
+                        PlayPauseGlyph(playing: player.isPlaying)
                             .font(Typeface.symbol(.title2))
                             .opacity(player.isLoading ? 0 : 1)
                         if player.isLoading {
@@ -82,8 +82,11 @@ struct MiniPlayerView: View {
                 .padding(.trailing, Self.edge)
                 .accessibilityLabel(PlayerWords.playPause(playing: player.isPlaying))
                 .accessibilityShowsLargeContentViewer {
-                    Label(PlayerWords.playPause(playing: player.isPlaying),
-                          systemImage: player.isPlaying ? "pause.fill" : "play.fill")
+                    Label {
+                        Text(PlayerWords.playPause(playing: player.isPlaying))
+                    } icon: {
+                        Image(uiImage: (player.isPlaying ? SharpGlyph.pause : SharpGlyph.play).image)
+                    }
                 }
                 .accessibilitySortPriority(2)
             }

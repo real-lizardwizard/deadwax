@@ -3604,6 +3604,26 @@ with Wi-Fi off. 237-243 want logins on, and 241 two accounts (one an admin); 244
   place once it goes. At the largest text size, the words still clear the home indicator. If you can, an SE: a small
   margin under the words, not flush with the edge.
 
+### Actual corners' checks (251-252)
+
+**Not done yet.** These come with the build that takes every squared corner to a true corner and draws the transport
+and the Library's icon sharp (still app 0.13 (13)).
+
+- **251 Square corners.** Look for any rounding left on what was squared: covers (an album's page, Now Playing, the
+  Library's tiles, the rows, the play bar's), the album page's Play and Shuffle, the chips and pills, the badges (In
+  your library, New, Requests' count), the Library's switch and its chosen segment, Find's field, the notice, the
+  first ask, the sign-in's fields, the EQ's buttons and Paste, You > Downloads' bars. Every corner is a point. Say if
+  any reads badly square - the switch's chosen segment inside its well, Play's light line along its top, a badge
+  over the Requests icon. Still round, as they should be: the dots, your avatar, artists' pictures, the rings, the
+  sliders' knobs, the Library's search and ••• circles, Requests' round ▶, the turntable's own corners.
+- **252 Sharp glyphs, and the Library icon.** Play, pause, next and previous have sharp points and square bars,
+  the same size as before: the play bar's Play/Pause, Now Playing's three, the album and playlist pages' Play,
+  Requests' ▶, Search's ▶ beside a song, and Debug's. Tap Play/Pause on each: it turns between the two with a short
+  fade. The Library tab's icon is a square stack with sharp corners, the same size and weight as Search's, Requests'
+  and You's beside it, in the accent when the Library is shown and grey when not. At the largest text size, all of
+  them grow as the words do; hold a finger on Play/Pause in the play bar and on the Library tab: the large view
+  shows the sharp glyph. With VoiceOver, each still reads its name ("Pause", "Next", "Library").
+
 ## What it can't do yet
 
 These are the web app's for now:

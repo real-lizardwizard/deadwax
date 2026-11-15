@@ -8518,6 +8518,10 @@ it the top would take a fifth of the screen to say three words that the Large Co
 
 ### Corners, before and after
 
+**Since 15 Nov every "after" below is 0**, the primary button and the secondary pill's with them: James asked for
+actual corners, and Corners' five went to 0 (see "Actual corners (15 Nov)"). The table still says which kind each
+place takes.
+
 | where | before | after |
 | --- | --- | --- |
 | the album page's, the playlist page's and the album you don't have's cover (the hero) | 10 | art 2 |
@@ -10060,3 +10064,64 @@ keyboard's ignore and `keyboardUp`.
 **Verified**: swift test, the unsigned Debug and Release device builds, check_project, npm run build, the sims and
 pytest. **Not verified** - only the phone can tell: how the gap looks, the indicator clear of the words, the last rows
 and the notice over the bar, the keyboard, and an SE's margin (docs/ios.md check 250).
+
+## Actual corners (15 Nov)
+
+James: "let's square off everything already square a bit more. Actual corners. The pause, skip buttons, etc. I like the
+square look. Even the library icon should be a bit more square."
+
+- **Every corner 0**: Corners.art, card, control, track and fill all go from 2, 4, 4, 2 and 1 to 0, and with them
+  `controlBorder` (a system button's border: the `.bordered` buttons and Paste). The kinds keep their names, so what
+  each is for stays said. The primary button and the secondary pill (ButtonFaces' PrimaryFace) drew
+  PrimaryButton.radius, the web's --dw-radius-control (4); they now draw Corners.control, so they are square too, and
+  PrimaryButton.radius stays the web's number in Core, held to theme.css as before. Round stays round, as Corners' doc
+  says: the dots, the avatar, artists' pictures, the rings, the sliders' knobs, the Library's two circles, Requests'
+  round ▶ and ✕, the turntable's own corners (TurntableFace.lookRadius) and the app icon. The squared look's table
+  ("Corners, before and after") is history now: every "after" there is 0.
+- **What a 0 changed beyond the corners**: PrimaryFace's highlight - the light line inside its top edge - was masked
+  to the top `radius` points, which at 0 is nothing, so the line would have gone; its band is now at least two
+  hairlines tall, which holds the top line (and its square ends). The switch's well shade inside its top edge was
+  kept off the corners by `Corners.control`, and now runs edge to edge inside the border, as a square well's should.
+  To look at on the phone (check 251): the switch's chosen segment, a square 1 point inside a square well, and the
+  Requests count, a square badge over the icon's corner.
+- **Sharp transport glyphs** (Core's SharpGlyph, the shapes; the app's Shared/SharpGlyphs.swift, the views): SF
+  Symbols has no sharp-cornered play, pause, forward or backward, so they are drawn - the play triangle, pause's two
+  bars, forward's and backward's two triangles point to base - as straight lines meeting at points. **Measured, not
+  guessed**: SwiftUI's own rendering of each symbol at 44 points (ImageRenderer at 8x on the Mac - the symbols are
+  iOS's artwork; scratch scripts, not kept) gave the frame SwiftUI lays it into, where its ink sits there (play.fill's
+  from 14% to 98% across and 9% to 91% down; pause's bars 0.405 of their box each, 0.19 between) and how much of the
+  frame it inks. Each sharp glyph is its shape in the symbol's ink box, grown or shrunk about the box's centre until
+  it inks just as much: the same weight. Rounding a triangle cuts most at its points, so a sharp one in the rounded
+  one's box would ink 15-16% less: play grows 8% and the skip pair 9%, their points reaching where the rounding had
+  cut them (the skip pair's a little past their frames' edges, under 3% of the frame - the overlay isn't clipped);
+  pause's bars and the stack shrink under 1.5%. Filling the whole frame would have drawn each glyph about a fifth
+  larger than its symbol: SF Symbols' frames hold 8-14% of room around the ink. `SharpSymbol` lays a glyph into the
+  frame of its SF Symbol at the font in use (the symbol is still there, `.hidden()`, as the template), so each is the
+  size it was at every text size and grows with Dynamic Type as the symbol did. Measured at the regular weight; at
+  semibold (Requests' ▶, the album page's Play) the template's larger frame carries the weight's size, its ink about
+  5% heavier than the sharp glyph's. `PlayPauseGlyph` holds both, crossfading 0.15 s as Play/Pause turns (the symbols
+  swapped at once; at once under Reduce Motion, as the EQ's animations are), in the larger's room, so the button never
+  changes size. Used in the play bar, Now Playing (previous, play/pause, next), the album and playlist pages' Play
+  (AlbumHero), Requests' ▶, Search's ▶ and Debug's three. The Large Content Viewer shows images, so `SharpGlyph.image`
+  is the same path in a template UIImage, the symbol's own size at 44 points. The lock screen's controls are iOS's and
+  keep its symbols. The Library's ••• menu keeps its "square.stack" beside Albums: a menu row's icon, iOS's to draw,
+  not the Library's icon.
+- **The Library's icon**: AppTab's `sharp` (Routes.swift) is `.library` for the Library alone: square.stack.fill's own
+  parts measured the same way and squared - the front card a true square at the foot (37.6 points a side at 44), the
+  two cards behind it strips above, each narrower, with the symbol's gaps - in square.stack.fill's frame. The tab bar
+  draws every tab's symbol in its fill variant, shown or not (`.symbolVariant(.fill)`, unconditional before this too),
+  so the stack is always filled, in the accent when shown and --dw-tab-inactive when not, like the other three, which
+  keep their SF Symbols. Its Large Content Viewer shows the sharp image.
+
+**Tests**: Core's SharpGlyphTests (9) - each glyph inks what its symbol did, centred on its ink, the triangles grown
+and the rectangles hardly, none far past its frame, pause's bars, previous as next turned round, the Library's front
+card square. tests/test_ios_palette.py - `test_the_corners_are_the_squared_looks` holds every corner at 0 and the
+web's above it, `test_every_corner_in_the_app_is_a_token` the face's Corners.control, the primary's test every
+PrimaryButton number but the radius, and `test_the_transport_and_the_librarys_icon_have_actual_corners` that no
+transport symbol is named in the app but Core's templates, each place's glyph, the crossfade, the Large Content
+Viewer's images and the Library tab's.
+
+**Verified**: swift test, the unsigned Debug and Release device builds, check_project, npm run build, the sims and
+pytest. **Not verified** - only the phone can tell: how the corners read, the glyphs' size and weight beside the old
+ones' memory, the fade, the Library icon beside the others, at the default and largest text sizes (docs/ios.md checks
+251-252).

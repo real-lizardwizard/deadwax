@@ -4,7 +4,8 @@ James: "the color of the play button on the album page doesn't show the play ico
 SwiftUI's `.borderedProminent` under the app's tint (#C084FC, the web's accent for text on black) and a white glyph -
 2.64:1. It now draws the web's primary button, as player.css's `.pl-pill.is-primary` and app.css's primary buttons do:
 theme.css's --dw-primary-bg gradient, --dw-primary-border edge, --dw-primary-highlight line, a --dw-text label, 4 pt
-corners (--dw-radius-control), and the album's and playlist's pills 48 pt tall (--pl-pill-height). Pressed, its fill
+corners (--dw-radius-control; square on the phone since 15 Nov, Corners.control), and the album's and playlist's pills
+48 pt tall (--pl-pill-height). Pressed, its fill
 and edge are darkened by brightness(0.92) (--dw-primary-pressed) and its label left white - the web's filter darkens the
 label too, under AA at its top (slice 3b's review) - and the secondary pill beside it turns its gradient over
 (--dw-secondary-bg-active), as the web's .pl-pill does. PrimaryButton (ios/DeadwaxKit/Sources/DeadwaxCore/PrimaryButton.swift) holds those
@@ -119,9 +120,12 @@ def test_no_button_in_the_app_is_drawn_with_the_tint():
     assert not left, left
     faces = REPO / "ios" / "App" / "Shared" / "ButtonFaces.swift"
     text = faces.read_text(encoding="utf-8")
+    # (15 Nov, actual corners) every number but the radius: PrimaryButton.radius keeps the web's 4, and the phone's
+    # face takes Corners.control, square
     for name in ("top", "bottom", "edge", "highlight", "label", "pressedTop", "pressedBottom", "pressedEdge",
-                 "radius", "largeHeight"):
+                 "largeHeight"):
         assert re.search(rf"\bPrimaryButton\.{name}\b", text), f"the app's face doesn't draw PrimaryButton.{name}"
+    assert "PrimaryButton.radius" not in text and "let radius = Corners.control" in text
     # the label is never darkened with the fill: no multiply over the whole button
     assert "colorMultiply" not in text and ".brightness(" not in text
 
@@ -173,15 +177,16 @@ def app_code() -> list[tuple[str, int, str]]:
 
 
 def test_the_corners_are_the_squared_looks():
-    assert (corner("art"), corner("card"), corner("control"), corner("track"), corner("fill")) == (2, 4, 4, 2, 1)
-    # the controls, tracks and fills are the web's own - the primary button's corners among them (PrimaryButton.radius,
-    # held to --dw-radius-control above), so a button is the same shape on both
-    assert corner("control") == px(token(THEME_CSS, "dw-radius-control")) == swift_number("radius")
-    assert corner("track") == px(token(THEME_CSS, "dw-radius-track"))
-    assert corner("fill") == px(token(THEME_CSS, "dw-radius-fill"))
-    # the departure, on purpose: covers and cards squarer on the phone than the web's 3 and 6
-    assert corner("art") < px(token(THEME_CSS, "dw-radius-cover"))
-    assert corner("card") < px(token(THEME_CSS, "dw-radius-card"))
+    # 15 Nov, James: "let's square off everything already square a bit more. Actual corners." Every corner is 0 - truly
+    # square - a system button's border with them
+    assert (corner("art"), corner("card"), corner("control"), corner("track"), corner("fill")) == (0, 0, 0, 0, 0)
+    assert "static let controlBorder = ButtonBorderShape.roundedRectangle(radius: control)\n" in CORNERS.read_text(
+        encoding="utf-8")
+    # the departure from the web, on purpose: square where the web's cover, card, control, track and fill are rounded -
+    # PrimaryButton.radius keeps the web's control radius (held above), which the phone's face no longer draws
+    for web in ("dw-radius-cover", "dw-radius-card", "dw-radius-control", "dw-radius-track", "dw-radius-fill"):
+        assert px(token(THEME_CSS, web)) > 0
+    assert swift_number("radius") == px(token(THEME_CSS, "dw-radius-control"))
 
 
 def test_every_corner_in_the_app_is_a_token():
@@ -202,7 +207,7 @@ def test_every_corner_in_the_app_is_a_token():
             left.append(f"{name}:{number} a capsule")
     assert not left, left
     faces = (APP / "Shared" / "ButtonFaces.swift").read_text(encoding="utf-8")
-    assert "let radius = CGFloat(PrimaryButton.radius)" in faces
+    assert "let radius = Corners.control" in faces
 
 
 def test_every_system_bordered_button_is_squared():
@@ -443,6 +448,39 @@ def test_the_tab_bar_comes_down_into_the_home_indicators_room():
     assert "window?.safeAreaInsets.bottom ?? 0" in tabs
     # the keyboard: the bar under it, the pages making no room meanwhile
     assert ".ignoresSafeArea(.keyboard, edges: .bottom)" in tabs and "keyboardUp = true" in tabs
+
+
+def test_the_transport_and_the_librarys_icon_have_actual_corners():
+    # 15 Nov, James: "Actual corners. The pause, skip buttons, etc. ... Even the library icon should be a bit more square."
+    # SF Symbols' play, pause, forward and backward are rounded, so each place draws SharpGlyph's sharp-cornered shapes
+    # instead (Core: measured from the symbols, at their weight - SharpGlyphTests), in the frame of the symbol it
+    # replaced (hidden, as the template); the Library's tab its squared stack. No transport symbol is named anywhere in
+    # the app now - only Core's templates; the other tabs keep their SF Symbols.
+    core = (REPO / "ios" / "DeadwaxKit" / "Sources" / "DeadwaxCore" / "SharpGlyph.swift").read_text(encoding="utf-8")
+    for template in ('"play.fill"', '"pause.fill"', '"forward.fill"', '"backward.fill"', '"square.stack.fill"'):
+        assert template in core
+    glyphs = (APP / "Shared" / "SharpGlyphs.swift").read_text(encoding="utf-8")
+    assert "Image(systemName: glyph.template)\n            .hidden()" in glyphs
+    assert ".animation(reduceMotion ? nil : .easeInOut(duration: 0.15), value: playing)" in glyphs
+    left = [f"{name}:{number}" for name, number, code in app_code()
+            if re.search(r'"(play|pause|forward|backward)(\.fill|\.end\.fill|\.end)?"', code)]
+    assert not left, left
+    places = {"Player/MiniPlayerView.swift": "PlayPauseGlyph(playing: player.isPlaying)",
+              "Player/NowPlayingView.swift": "PlayPauseGlyph(playing: player.isPlaying)",
+              "Album/AlbumHero.swift": "SharpSymbol(.play)", "Requests/RequestCards.swift": "SharpSymbol(.play)",
+              "Search/SearchScreen.swift": "SharpSymbol(.play)", "You/DebugView.swift": "PlayPauseGlyph("}
+    for name, drawn in places.items():
+        assert drawn in (APP / name).read_text(encoding="utf-8"), name
+    now_playing = (APP / "Player" / "NowPlayingView.swift").read_text(encoding="utf-8")
+    assert "SharpSymbol(.previous)" in now_playing and "SharpSymbol(.next)" in now_playing
+    # the Large Content Viewer keeps an image of each
+    mini = (APP / "Player" / "MiniPlayerView.swift").read_text(encoding="utf-8")
+    assert "Image(uiImage: (player.isPlaying ? SharpGlyph.pause : SharpGlyph.play).image)" in mini
+    tabs = (APP / "Root" / "MainTabs.swift").read_text(encoding="utf-8")
+    button = tabs[tabs.index("private struct AppTabButton"):]
+    assert "SharpSymbol(sharp)" in button and ".symbolVariant(.fill)" in button and "Image(uiImage: sharp.image)" in button
+    routes = (APP / "Shared" / "Routes.swift").read_text(encoding="utf-8")
+    assert "case .library: return .library" in routes
 
 
 # Noto Sans (15 Nov): James chose "Noto Sans (the web's)". The phone's four faces are the web's own seven files made into
