@@ -346,6 +346,50 @@ def test_the_play_bar_is_the_tab_bars_top():
         assert f".accessibilitySortPriority({priority})" in mini
 
 
+def test_the_bars_run_smooth_only_while_the_song_plays():
+    # 15 Nov, James: "Can we make the progress bar smooth instead of updating every half second?" The seek line's part
+    # played and Now Playing's bar (and its clocks) are drawn from a timeline of frames, 30 a second at most, that stops
+    # unless the song plays - paused, loading, under a finger, and for the play bar with Now Playing over it - and then
+    # they show shownPosition, as before. Between the ticker's readings they carry the last one on (Core's PlayClock),
+    # the engine not asked; the ticker and all it drives are as they were; VoiceOver's value stays on shownPosition.
+    model = (APP / "Models" / "PlayerModel.swift").read_text(encoding="utf-8")
+    mini = (APP / "Player" / "MiniPlayerView.swift").read_text(encoding="utf-8")
+    scrubber = (APP / "Player" / "ScrubberView.swift").read_text(encoding="utf-8")
+    clock = (REPO / "ios" / "DeadwaxKit" / "Sources" / "DeadwaxCore" / "PlayClock.swift").read_text(encoding="utf-8")
+    assert "public static let frame = 1.0 / 30\n" in clock
+    assert "var barsRun: Bool { isPlaying && !isLoading }" in model
+    reading = model[model.index("func barPosition(at now: Double) -> Double {"):]
+    reading = reading[:reading.index("\n    }\n")]
+    assert "guard barsRun, let smooth, smooth.entry == heardEntry else { return shownPosition }" in reading
+    assert "PlayClock.shown(smooth, now: now)" in reading and "link" not in reading
+    # the ticker: still twice a second, still driving the plays, Repeat's top-up, resume and the pace from `position`
+    assert "Timer(timeInterval: 0.5, repeats: true)" in model
+    tick = model[model.index("    private func tick() {"):]
+    tick = tick[:tick.index("\n    }\n")]
+    for kept in ("measurePace()", "reporter.tick(position: position, duration: duration)",
+                 "controller?.tick(heard: reporter.heard, length: length)", "resuming?.position(position)",
+                 "if !isPlaying { stopTicking() }"):
+        assert kept in tick
+    assert "smooth = PlayClock.reading(entry: at.key, seconds: at.seconds, at: now, rate: speed, shown: before)" in tick
+    assert "if !barsRun { smooth = nil }" in tick
+    for view, runs in ((mini, "let runs = player.barsRun && held == nil && !navigation.nowPlayingShown"),
+                       (scrubber, "let runs = player.barsRun && held == nil")):
+        assert runs in view
+        assert view.count("TimelineView(.animation(minimumInterval: PlayClock.frame, paused: !runs))") == 1
+        assert "let shown = Scrub.shownTime(held, position: player.shownPosition, length: length)" in view
+        assert ".accessibilityValue(PlayerWords.scrubberValue(shown: shown, length: length))" in view
+        # the frames' value is drawn inside the timeline alone
+        assert view.count("player.barPosition(at: Monotonic.seconds())") == 1
+        assert view.index("TimelineView(") < view.index("player.barPosition(")
+    # the seek line's timeline holds its fill alone; the scrubber's clocks are redrawn only when their words change
+    fill = mini[mini.index("TimelineView("):]
+    assert fill.index("Rectangle().fill(Palette.accent)") < fill.index("}")
+    assert "private struct ScrubberClocks: View, Equatable" in scrubber and ".equatable()" in scrubber
+    assert "PlayerWords.elapsed(shown: drawn)" in scrubber and "PlayerWords.remaining(shown: drawn, length: length)" in scrubber
+    # the lyrics keep their own clock
+    assert "player.clock()" in (APP / "Player" / "LyricsView.swift").read_text(encoding="utf-8")
+
+
 # Noto Sans (15 Nov): James chose "Noto Sans (the web's)". The phone's four faces are the web's own seven files made into
 # one font per weight (ios/scripts/make-fonts.py), named by Info.plist's UIAppFonts, and every text style the app sets is
 # ios/App/Shared/Typeface.swift's - nothing in ios/App names a system text font of its own. A symbol drawn alone keeps

@@ -10,6 +10,12 @@ import SwiftUI
 /// swipe up and down moving 5 s (Scrub.adjusted). A squared-off bar, 12 pt, 16 while held (James, 2026-11-14: "a
 /// squared off thicker bar for the play progress"; the web's phone bar since 2.1.20, the same sizes); it was a 4 pt
 /// capsule.
+///
+/// Smooth (James, 15 Nov: "Can we make the progress bar smooth instead of updating every half second?"): while the song
+/// plays the bar and its clocks are drawn every frame, up to 30 a second, from PlayerModel's `barPosition(at:)` - the
+/// tick's reading carried on (PlayClock), the engine not asked. Paused, loading, or under a finger, the timeline stops
+/// and they show `shownPosition`, as before. The clocks read the same value as the bar, a view of their own that is
+/// drawn again only when their words change; VoiceOver's value stays on `shownPosition`, twice a second at most.
 struct ScrubberView: View {
     @Environment(PlayerModel.self) private var player
     /// The finger on the bar (one: a phone's bar takes one touch).
@@ -29,31 +35,34 @@ struct ScrubberView: View {
     var body: some View {
         let track = player.current?.track.id ?? ""
         let length = player.duration
-        let shown = Scrub.shownTime(Scrub.dragFor(drag, track: track), position: player.shownPosition, length: length)
-        let done = length > 0 ? min(max(shown / length, 0), 1) : 0
-        VStack(spacing: 6) {
-            GeometryReader { bar in
-                let width = bar.size.width
-                ZStack(alignment: .leading) {
-                    Rectangle().fill(Color.primary.opacity(0.2))
-                    Rectangle().fill(Color.primary.opacity(0.85))
-                        .frame(width: done.isFinite ? width * done : 0)
+        let held = Scrub.dragFor(drag, track: track)
+        // VoiceOver's value and its swipes: the ticker's, never the frames'
+        let shown = Scrub.shownTime(held, position: player.shownPosition, length: length)
+        // no frames paused, loading or under the finger (and none once Now Playing has closed: the view is gone)
+        let runs = player.barsRun && held == nil
+        TimelineView(.animation(minimumInterval: PlayClock.frame, paused: !runs)) { (_: TimelineViewDefaultContext) in
+            let position = player.barPosition(at: Monotonic.seconds())
+            let drawn = Scrub.shownTime(held, position: position, length: length)
+            let done = length > 0 ? min(max(drawn / length, 0), 1) : 0
+            VStack(spacing: 6) {
+                GeometryReader { (bar: GeometryProxy) in
+                    let width = bar.size.width
+                    ZStack(alignment: .leading) {
+                        Rectangle().fill(Color.primary.opacity(0.2))
+                        Rectangle().fill(Color.primary.opacity(0.85))
+                            .frame(width: done.isFinite ? width * done : 0)
+                    }
+                    .frame(height: drag == nil ? Self.barHeight : Self.heldHeight)
+                    .frame(maxHeight: .infinity)
+                    .contentShape(Rectangle())
+                    .animation(.easeOut(duration: 0.15), value: drag == nil)
+                    .gesture(press(track: track, width: width, length: length))
                 }
-                .frame(height: drag == nil ? Self.barHeight : Self.heldHeight)
-                .frame(maxHeight: .infinity)
-                .contentShape(Rectangle())
-                .animation(.easeOut(duration: 0.15), value: drag == nil)
-                .gesture(press(track: track, width: width, length: length))
+                .frame(height: Self.target)
+                ScrubberClocks(elapsed: PlayerWords.elapsed(shown: drawn),
+                               remaining: PlayerWords.remaining(shown: drawn, length: length))
+                    .equatable()
             }
-            .frame(height: Self.target)
-            HStack {
-                Text(PlayerWords.elapsed(shown: shown))
-                Spacer()
-                Text(PlayerWords.remaining(shown: shown, length: length))
-            }
-            .font(Typeface.caption.monospacedDigit())
-            .foregroundStyle(Palette.quiet)
-            .accessibilityHidden(true)
         }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(PlayerWords.scrubberName)
@@ -95,5 +104,23 @@ struct ScrubberView: View {
                 drag = next
                 if let seek { player.seek(to: seek) }
             }
+    }
+}
+
+/// The scrubber's two clocks, "1:23" and "-3:33": the bar's own value in whole seconds, so this view is drawn again only
+/// when their words change - a second's step, not every frame the bar is.
+private struct ScrubberClocks: View, Equatable {
+    let elapsed: String
+    let remaining: String
+
+    var body: some View {
+        HStack {
+            Text(elapsed)
+            Spacer()
+            Text(remaining)
+        }
+        .font(Typeface.caption.monospacedDigit())
+        .foregroundStyle(Palette.quiet)
+        .accessibilityHidden(true)
     }
 }

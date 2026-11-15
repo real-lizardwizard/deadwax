@@ -3563,6 +3563,20 @@ with Wi-Fi off. 237-243 want logins on, and 241 two accounts (one an admin); 244
   Brightness > Text Size, one step up), the top one is a magnifying glass and the title still reads whole. With
   VoiceOver, both read "Search again, button, collapsed" (expanded once open).
 
+### The smooth progress bars' check (248)
+
+**Not done yet.** This comes with the build that draws the progress smooth (still app 0.13 (13)).
+
+- **248 Smooth, and still on pause.** Play a short song (two or three minutes, so the line moves quickly) and
+  watch the line along the mini player's top: it creeps along evenly, with no step twice a second. Open Now Playing:
+  its bar does the same, and its two clocks still change once a second, each in step with the bar - "1:23" never
+  lingers after the bar has passed a second, nor comes before it. Pause: both stop dead at once, with no creep on
+  and no jump back; play: on from there. Seek on each (drag the mini player's line, drag and tap Now Playing's bar):
+  it lands where you let go and carries on from there, never jumping back first. Change the speed on the turntable
+  (the fader, and a tap on the readout to 2x and back to 1x): the bar keeps up, with no jump. Do it all again at the
+  largest text size. With VoiceOver on, the line and the bar still read their time ("0:12 of 5:00") without
+  repeating it as the song plays. Say whether anything feels slower or warmer than before.
+
 ## What it can't do yet
 
 These are the web app's for now:

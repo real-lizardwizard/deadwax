@@ -42,6 +42,16 @@ final class PlayerModel {
     var shownPosition: Double {
         Scrub.reportedPosition(pendingSeek, position: position, now: Self.nowMs())
     }
+    /// The bars run smooth (notes/ios.md "The bars, smooth"): playing and not loading - when the play bar's seek line
+    /// and Now Playing's scrubber are drawn every frame. Else they show `shownPosition`, and no frame runs.
+    var barsRun: Bool { isPlaying && !isLoading }
+    /// What the seek line and the scrubber draw at `now` (monotonic seconds) while they run: the last reading of the entry
+    /// heard carried on at its speed (PlayClock) - a seek's target while it is on its way, as `shownPosition` - else
+    /// `shownPosition` itself. A read: nothing changes, and the engine isn't asked (its position waits on its queue).
+    func barPosition(at now: Double) -> Double {
+        guard barsRun, let smooth, smooth.entry == heardEntry else { return shownPosition }
+        return Scrub.reportedPosition(pendingSeek, position: PlayClock.shown(smooth, now: now), now: Self.nowMs())
+    }
     /// The entry heard's length: the engine's decoded length once it has one, else what Navidrome said (0 for none).
     var duration: Double { length ?? current?.track.duration ?? 0 }
     /// The device's Repeat (UserDefaults `Repeat.storageKey`, never saved with the queue).
@@ -173,6 +183,8 @@ final class PlayerModel {
     /// The decoded length the engine reported for the entry heard.
     private var length: Double?
     private var pendingSeek: Scrub.PendingSeek?
+    /// The tick's last reading as the bars carry it on (PlayClock), while they run; nil else.
+    @ObservationIgnored private var smooth: PlayClock.Reading?
     private var normalizationSetting = Normalization.read(UserDefaults.standard.string(forKey: Normalization.storageKey))
     /// A song that failed to load is being asked for again (PlayerWords.retryDelaySeconds).
     private var retrying = false
@@ -567,6 +579,7 @@ final class PlayerModel {
         position = 0
         length = nil
         pendingSeek = nil
+        smooth = nil
         errorLine = nil
         refusalSaid = false
         levelDecisions = LevelDecisions()
@@ -841,6 +854,7 @@ final class PlayerModel {
         reporter.speedChanged(send.speed)
         pace = []
         paceFrom = nil
+        if let reading = smooth { smooth = PlayClock.atRate(reading, rate: send.speed, now: Monotonic.seconds()) }
         if let link {
             if send.restarts, engineState.phase == .playing || speedHold.hiding, let key = engineState.key {
                 speedHold.asked(entry: key, at: Monotonic.seconds())
@@ -848,6 +862,8 @@ final class PlayerModel {
                     MainActor.assumeIsolated {
                         // a restart still loading past the hold is a real wait: it shows
                         guard let self, self.speedHold.expired(at: Monotonic.seconds()) else { return }
+                        // the bars stop for it, with no tick to say so: a reading from before the wait carries nothing on
+                        self.smooth = nil
                         self.showNowPlaying()
                     }
                 }
@@ -1182,10 +1198,16 @@ final class PlayerModel {
         guard let link else { return }
         follow()
         if let at = link.position(), let entry = current, at.key == link.engineKey(entry.key) {
+            // what the bars showed as it came: they never go back from it by less than a seek's landing (PlayClock)
+            let now = Monotonic.seconds()
+            let before = barPosition(at: now)
             position = at.seconds
             length = at.length
             pendingSeek = Scrub.settled(pendingSeek, position: at.seconds, now: Self.nowMs())
+            smooth = PlayClock.reading(entry: at.key, seconds: at.seconds, at: now, rate: speed, shown: before)
         }
+        // stopped (paused, loading, a retry's wait): nothing carried on, so a play goes on from what they showed
+        if !barsRun { smooth = nil }
         if engineState.phase == .playing {
             measurePace()
             reporter.tick(position: position, duration: duration)

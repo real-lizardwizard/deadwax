@@ -9952,3 +9952,49 @@ with its VoiceOver name and state.
 **Verified**: the unsigned Debug device build; the test above and the full pytest suite. **Not verified** - only the
 phone can tell: that the title reads whole beside the words, the glass one size up, and the field opening above the
 chips with the keyboard (docs/ios.md check 247).
+
+## The bars, smooth (15 Nov)
+
+James: "Can we make the progress bar smooth instead of updating every half second?" The play bar's seek line and Now
+Playing's scrubber drew PlayerModel's `shownPosition`, which moves when the ticker reads the engine - twice a second -
+so both stepped.
+
+- **Drawn every frame while the song plays**: each bar's fill is inside a `TimelineView(.animation(minimumInterval:
+  PlayClock.frame, paused: !runs))`, 30 frames a second at most. `runs` is `player.barsRun` (playing and not loading -
+  `isPlaying && !isLoading`, so a speed change's hidden restart keeps it running) with no finger on the bar, and for
+  the play bar Now Playing not over it (`navigation.nowPlayingShown`); the scrubber's goes with Now Playing. Paused,
+  the timeline stops and its content shows `shownPosition`, exactly as before. The seek line's timeline holds its
+  accent fill alone; the scrubber's holds the bar and its clocks, which are `ScrubberClocks` (Equatable, `.equatable()`)
+  fed the same value's words, so they are drawn again only when the words change - and never disagree with the bar.
+  VoiceOver's value and its swipes stay on `shownPosition`, so it isn't told thirty times a second.
+- **The engine isn't asked per frame**: the brief allowed `clock()` (the lyrics' read) if it is trivially cheap.
+  Measured with a temporary test on this Mac (a live offline engine, 5,000 reads; deleted after, so DeadwaxAudio has no
+  diff): 3.4 us a read with the engine's queue idle, 13 us straight after a render's completions, and 0.4-1.9 ms
+  straight after a play or a seek, waiting behind the start being decoded - and the phone decodes FLAC there, slower.
+  Thirty of those a second on the main thread, landing exactly when a song starts or a seek lands, is not trivial.
+- **So the tick's reading is carried on (Core's PlayClock, pure)**: at each tick, `PlayClock.reading(entry:seconds:at:
+  rate:shown:)` keeps the engine's seconds, when (Monotonic), and the speed; `PlayClock.shown(_:now:)` is those seconds
+  plus the time since at the speed - at most `reach` (1 s, two ticks), so with no reading it stops rather than running
+  on - never under the reading's `floor`. The floor is what the bars showed as the reading came, when that was ahead of
+  it by less than `holdWithin` (Scrub.landedWithin, 1.5 s): a reading behind is waited for, the line standing still
+  until the song catches up, never jumped back to. Between ticks that is milliseconds; at a seek's landing it is the
+  target the bars held (Scrub lets a target go within 1.5 s of it), so a seek never lands with a jump back. Further
+  behind is a real move (AirPlay's 2 s of latency) and is gone to. A speed change carries on from where the bars are
+  at the new rate (`PlayClock.atRate`), with no wait for the next tick.
+- **PlayerModel** gains `barsRun`, `barPosition(at:)` - nil reading, another entry's, or not running: `shownPosition`;
+  else the carried reading under a seek's target (Scrub.reportedPosition) - and `smooth`, set in `tick()` from the very
+  reading it already takes (`before` read first) and dropped whenever the bars don't run, at the speed hold's expiry
+  (they stop with no tick) and at a stop. Nothing the ticker drives changed: still 0.5 s, and the plays, Repeat's
+  top-up, resume and the pace all read `position` as before. The lyrics keep `clock()`; the turntable and Debug read
+  `shownPosition`, as before. No engine file has a diff.
+
+**Tests**: PlayClockTests (Core, 10): the carry at 1x, 0.5x and 2x; the reach; a time before the reading; a reading
+ahead gone to; one behind waited for and then moved on from; a seek landing short of its target holding it; far behind
+gone to; a speed change; no rate; and 240 readings with a few ms of wobble and the engine's clock 0.2% slow, drawn at
+30 frames a second - never back, never more than 20 ms off. `test_the_bars_run_smooth_only_while_the_song_plays`
+(tests/test_ios_palette.py) holds the timelines and what pauses them, VoiceOver on `shownPosition`, the frame's value
+read inside the timeline alone, the clocks' Equatable view, the ticker and what it drives, and the lyrics' clock.
+
+**Verified**: swift test, the unsigned Debug and Release device builds, check_project, npm run build, the sims and
+pytest. **Not verified** - only the phone can tell: that it looks smooth, that the frames cost nothing a listener
+notices (no warmth, no stutter), the stop on pause, and the landings (docs/ios.md check 248).

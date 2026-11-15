@@ -286,8 +286,15 @@ private struct BarTitle: View {
 /// takes away seeks nowhere; the song changing under it drops it; PlayerModel's `shownPosition` holds the seek's target
 /// until the engine says it landed. A slider to VoiceOver, "Position in the song", "0:12 of 5:00", 10 s a swipe
 /// (PlayBar.adjusted). A view of its own, so only it is drawn again as the position moves.
+///
+/// Smooth (James, 15 Nov: "Can we make the progress bar smooth instead of updating every half second?"): while the song
+/// plays, the part played alone is drawn every frame, up to 30 a second (PlayClock.frame), from PlayerModel's
+/// `barPosition(at:)` - the tick's reading carried on, the engine not asked. Paused, loading, under the finger, or
+/// covered by Now Playing, its timeline stops and it shows `shownPosition`, as before; VoiceOver's value stays on
+/// `shownPosition`.
 private struct SeekLine: View {
     @Environment(PlayerModel.self) private var player
+    @Environment(AppNavigation.self) private var navigation
     @Environment(\.displayScale) private var displayScale
 
     /// The seek's finger, while there is one.
@@ -306,17 +313,24 @@ private struct SeekLine: View {
         let track = player.current?.track.id ?? ""
         let length = player.duration
         let held = Scrub.dragFor(drag, track: track)
+        // VoiceOver's value, its swipes and the finger's time: the ticker's, never the frames'
         let shown = Scrub.shownTime(held, position: player.shownPosition, length: length)
-        let done = PlayerWords.progress(position: shown, duration: length)
-        let part = done.isFinite ? min(max(done, 0), 1) : 0
+        let part = Self.part(shown, length: length)
+        // no frames paused, loading, under the finger, or with Now Playing over the bar
+        let runs = player.barsRun && held == nil && !navigation.nowPlayingShown
         GeometryReader { (band: GeometryProxy) in
             let width = band.size.width
             ZStack(alignment: .leading) {
                 Color.clear
                 ZStack(alignment: .leading) {
                     Rectangle().fill(Palette.border)
-                    Rectangle().fill(Palette.accent)
-                        .frame(width: width * part)
+                    TimelineView(.animation(minimumInterval: PlayClock.frame, paused: !runs)) {
+                        (_: TimelineViewDefaultContext) in
+                        let position = player.barPosition(at: Monotonic.seconds())
+                        let drawn = Scrub.shownTime(held, position: position, length: length)
+                        Rectangle().fill(Palette.accent)
+                            .frame(width: width * Self.part(drawn, length: length))
+                    }
                 }
                 .frame(height: held == nil ? Self.rest : Self.held)
                 .animation(.easeOut(duration: 0.15), value: held == nil)
@@ -345,6 +359,12 @@ private struct SeekLine: View {
                 player.seek(to: target)
             }
         }
+    }
+
+    /// The part of the line played: `seconds` of `length`, 0 to 1.
+    private static func part(_ seconds: Double, length: Double) -> CGFloat {
+        let done = PlayerWords.progress(position: seconds, duration: length)
+        return CGFloat(done.isFinite ? min(max(done, 0), 1) : 0)
     }
 
     /// The time over the finger, above the held line, kept on the screen.
