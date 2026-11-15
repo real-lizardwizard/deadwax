@@ -456,4 +456,71 @@ import Testing
             #expect(ErrorWords.of(error).said.contains("cleared from the list since"))
         }
     }
+
+    // MARK: slice 3's review
+
+    @Test func deadwaxBackRunsTheVerySearchThatFailedForWantOfIt() {
+        let server = ServerAddress(base: URL(string: "http://deadwax.test:8080")!)
+        let none = APIFailure.NoAnswer(server: server, method: "POST", path: "/download/find_candidates", reason: "no route")
+        let typed = SourcesRun.requery(override: "portishead third lp")
+        // a search again by hand that never reached deadwax, or had no answer in time: the very search again - the
+        // words it sent - and never a pick
+        #expect(SourcesRun.onReturn(typed, error: APIFailure.offline(none)) == typed)
+        #expect(SourcesRun.onReturn(typed, error: URLError(.timedOut)) == typed)
+        #expect(!typed.picks && typed.override == "portishead third lp")
+        // the field left as it was: still a search again, with no query of its own - and still no pick
+        let unedited = SourcesRun.requery(override: "")
+        #expect(SourcesRun.onReturn(unedited, error: URLError(.notConnectedToInternet)) == unedited)
+        #expect(!unedited.picks && unedited.override == "")
+        // a Get or Try again that failed so: a fresh Get, which may pick
+        #expect(SourcesRun.onReturn(.fresh, error: APIFailure.timeout(none)) == .fresh)
+        #expect(SourcesRun.fresh.picks && SourcesRun.fresh.override == "")
+        // nothing for a search that answered, one deadwax refused in words (Try again is there for it), or none at all
+        let refused = APIFailure.answered(.init(status: 409, method: "POST", path: "/download/find_candidates",
+                                               detail: "slskd isn't connected to Soulseek right now"))
+        #expect(SourcesRun.onReturn(typed, error: nil) == nil)
+        #expect(SourcesRun.onReturn(.fresh, error: refused) == nil)
+        #expect(SourcesRun.onReturn(typed, error: refused) == nil)
+        #expect(SourcesRun.onReturn(nil, error: URLError(.timedOut)) == nil)
+    }
+
+    @Test func aPickAsDeadwaxWentOutOfReachSaysWhyAndLeavesTheChoiceToYou() {
+        // in the not-picked lines' own form, and said to VoiceOver with the outcome
+        #expect(Sources.notPickedOffline.hasSuffix("- choose a source yourself once it's back."))
+        let release = GetRelease.build(group: Self.group, release: Self.pressing)
+        let answer = FindCandidatesAnswer(query: "Portishead Third", candidates: [Self.candidate("bob", "Third", score: 0.92)])
+        let said = Sources.announcement(pending: false, release: release, error: nil, status: nil, answer: answer, shown: 1,
+                                        notPicked: Sources.notPickedOffline, format: .any)
+        #expect(said.hasSuffix(" " + Sources.notPickedOffline))
+    }
+
+    @Test func aJoinOrAnAddWithNoAnswerInTimeIsLookedForInTheStore() {
+        let mine = DownloadInFlight(jobId: 41, status: "downloading", username: "mellotron", files: 11, yours: true)
+        let theirs = DownloadInFlight(jobId: 41, status: "downloading", username: "mellotron", files: 11, yours: false)
+        let unsaid = DownloadInFlight(jobId: 41, status: "downloading", username: "mellotron", files: 11)
+        // the join landed: that very download is yours now
+        #expect(StoreLine.joinLanded(41, in: StoreStateAnswer(downloading: mine)))
+        // not landed: still somebody else's, another download, nothing said of whose it is, or nothing downloading
+        #expect(!StoreLine.joinLanded(41, in: StoreStateAnswer(downloading: theirs)))
+        #expect(!StoreLine.joinLanded(42, in: StoreStateAnswer(downloading: mine)))
+        #expect(!StoreLine.joinLanded(41, in: StoreStateAnswer(downloading: unsaid)))
+        #expect(!StoreLine.joinLanded(41, in: StoreStateAnswer()))
+        // the add landed: the pressing held is yours now - not while it's the collection's, nor when nobody says
+        func held(_ yours: Bool?) -> StoreStateAnswer {
+            StoreStateAnswer(held: HeldPressing(path: "Portishead/Third (2008)", trackCount: 11, expectedTracks: 11,
+                                                complete: true, yours: yours))
+        }
+        #expect(StoreLine.addLanded(in: held(true)))
+        #expect(!StoreLine.addLanded(in: held(false)))
+        #expect(!StoreLine.addLanded(in: held(nil)))
+        #expect(!StoreLine.addLanded(in: StoreStateAnswer()))
+        // said as maybe, never as refused - each with what to do if it didn't
+        #expect(StoreWords.joinUnanswered.hasPrefix("deadwax didn't answer in time, so you may have joined it anyway."))
+        #expect(StoreWords.joinUnanswered.hasSuffix("join it again."))
+        #expect(StoreWords.addUnanswered.hasPrefix("deadwax didn't answer in time, so it may have been added anyway."))
+        #expect(StoreWords.addUnanswered.hasSuffix("add it again."))
+        // an Add stars in Navidrome before it answers: a join's time, past a call that never answers (four 10 s phases)
+        #expect(Routes.timeouts[Routes.libraryAdd] == Routes.timeouts[Routes.joinJob])
+        #expect((Routes.timeouts[Routes.libraryAdd] ?? 0) > 4 * 10)
+    }
 }

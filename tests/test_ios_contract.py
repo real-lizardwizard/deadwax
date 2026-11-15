@@ -1836,3 +1836,69 @@ def test_you_getting_albums_is_saved_as_the_preferences_route_takes_it():
     # and a database that can't keep them is a 503 in words, said under the three ("Not saved. …")
     source = inspect.getsource(me_route.save_preferences)
     assert source.count("raise HTTPException(status_code=503, detail=") == 2
+
+
+def test_an_add_is_given_time_for_its_stars_and_said_as_maybe_when_none_came():
+    # (slice 3's review, finding 3) the add route writes your library, THEN stars it in Navidrome as you before it
+    # answers - so an answer that never came may well have landed, which the phone says as maybe, never as refused
+    import src.stars as stars
+    source = inspect.getsource(my_library.add_to_my_library)
+    assert source.index("await store.grant_albums(") < source.index("await _star_now(")
+    # every star call goes through the login client, whose every phase gives up after 10 s; the first that finds
+    # Navidrome away (a transport error, a timeout among them) ends the starring - the entry waits for the worker
+    assert isinstance(stars.star_client, auth.LoginClient)
+    phases = re.findall(r"timeout=httpx\.Timeout\(([\d.]+)\)", inspect.getsource(auth.LoginClient.get_client))
+    assert len(phases) == 1
+    phase = float(phases[0])
+    assert "raise NavidromeDown(" in inspect.getsource(stars._fail)
+    assert "unreachable=isinstance(e, httpx.TransportError)" in inspect.getsource(stars.AsUser.call)
+    star_now = inspect.getsource(my_library._star_now)
+    assert "except (stars.CredentialDead, stars.NavidromeDown)" in star_now and "return False" in star_now
+    # so the phone waits past one call that never answers (pool, connect, write, read), as long as for a join
+    text = (CORE / "Routes.swift").read_text(encoding="utf-8")
+    literal = re.search(r"public static let timeouts: \[Endpoint: Double\] = \[([^\]]*)\]", text)
+    timeouts = {name: float(seconds) for name, seconds in re.findall(r"(\w+): ([\d.]+)", literal.group(1))}
+    assert timeouts["libraryAdd"] > 4 * phase
+    assert timeouts["libraryAdd"] == timeouts["joinJob"]
+    # and the store line's Join and Add say an answer that never came as maybe, looking for it in the store
+    app = CORE.parent.parent.parent / "App"
+    line = _code((app / "Get" / "StoreLineView.swift").read_text(encoding="utf-8"))
+    assert "if RequestOverlays.unanswered(error) {" in line and "words.unanswered" in line
+    sheet = _code((app / "Get" / "SourcesSheet.swift").read_text(encoding="utf-8"))
+    assert "StoreLine.joinLanded(jobId, in: answer)" in sheet and "StoreLine.addLanded(in: answer)" in sheet
+    assert "try? await client.storeState(release)" in sheet
+    view = _code((app / "Search" / "GroupView.swift").read_text(encoding="utf-8"))
+    assert view.count("if RequestOverlays.unanswered(error) {") == 2
+    requests = _code((app / "Models" / "RequestsModel.swift").read_text(encoding="utf-8"))
+    join = _block(requests, requests.index("{", requests.index("func join(_ jobId: Int)")))
+    assert "defer { if epoch == self.epoch { kick() } }" in join
+
+
+def test_the_sources_sheet_runs_the_very_search_again_offline_and_lets_it_go_as_it_goes():
+    app = CORE.parent.parent.parent / "App"
+    sheet = _code((app / "Get" / "SourcesSheet.swift").read_text(encoding="utf-8"))
+    search = _code((app / "Models" / "SourcesSearch.swift").read_text(encoding="utf-8"))
+    # (finding 1) deadwax back: the very run again - a search again by hand stays one (its query as sent, the field
+    # as typed: never `start`, which empties it), and only a fresh Get picks
+    opened = sheet.index(".onChange(of: online)")
+    back = _block(sheet, sheet.index("{", opened))
+    assert "model.rerunOnReturn(client: server.client, settings: settings)" in back and "begin(" not in back
+    rerun = _block(search, search.index("{", search.index("func rerunOnReturn(")))
+    assert "SourcesRun.onReturn(lastRun, error: search.error)" in rerun
+    assert "case .requery: run(search.release, kind: kind," in rerun and rerun.count("start(") == 1
+    run = _block(search, search.index("{", search.index("private func run(")))
+    assert "let picking = kind.picks ? lastPicking : nil" in run and "lastRun = kind" in run
+    assert "queryOverride: kind.override" in run
+    # (finding 2) out of reach: Join and Add off, and a pick landing then isn't asked for, but said
+    assert "live: online" in sheet
+    assert "guard online else { return .offline }" in sheet
+    assert "== .offline { notPicked = Sources.notPickedOffline }" in search
+    # (finding 4) let go as the sheet starts going - a swipe let go, Cancel, the page's binding - and nothing from it
+    # after: no answer lands, no pick, no download
+    assert ".background(SheetGoing { model.close() })" in sheet and ".onDisappear { model.close() }" in sheet
+    assert "model.close()\n                        dismiss()" in sheet
+    view = _code((app / "Search" / "GroupView.swift").read_text(encoding="utf-8"))
+    assert "if next == nil { getting?.search.close() }" in view
+    for function in ("func start(", "private func run(", "private func pick(", "func download()"):
+        body = _block(search, search.index("{", search.index(function)))
+        assert "!closed" in body, function

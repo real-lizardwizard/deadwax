@@ -138,7 +138,11 @@ struct GroupView: View {
                 }
             }
         }
-        .sheet(item: $getting, onDismiss: {
+        // (slice 3's review) the sheet let go - swiped away, or closed: its search goes as the dismissal begins
+        .sheet(item: Binding(get: { getting }, set: { (next: GetRequest?) in
+            if next == nil { getting?.search.close() }
+            getting = next
+        }), onDismiss: {
             // a download asked for: Requests at its root once the sheet has gone (App.tsx `gotten`)
             guard queued else { return }
             queued = false
@@ -210,7 +214,8 @@ struct GroupView: View {
         let title = Pressings.header(model.answer?.releases ?? [], chosen: pressing, preview: route.preview).title
         gets += 1
         getting = GetRequest(id: gets, release: release,
-                             subtitle: SourcesWords.subtitle(title: title, pressing: Pressings.label(pressing)))
+                             subtitle: SourcesWords.subtitle(title: title, pressing: Pressings.label(pressing)),
+                             search: SourcesSearch())
     }
 
     /// The song brought into view as its tracks are first drawn - once for the page, counted only once the page is the
@@ -419,17 +424,32 @@ struct GroupView: View {
     }
 
     /// (Slice 3) Join this download, from the line: once deadwax has it (and the Requests poll told), the store asked
-    /// again - the line says it's yours.
+    /// again - the line says it's yours. (Slice 3's review) An answer that never came asks the store again too: a join
+    /// that landed shows as yours, and the button goes with it.
     private func join(_ jobId: Int) async throws {
-        try await requests.join(jobId)
+        do {
+            try await requests.join(jobId)
+        } catch {
+            if RequestOverlays.unanswered(error) { changed += 1 }
+            throw error
+        }
         changed += 1
     }
 
     /// (Slice 3) Add to my library, from the line: the chosen pressing, as a Get would download it. Once deadwax has it,
     /// your library and Search's marks are told, and the store asked again - the line says "Already in your library".
+    /// (Slice 3's review) An answer that never came does the same: an Add that landed shows as yours.
     private func add(_ page: GroupPage) async throws {
         guard let release = download(page) else { throw URLError(.badURL) }
-        try await library.add(release)
+        do {
+            try await library.add(release)
+        } catch {
+            if RequestOverlays.unanswered(error) {
+                search.refreshOwned()
+                changed += 1
+            }
+            throw error
+        }
         search.refreshOwned()
         changed += 1
     }

@@ -17,6 +17,33 @@ public enum AutoPick: Equatable, Sendable {
     case notPicked(String?)
 }
 
+/// Which search the Sources sheet ran - and so what runs again as deadwax comes back (slice 3's review, finding 1). A
+/// phone's own: the web has no out of reach to come back from.
+public enum SourcesRun: Equatable, Sendable {
+    /// A Get, or Try again: searched afresh, and a pick made as the answer lands when When I tap Get says so.
+    case fresh
+    /// Search again by hand, with the query it sent (`Sources.queryOverride` - "" for the field left as it was): you
+    /// are choosing, so it never picks.
+    case requery(override: String)
+
+    /// Only a fresh Get picks (useCandidateSearch.ts `fresh`).
+    public var picks: Bool { self == .fresh }
+
+    /// The query the search sends: none of its own for a fresh Get.
+    public var override: String {
+        if case .requery(let override) = self { return override }
+        return ""
+    }
+
+    /// What runs again by itself as deadwax comes back: the very run that failed for want of it - nothing answered, or
+    /// not in time - so a search again stays one, never picking, with the words it sent; a Get or Try again stays a
+    /// fresh Get. Nothing for a search that answered, or one deadwax refused in words (Try again is there for it).
+    public static func onReturn(_ run: SourcesRun?, error: (any Error)?) -> SourcesRun? {
+        guard let run, let error, [.offline, .timeout].contains(ErrorWords.kind(of: error)) else { return nil }
+        return run
+    }
+}
+
 extension Sources {
     /// The "good" band of the score colours (`AUTO_GRAB_MIN_SCORE`): below it, a pick leaves the choice to you.
     public static let autoGrabMinScore: Double = 75
@@ -62,6 +89,11 @@ extension Sources {
         guard let blocked else { return "No close match that passes your filters - choose a source yourself." }
         return "\(blocked) - choose a source yourself."
     }
+
+    /// (Slice 3's review, finding 2; the phone's own) A pick made as deadwax went out of reach: not asked for - a Get
+    /// that would hand over to a Requests that can't show it - and never made later by itself: the sources show, and
+    /// the choice is yours once deadwax is back.
+    public static let notPickedOffline = "deadwax went out of reach as the sources came in - choose a source yourself once it's back."
 
     /// What an answer landing leads to (useCandidateSearch.ts): only for a FRESH Get - never a search again you are
     /// steering by hand - with When I tap Get set to pick, both read as the answer lands; never for a pressing held or on

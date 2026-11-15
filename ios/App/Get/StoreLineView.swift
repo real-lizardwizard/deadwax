@@ -18,6 +18,11 @@ import SwiftUI
 /// way to its words ("Joined - it's in your Requests.", "Added to your library."), said to VoiceOver too; a refusal is
 /// said under it in a listener's words, and the button is there to try again. Each is keyed on what it acts on - Join
 /// on the download, Add on the first folder - so another download's Join starts afresh, as the web's keys do.
+///
+/// (Slice 3's review) An answer that never came - the phone stopped waiting, or a proxy between gave up
+/// (RequestOverlays.unanswered) - may have gone through, so it is never said as refused: the button says it may have
+/// (StoreWords.joinUnanswered, addUnanswered), and stays for a second try, which deadwax takes harmlessly. While the
+/// page says deadwax is out of reach (`live` false), both are off.
 struct StoreLineView: View {
     let status: StoreStatus?
     let notes: [String]
@@ -25,6 +30,8 @@ struct StoreLineView: View {
     var onJoin: ((Int) async throws -> Void)?
     /// Add the pressing the box is about to your library; returns once deadwax has it. Nil: no Add.
     var onAdd: (() async throws -> Void)?
+    /// (Slice 3's review) deadwax can be asked: false, Join and Add are off.
+    var live = true
 
     var body: some View {
         if status != nil || !notes.isEmpty {
@@ -59,11 +66,11 @@ struct StoreLineView: View {
             }
             .accessibilityElement(children: .combine)
             if let jobId = status.joinJobId, let onJoin {
-                StoreActionButton(words: .join) { try await onJoin(jobId) }
+                StoreActionButton(words: .join, live: live) { try await onJoin(jobId) }
                     .id("join-\(jobId)")
             }
             if status.add, let onAdd {
-                StoreActionButton(words: .add, act: onAdd)
+                StoreActionButton(words: .add, live: live, act: onAdd)
                     .id("add-\(status.lines.first ?? "")")
             }
         }
@@ -80,20 +87,26 @@ struct StoreLineView: View {
 /// then done - the done words in the button's place until the page's next look draws the box again.
 private struct StoreActionButton: View {
     struct Words {
-        let idle, busy, done: String
+        let idle, busy, done, unanswered: String
 
-        static let join = Words(idle: StoreWords.join, busy: StoreWords.joining, done: StoreWords.joined)
-        static let add = Words(idle: StoreWords.add, busy: StoreWords.adding, done: StoreWords.added)
+        static let join = Words(idle: StoreWords.join, busy: StoreWords.joining, done: StoreWords.joined,
+                                unanswered: StoreWords.joinUnanswered)
+        static let add = Words(idle: StoreWords.add, busy: StoreWords.adding, done: StoreWords.added,
+                               unanswered: StoreWords.addUnanswered)
     }
 
     private enum Phase { case idle, busy, done }
 
     let words: Words
+    /// deadwax can be asked: false, the button is off.
+    let live: Bool
     let act: () async throws -> Void
 
     @Environment(ServerModel.self) private var server
     @State private var phase = Phase.idle
     @State private var refused: (any Error)?
+    /// (Slice 3's review) The last try got no answer in time: it may have gone through.
+    @State private var unanswered = false
 
     var body: some View {
         if phase == .done {
@@ -108,7 +121,15 @@ private struct StoreActionButton: View {
                     .buttonStyle(SecondaryPill())
                     // waiting, it stays where it is and keeps VoiceOver's focus: faded, a second tap nothing
                     .opacity(phase == .busy ? Palette.busy : 1)
-                if let refused {
+                    // out of reach, off - unless already asked, whose answer is still coming
+                    .disabled(!live && phase == .idle)
+                if unanswered {
+                    // not a refusal: it may have gone through
+                    Text(words.unanswered)
+                        .font(Typeface.footnote)
+                        .foregroundStyle(Palette.text2)
+                        .fixedSize(horizontal: false, vertical: true)
+                } else if let refused {
                     ErrorNote(refused)
                         .foregroundStyle(Palette.danger)
                 }
@@ -118,9 +139,10 @@ private struct StoreActionButton: View {
     }
 
     private func tap() {
-        guard phase == .idle else { return }
+        guard phase == .idle, live else { return }
         phase = .busy
         refused = nil
+        unanswered = false
         Task {
             do {
                 try await act()
@@ -129,8 +151,13 @@ private struct StoreActionButton: View {
             } catch {
                 phase = .idle
                 guard !APIFailure.isCancellation(error) else { return }
-                refused = error
-                Notice.announce(ErrorWords.of(error, admin: server.access.seesDetail).said)
+                if RequestOverlays.unanswered(error) {
+                    unanswered = true
+                    Notice.announce(words.unanswered)
+                } else {
+                    refused = error
+                    Notice.announce(ErrorWords.of(error, admin: server.access.seesDetail).said)
+                }
             }
         }
     }

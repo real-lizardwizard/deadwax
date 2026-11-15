@@ -412,7 +412,7 @@ func sentJSON(_ request: HTTPRequest?) throws -> [String: SentValue] {
                                           Routes.discography: 60, Routes.jobs: 20, Routes.cancelJob: 30,
                                           Routes.retryJob: 60, Routes.retryJobSame: 30, Routes.clearJobs: 30,
                                           Routes.storeState: 20, Routes.findCandidates: 300, Routes.enqueue: 300,
-                                          Routes.joinJob: 60]
+                                          Routes.joinJob: 60, Routes.libraryAdd: 60]
         #expect(Routes.timeouts == longer)
         for endpoint in Routes.all {
             // each path parameter filled in: a brace left in a path is no URL

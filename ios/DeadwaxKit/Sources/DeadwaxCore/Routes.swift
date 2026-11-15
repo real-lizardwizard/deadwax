@@ -195,8 +195,11 @@ public enum Routes {
     /// enqueue has no bound on the server at all (the release's lock, then slskd's, which answers once the peer is
     /// reached), so it is given the search's, and an answer that never comes isn't taken for a refusal
     /// (RequestOverlays.unanswered); a join waits for the same release's lock as an enqueue or a move to the next source
-    /// does, so it is given a move's time - tests/test_ios_contract.py holds each above the server's.
-    public static let timeouts: [Endpoint: Double] = [albumIndex: 30, autoEqSearch: 20, autoEqProfile: 20, libraryOwned: 30, fullySearch: 20, releaseGroup: 60, searchArtists: 20, searchSongs: 20, artistFacts: 60, discography: 60, jobs: 20, cancelJob: 30, retryJob: 60, retryJobSame: 30, clearJobs: 30, storeState: 20, findCandidates: 300, enqueue: 300, joinJob: 60]
+    /// does, so it is given a move's time; and an Add to my library stars the pressing in Navidrome as you before it
+    /// answers (my_library.py `_star_now`: up to six calls a folder, each through a client that gives up after 10 s a
+    /// phase), so it is given time for one call that never answers on top of the rest (slice 3's review) -
+    /// tests/test_ios_contract.py holds each above the server's.
+    public static let timeouts: [Endpoint: Double] = [albumIndex: 30, autoEqSearch: 20, autoEqProfile: 20, libraryOwned: 30, fullySearch: 20, releaseGroup: 60, searchArtists: 20, searchSongs: 20, artistFacts: 60, discography: 60, jobs: 20, cancelJob: 30, retryJob: 60, retryJobSame: 30, clearJobs: 30, storeState: 20, findCandidates: 300, enqueue: 300, joinJob: 60, libraryAdd: 60]
 }
 
 /// The Cover Art Archive's thumbnail sizes the app asks deadwax's relay for (`Routes.archiveCover`'s `size`, which takes

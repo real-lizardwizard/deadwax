@@ -213,13 +213,14 @@ final class RequestsModel {
     /// is on the board as the person's own (the web's joinDownload, which every downloads list hears). Nothing is laid
     /// over the board: deadwax's next answer lists the job as theirs. Throws deadwax's refusal ("that download has been
     /// cleared from the list since - get it again") for the line to say. Not a page's request: it runs to its answer.
+    /// (Slice 3's review) The look is asked however it ends: a refusal may mean the board has moved on, and an answer
+    /// that never came may hide a join that landed (StoreWords.joinUnanswered).
     @discardableResult
     func join(_ jobId: Int) async throws -> JoinAnswer {
         guard let client = server.client else { throw URLError(.notConnectedToInternet) }
         let epoch = self.epoch
-        let answer = try await client.joinJob(jobId)
-        if epoch == self.epoch { kick() }
-        return answer
+        defer { if epoch == self.epoch { kick() } }
+        return try await client.joinJob(jobId)
     }
 
     // MARK: the poll

@@ -437,4 +437,26 @@ public enum StoreWords {
     public static let add = "Add to my library"
     public static let adding = "Adding\u{2026}"
     public static let added = "Added to your library."
+
+    /// (Slice 3's review, finding 3; the phone's own) A Join deadwax didn't answer in time - the phone stopped waiting,
+    /// or a proxy between gave up (RequestOverlays.unanswered): it may have gone through, so it isn't said as refused.
+    /// The button stays, and a second Join of a download already yours is harmless.
+    public static let joinUnanswered = "deadwax didn't answer in time, so you may have joined it anyway. If it isn't in your Requests soon, join it again."
+    /// The same for an Add - deadwax writes it into your library before it stars it in Navidrome, which is the slow part;
+    /// a second Add of a pressing already yours is harmless.
+    public static let addUnanswered = "deadwax didn't answer in time, so it may have been added anyway. If it isn't in your library soon, add it again."
+}
+
+extension StoreLine {
+    /// (Slice 3's review, finding 3) A Join deadwax didn't answer in time landed after all: the store, asked again, has
+    /// that very download as yours. Only deadwax's word counts - with nothing said of whose it is, it hasn't.
+    public static func joinLanded(_ jobId: Int, in answer: StoreStateAnswer) -> Bool {
+        guard let download = answer.downloading else { return false }
+        return download.jobId == jobId && download.yours == true
+    }
+
+    /// An Add deadwax didn't answer in time landed after all: the store, asked again, has the pressing as yours.
+    public static func addLanded(in answer: StoreStateAnswer) -> Bool {
+        answer.held?.yours == true
+    }
 }

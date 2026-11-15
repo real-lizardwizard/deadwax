@@ -9538,9 +9538,9 @@ body) and Add (the Get's release, tracks and all); a refused Join thrown in dead
   `StoreActionButton` keyed as the web keys it (Join on the job, Add on the first line): idle, busy ("Joining…",
   faded to the new `Palette.busy` 0.75 - --app-job-busy - a second tap nothing), done (the words, announced); a refusal
   as an ErrorNote in `Palette.danger` under it, announced, the button back.
-- **SourcesSearch**: `start(_:client:settings:picking:)` - a Get, Try again, and the search again by itself when
-  deadwax comes back - gives a `Picking` (the chips read as the answer lands, and how to download); `requery` never
-  does. As a fresh answer lands, `Sources.autoPick` with When I tap Get as it is then (the read before the search has
+- **SourcesSearch**: `start(_:client:settings:picking:)` - a Get, Try again, and (until the review below) the search
+  again by itself when deadwax comes back - gives a `Picking` (the chips read as the answer lands, and how to
+  download); `requery` never does. As a fresh answer lands, `Sources.autoPick` with When I tap Get as it is then (the read before the search has
   landed by then). `notPicked`, reset by every search; `landed`, one more per answer.
 - **SourcesSheet**: `begin` hands the search its Picking (`GetSettings.candidateFilters(filters)`, and `get`, which
   now says whether it asked); the box (`storeBox`: `drawn` with `joins`, `addedStatus` once Add added from this very
@@ -9571,7 +9571,10 @@ body) and Add (the Get's release, tracks and all); a refused Join thrown in dead
   2.0.0-player.66, so only a browser untouched since then could.
 - **The pick's enqueue that can't be asked at all** (no deadwax to ask) says nothing of not picking: the sheet's
   `getFailure` says why over the sources, as for a card's Get. The web's `ask` can't fail that way.
-- **The search that runs again by itself as deadwax comes back** is fresh: the Get's first answer never landed.
+- **The search that runs again by itself as deadwax comes back** was made fresh here, on the reasoning that the Get's
+  first answer never landed. That was wrong (the review's finding 1): the search that failed can be a search again
+  by hand, after a first answer did land, with the chips loosened and words typed - and a fresh Get empties the field
+  and may pick. It now runs again as the very search it was (After review, below).
 - **The checks are 193-199, then 229-232**: 200-228 went to the look's builds while Phase 6 was being written.
 
 ### Tests
@@ -9627,3 +9630,86 @@ Not verified - only the phone, and a real deadwax, can tell (docs/ios.md's check
 - You's rows at the largest text sizes, and their "Selected" and "dimmed" to VoiceOver;
 - a save refused by an unwritable database (check 230) - seen only in the contract's reading of the route;
 - CI's Xcode 26.6 (the older Swift). The new code spells out its closures' types and keeps each `#expect` small.
+
+### After review (2026-11-15)
+
+The review found nothing high, and SEEDED checked out (the web's own save writes it too). Its four points, fixed in
+one commit after 8ab48af:
+
+1. **Coming back could pick after a search again.** The sheet's search that runs again by itself as deadwax comes
+   back called `begin` - a fresh Get, which may pick - whatever had failed. But the failed search can be a search
+   again by hand: chips loosened, words typed, WireGuard drops, and on its return the sheet picked an MP3 under the
+   floor and closed, untapped. And `start` empties the query field, so the typed words were gone too. Now Core's
+   `SourcesRun` names what ran (`.fresh`, or `.requery(override:)` with the query it sent), `picks` is true only for
+   `.fresh`, and `SourcesRun.onReturn(run, error:)` gives the very run back for an offline or timed-out failure and
+   nothing otherwise. SourcesSearch keeps `lastRun` (and a fresh Get's Picking), and `rerunOnReturn` runs a requery
+   as itself - its override, the field untouched, no Picking - and only a fresh Get through `start`. The chips were
+   never reset there (only `onAppear` sets them). Try again stays a fresh Get, which may pick, as the web's is.
+2. **Join and Add were live offline in the sheet, and a pick landing offline was dropped without a word.**
+   `StoreLineView(live:)` turns both off (`.disabled`, the pill's off face) while the sheet says deadwax is out of
+   reach - a button already asked keeps waiting for its answer - and the box dims with the cards. `Picking.picked`
+   now answers a `Sent` (`asked`, `offline`, `notAsked`): the sheet's closure answers `offline` before asking
+   anything, and the search says `Sources.notPickedOffline` ("deadwax went out of reach as the sources came in -
+   choose a source yourself once it's back.") above the sources, in the not-picked lines' own form, and to VoiceOver
+   with the outcome. Nothing picks later: `rerunOnReturn` runs only after a failure, and this search answered.
+3. **A Join that timed out read as refused, though it may have landed.** On an answer that never came
+   (`RequestOverlays.unanswered`: URLSession's timeout, a 408 or 504), the box says `StoreWords.joinUnanswered`
+   ("deadwax didn't answer in time, so you may have joined it anyway. If it isn't in your Requests soon, join it
+   again.") in the secondary colour, never the danger one, and keeps the button - a second Join is harmless. The
+   sheet asks `/store_state` again first: `StoreLine.joinLanded` (that very job, `yours` exactly true) hands over to
+   Requests as a Join that answered does. The album page asks its line again (`changed`), which then shows the
+   download as yours. `RequestsModel.join` kicks the board however it ends (`defer`, epoch-guarded). **Add** the
+   same: `addUnanswered`, `StoreLine.addLanded` (`held.yours` exactly true), Search's owned marks and your library
+   asked again on no answer too (`LibraryModel.add`). And Add was on the transport's 8 s while the route stars the
+   album in Navidrome before it answers: `Routes.timeouts` gives `libraryAdd` 60 s, a join's.
+   - **The review's "up to 60 s per read" was the player's client** (NavidromeClient's read=60). The add's starring
+     goes through `stars.star_client`, an `auth.LoginClient`, whose `httpx.Timeout(10.0)` gives every phase 10 s, and
+     the first call that finds Navidrome away (a transport error, a timeout among them) raises NavidromeDown, which
+     `_star_now` catches and returns. So a Navidrome that never answers costs one call's four phases, 40 s at most,
+     after up to five quick calls a folder; 60 s covers it with room. A Navidrome answering every call just under
+     10 s could take longer - the may-have-landed words cover that, and the grant is written before the starring
+     begins, so an add that times out has nearly always landed. test_ios_contract holds all of it to the source.
+   - **The album page's own Add** (AlbumModel, the album you have, Phase 1) gains the 60 s, but keeps its refusal
+     words on a timeout: it wasn't in the review, and its line is the id bridge's, not the store's.
+4. **A pick could land while the sheet was being swiped away**: `stop()` ran only in `onDisappear`, after the slide.
+   The search now belongs to the Get (`GetRequest.search`, made by GroupView), so it outlives the sheet's view and
+   the page can reach it, and `SourcesSearch.close()` ends it for good: `closed` stops `start`, `run`, `pick`,
+   `download` and an answer landing. It is called as the sheet starts going, three ways: `SheetGoing`, a
+   representable whose controller hears `viewWillDisappear` as the dismissal's transition begins (for a swipe, once
+   the finger lifts without pulling it back - `notifyWhenInteractionChanges`, `isCancelled` - and only when the
+   sheet's presented controller `isBeingDismissed`); GroupView's sheet binding, whose setter closes the search as
+   SwiftUI sets it to nil; and `onDisappear`, the backstop. Cancel calls `close()` in the tap, as it called `stop()`.
+   - **When SwiftUI calls the binding's setter for a swipe, and whether a representable inside a sheet hears
+     viewWillDisappear, are not known from here**: both are read from documented behaviour, not seen on a phone.
+     Check 233 is the phone's answer; if neither comes early, `onDisappear` still closes the search, as before.
+   - A pick landing while the finger is still on the sheet (the swipe not yet let go) is asked for, and the sheet
+     closes onto Requests: the person hadn't let it go yet.
+
+**The checks**: 233-236 (docs/ios.md's slice 3 checks, now "193-199, 229-236"): swiped away while it looks, back
+after a Search of your own, Join and Add out of reach, no answer in time. Two troubleshooting rows: the may-have
+words, and the pick dropped offline.
+
+**Tests.** GetTests gains three (24): `deadwaxBackRunsTheVerySearchThatFailedForWantOfIt`,
+`aPickAsDeadwaxWentOutOfReachSaysWhyAndLeavesTheChoiceToYou`, `aJoinOrAnAddWithNoAnswerInTimeIsLookedForInTheStore`.
+ClientTests' map gains `libraryAdd: 60`. test_ios_contract gains two: the add's time held above the star client's
+phases (the grant before `_star_now`, the login client's one Timeout, NavidromeDown ending the starring) with the
+App's may-have handling, and the sheet's wiring - the very run on return, `live: online`, the offline pick, `close`
+on the binding, SheetGoing, Cancel and `onDisappear`, and `!closed` in `start`, `run`, `pick` and `download`.
+
+**Mutations** - 17, each caught (scratchpad p6s3_review_mutate.py): nine in Core against GetTests, GetVectorTests
+and ClientTests (a search again picking; any failure running again; a search again run again as a fresh Get; the
+typed words dropped; a join landed whoever's it is; on any download; an add landed on nothing said; the add on the
+transport's time; the offline line without what to do), and eight in the App against the two contract tests (back
+runs a fresh Get; Join and Add live offline; an offline pick asked for; the swipe not closing; a search again run
+again picking; a closed search downloading; a failed join not kicking; an unanswered join said as refused). The
+App's are the contract's reading of the source - they hold the wiring in place, not its behaviour on a phone.
+
+**Verified**, on the tree before its commit: `swift test` (Core 1618, Audio 158, Turntable 12, no warnings); the
+unsigned Debug and Release device builds, with no warnings but the usual appintentsmetadataprocessor line, the built
+app 0.12 (12), the .xcodeproj unchanged and `check_project.py` ok; the exporter's `--check`; `npm run build` and the
+89 sims; the full pytest suite, 4557 passed and 1 skipped; `git diff --check`; src/ has no diff; the 17 mutations.
+
+**Not verified** - only the phone can tell (checks 233-236): when SwiftUI calls the sheet binding's setter for a
+swipe, and whether SheetGoing's controller hears viewWillDisappear as the sheet goes (if neither comes early,
+`onDisappear` closes the search, as before the review); the box dimmed offline and the may-have words read on a
+phone; a real deadwax's Join and Add going unanswered.

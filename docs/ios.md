@@ -841,12 +841,19 @@ asked waiting for it, rather than a second copy fetched. Tap it: "Joining…", t
 and the line asks deadwax again and says it's yours ("Already downloading"); the download is in your Requests. If it
 has finished, stopped or been cleared since the line was drawn, deadwax says so under the button ("That download
 has been cleared from the list since - get it again.") and the button stays, to try again. Without Get albums
-there's no Join, and the line says nothing of joining.
+there's no Join, and the line says nothing of joining. A join can wait for another Get of the same album to reach
+its source, so the phone waits up to a minute; if no answer comes, the join may still have gone through, so the
+line asks deadwax again, and Requests looks again. If you're on it, the line says so; if not, "deadwax didn't
+answer in time, so you may have joined it anyway. If it isn't in your Requests soon, join it again." Joining twice
+does no harm.
 
 **Add to my library**, under "In the collection, not in your library" (with logins on): the pressing someone else
 has, put in your library rather than downloaded again. Tap it: "Adding…", then "Added to your library.", and the
 line asks deadwax again: "Already in your library". Your albums in the Library show it the next time you look, and
-Search marks it as yours. A refusal is said under the button, as for Join.
+Search marks it as yours. A refusal is said under the button, as for Join. deadwax puts it in your library, then
+stars it in Navidrome for you before it answers, which takes longer while Navidrome is slow; the phone waits up to
+a minute. If no answer comes, the line asks again, and if it isn't yours yet: "deadwax didn't answer in time, so it
+may have been added anyway. If it isn't in your library soon, add it again." Adding twice does no harm.
 
 **Choose a source.** Tap Get the album and a sheet opens, **Choose a source**, the album and pressing under its title
 ("Dummy · CD · 1994 · GB · Go! Beat"). deadwax searches Soulseek for that pressing - "Looking for “Dummy” by
@@ -888,17 +895,22 @@ download there. Never for a pressing you have or that's on its way, nor one dead
 MusicBrainz lists no tracks for: there's nothing to check the sources against). When nothing qualifies, the sources
 show, with why above them: "No close match that passes your filters - choose a source yourself.", or "You already
 have part of it - choose a source yourself." (VoiceOver says it with the outcome). **Try again** picks too;
-**Search** never does.
+**Search** never does. If deadwax goes out of reach just as the sources come in, nothing is got for you: the
+sources show, with "deadwax went out of reach as the sources came in - choose a source yourself once it's back.",
+and nothing is picked later by itself.
 
 **In the sheet**, the line's **Join this download** joins and closes the sheet onto Requests, as a Get does. **Add
 to my library** adds the pressing, and the box says "Already in your library" with "Added to your library." under
-it.
+it. If deadwax doesn't answer either in time, the sheet asks deadwax whether it went through: a join that did
+closes the sheet onto Requests, and an add that did says it's in your library, as if the answer had come.
 
 **A card's Get** closes the sheet and shows Requests, the download already there from your tap, under Waiting,
 "starting…", until deadwax and slskd take it. If deadwax refuses it (someone got it meanwhile, say), it moves to
 Needs attention, "didn't start", with why ("It's already downloading.", "It's already in your library."). The Get
 also hands deadwax the next sources in the list as you had it, for **Another source** if this one fails. **Cancel**,
-or the sheet swiped down, stops the search, in slskd too; Get the album again searches afresh.
+or the sheet swiped down, stops the search, in slskd too, as soon as you let go of the swipe: a pick whose sources
+come in while the sheet slides away isn't got. A swipe pulled back leaves the search running. Get the album again
+searches afresh.
 
 deadwax waits as long as it takes for the person sharing the album to be reached, and the phone waits up to five
 minutes for its answer. If none comes, the row isn't marked as failed - the download may well have started. It
@@ -908,10 +920,12 @@ this may have started anyway. If it doesn't appear here soon, get it again." **C
 
 **Offline**, there's no Get the album, and "Getting albums works once deadwax is back." stands in the line's place
 (with Get albums). In a sheet already open, the same words stand at its top (VoiceOver says them as it happens).
-What it found stays, dimmed, and its **Get**, **Try again** and **Search** are off until deadwax is back - a Get then
-would close onto a Requests that can't show it. Once deadwax is back they're on again, and Search again is under the
-cards if you want a fresh search. A search still under way when deadwax went out of reach carries on waiting for its
-answer. If the phone gives up on it first, the sheet says why, then searches again by itself once deadwax is back.
+What it found stays, dimmed, and its **Get**, **Join this download**, **Add to my library**, **Try again** and
+**Search** are off until deadwax is back - a Get then would close onto a Requests that can't show it. Once deadwax is
+back they're on again, and Search again is under the cards if you want a fresh search. A search still under way when
+deadwax went out of reach carries on waiting for its answer. If the phone gives up on it first, the sheet says why,
+then runs the same search again by itself once deadwax is back: after a Search with your own words, those words
+again with the chips as you left them, and never picking a source for you.
 
 **VoiceOver** reads the line as one, and says what it now says as it changes. The sheet says each outcome as it lands
 ("Looking for “Dummy” by Portishead…", then "12 sources."). The score reads "92% match", collapsed or expanded, and a
@@ -3232,7 +3246,7 @@ same words. Check 187 wants logins on; the rest work either way. Use an album yo
   Waiting, "starting…", however long deadwax takes, and becomes the download when it shows - never "didn't start"
   beside it. Note how long it took.
 
-### Getting albums' checks, slice 3 (193-199, 229-232)
+### Getting albums' checks, slice 3 (193-199, 229-236)
 
 **Not done yet.** These come with **app 0.12 (12)**, the end of Phase 6: Join, Add to my library, Pick the best
 source for me and You's Getting albums. They take 193-199, then go on at 229 - the look's builds took 200-228
@@ -3283,6 +3297,25 @@ two accounts (one can be an admin); the rest work either way.
 - **232 VoiceOver.** You's rows read their names, the chosen one "Selected", and dimmed until deadwax has answered.
   Join and Add read as buttons; "Joining…" stays where it is with the focus on it, then "Joined - it's in your
   Requests." is heard (and "Added to your library."). A refusal is heard as it's said.
+
+After review, four more, for what the review changed:
+
+- **233 Swiped away while it looks.** With **Pick the best source for me** on, Get a well-shared album and, while
+  it says it's looking, swipe the sheet down and let go: the sheet goes, and nothing is got - Requests has no new
+  download, then or a minute later. Get it again, swipe halfway and pull the sheet back up: it carries on, and
+  picks as it would have.
+- **234 Back after a Search of your own.** With Pick the best source for me on, Get an album, tap **Search
+  again**, change the words and tap a chip off. Tap **Search** and, while it's looking, turn Airplane Mode on;
+  wait for the sheet to say why (up to five minutes, if iOS keeps the search open). Airplane Mode off: the sheet
+  searches your words again, the chips as you left them, and shows the sources - nothing is picked, and the sheet
+  stays.
+- **235 Join and Add out of reach.** With the sheet showing **Join this download** or **Add to my library**,
+  Airplane Mode on: the box dims and the button can't be tapped. Off again: it can.
+- **236 No answer in time.** (Hard to make happen - skip it if it won't.) In the sheet, tap **Join this
+  download** (or **Add to my library**) and at once turn WireGuard off. After about a minute the box says "deadwax
+  didn't answer in time, so you may have joined it anyway. …" (or "… it may have been added anyway. …"), never that
+  it was refused; if it says deadwax couldn't be reached instead, iOS dropped the connection at once, which is fine
+  too. WireGuard back on: Requests (or Your albums) shows whether it went through, and a second tap does no harm.
 
 ### The squared look's checks (200-209)
 
@@ -3454,6 +3487,8 @@ These are the web app's for now. Most of them come to the phone in the next phas
 | Choose a source: **'Nothing lossless found for “…”.'** | Your Format is Lossless only, which leaves out every copy that isn't. Change it in You > Getting albums, or **Search again** with other words. |
 | Choose a source, with **Pick the best source for me** on: **"No close match that passes your filters - choose a source yourself."** (or **"You already have part of it - …"**, **"Part of it is already downloading - …"**) | Nothing through the chips scored 75% or more, or the pressing is partly here or on its way, so nothing was picked: choose one yourself. Clearing a chip, or a lower quality floor in You > Getting albums, lets more through. [The troubleshooting page](troubleshooting.md#get-shows-downloads-arent-working-right-now-or-nothing-to-choose-from) has the rest. |
 | **Join this download** says **"That download has been cleared from the list since - get it again."** (or that it has finished, failed or been cancelled) | The download moved on after the line was drawn. Get the album again: the line then says what's true now. [The troubleshooting page](troubleshooting.md#join-this-download-says-the-download-has-finished-failed-or-been-cancelled) has the rest. |
+| **Join this download** says **"deadwax didn't answer in time, so you may have joined it anyway. …"** (or **Add to my library**, **"… it may have been added anyway. …"**) | The phone waited a minute with no answer - a join waits for any other Get of the album to reach its source, and an add stars the album in Navidrome before it answers, so a slow slskd or Navidrome (or the connection dropping) does this. It may well have gone through: look in Requests (or Your albums) in a moment, and if it isn't there, tap it again - a second Join or Add does no harm. |
+| Choose a source, with **Pick the best source for me** on: **"deadwax went out of reach as the sources came in - choose a source yourself once it's back."** | The phone lost deadwax just as the answer came, so nothing was got for you - a Get then would close onto a Requests that can't show it - and nothing is got later by itself. Once deadwax is back, tap a source's **Get**. |
 | You > Getting albums: **"deadwax can't keep these: its database isn't writable."**, or a choice going back with **"Not saved. …"** | deadwax keeps the three in its database. Whoever runs deadwax checks `DB_PATH`, and that its folder can be written as `PUID`/`PGID`, then restarts the deadwax container - the choices in hand still apply to a Get meanwhile. |
 | A Get's row under Needs attention says **"didn't start"** and **"It's already downloading."** (or **"…already in your library."**) | It was got - by you elsewhere, or by someone else - after the sheet searched. It's already in Requests, or already yours; **Clear done** takes the refused row away. |
 | A Get's row under Needs attention says **"no answer"** and **"deadwax didn't answer in time, so this may have started anyway."** | The person sharing it took more than ten minutes to be reached, or deadwax was stuck. Look under Waiting and Downloading - it may be there - and if it isn't, get it again. **Clear done** takes the row away. |

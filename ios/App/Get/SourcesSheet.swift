@@ -9,6 +9,9 @@ struct GetRequest: Identifiable {
     let release: GetRelease
     /// "Third · CD · 2008 · GB · Island".
     let subtitle: String
+    /// (Slice 3's review, finding 4) This Get's search - held by the Get rather than the sheet, so the page that opened
+    /// it can let it go the moment the sheet is let go (GroupView's binding), not once the slide away has ended.
+    let search: SourcesSearch
 }
 
 /// Choose a source (Phase 6, slices 2 and 3 - phase6-get-requests.md 2.10, 2.11, 3.5; the web's app/Sources.tsx as a
@@ -49,7 +52,18 @@ struct GetRequest: Identifiable {
 ///   isn't yours is added from the box (Add to my library), which then says it's yours (StoreLine.addedStatus) and
 ///   tells your library and Search's marks.
 ///
-/// Cancel - or the sheet swiped away - lets the search go (its request cancelled, which stops it in slskd too).
+/// - (Slice 3's review) OUT OF REACH, Join and Add are off with every Get (the box dimmed with the rest), and a pick
+///   landing then isn't asked for - said above the sources (Sources.notPickedOffline), and never made later by itself:
+///   the choice is yours once deadwax is back. Coming back, a search that failed for want of deadwax runs again as the
+///   very search it was (SourcesSearch.rerunOnReturn): a search again by hand stays one, with your words and chips,
+///   and never picks.
+/// - (Slice 3's review) A JOIN OR AN ADD DEADWAX DIDN'T ANSWER IN TIME may have gone through: the store is asked
+///   again, and one that landed is taken as done (Requests for a Join, yours for an Add); otherwise the box says it may
+///   have (StoreWords.joinUnanswered, addUnanswered), never that it was refused, and Requests is asked again either way.
+///
+/// Cancel - or the sheet swiped away - lets the search go (its request cancelled, which stops it in slskd too): as the
+/// sheet starts going for good (SheetGoing, and GroupView's binding), not once it has slid away, so nothing is picked
+/// or asked for once you have let it go.
 struct SourcesSheet: View {
     let request: GetRequest
     /// A download asked for: the sheet goes, and Requests shows.
@@ -62,7 +76,8 @@ struct SourcesSheet: View {
     @Environment(Reachability.self) private var reachability
     @Environment(LibraryModel.self) private var library
     @Environment(SearchModel.self) private var searchModel
-    @State private var model = SourcesSearch()
+    /// This Get's search (GetRequest.search).
+    private var model: SourcesSearch { request.search }
     @State private var filters = SourceFilters.none
     /// A chip was tapped since this Get began: the floor landing late doesn't re-make them then.
     @State private var touched = false
@@ -101,13 +116,15 @@ struct SourcesSheet: View {
                 .scrollDismissesKeyboard(.interactively)
             }
             .padding(.top, 4)
+            // the sheet going for good - a swipe let go, not one pulled back: the search goes with it, there and then
+            .background(SheetGoing { model.close() })
             .navigationTitle(SourcesWords.title)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button(SourcesWords.cancel) {
                         // the search let go in the tap, then the sheet closes
-                        model.stop()
+                        model.close()
                         dismiss()
                     }
                 }
@@ -119,7 +136,7 @@ struct SourcesSheet: View {
             begin(request.release)
         }
         // the backstop: however the sheet went (swiped away, a Get handing over), the search goes with it
-        .onDisappear { model.stop() }
+        .onDisappear { model.close() }
         // the floor's word landing after the sheet opened: the chips become it, unless already tapped
         .onChange(of: settings.settings?.floor) { _, landed in
             guard let landed, !touched else { return }
@@ -136,11 +153,9 @@ struct SourcesSheet: View {
                 return
             }
             getFailure = nil
-            //? nothing answered it, or not in time: from while deadwax was away (this fires only on its coming back)
-            if let search = model.search, let error = search.error,
-               [.offline, .timeout].contains(ErrorWords.kind(of: error)) {
-                begin(search.release)
-            }
+            //? nothing answered it, or not in time (this fires only on deadwax coming back): the very search again - a
+            //? search again by hand stays one, its words and the chips as you left them, and never picks
+            model.rerunOnReturn(client: server.client, settings: settings)
         }
     }
 
@@ -152,8 +167,10 @@ struct SourcesSheet: View {
         again = false
         let picking = SourcesSearch.Picking(
             filters: { GetSettings.candidateFilters(filters) },
-            picked: { (candidate: Candidate, release: GetRelease, list: [Candidate]) -> Bool in
-                get(candidate, release: release, shown: list)
+            picked: { (candidate: Candidate, release: GetRelease, list: [Candidate]) -> SourcesSearch.Sent in
+                // out of reach as it landed: not asked - and not later either (the search says why)
+                guard online else { return .offline }
+                return get(candidate, release: release, shown: list) ? .asked : .notAsked
             })
         model.start(release, client: server.client, settings: settings, picking: picking)
     }
@@ -276,9 +293,11 @@ struct SourcesSheet: View {
         let notes = StoreLine.notes(answer.store)
         if let status = storeBox(answer) {
             // held whole, or downloading whole: where the sources would be - the server searched nothing
+            // out of reach, Join and Add are off as every Get is
             StoreLineView(status: status, notes: notes,
-                          onJoin: server.access.can(.request) ? { (jobId: Int) in try await join(jobId) } : nil,
-                          onAdd: { try await add(release) })
+                          onJoin: server.access.can(.request) ? { (jobId: Int) in try await join(jobId, release: release) } : nil,
+                          onAdd: { try await add(release) }, live: online)
+                .opacity(online ? 1 : Palette.dimmed)
         } else {
             StoreLineView(status: nil, notes: notes)
             if let notPicked = model.notPicked {
@@ -359,20 +378,46 @@ struct SourcesSheet: View {
     }
 
     /// (Slice 3) Join this download, from the box: once deadwax has it, Requests - as a Get - but only while the sheet
-    /// still shows the Get that joined (GroupView's hand-over checks it is still up).
-    private func join(_ jobId: Int) async throws {
-        try await requests.join(jobId)
+    /// still shows the Get that joined (GroupView's hand-over checks it is still up). (Slice 3's review) One deadwax
+    /// didn't answer in time is looked for in the store: landed, it is a Join done; else it throws, for the box to say
+    /// it may have joined.
+    private func join(_ jobId: Int, release: GetRelease) async throws {
+        do {
+            try await requests.join(jobId)
+        } catch {
+            guard RequestOverlays.unanswered(error),
+                  await landed(release, { (answer: StoreStateAnswer) in StoreLine.joinLanded(jobId, in: answer) })
+            else { throw error }
+        }
         onQueued()
     }
 
     /// (Slice 3) Add to my library, from the box: the pressing this search is for, as a Get would download it. Once
     /// deadwax has it, the box says it's yours (if it still shows the answer added from), and your library and Search's
-    /// marks are told.
+    /// marks are told. (Slice 3's review) One deadwax didn't answer in time is looked for in the store, as a Join is.
     private func add(_ release: GetRelease) async throws {
         let from = model.landed
-        try await library.add(release)
+        do {
+            try await library.add(release)
+        } catch {
+            guard RequestOverlays.unanswered(error) else { throw error }
+            // it may have landed: Search's marks asked again either way (LibraryModel.add tells your library)
+            searchModel.refreshOwned()
+            guard await landed(release, { (answer: StoreStateAnswer) in StoreLine.addLanded(in: answer) }) else {
+                throw error
+            }
+            addedFrom = from
+            return
+        }
         addedFrom = from
         searchModel.refreshOwned()
+    }
+
+    /// (Slice 3's review, finding 3) A Join or an Add deadwax didn't answer in time: the store asked again whether it
+    /// landed anyway - false when it can't be asked, or doesn't say so.
+    private func landed(_ release: GetRelease, _ said: (StoreStateAnswer) -> Bool) async -> Bool {
+        guard let client = server.client, let answer = try? await client.storeState(release) else { return false }
+        return said(answer)
     }
 
     private func stateText(_ words: String) -> some View {
