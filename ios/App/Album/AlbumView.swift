@@ -5,7 +5,8 @@ import SwiftUI
 /// (the Library's row, Now Playing's Go to the album) drawn at once while the album loads. Top to bottom: the hero
 /// (cover, title, artist, meta line, the badge, Play and Shuffle), the mine block (logins on with a library of your
 /// own), the songs with their disc headings, the footer; the bar's ••• is the whole album's Play Next and Play Last -
-/// and (Phase 7) Edit in the web app, for someone the web gives the album's Edit.
+/// and (Phase 7) Edit in the web app, for someone the web gives the album's Edit - and Album info (notes/ios.md "Album
+/// info"), the album's sheet of everything known of it, for everyone.
 ///
 /// What it asks as it opens, at once (AlbumModel): the album; the id bridge only with a library of your own (D12);
 /// and, as the songs come, the album's levels warmed (PlayerModel.albumShown) - wanted again each time the page is
@@ -35,6 +36,8 @@ struct AlbumView: View {
     @State private var titleInBar = false
     /// A download was asked for from this page and hasn't ended: its end is announced while the page is on top.
     @State private var askedHere = false
+    /// The album Album info is open for (its sheet).
+    @State private var albumInfo: Album?
     @AccessibilityFocusState private var noteFocused: Bool
 
     init(route: AlbumRoute) {
@@ -171,6 +174,9 @@ struct AlbumView: View {
                                  downloads: downloads)
             }
         }
+        .sheet(item: $albumInfo) { album in
+            AlbumInfoSheet(album: album)
+        }
         .onChange(of: download) { _, now in ended(now) }
         .onChange(of: model.answered) { _, _ in told() }
         .onAppear {
@@ -223,10 +229,12 @@ struct AlbumView: View {
     }
 
     /// The bar's •••: the whole album, as an album - nil (the ••• dimmed) until its songs are in. (Phase 7) With the
-    /// album's Edit in the web app (Edit albums or Look after the library - Managing.albumEdit), its page there.
+    /// album's Edit in the web app (Edit albums or Look after the library - Managing.albumEdit), its page there. And
+    /// Album info, for everyone.
     private var albumMenu: QueueMenuRequest? {
         guard let album = model.album, let pick = model.albumPick else { return nil }
         var request = QueueMenuRequest(pick: pick, album: album, gone: model.goneButHere)
+        request.albumInfo = { albumInfo = album }
         if Managing.albumEdit(server.access.permissions).shown {
             request.webEdit = Managing.albumURL(id: album.id, at: server.address)
         }

@@ -69,6 +69,12 @@ And slice 3's Join, Add and You's three: JoinAnswer within what the join route r
 Get albums its permission, and its time to answer above the release lock it waits on; Add from the store line sending
 the Get's release, FindCandidatesRequest's fields; GetChoice to the extra="forbid" Preferences it is PUT to (only
 what was chosen, each value one the route takes) and GetSettingsAnswer's `can_save` to what both preference routes answer.
+
+And app 0.13's Album info (notes/ios.md "Album info"): AlbumFiles and AlbumFile to what /library/tracks sends
+(read_album_details); the answers the Swift tests decode (Fixtures/albuminfo/files.json, written by
+ios/scripts/album_files_answers.py over a FLAC set, an MP3 and an M4A tagged as Picard tags them) to what the helper makes
+now and to the real route's answer over the same folders; and AlbumTag's names - the server's among DETAIL_TAGS, each
+container's as Picard writes it - finding every tag the sheet reads in those answers.
 """
 
 import asyncio
@@ -113,7 +119,7 @@ from src.store import JobStore  # noqa: E402
 
 CORE = Path(__file__).resolve().parent.parent / "ios" / "DeadwaxKit" / "Sources" / "DeadwaxCore"
 ENDPOINT = re.compile(r'Endpoint\(method: "(\w+)", path: "([^"]+)", query: \[([^\]]*)\]\)')
-ROUTE_COUNT = 60
+ROUTE_COUNT = 61
 RAW_OPENING = re.compile(r'#+"')
 HASHES = re.compile(r"#*")
 
@@ -1941,3 +1947,128 @@ def test_search_again_sits_in_the_bar_as_well_as_under_the_cards():
     assert "if typeSize > .large {" in bar and 'Image(systemName: "magnifyingglass")' in bar
     assert "Text(SourcesWords.searchAgain)" in bar and ".accessibilityLabel(SourcesWords.searchAgain)" in bar
     assert "again == .top ? SourcesWords.expanded : SourcesWords.collapsed" in bar
+
+
+# ---------------------------------------------------------------------------- Album info (app 0.13)
+
+ALBUM_FILES_HELPER = Path(__file__).resolve().parent.parent / "ios" / "scripts" / "album_files_answers.py"
+ALBUM_FILES_ANSWERS = (Path(__file__).resolve().parent.parent / "ios" / "DeadwaxKit" / "Tests" / "DeadwaxCoreTests"
+                       / "Fixtures" / "albuminfo" / "files.json")
+
+
+def _album_files_helper():
+    spec = importlib.util.spec_from_file_location("ios_album_files_answers", ALBUM_FILES_HELPER)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def _album_files_cases() -> dict:
+    return {case["name"]: case["answer"] for case in json.loads(ALBUM_FILES_ANSWERS.read_text(encoding="utf-8"))["cases"]}
+
+
+def test_the_album_files_answers_are_the_ones_the_helper_makes():
+    # Fixtures/albuminfo/files.json is what ios/scripts/album_files_answers.py writes now, byte for byte - what the route
+    # sends changed (or the file by hand) fails until it is written again
+    helper = _album_files_helper()
+    assert ALBUM_FILES_ANSWERS.read_text(encoding="utf-8") == helper.text()
+    assert ALBUM_FILES_ANSWERS.read_bytes().isascii()
+
+
+def test_the_album_files_answers_are_the_routes_own(monkeypatch, tmp_path):
+    # the same folders asked of the real route, as the phone asks it (a folder relative to the library, the id
+    # bridge's `path`): what the Swift tests decode is what /library/tracks sends
+    monkeypatch.setattr(Config, "AUTH_MODE", None)
+    monkeypatch.setattr(Config, "LIBRARY_PATH", str(tmp_path))
+    helper = _album_files_helper()
+    made = helper.make(tmp_path)
+    cases = _album_files_cases()
+    assert [name for name, _ in made] == list(cases)
+    app = start()
+    app.state.poller_task = SimpleNamespace(done=lambda: False)
+    client = TestClient(app)
+    for name, folder in made:
+        answer = client.get("/deadwax/library/tracks", params={"album": folder})
+        assert answer.status_code == 200, answer.text
+        assert helper.tidy(answer.json()) == cases[name], name
+    # a folder that isn't there is a 404, which the phone says as moved (AlbumInfoWords.filesGone)
+    assert client.get("/deadwax/library/tracks", params={"album": "Nobody/Nothing"}).status_code == 404
+
+
+def test_album_info_reads_what_the_tracks_route_sends():
+    assert '{"album": album, "files": await asyncio.to_thread(read_album_details, directory)}' in \
+        inspect.getsource(library_route.tracks)
+    assert fields("AlbumFiles") == {"files": False}
+    assert fields("AlbumFile") == {"disc": True, "tags": True, "raw": True}
+    for name, answer in _album_files_cases().items():
+        assert answer["files"], name
+        for file in answer["files"]:
+            assert set(fields("AlbumFile")) <= set(file), name
+    # read leniently, as every answer is: a file or a field of an unexpected type is left out, never the whole sheet
+    for struct in ("AlbumFiles", "AlbumFile", "AlbumExtras", "Day", "Named"):
+        assert ".loose" in swift_struct(struct), struct
+    # asked by the folder the id bridge names - a present row's `path`, relative to the library as the route takes it
+    body = swift_function("DeadwaxClient.swift", "albumFiles")
+    assert 'call(Routes.libraryTracks, as: AlbumFiles.self, query: [("album", folder)])' in body
+    assert "path" in required_fields("StoreRow")
+
+
+def album_tag_names(kind: str) -> dict[str, list[str]]:
+    """AlbumTag's `named` or `raw` names, case by case, read from AlbumInfo.swift."""
+    code = _code((CORE / "AlbumInfo.swift").read_text(encoding="utf-8"))
+    enum = _block(code, re.search(r"\benum\s+AlbumTag\b[^{]*\{", code).end() - 1)
+    var = _block(enum, re.search(r"\bvar\s+" + kind + r"\s*:\s*\[String\]\s*\{", enum).end() - 1)
+    names = {}
+    for cases, listed in re.findall(r"\bcase\s+((?:\.\w+\s*,?\s*)+):\s*(?:return\s*)?\[([^\]]*)\]", var, re.S):
+        for case in re.findall(r"\.(\w+)", cases):
+            names[case] = re.findall(r'"([^"]*)"', listed)
+    return names
+
+
+def test_the_tags_album_info_reads_are_the_servers_names_and_picards():
+    from src.library import DETAIL_TAGS
+
+    named = album_tag_names("named")
+    raw = album_tag_names("raw")
+    cases = swift_raw_values("AlbumInfo.swift", "AlbumTag")
+    assert set(named) == set(raw) == cases
+    # every name read from `tags` is one the route sends there (DETAIL_TAGS): another would never be found
+    for tag, names in named.items():
+        assert set(names) <= set(DETAIL_TAGS), tag
+    # the status and type aren't sent by name, so are read raw, as each container keeps them
+    assert {"releasestatus", "releasetype"}.isdisjoint(DETAIL_TAGS)
+    assert named["status"] == named["type"] == []
+    # the phone compares a raw name lower-cased
+    assert all(name == name.lower() for names in raw.values() for name in names)
+
+    def values(file: dict, tag: str) -> list[str]:
+        # AlbumFile.values: the named tag first, else the first raw pair under any of the tag's names
+        for key in named[tag]:
+            found = [one.strip() for one in (file["tags"].get(key) or "").split(";") if one.strip()]
+            if found:
+                return found
+        for pair in file["raw"]:
+            if len(pair) >= 2 and pair[0].lower() in raw[tag]:
+                found = [one.strip() for one in pair[1].split(";") if one.strip()]
+                if found:
+                    return found
+        return []
+
+    group = _album_files_helper().GROUP
+    expected = {
+        "flac": {"media": ["CD"], "label": ["Harvest"], "catalogueNumber": ["SHVL 804"], "barcode": ["5099902894225"],
+                 "country": ["GB"], "status": ["official"], "type": ["album", "live"], "date": ["2011-09-26"],
+                 "originalDate": ["1973-03-01"], "genre": ["Rock"], "releaseGroup": [group]},
+        "mp3": {"media": ['12" Vinyl'], "label": ["Go! Beat"], "catalogueNumber": ["828 522-1"],
+                "barcode": ["042282852216"], "country": ["GB"], "status": ["Official"], "type": ["album"],
+                "releaseGroup": [group]},
+        "m4a": {"media": ["Digital Media"], "label": ["Warp"], "catalogueNumber": ["WAP105CD"],
+                "barcode": ["801061010524"], "country": ["XW"], "status": ["Promotion"], "type": ["single"]},
+    }
+    answers = _album_files_cases()
+    for name, tags in expected.items():
+        first = answers[name]["files"][0]
+        for tag, value in tags.items():
+            assert values(first, tag) == value, (name, tag)
+    # the M4A's are every one raw: Easy MP4 has no names for Picard's freeform atoms
+    assert set(answers["m4a"]["files"][0]["tags"]) == {"title", "album"}

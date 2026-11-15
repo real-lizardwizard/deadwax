@@ -151,6 +151,10 @@ public enum Routes {
     // albums changed on the phone - only what was chosen (`GetChoice`), answered with all three as they stand after it
     public static let joinJob = Endpoint(method: "POST", path: "/deadwax/download/jobs/{job_id}/join", query: [])
     public static let savePreferences = Endpoint(method: "PUT", path: "/deadwax/me/preferences", query: [])
+    // Album info (2026-11-15, notes/ios.md "Album info"): one of the store's folders of an album, every file's tags read
+    // from the disk as it is asked (`AlbumFiles`) - the track viewer's route, a user's: what only the files' tags hold
+    // (Media, Catalogue number, Barcode, Country, Status), by the folder the id bridge names
+    public static let libraryTracks = Endpoint(method: "GET", path: "/deadwax/library/tracks", query: ["album"])
 
     /// The levels spec's name for `levelAlbum`: the album's levels warmed before its first play.
     public static var warmLevels: Endpoint { levelAlbum }
@@ -176,6 +180,7 @@ public enum Routes {
         jobs, cancelJob, retryJob, retryJobSame, clearJobs,
         storeState, findCandidates, enqueue, preferences,
         joinJob, savePreferences,
+        libraryTracks,
     ]
 
     /// The routes given longer than the transport's own 8 seconds to answer, in seconds: the album index reads every
@@ -197,9 +202,12 @@ public enum Routes {
     /// (RequestOverlays.unanswered); a join waits for the same release's lock as an enqueue or a move to the next source
     /// does, so it is given a move's time; and an Add to my library stars the pressing in Navidrome as you before it
     /// answers (my_library.py `_star_now`: up to six calls a folder, each through a client that gives up after 10 s a
-    /// phase), so it is given time for one call that never answers on top of the rest (slice 3's review) -
+    /// phase), so it is given time for one call that never answers on top of the rest (slice 3's review); and Album
+    /// info's read of a folder's files opens every file there as it is asked (read_album_details: each file twice, and
+    /// its pictures' sizes), which a box set on a disk that has to spin up can take a while over - nothing waits on it
+    /// past AlbumInfoWords.settleSeconds, so it is given time to land late rather than fail -
     /// tests/test_ios_contract.py holds each above the server's.
-    public static let timeouts: [Endpoint: Double] = [albumIndex: 30, autoEqSearch: 20, autoEqProfile: 20, libraryOwned: 30, fullySearch: 20, releaseGroup: 60, searchArtists: 20, searchSongs: 20, artistFacts: 60, discography: 60, jobs: 20, cancelJob: 30, retryJob: 60, retryJobSame: 30, clearJobs: 30, storeState: 20, findCandidates: 300, enqueue: 300, joinJob: 60, libraryAdd: 60]
+    public static let timeouts: [Endpoint: Double] = [albumIndex: 30, autoEqSearch: 20, autoEqProfile: 20, libraryOwned: 30, fullySearch: 20, releaseGroup: 60, searchArtists: 20, searchSongs: 20, artistFacts: 60, discography: 60, jobs: 20, cancelJob: 30, retryJob: 60, retryJobSame: 30, clearJobs: 30, storeState: 20, findCandidates: 300, enqueue: 300, joinJob: 60, libraryAdd: 60, libraryTracks: 30]
 }
 
 /// The Cover Art Archive's thumbnail sizes the app asks deadwax's relay for (`Routes.archiveCover`'s `size`, which takes

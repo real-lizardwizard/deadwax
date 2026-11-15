@@ -9952,3 +9952,127 @@ with its VoiceOver name and state.
 **Verified**: the unsigned Debug device build; the test above and the full pytest suite. **Not verified** - only the
 phone can tell: that the title reads whole beside the words, the glass one size up, and the field opening above the
 chips with the keyboard (docs/ios.md check 247).
+
+
+## Album info (2026-11-15)
+
+James: "I'd like somewhere I can see all the album metadata like quality, media type, etc." An album as a whole, in a
+listener's words, grouped, on a sheet of its own: **Album info**, in the album page's bar ••• (its last section, above
+Edit in the web app, for everyone - offline too, and for an album gone from the collection), and as a row under Info's
+album card, pushed inside Info's own stack. The web has no such sheet: its album page's Properties
+(lib/albumProperties.ts) is the nearest, and its year, size, release link and Added are said here too. Still app 0.13
+(13); the .xcodeproj unchanged (AlbumInfo.swift is in the package, the views in the synchronized folder).
+
+**No server change.** Every line comes from a route the app could already call, so nothing went to main: one route
+added to Routes.swift (ROUTE_COUNT 60 -> 61) is the track viewer's `GET /deadwax/library/tracks?album=<folder>`, a
+user's route (tests/test_logins.py ROUTES), given 30 s (Routes.timeouts) since it reads every
+file of the folder from the disk as it is asked.
+
+### Where each line comes from
+
+Looked up before anything was drawn - Navidrome's getAlbum and its OpenSubsonic fields (server/subsonic/helpers.go
+buildOSAlbumID3, the OpenSubsonic spec's AlbumID3), the id bridge's `_facts` (src/routes/store_album.py), the tracks
+route's `read_album_details` (src/library.py: DETAIL_TAGS by name, every tag raw), and Picard's tag map
+(picard-docs appendices/tag_mapping) for the names each container keeps each tag under.
+
+| line | from |
+| --- | --- |
+| Format, Bitrate, Channels | the album's songs as getAlbum answered them: `suffix` (else the content type), `bitDepth`, `samplingRate`, `bitRate`, `channelCount` |
+| Songs, Discs (titles), Disc title, Length, Size | the songs (`discNumber`, `duration`, `size`) and getAlbum's `discTitles` |
+| Downloaded | DownloadModel: `album(songs)` and `here(songs)` |
+| Media | the files' MEDIA, per disc (each disc's commonest), as MusicBrainz writes a release's format: "2×CD + DVD-Video" |
+| Label | getAlbum's `recordLabels` (OpenSubsonic), else the files' LABEL / ORGANIZATION / TPUB |
+| Catalogue number, Barcode, Country | the files' CATALOGNUMBER, BARCODE, RELEASECOUNTRY (XW Worldwide, XE Europe, else Locale's English name) |
+| Released | getAlbum's `releaseDate`, else the files' DATE, else the album's `year` |
+| First released | getAlbum's `originalReleaseDate`, else the files' ORIGINALDATE, else the bridge's `original_year` - only when it isn't Released |
+| Type | getAlbum's `releaseTypes` (+ Compilation from `isCompilation`), else the files' RELEASETYPE |
+| Status | the files' RELEASESTATUS - read raw: it isn't among DETAIL_TAGS |
+| Edition | the bridge's `edition` (deadwax's own words for the pressing), else getAlbum's `version` |
+| Genres | getAlbum's `genres`, else the album's `genre`, else the files' GENRE |
+| Added | the bridge's earliest `first_seen`, ", downloaded by deadwax" when any folder's `imported` |
+| Release, Release group (and their pages) | the bridge's `release_mbid` (else the album's `musicBrainzId`), its `release_group_mbid` (else the files' MUSICBRAINZ_RELEASEGROUPID) |
+| Folder(s) | the bridge's `present` paths (AboutCard.folderLine), for an admin (`Access.isAdmin`, as Info's) |
+
+A tag is read by the server's own name for it first (`tags`, mutagen's easy keys, values joined "; "), else by any
+of the names Picard writes it under in each container (`raw`, compared lower-cased): Vorbis comments' own,
+`TXXX:MusicBrainz Album Status` and the like for ID3, `----:com.apple.iTunes:…` for MP4's freeform atoms (which Easy
+MP4 has no names for - an M4A's every one is raw), `WM/…` for ASF. AlbumTag holds both lists.
+
+### Core (DeadwaxCore)
+
+- **AlbumInfo.swift** (new): `AlbumExtras` (getAlbum's OpenSubsonic fields the Album model doesn't keep, read
+  leniently from the same answer - `Day`, `Named`), `AlbumFiles` and `AlbumFile` (the tracks route's files: `disc`,
+  `tags`, `raw`; `values(_:)`), `AlbumTag` (each tag's names), `AlbumInfoRow` (label, value, lines under it, plain /
+  copyable / link), `AlbumInfoSection`, `AlbumInfoWords`, and `AlbumInfo`'s rules: `quality`, `theAlbum`, `onPhone`,
+  `release`, `musicBrainz` (a page made only for a UUID-shaped id), `server`, then `local` (Quality, The album, On this
+  phone) and `fromServer` (The release, MusicBrainz, On the server), each leaving out a section with no lines;
+  `foldersToRead` (the bridge's present paths, each once, at most 8); `media`, `country`, `dateWords`.
+- **Routes.swift**: `libraryTracks` (and 30 s); **DeadwaxClient**: `albumFiles(folder:)`.
+
+### The app
+
+- **Album/AlbumInfoAsk.swift**: what the sheet asks while open, Info's settle pattern (InfoAsk.details): getAlbum
+  again (`albumAnswered` - the whole album, and AlbumExtras from the same body), the bridge, and - once the bridge names
+  them - every folder's files at once; all held for each other until in or AlbumInfoWords.settleSeconds (3 s) has gone,
+  then each landing as it comes. Only the files' failing is said, and only when every folder failed (ErrorNote, a 404
+  as "isn't where deadwax last saw it").
+- **Album/AlbumInfoView.swift**: `AlbumInfoList` (the list - the header's cover, title and artist, then the sections;
+  Copy, links, the reading row, the offline line) and `AlbumInfoSheet` (it in a NavigationStack with Done).
+- **QueueMenu**: `QueueMenuRequest.albumInfo`, a button in the last section. **AlbumView**: sets it, and presents the
+  sheet (`.sheet(item:)` on the album). **InfoView**: a NavigationLink under the album card whenever the queue knows
+  the album's id.
+
+### Decided here (the ask was silent)
+
+- **The bridge is asked whatever D12 says.** The album page and Info ask it only with a library of one's own
+  (`hasLibrary`); Album info asks it always, as the web's Properties does - it is a user's route either way, and its
+  folders are the only way to the files' tags. With logins off, the release's tag lines would otherwise never show.
+- **The files are read live**, not from the saved scan: the scan keeps none of these tags (DETAIL_TAGS are the track
+  viewer's, read as asked), and adding them to it would be a server change and a SCAN_FORMAT bump for one sheet.
+- **"songs", not "tracks"** ("all 10 songs"), as every other line of the app says them.
+- **"downloaded by deadwax"**, not the web's "downloaded here" - on a phone "here" reads as this phone.
+- **Bitrate is Navidrome's, weighed by length**, never the files' sizes over their lengths: a cover in every file
+  would count as sound.
+- **A lossy format never shows a depth** (a tag reader may give an MP3 one); a lossy group says its bitrate instead.
+- **Countries in British English** (`Locale(identifier: "en_GB")`), the app's own, whatever the phone's language.
+- **Info's album from a playlist is a stub** (`Album.partial`): its own lines wait for the album's answer rather
+  than counting the playlist's songs as the album's.
+- **Copy is a button beside the words**, not a long-press menu, so VoiceOver and a first look both find it; the words
+  are selectable too.
+
+### Left out, and why
+
+- **MusicBrainz's release disambiguation and packaging**: Picard writes neither into the files by default, and
+  getAlbum doesn't carry them; asking MusicBrainz from the sheet would be a second source that can disagree with the
+  files. The bridge's `edition` (deadwax's own words for the pressing) stands in for the disambiguation.
+- **The codec inside an M4A** (ALAC or AAC): Navidrome's `suffix` says "m4a" either way; the format says M4A, with
+  Navidrome's depth when it gives one (an ALAC's), the bitrate otherwise.
+- **An album not matched to MusicBrainz** has no bridge folder (the bridge is keyed on the release), so no files are
+  read and none of the five tag-only lines show: the docs say so.
+- **More than eight folders** of one album are not read (`foldersRead`): a set kept per disc is a handful; a dozen
+  copies of one release is not this sheet's to read.
+
+### Tests
+
+- **AlbumInfoTests** (DeadwaxCoreTests, 24): every tag in each container from the route's own answers, media per
+  disc, the named tag before raw, Quality's lines and mixes, the bitrate, channels, the album's lines, On this phone,
+  the release from each source and in what order, dates and countries in words, the ids and their pages (and an id
+  that isn't one), the folders, which folders are read, empty sections left out, getAlbum's other fields read
+  leniently, and the files asked for by their folder with the 30 s.
+- **Fixtures/albuminfo/files.json**: written by `ios/scripts/album_files_answers.py` - real FLAC (two discs), MP3 and
+  M4A files tagged as Picard tags them, read by `read_album_details`, each file's raw sorted (a FLAC's come in a set's
+  order).
+- **tests/test_ios_contract.py**: the fixture is what the helper makes now, byte for byte; the real route over the same
+  folders answers the same (and a missing folder 404s); AlbumFile and AlbumFiles read what the route sends, leniently;
+  AlbumTag's names, parsed from the Swift, are DETAIL_TAGS' for the named ones (status and type not among them), lower
+  case for the raw ones, and find every tag in each container's answer.
+- ClientTests: 61 routes, libraryTracks' 30 s.
+
+### Verified, and not
+
+**Verified**: `swift test` (DeadwaxKit, all of it); the unsigned Debug device build, no warnings, the .xcodeproj
+unchanged; the full pytest suite. **Not verified** - only the phone and a real library can tell (docs/ios.md checks
+260-270): that a real Navidrome sends the OpenSubsonic fields as its source says (no recorded answer of a 0.5x
+getAlbum is in the repo); what Picard-tagged and deadwax-filed albums in the real library actually carry; how long the
+tracks route takes on the NAS for a box set on a sleeping disk; the sheet's look at the largest text and with
+VoiceOver; Copy; and Safari opening musicbrainz.org beside the app.

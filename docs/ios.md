@@ -387,6 +387,8 @@ back to the Library tab or the app, and when you pull down.
   after the library - an admin, or everyone with logins off): this album's page in the web app, in Safari, with
   **Edit** at its top (see [Manage](#manage)). It isn't there while deadwax can't be reached, or for an album gone
   from the collection.
+- **Album info**, in the same last part of the top •••'s menu (above Edit in the web app), for everyone: everything
+  known about the album, on a sheet of its own with **Done**. See [Album info](#album-info).
 - **Add to my library** and **Remove from my library**, with logins on. Removing takes the album out
   of your library only: "it's still in the collection, and nothing was deleted."
 - **The artist's name**, in purple, opens [their page](#artists). An album that names no artist to go to
@@ -430,6 +432,44 @@ With [Download your library](#your-library-on-this-phone) on:
 
 With Normalization on, opening an album that has FLAC songs asks deadwax to measure it, if it hasn't
 yet, so its first song is less likely to wait when you play it.
+
+### Album info
+
+**Album info** (the album page's top **•••**, or under the album in [Info](#info)) is everything known about an
+album as a whole, grouped. A line with nothing to say is left out, never shown as "Unknown".
+
+- **Quality**: **Format** - "FLAC · 24-bit / 96 kHz · all 10 songs", or one line for each kind when the songs
+  differ ("FLAC · 16-bit / 44.1 kHz · 8 of 10 songs", "MP3 · 320 kbps · 2 of 10 songs"); an MP3 or AAC never shows a
+  bit depth. **Bitrate**: "320 kbps" when every song has the same, otherwise "1,350 kbps on average" (each song's
+  bitrate weighed by its length). **Channels**: Mono, Stereo, 5.1 surround, 7.1 surround.
+- **The album**: how many **Songs**; **Discs** when there's more than one, with each disc's title and songs ("Disc
+  2 · Live at Wembley · 3 songs"), or the **Disc title** of a single disc that has one; its **Length** and **Size**.
+- **On this phone**: **Downloaded** - "All 10 songs · 412 MB", "3 of 12 songs · 92 MB" or "Not downloaded", with
+  what's under way ("Downloading - 4 of 12 songs", "Waiting for Wi-Fi") under it.
+- **The release**: **Media** ("CD", "2×CD + DVD-Video", 12" Vinyl, "Digital Media"), **Label**, **Catalogue
+  number**, **Barcode**, **Country** ("United Kingdom", "Worldwide"), **Released** and **First released** (when it
+  isn't the same: "26 September 2011", "1 March 1973"), **Type** ("Album · Live", "Compilation"), **Status**
+  ("Official", "Promotion"), **Edition**, **Genres**, and **Added** - when deadwax first saw the album, with
+  "downloaded by deadwax" for one it filed itself.
+- **MusicBrainz**: the **Release** and **Release group** ids, each with a **Copy** button, and **This pressing on
+  MusicBrainz** and **Every pressing on MusicBrainz**, which open those pages in Safari.
+- **On the server**, for an admin: the album's **Folder** (one per disc for a set kept that way), with **Copy**.
+
+The media, catalogue number, barcode, country and status come from the album's files themselves, read as the sheet
+opens - so they show only for an album whose files carry them. MusicBrainz Picard writes all five. deadwax writes the
+media, country and catalogue number when it files an album (not into an M4A, which has no place for them), and never
+the barcode or status. An album that isn't matched to MusicBrainz has no folder deadwax knows by its id, so none of the
+five show for it.
+
+The first three parts show at once. The rest comes from deadwax: "Reading the album's files…" shows for a moment
+in their place (a box set on a disk that's asleep can take a while), then they appear. While deadwax can't be reached,
+the sheet shows what the phone has - with the label, year and genre the album already said - and "The rest shows once
+deadwax is back."; it fills in by itself when deadwax is back. If the files can't be read, it says so where they
+would have been.
+
+Each id, the barcode, the catalogue number and the folder are in the typewriter face; you can select them, and
+**Copy** puts the whole of one on the clipboard, its button a tick for a moment. If Safari can't open a MusicBrainz
+page (turned off in Screen Time), the sheet says so under the link.
 
 ## Playlists
 
@@ -1284,7 +1324,9 @@ takes away their soft top and bottom edges. Nothing about lyrics is on the lock 
 - **The song**: its title and artist, a line like "Track 4 of 10 · 7:05 · played 12 times", its disc,
   and who wrote it, when Navidrome says.
 - **The album**: tap it to go to its page. With logins on, it says which pressing it is, and an admin
-  also sees its folder on the server.
+  also sees its folder on the server. **Album info**, under it, opens [everything known about the
+  album](#album-info) inside Info - its Back goes back to Info. From a playlist, it's the whole album's, not only the
+  playlist's songs of it.
 - **The artist.**
 - **Sound**: the file's **Format**, **Gapless** (always On: the app joins every song end to end), and
   **Normalization**: what was done to this song's level, and from what. For example "Album volume
@@ -3562,6 +3604,53 @@ with Wi-Fi off. 237-243 want logins on, and 241 two accounts (one an admin); 244
   cards: the field moves down there; tap that one again and it closes. At a larger text size (Settings > Display &
   Brightness > Text Size, one step up), the top one is a magnifying glass and the title still reads whole. With
   VoiceOver, both read "Search again, button, collapsed" (expanded once open).
+
+### Album info's checks (260-270)
+
+**Not done yet.** These come with the build that adds [Album info](#album-info) (still app 0.13 (13)). No server
+change is needed: it works with the deadwax you already run.
+
+- **260 From an album's •••.** Open an album of FLACs (a 24-bit one if there is one) and tap the top •••: the last part
+  of the menu has **Album info** with an ⓘ - above Edit in the web app, as an admin. Tap it: a sheet with the cover,
+  title and artist, then **Quality** ("FLAC · 24-bit / 96 kHz · all 10 songs", Bitrate, Channels "Stereo"), **The
+  album** (Songs, Length, Size) and **On this phone**, at once. Then, after a moment of "Reading the album's
+  files…", **The release** and **MusicBrainz**. Does the reading line show for long? **Done** closes it. A song's
+  ••• has no Album info.
+- **261 The format, against the files.** For the same album, compare Format and Bitrate with the web app's Debug or
+  the files on the server: the depth and rate are the files' own, and the bitrate is about what Navidrome says
+  for a song of it (Info's Debug). An album of MP3s says "MP3 · 320 kbps" (or "MP3 · 245 kbps on average" for a
+  VBR one), never a bit depth.
+- **262 A mix.** An album whose songs differ - some 16-bit and some 24-bit, or FLAC and MP3 - says the commonest
+  first ("FLAC · 16-bit / 44.1 kHz · 8 of 10 songs") with the others under it, each "N of 10 songs".
+- **263 The release, from Picard's tags.** Open an album tagged by MusicBrainz Picard and compare The release with
+  its page on MusicBrainz (This pressing on MusicBrainz): Media ("CD", "2×CD", 12" Vinyl), Label, Catalogue
+  number, Barcode, Country, Released, First released (only when it differs), Type, Status, Genres. Say any line that is
+  missing or reads oddly - and whether anything shows as "Unknown" or empty (nothing should). Then an album deadwax
+  downloaded and filed: Media, Country and Catalogue number, and Added "…, downloaded by deadwax". And an M4A album, if
+  there is one.
+- **264 A box set.** An album of two or more discs: Discs "2", each disc's line ("Disc 2 · Live at Wembley · 3 songs"
+  when it has a title), Media "2×CD" or "CD + DVD-Video". One kept as a folder per disc: as an admin, On the server
+  says **Folders**, each on its own line.
+- **265 Copy and MusicBrainz.** Tap Copy beside Release: the button is a tick for a moment; paste in Notes - the id
+  whole, nothing else. The same for Barcode and (as an admin) the Folder. Tap **This pressing on MusicBrainz**:
+  Safari opens musicbrainz.org's page for that release, beside the app; back in the app the sheet is still open.
+  **Every pressing on MusicBrainz** opens the release group's page, its other pressings listed.
+- **266 Offline.** Turn off Wi-Fi and WireGuard, open a downloaded album and its Album info: Quality, The album, and
+  On this phone "All 10 songs · 412 MB" (or "3 of 12 songs · …"); The release with only what the album says itself
+  (the label, the year, the genre), and "The rest shows once deadwax is back." Turn the network back on with the sheet
+  open: the rest arrives without closing it.
+- **267 From Info.** Play an album, open Now Playing's ••• > Info: under the album's card, **Album info**. Tap it: the
+  same lines, pushed inside Info; its Back returns to Info, and Done still closes Info. Then play a playlist and do
+  the same for a song of it: Songs and Size are the whole album's, not the playlist's songs of it.
+- **268 Someone else.** With logins on, signed in as someone who isn't an admin: no On the server, everything else
+  the same. With logins off (if you can try it), the release lines still come.
+- **269 A big one, asleep.** Let the server's disks spin down (leave it an hour), then open Album info for the
+  biggest box set: how long "Reading the album's files…" shows before The release appears - and whether it ever says
+  "The album's files couldn't be read just now." instead.
+- **270 The largest text, and VoiceOver.** At the largest text sizes every line wraps, nothing cut off, the Copy
+  buttons beside their ids and the arrows beside the links growing with them. With VoiceOver: each line reads as one
+  ("Format, FLAC · 24-bit / 96 kHz · all 10 songs"); a Copy button reads "Copy release, button" and says "Copied";
+  a link reads "This pressing on MusicBrainz, button, Opens in Safari."
 
 ## What it can't do yet
 

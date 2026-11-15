@@ -20,6 +20,8 @@ struct QueueMenuRequest {
     /// (Phase 7) The album's page in the web app - its page's bar •••, for someone the web gives the album's Edit
     /// (Managing.albumEdit): "Edit in the web app", opened in Safari, the web's Edit one tap away there.
     var webEdit: URL?
+    /// (Album info) The album page's bar •••: "Album info", which opens the album's sheet of everything known of it.
+    var albumInfo: (@MainActor () -> Void)?
 }
 
 /// The queue menu (screens.md 5; the web's app/QueueMenu.tsx): Play Next and Play Last, opened FROM the ••• tapped -
@@ -56,6 +58,10 @@ struct QueueMenuRequest {
 /// editors have no address of their own. Left out while deadwax can't be reached and for an album gone from the
 /// collection, as Add to a playlist is. It plays nothing; if iOS refuses to open it, the notice says so
 /// (OpenURLAction.webApp).
+///
+/// Album info (notes/ios.md "Album info"): the album page's bar ••• (`request.albumInfo`) has "Album info" in that last
+/// section, above Edit in the web app - offline too (it draws what the phone has), and for an album gone from the
+/// collection. It plays nothing.
 struct QueueMenu<Label: View>: View {
     let request: QueueMenuRequest?
     @ViewBuilder let label: () -> Label
@@ -90,10 +96,18 @@ struct QueueMenu<Label: View>: View {
                                         album: request.pick.queuedAs == .album ? request.album : nil,
                                         gone: request.gone, name: request.pick.title)
                 }
-                if let webEdit = request.webEdit, reachability.online, !request.gone {
+                let webEdit = reachability.online && !request.gone ? request.webEdit : nil
+                if request.albumInfo != nil || webEdit != nil {
                     Section {
-                        Button(ManagingWords.editInWebApp, systemImage: ManagingWords.safariSymbol) {
-                            openURL.webApp(webEdit, player: player)
+                        if let albumInfo = request.albumInfo {
+                            Button(AlbumInfoWords.title, systemImage: AlbumInfoWords.symbol) {
+                                albumInfo()
+                            }
+                        }
+                        if let webEdit {
+                            Button(ManagingWords.editInWebApp, systemImage: ManagingWords.safariSymbol) {
+                                openURL.webApp(webEdit, player: player)
+                            }
                         }
                     }
                 }

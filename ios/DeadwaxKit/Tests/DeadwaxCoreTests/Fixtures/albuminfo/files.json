@@ -1,0 +1,429 @@
+{
+ "made_from": "src/routes/library.py tracks(): read_album_details (ios/scripts/album_files_answers.py)",
+ "cases": [
+  {
+   "name": "flac",
+   "answer": {
+    "album": "Pink Floyd/The Dark Side of the Moon [Box]",
+    "files": [
+     {
+      "filename": "1-01 Speak to Me.flac",
+      "format": "flac",
+      "size": 1480,
+      "length": 0.0,
+      "bitrate": null,
+      "sample_rate": 44100,
+      "bits_per_sample": 16,
+      "channels": 2,
+      "codec": "FLAC",
+      "position": 1,
+      "disc": 1,
+      "tags": {
+       "title": "Speak to Me",
+       "album": "The Dark Side of the Moon",
+       "tracknumber": "1",
+       "discnumber": "1",
+       "date": "2011-09-26",
+       "originaldate": "1973-03-01",
+       "genre": "Rock",
+       "label": "Harvest",
+       "catalognumber": "SHVL 804",
+       "barcode": "5099902894225",
+       "releasecountry": "GB",
+       "media": "CD",
+       "musicbrainz_releasegroupid": "4b4f4f2f-7a5e-3d58-9d1a-5c3b5c3c2b10"
+      },
+      "raw": [
+       [
+        "album",
+        "The Dark Side of the Moon"
+       ],
+       [
+        "barcode",
+        "5099902894225"
+       ],
+       [
+        "catalognumber",
+        "SHVL 804"
+       ],
+       [
+        "date",
+        "2011-09-26"
+       ],
+       [
+        "discnumber",
+        "1"
+       ],
+       [
+        "genre",
+        "Rock"
+       ],
+       [
+        "label",
+        "Harvest"
+       ],
+       [
+        "media",
+        "CD"
+       ],
+       [
+        "musicbrainz_releasegroupid",
+        "4b4f4f2f-7a5e-3d58-9d1a-5c3b5c3c2b10"
+       ],
+       [
+        "originaldate",
+        "1973-03-01"
+       ],
+       [
+        "releasecountry",
+        "GB"
+       ],
+       [
+        "releasestatus",
+        "official"
+       ],
+       [
+        "releasetype",
+        "album; live"
+       ],
+       [
+        "title",
+        "Speak to Me"
+       ],
+       [
+        "tracknumber",
+        "1"
+       ]
+      ],
+      "pictures": []
+     },
+     {
+      "filename": "1-02 Breathe.flac",
+      "format": "flac",
+      "size": 1476,
+      "length": 0.0,
+      "bitrate": null,
+      "sample_rate": 44100,
+      "bits_per_sample": 16,
+      "channels": 2,
+      "codec": "FLAC",
+      "position": 2,
+      "disc": 1,
+      "tags": {
+       "title": "Breathe",
+       "album": "The Dark Side of the Moon",
+       "tracknumber": "2",
+       "discnumber": "1",
+       "date": "2011-09-26",
+       "originaldate": "1973-03-01",
+       "genre": "Rock",
+       "label": "Harvest",
+       "catalognumber": "SHVL 804",
+       "barcode": "5099902894225",
+       "releasecountry": "GB",
+       "media": "CD",
+       "musicbrainz_releasegroupid": "4b4f4f2f-7a5e-3d58-9d1a-5c3b5c3c2b10"
+      },
+      "raw": [
+       [
+        "album",
+        "The Dark Side of the Moon"
+       ],
+       [
+        "barcode",
+        "5099902894225"
+       ],
+       [
+        "catalognumber",
+        "SHVL 804"
+       ],
+       [
+        "date",
+        "2011-09-26"
+       ],
+       [
+        "discnumber",
+        "1"
+       ],
+       [
+        "genre",
+        "Rock"
+       ],
+       [
+        "label",
+        "Harvest"
+       ],
+       [
+        "media",
+        "CD"
+       ],
+       [
+        "musicbrainz_releasegroupid",
+        "4b4f4f2f-7a5e-3d58-9d1a-5c3b5c3c2b10"
+       ],
+       [
+        "originaldate",
+        "1973-03-01"
+       ],
+       [
+        "releasecountry",
+        "GB"
+       ],
+       [
+        "releasestatus",
+        "official"
+       ],
+       [
+        "releasetype",
+        "album; live"
+       ],
+       [
+        "title",
+        "Breathe"
+       ],
+       [
+        "tracknumber",
+        "2"
+       ]
+      ],
+      "pictures": []
+     },
+     {
+      "filename": "2-01 Speak to Me (live).flac",
+      "format": "flac",
+      "size": 1494,
+      "length": 0.0,
+      "bitrate": null,
+      "sample_rate": 44100,
+      "bits_per_sample": 16,
+      "channels": 2,
+      "codec": "FLAC",
+      "position": 1,
+      "disc": 2,
+      "tags": {
+       "title": "Speak to Me (live)",
+       "album": "The Dark Side of the Moon",
+       "tracknumber": "1",
+       "discnumber": "2",
+       "date": "2011-09-26",
+       "originaldate": "1973-03-01",
+       "genre": "Rock",
+       "label": "Harvest",
+       "catalognumber": "SHVL 804",
+       "barcode": "5099902894225",
+       "releasecountry": "GB",
+       "media": "DVD-Video",
+       "musicbrainz_releasegroupid": "4b4f4f2f-7a5e-3d58-9d1a-5c3b5c3c2b10"
+      },
+      "raw": [
+       [
+        "album",
+        "The Dark Side of the Moon"
+       ],
+       [
+        "barcode",
+        "5099902894225"
+       ],
+       [
+        "catalognumber",
+        "SHVL 804"
+       ],
+       [
+        "date",
+        "2011-09-26"
+       ],
+       [
+        "discnumber",
+        "2"
+       ],
+       [
+        "genre",
+        "Rock"
+       ],
+       [
+        "label",
+        "Harvest"
+       ],
+       [
+        "media",
+        "DVD-Video"
+       ],
+       [
+        "musicbrainz_releasegroupid",
+        "4b4f4f2f-7a5e-3d58-9d1a-5c3b5c3c2b10"
+       ],
+       [
+        "originaldate",
+        "1973-03-01"
+       ],
+       [
+        "releasecountry",
+        "GB"
+       ],
+       [
+        "releasestatus",
+        "official"
+       ],
+       [
+        "releasetype",
+        "album; live"
+       ],
+       [
+        "title",
+        "Speak to Me (live)"
+       ],
+       [
+        "tracknumber",
+        "1"
+       ]
+      ],
+      "pictures": []
+     }
+    ]
+   }
+  },
+  {
+   "name": "mp3",
+   "answer": {
+    "album": "Portishead/Dummy",
+    "files": [
+     {
+      "filename": "01 Roads.mp3",
+      "format": "mp3",
+      "size": 9747,
+      "length": 0.5,
+      "bitrate": 128000,
+      "sample_rate": 44100,
+      "bits_per_sample": null,
+      "channels": 2,
+      "codec": "MP3",
+      "position": 1,
+      "disc": null,
+      "tags": {
+       "title": "Roads",
+       "album": "Dummy",
+       "tracknumber": "1",
+       "organization": "Go! Beat",
+       "catalognumber": "828 522-1",
+       "barcode": "042282852216",
+       "releasecountry": "GB",
+       "media": "12\" Vinyl",
+       "musicbrainz_releasegroupid": "4b4f4f2f-7a5e-3d58-9d1a-5c3b5c3c2b10"
+      },
+      "raw": [
+       [
+        "TALB",
+        "Dummy"
+       ],
+       [
+        "TIT2",
+        "Roads"
+       ],
+       [
+        "TMED",
+        "12\" Vinyl"
+       ],
+       [
+        "TPUB",
+        "Go! Beat"
+       ],
+       [
+        "TRCK",
+        "1"
+       ],
+       [
+        "TXXX:BARCODE",
+        "042282852216"
+       ],
+       [
+        "TXXX:CATALOGNUMBER",
+        "828 522-1"
+       ],
+       [
+        "TXXX:MusicBrainz Album Release Country",
+        "GB"
+       ],
+       [
+        "TXXX:MusicBrainz Album Status",
+        "Official"
+       ],
+       [
+        "TXXX:MusicBrainz Album Type",
+        "album"
+       ],
+       [
+        "TXXX:MusicBrainz Release Group Id",
+        "4b4f4f2f-7a5e-3d58-9d1a-5c3b5c3c2b10"
+       ]
+      ],
+      "pictures": []
+     }
+    ]
+   }
+  },
+  {
+   "name": "m4a",
+   "answer": {
+    "album": "Aphex Twin/Windowlicker",
+    "files": [
+     {
+      "filename": "01 Windowlicker.m4a",
+      "format": "m4a",
+      "size": 2493,
+      "length": 0.2,
+      "bitrate": 359,
+      "sample_rate": 8000,
+      "bits_per_sample": 16,
+      "channels": 1,
+      "codec": "mp4a.40.2",
+      "position": null,
+      "disc": null,
+      "tags": {
+       "title": "Windowlicker",
+       "album": "Windowlicker"
+      },
+      "raw": [
+       [
+        "----:com.apple.iTunes:BARCODE",
+        "801061010524"
+       ],
+       [
+        "----:com.apple.iTunes:CATALOGNUMBER",
+        "WAP105CD"
+       ],
+       [
+        "----:com.apple.iTunes:LABEL",
+        "Warp"
+       ],
+       [
+        "----:com.apple.iTunes:MEDIA",
+        "Digital Media"
+       ],
+       [
+        "----:com.apple.iTunes:MusicBrainz Album Release Country",
+        "XW"
+       ],
+       [
+        "----:com.apple.iTunes:MusicBrainz Album Status",
+        "Promotion"
+       ],
+       [
+        "----:com.apple.iTunes:MusicBrainz Album Type",
+        "single"
+       ],
+       [
+        "\u00a9alb",
+        "Windowlicker"
+       ],
+       [
+        "\u00a9nam",
+        "Windowlicker"
+       ]
+      ],
+      "pictures": []
+     }
+    ]
+   }
+  }
+ ]
+}

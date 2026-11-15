@@ -262,6 +262,12 @@ public struct DeadwaxClient: Sendable {
         try await call(Routes.storeAlbum, query: [("navidrome_id", navidromeID)])
     }
 
+    /// (Album info) One of the store's folders of an album - `folder` as the id bridge's `present` names it, relative
+    /// to the library - every file's tags read from the disk now. A 404 for a folder that isn't there.
+    public func albumFiles(folder: String) async throws -> [AlbumFile] {
+        try await call(Routes.libraryTracks, as: AlbumFiles.self, query: [("album", folder)]).files
+    }
+
     /// Add to my library: the pressing the store holds (`AddRelease.from`). A 409 in words when there is nothing
     /// to add.
     public func addToLibrary(_ release: AddRelease) async throws -> AddedToLibrary {

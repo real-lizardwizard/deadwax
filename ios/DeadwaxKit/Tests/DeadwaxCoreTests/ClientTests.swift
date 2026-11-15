@@ -374,7 +374,7 @@ func sentJSON(_ request: HTTPRequest?) throws -> [String: SentValue] {
     }
 
     @Test func everyRouteIsDeadwaxsOwn() {
-        #expect(Routes.all.count == 60)
+        #expect(Routes.all.count == 61)
         #expect(Set(Routes.all).count == Routes.all.count)
         for endpoint in Routes.all {
             #expect(endpoint.path.hasPrefix("/deadwax/"))
@@ -405,14 +405,14 @@ func sentJSON(_ request: HTTPRequest?) throws -> [String: SentValue] {
         // two rounds of slskd's search behind deadwax's gate and the former names' lookup (test_ios_contract.py holds
         // it above deadwax's own worst case); an enqueue the same, as deadwax puts no bound on it. The preferences: the
         // transport's, read and saved (Phase 6, slice 3); a Join, 60 s, as Another source - it waits for the same
-        // release's lock
+        // release's lock. (Album info) a folder's files read from the disk, 30 s: every file opened as it is asked
         let longer: [Endpoint: Double] = [Routes.albumIndex: 30, Routes.autoEqSearch: 20, Routes.autoEqProfile: 20,
                                           Routes.libraryOwned: 30, Routes.fullySearch: 20, Routes.releaseGroup: 60,
                                           Routes.searchArtists: 20, Routes.searchSongs: 20, Routes.artistFacts: 60,
                                           Routes.discography: 60, Routes.jobs: 20, Routes.cancelJob: 30,
                                           Routes.retryJob: 60, Routes.retryJobSame: 30, Routes.clearJobs: 30,
                                           Routes.storeState: 20, Routes.findCandidates: 300, Routes.enqueue: 300,
-                                          Routes.joinJob: 60, Routes.libraryAdd: 60]
+                                          Routes.joinJob: 60, Routes.libraryAdd: 60, Routes.libraryTracks: 30]
         #expect(Routes.timeouts == longer)
         for endpoint in Routes.all {
             // each path parameter filled in: a brace left in a path is no URL

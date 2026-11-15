@@ -23,6 +23,9 @@ import SwiftUI
 /// The EQ (eq.md 3.1, app 0.5): Sound gains "EQ" after Plays from while it is on - "Bass Boost on James's AirPods Pro,
 /// preamp -6.1 dB" - and Debug's Sent to this device gains "EQ" after the engine's rows: what its unit does with the
 /// sound now.
+///
+/// Album info (notes/ios.md "Album info"): The album gains an "Album info" row under its card while the queue knows the
+/// album's id - everything known of the album, pushed here (AlbumInfoList), Info's own Done still a tap away.
 struct InfoView: View {
     @Environment(PlayerModel.self) private var player
     @Environment(EQModel.self) private var eq
@@ -140,6 +143,15 @@ struct InfoView: View {
                     .buttonStyle(.plain)
                 } else {
                     albumCard(card)
+                }
+                if let id = card.id, !id.isEmpty {
+                    //? the album as it was played from - or, for a playlist's songs, a stub Album info asks the whole of
+                    NavigationLink {
+                        AlbumInfoList(album: player.playedAlbum(id: id)
+                            ?? Album(id: id, name: card.title, artist: track.artist, coverArt: card.coverArt, partial: true))
+                    } label: {
+                        Label(AlbumInfoWords.title, systemImage: AlbumInfoWords.symbol)
+                    }
                 }
             } header: {
                 Text(InfoWords.albumTitle).font(Typeface.footnote)
