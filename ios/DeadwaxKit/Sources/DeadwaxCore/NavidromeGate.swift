@@ -7,8 +7,8 @@ import Foundation
 /// A listener (not `Access.seesDetail`) reads that their music isn't available, in their words, and what they can do -
 /// try again, or tell whoever runs deadwax - never Navidrome's address, its error or a setting's name. Whoever runs
 /// deadwax reads Navidrome's own words (the status's `problem`) and why the library needs it; an admin also gets Set up
-/// Navidrome. The phone has no Server settings until Phase 7, so that button opens deadwax's own app (`/player/`) in
-/// Safari, and its line keeps the web's words (D8).
+/// Navidrome. The phone has no Server settings of its own, so that button opens the web app's in Safari (D8; Server
+/// settings' own page since Phase 7, where the web app's Home was until then), and its line keeps the web's words.
 ///
 /// Held to the web by Tests/DeadwaxCoreTests/Fixtures/gate/navidrome.json (ios/scripts/export-gate-vectors.cjs, which
 /// runs NeedsNavidrome.tsx as it is; ui/test/iosgate.sim.cjs checks it is current).
@@ -73,19 +73,17 @@ public enum NavidromeGate {
     public static let navidromeRequired = "deadwax needs Navidrome for your library: the app shows and plays the albums "
         + "Navidrome lists, through deadwax - so the phone never needs Navidrome's password."
     public static let navidromeUnreached = "Your library comes from Navidrome, so it shows here once deadwax can reach it."
-    /// An admin's, after navidromeRequired (D8: the words kept, the button opening /player/ in Safari).
+    /// An admin's, after navidromeRequired (D8: the words kept, the button opening Server settings in Safari).
     public static let setItUp = "Set it up in Server settings (Connections), then come back."
     public static let cantReach = "Can't reach Navidrome"
     public static let connect = "Connect Navidrome"
     public static let tryAgain = "Try again"
     public static let setUp = "Set up Navidrome"
-    /// Where Set up Navidrome goes: deadwax's own app, whose Server settings set Navidrome up (Phase 7 brings the
-    /// phone's links into it).
-    public static let setUpPath = "/player/"
-
-    /// Set up Navidrome's address: deadwax's own app, at the server this phone uses.
+    /// Set up Navidrome's address: the web app's Server settings (Managing's), at the server this phone uses - the page
+    /// the line says to set it up in. The web's own button opens it at Connections, which no address can name, so it
+    /// opens at its first tab (phase7-managing.md question 8).
     public static func setUpURL(_ server: ServerAddress) -> URL? {
-        URL(string: server.base.absoluteString + setUpPath)
+        Managing.url(.settings, at: server)
     }
 
     // MARK: the rule

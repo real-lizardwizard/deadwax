@@ -3,7 +3,7 @@ import SwiftUI
 
 /// The You tab (screens.md 8, the web's app/You.tsx as Phase 1 has it), top to bottom: who is signed in - the
 /// avatar's letter, the name, "No sign-in needed" with logins off - and the UNVERIFIED line under them when /me says
-/// so; Getting albums (Phase 6: When I tap Get, Quality floor, Format, Confirm before cancelling); Playback (Gapless, Normalization, EQ); Downloads (Phase 2: what's on this phone, pushing You > Downloads); Account (Sign out, with logins on); About (deadwax's version, and for an
+/// so; Getting albums (Phase 6: When I tap Get, Quality floor, Format, Confirm before cancelling); Playback (Gapless, Normalization, EQ); Downloads (Phase 2: what's on this phone, pushing You > Downloads); Manage (Phase 7: the managing tools this person may use, each opened in the web app in Safari - ManageSection); Account (Change password in the web app, and Sign out, with logins on); About (deadwax's version, and for an
 /// admin whether logins are on, and the app's own version and build - with /me's failure said under them); This phone
 /// (the address, Change address, and Debug for an admin, D1).
 ///
@@ -42,6 +42,8 @@ struct YouView: View {
                 GettingAlbumsSection()
                 PlaybackSection()
                 DownloadsRow()
+                // (Phase 7) before Account, as the web's Manage is
+                ManageSection()
                 if lines.account, let me = server.me {
                     AccountSection(user: me.user)
                 }
@@ -109,7 +111,7 @@ struct YouView: View {
         }
     }
 
-    /// About's App row: "0.12 (12)", from the bundle.
+    /// About's App row: "0.13 (13)", from the bundle.
     static var appVersion: String {
         let info = Bundle.main.infoDictionary
         return YouWords.app(version: info?["CFBundleShortVersionString"] as? String, build: info?["CFBundleVersion"] as? String)

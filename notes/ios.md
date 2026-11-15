@@ -9713,3 +9713,207 @@ app 0.12 (12), the .xcodeproj unchanged and `check_project.py` ok; the exporter'
 swipe, and whether SheetGoing's controller hears viewWillDisappear as the sheet goes (if neither comes early,
 `onDisappear` closes the search, as before the review); the box dimmed offline and the may-have words read on a
 phone; a real deadwax's Join and Add going unanswered.
+
+## Phase 7: Managing (2026-11-15)
+
+notes/ios-specs/phase7-managing.md, the plan's last phase. Before it, You had no way to the tools for looking after
+deadwax: docs/ios.md's "What it can't do yet" listed People, Server settings, the event log, Needs a look, Library
+care, the editors and changing your password, and the Library's Set up Navidrome opened the web app's Home. James's
+binding decision is "managing links out to the web app", so nothing is rebuilt natively. Now:
+- **You > Manage**, between Downloads and Account (the web's Manage comes before its Account), drawn only with a row:
+  **Edit an album** (the phone's own), then the web's five in its order and words - **Needs a look**, **Library care**,
+  **People**, **Server settings**, **Event log** - each by the web's permission rule, each opening the web app's own
+  address for it in Safari;
+- **Edit in the web app** at the end of an album page's bar •••, for someone the web gives the album's Edit: that
+  album's page in the web app, its Edit chip one tap away;
+- **Change password** in Account, above Sign out, for a Navidrome sign-in (never break-glass): the web app's You;
+- **Set up Navidrome** (the Library's gate, an admin's) opens Server settings, not the web app's Home.
+
+On `phase7-managing` from `ios` at 8f2d52f (Phase 6's slice 3 merged). **The app is 0.13 (13)** (Base.xcconfig,
+check_project.py, ios.yml, test_ios_install.py). src/__init__.py untouched; the .xcodeproj unchanged (Managing.swift
+is in the package, ManageSection.swift in the synchronized folder). **No route added and no server change**:
+ROUTE_COUNT stays 60, and the rows read the /me the app already has.
+
+### Core (DeadwaxCore)
+
+- **Managing.swift** (new): permissions.ts' `managing` (`Parts` and `parts(_:loginsOn:)`: Needs a look with Look after
+  the library, Library care with it or Edit albums, People with People and logins on, Server settings and the log with
+  Settings and the log) and `albumEdit` (`AlbumEdit`: shown with Edit albums or Look after the library, the editors
+  Edit albums', Delete Look after the library's); `Tool`, the six rows in You's order, and `tools(_ access:)`, the
+  rows for a reader (the first by `albumEdit`, the rest by `parts` of `access.permissions` with `access.on`);
+  ownPassword.ts' `changeOffered` (logins on, a name, not `deadwax` - compared unit for unit, as JavaScript does); and
+  the addresses: `appPath` "/player/", `fragment(_:)` (formatRoute's without its `#`: `/library` for the editors, then
+  `/you/queue/all`, `/you/care/library`, `/you/people/all`, `/you/settings/server`, `/you/log/all`),
+  `albumFragment(id:)` (`/library/album/` + `encodeURIComponent`, TurntableGeometry's port), `youFragment`, and
+  `url(_:at:)`, `albumURL(id:at:)` (nil for an empty id) and `youURL(at:)` - each `base + /player/#...`, nil without a
+  server address, never a query.
+- **ManagingWords**: the web's (Manage, the five rows, CHANGE_TITLE) and the phone's own: Edit an album and its line,
+  Edit in the web app, the line under Change password, "Opens in Safari." (VoiceOver's hint), the footer's sentences
+  (`footer(loginsOn:online:)`: where they open, or "These open once deadwax is back."; then Safari's sign-in with
+  logins on), and the two symbols (`arrow.up.forward`, `safari`).
+- **NavidromeGate.swift**: `setUpPath` gone; `setUpURL` is `Managing.url(.settings, at:)`.
+
+### Held to the web: by the exporter, or by hand
+
+`ios/scripts/export-managing-vectors.cjs` (new) compiles lib/permissions.ts, lib/appRoutes.ts, lib/ownPassword.ts and
+app/access.ts with the repo's TypeScript (Preact's index and hooks stubbed) and reads You.tsx's Manage section out of
+its source: the title, each row's label with the part of `managing` that draws it, in order, and You's own
+`managing(...)` call, evaluated. It writes Fixtures/managing/managing-vectors.json (29 KB): `managing` and `albumEdit`
+for all 64 sets of permissions, logins on and off; 20 /me answers (logins off, a Navidrome admin, break-glass, people
+with one or more permissions, an answer from before permissions, names it doesn't know, unverified) through
+`accessOf`, then `managing`, `albumEdit`, `seesDetail` and `changeOffered`; the addresses - every Managing page as You
+opens it (`formatRoute({tab: 'you', page})`), the Library's and You's roots, and an album's for 14 ids from a hex id
+to a slash, `%`, `#`, `?`, `&`, `+`, a space, an accent and an emoji - each with what `parseHash` makes of it and
+whether `formatRoute` of that gives the same address back (all do); and the words. `ui/test/iosmanaging.sim.cjs` runs
+it with `--check`; `ManagingVectorTests` (5) replays it - 320 checks of the sets, 180 of the answers (the rows the
+phone draws among them), every address.
+
+By hand (`ManagingTests`, 5): the addresses on every kind of base the phone may have (an IP, a name, a pasted
+`…/player/` link, https with no port, IPv6 with a zone and without) - the page always `/player/`, the route the
+fragment, no query; nil without an address and for an empty album id; the rows for the readers the phone has (logins
+off: all but People; an admin and break-glass with every permission: all; /me's list deciding, an admin's included;
+Everyone's downloads no tool); Change password's rule; the footer. `ScreenGateTests`: Set up Navidrome at Server
+settings' address on both bases.
+
+### The app
+
+- **You/ManageSection.swift** (new): `ManageSection` draws `Managing.tools(server.access)` as `WebAppRow`s, the
+  header "Manage" and the footer in `Typeface.footnote`. `WebAppRow` (Manage's rows and Account's Change password) is a
+  Button: the label (and a line under it in footnote, quiet, for Edit an album and Change password), wrapping at every
+  size, with `arrow.up.forward` at the trailing edge (`Typeface.symbol(.body)`, quiet, hidden from VoiceOver) where a
+  pushed page's row has its chevron. The tap is SwiftUI's `openURL` - the default browser, never a web view in the app.
+  Out of reach it is dimmed (`Palette.off`) and `.disabled`. VoiceOver reads one button: the label, the line, then the
+  hint "Opens in Safari."
+- **YouView**: `ManageSection()` after `DownloadsRow()`, before Account. **AccountSection**: Change password first, by
+  `Managing.changeOffered(server.me)`, live by reachability.
+- **QueueMenuRequest.webEdit** (new): QueueMenu ends with a section of its own, "Edit in the web app" with the `safari`
+  symbol, opened with `openURL` - only while deadwax is in reach and the album isn't gone, as Add to a playlist is.
+  AlbumView's bar ••• sets it when `Managing.albumEdit(server.access.permissions).shown`. A song's ••• never has it.
+
+### Decided here (the spec's open questions, each built with its recommendation)
+
+1. **Safari through `openURL`, not a web view in the app** - James's decision; the web app is a player too, and in
+   the app its audio would sit beside the native engine's; SFSafariViewController keeps cookies of its own, a third
+   sign-in.
+2. **The section is "Manage"**, the web's title.
+3. **The editors have no address** (the Edit panel opens only from an album page's chip): You's **Edit an album**
+   opens the Library, saying so under the row, and the album's ••• gains **Edit in the web app**. A web change to open
+   the panel from an address would be main's, and one tap doesn't need it.
+4. **The artist page's managing isn't linked** - not in the plan's list; the Library reaches it.
+5. **Needs a look's count isn't shown** - it would be the phone's first ask of `/library/queue/summary`, for a row
+   that opens a page counting them itself.
+6. **Connections isn't a row**: no address of its own, several sections down the web's You. Three read-only rows from
+   routes deadwax has, if ever wanted - a native change of its own.
+7. **Change password is a row in Account**, opening the web app's You, its line saying where it is.
+8. **Set up Navidrome opens Server settings** (`#/you/settings/server`), the page the gate's line names, at its first
+   tab: the tab is kept per page, not in the address, so Connections can't be named.
+9. **The words say Safari**, though `openURL` opens the default browser.
+10. **Offline, the rows are dimmed and off**, "These open once deadwax is back." - not hidden, not live.
+11. **The app's session is never handed to Safari**: it could only go in the address. Safari signs in once, with the
+    same name and password, and keeps its sign-in as any browser does (30 days from its last use).
+
+Also read, not built: ATS governs the app's own loading, so a URL handed to `openURL` is Safari's to load by its own
+rules - Info.plist gains nothing (`LSApplicationQueriesSchemes` is for `canOpenURL`, and http/https need no entry).
+The cookie's SameSite=Strict doesn't stand in the way: `/player/` itself needs no cookie, and every request the page
+makes is same-site. The sign-in keeps the address (signInGate.tsx renders the app after, and its history starts from
+`location.hash`), so the first sign-in lands on the page the row named.
+
+### Tests
+
+- **ManagingVectorTests** (5) and **ManagingTests** (5), above; **ScreenGateTests**' Set up Navidrome test now holds
+  it to Server settings' address. FixtureFiles lists the new fixture.
+- **tests/test_ios_install.py**: 0.13 (13).
+
+**Mutations** - each rule broken on purpose, ManagingTests, ManagingVectorTests and ScreenGateTests run, the rule put
+back (scratchpad mutate.py). All 12 were caught:
+1. Library care without Edit albums (`everySetOfPermissionsShowsTheWebsParts`, `everyAnswerOfMeShowsTheWebsRows`,
+   `eachReaderHasTheRowsTheirPermissionsGive`);
+2. People with logins off (the same three);
+3. the album's Edit by Edit albums alone (the same three);
+4. Needs a look at `#/you/queue` (`everyAddressIsTheWebsAndOpensAsItself`, `everyToolOpensTheWebAppAtThePhonesServer`);
+5. an album's id not encoded (the same two);
+6. break-glass compared ignoring case (`changePasswordIsANavidromeSignInsAlone`, `everyAnswerOfMeShowsTheWebsRows`);
+7. Change password with logins off (the same two);
+8. Edit an album last (`theWordsAndTheOrderAreTheWebs`, and the rows' two);
+9. Safari's sign-in line with logins off (`theFooterSaysWhereTheyOpenAndHowSafariSignsIn`);
+10. the web app at `/player` without its slash (the addresses' two, and ScreenGateTests' Set up Navidrome);
+11. the route after a `?route=` instead of the `#` (the same three);
+12. Set up Navidrome back at the web app's Home (`setUpOpensTheWebAppsServerSettingsAtThePhonesServer`).
+
+The App's wiring (which section draws, the menu's item, the tap's `openURL`) has no tests of its own: it is SwiftUI's,
+and every rule it applies is in Core.
+
+### Verified, and not
+
+Verified, on the tree before its commit:
+- `swift test`: Core 1628, Audio 158, Turntable 12. No warnings.
+- The unsigned Debug and Release device builds succeeded, with no warnings but the usual appintentsmetadataprocessor
+  line; the built app's Info.plist reads 0.13 (13) and net.lizardlounge.deadwax. The .xcodeproj is unchanged;
+  `check_project.py` ok.
+- The exporter's `--check`; `npm run build` and all 90 sims on Node 22.23.4.
+- The full pytest suite: 4557 passed, 1 skipped. src/ has no diff; `git diff --check` clean.
+- The 12 mutations above, each caught, every file put back.
+
+Not verified - only the phone can tell (docs/ios.md's checks 237-246):
+- that Safari opens each address on the page it names, over plain http on the Wi-Fi and over WireGuard, with no
+  warning James didn't ask for - and whether it opens a new tab each time or goes back to one it has;
+- that the first sign-in in Safari lands on the page the row named, and the second time goes straight there (the
+  SameSite reading above);
+- that Safari asks nothing about the local network;
+- the rows at the largest text sizes, and VoiceOver's reading of them ("Opens in Safari." as a hint, after the label);
+- CI's Xcode 26.6 (the older Swift). The new code spells out its closures' types and keeps each `#expect` small.
+
+### After review (2026-11-15)
+
+The review found no wrong row, address or crash; its four low points, fixed in one commit after 6cb6767:
+
+1. **A refused open said nothing.** Every way out called `openURL(url)` without its completion - Manage's rows,
+   Change password, the album's Edit in the web app, and the Library's Set up Navidrome (which had been like that
+   since Phase 1). With Safari turned off in Screen Time and no other browser, a tap did nothing at all. They now open
+   through `OpenURLAction.webApp(_:player:)` (ManageSection.swift), whose completion hands `accepted` to Core's
+   `Managing.notice(opened:)`: nothing when the browser took it, else `ManagingWords.notOpened` - "Couldn't open the
+   web app - Safari may be turned off in Screen Time." - said over the tabs by `PlayerModel.say` (the notice, 5 s,
+   announced). The address isn't said, even to whoever runs deadwax: iOS refused the kind of link, not this one, so it
+   would help nobody. ManagingTests' `anOpenIOSRefusedSaysSoInAListenersWords` holds the words to ErrorWords'
+   `plumbing` (none) and to having no address in them.
+2. **The rows follow the app's person; the page follows Safari's.** Nothing compares the two, and nothing could
+   without handing the session over (question 11). The page is still the server's to refuse, so nobody gets what
+   Safari's person doesn't have - but signed in to the app as one person and to Safari as another, a row opens with
+   the other's access, and Change password changes the other's password. The footer's sign-in line now ends "The pages
+   open as whoever is signed in there, who may not be who's signed in here."; Change password's line ends "It changes
+   the password of whoever is signed in in Safari." (it's shown to people with no Manage, so it carries its own);
+   docs/ios.md's Manage section says it in bold and how to see Safari's name (the web app's You heads with it), and a
+   troubleshooting row covers a page with someone else's access. **Check 241 was wrong**: it had the admin change
+   permissions "in the web app", which on the same phone signs Safari in as the admin, after which Library care opens
+   with full access. It now does the admin's part on another device, with Safari signed in as the person under test.
+3. **People refuses in its own words**: "Only an admin can open People - it comes with being a Navidrome admin."
+   (People.tsx's `PEOPLE_ONLY`), not NO_PERMISSION's. docs/ios.md's Manage section and its troubleshooting row said
+   every refused page read NO_PERMISSION; both now give People's too.
+4. **The vectors missed two of App.tsx's rules.** The album page's Edit chip is drawn by `onEdit={albumEdit(perms).shown
+   ? …}` in App.tsx, which wasn't hashed or run, and the addresses' `tab: 'you'` and `tab: 'library'` were written into
+   the exporter. It now reads out of App.tsx and hashes: the chip's rule (exactly one such `onEdit`, or it stops) and
+   App's `const perms = …`, both evaluated as written - `albumPage` for every set and every /me answer, which
+   ManagingVectorTests replays (64 × 6 and 20 × 10 checks; Edit an album's row now follows `albumPage`); and
+   `openManagingPage` - the stack it reads, the tab it shows and the scroll key's tab, which must agree and be one of
+   appRoutes.ts's `TABS` - whose tab every Managing page's address and You's are made with. The Library's tab is the
+   phone's own choice (an album opens on whichever tab shows, openAlbum), held to `TABS`. The fixture carries both
+   (`addresses.tabs`), and the vector test holds each fragment to its tab. 31 KB.
+
+Also: check 245 gained Safari turned off in Screen Time (the range stays 237-246), and two troubleshooting rows (someone
+else's access; the refusal's words).
+
+**Mutations** - 11, each caught (scratchpad mutate_p7_review.py, and two more by hand with its helpers): five in Core
+against the Managing tests (a refusal saying nothing; an accepted open saying the refusal; the address in the words;
+the footer without whose page it is; Change password's line without whose password), and six in App.tsx against the
+exporter's `--check` (the chip by `.editors`; `perms` an empty set; `perms` written so it can't be evaluated; a
+Managing page opened on Home; its stack another tab's; a second albumEdit `onEdit`). The unmutated tree passed
+`--check` first, and every file was put back.
+
+**Verified**, on the tree before its commit: `swift test` (Core 1629, Audio 158, Turntable 12, no warnings); the
+unsigned Debug and Release device builds, with no warnings but the usual appintentsmetadataprocessor line, the built
+app 0.13 (13), the .xcodeproj unchanged and `check_project.py` ok; the exporter's `--check`; `npm run build` and the
+90 sims on Node 22.23.4; the full pytest suite, 4557 passed and 1 skipped; `git diff --check`; src/ and ui/src have no diff; the
+11 mutations. `ios` was still at 8f2d52f, so there was nothing to merge.
+
+**Not verified** - only the phone can tell: that openURL's completion says `false` with Safari turned off in Screen
+Time, so the notice shows (check 245); the notice read by VoiceOver after the tap.

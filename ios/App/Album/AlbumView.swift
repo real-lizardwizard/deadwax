@@ -4,7 +4,8 @@ import SwiftUI
 /// An album's page (screens.md 4; the web's ui/src/player/AlbumPage.tsx), by Navidrome's album id - what opened it
 /// (the Library's row, Now Playing's Go to the album) drawn at once while the album loads. Top to bottom: the hero
 /// (cover, title, artist, meta line, the badge, Play and Shuffle), the mine block (logins on with a library of your
-/// own), the songs with their disc headings, the footer; the bar's ••• is the whole album's Play Next and Play Last.
+/// own), the songs with their disc headings, the footer; the bar's ••• is the whole album's Play Next and Play Last -
+/// and (Phase 7) Edit in the web app, for someone the web gives the album's Edit.
 ///
 /// What it asks as it opens, at once (AlbumModel): the album; the id bridge only with a library of your own (D12);
 /// and, as the songs come, the album's levels warmed (PlayerModel.albumShown) - wanted again each time the page is
@@ -221,10 +222,15 @@ struct AlbumView: View {
         }
     }
 
-    /// The bar's •••: the whole album, as an album - nil (the ••• dimmed) until its songs are in.
+    /// The bar's •••: the whole album, as an album - nil (the ••• dimmed) until its songs are in. (Phase 7) With the
+    /// album's Edit in the web app (Edit albums or Look after the library - Managing.albumEdit), its page there.
     private var albumMenu: QueueMenuRequest? {
         guard let album = model.album, let pick = model.albumPick else { return nil }
-        return QueueMenuRequest(pick: pick, album: album, gone: model.goneButHere)
+        var request = QueueMenuRequest(pick: pick, album: album, gone: model.goneButHere)
+        if Managing.albumEdit(server.access.permissions).shown {
+            request.webEdit = Managing.albumURL(id: album.id, at: server.address)
+        }
+        return request
     }
 
     /// What Play and Shuffle take: the album's songs - offline, or with the album gone from the collection, its songs on

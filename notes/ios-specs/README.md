@@ -60,3 +60,13 @@ patterns. The app is then built to the spec and reviewed against it. notes/ios.m
   what is asked and when, the list drawn once per text and frozen, a song playing in its tap, the album you don't have
   with room for Get; no server addition for slice 1 (a Cover Art Archive relay recommended before slice 2); four slices
   (the first built), tests, James's checks (121 on) and 13 open questions.
+- `phase6-get-requests.md` - Get and Requests (Phase 6, app 0.11 and 0.12), designed 2026-11-14 against 2.1.25 / ios
+  3fc9a17 (app 0.11): the Requests board and its four headings, Get on the album you don't have, the store's word on a
+  pressing, the Sources sheet and its reasoning, the download asked for, Join and Add to my library, Pick the best
+  source for me and You's Getting albums; three slices, tests, James's checks (166 on) and its open questions.
+- `phase7-managing.md` - Managing (Phase 7, the plan's last, app 0.13), designed 2026-11-15 against 2.1.26 / ios
+  8f2d52f (app 0.12): You > Manage's rows, each by the web's permission rule and opening the web app's own address for
+  it in Safari (`/player/#/you/...`; the editors, which have no address, by the Library and an album's ••• "Edit in the
+  web app"), Account's Change password, Set up Navidrome on Server settings, Safari's own sign-in in a listener's
+  words, plain http and ATS, offline, Dynamic Type and VoiceOver; no server addition; James's checks (237-246) and 11
+  open questions, each built with its recommendation.
