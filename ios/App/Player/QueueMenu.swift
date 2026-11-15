@@ -54,7 +54,8 @@ struct QueueMenuRequest {
 /// Phase 7 (phase7-managing.md 1): an album page's bar ••• (`request.webEdit`) ends with "Edit in the web app", in a
 /// section of its own - that album's page in the web app, in Safari (openURL), where its Edit is one tap away: the
 /// editors have no address of their own. Left out while deadwax can't be reached and for an album gone from the
-/// collection, as Add to a playlist is. It plays nothing.
+/// collection, as Add to a playlist is. It plays nothing; if iOS refuses to open it, the notice says so
+/// (OpenURLAction.webApp).
 struct QueueMenu<Label: View>: View {
     let request: QueueMenuRequest?
     @ViewBuilder let label: () -> Label
@@ -92,7 +93,7 @@ struct QueueMenu<Label: View>: View {
                 if let webEdit = request.webEdit, reachability.online, !request.gone {
                     Section {
                         Button(ManagingWords.editInWebApp, systemImage: ManagingWords.safariSymbol) {
-                            openURL(webEdit)
+                            openURL.webApp(webEdit, player: player)
                         }
                     }
                 }

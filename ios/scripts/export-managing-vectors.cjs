@@ -15,7 +15,10 @@
  *   Library's and You's roots, and an album's page for ids from the plain to the awkward - each with what `parseHash`
  *   makes of it, so the vectors also say each opens as itself, not rewritten.
  * And reads You.tsx's Manage section out of its source: its title, and its rows in order, each with the part of
- * `managing` that draws it and its label. A pattern that no longer matches stops this script, naming what moved.
+ * `managing` that draws it and its label. And App.tsx's two the phone follows (after review): the album page's Edit
+ * chip - its `onEdit` rule and App's `perms`, evaluated as written for every set and answer - and the tab
+ * `openManagingPage` opens a Managing page on, which the addresses are made with. A pattern that no longer matches
+ * stops this script, naming what moved.
  * Writes ios/DeadwaxKit/Tests/DeadwaxCoreTests/Fixtures/managing/managing-vectors.json.
  *
  * The file names each source it was made from with its sha256, so ui/test/iosmanaging.sim.cjs - which runs this with
@@ -42,6 +45,7 @@ const CHECK = process.argv.includes('--check')
 const MADE_BY = 'ios/scripts/export-managing-vectors.cjs'
 const SOURCES = ['lib/permissions.ts', 'lib/appRoutes.ts', 'lib/ownPassword.ts', 'app/access.ts']
 const YOU = 'app/You.tsx'
+const APP = 'app/App.tsx'
 
 const sha256 = (body) => crypto.createHash('sha256').update(body).digest('hex')
 const source = (file) => fs.readFileSync(path.join(UI, 'src', file), 'utf8')
@@ -97,6 +101,31 @@ for (const row of rows) {
   if (!PARTS.includes(row.part)) throw new Error(`You's Manage section has a row for managing.${row.part}, which the port doesn't know`)
 }
 
+/* ===== App's own, read out of its source ===== */
+
+//? the album page's Edit chip: App hands AlbumPage `onEdit` by this rule over its `perms` - the phone's Edit an album
+//? row and the album's Edit in the web app follow it. Exactly one such onEdit, or the script can't say which is drawn.
+const chipRule = /onEdit=\{(albumEdit\(perms\)\.\w+) \? toggleEdit : undefined\}/
+if ([...source(APP).matchAll(new RegExp(chipRule.source, 'g'))].length !== 1) {
+  throw new Error("App.tsx doesn't hand AlbumPage its Edit by one albumEdit rule any more - the web app's code moved")
+}
+const chipCall = piece(APP, chipRule, "the album page's Edit")[1]
+const permsCall = piece(APP, /\n\s*const perms = (.+)\n/, "App's perms")[1]
+const chip = new Function('albumEdit', 'perms', `return (${chipCall})`)
+const permsOf = new Function('access', `return (${permsCall})`)
+const albumPage = (permissions) => chip(P.albumEdit, permissions) === true
+//? the tab a Managing page opens on (openManagingPage: the stack it reads, the tab it shows, the scroll it forgets)
+const opener = piece(APP, /const openManagingPage = \(page: Page\) => \{\n\s*const stack = router\.nav\.stacks\.(\w+)\n[\s\S]*?if \(router\.nav\.tab !== '(\w+)'\) router\.tab\('(\w+)'\)\n[\s\S]*?scrollKey\(\{ tab: '(\w+)', page \}\)/,
+  'openManagingPage')
+const MANAGING_TAB = opener[1]
+if (opener.slice(2, 5).some((tab) => tab !== MANAGING_TAB) || !R.TABS.includes(MANAGING_TAB)) {
+  throw new Error(`openManagingPage opens on ${opener.slice(1, 5).join(', ')} - not one of appRoutes.ts's tabs; the port's addresses moved`)
+}
+//? the phone's own choice, not App's: the editors' row and an album's Edit in the web app open on the Library tab (an
+//? album opens on whichever tab shows, openAlbum) - held to appRoutes.ts's tabs, which the fixture's hash covers
+const LIBRARY_TAB = 'library'
+if (!R.TABS.includes(LIBRARY_TAB)) throw new Error(`appRoutes.ts has no ${LIBRARY_TAB} tab any more - the port's addresses moved`)
+
 /* ===== the cases ===== */
 
 const setOf = (mask) => new Set(P.PERMISSIONS.filter((_, bit) => mask & (1 << bit)))
@@ -111,6 +140,7 @@ for (let mask = 0; mask < 1 << P.PERMISSIONS.length; mask++) {
     on: partsOf(P.managing(permissions, true)),
     off: partsOf(P.managing(permissions, false)),
     albumEdit: P.albumEdit(permissions),
+    albumPage: albumPage(permissions),
   })
 }
 
@@ -144,6 +174,7 @@ const me = ME.map((answer) => {
     access: { permissions: sorted(access.permissions), on: access.on, admin: access.admin, unverified: access.unverified },
     managing: partsOf(youManaging(access)),
     albumEdit: P.albumEdit(access.permissions),
+    albumPage: albumPage(permsOf(access)),
     seesDetail: A.seesDetail(access),
     changeOffered: O.changeOffered(answer),
   }
@@ -164,11 +195,12 @@ const NOTE = String.fromCodePoint(0x1f3b5)
 const ALBUM_IDS = ['3f2a1c0e9b8d7a6f5e4d3c2b1a0f9e8d', '1b2Kq7xYz', 'a/b', 'a b', '50%', 'x#y', 'x?y=1', 'a&b',
   "o'neil!*()~", 'caf' + E_ACUTE, NOTE, 'a+b', 'mb:abc', '-_.']
 const addresses = {
-  pages: Object.fromEntries(PARTS.map((part) => [part, { label: pages[part].label, ...address({ tab: 'you', page: pages[part] }) }])),
-  library: address({ tab: 'library', page: null }),
-  you: address({ tab: 'you', page: null }),
+  tabs: { managing: MANAGING_TAB, library: LIBRARY_TAB },
+  pages: Object.fromEntries(PARTS.map((part) => [part, { label: pages[part].label, ...address({ tab: MANAGING_TAB, page: pages[part] }) }])),
+  library: address({ tab: LIBRARY_TAB, page: null }),
+  you: address({ tab: MANAGING_TAB, page: null }),
 }
-const albums = ALBUM_IDS.map((id) => ({ id, ...address({ tab: 'library', page: { kind: 'album', id } }) }))
+const albums = ALBUM_IDS.map((id) => ({ id, ...address({ tab: LIBRARY_TAB, page: { kind: 'album', id } }) }))
 fs.rmSync(OUT, { recursive: true, force: true })
 
 /* ===== output: plain ASCII ===== */
@@ -185,7 +217,7 @@ function ascii(json) {
 const flat = (value) => ascii(JSON.stringify(value))
 
 const fixture = {
-  about: "Manage (app/You.tsx, lib/permissions.ts, lib/appRoutes.ts, lib/ownPassword.ts, app/access.ts): which managing tools the web app offers for which permissions, and the address each opens at - run as they are; You's Manage section read out of its source.",
+  about: "Manage (app/You.tsx, app/App.tsx, lib/permissions.ts, lib/appRoutes.ts, lib/ownPassword.ts, app/access.ts): which managing tools the web app offers for which permissions, and the address each opens at - run as they are; You's Manage section, App's album page Edit rule and its Managing pages' tab read out of their source.",
   made_by: MADE_BY,
   made_from: Object.fromEntries(Object.keys(madeFrom).sort().map((key) => [key, madeFrom[key]])),
   words: { title, rows, CHANGE_TITLE: O.CHANGE_TITLE, LABELS: P.LABELS, PERMISSIONS: P.PERMISSIONS },

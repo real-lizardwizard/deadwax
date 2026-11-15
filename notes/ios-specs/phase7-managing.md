@@ -90,10 +90,11 @@ The phone's own (nothing on the web opens anything in Safari):
 | --- | --- |
 | the first row | **Edit an album**; under it "Opens the web app's Library: open an album there, then Edit. An album's ••• here has Edit in the web app too." |
 | the album's ••• | **Edit in the web app** (symbol `safari`) |
-| Manage's footer | "These open in the web app, in Safari." - and with logins on: "Safari has its own sign-in, apart from the app's: the first time, sign in there with the same name and password you use here." |
+| Manage's footer | "These open in the web app, in Safari." - and with logins on: "Safari has its own sign-in, apart from the app's: the first time, sign in there with the same name and password you use here. The pages open as whoever is signed in there, who may not be who's signed in here." (its last sentence after review) |
 | Manage, deadwax out of reach | "These open once deadwax is back." in the footer's first sentence's place; every row dimmed (`Palette.off`) and off |
-| Change password | under it "Opens the web app's You: Change password is under Account there." |
+| Change password | under it "Opens the web app's You: Change password is under Account there. It changes the password of whoever is signed in in Safari." (its last sentence after review) |
 | VoiceOver, every row out | the hint "Opens in Safari." |
+| iOS refused the open (after review) | "Couldn't open the web app - Safari may be turned off in Screen Time." - the notice over the tabs, announced; every way out (the rows, Change password, the album's •••, Set up Navidrome) |
 
 ## 3. Signing in, in Safari
 
@@ -116,9 +117,16 @@ on purpose:
 - **The cookie's SameSite=Strict** doesn't get in the way: the page itself (`/player/`, static) needs no cookie, and
   every request it makes is to its own site, which a Strict cookie goes with. Read from the cookie's rules, not watched
   in Safari: check 239 is the proof.
+- **The page is Safari's person's, not the app's** (after review). The rows follow the app's sign-in; the page each
+  opens follows Safari's, and nothing compares the two - nothing could, short of handing the session over. Signed in to
+  the app as one person and to Safari as another, a row the app shows opens with the other person's access, and Change
+  password changes the other person's password. The page itself is still the server's to refuse, so nothing is given
+  that Safari's person doesn't have; the risk is only confusion, and the words say it plainly. Check 241 does the
+  admin's part on another device for this reason: done in Safari on the same phone, it signs Safari in as the admin.
 
 The footer says it in a listener's words (section 2): "Safari has its own sign-in, apart from the app's: the first time,
-sign in there with the same name and password you use here."
+sign in there with the same name and password you use here. The pages open as whoever is signed in there, who may not
+be who's signed in here."
 
 ## 4. Plain http, ATS and the local network
 
@@ -137,6 +145,11 @@ James opens deadwax at a plain `http://` address on his network, and over WireGu
   goes through it as the app does. Believed, not seen: check 240.
 - **The default browser.** `openURL` opens a web address in the phone's default browser, which is Safari unless it has
   been changed. The words say Safari (question 9).
+- **A refused open** (after review). With Safari turned off in Screen Time and no other browser, iOS refuses the
+  address: openURL's completion says `false`. Every way out opens through `OpenURLAction.webApp`, which then says
+  `ManagingWords.notOpened` over the tabs (PlayerModel.say, announced) - Core's `Managing.notice(opened:)`. The address
+  isn't said, even to whoever runs deadwax: iOS refused the kind of link, not this one. Read from Apple's documentation,
+  not seen: check 245.
 
 ## 5. Offline, no address, and what the rows read
 
@@ -161,7 +174,10 @@ view in the app (question 1).
 **Held to the web.** `ios/scripts/export-managing-vectors.cjs` compiles `lib/permissions.ts`, `lib/appRoutes.ts`,
 `lib/ownPassword.ts` and `app/access.ts` with the repo's TypeScript (Preact stubbed, as export-gate-vectors.cjs does)
 and reads You.tsx's Manage section out of its source (its title, and its rows in order, each with the part of
-`managing` that draws it); writes `ios/DeadwaxKit/Tests/DeadwaxCoreTests/Fixtures/managing/managing-vectors.json`;
+`managing` that draws it) - and, after review, App.tsx's two rules the phone follows: the album page's Edit chip
+(`onEdit={albumEdit(perms).shown ? …}` and App's `perms`, evaluated as written for every set and answer) and the tab
+`openManagingPage` opens a Managing page on (the addresses are made with it; the Library's tab, the phone's own
+choice, held to appRoutes.ts's `TABS`); writes `ios/DeadwaxKit/Tests/DeadwaxCoreTests/Fixtures/managing/managing-vectors.json`;
 `ui/test/iosmanaging.sim.cjs` runs it with `--check`; `ManagingVectorTests` replays it:
 
 - `managing` for every one of the 64 sets of permissions, logins on and off, and `albumEdit` for each;
@@ -191,8 +207,9 @@ an address, the phone's own row first and the rest in the web's order, the album
 
 Numbered after 236 (193-199 and 200-236 are taken). Written out in docs/ios.md ("Managing's checks (237-246)"):
 the version; each row opening the right page (the plan's); the first sign-in in Safari and the second time straight
-through; plain http and the network; each row by permission; the album's Edit in the web app; Change password; Set up
-Navidrome; offline; the largest text and VoiceOver.
+through; plain http and the network; each row by permission (the admin's part on another device - section 3); the
+album's Edit in the web app; Change password; Set up Navidrome; offline, and Safari turned off in Screen Time; the
+largest text and VoiceOver.
 
 ## 9. What only the phone can tell
 
@@ -202,6 +219,7 @@ Navidrome; offline; the largest text and VoiceOver.
   SameSite reading in section 3).
 - That Safari asks nothing about the local network.
 - The rows at the largest text sizes, and VoiceOver's reading of them ("Opens in Safari." as a hint, after the label).
+- That openURL's completion says `false` with Safari turned off in Screen Time, so the notice shows (section 4).
 
 ## 10. Open questions, each with the recommendation built
 

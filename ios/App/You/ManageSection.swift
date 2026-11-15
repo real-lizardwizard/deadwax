@@ -10,7 +10,8 @@ import SwiftUI
 /// before its Account).
 ///
 /// The footer says they open in Safari and - with logins on - that Safari signs in apart from the app, the first
-/// time, with the same name and password. While deadwax can't be reached the rows are dimmed and off, the footer
+/// time, with the same name and password, and that each page opens as Safari's person, who may not be the app's:
+/// nothing compares the two. While deadwax can't be reached the rows are dimmed and off, the footer
 /// saying they open once it's back: Safari would only fail at the same address. Nothing is asked of deadwax here -
 /// the page each opens asks it itself, and refuses for itself without its permission.
 struct ManageSection: View {
@@ -43,10 +44,24 @@ struct ManageSection: View {
     }
 }
 
+extension OpenURLAction {
+    /// Opens a web-app address - Manage's rows, Change password, an album's Edit in the web app, Set up Navidrome - in
+    /// the default browser (never a web view in the app), and when iOS refuses it (Safari turned off in Screen Time, no
+    /// other browser to take it) says so over the tabs, announced: Core's Managing.notice(opened:). A tap that opens
+    /// nothing never says nothing.
+    @MainActor
+    func webApp(_ url: URL, player: PlayerModel) {
+        self(url) { (accepted: Bool) in
+            guard let words = Managing.notice(opened: accepted) else { return }
+            Task { @MainActor in player.say(words) }
+        }
+    }
+}
+
 /// A row that opens the web app in Safari (Manage's rows, Account's Change password): its words - and, for a row that
 /// can't open its tool's own page, a line under them saying where it is once open - with `arrow.up.forward` at the
 /// trailing edge, where a pushed page's row has its chevron. The tap hands the address to the default browser
-/// (SwiftUI's openURL - never a web view in the app). Off (dimmed, `.disabled`) while deadwax can't be reached.
+/// (`OpenURLAction.webApp`, which says so if iOS refuses it). Off (dimmed, `.disabled`) while deadwax can't be reached.
 /// VoiceOver reads it as one button, its words and line, with the hint "Opens in Safari."; the words wrap at every
 /// text size, the sign growing with them.
 struct WebAppRow: View {
@@ -56,11 +71,12 @@ struct WebAppRow: View {
     let live: Bool
 
     @Environment(\.openURL) private var openURL
+    @Environment(PlayerModel.self) private var player
 
     var body: some View {
         Button {
             guard live else { return }
-            openURL(url)
+            openURL.webApp(url, player: player)
         } label: {
             HStack(alignment: .firstTextBaseline, spacing: 12) {
                 VStack(alignment: .leading, spacing: 3) {

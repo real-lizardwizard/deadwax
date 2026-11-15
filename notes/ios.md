@@ -9862,3 +9862,58 @@ Not verified - only the phone can tell (docs/ios.md's checks 237-246):
 - that Safari asks nothing about the local network;
 - the rows at the largest text sizes, and VoiceOver's reading of them ("Opens in Safari." as a hint, after the label);
 - CI's Xcode 26.6 (the older Swift). The new code spells out its closures' types and keeps each `#expect` small.
+
+### After review (2026-11-15)
+
+The review found no wrong row, address or crash; its four low points, fixed in one commit after 6cb6767:
+
+1. **A refused open said nothing.** Every way out called `openURL(url)` without its completion - Manage's rows,
+   Change password, the album's Edit in the web app, and the Library's Set up Navidrome (which had been like that
+   since Phase 1). With Safari turned off in Screen Time and no other browser, a tap did nothing at all. They now open
+   through `OpenURLAction.webApp(_:player:)` (ManageSection.swift), whose completion hands `accepted` to Core's
+   `Managing.notice(opened:)`: nothing when the browser took it, else `ManagingWords.notOpened` - "Couldn't open the
+   web app - Safari may be turned off in Screen Time." - said over the tabs by `PlayerModel.say` (the notice, 5 s,
+   announced). The address isn't said, even to whoever runs deadwax: iOS refused the kind of link, not this one, so it
+   would help nobody. ManagingTests' `anOpenIOSRefusedSaysSoInAListenersWords` holds the words to ErrorWords'
+   `plumbing` (none) and to having no address in them.
+2. **The rows follow the app's person; the page follows Safari's.** Nothing compares the two, and nothing could
+   without handing the session over (question 11). The page is still the server's to refuse, so nobody gets what
+   Safari's person doesn't have - but signed in to the app as one person and to Safari as another, a row opens with
+   the other's access, and Change password changes the other's password. The footer's sign-in line now ends "The pages
+   open as whoever is signed in there, who may not be who's signed in here."; Change password's line ends "It changes
+   the password of whoever is signed in in Safari." (it's shown to people with no Manage, so it carries its own);
+   docs/ios.md's Manage section says it in bold and how to see Safari's name (the web app's You heads with it), and a
+   troubleshooting row covers a page with someone else's access. **Check 241 was wrong**: it had the admin change
+   permissions "in the web app", which on the same phone signs Safari in as the admin, after which Library care opens
+   with full access. It now does the admin's part on another device, with Safari signed in as the person under test.
+3. **People refuses in its own words**: "Only an admin can open People - it comes with being a Navidrome admin."
+   (People.tsx's `PEOPLE_ONLY`), not NO_PERMISSION's. docs/ios.md's Manage section and its troubleshooting row said
+   every refused page read NO_PERMISSION; both now give People's too.
+4. **The vectors missed two of App.tsx's rules.** The album page's Edit chip is drawn by `onEdit={albumEdit(perms).shown
+   ? …}` in App.tsx, which wasn't hashed or run, and the addresses' `tab: 'you'` and `tab: 'library'` were written into
+   the exporter. It now reads out of App.tsx and hashes: the chip's rule (exactly one such `onEdit`, or it stops) and
+   App's `const perms = …`, both evaluated as written - `albumPage` for every set and every /me answer, which
+   ManagingVectorTests replays (64 × 6 and 20 × 10 checks; Edit an album's row now follows `albumPage`); and
+   `openManagingPage` - the stack it reads, the tab it shows and the scroll key's tab, which must agree and be one of
+   appRoutes.ts's `TABS` - whose tab every Managing page's address and You's are made with. The Library's tab is the
+   phone's own choice (an album opens on whichever tab shows, openAlbum), held to `TABS`. The fixture carries both
+   (`addresses.tabs`), and the vector test holds each fragment to its tab. 31 KB.
+
+Also: check 245 gained Safari turned off in Screen Time (the range stays 237-246), and two troubleshooting rows (someone
+else's access; the refusal's words).
+
+**Mutations** - 11, each caught (scratchpad mutate_p7_review.py, and two more by hand with its helpers): five in Core
+against the Managing tests (a refusal saying nothing; an accepted open saying the refusal; the address in the words;
+the footer without whose page it is; Change password's line without whose password), and six in App.tsx against the
+exporter's `--check` (the chip by `.editors`; `perms` an empty set; `perms` written so it can't be evaluated; a
+Managing page opened on Home; its stack another tab's; a second albumEdit `onEdit`). The unmutated tree passed
+`--check` first, and every file was put back.
+
+**Verified**, on the tree before its commit: `swift test` (Core 1629, Audio 158, Turntable 12, no warnings); the
+unsigned Debug and Release device builds, with no warnings but the usual appintentsmetadataprocessor line, the built
+app 0.13 (13), the .xcodeproj unchanged and `check_project.py` ok; the exporter's `--check`; `npm run build` and the
+90 sims on Node 22.23.4; the full pytest suite, 4557 passed and 1 skipped; `git diff --check`; src/ and ui/src have no diff; the
+11 mutations. `ios` was still at 8f2d52f, so there was nothing to merge.
+
+**Not verified** - only the phone can tell: that openURL's completion says `false` with Safari turned off in Screen
+Time, so the notice shows (check 245); the notice read by VoiceOver after the tap.

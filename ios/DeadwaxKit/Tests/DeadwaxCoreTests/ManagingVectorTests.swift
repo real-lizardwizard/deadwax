@@ -4,8 +4,9 @@ import Testing
 
 /// Fixtures/managing/managing-vectors.json: the web's lib/permissions.ts (`managing`, `albumEdit`), app/access.ts
 /// (`accessOf`, `seesDetail`), lib/ownPassword.ts (`changeOffered`) and lib/appRoutes.ts (`formatRoute`, `parseHash`)
-/// run as they are, and You.tsx's Manage section read out of its source - replayed here through Managing and Access,
-/// case for case (notes/ios-specs/phase7-managing.md 6).
+/// run as they are, You.tsx's Manage section read out of its source, and App.tsx's album page Edit rule (evaluated as
+/// written) and the tab its Managing pages open on - replayed here through Managing and Access, case for case
+/// (notes/ios-specs/phase7-managing.md 6).
 @Suite struct ManagingVectorTests {
     let fixture = try! JSONDecoder().decode(Web.self, from: Fixtures.data("managing/managing-vectors.json"))
 
@@ -13,7 +14,9 @@ import Testing
         #expect(fixture["made_by"].string == "ios/scripts/export-managing-vectors.cjs")
         expectMadeFrom(fixture, ["ui/src/lib/permissions.ts", "ui/src/lib/appRoutes.ts", "ui/src/lib/ownPassword.ts",
                                  "ui/src/app/access.ts", "ui/src/app/You.tsx the Manage section",
-                                 "ui/src/app/You.tsx the Manage title", "ui/src/app/You.tsx You's managing"])
+                                 "ui/src/app/You.tsx the Manage title", "ui/src/app/You.tsx You's managing",
+                                 "ui/src/app/App.tsx the album page's Edit", "ui/src/app/App.tsx App's perms",
+                                 "ui/src/app/App.tsx openManagingPage"])
         #expect(fixture["sets"].list.count == 64)
         #expect(fixture["me"].list.count == 20)
         #expect(fixture["albums"].list.count == 14)
@@ -60,8 +63,10 @@ import Testing
             diffs.check("\(label): any, on", Managing.parts(permissions, loginsOn: true).any, row["on"]["any"].bool!)
             diffs.check("\(label): any, off", Managing.parts(permissions, loginsOn: false).any, row["off"]["any"].bool!)
             diffs.check("\(label): the album's Edit", Managing.albumEdit(permissions), Self.albumEdit(row["albumEdit"]))
+            diffs.check("\(label): the album page's Edit chip", Managing.albumEdit(permissions).shown,
+                        row["albumPage"].bool!)
         }
-        #expect(diffs.checked == 64 * 5)
+        #expect(diffs.checked == 64 * 6)
         diffs.done()
     }
 
@@ -84,16 +89,19 @@ import Testing
             diffs.check("\(label): managing", Managing.parts(access.permissions, loginsOn: access.on), parts)
             let edit = Self.albumEdit(row["albumEdit"])
             diffs.check("\(label): the album's Edit", Managing.albumEdit(access.permissions), edit)
+            // App's own rule for the album page's Edit chip, which Edit an album and Edit in the web app follow
+            let chip = row["albumPage"].bool!
+            diffs.check("\(label): the album page's Edit chip", Managing.albumEdit(access.permissions).shown, chip)
             diffs.check("\(label): sees the detail", access.seesDetail, row["seesDetail"].bool!)
             diffs.check("\(label): Change password", Managing.changeOffered(me), row["changeOffered"].bool!)
-            // the rows: Edit an album by the album's Edit, then the web's five by its parts, in its order
-            let web: [Managing.Tool] = (edit.shown ? [.edit] : []) + fixture["words"]["rows"].list.compactMap { rowWeb in
+            // the rows: Edit an album by the album page's Edit chip, then the web's five by its parts, in its order
+            let web: [Managing.Tool] = (chip ? [.edit] : []) + fixture["words"]["rows"].list.compactMap { rowWeb in
                 guard let part = rowWeb["part"].string, row["managing"][part].bool == true else { return nil }
                 return Managing.Tool(rawValue: part)
             }
             diffs.check("\(label): the rows", Managing.tools(access), web)
         }
-        #expect(diffs.checked == 20 * 9)
+        #expect(diffs.checked == 20 * 10)
         diffs.done()
     }
 
@@ -103,7 +111,14 @@ import Testing
         let server = try ServerAddress.parse("http://192.168.3.20:8090").get()
         let addresses = fixture["addresses"]
         let base = "http://192.168.3.20:8090/player/"
+        // the tabs they open on: App's openManagingPage's for the Managing pages and You, the phone's Library for the rest
+        let managingTab = try #require(addresses["tabs"]["managing"].string)
+        let libraryTab = try #require(addresses["tabs"]["library"].string)
+        #expect(Managing.youFragment == "/" + managingTab)
+        #expect(Managing.fragment(.edit) == "/" + libraryTab)
+        #expect(Managing.albumFragment(id: "x").hasPrefix("/" + libraryTab + "/"))
         for tool in Managing.Tool.allCases where tool != .edit {
+            #expect(Managing.fragment(tool).hasPrefix("/" + managingTab + "/"), "\(tool) opens on App's tab")
             let page = addresses["pages"][tool.rawValue]
             #expect("#" + Managing.fragment(tool) == page["hash"].string, "\(tool)")
             #expect(Managing.url(tool, at: server)?.absoluteString == base + (page["hash"].string ?? "?"), "\(tool)")

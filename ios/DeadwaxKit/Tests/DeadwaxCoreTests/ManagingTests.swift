@@ -85,5 +85,19 @@ import Testing
         // only the row that can't open its tool's own page says where it is once open
         for tool in Managing.Tool.allCases { #expect((ManagingWords.line(tool) != nil) == (tool == .edit), "\(tool)") }
         #expect(ManagingWords.editLine.contains(ManagingWords.editInWebApp))
+        // the page is Safari's person's, not the app's: said wherever a row opens one
+        #expect(ManagingWords.signIn.contains("whoever is signed in there"))
+        #expect(ManagingWords.changePasswordLine.contains("whoever is signed in in Safari"))
+    }
+
+    /// A tap iOS refused (Safari turned off in Screen Time, no browser to open it) says so - in a listener's words,
+    /// no address in them - and one the browser took says nothing.
+    @Test func anOpenIOSRefusedSaysSoInAListenersWords() throws {
+        #expect(Managing.notice(opened: true) == nil)
+        let words = try #require(Managing.notice(opened: false))
+        #expect(words == ManagingWords.notOpened)
+        #expect(!ErrorWords.plumbing(words), "a listener's line: no address, setting or error in it")
+        #expect(!words.contains("http") && !words.contains("/player/"))
+        #expect(words.contains("Safari") && words.contains("Screen Time"))
     }
 }

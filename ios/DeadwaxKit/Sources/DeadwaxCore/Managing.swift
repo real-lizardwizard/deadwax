@@ -140,6 +140,14 @@ public enum Managing {
         guard let server else { return nil }
         return URL(string: server.base.absoluteString + appPath + "#" + fragment)
     }
+
+    /// What a tap says once iOS has answered the open (SwiftUI's openURL completion): nothing when the browser took the
+    /// address; when iOS refused it - Safari turned off in Screen Time, no other browser to open it - a notice in a
+    /// listener's words, so a tap that opened nothing never says nothing. The address is no help to anyone here (iOS
+    /// refused the kind of link, not this one), so it isn't said, even to whoever runs deadwax.
+    public static func notice(opened: Bool) -> String? {
+        opened ? nil : ManagingWords.notOpened
+    }
 }
 
 /// Manage's words: the web's where the web says them (You.tsx's title and rows, ownPassword.ts's CHANGE_TITLE - held by
@@ -172,19 +180,26 @@ public enum ManagingWords {
     /// An album's ••• (its page's bar): that album's page in the web app, its Edit one tap away.
     public static let editInWebApp = "Edit in the web app"
 
-    /// Account's row (ownPassword.ts CHANGE_TITLE), and the line under it.
+    /// Account's row (ownPassword.ts CHANGE_TITLE), and the line under it: where it is once open, and whose password
+    /// it changes there - Safari's person's, who may not be the app's (Safari signs in apart).
     public static let changePassword = "Change password"
-    public static let changePasswordLine = "Opens the web app's You: Change password is under Account there."
+    public static let changePasswordLine = "Opens the web app's You: Change password is under Account there. It changes "
+        + "the password of whoever is signed in in Safari."
 
     /// VoiceOver's hint on every row that opens Safari.
     public static let opensInSafari = "Opens in Safari."
 
     public static let opens = "These open in the web app, in Safari."
-    /// With logins on: Safari signs in apart from the app.
+    /// With logins on: Safari signs in apart from the app - and each page is Safari's person's, not the app's: nothing
+    /// compares the two.
     public static let signIn = "Safari has its own sign-in, apart from the app's: the first time, sign in there with the "
-        + "same name and password you use here."
+        + "same name and password you use here. The pages open as whoever is signed in there, who may not be who's "
+        + "signed in here."
     /// deadwax out of reach: the rows are off.
     public static let offline = "These open once deadwax is back."
+
+    /// iOS refused to open the address (Managing.notice(opened:)): said over the tabs, announced.
+    public static let notOpened = "Couldn't open the web app - Safari may be turned off in Screen Time."
 
     /// The section's footer, a sentence a line: where they open (or, out of reach, when), then Safari's sign-in with
     /// logins on.

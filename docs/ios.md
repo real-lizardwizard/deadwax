@@ -1359,8 +1359,9 @@ album.
 - **Manage**, for someone who may look after deadwax - an admin, everyone with logins off, or someone an admin gave
   a permission to: the tools you may use, each opening in the web app, in Safari (see [Manage](#manage)).
 - **Account**, with logins on: **Change password**, then **Sign out**. Change password opens the web app's You in
-  Safari - "Opens the web app's You: Change password is under Account there." under it - and isn't there for the
-  emergency `deadwax` sign-in, which has no Navidrome password to change. **Sign out** ends this phone's session and
+  Safari - "Opens the web app's You: Change password is under Account there. It changes the password of whoever is
+  signed in in Safari." under it: Safari signs in apart from the app ([Manage](#manage)), so check the name there
+  first. It isn't there for the emergency `deadwax` sign-in, which has no Navidrome password to change. **Sign out** ends this phone's session and
   stops what's playing. With anything downloaded, it adds that your downloads stay on this phone for when you sign in
   again. If deadwax can't be reached, it says "Couldn't reach deadwax, so you're still signed in - try again."
 - **About**: deadwax's version, whether logins are on (for an admin), and the app's own version,
@@ -1388,20 +1389,29 @@ An admin has every row. With logins off everyone does, but People: there's nobod
 these permissions has no Manage at all ([Sharing deadwax](sharing.md#admins-permissions-and-everyone-else) has what each
 one gives). The rows follow what deadwax last said of you: You asks again the first time it shows and on a pull
 down. If an admin took a permission away since, the page it opens says "This page needs a permission an admin hasn't
-given you - ask one if you need it."
+given you - ask one if you need it." - and People, its own words: "Only an admin can open People - it comes with
+being a Navidrome admin."
 
 Under the rows: "These open in the web app, in Safari." - and with logins on, "Safari has its own sign-in, apart from
-the app's: the first time, sign in there with the same name and password you use here." Nothing hands the app's
-sign-in to Safari (it could only go in the address, where it would sit in Safari's history), so the first time a row
-opens, the web app's sign-in comes first. Sign in, and the page the row named opens. Safari stays signed in after
-that, as any browser does, until its sign-in goes 30 days without use. Signing out of the app doesn't sign Safari out,
-nor the other way round. If you use the web app from your Home Screen, it keeps a sign-in of its own, and the rows
-open in Safari, not in it.
+the app's: the first time, sign in there with the same name and password you use here. The pages open as whoever is
+signed in there, who may not be who's signed in here." Nothing hands the app's sign-in to Safari (it could only go in
+the address, where it would sit in Safari's history), so the first time a row opens, the web app's sign-in comes
+first. Sign in, and the page the row named opens. Safari stays signed in after that, as any browser does, until its
+sign-in goes 30 days without use. Signing out of the app doesn't sign Safari out, nor the other way round.
+
+**The page opens as whoever is signed in in Safari, which may not be who's signed in to the app.** The app shows the
+rows its own sign-in may use; nothing checks Safari's against it. Sign in to the app as one person and Safari as
+another, and the page is the other person's: what they may do, and their password changed by Change password. To be
+sure, open the web app's You in Safari and look at the name at its top. If you use the web app from your Home
+Screen, it keeps a sign-in of its own, and the rows open in Safari, not in it.
 
 The rows open deadwax's address as the app has it, plain `http://` included: Safari opens it as it would the address
 typed (its address bar says Not Secure), over your Wi-Fi or WireGuard. If the phone's default browser isn't Safari,
 they open in that one instead. While deadwax can't be reached the rows are dimmed and can't be tapped, and "These
 open once deadwax is back." says why; so is Change password, and the album's Edit in the web app isn't in its menu.
+If iOS won't open the address at all - Safari turned off in Screen Time, with no other browser - the app says
+"Couldn't open the web app - Safari may be turned off in Screen Time." over the tabs, and VoiceOver reads it. The same
+goes for the album's Edit in the web app and the Library's Set up Navidrome.
 
 VoiceOver reads each row as a button, with "Opens in Safari." after it. The rows grow with the text size.
 
@@ -3508,23 +3518,31 @@ with Wi-Fi off. 237-243 want logins on, and 241 two accounts (one an admin); 244
   the address bar and no other warning - unless Safari is set to warn about pages that aren't secure (Settings >
   Apps > Safari), in which case say what it shows. Safari doesn't ask about the local network, and the address isn't
   turned into `https://`.
-- **241 The rows follow the permissions.** As an ordinary person with no permissions: no Manage in You, and the
-  album's ••• has no Edit in the web app. In the web app, as the admin, give them **Edit albums** in People; on the
-  phone pull down on You: Edit an album and Library care appear, and nothing else. Give them **Settings and the
-  log**: Server settings and Event log join them. Take Edit albums away and tap Library care before pulling down:
-  the page in Safari says it needs a permission an admin hasn't given you. Pull down: the row goes.
+- **241 The rows follow the permissions.** Do the admin's part on **another device** - the web app on the Mac,
+  signed in as the admin - never in Safari on this phone: that would sign Safari in as the admin, and every page
+  would then open with the admin's access. On the phone, sign Safari in as the person under test (the web app's You
+  > Sign out in Safari, then sign in as them), and the app too. As them, with no permissions: no Manage in You, and
+  the album's ••• has no Edit in the web app. On the Mac, give them **Edit albums** in People; on the phone pull down
+  on You: Edit an album and Library care appear, and nothing else. Give them **Settings and the log**: Server
+  settings and Event log join them. Take Edit albums away on the Mac and tap Library care on the phone before
+  pulling down: Safari, signed in as them, says "This page needs a permission an admin hasn't given you - ask one if
+  you need it." Pull down: the row goes.
 - **242 An album's Edit in the web app.** As an admin, open an album and tap the top •••: after the download items,
   **Edit in the web app**, with Safari's compass. Tap it: the same album's page in the web app, with **Edit** at
   its top. Try an album whose name has an accent or a slash in it. A song's ••• has no such item.
 - **243 Change password.** You > Account has **Change password** above Sign out, with "Opens the web app's You:
-  Change password is under Account there." under it. Tap it: the web app's You, Change password under Account.
-  Signed in as `deadwax` (the emergency admin), Account has Sign out alone.
+  Change password is under Account there. It changes the password of whoever is signed in in Safari." under it. Tap
+  it: the web app's You, with Safari's signed-in name at its top and Change password under Account. (Don't change
+  it unless you mean to.) Signed in as `deadwax` (the emergency admin), Account has Sign out alone.
 - **244 Set up Navidrome.** Only if you can take Navidrome's address away for a moment (in the web app's Server
   settings > Connections, on a test setup): the Library shows "Connect Navidrome" with **Set up Navidrome**. Tap it:
   Safari opens the web app's Server settings, at its first tab; Connections is the third. Put the address back.
-- **245 Offline.** Turn off Wi-Fi and WireGuard: Manage's rows dim and do nothing when tapped, the footer says
-  "These open once deadwax is back.", Change password dims, and the album's ••• has no Edit in the web app. Turn
-  the network back on: all of it works again without leaving You.
+- **245 Offline, and Safari turned off.** Turn off Wi-Fi and WireGuard: Manage's rows dim and do nothing when
+  tapped, the footer says "These open once deadwax is back.", Change password dims, and the album's ••• has no Edit
+  in the web app. Turn the network back on: all of it works again without leaving You. Then, only if you're happy
+  to change Screen Time for a minute: turn Safari off (Settings > Screen Time > Content & Privacy Restrictions >
+  Allowed Apps) and tap Needs a look: nothing opens, and "Couldn't open the web app - Safari may be turned off in
+  Screen Time." shows over the tabs for a few seconds. Turn Safari back on.
 - **246 The largest text, and VoiceOver.** At the largest text sizes, Manage's rows and the line under Edit an
   album wrap, nothing cut off, the arrows growing with them. With VoiceOver, each row reads as one button - "Needs
   a look, button, Opens in Safari." - and Edit an album reads its line too; dimmed rows read as dimmed.
@@ -3561,7 +3579,9 @@ These are the web app's for now:
 | Library: **"Your music isn't available right now"** (an admin sees **"Can't reach Navidrome"**) | deadwax can't reach Navidrome. Check Navidrome is running, then **Try again**. |
 | Library: **"Your music isn't available yet"** (an admin sees **"Connect Navidrome"**) | deadwax hasn't been told where Navidrome is. An admin's **Set up Navidrome** opens the web app's Server settings in Safari: set Navidrome up on its Connections tab, **Save changes**, then come back. |
 | A row of You > **Manage** opens Safari on deadwax's **sign-in** | Safari has its own sign-in, apart from the app's. Sign in with the same name and password you use in the app: the page the row named opens, and Safari stays signed in after that (until it goes 30 days without use). See [Manage](#manage). |
-| A row of You > Manage opens a page saying **"This page needs a permission an admin hasn't given you"** | An admin took that permission away since deadwax last told the app. Pull down on You: the row goes. Ask an admin if you need it. |
+| A row of You > Manage opens a page saying **"This page needs a permission an admin hasn't given you"** (People: **"Only an admin can open People - it comes with being a Navidrome admin."**) | An admin took that permission away since deadwax last told the app - or Safari is signed in as someone other than you (below). Pull down on You: the row goes. Ask an admin if you need it. |
+| A Manage page opens with **someone else's access** - more than you have, or less | Safari is signed in as someone else: it signs in apart from the app, and the page is Safari's person's. In Safari, open the web app's You and look at the name at its top; **Sign out**, then sign in as yourself. |
+| **"Couldn't open the web app - Safari may be turned off in Screen Time."** | iOS wouldn't open the address. Turn Safari back on in Settings > Screen Time > Content & Privacy Restrictions > Allowed Apps (or ask whoever set Screen Time up), then tap the row again. |
 | You > Manage's rows are **dimmed** | deadwax can't be reached ("These open once deadwax is back."). They work again as soon as it can. |
 | Library: **"Couldn't update this list - showing it as it was."** | deadwax didn't answer just then. ••• > Refresh to try again (pull down, on a list opened from the •••). |
 | An album's page: **"This album isn't here any more - it may have been moved or deleted."** | Go back, and ••• > Refresh in the Library to bring it up to date. |
