@@ -429,7 +429,8 @@ enum SearchSavedVectors {
             #expect(V.same(reading.query, wanted.query) && reading.kind.rawValue == wanted.kind, "\(what): the reading")
             let view = try #require(SearchView(rawValue: each.view))
             let kinds = try V.kinds(try #require(each.kinds))
-            let studio = try #require(each.studio)
+            //? an optional Bool unwrapped, said so - `#require` of one alone is ambiguous (truth or presence)
+            let studio = try #require(each.studio as Bool?)
             if !each.given {
                 let madeKinds = SearchState.wantedKinds(term, reading, view: view)
                 let madeStudio = view == .all && SearchAlbums.allAlbumsQuery(reading).studio

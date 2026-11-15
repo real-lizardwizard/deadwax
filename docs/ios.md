@@ -690,7 +690,9 @@ too. For words MusicBrainz is asked for (three letters or more, or Search presse
 artists, albums and songs you don't have is drawn with your library, at its moment, before MusicBrainz has
 answered - so an album found before can lead Top results at once. The list waits at most four tenths of a
 second for it; slower than that, it's left out for those words, and MusicBrainz's answer comes as it would
-without it. MusicBrainz's answer adds only what isn't there already, and nothing drawn moves; VoiceOver says "Found earlier: 1 album." as
+without it. Until deadwax knows which albums your library holds (the first look after the deadwax container
+starts can take a while on a sleeping disk), saved albums wait - saved artists and songs don't - and
+MusicBrainz's albums come as ever. MusicBrainz's answer adds only what isn't there already, and nothing drawn moves; VoiceOver says "Found earlier: 1 album." as
 the list is drawn, then "More found: 2 albums." (or "Nothing more found."). If MusicBrainz can't be asked, what's
 saved stays, and where MusicBrainz's rows would be: "Showing earlier results - searching for more isn't working
 right now." (or "…try again in a moment for more."), with **Try again**.

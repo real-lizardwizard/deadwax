@@ -8049,8 +8049,8 @@ Not verified - only the phone can tell (docs/ios.md's checks 156-165, beside the
 
 The review of slice 4 found one medium-low bug and three low ones. This fixes three of them, in a commit of its own
 on `phase5-search`. The second (an album both what's saved and MusicBrainz found drawn nowhere in All while
-`/library/owned` isn't in hand) is the web's rule too: it is fixed in searchList.ts on main, and ported here once
-that reaches ios.
+`/library/owned` isn't in hand) is the web's rule too: it was fixed in searchList.ts on main (2.1.25) and ported
+here in a commit of its own once it reached ios - "Phase 5, slice 4's review, finding 2", below.
 
 ### What was wrong, and the fix
 
@@ -8113,7 +8113,8 @@ that reaches ios.
 Verified, on the tree before its commit:
 - `swift test`: Core 1518 (4 new), Audio 158, Turntable 12. One warning, and not a new one:
   SearchSavedVectorTests.swift:432's `#require(each.studio)` is ambiguous (an optional Bool). It has been there since
-  slice 4, whose full run compiled nothing new and so didn't print it - its "No new warnings" missed it.
+  slice 4, whose full run compiled nothing new and so didn't print it - its "No new warnings" missed it. Fixed with
+  finding 2's port.
 - The unsigned Debug and Release device builds (Xcode, `generic/platform=iOS`) succeeded. The .xcodeproj is unchanged.
 - `check_project.py` ok.
 - `npm run build` and all 87 sims on Node 22.23.4.
@@ -8123,6 +8124,49 @@ Verified, on the tree before its commit:
 Not verified - only the phone can tell (checks 162 and 163 gain a sentence each):
 - More on two chips over a slow connection.
 - A kept answer asked again after an hour with the phone asleep in between.
+
+## Phase 5, slice 4's review, finding 2: saved albums before the library's index (2026-11-14)
+
+The review's second finding is the web's rule too. It was fixed on main as 2.1.25 (notes/backend-gotchas.md, "Saved
+albums before the library's index (2.1.25)"), merged into ios, and from there into `phase5-search`.
+
+- **What was wrong.** `pool` left every album what's saved holds out of MusicBrainz's answer (`savedGroupIds`),
+  while `savedFor` draws none of them until the library's index (`/library/owned`) is in hand: its `shown` is empty
+  before then. So an album both had found was drawn nowhere before the index, neither as saved nor as MusicBrainz's.
+  A slow or failed `/library/owned` was enough, and All, frozen once drawn, kept the gap for those words.
+- **The port.** SearchList.swift's pool keeps `savedDrawn`, the saved groups it draws: `shown`, and the held ones it
+  brings in. It filters MusicBrainz's `groups` and `shown` by that set, never by every saved group. Before the index,
+  the album comes as MusicBrainz's row; once the index is in, it is drawn once, as saved.
+- **docs/ios.md**'s What's saved now says so, in the web's words (docs/finding-music.md): saved albums wait for the
+  index, saved artists and songs don't, and MusicBrainz's albums come as ever.
+
+### Tests
+
+- **The exporter** (export-search-saved-vectors.cjs) gains two fixed cases, "portishead" with no index (list 0) and
+  with one (list 3), where what's saved and MusicBrainz both found Portishead, Dummy Remixed and Glory Box EP.
+  - Before the index, all three are MusicBrainz's rows. With it, Portishead and Glory Box EP are saved rows and Dummy
+    Remixed is MusicBrainz's, each drawn once.
+  - search-saved-vectors.json is re-exported. The other three Search fixtures (search, search-albums, search-songs)
+    are unchanged by the web's change, each checked with `--check`.
+- Against the unported Swift, the replay failed 10 cases, the new no-index one among them. Ported, all pass.
+- **Mutations**: 2, both caught.
+  1. The held saved groups brought in left out of `savedDrawn` (7 cases).
+  2. MusicBrainz's `shown` not filtered at all (35).
+- The replay's `#require(each.studio)` is now `as Bool?`, which ends its ambiguity warning.
+
+### Verified, and not
+
+Verified, on the tree before its commit:
+- `swift test`: Core 1518, Audio 158, Turntable 12, with no warnings.
+- The unsigned Debug and Release device builds succeeded. The .xcodeproj is unchanged.
+- `check_project.py` ok.
+- `npm run build` and all 87 sims on Node 22.23.4, iossearchsaved's `--check` among them, and searchList's two new
+  checks from main.
+- The full pytest suite: 4520 passed, 1 skipped.
+- The 2 mutations above, both caught.
+
+Not verified: the phone with a slow `/library/owned` (the first look after the deadwax container starts, on a
+sleeping disk). The web's commit didn't see it in a browser either.
 
 ## Phase 5 as a whole (2026-11-14)
 

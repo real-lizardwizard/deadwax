@@ -532,7 +532,10 @@ public enum SearchList {
                          position: each.offset)
         })
         let savedGroups = saved?.groups ?? []
-        let savedGroupIds = Set(savedGroups.map(\.id))
+        //? only the saved albums this pool DRAWS - shown, or brought in as held - are left out of MusicBrainz's answer
+        //? (the web's 2.1.25, found reviewing this port): before the library's index is in, what's saved draws none of
+        //? its albums (`shown`), so leaving out every saved one drew an album both had found nowhere at all
+        var savedDrawn = Set<String>()
         if !savedGroups.isEmpty {
             var at: [String: Int] = [:]
             for (position, group) in savedGroups.enumerated() { at[group.id] = position }
@@ -541,19 +544,20 @@ public enum SearchList {
                 SearchPlaced(row: .group(group), holder: .yours, position: at[group.id] ?? 0, saved: true)
             }
             let shown = Set(savedShown.map(\.id))
-            albums.brought = SearchAlbums.heldUnlisted(savedGroups, marks.index, libraryAlbums)
+            let brought = SearchAlbums.heldUnlisted(savedGroups, marks.index, libraryAlbums)
                 .filter { !shown.contains($0.id) }
-                .map { (group: ReleaseGroup) -> SearchPlaced in
-                    SearchPlaced(row: .group(group), holder: SearchHolder(SearchAlbums.yours(group, marks)),
-                                 position: at[group.id] ?? 0, saved: true)
-                }
+            albums.brought = brought.map { (group: ReleaseGroup) -> SearchPlaced in
+                SearchPlaced(row: .group(group), holder: SearchHolder(SearchAlbums.yours(group, marks)),
+                             position: at[group.id] ?? 0, saved: true)
+            }
+            for group in savedShown + brought { savedDrawn.insert(group.id) }
         }
         if let found {
             //? a Map of id -> position: a group named twice keeps its last position, as JavaScript's Map does
             var at: [String: Int] = [:]
             for (position, group) in found.groups.enumerated() { at[group.id] = position }
-            let groups = found.groups.filter { !savedGroupIds.contains($0.id) }
-            albums.musicbrainz = found.shown.filter { !savedGroupIds.contains($0.id) }.map { (group: ReleaseGroup) -> SearchPlaced in
+            let groups = found.groups.filter { !savedDrawn.contains($0.id) }
+            albums.musicbrainz = found.shown.filter { !savedDrawn.contains($0.id) }.map { (group: ReleaseGroup) -> SearchPlaced in
                 SearchPlaced(row: .group(group), holder: .yours, position: at[group.id] ?? 0)
             }
             //? MusicBrainz's block is the one worked out as its answer landed (`shown`); a group found held only since
