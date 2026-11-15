@@ -1,4 +1,4 @@
-# The iPhone app (early: app 0.12, downloads, lyrics, the EQ, the turntable, play history, your library, the Library, Search, Requests and getting albums)
+# The iPhone app (early: app 0.13, downloads, lyrics, the EQ, the turntable, play history, your library, the Library, Search, Requests, getting albums and Manage)
 
 deadwax is getting a native iPhone app, built with SwiftUI and its own audio engine, for what a web
 page can't do well: seamless joins and normalization done on the phone, downloads to play offline,
@@ -44,13 +44,16 @@ sources Soulseek has for it in a sheet, each with why it scored what it did, and
 Requests from your tap (see [Getting an album](#getting-an-album)). **App 0.12** finishes getting albums on the
 phone: a download somebody else asked for **joined**, a pressing in the collection **added to your library**,
 **Pick the best source for me**, and You's **When I tap Get**, **Quality floor** and **Format** chosen on the phone
-(see [You](#you)).
+(see [You](#you)). **App 0.13** is Phase 7, the last of the plan: You's **Manage** lists the tools for looking after
+deadwax that you may use - editing an album, Needs a look, Library care, People, Server settings and the event log -
+and each opens in the web app, in Safari, where it's already built for a phone; so does **Change password** (see
+[Manage](#manage)).
 
 **Nothing of Phase 2, the lyrics, the EQ, the turntable, play history, your library downloaded,
-playlists, artists, songs, Search, Requests or Get has been seen on an iPhone yet.** It's built and tested on a Mac,
+playlists, artists, songs, Search, Requests, Get or Manage has been seen on an iPhone yet.** It's built and tested on a Mac,
 and what only a phone can tell is what [the checks](#the-checks) are for. Until they're answered, read
 everything about downloads, lyrics, the EQ, the turntable, play history, your library, playlists, artists,
-songs, Search, Requests and Get below as what the app is built to do.
+songs, Search, Requests, Get and Manage below as what the app is built to do.
 
 The app talks only to deadwax, never to Navidrome, through deadwax's own routes, so the phone never
 needs the Navidrome account deadwax itself uses. With logins on, you sign in with your own Navidrome
@@ -166,7 +169,7 @@ old one. It also uses up one of the few new app ids a free account may register 
 It pulls the latest code, asks GitHub whether the app's checks passed on it (and asks you before
 building one that failed or is still running), builds it (Release), and installs it **over** the app
 on the phone, so everything on the phone stays. Then it opens the app and says how long the new
-install runs: `Installed deadwax 0.12 (12), runs until Wed 18 Nov, 14:02`. It also says how long it
+install runs: `Installed deadwax 0.13 (13), runs until Wed 18 Nov, 14:02`. It also says how long it
 took and the Mac's free space before and after. Xcode doesn't need to be open.
 
 | option | what it does |
@@ -380,6 +383,10 @@ back to the Library tab or the app, and when you pull down.
   that song; the **•••** at the top has them for the whole album (see [Up Next](#up-next) and [Add to
   a playlist](#add-to-a-playlist)). Each menu opens from the ••• you tapped, and a tap anywhere else
   closes it.
+- **Edit in the web app**, at the end of the top •••'s menu, for someone who may edit albums (Edit albums or Look
+  after the library - an admin, or everyone with logins off): this album's page in the web app, in Safari, with
+  **Edit** at its top (see [Manage](#manage)). It isn't there while deadwax can't be reached, or for an album gone
+  from the collection.
 - **Add to my library** and **Remove from my library**, with logins on. Removing takes the album out
   of your library only: "it's still in the collection, and nothing was deleted."
 - **The artist's name**, in purple, opens [their page](#artists). An album that names no artist to go to
@@ -1349,14 +1356,57 @@ album.
 - **Downloads**: what's on this phone ("2.1 GB"), opening [You > Downloads](#you--downloads). Under
   it, only while something is happening: "Downloading - 6 songs to go", what it's waiting for, or, in
   amber, "2 songs didn't download".
-- **Account**, with logins on: **Sign out**. It ends this phone's session and stops what's playing.
-  With anything downloaded, it adds that your downloads stay on this phone for when you sign in again.
-  If deadwax can't be reached, it says "Couldn't reach deadwax, so you're still signed in - try
-  again." Changing your password is the web app's, for now.
+- **Manage**, for someone who may look after deadwax - an admin, everyone with logins off, or someone an admin gave
+  a permission to: the tools you may use, each opening in the web app, in Safari (see [Manage](#manage)).
+- **Account**, with logins on: **Change password**, then **Sign out**. Change password opens the web app's You in
+  Safari - "Opens the web app's You: Change password is under Account there." under it - and isn't there for the
+  emergency `deadwax` sign-in, which has no Navidrome password to change. **Sign out** ends this phone's session and
+  stops what's playing. With anything downloaded, it adds that your downloads stay on this phone for when you sign in
+  again. If deadwax can't be reached, it says "Couldn't reach deadwax, so you're still signed in - try again."
 - **About**: deadwax's version, whether logins are on (for an admin), and the app's own version,
-  **0.12 (12)**.
+  **0.13 (13)**.
 - **This phone**: deadwax's address, **Change address**, and **Debug**, for an admin (with logins
   off, everyone is one).
+
+### Manage
+
+You > **Manage** is deadwax's tools for looking after it, as many of them as you may use. Each one **opens in the web
+app, in Safari** - the web app has every one of them laid out for a phone ([Looking after deadwax from a
+phone](player.md#looking-after-deadwax-from-a-phone)), so the app doesn't build them again. Top to bottom, each only
+for someone who may use it:
+
+| row | who has it | opens in the web app |
+| --- | --- | --- |
+| **Edit an album** | Edit albums or Look after the library | the Library: open an album there, then **Edit** at its top - the line under the row says so. An album's top **•••** here has **Edit in the web app**, which opens that album's own page there ([An album's page](#an-albums-page)). |
+| **Needs a look** | Look after the library | Needs a look |
+| **Library care** | Look after the library or Edit albums | Library care |
+| **People** | an admin, with logins on | People - unlock it with your own Navidrome password, as in the web app |
+| **Server settings** | Settings and the log | Server settings, at its first tab |
+| **Event log** | Settings and the log | the event log |
+
+An admin has every row. With logins off everyone does, but People: there's nobody to manage. Someone with none of
+these permissions has no Manage at all ([Sharing deadwax](sharing.md#admins-permissions-and-everyone-else) has what each
+one gives). The rows follow what deadwax last said of you: You asks again the first time it shows and on a pull
+down. If an admin took a permission away since, the page it opens says "This page needs a permission an admin hasn't
+given you - ask one if you need it."
+
+Under the rows: "These open in the web app, in Safari." - and with logins on, "Safari has its own sign-in, apart from
+the app's: the first time, sign in there with the same name and password you use here." Nothing hands the app's
+sign-in to Safari (it could only go in the address, where it would sit in Safari's history), so the first time a row
+opens, the web app's sign-in comes first. Sign in, and the page the row named opens. Safari stays signed in after
+that, as any browser does, until its sign-in goes 30 days without use. Signing out of the app doesn't sign Safari out,
+nor the other way round. If you use the web app from your Home Screen, it keeps a sign-in of its own, and the rows
+open in Safari, not in it.
+
+The rows open deadwax's address as the app has it, plain `http://` included: Safari opens it as it would the address
+typed (its address bar says Not Secure), over your Wi-Fi or WireGuard. If the phone's default browser isn't Safari,
+they open in that one instead. While deadwax can't be reached the rows are dimmed and can't be tapped, and "These
+open once deadwax is back." says why; so is Change password, and the album's Edit in the web app isn't in its menu.
+
+VoiceOver reads each row as a button, with "Opens in Safari." after it. The rows grow with the text size.
+
+What isn't linked from the phone: an artist's managing (pictures, names), on the artist's page in the web app; the
+web app's **Connections**, in its You; and Needs a look's count.
 
 ### Debug
 
@@ -3435,9 +3485,53 @@ follow Noto Sans's.
   above the mini player: it opens. Start a drag up on the mini player's top edge: Now Playing opens as you let go,
   and the song doesn't jump.
 
+### Managing's checks (237-246)
+
+**Not done yet.** These come with **app 0.13 (13)**, Phase 7: You's [Manage](#manage), each row opening the web app
+in Safari. Use deadwax's plain `http://` address, as the app has it - once on the home Wi-Fi, once over WireGuard
+with Wi-Fi off. 237-243 want logins on, and 241 two accounts (one an admin); 244-246 work either way.
+
+- **237 The version, and Manage.** install.sh says "Installed deadwax 0.13 (13), runs until …", and You > About
+  reads 0.13 (13). As an admin, You has **Manage** between Downloads and Account: **Edit an album** (with "Opens the
+  web app's Library: open an album there, then Edit. An album's ••• here has Edit in the web app too." under it),
+  **Needs a look**, **Library care**, **People**, **Server settings** and **Event log**, each with an arrow at its
+  right, and under them "These open in the web app, in Safari." and the line about Safari's own sign-in.
+- **238 Each row opens its page.** Tap each row in turn, coming back to the app between them: Edit an album opens
+  the web app's Library; Needs a look, Library care, People, Server settings and Event log each open that very page
+  in Safari, its title at the top, not the web app's Home. Its Back goes to the web app's You. Does Safari open a new
+  tab each time, or go back to the one it has?
+- **239 Safari's first sign-in.** Sign out of deadwax in Safari first (the web app's You > Sign out), then tap
+  Needs a look in the app: Safari shows the web app's sign-in. Sign in with the name and password you use in the
+  app: Needs a look opens, not Home. Back in the app, tap Event log: it opens at once, with no sign-in. The app is
+  still signed in throughout.
+- **240 Plain http and the network.** On Wi-Fi and over WireGuard, the pages open at `http://…` with Not Secure in
+  the address bar and no other warning - unless Safari is set to warn about pages that aren't secure (Settings >
+  Apps > Safari), in which case say what it shows. Safari doesn't ask about the local network, and the address isn't
+  turned into `https://`.
+- **241 The rows follow the permissions.** As an ordinary person with no permissions: no Manage in You, and the
+  album's ••• has no Edit in the web app. In the web app, as the admin, give them **Edit albums** in People; on the
+  phone pull down on You: Edit an album and Library care appear, and nothing else. Give them **Settings and the
+  log**: Server settings and Event log join them. Take Edit albums away and tap Library care before pulling down:
+  the page in Safari says it needs a permission an admin hasn't given you. Pull down: the row goes.
+- **242 An album's Edit in the web app.** As an admin, open an album and tap the top •••: after the download items,
+  **Edit in the web app**, with Safari's compass. Tap it: the same album's page in the web app, with **Edit** at
+  its top. Try an album whose name has an accent or a slash in it. A song's ••• has no such item.
+- **243 Change password.** You > Account has **Change password** above Sign out, with "Opens the web app's You:
+  Change password is under Account there." under it. Tap it: the web app's You, Change password under Account.
+  Signed in as `deadwax` (the emergency admin), Account has Sign out alone.
+- **244 Set up Navidrome.** Only if you can take Navidrome's address away for a moment (in the web app's Server
+  settings > Connections, on a test setup): the Library shows "Connect Navidrome" with **Set up Navidrome**. Tap it:
+  Safari opens the web app's Server settings, at its first tab; Connections is the third. Put the address back.
+- **245 Offline.** Turn off Wi-Fi and WireGuard: Manage's rows dim and do nothing when tapped, the footer says
+  "These open once deadwax is back.", Change password dims, and the album's ••• has no Edit in the web app. Turn
+  the network back on: all of it works again without leaving You.
+- **246 The largest text, and VoiceOver.** At the largest text sizes, Manage's rows and the line under Edit an
+  album wrap, nothing cut off, the arrows growing with them. With VoiceOver, each row reads as one button - "Needs
+  a look, button, Opens in Safari." - and Edit an album reads its line too; dimmed rows read as dimmed.
+
 ## What it can't do yet
 
-These are the web app's for now. Most of them come to the phone in the next phases:
+These are the web app's for now:
 
 - **The visualizer**: it stays the web app's, on a desktop.
 
@@ -3448,8 +3542,9 @@ These are the web app's for now. Most of them come to the phone in the next phas
   new words wait for deadwax.
 - **Home** and **pins** - and so Home's Arriving: outside Requests, the tab's badge is the phone's only sign of a
   download on its way.
-- **Looking after deadwax**: People, Server settings, the event log, Needs a look, Library care, the
-  editors, and changing your password. For an admin, **Set up Navidrome** opens the web app in Safari.
+- **Looking after deadwax** stays the web app's: You > [Manage](#manage) opens each tool there, in Safari, and
+  Change password too. Not linked from the phone: the artist's managing (above), the web app's **Connections** (in
+  its You) and Needs a look's count.
 
 ## When something goes wrong
 
@@ -3464,7 +3559,10 @@ These are the web app's for now. Most of them come to the phone in the next phas
 | Sign in: **"deadwax can't reach the music server, so nobody can sign in just now. Tell whoever runs deadwax."** | deadwax hasn't been told where Navidrome is, or the address it has can't be used. Whoever runs deadwax sets it in [Navidrome settings](configuration.md#navidrome-settings--connections); what's wrong is folded under "For whoever runs deadwax". (A deadwax older than 2.0.4 says "Something went wrong on the server - try again in a moment." here instead.) |
 | The sign-in comes up over the app, with a reason ("Your sign-in ran out after 30 days without use - sign in again.") | Sign in again. The music plays on underneath. |
 | Library: **"Your music isn't available right now"** (an admin sees **"Can't reach Navidrome"**) | deadwax can't reach Navidrome. Check Navidrome is running, then **Try again**. |
-| Library: **"Your music isn't available yet"** (an admin sees **"Connect Navidrome"**) | deadwax hasn't been told where Navidrome is. An admin's **Set up Navidrome** opens the web app in Safari: set it up in Server settings (Connections), then come back. |
+| Library: **"Your music isn't available yet"** (an admin sees **"Connect Navidrome"**) | deadwax hasn't been told where Navidrome is. An admin's **Set up Navidrome** opens the web app's Server settings in Safari: set Navidrome up on its Connections tab, **Save changes**, then come back. |
+| A row of You > **Manage** opens Safari on deadwax's **sign-in** | Safari has its own sign-in, apart from the app's. Sign in with the same name and password you use in the app: the page the row named opens, and Safari stays signed in after that (until it goes 30 days without use). See [Manage](#manage). |
+| A row of You > Manage opens a page saying **"This page needs a permission an admin hasn't given you"** | An admin took that permission away since deadwax last told the app. Pull down on You: the row goes. Ask an admin if you need it. |
+| You > Manage's rows are **dimmed** | deadwax can't be reached ("These open once deadwax is back."). They work again as soon as it can. |
 | Library: **"Couldn't update this list - showing it as it was."** | deadwax didn't answer just then. ••• > Refresh to try again (pull down, on a list opened from the •••). |
 | An album's page: **"This album isn't here any more - it may have been moved or deleted."** | Go back, and ••• > Refresh in the Library to bring it up to date. |
 | An artist's page: **"This artist isn't here any more - their albums may have been moved or deleted."** | The same: go back, and ••• > Refresh. |

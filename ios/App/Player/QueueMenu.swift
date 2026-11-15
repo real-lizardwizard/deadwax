@@ -17,6 +17,9 @@ struct QueueMenuRequest {
     /// (Phase 4, slice 3) The whole playlist the songs are - its page's bar •••: the playlist's own download items
     /// (PlaylistDownloadMenuSection) in place of the songs'.
     var playlist: PlaylistWithSongs?
+    /// (Phase 7) The album's page in the web app - its page's bar •••, for someone the web gives the album's Edit
+    /// (Managing.albumEdit): "Edit in the web app", opened in Safari, the web's Edit one tap away there.
+    var webEdit: URL?
 }
 
 /// The queue menu (screens.md 5; the web's app/QueueMenu.tsx): Play Next and Play Last, opened FROM the ••• tapped -
@@ -47,6 +50,11 @@ struct QueueMenuRequest {
 ///
 /// Phase 4, slice 3: a playlist page's bar ••• (`request.playlist`) has the playlist's own download items instead -
 /// Download, Download Again, Remove Download - the same as the control beside it.
+///
+/// Phase 7 (phase7-managing.md 1): an album page's bar ••• (`request.webEdit`) ends with "Edit in the web app", in a
+/// section of its own - that album's page in the web app, in Safari (openURL), where its Edit is one tap away: the
+/// editors have no address of their own. Left out while deadwax can't be reached and for an album gone from the
+/// collection, as Add to a playlist is. It plays nothing.
 struct QueueMenu<Label: View>: View {
     let request: QueueMenuRequest?
     @ViewBuilder let label: () -> Label
@@ -55,6 +63,7 @@ struct QueueMenu<Label: View>: View {
     @Environment(DownloadModel.self) private var downloads
     @Environment(Reachability.self) private var reachability
     @Environment(AppNavigation.self) private var navigation
+    @Environment(\.openURL) private var openURL
 
     var body: some View {
         Menu {
@@ -79,6 +88,13 @@ struct QueueMenu<Label: View>: View {
                     DownloadMenuSection(songs: request.pick.tracks,
                                         album: request.pick.queuedAs == .album ? request.album : nil,
                                         gone: request.gone, name: request.pick.title)
+                }
+                if let webEdit = request.webEdit, reachability.online, !request.gone {
+                    Section {
+                        Button(ManagingWords.editInWebApp, systemImage: ManagingWords.safariSymbol) {
+                            openURL(webEdit)
+                        }
+                    }
                 }
             }
         } label: {

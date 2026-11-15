@@ -573,7 +573,7 @@ private struct EditOrderSheet: View {
 
 /// The Navidrome gate drawn (app/NeedsNavidrome.tsx): why the Library has no albums to show, in the words Core's
 /// NavidromeGate gives this reader, Try again (asks Navidrome again - also on a pull) and, for an admin, Set up
-/// Navidrome - deadwax's own app opened in Safari, whose Server settings set it up (D8). Navidrome's own words, for
+/// Navidrome - the web app's Server settings opened in Safari (D8; since Phase 7 the page itself, not the web app's Home). Navidrome's own words, for
 /// whoever runs deadwax, can be selected to copy.
 struct NavidromeGateView: View {
     let closed: NavidromeGate.Closed

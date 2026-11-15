@@ -2,7 +2,7 @@
 
 The native iPhone app: a SwiftUI app over the `DeadwaxKit` Swift package (its `DeadwaxCore` logic,
 tested on Linux, its `DeadwaxAudio` engine and its `DeadwaxTurntable` drawing), built on a Mac with
-Xcode and a free Apple account. It is early: app 0.12 - Phase 1's player (your library, album pages,
+Xcode and a free Apple account. It is early: app 0.13 - Phase 1's player (your library, album pages,
 Up Next, Now Playing, normalization on the phone, the lock screen, plays and picking up where you
 left off), Phase 2's albums and songs downloaded to play offline, lyrics on Now Playing, the EQ (ten
 sliders, nine presets and AutoEq's corrections, kept per output) and the turntable on Now Playing (a
@@ -22,14 +22,17 @@ tried again and cleared on the phone, a finished album opened or played from its
 what's on its way - and Get: an album you don't have got from its page, the store's word on the pressing under
 the button, Soulseek's sources in a sheet with each one's reasoning, the one picked in Requests from the tap, or
 picked for you with Pick the best source for me; a download somebody else asked for joined, a pressing in the
-collection added to your library, and You's When I tap Get, Quality floor and Format chosen on the phone - kept
-on the `ios` branch while it's being built. Nothing of Phase 2, the lyrics, the EQ, the turntable, play history,
-Phase 3, Phase 4, Search, Requests or Get has been seen on an iPhone yet.
+collection added to your library, and You's When I tap Get, Quality floor and Format chosen on the phone - and
+Phase 7's Manage, the last of the plan: You's list of the managing tools you may use (editing an album, Needs a
+look, Library care, People, Server settings and the event log) and Change password, each opened in the web app in
+Safari, never rebuilt on the phone - kept on the `ios` branch while it's being built. Nothing of Phase 2, the
+lyrics, the EQ, the turntable, play history, Phase 3, Phase 4, Search, Requests, Get or Manage has been seen on an
+iPhone yet.
 Phase 0's test screen lives on in the app's Debug.
 
 - **To install it, and every week after:** [docs/ios.md](../docs/ios.md) - the steps once on the Mac
   and the iPhone, the weekly `ios/scripts/install.sh`, the test album
-  (`ios/scripts/make-test-album.py`), what the app does, and the checks: Phase 1's, and Phase 2's twenty.
+  (`ios/scripts/make-test-album.py`), what the app does, and the checks, phase by phase - Phase 7's are 237-246.
 - **How it is built, and why:** [notes/ios.md](../notes/ios.md).
 - **Before pushing a change here, on Linux:** `ios/scripts/check-linux.sh`. GitHub's `ios.yml` compiles
   the rest on macOS.
