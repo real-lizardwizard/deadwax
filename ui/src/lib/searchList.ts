@@ -517,19 +517,23 @@ export function pool(input: PoolInput): Record<Kind, KindPool> {
     musicbrainz: [],
   }
   const savedGroups = saved?.groups ?? []
-  const savedGroupIds = new Set(savedGroups.map((group) => group.id))
+  //? only the saved albums this pool DRAWS - shown, or brought in as held - are left out of MusicBrainz's answer
+  //? (2.1.25, found reviewing the iPhone's port): before the library's index is in, what's saved draws none of its
+  //? albums (savedFor's `shown`), so leaving out every saved one drew an album both had found nowhere at all
+  const savedDrawn = new Set<string>()
   if (savedGroups.length) {
     const at = new Map(savedGroups.map((group, position) => [group.id, position]))
     albums.saved = (saved?.shown ?? []).map((group) => ({ row: savedRow(groupRow(group)), holder: 'yours', position: at.get(group.id) ?? 0, saved: true }))
     const shown = new Set((saved?.shown ?? []).map((group) => group.id))
-    albums.brought = heldUnlisted(savedGroups, index, libraryAlbums)
-      .filter((group) => !shown.has(group.id))
+    const brought = heldUnlisted(savedGroups, index, libraryAlbums).filter((group) => !shown.has(group.id))
+    albums.brought = brought
       .map((group) => ({ row: groupRow(group), holder: holder(groupYours(group, marks)), position: at.get(group.id) ?? 0, saved: true }))
+    for (const group of [...(saved?.shown ?? []), ...brought]) savedDrawn.add(group.id)
   }
   if (input.albums) {
-    const groups = input.albums.groups.filter((group) => !savedGroupIds.has(group.id))
+    const groups = input.albums.groups.filter((group) => !savedDrawn.has(group.id))
     const at = new Map(input.albums.groups.map((group, position) => [group.id, position]))
-    albums.musicbrainz = input.albums.shown.filter((group) => !savedGroupIds.has(group.id))
+    albums.musicbrainz = input.albums.shown.filter((group) => !savedDrawn.has(group.id))
       .map((group) => ({ row: groupRow(group), holder: 'yours', position: at.get(group.id) ?? 0 }))
     //? MusicBrainz's block is the one worked out as its answer landed (`shown`); a group found held only since stays
     //? in it, marked in place - never brought in as well, which drew it twice (review)

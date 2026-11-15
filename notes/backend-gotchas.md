@@ -680,6 +680,17 @@ and .55 (Search's one list, notes/app-requests-search-get.md).
     searchList.sim +2. Mutations: 9 rules broken one at a time, all caught (the failure's `problem` kept while asked
     again is caught by searchList.sim alone).
 
+#### Saved albums before the library's index (2.1.25)
+
+Found reviewing the iPhone app's port of Search (Phase 5, slice 4), and the web's rule too. `pool` left every album
+what's saved holds out of MusicBrainz's answer (`savedGroupIds`), while `savedFor` draws none of them until the
+library's index (`/library/owned`) is in hand - so an album both had found was drawn nowhere: not as saved, not as
+MusicBrainz's. A slow or failed `/library/owned` was enough, and the All list, frozen once drawn, kept the gap for
+that search. Now only the saved albums the pool DRAWS (its `shown`, and the held ones it brings in) are left out of
+MusicBrainz's answer (`savedDrawn`): before the index, MusicBrainz's albums come as ever, as docs/finding-music.md
+always said; once it is in, a saved album is drawn once, as saved. ui/test/searchList.sim.cjs holds both, and its
+first check fails on the old rule.
+
 ### A short compose file, and every environment variable in one list (2.0.3)
 
 James (2026-10-23): "can we prune the docker compose a bit so that most things default to a sensible value and can
