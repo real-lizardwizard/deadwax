@@ -46,7 +46,7 @@ struct TrackRow: View {
                             .lineLimit(typeSize.isAccessibilitySize ? 3 : 1)
                         if let artist = AlbumPageLines.artistShown(song, albumArtist: albumArtist) {
                             Text(artist)
-                                .font(.footnote)
+                                .font(Typeface.footnote)
                                 .foregroundStyle(Palette.quiet)
                                 .lineLimit(typeSize.isAccessibilitySize ? 2 : 1)
                         }
@@ -55,7 +55,7 @@ struct TrackRow: View {
                     Spacer(minLength: 8)
                     if slot { stateSlot }
                     Text(Format.trackTime(song.duration))
-                        .font(.subheadline.monospacedDigit())
+                        .font(Typeface.subheadline.monospacedDigit())
                         .foregroundStyle(Palette.quiet)
                 }
                 .padding(.vertical, 6)
@@ -72,7 +72,7 @@ struct TrackRow: View {
 
             QueueMenu(request: menu) {
                 Image(systemName: "ellipsis")
-                    .font(.body.weight(.semibold))
+                    .font(Typeface.symbol(.body).weight(.semibold))
                     .foregroundStyle(Palette.quiet)
                     .frame(minWidth: 44, minHeight: 44)
                     .contentShape(Rectangle())
@@ -91,9 +91,9 @@ struct TrackRow: View {
         let words = dimmed ? DownloadWords.notOnPhone : DownloadWords.songLine(download)
         ZStack {
             if let mark = DownloadWords.mark(download) {
-                DownloadMark(mark: mark, fraction: DownloadWords.Mark.fraction(download), font: .caption)
+                DownloadMark(mark: mark, fraction: DownloadWords.Mark.fraction(download), font: Typeface.symbol(.caption))
             } else {
-                DownloadMark(mark: .downloaded, font: .caption).hidden()
+                DownloadMark(mark: .downloaded, font: Typeface.symbol(.caption)).hidden()
             }
         }
         .accessibilityElement(children: .ignore)
@@ -104,13 +104,13 @@ struct TrackRow: View {
     @ViewBuilder private var number: some View {
         if current {
             Image(systemName: "waveform")
-                .font(.subheadline.weight(.semibold))
+                .font(Typeface.symbol(.subheadline).weight(.semibold))
                 .foregroundStyle(Palette.accent)
                 .symbolEffect(.variableColor.iterative.reversing, options: .repeating, isActive: playing)
                 .accessibilityLabel(PlayingBars.label(paused: !playing))
         } else {
             Text(AlbumPageLines.number(song))
-                .font(.subheadline.monospacedDigit())
+                .font(Typeface.subheadline.monospacedDigit())
                 .foregroundStyle(Palette.quiet)
         }
     }
@@ -122,7 +122,7 @@ struct DiscHeadingRow: View {
 
     var body: some View {
         Text(heading)
-            .font(.footnote.weight(.semibold))
+            .font(Typeface.footnote.weight(.semibold))
             .foregroundStyle(Palette.quiet)
             .fixedSize(horizontal: false, vertical: true)
             .padding(.top, 14)

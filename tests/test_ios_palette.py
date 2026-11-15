@@ -275,3 +275,197 @@ def test_the_requests_badge_is_the_webs():
     assert 'tab == .requests ? RequestWords.badgeText(requests.badgeCount) : ""' in tabs
     assert "tab == .requests ? RequestWords.badgeLabel(tab.title, requests.badgeCount) : tab.title" in tabs
     assert ".accessibilityLabel(spoken)" in tabs
+
+
+def test_the_play_bar_is_the_tab_bars_top():
+    # 15 Nov, James: "merge the play bar with the bottom bar so it doesn't look like it's floating", "opaque the whole
+    # way", "get rid of the skip forward button", "let's make sure the play/pause isn't right up against the edge". The
+    # mini player is drawn by AppTabBar alone, on its opaque fill rather than as a card of material over the pages, with
+    # Play/Pause its only button: 48 pt, 12-16 pt from the edge. VoiceOver's actions are the bar's way to skip.
+    tabs = (APP / "Root" / "MainTabs.swift").read_text(encoding="utf-8")
+    mini = (APP / "Player" / "MiniPlayerView.swift").read_text(encoding="utf-8")
+    bar = tabs[tabs.index("struct AppTabBar"):tabs.index("private struct AppTabButton")]
+    assert "MiniPlayerView()" in bar
+    assert sum(path.read_text(encoding="utf-8").count("MiniPlayerView()") for path in APP.rglob("*.swift")) == 1
+    assert "Material" not in mini and "Corners.card" not in mini
+    assert "forward.fill" not in mini and "backward.fill" not in mini
+    assert "private static let height: CGFloat = 60\n" in mini
+    assert "private static let button: CGFloat = 48\n" in mini
+    edge = re.search(r"private static let edge: CGFloat = (\d+)\n", mini)
+    assert edge and 12 <= int(edge.group(1)) <= 16
+    assert "Button(PlayerWords.nextSong) { player.next() }" in mini
+    assert "Button(PlayerWords.previousSong) { player.songBefore() }" in mini
+
+
+# Noto Sans (15 Nov): James chose "Noto Sans (the web's)". The phone's four faces are the web's own seven files made into
+# one font per weight (ios/scripts/make-fonts.py), named by Info.plist's UIAppFonts, and every text style the app sets is
+# ios/App/Shared/Typeface.swift's - nothing in ios/App names a system text font of its own. A symbol drawn alone keeps
+# iOS's own font (Typeface.symbol), which is how an SF Symbol is sized, and data the system's monospace (Typeface.mono).
+
+TYPEFACE = APP / "Shared" / "Typeface.swift"
+FONTS = APP / "Fonts"
+WEB_FONTS = REPO / "interface" / "styles" / "font" / "noto-sans"
+INFO_PLIST = REPO / "ios" / "Config" / "Info.plist"
+STYLES = ("largeTitle", "title", "title2", "title3", "headline", "body", "callout", "subheadline", "footnote", "caption",
+          "caption2")
+# each text style's size at iOS's standard text size (Large) - what SwiftUI's .body and the rest were
+IOS_SIZES = {"largeTitle": 34, "title": 28, "title2": 22, "title3": 20, "headline": 17, "body": 17, "callout": 16,
+             "subheadline": 15, "footnote": 13, "caption": 12, "caption2": 11}
+
+
+def sfnt_tables(data: bytes) -> dict:
+    count = int.from_bytes(data[4:6], "big")
+    tables = {}
+    for index in range(count):
+        record = data[12 + 16 * index:28 + 16 * index]
+        tables[record[:4].decode("latin-1")] = int.from_bytes(record[8:12], "big")
+    return tables
+
+
+def font_names(path: Path) -> dict:
+    # the name table's Windows (3, 1) strings, by name id
+    data = path.read_bytes()
+    start = sfnt_tables(data)["name"]
+    count = int.from_bytes(data[start + 2:start + 4], "big")
+    strings = start + int.from_bytes(data[start + 4:start + 6], "big")
+    names = {}
+    for index in range(count):
+        record = data[start + 6 + 12 * index:start + 18 + 12 * index]
+        platform, encoding, _, name_id, length, offset = (int.from_bytes(record[i:i + 2], "big") for i in range(0, 12, 2))
+        if (platform, encoding) == (3, 1):
+            names[name_id] = data[strings + offset:strings + offset + length].decode("utf-16-be")
+    return names
+
+
+def font_characters(path: Path) -> set:
+    # the code points the (3, 1) cmap - a format 4 table - maps to a glyph
+    data = path.read_bytes()
+    start = sfnt_tables(data)["cmap"]
+    for index in range(int.from_bytes(data[start + 2:start + 4], "big")):
+        record = data[start + 4 + 8 * index:start + 12 + 8 * index]
+        if (int.from_bytes(record[0:2], "big"), int.from_bytes(record[2:4], "big")) != (3, 1):
+            continue
+        table = start + int.from_bytes(record[4:8], "big")
+        assert int.from_bytes(data[table:table + 2], "big") == 4
+        segments = int.from_bytes(data[table + 6:table + 8], "big") // 2
+
+        def column(base: int) -> list:
+            return [int.from_bytes(data[base + 2 * i:base + 2 * i + 2], "big") for i in range(segments)]
+
+        ends, starts = column(table + 14), column(table + 16 + 2 * segments)
+        deltas, offsets = column(table + 16 + 4 * segments), column(table + 16 + 6 * segments)
+        found = set()
+        for i in range(segments):
+            for code in range(starts[i], ends[i] + 1):
+                if code == 0xFFFF:
+                    continue
+                if offsets[i] == 0:
+                    glyph = (code + deltas[i]) & 0xFFFF
+                else:
+                    at = table + 16 + 6 * segments + 2 * i + offsets[i] + 2 * (code - starts[i])
+                    glyph = int.from_bytes(data[at:at + 2], "big")
+                    glyph = (glyph + deltas[i]) & 0xFFFF if glyph else 0
+                if glyph:
+                    found.add(code)
+        return found
+    raise AssertionError(f"{path.name} has no (3, 1) cmap")
+
+
+def test_the_fonts_are_the_webs_own_noto_sans():
+    import json
+    import plistlib
+    files = sorted(path.name for path in FONTS.glob("*.ttf"))
+    assert files == ["NotoSans-Bold.ttf", "NotoSans-Medium.ttf", "NotoSans-Regular.ttf", "NotoSans-SemiBold.ttf"]
+    # Info.plist names each (the synchronized folder copies them to the bundle's root, where UIAppFonts looks)
+    assert sorted(plistlib.loads(INFO_PLIST.read_bytes())["UIAppFonts"]) == files
+    # the licence goes with them: the web's own
+    assert (FONTS / "OFL.txt").read_bytes() == (WEB_FONTS / "OFL.txt").read_bytes()
+    # each face is of the family Typeface asks for, under the PostScript name Typeface gives UIKit
+    source = TYPEFACE.read_text(encoding="utf-8")
+    assert re.search(r'static let family = "([^"]+)"', source).group(1) == "Noto Sans"
+    faces = sorted(re.findall(r'case \w+ = "(NotoSans-\w+)"', source))
+    assert len(faces) == 4
+    named = []
+    for name in files:
+        table = font_names(FONTS / name)
+        assert table.get(16, table[1]) == "Noto Sans", name
+        named.append(table[6])
+    assert sorted(named) == faces
+    # every character of the web's seven files, in every face: one font per weight, the web's whole range
+    web = json.loads((REPO / "tests" / "fixtures" / "font_cmaps.json").read_text(encoding="utf-8"))
+    wanted = set()
+    for key, entry in web.items():
+        if key.startswith("noto-sans/"):
+            for part in entry["cmap"].split(","):
+                low, _, high = part.strip()[2:].partition("-")
+                wanted |= set(range(int(low, 16), int(high or low, 16) + 1))
+    assert len(wanted) > 1600
+    for name in files:
+        assert font_characters(FONTS / name) == wanted, name
+
+
+def test_every_text_style_is_noto_sans_scaled_as_ios_scales_it():
+    source = TYPEFACE.read_text(encoding="utf-8")
+    for style in STYLES:
+        found = re.search(rf"static let {style} = text\(([0-9]+), \.([a-zA-Z0-9]+)\)", source)
+        assert found, f"Typeface has no {style}"
+        # the size iOS gives the style at the standard text size, relative to that same style, so it grows as it did
+        assert (int(found.group(1)), found.group(2)) == (IOS_SIZES[style], style)
+    assert ".custom(family, size: size, relativeTo: style)" in source
+    assert "static let headline = text(17, .headline).weight(.semibold)" in source
+    app = (APP / "DeadwaxApp.swift").read_text(encoding="utf-8")
+    # the app's words default to it, under every Text and control that sets none, and UIKit's bars and fields are
+    # given the faces before any is made
+    assert ".font(Typeface.body)" in app and "Typeface.configureUIKit()" in app
+    for face in ("largeTitleTextAttributes", "titleTextAttributes", "UISearchTextField.appearance().font",
+                 "UIBarButtonItem.appearance().setTitleTextAttributes", "UISegmentedControl.appearance()"):
+        assert face in source, face
+
+
+def test_no_system_text_font_is_left_in_the_app():
+    styles = "|".join(sorted(STYLES, key=len, reverse=True))
+    leading = re.compile(rf"(?<![\w)\]])\.({styles})\b")
+    left = []
+    for name, number, code in app_code():
+        if name == "Shared/Typeface.swift":
+            continue
+        where = f"{name}:{number}"
+        # a symbol drawn alone and data keep the system's faces - but only through Typeface, by name
+        plain = re.sub(r"Typeface\.(symbol|mono)\([^()]*\)", "Typeface.kept", code)
+        for found in re.finditer(r"\.font\(", plain):
+            depth, end = 0, len(plain)
+            for end in range(found.start() + len(".font"), len(plain)):
+                depth += {"(": 1, ")": -1}.get(plain[end], 0)
+                if depth == 0:
+                    break
+            argument = plain[found.start() + len(".font("):end]
+            if leading.search(argument):
+                left.append(f"{where} .font({argument})")
+        if re.search(r"\.system\(|Font\.(system|custom)|\.custom\([^()]*size:", plain):
+            left.append(f"{where} a system or custom font of its own")
+        if re.search(rf"font: \.({styles})\b|Font = \.({styles})\b", plain):
+            left.append(f"{where} a system text style handed on")
+        if re.search(r"\.monospaced\(\)", plain):
+            left.append(f"{where} .monospaced() (Typeface.mono is the data face)")
+        if re.search(r"UIFont\.(systemFont|boldSystemFont|preferredFont)|UIFont\(name:", plain):
+            left.append(f"{where} a UIKit font of its own")
+    assert not left, left
+    # the one font left is the turntable's own drawing's (its readouts, drawn in a Canvas), left alone on purpose
+    turntable = (APP / "Player" / "Turntable" / "TurntableView.swift").read_text(encoding="utf-8")
+    assert "UIFont.monospacedSystemFont(ofSize: CGFloat(points), weight: .regular)" in turntable
+
+
+def test_every_list_sections_header_and_footer_is_noto_sans():
+    # a header's or footer's words take the face at footnote's size (iOS's own for both), never the list's own font;
+    # a section titled by a string is a menu's (QueueMenu, DownloadControl: UIMenu's titles take no font)
+    lines = app_code()
+    loose = []
+    for index, (name, number, code) in enumerate(lines):
+        if re.search(r"\} (header|footer): \{", code):
+            following = " ".join(line for _, _, line in lines[index:index + 40])
+            if ".font(Typeface." not in following:
+                loose.append(f"{name}:{number}")
+        if re.search(r"Section\([^{}:]+\) \{", code) and name not in ("Player/QueueMenu.swift",
+                                                                     "Downloads/DownloadControl.swift"):
+            loose.append(f"{name}:{number} a section titled by a string")
+    assert not loose, loose

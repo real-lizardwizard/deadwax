@@ -41,21 +41,27 @@ struct EQProfileScreen: View {
             Section {
                 content(output)
             } header: {
-                if let gone {
-                    Text(gone)
-                        .font(.footnote)
-                        .foregroundStyle(Palette.quiet)
-                        .textCase(nil)
-                }
-            } footer: {
-                VStack(alignment: .leading, spacing: 3) {
-                    Text(EQWords.Profile.measured(source: page.shown.source, rig: page.shown.rig, form: page.shown.form))
-                    if let loaded, case .success(let correction) = loaded.reading {
-                        Text(EQWords.Profile.summary(filters: correction.filters.count, preamp: correction.preamp.all))
+                Group {
+                    if let gone {
+                        Text(gone)
+                            .font(Typeface.footnote)
+                            .foregroundStyle(Palette.quiet)
+                            .textCase(nil)
                     }
                 }
-                .font(.footnote)
-                .foregroundStyle(Palette.quiet)
+                .font(Typeface.footnote)
+            } footer: {
+                Group {
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(EQWords.Profile.measured(source: page.shown.source, rig: page.shown.rig, form: page.shown.form))
+                        if let loaded, case .success(let correction) = loaded.reading {
+                            Text(EQWords.Profile.summary(filters: correction.filters.count, preamp: correction.preamp.all))
+                        }
+                    }
+                    .font(Typeface.footnote)
+                    .foregroundStyle(Palette.quiet)
+                }
+                .font(Typeface.footnote)
             }
             if let loaded, case .success(let correction) = loaded.reading {
                 Section {
@@ -73,17 +79,21 @@ struct EQProfileScreen: View {
                     }
                 } header: {
                     Text(EQWords.Profile.others)
+                        .font(Typeface.footnote)
                 }
             }
             Section {
             } footer: {
-                VStack(alignment: .leading, spacing: 8) {
-                    Text(EQWords.Profile.footer)
-                    if let address = URL(string: EQWords.Profile.gitHubAddress) {
-                        Link(EQWords.Profile.gitHub, destination: address)
-                            .font(.footnote)
+                Group {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text(EQWords.Profile.footer)
+                        if let address = URL(string: EQWords.Profile.gitHubAddress) {
+                            Link(EQWords.Profile.gitHub, destination: address)
+                                .font(Typeface.footnote)
+                        }
                     }
                 }
+                .font(Typeface.footnote)
             }
         }
         .listStyle(.insetGrouped)
@@ -110,7 +120,7 @@ struct EQProfileScreen: View {
                         .foregroundStyle(Palette.danger)
                     if server.access.seesDetail {
                         Text(refusal.text)
-                            .font(.footnote.monospaced())
+                            .font(Typeface.mono(.footnote))
                             .foregroundStyle(Palette.quiet)
                             .textSelection(.enabled)
                     }
@@ -150,7 +160,7 @@ struct EQProfileScreen: View {
                     Text(EQWords.Profile.use(output.name))
                 }
             }
-            .font(.headline)
+            .font(Typeface.headline)
             .frame(maxWidth: .infinity)
             .padding(.vertical, 6)
         }

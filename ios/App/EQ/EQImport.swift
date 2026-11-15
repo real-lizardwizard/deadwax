@@ -202,7 +202,7 @@ struct EQImportPreview: View {
         return List {
             Section {
                 Text(lines.from)
-                    .font(.footnote)
+                    .font(Typeface.footnote)
                     .foregroundStyle(Palette.quiet)
                 Picker(EQWords.Import.forLabel, selection: Binding<String>(get: { key }, set: { (now: String) -> Void in
                     chosen = now
@@ -232,10 +232,11 @@ struct EQImportPreview: View {
                 Section {
                     ForEach(Array(lines.skipped.enumerated()), id: \.offset) { (_: Int, note: String) in
                         Text(note)
-                            .font(.footnote)
+                            .font(Typeface.footnote)
                     }
                 } header: {
                     Text(EQWords.Import.skipped)
+                        .font(Typeface.footnote)
                 }
             }
         }
@@ -247,13 +248,13 @@ struct EQImportPreview: View {
             Section {
                 VStack(alignment: .leading, spacing: 8) {
                     Text(EQWords.Import.refusedTitle)
-                        .font(.headline)
+                        .font(Typeface.headline)
                     Text(refusal.text)
-                        .font(.body)
+                        .font(Typeface.body)
                         .fixedSize(horizontal: false, vertical: true)
                     if server.access.seesDetail, let detail = detail(refusal) {
                         Text(detail)
-                            .font(.footnote.monospaced())
+                            .font(Typeface.mono(.footnote))
                             .foregroundStyle(Palette.quiet)
                             .textSelection(.enabled)
                     }

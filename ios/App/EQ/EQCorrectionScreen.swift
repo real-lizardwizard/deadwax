@@ -71,12 +71,15 @@ struct EQCorrectionScreen: View {
                     }
                 }
             } header: {
-                if let gone {
-                    Text(gone)
-                        .font(.footnote)
-                        .foregroundStyle(Palette.quiet)
-                        .textCase(nil)
+                Group {
+                    if let gone {
+                        Text(gone)
+                            .font(Typeface.footnote)
+                            .foregroundStyle(Palette.quiet)
+                            .textCase(nil)
+                    }
                 }
+                .font(Typeface.footnote)
             }
             if !suggested.isEmpty {
                 Section {
@@ -85,6 +88,7 @@ struct EQCorrectionScreen: View {
                     }
                 } header: {
                     Text(EQWords.Picker.suggested(output.name))
+                        .font(Typeface.footnote)
                 }
             }
             results(excluding: shownAbove)
@@ -110,9 +114,12 @@ struct EQCorrectionScreen: View {
         if AutoEqAsk.query(text) == nil {
             Section {
             } footer: {
-                Text(EQWords.Picker.empty)
-                    .font(.footnote)
-                    .foregroundStyle(Palette.quiet)
+                Group {
+                    Text(EQWords.Picker.empty)
+                        .font(Typeface.footnote)
+                        .foregroundStyle(Palette.quiet)
+                }
+                .font(Typeface.footnote)
             }
         } else if searching {
             Section {
@@ -124,6 +131,7 @@ struct EQCorrectionScreen: View {
                 .accessibilityElement(children: .combine)
             } header: {
                 Text(EQWords.Picker.header)
+                    .font(Typeface.footnote)
             }
         } else if let failed {
             Section {
@@ -140,6 +148,7 @@ struct EQCorrectionScreen: View {
                 .padding(.vertical, 4)
             } header: {
                 Text(EQWords.Picker.header)
+                    .font(Typeface.footnote)
             }
         } else if let found {
             let rows = found.answer.results.filter { !shownAbove.contains($0.id) }
@@ -148,12 +157,13 @@ struct EQCorrectionScreen: View {
                     VStack(alignment: .leading, spacing: 4) {
                         Text(EQWords.Picker.noMatch(found.query))
                         Text(EQWords.Picker.tryTheModel)
-                            .font(.footnote)
+                            .font(Typeface.footnote)
                             .foregroundStyle(Palette.quiet)
                     }
                     .accessibilityElement(children: .combine)
                 } header: {
                     Text(EQWords.Picker.header)
+                        .font(Typeface.footnote)
                 }
             } else if !rows.isEmpty {
                 Section {
@@ -162,6 +172,7 @@ struct EQCorrectionScreen: View {
                     }
                 } header: {
                     Text(EQWords.Picker.header)
+                        .font(Typeface.footnote)
                 }
             }
         }
@@ -177,7 +188,7 @@ struct EQCorrectionScreen: View {
                     .foregroundStyle(.primary)
                     .fixedSize(horizontal: false, vertical: true)
                 Text(line)
-                    .font(.footnote)
+                    .font(Typeface.footnote)
                     .foregroundStyle(Palette.quiet)
             }
             .accessibilityElement(children: .ignore)
@@ -195,14 +206,14 @@ struct EQCorrectionScreen: View {
                         .foregroundStyle(.primary)
                     if let note {
                         Text(note)
-                            .font(.footnote)
+                            .font(Typeface.footnote)
                             .foregroundStyle(Palette.quiet)
                             .fixedSize(horizontal: false, vertical: true)
                     }
                 }
                 Spacer(minLength: 8)
                 Image(systemName: "checkmark")
-                    .font(.body.weight(.semibold))
+                    .font(Typeface.symbol(.body).weight(.semibold))
                     .foregroundStyle(Palette.accent)
                     .opacity(chosen ? 1 : 0)
             }

@@ -83,17 +83,17 @@ struct JobCardView: View {
                     .opacity(row.dimmed ? Palette.dimmed : 1)
                 VStack(alignment: .leading, spacing: 2) {
                     Text(row.title)
-                        .font(.body.weight(.semibold))
+                        .font(Typeface.body.weight(.semibold))
                         .lineLimit(typeSize.isAccessibilitySize ? CardSizes.titleLines : 1)
                         .opacity(row.dimmed ? Palette.dimmed : 1)
                     Text(row.line)
-                        .font(.footnote)
+                        .font(Typeface.footnote)
                         .foregroundStyle(toneColour(row.lineTone))
                         .fixedSize(horizontal: false, vertical: true)
                         .opacity(row.dimmed && downloading ? Palette.dimmed : 1)
                     if let askedBy = row.askedBy {
                         Text(askedBy)
-                            .font(.footnote)
+                            .font(Typeface.footnote)
                             .foregroundStyle(Palette.quiet)
                             .fixedSize(horizontal: false, vertical: true)
                     }
@@ -103,7 +103,7 @@ struct JobCardView: View {
                             .opacity(row.dimmed ? Palette.dimmed : 1)
                         // one line, always drawn: its height kept whether or not a speed is in it
                         Text(row.data ?? " ")
-                            .font(.footnote.monospacedDigit())
+                            .font(Typeface.footnote.monospacedDigit())
                             .foregroundStyle(Palette.quiet)
                             .lineLimit(1)
                     }
@@ -131,7 +131,7 @@ private struct CancelButton: View {
     var body: some View {
         Button(action: action) {
             Image(systemName: "xmark")
-                .font(.footnote.weight(.semibold))
+                .font(Typeface.symbol(.footnote).weight(.semibold))
                 .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
                 .foregroundStyle(Palette.onSecondary)
                 .frame(width: CardSizes.face, height: CardSizes.face)
@@ -160,7 +160,7 @@ private struct CancelQuestion: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text(row.cancelWords.question)
-                .font(.subheadline)
+                .font(Typeface.subheadline)
                 .fixedSize(horizontal: false, vertical: true)
             ButtonPair {
                 Button(action: onKeep) {
@@ -199,17 +199,17 @@ struct AttentionCardView: View {
                 RequestCover(release: row.cover, size: CardSizes.cover)
                 VStack(alignment: .leading, spacing: 2) {
                     Text(row.title)
-                        .font(.body.weight(.semibold))
+                        .font(Typeface.body.weight(.semibold))
                         .lineLimit(typeSize.isAccessibilitySize ? CardSizes.titleLines : 1)
                     if !row.line.isEmpty {
                         Text(row.line)
-                            .font(.footnote)
+                            .font(Typeface.footnote)
                             .foregroundStyle(Palette.quiet)
                             .fixedSize(horizontal: false, vertical: true)
                     }
                     if let askedBy = row.askedBy {
                         Text(askedBy)
-                            .font(.footnote)
+                            .font(Typeface.footnote)
                             .foregroundStyle(Palette.quiet)
                             .fixedSize(horizontal: false, vertical: true)
                     }
@@ -222,7 +222,7 @@ struct AttentionCardView: View {
                     }
                     if !gets && ways {
                         Text(RequestWords.getOff)
-                            .font(.footnote)
+                            .font(Typeface.footnote)
                             .foregroundStyle(Palette.quiet)
                             .fixedSize(horizontal: false, vertical: true)
                     }
@@ -260,18 +260,18 @@ private struct ReasonLine: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 2) {
             Text(text)
-                .font(.footnote)
+                .font(Typeface.footnote)
                 .foregroundStyle(Palette.danger)
                 .fixedSize(horizontal: false, vertical: true)
             if let detail, !detail.isEmpty {
                 DisclosureGroup(ErrorWords.forWhoever) {
                     Text(detail)
-                        .font(.footnote.monospaced())
+                        .font(Typeface.mono(.footnote))
                         .foregroundStyle(Palette.quiet)
                         .textSelection(.enabled)
                         .frame(maxWidth: .infinity, alignment: .leading)
                 }
-                .font(.footnote)
+                .font(Typeface.footnote)
             }
         }
     }
@@ -302,7 +302,7 @@ struct DoneRowView: View {
             if row.release != nil && row.plays {
                 Button(action: onPlay) {
                     Image(systemName: "play.fill")
-                        .font(.footnote.weight(.semibold))
+                        .font(Typeface.symbol(.footnote).weight(.semibold))
                         .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
                         .foregroundStyle(Palette.primaryLabel)
                         .frame(width: CardSizes.face, height: CardSizes.face)
@@ -325,33 +325,33 @@ struct DoneRowView: View {
             RequestCover(release: row.cover, size: CardSizes.cover)
             VStack(alignment: .leading, spacing: 2) {
                 Text(row.title)
-                    .font(.body.weight(.semibold))
+                    .font(Typeface.body.weight(.semibold))
                     .lineLimit(typeSize.isAccessibilitySize ? CardSizes.titleLines : 1)
                 Text(row.line)
-                    .font(.footnote)
+                    .font(Typeface.footnote)
                     .foregroundStyle(toneColour(row.lineTone))
                     .fixedSize(horizontal: false, vertical: true)
                 if runs, let detail = row.reasonDetail, !detail.isEmpty {
                     Text(detail)
-                        .font(.footnote.monospaced())
+                        .font(Typeface.mono(.footnote))
                         .foregroundStyle(Palette.quiet)
                         .fixedSize(horizontal: false, vertical: true)
                 }
                 if !runs && row.reasonTell {
                     Text(ErrorWords.tell)
-                        .font(.footnote)
+                        .font(Typeface.footnote)
                         .foregroundStyle(Palette.quiet)
                         .fixedSize(horizontal: false, vertical: true)
                 }
                 if let askedBy = row.askedBy {
                     Text(askedBy)
-                        .font(.footnote)
+                        .font(Typeface.footnote)
                         .foregroundStyle(Palette.quiet)
                         .fixedSize(horizontal: false, vertical: true)
                 }
                 if let note {
                     Text(note)
-                        .font(.footnote)
+                        .font(Typeface.footnote)
                         .foregroundStyle(Palette.amber)
                         .fixedSize(horizontal: false, vertical: true)
                 }

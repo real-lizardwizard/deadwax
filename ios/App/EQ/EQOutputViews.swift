@@ -17,15 +17,15 @@ struct EQOutputHeader: View {
     var body: some View {
         HStack(spacing: 12) {
             Image(systemName: output.symbol)
-                .font(.title2)
+                .font(Typeface.symbol(.title2))
                 .foregroundStyle(Palette.quiet)
                 .frame(width: 32)
             VStack(alignment: .leading, spacing: 2) {
                 Text(output.name)
-                    .font(.headline)
+                    .font(Typeface.headline)
                     .fixedSize(horizontal: false, vertical: true)
                 Text(connected ? EQWords.Screen.connected : EQWords.Screen.notConnected)
-                    .font(.footnote)
+                    .font(Typeface.footnote)
                     .foregroundStyle(Palette.quiet)
             }
             Spacer(minLength: 0)

@@ -34,15 +34,19 @@ struct AccountSection: View {
             .disabled(row.busy)
             if let problem = row.problem {
                 Text(problem)
-                    .font(.footnote)
+                    .font(Typeface.footnote)
                     .foregroundStyle(Palette.danger)
                     .fixedSize(horizontal: false, vertical: true)
             }
         } header: {
             Text(YouWords.account)
+                .font(Typeface.footnote)
         } footer: {
-            // with anything on the phone, where someone signing out wonders: the downloads stay (6.1)
-            Text(SignOutRow.footnote(user: user) + (downloads.anythingHere ? DownloadWords.staysAfterSignOut : ""))
+            Group {
+                // with anything on the phone, where someone signing out wonders: the downloads stay (6.1)
+                Text(SignOutRow.footnote(user: user) + (downloads.anythingHere ? DownloadWords.staysAfterSignOut : ""))
+            }
+            .font(Typeface.footnote)
         }
         .onChange(of: row.problem) { _, problem in
             if let problem { Notice.announce(problem) }

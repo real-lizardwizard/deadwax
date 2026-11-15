@@ -210,13 +210,13 @@ struct ArtistsScreen: View {
         if let drawn {
             if drawn.standIn {
                 Text(ArtistWords.offlineList)
-                    .font(.footnote)
+                    .font(Typeface.footnote)
                     .foregroundStyle(Palette.quiet)
                     .fixedSize(horizontal: false, vertical: true)
                     .padding(.vertical, 8)
             } else if !drawn.artists.isEmpty, !drawn.view.countText.isEmpty {
                 Text(drawn.view.countText)
-                    .font(.footnote)
+                    .font(Typeface.footnote)
                     .foregroundStyle(Palette.quiet)
                     .padding(.top, 8)
                     .padding(.bottom, 4)
@@ -308,14 +308,14 @@ struct ArtistRow: View {
                             .foregroundStyle(.primary)
                         if !line.isEmpty {
                             Text(line)
-                                .font(.subheadline)
+                                .font(Typeface.subheadline)
                                 .foregroundStyle(Palette.quiet)
                         }
                     }
                     .lineLimit(1)
                     Spacer(minLength: 8)
                     Image(systemName: "chevron.right")
-                        .font(.footnote.weight(.semibold))
+                        .font(Typeface.symbol(.footnote).weight(.semibold))
                         .foregroundStyle(.tertiary)
                         .accessibilityHidden(true)
                 }
@@ -349,7 +349,7 @@ struct ArtistPicture: View {
                 ZStack {
                     Palette.coverEmpty
                     Image(systemName: "person.fill")
-                        .font(.system(size: side * 0.42, weight: .regular))
+                        .font(Typeface.symbol(size: side * 0.42, weight: .regular))
                         .foregroundStyle(Palette.quiet)
                 }
             }

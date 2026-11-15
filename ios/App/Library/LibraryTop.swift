@@ -123,7 +123,7 @@ struct LibrarySwitchControl: View {
             choose(page)
         } label: {
             Text(page.title)
-                .font(.footnote.weight(.semibold))
+                .font(Typeface.footnote.weight(.semibold))
                 .lineLimit(1)
                 .minimumScaleFactor(0.7)
                 .truncationMode(.tail)

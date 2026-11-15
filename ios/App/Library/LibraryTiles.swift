@@ -27,12 +27,12 @@ struct LibraryTile: View {
                     }
                 VStack(alignment: .leading, spacing: 1) {
                     Text(album.name ?? "")
-                        .font(.footnote.weight(.medium))
+                        .font(Typeface.footnote.weight(.medium))
                         .foregroundStyle(.primary)
-                    ArtistLine(artist: album.artist ?? "", download: download, font: .footnote)
+                    ArtistLine(artist: album.artist ?? "", download: download, font: Typeface.footnote)
                     if let line {
                         Text(line)
-                            .font(.footnote)
+                            .font(Typeface.footnote)
                             .foregroundStyle(download.isFailed ? Palette.amber : Palette.quiet)
                     }
                 }
@@ -72,7 +72,7 @@ private struct ArtistLine: View {
                 .foregroundStyle(Palette.quiet)
                 .lineLimit(1)
             if let mark = DownloadWords.mark(download) {
-                DownloadMark(mark: mark, fraction: DownloadWords.Mark.fraction(download), font: .caption2)
+                DownloadMark(mark: mark, fraction: DownloadWords.Mark.fraction(download), font: Typeface.symbol(.caption2))
                     .fixedSize()
             }
         }
@@ -110,10 +110,10 @@ struct LibraryRow: View {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(album.name ?? "")
                         .foregroundStyle(.primary)
-                    ArtistLine(artist: album.artist ?? "", download: download, font: .subheadline)
+                    ArtistLine(artist: album.artist ?? "", download: download, font: Typeface.subheadline)
                     if let line {
                         Text(line)
-                            .font(.footnote)
+                            .font(Typeface.footnote)
                             .foregroundStyle(download.isFailed ? Palette.amber : Palette.quiet)
                     }
                 }
@@ -135,7 +135,7 @@ struct LibraryRow: View {
 struct LibraryNewMark: View {
     var body: some View {
         Text(LibraryWords.newMark)
-            .font(.caption2.weight(.semibold))
+            .font(Typeface.caption2.weight(.semibold))
             .foregroundStyle(Palette.accent)
             .padding(.horizontal, 6)
             .padding(.vertical, 2)
@@ -157,7 +157,7 @@ struct LibraryHeader: View {
 
     var body: some View {
         Text(label)
-            .font(.title3.weight(.semibold))
+            .font(Typeface.title3.weight(.semibold))
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.top, 14)
             .padding(.bottom, 2)

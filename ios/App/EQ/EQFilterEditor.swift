@@ -62,6 +62,7 @@ struct EQFilterEditor: View {
                         .pickerStyle(.segmented)
                     } header: {
                         Text(EQWords.Editor.ear)
+                            .font(Typeface.footnote)
                     }
                 }
                 Section {
@@ -112,12 +113,15 @@ struct EQFilterEditor: View {
                         animated: holding == 0, height: 120, handles: handles)
                 .listRowInsets(EdgeInsets())
         } header: {
-            if let gone {
-                Text(gone)
-                    .font(.footnote)
-                    .foregroundStyle(Palette.quiet)
-                    .textCase(nil)
+            Group {
+                if let gone {
+                    Text(gone)
+                        .font(Typeface.footnote)
+                        .foregroundStyle(Palette.quiet)
+                        .textCase(nil)
+                }
             }
+            .font(Typeface.footnote)
         }
     }
 
@@ -146,7 +150,7 @@ struct EQFilterEditor: View {
                 .accessibilityValue("\(EQWords.number(f.fc)) \(EQWords.Editor.hz)")
                 if let note = EQEditorRules.cornerNote(f) {
                     Text(note)
-                        .font(.footnote)
+                        .font(Typeface.footnote)
                         .foregroundStyle(Palette.quiet)
                         .fixedSize(horizontal: false, vertical: true)
                 }
@@ -229,7 +233,7 @@ struct EQFilterEditor: View {
             }
             if let problem {
                 Text(problem)
-                    .font(.footnote)
+                    .font(Typeface.footnote)
                     .foregroundStyle(Palette.danger)
                     .fixedSize(horizontal: false, vertical: true)
             }

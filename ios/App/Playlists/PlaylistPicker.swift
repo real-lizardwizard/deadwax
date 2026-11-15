@@ -52,7 +52,7 @@ struct PlaylistPicker: View {
             List {
                 Section {
                     Text(PlaylistRules.pickLine(model.pick))
-                        .font(.subheadline)
+                        .font(Typeface.subheadline)
                         .foregroundStyle(Palette.quiet)
                         .lineLimit(3)
                     if let failure = model.failure {
@@ -192,7 +192,7 @@ private struct PickerRow: View {
                 ZStack {
                     Palette.coverEmpty
                     Image(systemName: symbol)
-                        .font(.title3.weight(.semibold))
+                        .font(Typeface.symbol(.title3).weight(.semibold))
                         .foregroundStyle(Palette.accent)
                 }
                 .frame(width: LibraryRow.cover, height: LibraryRow.cover)
@@ -206,7 +206,7 @@ private struct PickerRow: View {
                     .foregroundStyle(.primary)
                 if let line {
                     Text(line)
-                        .font(.subheadline)
+                        .font(Typeface.subheadline)
                         .foregroundStyle(Palette.quiet)
                 }
             }

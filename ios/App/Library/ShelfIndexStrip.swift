@@ -87,7 +87,7 @@ struct ShelfIndexStrip: View {
         switch place {
         case .entry(let entry, _):
             Text(entry.label)
-                .font(.caption2.weight(.semibold))
+                .font(Typeface.caption2.weight(.semibold))
                 .foregroundStyle(Palette.accent)
                 .lineLimit(1)
                 .minimumScaleFactor(0.6)

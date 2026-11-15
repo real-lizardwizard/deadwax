@@ -21,11 +21,11 @@ struct UnreachableView: View {
         ScrollView {
             VStack(spacing: 20) {
                 Image(systemName: "wifi.exclamationmark")
-                    .font(.system(size: mark))
+                    .font(Typeface.symbol(size: mark))
                     .foregroundStyle(Palette.quiet)
                     .accessibilityHidden(true)
                 Text(lines.text)
-                    .font(.title3)
+                    .font(Typeface.title3)
                     .multilineTextAlignment(.center)
                     .fixedSize(horizontal: false, vertical: true)
                     .accessibilityAddTraits(.isHeader)
@@ -45,21 +45,21 @@ struct UnreachableView: View {
                 }
                 if let address = server.address {
                     Text(address.description)
-                        .font(.footnote.monospaced())
+                        .font(Typeface.mono(.footnote))
                         .foregroundStyle(Palette.quiet)
                         .textSelection(.enabled)
                 }
                 if let detail = lines.detail {
                     DisclosureGroup(ErrorWords.forWhoever) {
                         Text(detail)
-                            .font(.footnote)
+                            .font(Typeface.footnote)
                             .foregroundStyle(Palette.quiet)
                             .textSelection(.enabled)
                             .fixedSize(horizontal: false, vertical: true)
                             .frame(maxWidth: .infinity, alignment: .leading)
                             .padding(.top, 6)
                     }
-                    .font(.footnote)
+                    .font(Typeface.footnote)
                 }
             }
             .padding(24)

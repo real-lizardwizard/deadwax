@@ -80,7 +80,7 @@ struct NowPlayingMenu: View {
             }
         } label: {
             Image(systemName: "ellipsis")
-                .font(.title3)
+                .font(Typeface.symbol(.title3))
                 .frame(minWidth: 44, minHeight: 44)
                 .contentShape(Rectangle())
         }

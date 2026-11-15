@@ -16,8 +16,10 @@ struct GettingAlbumsSection: View {
                                                                   }))
         } header: {
             Text(RequestWords.gettingAlbums)
+                .font(Typeface.footnote)
         } footer: {
             Text(RequestWords.confirmCancelNote)
+                .font(Typeface.footnote)
         }
     }
 }

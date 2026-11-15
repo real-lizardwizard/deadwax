@@ -28,8 +28,10 @@ struct PlaybackSection: View {
             LabeledContent(YouWords.gapless, value: YouWords.gaplessOn)
         } header: {
             Text(YouWords.playback)
+                .font(Typeface.footnote)
         } footer: {
             Text(YouWords.gaplessLine)
+                .font(Typeface.footnote)
         }
 
         Section {
@@ -38,8 +40,10 @@ struct PlaybackSection: View {
             }
         } header: {
             Text(TurntableWords.opensAs)
+                .font(Typeface.footnote)
         } footer: {
             Text(TurntableWords.lookNote)
+                .font(Typeface.footnote)
         }
 
         Section {
@@ -48,6 +52,7 @@ struct PlaybackSection: View {
             }))
         } footer: {
             Text(TurntableWords.windDownNote)
+                .font(Typeface.footnote)
         }
 
         Section {
@@ -56,11 +61,15 @@ struct PlaybackSection: View {
             }
         } header: {
             Text(Normalization.title)
+                .font(Typeface.footnote)
         } footer: {
-            VStack(alignment: .leading, spacing: 8) {
-                Text(YouWords.normalizationNote)
-                Text(YouWords.kept)
+            Group {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text(YouWords.normalizationNote)
+                    Text(YouWords.kept)
+                }
             }
+            .font(Typeface.footnote)
         }
 
         Section {
@@ -72,13 +81,14 @@ struct PlaybackSection: View {
                     VStack(alignment: .leading, spacing: 3) {
                         Text(EQWords.You.row)
                         Text(now.name)
-                            .font(.footnote)
+                            .font(Typeface.footnote)
                             .foregroundStyle(Palette.quiet)
                     }
                 }
             }
         } footer: {
             Text(EQWords.You.footer)
+                .font(Typeface.footnote)
         }
     }
 
@@ -94,7 +104,7 @@ struct PlaybackSection: View {
                     .foregroundStyle(.primary)
                 Spacer(minLength: 8)
                 Image(systemName: "checkmark")
-                    .font(.body.weight(.semibold))
+                    .font(Typeface.symbol(.body).weight(.semibold))
                     .foregroundStyle(Palette.accent)
                     .opacity(chosen ? 1 : 0)
             }
@@ -115,13 +125,13 @@ struct PlaybackSection: View {
                     Text(choice.label)
                         .foregroundStyle(.primary)
                     Text(choice.note)
-                        .font(.footnote)
+                        .font(Typeface.footnote)
                         .foregroundStyle(Palette.quiet)
                         .fixedSize(horizontal: false, vertical: true)
                 }
                 Spacer(minLength: 8)
                 Image(systemName: "checkmark")
-                    .font(.body.weight(.semibold))
+                    .font(Typeface.symbol(.body).weight(.semibold))
                     .foregroundStyle(Palette.accent)
                     .opacity(chosen ? 1 : 0)
             }

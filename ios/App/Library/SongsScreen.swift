@@ -182,7 +182,7 @@ struct SongsScreen: View {
                 .disabled(!face.enabled)
                 if let why = face.why {
                     Text(why)
-                        .font(.footnote)
+                        .font(Typeface.footnote)
                         .foregroundStyle(Palette.quiet)
                         .fixedSize(horizontal: false, vertical: true)
                 }
@@ -246,7 +246,7 @@ struct SongsScreen: View {
                     .padding(.vertical, 8)
             } else if !paging.countText.isEmpty {
                 Text(paging.countText)
-                    .font(.footnote)
+                    .font(Typeface.footnote)
                     .foregroundStyle(Palette.quiet)
                     .padding(.top, 8)
                     .padding(.bottom, 4)
@@ -327,7 +327,7 @@ struct SongRow: View {
                 opener
                 QueueMenu(request: QueueMenuRequest(pick: PlaylistPlay.pick(song: song), album: nil)) {
                     Image(systemName: "ellipsis")
-                        .font(.body.weight(.semibold))
+                        .font(Typeface.symbol(.body).weight(.semibold))
                         .foregroundStyle(Palette.quiet)
                         .frame(minWidth: 44, minHeight: 44)
                         .contentShape(Rectangle())
@@ -372,7 +372,7 @@ struct SongRow: View {
                     .lineLimit(typeSize.isAccessibilitySize ? 3 : 1)
                 if !line.isEmpty {
                     Text(line)
-                        .font(.footnote)
+                        .font(Typeface.footnote)
                         .foregroundStyle(Palette.quiet)
                         .lineLimit(typeSize.isAccessibilitySize ? 2 : 1)
                 }

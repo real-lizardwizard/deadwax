@@ -96,7 +96,7 @@ private struct PressingChoiceRow: View {
     var body: some View {
         HStack(alignment: .firstTextBaseline, spacing: 10) {
             Image(systemName: "checkmark")
-                .font(.footnote.weight(.bold))
+                .font(Typeface.symbol(.footnote).weight(.bold))
                 .foregroundStyle(Palette.accent)
                 .opacity(selected ? 1 : 0)
                 .accessibilityHidden(true)
@@ -105,15 +105,15 @@ private struct PressingChoiceRow: View {
                     .foregroundStyle(.primary)
                 if !row.facts.isEmpty {
                     Text(row.facts)
-                        .font(.footnote)
+                        .font(Typeface.footnote)
                         .foregroundStyle(Palette.quiet)
                 }
                 Text(row.note)
-                    .font(.footnote)
+                    .font(Typeface.footnote)
                     .foregroundStyle(row.kind == .differs ? Palette.amber : Palette.quiet)
                 if row.held {
                     Text(row.heldLabel)
-                        .font(.caption.weight(.semibold))
+                        .font(Typeface.caption.weight(.semibold))
                         .foregroundStyle(Palette.held)
                 }
             }

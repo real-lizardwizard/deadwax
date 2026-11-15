@@ -138,6 +138,8 @@ struct DeadwaxApp: App {
                 .environment(requests)
                 .preferredColorScheme(.dark)
                 .tint(Palette.accent)
+                // (Noto Sans, 15 Nov) the words of every Text and control that sets no font of its own
+                .font(Typeface.body)
         }
         .backgroundTask(.urlSession(DownloadSession.identifier)) {
             let began = ContinuousClock().now
@@ -149,11 +151,12 @@ struct DeadwaxApp: App {
 }
 
 /// The app delegate, for BGTaskScheduler's one rule SwiftUI can't keep before iOS 27: every task registered before the
-/// launch ends (2.9).
+/// launch ends (2.9). And (Noto Sans) the faces UIKit draws its bars and fields in, set before any is made.
 final class AppDelegate: NSObject, UIApplicationDelegate {
     func application(_ application: UIApplication,
                      didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil) -> Bool {
         BackgroundWork.shared.register()
+        Typeface.configureUIKit()
         return true
     }
 }

@@ -52,17 +52,17 @@ struct ErrorNote: View {
         let line = line
         VStack(alignment: .leading, spacing: 6) {
             Text(line.said)
-                .font(.callout)
+                .font(Typeface.callout)
                 .fixedSize(horizontal: false, vertical: true)
             if let detail = line.detail, !detail.isEmpty {
                 DisclosureGroup(ErrorWords.forWhoever) {
                     Text(detail)
-                        .font(.footnote.monospaced())
+                        .font(Typeface.mono(.footnote))
                         .foregroundStyle(Palette.quiet)
                         .textSelection(.enabled)
                         .frame(maxWidth: .infinity, alignment: .leading)
                 }
-                .font(.footnote)
+                .font(Typeface.footnote)
             }
         }
     }

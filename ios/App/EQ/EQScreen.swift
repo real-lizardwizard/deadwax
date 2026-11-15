@@ -87,6 +87,7 @@ struct EQScreen: View {
                 }))
             } footer: {
                 Text(EQWords.Advanced.footer)
+                    .font(Typeface.footnote)
             }
             if EQScreenRules.forgets(page, met: eq.settings.output(key) != nil) {
                 Section {
@@ -156,9 +157,12 @@ struct EQScreen: View {
             }))
             .accessibilityLabel(EQWords.Screen.toggleSaid(output.name))
         } footer: {
-            if output.isAirPlay {
-                Text(EQWords.Screen.airPlayFooter)
+            Group {
+                if output.isAirPlay {
+                    Text(EQWords.Screen.airPlayFooter)
+                }
             }
+            .font(Typeface.footnote)
         }
     }
 
@@ -175,23 +179,29 @@ struct EQScreen: View {
                         handles: advanced ? handles(output, correction: setting.correction) : nil)
                 .listRowInsets(EdgeInsets())
         } header: {
-            if !connected {
-                Text(EQWords.Screen.notConnectedLine)
-                    .font(.footnote)
-                    .foregroundStyle(Palette.quiet)
-                    .textCase(nil)
-            }
-        } footer: {
-            VStack(alignment: .leading, spacing: 6) {
-                Text(line.text)
-                    .foregroundStyle(Self.color(line.tone))
-                if line.tone == .danger, server.access.seesDetail, let problem = eq.unitProblem {
-                    Text(problem)
-                        .font(.footnote.monospaced())
+            Group {
+                if !connected {
+                    Text(EQWords.Screen.notConnectedLine)
+                        .font(Typeface.footnote)
                         .foregroundStyle(Palette.quiet)
-                        .textSelection(.enabled)
+                        .textCase(nil)
                 }
             }
+            .font(Typeface.footnote)
+        } footer: {
+            Group {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(line.text)
+                        .foregroundStyle(Self.color(line.tone))
+                    if line.tone == .danger, server.access.seesDetail, let problem = eq.unitProblem {
+                        Text(problem)
+                            .font(Typeface.mono(.footnote))
+                            .foregroundStyle(Palette.quiet)
+                            .textSelection(.enabled)
+                    }
+                }
+            }
+            .font(Typeface.footnote)
         }
     }
 
@@ -228,7 +238,7 @@ struct EQScreen: View {
                         Text(EQWords.Correction.header)
                         if let correction = setting.correction {
                             Text(EQWords.Correction.source(correction))
-                                .font(.footnote)
+                                .font(Typeface.footnote)
                                 .foregroundStyle(Palette.quiet)
                         }
                     }
@@ -256,8 +266,10 @@ struct EQScreen: View {
             }
         } header: {
             Text(EQWords.Correction.header)
+                .font(Typeface.footnote)
         } footer: {
             Text(EQWords.Correction.footer(output))
+                .font(Typeface.footnote)
         }
     }
 
@@ -288,7 +300,7 @@ struct EQScreen: View {
                 Label(EQWords.Advanced.addFilter, systemImage: "plus")
                 if !canAdd {
                     Text(EQWords.Advanced.mostFilters)
-                        .font(.footnote)
+                        .font(Typeface.footnote)
                         .foregroundStyle(Palette.quiet)
                 }
             }
@@ -338,14 +350,18 @@ struct EQScreen: View {
             }
         } header: {
             Text(EQWords.Preamp.header)
+                .font(Typeface.footnote)
         } footer: {
-            VStack(alignment: .leading, spacing: 6) {
-                Text(hand == nil ? EQWords.Preamp.automaticFooter : EQWords.Preamp.handFooter)
-                if let hand, setting.on, drawing.top + hand > 1e-9 {
-                    Text(EQWords.Screen.hand(hand, top: drawing.top))
-                        .foregroundStyle(Palette.amber)
+            Group {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(hand == nil ? EQWords.Preamp.automaticFooter : EQWords.Preamp.handFooter)
+                    if let hand, setting.on, drawing.top + hand > 1e-9 {
+                        Text(EQWords.Screen.hand(hand, top: drawing.top))
+                            .foregroundStyle(Palette.amber)
+                    }
                 }
             }
+            .font(Typeface.footnote)
         }
     }
 
@@ -387,8 +403,10 @@ struct EQScreen: View {
             }
         } header: {
             Text(EQWords.Tone.header)
+                .font(Typeface.footnote)
         } footer: {
             Text(EQWords.Tone.footer)
+                .font(Typeface.footnote)
         }
     }
 
@@ -408,6 +426,7 @@ struct EQScreen: View {
             }
         } header: {
             Text(EQWords.Outputs.others)
+                .font(Typeface.footnote)
         }
     }
 
@@ -504,7 +523,7 @@ struct EQSuggestionRow: View {
                     .foregroundStyle(.primary)
                     .fixedSize(horizontal: false, vertical: true)
                 Text(detail)
-                    .font(.footnote)
+                    .font(Typeface.footnote)
                     .foregroundStyle(Palette.quiet)
             }
         }
@@ -531,12 +550,12 @@ struct EQFilterRowView: View {
                     Text(EQWords.Advanced.type(f.kind))
                         .foregroundStyle(.primary)
                     Text(EQWords.Advanced.detail(f))
-                        .font(.footnote.monospacedDigit())
+                        .font(Typeface.footnote.monospacedDigit())
                         .foregroundStyle(Palette.quiet)
                         .fixedSize(horizontal: false, vertical: true)
                     if row.leftOut {
                         Text(EQWords.Advanced.above)
-                            .font(.footnote)
+                            .font(Typeface.footnote)
                             .foregroundStyle(Palette.amber)
                             .fixedSize(horizontal: false, vertical: true)
                     }

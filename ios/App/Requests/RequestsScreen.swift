@@ -103,6 +103,7 @@ struct RequestsScreen: View {
                             }
                         } header: {
                             Text(RequestWords.title(section))
+                                .font(Typeface.footnote)
                         }
                     }
                 }
@@ -116,11 +117,11 @@ struct RequestsScreen: View {
         let line = ErrorWords.of(failure, admin: server.access.seesDetail, service: .downloads)
         return VStack(alignment: .leading, spacing: 6) {
             Text(RequestWords.unreached)
-                .font(.headline)
+                .font(Typeface.headline)
                 .fixedSize(horizontal: false, vertical: true)
             ErrorNote(text: line.text, detail: line.detail)
             Text(RequestWords.keepsAsking(empty: empty))
-                .font(.callout)
+                .font(Typeface.callout)
                 .foregroundStyle(Palette.quiet)
                 .fixedSize(horizontal: false, vertical: true)
         }
@@ -130,10 +131,10 @@ struct RequestsScreen: View {
     private var untracked: some View {
         VStack(alignment: .leading, spacing: 6) {
             Text(RequestWords.untracked)
-                .font(.headline)
+                .font(Typeface.headline)
                 .fixedSize(horizontal: false, vertical: true)
             Text(server.access.seesDetail ? RequestWords.untrackedRuns : RequestWords.untrackedText)
-                .font(.callout)
+                .font(Typeface.callout)
                 .foregroundStyle(Palette.quiet)
                 .fixedSize(horizontal: false, vertical: true)
         }
@@ -143,11 +144,11 @@ struct RequestsScreen: View {
     private var nothingYet: some View {
         VStack(alignment: .leading, spacing: 6) {
             Text(RequestWords.nothingYet)
-                .font(.headline)
+                .font(Typeface.headline)
                 .fixedSize(horizontal: false, vertical: true)
             // "tap Get" only to someone who can Get - anyone else's list holds what they join
             Text(RequestWords.emptyLine(gets: server.access.can(.request)))
-                .font(.callout)
+                .font(Typeface.callout)
                 .foregroundStyle(Palette.quiet)
                 .fixedSize(horizontal: false, vertical: true)
         }

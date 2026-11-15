@@ -76,7 +76,7 @@ struct GroupView: View {
         .toolbar {
             ToolbarItem(placement: .principal) {
                 Text(page.title)
-                    .font(.headline)
+                    .font(Typeface.headline)
                     .lineLimit(1)
                     .opacity(titleInBar ? 1 : 0)
                     .accessibilityHidden(!titleInBar)
@@ -137,7 +137,7 @@ struct GroupView: View {
                 .padding(.top, 8)
 
             Text(page.title)
-                .font(page.title.count > 60 ? .title3.bold() : .title2.bold())
+                .font(page.title.count > 60 ? Typeface.title3.bold() : Typeface.title2.bold())
                 .multilineTextAlignment(.center)
                 .lineLimit(2)
                 .padding(.top, 18)
@@ -163,7 +163,7 @@ struct GroupView: View {
             creditLink(page.artist) { navigation.open(.mbArtist(MBArtistRoute(mbid: sole.mbid, name: sole.name))) }
         } else {
             Text(page.artist)
-                .font(.title3)
+                .font(Typeface.title3)
                 .foregroundStyle(Palette.quiet)
                 .multilineTextAlignment(.center)
                 .lineLimit(2)
@@ -173,7 +173,7 @@ struct GroupView: View {
     private func creditLink(_ name: String, _ open: @escaping () -> Void) -> some View {
         Button(action: open) {
             Text(name)
-                .font(.title3)
+                .font(Typeface.title3)
                 .foregroundStyle(Palette.accent)
                 .multilineTextAlignment(.center)
                 .lineLimit(2)
@@ -202,7 +202,7 @@ struct GroupView: View {
     @ViewBuilder private func metaLine(_ page: GroupPage) -> some View {
         if page.maybe.isEmpty {
             Text(page.meta.isEmpty ? " " : page.meta)
-                .font(.footnote)
+                .font(Typeface.footnote)
                 .foregroundStyle(Palette.quiet)
                 .multilineTextAlignment(.center)
                 .accessibilityHidden(page.meta.isEmpty)
@@ -217,7 +217,7 @@ struct GroupView: View {
                     .overlay(Corners.controlShape.strokeBorder(Palette.quiet,
                                                                style: StrokeStyle(lineWidth: 1, dash: [3, 2])))
             }
-            .font(.footnote)
+            .font(Typeface.footnote)
             .foregroundStyle(Palette.quiet)
             .accessibilityElement(children: .combine)
         }
@@ -236,7 +236,7 @@ struct GroupView: View {
                     HStack(spacing: 8) {
                         VStack(alignment: .leading, spacing: 1) {
                             Text(Pressings.picker)
-                                .font(.caption)
+                                .font(Typeface.caption)
                                 .foregroundStyle(Palette.quiet)
                             Text(view.chosen?.label ?? "")
                                 .foregroundStyle(.primary)
@@ -244,7 +244,7 @@ struct GroupView: View {
                         }
                         Spacer(minLength: 8)
                         Image(systemName: "chevron.down")
-                            .font(.footnote.weight(.semibold))
+                            .font(Typeface.symbol(.footnote).weight(.semibold))
                             .foregroundStyle(Palette.quiet)
                             .accessibilityHidden(true)
                     }
@@ -260,7 +260,7 @@ struct GroupView: View {
                 .accessibilityHint(view.chosen?.facts ?? "")
                 // the chosen pressing's facts, two lines held whatever it says, so another chosen moves nothing under it
                 Text(page.facts.isEmpty ? " " : page.facts)
-                    .font(.footnote)
+                    .font(Typeface.footnote)
                     .foregroundStyle(Palette.quiet)
                     .lineLimit(2, reservesSpace: true)
                     .accessibilityHidden(true)
@@ -268,7 +268,7 @@ struct GroupView: View {
             // Phase 6's Get the album goes here
             if !page.maybeNote.isEmpty {
                 Text(page.maybeNote)
-                    .font(.footnote)
+                    .font(Typeface.footnote)
                     .foregroundStyle(Palette.quiet)
                     .fixedSize(horizontal: false, vertical: true)
             }
@@ -324,13 +324,13 @@ struct GroupView: View {
 
     @ViewBuilder private func tracklist(_ page: GroupPage) -> some View {
         Text(Pressings.tracklist)
-            .font(.title3.weight(.semibold))
+            .font(Typeface.title3.weight(.semibold))
             .padding(.top, 22)
             .padding(.bottom, 4)
             .accessibilityAddTraits(.isHeader)
         if let summary = page.summary, !summary.text.isEmpty {
             Text(summary.text)
-                .font(.footnote)
+                .font(Typeface.footnote)
                 .foregroundStyle(summary.differs ? Palette.amber : Palette.quiet)
                 .fixedSize(horizontal: false, vertical: true)
                 .padding(.bottom, 6)
@@ -338,7 +338,7 @@ struct GroupView: View {
         ForEach(page.tracks) { (track: PressingTrack) in
             if let heading = track.heading {
                 Text(heading)
-                    .font(.subheadline.weight(.semibold))
+                    .font(Typeface.subheadline.weight(.semibold))
                     .foregroundStyle(Palette.quiet)
                     .padding(.top, 14)
                     .padding(.bottom, 2)
@@ -350,7 +350,7 @@ struct GroupView: View {
         }
         if !page.missing.isEmpty {
             Text(Pressings.notOnThisPressing)
-                .font(.headline)
+                .font(Typeface.headline)
                 .padding(.top, 20)
                 .padding(.bottom, 2)
                 .accessibilityAddTraits(.isHeader)
@@ -380,7 +380,7 @@ private struct PressedTrackRow: View {
         VStack(spacing: 0) {
             HStack(alignment: .firstTextBaseline, spacing: 10) {
                 Text(number)
-                    .font(.subheadline.monospacedDigit())
+                    .font(Typeface.subheadline.monospacedDigit())
                     .foregroundStyle(Palette.quiet)
                     .frame(minWidth: 22, alignment: .trailing)
                     .accessibilityHidden(left)
@@ -392,14 +392,14 @@ private struct PressedTrackRow: View {
                         .accessibilityLabel(song ? title + SongSearch.songWords : title)
                     if let mark {
                         Text(mark.note)
-                            .font(.footnote)
+                            .font(Typeface.footnote)
                             .foregroundStyle(Palette.quiet)
                     }
                 }
                 Spacer(minLength: 8)
                 if let mark {
                     Text(mark.chip)
-                        .font(.caption2.weight(.semibold))
+                        .font(Typeface.caption2.weight(.semibold))
                         .padding(.horizontal, 6)
                         .padding(.vertical, 2)
                         .foregroundStyle(Palette.amber)
@@ -407,7 +407,7 @@ private struct PressedTrackRow: View {
                         .overlay(Corners.controlShape.strokeBorder(Palette.amberEdge))
                 }
                 Text(length)
-                    .font(.subheadline.monospacedDigit())
+                    .font(Typeface.subheadline.monospacedDigit())
                     .foregroundStyle(Palette.quiet)
             }
             .padding(.vertical, 8)

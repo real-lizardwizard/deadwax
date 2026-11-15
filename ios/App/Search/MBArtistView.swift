@@ -51,7 +51,7 @@ struct MBArtistView: View {
         .toolbar {
             ToolbarItem(placement: .principal) {
                 Text(route.name)
-                    .font(.headline)
+                    .font(Typeface.headline)
                     .lineLimit(1)
                     .opacity(nameInBar ? 1 : 0)
                     .accessibilityHidden(!nameInBar)
@@ -83,7 +83,7 @@ struct MBArtistView: View {
                 .padding(.top, 8)
                 .accessibilityHidden(true)
             Text(route.name)
-                .font(.title.bold())
+                .font(Typeface.title.bold())
                 .multilineTextAlignment(.center)
                 .lineLimit(3)
                 .padding(.top, 18)
@@ -91,7 +91,7 @@ struct MBArtistView: View {
             // who they are: wrapping as the web's line does, its two lines held from the first (at any text size), so
             // nothing below moves as it lands or as it turns out longer than one
             Text(about.isEmpty ? " " : about)
-                .font(.subheadline)
+                .font(Typeface.subheadline)
                 .foregroundStyle(Palette.quiet)
                 .multilineTextAlignment(.center)
                 .lineLimit(2, reservesSpace: true)
@@ -106,7 +106,7 @@ struct MBArtistView: View {
     private var albumsHead: some View {
         HStack(alignment: .firstTextBaseline) {
             Text(ArtistWords.albumsHeading)
-                .font(.title3.weight(.semibold))
+                .font(Typeface.title3.weight(.semibold))
                 .accessibilityAddTraits(.isHeader)
             Spacer(minLength: 8)
             if reachability.online {
@@ -114,7 +114,7 @@ struct MBArtistView: View {
                     model.toggleStudio(client: server.client, online: reachability.online)
                 }))
                 .toggleStyle(.button)
-                .font(.footnote)
+                .font(Typeface.footnote)
             }
         }
         .padding(.top, 24)
@@ -202,12 +202,12 @@ private struct MBArtistAlbumRow: View {
                         HStack(alignment: .firstTextBaseline, spacing: 4) {
                             if marked {
                                 Image(systemName: "checkmark")
-                                    .font(.caption2.weight(.bold))
+                                    .font(Typeface.symbol(.caption2).weight(.bold))
                                     .foregroundStyle(Palette.held)
                                     .accessibilityHidden(true)
                             }
                             Text(line.isEmpty ? " " : line)
-                                .font(.subheadline)
+                                .font(Typeface.subheadline)
                                 .foregroundStyle(Palette.quiet)
                         }
                     }
@@ -218,7 +218,7 @@ private struct MBArtistAlbumRow: View {
                             .accessibilityHidden(true)
                     } else {
                         Image(systemName: "chevron.right")
-                            .font(.footnote.weight(.semibold))
+                            .font(Typeface.symbol(.footnote).weight(.semibold))
                             .foregroundStyle(.tertiary)
                             .accessibilityHidden(true)
                     }

@@ -72,7 +72,7 @@ struct LyricsView: View {
                         .accessibilityHidden(true)
                     if !synced {
                         Text(LyricsWords.notSynced)
-                            .font(.footnote)
+                            .font(Typeface.footnote)
                             .foregroundStyle(Palette.quiet)
                             .fixedSize(horizontal: false, vertical: true)
                             .padding(.bottom, Lyrics.lineSpace / 2)
@@ -176,7 +176,7 @@ struct LyricsView: View {
 
     private func lineText(_ text: String, color: Color) -> some View {
         Text(text)
-            .font(.system(.title, weight: .bold))
+            .font(Typeface.title.weight(.bold))
             .foregroundStyle(color)
             .multilineTextAlignment(.leading)
             .fixedSize(horizontal: false, vertical: true)

@@ -151,13 +151,13 @@ struct UpNextScreen: View {
                                     .onDisappear { seen.ids.remove(Self.card) }
                                 if view.repeatOne {
                                     Text(UpNextWords.repeatingOne)
-                                        .font(.footnote)
+                                        .font(Typeface.footnote)
                                         .foregroundStyle(Palette.quiet)
                                 }
                                 modes
                                 if player.paged != nil {
                                     Text(UpNextWords.shufflingLibrary)
-                                        .font(.footnote)
+                                        .font(Typeface.footnote)
                                         .foregroundStyle(Palette.quiet)
                                 }
                             }
@@ -168,15 +168,18 @@ struct UpNextScreen: View {
                                         view.added.indices.contains(index + 1) ? view.added[index + 1] : listRows.first
                                     }
                                 } header: {
-                                    HStack {
-                                        Text(UpNextWords.playingNext)
-                                            .accessibilityAddTraits(.isHeader)
-                                        Spacer()
-                                        Button(UpNextWords.clear, action: clear)
-                                            .buttonStyle(.borderless)
-                                            .font(.subheadline)
+                                    Group {
+                                        HStack {
+                                            Text(UpNextWords.playingNext)
+                                                .accessibilityAddTraits(.isHeader)
+                                            Spacer()
+                                            Button(UpNextWords.clear, action: clear)
+                                                .buttonStyle(.borderless)
+                                                .font(Typeface.subheadline)
+                                        }
+                                        .textCase(nil)
                                     }
-                                    .textCase(nil)
+                                    .font(Typeface.footnote)
                                 }
                             }
 
@@ -188,20 +191,23 @@ struct UpNextScreen: View {
                                     }
                                     if list.more > 0 {
                                         Text(UpNextWords.more(list.more))
-                                            .font(.footnote)
+                                            .font(Typeface.footnote)
                                             .foregroundStyle(Palette.quiet)
                                     }
                                 } header: {
-                                    Text(list.title)
-                                        .textCase(nil)
-                                        .accessibilityAddTraits(.isHeader)
+                                    Group {
+                                        Text(list.title)
+                                            .textCase(nil)
+                                            .accessibilityAddTraits(.isHeader)
+                                    }
+                                    .font(Typeface.footnote)
                                 }
                             }
 
                             if let then = view.then {
                                 Section {
                                     Text(then)
-                                        .font(.footnote)
+                                        .font(Typeface.footnote)
                                         .foregroundStyle(Palette.quiet)
                                 }
                             }
@@ -366,15 +372,15 @@ struct UpNextScreen: View {
                 if line.isEmpty {
                     HStack(alignment: .firstTextBaseline, spacing: 4) {
                         Text(playing.title)
-                            .font(.headline)
+                            .font(Typeface.headline)
                         UpNextSongMark(songID: playing.id)
                     }
                 } else {
                     Text(playing.title)
-                        .font(.headline)
+                        .font(Typeface.headline)
                     HStack(alignment: .firstTextBaseline, spacing: 4) {
                         Text(line)
-                            .font(.subheadline)
+                            .font(Typeface.subheadline)
                             .foregroundStyle(Palette.quiet)
                         UpNextSongMark(songID: playing.id)
                     }
@@ -522,7 +528,7 @@ struct UpNextScreen: View {
                 Image(systemName: "minus.circle.fill")
                     .symbolRenderingMode(.palette)
                     .foregroundStyle(.white, .red)
-                    .font(.title3)
+                    .font(Typeface.symbol(.title3))
                     .frame(minWidth: 44, minHeight: 44)
                     .contentShape(Rectangle())
             }
@@ -564,7 +570,7 @@ struct UpNextScreen: View {
                     .foregroundStyle(.primary)
                 HStack(alignment: .firstTextBaseline, spacing: 4) {
                     Text(line)
-                        .font(.footnote)
+                        .font(Typeface.footnote)
                         .foregroundStyle(Palette.quiet)
                     UpNextSongMark(songID: track.id)
                 }
@@ -624,7 +630,7 @@ private struct UpNextSongMark: View {
     var body: some View {
         let state = downloads.state(songID)
         if let mark = DownloadWords.mark(state) {
-            DownloadMark(mark: mark, fraction: DownloadWords.Mark.fraction(state), font: .caption)
+            DownloadMark(mark: mark, fraction: DownloadWords.Mark.fraction(state), font: Typeface.symbol(.caption))
                 .fixedSize()
         }
     }
@@ -689,7 +695,7 @@ private struct Chip: View {
     var body: some View {
         Button(action: action) {
             Label(label, systemImage: glyph)
-                .font(.subheadline.weight(.medium))
+                .font(Typeface.subheadline.weight(.medium))
                 .padding(.horizontal, 12)
                 .padding(.vertical, 8)
                 .foregroundStyle(on ? Color.black : Color.primary)
