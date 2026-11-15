@@ -430,13 +430,13 @@ def test_two_users_saves_never_wait_on_each_other(player):
 
     async def both():
         async with async_client(player, ethan) as first, async_client(player, james) as second:
-            started = time.monotonic()
-            answers = await asyncio.gather(first.post(QUEUE, json=body(ids)), second.post(QUEUE, json=body(ids[::-1])))
-            return answers, time.monotonic() - started
+            return await asyncio.gather(first.post(QUEUE, json=body(ids)), second.post(QUEUE, json=body(ids[::-1])))
 
-    (one, two), took = asyncio.run(both())
+    one, two = asyncio.run(both())
     assert one.status_code == two.status_code == 200
-    assert timed.most == 2 and took < 0.35
+    #? both saves were out at Navidrome at once: neither waited on the other's lock. No wall-clock bound - a busy CI
+    #? runner made the 0.2 s writes take over 0.35 s together (2.1.26), while `most` says the same thing exactly
+    assert timed.most == 2
 
 
 # ----------------------------------------------------------------- whose queue it is
