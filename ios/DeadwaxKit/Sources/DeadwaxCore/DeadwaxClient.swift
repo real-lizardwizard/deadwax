@@ -195,6 +195,20 @@ public struct DeadwaxClient: Sendable {
         try await answer(coverRequest(coverID: coverID, size: size)).body
     }
 
+    /// A cover as large as Navidrome has it - the cover viewer's (notes/ios.md "The cover, full screen"): the same
+    /// route with no `size`, which deadwax passes on to getCoverArt as none, and Navidrome then sends the picture
+    /// unresized.
+    public func fullCoverRequest(coverID: String) -> HTTPRequest {
+        var built = request(Routes.cover, path: ["cover_id": coverID])
+        built.headers["Accept"] = "image/*"
+        return built
+    }
+
+    /// Fetches a cover's bytes at the largest size there is.
+    public func fullCover(coverID: String) async throws -> Data {
+        try await answer(fullCoverRequest(coverID: coverID)).body
+    }
+
     /// A cover's bytes, or `.unchanged` when the copy kept (its ETag `ifNoneMatch`) is still the cover - deadwax
     /// passes Navidrome's revalidation on as a 304 with no body.
     public func cover(coverID: String, size: Int, ifNoneMatch etag: String?) async throws -> Fetched<Data> {

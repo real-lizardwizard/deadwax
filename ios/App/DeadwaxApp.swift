@@ -220,6 +220,9 @@ enum Palette {
     static let toggledEdge = colour(TurntablePalette.toggledEdge)
     /// --dw-pressed rgba(255, 255, 255, 0.06): the speed chip's face under a finger (app.css .app-speed-chip:active).
     static let pressed = Color.white.opacity(0.06)
+    /// --dw-bg #000, the page on a phone - the darkest of the app's grounds: the cover viewer's, under the cover full
+    /// screen (notes/ios.md "The cover, full screen").
+    static let page = Color(red: 0x00 / 255, green: 0x00 / 255, blue: 0x00 / 255)
 
     // The app's own bars (the squared look, 14 Nov): the tab bar along the foot, as the web's .app-tabbar, and the
     // Library's top with its switch, as the web's .app-segmented.

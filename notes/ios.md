@@ -9952,3 +9952,67 @@ with its VoiceOver name and state.
 **Verified**: the unsigned Debug device build; the test above and the full pytest suite. **Not verified** - only the
 phone can tell: that the title reads whole beside the words, the glass one size up, and the field opening above the
 chips with the keyboard (docs/ios.md check 247).
+
+## The cover, full screen (2026-11-15)
+
+James: "maybe when you tap the album art in the play screen it should become full screen so you can zoom in and look
+at it." Now Playing's cover opens full screen on a tap; there it pinch-zooms, double-taps in and out, pans, and closes
+by a swipe down, ✕ or VoiceOver's escape. The rules are DeadwaxCore's `CoverZoom` and `CoverViewerWords`
+(ios/DeadwaxKit/Sources/DeadwaxCore/CoverViewer.swift, tested on Linux); the app's half is two new files,
+ios/App/Player/CoverViewer.swift (the tap, the presentation, the loading) and CoverZoomView.swift (the zoom), and one
+line in NowPlayingView.swift.
+
+- **A tap, never the drag.** The cover is also Now Playing's grip: its `DragGesture` on the whole face closes Now
+  Playing by a drag down. The cover takes `.onTapGesture` alone (`opensCoverFullScreen(track)`, after its clip): the grip's
+  drag begins after 6 points' movement (`PlayerWords.dragStartDistance`) and the tap fails when it does, so a drag is
+  still entirely the grip's, unchanged. Only the plain
+  cover's branch has it: Lyrics' and the turntable's places open nothing. A song with no cover opens nothing and the
+  grey square isn't a button to VoiceOver.
+- **The presentation**: `fullScreenCover(item:)` with the transaction's animations off (no slide up) and a
+  `.clear` presentation background, then a 0.2-second ease-out fade of the viewer's own ground and cover; closing fades
+  out first, then dismisses. The ground is `Palette.page`, new: theme.css's `--dw-bg` #000, the darkest of the app's
+  grounds (`test_ios_cover_viewer.py` holds it to theme.css). The status bar is hidden while it shows. ✕ is a 36-point
+  glyph on `Palette.card` in `Corners.controlShape`, with a 44-point target, top right.
+- **Drawn at once, then the full size.** The viewer opens on the cover Now Playing already has (CoverCache's
+  largest step kept, 1024 down to 128; else the downloaded album's KeptCovers file at the hero size), then asks
+  `fullCover(coverID:)` - the existing relay, `/deadwax/navidrome/cover/{cover_id}`, with no `size`, which the route
+  leaves out of its getCoverArt call, so Navidrome sends the original (test_ios_cover_viewer.py drives the route with a
+  fake transport to hold that). It's decoded off the main actor through ImageIO's thumbnail call capped at 4096 pixels
+  on the longer side (a 6000-pixel scan as a full bitmap is 144 MB; capped, 64 MB), with the EXIF orientation applied,
+  and crossfaded in over the drawn one (0.2 s; at once under Reduce Motion) where it was, keeping the zoom and the
+  place. It's only shown if it's at least as big as what's drawn (`showsFull`). Offline it asks nothing. The last
+  cover's bytes are kept, one cover at a time, so opening it again fetches nothing (only the decode again); a memory
+  warning lets them go.
+- **The zoom: a UIScrollView, through UIViewRepresentable.** iOS 17's SwiftUI has no zooming scroll view, so a pinch
+  about the fingers, a pan that carries on after a flick and stops at the edges, a spring past the zoom's ends and
+  zoom-to-a-rect would all be gestures written by hand and tuned without a phone. UIScrollView is the way Photos'
+  behaviour comes for free: `viewForZooming` the image view; centred by `contentInset` while smaller than the screen;
+  `bounces = false` so a pan never pulls past an edge, with `bouncesZoom = true` so only the pinch springs back past
+  its ends; double-tap is a two-tap recognizer and `zoom(to:animated:)` on the rect around the point tapped.
+- **The numbers (decided here, not measured on the phone)**: the most zoom is twice the cover's native size on the
+  screen, held between 3 and 8 (`maximum(pixels:fitted:scale:)` - a 600-pixel cover fitted 402 points wide at 3x is
+  3; a 3000-pixel one is 5); recomputed when the full size lands, the zoom kept. Double-tap zooms to 2.5 (or the most,
+  if lower), and from anything zoomed, back to 1. The close: a swipe down only when not zoomed (a zoom within 1% of 1
+  counts), recognised by its own pan that the scroll view's pan waits on, beginning only downward and mostly
+  vertical; the cover follows the finger and the ground fades to 25% over 300 points; let go 100 points down, or
+  flicked at 900 points a second or more, and it closes; otherwise it springs back.
+- **VoiceOver**: the scroll view is one element, the image named for the album ("Cover of Dummy, by Portishead"),
+  adjustable - swipe up and down zoom by twice, half (snapping to 1 under 1.5) - its value "Not zoomed" or "Zoomed 2.5
+  times"; zoomed, three-finger scrolls move by a screen and say where ("Showing the top left of the cover"); the
+  two-finger Z (accessibilityPerformEscape, on it and on the viewer) closes it. ✕ reads "Close". The viewer is modal,
+  so VoiceOver doesn't wander back into Now Playing beneath it.
+- **Nothing in the player moved**: the viewer reads the QueueTrack it was handed and the cover caches; no engine
+  file, no audio call (`test_ios_cover_viewer.py` holds that the new files never name the player).
+
+**Tests**: CoverViewerTests (DeadwaxCore: every CoverZoom rule, every word, and that `fullCoverRequest` sends no size
+and asks for an image, the sized one unchanged) and tests/test_ios_cover_viewer.py (the tap after the clip and only on
+the cover's branch, the grip's DragGesture unchanged, the presentation and its black, the three closes, the scroll
+view's edges and double-tap, VoiceOver's element and actions, drawn-then-full, the player untouched, and the route
+leaving size out).
+
+**Verified**: the Core tests and the full swift test, the unsigned Debug device build (no warnings), the source tests
+and the full pytest suite. **Not verified** - only the phone can tell: a tap and a drag on the real cover (that a slow
+drag never opens it), the fade, the full size landing without a jump, the pinch's feel and its limits, the edges
+stopping dead (rather than Photos' little spring), whether Now Playing shows through the fading ground as you drag
+(the clear presentation background says it should), VoiceOver's reading, and the music going on undisturbed
+(docs/ios.md checks 271-278).

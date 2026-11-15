@@ -149,6 +149,8 @@ struct NowPlayingView: View {
                         CoverImage(id: track.coverArt, size: 360)
                             .frame(maxWidth: 360)
                             .clipShape(Corners.artShape)
+                            // a tap opens the cover full screen; a drag is still the grip's (CoverViewer.swift)
+                            .opensCoverFullScreen(track)
                             .shadow(color: .black.opacity(0.4), radius: 24, y: 12)
                             .scaleEffect(player.isPlaying ? 1 : Self.pausedScale)
                             .animation(.spring(response: 0.45, dampingFraction: 0.7), value: player.isPlaying)

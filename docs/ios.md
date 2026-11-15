@@ -1052,6 +1052,18 @@ bar does.
 - **The button at the top right** shows Now Playing as [a turntable](#the-turntable) instead, and back.
 - The chevron at the top, or a swipe down, closes it.
 
+**Tap the cover** to see it full screen, on black, as large as Navidrome has it: the cover Now Playing shows comes at
+once, and the full-size picture takes its place as it arrives. Pinch to zoom (as far as 3 times for an ordinary cover,
+further for a large one, up to 8), double-tap to zoom in where you tapped and again to zoom back out, and drag to look
+around while zoomed - it stops at the cover's edges. To close it, swipe down when it isn't zoomed, or tap **✕** at the
+top right. Only a tap opens it: a drag down on the cover still closes Now Playing. With Lyrics or the turntable showing,
+there's no cover to tap. The full size is asked of deadwax only while it can be reached; offline, a downloaded album's
+cover opens at Now Playing's size. The music isn't touched by any of it.
+
+With VoiceOver, Now Playing's cover reads "Cover of Dummy - show full screen". Full screen, the picture reads "Cover of
+Dummy, by Portishead" and says how far it's zoomed: swipe up or down to zoom, scroll with three fingers to look around
+while zoomed, and the escape gesture (a two-finger Z) or **Close** closes it.
+
 ### The turntable
 
 Now Playing has a second look, as the web app's does: the song on a record turning on a turntable.
@@ -3562,6 +3574,40 @@ with Wi-Fi off. 237-243 want logins on, and 241 two accounts (one an admin); 244
   cards: the field moves down there; tap that one again and it closes. At a larger text size (Settings > Display &
   Brightness > Text Size, one step up), the top one is a magnifying glass and the title still reads whole. With
   VoiceOver, both read "Search again, button, collapsed" (expanded once open).
+
+### The cover full screen's checks (271-278)
+
+**Not done yet.** These come with the build that lets Now Playing's cover open full screen (still app 0.13 (13)).
+
+- **271 A tap, or a drag.** Play something and open Now Playing. Tap the cover: it fades in full screen on black, the
+  status bar gone, **✕** at the top right. Close it. Now drag down on the cover: Now Playing follows your finger and
+  closes as it always has, and the cover never opens. A tap with a slight wobble still opens it (the drag begins after
+  6 points' movement). Try a slow drag that starts very gently, too: does it ever open the cover instead of closing Now
+  Playing? With Lyrics on, and with the
+  turntable, tapping their place opens nothing.
+- **272 The full size.** Open a cover you know is large in its file (a scan of 3000 pixels or more): Now Playing's
+  cover shows at once, then sharpens a moment later without moving or jumping. Zoom right in: the detail holds. Close
+  and open it again: it sharpens almost at once, with nothing fetched again. Over WireGuard, the same, slower. With Wi-Fi and WireGuard off, a downloaded
+  album's cover still opens, at Now Playing's sharpness. A song with no cover: tapping its grey square opens nothing.
+- **273 Pinching.** Pinch to zoom in: it zooms about your fingers and stops at a sensible most - about 3 times for an
+  ordinary cover, more for a big one - with a small spring past it. Pinch it smaller than the screen: it springs back.
+- **274 Double-tap.** Double-tap near a corner of the cover: it zooms in on that corner. Double-tap again: back to the
+  whole cover. Both slide smoothly (at once with Reduce Motion on).
+- **275 Panning.** Zoomed in, drag around: it follows, carries on a little when flicked, and stops at each of the
+  cover's edges - no black opens past them, and it never pulls past an edge and springs back. Does stopping dead at an
+  edge feel right, or would Photos' little spring be better?
+- **276 Closing.** Not zoomed, drag the cover down: it follows your finger and the black fades; let go a short way down
+  and it springs back; let go further (about a thumb's length), or flick it down, and it fades away to Now Playing just
+  as you left it. As you drag, does Now Playing show through the fading black, or is it black behind? Zoomed in, a drag
+  down moves around the cover instead and never closes it. **✕** closes it.
+- **277 VoiceOver.** On Now Playing, the cover reads "Cover of Dummy - show full screen, button"; a double-tap opens it.
+  Full screen, **Close** reads "Close, button" and the picture "Cover of Dummy, by Portishead, Not zoomed, adjustable,
+  image". Swipe up: "Zoomed 2 times", then twice that, up to the most (3 times for most covers); swipe down
+  goes back, to "Not zoomed". Zoomed, a three-finger swipe moves
+  about it and says where ("Showing the top left of the cover"); at an edge it says there's no more. The two-finger Z
+  closes it, from the picture and from Close.
+- **278 The music.** Open, zoom and close the cover a few times while a song plays: the song plays on with no gap or
+  glitch, and the lock screen and Control Center don't change.
 
 ## What it can't do yet
 
