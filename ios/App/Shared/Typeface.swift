@@ -69,24 +69,35 @@ enum Typeface {
     }
 
     /// A face for UIKit at a text style's size, scaled for the text size in use - iOS's own font if the face somehow
-    /// isn't registered, never nothing.
-    static func uiFont(_ face: Face, size: CGFloat, style: UIFont.TextStyle) -> UIFont {
+    /// isn't registered, never nothing. Capped (after review, 15 Nov) at the style's size at xxxLarge, the app's tab
+    /// bar's cap (AppTabBar's `dynamicTypeSize(...xxxLarge)`): what these fonts go into - the inline title, the bars'
+    /// buttons and the back button, a search field, a segmented control - is a bar or a control of a fixed height, and
+    /// uncapped they reached about 53 pt in a 44 pt bar at the largest size. `capped: false` for the large title alone,
+    /// which grows as iOS's own does.
+    static func uiFont(_ face: Face, size: CGFloat, style: UIFont.TextStyle, capped: Bool = true) -> UIFont {
         let metrics = UIFontMetrics(forTextStyle: style)
-        guard let font = UIFont(name: face.rawValue, size: size) else {
-            return metrics.scaledFont(for: .systemFont(ofSize: size))
-        }
-        return metrics.scaledFont(for: font)
+        let font = UIFont(name: face.rawValue, size: size) ?? .systemFont(ofSize: size)
+        guard capped else { return metrics.scaledFont(for: font) }
+        return metrics.scaledFont(for: font, maximumPointSize: cap(size, style))
+    }
+
+    /// The cap: a style's size at xxxLarge, the largest of the standard text sizes - 23 for the 17 of the body and the
+    /// headline, 19 for the footnote's 13.
+    static func cap(_ size: CGFloat, _ style: UIFont.TextStyle) -> CGFloat {
+        let largest = UITraitCollection(preferredContentSizeCategory: .extraExtraExtraLarge)
+        return UIFontMetrics(forTextStyle: style).scaledValue(for: size, compatibleWith: largest)
     }
 
     /// The faces for what UIKit draws, set on its appearance proxies once at launch (AppDelegate): a large title Bold
     /// at 34 (iOS's), an inline title SemiBold at 17, the bars' buttons and the back button Regular at 17, a search
     /// field's words Regular at 17, a segmented control's Regular at 13 and its chosen segment's SemiBold. Only the
     /// font is set - every colour, background and shape is still iOS's. They take the text size the app opened at:
-    /// one changed while it's open reaches the bars when it next opens.
+    /// one changed while it's open reaches the bars when it next opens. All but the large title stop growing at
+    /// xxxLarge (`uiFont`'s cap), as the app's tab bar does.
     @MainActor
     static func configureUIKit() {
         let bar = UINavigationBar.appearance()
-        bar.largeTitleTextAttributes = [.font: uiFont(.bold, size: 34, style: .largeTitle)]
+        bar.largeTitleTextAttributes = [.font: uiFont(.bold, size: 34, style: .largeTitle, capped: false)]
         bar.titleTextAttributes = [.font: uiFont(.semibold, size: 17, style: .headline)]
         let button = [NSAttributedString.Key.font: uiFont(.regular, size: 17, style: .body)]
         for state in [UIControl.State.normal, .highlighted, .disabled] {
