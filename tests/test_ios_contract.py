@@ -1902,3 +1902,33 @@ def test_the_sources_sheet_runs_the_very_search_again_offline_and_lets_it_go_as_
     for function in ("func start(", "private func run(", "private func pick(", "func download()"):
         body = _block(search, search.index("{", search.index(function)))
         assert "!closed" in body, function
+
+
+def test_search_again_sits_above_the_cards_as_well_as_under_them():
+    # (James, 2026-11-15: "search again should be somewhere near the top as well") - above the cards, at the right of
+    # how many are shown, so a long list needn't be scrolled to its end to try other words; still under folders found
+    app = CORE.parent.parent.parent / "App"
+    sheet = _code((app / "Get" / "SourcesSheet.swift").read_text(encoding="utf-8"))
+    found = _block(sheet, sheet.index("{", sheet.index("private func found(")))
+    assert found.count("searchAgain(.top, shown: shown.count)") == 1 and found.count("searchAgain(.bottom)") == 2
+    cards = found.index("ForEach(shown)")
+    assert found.index("searchAgain(.top") < cards < found.index("Sources.searchedLine(answer") < found.rindex(
+        "searchAgain(.bottom)")
+    # none passing the chips is a short page: Search again only under "none match", as before
+    none = found.index("Sources.noneMatchLine(")
+    assert none < found.index("searchAgain(.bottom)") < cards
+    # one form at a time, under the one tapped - a second tap closes it, the other's moves it - closed as a search starts
+    assert "@State private var again: AgainPlace?" in sheet
+    assert "again = again == place ? nil : place" in sheet
+    for function in ("private func begin(", "private func requery("):
+        assert "again = nil" in _block(sheet, sheet.index("{", sheet.index(function))), function
+    again = _block(sheet, sheet.index("{", sheet.index("private func searchAgain(")))
+    assert "if again == place {" in again and "queryForm(focus: true)" in again
+    # each a 44-point target, saying whether it is open; the count beside it is the cards shown, in Core's words
+    above = _block(sheet, sheet.index("{", sheet.index("private func againAbove(")))
+    assert ".frame(minHeight: 44)" in above and ".contentShape(Rectangle())" in above
+    assert "again == .top ? SourcesWords.expanded : SourcesWords.collapsed" in above
+    assert "again == .bottom ? SourcesWords.expanded : SourcesWords.collapsed" in again
+    assert "Text(Sources.sourcesCount(shown))" in above
+    # and at the largest text sizes the two stack rather than squeeze
+    assert "ViewThatFits(in: .horizontal)" in above and "VStack(alignment: .leading" in above

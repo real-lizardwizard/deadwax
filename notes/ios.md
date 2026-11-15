@@ -9917,3 +9917,30 @@ app 0.13 (13), the .xcodeproj unchanged and `check_project.py` ok; the exporter'
 
 **Not verified** - only the phone can tell: that openURL's completion says `false` with Safari turned off in Screen
 Time, so the notice shows (check 245); the notice read by VoiceOver after the tap.
+
+## Search again above the cards (2026-11-15)
+
+James: "When finding a peer, search again should be somewhere near the top as well." Choose a source had Search again
+only under the cards (and under "none match your filters"), so with forty sources the way to try other words was a
+scroll to the end. The web's sheet (ui/src/app/Sources.tsx) has it in the same one place; this change is the phone's
+alone, and the web is left as it is until James says otherwise.
+
+- **Where**: above the first card, a row with how many cards are shown at the left (`Sources.sourcesCount(shown)` -
+  Core's words, the web's `sourcesCount`) and **Search again** at the right, in subheadline, its label framed to 44
+  points with a content shape so the whole height takes the tap. The one under the cards stays as it was; "none match"
+  keeps only its own, its page being short already. When the text is too large for the two on one line,
+  `ViewThatFits` stacks them (the count, then the button).
+- **One form at a time**: `again` is now `AgainPlace?` (`.top`, `.bottom`) rather than a Bool, and the query form opens
+  under whichever was tapped; a second tap closes it, the other's moves it there (its field focused again by the form's
+  own `.task`, as before). A search starting - begin() or requery() - closes it, as it did.
+- Nothing else changed: the field, Search, an edited query searched as typed, and offline (the form's Search off) are
+  queryForm's, shared by both.
+
+**Tests**: `test_search_again_sits_above_the_cards_as_well_as_under_them` (tests/test_ios_contract.py) holds the top one
+before the cards and the bottom ones after "none match" and after the searched line, the optional place and its
+toggle, both closed by begin() and requery(), the 44-point target, each one's expanded/collapsed, the count from Core,
+and the stacking.
+
+**Verified**: the unsigned Debug device build; the test above and the full pytest suite. **Not verified** - only the
+phone can tell: the row's look beside the first card, the field focusing under the top one, and the stacking at the
+largest text sizes (docs/ios.md check 247).
