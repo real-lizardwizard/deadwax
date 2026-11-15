@@ -17,8 +17,10 @@ every song, a page at a time - and Phase 5's Search: your library and MusicBrain
 app's Search searches them, one list with Top results, a song playing from its tap, the albums, artists
 and songs you don't have yet after yours (an album opening its pressings and their tracklists, an artist
 their albums), what deadwax has saved of MusicBrainz's answers drawn at once, and More from MusicBrainz a
-page at a time - kept on the `ios` branch while it's being built. Nothing of Phase 2, the lyrics, the EQ, the turntable, play history, Phase 3,
-Phase 4 or Search has been seen on an iPhone yet.
+page at a time - and Phase 6's Requests: every download you asked for under the web app's four headings, cancelled,
+tried again and cleared on the phone, a finished album opened or played from its row, the tab's badge counting
+what's on its way - kept on the `ios` branch while it's being built. Nothing of Phase 2, the lyrics, the EQ, the
+turntable, play history, Phase 3, Phase 4, Search or Requests has been seen on an iPhone yet.
 Phase 0's test screen lives on in the app's Debug.
 
 - **To install it, and every week after:** [docs/ios.md](../docs/ios.md) - the steps once on the Mac

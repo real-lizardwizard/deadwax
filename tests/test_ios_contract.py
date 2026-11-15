@@ -53,8 +53,14 @@ And slice 4's artists (phase4-library.md 2.6): ArtistList, Artist and ArtistWith
 index flattened under "artists") and /artists/{id} (getArtist's artist as Navidrome sent it, `{}` for none) return -
 every field the phone reads one Navidrome sends, the id the one it can't do without - over the routes' own tests'
 answers (tests/test_navidrome_artists.py).
+
+And Phase 6's Requests (notes/ios-specs/phase6-get-requests.md): DownloadJob and JobsAnswer to what /download/jobs
+builds (its merged row, the transfer summary, the runners-up, who asked and the library grant) and to a real answer of
+the route; CancelAnswer, RetryAnswer, RetrySameAnswer and ClearAnswer to what the four writes and the poller's retries
+return, the statuses the phone reads, and the writes' time to answer held above what deadwax may take.
 """
 
+import asyncio
 import importlib.util
 import inspect
 import json
@@ -71,7 +77,8 @@ from fastapi.testclient import TestClient
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from src import auth, autoeq, levels, loudness, lyrics, users  # noqa: E402
+from src import auth, autoeq, levels, loudness, lyrics, poller, users  # noqa: E402
+from src import store as store_module  # noqa: E402
 from src.artists import artist_match  # noqa: E402
 from src import play_history as history_rules  # noqa: E402
 from src import playlists as playlist_rules  # noqa: E402
@@ -83,6 +90,7 @@ from src.routes import eq as eq_route  # noqa: E402
 from src.routes import library as library_route  # noqa: E402
 from src.api import musicbrainz_endpoint  # noqa: E402
 from src.routes import coverart as coverart_route  # noqa: E402
+from src.routes import download as download_route  # noqa: E402
 from src.routes import my_library, navidrome, search_musicbrainz, store_album  # noqa: E402
 from src.routes import play_history as history_route  # noqa: E402
 from src.routes.auth import SignIn  # noqa: E402
@@ -91,7 +99,7 @@ from src.store import JobStore  # noqa: E402
 
 CORE = Path(__file__).resolve().parent.parent / "ios" / "DeadwaxKit" / "Sources" / "DeadwaxCore"
 ENDPOINT = re.compile(r'Endpoint\(method: "(\w+)", path: "([^"]+)", query: \[([^\]]*)\]\)')
-ROUTE_COUNT = 49
+ROUTE_COUNT = 54
 RAW_OPENING = re.compile(r'#+"')
 HASHES = re.compile(r"#*")
 
@@ -1261,9 +1269,12 @@ def test_the_app_waits_for_musicbrainz_as_long_as_deadwax_does():
 
 
 def test_a_held_album_is_found_by_its_release():
-    # the id bridge asked by a release you hold (DeadwaxClient.navidromeAlbum(releaseMbid:)), its navidrome_id read
+    # the id bridge asked by a release you hold (DeadwaxClient.navidromeAlbum(releaseMbid:)), its navidrome_id read -
+    # since Phase 6's slice 1 through storeAlbum(releaseMbid:), the whole answer, which a Done row's note reads too
     text = _code((CORE / "DeadwaxClient.swift").read_text(encoding="utf-8"))
-    assert 'call(Routes.storeAlbum, as: StoreAlbum.self, query: [("release_mbid", releaseMbid)])' in text
+    assert 'func storeAlbum(releaseMbid: String) async throws -> StoreAlbum {' in text
+    assert 'call(Routes.storeAlbum, query: [("release_mbid", releaseMbid)])' in text
+    assert "let answer = try await storeAlbum(releaseMbid: releaseMbid)" in text
     assert "release_mbid" in inspect.signature(store_album.store_album).parameters
     assert "navidrome_id" in fields("StoreAlbum")
 
@@ -1431,3 +1442,136 @@ def test_the_apps_kept_answers_last_deadwaxs_own_hour():
     found = re.search(r"public static let lifetime: Double = ([\d_]+)\b", body.group(1))
     assert found, "no SearchAnswersKept.lifetime"
     assert float(found.group(1).replace("_", "")) == hour
+
+
+# ---------------------------------------------------------------------------- Phase 6, slice 1: Requests
+
+PER_PERSON = {"mine", "shared", "requested_by", "library"}
+
+
+def _jobs_row_keys() -> tuple[set[str], set[str]]:
+    """What /download/jobs can send of a row, from its source: the merged literal's own keys (always sent), with the
+    transfer summary, the runners-up, who asked and the library grant laid on - and the always-sent ones alone."""
+    source = inspect.getsource(download_route.jobs)
+    opening = re.search(r"merged\.append\(\{", source)
+    assert opening, "no merged.append({...}) in the jobs route"
+    always = literal_keys(_block(source, opening.end() - 1))
+    summary = set().union(*(literal_keys(one) for one in returned_literals(store_module.summarize_transfers)))
+    #? a finished job's summary is the route's own literal, the open one's summarize_transfers'
+    assert '"files_total": len(job["files"]), "matched": False}' in source
+    assert '**({"alternatives_left": len(untried_alternatives(job))}' in source
+    assert '**({"library": job.get("library_grant")} if logins else {})' in source
+    assert "**_per_person(job, user, admin)" in source
+    person = set().union(*(literal_keys(one) for one in returned_literals(download_route._per_person)))
+    assert '**({"requested_by": others} if admin else {})' in inspect.getsource(download_route._per_person)
+    return always | summary | person | {"alternatives_left", "library", "requested_by"}, always
+
+
+def test_a_download_is_read_as_the_jobs_route_sends_it():
+    # every field the phone reads of a row is one the route sends, and the two it can't do without - the id and the
+    # status - are in the literal every row is built from, never null; the rest are read leniently (looseField)
+    sent, always = _jobs_row_keys()
+    reads = set(fields("DownloadJob"))
+    assert reads <= sent, f"DownloadJob reads {sorted(reads - sent)}, never sent"
+    assert required_fields("DownloadJob") == {"id", "status"} <= always
+    assert PER_PERSON <= reads
+    body = swift_struct("DownloadJob")
+    assert body.count("c.looseField(") + body.count("c.looseList(") == len(reads) - 2
+    # the answer: both returns carry both keys
+    answers = returned_literals(download_route.jobs)
+    assert len(answers) == 2 and all(literal_keys(one) == {"jobs", "tracking_enabled"} for one in answers)
+    assert required_fields("JobsAnswer") == {"jobs", "tracking_enabled"}
+
+
+def test_the_jobs_route_answers_what_the_app_decodes(monkeypatch, tmp_path):
+    # through the real route with logins off (one user, every download theirs): a download on its way, one filed and
+    # one failed with a runner-up left - every field the phone reads is in one of them, but who asked and the library
+    # grant, which are sent only with logins on (the source test above holds those)
+    monkeypatch.setattr(Config, "AUTH_MODE", None)
+    files = [{"filename": f"share\\Dummy\\0{n}.flac", "size": 10} for n in (1, 2)]
+    release = {"artist": "Portishead", "album": "Dummy", "year": "1994", "release_mbid": "rel-dummy",
+               "release_group_mbid": "rg-dummy", "disambiguation": "2014 vinyl", "tracks": []}
+
+    class Slskd:
+        async def get_downloads(self, usernames=()):
+            return [{"username": "bob", "directories": [{"directory": "d", "files": [
+                {"id": "t1", "filename": files[0]["filename"], "state": "Queued, Remotely", "percentComplete": 0,
+                 "averageSpeed": 0, "bytesTransferred": 0}]}]}]
+
+        async def queue_position(self, username, transfer_id):
+            return 4
+
+    store = JobStore(str(tmp_path / "deadwax.db"))
+    store.init()
+
+    async def jobs():
+        await store.create_job("bob", "share\\Dummy", files, release, [])
+        filed = await store.create_job("dave", "share\\Dummy", files, release, [])
+        await store.update_status(filed, "organized")
+        failed = await store.create_job("erin", "share\\Dummy", files, release,
+                                        [{"username": "carol", "directory": "x", "files": files}])
+        await store.update_status(failed, "failed", "the peer went offline")
+
+    asyncio.run(jobs())
+    app = start()
+    app.state.store = store
+    app.state.slskd_client = Slskd()
+    answer = TestClient(app).get("/deadwax/download/jobs")
+    assert answer.status_code == 200
+    body = answer.json()
+    assert set(body) == {"jobs", "tracking_enabled"} and body["tracking_enabled"] is True
+    rows = body["jobs"]
+    assert sorted(row["status"] for row in rows) == ["failed", "organized", "queued"]
+    for row in rows:
+        assert all(row.get(name) is not None for name in required_fields("DownloadJob")), row
+    seen = set().union(*(set(row) for row in rows))
+    missing = set(fields("DownloadJob")) - PER_PERSON - seen
+    assert not missing, f"DownloadJob reads {sorted(missing)}, which no row sent"
+    queued = next(row for row in rows if row["status"] == "queued")
+    assert (queued["queue_position"], queued["matched"], queued["files_total"]) == (4, True, 2)
+    assert next(row for row in rows if row["status"] == "failed")["alternatives_left"] == 1
+
+
+def test_the_four_writes_answer_what_the_app_decodes():
+    # a cancel: `left` - only your request withdrawn - or the download itself, both through literals the route returns
+    cancels = returned_literals(download_route.cancel_job) + returned_literals(download_route._cancel_download)
+    sent = set().union(*(literal_keys(one) for one in cancels))
+    assert set(fields("CancelAnswer")) <= sent and not required_fields("CancelAnswer")
+    assert all("left" in literal_keys(one) for one in cancels)
+    # Another source and Same source again answer the poller's own, 200 either way: `moved` / `retried` in every one
+    assert "return await retry_next_peer(" in inspect.getsource(download_route.retry_job)
+    assert "return await retry_same_peer(" in inspect.getsource(download_route.retry_job_same_peer)
+    for struct, function, needed in (("RetryAnswer", poller.retry_next_peer, "moved"),
+                                     ("RetrySameAnswer", poller.retry_same_peer, "retried")):
+        literals = returned_literals(function)
+        assert literals, struct
+        keys = set().union(*(literal_keys(one) for one in literals))
+        assert set(fields(struct)) <= keys, f"{struct} reads {sorted(set(fields(struct)) - keys)}"
+        assert required_fields(struct) == {needed}
+        assert all(needed in literal_keys(one) and needed not in literal_nulls(one) for one in literals), struct
+    # Clear done: how many went
+    clears = returned_literals(download_route.clear_jobs)
+    assert clears and all(set(fields("ClearAnswer")) <= literal_keys(one) for one in clears)
+    # the statuses the phone reads: 409 for a download no longer failed or cancelled, 404 for one not the asker's
+    for function in (download_route.retry_job, download_route.retry_job_same_peer):
+        assert "status_code=409" in inspect.getsource(function)
+    assert 'status_code=404, detail="No such download job"' in inspect.getsource(download_route._job_for)
+    # and every write is a POST with no body: the routes read none (a body would be ignored without a word)
+    routes = app_routes()
+    for path in ("/deadwax/download/jobs/{job_id}/cancel", "/deadwax/download/jobs/{job_id}/retry",
+                 "/deadwax/download/jobs/{job_id}/retry_same", "/deadwax/download/jobs/clear"):
+        assert routes[("POST", path)].body_field is None, path
+    for name in ("cancelJob", "retryJob", "retryJobSame", "clearJobs"):
+        assert "sending:" not in swift_function("DeadwaxClient.swift", name), name
+
+
+def test_the_app_waits_for_the_downloads_as_long_as_deadwax_does():
+    # /download/jobs asks slskd once for every open download and each queued one's place; Another source asks up to
+    # RETRY_ASKS runners-up in turn, each an ask of slskd - so it is given that many looks' time
+    text = (CORE / "Routes.swift").read_text(encoding="utf-8")
+    literal = re.search(r"public static let timeouts: \[Endpoint: Double\] = \[([^\]]*)\]", text)
+    timeouts = {name: float(seconds) for name, seconds in re.findall(r"(\w+): ([\d.]+)", literal.group(1))}
+    for name in ("jobs", "cancelJob", "retryJob", "retryJobSame", "clearJobs"):
+        assert timeouts[name] > 8, name
+    assert timeouts["retryJob"] >= poller.RETRY_ASKS * timeouts["jobs"]
+    assert timeouts["retryJob"] > timeouts["retryJobSame"]

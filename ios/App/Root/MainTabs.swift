@@ -1,12 +1,20 @@
 import DeadwaxCore
 import SwiftUI
 
-/// The app's tabs (D1), Library, Search (Phase 5) and You, each its own NavigationStack. Tapping the tab shown again pops it to its
-/// root (and, at its root, scrolls its list to the top - AppNavigation.select). With something queued the mini
-/// player sits above the tab bar, and a notice (D11) above it; Now Playing opens over everything.
+/// The app's tabs (D1), Library, Search (Phase 5), Requests (Phase 6) and You, each its own NavigationStack. Tapping the
+/// tab shown again pops it to its root (and, at its root, scrolls its list to the top - AppNavigation.select). With
+/// something queued the mini player sits above the tab bar, and a notice (D11) above it; Now Playing opens over
+/// everything.
+///
+/// Requests' badge is the count of downloads on their way (RequestsView.arriving), none at 0 and none while deadwax
+/// can't be reached; what the app is looking at, as far as downloads go (RequestsWatch.watching - the scene, the tab,
+/// its pages, Now Playing over it, the sign-in over the app), is handed to RequestsModel, whose poll it paces.
 struct MainTabs: View {
     @Environment(PlayerModel.self) private var player
     @Environment(AppNavigation.self) private var navigation
+    @Environment(RequestsModel.self) private var requests
+    @Environment(ServerModel.self) private var server
+    @Environment(\.scenePhase) private var scenePhase
 
     var body: some View {
         @Bindable var navigation = navigation
@@ -19,6 +27,15 @@ struct MainTabs: View {
             TabStack(path: $navigation.search) { SearchScreen() }
                 .tabItem { Label(SearchWords.title, systemImage: "magnifyingglass") }
                 .tag(AppTab.search)
+
+            // (Phase 6) between Search and You, the web's order less Home (phase6-get-requests.md question 1)
+            TabStack(path: $navigation.requests) { RequestsScreen() }
+                .tabItem {
+                    Label(RequestWords.tab, systemImage: "square.and.arrow.down")
+                        .accessibilityLabel(RequestWords.badgeLabel(RequestWords.tab, requests.badgeCount))
+                }
+                .badge(badge)
+                .tag(AppTab.requests)
 
             TabStack(path: $navigation.you) { YouView() }
                 .tabItem { Label("You", systemImage: "person.crop.circle") }
@@ -39,6 +56,28 @@ struct MainTabs: View {
         .onChange(of: player.hasQueue) { _, queued in
             if !queued { navigation.nowPlayingShown = false }
         }
+        .onChange(of: watching, initial: true) { _, now in requests.watch(now) }
+        .onDisappear { requests.watch(.hidden) }
+    }
+
+    /// Requests' badge: "2", "99+" - none at 0 (the count is 0 while deadwax can't be reached).
+    private var badge: Text? {
+        let words = RequestWords.badgeText(requests.badgeCount)
+        return words.isEmpty ? nil : Text(words)
+    }
+
+    /// What the app is looking at, as far as downloads go: nothing in the background or under the sign-in; a tab at
+    /// its root with Now Playing not over it.
+    private var watching: Watching {
+        let tab: String
+        switch navigation.tab {
+        case .requests: tab = "requests"
+        case .library: tab = "library"
+        case .search: tab = "search"
+        case .you: tab = "you"
+        }
+        return RequestsWatch.watching(shown: scenePhase != .background && server.signInOver == nil, tab: tab,
+                                      depth: navigation.shownStack.count, sheetOpen: navigation.nowPlayingShown)
     }
 }
 

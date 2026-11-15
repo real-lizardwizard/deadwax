@@ -1,4 +1,4 @@
-# The iPhone app (early: app 0.11, downloads, lyrics, the EQ, the turntable, play history, your library, the Library and Search)
+# The iPhone app (early: app 0.11, downloads, lyrics, the EQ, the turntable, play history, your library, the Library, Search and Requests)
 
 deadwax is getting a native iPhone app, built with SwiftUI and its own audio engine, for what a web
 page can't do well: seamless joins and normalization done on the phone, downloads to play offline,
@@ -35,14 +35,17 @@ Shuffle (see [Artists](#artists)); and **songs** - every song, a page at a time,
 web app's Search searches them, in one list - Top results, then artists, albums and songs, yours first - a song
 playing from its tap; the albums, artists and songs you don't have yet, each opening its page (an album's
 pressings and tracklists, an artist's albums); what deadwax has saved of MusicBrainz's answers, drawn with your
-library at once; and **More** from MusicBrainz, a page at a time (see [Search](#search)). Get, Requests and the
-rest come next (see [What it can't do yet](#what-it-cant-do-yet)).
+library at once; and **More** from MusicBrainz, a page at a time (see [Search](#search)). Phase 6 begins with
+**Requests**, still app 0.11: every download you asked for - in the web app, or on another phone - under the web
+app's four headings, with its progress, cancelled, tried again from another source and cleared on the phone, and
+a finished album opened or played from its row (see [Requests](#requests)). Get on the phone and the rest come
+next (see [What it can't do yet](#what-it-cant-do-yet)).
 
 **Nothing of Phase 2, the lyrics, the EQ, the turntable, play history, your library downloaded,
-playlists, artists, songs or Search has been seen on an iPhone yet.** It's built and tested on a Mac, and what
-only a phone can tell is what [the checks](#the-checks) are for. Until they're answered, read everything
-about downloads, lyrics, the EQ, the turntable, play history, your library, playlists, artists, songs and
-Search below as what the app is built to do.
+playlists, artists, songs, Search or Requests has been seen on an iPhone yet.** It's built and tested on a Mac,
+and what only a phone can tell is what [the checks](#the-checks) are for. Until they're answered, read
+everything about downloads, lyrics, the EQ, the turntable, play history, your library, playlists, artists,
+songs, Search and Requests below as what the app is built to do.
 
 The app talks only to deadwax, never to Navidrome, through deadwax's own routes, so the phone never
 needs the Navidrome account deadwax itself uses. With logins on, you sign in with your own Navidrome
@@ -771,6 +774,69 @@ go.
   comes in: "In your library: 2 albums.", then "Found earlier: 1 album. More found: 3 albums." (each once for
   the words). On an album opened from a song, its track reads "…, the song you searched for".
 
+## Requests
+
+The **Requests** tab, between Search and You, lists every download you asked for - in the web app, or on another
+phone (getting an album from the phone comes in the next build) - under the web app's four headings, in the web
+app's words. A heading shows only when it has something under it.
+
+- **Downloading**: the pressing's cover, the album and its edition ("Mezzanine · 1998 CD"), the artist and who
+  it's coming from ("Massive Attack · from mellotron", with "2nd try" once it's on another source), the bar, and
+  "6 of 10 files · 1.8 MB/s" - the speed measured on the phone over the last second or more, never slskd's
+  average since the start. While it's being filed: "adding to your library…".
+- **Waiting**: its place in the peer's queue ("4th in their queue"), or "starting" - in amber with "2 failed" when
+  the peer has already refused some of its files.
+- **Needs attention**: why it stopped, in red ("Tell whoever runs deadwax." after it where only they can put it
+  right; whoever runs deadwax reads the error's own words, folded under it, instead), and the two ways on:
+  **Another source · 2 left** (solid on the first such card only) and **Same source again**. While one runs
+  both wait, the one you tapped saying "Trying another source…" or "Trying again…"; if it couldn't start, why, in
+  red under the reason ("No other source would send it."). Without **Get albums** (with logins on, an admin
+  gives it) neither is there, and the card says "Getting albums is off for you - ask an admin."
+- **Done**: how it ended and how long ago ("In your library · 12 minutes ago", "You already had it", or in amber
+  "In your library - 2 files couldn't be added"). A download whose album is in your library opens the album's page
+  when you tap it, on the Requests tab; one this download filed has **▶**, which plays the album from its first
+  song. The first five Done albums are looked for ahead - Navidrome given 10 seconds to scan what was just filed -
+  so ▶ plays the moment you tap it; one not found yet opens its page instead. An album that can't be opened says
+  why under its row: "Not ready to play yet - it may still be scanning.", "Can't find this album to open it - it
+  may have moved, or isn't matched to a pressing.", or the music server's own trouble ("Can't open this album
+  right now - the music server can't be reached. Try again in a minute."). Open something else, or go to another
+  tab, while it looks, and it doesn't open over what you went to.
+
+With logins on, a row says who else is waiting for it: "Someone else asked for it too" - and, for an admin, who
+("Asked by you and ethan", or "Nobody is waiting for this any more").
+
+**The ✕** on a downloading or waiting card cancels it. With **Confirm before cancelling** on (You > Getting
+albums - on unless you turn it off, and kept on this phone, not your account) it asks first, in the card: "Cancel
+this download? You'll lose your place in their queue." with **Keep it** and **Cancel download**. A second tap on
+the ✕ closes the question, and one card asks at a time. With logins on, a download someone else is waiting for
+too asks "Leave this download? Someone else asked for it too, so it carries on for them." with **Leave it**: only
+your request goes, and its ✕ reads "Leave …" to VoiceOver. An admin cancelling one that ethan asked for as well is
+asked "Cancel this download for everyone? ethan asked for it too." with **Cancel for everyone**. The card dims at once,
+"cancelling…", until deadwax agrees. Nothing can be cancelled once it's being filed.
+
+**Clear done**, at the top, takes every finished, failed and cancelled download off your list at once (with logins
+off, deadwax forgets them). It's dimmed with nothing to clear.
+
+**The badge** on the tab counts what's on its way - downloading, waiting, and anything being tried again - with
+none at 0, as the web app's does. VoiceOver reads the tab as "Requests, 2 arriving".
+
+**How often it asks.** Twice a second while Requests is what you're looking at (not a page opened from it, and not
+with Now Playing over it); otherwise once a second while an album is being filed, every 5 seconds while anything is
+on its way, and not at all when nothing is - nor with the app in the background, music playing or not, nor while
+deadwax can't be reached. Coming back to the app, or deadwax coming back, asks once at once. An album filed
+meanwhile shows as yours in Search at once.
+
+**When it can't ask.** If deadwax answers with an error: "Can't update your requests right now", what went wrong,
+and "It keeps asking while this tab is open; what's below is from the last answer." If deadwax can't keep track of
+downloads (its database can't be written): "Downloads aren't being kept track of" - whoever runs deadwax reads
+"… Check DB_PATH." Until deadwax first answers, a spinner - never "Nothing requested yet". **Offline**: "Requests
+show once deadwax is back." - nothing of the last answer shown as if it were current, no badge, Clear done dimmed.
+Once deadwax is back the list is drawn again at once and asked afresh.
+
+**VoiceOver** hears what changes while Requests shows - "Dummy: downloading" as a download moves on, a retry's
+refusal, "trying again…", "cancelling…", "Homogenic: left - it carries on for whoever else asked" - and stays
+where it was in the list.
+
 ## Playing
 
 **The mini player**, above the tabs: the cover, the song and its artist, play/pause and next, and a
@@ -1053,6 +1119,9 @@ album.
 ## You
 
 - **At the top**: who you're signed in as, or "No sign-in needed" with logins off.
+- **Getting albums**: **Confirm before cancelling**, on by default - "The ✕ on a download in Requests asks first.
+  Kept on this device." Off, the ✕ on a card in [Requests](#requests) cancels at once. It's this phone's, not your
+  account's, as it is each browser's in the web app. When I tap Get, the quality floor and Format come with Get.
 - **Playback**:
   - **Gapless**: On. "Albums play straight through, with no gap between songs." It isn't a setting:
     the app always plays this way.
@@ -2861,6 +2930,53 @@ artist you don't have's page (still app 0.10). Compare with the web app's Search
   albums.", then what MusicBrainz and what's saved brought ("Found earlier: 1 album. More found: 3 albums."), each
   once. More's button reads its words ("More albums", "Loading…", "Try again").
 
+### Requests' checks, slice 1 (166-177)
+
+**Not done yet.** These come with the build that adds Requests - still **app 0.11 (11)**, the first part of Phase 6.
+Compare with the web app's Requests on the Mac: the phone should show the same rows, in the same order, in the
+same words. Check 175 wants logins on; the rest work either way. Getting an album is done in the web app for now.
+
+- **166 The tab.** The tabs read Library | Search | Requests | You, Requests' icon an arrow into a tray. Tap it:
+  the heading Requests, and Clear done at the top right, dimmed with nothing to clear. With nothing ever asked
+  for, "Nothing requested yet" and "Albums you get show here while they download, and once they've arrived - find
+  one in Search and tap Get." A spinner shows only until deadwax first answers.
+- **167 A download from the web app.** In the web app, Get an album. On the phone, Requests: its row under
+  Waiting ("starting", or "4th in their queue"), then under Downloading with its cover, the bar and "3 of 11 files
+  · 1.2 MB/s" - the web app's speed, within a moment. The data line doesn't jump as the speed comes and goes, at
+  the largest text size too.
+- **168 The badge.** With the Library shown and something on its way, Requests' badge counts it - the web app's
+  count - and at 0 there's none. With VoiceOver, the tab reads "Requests, 2 arriving": note what it says if not.
+- **169 Filed.** Let the download finish: under Done, "In your library · just now", and the badge goes. Search the
+  album's words: it's yours ("In your library"), with no pull.
+- **170 Play from Done.** About 10 seconds after it's filed, tap **▶** on its Done row: the album plays from its
+  first song at once, in Up Next as from its page. Tap the row itself: the album's page opens on the Requests tab;
+  Back is Requests. Close and reopen the app: ▶ on a row done before it opened plays at once.
+- **171 Opening, left behind.** On a slow connection, tap a Done row below the first five, then tap Library before
+  the page opens: nothing opens over the Library, and nothing opens by itself back on Requests. The same with Now
+  Playing opened meanwhile. A row that can't open says why under it.
+- **172 Cancel, asked first.** Tap ✕ on a waiting download: the question in the card, **Keep it** and **Cancel
+  download**; tap ✕ again: it closes. Tap ✕ on another card while one asks: only the new one asks. Tap **Cancel
+  download**: the card dims, "cancelling…", then goes to Needs attention as Cancelled. In You > Getting albums turn
+  **Confirm before cancelling** off: ✕ cancels at once. Turn it back on.
+- **173 Another source and Same source again.** A download under Needs attention with sources left: **Another
+  source · 2 left**; tap it: both buttons wait, "Trying another source…", then the row moves to Waiting, a try on.
+  **Same source again** on one a peer stopped: "Trying again…" - and if it's refused, why in red under the reason.
+- **174 Clear done.** Tap **Clear done**: the Done rows and the finished ones under Needs attention go at once and
+  stay gone; the web app's Requests agrees after its next look.
+- **175 Logins on.** As a user, a download someone else asked for too: "Someone else asked for it too", its ✕
+  read as "Leave …", the question "Leave this download? …" with **Leave it** - it goes from your list and carries
+  on in theirs, and VoiceOver says "…: left - it carries on for whoever else asked". As an admin: "Asked by you
+  and ethan", and **Cancel for everyone**. As someone without Get albums: no buttons under Needs attention, and
+  "Getting albums is off for you - ask an admin."
+- **176 Offline and the background.** Airplane Mode on with Requests showing: the offline banner and "Requests
+  show once deadwax is back." - no rows, no badge, Clear done dimmed. Off: the rows back at once, then current.
+  With something on its way and music playing, put the app in the background for a few minutes and bring it
+  back: the board is current within a moment, as if it had been watching.
+- **177 Twice a second, and VoiceOver.** Leave Requests open over WireGuard for ten minutes with a download on its
+  way: does it keep up, and what does it cost the battery (Settings > Battery)? With VoiceOver on, watch a
+  download move from Waiting to Downloading: "…: downloading" is heard, and VoiceOver stays where it was. Open and
+  close a card's question at the largest text size: does the row jump?
+
 ## What it can't do yet
 
 These are the web app's for now. Most of them come to the phone in the next phases:
@@ -2869,11 +2985,12 @@ These are the web app's for now. Most of them come to the phone in the next phas
 
 - On an artist's page their **discography** from MusicBrainz, the **description** and the artist's
   managing (pictures, names).
-- In **Search**, **Get** (an album you don't have shows its pressings, but is got in the web app) and
-  **Requests**. An artist you don't have's page lists their albums, without their description or links. A
+- In **Search**, **Get** (an album you don't have shows its pressings, but is got in the web app - Requests on
+  the phone then shows it on its way). An artist you don't have's page lists their albums, without their description or links. A
   search of what's downloaded while deadwax can't be reached isn't built: offline, Search keeps a list already
   drawn, and new words wait for deadwax.
-- **Home** and **pins**.
+- **Home** and **pins** - and so Home's Arriving: outside Requests, the tab's badge is the phone's only sign of a
+  download on its way.
 - **Looking after deadwax**: People, Server settings, the event log, Needs a look, Library care, the
   editors, and changing your password. For an admin, **Set up Navidrome** opens the web app in Safari.
 

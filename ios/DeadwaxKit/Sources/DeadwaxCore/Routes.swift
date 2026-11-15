@@ -130,6 +130,14 @@ public enum Routes {
     // (`SavedSearchAnswer`, server 2.0.0-player.56) - asked beside the library as the words settle, given up after
     // `SearchSaved.waitMs`; the three searches above take `offset` for More from MusicBrainz
     public static let savedSearch = Endpoint(method: "GET", path: "/deadwax/search_musicbrainz/saved", query: ["words"])
+    // Phase 6, slice 1's (phase6-get-requests.md 0): the Requests tab - the asker's downloads with slskd's progress laid
+    // on (`JobsAnswer`), a download cancelled (only left, for one somebody else waits for too), moved to the next source
+    // or asked of the same one again (200 either way, the refusal in `problem`), and the finished ones cleared
+    public static let jobs = Endpoint(method: "GET", path: "/deadwax/download/jobs", query: [])
+    public static let cancelJob = Endpoint(method: "POST", path: "/deadwax/download/jobs/{job_id}/cancel", query: [])
+    public static let retryJob = Endpoint(method: "POST", path: "/deadwax/download/jobs/{job_id}/retry", query: [])
+    public static let retryJobSame = Endpoint(method: "POST", path: "/deadwax/download/jobs/{job_id}/retry_same", query: [])
+    public static let clearJobs = Endpoint(method: "POST", path: "/deadwax/download/jobs/clear", query: [])
 
     /// The levels spec's name for `levelAlbum`: the album's levels warmed before its first play.
     public static var warmLevels: Endpoint { levelAlbum }
@@ -152,6 +160,7 @@ public enum Routes {
         fullySearch, releaseGroup, archiveCover,
         searchArtists, searchSongs, artistFacts, discography,
         savedSearch,
+        jobs, cancelJob, retryJob, retryJobSame, clearJobs,
     ]
 
     /// The routes given longer than the transport's own 8 seconds to answer, in seconds: the album index reads every
@@ -160,9 +169,12 @@ public enum Routes {
     /// (PROFILE_DEADLINE_SECONDS, 15 s); MusicBrainz's albums for the box take about eight seconds to give up while
     /// MusicBrainz turns searches away (SEARCH_PATIENCE), and an album's pressings with their tracklists up to five
     /// MusicBrainz pages; the artists and songs are quick searches as the albums are, an artist's facts one request with
-    /// MusicBrainz's ten attempts (3 s apart while it is busy), and their albums a browse of up to five pages -
+    /// MusicBrainz's ten attempts (3 s apart while it is busy), and their albums a browse of up to five pages; the
+    /// downloads ask slskd for every open one's transfers and each queued one's place in its queue, a cancel stops each
+    /// transfer and clears the partials, a move to the next source tries each runner-up in turn until one takes it, a
+    /// retry of the same one asks slskd again and a clear tidies the cancelled ones' transfers first -
     /// tests/test_ios_contract.py holds each above the server's.
-    public static let timeouts: [Endpoint: Double] = [albumIndex: 30, autoEqSearch: 20, autoEqProfile: 20, libraryOwned: 30, fullySearch: 20, releaseGroup: 60, searchArtists: 20, searchSongs: 20, artistFacts: 60, discography: 60]
+    public static let timeouts: [Endpoint: Double] = [albumIndex: 30, autoEqSearch: 20, autoEqProfile: 20, libraryOwned: 30, fullySearch: 20, releaseGroup: 60, searchArtists: 20, searchSongs: 20, artistFacts: 60, discography: 60, jobs: 20, cancelJob: 30, retryJob: 60, retryJobSame: 30, clearJobs: 30]
 }
 
 /// The Cover Art Archive's thumbnail sizes the app asks deadwax's relay for (`Routes.archiveCover`'s `size`, which takes

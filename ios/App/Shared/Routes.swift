@@ -2,11 +2,12 @@ import DeadwaxCore
 import Observation
 import SwiftUI
 
-/// The app's tabs (D1): Library, Search (Phase 5 - phase5-search.md 3.1, question 1: the web's order, You at the end)
-/// and You.
+/// The app's tabs (D1): Library, Search (Phase 5 - phase5-search.md 3.1, question 1: the web's order, You at the end),
+/// Requests (Phase 6 - phase6-get-requests.md 3.1, question 1: the web's order less Home) and You.
 enum AppTab: Hashable {
     case library
     case search
+    case requests
     case you
 }
 
@@ -190,6 +191,8 @@ final class AppNavigation {
     var library: [AppRoute] = []
     /// (Phase 5) The Search tab's pages - an album, an artist, anything the Library pushes.
     var search: [AppRoute] = []
+    /// (Phase 6) The Requests tab's pages - the album a Done row opens, and anything it pushes.
+    var requests: [AppRoute] = []
     /// The You tab's pages.
     var you: [AppRoute] = []
     /// Now Playing is open (a full-screen cover over the tabs).
@@ -197,6 +200,7 @@ final class AppNavigation {
     /// One more each time a tab already at its root is tapped again: its root list scrolls to the top.
     private(set) var libraryScrollToTop = 0
     private(set) var searchScrollToTop = 0
+    private(set) var requestsScrollToTop = 0
     private(set) var youScrollToTop = 0
 
     /// An EQ import's preview (eq.md 3.9), one at a time: a file shared to deadwax, or one an EQ page read from Files or
@@ -249,6 +253,8 @@ final class AppNavigation {
             if library.isEmpty { libraryScrollToTop += 1 } else { backToRoot(&library) }
         case .search:
             if search.isEmpty { searchScrollToTop += 1 } else { backToRoot(&search) }
+        case .requests:
+            if requests.isEmpty { requestsScrollToTop += 1 } else { backToRoot(&requests) }
         case .you:
             if you.isEmpty { youScrollToTop += 1 } else { backToRoot(&you) }
         }
@@ -276,7 +282,7 @@ final class AppNavigation {
     /// A playlist's page went away: popped (no page of it left on any tab), its Edit with it.
     func pageGone(_ id: String) {
         guard editingPlaylist == id else { return }
-        let held = (library + search + you).contains { (route: AppRoute) -> Bool in
+        let held = (library + search + requests + you).contains { (route: AppRoute) -> Bool in
             if case .playlist(let shown) = route { return shown.id == id }
             return false
         }
@@ -288,6 +294,7 @@ final class AppNavigation {
         switch tab {
         case .library: library.append(route)
         case .search: search.append(route)
+        case .requests: requests.append(route)
         case .you: you.append(route)
         }
     }
@@ -297,6 +304,7 @@ final class AppNavigation {
         switch tab {
         case .library: return library
         case .search: return search
+        case .requests: return requests
         case .you: return you
         }
     }
@@ -319,6 +327,8 @@ final class AppNavigation {
             if case .playlist(let shown)? = library.last, shown.id == id { library.removeLast() }
         case .search:
             if case .playlist(let shown)? = search.last, shown.id == id { search.removeLast() }
+        case .requests:
+            if case .playlist(let shown)? = requests.last, shown.id == id { requests.removeLast() }
         case .you:
             if case .playlist(let shown)? = you.last, shown.id == id { you.removeLast() }
         }
@@ -337,6 +347,7 @@ final class AppNavigation {
         switch tab {
         case .library: popped(&library)
         case .search: popped(&search)
+        case .requests: popped(&requests)
         case .you: popped(&you)
         }
     }
@@ -345,6 +356,7 @@ final class AppNavigation {
     func reset() {
         library.removeAll()
         search.removeAll()
+        requests.removeAll()
         you.removeAll()
         nowPlayingShown = false
         eqImportSheet = false

@@ -8201,3 +8201,215 @@ Four slices, each with its review. The app is 0.11 (11).
   - an artist's description and links (Phase 7), and Home and pins (a later phase);
   - a search of what's downloaded while deadwax can't be reached (question 5: not built - offline, a list
     already drawn stays, and new words wait for deadwax).
+
+## Phase 6, slice 1: Requests (2026-11-14)
+
+notes/ios-specs/phase6-get-requests.md 2.1-2.7, 2.12, 3.1-3.3 and 6.1, and questions 1-12. Before it, the phone
+showed nothing of a download: whatever was asked for in the web app was seen only there. Now Requests is a fourth
+tab, between Search and You:
+- every download the person asked for, wherever they asked, under the web's four headings, in the web's words;
+- the ✕ (asking first in the card, with You > Getting albums' Confirm before cancelling), Another source, Same source
+  again and Clear done;
+- a Done row opening its album, and its ▶ playing it;
+- the badge, the announcements, offline and the background.
+
+Nothing on the phone asks for a download yet: Get is slice 2.
+
+On `phase6-get` from `ios` at 3fc9a17, after the spec's own commit (2e8b2cc). src/__init__.py untouched; the app
+stays **0.11 (11)**; the .xcodeproj is unchanged (the new files are in the synchronized App folder). ROUTE_COUNT
+49 -> 54: `/download/jobs` and its four writes, every one on the server since 2.0.0 (src/routes/download.py). There
+is no server change.
+
+### Core (DeadwaxCore)
+
+- **Requests.swift** (new): requestsView.ts, ported to the character.
+  - `DownloadJob`: a row of `/jobs`, read leniently but for its id and status (`looseField`, `looseList`). `JobsAnswer`,
+    `CancelAnswer`, `RetryAnswer`, `RetrySameAnswer`, `ClearAnswer`: the writes' answers, each within what its route
+    returns.
+  - `RequestSection`, `RequestTone`, `RetryProblem` (deadwax's own words, or a sentence with the error's own beside
+    it), `RequestRow` (every field of the web's row, but `cover`: the release's id, for the relay, where the web makes
+    the Archive's own address), `RequestsInput`, and `RequestsView.make(_:now:)`.
+  - `RequestWords`: every word of the board, the cards, the hook's refusals and You's Confirm before cancelling - and
+    the small rules: `age`, `outcome`, `badgeText`, `badgeLabel`, `ordinal`, `speed`, `section`, `retryProblemWords`,
+    `cantOpen` (App.tsx `navidromeProblem`), `note` (Requests.tsx `noteFor`), `emptyLine`, `keepsAsking`. The phone's
+    one sentence of its own: `offline`, "Requests show once deadwax is back." (question 4).
+- **RequestOverlays.swift** (new): downloadOverlay.ts, speed.ts and perPerson.ts.
+  - `PendingDownload` and `RequestOverlays`: `withPending`, `settlePending`, `withoutRefused`, `visibleJobs`,
+    `activeCount`, `visiblePending`, `reconcile` and `finishedIds`, and the overlays' 15 s (`ttlSeconds`).
+  - `SpeedSamples`: the rate measured from byte counts over a second or more, kept 6 s through quiet polls.
+  - `CancelWords` and `PerPerson`: who asked, what a cancel does, and what a filing gave them (grantWords and
+    partlyWords, from myLibrary.ts).
+- **RequestsWatch.swift** (new):
+  - `Watching` and `RequestsWatch`: `watching` (watchingOf), `stallsOn`, `asksAgain`, and libraryEvents.ts'
+    `statuses` and `newlyFiled` (statusesOf and newlyOrganized).
+  - `RequestsPolling`: the poll's pace, `delay(open:hasActive:filing:online:watching:)` and `asks(online:watching:)` -
+    the web's 0.5 s, 1 s and 5 s, and none offline or in the background (question 3).
+  - `RequestChanges`: `changes` (and `focusAfterGone`, which it uses).
+  - `DoneLooks`: `looks`, the Done rows' albums looked for ahead (DONE_PREFETCHED 5, DONE_SCAN_SETTLE_MS 10 s, the
+    5 s backoff doubling to 60 s, songs asked again when 30 s older than the tab's coming into view).
+  - `ConfirmCancel`: the web's key `deadwax-player-confirm-cancel`, "off" off and anything else on.
+- **Routes.swift**: `jobs`, `cancelJob`, `retryJob`, `retryJobSame` and `clearJobs`, in `all`, with their times to
+  answer (question 11): 20 s, 30 s, 60 s, 30 s and 30 s.
+- **DeadwaxClient**: `jobs()`, `cancelJob(_:)`, `retryJob(_:)`, `retryJobSame(_:)`, `clearJobs()`, and
+  `storeAlbum(releaseMbid:)` - the id bridge's whole answer by a pressing, for a Done row's note
+  (`navidromeAlbum(releaseMbid:)` now goes through it).
+
+### Held to the web: by the exporter, or by hand
+
+`ios/scripts/export-requests-vectors.cjs` compiles lib/requestsView.ts, lib/downloadOverlay.ts, lib/speed.ts and
+lib/libraryEvents.ts, with what they import (perPerson, myLibrary, errorWords, format, jobs), and reads the numbers and
+words of useDownloadJobs.ts, Requests.tsx, JobCard.tsx, You.tsx, ConfirmCancelChoice.tsx, persisted.ts and
+permissions.ts from their source. It writes Fixtures/requests/requests-vectors.json (2.2 MB, seed 6606):
+- 140 ordinals, 10 badges, 17 speeds, 48 ages, 8 partly-filed counts;
+- 489 endings, 32 retry problems, 45 askers, 288 sections;
+- 100 seeded boards (535 rows, every field of every row);
+- 30 runs of five looks for `changes`;
+- 120 overlay cases and 40 speed traces of 14 polls;
+- every watching, stalling and asking-again combination (60, 36, 16);
+- 200 Done rows' looks;
+- and 40 runs of six looks for what was filed (31 jobs filed).
+
+`ui/test/iosrequests.sim.cjs` runs it with `--check`; `RequestsVectorTests` (14) replays it through the real models.
+libraryEvents.ts was added to the spec's list: newlyOrganized is plain TypeScript, so it is held rather than ported
+by hand.
+
+What lives in a hook or a component the exporter can't compile is ported by hand, with tests of its own
+(`RequestsTests`, 16):
+- the poll's cadences;
+- `noteFor` and `navidromeProblem`;
+- Confirm before cancelling's read;
+- a request becoming its job, a refused one keeping its detail;
+- "left" said for a cancel that only leaves;
+- the speed over a second and through quiet polls;
+- `DownloadJob` reading the route's own rows (logins off and on, and an odd field);
+- the client's five requests and the id bridge's, their methods, paths and times, and a refused write's kind.
+
+The hook's and the page's state - the overlays set before a write and rolled back after, the retry's give-up words,
+the Done rows' state - is RequestsModel's in the app, read from useDownloadJobs.ts and Requests.tsx.
+
+### Where the phone can't follow the web exactly
+
+- **A field of a shape the app doesn't know** (a `queue_position` of "4th", a name that isn't a string) is none, not
+  the whole list gone: the web's JavaScript would draw the rest, and a strict Decodable would draw nothing. Only a row
+  without its id or status throws.
+- **Offline** (question 4): none of the last answer drawn, where the web's page keeps showing it; back, it is drawn
+  again at once and asked afresh. **In the background** (question 3): no poll, where the web's goes on until iOS
+  suspends the page. **Under the sign-in over the app**: no poll either - every look would be a 401.
+- **No Home** (question 7): `home` never comes; the badge is the only sign of a download outside Requests.
+- **No focus moves** (question 10): what changed is announced, and VoiceOver keeps its own place in the List.
+- **Each sentence `changes` says is announced**, where the web's live region speaks only when its text changes - the
+  same sentence twice in a row is heard twice here.
+- **▶ doesn't warm the album's levels itself** (the web's `warmAlbum`): the player's LoudnessBook asks for every
+  album the new queue names as it is set (`wantQueue`), which is the same ask.
+- **A cancel or Clear done that fails** is only rolled back, as the web's (whose console.error has no phone
+  counterpart): the row coming back is the word.
+- **The cover's id is lowercased** for the relay, which takes MusicBrainz's ids only as MusicBrainz gives them.
+- **Clear done waits offline** as well as with nothing to clear.
+
+### The app
+
+- **RequestsModel** (Models/RequestsModel.swift):
+  - The one poll: `kick()` starts a loop, the one before let go (`stopPolling`, one more `looks`), and each answer
+    lands only for the newest loop and the person it began for (`epoch`). `RequestsPolling` decides each wait; a turn
+    of `open` (Requests' root, or `stallsOn`) asks at once, even from inside the loop, as the web's effect re-runs.
+  - `watch(_:)`, from MainTabs: Requests' root coming into view starts a period of looking, leaving it lets every
+    look go (`letLooksGo`); the background stops the poll; `asksAgain` asks once.
+  - `reachChanged()`, from Reachability: offline stops everything; back, the failure from while deadwax was away is
+    forgotten, the board drawn again and a look asked.
+  - `land(_:)`: the speeds sampled (on the monotonic clock), `newlyFiled` asking Search's owned index again
+    (question 8), the overlays reconciled.
+  - `redraw()`: the board made from the last answer and the overlays; `changes` announced while Requests' root shows;
+    each Done row's first moment kept (0 for the first answer's); the looks run again.
+  - `cancel`, `retry(_:same:)` and `clear()`: the overlay up before the request, each write its own task, rolled back
+    or given up with the web's words; an answered write asks at once. The overlays' clocks are tasks too, and a reset
+    lets every one go.
+  - The Done rows: `runLooks()` - the id bridge by release, then the album's songs - with the due clock, all only while
+    Requests' root shows. `open(_:)` opens a known album at once, else asks and opens only if the root still shows, the
+    same period, and no second tap; a row that can't open gets its note. `plays(_:)` hands a ▶ the songs in hand.
+  - `reset()`: everything let go, and the new person's first look asked once the new session is in hand.
+- **RequestsScreen** and **RequestCards** (Requests/): a List of Sections, each heading only with rows; the failed
+  look's card, the untracked card (DB_PATH for whoever runs deadwax), the spinner until the first answer, the empty
+  card (Get's words only to someone who can Get), the offline line. Clear done in the bar. The cards: the cover
+  through ArchiveCover (44 and 52 points, scaled), the title on one line as the web's, the data line always drawn and
+  one line, DownloadBar, the ✕ (44 points, its 32-point face, disabled while its cancel is out), the card's question
+  (SecondaryPill's Keep it and the red action), Needs attention's buttons (PrimaryFace for the first Another source,
+  SecondaryPill for the rest, disabled while busy) and GET_OFF without Get albums, and the Done row's button and ▶.
+  The ✕ reads Confirm before cancelling at the tap; one card asks at a time, and a second tap closes it.
+- **MainTabs**: the tab, `square.and.arrow.down`, its badge (`Text?`, nil at 0 - an empty string would draw an empty
+  badge), the Label's accessibility label "Requests, 2 arriving"; `watching` from the scene, the tab, its stack's depth,
+  Now Playing and the sign-in over the app, handed over with `onChange(initial: true)`, and `.hidden` as the tabs go.
+- **AppNavigation**: `AppTab.requests`, the `requests` stack and `requestsScrollToTop`, in every switch.
+- **You**: GettingAlbumsSection, before Playback (the web's order) - the toggle, `@AppStorage` under the web's key.
+- **DeadwaxApp**: the model made after Search, `reachability.whenChanged` and `whenPersonChanges` wired, in the
+  environment. **Palette.dimmed** 0.55 (`--app-job-dimmed`).
+
+### Decided here (the spec was silent, or this departs from it)
+
+Questions 1-12 in the spec, each built to its recommendation. And smaller ones, not worth a question:
+- the Done rows' clock is this phone's wall clock in milliseconds, as the web's Date.now() (a first answer's rows at 0
+  are then long done); the speeds' is the monotonic one, as the spec says of SpeedSamples;
+- the lines that come once - a reason, a retry's refusal, a Done row's note - wrap, as the web's do; the one that
+  changes at every look (the data line) is one line high, drawn when empty;
+- the web's tinted Another source is drawn as the secondary pill: the phone has two button faces, and the solid one
+  is still only the first;
+- a turn of `open` from inside the loop asks at once, as the web's effect re-runs: one extra look when a stall ends;
+- the sign-in over the app counts as hidden.
+
+### Tests
+
+- **RequestsVectorTests** (14): every vector of requests-vectors.json - the numbers and words, the small rules, the
+  endings, the retry problems, who asked, 100 whole boards (over 400 rows checked field by field, and activeCount over
+  the same overlays), `changes` over 30 runs, the overlays, the speed traces, the watching grids, what was filed and
+  the Done rows' looks.
+- **RequestsTests** (16), by hand, as listed above.
+- **ClientTests**: `Routes.all` 54, and the five new times to answer.
+- **tests/test_ios_contract.py**: ROUTE_COUNT 54; `DownloadJob`'s keys within what `/jobs` builds; the real `/jobs`
+  route (logins off, a fake slskd: queued, organized, failed with a runner-up) decoded as the app decodes it; the four
+  writes' answers within their routes'; `/retry`'s 60 s at least what deadwax's own asks of slskd can take. And
+  `test_a_held_album_is_found_by_its_release` reads the id bridge's call where it now is, in `storeAlbum(releaseMbid:)`
+  (it read the line `navidromeAlbum(releaseMbid:)` used to make itself, and failed on the move).
+- **iosrequests.sim.cjs**: the exporter's `--check`.
+
+**Mutations** - each rule broken on purpose, the tests run, the rule put back. All 22 were caught:
+1. the poll asking offline (`nothingIsAskedOfflineNorInTheBackground`);
+2. filing at the background's pace, and 3. polling on with nothing active (`thePollIsFast…`);
+4. asking again after Requests, and 6. stalling with nothing arriving (`whatTheAppWatchesIsTheWebs`);
+5. what was filed before the first look counted as news (`anAlbumJustFiledIsNoticed…`);
+7. "left" said for every cancel that went (`whatAScreenReaderHearsIsTheWebs`);
+8. the backoff doubling one early, and 9. songs never asked again (`theDoneRowsAlbumsAreLookedFor…`);
+10. Confirm before cancelling off unless "on" (`confirmBeforeCancellingIsOnUnlessTurnedOff`);
+11. a cancel kept after its job stopped, and 22. Clear done keeping the refused requests (`theOverlaysAreTheWebs`);
+12. activeCount without the requests (`aRequestBecomesItsJob…`, the boards);
+13. a rate from under a second (`aSpeedIsMeasuredOverASecond…`);
+14. a strict queue place emptying the list (`anOddFieldIsNone…`);
+15. a queued job with bytes moving left under Waiting, and 18. 99+ from 101 (`theSmallRulesAreTheWebs`);
+16. the music server's being unreachable unsaid, and 21. the store's folders not read for the note
+    (`aDoneRowsNote…`, `aDoneRowsAlbumIsAskedOfTheIdBridge…`);
+17. no solid Another source, and 20. an already-there album's row playing (`everyBoardIsDrawnAsTheWebDrawsIt`);
+19. an admin's cancel of a shared download only leaving (`aJobIsReadAsDeadwaxSendsItWithLoginsOn`, the boards).
+
+The App's own wiring (the loop, the periods, the looks' tasks) has no tests: it is SwiftUI's and URLSession's, and the
+rules it applies are each tested in Core.
+
+### Verified, and not
+
+Verified, on the tree before its commit:
+- `swift test`: Core 1548, Audio 158, Turntable 12. No warnings.
+- The unsigned Debug and Release device builds (Xcode, `generic/platform=iOS`) succeeded, with no warnings but the
+  usual appintentsmetadataprocessor line. The .xcodeproj is unchanged; `check_project.py` ok.
+- `npm run build` and all 88 sims on Node 22.23.4, iosrequests' `--check` among them.
+- The full pytest suite: 4529 passed, 1 skipped (test_ios_contract's four new tests among them). Its first run
+  failed test_a_held_album_is_found_by_its_release, fixed as above.
+- The 22 mutations above, each caught.
+
+Not verified - only the phone can tell (docs/ios.md's checks 166-177, beside the spec's section 9):
+- Whether a 0.5 s poll keeps up over WireGuard, and what Requests left open costs the battery.
+- Whether the tab is read "Requests, 2 arriving": an accessibility label on a `.tabItem`'s Label isn't documented to
+  reach the tab bar, which may read the badge its own way.
+- Whether an announcement made as the List redraws is heard whole, and where VoiceOver's cursor is after a card moves
+  or goes.
+- Whether a card's question opening and closing in a List row moves the rows around it at the largest text size.
+- Real slskd: its queue places, the speed, a refusal and a cancel, in the board's words. Every slskd here is a fake.
+- The in-app pieces themselves - the loop's periods, the looks' tasks, a Done row's open left behind - have run only in
+  the compiler: no Simulator is used here.
+- CI's Xcode 26.6 (the older Swift). The new code spells out its closures' types and keeps each `#expect` small.
