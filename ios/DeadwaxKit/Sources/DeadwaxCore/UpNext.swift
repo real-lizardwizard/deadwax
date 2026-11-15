@@ -862,6 +862,14 @@ public func backward(_ queue: UpNextQueue, position: Double) -> PreviousAction {
     return place > 0 ? .go(place - 1) : .restart
 }
 
+/// (The phone's play bar, 15 Nov: a swipe right on its title) The song before, however far into this one: the entry
+/// backward() goes to at the song's start, before the run of Repeat One's copies the song playing is part of. Nil at
+/// the queue's first song, or with only copies before it. Never the song again, which is Previous's past 3 s.
+public func entryBefore(_ queue: UpNextQueue) -> Int? {
+    guard case .go(let index) = backward(queue, position: 0) else { return nil }
+    return index
+}
+
 /// A failed song's skip: the first entry at or after `from` that isn't one of Repeat One's copies - a song that
 /// won't play isn't asked for again once per copy. Nil if none: the queue stops there, as at its end.
 public func pastCopies(_ queue: UpNextQueue, from: Int) -> Int? {

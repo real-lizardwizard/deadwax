@@ -39,10 +39,11 @@ struct DebugView: View {
             libraryLists
             Section {
                 Text(model.installLine)
-                    .font(.footnote)
+                    .font(Typeface.footnote)
                     .foregroundStyle(Palette.quiet)
             } footer: {
                 Text("deadwax for iPhone \(YouView.appVersion)")
+                    .font(Typeface.footnote)
             }
         }
         .navigationTitle("Debug")
@@ -66,7 +67,7 @@ struct DebugView: View {
                 if let fetch = library.lastFetch[scope] {
                     LabeledContent(scope == .yours ? "Your albums" : "All albums") {
                         Text("\(fetch.albums) albums \u{00B7} \(fetch.status) \u{00B7} \(String(format: "%.2f", fetch.seconds)) s")
-                            .font(.footnote.monospacedDigit())
+                            .font(Typeface.footnote.monospacedDigit())
                     }
                 }
             }
@@ -75,6 +76,7 @@ struct DebugView: View {
             }
         } header: {
             Text("Library")
+                .font(Typeface.footnote)
         }
     }
 
@@ -87,10 +89,11 @@ struct DebugView: View {
             }
             .disabled(model.checking)
             ForEach(model.report?.lines ?? [], id: \.self) { line in
-                Text(line).font(.footnote)
+                Text(line).font(Typeface.footnote)
             }
         } header: {
             Text("deadwax")
+                .font(Typeface.footnote)
         }
     }
 
@@ -113,12 +116,14 @@ struct DebugView: View {
                     Button("Remove the downloads", role: .destructive) { model.removeDownloads() }
                 }
             }
-            if let words = model.testWords { Text(words).font(.footnote) }
+            if let words = model.testWords { Text(words).font(Typeface.footnote) }
             DeckTrialRows(model: deckTrial)
         } header: {
             Text("Test sounds")
+                .font(Typeface.footnote)
         } footer: {
             Text("Songs 1 to 8 are three beeps each: tap one to play the album from it and count the beeps - all three, every time? Songs 9 and 10 are one tone cut in two: played one into the other, the tone should never break. A song downloaded to this phone plays from there, as every song does; \"Stream even when downloaded\" (under Downloads) streams it instead, to hear the two side by side. \(TurntableDebugRows.trialFooter)")
+                .font(Typeface.footnote)
         }
     }
 
@@ -128,7 +133,7 @@ struct DebugView: View {
                 HStack {
                     VStack(alignment: .leading, spacing: 2) {
                         Text(song.name).foregroundStyle(playing ? Palette.accent : .primary)
-                        Text(detail(song)).font(.caption).foregroundStyle(Palette.quiet)
+                        Text(detail(song)).font(Typeface.caption).foregroundStyle(Palette.quiet)
                     }
                     Spacer()
                     if playing { Image(systemName: "speaker.wave.2.fill").foregroundStyle(Palette.accent) }
@@ -175,11 +180,13 @@ struct DebugView: View {
                     model.play([song], at: 0)
                 }
             }
-            if let words = model.hiResWords { Text(words).font(.footnote) }
+            if let words = model.hiResWords { Text(words).font(Typeface.footnote) }
         } header: {
             Text("Hi-res")
+                .font(Typeface.footnote)
         } footer: {
             Text("Decodes the song at its own rate. What's playing below says the file's rate and the output's: when they differ, the app's audio engine converts to the output's rate, as any app must.")
+                .font(Typeface.footnote)
         }
     }
 
@@ -189,13 +196,13 @@ struct DebugView: View {
         Section {
             if let track = player.current?.track {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(track.title.isEmpty ? track.id : track.title).font(.headline)
+                    Text(track.title.isEmpty ? track.id : track.title).font(Typeface.headline)
                     Text([track.artist, track.album].filter { !$0.isEmpty }.joined(separator: " \u{2014} "))
-                        .font(.subheadline).foregroundStyle(Palette.quiet)
+                        .font(Typeface.subheadline).foregroundStyle(Palette.quiet)
                     Text("\(player.phaseWords) \u{00B7} \(clock(player.shownPosition))\(player.duration > 0 ? " of \(clock(player.duration))" : "")")
-                        .font(.footnote.monospacedDigit())
+                        .font(Typeface.footnote.monospacedDigit())
                     if let readout = player.readout {
-                        Text(readout).font(.footnote)
+                        Text(readout).font(Typeface.footnote)
                     }
                 }
                 HStack {
@@ -205,7 +212,7 @@ struct DebugView: View {
                     Spacer()
                     Button { player.toggle() } label: {
                         Image(systemName: player.engineState.phase == .playing ? "pause.fill" : "play.fill")
-                            .font(.title)
+                            .font(Typeface.symbol(.title))
                     }
                     .accessibilityLabel(player.engineState.phase == .playing ? "Pause" : "Play")
                     Spacer()
@@ -224,11 +231,12 @@ struct DebugView: View {
             }
             if let words = player.lastFailure {
                 LabeledContent("Last failure") {
-                    Text(words).font(.footnote).foregroundStyle(.red)
+                    Text(words).font(Typeface.footnote).foregroundStyle(.red)
                 }
             }
         } header: {
             Text("Playing")
+                .font(Typeface.footnote)
         }
     }
 
@@ -250,7 +258,7 @@ private struct EQDebugSection: View {
         Section {
             ForEach(Array(rows.enumerated()), id: \.offset) { _, row in
                 LabeledContent(row.label) {
-                    Text(row.value).font(.footnote)
+                    Text(row.value).font(Typeface.footnote)
                 }
             }
             Toggle(EQWords.Debug.muffle, isOn: Binding<Bool>(get: { eq.muffle }, set: { (on: Bool) -> Void in
@@ -258,8 +266,10 @@ private struct EQDebugSection: View {
             }))
         } header: {
             Text(EQWords.Debug.header)
+                .font(Typeface.footnote)
         } footer: {
             Text(EQWords.Debug.muffleFooter)
+                .font(Typeface.footnote)
         }
         .task(id: phase) {
             guard phase == .active else { return }
@@ -285,9 +295,9 @@ private struct TurntableDebugSection: View {
             ForEach(Array(rows.enumerated()), id: \.offset) { (_: Int, row: InfoRow) in
                 LabeledContent(row.label) {
                     VStack(alignment: .trailing, spacing: 2) {
-                        Text(row.value).font(row.mono ? .footnote.monospaced() : .footnote)
+                        Text(row.value).font(row.mono ? Typeface.mono(.footnote) : Typeface.footnote)
                         if let note = row.note {
-                            Text(note).font(.caption).foregroundStyle(Palette.quiet)
+                            Text(note).font(Typeface.caption).foregroundStyle(Palette.quiet)
                         }
                     }
                 }
@@ -298,6 +308,7 @@ private struct TurntableDebugSection: View {
             }
         } header: {
             Text("Turntable")
+                .font(Typeface.footnote)
         }
         .task(id: phase) {
             guard phase == .active else { return }
@@ -323,9 +334,9 @@ private struct TurntableRecordingRow: View {
         VStack(alignment: .leading, spacing: 6) {
             LabeledContent(said.row.label) {
                 VStack(alignment: .trailing, spacing: 2) {
-                    Text(said.row.value).font(.footnote)
+                    Text(said.row.value).font(Typeface.footnote)
                     if let note = said.row.note {
-                        Text(note).font(.caption).foregroundStyle(Palette.quiet)
+                        Text(note).font(Typeface.caption).foregroundStyle(Palette.quiet)
                     }
                 }
             }
@@ -418,7 +429,7 @@ private struct DeckTrialRows: View {
         }
         ForEach(Array(model.rows.enumerated()), id: \.offset) { _, row in
             LabeledContent(row.label) {
-                Text(row.value).font(.footnote.monospacedDigit())
+                Text(row.value).font(Typeface.footnote.monospacedDigit())
             }
         }
     }
@@ -463,7 +474,7 @@ private struct EngineLogSection: View {
                                 Text(shown.lines[number - shown.first])
                             }
                         }
-                        .font(.caption2.monospaced())
+                        .font(Typeface.mono(.caption2))
                         .textSelection(.enabled)
                         .frame(maxWidth: .infinity, alignment: .leading)
                     }
@@ -482,8 +493,10 @@ private struct EngineLogSection: View {
             }
         } header: {
             Text("Engine log")
+                .font(Typeface.footnote)
         } footer: {
             Text("The engine's last \(EngineTrace.log.capacity) lines, the newest last (\(shown.total) so far); once there are \(EngineTrace.log.capacity), the oldest go as new ones come, so the lines move up while you read - Copy keeps them as they are. Each line starts with a time in seconds on the phone's clock: the gaps between lines are what count. Console on a Mac shows them too, as they happen: choose the iPhone, turn on Action > Include Info Messages, press Start, then search for subsystem:net.lizardlounge.deadwax.")
+                .font(Typeface.footnote)
         }
     }
 }
@@ -507,7 +520,7 @@ private struct DownloadsDebugSection: View {
                 let bytes = rows.reduce(Int64(0)) { $0 + ($1.bytes ?? 0) }
                 LabeledContent(state.rawValue) {
                     Text("\(rows.count) \u{00B7} \(Bytes.words(bytes))")
-                        .font(.footnote.monospacedDigit())
+                        .font(Typeface.footnote.monospacedDigit())
                 }
             }
             LabeledContent("Tasks") {
@@ -515,38 +528,38 @@ private struct DownloadsDebugSection: View {
                 let resumable = downloads.records.values.filter { $0.resume != nil }.count
                 Text(tasksRead ? "\(running) running \u{00B7} \(tasks.count - running) waiting \u{00B7} \(resumable) with resume data"
                                : "Reading\u{2026}")
-                    .font(.footnote.monospacedDigit())
+                    .font(Typeface.footnote.monospacedDigit())
             }
             LabeledContent("Reach") {
                 Text(reachability.reach.rawValue + (reachability.probing ? " \u{00B7} probing" : ""))
-                    .font(.footnote.monospaced())
+                    .font(Typeface.mono(.footnote))
             }
             LabeledContent("Path") {
                 Text(pathFacts(reachability.path))
-                    .font(.footnote.monospaced())
+                    .font(Typeface.mono(.footnote))
             }
             LabeledContent("Last probe") {
                 Text(reachability.lastProbe.map { "\($0.answered ? "answered" : "no answer") \u{00B7} \($0.at.formatted(date: .omitted, time: .standard))" } ?? "none yet")
-                    .font(.footnote.monospaced())
+                    .font(Typeface.mono(.footnote))
             }
             LabeledContent("Plays waiting to be sent") {
                 Text("\(downloads.playsWaiting)")
-                    .font(.footnote.monospacedDigit())
+                    .font(Typeface.footnote.monospacedDigit())
             }
             LabeledContent("Starts waiting to be sent") {
                 Text("\(downloads.startsWaiting)")
-                    .font(.footnote.monospacedDigit())
+                    .font(Typeface.footnote.monospacedDigit())
             }
             if !downloads.checkSeconds.isEmpty {
                 let times = Array(downloads.checkSeconds.values)
                 LabeledContent("Checks") {
                     Text("\(times.count) \u{00B7} mean \(String(format: "%.2f", times.reduce(0, +) / Double(times.count))) s \u{00B7} longest \(String(format: "%.2f", times.max() ?? 0)) s")
-                        .font(.footnote.monospacedDigit())
+                        .font(Typeface.footnote.monospacedDigit())
                 }
             }
             if let problem = downloads.storeProblem {
                 Text(problem)
-                    .font(.footnote.monospaced())
+                    .font(Typeface.mono(.footnote))
                     .foregroundStyle(Palette.danger)
                     .textSelection(.enabled)
             }
@@ -559,12 +572,13 @@ private struct DownloadsDebugSection: View {
                         Text(line)
                     }
                 }
-                .font(.caption2.monospaced())
+                .font(Typeface.mono(.caption2))
                 .textSelection(.enabled)
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
         } header: {
             Text("Downloads")
+                .font(Typeface.footnote)
         }
         .task {
             while !Task.isCancelled {
@@ -602,8 +616,10 @@ private struct LibraryFollowDebugSection: View {
             backgroundRows()
         } header: {
             Text(LibraryFollowWords.section)
+                .font(Typeface.footnote)
         } footer: {
             Text(LibraryFollowWords.followNote)
+                .font(Typeface.footnote)
         }
     }
 
@@ -616,56 +632,56 @@ private struct LibraryFollowDebugSection: View {
         if let scope = follower.scope {
             LabeledContent("Following") {
                 Text(LibraryFollowWords.scope(scope))
-                    .font(.footnote)
+                    .font(Typeface.footnote)
             }
         }
         LabeledContent("Albums") {
             Text(LibraryFollowWords.count(albums.count))
-                .font(.footnote.monospacedDigit())
+                .font(Typeface.footnote.monospacedDigit())
         }
         LabeledContent("Songs read") {
             Text(LibraryFollowWords.read(read, of: listed)
                  + (follower.readingNow > 0 ? " \u{00B7} reading \(follower.readingNow)" : ""))
-                .font(.footnote.monospacedDigit())
+                .font(Typeface.footnote.monospacedDigit())
         }
         LabeledContent("Missing") {
             Text(LibraryFollowWords.missing(albums, now: now))
-                .font(.footnote.monospacedDigit())
+                .font(Typeface.footnote.monospacedDigit())
         }
         LabeledContent("Held back") {
             Text(LibraryFollowWords.held(follower.held)
                  + (follower.believing ? " \u{00B7} believing (Remove)" : "")
                  + (follower.keptThem ? " \u{00B7} kept them" : ""))
-                .font(.footnote)
+                .font(Typeface.footnote)
         }
         LabeledContent("Removed, to let go") {
             Text(LibraryFollowWords.count(follower.removed.count))
-                .font(.footnote.monospacedDigit())
+                .font(Typeface.footnote.monospacedDigit())
         }
         LabeledContent("Leaving their albums") {
             Text(LibraryFollowWords.leaving(albums))
-                .font(.footnote.monospacedDigit())
+                .font(Typeface.footnote.monospacedDigit())
         }
         LabeledContent("Last check") {
             Text(follower.checking ? "Checking\u{2026}"
                  : follower.lastCheck.map { LibraryFollowWords.lastCheck($0, now: now) } ?? LibraryFollowWords.noCheckYet)
-                .font(.footnote.monospacedDigit())
+                .font(Typeface.footnote.monospacedDigit())
         }
         if let first = follower.firstRead {
             LabeledContent("First read") {
                 Text(LibraryFollowWords.firstRead(seconds: first.seconds, albums: first.albums))
-                    .font(.footnote.monospacedDigit())
+                    .font(Typeface.footnote.monospacedDigit())
             }
         }
         if let plan = downloads.libraryFill {
             VStack(alignment: .leading, spacing: 2) {
                 Text(LibraryFollowWords.wouldFit(plan, limit: downloads.storageLimit))
                 Text(LibraryFollowWords.fitDetail(plan))
-                    .font(.footnote)
+                    .font(Typeface.footnote)
                     .foregroundStyle(Palette.quiet)
                 if plan.deficit > 0 {
                     Text(LibraryFollowWords.underReserve(plan.deficit, confirmed: downloads.libraryDeficitConfirmed))
-                        .font(.footnote)
+                        .font(Typeface.footnote)
                         .foregroundStyle(Palette.amber)
                 }
             }
@@ -673,7 +689,7 @@ private struct LibraryFollowDebugSection: View {
         }
         if let problem = follower.problem {
             Text(problem)
-                .font(.footnote.monospaced())
+                .font(Typeface.mono(.footnote))
                 .foregroundStyle(Palette.danger)
                 .textSelection(.enabled)
         }
@@ -687,24 +703,24 @@ private struct LibraryFollowDebugSection: View {
         LabeledContent("Power") {
             Text(LibraryFollowWords.power(downloads.power)
                  + (downloads.onlyWhileCharging ? " \u{00B7} only while charging" : ""))
-                .font(.footnote)
+                .font(Typeface.footnote)
         }
         LabeledContent("Albums out") {
             Text(LibraryFollowWords.count(downloads.libraryAlbumsOut))
-                .font(.footnote.monospacedDigit())
+                .font(Typeface.footnote.monospacedDigit())
         }
         VStack(alignment: .leading, spacing: 2) {
             Text("In the background")
             let now = ListenTracker.wallMs()
             if downloads.backgroundRuns.isEmpty {
                 Text(LibraryFollowWords.noBackgroundRun)
-                    .font(.footnote)
+                    .font(Typeface.footnote)
                     .foregroundStyle(Palette.quiet)
             }
             ForEach(Array(downloads.backgroundRuns.enumerated()), id: \.offset) {
                 (item: (offset: Int, element: LibraryBackground.Run)) in
                 Text(LibraryFollowWords.backgroundRun(item.element, now: now))
-                    .font(.footnote.monospacedDigit())
+                    .font(Typeface.footnote.monospacedDigit())
                     .foregroundStyle(Palette.quiet)
             }
         }

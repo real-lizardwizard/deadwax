@@ -56,7 +56,7 @@ ios/
                             slice 4's EQCorrectionScreen and EQProfileScreen; slice 5's EQFilterEditor,
                             EQImport, EQExport); URLSessionTransport,
                             SessionKeychain, AudioSessionController, NowPlayingController, SongFiles (stream
-                            cache, downloads); Icon/ loose PNGs
+                            cache, downloads); Icon/ loose PNGs; Fonts/ Noto Sans's four faces and OFL.txt
   DeadwaxKit/               Package.swift (tools 6.0; iOS 17, macOS 14)
     Sources/DeadwaxCore/    pure Swift + Foundation, Swift 6 mode, tested on Linux
     Sources/DeadwaxAudio/   the engine; every file inside #if canImport(AVFAudio); Swift 5 mode - and the EQ's
@@ -74,7 +74,8 @@ ios/
                             (turntable.md 4.3, built first for the EQ)
   scripts/                  install.sh (James's), install_helper.py (its JSON/plist reading, in Xcode's
                             python3), check-linux.sh, check_project.py, make-icon.py, make-test-album.py,
-                            make-eq-fixtures.py (the EQ's fixtures; numpy and scipy, run with python -I)
+                            make-eq-fixtures.py (the EQ's fixtures; numpy and scipy, run with python -I),
+                            make-fonts.py (App/Fonts from the web's Noto Sans; fontTools and brotli)
   README.md                 a pointer to docs/ios.md and this file
 .github/workflows/ios.yml   branches '**' + paths: ios/** and itself (never a tag: GitHub applies no paths
                             filter to a tag push) - linux (swift:6.4.1-noble), project (check_project.py),
@@ -8382,3 +8383,284 @@ written at the same time after 165):
   web's; that the chosen segment slides, and doesn't under Reduce Motion;
 - Dynamic Type at the largest sizes (the switch's shrink and truncation, the Large Content Viewer) and VoiceOver's
   reading of the bar, the switch and Find.
+
+## Noto Sans (15 Nov)
+
+James chose the app's face from six set side by side, each drawn as the squared Library's top
+(~/Library/Caches/deadwax-build/fonts/font-options.html). His pick was "Noto Sans (the web's)". The whole app now draws
+its words in it. Fonts weren't part of the squared look; they were chosen separately and come after it, on the same
+branch (square-look).
+
+### The files: the web's own, made one font per weight
+
+- **Nothing was fetched.** ios/scripts/make-fonts.py makes ios/App/Fonts from interface/styles/font/noto-sans/: the
+  web's seven variable woff2 files (Noto Sans 2.015; weight axis 100-900) and its OFL.txt, copied unchanged.
+- **Does iOS read a woff2 as it is?** This Mac's CoreText does: `CTFontManagerCreateFontDescriptorsFromData` gives
+  each file's nine named instances. But that doesn't settle the bundle:
+  - Every subset calls itself NotoSans-Regular (and NotoSans-Bold, and so on). Registered side by side, only the
+    first would take; the rest are refused as the same name.
+  - iOS has no unicode-range to choose between them.
+  - Whether the phone's CoreText reads woff2 has never been tried.
+- **So each weight the app draws is one TrueType font.** The weights are 400, 500, 600 and 700. For each:
+  - each of the seven subsets is pinned at that weight (fontTools' instancer, `updateFontNames`);
+  - the seven are merged into one font (fontTools' Merger), latin first, so its glyph wins a character two subsets
+    share and its header and names are the font's.
+- **Why static:** the Merger takes no variable font.
+- **What came out** (sha256 as committed; the script reproduces them byte for byte, with the latin file's dates and
+  no timestamp of its own):
+
+  | file | bytes | sha256 |
+  | --- | --- | --- |
+  | NotoSans-Regular.ttf | 181,256 | `d0b2dcbc…eef0` |
+  | NotoSans-Medium.ttf | 181,620 | `03ed4445…1169` |
+  | NotoSans-SemiBold.ttf | 181,688 | `4782bd3d…9a61` |
+  | NotoSans-Bold.ttf | 181,332 | `d3c95d22…83c7` |
+
+  About 725 KB in all. Each has 2,022 glyphs: the subsets' shared glyphs are kept twice, renamed, by the Merger.
+  Each maps 1,672 characters: exactly the union of the web's seven cmaps (tests/fixtures/font_cmaps.json).
+- **The subsets: all seven**, not latin and latin-ext alone. Merged under one family there's no collision, and a
+  Polish, Vietnamese, Greek or Cyrillic name is in the same face as the Latin beside it, as on the web. Anything
+  else, such as Japanese, Korean or Arabic, falls through to iOS's face.
+- **The tools:** fontTools 4.68.0 and brotli, in a venv of their own (~/Library/Caches/deadwax-build/fonttools-venv),
+  never the repo's .venv nor anything system-wide.
+
+### Registered by UIAppFonts
+
+- Info.plist names the four (`UIAppFonts`).
+- App/ is a synchronized folder, so the files are copied to the bundle's root, which is where UIAppFonts looks. This
+  was checked in the built Deadwax.app: the four .ttf and OFL.txt are there at the root, byte for byte the committed
+  ones, and the built Info.plist lists them.
+- **The .xcodeproj is unchanged.**
+- check_project.py now also checks:
+  - UIAppFonts names exactly App/Fonts' .ttf files;
+  - each of them is TrueType;
+  - OFL.txt is there beside them;
+  - no two resources in App/ share a name, since every one lands at the bundle's root.
+- UIAppFonts was chosen over registering at launch: it is declarative, it is done before any view is made, and there
+  is no code to fail.
+
+### Typeface (ios/App/Shared/Typeface.swift): one layer, like Corners
+
+- **Every text style iOS has**, at its size at the standard text size: largeTitle 34, title 28, title2 22, title3 20,
+  headline 17 semibold, body 17, callout 16, subheadline 15, footnote 13, caption 12, caption2 11. Each is
+  `Font.custom("Noto Sans", size:, relativeTo: <that style>)`, so it scales with Dynamic Type exactly as iOS's own
+  style did.
+- **The default:** the root is given `.font(Typeface.body)`, so a Text or control that sets no font is Noto Sans.
+- **Weights: `.weight()`, `.bold()` and `Text.fontWeight()` work unchanged.** This was measured on this Mac (macOS 27.2, SwiftUI's
+  ImageRenderer, the four faces registered for the process): `.custom("NotoSans-Regular").weight(.semibold)`,
+  `.weight(.medium)`, `.weight(.bold)`, `.bold()`, `Text.bold()` and `Text.fontWeight(.semibold)` each draw
+  **pixel for pixel** the named face (NotoSans-SemiBold and so on), and so does the family name with a weight. The
+  web's variable woff2, registered alone, moved along its axis the same way.
+  - The phone's SwiftUI is the same code, but it hasn't been seen there: check 211.
+  - So the 80-odd call sites kept their `.weight(...)`. Only `.medium`, `.semibold` and `.bold` are used, and each
+    has its face.
+- **Figures:** Noto Sans's are tabular as they are. Every digit is 572 thousandths wide (`1111` and `0000` measured
+  the same width), so the times and track numbers hold still. `.monospacedDigit()` is kept where it was; it changes
+  nothing drawn (measured).
+- **The exceptions are kept by name, through Typeface:**
+  - `Typeface.symbol(.style)` / `symbol(size:weight:)`: an SF Symbol drawn alone keeps iOS's own font, which is how
+    a symbol is sized. 47 sites were classified by the head of their modifier chain being an Image, plus DownloadMark
+    (always a symbol), a label style's icon and CircleFace's label. A symbol inside a Label or a container takes
+    the container's Noto Sans at the same point size, as any text beside it does.
+  - `Typeface.mono(.style)`: data (ids, paths, versions, an error's detail, Debug's values, the turntable's time
+    line) keeps the system's monospace, as before. The web's Noto Sans Mono isn't bundled; doing that is a follow-up.
+  - The turntable's Canvas readouts (`UIFont.monospacedSystemFont`) are its own drawing, left alone.
+- **Section headers and footers:** all 94 got an explicit `Typeface.footnote`, iOS's size for both. A List's style
+  sets its headers' text itself, so the root's font can't be relied on to reach them, and if it did they would turn
+  body-sized. InfoView's six string-titled sections became header closures. A Menu's sections (QueueMenu,
+  DownloadControl) are UIMenu titles and were left.
+- **UIKit, `Typeface.configureUIKit()`,** called in AppDelegate's didFinishLaunching. It sets only the font, and uses
+  the legacy appearance properties, not a UINavigationBarAppearance, so that iOS 26+'s own bar look is untouched.
+  The faces:
+  - large titles Bold 34;
+  - inline titles SemiBold 17;
+  - bar buttons and the back button Regular 17;
+  - UISearchTextField Regular 17;
+  - segmented controls Regular 13, the chosen segment SemiBold 13.
+
+  Each is scaled with UIFontMetrics at launch, so a text size changed while the app is open reaches the bars at
+  the next launch (check 214).
+- **What can't take a font:** menus, alerts, confirmation dialogs, swipe actions and PasteButton are iOS's own and
+  stay in iOS's face.
+
+### Where it looks different
+
+- **Wider and taller.** At the same point size Noto Sans is about 6% wider than SF (a 40 pt sample: 824 against 775
+  px) and its lines about 17% taller (55 against 47 px: Noto's ascent and descent are 1069 and 293 thousandths).
+  Rows grow a little, and text truncates a little sooner where room is tight (check 217).
+- **Bold Text isn't followed.** With `legibilityWeight` bold, SF regular drew as SF semibold, but Noto Sans,
+  static or variable, drew unchanged (measured). SwiftUI applies Bold Text to the system font only. Following it
+  would mean every weight resolved by Typeface from the environment, which is a larger change than this one, and
+  it was left (check 216).
+
+### Tests
+
+tests/test_ios_palette.py has four new tests:
+- **The fonts are the web's own:**
+  - the four files, and Info.plist's UIAppFonts;
+  - OFL.txt byte for byte the web's;
+  - each name table's family "Noto Sans" and PostScript names equal to Typeface.Face;
+  - each font's cmap, parsed by hand (the suite has no fontTools), equal to the union of the web's seven.
+- **Every text style's size and `relativeTo:` are iOS's own,** the root font is set, and configureUIKit sets each
+  appearance.
+- **No system text font is left in ios/App:** no leading-dot style in a `.font(...)` once Typeface.symbol and mono
+  are set aside, no `.system(` or custom font of its own, no style handed on as a value, no bare `.monospaced()`,
+  and no UIKit font but the turntable's. A slipped-back `.subheadline` fails it (tried).
+- **Every List section's header and footer takes Typeface,** and only a menu's section is titled by a string.
+
+### Verified, and not
+
+Verified on the Mac: see the commit, which has the checks' results. Not verified: anything on the phone (checks
+210-217): the face itself on iOS 27, its weights, the alphabets, the navigation bars' and search fields' fonts on iOS
+27's bars, the section headers' size, Bold Text, and where Noto's extra width and height crowd a layout.
+
+## The play bar on the tab bar (15 Nov)
+
+James, on his iPhone at app 0.11, in this order:
+
+- "merge the play bar with the bottom bar so it doesn't look like it's floating";
+- "I would like to be able to swipe on the title to skip forward and backward while also being able to seek. let's
+  put the progress on top of the play bar";
+- "opaque the whole way";
+- "get rid of the skip forward button";
+- "dragging up or tapping on the title should bring up the play page. let's make sure the play/pause isn't right up
+  against the edge as well, so its easily pressable".
+
+Built on `square-look` after Noto Sans (68b4b97). **The app stays 0.11 (11)**. src/__init__.py is untouched (2.1.26,
+from ios's c8da2eb). There is no server change, and the engine files are untouched. The only new playback action is
+the swipe right's "the song before": QueueController's own move, made from Previous's rules without its restart.
+Next and seek are the ones already there.
+
+### What changed
+
+- **The mini player is the tab bar's top** (AppTabBar, MainTabs.swift):
+  - It is one VStack: MiniPlayerView while something is queued, a hairline of --dw-border, then the tabs.
+  - The whole block sits on --dw-tab-bar, solid, running down under the home indicator. The `.regularMaterial` card,
+    its corners and its 8 pt inset are gone, so nothing of the page shows through.
+  - With the play bar there, its seek line is the block's top edge; the 1 px hairline along the top is drawn only
+    with nothing queued. Nothing queued, the bar is exactly as it was.
+  - `.isTabBar` and `.contain` moved onto the tabs' HStack, so VoiceOver reads the play bar as its own elements
+    before the tab bar.
+  - The `.dynamicTypeSize(...xxxLarge)` cap now covers the block (see the decisions).
+- **The play bar** (MiniPlayerView, rewritten):
+  - The cover, flush left, the bar's full height, `Corners.art`.
+  - Then the title (subheadline semibold) and PlayerWords.secondLine (footnote, quiet).
+  - Then Play/Pause alone: a 48 pt wide target, the bar's full height tall, with 14 pt past it to the screen's edge.
+    Its glyph (title2) and spinner are as they were, and it shows itself in the Large Content Viewer. The Next button
+    is gone.
+  - The row is `max(60, @ScaledMetric(relativeTo: .subheadline) 60)` tall, so it and the cover grow with the two lines.
+- **BarTitle** (the cover and the words; one gesture area):
+  - A tap opens Now Playing (`.onTapGesture`).
+  - A `DragGesture(minimumDistance: PlayBar.decideAfter)` reads its direction once, on its first change
+    (PlayBar.way), and keeps it: across, up or down.
+  - **Across**: the words follow the finger (an offset inside a clipped column, on the words' own view, so the words
+    leaving keep where the finger left them and the new song's come in from the column's edge). Toward a song that isn't there
+    (PlayerModel.hasSongBefore / hasSongAfter) they follow a third of the way (PlayBar.followed).
+  - On letting go, PlayBar.skip decides. Left is `player.next()`, right is `player.songBefore()`, and anything else
+    springs back. The words carry `.id(entry.key)` and a transition chosen by `sliding`, which is set while the drag
+    goes across (so the words leaving already carry it) and cleared once the key has changed. The old words leave
+    one way and the new ones come in from the other, `.animation(value: entry.key)` on the column alone. A song that
+    changes by itself, or from the lock screen, changes the words at once, as before. Under Reduce Motion they fade.
+  - **Up**: Now Playing opens on letting go, if PlayBar.opens. **Down**: nothing.
+  - A drag the system takes away (the `@GestureState`, as ScrubberView's) skips and opens nothing, and springs back.
+  - VoiceOver: one element, "Now playing: Roads, Portishead - open" (PlayerWords.miniPlayerLabel, as before), a
+    button whose activation opens Now Playing. Its actions are "Next song" and "Previous song", each only while there
+    is a song that way.
+- **SeekLine** (along the top edge; a view of its own, so only it redraws as the position moves, as Hairline did):
+  - At rest, a 2 pt line of --dw-border with the part played in the accent, its top on the bar's top edge.
+  - A 16 pt touch area centred on it, an overlay, so it adds no room and reaches 7 pt over the page.
+  - A finger on it: 8 pt thick, and a tag over the finger, "1:23 / 4:56" (PlayerWords.barTime). The tag is caption
+    with monospaced digits, on --dw-tab-bar with a --dw-border edge and `Corners.control`, 6 pt above the line and
+    kept 8 pt from the screen's sides.
+  - Every rule is Scrub's, as ScrubberView's: dragStart, dragMove, dragEnd (one seek, on letting go), dragFor (the
+    song changing drops it), the cancel, and `shownPosition` holding the target until it lands. One rule is the bar's
+    own (see the decisions).
+  - VoiceOver: adjustable, "Position in the song", "0:12 of 5:00" (the scrubber's words), PlayBar.adjusted's 10 s.
+- **The room** (TabStack):
+  - `tabBarRoom` is still AppTabBar's measured height, which now includes the play bar and the hairline under it.
+  - PlayerInset became NoticeInset, which holds only the notice. `playerClearance` is the notice's height (while one
+    shows) plus `tabBarRoom`, so the two add up to the block and a list's last row clears it.
+  - The seek line's reach over the page and its tag are overlays, overlap rather than room.
+- **The keyboard**: the block keeps `.ignoresSafeArea(.keyboard)`, so the play bar now stays under the keyboard with
+  the tabs, and `tabBarRoom` is 0 while it's up. The notice still rides the keyboard.
+- **Core**:
+  - `entryBefore(_:)` (UpNext.swift): backward()'s entry at position 0, past Repeat One's copies, or nil.
+  - `QueueController.toEntryBefore()`: catchUp, then Previous's move without its restart.
+  - **PlayBar.swift**, the gestures' rules and numbers.
+  - PlayerWords: `nextSong`, `previousSong`, `barTime`.
+  - PlayerModel adds `songBefore()` (as next(): cancelRetry, act, startTicking), `hasSongBefore` and `hasSongAfter`
+    (onward, or Repeat All with a queue). previous() is unchanged.
+- Corners.swift's comments: the play bar is no longer a card.
+
+### Decided here (the brief left these open, or this departs from it)
+
+- **Now Playing opens on letting go; it doesn't follow the finger.** It is a `fullScreenCover`, which can't be driven
+  by a drag. Following the finger would mean presenting Now Playing as the app's own overlay: its dismiss drag, the
+  turntable's full screen, and the sheets over it would all move with it. That is a larger change than this one.
+  Check 224 asks whether it feels wrong.
+- **A tap on the seek line seeks nowhere.** ScrubberView seeks on a tap, but the line's 16 pt touch area reaches 7 pt
+  over the page's foot and 9 pt into the title's top, where a tap means a row or Now Playing. A seek there would jump
+  the song by surprise, so a touch must move PlayBar.seekSlop (4 pt) across before it seeks. It still thickens and
+  shows the time at once.
+- **The keyboard covers the play bar.** It used to ride the keyboard as a card. As one block with the tabs, it goes
+  under the keyboard with them, as Music's does. Check 202 now says so, and the notice still rides the keyboard.
+- **The cap covers the play bar.** The mini player had no Dynamic Type cap; the block now holds at `.xxxLarge`, the
+  tab bar's, so the joined block can't take half the screen at the accessibility sizes. Play/Pause has the Large
+  Content Viewer. The title has none, since its long press would fight the drag.
+- **The numbers**, all in PlayBar:
+  - a direction is read after 10 pt;
+  - a skip at 50 pt, still going that way, or a flick whose predicted end is past 120;
+  - Now Playing at 40 pt up, still going up, or a flick past 120;
+  - a third of the way toward a song that isn't there;
+  - the line's slop is 4 pt and its VoiceOver step 10 s (the scrubber's is 5).
+- **"Right always goes to the song before"** is entryBefore: past Repeat One's copies as Previous does, with History
+  following (wentBack). At the first song (or with only copies before it) the title springs back. Left is Next's own
+  rule, Repeat All's next time round included.
+- **The actions only when there's a song that way**, so VoiceOver never offers one that does nothing.
+- **"Mostly horizontal"** is a drag that has moved more across than up or down by the time it is read. The bar
+  isn't in a scroll view, so no vertical scroll is there to steal; the 7 pt of the line's touch area over the page is
+  the only overlap, as the brief set it.
+
+### Tests
+
+- **PlayBarTests** (13):
+  - the way, read once past 10 pt (a tie isn't across);
+  - left is next and right is before;
+  - under the threshold, or flung back, it springs back;
+  - a flick skips;
+  - the resistance, and which way has a song;
+  - a drag up opens, and a short or reversed one doesn't;
+  - the line's slop;
+  - VoiceOver's 10 s, and the song's ends;
+  - the words;
+  - entryBefore on a plain queue.
+- **QueueControllerSongBeforeTests** (6):
+  - the song before at 30 s, a skip and never a seek;
+  - at the first song nothing moves;
+  - paused stays paused;
+  - History's floor follows, as Previous's does;
+  - a join no change has seen is caught up first;
+  - Repeat One's copies are passed over.
+- **tests/test_ios_palette.py**, `test_the_play_bar_is_the_tab_bars_top`:
+  - AppTabBar draws MiniPlayerView, and nothing else does;
+  - no material or card in it;
+  - no Next or Previous glyph;
+  - its 60, 48 and an edge of 12-16 pt;
+  - both VoiceOver actions.
+
+### Verified, and not
+
+Verified on the Mac: see the commit, which has the checks' results. Nothing has been seen on a screen, since no
+simulator was used.
+
+Not verified, so only the phone can show (docs/ios.md's checks 218-227):
+- that the block sits flush and opaque, the cover flush, and Play/Pause easy to hit one-handed;
+- that the 16 pt touch area above the bar takes a finger, with the overlay offset outside the block's frame, and that
+  the tag sits where it should;
+- that `.onTapGesture` and the drag share the title as intended, with no tap after a swipe;
+- that the transition chosen during the drag is the one the leaving words take on iOS 27, and that the slide looks
+  right;
+- the thresholds' feel;
+- VoiceOver's reading and actions;
+- that `tabBarRoom` measured with the play bar reaches every list's foot;
+- the keyboard over the block.

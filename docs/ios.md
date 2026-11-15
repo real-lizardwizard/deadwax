@@ -201,15 +201,25 @@ first person's queue stays.
 The app has three tabs, **Library**, **Search** and **You**, along a bar at the foot of the screen: square,
 the full width, flush with the bottom edge, with a thin line along its top - as the web app's tab bar is. The tab
 you're on is purple. Tapping the tab you're on goes back to its first screen, or to the top of it. Once something
-is playing, the mini player sits just above the tab bar, and every screen scrolls far enough for its last row to
-come up above both. While the keyboard is up, the tab bar stays under it, and the mini player sits on the keyboard.
+is playing, the mini player is the top of the tab bar: one solid block with the tabs, a thin line between them (see
+[Playing](#playing)). Every screen scrolls far enough for its last row to come up above the whole block. While the
+keyboard is up, the tab bar and the mini player both stay under it.
 VoiceOver reads the bar as a tab bar, the tab you're on as selected; at the largest text sizes its words stop
 growing, and holding a finger on a tab shows it large.
 
 Everything is squarer since the build after app 0.11's Search (still 0.11): album covers have the smallest of
-corners, everywhere they're drawn - the album page, Now Playing, the tiles and the rows - and the mini player,
-the notices, cards, buttons and chips small square ones. Artists' pictures, the avatar, and the two buttons at the
-top of the Library stay round.
+corners, everywhere they're drawn - the album page, Now Playing, the tiles and the rows - and the notices, cards,
+buttons and chips small square ones. The mini player is square, as the tab bar it sits on. Artists' pictures,
+the avatar, and the two buttons at the top of the Library stay round.
+
+The app's words are in **Noto Sans**, the web app's face, since the build after the squared look (still 0.11): every
+screen's titles, rows, buttons and notes, the navigation bars' titles, and the search fields. It covers the same
+letters the web app's does: Latin with every European language's accents, Vietnamese, Greek and Cyrillic.
+Anything else, such as Japanese, Korean or Arabic, is drawn in iOS's own face. It grows and shrinks with your text
+size as iOS's own did. Times and track numbers keep their place as they count. A few things are still in iOS's
+face: the symbols, the menus, alerts and swipe buttons (iOS draws those itself), and ids, paths and versions,
+which keep the phone's monospace. **Bold Text** (Settings > Accessibility > Display & Text Size) makes iOS's face
+heavier, but not Noto Sans.
 
 ## The Library
 
@@ -793,8 +803,23 @@ go.
 
 ## Playing
 
-**The mini player**, above the tab bar: the cover, the song and its artist, play/pause and next, and a
-thin line along it for how far in the song is - square-cornered, as its cover is. Tap it for Now Playing.
+**The mini player**, the top of the tab bar while something is playing: the cover at its left edge, the song
+and its artist, and play/pause, with room past it so a thumb finds it. It is solid, the tab bar's own colour, with
+nothing of the page showing through. There's no next button; instead:
+
+- **The line along its top** is how far in the song is. Put a finger on it and it thickens, with the time under
+  your finger over it ("1:23 / 4:56"); drag and let go, and the song goes there. A tap on the line that doesn't
+  move goes nowhere, so a tap meant for the song or the page above never jumps the song.
+- **Swipe the song's title** left for the next song, right for the song before - however far into this song you
+  are, which Now Playing's previous button doesn't do. The title slides away and the new one comes in from the
+  other side. A short swipe springs back, and so does one past the first or the last song.
+- **Tap the title or the cover**, or drag up on them, for Now Playing. Now Playing opens as you let go, without
+  following your finger. A drag down does nothing.
+
+VoiceOver reads it as "Now playing: Roads, Portishead - open", with **Next song** and **Previous song** as its
+actions (swipe up or down to hear them): the only way to skip from the mini player without the swipe. The line
+reads "Position in the song", "0:12 of 5:00", in 10-second steps. It grows with the text size as far as the tab
+bar does.
 
 **Now Playing**: the cover (a little smaller while paused), the song's title, and "artist — album"
 (tap it to go to the album). Under them:
@@ -2889,15 +2914,16 @@ not 166: Phase 6's checks are being written at the same time and take the number
 - **200 The tab bar.** Square, the full width, flush with the bottom edge, a thin line along its top - no
   floating capsule. The tab you're on is purple. Tap each tab; tap the one you're on: back to its first screen,
   then to its top. Open an album and swipe back: the bar never moves or flickers, and iOS's own never shows.
-- **201 Above the bar.** With something playing, the mini player sits just above the bar, square-cornered, its
-  cover square; Play Next a song: the line above the mini player. Scroll to the end of an album, Your albums
-  (grid and list), Playlists, Artists and You: the last row clears the mini player and the bar, and the letter
+- **201 Above the bar.** With something playing, the mini player is the top of the bar (since the build after
+  Noto Sans: checks 218-227); Play Next a song: the line above the mini player. Scroll to the end of an album, Your
+  albums (grid and list), Playlists, Artists and You: the last row clears the mini player and the bar, and the letter
   index's last letter is above them. Nothing playing: the last row clears the bar, with no gap under it. Now
   Playing opens over everything, the bar included.
 - **202 The keyboard.** In Search, tap the field: the keyboard comes up over the tab bar - the bar doesn't ride
-  up on it - and the mini player sits on the keyboard. Scroll the results to the end: the last row clears the
-  mini player, with no gap the bar's height above it. Put the keyboard away: the bar and the mini player are back
-  where they were. The same with the Library's Find and You > Server address.
+  up on it - and over the mini player with it (until the build after Noto Sans the mini player sat on the
+  keyboard). Scroll the results to the end: the last row clears the keyboard, with no gap the bar's height above
+  it. Put the keyboard away: the bar and the mini player are back where they were. The same with the Library's
+  Find and You > Server address.
 - **203 The Library's top.** On Albums: the round magnifying glass, the switch, the round •••, evenly spaced -
   the switch filling the room - and no Find field. Swipe to Playlists and Artists: the same top, no **+**.
   The switch's purple slides as you swipe and as you tap. Does the top look complete?
@@ -2908,7 +2934,7 @@ not 166: Phase 6's checks are being written at the same time and take the number
 - **205 New playlist.** On Playlists, ••• > **New playlist**: the sheet the **+** opened, and Create opens the new
   playlist's page. In Airplane Mode it's dimmed.
 - **206 Square corners.** The album page's cover, Now Playing's, the tiles and rows, Up Next's and Info's covers,
-  Search's rows: the smallest of corners. The mini player, the line over it, the first ask on Downloaded, the
+  Search's rows: the smallest of corners. The line over the mini player, the first ask on Downloaded, the
   sign-in's fields, the "In your library" badge, Up Next's Shuffle and Repeat, the EQ's held value, the Try again
   buttons: small square corners, no round ends. Still round: artists' pictures, your initial on You, the download
   rings, the EQ's knobs, the two buttons at the Library's top. The turntable as it was.
@@ -2921,6 +2947,71 @@ not 166: Phase 6's checks are being written at the same time and take the number
   overlaps, and every list still ends above the mini player and the bar.
 - **209 Reduce Motion** (Settings > Accessibility > Motion): a tap on the switch moves the page and its purple at
   once, with no slide; Find comes and goes without sliding.
+
+### Noto Sans's checks (210-217)
+
+**Not done yet.** These come with the build that sets the app in Noto Sans (still app 0.11 (11)), and follow
+the squared look's.
+
+- **210 The face.** Go through the Library, an album, Now Playing, Up Next, Search and You with the web app open
+  beside them: the same face as the web's. Check the navigation bars' titles too, large and then small once you
+  scroll (Search, You, All music's pages, an artist), and the back button's word.
+- **211 Its weights.** An album's title and Now Playing's song are bold; the switch's names, the tab bar's words
+  and the track titles keep the weights they had. Nothing looks smeared or faked-bold.
+- **212 Other alphabets.** Find a name with Polish or Czech letters (Łódź, Dvořák), Turkish (ş, ğ, ı), Vietnamese,
+  Greek and Cyrillic: each is drawn in the same face as the Latin beside it, not a different one. Japanese, Korean
+  and Arabic are iOS's face, as they were.
+- **213 Numbers that count.** Now Playing's times, the mini player's line, a track's number and length, and
+  Downloads' sizes: the digits hold still as they change, with no jiggle.
+- **214 Text size.** At the smallest and the largest text sizes, Noto Sans shrinks and grows as iOS's face did.
+  The navigation bars' titles take the size the app opened at: change the size with the app open, and they catch up
+  the next time it opens.
+- **215 What iOS draws for the app.** These are in Noto Sans: You's and Info's section headings and the small notes
+  under sections, the segmented controls (Search's filter, Info's, the EQ's ear), what you type in a search field,
+  and the bars' buttons (**Done**, **Edit**). The menus, alerts, swipe buttons and Paste stay in iOS's face.
+- **216 Bold Text** on: what's in iOS's face gets heavier, Noto Sans doesn't. Say whether that reads badly.
+- **217 Fit.** Noto Sans is a little wider than iOS's face, and its lines a little taller. Look where room was
+  tight: the switch's names, the tab bar's words, the mini player's two lines, Now Playing's song, the tiles'
+  title and artist, Up Next's rows, the EQ's numbers. Is anything cut off sooner than before, or overlapping?
+
+### The mini player on the tab bar's checks (218-227)
+
+**Not done yet.** These come with the build that joins the mini player to the tab bar (still app 0.11 (11)), and
+follow Noto Sans's.
+
+- **218 One block.** Play something: the mini player sits right on the tabs, the full width, square, with no gap,
+  no card and no room at its sides, and a thin line between it and the tabs. Scroll a page under it: it's solid
+  from its top down to the bottom edge, with nothing showing through. The cover is at the very left, the mini
+  player's full height. With nothing queued (sign in as someone else, before anything plays): the tab bar alone,
+  as before.
+- **219 Play/Pause, one-handed.** Holding the phone in one hand, tap Play/Pause with your thumb a few times, then
+  with the other hand's: is it easy to hit, and clear of the screen's edge? The spinner shows while a song loads.
+  There's no next button.
+- **220 Seeking by the line.** The line along the mini player's top shows how far in the song is. Put a finger on
+  it: it thickens, and the time under your finger shows over it, "1:23 / 4:56", kept on the screen at either end.
+  Drag and let go: the song goes there, once, and the line doesn't jump back while it gets there. Tap the line
+  without moving: nothing changes. Paused, the same, and it stays paused.
+- **221 Swiping the title.** Swipe it left: the title slides away to the left, the next song's slides in from the
+  right, and it plays (or stays paused). Swipe right well into a song: the song before, never the same song again.
+  A short swipe springs back; a quick flick is enough. With Shuffle on, left and right follow Up Next's order.
+- **222 The queue's ends.** On the first song, swipe right: the title pulls a little way and springs back, and
+  nothing changes. On the last song with Repeat off, swipe left: the same. With Repeat All on, the last song's
+  swipe left goes to the first.
+- **223 A tap opens Now Playing.** Tap the title, the artist's line or the cover: Now Playing opens. A swipe across
+  never opens it.
+- **224 A drag up opens Now Playing.** Drag up on the title or the cover and let go: Now Playing opens as you let
+  go. It doesn't follow your finger: say whether that feels wrong. A short drag up does nothing, and so does a drag
+  down; a drag up never skips.
+- **225 VoiceOver.** The mini player reads "Now playing: Roads, Portishead - open"; double-tap opens Now Playing.
+  Swipe up or down on it: **Next song** and **Previous song**, each only when there's a song that way. Then
+  Play/Pause, then the line: "Position in the song", "0:12 of 5:00", and swiping up or down moves it 10 seconds.
+- **226 The last row.** Scroll to the end of an album, Your albums (grid and list), Playlists, Artists, You and
+  Search's results: the last row clears the mini player and the tabs, with no gap. Play Next a song: the line above
+  the mini player, and the last row clears that too. In Search, tap the field: the keyboard covers the mini player
+  and the tabs, and the last result clears the keyboard alone.
+- **227 The largest text and Reduce Motion.** At the largest text sizes, the mini player grows with its words as
+  far as the tab bar's do, the cover with it; hold a finger on Play/Pause: it shows large. With Reduce Motion on, a
+  swipe's titles fade instead of sliding.
 
 ## What it can't do yet
 

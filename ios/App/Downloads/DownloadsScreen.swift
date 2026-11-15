@@ -30,13 +30,13 @@ struct DownloadsScreen: View {
             DownloadOverSection(waitingForIt: shelf.waitingForNetwork)
             if downloads.storeProblem != nil {
                 // downloads are off for this launch: no list to draw, nothing to remove
-                Section {} footer: { Text(DownloadWords.lastFooter) }
+                Section {} footer: { Text(DownloadWords.lastFooter).font(Typeface.footnote) }
             } else if shelf.isEmpty {
                 Section {
                     VStack(alignment: .leading, spacing: 4) {
                         Text(DownloadWords.nothingYet)
                         Text(DownloadWords.nothingYetHow)
-                            .font(.subheadline)
+                            .font(Typeface.subheadline)
                             .foregroundStyle(Palette.quiet)
                     }
                     .fixedSize(horizontal: false, vertical: true)
@@ -44,8 +44,10 @@ struct DownloadsScreen: View {
                     .accessibilityElement(children: .combine)
                 } header: {
                     Text(DownloadWords.downloadedHeader)
+                        .font(Typeface.footnote)
                 } footer: {
                     Text(DownloadWords.lastFooter)
+                        .font(Typeface.footnote)
                 }
             } else {
                 if !shelf.downloading.isEmpty || downloads.libraryProgress != nil || !shelf.playlistsGoing.isEmpty {
@@ -81,6 +83,7 @@ struct DownloadsScreen: View {
                     }
                 } footer: {
                     Text(DownloadWords.lastFooter)
+                        .font(Typeface.footnote)
                 }
             }
         }
@@ -274,21 +277,21 @@ private struct StorageSection: View {
                 if shelf.songsHere > 0 {
                     let used = DownloadWords.used(bytes, limit: limit)
                     // one Text, so at the largest sizes it wraps as a sentence
-                    Text("\(Text(used.amount).font(.title2.bold()))\(Text(used.rest).font(.title2).foregroundStyle(Palette.quiet))")
+                    Text("\(Text(used.amount).font(Typeface.title2.bold()))\(Text(used.rest).font(Typeface.title2).foregroundStyle(Palette.quiet))")
                         .fixedSize(horizontal: false, vertical: true)
                 } else {
                     Text(DownloadWords.nothingYetHeadline)
-                        .font(.headline)
+                        .font(Typeface.headline)
                 }
                 DownloadBar(fraction: over ? 1 : fraction(bytes, limit: limit), amber: over)
                     .padding(.vertical, 2)
                 Text(DownloadWords.usageLine(albums: shelf.albumsHere, songs: shelf.songsHere, free: free))
-                    .font(.footnote)
+                    .font(Typeface.footnote)
                     .foregroundStyle(Palette.quiet)
                     .fixedSize(horizontal: false, vertical: true)
                 if over {
                     Text(DownloadWords.overLimit(limit))
-                        .font(.footnote)
+                        .font(Typeface.footnote)
                         .foregroundStyle(Palette.amber)
                         .fixedSize(horizontal: false, vertical: true)
                 }
@@ -311,7 +314,7 @@ private struct StorageSection: View {
                     VStack(alignment: .leading, spacing: 2) {
                         Text(DownloadWords.otherAccounts)
                         Text(Bytes.words(downloads.otherBytes))
-                            .font(.subheadline)
+                            .font(Typeface.subheadline)
                             .foregroundStyle(Palette.quiet)
                             .monospacedDigit()
                     }
@@ -334,8 +337,10 @@ private struct StorageSection: View {
             }
         } header: {
             Text(DownloadWords.storage)
+                .font(Typeface.footnote)
         } footer: {
             Text(DownloadWords.storageFooter)
+                .font(Typeface.footnote)
         }
     }
 
@@ -368,7 +373,7 @@ private struct LibrarySection: View {
                 VStack(alignment: .leading, spacing: 3) {
                     Text(AutoDownloadWords.switchName(scope))
                     Text(AutoDownloadWords.note(scope))
-                        .font(.footnote)
+                        .font(Typeface.footnote)
                         .foregroundStyle(Palette.quiet)
                         .fixedSize(horizontal: false, vertical: true)
                 }
@@ -396,8 +401,12 @@ private struct LibrarySection: View {
             }
         } header: {
             Text(AutoDownloadWords.header(scope))
+                .font(Typeface.footnote)
         } footer: {
-            if follower.on { footer(follower) }
+            Group {
+                if follower.on { footer(follower) }
+            }
+            .font(Typeface.footnote)
         }
     }
 
@@ -476,7 +485,7 @@ private struct ChargingToggle: View {
             VStack(alignment: .leading, spacing: 3) {
                 Text(AutoDownloadWords.onlyWhileCharging)
                 Text(AutoDownloadWords.chargingNote(scope))
-                    .font(.footnote)
+                    .font(Typeface.footnote)
                     .foregroundStyle(Palette.quiet)
                     .fixedSize(horizontal: false, vertical: true)
             }
@@ -503,7 +512,7 @@ private struct QuestionRow: View {
                 .foregroundStyle(Palette.amber)
                 .fixedSize(horizontal: false, vertical: true)
             Text(AutoDownloadWords.questionNote)
-                .font(.footnote)
+                .font(Typeface.footnote)
                 .foregroundStyle(Palette.quiet)
                 .fixedSize(horizontal: false, vertical: true)
             HStack(spacing: 12) {
@@ -541,7 +550,7 @@ private struct PlaylistLineRow: View {
                         .foregroundStyle(.primary)
                         .lineLimit(large ? nil : 1)
                     Text(row.line)
-                        .font(.subheadline)
+                        .font(Typeface.subheadline)
                         .foregroundStyle(Palette.quiet)
                         .monospacedDigit()
                         .fixedSize(horizontal: false, vertical: true)
@@ -580,14 +589,14 @@ private struct LibraryDownloadingRow: View {
         } label: {
             HStack(alignment: .center, spacing: 12) {
                 Image(systemName: DownloadWords.downloadSymbol)
-                    .font(.title3)
+                    .font(Typeface.symbol(.title3))
                     .foregroundStyle(Palette.accent)
                     .frame(minWidth: 44)
                 VStack(alignment: .leading, spacing: 2) {
                     Text(AutoDownloadWords.downloadingTitle(scope))
                         .foregroundStyle(.primary)
                     Text(line)
-                        .font(.subheadline)
+                        .font(Typeface.subheadline)
                         .foregroundStyle(Palette.quiet)
                         .fixedSize(horizontal: false, vertical: true)
                     DownloadBar(fraction: progress.fraction)
@@ -623,12 +632,16 @@ private struct DownloadOverSection: View {
             }
         } header: {
             Text(DownloadWords.downloadOver)
+                .font(Typeface.footnote)
         } footer: {
-            VStack(alignment: .leading, spacing: 8) {
-                Text(DownloadWords.overNow(reachability.path, setting: downloads.downloadOver))
-                    .foregroundStyle(waitingForIt ? Palette.amber : Palette.quiet)
-                Text(DownloadWords.overKept)
+            Group {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text(DownloadWords.overNow(reachability.path, setting: downloads.downloadOver))
+                        .foregroundStyle(waitingForIt ? Palette.amber : Palette.quiet)
+                    Text(DownloadWords.overKept)
+                }
             }
+            .font(Typeface.footnote)
         }
     }
 
@@ -643,13 +656,13 @@ private struct DownloadOverSection: View {
                     Text(words.name)
                         .foregroundStyle(.primary)
                     Text(words.note)
-                        .font(.footnote)
+                        .font(Typeface.footnote)
                         .foregroundStyle(Palette.quiet)
                         .fixedSize(horizontal: false, vertical: true)
                 }
                 Spacer(minLength: 8)
                 Image(systemName: "checkmark")
-                    .font(.body.weight(.semibold))
+                    .font(Typeface.symbol(.body).weight(.semibold))
                     .foregroundStyle(Palette.accent)
                     .opacity(chosen ? 1 : 0)
             }
@@ -684,7 +697,7 @@ private struct DownloadingSection: View {
             ForEach(rows) { row in
                 AlbumLine(album: row.album, albumID: row.id, spoken: spoken(row), updates: row.fraction != nil) {
                     Text(row.line)
-                        .font(.subheadline)
+                        .font(Typeface.subheadline)
                         .foregroundStyle(Palette.quiet)
                     if let fraction = row.fraction {
                         DownloadBar(fraction: fraction)
@@ -695,12 +708,16 @@ private struct DownloadingSection: View {
             }
         } header: {
             Text(DownloadWords.downloadingHeader)
+                .font(Typeface.footnote)
         } footer: {
-            let lines = [allWaitForWifi ? DownloadWords.allWaitForWifi : nil,
-                         downloads.forceQuitShown ? DownloadWords.forceQuit : nil].compactMap { $0 }
-            if !lines.isEmpty {
-                Text(lines.joined(separator: "\n\n"))
+            Group {
+                let lines = [allWaitForWifi ? DownloadWords.allWaitForWifi : nil,
+                             downloads.forceQuitShown ? DownloadWords.forceQuit : nil].compactMap { $0 }
+                if !lines.isEmpty {
+                    Text(lines.joined(separator: "\n\n"))
+                }
             }
+            .font(Typeface.footnote)
         }
     }
 
@@ -733,6 +750,7 @@ private struct FailedSection: View {
             }
         } header: {
             Text(DownloadWords.didntDownloadHeader)
+                .font(Typeface.footnote)
         }
     }
 }
@@ -752,30 +770,30 @@ private struct FailedRow: View {
         VStack(alignment: .leading, spacing: 6) {
             AlbumLine(album: row.album, albumID: row.id, spoken: spoken, tryAgain: { tryAgain() }) {
                 HStack(alignment: .firstTextBaseline, spacing: 4) {
-                    DownloadMark(mark: .failed, font: .caption)
+                    DownloadMark(mark: .failed, font: Typeface.symbol(.caption))
                     Text(DownloadWords.didntDownload(row.records.count))
-                        .font(.subheadline.weight(.medium))
+                        .font(Typeface.subheadline.weight(.medium))
                         .foregroundStyle(Palette.amber)
                 }
                 Text(row.reason.said)
-                    .font(.footnote)
+                    .font(Typeface.footnote)
                     .foregroundStyle(Palette.quiet)
                     .fixedSize(horizontal: false, vertical: true)
             } trailing: {
                 Button(DownloadWords.tryAgain) { tryAgain() }
                     .buttonStyle(.borderless)
-                    .font(.subheadline.weight(.semibold))
+                    .font(Typeface.subheadline.weight(.semibold))
             }
             // the raw words for whoever runs deadwax - ErrorNote's split, its own element
             if server.access.seesDetail, let detail = row.reason.detail, !detail.isEmpty {
                 DisclosureGroup(ErrorWords.forWhoever) {
                     Text(detail)
-                        .font(.footnote.monospaced())
+                        .font(Typeface.mono(.footnote))
                         .foregroundStyle(Palette.quiet)
                         .textSelection(.enabled)
                         .frame(maxWidth: .infinity, alignment: .leading)
                 }
-                .font(.footnote)
+                .font(Typeface.footnote)
                 .padding(.leading, AlbumLineInset.text)
             }
         }
@@ -853,7 +871,7 @@ private struct DownloadedSection: View {
                 let large = typeSize.isAccessibilitySize
                 AlbumLine(album: row.album, albumID: row.id, spoken: spoken(row)) {
                     Text(row.line)
-                        .font(.subheadline)
+                        .font(Typeface.subheadline)
                         .foregroundStyle(Palette.quiet)
                         .monospacedDigit()
                     if large { verdict(row.verdict).padding(.top, 2) }
@@ -864,8 +882,10 @@ private struct DownloadedSection: View {
             }
         } header: {
             Text(DownloadWords.downloadedHeader)
+                .font(Typeface.footnote)
         } footer: {
             Text(DownloadWords.downloadedFooter)
+                .font(Typeface.footnote)
         }
     }
 
@@ -879,7 +899,7 @@ private struct DownloadedSection: View {
                 .foregroundStyle(Palette.held)
         } else {
             Text(words)
-                .font(.footnote)
+                .font(Typeface.footnote)
                 .foregroundStyle(Palette.quiet)
         }
     }
@@ -895,8 +915,8 @@ private struct DownloadedSection: View {
 private struct VerdictLabel: LabelStyle {
     func makeBody(configuration: Configuration) -> some View {
         HStack(alignment: .firstTextBaseline, spacing: 3) {
-            configuration.icon.font(.caption)
-            configuration.title.font(.footnote)
+            configuration.icon.font(Typeface.symbol(.caption))
+            configuration.title.font(Typeface.footnote)
         }
     }
 }
@@ -954,7 +974,7 @@ private struct AlbumLine<Lines: View, Trailing: View>: View {
                             .lineLimit(large ? nil : 1)
                         if let artist = album?.artist, !artist.isEmpty {
                             Text(artist)
-                                .font(.subheadline)
+                                .font(Typeface.subheadline)
                                 .foregroundStyle(Palette.quiet)
                                 .lineLimit(large ? nil : 1)
                         }

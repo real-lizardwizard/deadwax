@@ -312,7 +312,7 @@ private struct DrawnList: View {
         }
         if !top.isEmpty || (online && drawn.topPlace) {
             Text(SearchWords.topResults)
-                .font(.title3.weight(.semibold))
+                .font(Typeface.title3.weight(.semibold))
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.top, 10)
                 .padding(.bottom, 2)
@@ -348,7 +348,7 @@ private struct DrawnList: View {
         if drawn.nothing {
             VStack(alignment: .leading, spacing: 6) {
                 Text(SearchWords.nothing(.all, drawn.text))
-                    .font(.headline)
+                    .font(Typeface.headline)
                     .fixedSize(horizontal: false, vertical: true)
                 Text(SearchWords.checkSpelling)
                     .foregroundStyle(Palette.quiet)
@@ -385,7 +385,7 @@ private struct DrawnSection: View {
         }
         if studio {
             Text(SearchWords.studioNote)
-                .font(.footnote)
+                .font(Typeface.footnote)
                 .foregroundStyle(Palette.quiet)
                 .fixedSize(horizontal: false, vertical: true)
                 .padding(.top, 6)
@@ -600,7 +600,7 @@ private struct SectionHead: View {
     var body: some View {
         HStack(alignment: .firstTextBaseline) {
             Text(SearchWords.section(kind))
-                .font(.title3.weight(.semibold))
+                .font(Typeface.title3.weight(.semibold))
                 .accessibilityAddTraits(.isHeader)
             Spacer(minLength: 8)
             if seeAll {
@@ -663,7 +663,7 @@ private struct SearchGateNote: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text(closed.title)
-                .font(.headline)
+                .font(Typeface.headline)
                 .fixedSize(horizontal: false, vertical: true)
                 .accessibilityAddTraits(.isHeader)
             ForEach(closed.lines, id: \.self) { (line: String) in
@@ -927,7 +927,7 @@ struct SearchRowView: View {
     private func songMenu(_ song: Song) -> some View {
         QueueMenu(request: menu(song)) {
             Image(systemName: "ellipsis")
-                .font(.body.weight(.semibold))
+                .font(Typeface.symbol(.body).weight(.semibold))
                 .foregroundStyle(Palette.quiet)
                 .frame(minWidth: 44, minHeight: 44)
                 .contentShape(Rectangle())
@@ -994,12 +994,12 @@ struct SearchRowView: View {
     @ViewBuilder private func trailing(plays: Bool) -> some View {
         if plays {
             Image(systemName: "play.fill")
-                .font(.caption2)
+                .font(Typeface.symbol(.caption2))
                 .foregroundStyle(Palette.quiet)
                 .accessibilityHidden(true)
         } else if row.kind == .artists {
             Image(systemName: "chevron.right")
-                .font(.footnote.weight(.semibold))
+                .font(Typeface.symbol(.footnote).weight(.semibold))
                 .foregroundStyle(.tertiary)
                 .accessibilityHidden(true)
         }
@@ -1017,7 +1017,7 @@ struct SearchLineText: View {
             EmptyView()
         } else if large {
             Text(line.said)
-                .font(.footnote)
+                .font(Typeface.footnote)
                 .foregroundStyle(Palette.quiet)
                 .lineLimit(2)
         } else {
@@ -1034,7 +1034,7 @@ struct SearchLineText: View {
                         .fixedSize()
                 }
             }
-            .font(.footnote)
+            .font(Typeface.footnote)
             .foregroundStyle(Palette.quiet)
         }
     }
@@ -1083,7 +1083,7 @@ private struct SongDisclosure: View {
                 }
                 Spacer(minLength: 8)
                 Image(systemName: "chevron.down")
-                    .font(.footnote.weight(.semibold))
+                    .font(Typeface.symbol(.footnote).weight(.semibold))
                     .foregroundStyle(Palette.quiet)
                     .rotationEffect(.degrees(open ? 180 : 0))
                     .accessibilityHidden(true)
@@ -1107,13 +1107,13 @@ private struct SongDisclosure: View {
             if bands.listed.isEmpty {
                 // nothing else to list: the fold's words as its caption, its albums listed at once
                 Text(SongSearch.foldLabel(bands.folded))
-                    .font(.footnote)
+                    .font(Typeface.footnote)
                     .foregroundStyle(Palette.quiet)
                     .fixedSize(horizontal: false, vertical: true)
                     .padding(.vertical, 6)
             } else {
                 Button(SongSearch.foldLabel(bands.folded)) { search.toggleFold(song.key) }
-                    .font(.footnote)
+                    .font(Typeface.footnote)
                     .padding(.vertical, 8)
                     .accessibilityHint(SongSearch.foldHint(open: foldOpen))
             }
@@ -1156,7 +1156,7 @@ private struct SongAlbumRow: View {
                         .lineLimit(large ? 3 : 1)
                     if !line.isEmpty {
                         Text(line)
-                            .font(.footnote)
+                            .font(Typeface.footnote)
                             .foregroundStyle(Palette.quiet)
                             .lineLimit(large ? 3 : 1)
                     }

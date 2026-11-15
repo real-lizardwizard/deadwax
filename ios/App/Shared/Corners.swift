@@ -5,8 +5,8 @@ import SwiftUI
 /// takes one of these, and nothing in ios/App writes a radius of its own (tests/test_ios_palette.py holds that):
 ///
 /// - `art`: every cover - an album's, a playlist's, a song's - wherever it is drawn: the album and playlist pages' hero,
-///   Now Playing's cover, the tiles, the rows, the mini player's thumb, the cards of Up Next and Info.
-/// - `card`: what sits over the page or in it as a panel - the mini player, the notice, the first ask, a list that
+///   Now Playing's cover, the tiles, the rows, the play bar's cover, the cards of Up Next and Info.
+/// - `card`: what sits over the page or in it as a panel - the notice, the first ask, a list that
 ///   couldn't be asked again, the sign-in's reason, the song you searched for on its album.
 /// - `control`: what a finger takes - buttons (the primary and the secondary pill: PrimaryButton.radius, the web's
 ///   --dw-radius-control, the same 4), chips, pills, badges, fields, the Library's switch and its segments.
@@ -22,7 +22,7 @@ import SwiftUI
 enum Corners {
     /// Covers.
     static let art: CGFloat = 2
-    /// Panels, cards and the mini player.
+    /// Panels and cards. (The mini player was one until it joined the tab bar, square, on 15 Nov.)
     static let card: CGFloat = 4
     /// Buttons, chips, pills, fields, the switch.
     static let control: CGFloat = 4

@@ -3,20 +3,22 @@ import SwiftUI
 import UIKit
 
 /// The app's tabs (D1), Library, Search (Phase 5) and You, each its own NavigationStack. Tapping the tab shown again pops it to its
-/// root (and, at its root, scrolls its list to the top - AppNavigation.select). With something queued the mini
-/// player sits above the tab bar, and a notice (D11) above it; Now Playing opens over everything.
+/// root (and, at its root, scrolls its list to the top - AppNavigation.select). With something queued the play bar
+/// is the top of the tab bar (MiniPlayerView, since 15 Nov), and a notice (D11) sits above them; Now Playing opens over
+/// everything.
 ///
 /// The tab bar is the app's own since the squared look (14 Nov, James: "maybe square off the slider and the bar at the
 /// bottom and the now playing bar as well"): iOS's can't be reshaped - on iOS 26 and later it floats, a capsule of
 /// glass - so it is hidden on every tab's stack, and AppTabBar is drawn over the TabView's foot instead: squared, full
 /// width, flush to the screen's bottom edge, a hairline along its top, as the web's .app-tabbar. The TabView stays, for
 /// each tab's own state; a tap goes through AppNavigation.select, as iOS's bar's did. The bar stays down when the
-/// keyboard comes up (it is under it, as iOS's was), and nothing makes room for it then; the mini player rides the
-/// keyboard as before.
+/// keyboard comes up (it is under it, as iOS's was), and nothing makes room for it then. Since the play bar joined it
+/// (15 Nov) the play bar is under the keyboard too, one block with the tabs; the notice rides the keyboard.
 struct MainTabs: View {
     @Environment(PlayerModel.self) private var player
     @Environment(AppNavigation.self) private var navigation
-    /// The tab bar's height as drawn, above the bottom safe area (the home indicator's), at the text size in use.
+    /// The tab bar's height as drawn, above the bottom safe area (the home indicator's), at the text size in use - the
+    /// play bar's included while something is queued.
     @State private var barHeight: CGFloat = 0
     /// The keyboard is up, over the bar: the pages and the player make no room for the bar meanwhile.
     @State private var keyboardUp = false
@@ -86,12 +88,18 @@ struct MainTabs: View {
 /// edge (its fill runs under the home indicator), a hairline of --dw-border along its top. A tap is AppNavigation's
 /// select: another tab shown, or the tab shown back at its root and then its top.
 ///
-/// VoiceOver reads it as a tab bar, each tab a button with its words, the one shown selected. Its words grow with the
-/// text size up to the largest of the standard sizes, as far as a bar can and leave the page its room; at the
-/// accessibility sizes they hold there, and a long press shows the tab's symbol and words large (the Large Content
-/// Viewer), as iOS's own tab bar does.
+/// With something queued the play bar is its top (15 Nov, James: "merge the play bar with the bottom bar so it doesn't
+/// look like it's floating", "opaque the whole way"): MiniPlayerView, full width and square, then a hairline of
+/// --dw-border, then the tabs, all on the one opaque --dw-tab-bar down through the home indicator. The play bar's seek
+/// line is then the block's top edge, in place of the hairline. Nothing queued: the tabs alone, as before.
+///
+/// VoiceOver reads the tabs as a tab bar, each tab a button with its words, the one shown selected; the play bar before
+/// them, as its own elements. Its words grow with the text size up to the largest of the standard sizes, as far as a
+/// bar can and leave the page its room; at the accessibility sizes they hold there, and a long press shows a tab's symbol
+/// and words large (the Large Content Viewer), as iOS's own tab bar does - and Play/Pause.
 struct AppTabBar: View {
     @Environment(AppNavigation.self) private var navigation
+    @Environment(PlayerModel.self) private var player
     @Environment(\.displayScale) private var displayScale
 
     /// --dw-tab-pad: above the tabs.
@@ -100,28 +108,40 @@ struct AppTabBar: View {
     private static let side: CGFloat = 8
 
     var body: some View {
-        HStack(spacing: 0) {
-            ForEach(AppTab.allCases, id: \.self) { (tab: AppTab) in
-                AppTabButton(tab: tab, shown: navigation.tab == tab) {
-                    navigation.select(tab)
+        VStack(spacing: 0) {
+            if player.hasQueue {
+                MiniPlayerView()
+                hairline
+            }
+            HStack(spacing: 0) {
+                ForEach(AppTab.allCases, id: \.self) { (tab: AppTab) in
+                    AppTabButton(tab: tab, shown: navigation.tab == tab) {
+                        navigation.select(tab)
+                    }
                 }
             }
+            .padding(.top, Self.pad)
+            .padding(.horizontal, Self.side)
+            .accessibilityElement(children: .contain)
+            .accessibilityAddTraits(.isTabBar)
         }
-        .padding(.top, Self.pad)
-        .padding(.horizontal, Self.side)
         .frame(maxWidth: .infinity)
         .background {
             Palette.tabBar
                 .ignoresSafeArea(.container, edges: .bottom)
         }
         .overlay(alignment: .top) {
-            Palette.border
-                .frame(height: 1 / max(displayScale, 1))
-                .accessibilityHidden(true)
+            // with the play bar, its seek line is the top edge
+            if !player.hasQueue { hairline }
         }
         .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
-        .accessibilityElement(children: .contain)
-        .accessibilityAddTraits(.isTabBar)
+    }
+
+    /// A hairline of --dw-border: along the top with nothing queued, and between the play bar and the tabs.
+    private var hairline: some View {
+        Palette.border
+            .frame(height: 1 / max(displayScale, 1))
+            .accessibilityHidden(true)
     }
 }
 
@@ -144,10 +164,10 @@ private struct AppTabButton: View {
             VStack(spacing: Self.gap) {
                 Image(systemName: tab.symbol)
                     .symbolVariant(.fill)
-                    .font(.title2)
+                    .font(Typeface.symbol(.title2))
                     .frame(height: symbolBox)
                 Text(tab.title)
-                    .font(.caption2.weight(.medium))
+                    .font(Typeface.caption2.weight(.medium))
                     .lineLimit(1)
             }
             .foregroundStyle(shown ? Palette.accent : Palette.tabInactive)
@@ -163,9 +183,9 @@ private struct AppTabButton: View {
     }
 }
 
-/// A tab's NavigationStack with the player drawn over its bottom edge, above the tab bar - and every page in it, its
-/// root and each one pushed (appRoutes), given room at its foot for the player's height and the bar's
-/// (`clearsPlayer()`), so a list scrolled to its end has its last row above the mini player and the bar.
+/// A tab's NavigationStack with the notice drawn over its bottom edge, above the tab bar - and every page in it, its
+/// root and each one pushed (appRoutes), given room at its foot for the notice's height and the bar's, the play bar
+/// in it (`clearsPlayer()`), so a list scrolled to its end has its last row above the play bar and the tabs.
 ///
 /// The room is given to the pages, not the stack: a `safeAreaInset` on the NavigationStack itself (as this was until
 /// fix/player-inset) draws the player in the right place but never reaches the lists inside - on James's iOS 27.2 a
@@ -173,7 +193,8 @@ private struct AppTabButton: View {
 /// over the last row"). The player is an overlay here, so it adds to no safe area, and the only room a page gets is
 /// its own: never twice on an iOS where the stack's inset did reach. Since the squared look iOS's tab bar is hidden
 /// on the stack and on each page (the app draws its own, MainTabs), so the stack's safe area at its foot is the home
-/// indicator's (or the keyboard's): the player sits `tabBarRoom` above it, and the pages' room counts the bar too.
+/// indicator's (or the keyboard's): the notice sits `tabBarRoom` above it, and the pages' room counts the bar too.
+/// Since the play bar joined the tab bar (15 Nov) `tabBarRoom` is the whole block, the play bar's height in it.
 private struct TabStack<Root: View>: View {
     @Binding var path: [AppRoute]
     /// The root draws its own top, with the offline banner under it (the Library's switch): not drawn here.
@@ -181,10 +202,10 @@ private struct TabStack<Root: View>: View {
     @ViewBuilder var root: Root
 
     @Environment(PlayerModel.self) private var player
-    /// The tab bar's height while it shows (0 while the keyboard is over it).
+    /// The tab bar's height while it shows, the play bar's included (0 while the keyboard is over it).
     @Environment(\.tabBarRoom) private var tabBarRoom
-    /// The player's height as last drawn (the notice, the mini player and their padding), at the text size in use.
-    @State private var playerHeight: CGFloat = 0
+    /// The notice's height as last drawn, with its padding, at the text size in use.
+    @State private var noticeHeight: CGFloat = 0
 
     var body: some View {
         NavigationStack(path: $path) {
@@ -195,48 +216,41 @@ private struct TabStack<Root: View>: View {
                 .appRoutes()
         }
         .toolbar(.hidden, for: .tabBar)
-        .environment(\.playerClearance, (PlayerInset.shown(player) ? playerHeight : 0) + tabBarRoom)
+        .environment(\.playerClearance, (player.notice != nil ? noticeHeight : 0) + tabBarRoom)
         .overlay(alignment: .bottom) {
-            PlayerInset { playerHeight = $0 }
+            NoticeInset { noticeHeight = $0 }
                 .padding(.bottom, tabBarRoom)
         }
     }
 }
 
-/// What sits above the tab bar: the notice (for its 5 s) over the mini player (with something queued). It says its
-/// height as drawn, for the pages' room under it.
-private struct PlayerInset: View {
+/// What sits above the tab bar (the play bar in it): the notice, for its 5 s. It says its height as drawn, for the
+/// pages' room under it. The play bar was here too, a card above the bar, until it joined the bar (15 Nov).
+private struct NoticeInset: View {
     @Environment(PlayerModel.self) private var player
 
     let measured: (CGFloat) -> Void
 
-    /// Anything to draw: something queued, or a notice.
-    static func shown(_ player: PlayerModel) -> Bool { player.hasQueue || player.notice != nil }
-
     var body: some View {
-        if Self.shown(player) {
-            VStack(spacing: 8) {
-                if let notice = player.notice {
-                    Notice(text: notice)
-                        .transition(.move(edge: .bottom).combined(with: .opacity))
-                }
-                if player.hasQueue {
-                    MiniPlayerView()
-                }
+        VStack(spacing: 0) {
+            if let notice = player.notice {
+                Notice(text: notice)
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+                    .padding(.horizontal, 8)
+                    .padding(.bottom, 8)
             }
-            .padding(.horizontal, 8)
-            .padding(.bottom, 8)
-            .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { height in measured(height) }
-            .animation(.default, value: player.notice)
         }
+        .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { height in measured(height) }
+        .animation(.default, value: player.notice)
     }
 }
 
 extension EnvironmentValues {
-    /// The room a tab's pages leave at their foot for the player and the tab bar over them (TabStack): the player's
-    /// height while it's drawn, and the bar's while the keyboard isn't over it.
+    /// The room a tab's pages leave at their foot for the notice and the tab bar over them (TabStack): the notice's
+    /// height while it's drawn, and the bar's - the play bar in it - while the keyboard isn't over it.
     @Entry var playerClearance: CGFloat = 0
-    /// The app's tab bar's height above the home indicator (MainTabs) - 0 while the keyboard is up, over it.
+    /// The app's tab bar's height above the home indicator (MainTabs), the play bar's included while something is
+    /// queued - 0 while the keyboard is up, over it.
     @Entry var tabBarRoom: CGFloat = 0
 }
 

@@ -30,10 +30,13 @@ struct DownloadsRow: View {
                 }
             }
         } footer: {
-            if let footer {
-                Text(footer.text)
-                    .foregroundStyle(footer.amber ? Palette.amber : Palette.quiet)
+            Group {
+                if let footer {
+                    Text(footer.text)
+                        .foregroundStyle(footer.amber ? Palette.amber : Palette.quiet)
+                }
             }
+            .font(Typeface.footnote)
         }
     }
 }

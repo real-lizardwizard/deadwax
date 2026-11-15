@@ -76,7 +76,7 @@ struct ArtistView: View {
         .toolbar {
             ToolbarItem(placement: .principal) {
                 Text(model.name)
-                    .font(.headline)
+                    .font(Typeface.headline)
                     .lineLimit(1)
                     .opacity(nameInBar ? 1 : 0)
                     .accessibilityHidden(!nameInBar)
@@ -129,7 +129,7 @@ struct ArtistView: View {
                 .shadow(color: .black.opacity(0.35), radius: 14, y: 6)
                 .padding(.top, 8)
             Text(model.name)
-                .font(.title.bold())
+                .font(Typeface.title.bold())
                 .multilineTextAlignment(.center)
                 .lineLimit(3)
                 .padding(.top, 18)
@@ -154,14 +154,14 @@ struct ArtistView: View {
                         play: { play(shuffle: false, online: online, offlineAlbums: offlineAlbums) },
                         shuffle: { play(shuffle: true, online: online, offlineAlbums: offlineAlbums) })
             Text(line.isEmpty ? " " : line)
-                .font(.footnote)
+                .font(Typeface.footnote)
                 .foregroundStyle(Palette.quiet)
                 .multilineTextAlignment(.center)
                 .fixedSize(horizontal: false, vertical: true)
                 .accessibilityHidden(line.isEmpty)
             if online, model.asks.someMissing {
                 Button(LibraryWords.tryAgain) { model.again(client: server.client) }
-                    .font(.footnote)
+                    .font(Typeface.footnote)
             }
         }
         .frame(maxWidth: .infinity)
@@ -188,7 +188,7 @@ struct ArtistView: View {
     private func albumsList(_ rows: [ArtistPage.Row], albums: [Album], online: Bool, personal: Bool) -> some View {
         if !rows.isEmpty {
             Text(ArtistWords.albumsHeading)
-                .font(.title3.weight(.semibold))
+                .font(Typeface.title3.weight(.semibold))
                 .padding(.top, 18)
                 .padding(.bottom, 4)
                 .accessibilityAddTraits(.isHeader)
@@ -237,19 +237,19 @@ private struct ArtistAlbumRow: View {
                         HStack(alignment: .firstTextBaseline, spacing: 4) {
                             if marked {
                                 Image(systemName: "checkmark")
-                                    .font(.caption2.weight(.bold))
+                                    .font(Typeface.symbol(.caption2).weight(.bold))
                                     .foregroundStyle(Palette.held)
                                     .accessibilityHidden(true)
                             }
                             Text(line)
-                                .font(.subheadline)
+                                .font(Typeface.subheadline)
                                 .foregroundStyle(Palette.quiet)
                         }
                     }
                     .lineLimit(1)
                     Spacer(minLength: 8)
                     Image(systemName: "chevron.right")
-                        .font(.footnote.weight(.semibold))
+                        .font(Typeface.symbol(.footnote).weight(.semibold))
                         .foregroundStyle(.tertiary)
                         .accessibilityHidden(true)
                 }

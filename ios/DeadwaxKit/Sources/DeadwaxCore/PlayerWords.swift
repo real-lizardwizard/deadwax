@@ -36,6 +36,18 @@ public enum PlayerWords {
     /// Next's name.
     public static let next = "Next"
 
+    // MARK: the play bar on the tab bar (the phone's own, 15 Nov)
+
+    /// The bar's VoiceOver actions: the only way to skip from the bar other than a swipe on its title, since it has no
+    /// Next button. The web's mini player has one (`next`), so these have no web words to be held to.
+    public static let nextSong = "Next song"
+    public static let previousSong = "Previous song"
+
+    /// The time over a finger on the bar's seek line: "1:23 / 4:56".
+    public static func barTime(shown: Double, length: Double) -> String {
+        "\(Format.clock(shown)) / \(Format.clock(length))"
+    }
+
     // MARK: Now Playing
 
     /// Under the title: "Portishead — Dummy" (an em dash), the two there are.

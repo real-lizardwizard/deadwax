@@ -49,11 +49,11 @@ struct OfflineBanner: View {
                         .lineLimit(2)
                         .frame(maxWidth: .infinity, alignment: .leading)
                     Image(systemName: "chevron.down")
-                        .font(.caption2.weight(.bold))
+                        .font(Typeface.symbol(.caption2).weight(.bold))
                         .rotationEffect(.degrees(open ? 180 : 0))
                         .accessibilityHidden(true)
                 }
-                .font(.footnote.weight(.semibold))
+                .font(Typeface.footnote.weight(.semibold))
                 .foregroundStyle(Palette.amber)
                 .contentShape(Rectangle())
             }
@@ -63,7 +63,7 @@ struct OfflineBanner: View {
 
             if open {
                 Text(banner.more)
-                    .font(.footnote)
+                    .font(Typeface.footnote)
                     .foregroundStyle(Palette.amber)
                     .fixedSize(horizontal: false, vertical: true)
                     .transition(.opacity)
@@ -71,7 +71,7 @@ struct OfflineBanner: View {
                     Button(reachability.probing ? DownloadWords.trying : DownloadWords.tryAgain) {
                         reachability.tryNow()
                     }
-                    .font(.footnote.weight(.semibold))
+                    .font(Typeface.footnote.weight(.semibold))
                     .foregroundStyle(Palette.amber)
                     .buttonStyle(.borderless)
                     .disabled(reachability.probing)

@@ -120,7 +120,7 @@ struct AlbumView: View {
                         Text(line)
                     }
                 }
-                .font(.footnote)
+                .font(Typeface.footnote)
                 .foregroundStyle(Palette.quiet)
                 .listRowSeparator(.hidden, edges: .bottom)
             }
@@ -131,7 +131,7 @@ struct AlbumView: View {
         .toolbar {
             ToolbarItem(placement: .principal) {
                 Text(model.name)
-                    .font(.headline)
+                    .font(Typeface.headline)
                     .lineLimit(1)
                     .opacity(titleInBar ? 1 : 0)
                     .accessibilityHidden(!titleInBar)
@@ -304,7 +304,7 @@ private struct QuietNote: View {
 
     var body: some View {
         Text(text)
-            .font(.callout)
+            .font(Typeface.callout)
             .foregroundStyle(Palette.quiet)
             .multilineTextAlignment(.center)
             .fixedSize(horizontal: false, vertical: true)

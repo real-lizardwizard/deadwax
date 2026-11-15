@@ -14,7 +14,7 @@ struct ThisPhoneSection: View {
         Section {
             LabeledContent(YouWords.server) {
                 Text(server.address?.description ?? "")
-                    .monospaced()
+                    .font(Typeface.mono(.body))
                     .lineLimit(1)
                     .truncationMode(.middle)
                     .textSelection(.enabled)
@@ -29,6 +29,7 @@ struct ThisPhoneSection: View {
             }
         } header: {
             Text(YouWords.thisPhone)
+                .font(Typeface.footnote)
         }
     }
 }

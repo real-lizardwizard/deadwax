@@ -80,7 +80,7 @@ private struct CircleFaceBody<Label: View>: View {
     var body: some View {
         let face = CircleFace.face
         label
-            .font(.body.weight(.semibold))
+            .font(Typeface.symbol(.body).weight(.semibold))
             .imageScale(.medium)
             .foregroundStyle(Palette.onSecondary)
             .frame(width: face, height: face)
@@ -120,7 +120,7 @@ private struct ButtonFace: View {
         let shape = RoundedRectangle(cornerRadius: radius)
         let pressed = configuration.isPressed
         configuration.label
-            .font(.body.weight(.semibold))
+            .font(Typeface.body.weight(.semibold))
             .foregroundStyle(primary ? Palette.primaryLabel : Palette.onSecondary)
             .multilineTextAlignment(.center)
             .padding(.horizontal, 16)

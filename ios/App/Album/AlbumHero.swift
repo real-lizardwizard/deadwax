@@ -30,7 +30,7 @@ struct AlbumHero: View {
                 .padding(.top, 8)
 
             Text(model.name)
-                .font(model.longTitle ? .title3.bold() : .title2.bold())
+                .font(model.longTitle ? Typeface.title3.bold() : Typeface.title2.bold())
                 .multilineTextAlignment(.center)
                 .lineLimit(2)
                 .padding(.top, 18)
@@ -43,7 +43,7 @@ struct AlbumHero: View {
 
             // the meta line holds its line while it is empty, so nothing below moves as it fills
             Text(model.meta.isEmpty ? " " : model.meta)
-                .font(.footnote)
+                .font(Typeface.footnote)
                 .foregroundStyle(Palette.quiet)
                 .multilineTextAlignment(.center)
                 .padding(.top, 6)
@@ -74,7 +74,7 @@ struct AlbumHero: View {
     /// artist to go to.
     @ViewBuilder private var artistLine: some View {
         let words = Text(model.artist)
-            .font(.title3)
+            .font(Typeface.title3)
             .multilineTextAlignment(.center)
             .lineLimit(2)
         switch model.artistLink {
@@ -114,13 +114,13 @@ struct DownloadLine: View {
         HStack(alignment: .firstTextBaseline, spacing: 5) {
             if let mark = DownloadWords.mark(download) {
                 // a symbol's own baseline (the ring keeps the hidden symbol's) sits it on the words' line
-                DownloadMark(mark: mark, fraction: DownloadWords.Mark.fraction(download), font: .caption)
+                DownloadMark(mark: mark, fraction: DownloadWords.Mark.fraction(download), font: Typeface.symbol(.caption))
             }
             Text(line)
                 .multilineTextAlignment(.center)
                 .fixedSize(horizontal: false, vertical: true)
         }
-        .font(.caption.weight(.semibold))
+        .font(Typeface.caption.weight(.semibold))
         .foregroundStyle(failed ? Palette.amber : Palette.quiet)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(line)
@@ -136,12 +136,12 @@ struct HeldBadge: View {
         HStack(spacing: 5) {
             if yours {
                 Image(systemName: "checkmark")
-                    .font(.caption2.weight(.bold))
+                    .font(Typeface.symbol(.caption2).weight(.bold))
                     .accessibilityHidden(true)
             }
             Text(mine.badge)
         }
-        .font(.caption.weight(.semibold))
+        .font(Typeface.caption.weight(.semibold))
         .foregroundStyle(yours ? Palette.held : Palette.quiet)
         .padding(.horizontal, yours ? 8 : 0)
         .padding(.vertical, 3)
@@ -175,14 +175,14 @@ struct PlayButtons: View {
     @ViewBuilder private var buttons: some View {
         Button(action: play) {
             Label("Play", systemImage: "play.fill")
-                .font(.body.weight(.semibold))
+                .font(Typeface.body.weight(.semibold))
                 .frame(maxWidth: .infinity)
         }
         .buttonStyle(PrimaryFace(large: true))
 
         Button(action: shuffle) {
             Label("Shuffle", systemImage: "shuffle")
-                .font(.body.weight(.semibold))
+                .font(Typeface.body.weight(.semibold))
                 .frame(maxWidth: .infinity)
         }
         .buttonStyle(SecondaryPill(large: true))

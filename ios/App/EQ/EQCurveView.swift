@@ -123,7 +123,7 @@ struct EQCurveView: View {
             let height = Double(geometry.size.height)
             ForEach(Array(zip([12.0, 0, -12], EQWords.Screen.gainLabels)), id: \.1) { gain, label in
                 Text(label)
-                    .font(.caption2.monospacedDigit())
+                    .font(Typeface.caption2.monospacedDigit())
                     .foregroundStyle(Palette.quiet)
                     .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
                     .fixedSize()
@@ -139,7 +139,7 @@ struct EQCurveView: View {
             let height = Double(geometry.size.height)
             ForEach(drawing.lines.filter { $0.label != nil }, id: \.kind) { line in
                 Text(line.label ?? "")
-                    .font(.caption2)
+                    .font(Typeface.caption2)
                     .foregroundStyle(line.kind == .right ? Palette.accentText : Palette.accent)
                     .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
                     .fixedSize()
@@ -155,7 +155,7 @@ struct EQCurveView: View {
         GeometryReader { geometry in
             ForEach(Array(zip([100.0, 1_000, 10_000], EQWords.Screen.frequencyLabels)), id: \.1) { frequency, label in
                 Text(label)
-                    .font(.caption2.monospacedDigit())
+                    .font(Typeface.caption2.monospacedDigit())
                     .foregroundStyle(Palette.quiet)
                     .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
                     .fixedSize()
@@ -322,7 +322,7 @@ struct EQHandleCapsule: View {
 
     var body: some View {
         Text(text ?? " ")
-            .font(.caption.monospacedDigit())
+            .font(Typeface.caption.monospacedDigit())
             .fontWeight(.semibold)
             .lineLimit(1)
             .truncationMode(.middle)

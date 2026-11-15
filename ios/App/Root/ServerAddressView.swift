@@ -40,15 +40,17 @@ struct ServerAddressView: View {
                 if checked, let report = server.addressReport {
                     ForEach(report.lines, id: \.self) { line in
                         Text(line)
-                            .font(.footnote)
+                            .font(Typeface.footnote)
                             .fixedSize(horizontal: false, vertical: true)
                             .textSelection(.enabled)
                     }
                 }
             } header: {
                 Text("deadwax's address")
+                    .font(Typeface.footnote)
             } footer: {
                 Text("The address you open deadwax at, by IP or by name. The first time, iOS asks to let deadwax find devices on your local network: say yes.")
+                    .font(Typeface.footnote)
             }
         }
         .navigationTitle("deadwax")

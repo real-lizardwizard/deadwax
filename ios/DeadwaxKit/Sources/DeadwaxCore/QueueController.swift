@@ -327,6 +327,18 @@ public final class QueueController {
         }
     }
 
+    /// (The phone's play bar, 15 Nov) The song before, however far into this one (entryBefore): Previous's move to
+    /// it, History following as Previous's does, never the song again. Playing or paused as it was. False, with
+    /// nothing moved, at the queue's first song.
+    @discardableResult
+    public func toEntryBefore() -> Bool {
+        catchUp()
+        guard let index = entryBefore(queue) else { return false }
+        queue = wentBack(queue, index)
+        move(to: index)
+        return true
+    }
+
     /// The engine played out its last entry (its phase ended). With Repeat on and nothing queued after the song - it
     /// was sought to its end before the top-up's 2 s - the list or the song again, played on from there; otherwise
     /// the music has stopped. True if it plays on.
