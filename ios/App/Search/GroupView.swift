@@ -132,7 +132,7 @@ struct GroupView: View {
             ArchiveCover(addresses: ArchiveCoverID.addresses(release: page.chosenId, group: route.id),
                          size: ArchiveCoverSize.hero)
                 .frame(maxWidth: AlbumHero.coverSide)
-                .clipShape(RoundedRectangle(cornerRadius: 10))
+                .clipShape(Corners.artShape)
                 .shadow(color: .black.opacity(0.35), radius: 14, y: 6)
                 .padding(.top, 8)
 
@@ -214,7 +214,8 @@ struct GroupView: View {
                 Text(page.maybe)
                     .padding(.horizontal, 6)
                     .padding(.vertical, 1)
-                    .overlay(Capsule().strokeBorder(Palette.quiet, style: StrokeStyle(lineWidth: 1, dash: [3, 2])))
+                    .overlay(Corners.controlShape.strokeBorder(Palette.quiet,
+                                                               style: StrokeStyle(lineWidth: 1, dash: [3, 2])))
             }
             .font(.footnote)
             .foregroundStyle(Palette.quiet)
@@ -250,7 +251,7 @@ struct GroupView: View {
                     .padding(.horizontal, 12)
                     .padding(.vertical, 8)
                     .frame(minHeight: 44)
-                    .background(RoundedRectangle(cornerRadius: 10, style: .continuous).fill(Color(white: 1, opacity: 0.06)))
+                    .background(Corners.controlShape.fill(Color(white: 1, opacity: 0.06)))
                     .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
@@ -402,8 +403,8 @@ private struct PressedTrackRow: View {
                         .padding(.horizontal, 6)
                         .padding(.vertical, 2)
                         .foregroundStyle(Palette.amber)
-                        .background(Capsule().fill(Palette.amberFill))
-                        .overlay(Capsule().strokeBorder(Palette.amberEdge))
+                        .background(Corners.controlShape.fill(Palette.amberFill))
+                        .overlay(Corners.controlShape.strokeBorder(Palette.amberEdge))
                 }
                 Text(length)
                     .font(.subheadline.monospacedDigit())
@@ -414,13 +415,13 @@ private struct PressedTrackRow: View {
             .background(alignment: .leading) {
                 if song {
                     ZStack(alignment: .leading) {
-                        RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        Corners.cardShape
                             .fill(Palette.pressed)
                         Rectangle()
                             .fill(Palette.accent)
                             .frame(width: Self.bar)
                     }
-                    .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                    .clipShape(Corners.cardShape)
                 }
             }
             .padding(.horizontal, song ? -Self.bleed : 0)

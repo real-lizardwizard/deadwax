@@ -195,7 +195,7 @@ private struct MBArtistAlbumRow: View {
                     ArchiveCover(addresses: ArchiveCoverID.addresses(release: nil, group: row.group.id),
                                  size: ArchiveCoverSize.row)
                         .frame(width: LibraryRow.cover, height: LibraryRow.cover)
-                        .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
+                        .clipShape(Corners.artShape)
                     VStack(alignment: .leading, spacing: 2) {
                         Text(row.title)
                             .foregroundStyle(.primary)

@@ -25,7 +25,7 @@ struct AlbumHero: View {
         VStack(spacing: 0) {
             CoverImage(id: model.coverArt, size: Self.coverSide)
                 .frame(maxWidth: Self.coverSide)
-                .clipShape(RoundedRectangle(cornerRadius: 10))
+                .clipShape(Corners.artShape)
                 .shadow(color: .black.opacity(0.35), radius: 14, y: 6)
                 .padding(.top, 8)
 
@@ -147,9 +147,9 @@ struct HeldBadge: View {
         .padding(.vertical, 3)
         .background {
             if yours {
-                RoundedRectangle(cornerRadius: 6)
+                Corners.controlShape
                     .fill(Palette.heldFill)
-                    .overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(Palette.heldEdge, lineWidth: 0.5))
+                    .overlay(Corners.controlShape.strokeBorder(Palette.heldEdge, lineWidth: 0.5))
             }
         }
         .accessibilityElement(children: .combine)

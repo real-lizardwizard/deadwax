@@ -301,7 +301,7 @@ struct PlaylistRow: View {
     private var link: some View {
         NavigationLink(value: AppRoute.playlist(PlaylistRoute(playlist))) {
             HStack(spacing: 12) {
-                PlaylistCover(id: playlist.coverArt, side: LibraryRow.cover, pixels: CoverSize.row, corner: 4)
+                PlaylistCover(id: playlist.coverArt, side: LibraryRow.cover, pixels: CoverSize.row)
                 VStack(alignment: .leading, spacing: 2) {
                     Text(playlist.name)
                         .foregroundStyle(.primary)
@@ -335,7 +335,6 @@ struct PlaylistCover: View {
     let id: String?
     let side: CGFloat
     let pixels: Int
-    let corner: CGFloat
 
     var body: some View {
         Group {
@@ -351,7 +350,7 @@ struct PlaylistCover: View {
             }
         }
         .frame(width: side, height: side)
-        .clipShape(RoundedRectangle(cornerRadius: corner, style: .continuous))
+        .clipShape(Corners.artShape)
         .accessibilityHidden(true)
     }
 }

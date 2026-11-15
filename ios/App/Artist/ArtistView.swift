@@ -230,7 +230,7 @@ private struct ArtistAlbumRow: View {
                 HStack(spacing: 12) {
                     LibraryCover(id: row.coverArt, pixels: CoverSize.row)
                         .frame(width: LibraryRow.cover, height: LibraryRow.cover)
-                        .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
+                        .clipShape(Corners.artShape)
                     VStack(alignment: .leading, spacing: 2) {
                         Text(row.title)
                             .foregroundStyle(.primary)

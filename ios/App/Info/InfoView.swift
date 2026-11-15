@@ -182,7 +182,7 @@ struct InfoView: View {
         HStack(spacing: 12) {
             CoverImage(id: card.coverArt, size: Self.cover)
                 .frame(width: Self.cover, height: Self.cover)
-                .clipShape(RoundedRectangle(cornerRadius: 6))
+                .clipShape(Corners.artShape)
             VStack(alignment: .leading, spacing: 3) {
                 Text(card.title)
                     .font(.headline)

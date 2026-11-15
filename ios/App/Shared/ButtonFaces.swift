@@ -54,6 +54,51 @@ struct SecondaryPill: ButtonStyle {
     }
 }
 
+/// (the squared look, 14 Nov) The Library's two buttons at its top - Find's magnifying glass and the ••• - as circles:
+/// James, "but the search button and options button at the top can be circles". The secondary face (the look button's
+/// gradient, edge and highlight, turned over while pressed) drawn round, 36 pt in a 44 pt target, its glyph in the
+/// secondary's label colour. For a Menu too (`.menuStyle(.button)`, whose label takes the button style in use). Its
+/// glyph grows with the text to the largest standard size and holds there; a long press then shows it large.
+struct CircleFace: ButtonStyle {
+    /// The face's side, and the target round it.
+    static let face: CGFloat = 36
+    static let target: CGFloat = 44
+
+    func makeBody(configuration: Configuration) -> some View {
+        CircleFaceBody(label: configuration.label, pressed: configuration.isPressed)
+    }
+}
+
+private struct CircleFaceBody<Label: View>: View {
+    let label: Label
+    let pressed: Bool
+
+    @Environment(\.isEnabled) private var isEnabled
+
+    private static var hairline: CGFloat { 1 }
+
+    var body: some View {
+        let face = CircleFace.face
+        label
+            .font(.body.weight(.semibold))
+            .imageScale(.medium)
+            .foregroundStyle(Palette.onSecondary)
+            .frame(width: face, height: face)
+            .background(Circle().fill(pressed ? Palette.secondaryFillPressed : Palette.secondaryFill))
+            .overlay(alignment: .top) {
+                // the highlight: a line inside the top edge, following the circle (ButtonFace's, round)
+                Circle().inset(by: Self.hairline * 1.5)
+                    .stroke(Palette.highlight, lineWidth: Self.hairline)
+                    .mask(alignment: .top) { Rectangle().frame(height: face / 3) }
+            }
+            .overlay(Circle().strokeBorder(Palette.secondaryEdge, lineWidth: Self.hairline))
+            .opacity(isEnabled ? 1 : Palette.off)
+            .frame(width: CircleFace.target, height: CircleFace.target)
+            .contentShape(Rectangle())
+            .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
+    }
+}
+
 private struct ButtonFace: View {
     let configuration: ButtonStyleConfiguration
     let primary: Bool

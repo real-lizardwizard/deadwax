@@ -509,8 +509,10 @@ private struct QuestionRow: View {
             HStack(spacing: 12) {
                 Button(AutoDownloadWords.keepThem) { downloads.follower.keepThem() }
                     .buttonStyle(.bordered)
+                    .buttonBorderShape(Corners.controlBorder)
                 Button(AutoDownloadWords.remove, role: .destructive) { downloads.follower.removeThem() }
                     .buttonStyle(.bordered)
+                    .buttonBorderShape(Corners.controlBorder)
             }
         }
         .padding(.vertical, 4)
@@ -533,7 +535,7 @@ private struct PlaylistLineRow: View {
             navigation.open(.playlist(PlaylistRoute(id: row.id)))
         } label: {
             HStack(alignment: .center, spacing: 12) {
-                PlaylistCover(id: row.coverArt, side: cover, pixels: CoverSize.row, corner: 4)
+                PlaylistCover(id: row.coverArt, side: cover, pixels: CoverSize.row)
                 VStack(alignment: .leading, spacing: 2) {
                     Text(row.name)
                         .foregroundStyle(.primary)
@@ -945,7 +947,7 @@ private struct AlbumLine<Lines: View, Trailing: View>: View {
                 HStack(alignment: .center, spacing: 12) {
                     CoverImage(id: album?.coverArt, size: cover)
                         .frame(width: cover, height: cover)
-                        .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
+                        .clipShape(Corners.artShape)
                     VStack(alignment: .leading, spacing: 2) {
                         Text(album?.name ?? "")
                             .foregroundStyle(.primary)

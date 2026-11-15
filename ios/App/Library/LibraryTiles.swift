@@ -21,7 +21,7 @@ struct LibraryTile: View {
         Button(action: open) {
             VStack(alignment: .leading, spacing: 6) {
                 LibraryCover(id: album.coverArt, pixels: CoverSize.tile)
-                    .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+                    .clipShape(Corners.artShape)
                     .overlay(alignment: .topLeading) {
                         if isNew { LibraryNewMark().padding(6) }
                     }
@@ -106,7 +106,7 @@ struct LibraryRow: View {
             HStack(spacing: 12) {
                 LibraryCover(id: album.coverArt, pixels: CoverSize.row)
                     .frame(width: Self.cover, height: Self.cover)
-                    .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
+                    .clipShape(Corners.artShape)
                 VStack(alignment: .leading, spacing: 2) {
                     Text(album.name ?? "")
                         .foregroundStyle(.primary)
@@ -141,11 +141,11 @@ struct LibraryNewMark: View {
             .padding(.vertical, 2)
             .background {
                 // the card's own colour under the badge's tint: legible whatever the cover behind it
-                RoundedRectangle(cornerRadius: 4, style: .continuous)
+                Corners.controlShape
                     .fill(Color(white: 0.08))
-                    .overlay(RoundedRectangle(cornerRadius: 4, style: .continuous).fill(Palette.accent.opacity(0.18)))
+                    .overlay(Corners.controlShape.fill(Palette.accent.opacity(0.18)))
             }
-            .overlay(RoundedRectangle(cornerRadius: 4, style: .continuous).strokeBorder(Palette.accent.opacity(0.55)))
+            .overlay(Corners.controlShape.strokeBorder(Palette.accent.opacity(0.55)))
             .accessibilityLabel(LibraryWords.newMarkSpoken)
     }
 }

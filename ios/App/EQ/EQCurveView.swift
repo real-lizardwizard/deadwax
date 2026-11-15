@@ -313,9 +313,10 @@ struct EQHandles {
     let hold: (Bool) -> Void
 }
 
-/// The selected filter's numbers, above the plot (3.8): `.caption.monospacedDigit()` semibold on a capsule of
-/// `barTrack`, as a held slider's value is - stopped at `.xxxLarge` and cut in the middle (3.15); the filter's row
-/// says it in full. Its room is kept while nothing is selected, so the plot never moves.
+/// The selected filter's numbers, above the plot (3.8): `.caption.monospacedDigit()` semibold on a chip of
+/// `barTrack` (a control's corners since the squared look), as a held slider's value is - stopped at `.xxxLarge` and
+/// cut in the middle (3.15); the filter's row says it in full. Its room is kept while nothing is selected, so the plot
+/// never moves.
 struct EQHandleCapsule: View {
     let text: String?
 
@@ -328,7 +329,7 @@ struct EQHandleCapsule: View {
             .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
             .padding(.horizontal, 8)
             .padding(.vertical, 3)
-            .background(Palette.barTrack, in: Capsule())
+            .background(Palette.barTrack, in: Corners.controlShape)
             .opacity(text == nil ? 0 : 1)
             .frame(maxWidth: .infinity)
             .padding(.horizontal, 16)

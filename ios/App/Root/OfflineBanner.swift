@@ -101,8 +101,12 @@ struct OfflineBanner: View {
 extension View {
     /// The offline banner pinned at the top of this page, under its navigation bar - on the page's own content, never on
     /// the NavigationStack (an inset there doesn't reach the pages inside it: the mini player's lesson, FB23732628).
-    /// For every page a tab's stack shows, beside `clearsPlayer()`: its root (TabStack) and each pushed one (appRoutes).
-    func showsOfflineBanner() -> some View {
-        safeAreaInset(edge: .top, spacing: 0) { OfflineBanner() }
+    /// For every page a tab's stack shows, beside `clearsPlayer()`: its root (TabStack) and each pushed one (appRoutes) -
+    /// but the Library's root, whose own top (the switch, the squared look) has the banner under it, not over it: there
+    /// TabStack passes `false`, and LibraryView draws it.
+    func showsOfflineBanner(_ shown: Bool = true) -> some View {
+        safeAreaInset(edge: .top, spacing: 0) {
+            if shown { OfflineBanner() }
+        }
     }
 }
