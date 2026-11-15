@@ -251,6 +251,32 @@ def test_the_apps_own_bars_are_the_webs():
     assert ".accessibilityAddTraits(.isTabBar)" in tabs
 
 
+def test_the_requests_badge_is_the_webs():
+    # (Phase 6) Requests' count on the app's tab bar, as app.css's .app-tab-badge: STYLE.md's purple badge laid over the
+    # bar's own colour, the accent's words, a control's corners, the web's sizes and its place over the icon's corner
+    assert token(THEME_CSS, "dw-badge-purple-bg") == "rgba(168, 85, 247, 0.16)"
+    assert token(THEME_CSS, "dw-badge-purple-border") == "rgba(192, 132, 252, 0.4)"
+    palette = (APP / "DeadwaxApp.swift").read_text(encoding="utf-8")
+    assert "static let badgeFill = Color(red: 168 / 255, green: 85 / 255, blue: 247 / 255).opacity(0.16)\n" in palette
+    assert "static let badgeEdge = Color(red: 192 / 255, green: 132 / 255, blue: 252 / 255).opacity(0.4)\n" in palette
+    assert palette_rgb("accentText") == hex_colour(token(THEME_CSS, "dw-accent-text"))[:3]
+    tabs = (APP / "Root" / "MainTabs.swift").read_text(encoding="utf-8")
+    badge = tabs[tabs.index("private struct TabBadge"):]
+    badge = badge[:badge.index("\n}\n")]
+    assert f"private var size: CGFloat = {px(token(APP_CSS, 'app-tab-badge')):g}\n" in badge
+    assert f"private static let pad: CGFloat = {px(token(APP_CSS, 'app-tab-badge-pad')):g}\n" in badge
+    assert f"private static let up: CGFloat = {-px(token(APP_CSS, 'app-tab-badge-top')):g}\n" in badge
+    icon, left = px(token(APP_CSS, "app-tab-icon")), px(token(APP_CSS, "app-tab-badge-left"))
+    assert f"private static let right: CGFloat = {left - icon / 2:g}\n" in badge
+    for drawn in ("Palette.accentText", "Palette.badgeFill", "Palette.tabBar", "Palette.badgeEdge",
+                  "Corners.controlShape"):
+        assert drawn in badge, drawn
+    # drawn on Requests' button alone, and read in its label
+    assert 'tab == .requests ? RequestWords.badgeText(requests.badgeCount) : ""' in tabs
+    assert "tab == .requests ? RequestWords.badgeLabel(tab.title, requests.badgeCount) : tab.title" in tabs
+    assert ".accessibilityLabel(spoken)" in tabs
+
+
 def test_the_play_bar_is_the_tab_bars_top():
     # 15 Nov, James: "merge the play bar with the bottom bar so it doesn't look like it's floating", "opaque the whole
     # way", "get rid of the skip forward button", "let's make sure the play/pause isn't right up against the edge". The

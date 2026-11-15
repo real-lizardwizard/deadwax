@@ -33,6 +33,7 @@ struct DeadwaxApp: App {
     @State private var artists: ArtistsModel
     @State private var songs: SongsModel
     @State private var search: SearchModel
+    @State private var requests: RequestsModel
 
     /// The one background session, made before anything else can ask it.
     private static let downloadSession = DownloadSession()
@@ -60,6 +61,10 @@ struct DeadwaxApp: App {
         // Phase 5: Search - your library's half (slice 1), MusicBrainz's albums and the album you don't have (slice 2)
         let search = SearchModel(server: server, library: library, artists: artists, reachability: reachability,
                                  navigation: navigation)
+        // Phase 6: Requests - the one poll of the downloads, the board, its writes and the Done rows' albums
+        let requests = RequestsModel(server: server, reachability: reachability, navigation: navigation, library: library,
+                                     search: search)
+        reachability.whenChanged { [weak requests] in requests?.reachChanged() }
         let downloads = DownloadModel(server: server, reachability: reachability, files: files, session: Self.downloadSession)
         player.connect(downloads: downloads, reachability: reachability)
         // Phase 4, slice 3: a write here to a downloaded playlist keeps it in step at once
@@ -90,6 +95,7 @@ struct DeadwaxApp: App {
             artists.reset()
             songs.reset()
             search.reset()
+            requests.reset()
         }
         _server = State(initialValue: server)
         _player = State(initialValue: player)
@@ -107,6 +113,7 @@ struct DeadwaxApp: App {
         _artists = State(initialValue: artists)
         _songs = State(initialValue: songs)
         _search = State(initialValue: search)
+        _requests = State(initialValue: requests)
     }
 
     var body: some Scene {
@@ -128,6 +135,7 @@ struct DeadwaxApp: App {
                 .environment(artists)
                 .environment(songs)
                 .environment(search)
+                .environment(requests)
                 .preferredColorScheme(.dark)
                 .tint(Palette.accent)
                 // (Noto Sans, 15 Nov) the words of every Text and control that sets no font of its own
@@ -182,6 +190,9 @@ enum Palette {
     /// --app-pin-off 0.45, an opacity: "a pin, or an Edit button, that can't be used just now" - a song or an album not
     /// on this phone while deadwax can't be reached.
     static let off: Double = 0.45
+    /// --app-job-dimmed 0.55, an opacity: a download being cancelled, until the server agrees - its cover, title, bar and
+    /// line (Requests); and a Done row whose album is being looked up for its tap.
+    static let dimmed: Double = 0.55
     /// --dw-track #121117, --dw-border #2c2a36 and --dw-bar-purple (#b56af5 to #9333ea, top to bottom): the Requests
     /// board's bar (app.css .app-bar), You > Downloads' bars - a download on the phone looks like one on the web.
     /// Named `bar…`: in a music app a track is a song.
@@ -212,6 +223,10 @@ enum Palette {
     static let tabInactive = Color(red: 0x8A / 255, green: 0x8A / 255, blue: 0x9C / 255)
     /// --dw-well rgba(0, 0, 0, 0.2): the switch's well.
     static let well = Color.black.opacity(0.2)
+    /// --dw-badge-purple-bg rgba(168, 85, 247, 0.16): Requests' count on the tab bar, over `tabBar` (Phase 6).
+    static let badgeFill = Color(red: 168 / 255, green: 85 / 255, blue: 247 / 255).opacity(0.16)
+    /// --dw-badge-purple-border rgba(192, 132, 252, 0.4): its edge.
+    static let badgeEdge = Color(red: 192 / 255, green: 132 / 255, blue: 252 / 255).opacity(0.4)
     /// --dw-text-2 #a3a3b8: a segment of the switch not chosen.
     static let text2 = Color(red: 0xA3 / 255, green: 0xA3 / 255, blue: 0xB8 / 255)
 

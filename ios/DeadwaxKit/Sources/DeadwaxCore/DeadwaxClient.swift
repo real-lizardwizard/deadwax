@@ -449,7 +449,7 @@ public struct DeadwaxClient: Sendable {
     /// The id bridge by a release you hold (`Routes.storeAlbum` with `release_mbid`): Navidrome's album for it - nil
     /// when Navidrome doesn't have it, or can't be asked.
     public func navidromeAlbum(releaseMbid: String) async throws -> String? {
-        let answer = try await call(Routes.storeAlbum, as: StoreAlbum.self, query: [("release_mbid", releaseMbid)])
+        let answer = try await storeAlbum(releaseMbid: releaseMbid)
         guard let id = answer.navidromeId, !id.isEmpty else { return nil }
         return id
     }
@@ -504,6 +504,41 @@ public struct DeadwaxClient: Sendable {
         }
         let response = try await answer(request(Routes.recordHistory, json: json), accept: Set(200..<300))
         return try? JSONDecoder().decode(HistoryTaken.self, from: response.body)
+    }
+
+    // MARK: Phase 6, slice 1: Requests
+
+    /// The asker's downloads, slskd's progress laid on - each row saying who asked, with logins on.
+    public func jobs() async throws -> JobsAnswer {
+        try await call(Routes.jobs)
+    }
+
+    /// The ✕: the download cancelled - or, for one somebody else waits for too, only the asker's request withdrawn
+    /// (`left`). A 404 is a download that isn't the asker's to act on any more.
+    public func cancelJob(_ id: Int) async throws -> CancelAnswer {
+        try await call(Routes.cancelJob, path: ["job_id": String(id)])
+    }
+
+    /// Another source: the download moved to the next runner-up - `moved` false with the problem when none would take
+    /// it. A 409 is a download no longer failed or cancelled.
+    public func retryJob(_ id: Int) async throws -> RetryAnswer {
+        try await call(Routes.retryJob, path: ["job_id": String(id)])
+    }
+
+    /// Same source again: the files that didn't arrive asked of the same peer - `retried` false with the problem.
+    public func retryJobSame(_ id: Int) async throws -> RetrySameAnswer {
+        try await call(Routes.retryJobSame, path: ["job_id": String(id)])
+    }
+
+    /// Clear done: the asker's finished downloads taken off their list (with logins off, forgotten).
+    public func clearJobs() async throws -> ClearAnswer {
+        try await call(Routes.clearJobs)
+    }
+
+    /// The id bridge by a pressing, whole (`Routes.storeAlbum` with `release_mbid`): Navidrome's album for it and the
+    /// store's folders of it - a Done row's album, and why it can't be opened (RequestWords.note).
+    public func storeAlbum(releaseMbid: String) async throws -> StoreAlbum {
+        try await call(Routes.storeAlbum, query: [("release_mbid", releaseMbid)])
     }
 
     // MARK: the turntable's window (turntable.md 4.5)

@@ -374,7 +374,7 @@ func sentJSON(_ request: HTTPRequest?) throws -> [String: SentValue] {
     }
 
     @Test func everyRouteIsDeadwaxsOwn() {
-        #expect(Routes.all.count == 49)
+        #expect(Routes.all.count == 54)
         #expect(Set(Routes.all).count == Routes.all.count)
         for endpoint in Routes.all {
             #expect(endpoint.path.hasPrefix("/deadwax/"))
@@ -396,10 +396,14 @@ func sentJSON(_ request: HTTPRequest?) throws -> [String: SentValue] {
         // 60 s: several pages of MusicBrainz's browse (test_ios_contract.py holds both above deadwax's own waits)
         // (slice 3) /artists and /songs, 20 s, quick searches as /fully_search is; /artist, 60 s, one request with
         // MusicBrainz's ten attempts; /discography, 60 s, a browse of up to five pages
+        // (Phase 6, slice 1) /download/jobs, 20 s, slskd asked for every open download and each queued one's place;
+        // a cancel and a clear, 30 s, slskd's transfers each stopped or tidied; Another source, 60 s, up to three
+        // runners-up asked in turn; Same source again, 30 s, one peer asked again
         let longer: [Endpoint: Double] = [Routes.albumIndex: 30, Routes.autoEqSearch: 20, Routes.autoEqProfile: 20,
                                           Routes.libraryOwned: 30, Routes.fullySearch: 20, Routes.releaseGroup: 60,
                                           Routes.searchArtists: 20, Routes.searchSongs: 20, Routes.artistFacts: 60,
-                                          Routes.discography: 60]
+                                          Routes.discography: 60, Routes.jobs: 20, Routes.cancelJob: 30,
+                                          Routes.retryJob: 60, Routes.retryJobSame: 30, Routes.clearJobs: 30]
         #expect(Routes.timeouts == longer)
         for endpoint in Routes.all {
             // each path parameter filled in: a brace left in a path is no URL

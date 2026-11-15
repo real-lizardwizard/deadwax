@@ -2,10 +2,10 @@ import DeadwaxCore
 import SwiftUI
 import UIKit
 
-/// The app's tabs (D1), Library, Search (Phase 5) and You, each its own NavigationStack. Tapping the tab shown again pops it to its
-/// root (and, at its root, scrolls its list to the top - AppNavigation.select). With something queued the play bar
-/// is the top of the tab bar (MiniPlayerView, since 15 Nov), and a notice (D11) sits above them; Now Playing opens over
-/// everything.
+/// The app's tabs (D1), Library, Search (Phase 5), Requests (Phase 6) and You, each its own NavigationStack. Tapping the
+/// tab shown again pops it to its root (and, at its root, scrolls its list to the top - AppNavigation.select). With
+/// something queued the play bar is the top of the tab bar (MiniPlayerView, since 15 Nov), and a notice (D11) sits
+/// above them; Now Playing opens over everything.
 ///
 /// The tab bar is the app's own since the squared look (14 Nov, James: "maybe square off the slider and the bar at the
 /// bottom and the now playing bar as well"): iOS's can't be reshaped - on iOS 26 and later it floats, a capsule of
@@ -14,9 +14,17 @@ import UIKit
 /// each tab's own state; a tap goes through AppNavigation.select, as iOS's bar's did. The bar stays down when the
 /// keyboard comes up (it is under it, as iOS's was), and nothing makes room for it then. Since the play bar joined it
 /// (15 Nov) the play bar is under the keyboard too, one block with the tabs; the notice rides the keyboard.
+///
+/// Requests' badge is the count of downloads on their way (RequestsView.arriving), drawn on its button in AppTabBar -
+/// none at 0 and none while deadwax can't be reached; what the app is looking at, as far as downloads go
+/// (RequestsWatch.watching - the scene, the tab, its pages, Now Playing over it, the sign-in over the app), is handed to
+/// RequestsModel, whose poll it paces.
 struct MainTabs: View {
     @Environment(PlayerModel.self) private var player
     @Environment(AppNavigation.self) private var navigation
+    @Environment(RequestsModel.self) private var requests
+    @Environment(ServerModel.self) private var server
+    @Environment(\.scenePhase) private var scenePhase
     /// The tab bar's height as drawn, above the bottom safe area (the home indicator's), at the text size in use - the
     /// play bar's included while something is queued.
     @State private var barHeight: CGFloat = 0
@@ -66,10 +74,32 @@ struct MainTabs: View {
         .onChange(of: player.hasQueue) { _, queued in
             if !queued { navigation.nowPlayingShown = false }
         }
+        .onChange(of: watching, initial: true) { _, now in requests.watch(now) }
+        // the tabs gone (the sign-in or the launch screen instead, or iOS taking them from under Now Playing's
+        // full-screen cover) watch nothing; back, they watch what shows - even when that's what they watched before
+        // they went, which onChange alone never says (slice 1's review, finding 1)
+        .onAppear { requests.watch(watching) }
+        .onDisappear { requests.watch(.hidden) }
+    }
+
+    /// What the app is looking at, as far as downloads go: nothing in the background or under the sign-in; a tab at
+    /// its root with Now Playing not over it.
+    private var watching: Watching {
+        let tab: String
+        switch navigation.tab {
+        case .requests: tab = "requests"
+        case .library: tab = "library"
+        case .search: tab = "search"
+        case .you: tab = "you"
+        }
+        return RequestsWatch.watching(shown: scenePhase != .background && server.signInOver == nil, tab: tab,
+                                      depth: navigation.shownStack.count, sheetOpen: navigation.nowPlayingShown)
     }
 
     /// A tab's stack, its root the tab's own page. (Phase 5) Search between Library and You, the web's order
-    /// (phase5-search.md question 1). The Library draws its own top - the switch - with the offline banner under it.
+    /// (phase5-search.md question 1); (Phase 6) Requests between Search and You, the web's order less Home
+    /// (phase6-get-requests.md question 1). The Library draws its own top - the switch - with the offline banner under
+    /// it.
     @ViewBuilder private func stack(_ tab: AppTab) -> some View {
         let paths = Bindable(navigation)
         switch tab {
@@ -77,6 +107,8 @@ struct MainTabs: View {
             TabStack(path: paths.library, ownTop: true) { LibraryView() }
         case .search:
             TabStack(path: paths.search) { SearchScreen() }
+        case .requests:
+            TabStack(path: paths.requests) { RequestsScreen() }
         case .you:
             TabStack(path: paths.you) { YouView() }
         }
@@ -97,9 +129,13 @@ struct MainTabs: View {
 /// them, as its own elements. Its words grow with the text size up to the largest of the standard sizes, as far as a
 /// bar can and leave the page its room; at the accessibility sizes they hold there, and a long press shows a tab's symbol
 /// and words large (the Large Content Viewer), as iOS's own tab bar does - and Play/Pause.
+///
+/// (Phase 6) Requests' button carries its badge, the count of downloads on their way (RequestsModel.badgeCount, 0
+/// while deadwax can't be reached), and is read with it: "Requests, 2 arriving" (RequestWords.badgeLabel).
 struct AppTabBar: View {
     @Environment(AppNavigation.self) private var navigation
     @Environment(PlayerModel.self) private var player
+    @Environment(RequestsModel.self) private var requests
     @Environment(\.displayScale) private var displayScale
 
     /// --dw-tab-pad: above the tabs.
@@ -115,7 +151,7 @@ struct AppTabBar: View {
             }
             HStack(spacing: 0) {
                 ForEach(AppTab.allCases, id: \.self) { (tab: AppTab) in
-                    AppTabButton(tab: tab, shown: navigation.tab == tab) {
+                    AppTabButton(tab: tab, shown: navigation.tab == tab, badge: badge(tab), spoken: spoken(tab)) {
                         navigation.select(tab)
                     }
                 }
@@ -143,12 +179,27 @@ struct AppTabBar: View {
             .frame(height: 1 / max(displayScale, 1))
             .accessibilityHidden(true)
     }
+
+    /// The count over a tab's symbol: Requests' "2", "99+" - none at 0, and none on the other tabs.
+    private func badge(_ tab: AppTab) -> String {
+        tab == .requests ? RequestWords.badgeText(requests.badgeCount) : ""
+    }
+
+    /// What VoiceOver reads for a tab: its words, Requests' with its count ("Requests, 2 arriving").
+    private func spoken(_ tab: AppTab) -> String {
+        tab == .requests ? RequestWords.badgeLabel(tab.title, requests.badgeCount) : tab.title
+    }
 }
 
-/// One tab of the bar: its symbol over its words, a button the bar's height.
+/// One tab of the bar: its symbol over its words, a button the bar's height - and Requests' count over its symbol's top
+/// right corner, as the web's .app-tab-badge.
 private struct AppTabButton: View {
     let tab: AppTab
     let shown: Bool
+    /// The count over the symbol ("2", "99+"), none when empty.
+    let badge: String
+    /// What VoiceOver reads: the tab's words, with Requests' count.
+    let spoken: String
     let action: () -> Void
 
     /// --dw-tab-item: a tab's height.
@@ -166,6 +217,9 @@ private struct AppTabButton: View {
                     .symbolVariant(.fill)
                     .font(Typeface.symbol(.title2))
                     .frame(height: symbolBox)
+                    .overlay(alignment: .top) {
+                        if !badge.isEmpty { TabBadge(count: badge) }
+                    }
                 Text(tab.title)
                     .font(Typeface.caption2.weight(.medium))
                     .lineLimit(1)
@@ -175,11 +229,47 @@ private struct AppTabButton: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .accessibilityLabel(tab.title)
+        .accessibilityLabel(spoken)
         .accessibilityAddTraits(shown ? .isSelected : [])
         .accessibilityShowsLargeContentViewer {
-            Label(tab.title, systemImage: tab.symbol)
+            Label(spoken, systemImage: tab.symbol)
         }
+    }
+}
+
+/// Requests' count over its symbol's top right corner (app.css .app-tab-badge): STYLE.md's purple badge laid over the
+/// bar's own colour, so it is opaque and no stroke of the symbol shows through it - --dw-badge-purple-bg over
+/// --dw-tab-bar, a --dw-hairline (1) of --dw-badge-purple-border, --dw-accent-text words in the tab's size, bold
+/// (--dw-weight-bold), a control's corners. Its left edge 2 right of the symbol's centre and its top 5 above the
+/// symbol's box: the web's 14 and -5 on its 24 icon. It grows with the words; VoiceOver reads it in the button's label,
+/// not on its own.
+private struct TabBadge: View {
+    let count: String
+
+    /// --app-tab-badge: its height, and its narrowest.
+    @ScaledMetric(relativeTo: .caption2) private var size: CGFloat = 16
+    /// --app-tab-badge-pad: either side of the count.
+    private static let pad: CGFloat = 4
+    /// --app-tab-badge-left 14 on --app-tab-icon 24: its left edge this far right of the symbol's centre.
+    private static let right: CGFloat = 2
+    /// --app-tab-badge-top -5: its top this far above the symbol's.
+    private static let up: CGFloat = 5
+
+    var body: some View {
+        Text(count)
+            .font(Typeface.caption2.weight(.bold))
+            .monospacedDigit()
+            .lineLimit(1)
+            .fixedSize()
+            .foregroundStyle(Palette.accentText)
+            .padding(.horizontal, Self.pad)
+            .frame(minWidth: size, minHeight: size)
+            .background(Palette.badgeFill, in: Corners.controlShape)
+            .background(Palette.tabBar, in: Corners.controlShape)
+            .overlay(Corners.controlShape.strokeBorder(Palette.badgeEdge, lineWidth: 1))
+            .alignmentGuide(HorizontalAlignment.center) { (box: ViewDimensions) -> CGFloat in box[.leading] - Self.right }
+            .alignmentGuide(VerticalAlignment.top) { (box: ViewDimensions) -> CGFloat in box[.top] + Self.up }
+            .accessibilityHidden(true)
     }
 }
 
