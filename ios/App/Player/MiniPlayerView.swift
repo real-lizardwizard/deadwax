@@ -6,7 +6,9 @@ import SwiftUI
 /// (PlayerWords.secondLine) - Play/Pause (busy while the song loads) and Next, each at least 44 points and growing with
 /// the text size, and a hairline along its bottom edge
 /// for how far into the song it is (PlayerWords.progress). The bar, not its buttons, opens Now Playing; VoiceOver
-/// reads it as "Now playing: Roads, Portishead - open" (PlayerWords.miniPlayerLabel).
+/// reads it as "Now playing: Roads, Portishead - open" (PlayerWords.miniPlayerLabel). Squared since the squared look
+/// (James: "maybe square off the slider and the bar at the bottom and the now playing bar as well"): a card's corners,
+/// its cover a cover's (Corners).
 struct MiniPlayerView: View {
     @Environment(PlayerModel.self) private var player
     @Environment(AppNavigation.self) private var navigation
@@ -27,7 +29,7 @@ struct MiniPlayerView: View {
                     HStack(spacing: 12) {
                         CoverImage(id: track.coverArt, size: Self.cover)
                             .frame(width: Self.cover, height: Self.cover)
-                            .clipShape(RoundedRectangle(cornerRadius: 6))
+                            .clipShape(Corners.artShape)
                         VStack(alignment: .leading, spacing: 2) {
                             Text(track.title)
                                 .font(.subheadline.weight(.semibold))
@@ -73,9 +75,9 @@ struct MiniPlayerView: View {
             .padding(.leading, 8)
             .padding(.trailing, 4)
             .frame(minHeight: Self.height)
-            .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12))
+            .background(.regularMaterial, in: Corners.cardShape)
             .overlay(alignment: .bottom) { Hairline() }
-            .clipShape(RoundedRectangle(cornerRadius: 12))
+            .clipShape(Corners.cardShape)
         }
     }
 }

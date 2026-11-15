@@ -30,7 +30,7 @@ struct DownloadRing: View {
             if stop {
                 GeometryReader { space in
                     let side = min(space.size.width, space.size.height) / 3
-                    RoundedRectangle(cornerRadius: side * 0.18, style: .continuous)
+                    Corners.fillShape
                         .fill(Palette.accent)
                         .frame(width: side, height: side)
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -107,25 +107,25 @@ struct DownloadBar: View {
         let shown = min(max(fraction, 0), 1)
         GeometryReader { space in
             ZStack(alignment: .leading) {
-                RoundedRectangle(cornerRadius: 2, style: .continuous)
+                Corners.trackShape
                     .fill(Palette.barTrack)
                     // the track's inset shade (--dw-shadow-inset-track)
                     .overlay(alignment: .top) {
                         Rectangle().fill(Color.black.opacity(0.35)).frame(height: 1)
-                            .clipShape(RoundedRectangle(cornerRadius: 2, style: .continuous))
+                            .clipShape(Corners.trackShape)
                     }
                 Group {
                     if amber {
-                        RoundedRectangle(cornerRadius: 1, style: .continuous).fill(Palette.amberIcon)
+                        Corners.fillShape.fill(Palette.amberIcon)
                     } else {
-                        RoundedRectangle(cornerRadius: 1, style: .continuous).fill(Palette.barFill)
+                        Corners.fillShape.fill(Palette.barFill)
                     }
                 }
                 .frame(width: max(0, (space.size.width - 2) * shown))
                 .padding(1)
                 .animation(reduceMotion ? nil : .linear(duration: 0.25), value: shown)
             }
-            .overlay(RoundedRectangle(cornerRadius: 2, style: .continuous).strokeBorder(Palette.barEdge, lineWidth: 0.5))
+            .overlay(Corners.trackShape.strokeBorder(Palette.barEdge, lineWidth: 0.5))
         }
         .frame(height: height)
         .accessibilityHidden(true)

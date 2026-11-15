@@ -47,8 +47,8 @@ struct SignInView: View {
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .padding(.horizontal, 12)
                         .padding(.vertical, 10)
-                        .background(Palette.amberFill, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
-                        .overlay(RoundedRectangle(cornerRadius: 10, style: .continuous).strokeBorder(Palette.amberEdge))
+                        .background(Palette.amberFill, in: Corners.cardShape)
+                        .overlay(Corners.cardShape.strokeBorder(Palette.amberEdge))
                     if let why = lines.reasonWhy { whoever(why) }
                 }
                 fields
@@ -170,14 +170,14 @@ struct SignInView: View {
     }
 }
 
-/// A sign-in field: a filled, rounded box, its text never smaller than the body's.
+/// A sign-in field: a filled box with a control's corners, its text never smaller than the body's.
 private struct FieldLook: ViewModifier {
     func body(content: Content) -> some View {
         content
             .font(.body)
             .padding(.horizontal, 12)
             .padding(.vertical, 10)
-            .background(Color(white: 0.14), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
-            .overlay(RoundedRectangle(cornerRadius: 10, style: .continuous).strokeBorder(Color(white: 0.24)))
+            .background(Color(white: 0.14), in: Corners.controlShape)
+            .overlay(Corners.controlShape.strokeBorder(Color(white: 0.24)))
     }
 }

@@ -140,6 +140,9 @@ public enum LibraryMenuItem: Sendable, Equatable {
     case order(LibraryPage)
     /// (slice 4, question 26) Albums' tiles or rows: `grid` while it is tiles
     case layout(grid: Bool)
+    /// (the squared look, 14 Nov) Playlists' New playlist - the bar's + until then: chosen only while deadwax can be
+    /// reached (`online`), as the + was
+    case newPlaylist(online: Bool)
     /// Downloaded, pushed
     case downloaded
     /// the way back to the albums while the Albums page is Downloaded: the scope's albums, pushed - and All music's
@@ -166,6 +169,7 @@ public enum LibraryMenuItem: Sendable, Equatable {
             }
         case .order(let page): return page == .artists ? ArtistWords.sortLabel : LibraryWords.sortLabel
         case .layout(let grid): return grid ? LibrarySwitchWords.showAsList : LibrarySwitchWords.showAsGrid
+        case .newPlaylist: return PlaylistWords.newPlaylist
         case .downloaded: return DownloadWords.downloadedTitle
         case .albums(let scope): return LibraryWords.title(scope, personal: personal)
         case .allMusic: return LibraryWords.allMusic
@@ -176,16 +180,20 @@ public enum LibraryMenuItem: Sendable, Equatable {
         }
     }
 
-    /// It can be chosen (Getting ready… and why it failed are drawn dimmed).
+    /// It can be chosen (Getting ready… and why it failed are drawn dimmed; New playlist while deadwax can't be reached).
     public var enabled: Bool {
-        if case .shuffle(let can) = self { return can.starts }
-        return true
+        switch self {
+        case .shuffle(let can): return can.starts
+        case .newPlaylist(let online): return online
+        default: return true
+        }
     }
 }
 
 /// The Library's ••• (2.8): what it holds, in its sections. Since slice 4 (question 26: three pages and their buttons
-/// crowd the bar) the page's own order and Albums' Grid or list are its second section - Playlists keeps its + in the
-/// bar, and Songs has neither (Navidrome's order is its one order) - and All music is a submenu of the collection's
+/// crowd the bar) the page's own order and Albums' Grid or list are its second section - and, since the squared look
+/// (14 Nov: the bar's top is the Library's Find, the switch and the ••• alone), Playlists' New playlist, the bar's +
+/// until then; Songs has none (Navidrome's order is its one order) - and All music is a submenu of the collection's
 /// albums, artists and (slice 5) songs.
 public enum LibraryMenu {
     /// All music's submenu: the collection's albums, artists and songs, each pushed.
@@ -204,7 +212,8 @@ public enum LibraryMenu {
         switch page {
         case .albums: sections.append([.order(.albums), .layout(grid: grid)])
         case .artists: sections.append([.order(.artists)])
-        case .playlists, .songs: break
+        case .playlists: sections.append([.newPlaylist(online: online)])
+        case .songs: break
         }
         var places: [LibraryMenuItem] = [albumsPage == .downloaded ? .albums(scope) : .downloaded]
         if online && personal && scope == .yours { places.append(.allMusic) }
@@ -230,6 +239,8 @@ public enum LibrarySwitchWords {
     public static let done = "Done"
     /// The switch's label to VoiceOver.
     public static let switchLabel = "Library pages"
+    /// (the squared look) Find's own Cancel, beside its field: hides Find and clears its words.
+    public static let cancelFind = "Cancel"
     /// Find's placeholder on Playlists.
     public static let findPlaylists = "Find in playlists"
     /// "No playlists match “late”."

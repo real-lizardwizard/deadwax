@@ -198,6 +198,20 @@ enum Palette {
     /// --dw-pressed rgba(255, 255, 255, 0.06): the speed chip's face under a finger (app.css .app-speed-chip:active).
     static let pressed = Color.white.opacity(0.06)
 
+    // The app's own bars (the squared look, 14 Nov): the tab bar along the foot, as the web's .app-tabbar, and the
+    // Library's top with its switch, as the web's .app-segmented.
+
+    /// --dw-tab-bar #121117: the tab bar's fill, and the Library's top's.
+    static let tabBar = Color(red: 0x12 / 255, green: 0x11 / 255, blue: 0x17 / 255)
+    /// --dw-border #2c2a36: the hairline along the tab bar's top and the Library's top's foot, the switch's edge.
+    static let border = Color(red: 0x2C / 255, green: 0x2A / 255, blue: 0x36 / 255)
+    /// --dw-tab-inactive #8a8a9c: a tab not shown (the one shown is `accent`).
+    static let tabInactive = Color(red: 0x8A / 255, green: 0x8A / 255, blue: 0x9C / 255)
+    /// --dw-well rgba(0, 0, 0, 0.2): the switch's well.
+    static let well = Color.black.opacity(0.2)
+    /// --dw-text-2 #a3a3b8: a segment of the switch not chosen.
+    static let text2 = Color(red: 0xA3 / 255, green: 0xA3 / 255, blue: 0xB8 / 255)
+
     // The turntable's look button (turntable.md 2.1, 2.14), from Core's TurntablePalette - the web's tokens' values,
     // held to theme.css there. The plinth's own colours are drawn by DeadwaxTurntable from the same table.
 

@@ -582,7 +582,7 @@ private struct PlaylistHero: View {
         let playlist = model.playlist
         let songs = model.songs
         VStack(spacing: 0) {
-            PlaylistCover(id: playlist?.coverArt, side: AlbumHero.coverSide, pixels: CoverSize.hero, corner: 10)
+            PlaylistCover(id: playlist?.coverArt, side: AlbumHero.coverSide, pixels: CoverSize.hero)
                 .frame(maxWidth: AlbumHero.coverSide)
                 .shadow(color: .black.opacity(0.35), radius: 14, y: 6)
                 .padding(.top, 8)
@@ -683,9 +683,9 @@ private struct PlaylistSongRow: View {
                     ZStack {
                         LibraryCover(id: song.coverArt, pixels: CoverSize.row)
                             .frame(width: Self.cover, height: Self.cover)
-                            .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
+                            .clipShape(Corners.artShape)
                         if current {
-                            RoundedRectangle(cornerRadius: 4, style: .continuous)
+                            Corners.artShape
                                 .fill(.black.opacity(0.45))
                                 .frame(width: Self.cover, height: Self.cover)
                             Image(systemName: "waveform")

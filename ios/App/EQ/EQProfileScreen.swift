@@ -124,6 +124,7 @@ struct EQProfileScreen: View {
                 if ErrorWords.kind(of: failed) != .notFound {
                     Button(EQWords.Picker.tryAgain) { attempt += 1 }
                         .buttonStyle(.bordered)
+                        .buttonBorderShape(Corners.controlBorder)
                 }
             }
             .padding(.vertical, 4)

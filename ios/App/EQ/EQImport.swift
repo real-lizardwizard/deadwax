@@ -96,7 +96,7 @@ struct EQImportRows: View {
             guard let text = strings.first else { return }
             read { EQImportReading.pasted(text, forKey: key) }
         }
-        .buttonBorderShape(.capsule)
+        .buttonBorderShape(Corners.controlBorder)
         .labelStyle(.titleAndIcon)
     }
 

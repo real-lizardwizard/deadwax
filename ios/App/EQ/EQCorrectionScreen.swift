@@ -134,6 +134,7 @@ struct EQCorrectionScreen: View {
                     if ErrorWords.kind(of: failed.error) != .notFound {
                         Button(EQWords.Picker.tryAgain) { attempt += 1 }
                             .buttonStyle(.bordered)
+                            .buttonBorderShape(Corners.controlBorder)
                     }
                 }
                 .padding(.vertical, 4)
