@@ -424,6 +424,27 @@ def test_the_librarys_top_sits_under_the_status_bar():
     assert ".background(Color(.systemBackground).ignoresSafeArea())" in sources["Root/RootView.swift"]
 
 
+def test_the_tab_bar_comes_down_into_the_home_indicators_room():
+    # 15 Nov, James: "there might be a little too much space below the bottom tab bar". The bar runs to the screen's edge
+    # itself, its play bar and tabs padded off it by Core's TabBarFoot (20 on a Face ID iPhone, where they stood on the
+    # home indicator's whole 34; 6 with a Home button); the pages' room is the bar over the home indicator's, so nothing
+    # sits under it; the keyboard is as it was.
+    tabs = (APP / "Root" / "MainTabs.swift").read_text(encoding="utf-8")
+    foot = (REPO / "ios" / "DeadwaxKit" / "Sources" / "DeadwaxCore" / "TabBarFoot.swift").read_text(encoding="utf-8")
+    assert "public static let drop = 14.0\n" in foot and "public static let least = 6.0\n" in foot
+    bar = tabs[tabs.index("struct AppTabBar"):tabs.index("private struct AppTabButton")]
+    body = bar[bar.index("var body: some View {"):]
+    order = [body.index(part) for part in ("measured(height)", ".padding(.bottom, CGFloat(TabBarFoot.below(home: home)))",
+                                           ".background {", ".dynamicTypeSize(...DynamicTypeSize.xxxLarge)",
+                                           ".ignoresSafeArea(.container, edges: .bottom)\n    }")]
+    assert order == sorted(order)
+    assert ".environment(\\.tabBarRoom, keyboardUp ? 0 : CGFloat(TabBarFoot.room(content: barHeight, home: home)))" in tabs
+    assert "AppTabBar(home: home)" in tabs and "barHeight = height" in tabs
+    assert "window?.safeAreaInsets.bottom ?? 0" in tabs
+    # the keyboard: the bar under it, the pages making no room meanwhile
+    assert ".ignoresSafeArea(.keyboard, edges: .bottom)" in tabs and "keyboardUp = true" in tabs
+
+
 # Noto Sans (15 Nov): James chose "Noto Sans (the web's)". The phone's four faces are the web's own seven files made into
 # one font per weight (ios/scripts/make-fonts.py), named by Info.plist's UIAppFonts, and every text style the app sets is
 # ios/App/Shared/Typeface.swift's - nothing in ios/App names a system text font of its own. A symbol drawn alone keeps

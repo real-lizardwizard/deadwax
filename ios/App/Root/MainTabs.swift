@@ -25,8 +25,8 @@ struct MainTabs: View {
     @Environment(RequestsModel.self) private var requests
     @Environment(ServerModel.self) private var server
     @Environment(\.scenePhase) private var scenePhase
-    /// The tab bar's height as drawn, above the bottom safe area (the home indicator's), at the text size in use - the
-    /// play bar's included while something is queued.
+    /// The play bar's and the tabs' height as drawn at the text size in use, the room under them not counted (AppTabBar
+    /// measures it) - the play bar's included while something is queued. The pages' room is TabBarFoot.room of it.
     @State private var barHeight: CGFloat = 0
     /// The keyboard is up, over the bar: the pages and the player make no room for the bar meanwhile.
     @State private var keyboardUp = false
@@ -40,16 +40,13 @@ struct MainTabs: View {
                     .tag(tab)
             }
         }
-        .environment(\.tabBarRoom, keyboardUp ? 0 : barHeight)
+        .environment(\.tabBarRoom, keyboardUp ? 0 : CGFloat(TabBarFoot.room(content: barHeight, home: home)))
         .overlay(alignment: .bottom) {
-            AppTabBar()
-                .onGeometryChange(for: CGFloat.self) { (bar: GeometryProxy) -> CGFloat in
-                    bar.size.height
-                } action: { (height: CGFloat) -> Void in
-                    barHeight = height
-                }
-                // under the keyboard, as iOS's bar was - never riding up on it
-                .ignoresSafeArea(.keyboard, edges: .bottom)
+            AppTabBar(home: home) { (height: CGFloat) -> Void in
+                barHeight = height
+            }
+            // under the keyboard, as iOS's bar was - never riding up on it
+            .ignoresSafeArea(.keyboard, edges: .bottom)
         }
         .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillShowNotification)) {
             (_: Notification) -> Void in
@@ -80,6 +77,17 @@ struct MainTabs: View {
         // they went, which onChange alone never says (slice 1's review, finding 1)
         .onAppear { requests.watch(watching) }
         .onDisappear { requests.watch(.hidden) }
+    }
+
+    /// The home indicator's room at the screen's foot (TabBarFoot): the window's own bottom safe area - 34 on a Face ID
+    /// iPhone, 0 with a Home button. A window's rather than a view's, so it never counts the keyboard.
+    private var home: CGFloat {
+        let scenes = UIApplication.shared.connectedScenes.compactMap { (scene: UIScene) -> UIWindowScene? in
+            scene as? UIWindowScene
+        }
+        let windows = scenes.flatMap { (scene: UIWindowScene) -> [UIWindow] in scene.windows }
+        let window = windows.first { (window: UIWindow) -> Bool in window.isKeyWindow } ?? windows.first
+        return window?.safeAreaInsets.bottom ?? 0
     }
 
     /// What the app is looking at, as far as downloads go: nothing in the background or under the sign-in; a tab at
@@ -125,6 +133,12 @@ struct MainTabs: View {
 /// --dw-border, then the tabs, all on the one opaque --dw-tab-bar down through the home indicator. The play bar's seek
 /// line is then the block's top edge, in place of the hairline. Nothing queued: the tabs alone, as before.
 ///
+/// Lower (15 Nov, James: "there might be a little too much space below the bottom tab bar"): the bar runs to the screen's
+/// edge itself and its tabs come down into the home indicator's room, 20 points off the edge on a Face ID iPhone where
+/// they stood on its whole 34, and 6 off it on a phone with a Home button, where they were flush (TabBarFoot). It
+/// measures the play bar and the tabs alone (`measured`), and MainTabs gives the pages the room over the home
+/// indicator's (TabBarFoot.room).
+///
 /// VoiceOver reads the tabs as a tab bar, each tab a button with its words, the one shown selected; the play bar before
 /// them, as its own elements. Its words grow with the text size up to the largest of the standard sizes, as far as a
 /// bar can and leave the page its room; at the accessibility sizes they hold there, and a long press shows a tab's symbol
@@ -133,6 +147,11 @@ struct MainTabs: View {
 /// (Phase 6) Requests' button carries its badge, the count of downloads on their way (RequestsModel.badgeCount, 0
 /// while deadwax can't be reached), and is read with it: "Requests, 2 arriving" (RequestWords.badgeLabel).
 struct AppTabBar: View {
+    /// The home indicator's room at the screen's foot (MainTabs reads it from the window).
+    let home: CGFloat
+    /// The play bar's and the tabs' height as drawn, the room under them not counted.
+    let measured: (CGFloat) -> Void
+
     @Environment(AppNavigation.self) private var navigation
     @Environment(PlayerModel.self) private var player
     @Environment(RequestsModel.self) private var requests
@@ -161,6 +180,13 @@ struct AppTabBar: View {
             .accessibilityElement(children: .contain)
             .accessibilityAddTraits(.isTabBar)
         }
+        .onGeometryChange(for: CGFloat.self) { (bar: GeometryProxy) -> CGFloat in
+            bar.size.height
+        } action: { (height: CGFloat) -> Void in
+            measured(height)
+        }
+        // into the home indicator's room, clear of it (TabBarFoot)
+        .padding(.bottom, CGFloat(TabBarFoot.below(home: home)))
         .frame(maxWidth: .infinity)
         .background {
             Palette.tabBar
@@ -171,6 +197,8 @@ struct AppTabBar: View {
             if !player.hasQueue { hairline }
         }
         .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
+        // the bar to the screen's edge, its tabs `below` off it
+        .ignoresSafeArea(.container, edges: .bottom)
     }
 
     /// A hairline of --dw-border: along the top with nothing queued, and between the play bar and the tabs.

@@ -10027,3 +10027,36 @@ Library as the only page hiding the navigation bar, and the four views that reac
 **Verified**: swift test, the unsigned Debug and Release device builds, check_project, npm run build, the sims and
 pytest. **Not verified** - only the phone can tell: the row clear of the island, the fill behind the status bar, Find
 and the banner under the row, at the normal and the largest text sizes (docs/ios.md check 249).
+
+## The tab bar, lower (15 Nov)
+
+James: "there might be a little too much space below the bottom tab bar". AppTabBar was an overlay inside the safe
+area, so on a Face ID iPhone the whole 34 points of the home indicator's room were under it, and each tab's 49 points
+(a 26-point symbol, 3 between, then the words, about 15 in Noto Sans's caption2 - about 2.5 points of slack under
+them) stood on top of that: the words' baseline about 40 points off the screen's edge. iOS's own bar before iOS 26 lays
+its items out the same way, over the whole 34.
+
+- **The number - 14 points down (Core's `TabBarFoot.drop`)**: the tabs' foot 20 points off the edge, so the words' line
+  is about 22 up and their baseline about 26. The home indicator is a 5-point bar about 8 points off the edge, its top
+  about 13 up: that leaves some 9 points of clear room between the words and it - clear at a glance, and the words no
+  longer floating. On a phone with a Home button (no such room, 0) the tabs keep 6 points off the edge
+  (`TabBarFoot.least`), where they had none.
+- **How**: AppTabBar ignores the container's bottom safe area itself, so it runs to the edge, and pads under its play bar
+  and tabs by `TabBarFoot.below(home:)`; its fill still runs to the edge. The home indicator's room is the key window's
+  bottom safe area (MainTabs's `home`), read from UIKit because a window's never counts the keyboard - a view's
+  safeAreaInsets would, and the bar would grow under the keyboard. The bar measures its play bar and tabs alone
+  (`measured`, before the padding), and `tabBarRoom` - the pages' room at their foot and the notice's lift, over the home
+  indicator's own - is `TabBarFoot.room(content:home:)`: that height and the room under it, less the home indicator's
+  (86 for a 100-point bar on a Face ID iPhone; 106 on an SE). So nothing sits under the bar, and its height follows the
+  text size as before.
+- **Unchanged**: the keyboard - the bar stays under it (`.ignoresSafeArea(.keyboard, edges: .bottom)`) and the pages make
+  no room for it meanwhile (`keyboardUp`); the bar's sizes and its tabs' look.
+
+**Tests**: TabBarFootTests (Core, 4): 20 on a Face ID iPhone, clear of the indicator, 6 with none (and nonsense), and the
+pages' room. `test_the_tab_bar_comes_down_into_the_home_indicators_room` (tests/test_ios_palette.py) holds the bar's
+padding and its own ignore, the measure before the padding, the room from TabBarFoot, the window's inset, and the
+keyboard's ignore and `keyboardUp`.
+
+**Verified**: swift test, the unsigned Debug and Release device builds, check_project, npm run build, the sims and
+pytest. **Not verified** - only the phone can tell: how the gap looks, the indicator clear of the words, the last rows
+and the notice over the bar, the keyboard, and an SE's margin (docs/ios.md check 250).

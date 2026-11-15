@@ -3590,6 +3590,20 @@ with Wi-Fi off. 237-243 want logins on, and 241 two accounts (one an admin); 244
   WireGuard: the offline banner shows under the row, not over it. Do it all again at the largest text size. If you
   can, try a phone with a notch, or an SE.
 
+### The tab bar, lower's check (250)
+
+**Not done yet.** This comes with the build that brings the tabs down into the home indicator's room (still app 0.13
+(13)).
+
+- **250 The room under the tabs.** On the iPhone 17 Pro, look at the tabs' words: they sit nearer the bottom edge
+  than before, with clear room between them and the home indicator - the indicator never touches or overlaps a
+  word, and the bar's colour still runs down to the very edge. Does the gap look right, or still too much (or now
+  too little)? Tap each tab near its foot: it opens. Scroll a long list to its end (an album, Your albums, Search's
+  results): the last row clears the bar, with no gap and nothing under it; Play Next a song: its notice sits just
+  over the bar. In Search, tap the field: the keyboard comes up over the bar, as before, and the bar is back in its
+  place once it goes. At the largest text size, the words still clear the home indicator. If you can, an SE: a small
+  margin under the words, not flush with the edge.
+
 ## What it can't do yet
 
 These are the web app's for now:
