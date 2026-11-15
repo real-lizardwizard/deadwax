@@ -8,12 +8,19 @@ import SwiftUI
 /// box as it changes under the finger (the .59 reviews). It never scrolls the page itself: `jump` does, to the
 /// entry's group, at once.
 ///
+/// A touch on it beats the list's momentum (notes/ios.md "The letter bar beats momentum"): at touch-down it stops the
+/// list where it is (`momentum`, the list's own UIScrollView stopped as a touch on the list would), then jumps. The
+/// strip is laid over the list, outside its scroll view, so the touch never stops the list by itself, and SwiftUI
+/// can drop a jump made while the list is still decelerating.
+///
 /// For VoiceOver each drawn entry is a button, "Jump to A" ... "Jump to numbers and symbols", "Jump to the 1990s",
 /// inside "Jump to" (ShelfIndex.tsx:167).
 struct ShelfIndexStrip: View {
     let entries: [ShelfIndex.Entry]
     /// decades ("1990"), wider than a letter
     let years: Bool
+    /// the list's momentum, stopped before a jump
+    let momentum: MomentumStop
     /// scroll to the group at this place among the groups
     let jump: (Int) -> Void
 
@@ -62,7 +69,11 @@ struct ShelfIndexStrip: View {
                 DragGesture(minimumDistance: 0, coordinateSpace: .local)
                     .onChanged { touch in
                         let held = press ?? Press(drawn: drawn, top: top, height: extent)
-                        if press == nil { press = held }
+                        if press == nil {
+                            // touch-down: the list stopped first, so the jump below takes
+                            press = held
+                            momentum.stop()
+                        }
                         guard let at = ShelfIndex.entryAt(held.drawn, y: Double(touch.location.y), top: held.top,
                                                           height: held.height),
                               at != under, entries.indices.contains(at) else { return }
@@ -93,7 +104,10 @@ struct ShelfIndexStrip: View {
                 .minimumScaleFactor(0.6)
                 .accessibilityLabel(entry.accessibility)
                 .accessibilityAddTraits(.isButton)
-                .accessibilityAction { jump(entry.group) }
+                .accessibilityAction {
+                    momentum.stop()
+                    jump(entry.group)
+                }
         case .dot:
             Circle()
                 .fill(Palette.accent.opacity(0.6))

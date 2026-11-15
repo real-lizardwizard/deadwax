@@ -10016,3 +10016,69 @@ drag never opens it), the fade, the full size landing without a jump, the pinch'
 stopping dead (rather than Photos' little spring), whether Now Playing shows through the fading ground as you drag
 (the clear presentation background says it should), VoiceOver's reading, and the music going on undisturbed
 (docs/ios.md checks 271-278).
+
+## The letter bar beats momentum (2026-11-15)
+
+James: "if the library is still scrolling by momentum, I can't use the letter bar on the right side. I'd like that
+seek bar to override the momentum." Flick Albums or Artists, touch the index while the list still glides: the tick
+came, but the list flew on as if it hadn't been touched.
+
+**The cause, found before fixing.** No Simulator here, so a probe: a Catalyst app built with swiftc
+(`-target arm64-apple-ios17.0-macabi`, scratch only, never committed) running the same SwiftUI and UIKit as iOS 27.2,
+with the app's shape - a ScrollView of 400 rows in a ScrollViewReader, a strip of the index's look as its
+`.overlay(alignment: .trailing)` with the same `DragGesture(minimumDistance: 0)`, and the Library's pager around it
+as a mode. It found the scroll views by walking up from inside the content, hit-tested the strip and the list
+(`hitTest(_:with:)` at each), swizzled UIScrollView's `setContentOffset:`, `setContentOffset:animated:` and its
+private stop methods to log who called what, and flung the list with UIKit's own private simulated scroll (a
+translation of 1,500 points over 0.06 s, as a finger's flick) before jumping to row 100 in the middle of the glide.
+Two things came out:
+
+1. **The strip's touch never reaches the list's UIScrollView.** The hit for a point on the strip was the hosting
+   view, with no scroll view anywhere in its chain; a point on the list had the list's. So the touch can't stop the
+   list as a touch on the list does (UIScrollView stops its own deceleration on a touch-down inside itself), and the
+   list can't swallow it either - the strip's gesture does run, which is why the tick came. (The pager mode looped
+   SwiftUI's layout on Catalyst, so the hit test is from the page alone; with the pager, the walk up from the content
+   met the list's own scroll view first, then the pager's - which is what the fix relies on.)
+2. **A ScrollViewReader jump during a deceleration is unreliable.** `proxy.scrollTo(100, anchor: .top)` made while
+   the list decelerated held in four flings of seven and was dropped in three (one of those a fling that only
+   bounced at the top): in the dropped ones SwiftUI never set the offset at all and the list glided on to 13,490 of
+   17,600 points. In the ones that held, SwiftUI had called UIKit's private stop itself - so whether it does is a race
+   with the deceleration's frame. The same fling stopped first with `setContentOffset(contentOffset, animated: false)`
+   - public, and UIKit's own way to end a deceleration (it calls the private stop with the delegate told, which the
+   `contentOffset` setter doesn't) - then jumped, landed on row 100 (4,359 = 4,400 less the inset) in seven of seven,
+   including from the very bottom.
+
+The phone was not probed: there is no touch injection to it from here, so whether iOS 27.2 on an iPhone races the
+same way is what check 279 asks. Catalyst's scroll view is iOS's, not AppKit's, so the cause should carry.
+
+**The fix**: `MomentumStop` (ios/App/Library/MomentumStop.swift). Each strip screen keeps one (`@State`), puts
+`.stopsMomentum(momentum)` on its ScrollView's content - a view of no size at the content's top, taking no touch and
+hidden from VoiceOver, that finds the nearest UIScrollView up its superviews (the list's own; the pager is further up)
+and holds it weakly - and hands it to `ShelfIndexStrip(momentum:)`. At touch-down, the first `onChanged` (press
+still nil), the strip calls `momentum.stop()` before reading the entry and jumping; VoiceOver's "Jump to" buttons do
+the same. `stop()` does nothing unless the list is decelerating and not being dragged, so a list at rest, or under
+another finger, is untouched. Everything else is the strip's as it was: entryAt over the strip as drawn at
+touch-down, the jump at once, the haptic tick per jump, the strip's own DragGesture, and the pull to shuffle on the
+same ScrollView. The only two uses of the strip are AlbumsScreen (grid and list, Title, Artist and the Year sorts) and
+ArtistsScreen.
+
+**Not taken**: putting the strip in a ZStack beside the list rather than over it (it already is outside the list - that
+is the cause, not the cure); `highPriorityGesture` or `simultaneousGesture` (nothing competes with the strip's
+gesture: it runs, and the tick proves it - the jump is what's lost); a UIKit gesture recognizer or touch surface under
+the strip (the probe showed one does become the hit view, but the touch already arrives, and it wouldn't make the
+jump stick); stopping by `isScrollEnabled` off and on (it also cancels a drag, and leaves the jump's race); and
+`scrollPosition(id:)` (iOS 17's, the same SwiftUI scrolling underneath, with no stop).
+
+**If the phone still loses the first touch** - no tick at all during a fling - the strip's SwiftUI gesture is what
+doesn't begin there, and the next step is a UIKit recognizer for the strip's touch-down, calling the same stop and jump.
+
+**Tests**: tests/test_ios_index_strip.py holds the stop at touch-down before the jump and in VoiceOver's action, the
+stop's guard and UIKit's own call, the finder (nearest scroll view, no size, no touch, hidden), every screen drawing the
+strip handing it its own list's stop from inside the ScrollView's content before the overlay, the pull to shuffle on
+the same ScrollView, and the strip's DragGesture, entryAt and tick as they were.
+
+**Verified**: the cause and the fix on the Catalyst probe (above); the unsigned Debug device build (no warnings); the
+source tests and the full pytest suite. **Not verified** - only the phone can tell: a touch on the strip during a real
+fling on Albums (grid and list) and Artists, and the Year sorts' decades - that it stops and jumps at once, with one
+tick; that a list at rest, the pull to shuffle, a touch on the list itself and VoiceOver's Jump to are as they were
+(docs/ios.md checks 279-281).

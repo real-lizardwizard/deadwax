@@ -294,7 +294,8 @@ On the Albums page:
   3012 albums". Each page keeps its own words in Find.
 - **The index** down the right edge, once a list has 50 albums or more: A to Z and # for Artist and
   Title, decades for the two Year orders. There's none for Recently added, or while you're finding.
-  Touch or slide along it to jump.
+  Touch or slide along it to jump - even while the list is still gliding from a flick: the touch stops it and
+  jumps.
 - **New** marks an album that came into your library and that you haven't opened yet, here or on the
   web app. Opening it clears the mark, on both.
 - **Tap an album** to open its page. Nothing plays from the Library itself, but the pull.
@@ -3608,6 +3609,23 @@ with Wi-Fi off. 237-243 want logins on, and 241 two accounts (one an admin); 244
   closes it, from the picture and from Close.
 - **278 The music.** Open, zoom and close the cover a few times while a song plays: the song plays on with no gap or
   glitch, and the lock screen and Control Center don't change.
+
+### The index during a fling's checks (279-281)
+
+**Not done yet.** These come with the build that lets the Library's index beat the list's momentum (still app 0.13
+(13)).
+
+- **279 Albums, mid-fling.** In Library > Albums, sorted by Title, flick the list hard so it glides. While it's still
+  moving, touch a letter on the index at the right: the list stops dead and is at that letter at once, with one tick.
+  Slide on along the index: it follows letter by letter, a tick each. Try it a few times, early in the glide and near
+  its end, and at the bottom of the list as it bounces. Does the first touch ever miss - a tick but no jump, or no tick
+  at all? The same in the grid and as a list (••• > **Show as list**). The index needs 50 albums or more.
+- **280 Artists, and the years.** The same in Library > Artists, ordered by Name. Then Albums ordered **Year, newest
+  first** and **Year, oldest first**: flick it and touch a decade: it stops and jumps there.
+- **281 At rest, and the rest.** With the list still, the index jumps as before. Pull down at the top: the pull to
+  shuffle still shuffles. Flick the list and touch the list itself (not the index): it stops where it is, as it always
+  has. Swipe back across the Library's pages: nothing changed. With VoiceOver, flick the list with three fingers and
+  double-tap a "Jump to" letter: it lands there.
 
 ## What it can't do yet
 
