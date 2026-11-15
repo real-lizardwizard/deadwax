@@ -8338,6 +8338,8 @@ the Done rows' state - is RequestsModel's in the app, read from useDownloadJobs.
 - **MainTabs**: the tab, `square.and.arrow.down`, its badge (`Text?`, nil at 0 - an empty string would draw an empty
   badge), the Label's accessibility label "Requests, 2 arriving"; `watching` from the scene, the tab, its stack's depth,
   Now Playing and the sign-in over the app, handed over with `onChange(initial: true)`, and `.hidden` as the tabs go.
+  (Since the squared look the tab is the app's own bar's, its badge and label on its button: "Requests on the app's
+  own tab bar" below.)
 - **AppNavigation**: `AppTab.requests`, the `requests` stack and `requestsScrollToTop`, in every switch.
 - **You**: GettingAlbumsSection, before Playback (the web's order) - the toggle, `@AppStorage` under the web's key.
 - **DeadwaxApp**: the model made after Search, `reachability.whenChanged` and `whenPersonChanges` wired, in the
@@ -8405,7 +8407,8 @@ Verified, on the tree before its commit:
 Not verified - only the phone can tell (docs/ios.md's checks 166-177, beside the spec's section 9):
 - Whether a 0.5 s poll keeps up over WireGuard, and what Requests left open costs the battery.
 - Whether the tab is read "Requests, 2 arriving": an accessibility label on a `.tabItem`'s Label isn't documented to
-  reach the tab bar, which may read the badge its own way.
+  reach the tab bar, which may read the badge its own way. (Moot since the merge below: the bar is the app's own, the
+  label its button's.)
 - Whether an announcement made as the List redraws is heard whole, and where VoiceOver's cursor is after a card moves
   or goes.
 - Whether a card's question opening and closing in a List row moves the rows around it at the largest text size.
@@ -8413,3 +8416,217 @@ Not verified - only the phone can tell (docs/ios.md's checks 166-177, beside the
 - The in-app pieces themselves - the loop's periods, the looks' tasks, a Done row's open left behind - have run only in
   the compiler: no Simulator is used here.
 - CI's Xcode 26.6 (the older Swift). The new code spells out its closures' types and keeps each `#expect` small.
+
+## The squared look (14 Nov)
+
+James, on his iPhone at app 0.11, in this order:
+
+- "the search bar is kinda in the way" (the Library's Find bar);
+- "let's put a magnifying glass button on the left side of the slider, and then maybe refine the slider size a
+  little so the top looks complete. maybe square off the slider and the bar at the bottom and the now playing bar as
+  well";
+- "as a matter of fact, let's square everything off a bit more, especially the album arts";
+- "but the search button and options button at the top can be circles".
+
+Fonts are being chosen apart from this, and nothing here changes one. Built on `square-look` from `ios` 3fc9a17.
+**The app stays 0.11 (11)**; src/__init__.py untouched; no server change; the engine files untouched (no playback
+change of any kind).
+
+### What changed
+
+- **One set of corners** (ios/App/Shared/Corners.swift): `art` 2, `card` 4, `control` 4, `track` 2, `fill` 1, with
+  their continuous shapes and `controlBorder` (a system button's `buttonBorderShape`). Every RoundedRectangle and
+  Capsule in ios/App is now one of them (the table below); test_ios_palette.py's
+  `test_every_corner_in_the_app_is_a_token` fails on a radius written anywhere else, a `Capsule()` or a `.capsule`,
+  and `test_every_system_bordered_button_is_squared` on a `.bordered` without `Corners.controlBorder` (iOS 26's
+  is a capsule).
+- **The Library's top** (LibraryView, new Library/LibraryTop.swift): the navigation bar is hidden on the pager, and
+  the Library draws its own top in a `safeAreaInset(edge: .top)`: Find's magnifying glass, the switch filling the
+  room between (`maxWidth: .infinity`), the ••• - 12 pt from the edges to the circles' 44 pt targets and 8 pt between
+  targets and switch, so the faces sit 16 pt in (the pages' gutter) with 12 pt either side of the switch. On
+  --dw-tab-bar, running up under the status bar, a hairline of --dw-border at its foot. `navigationTitle("Library")`
+  stays, for the back button of a page pushed over it. The Navidrome gate and the moment before the path is known
+  keep the system bar.
+- **The offline banner under that top, not over it**: an inset applied later sits above one applied earlier, and
+  TabStack applied the banner outside LibraryView. So TabStack takes `ownTop` (the Library's, true) and passes
+  `showsOfflineBanner(false)`; LibraryView applies the banner itself - on the pager inside its top's inset, and on
+  the gate, the spinner and the empty moment as before.
+- **Find, shown on demand**: the `.searchable` drawer (`displayMode: .always`) is gone from the Library's root. The
+  magnifying glass opens Find - its own TextField under the switch, for the page shown (`find(page)`, the prompt
+  `findPrompt(page)`), focused in a `.task` once it is drawn (a focus asked before the field exists is lost), the
+  keyboard up; tapped again while open, the field is focused again. Each page keeps its own words while it is open
+  (a swipe or the switch shows the next page's). **Cancel** (LibrarySwitchWords.cancelFind) hides it and clears
+  **every** page's words, not only the page shown's: the point is that a hidden Find never filters a list unseen, and
+  words typed on Albums before a swipe to Playlists would otherwise stay on Albums with no field showing them. The
+  keyboard's Search puts the keyboard away and leaves the words. A new person closes and clears it. The magnifying
+  glass's VoiceOver label is the page shown's own prompt ("Find in albums", "Find in playlists", ArtistWords' and
+  SongWords' findPlaceholder) - the app's existing words. All music's Artists/Albums/Songs, the Search tab, the EQ
+  picker and the pressing picker keep their `.searchable` bars.
+- **The switch, the app's own** (LibrarySwitchControl): iOS's segmented Picker can't be squared. The web's
+  `.app-segmented` / `.app-segment`: a 32 pt well (--dw-segmented) of --dw-well with a --dw-border edge and its inset
+  shade, segments 2 pt apart (--app-segment-gap), the chosen one --dw-toggled-bg under a --dw-toggled-border edge in
+  --dw-accent-text, the others --dw-text-2, footnote semibold; the well and the segment both `Corners.control` (the
+  web's segment is --dw-radius-tag, 3). Each segment is a Button with `.isSelected`; the whole is a `.contain`
+  element labelled "Library pages", as the Picker was. A segment's target reaches 6 pt above and below the well
+  (--app-segment-reach, a content shape of its own, never into the next segment). The chosen segment's tint slides
+  between segments (`matchedGeometryEffect`) on any change - a tap, or the pager settling after a swipe - with
+  `.snappy`, and moves at once under Reduce Motion; a tap moves the pager as the Picker's did (`withAnimation(.snappy)`
+  unless Reduce Motion). It follows the order kept, so Edit order reorders it.
+- **Playlists' + is the •••'s New playlist**: with a + on Playlists alone the switch would narrow on that page and the
+  top would be uneven again. Core's `LibraryMenuItem.newPlaylist(online:)` is the page's own section on Playlists
+  (as the orders are on Albums and Artists since question 26), dimmed while deadwax can't be reached, as the + was;
+  it opens the same sheet. The empty Playlists page keeps its own New playlist button.
+- **The circles** (CircleFace, ButtonFaces.swift): the secondary face (the look button's gradient, edge and top
+  highlight, turned over while pressed) drawn round, 36 pt in a 44 pt target. The ••• is a `Menu` with
+  `.menuStyle(.button)`, whose label takes the button style in use, its glyph `ellipsis` (it was `ellipsis.circle` in
+  the bar: a circle in a circle now).
+- **The tab bar, the app's own** (AppTabBar, MainTabs.swift): iOS's can't be reshaped (on iOS 26 and later it floats,
+  a glass capsule), so `.toolbar(.hidden, for: .tabBar)` on each tab's NavigationStack, its root and every page
+  pushed (appRoutes) - on all three, so no push brings it back - and AppTabBar is an overlay on the TabView's foot:
+  the tabs in one HStack, each its symbol (filled, as iOS's bar draws them) over its words, --dw-tab-item 49 tall,
+  --dw-tab-pad 4 above, --app-tab-side 8 either side, --app-tab-gap 3 between; the one shown --dw-accent, the others
+  --dw-tab-inactive; --dw-tab-bar under them running down under the home indicator; a hairline of --dw-border along
+  its top. The TabView stays, for each tab's state; a tap is `AppNavigation.select` (another tab, or back to the root
+  and then the top). **The tabs are one list**: `AppTab.allCases` draws the bar and MainTabs' `ForEach` builds the
+  stacks, each tab's words and symbol on AppTab, its stack in MainTabs' `stack(_:)` - Phase 6's Requests is one case
+  there (the compiler names every switch it must join).
+- **The keyboard**: the bar `.ignoresSafeArea(.keyboard)`, so it stays down under the keyboard as iOS's did. The
+  mini player still rides the keyboard (an overlay in the stack's safe area). MainTabs hears
+  keyboardWillShow/WillHide and, while it is up, sets `tabBarRoom` to 0: the player sits on the keyboard and the pages
+  make no room for a bar that's under it.
+- **The room at a page's foot**: `tabBarRoom` (the bar's height as drawn, above the home indicator - measured with
+  `onGeometryChange`, so it follows the text size) is an environment value from MainTabs; TabStack pads the player
+  overlay by it, and `playerClearance` is now the player's height (while drawn) plus it - so every list's last row,
+  and the Library's letter index (an overlay in the page's safe area), end above the mini player and the bar. With
+  nothing playing the room is the bar's alone.
+- **VoiceOver**: the bar is a `.contain` element with `.isTabBar`; each tab a button with its words, `.isSelected` on
+  the one shown. **Dynamic Type**: the bar's words and symbols grow up to `.xxxLarge` and hold there, and each tab
+  shows itself in the Large Content Viewer on a long press at the accessibility sizes (iOS's own bar grows less and
+  does the same).
+- **The mini player**: `Corners.card` (12 before), its cover `Corners.art` (6).
+
+### The switch at the largest text sizes (the fallback chosen)
+
+The segments' words are footnote semibold and grow with the text size up to **`.accessibility1`**, then hold (the
+switch's `dynamicTypeSize(...accessibility1)`); a title too long for its segment **shrinks to 70%**
+(`minimumScaleFactor(0.7)`), **then truncates at its end**; at the accessibility sizes a long press on a segment
+shows its title large (Large Content Viewer). The well grows from its 32 pt with the words. The two circles' glyphs
+grow up to `.xxxLarge` and hold, the faces a fixed 36 pt, each with the Large Content Viewer too. Why accessibility1:
+by then footnote is about 23 pt, so a 70% Playlists still fits a third of an iPhone's width less the circles; past
+it the top would take a fifth of the screen to say three words that the Large Content Viewer says better.
+
+### Corners, before and after
+
+| where | before | after |
+| --- | --- | --- |
+| the album page's, the playlist page's and the album you don't have's cover (the hero) | 10 | art 2 |
+| Now Playing's cover | 12 | art 2 |
+| the Library's tiles | 6 | art 2 |
+| rows' covers: albums, songs, playlists (and a playing song's shade), the picker's, an artist's and a MusicBrainz artist's albums, Search's rows and Top results' empty place, Downloads', Up Next's | 4 | art 2 |
+| Search's albums under a song | 3 | art 2 |
+| the mini player's cover, Up Next's playing card's, Info's album card's | 6 | art 2 |
+| the mini player | 12 | card 4 |
+| the notice (D11), Up Next's "loading earlier" | capsule | card 4 |
+| the first ask (Downloaded) | 12 | card 4 |
+| a list that couldn't be asked again, the sign-in's reason | 10 | card 4 |
+| the song you searched for, on its album's tracklist | 8 | card 4 |
+| the sign-in's fields, the pressing picker's button | 10 | control 4 |
+| the "In your library" badge | 6 | control 4 |
+| the maybe (dashed), a pressing's track mark, Up Next's Shuffle and Repeat, the EQ's held value and handle numbers | capsule | control 4 |
+| the New mark | 4 | control 4 |
+| `.bordered` buttons (Try again on lyrics and the EQ's two pickers, See All music, Keep them / Remove), Paste | iOS's own; Paste a capsule | control 4 (`buttonBorderShape`) |
+| the primary button and the secondary pill | 4 (PrimaryButton.radius) | 4, unchanged (= control) |
+| the switch's well and segments | iOS's segmented control | control 4 |
+| the Library's Find field | iOS's search bar | control 4 |
+| the EQ slider's track (4 pt wide) | capsule (2) | track 2 |
+| You > Downloads' bars: track, fill | 2, 1 | track 2, fill 1 |
+| the download control's stop square | 18% of its side (about 1.6) | fill 1 |
+| the tab bar | iOS's (a floating glass capsule on 26+) | square, full width |
+
+**Round, kept round**: the lyrics' and the letter index's dots, You's avatar, **artists' pictures** (a person's
+picture, as the web draws them - `is-round` - and in Search's one list the circle is what tells an artist's row from an
+album's; the brief's "every album or artist cover" was read as the album covers on an artist's page, and this is one
+line in ArtistPicture to change if James wants them square), the download rings, the EQ's knobs and handles, the
+pull's ring and disc, the Library's two circles. **The turntable's own**: TurntableFace.lookRadius (4) - the plinth's
+look button and Now Playing's speed chip - and its icons, as drawn; the scrubber was squared already (two Rectangles,
+"Now Playing's bar, squared off"). The app icon is untouched. **Not squared, iOS's own**: grouped Lists' and Forms'
+section corners (You, Up Next, Downloads, the EQ's pages), sheets, menus, alerts, the keyboard, and the system search
+bars named above - SwiftUI has no say over those short of redrawing them.
+
+### Where the phone departs from the web, on purpose
+
+theme.css's --dw-radius-cover is 3 and --dw-radius-card 6; the phone's art is 2 and its card 4 - James asked the phone
+to be squarer, and the web wasn't asked. test_ios_palette.py's `test_the_corners_are_the_squared_looks` holds that
+both are below the web's, and that control (4), track (2) and fill (1) are the web's own - control also
+PrimaryButton.radius, so the button test above stays truthful: the primary's corners didn't move. The switch's
+segment is control (4) where the web's is --dw-radius-tag (3), as the brief set. The tab bar and the switch take the
+web's colours and sizes, held by `test_the_apps_own_bars_are_the_webs` (and that iOS's bar is hidden in both places,
+and the bar has `.isTabBar`).
+
+### Tests
+
+- **LibrarySwitchTests**: the •••'s sections on Playlists (New playlist, online and not), its words and `enabled`,
+  `cancelFind`.
+- **tests/test_ios_palette.py** (4 new): the corners and the web's; no radius, capsule or unsquared `.bordered` left in
+  ios/App; the bars' colours and sizes from theme.css and app.css.
+
+### Verified, and not
+
+Verified, 14 Nov, on the Mac:
+- `swift test` through the wrapper: 12, 1518 and 158 tests, all passed.
+- The Debug and Release device builds (Xcode 27.2): succeeded, with no new warnings. The one warning is the
+  appintentsmetadataprocessor line, which was there before.
+- The .xcodeproj is unchanged; the two new files are in synchronized folders.
+- check_project.py: ok.
+- Node 22 `npm ci` and `npm run build`: ok.
+- Every sim (87): passed.
+- The full pytest: 4524 passed, 1 skipped.
+
+Nothing has been seen on a screen: no simulator was used.
+
+Not verified - only the phone can show (docs/ios.md's checks 200-209, numbered from 200 because Phase 6's are
+written at the same time after 165):
+- that iOS's tab bar stays hidden through pushes, pops and the swipe back on iOS 27, with no blank band where it was;
+- that the overlay bar sits flush with the bottom edge, its fill under the home indicator, and its height reaches
+  the pages (the letter index's foot, a list's last row) with the player and without;
+- the keyboard: that keyboardWillShow/WillHide arrive as the Library's Find, Search, Server address and a sheet's
+  field bring it up, and that the mini player then sits on it with no bar-sized gap under a list's end;
+- that a horizontal pager with the navigation bar hidden lays its pages out under the top inset as it did under the
+  bar, the pull still reading 0 at rest; that the field is focused with the keyboard up on the first tap;
+- that `.menuStyle(.button)` draws the ••• with CircleFace on iOS 27, and the circles' and switch's look beside the
+  web's; that the chosen segment slides, and doesn't under Reduce Motion;
+- Dynamic Type at the largest sizes (the switch's shrink and truncation, the Large Content Viewer) and VoiceOver's
+  reading of the bar, the switch and Find.
+
+## Requests on the app's own tab bar (2026-11-15)
+
+phase6-get merged ios at 90f4a13 (the squared look) after slice 1. The squared look draws its own tab bar
+(AppTabBar, MainTabs.swift) from `AppTab.allCases`, each case its `title` and `symbol`, and hides iOS's on every
+stack - so slice 1's `.tabItem` with `.badge(...)` and an accessibility label on its Label (the one way iOS's bar
+could carry them) went, and Requests became a case like the rest:
+
+- **AppTab.requests**: `RequestWords.tab`, `square.and.arrow.down`, between `.search` and `.you` (the web's order less
+  Home, question 1); MainTabs' `stack(_:)` gives it `TabStack(path: paths.requests) { RequestsScreen() }`.
+- **The badge** is drawn by AppTabBar on Requests' button alone: TabBadge, over the symbol's top right corner as the
+  web's .app-tab-badge - --app-tab-badge 16 (its height and narrowest, scaled with caption2), --app-tab-badge-pad 4 a
+  side, its left edge 2 right of the symbol's centre and its top 5 above the symbol's box (the web's 14 and -5 on its
+  24 icon), --dw-badge-purple-bg over --dw-tab-bar (Palette.badgeFill over Palette.tabBar, so no stroke of the symbol
+  shows through), a 1-point --dw-badge-purple-border edge (Palette.badgeEdge), --dw-accent-text in caption2 bold, a
+  control's corners (Corners.controlShape). None at 0, and none offline (`RequestsModel.badgeCount` is 0 then).
+- **What VoiceOver reads** is the button's own label now, "Requests, 2 arriving" (`RequestWords.badgeLabel`); the
+  badge itself is hidden from it. The Large Content Viewer shows the same words. That settles slice 1's open question
+  of whether a `.tabItem` Label's accessibility label reaches iOS's bar - it is no longer asked to.
+- **The watch** is unchanged: MainTabs still hands `watching` to RequestsModel with `onChange(initial: true)` and
+  `.hidden` as it goes.
+- **Corners**: RequestCover clips with `Corners.artShape` (it was 4, a cover's old corner); nothing else of slice 1
+  wrote a radius (the ✕'s and ▶'s faces are circles, round staying round).
+- **Room at the foot**: Requests' root is a TabStack's root, so its List takes `clearsPlayer()`'s inset of the
+  player's height plus `tabBarRoom` - its last card ends above both, as every tab's does. Pages pushed from it get
+  the same from `appRoutes()`.
+
+tests/test_ios_palette.py's `test_the_requests_badge_is_the_webs` holds the badge's colours to theme.css's, its sizes
+and place to app.css's tokens, and its drawing to Requests' button and label.
+
+Verified: swift test, a Debug device build, check_project, the sims and pytest (the merge commit's message has the
+numbers). Not verified: the badge's look beside the web's, its place at the largest text sizes, and VoiceOver's
+reading of it - checks 166 and 168 on the phone.

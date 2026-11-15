@@ -433,7 +433,7 @@ struct FirstAskCard: View {
             }
             .padding(14)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(Palette.toggledFill))
+            .background(Corners.cardShape.fill(Palette.toggledFill))
             .accessibilityElement(children: .contain)
             .padding(.bottom, 12)
         }
@@ -549,6 +549,7 @@ struct EmptyLibraryNote: View {
                 Text(LibraryWords.seeAllMusic)
             }
             .buttonStyle(.bordered)
+            .buttonBorderShape(Corners.controlBorder)
         }
         .fixedSize(horizontal: false, vertical: true)
         .padding(.top, 8)
@@ -570,7 +571,7 @@ struct RefreshProblemNote: View {
         }
         .padding(12)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color(white: 0.12), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .background(Color(white: 0.12), in: Corners.cardShape)
     }
 }
 

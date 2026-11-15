@@ -217,7 +217,7 @@ struct UpNextScreen: View {
                         if history.loading && !editing {
                             ProgressView()
                                 .padding(10)
-                                .background(.regularMaterial, in: Capsule())
+                                .background(.regularMaterial, in: Corners.cardShape)
                                 .padding(.top, 8)
                                 .accessibilityLabel(UpNextWords.loadingEarlier)
                         }
@@ -360,7 +360,7 @@ struct UpNextScreen: View {
         HStack(spacing: 12) {
             CoverImage(id: playing.coverArt, size: Self.playingCover)
                 .frame(width: Self.playingCover, height: Self.playingCover)
-                .clipShape(RoundedRectangle(cornerRadius: 6))
+                .clipShape(Corners.artShape)
             VStack(alignment: .leading, spacing: 2) {
                 let line = UpNextWords.songLine(artist: playing.artist, album: playing.album)
                 if line.isEmpty {
@@ -502,7 +502,7 @@ struct UpNextScreen: View {
         HStack(spacing: 12) {
             CoverImage(id: track.coverArt, size: Self.rowCover)
                 .frame(width: Self.rowCover, height: Self.rowCover)
-                .clipShape(RoundedRectangle(cornerRadius: 4))
+                .clipShape(Corners.artShape)
             text(track)
             Spacer(minLength: 0)
         }
@@ -693,8 +693,9 @@ private struct Chip: View {
                 .padding(.horizontal, 12)
                 .padding(.vertical, 8)
                 .foregroundStyle(on ? Color.black : Color.primary)
-                .background(on ? AnyShapeStyle(Palette.accent) : AnyShapeStyle(Color.primary.opacity(0.12)), in: Capsule())
-                .contentShape(Capsule())
+                .background(on ? AnyShapeStyle(Palette.accent) : AnyShapeStyle(Color.primary.opacity(0.12)),
+                            in: Corners.controlShape)
+                .contentShape(Corners.controlShape)
         }
         .buttonStyle(.borderless)
         .disabled(!enabled)

@@ -148,7 +148,7 @@ struct NowPlayingView: View {
                         Spacer(minLength: 12)
                         CoverImage(id: track.coverArt, size: 360)
                             .frame(maxWidth: 360)
-                            .clipShape(RoundedRectangle(cornerRadius: 12))
+                            .clipShape(Corners.artShape)
                             .shadow(color: .black.opacity(0.4), radius: 24, y: 12)
                             .scaleEffect(player.isPlaying ? 1 : Self.pausedScale)
                             .animation(.spring(response: 0.45, dampingFraction: 0.7), value: player.isPlaying)
@@ -295,6 +295,7 @@ struct NowPlayingView: View {
                     if tryAgain {
                         Button(LibraryWords.tryAgain) { lyrics.retry() }
                             .buttonStyle(.bordered)
+                            .buttonBorderShape(Corners.controlBorder)
                     }
                 }
                 .padding(.horizontal, 8)

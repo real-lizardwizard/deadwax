@@ -196,10 +196,10 @@ private struct PickerRow: View {
                         .foregroundStyle(Palette.accent)
                 }
                 .frame(width: LibraryRow.cover, height: LibraryRow.cover)
-                .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
+                .clipShape(Corners.artShape)
                 .accessibilityHidden(true)
             } else {
-                PlaylistCover(id: cover, side: LibraryRow.cover, pixels: CoverSize.row, corner: 4)
+                PlaylistCover(id: cover, side: LibraryRow.cover, pixels: CoverSize.row)
             }
             VStack(alignment: .leading, spacing: 2) {
                 Text(name)

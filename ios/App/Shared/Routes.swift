@@ -3,12 +3,35 @@ import Observation
 import SwiftUI
 
 /// The app's tabs (D1): Library, Search (Phase 5 - phase5-search.md 3.1, question 1: the web's order, You at the end),
-/// Requests (Phase 6 - phase6-get-requests.md 3.1, question 1: the web's order less Home) and You.
-enum AppTab: Hashable {
+/// Requests (Phase 6 - phase6-get-requests.md 3.1, question 1: the web's order less Home) and You. The one list of
+/// them: the tab bar draws `allCases` in this order and MainTabs builds a stack for each, so a tab is one case here,
+/// with its words and symbol below and its stack in MainTabs.
+enum AppTab: Hashable, CaseIterable {
     case library
     case search
     case requests
     case you
+
+    /// Its words in the tab bar, and to VoiceOver.
+    var title: String {
+        switch self {
+        case .library: return "Library"
+        case .search: return SearchWords.title
+        case .requests: return RequestWords.tab
+        case .you: return "You"
+        }
+    }
+
+    /// Its symbol in the tab bar (drawn filled, as iOS's tab bar draws them).
+    var symbol: String {
+        switch self {
+        case .library: return "square.stack"
+        case .search: return "magnifyingglass"
+        // the web's RequestsIcon: an arrow into an open box
+        case .requests: return "square.and.arrow.down"
+        case .you: return "person.crop.circle"
+        }
+    }
 }
 
 /// A page pushed on a tab's NavigationStack. Every page the parts add is a case here, drawn in `appRoutes()`.
@@ -368,8 +391,10 @@ final class AppNavigation {
 }
 
 extension View {
-    /// Every AppRoute's page, for a tab's NavigationStack - each given room at its foot for the player over it
-    /// (`clearsPlayer()`, MainTabs.swift), and the offline banner at its top (`showsOfflineBanner()`).
+    /// Every AppRoute's page, for a tab's NavigationStack - each given room at its foot for the player and the tab bar
+    /// over it (`clearsPlayer()`, MainTabs.swift), the offline banner at its top (`showsOfflineBanner()`), and iOS's own
+    /// tab bar kept hidden under the app's (the squared look: on the stack and on each page, so a push never brings it
+    /// back).
     func appRoutes() -> some View {
         navigationDestination(for: AppRoute.self) { route in
             Group {
@@ -392,6 +417,7 @@ extension View {
             }
             .clearsPlayer()
             .showsOfflineBanner()
+            .toolbar(.hidden, for: .tabBar)
         }
     }
 }

@@ -364,7 +364,7 @@ struct SongRow: View {
         return HStack(spacing: 12) {
             LibraryCover(id: song.coverArt, pixels: CoverSize.row)
                 .frame(width: LibraryRow.cover, height: LibraryRow.cover)
-                .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
+                .clipShape(Corners.artShape)
                 .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 1) {
                 Text(song.title ?? "")

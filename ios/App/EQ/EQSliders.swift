@@ -8,7 +8,7 @@ import UIKit
 /// - **The look**: ten columns sharing the width; in each a 4 pt track the full 200 pt in `barTrack` with a `barEdge`
 ///   hairline, a fill from the 0 dB mark to the knob in `accent`, and the knob - a 24 pt white circle with the iOS
 ///   slider's own shadow. A 1 pt line at 0 dB in `textTertiary` across all ten, "+12", "0", "-12" inside the first
-///   column, each band's name under it; while a knob is held, its value on a capsule above it (below it near the top,
+///   column, each band's name under it; while a knob is held, its value on a chip above it (below it near the top,
 ///   where above is off the row). Labels stop growing at `.xxxLarge`.
 /// - **A drag** takes hold wherever the knob is - a touch anywhere in a column grabs its knob without moving it - and
 ///   moves nothing until the finger has gone 6 pt up or down; then the knob follows the finger's movement, 24 dB over
@@ -177,9 +177,9 @@ private struct EQBandColumn: View {
         let knobY = top + track * EQSliderRules.place(gain)
         let zeroY = top + track / 2
         ZStack(alignment: .top) {
-            Capsule()
+            Corners.trackShape
                 .fill(Palette.barTrack)
-                .overlay(Capsule().strokeBorder(Palette.barEdge, lineWidth: 1 / max(displayScale, 1)))
+                .overlay(Corners.trackShape.strokeBorder(Palette.barEdge, lineWidth: 1 / max(displayScale, 1)))
                 .frame(width: 4, height: track)
                 .offset(y: top)
             Rectangle()
@@ -198,7 +198,7 @@ private struct EQBandColumn: View {
                     .fixedSize()
                     .padding(.horizontal, 6)
                     .padding(.vertical, 2)
-                    .background(Palette.barTrack, in: Capsule())
+                    .background(Palette.barTrack, in: Corners.controlShape)
                     // above the knob; below it near the top, where above is off the row
                     .offset(y: gain > 6 ? knobY + EQSliders.knob / 2 + 4 : knobY - EQSliders.knob / 2 - 24)
                     .allowsHitTesting(false)

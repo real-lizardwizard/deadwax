@@ -190,13 +190,18 @@ import Testing
                                                 scope: .yours, personal: true, online: true)
             #expect(sections.first == [.order(.albums), .layout(grid: true)], "nothing to shuffle: no Shuffle item")
         }
-        // (slice 4, question 26) each page's own: Artists' order alone, Playlists' + staying in the bar
+        // (slice 4, question 26) each page's own: Artists' order alone - and (the squared look) Playlists' New playlist,
+        // the bar's + until then, chosen only while deadwax can be reached
         let artists = LibraryMenu.sections(shuffle: .ready, page: .artists, grid: true, albumsPage: .albums,
                                            scope: .yours, personal: true, online: true)
         #expect(artists == [[.shuffle(.ready)], [.order(.artists)], [.downloaded, .allMusic], [.refresh, .editOrder]])
         let playlists = LibraryMenu.sections(shuffle: .ready, page: .playlists, grid: true, albumsPage: .albums,
                                              scope: .yours, personal: true, online: true)
-        #expect(playlists == [[.shuffle(.ready)], [.downloaded, .allMusic], [.refresh, .editOrder]])
+        #expect(playlists == [[.shuffle(.ready)], [.newPlaylist(online: true)], [.downloaded, .allMusic],
+                              [.refresh, .editOrder]])
+        let away = LibraryMenu.sections(shuffle: .downloads, page: .playlists, grid: true, albumsPage: .downloaded,
+                                        scope: .yours, personal: true, online: false)
+        #expect(away[1] == [.newPlaylist(online: false)], "offline: New playlist there, dimmed")
         // (slice 5) Songs has neither an order nor a layout: Navidrome's order is its one order
         let songs = LibraryMenu.sections(shuffle: .ready, page: .songs, grid: true, albumsPage: .albums,
                                          scope: .store, personal: false, online: true)
@@ -225,6 +230,11 @@ import Testing
         #expect(LibraryMenuItem.layout(grid: false).words(personal: true) == "Show as grid")
         #expect(LibraryMenuItem.refresh.words(personal: true) == "Refresh")
         #expect(LibraryMenuItem.editOrder.words(personal: true) == "Edit order")
+        #expect(LibraryMenuItem.newPlaylist(online: true).words(personal: true) == "New playlist")
+        #expect(LibraryMenuItem.newPlaylist(online: false).words(personal: false) == PlaylistWords.newPlaylist)
+        #expect(LibraryMenuItem.newPlaylist(online: true).enabled)
+        #expect(!LibraryMenuItem.newPlaylist(online: false).enabled, "not while deadwax can't be reached")
+        #expect(LibrarySwitchWords.cancelFind == "Cancel")
         let enabled = [LibraryMenuItem.shuffle(.ready), .shuffle(.downloads), .shuffle(.gettingReady), .shuffle(.failed("x")),
                        .downloaded, .refresh, .order(.artists), .layout(grid: true), .artists(.store), .allSongs].map(\.enabled)
         #expect(enabled == [true, true, false, false, true, true, true, true, true, true])

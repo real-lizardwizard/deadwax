@@ -201,18 +201,38 @@ app with deadwax's reason, Now Playing closes, and the music plays on underneath
 the same person carries on where you were. Signing in as someone else starts afresh: nothing of the
 first person's queue stays.
 
-The app has two tabs, **Library** and **You**. Tapping the tab you're on goes back to its first
-screen, or to the top of it. Once something is playing, the mini player sits just above the tabs,
-and every screen scrolls far enough for its last row to come up above it.
+The app has four tabs, **Library**, **Search**, **Requests** and **You**, along a bar at the foot of the screen:
+square, the full width, flush with the bottom edge, with a thin line along its top - as the web app's tab bar is.
+The tab you're on is purple. Requests carries a small purple count of the downloads on their way, as on the web
+app, and none when there are none. Tapping the tab you're on goes back to its first screen, or to the top of it.
+Once something is playing, the mini player sits just above the tab bar, and every screen scrolls far enough for
+its last row to come up above both. While the keyboard is up, the tab bar stays under it, and the mini player
+sits on the keyboard. VoiceOver reads the bar as a tab bar, the tab you're on as selected, and Requests with its
+count ("Requests, 2 arriving"); at the largest text sizes its words stop growing, and holding a finger on a tab
+shows it large.
+
+Everything is squarer since the build after app 0.11's Search (still 0.11): album covers have the smallest of
+corners, everywhere they're drawn - the album page, Now Playing, the tiles and the rows - and the mini player,
+the notices, cards, buttons and chips small square ones. Artists' pictures, the avatar, and the two buttons at the
+top of the Library stay round.
 
 ## The Library
 
 The Library opens on its pages, side by side: **Albums**, **Playlists**, **Artists** and - without a
-library of your own - **Songs**. The switch at the top - Albums | Playlists | Artists, and Songs where it's a
-page - picks one,
+library of your own - **Songs**. Along its top, evenly spaced: a round **magnifying glass** (Find - below), the
+switch - Albums | Playlists | Artists, and Songs where it's a page - filling the room between, and the round
+**•••**. The switch is square-cornered, the page you're on picked out in purple; tap a page to go to it,
 or swipe left and right between them, the switch moving with you. The Library opens on the first page each time the app
 starts, and when someone else signs in; after that it stays on the page you left it on. Tap the Library
 tab while you're on it, and the page goes back to its top. Nothing sits above the albums but their count.
+
+**Find** is hidden until you tap the magnifying glass: then its field comes up under the switch, for the page
+you're on ("Find in albums", "Find in playlists"...), with the keyboard up. Each page keeps its own words while
+Find is open - swipe to another page, or tap it on the switch, and the field shows that page's. **Cancel** puts
+Find away and clears the words of every page, so no page is ever left filtered with Find hidden. The keyboard's
+Search key puts the keyboard away and leaves the words. At the larger text sizes the switch's words grow up to a
+point and then hold; a page's name too long for its segment shrinks a little, then ends in "…", and holding a
+finger on it shows it large.
 
 With logins on, **Albums** is **Your albums**: the albums in your library, as the web app's Library has them
 ([sharing deadwax](sharing.md) says how an album gets there), and ••• > **All music** > **All albums** is
@@ -222,12 +242,13 @@ your albums (see [Artists](#artists)), and **Songs**, with logins off and for th
 song in the collection (see [Songs](#songs)). With logins on there's no Songs page: Navidrome can't list
 your library's songs alone, so every song is the collection's, under ••• > **All music** > **All songs**.
 
-**The •••** at the top right (VoiceOver reads it "More for the Library"):
+**The •••** at the top's right (VoiceOver reads it "More for the Library"):
 
 - **Shuffle**: your whole library, shuffled - see [Shuffling your library](#shuffling-your-library). Until
   it's ready it reads "Getting ready…", dimmed.
 - **The page's own**: on Albums, **Album order** (showing the one chosen - below) and **Show as list**
-  (or **Show as grid**); on Artists, **Artist order**. Playlists and Songs have none.
+  (or **Show as grid**); on Artists, **Artist order**; on Playlists, **New playlist** (dimmed while deadwax
+  can't be reached). Songs has none.
 - **Downloaded**: what's on this phone (below).
 - **All music**, with a library of your own: **All albums**, **All artists** and **All songs**, the whole
   collection's.
@@ -238,8 +259,9 @@ your library's songs alone, so every song is the collection's, under ••• >
   arranged them (Artists and Songs, for an order arranged before they came) joins at the end. With logins
   on, Songs isn't a page, so it isn't listed, and keeps its place for a sign-in without a library.
 
-Beside the ••• is Playlists' **+**, for [New playlist](#playlists), on that page. The orders and Grid or
-list moved into the ••• when Artists joined, so the four pages fit beside it.
+The orders and Grid or list moved into the ••• when Artists joined, so the four pages fit beside it; and
+Playlists' **+** became the •••'s [New playlist](#playlists) when the top got its magnifying glass, so the top
+is the same on every page.
 
 On the Albums page:
 
@@ -250,7 +272,7 @@ On the Albums page:
   start with a letter come last, under #), the month it was added ("Date unknown" when deadwax
   doesn't know), or the year ("No year"). In Your albums, Recently added means when the album came
   into your library; in All albums, when the collection got it. This phone remembers the order.
-- **Find**, under the switch, keeps the albums whose title or artist holds every word you type, in any
+- **Find** (the magnifying glass) keeps the albums whose title or artist holds every word you type, in any
   order and anywhere in a word ("eat" finds the Beatles). The count above the albums then says "12 of
   3012 albums". Each page keeps its own words in Find.
 - **The index** down the right edge, once a list has 50 albums or more: A to Z and # for Artist and
@@ -404,16 +426,16 @@ the Navidrome account deadwax uses:
 
 Each group is in Navidrome's order, by name, and shows only when it has playlists. The list is asked
 for each time the page comes into view, and when you come back to the app on it; ••• > Refresh asks now
-(a pull down [shuffles your library](#shuffling-your-library), as on Albums). **Find**, under the switch,
+(a pull down [shuffles your library](#shuffling-your-library), as on Albums). **Find** (the magnifying glass)
 keeps the playlists whose name holds every word you type, in any order, From files opened while it
 finds; with none, "No playlists match “…”." If deadwax can't be asked, it says "Couldn't list your
 playlists." and why - over the list as it was, or with **Try again** when there's no list to show.
 With none at all: "No playlists yet.", how to make one, and **New playlist**. **Tap a playlist** to
 open its page. Nothing plays from the list itself.
 
-**New playlist** is the **+** at the top of Playlists: type its name (up to 200 letters) and
-**Create**. It's made in Navidrome, as you, empty, and its page opens - add songs to it with **Add to a
-playlist…**. If it can't be made, the sheet stays open and says why.
+**New playlist** is in the Library's **•••** on Playlists (it was the **+** at the top): type its name (up
+to 200 letters) and **Create**. It's made in Navidrome, as you, empty, and its page opens - add songs to it
+with **Add to a playlist…**. If it can't be made, the sheet stays open and says why.
 
 **A playlist's page** is laid out as an album's:
 
@@ -569,7 +591,7 @@ for the break-glass `deadwax` sign-in, the page is **Artists**, the whole collec
   deadwax's own spelling of a name - "The" at the start, accents and case set aside - under letter headers,
   with names that don't start with a letter under # at the end. Most albums has no headers. This phone
   remembers the order.
-- **Find**, under the switch, keeps the artists whose name holds every word you type, in any order and
+- **Find** (the magnifying glass) keeps the artists whose name holds every word you type, in any order and
   anywhere in a word. The count then says "3 of 120 artists".
 - **The index** down the right edge for Name, once a list has 50 artists or more, as the albums' is.
 
@@ -617,7 +639,7 @@ and All artists, rather than a page among your own albums and artists.
   open its album's page, and play it from there - nothing plays from the list but the pull and Shuffle. Its
   **•••** is the song's own menu, as on an album's page: Play Next, Play Last, Add to a playlist…, and
   Download.
-- **Find**, under the switch (or All songs' own), asks Navidrome for the songs that match what you type -
+- **Find** (the magnifying glass, or All songs' own field), asks Navidrome for the songs that match what you type -
   by title, artist or album, as Navidrome's own search matches them - a moment after you stop typing. The
   songs come 100 at a time, so the phone can't look through the ones it hasn't fetched; Find here is
   Navidrome's search, not the other pages' filter. Nothing found says "No songs match “…”."
@@ -839,8 +861,8 @@ where it was in the list.
 
 ## Playing
 
-**The mini player**, above the tabs: the cover, the song and its artist, play/pause and next, and a
-thin line along it for how far in the song is. Tap it for Now Playing.
+**The mini player**, above the tab bar: the cover, the song and its artist, play/pause and next, and a
+thin line along it for how far in the song is - square-cornered, as its cover is. Tap it for Now Playing.
 
 **Now Playing**: the cover (a little smaller while paused), the song's title, and "artist — album"
 (tap it to go to the album). Under them:
@@ -2939,13 +2961,16 @@ same words. Check 175 wants logins on; the rest work either way. Getting an albu
 - **166 The tab.** The tabs read Library | Search | Requests | You, Requests' icon an arrow into a tray. Tap it:
   the heading Requests, and Clear done at the top right, dimmed with nothing to clear. With nothing ever asked
   for, "Nothing requested yet" and "Albums you get show here while they download, and once they've arrived - find
-  one in Search and tap Get." A spinner shows only until deadwax first answers.
+  one in Search and tap Get." A spinner shows only until deadwax first answers. With a long list and something
+  playing, scroll to its end: the last card clears the mini player and the tab bar.
 - **167 A download from the web app.** In the web app, Get an album. On the phone, Requests: its row under
   Waiting ("starting", or "4th in their queue"), then under Downloading with its cover, the bar and "3 of 11 files
   · 1.2 MB/s" - the web app's speed, within a moment. The data line doesn't jump as the speed comes and goes, at
   the largest text size too.
 - **168 The badge.** With the Library shown and something on its way, Requests' badge counts it - the web app's
-  count - and at 0 there's none. With VoiceOver, the tab reads "Requests, 2 arriving": note what it says if not.
+  count, a small purple square over the icon's top right corner, as on the web app's tab bar - and at 0 there's
+  none. At the largest text size it grows and stays clear of the tab's name. With VoiceOver, the tab reads
+  "Requests, 2 arriving": note what it says if not.
 - **169 Filed.** Let the download finish: under Done, "In your library · just now", and the badge goes. Search the
   album's words: it's yours ("In your library"), with no pull.
 - **170 Play from Done.** About 10 seconds after it's filed, tap **▶** on its Done row: the album plays from its
@@ -2976,6 +3001,47 @@ same words. Check 175 wants logins on; the rest work either way. Getting an albu
   way: does it keep up, and what does it cost the battery (Settings > Battery)? With VoiceOver on, watch a
   download move from Waiting to Downloading: "…: downloading" is heard, and VoiceOver stays where it was. Open and
   close a card's question at the largest text size: does the row jump?
+
+### The squared look's checks (200-209)
+
+**Not done yet.** These come with the build that squares the app off (still app 0.11 (11)). They start at 200,
+not 166: Phase 6's checks are being written at the same time and take the numbers after 165.
+
+- **200 The tab bar.** Square, the full width, flush with the bottom edge, a thin line along its top - no
+  floating capsule. The tab you're on is purple. Tap each tab; tap the one you're on: back to its first screen,
+  then to its top. Open an album and swipe back: the bar never moves or flickers, and iOS's own never shows.
+- **201 Above the bar.** With something playing, the mini player sits just above the bar, square-cornered, its
+  cover square; Play Next a song: the line above the mini player. Scroll to the end of an album, Your albums
+  (grid and list), Playlists, Artists and You: the last row clears the mini player and the bar, and the letter
+  index's last letter is above them. Nothing playing: the last row clears the bar, with no gap under it. Now
+  Playing opens over everything, the bar included.
+- **202 The keyboard.** In Search, tap the field: the keyboard comes up over the tab bar - the bar doesn't ride
+  up on it - and the mini player sits on the keyboard. Scroll the results to the end: the last row clears the
+  mini player, with no gap the bar's height above it. Put the keyboard away: the bar and the mini player are back
+  where they were. The same with the Library's Find and You > Server address.
+- **203 The Library's top.** On Albums: the round magnifying glass, the switch, the round •••, evenly spaced -
+  the switch filling the room - and no Find field. Swipe to Playlists and Artists: the same top, no **+**.
+  The switch's purple slides as you swipe and as you tap. Does the top look complete?
+- **204 Find.** Tap the magnifying glass: the field under the switch, "Find in albums", the keyboard up. Type:
+  the albums found. Swipe to Playlists: the field empty, "Find in playlists"; type there; swipe back: the albums'
+  words again. **Cancel**: the field goes, and every page shows everything (look at Playlists too). Open it again
+  and press the keyboard's Search: the keyboard goes, the words stay; tap the magnifying glass: the keyboard back.
+- **205 New playlist.** On Playlists, ••• > **New playlist**: the sheet the **+** opened, and Create opens the new
+  playlist's page. In Airplane Mode it's dimmed.
+- **206 Square corners.** The album page's cover, Now Playing's, the tiles and rows, Up Next's and Info's covers,
+  Search's rows: the smallest of corners. The mini player, the line over it, the first ask on Downloaded, the
+  sign-in's fields, the "In your library" badge, Up Next's Shuffle and Repeat, the EQ's held value, the Try again
+  buttons: small square corners, no round ends. Still round: artists' pictures, your initial on You, the download
+  rings, the EQ's knobs, the two buttons at the Library's top. The turntable as it was.
+- **207 VoiceOver.** The bar reads as a tab bar, each tab its name, the one you're on selected. The switch reads
+  "Library pages", each page a button, the one shown selected; the magnifying glass "Find in albums" (the page's
+  own words); the ••• "More for the Library"; then Find's field and **Cancel**.
+- **208 The largest text** (Settings > Accessibility > Display & Text Size > Larger Text, all the way up): the
+  tab bar's words stop growing; hold a finger on a tab: it shows large. The switch's names grow, then hold; one too
+  long for its segment shrinks a little, then ends in "…", and holding a finger on it shows it large. Nothing
+  overlaps, and every list still ends above the mini player and the bar.
+- **209 Reduce Motion** (Settings > Accessibility > Motion): a tap on the switch moves the page and its purple at
+  once, with no slide; Find comes and goes without sliding.
 
 ## What it can't do yet
 

@@ -5,14 +5,22 @@ import SwiftUI
 /// opening library to your albums", with a switch at the top - Albums | Playlists | Artists (slice 4) | Songs (slice 5,
 /// only where the collection is the Library: with a library of your own it is All music's All songs, question 32) -
 /// "and I would also like to be able to swipe left and right between them, and maybe a way to rearrange the order". So
-/// the bar holds the switch (a segmented control, the pages shown in the order kept on this phone, LibraryPages),
-/// Playlists' + on its page, and the Library's ••• (LibraryMenu: Shuffle; the page's own order, and Albums' Show as
-/// list or grid - in the ••• since slice 4, question 26, so three pages and more fit; Downloaded or the way back to the
-/// albums, All music's submenu - All albums, All artists, All songs; Refresh, Edit order); Find under it; and under them the pages
-/// side by side, a swipe moving between them as the switch does - each following the other. The Library opens on the
+/// the top holds the switch (the pages shown in the order kept on this phone, LibraryPages) and the Library's •••
+/// (LibraryMenu: Shuffle; the page's own order, and Albums' Show as list or grid - in the ••• since slice 4, question
+/// 26, so three pages and more fit - and Playlists' New playlist; Downloaded or the way back to the albums, All
+/// music's submenu - All albums, All artists, All songs; Refresh, Edit order); and under them the pages side by side, a
+/// swipe moving between them as the switch does - each following the other. The Library opens on the
 /// first page of the order, and on it again for a new person; after that, on the one last shown. Pulling a page down
 /// shuffles your library (2.8's PullShuffle; 3.5's graphic) - never refreshes: the Library refreshes itself as it
 /// shows, and the •••'s Refresh asks now.
+///
+/// THE TOP (the squared look, 14 Nov - LibraryTop): James, "the search bar is kinda in the way". The navigation bar is
+/// hidden on the pager and the Library draws its own top: Find's magnifying glass (a circle), the switch (the app's
+/// own, squared - LibrarySwitchControl) filling the room, the ••• (a circle); the offline banner under it. Find is
+/// shown only once the magnifying glass is tapped: its field under the switch for the page shown, focused, the
+/// keyboard up; each page keeps its own words while it is open, a swipe or the switch showing the next page's; Cancel
+/// hides it and clears every page's words, so a hidden Find never filters a list unseen. A new person closes it too.
+/// Playlists' + is the •••'s New playlist since, so the top is the same on every page.
 ///
 /// The Albums page is the Albums list of the person's scope - "Your albums" with a library of your own, "Albums" with
 /// logins off and for the break-glass admin - or, when a check finds deadwax has no Navidrome that answers, the Navidrome
@@ -54,6 +62,9 @@ struct LibraryView: View {
     /// The pager is moving: a finger on it, or settling (iOS 18's scroll phase; never on iOS 17, where `page` follows
     /// `scrolled` at once - at the swipe's halfway, the centre anchor's).
     @State private var paging = false
+    /// Find is open (the magnifying glass): its field under the switch, the page shown's words in it.
+    @State private var finding = false
+    @FocusState private var findFocused: Bool
     /// Each page's own words in Find.
     @State private var findAlbums = ""
     @State private var findPlaylists = ""
@@ -100,12 +111,10 @@ struct LibraryView: View {
                 if online { shown() }
             }
             .onChange(of: server.person) { _, _ in
-                // a new person opens on the first page, Find empty
+                // a new person opens on the first page, Find closed and empty
                 show(LibraryPages.first(shownOrder))
-                findAlbums = ""
-                findPlaylists = ""
-                findArtists = ""
-                findSongs = ""
+                finding = false
+                clearFind()
                 shown()
             }
             .onChange(of: library.scope) { _, scope in
@@ -148,6 +157,7 @@ struct LibraryView: View {
             // the moment before the phone's path is known: nothing drawn rather than the wrong list
             Color.clear
                 .navigationTitle("Library")
+                .showsOfflineBanner()
         case .downloaded:
             pager(albums: .downloaded)
         case .albums:
@@ -158,8 +168,11 @@ struct LibraryView: View {
                 ProgressView()
                     .controlSize(.large)
                     .accessibilityLabel(NavidromeGate.connecting)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .showsOfflineBanner()
             case .closed(let closed):
                 NavidromeGateView(closed: closed)
+                    .showsOfflineBanner()
             }
         }
     }
@@ -203,12 +216,12 @@ struct LibraryView: View {
         if let scrolled, scrolled != page { page = scrolled }
     }
 
-    /// The pages side by side under the switch, a swipe between them; Find, the bar and the ••• the switch's.
+    /// The pages side by side under the Library's own top (the squared look), a swipe between them; Find, the switch and
+    /// the ••• the top's, the navigation bar hidden; the offline banner between the top and the pages.
     private func pager(albums: AlbumList) -> some View {
         let order = shownOrder
         let can = shuffleCan
         let shownPage = self.shownPage
-        let online = reachability.online
         return ScrollView(.horizontal) {
             HStack(spacing: 0) {
                 // identified by the page itself, not its `id` string: scrollPosition(id:) matches the views' ids against
@@ -231,27 +244,17 @@ struct LibraryView: View {
             guard !paging, let now, now != page else { return }
             page = now
         }
+        // the title the pages pushed over it go back to; the bar itself is the Library's own top
         .navigationTitle("Library")
-        .navigationBarTitleDisplayMode(.inline)
-        .searchable(text: find(shownPage), placement: .navigationBarDrawer(displayMode: .always),
-                    prompt: Text(findPrompt(shownPage)))
-        .autocorrectionDisabled()
-        .textInputAutocapitalization(.never)
-        .toolbar {
-            ToolbarItem(placement: .principal) {
+        .toolbar(.hidden, for: .navigationBar)
+        // the banner under the top, not over it: TabStack leaves the Library's to it
+        .showsOfflineBanner()
+        .safeAreaInset(edge: .top, spacing: 0) {
+            LibraryTop(finding: finding, findLabel: findPrompt(shownPage), openFind: { openFind() }) {
+                findField(shownPage)
+            } switcher: {
                 switcher(order)
-            }
-            ToolbarItemGroup(placement: .topBarTrailing) {
-                // (slice 4, question 26) the order and the layout are the •••'s: only Playlists' + beside it
-                if shownPage == .playlists {
-                    Button {
-                        newPlaylist = PlaylistsPage.NewSheet()
-                    } label: {
-                        Image(systemName: "plus")
-                    }
-                    .disabled(!online)
-                    .accessibilityLabel(PlaylistWords.newPlaylist)
-                }
+            } more: {
                 more(albums: albums, can: can, page: shownPage)
             }
         }
@@ -305,22 +308,77 @@ struct LibraryView: View {
         }
     }
 
-    /// The switch: the pages in the order kept, its tap moving the page (at once under Reduce Motion).
+    // MARK: Find (the squared look)
+
+    /// Find's field under the switch, for the page shown - its own words, its own prompt - and Cancel. Typing finds as
+    /// it did in the bar's drawer; the keyboard's Search puts the keyboard away and leaves the words.
+    private func findField(_ page: LibraryPage) -> some View {
+        HStack(spacing: 8) {
+            HStack(spacing: 6) {
+                Image(systemName: "magnifyingglass")
+                    .foregroundStyle(Palette.quiet)
+                    .accessibilityHidden(true)
+                TextField(findPrompt(page), text: find(page), prompt: Text(findPrompt(page)))
+                    .focused($findFocused)
+                    .autocorrectionDisabled()
+                    .textInputAutocapitalization(.never)
+                    .submitLabel(.search)
+                    .onSubmit { findFocused = false }
+            }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 7)
+            .frame(minHeight: 36)
+            .background(Color(white: 0.14), in: Corners.controlShape)
+            .overlay(Corners.controlShape.strokeBorder(Color(white: 0.24)))
+            .task {
+                // focused once it is drawn: a focus asked before the field exists is lost
+                findFocused = true
+            }
+            Button(LibrarySwitchWords.cancelFind, action: closeFind)
+                .frame(minHeight: 44)
+        }
+    }
+
+    /// The magnifying glass: Find opened, focused, the keyboard up - or, open already, its field focused again.
+    private func openFind() {
+        if !finding {
+            if reduceMotion {
+                finding = true
+            } else {
+                withAnimation(.snappy) { finding = true }
+            }
+        }
+        findFocused = true
+    }
+
+    /// Cancel: Find hidden, and every page's words cleared - a hidden Find never filters a list unseen.
+    private func closeFind() {
+        findFocused = false
+        clearFind()
+        if reduceMotion {
+            finding = false
+        } else {
+            withAnimation(.snappy) { finding = false }
+        }
+    }
+
+    private func clearFind() {
+        findAlbums = ""
+        findPlaylists = ""
+        findArtists = ""
+        findSongs = ""
+    }
+
+    /// The switch (the app's own, squared - LibrarySwitchControl): the pages in the order kept, its tap moving the page
+    /// (at once under Reduce Motion).
     private func switcher(_ order: [LibraryPage]) -> some View {
-        Picker(LibrarySwitchWords.switchLabel, selection: Binding(get: { shownPage }, set: { (chosen: LibraryPage) in
+        LibrarySwitchControl(order: order, shown: shownPage) { (chosen: LibraryPage) -> Void in
             if reduceMotion {
                 show(chosen)
             } else {
                 withAnimation(.snappy) { show(chosen) }
             }
-        })) {
-            ForEach(order) { (each: LibraryPage) in
-                Text(each.title).tag(each)
-            }
         }
-        .pickerStyle(.segmented)
-        .fixedSize()
-        .accessibilityLabel(LibrarySwitchWords.switchLabel)
     }
 
     /// The Library's ••• (LibraryMenu, Core's): its sections, each item's words and whether it can be used now.
@@ -338,9 +396,16 @@ struct LibraryView: View {
                 }
             }
         } label: {
-            Image(systemName: "ellipsis.circle")
+            Image(systemName: "ellipsis")
         }
+        // a circle, as the magnifying glass is (CircleFace): the label takes the button style as a button menu's
+        .menuStyle(.button)
+        .buttonStyle(CircleFace())
+        .menuIndicator(.hidden)
         .accessibilityLabel(LibrarySwitchWords.more)
+        .accessibilityShowsLargeContentViewer {
+            Label(LibrarySwitchWords.more, systemImage: "ellipsis")
+        }
     }
 
     @ViewBuilder
@@ -358,6 +423,14 @@ struct LibraryView: View {
             } label: {
                 Label(words, systemImage: library.layout.switchSymbol)
             }
+        case .newPlaylist:
+            // (the squared look) the bar's + until then: the Playlists page's sheet
+            Button {
+                newPlaylist = PlaylistsPage.NewSheet()
+            } label: {
+                Label(words, systemImage: "plus")
+            }
+            .disabled(!item.enabled)
         case .downloaded:
             Button { navigation.open(.downloaded) } label: { Label(words, systemImage: DownloadWords.downloadSymbol) }
         case .albums, .artists, .allSongs:

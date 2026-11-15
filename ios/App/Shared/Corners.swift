@@ -1,0 +1,43 @@
+import SwiftUI
+
+/// The app's corners, one set for every screen (the squared look, 14 Nov - notes/ios.md "The squared look"). James, on
+/// app 0.11: "let's square everything off a bit more, especially the album arts". So every rounded rectangle in the app
+/// takes one of these, and nothing in ios/App writes a radius of its own (tests/test_ios_palette.py holds that):
+///
+/// - `art`: every cover - an album's, a playlist's, a song's - wherever it is drawn: the album and playlist pages' hero,
+///   Now Playing's cover, the tiles, the rows, the mini player's thumb, the cards of Up Next and Info.
+/// - `card`: what sits over the page or in it as a panel - the mini player, the notice, the first ask, a list that
+///   couldn't be asked again, the sign-in's reason, the song you searched for on its album.
+/// - `control`: what a finger takes - buttons (the primary and the secondary pill: PrimaryButton.radius, the web's
+///   --dw-radius-control, the same 4), chips, pills, badges, fields, the Library's switch and its segments.
+/// - `track` and `fill`: a bar's sunken track and the fill inside it (the web's --dw-radius-track and -fill).
+///
+/// Round stays round: dots, the avatar, artists' pictures, the rings, a slider's knob, the Library's two buttons at its
+/// top ("the search button and options button at the top can be circles"). The turntable keeps its own corners
+/// (TurntableFace.lookRadius - the plinth, the look button, the speed chip), and the app icon is left alone.
+///
+/// Against the web (theme.css section 10): the art is 2 where the web's --dw-radius-cover is 3, and a card 4 where its
+/// --dw-radius-card is 6 - the phone is squarer than the web on purpose, as James asked of the phone. Controls, tracks
+/// and fills are the web's own.
+enum Corners {
+    /// Covers.
+    static let art: CGFloat = 2
+    /// Panels, cards and the mini player.
+    static let card: CGFloat = 4
+    /// Buttons, chips, pills, fields, the switch.
+    static let control: CGFloat = 4
+    /// A bar's track.
+    static let track: CGFloat = 2
+    /// The fill inside a bar's track.
+    static let fill: CGFloat = 1
+
+    /// The shapes, drawn continuous as the app's corners always were.
+    static var artShape: RoundedRectangle { RoundedRectangle(cornerRadius: art, style: .continuous) }
+    static var cardShape: RoundedRectangle { RoundedRectangle(cornerRadius: card, style: .continuous) }
+    static var controlShape: RoundedRectangle { RoundedRectangle(cornerRadius: control, style: .continuous) }
+    static var trackShape: RoundedRectangle { RoundedRectangle(cornerRadius: track, style: .continuous) }
+    static var fillShape: RoundedRectangle { RoundedRectangle(cornerRadius: fill, style: .continuous) }
+
+    /// A system button's border (`.bordered`, PasteButton) squared to a control's.
+    static let controlBorder = ButtonBorderShape.roundedRectangle(radius: control)
+}

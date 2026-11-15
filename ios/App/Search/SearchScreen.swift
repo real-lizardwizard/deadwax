@@ -398,7 +398,7 @@ private struct DrawnSection: View {
 private struct TopPlace: View {
     var body: some View {
         HStack(spacing: 12) {
-            RoundedRectangle(cornerRadius: 4, style: .continuous)
+            Corners.artShape
                 .fill(Palette.coverEmpty)
                 .frame(width: LibraryRow.cover, height: LibraryRow.cover)
             Spacer()
@@ -819,7 +819,7 @@ struct SearchRowView: View {
         return HStack(spacing: 12) {
             ArchiveCover(addresses: ArchiveCoverID.addresses(release: nil, group: group), size: ArchiveCoverSize.row)
                 .frame(width: LibraryRow.cover, height: LibraryRow.cover)
-                .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
+                .clipShape(Corners.artShape)
             VStack(alignment: .leading, spacing: 1) {
                 Text(row.title)
                     .foregroundStyle(.primary)
@@ -985,7 +985,7 @@ struct SearchRowView: View {
         } else {
             LibraryCover(id: cover, pixels: CoverSize.row)
                 .frame(width: LibraryRow.cover, height: LibraryRow.cover)
-                .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
+                .clipShape(Corners.artShape)
                 .accessibilityHidden(true)
         }
     }
@@ -1074,7 +1074,7 @@ private struct SongDisclosure: View {
             HStack(spacing: 12) {
                 ArchiveCover(addresses: ArchiveCoverID.addresses(release: nil, group: named), size: ArchiveCoverSize.row)
                     .frame(width: LibraryRow.cover, height: LibraryRow.cover)
-                    .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
+                    .clipShape(Corners.artShape)
                 VStack(alignment: .leading, spacing: 1) {
                     Text(song.title)
                         .foregroundStyle(.primary)
@@ -1149,7 +1149,7 @@ private struct SongAlbumRow: View {
             HStack(spacing: 10) {
                 ArchiveCover(addresses: ArchiveCoverID.addresses(release: nil, group: album.id), size: ArchiveCoverSize.row)
                     .frame(width: Self.cover, height: Self.cover)
-                    .clipShape(RoundedRectangle(cornerRadius: 3, style: .continuous))
+                    .clipShape(Corners.artShape)
                 VStack(alignment: .leading, spacing: 1) {
                     Text(album.title)
                         .foregroundStyle(.primary)

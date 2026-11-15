@@ -17,7 +17,7 @@ struct RequestCover: View {
         let addresses = release.map { [ArchiveCoverID(.release, $0.lowercased())] } ?? []
         ArchiveCover(addresses: addresses, size: ArchiveCoverSize.row)
             .frame(width: size, height: size)
-            .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
+            .clipShape(Corners.artShape)
     }
 }
 

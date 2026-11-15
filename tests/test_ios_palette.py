@@ -144,3 +144,134 @@ def test_the_secondary_pill_turns_its_gradient_over_when_pressed():
     assert stops == ["secondaryFillBottom", "secondaryFillTop"], stops
     faces = (REPO / "ios" / "App" / "Shared" / "ButtonFaces.swift").read_text(encoding="utf-8")
     assert "pressed ? Palette.secondaryFillPressed : Palette.secondaryFill" in faces
+
+
+# The squared look (14 Nov, notes/ios.md "The squared look"). James, on the phone at app 0.11: "maybe square off the
+# slider and the bar at the bottom and the now playing bar as well" - "as a matter of fact, let's square everything off
+# a bit more, especially the album arts" - "but the search button and options button at the top can be circles". Every
+# corner in the app is one of ios/App/Shared/Corners.swift's; the phone's covers and cards are squarer than the web's on
+# purpose, its controls, tracks and fills the web's own.
+
+APP = REPO / "ios" / "App"
+CORNERS = APP / "Shared" / "Corners.swift"
+APP_CSS = REPO / "interface" / "player" / "app.css"
+
+
+def corner(name: str) -> float:
+    found = re.search(rf"static let {name}: CGFloat = ([0-9.]+)\n", CORNERS.read_text(encoding="utf-8"))
+    assert found, f"Corners has no {name}"
+    return float(found.group(1))
+
+
+def app_code() -> list[tuple[str, int, str]]:
+    # every line of the app's Swift with its comments taken off: (file, line number, code)
+    lines = []
+    for path in sorted(APP.rglob("*.swift")):
+        for number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
+            lines.append((str(path.relative_to(APP)), number, line.split("//", 1)[0]))
+    return lines
+
+
+def test_the_corners_are_the_squared_looks():
+    assert (corner("art"), corner("card"), corner("control"), corner("track"), corner("fill")) == (2, 4, 4, 2, 1)
+    # the controls, tracks and fills are the web's own - the primary button's corners among them (PrimaryButton.radius,
+    # held to --dw-radius-control above), so a button is the same shape on both
+    assert corner("control") == px(token(THEME_CSS, "dw-radius-control")) == swift_number("radius")
+    assert corner("track") == px(token(THEME_CSS, "dw-radius-track"))
+    assert corner("fill") == px(token(THEME_CSS, "dw-radius-fill"))
+    # the departure, on purpose: covers and cards squarer on the phone than the web's 3 and 6
+    assert corner("art") < px(token(THEME_CSS, "dw-radius-cover"))
+    assert corner("card") < px(token(THEME_CSS, "dw-radius-card"))
+
+
+def test_every_corner_in_the_app_is_a_token():
+    # no radius written in a view: a RoundedRectangle is Corners' own, the primary's (PrimaryButton.radius, the same as
+    # Corners.control) or the turntable's (TurntableFace.lookRadius - the plinth's look button and the speed chip)
+    kept = {"RoundedRectangle(cornerRadius: radius)", "RoundedRectangle(cornerRadius: CGFloat(TurntableFace.lookRadius))"}
+    left = []
+    for name, number, code in app_code():
+        if name == "Shared/Corners.swift":
+            continue
+        if re.search(r"cornerRadius:\s*[0-9]", code):
+            left.append(f"{name}:{number} a radius of its own")
+        for found in re.findall(r"RoundedRectangle\([^)]*\)+", code):
+            if found not in kept:
+                left.append(f"{name}:{number} {found}")
+        # nothing is a capsule: a pill is a control's rounded rectangle now
+        if re.search(r"\bCapsule\(\)|[(:]\s*\.capsule\b", code):
+            left.append(f"{name}:{number} a capsule")
+    assert not left, left
+    faces = (APP / "Shared" / "ButtonFaces.swift").read_text(encoding="utf-8")
+    assert "let radius = CGFloat(PrimaryButton.radius)" in faces
+
+
+def test_every_system_bordered_button_is_squared():
+    # SwiftUI's `.bordered` is a capsule on iOS 26 and later: each in the app takes a control's corners beside it
+    lines = app_code()
+    loose = []
+    for index, (name, number, code) in enumerate(lines):
+        if ".buttonStyle(.bordered)" in code:
+            following = " ".join(line for _, _, line in lines[index:index + 3])
+            if ".buttonBorderShape(Corners.controlBorder)" not in following:
+                loose.append(f"{name}:{number}")
+    assert not loose, loose
+
+
+def palette_rgb(name: str) -> tuple[int, int, int]:
+    palette = (APP / "DeadwaxApp.swift").read_text(encoding="utf-8")
+    found = re.search(rf"static let {name} = Color\(red: 0x([0-9A-F]{{2}}) / 255, green: 0x([0-9A-F]{{2}}) / 255, "
+                      rf"blue: 0x([0-9A-F]{{2}}) / 255\)\n", palette)
+    assert found, f"Palette has no {name}"
+    return int(found.group(1), 16), int(found.group(2), 16), int(found.group(3), 16)
+
+
+def test_the_apps_own_bars_are_the_webs():
+    # the tab bar (.app-tabbar) and the Library's top with its switch (.app-segmented): theme.css's colours
+    assert palette_rgb("tabBar") == hex_colour(token(THEME_CSS, "dw-tab-bar"))[:3]
+    assert palette_rgb("border") == hex_colour(token(THEME_CSS, "dw-border"))[:3]
+    assert palette_rgb("tabInactive") == hex_colour(token(THEME_CSS, "dw-tab-inactive"))[:3]
+    assert palette_rgb("text2") == hex_colour(token(THEME_CSS, "dw-text-2"))[:3]
+    assert token(THEME_CSS, "dw-well") == "rgba(0, 0, 0, 0.2)"
+    palette = (APP / "DeadwaxApp.swift").read_text(encoding="utf-8")
+    assert "static let well = Color.black.opacity(0.2)\n" in palette
+    # the tab bar's sizes: --dw-tab-item tall, --dw-tab-pad above, --app-tab-side either side, --app-tab-gap between
+    tabs = (APP / "Root" / "MainTabs.swift").read_text(encoding="utf-8")
+    assert f"private static let height: CGFloat = {px(token(THEME_CSS, 'dw-tab-item')):g}\n" in tabs
+    assert f"private static let pad: CGFloat = {px(token(THEME_CSS, 'dw-tab-pad')):g}\n" in tabs
+    assert f"private static let side: CGFloat = {px(token(APP_CSS, 'app-tab-side')):g}\n" in tabs
+    assert f"private static let gap: CGFloat = {px(token(APP_CSS, 'app-tab-gap')):g}\n" in tabs
+    # the switch's well, the gap between its segments and their reach past it
+    top = (APP / "Library" / "LibraryTop.swift").read_text(encoding="utf-8")
+    assert f"private static let well: CGFloat = {px(token(THEME_CSS, 'dw-segmented')):g}\n" in top
+    assert f"private static let gap: CGFloat = {px(token(APP_CSS, 'app-segment-gap')):g}\n" in top
+    assert f"private static let reach: CGFloat = {px(token(APP_CSS, 'app-segment-reach')):g}\n" in top
+    # iOS's own bar is hidden on every tab's stack and every page pushed, so it never comes back over the app's
+    routes = (APP / "Shared" / "Routes.swift").read_text(encoding="utf-8")
+    assert tabs.count(".toolbar(.hidden, for: .tabBar)") == 2 and ".toolbar(.hidden, for: .tabBar)" in routes
+    assert ".accessibilityAddTraits(.isTabBar)" in tabs
+
+
+def test_the_requests_badge_is_the_webs():
+    # (Phase 6) Requests' count on the app's tab bar, as app.css's .app-tab-badge: STYLE.md's purple badge laid over the
+    # bar's own colour, the accent's words, a control's corners, the web's sizes and its place over the icon's corner
+    assert token(THEME_CSS, "dw-badge-purple-bg") == "rgba(168, 85, 247, 0.16)"
+    assert token(THEME_CSS, "dw-badge-purple-border") == "rgba(192, 132, 252, 0.4)"
+    palette = (APP / "DeadwaxApp.swift").read_text(encoding="utf-8")
+    assert "static let badgeFill = Color(red: 168 / 255, green: 85 / 255, blue: 247 / 255).opacity(0.16)\n" in palette
+    assert "static let badgeEdge = Color(red: 192 / 255, green: 132 / 255, blue: 252 / 255).opacity(0.4)\n" in palette
+    assert palette_rgb("accentText") == hex_colour(token(THEME_CSS, "dw-accent-text"))[:3]
+    tabs = (APP / "Root" / "MainTabs.swift").read_text(encoding="utf-8")
+    badge = tabs[tabs.index("private struct TabBadge"):]
+    badge = badge[:badge.index("\n}\n")]
+    assert f"private var size: CGFloat = {px(token(APP_CSS, 'app-tab-badge')):g}\n" in badge
+    assert f"private static let pad: CGFloat = {px(token(APP_CSS, 'app-tab-badge-pad')):g}\n" in badge
+    assert f"private static let up: CGFloat = {-px(token(APP_CSS, 'app-tab-badge-top')):g}\n" in badge
+    icon, left = px(token(APP_CSS, "app-tab-icon")), px(token(APP_CSS, "app-tab-badge-left"))
+    assert f"private static let right: CGFloat = {left - icon / 2:g}\n" in badge
+    for drawn in ("Palette.accentText", "Palette.badgeFill", "Palette.tabBar", "Palette.badgeEdge",
+                  "Corners.controlShape"):
+        assert drawn in badge, drawn
+    # drawn on Requests' button alone, and read in its label
+    assert 'tab == .requests ? RequestWords.badgeText(requests.badgeCount) : ""' in tabs
+    assert "tab == .requests ? RequestWords.badgeLabel(tab.title, requests.badgeCount) : tab.title" in tabs
+    assert ".accessibilityLabel(spoken)" in tabs
