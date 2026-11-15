@@ -96,6 +96,7 @@ from src.config import Config  # noqa: E402
 from src.routes import eq as eq_route  # noqa: E402
 from src.routes import library as library_route  # noqa: E402
 from src.api import musicbrainz_endpoint  # noqa: E402
+from src.api import slskd_endpoint  # noqa: E402
 from src.routes import coverart as coverart_route  # noqa: E402
 from src.routes import download as download_route  # noqa: E402
 from src.routes import me as me_route  # noqa: E402
@@ -1689,18 +1690,43 @@ def test_you_getting_albums_is_read_as_the_preferences_route_sends_it():
 
 
 def test_the_app_waits_for_a_search_as_long_as_deadwax_does():
-    # a search: up to FORMER_NAMES_BUDGET_SECONDS looking up the artist's former names beside a first round of slskd's
-    # search, then a second round for a former name - each waited on for SLSKD_SEARCH_TIMEOUT (at most its range's
-    # top) + 17 s; the store's look may ask slskd how far a download has got; an enqueue asks slskd to queue it
+    # deadwax's longest search (find_candidates, slskd_endpoint's _run_searches), from the server's own numbers (slice 2's
+    # review, finding 3):
+    # - two rounds of slskd's search: the names the release carries, then a former name MusicBrainz gave within
+    #   FORMER_NAMES_BUDGET_SECONDS (a lookup beside the first round, counted whole);
+    # - every start waits its turn at SEARCH_GATE, up to SEARCH_TURN_SECONDS (a start stuck ahead of it holds the line
+    #   that long) - the first round's two names (the credit and the current one), the second's one former name;
+    # - each round's answers waited on for max_wait: SLSKD_SEARCH_TIMEOUT at its range's top, plus the route's allowance;
+    # - and beyond max_wait, which counts only its sleeps: slskd's state asked each half second, the answers fetched and
+    #   the searches deleted (ROUND_MARGIN a round), and the store's look before and the ranking after (MARGIN).
+    # An artist renamed more than once starts a search behind the gate for every name: deadwax bounds none of it as a
+    # whole, so this is the worst case of an artist renamed once.
+    ROUND_MARGIN, MARGIN = 15, 10
+    from src.config import SEARCH_TIMEOUT_RANGE
     text = (CORE / "Routes.swift").read_text(encoding="utf-8")
     literal = re.search(r"public static let timeouts: \[Endpoint: Double\] = \[([^\]]*)\]", text)
     timeouts = {name: float(seconds) for name, seconds in re.findall(r"(\w+): ([\d.]+)", literal.group(1))}
     source = inspect.getsource(download_route.find_candidates)
-    assert source.count("max_wait=timeout + 17") == 2
-    from src.config import SEARCH_TIMEOUT_RANGE
-    assert timeouts["findCandidates"] > 2 * (SEARCH_TIMEOUT_RANGE[1] + 17) + download_route.FORMER_NAMES_BUDGET_SECONDS
-    for name in ("storeState", "enqueue"):
-        assert timeouts[name] > 8, name
+    allowances = [int(found) for found in re.findall(r"max_wait=timeout \+ (\d+)", source)]
+    assert len(allowances) == 2, "a search is two rounds"
+    assert "for name in search_names(body.artist, body.album_artist)" in source
+    searches = inspect.getsource(slskd_endpoint.SlskdClient._run_searches)
+    assert "for query in queries:" in searches and "async with SEARCH_GATE.turn(query):" in searches
+    assert slskd_endpoint.SEARCH_GATE.bound == slskd_endpoint.SEARCH_TURN_SECONDS
+    starts = (2, 1)
+    worst = sum(count * slskd_endpoint.SEARCH_TURN_SECONDS + SEARCH_TIMEOUT_RANGE[1] + allowance + ROUND_MARGIN
+                for count, allowance in zip(starts, allowances)) + download_route.FORMER_NAMES_BUDGET_SECONDS + MARGIN
+    assert timeouts["findCandidates"] >= worst, f"{timeouts['findCandidates']} s, but deadwax may take {worst} s"
+    # and Routes.swift's account of it says the same number
+    assert f"{worst:g} s at worst" in " ".join(text.replace("///", " ").split())
+    # an enqueue: no bound on the server at all - the release's lock, then slskd's enqueue, which sets none of its own -
+    # so the phone gives it the search's, and an answer that never comes isn't a refusal (RequestOverlays.unanswered)
+    enqueue = inspect.getsource(download_route.enqueue)
+    assert "async with release_lock(" in enqueue and "wait_for" not in enqueue
+    assert "timeout" not in inspect.getsource(slskd_endpoint.SlskdClient.enqueue)
+    assert timeouts["enqueue"] == timeouts["findCandidates"]
+    # the store's look may ask slskd how far a download has got
+    assert timeouts["storeState"] > 8
     assert "preferences" not in timeouts
 
 

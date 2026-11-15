@@ -468,6 +468,12 @@ public enum RequestWords {
     public static let nextRefused = "No other source would send it."
     public static let retryBroke = "That didn't work."
     public static let enqueueBroke = "The download couldn't be started."
+    /// THE PHONE'S OWN (slice 2's review, finding 2): a Get whose answer never came, given up on after
+    /// RequestOverlays.unansweredSeconds - its line's state, and why, in place of a refusal's. deadwax puts no bound on
+    /// an enqueue, so it may well have started.
+    public static let noAnswer = "no answer"
+    public static let mayHaveStarted =
+        "deadwax didn't answer in time, so this may have started anyway. If it doesn't appear here soon, get it again."
 
     // You > Getting albums (ConfirmCancelChoice.tsx, You.tsx)
     public static let gettingAlbums = "Getting albums"
@@ -733,6 +739,12 @@ public enum RequestWords {
         let refused = pending.error != nil
         var row = RequestRow(key: pending.key, jobId: nil, section: refused ? .attention : .waiting,
                              title: titleOf(pending.album, nil), artist: pending.artist, album: pending.album)
+        if pending.mayHaveStarted {
+            //? the phone's own: no answer, not a refusal - so not said as one (RequestOverlays.gaveUp)
+            row.line = who(row.artist, pending.username, RequestWords.noAnswer)
+            row.reason = RequestWords.mayHaveStarted
+            return row
+        }
         if let error = pending.error {
             row.line = who(row.artist, pending.username, "didn't start")
             //? /enqueue's 409 is already_have's words, said as a retry's refusal is, the route's own kept

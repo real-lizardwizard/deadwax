@@ -66,6 +66,11 @@ final class SourcesSearch {
         return true
     }
 
+    /// The Get couldn't be asked at all (nothing was sent): another tap may ask it.
+    func downloadAgain() {
+        asked = false
+    }
+
     private func run(_ release: GetRelease, override: String, client: DeadwaxClient?, settings: GetSettingsModel) {
         stop()
         let number = runs

@@ -9182,6 +9182,8 @@ are in the synchronized App folder). ROUTE_COUNT 54 -> 58: `/download/store_stat
   slskd how far a download has got), `findCandidates` 180 s, `enqueue` 30 s; the preferences keep the default.
   180 s is above what deadwax may take: two rounds of slskd's search at SLSKD_SEARCH_TIMEOUT's top (60 s) plus its 17 s
   of bookkeeping each, and the 8 s it gives the former-names lookup - 162 s (test_the_app_waits_for_a_search...).
+  **Both were wrong, and are 300 s since the review** (below): the 162 s left out deadwax's search gate, and the
+  enqueue has no bound on the server at all.
 - **DeadwaxClient**: `storeState(_:)`, `findCandidates(_:)`, `enqueue(_:)` (a 409 is deadwax's "already downloading" or
   "already in your library", a 502 slskd's refusal, each thrown with its words) and `getSettings()`.
 
@@ -9316,7 +9318,7 @@ Verified, on the tree before its commit:
   passed.
 - The 12 mutations above, each caught.
 
-Not verified - only the phone can tell (docs/ios.md's checks 180-191):
+Not verified - only the phone can tell (docs/ios.md's checks 180-192):
 - Real slskd and real Soulseek: a search's answer, a refusal, an enqueue's - every slskd here is a fake, and Sources
   has been seen only against fakes (CLAUDE.md's Next up 2).
 - The sheet closing and the tab switching in `onDismiss` on a device: whether it reads as one movement, and whether
@@ -9328,3 +9330,126 @@ Not verified - only the phone can tell (docs/ios.md's checks 180-191):
 - The cards and the chips at the largest text sizes, and `ViewThatFits` choosing as intended.
 - The in-app pieces themselves have run only in the compiler: no Simulator is used here.
 - CI's Xcode 26.6 (the older Swift). The new code spells out its closures' types and keeps each `#expect` small.
+
+## Phase 6, slice 2's review (2026-11-15)
+
+Five findings, fixed on phase6-get after 41f62c6, in one commit. The review found the contract matching the server field
+for field and the vectors regenerating byte for byte.
+
+### 1. The Sources sheet ignored Reachability (high)
+
+The cards kept live Get buttons while deadwax was out of reach, and a Get then closed onto a Requests tab that, offline,
+shows only "Requests show once deadwax is back." - so whether the Get failed was never seen. Now the sheet reads
+Reachability:
+- out of reach, "Getting albums works once deadwax is back." (StoreLine.offline, the album page's own words) at the top
+  of whatever it shows, and announced as deadwax goes;
+- the cards found before dimmed (`Palette.dimmed`), and every card's Get off (`SourceCardView.gets`), as are Try again
+  and Search - and `get()` refuses in the tap too, so nothing hands over to Requests;
+- back in reach, all of it live again, and Search again is under the cards as ever;
+- a search that failed while deadwax was away (nothing answered, or not in time - `ErrorWords.kind` .offline or .timeout,
+  looked at only as deadwax comes back) searches again by itself.
+
+docs/ios.md said a sheet already searching "says it can't connect". It doesn't, at once: the request waits until
+URLSession gives up. The guide now says so, and check 188 asks it.
+
+### 2. The enqueue's 30 s was the phone's alone (high)
+
+deadwax puts no bound on `/download/enqueue`: it waits for the release's lock, then for slskd's enqueue (no timeout of
+its own), which answers once the peer is reached - and the web's fetch has no timeout. So a slow peer past 30 s left a
+refused "didn't start" row that never reconciled, beside the real job under Waiting. Now:
+- `Routes.timeouts[enqueue]` is the search's, 300 s (test_ios_contract holds them equal, and that the route and slskd's
+  enqueue still set no bound);
+- an answer that never came (`RequestOverlays.unanswered`: ErrorWords' .timeout class - URLSession's own, or a proxy's
+  408 or 504) isn't settled as refused: the row stays "starting…" (`stoppedWaiting`), and the poll keeps going for it
+  while nothing else is active (`looksForAJob`, in the poll's `hasActive`);
+- every poll looks for its job (`claimed`, before `reconcile`): a job not listed when the request was asked
+  (`PendingDownload.listedBefore`), for the same pressing (`releaseMbid`) - its own folder from its own peer first
+  (`directory`, `username`), else any (with logins on, the download deadwax joined it to). One job goes to one request,
+  and the row goes as an answer's would;
+- `RequestOverlays.unansweredSeconds` (600 s) after the tap with no job found, it is given up on (`gaveUp`): Needs
+  attention, "no answer", and RequestWords.mayHaveStarted - "deadwax didn't answer in time, so this may have started
+  anyway. If it doesn't appear here soon, get it again." Clear done takes it; a job showing later still claims it.
+
+The web has none of it (its request never times out), so it is held by hand: GetTests'
+`onlyAnAnswerThatNeverCameIsUnansweredRatherThanRefused`, `aGetWhoseAnswerNeverCameStaysStartingAndIsLookedFor`,
+`aPollFindsTheJobOfAnUnansweredGetByItsPressingAndFolder` and `givenUpOnAnUnansweredGetSaysItMayHaveStarted`.
+PendingDownload's four new fields are optional, so the web's vectors decode as before.
+
+### 3. The 180 s search timeout could be shorter than deadwax's worst case (medium)
+
+The 162 s left out the search gate - every start waits its turn at SEARCH_GATE, up to SEARCH_TURN_SECONDS (30 s) - and
+the time outside `_run_searches`' sleeps, which are all `max_wait` counts. The worst case, from the server's own
+numbers in test_the_app_waits_for_a_search_as_long_as_deadwax_does:
+- round one: two starts (the credit and the current name) behind the gate, 60 s, then max_wait (SLSKD_SEARCH_TIMEOUT's
+  top, 60, plus the route's 17) and 15 s of margin for slskd's state asked each half second, the answers fetched and the
+  searches deleted - 152 s;
+- round two: one former name's start, 30 s, then the same 77 + 15 - 122 s;
+- the former-names lookup, 8 s, counted whole though it runs beside round one; and 10 s for the store's look before and
+  the ranking after.
+
+That makes 292 s, and the phone's search is given 300 s. The test reads every number from the server: the gate's bound,
+the range's top, each round's `max_wait` allowance (two of them), the lookup's budget. It checks that the rounds are
+still each start behind the gate, and that Routes.swift's comment says "292 s at worst". It fails if any of them grows
+past 300. An artist renamed more than once starts a search behind the gate for every name; deadwax bounds none of it as
+a whole, so this is the worst case of an artist renamed once.
+
+### 4. Dynamic Type cut the facts short (low)
+
+`Fact`'s value was one line even in the one-over-another fallback, so "FLAC, MP3 VBR 128-320k" ended in "…" at the
+accessibility sizes. It now has the folder name's treatment: up to three lines at those sizes. ViewThatFits measures a
+text's one-line width whatever its limit, so which layout is chosen doesn't change. Check 190 asks for it.
+
+### 5. A Get could be dropped without a word (low)
+
+`RequestsModel.enqueue` returned quietly with no client, and the sheet still closed onto Requests. It now says whether
+the Get started (`-> Bool`, nothing laid down when it didn't). The sheet hands over only then; otherwise it stays, with
+the error in a listener's words ("Can't connect to deadwax.", ErrorNote with the downloads as its service), and another
+tap may ask again (`SourcesSearch.downloadAgain`).
+
+### Docs
+
+docs/ios.md's Getting an album:
+- the offline paragraph, rewritten (finding 1);
+- a paragraph on a Get whose answer doesn't come (finding 2);
+- the facts at the largest sizes (finding 4).
+
+Its checks:
+- 188 asks the sheet offline;
+- 190 asks the facts whole;
+- a new 192 asks a slow peer, if one comes along.
+
+The troubleshooting table has a "no answer" row.
+
+### Tests
+
+- GetTests: the four above, and the client's two times to answer (300 s each).
+- ClientTests: the times.
+- test_ios_contract.py: the search's worst case recomputed (finding 3), and the enqueue's.
+
+**Mutations**: each rule broken on purpose, the tests run, the rule put back. All were caught:
+1. `unanswered` taking an offline failure for no answer;
+2. `claimed` matching a job listed before the tap;
+3. `claimed` ignoring the pressing;
+4. `claimed` giving one job to two requests;
+5. `gaveUp` acting on a row still waiting for its answer;
+6. `looksForAJob` counting a refused row;
+7. the may-have-started row drawn as a refusal ("didn't start");
+8. the enqueue's timeout back to 30 s;
+9. SEARCH_TURN_SECONDS raised on the server (the contract test fails: the phone's 300 s no longer covers it).
+
+### Verified, and not
+
+Verified, on the tree before its commit:
+- `swift test`: Core 1606, Audio 158, Turntable 12. Its first run of the Get tests failed GetTests' two times to
+  answer (still 180 s and 30 s); fixed.
+- The unsigned Debug and Release device builds succeeded, with no warnings but the usual appintentsmetadataprocessor
+  line. The .xcodeproj is unchanged; `check_project.py` ok.
+- `npm run build` and all 89 sims.
+- The full pytest suite: 4550 passed, 1 skipped. After the last doc edits, the tests that read the docs, the iOS ones
+  and test_source_bytes were run again: 482 passed.
+- The 9 mutations above, each caught - the ninth on the server's own file, put back (src/ has no diff).
+
+Not verified - only the phone can tell:
+- whether a dimmed card and its dimmed Get read as "from before" (check 188);
+- what URLSession does with a search in flight as WireGuard drops - an error at once or only at 300 s;
+- a real slow peer (check 192): whether one ever takes long enough for any of this to show.

@@ -379,7 +379,7 @@ See notes/ios.md, "Phase 6, slice 1: Requests".
 ### Slice 2, built
 
 See notes/ios.md, "Phase 6, slice 2: Get and Sources". Search again with your own words (6.3) came with it: the web's
-sheet has it under folders found, and "Nothing found" had no way on without it. Its checks are docs/ios.md's 180-191.
+sheet has it under folders found, and "Nothing found" had no way on without it. Its checks are docs/ios.md's 180-192.
 
 ## 7. Tests
 

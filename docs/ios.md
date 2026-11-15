@@ -875,13 +875,24 @@ Needs attention, "didn't start", with why ("It's already downloading.", "It's al
 also hands deadwax the next sources in the list as you had it, for **Another source** if this one fails. **Cancel**,
 or the sheet swiped down, stops the search, in slskd too; Get the album again searches afresh.
 
+deadwax waits as long as it takes for the person sharing the album to be reached, and the phone waits up to five
+minutes for its answer. If none comes, the row isn't marked as failed - the download may well have started. It
+stays "starting…" while Requests looks for it, and is replaced by the download as soon as it shows. Only after ten
+minutes with nothing found does it move to Needs attention, "no answer", with "deadwax didn't answer in time, so
+this may have started anyway. If it doesn't appear here soon, get it again." **Clear done** takes it away.
+
 **Offline**, there's no Get the album, and "Getting albums works once deadwax is back." stands in the line's place
-(with Get albums). A sheet already searching says it can't connect, with **Try again**.
+(with Get albums). In a sheet already open, the same words stand at its top (VoiceOver says them as it happens).
+What it found stays, dimmed, and its **Get**, **Try again** and **Search** are off until deadwax is back - a Get then
+would close onto a Requests that can't show it. Once deadwax is back they're on again, and Search again is under the
+cards if you want a fresh search. A search still under way when deadwax went out of reach carries on waiting for its
+answer. If the phone gives up on it first, the sheet says why, then searches again by itself once deadwax is back.
 
 **VoiceOver** reads the line as one, and says what it now says as it changes. The sheet says each outcome as it lands
 ("Looking for “Dummy” by Portishead…", then "12 sources."). The score reads "92% match", collapsed or expanded, and a
 card's Get names its folder and who it's from ("Get Dummy [FLAC] from mellotron"), as one person often shares the
-same album twice. At the largest text sizes a card's facts go two by two, then one over another.
+same album twice. At the largest text sizes a card's facts go two by two, then one over another, each on up to three
+lines rather than cut short.
 
 ## Requests
 
@@ -3120,7 +3131,7 @@ one on the phone is checked from 180.
   foot, the mini player included; the badge sits clear of the mini player above it. Tap a Done row below the first
   five: its album opens; go Back and tap its ▶: it plays at once.
 
-### Get's checks, slice 2 (180-191)
+### Get's checks, slice 2 (180-192)
 
 **Not done yet.** These come with the build that adds Get - still **app 0.11 (11)**, the second part of Phase 6.
 Compare with the web app on the Mac, the same album and pressing open in both: the phone should say the same, in the
@@ -3162,19 +3173,25 @@ same words. Check 187 wants logins on; the rest work either way. Use an album yo
   downloading for someone else", the copy and how far it's got - the web app's words, without its Join.
 - **188 Offline.** On an album you don't have's page, turn Airplane Mode on: Get the album goes, and "Getting albums
   works once deadwax is back." stands in the line's place. Turn it off: the button is back, and the line is asked
-  again. Turn Airplane Mode on while the sheet searches: it says it can't connect, with **Try again**; turn it off and
-  tap Try again: it searches.
+  again. Open the sheet and wait for the cards, then turn Airplane Mode on: the same words at the sheet's top, the
+  cards dimmed, every Get dimmed - tap one: nothing happens, and Requests doesn't open. Turn it off: the cards and
+  their Gets are back. Turn Airplane Mode on while the sheet is still searching and leave it: once the phone gives up,
+  it says why; turn it off, and it searches again by itself.
 - **189 Only the newest answer.** On a slow connection, choose one pressing and then another quickly: the line never
   shows the first pressing's answer under the second. Open the sheet, Cancel, and Get the album again at once: only
   the second search's cards ever show.
 - **190 The largest text** (Settings > Accessibility > Display & Text Size > Larger Text, all the way up). Get the
   album reads whole; the line wraps rather than clips. In the sheet the chips scroll sideways, a card's facts go two
-  by two and then one over another, the reasons read whole, and every Get stays in reach. Nothing overlaps.
+  by two and then one over another, each fact read whole ("FLAC, MP3 VBR 128-320k" on two lines, not cut off with
+  "…"), the reasons read whole, and every Get stays in reach. Nothing overlaps.
 - **191 VoiceOver.** On the album's page, the line reads as one, and when it changes (Get something, come back) its
   new title is heard. In the sheet, "Looking for “…” by …" is heard, then "12 sources." (or why there are none). A
   score reads "92% match, collapsed", and double-tapping it reads expanded, the reasons after it. A card's Get reads
   "Get <folder> from <who>", and the chips' row "Filter the sources", the sort "Sort the sources". Note what it says
   if not.
+- **192 A slow peer.** (Only if you come across one: a Get whose peer takes minutes to answer.) Its row stays under
+  Waiting, "starting…", however long deadwax takes, and becomes the download when it shows - never "didn't start"
+  beside it. Note how long it took.
 
 ### The squared look's checks (200-209)
 
@@ -3348,6 +3365,7 @@ These are the web app's for now. Most of them come to the phone in the next phas
 | Choose a source: **"slskd is not connected to the Soulseek network, so it cannot search"** (or **"Downloads aren't working right now."**), with **Try again** | slskd isn't logged in to Soulseek, or deadwax can't reach slskd. Whoever runs deadwax checks You > Connections in the web app - [troubleshooting](troubleshooting.md#a-search-fails-with-not-logged-in-or-slskd-refused-it) has the rest - then **Try again**. |
 | Choose a source: **'Nothing lossless found for “…”.'** | Your Format is Lossless only, which leaves out every copy that isn't. Change it in the web app's You > Getting albums, or **Search again** with other words. |
 | A Get's row under Needs attention says **"didn't start"** and **"It's already downloading."** (or **"…already in your library."**) | It was got - by you elsewhere, or by someone else - after the sheet searched. It's already in Requests, or already yours; **Clear done** takes the refused row away. |
+| A Get's row under Needs attention says **"no answer"** and **"deadwax didn't answer in time, so this may have started anyway."** | The person sharing it took more than ten minutes to be reached, or deadwax was stuck. Look under Waiting and Downloading - it may be there - and if it isn't, get it again. **Clear done** takes the row away. |
 | An album you don't have says **"Getting albums is off for you - ask an admin."** where Get the album goes | With logins on, an admin gives **Get albums** in the web app's People. Open You afterwards, so the phone asks deadwax again. |
 | An album stays on **"Waiting for Wi-Fi"** | Download over is Wi-Fi only (You > Downloads): join a Wi-Fi network that isn't a phone's hotspot, with Low Data Mode off - or choose Wi-Fi and cellular. |
 | **"Waiting for room - the storage limit is reached"** | Raise the Storage limit in You > Downloads, or remove something there (largest first). |

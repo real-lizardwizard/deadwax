@@ -12,12 +12,16 @@ import SwiftUI
 ///   (green), their usual speed, or none reported yet.
 /// - Then Tracks (amber when tracks are missing), Quality, Size and Starts (green "now", amber while it waits), side by
 ///   side - two by two, or one over another, where the text is too large for that - and what it is missing, in amber.
+/// - While deadwax can't be reached (`gets` false), the card is dimmed - found before - and its Get is off (slice 2's
+///   review, finding 1).
 /// - WHY IT SCORED WHAT IT DID, behind a tap on the score (a phone's, as the web's sheet has it): the edition words in
 ///   the folder's name in their colours, and each signal's chip with what it measures beside it. Last on the card, so
 ///   opening it moves nothing above; the chevron turns.
 struct SourceCardView: View {
     let candidate: Candidate
     let best: Bool
+    /// Its Get can be asked: deadwax is in reach.
+    let gets: Bool
     let onGet: () -> Void
 
     @State private var open = false
@@ -43,6 +47,7 @@ struct SourceCardView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(Palette.card, in: Corners.cardShape)
         .overlay(Corners.cardShape.strokeBorder(best ? Palette.best : Palette.border))
+        .opacity(gets ? 1 : Palette.dimmed)
     }
 
     // MARK: the top line
@@ -96,10 +101,12 @@ struct SourceCardView: View {
         if best {
             Button(SourcesWords.get, action: onGet)
                 .buttonStyle(PrimaryFace())
+                .disabled(!gets)
                 .accessibilityLabel(SourcesWords.getLabel(candidate))
         } else {
             Button(SourcesWords.get, action: onGet)
                 .buttonStyle(TintedFace())
+                .disabled(!gets)
                 .accessibilityLabel(SourcesWords.getLabel(candidate))
         }
     }
@@ -224,12 +231,17 @@ struct SourceCardView: View {
     }
 }
 
-/// One of a card's facts: its label over its value, read as one.
+/// One of a card's facts: its label over its value, read as one - the value on one line, as the folder's name is, and
+/// on up to three at the accessibility sizes (slice 2's review, finding 4: "FLAC, MP3 VBR 128-320k" in the one-over-
+/// another fallback). ViewThatFits measures a text's one-line width whatever its limit, so the side-by-side layouts are
+/// chosen as before.
 private struct Fact: View {
     let label: String
     let value: String
     let mono: Bool
     let colour: Color
+
+    @Environment(\.dynamicTypeSize) private var typeSize
 
     var body: some View {
         VStack(alignment: .leading, spacing: 2) {
@@ -239,7 +251,7 @@ private struct Fact: View {
             Text(value)
                 .font(mono ? Typeface.mono(.footnote) : Typeface.footnote)
                 .foregroundStyle(colour)
-                .lineLimit(1)
+                .lineLimit(typeSize.isAccessibilitySize ? 3 : 1)
         }
         .accessibilityElement(children: .combine)
     }

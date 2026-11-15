@@ -159,11 +159,11 @@ import Testing
         #expect(try sentJSON(transport.last)["release_mbid"] == .string("r-cd"))
 
         _ = try await deadwax.findCandidates(FindCandidatesBody(release: release, format: .preferLossless, queryOverride: "Third"))
-        #expect(transport.last?.method == "POST" && transport.last?.timeout == 180)
+        #expect(transport.last?.method == "POST" && transport.last?.timeout == 300)
         #expect(try sentJSON(transport.last)["query_override"] == .string("Third"))
 
         let queued = try await deadwax.enqueue(EnqueueBody(candidate: Self.candidate("bob", "Third"), release: release, shown: []))
-        #expect(queued.jobId == 9 && transport.last?.timeout == 30 && transport.last?.url.path == "/deadwax/download/enqueue")
+        #expect(queued.jobId == 9 && transport.last?.timeout == 300 && transport.last?.url.path == "/deadwax/download/enqueue")
 
         let settings = try await deadwax.getSettings()
         #expect(settings == GetSettings(mode: .pick, floor: .lossless, format: .any))
@@ -225,5 +225,101 @@ import Testing
         #expect(SourcesWords.percent(92) == "92%")
         #expect(SourcesWords.match(7) == "7% match")
         #expect(SourcesWords.reasons(100) == "Why it's a 100% match")
+    }
+
+    // MARK: a Get whose answer never came - the phone's own (slice 2's review, finding 2)
+
+    /// A Get for Third's CD from bob, asked with jobs 1 and 2 listed.
+    static let asked = PendingDownload(key: "pending-1", artist: "Portishead", album: "Third", username: "bob",
+                                       releaseMbid: "r-cd", directory: "Portishead\\Third (CD)", listedBefore: [1, 2])
+
+    @Test func onlyAnAnswerThatNeverCameIsUnansweredRatherThanRefused() {
+        let server = ServerAddress(base: URL(string: "http://deadwax.test:8080")!)
+        let none = APIFailure.NoAnswer(server: server, method: "POST", path: "/download/enqueue", reason: "timed out")
+        func answered(_ status: Int) -> APIFailure {
+            .answered(.init(status: status, method: "POST", path: "/download/enqueue", detail: "already downloading from bob"))
+        }
+        #expect(RequestOverlays.unanswered(APIFailure.timeout(none)))
+        #expect(RequestOverlays.unanswered(URLError(.timedOut)))
+        //? a proxy between that gave up: deadwax may still be waiting on slskd
+        #expect(RequestOverlays.unanswered(answered(504)))
+        #expect(RequestOverlays.unanswered(answered(408)))
+        //? never sent, or refused: no download started
+        #expect(!RequestOverlays.unanswered(APIFailure.offline(none)))
+        #expect(!RequestOverlays.unanswered(answered(409)))
+        #expect(!RequestOverlays.unanswered(answered(502)))
+        // and the phone waits for it as long as for a search (deadwax puts no bound on it)
+        #expect(Routes.timeouts[Routes.enqueue] == Routes.timeouts[Routes.findCandidates])
+    }
+
+    @Test func aGetWhoseAnswerNeverCameStaysStartingAndIsLookedFor() {
+        let waiting = RequestOverlays.none.withPending(Self.asked).stoppedWaiting("pending-1")
+        #expect(waiting.pending.first?.unanswered == true && waiting.pending.first?.error == nil)
+        #expect(waiting.looksForAJob)
+        #expect(waiting.activeCount([]) == 1)
+        let view: RequestsView = RequestsView.make(RequestsInput(pending: waiting.visiblePending([])), now: 0)
+        let row = view.rows(.waiting).first
+        #expect(row?.line == "Portishead \u{00B7} from bob \u{00B7} starting\u{2026}")
+        #expect(view.rows(.attention).isEmpty)
+        // an answer still in hand isn't looked for, nor given up on; a refused one isn't made to wait
+        let asking = RequestOverlays.none.withPending(Self.asked)
+        #expect(!asking.looksForAJob)
+        #expect(asking.gaveUp("pending-1") == asking)
+        let refused = RequestOverlays.none.withPending(Self.asked)
+            .settlePending("pending-1", .refused(error: "It's already downloading.", detail: nil))
+        #expect(refused.stoppedWaiting("pending-1") == refused)
+        #expect(refused.gaveUp("pending-1") == refused)
+    }
+
+    @Test func aPollFindsTheJobOfAnUnansweredGetByItsPressingAndFolder() {
+        let waiting = RequestOverlays.none.withPending(Self.asked).stoppedWaiting("pending-1")
+        let before = DownloadJob(id: 2, status: "failed", username: "bob", directory: "Portishead\\Third (CD)",
+                                 releaseMbid: "r-cd")
+        let other = DownloadJob(id: 7, status: "queued", username: "bob", directory: "Portishead\\Dummy",
+                                releaseMbid: "r-dummy")
+        let joined = DownloadJob(id: 8, status: "downloading", username: "carol", directory: "Third [FLAC]",
+                                 releaseMbid: "r-cd")
+        let own = DownloadJob(id: 9, status: "queued", username: "bob", directory: "Portishead\\Third (CD)",
+                              releaseMbid: "r-cd")
+        //? listed before the tap, or another pressing: not its job
+        #expect(waiting.claimed([before, other]) == waiting)
+        // its own folder from its own peer first, then the row goes as an answer's would
+        let found = waiting.claimed([before, other, joined, own])
+        #expect(found.pending.first?.jobId == 9)
+        #expect(found.visiblePending([before, other, joined, own]).isEmpty)
+        #expect(found.reconcile([before, other, joined, own]).pending.isEmpty)
+        #expect(!found.looksForAJob)
+        // else a new download of the same pressing - with logins on, the one deadwax joined it to
+        #expect(waiting.claimed([before, joined]).pending.first?.jobId == 8)
+        // one job goes to one request
+        var second = Self.asked
+        second.key = "pending-2"
+        let two = waiting.withPending(second).stoppedWaiting("pending-2").claimed([own])
+        #expect(two.pending.compactMap(\.jobId) == [9])
+        // a request still waiting for its answer, or with no pressing to go by, is left to its answer
+        #expect(RequestOverlays.none.withPending(Self.asked).claimed([own]).pending.first?.jobId == nil)
+        var unknown = Self.asked
+        unknown.releaseMbid = nil
+        #expect(RequestOverlays.none.withPending(unknown).stoppedWaiting("pending-1").claimed([own]).pending.first?.jobId == nil)
+    }
+
+    @Test func givenUpOnAnUnansweredGetSaysItMayHaveStarted() {
+        let given = RequestOverlays.none.withPending(Self.asked).stoppedWaiting("pending-1").gaveUp("pending-1")
+        #expect(given.pending.first?.mayHaveStarted == true)
+        #expect(!given.looksForAJob)
+        #expect(given.activeCount([]) == 0)
+        let view: RequestsView = RequestsView.make(RequestsInput(pending: given.visiblePending([])), now: 0)
+        let row = view.rows(.attention).first
+        #expect(row?.line == "Portishead \u{00B7} from bob \u{00B7} no answer")
+        #expect(row?.reason == RequestWords.mayHaveStarted)
+        #expect(RequestWords.mayHaveStarted.contains("may have started"))
+        #expect(view.clearable)
+        #expect(given.withoutRefused().pending.isEmpty)
+        // its job showing after all still takes the row away
+        let own = DownloadJob(id: 9, status: "queued", username: "bob", directory: "Portishead\\Third (CD)",
+                              releaseMbid: "r-cd")
+        let late = given.claimed([own])
+        #expect(late.pending.first?.jobId == 9 && late.pending.first?.error == nil)
+        #expect(late.reconcile([own]).pending.isEmpty)
     }
 }

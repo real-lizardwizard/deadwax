@@ -31,6 +31,11 @@ struct GetRequest: Identifiable {
 ///   EDITED query is searched as typed. A search starting closes it again.
 /// - For VoiceOver, each outcome said in a line as it lands (Sources.announcement), so someone waiting hears the search
 ///   end.
+/// - OUT OF REACH (slice 2's review, finding 1): while deadwax can't be reached, "Getting albums works once deadwax is
+///   back." over whatever the sheet shows, the cards found before dimmed and every Get, Try again and Search off - a Get
+///   would close onto a Requests that can't show it. Back, they are live again; a search that failed for want of deadwax
+///   searches again by itself, and Search again is still under the cards. A Get that couldn't be asked at all keeps
+///   the sheet up, with why (`getFailure`).
 ///
 /// Cancel - or the sheet swiped away - lets the search go (its request cancelled, which stops it in slskd too). Not in
 /// slice 2: Join, Add to my library and Pick the best source for me (slice 3) - the store's box says neither "Join it"
@@ -44,6 +49,7 @@ struct SourcesSheet: View {
     @Environment(ServerModel.self) private var server
     @Environment(RequestsModel.self) private var requests
     @Environment(GetSettingsModel.self) private var settings
+    @Environment(Reachability.self) private var reachability
     @State private var model = SourcesSearch()
     @State private var filters = SourceFilters.none
     /// A chip was tapped since this Get began: the floor landing late doesn't re-make them then.
@@ -52,8 +58,11 @@ struct SourcesSheet: View {
     /// Search again, opened under folders found.
     @State private var again = false
     @FocusState private var againFocused: Bool
+    /// A card's Get that couldn't be asked at all (no deadwax to ask): the sheet stays, saying so.
+    @State private var getFailure: (any Error)?
 
     private var floor: QualityFloor { settings.floorNow }
+    private var online: Bool { reachability.online }
 
     var body: some View {
         NavigationStack {
@@ -104,6 +113,20 @@ struct SourcesSheet: View {
         }
         .onChange(of: announcement) { _, said in
             if !said.isEmpty { Notice.announce(said) }
+        }
+        // deadwax back: a search that failed for want of it searches again; a Get that couldn't be asked may be again
+        .onChange(of: online) { _, back in
+            guard back else {
+                // why every Get just went dim, for VoiceOver
+                Notice.announce(StoreLine.offline)
+                return
+            }
+            getFailure = nil
+            //? nothing answered it, or not in time: from while deadwax was away (this fires only on its coming back)
+            if let search = model.search, let error = search.error,
+               [.offline, .timeout].contains(ErrorWords.kind(of: error)) {
+                begin(search.release)
+            }
         }
     }
 
@@ -182,6 +205,14 @@ struct SourcesSheet: View {
 
     @ViewBuilder private var content: some View {
         if let search = model.search {
+            if !online {
+                // what's below is from before; nothing here can be asked of deadwax until it's back
+                ShelfNote(StoreLine.offline)
+                    .padding(.bottom, 4)
+            } else if let getFailure {
+                ErrorNote(getFailure, service: .downloads, failed: RequestWords.enqueueBroke)
+                    .padding(.bottom, 4)
+            }
             if search.pending {
                 VStack(spacing: 12) {
                     ProgressView()
@@ -201,6 +232,7 @@ struct SourcesSheet: View {
                     ErrorNote(error, service: .downloads, failed: ErrorWords.down[.downloads], retry: true)
                     Button(SourcesWords.tryAgain) { begin(search.release) }
                         .buttonStyle(SecondaryPill())
+                        .disabled(!online)
                 }
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 40)
@@ -254,7 +286,7 @@ struct SourcesSheet: View {
                 searchAgain
             } else {
                 ForEach(shown) { (candidate: Candidate) in
-                    SourceCardView(candidate: candidate, best: Sources.key(candidate) == best) {
+                    SourceCardView(candidate: candidate, best: Sources.key(candidate) == best, gets: online) {
                         get(candidate, release: release, shown: shown)
                     }
                 }
@@ -271,10 +303,16 @@ struct SourcesSheet: View {
     }
 
     /// A card's Get, in the tap: the download asked for as the release this search was for, with the list as shown for
-    /// the next peers - once per search - and the sheet handing over to Requests.
+    /// the next peers - once per search - and the sheet handing over to Requests only once the request is out. Refused
+    /// in the tap while deadwax is out of reach; one that couldn't be asked keeps the sheet, saying why.
     private func get(_ candidate: Candidate, release: GetRelease, shown: [Candidate]) {
-        guard model.download() else { return }
-        requests.enqueue(EnqueueBody(candidate: candidate, release: release, shown: shown))
+        guard online, model.download() else { return }
+        guard requests.enqueue(EnqueueBody(candidate: candidate, release: release, shown: shown)) else {
+            model.downloadAgain()
+            getFailure = URLError(.notConnectedToInternet)
+            return
+        }
+        getFailure = nil
         onQueued()
     }
 
@@ -315,7 +353,9 @@ struct SourcesSheet: View {
                     .autocorrectionDisabled()
                     .textInputAutocapitalization(.never)
                     .submitLabel(.search)
-                    .onSubmit(requery)
+                    .onSubmit {
+                        if online { requery() }
+                    }
                     .padding(.horizontal, 12)
                     .frame(minHeight: 44)
                     .background(Palette.well, in: Corners.controlShape)
@@ -328,6 +368,7 @@ struct SourcesSheet: View {
             }
             Button(SourcesWords.search, action: requery)
                 .buttonStyle(SecondaryPill())
+                .disabled(!online)
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, focus ? 0 : 40)

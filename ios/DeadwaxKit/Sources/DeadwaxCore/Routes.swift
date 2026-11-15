@@ -183,10 +183,13 @@ public enum Routes {
     /// transfer and clears the partials, a move to the next source tries each runner-up in turn until one takes it, a
     /// retry of the same one asks slskd again and a clear tidies the cancelled ones' transfers first; the store's look
     /// may ask slskd how far a download in flight has got (3 s) after the store index; a search for sources is two
-    /// rounds of slskd's search, each waited on for up to SLSKD_SEARCH_TIMEOUT (60 s at most) + 17 s, after up to 8 s
-    /// looking up the artist's former names; and an enqueue asks slskd to queue the files -
-    /// tests/test_ios_contract.py holds each above the server's.
-    public static let timeouts: [Endpoint: Double] = [albumIndex: 30, autoEqSearch: 20, autoEqProfile: 20, libraryOwned: 30, fullySearch: 20, releaseGroup: 60, searchArtists: 20, searchSongs: 20, artistFacts: 60, discography: 60, jobs: 20, cancelJob: 30, retryJob: 60, retryJobSame: 30, clearJobs: 30, storeState: 20, findCandidates: 180, enqueue: 30]
+    /// rounds of slskd's search, each start waiting up to SEARCH_TURN_SECONDS (30 s) at deadwax's gate and each round
+    /// waited on for up to SLSKD_SEARCH_TIMEOUT (60 s at most) + 17 s, beside up to 8 s looking up the artist's former
+    /// names, and slskd's state, answers and ranking around them - 292 s at worst (slice 2's review, finding 3); and an
+    /// enqueue has no bound on the server at all (the release's lock, then slskd's, which answers once the peer is
+    /// reached), so it is given the search's, and an answer that never comes isn't taken for a refusal
+    /// (RequestOverlays.unanswered) - tests/test_ios_contract.py holds each above the server's.
+    public static let timeouts: [Endpoint: Double] = [albumIndex: 30, autoEqSearch: 20, autoEqProfile: 20, libraryOwned: 30, fullySearch: 20, releaseGroup: 60, searchArtists: 20, searchSongs: 20, artistFacts: 60, discography: 60, jobs: 20, cancelJob: 30, retryJob: 60, retryJobSame: 30, clearJobs: 30, storeState: 20, findCandidates: 300, enqueue: 300]
 }
 
 /// The Cover Art Archive's thumbnail sizes the app asks deadwax's relay for (`Routes.archiveCover`'s `size`, which takes
