@@ -559,6 +559,19 @@ console.log('\nsearch what\'s saved (2.0.0-player.56): saved rows lead MusicBrai
     saved: L.savedFor(reading('bristol'), everything, L.KINDS, false, null) })
   check('...so the pool draws no saved album before the index: Dummy (yours) once', [keys(L.sectionRows(unknown.albums)).filter((key) => key.includes(DUMMY.id) || key === `album:${dummy.id}`)],
     [[`album:${dummy.id}`]])
+  //? (2.1.25) ...and an album both what's saved and MusicBrainz's answer found, before the index is in: MusicBrainz's
+  //? row of it drawn - only what's saved DRAWS is left out of MusicBrainz's answer, not everything it holds
+  const bothFound = L.pool({ reading: reading('bristol'), library: lib(), artistList: null, index: null, marks: off, artists: null,
+    albums: { groups: [THIRD, LIVE], shown: notInLibrary([THIRD, LIVE], null) }, songs: null,
+    saved: L.savedFor(reading('bristol'), everything, L.KINDS, false, null) })
+  check('...an album both found, before the index: drawn once, as MusicBrainz\'s row', [keys(bothFound.albums.saved.map((each) => each.row)), keys(L.sectionRows(bothFound.albums)).filter((key) => key === `group:${THIRD.id}` || key === `group:${LIVE.id}`)],
+    [[], [`group:${THIRD.id}`, `group:${LIVE.id}`]])
+  //? once the index is in, what's saved draws it and MusicBrainz's answer leaves it out - once, never twice
+  const bothIndexed = L.pool({ reading: reading('bristol'), library: lib(), artistList: null, index, marks: off, artists: null,
+    albums: { groups: [THIRD, LIVE], shown: notInLibrary([THIRD, LIVE], index) }, songs: null,
+    saved: L.savedFor(reading('bristol'), everything, L.KINDS, false, index) })
+  check('...and once it is in: drawn once, as what\'s saved', [L.sectionRows(bothIndexed.albums).filter((row) => row.key === `group:${THIRD.id}`).map((row) => row.saved === true)],
+    [[true]])
 
   //? (after review) a kind view's rows below its library's: kept where they were drawn as later answers land
   const r = (group, saved = false) => (saved ? L.savedRow(L.groupRow(group)) : L.groupRow(group))
