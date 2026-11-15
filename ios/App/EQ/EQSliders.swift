@@ -90,7 +90,7 @@ struct EQSliders: View {
     private var scale: some View {
         ForEach(Array(zip([12.0, 0, -12], EQWords.Screen.gainLabels)), id: \.1) { gain, label in
             Text(label)
-                .font(.caption2.monospacedDigit())
+                .font(Typeface.caption2.monospacedDigit())
                 .foregroundStyle(Palette.quiet)
                 .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
                 .fixedSize()
@@ -104,7 +104,7 @@ struct EQSliders: View {
         HStack(spacing: 0) {
             ForEach(gains.indices, id: \.self) { band in
                 Text(EQWords.Tone.bands[band])
-                    .font(.caption2.monospacedDigit())
+                    .font(Typeface.caption2.monospacedDigit())
                     .foregroundStyle(Palette.quiet)
                     .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
                     .lineLimit(1)
@@ -193,7 +193,7 @@ private struct EQBandColumn: View {
                 .offset(y: knobY - EQSliders.knob / 2)
             if held {
                 Text(EQWords.held(gain))
-                    .font(.caption.monospacedDigit().weight(.semibold))
+                    .font(Typeface.caption.monospacedDigit().weight(.semibold))
                     .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
                     .fixedSize()
                     .padding(.horizontal, 6)

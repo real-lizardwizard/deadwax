@@ -19,7 +19,7 @@ struct MineBlock: View {
         VStack(spacing: 10) {
             if let note = line, !note.isEmpty {
                 Text(note)
-                    .font(.footnote)
+                    .font(Typeface.footnote)
                     .foregroundStyle(Palette.quiet)
                     .multilineTextAlignment(.center)
                     .fixedSize(horizontal: false, vertical: true)
@@ -62,7 +62,7 @@ struct MinePlaceholder: View {
     var body: some View {
         VStack(spacing: 10) {
             Text(Whose.addFromPage)
-                .font(.footnote)
+                .font(Typeface.footnote)
                 .multilineTextAlignment(.center)
                 .fixedSize(horizontal: false, vertical: true)
             Button(Whose.placeholderButton) {}

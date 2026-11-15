@@ -42,7 +42,9 @@ BINARY_SUFFIXES = {".png", ".woff2", ".flac"}
 # kept whole for three cases, written by ios/scripts/export-deck-vectors.cjs and checked against it byte for byte by
 # ui/test/iosdeck.sim.cjs - base64 in JSON would take the folder past its 3 MB budget. A .f32 anywhere else is a new
 # decision, as a new suffix is.
-BINARY_IN = {".f32": "ios/DeadwaxKit/Tests/DeadwaxCoreTests/Fixtures/deck/voice/"}
+# .ttf: the iPhone app's Noto Sans, one TrueType font per weight made from the web's own woff2 by ios/scripts/make-fonts.py
+# (notes/ios.md "Noto Sans (15 Nov)") and held to the web's by tests/test_ios_palette.py.
+BINARY_IN = {".f32": "ios/DeadwaxKit/Tests/DeadwaxCoreTests/Fixtures/deck/voice/", ".ttf": "ios/App/Fonts/"}
 
 
 def _binary(rel):

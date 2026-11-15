@@ -330,6 +330,31 @@ def check_info_plist(problems: list) -> None:
                 problems.append(f"the icon {icon.name} is missing or isn't a PNG")
             elif size[:2] != (points * scale, points * scale) or size[2] != 2:
                 problems.append(f"the icon {icon.name} is {size[0]}x{size[1]} colour type {size[2]}, not an opaque RGB {points * scale}x{points * scale}")
+    check_fonts(info, problems)
+
+
+def check_fonts(info: dict, problems: list) -> None:
+    """(Noto Sans, 15 Nov) UIAppFonts names exactly the fonts in App/Fonts - the synchronized folder copies each to
+    the bundle's root, which is where UIAppFonts looks - each a TrueType font, with the licence beside them. A font
+    not named is never registered (its text falls back to iOS's face without a word); one named but missing, the same."""
+    fonts = IOS / "App" / "Fonts"
+    named = list(info.get("UIAppFonts", []))
+    present = sorted(path.name for path in fonts.glob("*.ttf")) if fonts.is_dir() else []
+    if sorted(named) != present:
+        problems.append(f"Info.plist: UIAppFonts is {named}, not the fonts in App/Fonts: {present}")
+    for name in present:
+        with open(fonts / name, "rb") as file:
+            if file.read(4) != b"\x00\x01\x00\x00":
+                problems.append(f"App/Fonts/{name} isn't a TrueType font")
+    if present and not (fonts / "OFL.txt").is_file():
+        problems.append("App/Fonts: no OFL.txt beside the fonts (the SIL Open Font License goes with them)")
+    # the synchronized folder copies every resource to the bundle's root: two of one name would collide there
+    seen: dict = {}
+    for path in (IOS / "App").rglob("*"):
+        if path.is_file() and path.suffix != ".swift" and path.name != ".DS_Store":
+            if path.name in seen:
+                problems.append(f"App/: {path.name} twice ({seen[path.name]} and {path.relative_to(IOS)}) - both land at the bundle's root")
+            seen[path.name] = path.relative_to(IOS)
 
 
 def background_identifiers(problems: list):
@@ -373,7 +398,7 @@ def main() -> int:
         print("PROBLEM:", problem)
     if problems:
         return 1
-    print("ok: the project, the scheme, the xcconfigs, Info.plist and the icons check out")
+    print("ok: the project, the scheme, the xcconfigs, Info.plist, the icons and the fonts check out")
     return 0
 
 

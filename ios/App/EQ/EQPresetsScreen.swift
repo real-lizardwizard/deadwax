@@ -39,12 +39,15 @@ struct EQPresetsScreen: View {
                     }
                 }
             } header: {
-                if let gone {
-                    Text(gone)
-                        .font(.footnote)
-                        .foregroundStyle(Palette.quiet)
-                        .textCase(nil)
+                Group {
+                    if let gone {
+                        Text(gone)
+                            .font(Typeface.footnote)
+                            .foregroundStyle(Palette.quiet)
+                            .textCase(nil)
+                    }
                 }
+                .font(Typeface.footnote)
             }
             if !eq.settings.presets.isEmpty {
                 Section {
@@ -59,6 +62,7 @@ struct EQPresetsScreen: View {
                     }
                 } header: {
                     Text(EQWords.Presets.yours)
+                        .font(Typeface.footnote)
                 }
             }
         }
@@ -79,14 +83,14 @@ struct EQPresetsScreen: View {
                         .foregroundStyle(.primary)
                     if let note {
                         Text(note)
-                            .font(.footnote)
+                            .font(Typeface.footnote)
                             .foregroundStyle(Palette.quiet)
                             .fixedSize(horizontal: false, vertical: true)
                     }
                 }
                 Spacer(minLength: 8)
                 Image(systemName: "checkmark")
-                    .font(.body.weight(.semibold))
+                    .font(Typeface.symbol(.body).weight(.semibold))
                     .foregroundStyle(Palette.accent)
                     .opacity(chosen ? 1 : 0)
             }

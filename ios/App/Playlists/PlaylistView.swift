@@ -195,7 +195,7 @@ struct PlaylistView: View {
             } else {
                 rows(songs, offline: !online)
                 Text(PlaylistRules.songsLine(songs.count, seconds: PlaylistRules.total(songs)))
-                    .font(.footnote)
+                    .font(Typeface.footnote)
                     .foregroundStyle(Palette.quiet)
                     .listRowSeparator(.hidden, edges: .bottom)
             }
@@ -207,7 +207,7 @@ struct PlaylistView: View {
     @ToolbarContentBuilder private func toolbar(_ proxy: ScrollViewProxy) -> some ToolbarContent {
         ToolbarItem(placement: .principal) {
             Text(model.name)
-                .font(.headline)
+                .font(Typeface.headline)
                 .lineLimit(1)
                 .opacity(titleInBar ? 1 : 0)
                 .accessibilityHidden(!titleInBar)
@@ -342,7 +342,7 @@ struct PlaylistView: View {
                     }
                 if model.needsName {
                     Text(PlaylistWords.needsAName)
-                        .font(.footnote)
+                        .font(Typeface.footnote)
                         .foregroundStyle(.red)
                 }
                 TextField(PlaylistWords.descriptionField, text: commentBinding, axis: .vertical)
@@ -356,7 +356,7 @@ struct PlaylistView: View {
                 VStack(alignment: .leading, spacing: 6) {
                     Toggle(PlaylistWords.sharedWithEveryone, isOn: publicBinding)
                     Text(PlaylistWords.sharedNote)
-                        .font(.footnote)
+                        .font(Typeface.footnote)
                         .foregroundStyle(Palette.quiet)
                         .fixedSize(horizontal: false, vertical: true)
                         .accessibilityHidden(true)
@@ -380,9 +380,12 @@ struct PlaylistView: View {
                     move(from: from, to: UpNextWords.movedTo(from: from, destination: destination))
                 }
             } header: {
-                Text(PlaylistWords.songsHeading)
-                    .textCase(nil)
-                    .accessibilityAddTraits(.isHeader)
+                Group {
+                    Text(PlaylistWords.songsHeading)
+                        .textCase(nil)
+                        .accessibilityAddTraits(.isHeader)
+                }
+                .font(Typeface.footnote)
             }
 
             Section {
@@ -418,7 +421,7 @@ struct PlaylistView: View {
                 Image(systemName: "minus.circle.fill")
                     .symbolRenderingMode(.palette)
                     .foregroundStyle(.white, .red)
-                    .font(.title3)
+                    .font(Typeface.symbol(.title3))
                     .frame(minWidth: 44, minHeight: 44)
                     .contentShape(Rectangle())
             }
@@ -430,7 +433,7 @@ struct PlaylistView: View {
                     .foregroundStyle(.primary)
                 if !row.artist.isEmpty {
                     Text(row.artist)
-                        .font(.footnote)
+                        .font(Typeface.footnote)
                         .foregroundStyle(Palette.quiet)
                 }
             }
@@ -588,7 +591,7 @@ private struct PlaylistHero: View {
                 .padding(.top, 8)
 
             Text(model.name)
-                .font(Format.isLongTitle(model.name) ? .title3.bold() : .title2.bold())
+                .font(Format.isLongTitle(model.name) ? Typeface.title3.bold() : Typeface.title2.bold())
                 .multilineTextAlignment(.center)
                 .lineLimit(2)
                 .padding(.top, 18)
@@ -596,7 +599,7 @@ private struct PlaylistHero: View {
 
             if let playlist {
                 Text(PlaylistRules.ownerLine(playlist))
-                    .font(.title3)
+                    .font(Typeface.title3)
                     .foregroundStyle(Palette.quiet)
                     .multilineTextAlignment(.center)
                     .lineLimit(2)
@@ -607,7 +610,7 @@ private struct PlaylistHero: View {
             if let answer = model.answer, !model.gone,
                let words = PlaylistRules.readOnlyWords(answer.playlist, songs: answer.songs.count) {
                 Text(words)
-                    .font(.footnote)
+                    .font(Typeface.footnote)
                     .foregroundStyle(Palette.quiet)
                     .multilineTextAlignment(.center)
                     .fixedSize(horizontal: false, vertical: true)
@@ -616,7 +619,7 @@ private struct PlaylistHero: View {
 
             if let comment = playlist?.comment, !comment.isEmpty {
                 Text(comment)
-                    .font(.subheadline)
+                    .font(Typeface.subheadline)
                     .multilineTextAlignment(.center)
                     .fixedSize(horizontal: false, vertical: true)
                     .padding(.top, 8)
@@ -626,7 +629,7 @@ private struct PlaylistHero: View {
             let line = model.answer != nil && !model.gone
                 ? PlaylistRules.songsLine(songs.count, seconds: PlaylistRules.total(songs)) : ""
             Text(line.isEmpty ? " " : line)
-                .font(.footnote)
+                .font(Typeface.footnote)
                 .foregroundStyle(Palette.quiet)
                 .padding(.top, 6)
                 .accessibilityHidden(line.isEmpty)
@@ -639,7 +642,7 @@ private struct PlaylistHero: View {
                     .transition(.opacity)
             } else if !model.gone, let words = PlaylistDownloadWords.heroLine(download, smart: smart) {
                 Text(words)
-                    .font(.footnote)
+                    .font(Typeface.footnote)
                     .foregroundStyle(Palette.quiet)
                     .multilineTextAlignment(.center)
                     .fixedSize(horizontal: false, vertical: true)
@@ -689,7 +692,7 @@ private struct PlaylistSongRow: View {
                                 .fill(.black.opacity(0.45))
                                 .frame(width: Self.cover, height: Self.cover)
                             Image(systemName: "waveform")
-                                .font(.body.weight(.semibold))
+                                .font(Typeface.symbol(.body).weight(.semibold))
                                 .foregroundStyle(Palette.accent)
                                 .symbolEffect(.variableColor.iterative.reversing, options: .repeating, isActive: playing)
                         }
@@ -701,7 +704,7 @@ private struct PlaylistSongRow: View {
                             .lineLimit(typeSize.isAccessibilitySize ? 3 : 1)
                         if !line.isEmpty {
                             Text(line)
-                                .font(.footnote)
+                                .font(Typeface.footnote)
                                 .foregroundStyle(Palette.quiet)
                                 .lineLimit(typeSize.isAccessibilitySize ? 2 : 1)
                         }
@@ -710,7 +713,7 @@ private struct PlaylistSongRow: View {
                     Spacer(minLength: 8)
                     if slot { stateSlot }
                     Text(Format.trackTime(song.duration))
-                        .font(.subheadline.monospacedDigit())
+                        .font(Typeface.subheadline.monospacedDigit())
                         .foregroundStyle(Palette.quiet)
                 }
                 .padding(.vertical, 4)
@@ -729,7 +732,7 @@ private struct PlaylistSongRow: View {
 
             QueueMenu(request: menu) {
                 Image(systemName: "ellipsis")
-                    .font(.body.weight(.semibold))
+                    .font(Typeface.symbol(.body).weight(.semibold))
                     .foregroundStyle(Palette.quiet)
                     .frame(minWidth: 44, minHeight: 44)
                     .contentShape(Rectangle())
@@ -756,9 +759,9 @@ private struct PlaylistSongRow: View {
     @ViewBuilder private var stateSlot: some View {
         ZStack {
             if let mark = DownloadWords.mark(download) {
-                DownloadMark(mark: mark, fraction: DownloadWords.Mark.fraction(download), font: .caption)
+                DownloadMark(mark: mark, fraction: DownloadWords.Mark.fraction(download), font: Typeface.symbol(.caption))
             } else {
-                DownloadMark(mark: .downloaded, font: .caption).hidden()
+                DownloadMark(mark: .downloaded, font: Typeface.symbol(.caption)).hidden()
             }
         }
         .accessibilityHidden(true)
@@ -771,7 +774,7 @@ private struct QuietLine: View {
 
     var body: some View {
         Text(text)
-            .font(.callout)
+            .font(Typeface.callout)
             .foregroundStyle(Palette.quiet)
             .multilineTextAlignment(.center)
             .fixedSize(horizontal: false, vertical: true)

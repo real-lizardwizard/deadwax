@@ -32,11 +32,11 @@ struct MiniPlayerView: View {
                             .clipShape(Corners.artShape)
                         VStack(alignment: .leading, spacing: 2) {
                             Text(track.title)
-                                .font(.subheadline.weight(.semibold))
+                                .font(Typeface.subheadline.weight(.semibold))
                                 .lineLimit(1)
                             if let line, !line.isEmpty {
                                 Text(line)
-                                    .font(.footnote)
+                                    .font(Typeface.footnote)
                                     .foregroundStyle(Palette.quiet)
                                     .lineLimit(1)
                             }
@@ -52,7 +52,7 @@ struct MiniPlayerView: View {
                     ZStack {
                         // the glyph keeps its room under the spinner, so the button doesn't change size as it loads
                         Image(systemName: player.isPlaying ? "pause.fill" : "play.fill")
-                            .font(.title2)
+                            .font(Typeface.symbol(.title2))
                             .opacity(player.isLoading ? 0 : 1)
                         if player.isLoading {
                             ProgressView()
@@ -65,7 +65,7 @@ struct MiniPlayerView: View {
 
                 Button { player.next() } label: {
                     Image(systemName: "forward.fill")
-                        .font(.title2)
+                        .font(Typeface.symbol(.title2))
                         .frame(minWidth: 44, minHeight: 44)
                         .contentShape(Rectangle())
                 }

@@ -96,31 +96,33 @@ struct InfoView: View {
         let about = AboutCard.about(track: AboutTrack(entry: track), album: album, details: details, folders: folders)
         let song = player.song(for: entry) ?? Song(queued: track)
 
-        Section(InfoWords.songTitle) {
+        Section {
             VStack(alignment: .leading, spacing: 3) {
                 Text(about.song.title)
-                    .font(.headline)
+                    .font(Typeface.headline)
                 if !about.song.artist.isEmpty {
                     Text(about.song.artist)
                         .foregroundStyle(Palette.quiet)
                 }
                 ForEach(about.song.lines, id: \.self) { line in
                     Text(line)
-                        .font(.subheadline)
+                        .font(Typeface.subheadline)
                         .foregroundStyle(Palette.quiet)
                 }
                 if let writers = about.song.writtenBy {
                     Text(InfoWords.writtenBy(writers))
-                        .font(.subheadline)
+                        .font(Typeface.subheadline)
                         .foregroundStyle(Palette.quiet)
                 }
             }
             .padding(.vertical, 2)
             .accessibilityElement(children: .combine)
+        } header: {
+            Text(InfoWords.songTitle).font(Typeface.footnote)
         }
 
         if let card = about.album {
-            Section(InfoWords.albumTitle) {
+            Section {
                 if let route = PlayedAlbum.route(id: card.id, track: track, player: player) {
                     Button {
                         navigation.openAlbum(route)
@@ -129,7 +131,7 @@ struct InfoView: View {
                             albumCard(card)
                             Spacer(minLength: 0)
                             Image(systemName: "chevron.right")
-                                .font(.footnote.weight(.semibold))
+                                .font(Typeface.symbol(.footnote).weight(.semibold))
                                 .foregroundStyle(Palette.quiet)
                                 .accessibilityHidden(true)
                         }
@@ -139,17 +141,21 @@ struct InfoView: View {
                 } else {
                     albumCard(card)
                 }
+            } header: {
+                Text(InfoWords.albumTitle).font(Typeface.footnote)
             }
         }
 
         if let artist = about.artist {
-            Section(InfoWords.artistTitle) {
+            Section {
                 Text(artist.name)
-                    .font(.headline)
+                    .font(Typeface.headline)
+            } header: {
+                Text(InfoWords.artistTitle).font(Typeface.footnote)
             }
         }
 
-        Section(LevelWords.soundTitle) {
+        Section {
             let rows = LevelWords.soundRows(song: song, level: track.level, key: entry.key, decisions: player.levelDecisions,
                                             live: track.albumId.flatMap { player.loudness(albumID: $0) })
             ForEach(rows, id: \.label) { row in
@@ -161,19 +167,23 @@ struct InfoView: View {
             if let sound = eq.infoSound {
                 LabeledContent(EQWords.Info.label, value: sound)
             }
+        } header: {
+            Text(LevelWords.soundTitle).font(Typeface.footnote)
         }
 
         //? last: a path to copy, and a line landing late here moves no card a finger is reaching for
         if let folder = about.album?.folder {
-            Section(InfoWords.serverTitle) {
+            Section {
                 VStack(alignment: .leading, spacing: 4) {
                     Text(InfoWords.folder)
                     Text(folder)
-                        .font(.footnote.monospaced())
+                        .font(Typeface.mono(.footnote))
                         .foregroundStyle(Palette.quiet)
                         .textSelection(.enabled)
                 }
                 .accessibilityElement(children: .combine)
+            } header: {
+                Text(InfoWords.serverTitle).font(Typeface.footnote)
             }
         }
     }
@@ -185,15 +195,15 @@ struct InfoView: View {
                 .clipShape(Corners.artShape)
             VStack(alignment: .leading, spacing: 3) {
                 Text(card.title)
-                    .font(.headline)
+                    .font(Typeface.headline)
                 if !card.line.isEmpty {
                     Text(card.line)
-                        .font(.subheadline)
+                        .font(Typeface.subheadline)
                         .foregroundStyle(Palette.quiet)
                 }
                 if let pressing = card.pressing {
                     Text(pressing)
-                        .font(.subheadline)
+                        .font(Typeface.subheadline)
                         .foregroundStyle(Palette.quiet)
                 }
             }
@@ -222,10 +232,12 @@ struct InfoView: View {
             return InfoSection(title: section.title, rows: section.rows + [onPhone])
         }
         ForEach(Array(sections.enumerated()), id: \.offset) { _, section in
-            Section(section.title) {
+            Section {
                 ForEach(Array(section.rows.enumerated()), id: \.offset) { _, row in
                     DebugRowView(row: row)
                 }
+            } header: {
+                Text(section.title).font(Typeface.footnote)
             }
         }
     }
@@ -285,14 +297,14 @@ private struct DebugRowView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 3) {
             Text(row.label)
-                .font(.subheadline.weight(.medium))
+                .font(Typeface.subheadline.weight(.medium))
             Text(row.value)
-                .font(row.mono ? .footnote.monospaced() : .footnote)
+                .font(row.mono ? Typeface.mono(.footnote) : Typeface.footnote)
                 .foregroundStyle(Palette.quiet)
                 .textSelection(.enabled)
             if let note = row.note, !note.isEmpty {
                 Text(note)
-                    .font(row.noteMono ? .caption.monospaced() : .caption)
+                    .font(row.noteMono ? Typeface.mono(.caption) : Typeface.caption)
                     .foregroundStyle(Palette.quiet)
                     .textSelection(.enabled)
             }

@@ -144,10 +144,10 @@ private struct AppTabButton: View {
             VStack(spacing: Self.gap) {
                 Image(systemName: tab.symbol)
                     .symbolVariant(.fill)
-                    .font(.title2)
+                    .font(Typeface.symbol(.title2))
                     .frame(height: symbolBox)
                 Text(tab.title)
-                    .font(.caption2.weight(.medium))
+                    .font(Typeface.caption2.weight(.medium))
                     .lineLimit(1)
             }
             .foregroundStyle(shown ? Palette.accent : Palette.tabInactive)

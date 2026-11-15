@@ -117,7 +117,7 @@ struct PlaylistsPage: View {
                 VStack(alignment: .leading, spacing: 8) {
                     Text(PlaylistWords.playlistsEmpty)
                     Text(PlaylistWords.playlistsEmptyHow)
-                        .font(.subheadline)
+                        .font(Typeface.subheadline)
                         .fixedSize(horizontal: false, vertical: true)
                     if online {
                         Button(PlaylistWords.newPlaylist) { newSheet = NewSheet() }
@@ -208,7 +208,7 @@ struct PlaylistsPage: View {
                 rows(groups.files, online: online)
             } label: {
                 Text(PlaylistWords.files(groups.files.count))
-                    .font(.title3.weight(.semibold))
+                    .font(Typeface.title3.weight(.semibold))
                     .foregroundStyle(.primary)
                     .accessibilityAddTraits(.isHeader)
             }
@@ -248,7 +248,7 @@ struct DownloadedPlaylistsScreen: View {
                 VStack(alignment: .leading, spacing: 8) {
                     Text(PlaylistDownloadWords.noneYet)
                     Text(PlaylistDownloadWords.noneYetHow)
-                        .font(.subheadline)
+                        .font(Typeface.subheadline)
                         .fixedSize(horizontal: false, vertical: true)
                 }
                 .foregroundStyle(Palette.quiet)
@@ -306,14 +306,14 @@ struct PlaylistRow: View {
                     Text(playlist.name)
                         .foregroundStyle(.primary)
                     Text(PlaylistRules.rowLine(playlist))
-                        .font(.subheadline)
+                        .font(Typeface.subheadline)
                         .foregroundStyle(Palette.quiet)
                 }
                 .lineLimit(2)
                 if !inList {
                     Spacer(minLength: 8)
                     Image(systemName: "chevron.right")
-                        .font(.footnote.weight(.semibold))
+                        .font(Typeface.symbol(.footnote).weight(.semibold))
                         .foregroundStyle(.tertiary)
                         .accessibilityHidden(true)
                 }
@@ -344,7 +344,7 @@ struct PlaylistCover: View {
                 ZStack {
                     Palette.coverEmpty
                     Image(systemName: "music.note.list")
-                        .font(.system(size: side * 0.4, weight: .regular))
+                        .font(Typeface.symbol(size: side * 0.4, weight: .regular))
                         .foregroundStyle(Palette.quiet)
                 }
             }

@@ -50,7 +50,7 @@ struct DownloadMark: View {
     let mark: DownloadWords.Mark
     /// The ring's fraction, while downloading.
     var fraction: Double = 0
-    var font: Font = .caption
+    var font: Font = Typeface.symbol(.caption)
     var lineWidth: CGFloat = 1.5
     /// The control's ring (its stop square) and arrow (the accent).
     var control = false
@@ -166,7 +166,7 @@ struct AlbumDownloadControl: View {
                     downloads.download(album: album)
                     asked()
                 } label: {
-                    DownloadMark(mark: .control, font: .body, lineWidth: 2, control: true)
+                    DownloadMark(mark: .control, font: Typeface.symbol(.body), lineWidth: 2, control: true)
                 }
             } else {
                 Menu {
@@ -179,7 +179,7 @@ struct AlbumDownloadControl: View {
                     }
                 } label: {
                     DownloadMark(mark: DownloadWords.mark(state, control: true) ?? .control,
-                                 fraction: DownloadWords.Mark.fraction(state), font: .body, lineWidth: 2, control: true)
+                                 fraction: DownloadWords.Mark.fraction(state), font: Typeface.symbol(.body), lineWidth: 2, control: true)
                 }
                 .menuOrder(.fixed)
             }
@@ -280,13 +280,16 @@ struct DownloadMenuSection: View {
                     }
                 }
             } header: {
-                if songs.count == 1, case .failed(let failure) = downloads.state(songs[0].id) {
-                    Text(DownloadWords.failure(failure, songID: songs[0].id, server: server.address,
-                                               admin: server.access.seesDetail).text)
-                } else if let name = downloads.keepingPlaylist(songs, album: album?.id) {
-                    // (slice 3) kept by a downloaded playlist: why there is no Remove Download
-                    Text(PlaylistDownloadWords.downloadedWith(name))
+                Group {
+                    if songs.count == 1, case .failed(let failure) = downloads.state(songs[0].id) {
+                        Text(DownloadWords.failure(failure, songID: songs[0].id, server: server.address,
+                                                   admin: server.access.seesDetail).text)
+                    } else if let name = downloads.keepingPlaylist(songs, album: album?.id) {
+                        // (slice 3) kept by a downloaded playlist: why there is no Remove Download
+                        Text(PlaylistDownloadWords.downloadedWith(name))
+                    }
                 }
+                .font(Typeface.footnote)
             }
         }
     }
@@ -333,7 +336,7 @@ struct PlaylistDownloadControl: View {
                     PlaylistDownloadMenuSection(answer: answer, id: id, titled: true)
                 } label: {
                     DownloadMark(mark: DownloadWords.mark(state, control: true) ?? .control,
-                                 fraction: DownloadWords.Mark.fraction(state), font: .body, lineWidth: 2, control: true)
+                                 fraction: DownloadWords.Mark.fraction(state), font: Typeface.symbol(.body), lineWidth: 2, control: true)
                 }
                 .menuOrder(.fixed)
             } else if !downloads.playlistIsSmart(id, answer: answer) {
@@ -341,7 +344,7 @@ struct PlaylistDownloadControl: View {
                     guard let answer else { return }
                     downloads.download(playlist: answer)
                 } label: {
-                    DownloadMark(mark: .control, font: .body, lineWidth: 2, control: true)
+                    DownloadMark(mark: .control, font: Typeface.symbol(.body), lineWidth: 2, control: true)
                 }
                 .disabled(answer == nil || gone)
             }
@@ -396,7 +399,10 @@ struct PlaylistDownloadMenuSection: View {
                         }
                     }
                 } header: {
-                    if titled, let state { Text(title(state, smart: smart)) }
+                    Group {
+                        if titled, let state { Text(title(state, smart: smart)) }
+                    }
+                    .font(Typeface.footnote)
                 }
             }
         }

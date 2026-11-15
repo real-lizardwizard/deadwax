@@ -151,7 +151,7 @@ struct AlbumsScreen: View {
                     }
                     if let drawn, !drawn.view.countText.isEmpty, !(list == .downloaded && drawn.albums.isEmpty) {
                         Text(drawn.view.countText)
-                            .font(.footnote)
+                            .font(Typeface.footnote)
                             .foregroundStyle(Palette.quiet)
                     }
                     if online, drawn != nil, let failure, let scope {
@@ -159,7 +159,7 @@ struct AlbumsScreen: View {
                     }
                     if drawn?.truncated == true {
                         Text(LibraryWords.truncated)
-                            .font(.footnote)
+                            .font(Typeface.footnote)
                             .foregroundStyle(Palette.quiet)
                             .fixedSize(horizontal: false, vertical: true)
                     }
@@ -227,7 +227,7 @@ struct AlbumsScreen: View {
             if page != nil {
                 // the Albums page while deadwax can't be reached is Downloaded: named here, the switch holding the bar
                 Text(DownloadWords.downloadedTitle)
-                    .font(.title2.weight(.bold))
+                    .font(Typeface.title2.weight(.bold))
                     .accessibilityAddTraits(.isHeader)
                     .padding(.bottom, 6)
             }
@@ -244,7 +244,7 @@ struct AlbumsScreen: View {
             }
             if offlinePage {
                 Text(DownloadWords.onlyDownloadedPlay)
-                    .font(.footnote)
+                    .font(Typeface.footnote)
                     .foregroundStyle(Palette.quiet)
                     .fixedSize(horizontal: false, vertical: true)
                     .padding(.vertical, 10)
@@ -308,7 +308,10 @@ struct AlbumsScreen: View {
                                         dimmed: !online && !download.hasSongsHere) { open(album) }
                         }
                     } header: {
-                        header(group)
+                        Group {
+                            header(group)
+                        }
+                        .font(Typeface.footnote)
                     }
                 }
             }
@@ -324,7 +327,10 @@ struct AlbumsScreen: View {
                             Divider().padding(.leading, LibraryRow.textInset)
                         }
                     } header: {
-                        header(group)
+                        Group {
+                            header(group)
+                        }
+                        .font(Typeface.footnote)
                     }
                 }
             }
@@ -419,11 +425,11 @@ struct FirstAskCard: View {
             let scope = downloads.libraryScope
             VStack(alignment: .leading, spacing: 10) {
                 Text(AutoDownloadWords.askTitle(scope))
-                    .font(.headline)
+                    .font(Typeface.headline)
                     .fixedSize(horizontal: false, vertical: true)
                     .accessibilityAddTraits(.isHeader)
                 Text(AutoDownloadWords.askLine(scope, limit: downloads.storageLimit))
-                    .font(.subheadline)
+                    .font(Typeface.subheadline)
                     .foregroundStyle(Palette.quiet)
                     .fixedSize(horizontal: false, vertical: true)
                 ViewThatFits(in: .horizontal) {
@@ -460,7 +466,7 @@ struct PlaceGroup<Rows: View>: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             Text(title)
-                .font(.title3.weight(.semibold))
+                .font(Typeface.title3.weight(.semibold))
                 .accessibilityAddTraits(.isHeader)
             rows()
         }
@@ -494,7 +500,7 @@ struct PlaceRow: View {
                             .accessibilityHidden(true)
                     }
                     Image(systemName: "chevron.right")
-                        .font(.footnote.weight(.semibold))
+                        .font(Typeface.symbol(.footnote).weight(.semibold))
                         .foregroundStyle(.tertiary)
                         .accessibilityHidden(true)
                 }
@@ -564,7 +570,7 @@ struct RefreshProblemNote: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text(LibraryWords.couldntRefresh)
-                .font(.callout.weight(.medium))
+                .font(Typeface.callout.weight(.medium))
                 .fixedSize(horizontal: false, vertical: true)
             ErrorNote(failure, retry: true)
             Button(LibraryWords.tryAgain, action: retry)

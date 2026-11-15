@@ -222,12 +222,12 @@ struct NowPlayingView: View {
         VStack(alignment: centred ? .center : .leading, spacing: 4) {
             if !centred, let error = player.errorLine, !error.isEmpty {
                 Text(error)
-                    .font(.footnote)
+                    .font(Typeface.footnote)
                     .foregroundStyle(Palette.quiet)
                     .fixedSize(horizontal: false, vertical: true)
             }
             Text(track.title)
-                .font(.title2.bold())
+                .font(Typeface.title2.bold())
                 .lineLimit(1)
             byline(track, centred: centred)
         }
@@ -239,7 +239,7 @@ struct NowPlayingView: View {
         HStack {
             Button(action: close) {
                 Image(systemName: "chevron.down")
-                    .font(.title3.weight(.semibold))
+                    .font(Typeface.symbol(.title3).weight(.semibold))
                     .frame(minWidth: 44, minHeight: 44)
                     .contentShape(Rectangle())
             }
@@ -319,7 +319,7 @@ struct NowPlayingView: View {
             withAnimation(.easeInOut(duration: 0.25)) { lyrics.showing = tapped.lyricsOn }
         } label: {
             Image(systemName: on ? "quote.bubble.fill" : "quote.bubble")
-                .font(.title3)
+                .font(Typeface.symbol(.title3))
                 .foregroundStyle(on ? Palette.accent : Color.primary)
                 .frame(minWidth: 44, minHeight: 44)
                 .contentShape(Rectangle())
@@ -338,7 +338,7 @@ struct NowPlayingView: View {
                 navigation.openAlbum(route)
             } label: {
                 Text(byline)
-                    .font(.body)
+                    .font(Typeface.body)
                     .foregroundStyle(Palette.quiet)
                     .lineLimit(1)
                     .frame(maxWidth: .infinity, minHeight: 28, alignment: centred ? .center : .leading)
@@ -348,7 +348,7 @@ struct NowPlayingView: View {
             .accessibilityLabel(PlayerWords.goToAlbum(byline))
         } else {
             Text(byline)
-                .font(.body)
+                .font(Typeface.body)
                 .foregroundStyle(Palette.quiet)
                 .lineLimit(1)
                 .frame(minHeight: 28)
@@ -367,7 +367,7 @@ struct NowPlayingView: View {
                 if turntable { deck.wake() }
                 player.previous()
             } label: {
-                Image(systemName: "backward.fill").font(.title)
+                Image(systemName: "backward.fill").font(Typeface.symbol(.title))
                     .frame(minWidth: 56, minHeight: 56)
                     .contentShape(Rectangle())
             }
@@ -379,7 +379,7 @@ struct NowPlayingView: View {
             } label: {
                 ZStack {
                     Image(systemName: player.isPlaying ? "pause.fill" : "play.fill")
-                        .font(.system(size: 44))
+                        .font(Typeface.symbol(size: 44))
                         .opacity(player.isLoading ? 0.35 : 1)
                     if player.isLoading { ProgressView().controlSize(.large) }
                 }
@@ -392,7 +392,7 @@ struct NowPlayingView: View {
                 if turntable { deck.wake() }
                 player.next()
             } label: {
-                Image(systemName: "forward.fill").font(.title)
+                Image(systemName: "forward.fill").font(Typeface.symbol(.title))
                     .frame(minWidth: 56, minHeight: 56)
                     .contentShape(Rectangle())
             }
@@ -418,7 +418,7 @@ struct NowPlayingView: View {
             Spacer()
             Button { showsUpNext = true } label: {
                 Image(systemName: "list.bullet")
-                    .font(.title3)
+                    .font(Typeface.symbol(.title3))
                     .frame(minWidth: 44, minHeight: 44)
                     .contentShape(Rectangle())
             }
@@ -472,7 +472,7 @@ private struct ModeButton: View {
     var body: some View {
         Button(action: action) {
             Image(systemName: glyph)
-                .font(.title3.weight(.semibold))
+                .font(Typeface.symbol(.title3).weight(.semibold))
                 .foregroundStyle(on ? Palette.accent : Color.primary.opacity(0.7))
                 .frame(minWidth: 44, minHeight: 44)
                 .contentShape(Rectangle())
@@ -529,7 +529,7 @@ private struct SpeedChip: View {
     var body: some View {
         Button(action: action) {
             Text(TurntableWords.speedLabel(speed))
-                .font(.footnote.monospaced().weight(.semibold))
+                .font(Typeface.mono(.footnote).weight(.semibold))
                 .foregroundStyle(Palette.accentText)
                 .lineLimit(1)
                 .fixedSize()

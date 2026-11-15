@@ -555,6 +555,7 @@ private struct EditOrderSheet: View {
                     }
                 } footer: {
                     Text(LibrarySwitchWords.orderFooter)
+                        .font(Typeface.footnote)
                 }
             }
             .environment(\.editMode, .constant(.active))
@@ -586,7 +587,7 @@ struct NavidromeGateView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 14) {
                 Text(closed.title)
-                    .font(.title3.weight(.semibold))
+                    .font(Typeface.title3.weight(.semibold))
                     .fixedSize(horizontal: false, vertical: true)
                     .accessibilityAddTraits(.isHeader)
                 ForEach(closed.lines, id: \.self) { line in

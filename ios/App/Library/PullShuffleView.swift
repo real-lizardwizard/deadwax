@@ -153,14 +153,14 @@ struct PullShuffleGraphic: View {
                         .rotationEffect(.degrees(-90))
                 }
                 Image(systemName: "shuffle")
-                    .font(.system(size: 16, weight: .semibold))
+                    .font(Typeface.symbol(size: 16, weight: .semibold))
                     .foregroundStyle(armed ? Palette.primaryLabel : Palette.accent)
                     .scaleEffect(reduceMotion || armed ? 1 : 0.6 + 0.4 * progress)
                     .rotationEffect(.degrees(reduceMotion ? 0 : (armed ? 180 : 180 * progress) + (spun ? 360 : 0)))
             }
             .frame(width: Self.ring, height: Self.ring)
             Text(line)
-                .font(.footnote.weight(.medium))
+                .font(Typeface.footnote.weight(.medium))
                 .foregroundStyle(Palette.quiet)
                 .lineLimit(2)
                 .multilineTextAlignment(.center)

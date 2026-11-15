@@ -36,12 +36,12 @@ struct SignInView: View {
             VStack(alignment: .leading, spacing: 16) {
                 head
                 Text(SignInWords.lede)
-                    .font(.footnote)
+                    .font(Typeface.footnote)
                     .foregroundStyle(Palette.quiet)
                     .fixedSize(horizontal: false, vertical: true)
                 if let said = lines.reason {
                     Text(said)
-                        .font(.footnote)
+                        .font(Typeface.footnote)
                         .foregroundStyle(Palette.amber)
                         .fixedSize(horizontal: false, vertical: true)
                         .frame(maxWidth: .infinity, alignment: .leading)
@@ -54,7 +54,7 @@ struct SignInView: View {
                 fields
                 if let problem = lines.problem {
                     Text(problem)
-                        .font(.callout)
+                        .font(Typeface.callout)
                         .foregroundStyle(Palette.danger)
                         .fixedSize(horizontal: false, vertical: true)
                     if let why = lines.problemWhy { whoever(why) }
@@ -89,7 +89,7 @@ struct SignInView: View {
         HStack(spacing: 14) {
             Avatar(letter: SignInWords.avatar)
             Text(SignInWords.title)
-                .font(.title2.bold())
+                .font(Typeface.title2.bold())
                 .accessibilityAddTraits(.isHeader)
         }
         .padding(.bottom, 4)
@@ -99,7 +99,7 @@ struct SignInView: View {
         VStack(alignment: .leading, spacing: 12) {
             VStack(alignment: .leading, spacing: 6) {
                 Text(SignInWords.userName)
-                    .font(.subheadline.weight(.medium))
+                    .font(Typeface.subheadline.weight(.medium))
                     .accessibilityHidden(true)
                 TextField("", text: $form.username)
                     .textContentType(.username)
@@ -113,7 +113,7 @@ struct SignInView: View {
             }
             VStack(alignment: .leading, spacing: 6) {
                 Text(SignInWords.password)
-                    .font(.subheadline.weight(.medium))
+                    .font(Typeface.subheadline.weight(.medium))
                     .accessibilityHidden(true)
                 SecureField("", text: $form.password)
                     .textContentType(.password)
@@ -130,13 +130,13 @@ struct SignInView: View {
     private var address: some View {
         HStack(alignment: .firstTextBaseline) {
             Text(server.address?.description ?? "")
-                .font(.footnote.monospaced())
+                .font(Typeface.mono(.footnote))
                 .foregroundStyle(Palette.quiet)
                 .lineLimit(1)
                 .truncationMode(.middle)
             Spacer(minLength: 12)
             Button(YouWords.changeAddress) { server.changeAddress() }
-                .font(.footnote)
+                .font(Typeface.footnote)
                 .disabled(lines.disabled)
         }
         .padding(.top, 8)
@@ -147,14 +147,14 @@ struct SignInView: View {
     private func whoever(_ words: String) -> some View {
         DisclosureGroup(ErrorWords.forWhoever) {
             Text(words)
-                .font(.footnote)
+                .font(Typeface.footnote)
                 .foregroundStyle(Palette.quiet)
                 .textSelection(.enabled)
                 .fixedSize(horizontal: false, vertical: true)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.top, 6)
         }
-        .font(.footnote)
+        .font(Typeface.footnote)
     }
 
     private func submit() {
@@ -174,7 +174,7 @@ struct SignInView: View {
 private struct FieldLook: ViewModifier {
     func body(content: Content) -> some View {
         content
-            .font(.body)
+            .font(Typeface.body)
             .padding(.horizontal, 12)
             .padding(.vertical, 10)
             .background(Color(white: 0.14), in: Corners.controlShape)

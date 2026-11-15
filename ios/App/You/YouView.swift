@@ -26,10 +26,13 @@ struct YouView: View {
                     headline(lines)
                         .id(Self.top)
                 } footer: {
-                    if let unverified = lines.unverified {
-                        Text(unverified)
-                            .foregroundStyle(Palette.amber)
+                    Group {
+                        if let unverified = lines.unverified {
+                            Text(unverified)
+                                .foregroundStyle(Palette.amber)
+                        }
                     }
+                    .font(Typeface.footnote)
                 }
                 PlaybackSection()
                 DownloadsRow()
@@ -57,11 +60,11 @@ struct YouView: View {
             Avatar(letter: lines.avatar)
             VStack(alignment: .leading, spacing: 2) {
                 Text(lines.name)
-                    .font(.title2.bold())
+                    .font(Typeface.title2.bold())
                     .lineLimit(2)
                 if let identity = lines.identity {
                     Text(identity)
-                        .font(.subheadline)
+                        .font(Typeface.subheadline)
                         .foregroundStyle(Palette.quiet)
                 }
             }
@@ -74,19 +77,20 @@ struct YouView: View {
     private func about(_ lines: YouLines) -> some View {
         Section {
             LabeledContent(YouWords.version) {
-                Text(lines.version).monospaced()
+                Text(lines.version).font(Typeface.mono(.body))
             }
             if let logins = lines.logins {
                 LabeledContent(YouWords.logins, value: logins)
             }
             LabeledContent(YouWords.app) {
-                Text(Self.appVersion).monospaced()
+                Text(Self.appVersion).font(Typeface.mono(.body))
             }
             if lines.failed, let failure = server.meFailure {
                 ErrorNote(failure)
             }
         } header: {
             Text(YouWords.about)
+                .font(Typeface.footnote)
         }
     }
 
@@ -107,7 +111,7 @@ struct Avatar: View {
 
     var body: some View {
         Text(letter)
-            .font(.title.weight(.semibold))
+            .font(Typeface.title.weight(.semibold))
             .lineLimit(1)
             .minimumScaleFactor(0.5)
             .padding(4)

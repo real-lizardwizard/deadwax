@@ -51,7 +51,7 @@ struct ScrubberView: View {
                 Spacer()
                 Text(PlayerWords.remaining(shown: shown, length: length))
             }
-            .font(.caption.monospacedDigit())
+            .font(Typeface.caption.monospacedDigit())
             .foregroundStyle(Palette.quiet)
             .accessibilityHidden(true)
         }

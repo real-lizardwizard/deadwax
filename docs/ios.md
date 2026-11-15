@@ -211,6 +211,15 @@ corners, everywhere they're drawn - the album page, Now Playing, the tiles and t
 the notices, cards, buttons and chips small square ones. Artists' pictures, the avatar, and the two buttons at the
 top of the Library stay round.
 
+The app's words are in **Noto Sans**, the web app's face, since the build after the squared look (still 0.11): every
+screen's titles, rows, buttons and notes, the navigation bars' titles, and the search fields. It covers the same
+letters the web app's does: Latin with every European language's accents, Vietnamese, Greek and Cyrillic.
+Anything else, such as Japanese, Korean or Arabic, is drawn in iOS's own face. It grows and shrinks with your text
+size as iOS's own did. Times and track numbers keep their place as they count. A few things are still in iOS's
+face: the symbols, the menus, alerts and swipe buttons (iOS draws those itself), and ids, paths and versions,
+which keep the phone's monospace. **Bold Text** (Settings > Accessibility > Display & Text Size) makes iOS's face
+heavier, but not Noto Sans.
+
 ## The Library
 
 The Library opens on its pages, side by side: **Albums**, **Playlists**, **Artists** and - without a
@@ -2921,6 +2930,32 @@ not 166: Phase 6's checks are being written at the same time and take the number
   overlaps, and every list still ends above the mini player and the bar.
 - **209 Reduce Motion** (Settings > Accessibility > Motion): a tap on the switch moves the page and its purple at
   once, with no slide; Find comes and goes without sliding.
+
+### Noto Sans's checks (210-217)
+
+**Not done yet.** These come with the build that sets the app in Noto Sans (still app 0.11 (11)), and follow
+the squared look's.
+
+- **210 The face.** Go through the Library, an album, Now Playing, Up Next, Search and You with the web app open
+  beside them: the same face as the web's. Check the navigation bars' titles too, large and then small once you
+  scroll (Search, You, All music's pages, an artist), and the back button's word.
+- **211 Its weights.** An album's title and Now Playing's song are bold; the switch's names, the tab bar's words
+  and the track titles keep the weights they had. Nothing looks smeared or faked-bold.
+- **212 Other alphabets.** Find a name with Polish or Czech letters (Łódź, Dvořák), Turkish (ş, ğ, ı), Vietnamese,
+  Greek and Cyrillic: each is drawn in the same face as the Latin beside it, not a different one. Japanese, Korean
+  and Arabic are iOS's face, as they were.
+- **213 Numbers that count.** Now Playing's times, the mini player's line, a track's number and length, and
+  Downloads' sizes: the digits hold still as they change, with no jiggle.
+- **214 Text size.** At the smallest and the largest text sizes, Noto Sans shrinks and grows as iOS's face did.
+  The navigation bars' titles take the size the app opened at: change the size with the app open, and they catch up
+  the next time it opens.
+- **215 What iOS draws for the app.** These are in Noto Sans: You's and Info's section headings and the small notes
+  under sections, the segmented controls (Search's filter, Info's, the EQ's ear), what you type in a search field,
+  and the bars' buttons (**Done**, **Edit**). The menus, alerts, swipe buttons and Paste stay in iOS's face.
+- **216 Bold Text** on: what's in iOS's face gets heavier, Noto Sans doesn't. Say whether that reads badly.
+- **217 Fit.** Noto Sans is a little wider than iOS's face, and its lines a little taller. Look where room was
+  tight: the switch's names, the tab bar's words, the mini player's two lines, Now Playing's song, the tiles'
+  title and artist, Up Next's rows, the EQ's numbers. Is anything cut off sooner than before, or overlapping?
 
 ## What it can't do yet
 

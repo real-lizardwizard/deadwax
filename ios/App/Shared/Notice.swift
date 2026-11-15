@@ -13,7 +13,7 @@ struct Notice: View {
 
     var body: some View {
         Text(text)
-            .font(.subheadline)
+            .font(Typeface.subheadline)
             .multilineTextAlignment(.center)
             .padding(.horizontal, 16)
             .padding(.vertical, 8)

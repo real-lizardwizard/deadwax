@@ -173,7 +173,7 @@ struct TurntableTimeLine: View {
 
     var body: some View {
         Text(deck.timeLine)
-            .font(.footnote.monospaced())
+            .font(Typeface.mono(.footnote))
             .foregroundStyle(Palette.quiet)
             .lineLimit(1)
             .minimumScaleFactor(0.8)
@@ -190,7 +190,7 @@ struct TurntableFootLine: View {
 
     var body: some View {
         Text(text)
-            .font(.footnote)
+            .font(Typeface.footnote)
             .foregroundStyle(Palette.quiet)
             .multilineTextAlignment(.center)
             .lineLimit(2)
