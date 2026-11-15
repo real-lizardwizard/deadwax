@@ -18,7 +18,13 @@ import Observation
 ///   away is forgotten, the last answer drawn again at once and a look asked.
 /// - The overlays are set before a write goes out and dropped when a poll agrees, or after 15 s; a cancel or a clear
 ///   that fails is only rolled back, as the web's (its error goes to the console there).
-/// - A look that sees an album newly filed asks Search's owned index again (question 8).
+/// - A look that sees an album newly filed asks Search's owned index again (question 8), and counts it (`filed`), so
+///   the album you don't have asks the store again (slice 2 - the web's announceAlbumsFiled).
+/// - (Slice 2) A source's Get (`enqueue`) lays its row down in the tap - "starting…" in Waiting - before the request
+///   goes out: deadwax's job settles it (gone once a poll lists the job, or after 15 s), a refusal stays on it in a
+///   listener's words until Clear done (useDownloadJobs.ts `enqueue`). An answer that never comes isn't a refusal
+///   (slice 2's review, finding 2): the row stays "starting…", the poll goes on looking for its job (`claimed`), and only
+///   RequestOverlays.unansweredSeconds after the tap does it say the download may have started.
 /// - The Done rows' albums are looked for only while Requests' root shows; leaving it, or deadwax going out of reach,
 ///   lets every look go - each out of flight at once, so the next look asks again (DoneLooks.InFlight). A tapped row's
 ///   album opens only while the root is still what shows when the answer comes; its songs are asked on their own, and
@@ -42,6 +48,8 @@ final class RequestsModel {
     private(set) var opening: String?
     /// What the app is looking at, as far as downloads go.
     private(set) var watching: Watching = .hidden
+    /// (Slice 2) One more each time a look sees an album newly filed: the album you don't have asks the store again.
+    private(set) var filed = 0
 
     private let server: ServerModel
     private let reachability: Reachability
@@ -71,6 +79,8 @@ final class RequestsModel {
     @ObservationIgnored private var looks = 0
     /// The writes out (each its own), and the overlays' clocks.
     @ObservationIgnored private var writes: [UUID: Task<Void, Never>] = [:]
+    /// (Slice 2) One more for each Get asked for here: a pending row's key, `pending-N` (the web's pendingKey).
+    @ObservationIgnored private var pendingKeys = 0
 
     // the Done rows' albums (Requests.tsx's)
     /// When each Done row first showed as done, by this phone's clock (ms) - 0 for one done in deadwax's first answer.
@@ -175,6 +185,7 @@ final class RequestsModel {
         overlays = .none
         retryingSame = []
         retryProblems = [:]
+        pendingKeys = 0
         samples = SpeedSamples()
         speeds = [:]
         statuses = nil
@@ -230,9 +241,10 @@ final class RequestsModel {
             do {
                 let answer = try await client.jobs()
                 guard !Task.isCancelled, epoch == self.epoch, look == looks else { return }
-                hasActive = answer.jobs.contains { $0.isActive }
                 filing = answer.jobs.contains { $0.status == "organizing" }
                 land(answer)
+                //? a Get whose answer never came is looked for as an active download is (the phone's own)
+                hasActive = answer.jobs.contains { $0.isActive } || overlays.looksForAJob
             } catch {
                 guard !Task.isCancelled, epoch == self.epoch, look == looks, !APIFailure.isCancellation(error) else { return }
                 // keep asking rather than dying on one bad answer
@@ -268,8 +280,11 @@ final class RequestsModel {
         //? the album a look sees filed: Search's owned marks asked again, so the album you don't have says you have it
         let filed = RequestsWatch.newlyFiled(statuses, jobs)
         statuses = RequestsWatch.statuses(jobs)
-        if !filed.isEmpty { search.refreshOwned() }
-        overlays = overlays.reconcile(jobs)
+        if !filed.isEmpty {
+            search.refreshOwned()
+            self.filed += 1
+        }
+        overlays = overlays.claimed(jobs).reconcile(jobs)
         trackingEnabled = answer.trackingEnabled
         failure = nil
         answered = true
@@ -384,6 +399,67 @@ final class RequestsModel {
         }
     }
 
+    /// (Slice 2) A source's Get, in the tap (useDownloadJobs.ts `enqueue`): its row up in Requests before the request
+    /// goes out, settled by deadwax's job (dropped after 15 s if no poll has listed it by then) or gone with no job to
+    /// show; refused - deadwax's 409, slskd's 502, deadwax out of reach - its words on the row, the error's own for
+    /// whoever runs deadwax, until Clear done. The poll asked at once once deadwax has it. An answer that never came
+    /// (the phone stopped waiting, RequestOverlays.unanswered) leaves the row "starting…", looked for in every poll, and
+    /// only RequestOverlays.unansweredSeconds after the tap says it may have started (`gaveUp`).
+    ///
+    /// False when it couldn't be asked at all - no deadwax to ask - and nothing was laid down: the sheet stays, and says so.
+    @discardableResult
+    func enqueue(_ body: EnqueueBody) -> Bool {
+        guard let client = server.client else { return false }
+        pendingKeys += 1
+        let key = "pending-\(pendingKeys)"
+        let asked = Monotonic.seconds()
+        overlays = overlays.withPending(PendingDownload(key: key, artist: body.release.artist, album: body.release.album,
+                                                        username: body.username, releaseMbid: body.release.releaseMbid,
+                                                        directory: body.directory, listedBefore: polled.map(\.id)))
+        redraw()
+        write { [weak self] epoch in
+            do {
+                let answer = try await client.enqueue(body)
+                guard let self, epoch == self.epoch else { return }
+                if let id = answer.jobId {
+                    self.overlays = self.overlays.settlePending(key, .job(id))
+                    self.expire(pending: [key])
+                } else {
+                    self.overlays.pending.removeAll { $0.key == key }
+                }
+                self.redraw()
+                self.kick()
+            } catch {
+                guard let self, epoch == self.epoch, !APIFailure.isCancellation(error) else { return }
+                if RequestOverlays.unanswered(error) {
+                    //? no answer is no refusal: deadwax may still be waiting on slskd, so the poll looks for its job
+                    self.overlays = self.overlays.stoppedWaiting(key)
+                    self.redraw()
+                    self.kick()
+                    self.giveUp(key, asked: asked)
+                    return
+                }
+                //? slskd's refusal, or deadwax's 409 ("already downloading from bob"), on its row: "didn't start"
+                let words = ErrorWords.of(error, admin: true, service: .downloads, failed: RequestWords.enqueueBroke)
+                self.overlays = self.overlays.settlePending(key, .refused(error: words.text, detail: words.detail))
+                self.redraw()
+            }
+        }
+        return true
+    }
+
+    /// A Get whose answer never came, said as possibly started once RequestOverlays.unansweredSeconds have passed since
+    /// its tap with no job found for it (a job found meanwhile has already taken the row away).
+    private func giveUp(_ key: String, asked: Double) {
+        write { [weak self] epoch in
+            let left = max(0, RequestOverlays.unansweredSeconds - (Monotonic.seconds() - asked))
+            try? await Task.sleep(nanoseconds: UInt64(left * 1_000_000_000))
+            guard !Task.isCancelled, let self, epoch == self.epoch else { return }
+            self.overlays = self.overlays.gaveUp(key)
+            self.redraw()
+        }
+    }
+
     /// A write's task, kept until it ends (a reset lets it go), given the epoch it began in.
     private func write(_ body: @escaping @MainActor (Int) async -> Void) {
         let key = UUID()
@@ -396,12 +472,13 @@ final class RequestsModel {
     }
 
     /// An overlay the server never confirms, dropped after `RequestOverlays.ttlSeconds`.
-    private func expire(cancelling: [Int] = [], cleared: [Int] = []) {
+    private func expire(cancelling: [Int] = [], cleared: [Int] = [], pending: [String] = []) {
         write { [weak self] epoch in
             try? await Task.sleep(nanoseconds: UInt64(RequestOverlays.ttlSeconds * 1_000_000_000))
             guard !Task.isCancelled, let self, epoch == self.epoch else { return }
             self.overlays.cancelling.subtract(cancelling)
             self.overlays.cleared.subtract(cleared)
+            self.overlays.pending.removeAll { pending.contains($0.key) }
             self.redraw()
         }
     }

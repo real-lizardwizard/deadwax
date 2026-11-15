@@ -9127,3 +9127,329 @@ Not verified, so only the phone can show:
 - that a thumb catches the line within the bar (check 220);
 - the sort order VoiceOver follows (check 225);
 - the bars' fonts at the largest sizes, and the large titles (check 227).
+
+## Phase 6, slice 2: Get and Sources (2026-11-15)
+
+notes/ios-specs/phase6-get-requests.md 2.8-2.10, 3.4, 3.5 and 6.2. Before it, an album you don't have showed its
+pressings on the phone but was got in the web app. Now:
+- **Get the album** under the chosen pressing's facts on GroupView (where "Phase 6's Get the album goes here" was), and
+  under it **the store line**: what the store and the downloads already have of that pressing, from
+  `/download/store_state`, which searches nothing;
+- **the Sources sheet**, "Choose a source": Soulseek searched for that pressing (`/download/find_candidates`, with the
+  person's Format), every folder a card - its score, folder and peer, Speed, Tracks, Quality, Size, Starts, what's
+  missing - and behind a tap on the score its reasoning; the chips (from the person's quality floor) and the sort;
+  Search again; every state's line;
+- **a card's Get**: `/download/enqueue` asked in the tap, the pending row up in Requests from that moment, the sheet
+  closing onto Requests' root.
+
+On `phase6-get` from `ios` at 8939ad9 (slice 1 merged), then fast-forwarded to 90f2964 (the play bar after review).
+src/__init__.py untouched; the app stays **0.11 (11)**; the .xcodeproj is unchanged (App/Get/ and the two new models
+are in the synchronized App folder). ROUTE_COUNT 54 -> 58: `/download/store_state`, `/download/find_candidates`,
+`/download/enqueue` and `GET /me/preferences`, every one on the server already. There is no server change.
+
+### Core (DeadwaxCore)
+
+- **GetRelease.swift** (new): releasePayload.ts and release.ts - what a Get sends. `GetGroup` and `GetRelease.group`
+  (`getGroup`: the group's title, first date and credit, from Search's preview or the pressings' own), and
+  `GetRelease.build` (`buildDownloadRelease`): the pressing's title, credit (`creditName`, `currentName`, `creditIds`),
+  year and original year, every track (`GetTrack`: position, title, length, disc and disc position, artist, the video
+  flag), the disc titles, format, country (its first event's area code, raw), catalogue number, label, packaging and
+  `detectEditionTags` - or the group's fallback with no pressing. Encoded with `FindCandidatesRequest`'s field names.
+- **MusicBrainz.swift**: what a Get needs that the page didn't read - a track's own credit, its recording's credit and
+  video flag, each release event's country and the packaging - all read leniently, nil where MusicBrainz gave none (an
+  empty credit kept as one: JavaScript's `[]` is truthy, so a track credited to nobody is "N/A", not its recording's).
+- **StoreLine.swift** (new): candidates.ts `storeStatus` and `storeNotes`, perPerson.ts `storeStatusFor`, `withoutJoin`
+  and the quality floor's word (`floorVerdict`, `floorNote`), with `StoreStateAnswer`, `HeldPressing`,
+  `DownloadInFlight` and `OtherPressing`, read leniently (an answer missing a field is never a failure). And the
+  phone's own `withoutAdd` and `drawn` - below.
+- **GetSettings.swift** (new): getSettings.ts - `readGetSettings`' three values (`GetMode`, `QualityFloor`,
+  `FormatPreference`, the route's defaults for anything wrong), `floorFilters`, `sourceChips` (`chips`), the phone's
+  `candidateFilters` and `pressedCount` - without Match details' minimums and the sample-rate floor, which are the
+  web's desktop panel's own (a phone-wide window of the web app has neither, docs/downloading.md).
+- **Sources.swift** (new): candidates.ts and the sheet's and a card's words. `Candidate`, `FindCandidatesAnswer` (the
+  store's four keys read off the same answer), `FindCandidatesBody` (the release flat, with the Format and an edited
+  query), `EnqueueBody` (the folder, the release searched for, up to ten runners-up as shown, the quality),
+  `EnqueueAnswer`; `CandidateFilters`, `QualityFilters`, `CandidateSort`; and `Sources`' rules - `passes`, `sorted`,
+  `best`, `band`, `percent`, `queryOverride`, `speedFact`, `startsFact`, `qualityText`, `tracksText`, `size`,
+  `signalChips`, `editionTags`, `missingLine`, `quality`, and every state's line and the announcement.
+  `SourcesWords`: the words the web builds inline in Sources.tsx, SourceCard.tsx and ReleaseGroupPage.tsx, read from
+  their source by the exporter - and three of the phone's own: `percent` (a score as drawn, for the App, which can't
+  see WebText), `subtitle` (ReleaseGroupPage.tsx's, a template literal there), and VoiceOver's `expanded`/`collapsed`.
+- **Whose.withStoreLine** (whose.ts): the folders held, each with whose it is as the store line says, so the meta line
+  ("in your library", "in the collection") never disagrees with the line under Get. **GroupPage** takes `store:` - the
+  last answer and the pressing it was for - and lays it on only for the pressing shown.
+- **Routes.swift**: the four routes in `all`, with their times to answer: `storeState` 20 s (the store's look may ask
+  slskd how far a download has got), `findCandidates` 180 s, `enqueue` 30 s; the preferences keep the default.
+  180 s is above what deadwax may take: two rounds of slskd's search at SLSKD_SEARCH_TIMEOUT's top (60 s) plus its 17 s
+  of bookkeeping each, and the 8 s it gives the former-names lookup - 162 s (test_the_app_waits_for_a_search...).
+  **Both were wrong, and are 300 s since the review** (below): the 162 s left out deadwax's search gate, and the
+  enqueue has no bound on the server at all.
+- **DeadwaxClient**: `storeState(_:)`, `findCandidates(_:)`, `enqueue(_:)` (a 409 is deadwax's "already downloading" or
+  "already in your library", a 502 slskd's refusal, each thrown with its words) and `getSettings()`.
+
+### Held to the web: by the exporter, or by hand
+
+`ios/scripts/export-get-vectors.cjs` compiles lib/releasePayload.ts, lib/release.ts, lib/pressings.ts,
+lib/candidates.ts, lib/getSettings.ts, lib/perPerson.ts, lib/whose.ts and lib/format.ts, with what they import, and
+reads the words that live in components (Sources.tsx's, SourceCard.tsx's, ReleaseGroupPage.tsx's Get the album,
+permissions.ts's GET_OFF) from their source. It writes Fixtures/get/get-vectors.json (3.6 MB, every choice seeded):
+- the speed bar's full rate and the score bands; every word;
+- what each of the main page's two Find buttons sent (tests/fixtures/payloads/find-buttons.json): 8 cases, the body
+  the one builder makes of each and of the album as a whole;
+- `getGroup` over the real pressings (tests/fixtures/pressings/): 76 groups, with and without Search's preview, each
+  pressing chosen and none, and each body;
+- 120 seeded groups and pressings with every edge a payload has, and their bodies;
+- 96 edition-word cases (JavaScript's `\s` included) and 65 video-flag cases;
+- 200 store answers: `storeStatus`, `storeStatusFor` at every floor, `withoutJoin`, `storeNotes`, each download's
+  progress, copy and floor verdict; 80 `withStoreLine` cases;
+- 200 seeded folders, every fact a card draws and its reasoning;
+- 120 seeded answers through seeded chips and every sort: what passes, in what order, the best, every state's line
+  and the announcement;
+- `sourceChips`, `floorFilters` and `pressedCount` for every floor and set of chips; 9 settings answers; 11
+  searching lines; 24 query overrides.
+
+`ui/test/iosget.sim.cjs` runs it with `--check`; `GetVectorTests` (15) replays it.
+
+By hand (`GetTests`, 11): `withoutAdd` and `drawn` (the web has no case without Add - every page of its gives it -
+so the vectors can't hold it); a Get's body flat with its Format; a card's Get sending the next ten as shown, itself
+left out; a real `find_candidates` answer read; an enqueue's two answers (a job, a join); the four requests' methods,
+paths and times; a refused enqueue thrown in deadwax's words; the meta line taking the store line's word only for the
+pressing shown; the sheet's subtitle; a score as drawn.
+
+### The app
+
+- **GetSettingsModel** (Models/, new): You > Getting albums as kept on deadwax - `ask()` shares the read in flight
+  (one per person, `epoch`-guarded), `format()` waits for it (else asks once) and gives the Format a search is scored
+  by, the defaults if deadwax can't say; `floorNow` the chips' start. Asked as the album's page shows; nothing is
+  seeded on the phone (spec 2.12: slice 3 brings You's three choices). Reset with the person.
+- **SourcesSearch** (Models/, new): one search per Get - `start`, `requery` (an edited query only:
+  `Sources.queryOverride`), `stop` (the request cancelled, which stops it in slskd too: the route's `unless_abandoned`),
+  and only the newest run lands. `download()` allows one Get per search.
+- **SourcesSheet** (Get/, new): a NavigationStack sheet, "Choose a source" with Cancel; the subtitle; the chips in a row
+  that scrolls sideways (`ChipFace`: a 30-point face in a 44-point target) and the sort's Menu; then the states in a
+  LazyVStack - asking, an error (ErrorNote in a listener's words, Try again), the store's status in the cards' place
+  (held whole or downloading whole: nothing was searched), notes, nothing lossless, nothing found (the query there to
+  edit), none through the chips (Clear filters), the cards and the line saying what was searched, and Search again.
+  The chips start as the floor and are re-made from it if its word lands after the sheet opened, unless one was tapped
+  since. Each outcome is announced (`Sources.announcement`).
+- **SourceCardView** (Get/, new): the score toggle (green from 75, amber under, the chevron turning; "92% match",
+  expanded or collapsed, to VoiceOver), the folder and "from <peer>", Get (`PrimaryFace` for the best match only -
+  edged in `Palette.best` - `TintedFace` for the rest, each named "Get <folder> from <peer>"), the speed's well and bar,
+  the facts in a `ViewThatFits` (side by side, two by two, one over another), what's missing in amber, and the
+  reasoning last on the card (the edition words in a wrapping layout, each signal's badge and meaning), so opening it
+  moves nothing above.
+- **StoreLineView** (Get/, new): the box - its title (green for held), its lines - and the notes under it; nothing at
+  all with nothing to say.
+- **GroupView**: Get the album (`PrimaryFace(large: true)`) and the store line under the pressing's facts, nothing
+  before a pressing is chosen; GET_OFF without Get albums; offline, no Get and `StoreLine.offline` in the line's place
+  (only for someone who could Get). The line is asked (`.task(id: StoreAsk)`) on the pressing, `RequestsModel.filed`,
+  the page shown (its tab current, no sheet, the app active), reachability and the person; the last answer for the same
+  pressing stays until the new one lands; a new title is announced while the page shows. The sheet is `item:`-driven
+  (`GetRequest`, a new id per Get, so the same album got twice searches twice).
+- **RequestsModel**: `enqueue(_:)` - the pending row (`pending-N`) laid with `withPending` and drawn at once, then
+  `.job(id)` settled (and the pending key expired once the job is seen) or the row dropped for an answer with no job,
+  or `.refused` with the words `ErrorWords.of` gives (RequestWords.enqueueBroke as the fallback) - and the poll kicked.
+  `filed` counts each answer that filed something, for the store line.
+- **AppNavigation.showRequestsRoot()**: Now Playing closed, the Requests tab, its stack at the root.
+- **Palette**: `card`, `label`, `best`, `barGreen`/`barGrey` (gradients), `dangerFill`/`dangerEdge`, each commented with
+  its web token (test_the_sources_sheet_is_drawn_in_the_webs_colours).
+
+### Decided here (the spec was silent, or this departs from it)
+
+- **No Join, no Add, no auto-pick** (slice 3's). So the phone draws `StoreLine.drawn` - `withoutJoin`, then the phone's
+  own `withoutAdd` - and the box never says "Join it" or "add it" above no button; "In the collection, not in your
+  library" stays as the title, as it's still true. Every Get shows the sources, whatever When I tap Get says. The
+  quality floor's line keeps the web's "getting a copy of your own isn't offered yet", which is the web's own word.
+- **Search again is built here**, not in slice 3: the web's sheet has it under folders found, and leaving it out would
+  have stranded "Nothing found" with no way on. The spec's slice 3 "Search again with your own words" is done.
+- **The hand-over to Requests happens in the sheet's `onDismiss`**, after the sheet has gone - switching the tab while
+  a sheet is presented from a tab not about to be shown is the kind of thing SwiftUI drops or animates oddly.
+- **The store line is asked again whenever the page shows**, not only as the pressing is chosen - so a Get, a cancel
+  in Requests or a filing elsewhere is said on coming back; the last answer stays meanwhile so the line doesn't flash.
+  Another pressing's answer never stands for the one shown (the web's `said` check).
+- **Offline: no Get at all**, and `StoreLine.offline` ("Getting albums works once deadwax is back.") where the line goes -
+  only for someone with Get albums; without, GET_OFF stands as ever.
+- **Get albums' preferences aren't seeded on the phone**: until deadwax answers, the chips start empty and the Format
+  is the route's default; the floor landing late re-makes the chips unless touched.
+- **The enqueue's refusal words**: a 409 is deadwax's sentence, said as a retry's refusal ("It's already
+  downloading."); anything else through `ErrorWords.of` with the downloads as its service.
+
+### Tests
+
+- **GetVectorTests** (15) and **GetTests** (11), above. **FixtureFiles** knows the new fixture.
+- **ClientTests**: `Routes.all` 58, and the three new times to answer (its first full run failed on both, still
+  slice 1's 54 routes and times - fixed).
+- **tests/test_ios_contract.py**: ROUTE_COUNT 58; a Get sends only what `FindCandidatesRequest`, `EnqueueRequest`,
+  `Alternative`, `Track`, `Quality` and `EnqueueFile` declare, and everything they need (pydantic drops the rest without
+  a word); the store's word within what `_nothing_here`, `held_copy`, `describe_job` and `other_pressings` build, each
+  struct read leniently; a search within `_serialize_candidate` and both `find_candidates` returns; an enqueue's two
+  returns and its 409 and 502; GetSettings within the preferences route, its defaults the route's; the 180 s; and
+  `find_candidates` and `enqueue` needing `request` (Get albums), as the app's Get does, while `store_state` needs
+  nothing more.
+- **tests/test_ios_palette.py**: the new colours against theme.css and drawn where the web draws them.
+- **iosget.sim.cjs**: the exporter's `--check`.
+
+**Mutations** - each rule broken on purpose, GetTests and GetVectorTests run, the rule put back. All 12 were caught:
+1. `withoutAdd` keeping the add line (`withoutAddDropsTheLineTellingYouToAddIt`);
+2. `drawn` keeping Join's line (`somebodyElsesDownloadIsSaidWithNoJoinUnderIt`);
+3. a part held said as held whole (`theStoreLineIsTheWebs`);
+4. the green band from 70 (`theNumbersAreTheWebs`, `aCardSaysWhatTheWebsSays`);
+5. nine runners-up (`aCardsGetSendsTheFolderAndTheNextTenAsShown`);
+6. an unedited query overriding (`onlyAnEditedQueryOverrides`);
+7. 320 kbps always a chip (`theChipsAreTheWebs`);
+8. "after 1 others" (`aCardSaysWhatTheWebsSays`);
+9. Highest quality sorted worst first, 10. Complete albums only letting a gap through, and 12. Starts now ignored
+   (`theListPassesSortsAndSaysWhatTheWebsDoes`);
+11. the subtitle keeping an empty part (`theSheetsSubtitleIsTheTitleAndThePressingEitherLeftOutWhenEmpty`).
+
+The App's own wiring (the sheet, the asks, the hand-over) has no tests: it is SwiftUI's, and the rules it applies are
+each tested in Core.
+
+### Verified, and not
+
+Verified, on the tree before its commit:
+- `swift test`: Core 1602, Audio 158, Turntable 12. No warnings. (Its first run failed ClientTests' two route tests,
+  still slice 1's - fixed, above.)
+- The unsigned Debug and Release device builds (Xcode, `generic/platform=iOS`) succeeded, with no warnings but the
+  usual appintentsmetadataprocessor line. The .xcodeproj is unchanged; `check_project.py` ok.
+- `npm run build` and all 89 sims on Node 22.23.4, iosget's `--check` among them.
+- The full pytest suite: 4550 passed, 1 skipped (test_ios_contract's six new tests and test_ios_palette's one among
+  them); the tests that read the docs, the iOS ones and test_source_bytes run again after the last doc edits: 482
+  passed.
+- The 12 mutations above, each caught.
+
+Not verified - only the phone can tell (docs/ios.md's checks 180-192):
+- Real slskd and real Soulseek: a search's answer, a refusal, an enqueue's - every slskd here is a fake, and Sources
+  has been seen only against fakes (CLAUDE.md's Next up 2).
+- The sheet closing and the tab switching in `onDismiss` on a device: whether it reads as one movement, and whether
+  the Search stack is where it was on coming back.
+- Whether a search cancelled by Cancel or a swipe really stops in slskd (the route's `unless_abandoned` on a dropped
+  connection, over WireGuard).
+- VoiceOver: the store line's and the sheet's announcements heard whole as the views redraw; the score's disclosure
+  read as "92% match, collapsed".
+- The cards and the chips at the largest text sizes, and `ViewThatFits` choosing as intended.
+- The in-app pieces themselves have run only in the compiler: no Simulator is used here.
+- CI's Xcode 26.6 (the older Swift). The new code spells out its closures' types and keeps each `#expect` small.
+
+## Phase 6, slice 2's review (2026-11-15)
+
+Five findings, fixed on phase6-get after 41f62c6, in one commit. The review found the contract matching the server field
+for field and the vectors regenerating byte for byte.
+
+### 1. The Sources sheet ignored Reachability (high)
+
+The cards kept live Get buttons while deadwax was out of reach, and a Get then closed onto a Requests tab that, offline,
+shows only "Requests show once deadwax is back." - so whether the Get failed was never seen. Now the sheet reads
+Reachability:
+- out of reach, "Getting albums works once deadwax is back." (StoreLine.offline, the album page's own words) at the top
+  of whatever it shows, and announced as deadwax goes;
+- the cards found before dimmed (`Palette.dimmed`), and every card's Get off (`SourceCardView.gets`), as are Try again
+  and Search - and `get()` refuses in the tap too, so nothing hands over to Requests;
+- back in reach, all of it live again, and Search again is under the cards as ever;
+- a search that failed while deadwax was away (nothing answered, or not in time - `ErrorWords.kind` .offline or .timeout,
+  looked at only as deadwax comes back) searches again by itself.
+
+docs/ios.md said a sheet already searching "says it can't connect". It doesn't, at once: the request waits until
+URLSession gives up. The guide now says so, and check 188 asks it.
+
+### 2. The enqueue's 30 s was the phone's alone (high)
+
+deadwax puts no bound on `/download/enqueue`: it waits for the release's lock, then for slskd's enqueue (no timeout of
+its own), which answers once the peer is reached - and the web's fetch has no timeout. So a slow peer past 30 s left a
+refused "didn't start" row that never reconciled, beside the real job under Waiting. Now:
+- `Routes.timeouts[enqueue]` is the search's, 300 s (test_ios_contract holds them equal, and that the route and slskd's
+  enqueue still set no bound);
+- an answer that never came (`RequestOverlays.unanswered`: ErrorWords' .timeout class - URLSession's own, or a proxy's
+  408 or 504) isn't settled as refused: the row stays "starting…" (`stoppedWaiting`), and the poll keeps going for it
+  while nothing else is active (`looksForAJob`, in the poll's `hasActive`);
+- every poll looks for its job (`claimed`, before `reconcile`): a job not listed when the request was asked
+  (`PendingDownload.listedBefore`), for the same pressing (`releaseMbid`) - its own folder from its own peer first
+  (`directory`, `username`), else any (with logins on, the download deadwax joined it to). One job goes to one request,
+  and the row goes as an answer's would;
+- `RequestOverlays.unansweredSeconds` (600 s) after the tap with no job found, it is given up on (`gaveUp`): Needs
+  attention, "no answer", and RequestWords.mayHaveStarted - "deadwax didn't answer in time, so this may have started
+  anyway. If it doesn't appear here soon, get it again." Clear done takes it; a job showing later still claims it.
+
+The web has none of it (its request never times out), so it is held by hand: GetTests'
+`onlyAnAnswerThatNeverCameIsUnansweredRatherThanRefused`, `aGetWhoseAnswerNeverCameStaysStartingAndIsLookedFor`,
+`aPollFindsTheJobOfAnUnansweredGetByItsPressingAndFolder` and `givenUpOnAnUnansweredGetSaysItMayHaveStarted`.
+PendingDownload's four new fields are optional, so the web's vectors decode as before.
+
+### 3. The 180 s search timeout could be shorter than deadwax's worst case (medium)
+
+The 162 s left out the search gate - every start waits its turn at SEARCH_GATE, up to SEARCH_TURN_SECONDS (30 s) - and
+the time outside `_run_searches`' sleeps, which are all `max_wait` counts. The worst case, from the server's own
+numbers in test_the_app_waits_for_a_search_as_long_as_deadwax_does:
+- round one: two starts (the credit and the current name) behind the gate, 60 s, then max_wait (SLSKD_SEARCH_TIMEOUT's
+  top, 60, plus the route's 17) and 15 s of margin for slskd's state asked each half second, the answers fetched and the
+  searches deleted - 152 s;
+- round two: one former name's start, 30 s, then the same 77 + 15 - 122 s;
+- the former-names lookup, 8 s, counted whole though it runs beside round one; and 10 s for the store's look before and
+  the ranking after.
+
+That makes 292 s, and the phone's search is given 300 s. The test reads every number from the server: the gate's bound,
+the range's top, each round's `max_wait` allowance (two of them), the lookup's budget. It checks that the rounds are
+still each start behind the gate, and that Routes.swift's comment says "292 s at worst". It fails if any of them grows
+past 300. An artist renamed more than once starts a search behind the gate for every name; deadwax bounds none of it as
+a whole, so this is the worst case of an artist renamed once.
+
+### 4. Dynamic Type cut the facts short (low)
+
+`Fact`'s value was one line even in the one-over-another fallback, so "FLAC, MP3 VBR 128-320k" ended in "…" at the
+accessibility sizes. It now has the folder name's treatment: up to three lines at those sizes. ViewThatFits measures a
+text's one-line width whatever its limit, so which layout is chosen doesn't change. Check 190 asks for it.
+
+### 5. A Get could be dropped without a word (low)
+
+`RequestsModel.enqueue` returned quietly with no client, and the sheet still closed onto Requests. It now says whether
+the Get started (`-> Bool`, nothing laid down when it didn't). The sheet hands over only then; otherwise it stays, with
+the error in a listener's words ("Can't connect to deadwax.", ErrorNote with the downloads as its service), and another
+tap may ask again (`SourcesSearch.downloadAgain`).
+
+### Docs
+
+docs/ios.md's Getting an album:
+- the offline paragraph, rewritten (finding 1);
+- a paragraph on a Get whose answer doesn't come (finding 2);
+- the facts at the largest sizes (finding 4).
+
+Its checks:
+- 188 asks the sheet offline;
+- 190 asks the facts whole;
+- a new 192 asks a slow peer, if one comes along.
+
+The troubleshooting table has a "no answer" row.
+
+### Tests
+
+- GetTests: the four above, and the client's two times to answer (300 s each).
+- ClientTests: the times.
+- test_ios_contract.py: the search's worst case recomputed (finding 3), and the enqueue's.
+
+**Mutations**: each rule broken on purpose, the tests run, the rule put back. All were caught:
+1. `unanswered` taking an offline failure for no answer;
+2. `claimed` matching a job listed before the tap;
+3. `claimed` ignoring the pressing;
+4. `claimed` giving one job to two requests;
+5. `gaveUp` acting on a row still waiting for its answer;
+6. `looksForAJob` counting a refused row;
+7. the may-have-started row drawn as a refusal ("didn't start");
+8. the enqueue's timeout back to 30 s;
+9. SEARCH_TURN_SECONDS raised on the server (the contract test fails: the phone's 300 s no longer covers it).
+
+### Verified, and not
+
+Verified, on the tree before its commit:
+- `swift test`: Core 1606, Audio 158, Turntable 12. Its first run of the Get tests failed GetTests' two times to
+  answer (still 180 s and 30 s); fixed.
+- The unsigned Debug and Release device builds succeeded, with no warnings but the usual appintentsmetadataprocessor
+  line. The .xcodeproj is unchanged; `check_project.py` ok.
+- `npm run build` and all 89 sims.
+- The full pytest suite: 4550 passed, 1 skipped. After the last doc edits, the tests that read the docs, the iOS ones
+  and test_source_bytes were run again: 482 passed.
+- The 9 mutations above, each caught - the ninth on the server's own file, put back (src/ has no diff).
+
+Not verified - only the phone can tell:
+- whether a dimmed card and its dimmed Get read as "from before" (check 188);
+- what URLSession does with a search in flight as WireGuard drops - an error at once or only at 300 s;
+- a real slow peer (check 192): whether one ever takes long enough for any of this to show.

@@ -125,6 +125,29 @@ public enum Whose {
     public static func mineBlockShown(_ mine: AlbumMine, refused: Bool) -> Bool {
         mine.action != nil || !(mine.note ?? "").isEmpty || refused
     }
+
+    /// (Phase 6, slice 2) The folders the store holds of an album, with whose each is as the store line under Get the
+    /// album last said it (`withStoreLine`): that line is asked afresh as the album you don't have shows, while
+    /// `/library/owned`'s answer is kept, and whose an album is moves outside the tab - so the meta line must never read
+    /// the kept "in your library" over the fresh "In the collection, not in your library". The folders of the pressing
+    /// the line is about (`held.paths`) and of each other pressing it names take its word; the rest, and every folder it
+    /// says nothing of (no `yours`), keep the library's. Held to the web by Fixtures/get/get-vectors.json.
+    public static func withStoreLine(_ holding: [OwnedAlbum], _ said: StoreStateAnswer?) -> [OwnedAlbum] {
+        var word: [[UInt16]: Bool] = [:]
+        for pressing in said?.otherPressings ?? [] {
+            if let yours = pressing.yours { word[Array(pressing.path.utf16)] = yours }
+        }
+        if let held = said?.held, let yours = held.yours {
+            for path in held.paths ?? [] { word[Array(path.utf16)] = yours }
+        }
+        return holding.map { (album: OwnedAlbum) -> OwnedAlbum in
+            guard let yours = word[Array(album.path.utf16)], yours != album.yours else { return album }
+            return OwnedAlbum(path: album.path, artist: album.artist, album: album.album, year: album.year,
+                              edition: album.edition, releaseMbid: album.releaseMbid,
+                              releaseGroupMbid: album.releaseGroupMbid, formats: album.formats,
+                              trackCount: album.trackCount, albumartistMbids: album.albumartistMbids, yours: yours)
+        }
+    }
 }
 
 /// What the album page says of whose an album is, and offers (whose.ts AlbumMine).

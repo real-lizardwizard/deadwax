@@ -2417,6 +2417,7 @@ and pick it from the new list.
 
 The native app's own problems - it can't reach deadwax, a sign-in that's refused, a Library that says
 your music isn't available (deadwax can't reach Navidrome), a song that won't play, normalization that
-couldn't check an album's volume, "Untrusted Developer", it won't open after a week, install.sh can't
-find the iPhone or the build fails signing - are in
+couldn't check an album's volume, a Get whose search for sources fails or whose download didn't start,
+"Untrusted Developer", it won't open after a week, install.sh can't find the iPhone or the build fails
+signing - are in
 [the iPhone app's page](ios.md#when-something-goes-wrong), with what to do about each.

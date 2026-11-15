@@ -1,4 +1,4 @@
-# The iPhone app (early: app 0.11, downloads, lyrics, the EQ, the turntable, play history, your library, the Library, Search and Requests)
+# The iPhone app (early: app 0.11, downloads, lyrics, the EQ, the turntable, play history, your library, the Library, Search, Requests and getting albums)
 
 deadwax is getting a native iPhone app, built with SwiftUI and its own audio engine, for what a web
 page can't do well: seamless joins and normalization done on the phone, downloads to play offline,
@@ -38,14 +38,17 @@ pressings and tracklists, an artist's albums); what deadwax has saved of MusicBr
 library at once; and **More** from MusicBrainz, a page at a time (see [Search](#search)). Phase 6 begins with
 **Requests**, still app 0.11: every download you asked for - in the web app, or on another phone - under the web
 app's four headings, with its progress, cancelled, tried again from another source and cleared on the phone, and
-a finished album opened or played from its row (see [Requests](#requests)). Get on the phone and the rest come
-next (see [What it can't do yet](#what-it-cant-do-yet)).
+a finished album opened or played from its row (see [Requests](#requests)). Then **Get**, still app 0.11: an
+album you don't have got from the phone - what deadwax already has of the pressing said under Get the album, the
+sources Soulseek has for it in a sheet, each with why it scored what it did, and the one you pick on its way in
+Requests from your tap (see [Getting an album](#getting-an-album)). Joining a download somebody else asked for,
+Add to my library and the rest come next (see [What it can't do yet](#what-it-cant-do-yet)).
 
 **Nothing of Phase 2, the lyrics, the EQ, the turntable, play history, your library downloaded,
-playlists, artists, songs, Search or Requests has been seen on an iPhone yet.** It's built and tested on a Mac,
+playlists, artists, songs, Search, Requests or Get has been seen on an iPhone yet.** It's built and tested on a Mac,
 and what only a phone can tell is what [the checks](#the-checks) are for. Until they're answered, read
 everything about downloads, lyrics, the EQ, the turntable, play history, your library, playlists, artists,
-songs, Search and Requests below as what the app is built to do.
+songs, Search, Requests and Get below as what the app is built to do.
 
 The app talks only to deadwax, never to Navidrome, through deadwax's own routes, so the phone never
 needs the Navidrome account deadwax itself uses. With logins on, you sign in with your own Navidrome
@@ -674,7 +677,7 @@ and All artists, rather than a page among your own albums and artists.
 with "Search your library and albums you don't have yet." under it while it's empty ("Search your
 library, the collection, and albums nobody has yet." with a library of your own). It searches what
 deadwax has, as the web app's Search does, and the artists, albums and songs you don't have yet from
-MusicBrainz. Get comes later (see [What it can't do yet](#what-it-cant-do-yet)).
+MusicBrainz - and an album you don't have is got from its page (see [Getting an album](#getting-an-album)).
 
 A fifth of a second after you stop typing - or at once when you press **Search** on the keyboard - it
 asks Navidrome, and shows **one list**, the web app's:
@@ -760,7 +763,8 @@ go.
   **tracklist**: what it is against the usual one ("The usual tracklist, shared by 9 of 10 pressings", or
   "This pressing adds 3 tracks"), each track marked where it differs (**Bonus**, **Other version**,
   **Renamed**), and **Not on this pressing** for what it leaves out. The artist is a link when one artist of
-  your library is theirs. **Get** comes to this page in the next phase; for now get it in the web app.
+  your library is theirs. **Get the album**, under the pressing's facts, gets the pressing chosen - see
+  [Getting an album](#getting-an-album).
 - **A song you don't have** opens under itself the albums it's on, the studio album first, each with its
   kind and year ("Live album · Bootleg · 2008") and "in your library" for one you have it on; compilations,
   live albums and soundtracks are folded behind **On 4 compilations and live albums** - tap it to show them.
@@ -805,10 +809,95 @@ go.
   comes in: "In your library: 2 albums.", then "Found earlier: 1 album. More found: 3 albums." (each once for
   the words). On an album opened from a song, its track reads "…, the song you searched for".
 
+## Getting an album
+
+On an album you don't have's page (see [Search](#search)), once its pressings are in, **Get the album** stands under
+the chosen pressing's facts: the page's one big button, for the pressing chosen above it. To get another pressing,
+choose it first. Without **Get albums** (with logins on, an admin gives it) there's no button, and in its place
+"Getting albums is off for you - ask an admin."
+
+**The line under it** says what deadwax already has of that pressing before you tap anything, in the web app's
+words (see [Downloading](downloading.md#when-you-already-have-it)). deadwax looks without searching Soulseek: as the
+pressing is chosen, as a download is filed, and each time the page comes back into view - from another tab, from the
+background, or as the sheet below closes - so a Get or a cancel in Requests shows on it when you come back. While it
+looks again, the line keeps what it said until the new answer comes, and another pressing's answer never stands for
+the one chosen.
+
+- **"Already in your library"**, its folder, and "10 of 10 tracks · FLAC".
+- **"Already downloading"**: "From mellotron · 3 of 11 files", and "To get it from another source, cancel it in
+  Requests first." - or **"Already downloaded"** while it's being added to your library.
+- With logins on, **"Already downloading for someone else"**: who from, the copy ("FLAC 16/44.1") and how far it's
+  got - and a line when that copy may be below your quality floor. **"In the collection, not in your library"** for
+  a pressing someone else has.
+- Notes under it: part of the pressing already here, and what a download would do about that ("Getting it adds only
+  the tracks that folder doesn't have yet."); a download of part of it running; another pressing you have.
+
+When deadwax has none of it, there's no line. **Join** (one download, everyone who asked waiting for it) and **Add to
+my library** come to the phone in the next build, so the line offers neither for now: do them in the web app.
+
+**Choose a source.** Tap Get the album and a sheet opens, **Choose a source**, the album and pressing under its title
+("Dummy · CD · 1994 · GB · Go! Beat"). deadwax searches Soulseek for that pressing - "Looking for “Dummy” by
+Portishead…" and "This takes a few seconds." while it does - and each folder found is a card, as in the web app's
+sheet (see [Downloading](downloading.md#choosing-a-source)):
+
+- **The score** ("92%" - green from 75, amber under it), the folder's name and who it's from, and **Get**. The best
+  match through the chips is edged in purple and has the one solid Get, wherever the sort puts it.
+- **Speed** first, with its bar: what you got from that person before ("what you got from them"), their usual speed,
+  or "no speed reported yet". Then **Tracks** ("11 of 11", amber with some missing), **Quality** ("FLAC 16/44.1",
+  "MP3 VBR 245k"), **Size** and **Starts** ("now", "after 3 others"), and in amber what's missing ('Missing “Roads”
+  and 2 more').
+- **Tap the score** for **Why it's a 92% match**: the edition words in the folder's name (DELUXE, REMASTER…), then
+  the score's six parts, each with its percentage and what it measures - **Track names**, **Track count**, **Track
+  lengths**, **Edition**, **Format** and **Availability**. Tap the score again to fold it away.
+- **The chips** - **Lossless**, **24-bit**, **Starts now** and **Complete albums only** (and **320 kbps** with that
+  quality floor) - narrow the list, and **the sort** orders it: **Best match**, **Highest quality**, **Largest
+  first** or **Smallest first**. The chips start as your **quality floor**, the sort at Best match, and the search is
+  scored by your **Format**. Both are kept for you on deadwax and set in the web app's You > Getting albums for now
+  (the phone's You gets them in the next build). Every Get on the phone shows the sources, even with **Pick the best
+  source for me** chosen there.
+- **Search again**, under the cards, opens the words searched in a field: change them and tap **Search**. Changed
+  words are searched exactly as typed; unchanged, it searches as Get did.
+
+Under the cards, what was searched: 'Searched for “Portishead Dummy” · 41 sources, 4 match your filters'. Otherwise:
+
+- **Nothing found**: 'Nothing found for “Portishead Dummy”.', the words there to change, with Search.
+- With your Format **Lossless only** and no lossless copy found: 'Nothing lossless found for “Portishead Dummy”.'
+  and why - your Format leaves the rest out.
+- **None through the chips**: "41 sources found - none match your filters." and **Clear filters**.
+- **Already in your library**, or **already downloading**: the line from the page, in the cards' place. deadwax
+  searched nothing.
+- **Soulseek couldn't be searched**: why - slskd's own sentence where it gave one ("slskd is not connected to the
+  Soulseek network, so it cannot search"), otherwise "Downloads aren't working right now." - with **Try again**.
+
+**A card's Get** closes the sheet and shows Requests, the download already there from your tap, under Waiting,
+"starting…", until deadwax and slskd take it. If deadwax refuses it (someone got it meanwhile, say), it moves to
+Needs attention, "didn't start", with why ("It's already downloading.", "It's already in your library."). The Get
+also hands deadwax the next sources in the list as you had it, for **Another source** if this one fails. **Cancel**,
+or the sheet swiped down, stops the search, in slskd too; Get the album again searches afresh.
+
+deadwax waits as long as it takes for the person sharing the album to be reached, and the phone waits up to five
+minutes for its answer. If none comes, the row isn't marked as failed - the download may well have started. It
+stays "starting…" while Requests looks for it, and is replaced by the download as soon as it shows. Only after ten
+minutes with nothing found does it move to Needs attention, "no answer", with "deadwax didn't answer in time, so
+this may have started anyway. If it doesn't appear here soon, get it again." **Clear done** takes it away.
+
+**Offline**, there's no Get the album, and "Getting albums works once deadwax is back." stands in the line's place
+(with Get albums). In a sheet already open, the same words stand at its top (VoiceOver says them as it happens).
+What it found stays, dimmed, and its **Get**, **Try again** and **Search** are off until deadwax is back - a Get then
+would close onto a Requests that can't show it. Once deadwax is back they're on again, and Search again is under the
+cards if you want a fresh search. A search still under way when deadwax went out of reach carries on waiting for its
+answer. If the phone gives up on it first, the sheet says why, then searches again by itself once deadwax is back.
+
+**VoiceOver** reads the line as one, and says what it now says as it changes. The sheet says each outcome as it lands
+("Looking for “Dummy” by Portishead…", then "12 sources."). The score reads "92% match", collapsed or expanded, and a
+card's Get names its folder and who it's from ("Get Dummy [FLAC] from mellotron"), as one person often shares the
+same album twice. At the largest text sizes a card's facts go two by two, then one over another, each on up to three
+lines rather than cut short.
+
 ## Requests
 
-The **Requests** tab, between Search and You, lists every download you asked for - in the web app, or on another
-phone (getting an album from the phone comes in the next build) - under the web app's four headings, in the web
+The **Requests** tab, between Search and You, lists every download you asked for - on this phone (see [Getting an
+album](#getting-an-album)), in the web app, or on another phone - under the web app's four headings, in the web
 app's words. A heading shows only when it has something under it.
 
 - **Downloading**: the pressing's cover, the album and its edition ("Mezzanine · 1998 CD"), the artist and who
@@ -1171,7 +1260,9 @@ album.
 - **At the top**: who you're signed in as, or "No sign-in needed" with logins off.
 - **Getting albums**: **Confirm before cancelling**, on by default - "The ✕ on a download in Requests asks first.
   Kept on this device." Off, the ✕ on a card in [Requests](#requests) cancels at once. It's this phone's, not your
-  account's, as it is each browser's in the web app. When I tap Get, the quality floor and Format come with Get.
+  account's, as it is each browser's in the web app. **When I tap Get**, the **Quality floor** and **Format** come
+  here in the next build. They're your account's, kept on deadwax: a Get on the phone already starts its chips at
+  your quality floor and is scored by your Format, as set in the web app (see [Getting an album](#getting-an-album)).
 - **Playback**:
   - **Gapless**: On. "Albums play straight through, with no gap between songs." It isn't a setting:
     the app always plays this way.
@@ -2984,7 +3075,8 @@ artist you don't have's page (still app 0.10). Compare with the web app's Search
 
 **Not done yet.** These come with the build that adds Requests - still **app 0.11 (11)**, the first part of Phase 6.
 Compare with the web app's Requests on the Mac: the phone should show the same rows, in the same order, in the
-same words. Check 175 wants logins on; the rest work either way. Getting an album is done in the web app for now.
+same words. Check 175 wants logins on; the rest work either way. Check 167 gets its album in the web app; getting
+one on the phone is checked from 180.
 
 - **166 The tab.** The tabs read Library | Search | Requests | You, Requests' icon an arrow into a tray. Tap it:
   the heading Requests, and Clear done at the top right, dimmed with nothing to clear. With nothing ever asked
@@ -3038,6 +3130,68 @@ same words. Check 175 wants logins on; the rest work either way. Getting an albu
   over **Same source again**, each read whole. Nothing overlaps, and the last card clears the whole bar at the
   foot, the mini player included; the badge sits clear of the mini player above it. Tap a Done row below the first
   five: its album opens; go Back and tap its ▶: it plays at once.
+
+### Get's checks, slice 2 (180-192)
+
+**Not done yet.** These come with the build that adds Get - still **app 0.11 (11)**, the second part of Phase 6.
+Compare with the web app on the Mac, the same album and pressing open in both: the phone should say the same, in the
+same words. Check 187 wants logins on; the rest work either way. Use an album you're happy to have in your library.
+
+- **180 Get an album, end to end.** In Search, find an album you don't have and open it. Under the pressing's facts:
+  **Get the album**. Tap it: **Choose a source** slides up, the album and pressing under its title, "Looking for …"
+  and "This takes a few seconds.", then the cards. Tap the best match's **Get** (the solid one): the sheet closes and
+  Requests shows at its top, the album already there under Waiting, "starting…", before deadwax has answered. Let it
+  download and be filed, then tap its **▶** under Done: it plays. Go back to Search: you're on the album's page as you
+  left it, and the line under Get the album now says "Already in your library".
+- **181 The pressing chosen.** On an album of several pressings, choose one that isn't the usual: the sheet's line
+  under its title names that pressing, and the search is for it. Before the pressings have loaded there's no Get the
+  album. On an album deadwax has nothing of, there's no line under the button.
+- **182 The line.** While 180's download is under Waiting or Downloading, open the album's page again: "Already
+  downloading", "From … · 3 of 11 files" and "To get it from another source, cancel it in Requests first." - the web
+  app's page for the same pressing says the same. Cancel it in Requests and go back to the page: the line goes within
+  a moment. Put the app in the background for a minute and bring it back: the line is asked again, and nothing on the
+  page jumps when it lands.
+- **183 Why it scored that.** In the sheet, tap a card's score: **Why it's a 92% match**, the edition words in the
+  folder's name, and the six parts with their percentages and what each measures. The same card in the web app's
+  sheet has the same score, parts and words. Tap the score again: it folds, and nothing above it moved.
+- **184 The chips and the sort.** Tap **Lossless**: the list narrows, and the purple edge and solid Get move to the
+  best match left. Sort by **Highest quality**: the best match keeps its edge wherever it lands. Press chips until
+  none match: "41 sources found - none match your filters." and **Clear filters**, which brings them all back. Under
+  the cards, "Searched for “…” · 41 sources, 4 match your filters" agrees with what's shown.
+- **185 Search again, and Cancel.** Tap **Search again**: a field opens with the words searched, the keyboard up.
+  Change them (drop the artist, say) and tap **Search**: "Looking for …" again, then cards, the line under them naming
+  your words. Words that find nothing: "Nothing found for “…”." with the field there to try again. Tap **Cancel**
+  while it searches: the sheet goes, and Get the album searches afresh.
+- **186 A refusal.** Open the sheet on the phone and wait for the cards. Then, in the web app, Get the same pressing.
+  Back on the phone, tap a card's Get: Requests shows the row "starting…", then under Needs attention "didn't start"
+  with "It's already downloading." (if it was filed meanwhile, "It's already in your library." - "…in the
+  collection." with logins on). Clear done takes it away.
+- **187 Get albums, and someone else's download.** As an admin, take **Get albums** from a user in the web app's
+  People. On their phone, open You (it asks deadwax again), then an album they don't have: no Get the album, and
+  "Getting albums is off for you - ask an admin." in its place, the line under it still saying what's here. Give it
+  back, open You again: Get the album is back. As that user, open an album another user is downloading: "Already
+  downloading for someone else", the copy and how far it's got - the web app's words, without its Join.
+- **188 Offline.** On an album you don't have's page, turn Airplane Mode on: Get the album goes, and "Getting albums
+  works once deadwax is back." stands in the line's place. Turn it off: the button is back, and the line is asked
+  again. Open the sheet and wait for the cards, then turn Airplane Mode on: the same words at the sheet's top, the
+  cards dimmed, every Get dimmed - tap one: nothing happens, and Requests doesn't open. Turn it off: the cards and
+  their Gets are back. Turn Airplane Mode on while the sheet is still searching and leave it: once the phone gives up,
+  it says why; turn it off, and it searches again by itself.
+- **189 Only the newest answer.** On a slow connection, choose one pressing and then another quickly: the line never
+  shows the first pressing's answer under the second. Open the sheet, Cancel, and Get the album again at once: only
+  the second search's cards ever show.
+- **190 The largest text** (Settings > Accessibility > Display & Text Size > Larger Text, all the way up). Get the
+  album reads whole; the line wraps rather than clips. In the sheet the chips scroll sideways, a card's facts go two
+  by two and then one over another, each fact read whole ("FLAC, MP3 VBR 128-320k" on two lines, not cut off with
+  "…"), the reasons read whole, and every Get stays in reach. Nothing overlaps.
+- **191 VoiceOver.** On the album's page, the line reads as one, and when it changes (Get something, come back) its
+  new title is heard. In the sheet, "Looking for “…” by …" is heard, then "12 sources." (or why there are none). A
+  score reads "92% match, collapsed", and double-tapping it reads expanded, the reasons after it. A card's Get reads
+  "Get <folder> from <who>", and the chips' row "Filter the sources", the sort "Sort the sources". Note what it says
+  if not.
+- **192 A slow peer.** (Only if you come across one: a Get whose peer takes minutes to answer.) Its row stays under
+  Waiting, "starting…", however long deadwax takes, and becomes the download when it shows - never "didn't start"
+  beside it. Note how long it took.
 
 ### The squared look's checks (200-209)
 
@@ -3165,8 +3319,10 @@ These are the web app's for now. Most of them come to the phone in the next phas
 
 - On an artist's page their **discography** from MusicBrainz, the **description** and the artist's
   managing (pictures, names).
-- In **Search**, **Get** (an album you don't have shows its pressings, but is got in the web app - Requests on
-  the phone then shows it on its way). An artist you don't have's page lists their albums, without their description or links. A
+- In **Search**, on an album you don't have: **Join** a download somebody else asked for, **Add to my library** a
+  pressing that's in the collection, and **Pick the best source for me** (every Get on the phone shows the
+  sources); and You's **When I tap Get**, **Quality floor** and **Format**, which the phone follows but which are
+  set in the web app. An artist you don't have's page lists their albums, without their description or links. A
   search of what's downloaded while deadwax can't be reached isn't built: offline, Search keeps a list already
   drawn, and new words wait for deadwax.
 - **Home** and **pins** - and so Home's Arriving: outside Requests, the tab's badge is the phone's only sign of a
@@ -3206,6 +3362,11 @@ These are the web app's for now. Most of them come to the phone in the next phas
 | The EQ's correction picker: **"Something went wrong."**, with **Try again** | deadwax answered with an error. If it's every search, deadwax may be older than 2.1.7, which has no AutoEq for the app (an admin sees why, folded under it). |
 | Search: **"Searching for more isn't working right now - try again in a few minutes."** (or **"Too many searches just now - try again in a moment."**), or an album you don't have says **"This album's details can't be loaded right now - try again in a few minutes."** | MusicBrainz is away, or turning searches away, for a while - it does, for minutes at a time. Your library's rows are still there; **Try again** in a minute. **"That took too long."** is the same, MusicBrainz slow enough that the phone stopped waiting. [The troubleshooting page](troubleshooting.md#the-apps-search-says-it-cant-search-for-more-or-keeps-searching) has the rest. |
 | Search: an album you don't have shows an **empty square** for its cover | Its cover comes from the Cover Art Archive through deadwax, which needs deadwax 2.1.24 or later - see [the troubleshooting page](troubleshooting.md#the-iphone-app-shows-no-cover-for-an-album-you-dont-have). |
+| Choose a source: **"slskd is not connected to the Soulseek network, so it cannot search"** (or **"Downloads aren't working right now."**), with **Try again** | slskd isn't logged in to Soulseek, or deadwax can't reach slskd. Whoever runs deadwax checks You > Connections in the web app - [troubleshooting](troubleshooting.md#a-search-fails-with-not-logged-in-or-slskd-refused-it) has the rest - then **Try again**. |
+| Choose a source: **'Nothing lossless found for “…”.'** | Your Format is Lossless only, which leaves out every copy that isn't. Change it in the web app's You > Getting albums, or **Search again** with other words. |
+| A Get's row under Needs attention says **"didn't start"** and **"It's already downloading."** (or **"…already in your library."**) | It was got - by you elsewhere, or by someone else - after the sheet searched. It's already in Requests, or already yours; **Clear done** takes the refused row away. |
+| A Get's row under Needs attention says **"no answer"** and **"deadwax didn't answer in time, so this may have started anyway."** | The person sharing it took more than ten minutes to be reached, or deadwax was stuck. Look under Waiting and Downloading - it may be there - and if it isn't, get it again. **Clear done** takes the row away. |
+| An album you don't have says **"Getting albums is off for you - ask an admin."** where Get the album goes | With logins on, an admin gives **Get albums** in the web app's People. Open You afterwards, so the phone asks deadwax again. |
 | An album stays on **"Waiting for Wi-Fi"** | Download over is Wi-Fi only (You > Downloads): join a Wi-Fi network that isn't a phone's hotspot, with Low Data Mode off - or choose Wi-Fi and cellular. |
 | **"Waiting for room - the storage limit is reached"** | Raise the Storage limit in You > Downloads, or remove something there (largest first). |
 | Your library's albums stay on **"Waiting for the phone to charge"** | Only while charging is on (You > Downloads, under Download your library): plug the phone in, or turn it off. Albums you download yourself don't wait for it. |

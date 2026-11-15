@@ -138,6 +138,14 @@ public enum Routes {
     public static let retryJob = Endpoint(method: "POST", path: "/deadwax/download/jobs/{job_id}/retry", query: [])
     public static let retryJobSame = Endpoint(method: "POST", path: "/deadwax/download/jobs/{job_id}/retry_same", query: [])
     public static let clearJobs = Endpoint(method: "POST", path: "/deadwax/download/jobs/clear", query: [])
+    // Phase 6, slice 2's (phase6-get-requests.md 0): Get - what the store and the downloads already have of a pressing
+    // (`StoreStateAnswer`, no search), Soulseek searched for it and its folders ranked (`FindCandidatesAnswer`), a
+    // folder asked for (`EnqueueAnswer`), and You > Getting albums as kept on deadwax (`GetSettings`: the Format a
+    // search is scored by, the floor the chips start as)
+    public static let storeState = Endpoint(method: "POST", path: "/deadwax/download/store_state", query: [])
+    public static let findCandidates = Endpoint(method: "POST", path: "/deadwax/download/find_candidates", query: [])
+    public static let enqueue = Endpoint(method: "POST", path: "/deadwax/download/enqueue", query: [])
+    public static let preferences = Endpoint(method: "GET", path: "/deadwax/me/preferences", query: [])
 
     /// The levels spec's name for `levelAlbum`: the album's levels warmed before its first play.
     public static var warmLevels: Endpoint { levelAlbum }
@@ -161,6 +169,7 @@ public enum Routes {
         searchArtists, searchSongs, artistFacts, discography,
         savedSearch,
         jobs, cancelJob, retryJob, retryJobSame, clearJobs,
+        storeState, findCandidates, enqueue, preferences,
     ]
 
     /// The routes given longer than the transport's own 8 seconds to answer, in seconds: the album index reads every
@@ -172,9 +181,15 @@ public enum Routes {
     /// MusicBrainz's ten attempts (3 s apart while it is busy), and their albums a browse of up to five pages; the
     /// downloads ask slskd for every open one's transfers and each queued one's place in its queue, a cancel stops each
     /// transfer and clears the partials, a move to the next source tries each runner-up in turn until one takes it, a
-    /// retry of the same one asks slskd again and a clear tidies the cancelled ones' transfers first -
-    /// tests/test_ios_contract.py holds each above the server's.
-    public static let timeouts: [Endpoint: Double] = [albumIndex: 30, autoEqSearch: 20, autoEqProfile: 20, libraryOwned: 30, fullySearch: 20, releaseGroup: 60, searchArtists: 20, searchSongs: 20, artistFacts: 60, discography: 60, jobs: 20, cancelJob: 30, retryJob: 60, retryJobSame: 30, clearJobs: 30]
+    /// retry of the same one asks slskd again and a clear tidies the cancelled ones' transfers first; the store's look
+    /// may ask slskd how far a download in flight has got (3 s) after the store index; a search for sources is two
+    /// rounds of slskd's search, each start waiting up to SEARCH_TURN_SECONDS (30 s) at deadwax's gate and each round
+    /// waited on for up to SLSKD_SEARCH_TIMEOUT (60 s at most) + 17 s, beside up to 8 s looking up the artist's former
+    /// names, and slskd's state, answers and ranking around them - 292 s at worst (slice 2's review, finding 3); and an
+    /// enqueue has no bound on the server at all (the release's lock, then slskd's, which answers once the peer is
+    /// reached), so it is given the search's, and an answer that never comes isn't taken for a refusal
+    /// (RequestOverlays.unanswered) - tests/test_ios_contract.py holds each above the server's.
+    public static let timeouts: [Endpoint: Double] = [albumIndex: 30, autoEqSearch: 20, autoEqProfile: 20, libraryOwned: 30, fullySearch: 20, releaseGroup: 60, searchArtists: 20, searchSongs: 20, artistFacts: 60, discography: 60, jobs: 20, cancelJob: 30, retryJob: 60, retryJobSame: 30, clearJobs: 30, storeState: 20, findCandidates: 300, enqueue: 300]
 }
 
 /// The Cover Art Archive's thumbnail sizes the app asks deadwax's relay for (`Routes.archiveCover`'s `size`, which takes

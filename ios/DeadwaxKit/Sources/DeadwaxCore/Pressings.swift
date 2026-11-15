@@ -786,10 +786,20 @@ public struct GroupPage: Sendable, Equatable {
     /// `index` (nil until `/library/owned` answers), the pressing picked (nil: the default) - and `song`, the recordings
     /// of the song it was opened from (slice 3): the pressing shown, unless one is picked, is one with the song
     /// (`songPressing`), and the song's tracks are marked (`songMatcher`).
+    ///
+    /// (Phase 6, slice 2) `store` is the store line's last answer and the pressing it was for: the answer for the
+    /// pressing shown says whose each folder it names is (`Whose.withStoreLine` - ReleaseGroupPage.tsx's `said`), so
+    /// the meta line and the line under Get never disagree; another pressing's says nothing.
     public init(id: String, answer: ReleaseGroupAnswer?, preview: ReleaseGroup?, index: OwnedIndex?, picked: String?,
-                personal: Bool, editors: Bool, fallbackTitle: String = "", song: [String] = []) {
+                personal: Bool, editors: Bool, fallbackTitle: String = "", song: [String] = [],
+                store: (id: String, answer: StoreStateAnswer)? = nil) {
         let releases = answer?.releases ?? []
         let asked = picked ?? (song.isEmpty ? nil : SongSearch.pressing(releases, song))
+        let shownId = Pressings.chosenId(releases, asked: asked, defaultId: Pressings.defaultId(releases))
+        let said = store.flatMap { (store: (id: String, answer: StoreStateAnswer)) -> StoreStateAnswer? in
+            guard let shownId, WebText.same(store.id, shownId) else { return nil }
+            return store.answer
+        }
         let isSong = song.isEmpty ? nil : SongSearch.matcher(releases, song)
         let credited = preview ?? releases.first(where: { $0.releaseGroup != nil })?.releaseGroup
         let ownership = index.map { (index: OwnedIndex) -> (held: [OwnedAlbum], guessed: [OwnedAlbum]) in
@@ -797,7 +807,7 @@ public struct GroupPage: Sendable, Equatable {
                                 title: Credits.first(credited?.title, Credits.first(releases.first?.title, fallbackTitle)),
                                 artists: [Credits.name(credited?.artistCredit), Credits.current(credited?.artistCredit)])
         }
-        let holding = ownership?.held
+        let holding = ownership.map { Whose.withStoreLine($0.held, said) }
         let held: Bool? = holding.map { !$0.isEmpty }
         let isMaybe = Pressings.holding(ownership) == .maybe
         func releaseIds(_ albums: [OwnedAlbum]) -> Set<String> {

@@ -18,9 +18,19 @@ public struct PendingDownload: Sendable, Equatable, Decodable {
     public var error: String?
     /// ...and the error's own words, for whoever runs deadwax.
     public var detail: String?
+    /// (The phone's own - slice 2's review, finding 2) What the request was for - its pressing and its folder - and the
+    /// jobs listed as it was asked, so a poll can find its job when deadwax's answer never came (`claimed`). Nil in the
+    /// web's vectors, which have none of it.
+    public var releaseMbid: String?
+    public var directory: String?
+    public var listedBefore: [Int]?
+    /// The phone stopped waiting for deadwax's answer (`RequestOverlays.unanswered`): the row stays "starting…" while
+    /// the poll looks for its job - and, given up on after `unansweredSeconds`, says it may have started.
+    public var unanswered: Bool?
 
     public init(key: String, artist: String, album: String, username: String, jobId: Int? = nil, error: String? = nil,
-                detail: String? = nil) {
+                detail: String? = nil, releaseMbid: String? = nil, directory: String? = nil, listedBefore: [Int]? = nil,
+                unanswered: Bool? = nil) {
         self.key = key
         self.artist = artist
         self.album = album
@@ -28,7 +38,14 @@ public struct PendingDownload: Sendable, Equatable, Decodable {
         self.jobId = jobId
         self.error = error
         self.detail = detail
+        self.releaseMbid = releaseMbid
+        self.directory = directory
+        self.listedBefore = listedBefore
+        self.unanswered = unanswered
     }
+
+    /// Given up on with no answer: it may have started all the same (`RequestOverlays.gaveUp`).
+    public var mayHaveStarted: Bool { unanswered == true && error != nil }
 
     /// Still waiting on slskd - it counts as active; a refused one doesn't.
     public var isWaiting: Bool { error == nil }
@@ -144,6 +161,82 @@ public struct RequestOverlays: Sendable, Equatable {
     /// there brings the first one's rows back until the next poll.
     public func toClear(_ polled: [DownloadJob]) -> [Int] {
         Self.finishedIds(visibleJobs(polled))
+    }
+}
+
+// MARK: a Get whose answer never came - the phone's own (slice 2's review, finding 2)
+
+/// deadwax puts no bound on an enqueue: it waits for the release's lock, then for slskd's enqueue, which answers only once
+/// the peer is reached - and the web's fetch waits as long. The phone's request can't wait for ever, and when it gives
+/// up the download may well have started: so the row isn't settled as refused. It stays "starting…" while the poll
+/// looks for its job (`claimed`), and only after `unansweredSeconds` from the tap says it may have started
+/// (`gaveUp`). The web has no such case - its request has no time limit - so these are held by hand (GetTests).
+extension RequestOverlays {
+    /// How long from its tap a Get whose answer never came is looked for, before its row says it may have started.
+    public static let unansweredSeconds: Double = 600
+
+    /// An enqueue's failure that leaves its outcome unknown - the phone stopped waiting, or a proxy between gave up (a
+    /// 408 or 504) - rather than a refusal (`ErrorWords.kind` .timeout).
+    public static func unanswered(_ error: any Error) -> Bool { ErrorWords.kind(of: error) == .timeout }
+
+    /// The phone stopped waiting for `key`'s answer: still "starting…", now looked for in every poll.
+    public func stoppedWaiting(_ key: String) -> RequestOverlays {
+        var next = self
+        next.pending = pending.map { (each: PendingDownload) -> PendingDownload in
+            guard each.key == key, each.jobId == nil, each.error == nil else { return each }
+            var waiting = each
+            waiting.unanswered = true
+            return waiting
+        }
+        return next
+    }
+
+    /// `unansweredSeconds` on, no job found for `key`: its row says it may have started (RequestWords.mayHaveStarted),
+    /// under Needs attention, until Clear done - or its job shows after all.
+    public func gaveUp(_ key: String) -> RequestOverlays {
+        var next = self
+        next.pending = pending.map { (each: PendingDownload) -> PendingDownload in
+            guard each.key == key, each.jobId == nil, each.error == nil, each.unanswered == true else { return each }
+            var given = each
+            given.error = RequestWords.mayHaveStarted
+            return given
+        }
+        return next
+    }
+
+    /// A request whose answer never came is still being looked for: the poll goes on for it, though nothing else is
+    /// active.
+    public var looksForAJob: Bool {
+        pending.contains { $0.jobId == nil && $0.error == nil && $0.unanswered == true }
+    }
+
+    /// Requests whose answer never came, given their job once a poll lists one: a job not listed when the request was
+    /// asked, for the same pressing - the one of its own folder from its own peer first, else any (with logins on, the
+    /// download somebody else asked for, which deadwax joined). A job goes to one request; once given, `reconcile` drops
+    /// the row for it, as it would for an answer.
+    public func claimed(_ jobs: [DownloadJob]) -> RequestOverlays {
+        guard pending.contains(where: { $0.jobId == nil && $0.unanswered == true }) else { return self }
+        var taken = Set(pending.compactMap(\.jobId))
+        var next = self
+        next.pending = pending.map { (each: PendingDownload) -> PendingDownload in
+            guard each.jobId == nil, each.unanswered == true, let release = each.releaseMbid, !release.isEmpty else {
+                return each
+            }
+            let before = Set(each.listedBefore ?? [])
+            let new = jobs.filter { (job: DownloadJob) -> Bool in
+                !before.contains(job.id) && !taken.contains(job.id) && WebText.same(job.releaseMbid ?? "", release)
+            }
+            let own = new.first { (job: DownloadJob) -> Bool in
+                WebText.same(job.directory ?? "", each.directory ?? "") && WebText.same(job.username ?? "", each.username)
+            }
+            guard let job = own ?? new.first else { return each }
+            taken.insert(job.id)
+            var found = each
+            found.jobId = job.id
+            found.error = nil
+            return found
+        }
+        return next
     }
 }
 

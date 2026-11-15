@@ -374,7 +374,7 @@ func sentJSON(_ request: HTTPRequest?) throws -> [String: SentValue] {
     }
 
     @Test func everyRouteIsDeadwaxsOwn() {
-        #expect(Routes.all.count == 54)
+        #expect(Routes.all.count == 58)
         #expect(Set(Routes.all).count == Routes.all.count)
         for endpoint in Routes.all {
             #expect(endpoint.path.hasPrefix("/deadwax/"))
@@ -399,11 +399,16 @@ func sentJSON(_ request: HTTPRequest?) throws -> [String: SentValue] {
         // (Phase 6, slice 1) /download/jobs, 20 s, slskd asked for every open download and each queued one's place;
         // a cancel and a clear, 30 s, slskd's transfers each stopped or tidied; Another source, 60 s, up to three
         // runners-up asked in turn; Same source again, 30 s, one peer asked again
+        // (Phase 6, slice 2) the store's word, 20 s, its look may ask slskd how far a download has got; a search, 300 s,
+        // two rounds of slskd's search behind deadwax's gate and the former names' lookup (test_ios_contract.py holds
+        // it above deadwax's own worst case); an enqueue the same, as deadwax puts no bound on it. The preferences: the
+        // transport's
         let longer: [Endpoint: Double] = [Routes.albumIndex: 30, Routes.autoEqSearch: 20, Routes.autoEqProfile: 20,
                                           Routes.libraryOwned: 30, Routes.fullySearch: 20, Routes.releaseGroup: 60,
                                           Routes.searchArtists: 20, Routes.searchSongs: 20, Routes.artistFacts: 60,
                                           Routes.discography: 60, Routes.jobs: 20, Routes.cancelJob: 30,
-                                          Routes.retryJob: 60, Routes.retryJobSame: 30, Routes.clearJobs: 30]
+                                          Routes.retryJob: 60, Routes.retryJobSame: 30, Routes.clearJobs: 30,
+                                          Routes.storeState: 20, Routes.findCandidates: 300, Routes.enqueue: 300]
         #expect(Routes.timeouts == longer)
         for endpoint in Routes.all {
             // each path parameter filled in: a brace left in a path is no URL

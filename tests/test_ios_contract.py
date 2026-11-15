@@ -58,6 +58,12 @@ And Phase 6's Requests (notes/ios-specs/phase6-get-requests.md): DownloadJob and
 builds (its merged row, the transfer summary, the runners-up, who asked and the library grant) and to a real answer of
 the route; CancelAnswer, RetryAnswer, RetrySameAnswer and ClearAnswer to what the four writes and the poller's retries
 return, the statuses the phone reads, and the writes' time to answer held above what deadwax may take.
+
+And Phase 6's Get (slice 2): what a Get sends - GetRelease, GetTrack, FindCandidatesBody, EnqueueBody, its runners-up,
+the folder's files and quality - every field one the routes declare (pydantic drops an undeclared one without a word);
+StoreStateAnswer, HeldPressing, DownloadInFlight, OtherPressing, Candidate, FindCandidatesAnswer and EnqueueAnswer
+within what /store_state, /find_candidates and /enqueue build; GetSettings and its three enums the preferences route's
+own; a search's time to answer above what deadwax may take; and Get albums the routes' own permission.
 """
 
 import asyncio
@@ -79,6 +85,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from src import auth, autoeq, levels, loudness, lyrics, poller, users  # noqa: E402
 from src import store as store_module  # noqa: E402
+from src import store_index  # noqa: E402
 from src.artists import artist_match  # noqa: E402
 from src import play_history as history_rules  # noqa: E402
 from src import playlists as playlist_rules  # noqa: E402
@@ -89,8 +96,10 @@ from src.config import Config  # noqa: E402
 from src.routes import eq as eq_route  # noqa: E402
 from src.routes import library as library_route  # noqa: E402
 from src.api import musicbrainz_endpoint  # noqa: E402
+from src.api import slskd_endpoint  # noqa: E402
 from src.routes import coverart as coverart_route  # noqa: E402
 from src.routes import download as download_route  # noqa: E402
+from src.routes import me as me_route  # noqa: E402
 from src.routes import my_library, navidrome, search_musicbrainz, store_album  # noqa: E402
 from src.routes import play_history as history_route  # noqa: E402
 from src.routes.auth import SignIn  # noqa: E402
@@ -99,7 +108,7 @@ from src.store import JobStore  # noqa: E402
 
 CORE = Path(__file__).resolve().parent.parent / "ios" / "DeadwaxKit" / "Sources" / "DeadwaxCore"
 ENDPOINT = re.compile(r'Endpoint\(method: "(\w+)", path: "([^"]+)", query: \[([^\]]*)\]\)')
-ROUTE_COUNT = 54
+ROUTE_COUNT = 58
 RAW_OPENING = re.compile(r'#+"')
 HASHES = re.compile(r"#*")
 
@@ -208,10 +217,11 @@ def coding_keys(body: str) -> dict[str, str] | None:
     return keys
 
 
-def fields(struct: str) -> dict[str, bool]:
+def fields(struct: str, body: str | None = None) -> dict[str, bool]:
     """A struct's stored properties by JSON name -> whether optional: its own `let`s (not a nested type's), named as
-    its CodingKeys say; a property CodingKeys leaves out is never read, so isn't here."""
-    body = swift_struct(struct)
+    its CodingKeys say; a property CodingKeys leaves out is never read, so isn't here. `body` for a struct whose name
+    another type in DeadwaxCore shares (struct_in)."""
+    body = swift_struct(struct) if body is None else body
     keys = coding_keys(body)
     found = {}
     for static, name, kind in re.findall(r"(\bstatic\s+)?\blet\s+(\w+)\s*:\s*([^=\n]+)", _top_level(body)):
@@ -1575,3 +1585,167 @@ def test_the_app_waits_for_the_downloads_as_long_as_deadwax_does():
         assert timeouts[name] > 8, name
     assert timeouts["retryJob"] >= poller.RETRY_ASKS * timeouts["jobs"]
     assert timeouts["retryJob"] > timeouts["retryJobSame"]
+
+
+# ---------------------------------------------------------------------------- Phase 6, slice 2: Get
+
+def struct_in(file: str, declaration: str) -> str:
+    """The body of the struct a declaration opens in one DeadwaxCore file - `public struct Candidate: Decodable`, where
+    another type nested elsewhere shares its name."""
+    code = _code((CORE / file).read_text(encoding="utf-8"))
+    found = [match for match in re.finditer(re.escape(declaration) + r"[^{]*\{", code)]
+    assert len(found) == 1, f"{declaration} is declared {len(found)} times in {file}"
+    return _block(code, found[0].end() - 1)
+
+
+def test_a_get_sends_only_what_the_routes_declare():
+    # the release a Get is for, as /store_state and /find_candidates take it (FindCandidatesRequest, flat with the
+    # Format and an edited query) and as /enqueue files it (EnqueueRelease) - and every track as Track
+    release = sent_fields("GetRelease")
+    assert release <= set(FindCandidatesRequest.model_fields), sorted(release - set(FindCandidatesRequest.model_fields))
+    assert release <= set(download_route.EnqueueRelease.model_fields)
+    assert {"artist", "album"} <= release
+    assert sent_fields("GetTrack") <= set(download_route.Track.model_fields)
+    body = sent_fields("FindCandidatesBody")
+    assert body == {"format_preference", "query_override"} and body <= set(FindCandidatesRequest.model_fields)
+    assert "try release.encode(to: encoder)" in swift_struct("FindCandidatesBody")
+    # a card's Get: the folder, the release, the runners-up as shown and what the copy is (synthesized: every let)
+    enqueue = set(fields("EnqueueBody"))
+    assert enqueue == {"username", "files", "directory", "release", "alternatives", "quality"}
+    assert enqueue <= set(download_route.EnqueueRequest.model_fields)
+    alternative = set(fields("Alternative"))
+    assert alternative <= set(download_route.Alternative.model_fields) and {"username", "files"} <= alternative
+    assert sent_fields("JobQuality") <= set(download_route.Quality.model_fields)
+    assert sent_fields("CandidateFile") == set(download_route.EnqueueFile.model_fields)
+    # what each route can't do without is sent
+    for model, sent in ((FindCandidatesRequest, release | body), (download_route.EnqueueRequest, enqueue),
+                        (download_route.Alternative, alternative)):
+        needed = {name for name, field in model.model_fields.items() if field.is_required()}
+        assert needed <= sent, f"{model.__name__} needs {sorted(needed - sent)}"
+    # the Format is one the route scores by
+    assert swift_raw_values("GetSettings.swift", "FormatPreference") == set(me_route.PREFERENCES["format_preference"])
+
+
+def test_the_stores_word_is_read_as_the_routes_send_it():
+    # /store_state's answer, and find_candidates' with the search's on it: the four keys always sent
+    nothing = returned_literals(download_route._nothing_here)
+    assert len(nothing) == 1 and literal_keys(nothing[0]) == set(fields("StoreStateAnswer"))
+    assert set(fields("StoreStateAnswer")) == {"held", "downloading", "downloading_part", "other_pressings"}
+    # a pressing held: held_copy's literal, with the asker's word and the part's filing laid on by the route
+    held = set().union(*(literal_keys(one) for one in returned_literals(store_index.held_copy)))
+    source = inspect.getsource(download_route._store_state)
+    assert 'held["yours"] = yours' in source and 'held["filed_to"]' in source and 'held["fills_gaps"]' in source
+    assert set(fields("HeldPressing")) <= held | {"yours"}, sorted(set(fields("HeldPressing")) - held)
+    # a download in flight: describe_job's, how far it has got laid on (done_files)
+    described = inspect.getsource(store_index.describe_job)
+    sent = set(re.findall(r'"(\w+)":', described)) | set(re.findall(r'"(\w+)"\s*[,)]', described.split("for key in", 1)[1]))
+    assert 'described["done_files"]' in inspect.getsource(download_route._describe_in_flight)
+    assert set(fields("DownloadInFlight")) <= sent | {"done_files"}, sorted(set(fields("DownloadInFlight")) - sent)
+    # another pressing held: other_pressings' rows, whose each is laid on by the route
+    others = inspect.getsource(store_index.other_pressings)
+    rows = set(re.findall(r'"(\w+)":', others[others.index("found.append({"):]))
+    assert 'pressing["yours"]' in source
+    assert set(fields("OtherPressing")) <= rows | {"yours"}, sorted(set(fields("OtherPressing")) - rows)
+    # every one read leniently: an answer missing a field is never a failure
+    for struct in ("HeldPressing", "DownloadInFlight", "OtherPressing", "StoreStateAnswer"):
+        body = swift_struct(struct)
+        assert body.count("looseField(") + body.count("looseList(") == len(fields(struct)), struct
+
+
+def test_a_search_is_read_as_find_candidates_sends_it():
+    # each folder: _serialize_candidate's keys, with what deadwax measured of the peer laid on
+    candidate = set(fields("Candidate", struct_in("Sources.swift", "public struct Candidate: Decodable")))
+    serialized = set().union(*(literal_keys(one) for one in returned_literals(download_route._serialize_candidate)))
+    measured = inspect.getsource(download_route._attach_measured_speeds)
+    assert 'candidate["measured_speed"]' in measured and 'candidate["measured_samples"]' in measured
+    assert candidate <= serialized | {"measured_speed", "measured_samples"}, sorted(candidate - serialized)
+    # the answer: both returns (nothing searched for a pressing held or downloading whole, and a search) carry the
+    # search's four keys and the store's, laid on with **store_state
+    answers = returned_literals(download_route.find_candidates)
+    assert len(answers) == 2
+    for answer in answers:
+        assert set(fields("FindCandidatesAnswer")) <= literal_keys(answer)
+        assert "**store_state" in answer
+    assert "store = try StoreStateAnswer(from: decoder)" in swift_struct("FindCandidatesAnswer")
+    # an enqueue: its job, or (logins on) the download somebody else asked for, joined
+    enqueued = returned_literals(download_route.enqueue)
+    assert len(enqueued) == 2 and all("job_id" in literal_keys(one) for one in enqueued)
+    keys = set().union(*(literal_keys(one) for one in enqueued))
+    assert set(fields("EnqueueAnswer")) <= keys
+    # its refusals: deadwax's 409 (already downloading, or already yours) and slskd's 502, each with its words
+    source = inspect.getsource(download_route.enqueue)
+    assert "status_code=409, detail=problem" in source and "status_code=502" in source
+
+
+def test_you_getting_albums_is_read_as_the_preferences_route_sends_it():
+    answer = me_route._answer(None, True)
+    reads = set(fields("GetSettings"))
+    assert reads == {"get_mode", "quality_floor", "format_preference"} <= set(answer)
+    assert swift_raw_values("GetSettings.swift", "GetMode") == set(me_route.PREFERENCES["get_mode"])
+    assert swift_raw_values("GetSettings.swift", "QualityFloor") == set(me_route.PREFERENCES["quality_floor"])
+    # the phone's defaults are the route's
+    defaults = swift_struct("GetSettings")
+    assert "static let defaults = GetSettings(mode: .sources, floor: .any, format: .preferLossless)" in defaults
+    assert me_route.DEFAULTS == {"get_mode": "sources", "quality_floor": "any", "format_preference": "prefer_lossless"}
+
+
+def test_the_app_waits_for_a_search_as_long_as_deadwax_does():
+    # deadwax's longest search (find_candidates, slskd_endpoint's _run_searches), from the server's own numbers (slice 2's
+    # review, finding 3):
+    # - two rounds of slskd's search: the names the release carries, then a former name MusicBrainz gave within
+    #   FORMER_NAMES_BUDGET_SECONDS (a lookup beside the first round, counted whole);
+    # - every start waits its turn at SEARCH_GATE, up to SEARCH_TURN_SECONDS (a start stuck ahead of it holds the line
+    #   that long) - the first round's two names (the credit and the current one), the second's one former name;
+    # - each round's answers waited on for max_wait: SLSKD_SEARCH_TIMEOUT at its range's top, plus the route's allowance;
+    # - and beyond max_wait, which counts only its sleeps: slskd's state asked each half second, the answers fetched and
+    #   the searches deleted (ROUND_MARGIN a round), and the store's look before and the ranking after (MARGIN).
+    # An artist renamed more than once starts a search behind the gate for every name: deadwax bounds none of it as a
+    # whole, so this is the worst case of an artist renamed once.
+    ROUND_MARGIN, MARGIN = 15, 10
+    from src.config import SEARCH_TIMEOUT_RANGE
+    text = (CORE / "Routes.swift").read_text(encoding="utf-8")
+    literal = re.search(r"public static let timeouts: \[Endpoint: Double\] = \[([^\]]*)\]", text)
+    timeouts = {name: float(seconds) for name, seconds in re.findall(r"(\w+): ([\d.]+)", literal.group(1))}
+    source = inspect.getsource(download_route.find_candidates)
+    allowances = [int(found) for found in re.findall(r"max_wait=timeout \+ (\d+)", source)]
+    assert len(allowances) == 2, "a search is two rounds"
+    assert "for name in search_names(body.artist, body.album_artist)" in source
+    searches = inspect.getsource(slskd_endpoint.SlskdClient._run_searches)
+    assert "for query in queries:" in searches and "async with SEARCH_GATE.turn(query):" in searches
+    assert slskd_endpoint.SEARCH_GATE.bound == slskd_endpoint.SEARCH_TURN_SECONDS
+    starts = (2, 1)
+    worst = sum(count * slskd_endpoint.SEARCH_TURN_SECONDS + SEARCH_TIMEOUT_RANGE[1] + allowance + ROUND_MARGIN
+                for count, allowance in zip(starts, allowances)) + download_route.FORMER_NAMES_BUDGET_SECONDS + MARGIN
+    assert timeouts["findCandidates"] >= worst, f"{timeouts['findCandidates']} s, but deadwax may take {worst} s"
+    # and Routes.swift's account of it says the same number
+    assert f"{worst:g} s at worst" in " ".join(text.replace("///", " ").split())
+    # an enqueue: no bound on the server at all - the release's lock, then slskd's enqueue, which sets none of its own -
+    # so the phone gives it the search's, and an answer that never comes isn't a refusal (RequestOverlays.unanswered)
+    enqueue = inspect.getsource(download_route.enqueue)
+    assert "async with release_lock(" in enqueue and "wait_for" not in enqueue
+    assert "timeout" not in inspect.getsource(slskd_endpoint.SlskdClient.enqueue)
+    assert timeouts["enqueue"] == timeouts["findCandidates"]
+    # the store's look may ask slskd how far a download has got
+    assert timeouts["storeState"] > 8
+    assert "preferences" not in timeouts
+
+
+def test_get_albums_is_the_routes_own_permission():
+    # a search and an enqueue need `request`, as the app's Get the album does (Access.can(.request)); the store's word
+    # needs nothing more, so someone without Get albums still sees what's here
+    routes = app_routes()
+    for path in ("/deadwax/download/find_candidates", "/deadwax/download/enqueue"):
+        route = routes[("POST", path)]
+        assert any(getattr(dependency.dependency, "__qualname__", "").startswith("require")
+                   for dependency in route.dependencies), path
+    assert "dependencies=GET_ALBUMS" in inspect.getsource(download_route.find_candidates)
+    assert "dependencies=GET_ALBUMS" in inspect.getsource(download_route.enqueue)
+    assert "dependencies=" not in inspect.getsource(download_route.store_state).split("\n", 1)[0]
+    assert 'GET_ALBUMS = [Depends(require("request"))]' in inspect.getsource(download_route)
+    view = (CORE.parent.parent.parent / "App" / "Search" / "GroupView.swift").read_text(encoding="utf-8")
+    assert "server.access.can(.request)" in view and "RequestWords.getOff" in view
+    # every body is POSTed, as the routes take them
+    for name, route in (("storeState", "store_state"), ("findCandidates", "find_candidates"), ("enqueue", "enqueue")):
+        assert f'public static let {name} = Endpoint(method: "POST", path: "/deadwax/download/{route}", query: [])' in \
+            (CORE / "Routes.swift").read_text(encoding="utf-8")
+        assert "sending:" in swift_function("DeadwaxClient.swift", name), name
