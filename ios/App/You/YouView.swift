@@ -3,15 +3,19 @@ import SwiftUI
 
 /// The You tab (screens.md 8, the web's app/You.tsx as Phase 1 has it), top to bottom: who is signed in - the
 /// avatar's letter, the name, "No sign-in needed" with logins off - and the UNVERIFIED line under them when /me says
-/// so; Getting albums (Phase 6: Confirm before cancelling); Playback (Gapless, Normalization, EQ); Downloads (Phase 2: what's on this phone, pushing You > Downloads); Account (Sign out, with logins on); About (deadwax's version, and for an
+/// so; Getting albums (Phase 6: When I tap Get, Quality floor, Format, Confirm before cancelling); Playback (Gapless, Normalization, EQ); Downloads (Phase 2: what's on this phone, pushing You > Downloads); Account (Sign out, with logins on); About (deadwax's version, and for an
 /// admin whether logins are on, and the app's own version and build - with /me's failure said under them); This phone
 /// (the address, Change address, and Debug for an admin, D1).
 ///
 /// Core's YouLines decides every line of it from what /me last said (ServerModel.me, its failure, whether it is being
 /// asked again, Access); this only draws. /me is asked the first time You shows, as the web asks it, and on a pull.
+/// (Phase 6, slice 3) Getting albums' three are asked each time You shows, on a pull and as deadwax comes back into
+/// reach (the web asks them each time You's tab opens, and on Check again) - what's in hand stands meanwhile.
 struct YouView: View {
     @Environment(ServerModel.self) private var server
     @Environment(AppNavigation.self) private var navigation
+    @Environment(GetSettingsModel.self) private var getSettings
+    @Environment(Reachability.self) private var reachability
     @State private var asked = false
 
     init() {}
@@ -49,11 +53,20 @@ struct YouView: View {
             }
         }
         .navigationTitle(YouWords.title)
-        .refreshable { await server.refreshMe() }
+        .refreshable {
+            let settings = getSettings.ask()
+            await server.refreshMe()
+            await settings.value
+        }
         .task {
             guard !asked else { return }
             asked = true
             await server.refreshMe()
+        }
+        // Getting albums: changed on another device, they show here
+        .onAppear { getSettings.ask() }
+        .onChange(of: reachability.online) { _, back in
+            if back { getSettings.ask() }
         }
     }
 
@@ -96,7 +109,7 @@ struct YouView: View {
         }
     }
 
-    /// About's App row: "0.11 (11)", from the bundle.
+    /// About's App row: "0.12 (12)", from the bundle.
     static var appVersion: String {
         let info = Bundle.main.infoDictionary
         return YouWords.app(version: info?["CFBundleShortVersionString"] as? String, build: info?["CFBundleVersion"] as? String)

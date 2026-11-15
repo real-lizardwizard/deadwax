@@ -1,4 +1,4 @@
-# The iPhone app (early: app 0.11, downloads, lyrics, the EQ, the turntable, play history, your library, the Library, Search, Requests and getting albums)
+# The iPhone app (early: app 0.12, downloads, lyrics, the EQ, the turntable, play history, your library, the Library, Search, Requests and getting albums)
 
 deadwax is getting a native iPhone app, built with SwiftUI and its own audio engine, for what a web
 page can't do well: seamless joins and normalization done on the phone, downloads to play offline,
@@ -41,8 +41,10 @@ app's four headings, with its progress, cancelled, tried again from another sour
 a finished album opened or played from its row (see [Requests](#requests)). Then **Get**, still app 0.11: an
 album you don't have got from the phone - what deadwax already has of the pressing said under Get the album, the
 sources Soulseek has for it in a sheet, each with why it scored what it did, and the one you pick on its way in
-Requests from your tap (see [Getting an album](#getting-an-album)). Joining a download somebody else asked for,
-Add to my library and the rest come next (see [What it can't do yet](#what-it-cant-do-yet)).
+Requests from your tap (see [Getting an album](#getting-an-album)). **App 0.12** finishes getting albums on the
+phone: a download somebody else asked for **joined**, a pressing in the collection **added to your library**,
+**Pick the best source for me**, and You's **When I tap Get**, **Quality floor** and **Format** chosen on the phone
+(see [You](#you)).
 
 **Nothing of Phase 2, the lyrics, the EQ, the turntable, play history, your library downloaded,
 playlists, artists, songs, Search, Requests or Get has been seen on an iPhone yet.** It's built and tested on a Mac,
@@ -164,7 +166,7 @@ old one. It also uses up one of the few new app ids a free account may register 
 It pulls the latest code, asks GitHub whether the app's checks passed on it (and asks you before
 building one that failed or is still running), builds it (Release), and installs it **over** the app
 on the phone, so everything on the phone stays. Then it opens the app and says how long the new
-install runs: `Installed deadwax 0.11 (11), runs until Wed 18 Nov, 14:02`. It also says how long it
+install runs: `Installed deadwax 0.12 (12), runs until Wed 18 Nov, 14:02`. It also says how long it
 took and the Mac's free space before and after. Xcode doesn't need to be open.
 
 | option | what it does |
@@ -832,8 +834,26 @@ the one chosen.
 - Notes under it: part of the pressing already here, and what a download would do about that ("Getting it adds only
   the tracks that folder doesn't have yet."); a download of part of it running; another pressing you have.
 
-When deadwax has none of it, there's no line. **Join** (one download, everyone who asked waiting for it) and **Add to
-my library** come to the phone in the next build, so the line offers neither for now: do them in the web app.
+When deadwax has none of it, there's no line.
+
+**Join this download**, under "Already downloading for someone else" (with Get albums): one download, everyone who
+asked waiting for it, rather than a second copy fetched. Tap it: "Joining…", then "Joined - it's in your Requests.",
+and the line asks deadwax again and says it's yours ("Already downloading"); the download is in your Requests. If it
+has finished, stopped or been cleared since the line was drawn, deadwax says so under the button ("That download
+has been cleared from the list since - get it again.") and the button stays, to try again. Without Get albums
+there's no Join, and the line says nothing of joining. A join can wait for another Get of the same album to reach
+its source, so the phone waits up to a minute; if no answer comes, the join may still have gone through, so the
+line asks deadwax again, and Requests looks again. If you're on it, the line says so; if not, "deadwax didn't
+answer in time, so you may have joined it anyway. If it isn't in your Requests soon, join it again." Joining twice
+does no harm.
+
+**Add to my library**, under "In the collection, not in your library" (with logins on): the pressing someone else
+has, put in your library rather than downloaded again. Tap it: "Adding…", then "Added to your library.", and the
+line asks deadwax again: "Already in your library". Your albums in the Library show it the next time you look, and
+Search marks it as yours. A refusal is said under the button, as for Join. deadwax puts it in your library, then
+stars it in Navidrome for you before it answers, which takes longer while Navidrome is slow; the phone waits up to
+a minute. If no answer comes, the line asks again, and if it isn't yours yet: "deadwax didn't answer in time, so it
+may have been added anyway. If it isn't in your library soon, add it again." Adding twice does no harm.
 
 **Choose a source.** Tap Get the album and a sheet opens, **Choose a source**, the album and pressing under its title
 ("Dummy · CD · 1994 · GB · Go! Beat"). deadwax searches Soulseek for that pressing - "Looking for “Dummy” by
@@ -852,9 +872,8 @@ sheet (see [Downloading](downloading.md#choosing-a-source)):
 - **The chips** - **Lossless**, **24-bit**, **Starts now** and **Complete albums only** (and **320 kbps** with that
   quality floor) - narrow the list, and **the sort** orders it: **Best match**, **Highest quality**, **Largest
   first** or **Smallest first**. The chips start as your **quality floor**, the sort at Best match, and the search is
-  scored by your **Format**. Both are kept for you on deadwax and set in the web app's You > Getting albums for now
-  (the phone's You gets them in the next build). Every Get on the phone shows the sources, even with **Pick the best
-  source for me** chosen there.
+  scored by your **Format**, both chosen in [You](#you) > Getting albums (or the web app's) and kept for you on
+  deadwax.
 - **Search again**, under the cards, opens the words searched in a field: change them and tap **Search**. Changed
   words are searched exactly as typed; unchanged, it searches as Get did.
 
@@ -869,11 +888,29 @@ Under the cards, what was searched: 'Searched for “Portishead Dummy” · 41 s
 - **Soulseek couldn't be searched**: why - slskd's own sentence where it gave one ("slskd is not connected to the
   Soulseek network, so it cannot search"), otherwise "Downloads aren't working right now." - with **Try again**.
 
+**Pick the best source for me** (You > Getting albums' When I tap Get): Get the album opens the sheet and searches
+as ever, and as the answer comes, the best match through the chips as they are then (your quality floor's, unless
+you've tapped one) at 75% or more is got for you, as a card's Get would be: the sheet closes onto Requests, the
+download there. Never for a pressing you have or that's on its way, nor one deadwax can't judge (a pressing
+MusicBrainz lists no tracks for: there's nothing to check the sources against). When nothing qualifies, the sources
+show, with why above them: "No close match that passes your filters - choose a source yourself.", or "You already
+have part of it - choose a source yourself." (VoiceOver says it with the outcome). **Try again** picks too;
+**Search** never does. If deadwax goes out of reach just as the sources come in, nothing is got for you: the
+sources show, with "deadwax went out of reach as the sources came in - choose a source yourself once it's back.",
+and nothing is picked later by itself.
+
+**In the sheet**, the line's **Join this download** joins and closes the sheet onto Requests, as a Get does. **Add
+to my library** adds the pressing, and the box says "Already in your library" with "Added to your library." under
+it. If deadwax doesn't answer either in time, the sheet asks deadwax whether it went through: a join that did
+closes the sheet onto Requests, and an add that did says it's in your library, as if the answer had come.
+
 **A card's Get** closes the sheet and shows Requests, the download already there from your tap, under Waiting,
 "starting…", until deadwax and slskd take it. If deadwax refuses it (someone got it meanwhile, say), it moves to
 Needs attention, "didn't start", with why ("It's already downloading.", "It's already in your library."). The Get
 also hands deadwax the next sources in the list as you had it, for **Another source** if this one fails. **Cancel**,
-or the sheet swiped down, stops the search, in slskd too; Get the album again searches afresh.
+or the sheet swiped down, stops the search, in slskd too, as soon as you let go of the swipe: a pick whose sources
+come in while the sheet slides away isn't got. A swipe pulled back leaves the search running. Get the album again
+searches afresh.
 
 deadwax waits as long as it takes for the person sharing the album to be reached, and the phone waits up to five
 minutes for its answer. If none comes, the row isn't marked as failed - the download may well have started. It
@@ -883,10 +920,12 @@ this may have started anyway. If it doesn't appear here soon, get it again." **C
 
 **Offline**, there's no Get the album, and "Getting albums works once deadwax is back." stands in the line's place
 (with Get albums). In a sheet already open, the same words stand at its top (VoiceOver says them as it happens).
-What it found stays, dimmed, and its **Get**, **Try again** and **Search** are off until deadwax is back - a Get then
-would close onto a Requests that can't show it. Once deadwax is back they're on again, and Search again is under the
-cards if you want a fresh search. A search still under way when deadwax went out of reach carries on waiting for its
-answer. If the phone gives up on it first, the sheet says why, then searches again by itself once deadwax is back.
+What it found stays, dimmed, and its **Get**, **Join this download**, **Add to my library**, **Try again** and
+**Search** are off until deadwax is back - a Get then would close onto a Requests that can't show it. Once deadwax is
+back they're on again, and Search again is under the cards if you want a fresh search. A search still under way when
+deadwax went out of reach carries on waiting for its answer. If the phone gives up on it first, the sheet says why,
+then runs the same search again by itself once deadwax is back: after a Search with your own words, those words
+again with the chips as you left them, and never picking a source for you.
 
 **VoiceOver** reads the line as one, and says what it now says as it changes. The sheet says each outcome as it lands
 ("Looking for “Dummy” by Portishead…", then "12 sources."). The score reads "92% match", collapsed or expanded, and a
@@ -1258,11 +1297,25 @@ album.
 ## You
 
 - **At the top**: who you're signed in as, or "No sign-in needed" with logins off.
-- **Getting albums**: **Confirm before cancelling**, on by default - "The ✕ on a download in Requests asks first.
-  Kept on this device." Off, the ✕ on a card in [Requests](#requests) cancels at once. It's this phone's, not your
-  account's, as it is each browser's in the web app. **When I tap Get**, the **Quality floor** and **Format** come
-  here in the next build. They're your account's, kept on deadwax: a Get on the phone already starts its chips at
-  your quality floor and is scored by your Format, as set in the web app (see [Getting an album](#getting-an-album)).
+- **Getting albums**, the web app's three, each a list with a tick on the one chosen - a tap chooses:
+  - **When I tap Get**: **Show me the sources** (the default) or **Pick the best source for me**.
+  - **Quality floor**: **Any** (the default), **320 kbps**, **Lossless** or **24-bit**.
+  - **Format**: **Any**, **Prefer lossless** (the default) or **Lossless only**.
+
+  Under them, the web app's note: "“Show me the sources” lets you choose each download yourself. “Pick the best
+  source for me” downloads the best match that meets your quality floor, and shows you the sources instead when
+  nothing matches well, or when you already have the album or are getting it." - and how the floor and the Format
+  are used (see [Getting an album](#getting-an-album)). They're your account's, kept on deadwax, so a choice on the
+  phone is the web app's too, and the other way round: You asks deadwax for them each time it shows and on a pull
+  down, so one changed in the web app shows here. A choice shows at once and is saved behind it. Until deadwax has
+  first answered, nothing is ticked and nothing can be chosen; while it can't be reached, nothing can be chosen and
+  "Getting albums works once deadwax is back." says why. A choice deadwax doesn't keep goes back, with "Not saved."
+  and why under the three (VoiceOver says it). With deadwax's database unwritable, "deadwax can't keep these: its
+  database isn't writable." - and "Tell whoever runs deadwax." for anyone but an admin.
+
+  Then **Confirm before cancelling**, on by default - "The ✕ on a download in Requests asks first. Kept on this
+  device." Off, the ✕ on a card in [Requests](#requests) cancels at once. It's this phone's, not your account's, as
+  it is each browser's in the web app.
 - **Playback**:
   - **Gapless**: On. "Albums play straight through, with no gap between songs." It isn't a setting:
     the app always plays this way.
@@ -1301,7 +1354,7 @@ album.
   If deadwax can't be reached, it says "Couldn't reach deadwax, so you're still signed in - try
   again." Changing your password is the web app's, for now.
 - **About**: deadwax's version, whether logins are on (for an admin), and the app's own version,
-  **0.11 (11)**.
+  **0.12 (12)**.
 - **This phone**: deadwax's address, **Change address**, and **Debug**, for an admin (with logins
   off, everyone is one).
 
@@ -3193,6 +3246,77 @@ same words. Check 187 wants logins on; the rest work either way. Use an album yo
   Waiting, "starting…", however long deadwax takes, and becomes the download when it shows - never "didn't start"
   beside it. Note how long it took.
 
+### Getting albums' checks, slice 3 (193-199, 229-236)
+
+**Not done yet.** These come with **app 0.12 (12)**, the end of Phase 6: Join, Add to my library, Pick the best
+source for me and You's Getting albums. They take 193-199, then go on at 229 - the look's builds took 200-228
+meanwhile. Compare with the web app on the Mac, the same album open in both. 196-199 want logins on and
+two accounts (one can be an admin); the rest work either way.
+
+- **193 The version, and You's three.** install.sh says "Installed deadwax 0.12 (12), runs until …", and You >
+  About reads 0.12 (12). You > Getting albums: **When I tap Get** (Show me the sources, Pick the best source for
+  me), **Quality floor** (Any, 320 kbps, Lossless, 24-bit) and **Format** (Any, Prefer lossless, Lossless only),
+  each with a tick on what the web app's You shows, the web app's note under them, then Confirm before cancelling.
+- **194 Chosen on the phone, kept on deadwax.** On the phone choose **Lossless** and **Lossless only**: the ticks
+  move at once. In the web app's You (reload it), the same two are chosen. Choose **Any** there, then open You on
+  the phone (or pull down): Any is ticked. Get an album: the sheet's chips start at the floor you chose.
+- **195 Pick the best source for me.** Choose it, then Get an album that's well shared ("Dummy" on CD): the sheet
+  says it's looking, then closes onto Requests, the download under Waiting or Downloading, its source the one the
+  web app would mark as the best match. Then Get an obscure album, or one whose sources are all MP3 with the floor
+  at Lossless: the sources show, and above them "No close match that passes your filters - choose a source
+  yourself." With VoiceOver, it's said after how many sources there are. Tap **Search again** and **Search**:
+  nothing is picked. Choose Show me the sources again afterwards.
+- **196 Join from the album's page.** Logins on: as one person, Get an album and leave it downloading. As the
+  other, on the phone, open the same album and pressing: "Already downloading for someone else", "Join it to have
+  it in your Requests too - …" and **Join this download**. Tap it: "Joining…", then "Joined - it's in your
+  Requests.", and the line becomes "Already downloading". Requests lists the download, as "Someone else asked for it
+  too". Without Get albums (an admin takes it in the web app's People, then open You), the line has no Join and
+  says nothing of joining.
+- **197 Add to my library.** Logins on: as one person, have an album filed. As the other, open it on the phone:
+  "In the collection, not in your library", "It's already here - add it to your library to keep it with your
+  music." and **Add to my library**. Tap it: "Adding…", then "Added to your library.", and the line becomes
+  "Already in your library". The Library's Your albums show it, and Search marks it as yours. In the web app, it's
+  in that person's library too.
+- **198 Join and Add in the sheet.** With **Pick the best source for me** on, Get a pressing that's downloading
+  for someone else: nothing is picked - the sheet shows the line, with **Join this download**; tap it: the sheet
+  closes onto Requests, the download there. Get one that's in the collection but not yours: **Add to my library**
+  in the sheet's box; tap it: the box says "Already in your library", with "Added to your library." under it.
+- **199 A Join refused.** Open a page with Join on the phone, then in the web app (as whoever asked for it)
+  cancel the download and Clear done. Tap Join on the phone: under the button, which stays, why it can't be
+  joined now ("That download has been cleared from the list since - get it again.", or that it has been
+  cancelled). Go back and open the album again: the line says nothing's on its way.
+- **229 Offline.** With You showing, Airplane Mode on: "Getting albums works once deadwax is back." under the
+  three, which can't be chosen. Back, they can, and a choice made in the web app meanwhile shows.
+- **230 Not saved.** (Only if you can make deadwax's database read-only for a minute, or you see it anyway.) A
+  choice goes back to what it was, with "Not saved." and why under the three; VoiceOver says it. "deadwax can't
+  keep these: its database isn't writable." under them while it lasts - and "Tell whoever runs deadwax." for
+  someone who isn't an admin.
+- **231 The largest text.** You's three rows and their note read whole, the ticks at the right. Join this download
+  and Add to my library, and the words that replace them, wrap rather than clip, in the page's line and in the
+  sheet.
+- **232 VoiceOver.** You's rows read their names, the chosen one "Selected", and dimmed until deadwax has answered.
+  Join and Add read as buttons; "Joining…" stays where it is with the focus on it, then "Joined - it's in your
+  Requests." is heard (and "Added to your library."). A refusal is heard as it's said.
+
+After review, four more, for what the review changed:
+
+- **233 Swiped away while it looks.** With **Pick the best source for me** on, Get a well-shared album and, while
+  it says it's looking, swipe the sheet down and let go: the sheet goes, and nothing is got - Requests has no new
+  download, then or a minute later. Get it again, swipe halfway and pull the sheet back up: it carries on, and
+  picks as it would have.
+- **234 Back after a Search of your own.** With Pick the best source for me on, Get an album, tap **Search
+  again**, change the words and tap a chip off. Tap **Search** and, while it's looking, turn Airplane Mode on;
+  wait for the sheet to say why (up to five minutes, if iOS keeps the search open). Airplane Mode off: the sheet
+  searches your words again, the chips as you left them, and shows the sources - nothing is picked, and the sheet
+  stays.
+- **235 Join and Add out of reach.** With the sheet showing **Join this download** or **Add to my library**,
+  Airplane Mode on: the box dims and the button can't be tapped. Off again: it can.
+- **236 No answer in time.** (Hard to make happen - skip it if it won't.) In the sheet, tap **Join this
+  download** (or **Add to my library**) and at once turn WireGuard off. After about a minute the box says "deadwax
+  didn't answer in time, so you may have joined it anyway. …" (or "… it may have been added anyway. …"), never that
+  it was refused; if it says deadwax couldn't be reached instead, iOS dropped the connection at once, which is fine
+  too. WireGuard back on: Requests (or Your albums) shows whether it went through, and a second tap does no harm.
+
 ### The squared look's checks (200-209)
 
 **Not done yet.** These come with the build that squares the app off (still app 0.11 (11)). They start at 200,
@@ -3319,12 +3443,9 @@ These are the web app's for now. Most of them come to the phone in the next phas
 
 - On an artist's page their **discography** from MusicBrainz, the **description** and the artist's
   managing (pictures, names).
-- In **Search**, on an album you don't have: **Join** a download somebody else asked for, **Add to my library** a
-  pressing that's in the collection, and **Pick the best source for me** (every Get on the phone shows the
-  sources); and You's **When I tap Get**, **Quality floor** and **Format**, which the phone follows but which are
-  set in the web app. An artist you don't have's page lists their albums, without their description or links. A
-  search of what's downloaded while deadwax can't be reached isn't built: offline, Search keeps a list already
-  drawn, and new words wait for deadwax.
+- In **Search**, an artist you don't have's page lists their albums, without their description or links. A search
+  of what's downloaded while deadwax can't be reached isn't built: offline, Search keeps a list already drawn, and
+  new words wait for deadwax.
 - **Home** and **pins** - and so Home's Arriving: outside Requests, the tab's badge is the phone's only sign of a
   download on its way.
 - **Looking after deadwax**: People, Server settings, the event log, Needs a look, Library care, the
@@ -3363,7 +3484,12 @@ These are the web app's for now. Most of them come to the phone in the next phas
 | Search: **"Searching for more isn't working right now - try again in a few minutes."** (or **"Too many searches just now - try again in a moment."**), or an album you don't have says **"This album's details can't be loaded right now - try again in a few minutes."** | MusicBrainz is away, or turning searches away, for a while - it does, for minutes at a time. Your library's rows are still there; **Try again** in a minute. **"That took too long."** is the same, MusicBrainz slow enough that the phone stopped waiting. [The troubleshooting page](troubleshooting.md#the-apps-search-says-it-cant-search-for-more-or-keeps-searching) has the rest. |
 | Search: an album you don't have shows an **empty square** for its cover | Its cover comes from the Cover Art Archive through deadwax, which needs deadwax 2.1.24 or later - see [the troubleshooting page](troubleshooting.md#the-iphone-app-shows-no-cover-for-an-album-you-dont-have). |
 | Choose a source: **"slskd is not connected to the Soulseek network, so it cannot search"** (or **"Downloads aren't working right now."**), with **Try again** | slskd isn't logged in to Soulseek, or deadwax can't reach slskd. Whoever runs deadwax checks You > Connections in the web app - [troubleshooting](troubleshooting.md#a-search-fails-with-not-logged-in-or-slskd-refused-it) has the rest - then **Try again**. |
-| Choose a source: **'Nothing lossless found for “…”.'** | Your Format is Lossless only, which leaves out every copy that isn't. Change it in the web app's You > Getting albums, or **Search again** with other words. |
+| Choose a source: **'Nothing lossless found for “…”.'** | Your Format is Lossless only, which leaves out every copy that isn't. Change it in You > Getting albums, or **Search again** with other words. |
+| Choose a source, with **Pick the best source for me** on: **"No close match that passes your filters - choose a source yourself."** (or **"You already have part of it - …"**, **"Part of it is already downloading - …"**) | Nothing through the chips scored 75% or more, or the pressing is partly here or on its way, so nothing was picked: choose one yourself. Clearing a chip, or a lower quality floor in You > Getting albums, lets more through. [The troubleshooting page](troubleshooting.md#get-shows-downloads-arent-working-right-now-or-nothing-to-choose-from) has the rest. |
+| **Join this download** says **"That download has been cleared from the list since - get it again."** (or that it has finished, failed or been cancelled) | The download moved on after the line was drawn. Get the album again: the line then says what's true now. [The troubleshooting page](troubleshooting.md#join-this-download-says-the-download-has-finished-failed-or-been-cancelled) has the rest. |
+| **Join this download** says **"deadwax didn't answer in time, so you may have joined it anyway. …"** (or **Add to my library**, **"… it may have been added anyway. …"**) | The phone waited a minute with no answer - a join waits for any other Get of the album to reach its source, and an add stars the album in Navidrome before it answers, so a slow slskd or Navidrome (or the connection dropping) does this. It may well have gone through: look in Requests (or Your albums) in a moment, and if it isn't there, tap it again - a second Join or Add does no harm. |
+| Choose a source, with **Pick the best source for me** on: **"deadwax went out of reach as the sources came in - choose a source yourself once it's back."** | The phone lost deadwax just as the answer came, so nothing was got for you - a Get then would close onto a Requests that can't show it - and nothing is got later by itself. Once deadwax is back, tap a source's **Get**. |
+| You > Getting albums: **"deadwax can't keep these: its database isn't writable."**, or a choice going back with **"Not saved. …"** | deadwax keeps the three in its database. Whoever runs deadwax checks `DB_PATH`, and that its folder can be written as `PUID`/`PGID`, then restarts the deadwax container - the choices in hand still apply to a Get meanwhile. |
 | A Get's row under Needs attention says **"didn't start"** and **"It's already downloading."** (or **"…already in your library."**) | It was got - by you elsewhere, or by someone else - after the sheet searched. It's already in Requests, or already yours; **Clear done** takes the refused row away. |
 | A Get's row under Needs attention says **"no answer"** and **"deadwax didn't answer in time, so this may have started anyway."** | The person sharing it took more than ten minutes to be reached, or deadwax was stuck. Look under Waiting and Downloading - it may be there - and if it isn't, get it again. **Clear done** takes the row away. |
 | An album you don't have says **"Getting albums is off for you - ask an admin."** where Get the album goes | With logins on, an admin gives **Get albums** in the web app's People. Open You afterwards, so the phone asks deadwax again. |

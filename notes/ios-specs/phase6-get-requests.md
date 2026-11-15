@@ -381,6 +381,12 @@ See notes/ios.md, "Phase 6, slice 1: Requests".
 See notes/ios.md, "Phase 6, slice 2: Get and Sources". Search again with your own words (6.3) came with it: the web's
 sheet has it under folders found, and "Nothing found" had no way on without it. Its checks are docs/ios.md's 180-192.
 
+### Slice 3, built
+
+See notes/ios.md, "Phase 6, slice 3: Join, Add, the pick and You's three". The app is **0.12 (12)**; routes 58 -> 60
+(`POST /download/jobs/{job_id}/join`, `PUT /me/preferences`), no server change. Its checks are docs/ios.md's 193-199
+and 229-232 - the look's builds took 200-228 meanwhile.
+
 ## 7. Tests
 
 - Core: `RequestsVectorTests` (every vector: the words, the ordinals and badges, the ages, the outcomes, who asked and

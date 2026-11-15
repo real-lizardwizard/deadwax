@@ -4,7 +4,8 @@ import Testing
 
 /// Fixtures/get/get-vectors.json: what the web's TypeScript (lib/releasePayload.ts, release.ts, pressings.ts getGroup,
 /// candidates.ts, getSettings.ts, perPerson.ts, whose.ts withStoreLine, format.ts formatSize) answers for Phase 6's
-/// slice 2, with the words Sources.tsx, SourceCard.tsx and ReleaseGroupPage.tsx build inline read out of their source -
+/// slices 2 and 3, with the words Sources.tsx, SourceCard.tsx, ReleaseGroupPage.tsx, StoreState.tsx, GettingChoices.tsx,
+/// You.tsx and useGetSettings.ts build inline read out of their source -
 /// written by ios/scripts/export-get-vectors.cjs, never by hand. The MusicBrainz objects, store answers and folders in it
 /// are decoded by the real models, as deadwax sends them.
 enum GetVectors {
@@ -24,12 +25,16 @@ enum GetVectors {
         let settings: [SettingsCase]
         let searching: [Searching]
         let overrides: [Override]
+        let picks: [PickCase]
+        let added: [AddedCase]
     }
 
     struct Numbers: Decodable {
         struct Band: Decodable { let percent: Double; let band: String }
         let speedBarFull: Double
         let bands: [Band]
+        let autoGrabMinScore: Double
+        let pickSort: String
     }
 
     struct Words: Decodable {
@@ -50,6 +55,13 @@ enum GetVectors {
         struct Floor: Decodable { let floor, label: String }
         struct Signal: Decodable { let signal, label, meaning: String }
         struct Count: Decodable { let count: Int; let said, none: String }
+        struct Join: Decodable { let join, joining, joined, add, adding, added, addedShown: String }
+        struct Choice: Decodable { let value, label: String }
+        struct Getting: Decodable {
+            let section, note, unsaved, unsavedTold, readFailed, notSaved: String
+            let titles: [String]
+            let modes, formats: [Choice]
+        }
         let sheet: Sheet
         let card: Card
         let page: Page
@@ -60,6 +72,8 @@ enum GetVectors {
         let signals: [Signal]
         let losslessFormats: [String]
         let sourcesCount: [Count]
+        let join: Join
+        let getting: Getting
     }
 
     struct Built: Decodable { let payload: JSONValue; let label: String }
@@ -233,8 +247,36 @@ enum GetVectors {
     }
 
     struct SettingsCase: Decodable {
-        let answer: GetSettings
+        let answer: GetSettingsAnswer
         let mode, floor, format: String
+        let canSave: Bool
+    }
+
+    /// (Slice 3) An answer, the release it was for and the chips: what a pick would ask for, and why not.
+    struct PickCase: Decodable {
+        struct Release: Decodable {
+            let releaseMbid: String?
+            let tracks: [JSONValue]?
+            enum CodingKeys: String, CodingKey {
+                case tracks
+                case releaseMbid = "release_mbid"
+            }
+        }
+        struct Grab: Decodable { let pick: String; let list: [String] }
+        let answer: FindCandidatesAnswer?
+        let release: Release?
+        let filters: Filters
+        let sort: String
+        let blocked: String?
+        let grab: Grab?
+        let notPicked: String?
+    }
+
+    /// (Slice 3) A store answer's status at each floor, and the box once Add has added it.
+    struct AddedCase: Decodable {
+        struct ForFloor: Decodable { let floor: String?; let status: Status?; let added: Status? }
+        let answer: StoreStateAnswer
+        let `for`: [ForFloor]
     }
 
     struct Searching: Decodable {
@@ -273,6 +315,8 @@ enum GetVectors {
         for band in v.numbers.bands {
             #expect(Sources.band(band.percent).rawValue == band.band, "\(band.percent)")
         }
+        #expect(Sources.autoGrabMinScore == v.numbers.autoGrabMinScore)
+        #expect(Sources.pickSort.rawValue == v.numbers.pickSort)
     }
 
     @Test func theWordsAreTheWebs() {
@@ -331,6 +375,30 @@ enum GetVectors {
             #expect(Sources.sourcesCount(count.count) == count.said)
             #expect(Sources.noneMatchLine(count.count) == count.none)
         }
+    }
+
+    @Test func joinAddAndGettingAlbumsSayWhatTheWebSays() {
+        let join = v.words.join
+        #expect(StoreWords.join == join.join && StoreWords.joining == join.joining && StoreWords.joined == join.joined)
+        #expect(StoreWords.add == join.add && StoreWords.adding == join.adding && StoreWords.added == join.added)
+        #expect(join.addedShown == "{ADDED_WORDS}")
+        // the album page's own Add says the same as the line's
+        #expect(Whose.button(.add, busy: false) == join.add && Whose.button(.add, busy: true) == join.adding)
+
+        let getting = v.words.getting
+        #expect(RequestWords.gettingAlbums == getting.section)
+        #expect([GettingWords.modeTitle, GettingWords.floorTitle, GettingWords.formatTitle] == getting.titles)
+        #expect(GetMode.allCases.map(\.rawValue) == getting.modes.map(\.value))
+        #expect(GetMode.allCases.map(\.label) == getting.modes.map(\.label))
+        #expect(FormatPreference.youOrder.map(\.rawValue) == getting.formats.map(\.value))
+        #expect(FormatPreference.youOrder.map(\.label) == getting.formats.map(\.label))
+        #expect(Set(FormatPreference.youOrder) == Set(FormatPreference.allCases))
+        #expect(GettingWords.note == getting.note)
+        #expect(GettingWords.unsaved == getting.unsaved)
+        #expect(getting.unsavedTold == "{GETTING_UNSAVED}{runsDeadwax ? '' : ` ${TELL}`}")
+        #expect(GettingWords.unsavedLine(runsDeadwax: true) == getting.unsaved)
+        #expect(GettingWords.unsavedLine(runsDeadwax: false) == "\(getting.unsaved) \(ErrorWords.tell)")
+        #expect(GettingWords.readFailed == getting.readFailed && GettingWords.notSaved == getting.notSaved)
     }
 
     @Test func aGetSendsWhatTheMainPagesFindButtonsSent() throws {
@@ -510,11 +578,38 @@ enum GetVectors {
     }
 
     @Test func theSettingsAreReadAsTheWebReadsThem() {
-        #expect(v.settings.count == 9)
+        #expect(v.settings.count == 13)
         for each in v.settings {
-            #expect(each.answer.mode.rawValue == each.mode)
-            #expect(each.answer.floor.rawValue == each.floor)
-            #expect(each.answer.format.rawValue == each.format)
+            #expect(each.answer.settings.mode.rawValue == each.mode)
+            #expect(each.answer.settings.floor.rawValue == each.floor)
+            #expect(each.answer.settings.format.rawValue == each.format)
+            #expect(each.answer.canSave == each.canSave)
+        }
+    }
+
+    @Test func aPickIsTheWebsAndSoIsWhyNot() {
+        #expect(v.picks.count == 161)
+        for (at, each) in v.picks.enumerated() {
+            let release = each.release.map { (releaseMbid: $0.releaseMbid, trackCount: $0.tracks?.count ?? 0) }
+            let blocked = Sources.autoPickBlocked(each.answer?.store, release: release)
+            #expect(blocked == each.blocked, "pick \(at)")
+            let filters = GetSettings.candidateFilters(each.filters.source)
+            let grab = Sources.autoGrabPick(each.answer?.candidates ?? [], filters, CandidateSort(rawValue: each.sort)!)
+            #expect(grab.map { Sources.key($0.pick) } == each.grab?.pick, "pick \(at)")
+            #expect(grab.map { $0.list.map(Sources.key) } == each.grab?.list, "pick \(at)")
+            #expect(Sources.notPickedLine(blocked, found: each.answer?.candidates.count ?? 0) == each.notPicked, "pick \(at)")
+        }
+    }
+
+    @Test func theBoxOnceAddedIsTheWebs() {
+        #expect(v.added.count == 120)
+        for (at, each) in v.added.enumerated() {
+            for floor in each.for {
+                let status = StoreLine.statusFor(each.answer, cancelIn: .requests,
+                                                 floor: floor.floor.map { QualityFloor(rawValue: $0)! })
+                #expect(status.map(GetVectors.Status.init) == floor.status, "added \(at)")
+                #expect(status.map(StoreLine.addedStatus).map(GetVectors.Status.init) == floor.added, "added \(at)")
+            }
         }
     }
 

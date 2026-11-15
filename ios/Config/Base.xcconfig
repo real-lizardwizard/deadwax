@@ -7,9 +7,9 @@
 PRODUCT_NAME = Deadwax
 PRODUCT_BUNDLE_IDENTIFIER = net.lizardlounge.deadwax
 
-// The app's own version, apart from the server's (src/__init__.py): 0.1 was Phase 0, 0.2 Phase 1's shell, 0.3 Phase 2's downloads, 0.4 lyrics, 0.5 the EQ, 0.6 the turntable, 0.7 the speed fader, 0.8 play history, 0.9 your library downloaded, 0.10 the Library (playlists, the switch, artists, songs), 0.11 is Search (MusicBrainz beside your library, what's saved, More).
-MARKETING_VERSION = 0.11
-CURRENT_PROJECT_VERSION = 11
+// The app's own version, apart from the server's (src/__init__.py): 0.1 was Phase 0, 0.2 Phase 1's shell, 0.3 Phase 2's downloads, 0.4 lyrics, 0.5 the EQ, 0.6 the turntable, 0.7 the speed fader, 0.8 play history, 0.9 your library downloaded, 0.10 the Library (playlists, the switch, artists, songs), 0.11 Search (MusicBrainz beside your library, what's saved, More), then Requests and Get, 0.12 is getting albums done (Join, Add to my library, Pick the best source for me, You's Getting albums).
+MARKETING_VERSION = 0.12
+CURRENT_PROJECT_VERSION = 12
 
 // A device build only: James's Mac has no Simulator runtime, and none is needed.
 SDKROOT = iphoneos

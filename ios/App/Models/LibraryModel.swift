@@ -438,6 +438,22 @@ final class LibraryModel {
         Task { await askMine() }
     }
 
+    /// (Phase 6, slice 3) Add to my library from the store line - a pressing the store holds that isn't yours, sent as a
+    /// Get would download it (`POST /me/library/add`, the web's addToMyLibrary(download.release)): once deadwax has it,
+    /// your library is asked again (libraryChanged - the web's announceAddedToLibrary). Throws deadwax's refusal for the
+    /// line to say. Not a page's request: it runs to its answer. (Slice 3's review) An answer that never came may hide
+    /// an Add that landed (StoreWords.addUnanswered): your library is asked again then too.
+    func add(_ release: GetRelease) async throws {
+        guard let client = server.client else { throw URLError(.notConnectedToInternet) }
+        do {
+            _ = try await client.addToLibrary(release)
+        } catch {
+            if RequestOverlays.unanswered(error) { libraryChanged() }
+            throw error
+        }
+        libraryChanged()
+    }
+
     /// POST /me/library/seen; a failure is let go (the mark is gone here; deadwax keeps it until the next open).
     private func tellSeen(_ body: SeenBody) {
         guard let client = server.client, let json = try? JSONEncoder().encode(body) else { return }

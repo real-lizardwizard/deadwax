@@ -555,9 +555,31 @@ public struct DeadwaxClient: Sendable {
         try await call(Routes.enqueue, sending: body)
     }
 
-    /// You > Getting albums as kept on deadwax, read leniently - the defaults for anything it doesn't say.
-    public func getSettings() async throws -> GetSettings {
+    /// You > Getting albums as kept on deadwax, read leniently - the defaults for anything it doesn't say - and whether
+    /// deadwax can keep them.
+    public func getSettings() async throws -> GetSettingsAnswer {
         try await call(Routes.preferences)
+    }
+
+    // MARK: Phase 6, slice 3: Join, Add and Getting albums
+
+    /// You > Getting albums changed: only what was chosen sent, the rest left as they are - answered with all three as
+    /// they stand after it. A 503 is a database that won't keep them, in its words.
+    public func saveSettings(_ choice: GetChoice) async throws -> GetSettingsAnswer {
+        try await call(Routes.savePreferences, sending: choice)
+    }
+
+    /// A download somebody else asked for, joined - one download, everyone who asked waiting for it. A 409 in words is
+    /// one that has landed, stopped or been cleared since the line was drawn.
+    public func joinJob(_ id: Int) async throws -> JoinAnswer {
+        try await call(Routes.joinJob, path: ["job_id": String(id)])
+    }
+
+    /// Add to my library from the store line: the pressing a Get would download (GetRelease, what the web's line sends -
+    /// FindCandidatesRequest's fields), whose folders the store holds, put in your library. A 409 in words when there is
+    /// nothing to add.
+    public func addToLibrary(_ release: GetRelease) async throws -> AddedToLibrary {
+        try await call(Routes.libraryAdd, sending: release)
     }
 
     /// The id bridge by a pressing, whole (`Routes.storeAlbum` with `release_mbid`): Navidrome's album for it and the
