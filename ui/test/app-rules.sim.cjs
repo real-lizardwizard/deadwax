@@ -2643,11 +2643,18 @@ console.log('\nGet, as the main page had it (2.0.0-player.41)')
       files.filter((file) => file.startsWith('app/') && /readPreferences\(/.test(code(read(file))))], [true, ['app/useGetSettings.ts']])
   //? Search again: a disclosure under folders found, its field focused as it opens, closed as a search starts
   check('Search again: a disclosure controlling the query form, focus to its field as it opens, closed as a search starts',
-    [/<button type="button" class="app-text-button" aria-expanded=\{again\} aria-controls=\{againId\} onClick=\{\(\) => setAgain\(\(was\) => !was\)\}>/.test(sheet),
+    [/<button type="button" class="app-text-button" aria-expanded=\{again === 'bottom'\} aria-controls=\{againId\} onClick=\{\(\) => toggleAgain\('bottom'\)\}>/.test(sheet),
       /useLayoutEffect\(\(\) => \{\s*if \(again\) againField\.current\?\.focus\(/.test(sheet),
-      /const requery = \(\) => \{\s*keepFocus\(\)\s*setAgain\(false\)\s*void askGetSettings\(\)\s*state\.requery\(\)/.test(sheet),
-      /if \(scroller\.current\) scroller\.current\.scrollTop = 0\s*setAgain\(false\)/.test(sheet)],
+      /const requery = \(\) => \{\s*keepFocus\(\)\s*setAgain\(null\)\s*void askGetSettings\(\)\s*state\.requery\(\)/.test(sheet),
+      /if \(scroller\.current\) scroller\.current\.scrollTop = 0\s*setAgain\(null\)/.test(sheet)],
     [true, true, true, true])
+  //? (2.1.27) ...and the head's: one form at a time, the other's tap moving it - named Search again whether
+  //? its words or its icon show
+  check('Search again in the head too: its own form, one open at a time, named the same as words or icon',
+    [/const toggleAgain = \(place: 'top' \| 'bottom'\) => setAgain\(\(was\) => \(was === place \? null : place\)\)/.test(sheet),
+      /aria-label="Search again"\s*aria-expanded=\{again === 'top'\}\s*aria-controls=\{againTopId\}\s*onClick=\{\(\) => toggleAgain\('top'\)\}/.test(sheet),
+      /\{foundFolders && again === 'top' && queryForm\(null, againTopId\)\}/.test(sheet)],
+    [true, true, true])
 }
 
 //? LOADING (the audit): the Library asks Navidrome for nothing until its tab has been shown once, and a

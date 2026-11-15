@@ -1008,11 +1008,13 @@ async function main() {
 
   console.log('\nSearch again, when folders were found (2.0.0-player.41)')
   {
-    const again = () => find((node) => node.type === 'button' && text(node) === 'Search again')[0]
+    const again = () => find((node) => node.type === 'button' && node.props.class === 'app-text-button' && text(node) === 'Search again')[0]
+    //? (2.1.27) the head's, at the right of "Choose a source"
+    const head = () => find(byClass('app-sources-again-head'))[0]
     const forms = () => find((node) => node.type === 'form')
     const fresh = sheet()
     fresh.draw({ open: true, request: { release: RELEASE, subtitle: 'Third', key: 420 } })
-    check('not while asking', again(), undefined)
+    check('not while asking', [again(), head()], [undefined, undefined])
     asks.at(-1).resolve(answer([source('vinylhead'), source('bob', { score: 0.8 })], { query: 'Portishead Third', queries: ['Portishead Third', 'Third Portishead'] }))
     await settle()
     fresh.draw()
@@ -1054,14 +1056,49 @@ async function main() {
     fresh.draw()
     check('a second tap on Search again closes it', [again()?.props['aria-expanded'], forms().length], [false, 0])
 
+    //? (2.1.27) the head's Search again: in the head after the title, its form above the chips - outside the list
+    {
+      const header = find((node) => node.type === 'header')[0]
+      const inHead = header.props.children.flat(Infinity).filter(Boolean).map((child) => child.props?.class ?? child.type)
+      check('the head: Cancel, "Choose a source", then Search again - named the same as words or icon, closed',
+        [inHead.slice(0, 3), head()?.props['aria-label'], head()?.props['aria-expanded'], forms().length],
+        [['app-sources-cancel', 'app-sources-title', 'app-sources-again-head'], 'Search again', false, 0])
+      head().props.onClick()
+      fresh.draw()
+      const box = find(byClass('app-sources'))[0].props.children.flat(Infinity).filter(Boolean)
+      const at = (cls) => box.findIndex((child) => (child.props?.class ?? '').split(' ').includes(cls))
+      check('...a tap opens its form above the chips, outside the list, the form it controls, focus to its field',
+        [forms().length, forms()[0]?.props.id === head()?.props['aria-controls'], forms()[0]?.props.class,
+          at('is-top') > -1 && at('is-top') < at('app-sources-chips') && at('app-sources-chips') < at('app-sources-scroll'),
+          find((node) => node.type === 'input')[0]?.props.ref !== undefined, head()?.props['aria-expanded']],
+        [1, true, 'app-sources-state is-again is-top', true, true, true])
+      again().props.onClick()
+      fresh.draw()
+      check('...the one under the cards moves it down there', [forms().length, forms()[0]?.props.class, head()?.props['aria-expanded'], again()?.props['aria-expanded']],
+        [1, 'app-sources-state is-again', false, true])
+      head().props.onClick()
+      fresh.draw()
+      head().props.onClick()
+      fresh.draw()
+      check('...and a second tap on the head\'s closes it', [forms().length, head()?.props['aria-expanded']], [0, false])
+      head().props.onClick()
+      fresh.draw()
+      forms()[0].props.onSubmit({ preventDefault() {} })
+      fresh.draw()
+      check('...a search from it starts, closing it - and no head Search again while asking', [forms().length, head()], [0, undefined])
+      asks.at(-1).resolve(answer([source('vinylhead')]))
+      await settle()
+      fresh.draw()
+    }
+
     //? none passing the chips: folders were found, so Search again is there too
     globalThis.__sources.settings = { get_mode: 'sources', quality_floor: 'lossless' }
     fresh.draw({ request: { release: RELEASE, subtitle: 'Third', key: 421 } })
     asks.at(-1).resolve(answer([source('mp3guy', { formats: ['mp3'], bitrates: [320], bit_depths: [], sample_rates: [] })]))
     await settle()
     fresh.draw()
-    check('none passing your filters: Search again under Clear filters', [text(classed('app-sources-state-text')[0]), !!again(), forms().length],
-      ['1 source found - none matches your filters.', true, 0])
+    check('none passing your filters: Search again under Clear filters, and in the head', [text(classed('app-sources-state-text')[0]), !!again(), !!head(), forms().length],
+      ['1 source found - none matches your filters.', true, true, 0])
     globalThis.__sources.settings = { get_mode: 'sources', quality_floor: 'any' }
 
     //? nothing found: the query form is already there - no Search again beside it
@@ -1069,17 +1106,17 @@ async function main() {
     asks.at(-1).resolve(answer([]))
     await settle()
     fresh.draw()
-    check('nothing found: the one query form, as it always was, and no Search again', [forms().length, again()], [1, undefined])
+    check('nothing found: the one query form, as it always was, and no Search again', [forms().length, again(), head()], [1, undefined, undefined])
     fresh.draw({ request: { release: RELEASE, subtitle: 'Third', key: 423 } })
     asks.at(-1).reject(new Error("slskd isn't logged in to Soulseek, so it can't search."))
     await settle()
     fresh.draw()
-    check('slskd unable to search: no Search again (Try again is the way)', again(), undefined)
+    check('slskd unable to search: no Search again (Try again is the way)', [again(), head()], [undefined, undefined])
     fresh.draw({ request: { release: RELEASE, subtitle: 'Third', key: 424 } })
     asks.at(-1).resolve(answer([], { held: { path: 'P/T', paths: ['P/T'], artist: 'P', album: 'T', edition: '', track_count: 11, expected_tracks: 11, formats: ['flac'], complete: true, fills_gaps: false, filed_to: null }, query: '', queries: [] }))
     await settle()
     fresh.draw()
-    check('held whole - the store\'s box, nothing searched: no Search again', again(), undefined)
+    check('held whole - the store\'s box, nothing searched: no Search again', [again(), head()], [undefined, undefined])
     fresh.draw({ open: false })
   }
 

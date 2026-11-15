@@ -948,6 +948,10 @@
 
     .app-desk .app-sources-heading { display: flex; flex-direction: column; gap: var(--app-line-gap); min-width: 0; }
 
+    /* Search again before the close button (2.1.27), the words in the panel's own size */
+    .app-desk .app-sources-head-end { display: flex; flex: none; align-items: center; gap: var(--app-desk-panel-gap); }
+    .app-desk .app-sources-head.is-panel .app-sources-again-head { font-size: var(--dw-text-label); }
+
     .app-desk .app-sources-head.is-panel .app-sources-title {
         color: var(--dw-text-heading-color);
         font-size: var(--dw-text-heading);

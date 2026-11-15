@@ -1920,3 +1920,29 @@ search, abandoned searches stopped, and the rate limiter's lock.
 What MusicBrainz's saved answers hold, searched under any words and drawn first in each kind's MusicBrainz rows, marked
 saved - its write-up is beside .54's, in notes/backend-gotchas.md ("Search what's saved (2.0.0-player.56)"): the index,
 the route, and Search's side (the saved block, SOURCE.saved in Top results, SAVED_WAIT_MS, the late kinds, the words).
+
+### Search again in the head (2.1.27)
+
+James, on the iPhone app's Choose a source: "search again should be somewhere near the top as well", then
+"Maybe on the right of 'choose a source'", and of the web: "Yeah change the web app to match". The iPhone app
+put it in its bar (ios d748030, notes/ios.md "Search again at the top of Choose a source"); this is the web's.
+
+- **Where**: a phone's sheet has it in its head's third column, right-aligned at the right of "Choose a source";
+  a desktop's panel has it before the close button (`.app-sources-head-end`), in the panel's label size. It's
+  drawn only while folders found are shown (`foundFolders`: not asking, no error, no store box, something
+  found - nothing found already shows its query form).
+- **Words or an icon**: measured in the browser with the app's own stylesheets, "Search again" is 103px at
+  17px Noto Sans and the title 135px. At 375px wide the words met the title edge to edge (1px), so the head's
+  grid now has a column gap (`--app-chip-gap`, 8px) and below 390px the words give way to the tab bar's
+  SearchIcon (`--app-tab-icon`), 44px square. The button's name is `aria-label="Search again"` either way, and
+  the words are aria-hidden so it isn't read twice. At 390 the title is still centred (127-263 of 390) with
+  8px to the words; at 375 and 320 the icon sits at the right, nothing overflowing.
+- **Its form opens above the chips**, outside the scrolling list (`is-top`: no state padding, `flex: none`), so
+  it's there however far the list was scrolled. `again` is `'top' | 'bottom' | null`, so one form is open at a
+  time and the other's tap moves it. A search starting closes it, as before (`setAgain(null)` in requery and
+  in the new-search effect).
+- **Sims**: sources.sim.cjs's Search again block checks that the head reads Cancel, then the title, then Search
+  again; that the head's opens its form above the chips and outside the list, the form it controls, its field
+  focused; that the bottom one moves it; a second tap; a search from it; and that it isn't drawn for nothing
+  found, an error, the store's box or while asking. app-rules.sim.cjs holds the toggle, the aria wiring and the
+  form's place.
