@@ -8513,3 +8513,154 @@ tests/test_ios_palette.py has four new tests:
 Verified on the Mac: see the commit, which has the checks' results. Not verified: anything on the phone (checks
 210-217): the face itself on iOS 27, its weights, the alphabets, the navigation bars' and search fields' fonts on iOS
 27's bars, the section headers' size, Bold Text, and where Noto's extra width and height crowd a layout.
+
+## The play bar on the tab bar (15 Nov)
+
+James, on his iPhone at app 0.11, in this order:
+
+- "merge the play bar with the bottom bar so it doesn't look like it's floating";
+- "I would like to be able to swipe on the title to skip forward and backward while also being able to seek. let's
+  put the progress on top of the play bar";
+- "opaque the whole way";
+- "get rid of the skip forward button";
+- "dragging up or tapping on the title should bring up the play page. let's make sure the play/pause isn't right up
+  against the edge as well, so its easily pressable".
+
+Built on `square-look` after Noto Sans (68b4b97). **The app stays 0.11 (11)**. src/__init__.py is untouched (2.1.26,
+from ios's c8da2eb). There is no server change, and the engine files are untouched. The only new playback action is
+the swipe right's "the song before": QueueController's own move, made from Previous's rules without its restart.
+Next and seek are the ones already there.
+
+### What changed
+
+- **The mini player is the tab bar's top** (AppTabBar, MainTabs.swift):
+  - It is one VStack: MiniPlayerView while something is queued, a hairline of --dw-border, then the tabs.
+  - The whole block sits on --dw-tab-bar, solid, running down under the home indicator. The `.regularMaterial` card,
+    its corners and its 8 pt inset are gone, so nothing of the page shows through.
+  - With the play bar there, its seek line is the block's top edge; the 1 px hairline along the top is drawn only
+    with nothing queued. Nothing queued, the bar is exactly as it was.
+  - `.isTabBar` and `.contain` moved onto the tabs' HStack, so VoiceOver reads the play bar as its own elements
+    before the tab bar.
+  - The `.dynamicTypeSize(...xxxLarge)` cap now covers the block (see the decisions).
+- **The play bar** (MiniPlayerView, rewritten):
+  - The cover, flush left, the bar's full height, `Corners.art`.
+  - Then the title (subheadline semibold) and PlayerWords.secondLine (footnote, quiet).
+  - Then Play/Pause alone: a 48 pt wide target, the bar's full height tall, with 14 pt past it to the screen's edge.
+    Its glyph (title2) and spinner are as they were, and it shows itself in the Large Content Viewer. The Next button
+    is gone.
+  - The row is `max(60, @ScaledMetric(relativeTo: .subheadline) 60)` tall, so it and the cover grow with the two lines.
+- **BarTitle** (the cover and the words; one gesture area):
+  - A tap opens Now Playing (`.onTapGesture`).
+  - A `DragGesture(minimumDistance: PlayBar.decideAfter)` reads its direction once, on its first change
+    (PlayBar.way), and keeps it: across, up or down.
+  - **Across**: the words follow the finger (an offset inside a clipped column, on the words' own view, so the words
+    leaving keep where the finger left them and the new song's come in from the column's edge). Toward a song that isn't there
+    (PlayerModel.hasSongBefore / hasSongAfter) they follow a third of the way (PlayBar.followed).
+  - On letting go, PlayBar.skip decides. Left is `player.next()`, right is `player.songBefore()`, and anything else
+    springs back. The words carry `.id(entry.key)` and a transition chosen by `sliding`, which is set while the drag
+    goes across (so the words leaving already carry it) and cleared once the key has changed. The old words leave
+    one way and the new ones come in from the other, `.animation(value: entry.key)` on the column alone. A song that
+    changes by itself, or from the lock screen, changes the words at once, as before. Under Reduce Motion they fade.
+  - **Up**: Now Playing opens on letting go, if PlayBar.opens. **Down**: nothing.
+  - A drag the system takes away (the `@GestureState`, as ScrubberView's) skips and opens nothing, and springs back.
+  - VoiceOver: one element, "Now playing: Roads, Portishead - open" (PlayerWords.miniPlayerLabel, as before), a
+    button whose activation opens Now Playing. Its actions are "Next song" and "Previous song", each only while there
+    is a song that way.
+- **SeekLine** (along the top edge; a view of its own, so only it redraws as the position moves, as Hairline did):
+  - At rest, a 2 pt line of --dw-border with the part played in the accent, its top on the bar's top edge.
+  - A 16 pt touch area centred on it, an overlay, so it adds no room and reaches 7 pt over the page.
+  - A finger on it: 8 pt thick, and a tag over the finger, "1:23 / 4:56" (PlayerWords.barTime). The tag is caption
+    with monospaced digits, on --dw-tab-bar with a --dw-border edge and `Corners.control`, 6 pt above the line and
+    kept 8 pt from the screen's sides.
+  - Every rule is Scrub's, as ScrubberView's: dragStart, dragMove, dragEnd (one seek, on letting go), dragFor (the
+    song changing drops it), the cancel, and `shownPosition` holding the target until it lands. One rule is the bar's
+    own (see the decisions).
+  - VoiceOver: adjustable, "Position in the song", "0:12 of 5:00" (the scrubber's words), PlayBar.adjusted's 10 s.
+- **The room** (TabStack):
+  - `tabBarRoom` is still AppTabBar's measured height, which now includes the play bar and the hairline under it.
+  - PlayerInset became NoticeInset, which holds only the notice. `playerClearance` is the notice's height (while one
+    shows) plus `tabBarRoom`, so the two add up to the block and a list's last row clears it.
+  - The seek line's reach over the page and its tag are overlays, overlap rather than room.
+- **The keyboard**: the block keeps `.ignoresSafeArea(.keyboard)`, so the play bar now stays under the keyboard with
+  the tabs, and `tabBarRoom` is 0 while it's up. The notice still rides the keyboard.
+- **Core**:
+  - `entryBefore(_:)` (UpNext.swift): backward()'s entry at position 0, past Repeat One's copies, or nil.
+  - `QueueController.toEntryBefore()`: catchUp, then Previous's move without its restart.
+  - **PlayBar.swift**, the gestures' rules and numbers.
+  - PlayerWords: `nextSong`, `previousSong`, `barTime`.
+  - PlayerModel adds `songBefore()` (as next(): cancelRetry, act, startTicking), `hasSongBefore` and `hasSongAfter`
+    (onward, or Repeat All with a queue). previous() is unchanged.
+- Corners.swift's comments: the play bar is no longer a card.
+
+### Decided here (the brief left these open, or this departs from it)
+
+- **Now Playing opens on letting go; it doesn't follow the finger.** It is a `fullScreenCover`, which can't be driven
+  by a drag. Following the finger would mean presenting Now Playing as the app's own overlay: its dismiss drag, the
+  turntable's full screen, and the sheets over it would all move with it. That is a larger change than this one.
+  Check 224 asks whether it feels wrong.
+- **A tap on the seek line seeks nowhere.** ScrubberView seeks on a tap, but the line's 16 pt touch area reaches 7 pt
+  over the page's foot and 9 pt into the title's top, where a tap means a row or Now Playing. A seek there would jump
+  the song by surprise, so a touch must move PlayBar.seekSlop (4 pt) across before it seeks. It still thickens and
+  shows the time at once.
+- **The keyboard covers the play bar.** It used to ride the keyboard as a card. As one block with the tabs, it goes
+  under the keyboard with them, as Music's does. Check 202 now says so, and the notice still rides the keyboard.
+- **The cap covers the play bar.** The mini player had no Dynamic Type cap; the block now holds at `.xxxLarge`, the
+  tab bar's, so the joined block can't take half the screen at the accessibility sizes. Play/Pause has the Large
+  Content Viewer. The title has none, since its long press would fight the drag.
+- **The numbers**, all in PlayBar:
+  - a direction is read after 10 pt;
+  - a skip at 50 pt, still going that way, or a flick whose predicted end is past 120;
+  - Now Playing at 40 pt up, still going up, or a flick past 120;
+  - a third of the way toward a song that isn't there;
+  - the line's slop is 4 pt and its VoiceOver step 10 s (the scrubber's is 5).
+- **"Right always goes to the song before"** is entryBefore: past Repeat One's copies as Previous does, with History
+  following (wentBack). At the first song (or with only copies before it) the title springs back. Left is Next's own
+  rule, Repeat All's next time round included.
+- **The actions only when there's a song that way**, so VoiceOver never offers one that does nothing.
+- **"Mostly horizontal"** is a drag that has moved more across than up or down by the time it is read. The bar
+  isn't in a scroll view, so no vertical scroll is there to steal; the 7 pt of the line's touch area over the page is
+  the only overlap, as the brief set it.
+
+### Tests
+
+- **PlayBarTests** (13):
+  - the way, read once past 10 pt (a tie isn't across);
+  - left is next and right is before;
+  - under the threshold, or flung back, it springs back;
+  - a flick skips;
+  - the resistance, and which way has a song;
+  - a drag up opens, and a short or reversed one doesn't;
+  - the line's slop;
+  - VoiceOver's 10 s, and the song's ends;
+  - the words;
+  - entryBefore on a plain queue.
+- **QueueControllerSongBeforeTests** (6):
+  - the song before at 30 s, a skip and never a seek;
+  - at the first song nothing moves;
+  - paused stays paused;
+  - History's floor follows, as Previous's does;
+  - a join no change has seen is caught up first;
+  - Repeat One's copies are passed over.
+- **tests/test_ios_palette.py**, `test_the_play_bar_is_the_tab_bars_top`:
+  - AppTabBar draws MiniPlayerView, and nothing else does;
+  - no material or card in it;
+  - no Next or Previous glyph;
+  - its 60, 48 and an edge of 12-16 pt;
+  - both VoiceOver actions.
+
+### Verified, and not
+
+Verified on the Mac: see the commit, which has the checks' results. Nothing has been seen on a screen, since no
+simulator was used.
+
+Not verified, so only the phone can show (docs/ios.md's checks 218-227):
+- that the block sits flush and opaque, the cover flush, and Play/Pause easy to hit one-handed;
+- that the 16 pt touch area above the bar takes a finger, with the overlay offset outside the block's frame, and that
+  the tag sits where it should;
+- that `.onTapGesture` and the drag share the title as intended, with no tap after a swipe;
+- that the transition chosen during the drag is the one the leaving words take on iOS 27, and that the slide looks
+  right;
+- the thresholds' feel;
+- VoiceOver's reading and actions;
+- that `tabBarRoom` measured with the play bar reaches every list's foot;
+- the keyboard over the block.

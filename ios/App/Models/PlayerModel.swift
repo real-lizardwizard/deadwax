@@ -423,6 +423,20 @@ final class PlayerModel {
         startTicking()
     }
 
+    /// (The play bar's swipe right, 15 Nov) The song before, however far into this one - never the song again, which is
+    /// Previous's past 3 s (QueueController.toEntryBefore). Nothing at the queue's first song. Playing or paused as it was.
+    func songBefore() {
+        guard let controller else { return }
+        cancelRetry()
+        act { controller.toEntryBefore() }
+        startTicking()
+    }
+
+    /// A song before the one playing for the bar's swipe right to go to (entryBefore).
+    var hasSongBefore: Bool { entryBefore(queue) != nil }
+    /// A song after it for the bar's swipe left (Next's: past Repeat One's copies, or Repeat All's next time round).
+    var hasSongAfter: Bool { onward(queue) != nil || (repeatMode == .all && hasQueue) }
+
     /// Previous: the song again from its start after `UpNext.restartAfterSeconds`, else the entry before the run of
     /// Repeat One's copies it is part of. Playing or paused as it was.
     func previous() {

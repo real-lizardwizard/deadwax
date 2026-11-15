@@ -863,3 +863,58 @@ private extension QueueController {
         #expect(!player.holdsAnEdit && player.queue.ids == ["1", "2", "3", "4"])
     }
 }
+
+// (The phone's play bar, 15 Nov) A swipe right on the bar's title: the song before, however far into this one - never
+// Previous's restart past 3 s.
+@Suite struct QueueControllerSongBeforeTests {
+    @Test func theSongBeforeIsGoneToHoweverFarIn() {
+        let (player, engine) = rig()
+        player.playTracks(simAlbum(3), start: 1)
+        engine.seconds = 30
+        #expect(player.toEntryBefore())
+        #expect(player.queue.current?.id == "1" && engine.current == "1")
+        #expect(engine.log == ["play 1", "skip 0", "resume"])
+    }
+
+    @Test func atTheFirstSongNothingMoves() {
+        let (player, engine) = rig()
+        player.playTracks(simAlbum(3), start: 0)
+        engine.seconds = 30
+        #expect(!player.toEntryBefore())
+        #expect(player.queue.index == 0 && engine.log == ["play 0"])
+    }
+
+    @Test func pausedStaysPaused() {
+        let (player, engine) = rig()
+        player.playTracks(simAlbum(3), start: 2)
+        player.intendsToPlay = false
+        #expect(player.toEntryBefore())
+        #expect(engine.current == "2" && engine.log == ["play 2", "skip 1"])
+    }
+
+    @Test func historyFollowsAsPreviousMakesIt() {
+        let (player, engine) = rig()
+        player.playTracks(simAlbum(4), start: 2)
+        engine.seconds = 10
+        player.toEntryBefore()
+        #expect(player.queue.current?.id == "2" && player.queue.upNext?.startedAt == 1)
+    }
+
+    @Test func aJoinNoChangeHasSeenIsCaughtUpWithFirst() {
+        let (player, engine) = rig()
+        player.playTracks(simAlbum(4), start: 0)
+        engine.join(after: 5)
+        #expect(player.toEntryBefore())
+        #expect(player.queue.current?.id == "1" && player.queue.index == 0)
+    }
+
+    @Test func repeatOnesCopiesArePassedOver() {
+        let (player, _) = rig(.one)
+        player.playTracks(simAlbum(3), start: 0)
+        #expect(!player.toEntryBefore())
+        player.next()
+        #expect(player.queue.current?.id == "2")
+        #expect(player.toEntryBefore())
+        #expect(player.queue.current?.id == "1")
+    }
+}

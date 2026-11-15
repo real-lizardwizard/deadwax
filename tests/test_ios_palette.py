@@ -251,6 +251,26 @@ def test_the_apps_own_bars_are_the_webs():
     assert ".accessibilityAddTraits(.isTabBar)" in tabs
 
 
+def test_the_play_bar_is_the_tab_bars_top():
+    # 15 Nov, James: "merge the play bar with the bottom bar so it doesn't look like it's floating", "opaque the whole
+    # way", "get rid of the skip forward button", "let's make sure the play/pause isn't right up against the edge". The
+    # mini player is drawn by AppTabBar alone, on its opaque fill rather than as a card of material over the pages, with
+    # Play/Pause its only button: 48 pt, 12-16 pt from the edge. VoiceOver's actions are the bar's way to skip.
+    tabs = (APP / "Root" / "MainTabs.swift").read_text(encoding="utf-8")
+    mini = (APP / "Player" / "MiniPlayerView.swift").read_text(encoding="utf-8")
+    bar = tabs[tabs.index("struct AppTabBar"):tabs.index("private struct AppTabButton")]
+    assert "MiniPlayerView()" in bar
+    assert sum(path.read_text(encoding="utf-8").count("MiniPlayerView()") for path in APP.rglob("*.swift")) == 1
+    assert "Material" not in mini and "Corners.card" not in mini
+    assert "forward.fill" not in mini and "backward.fill" not in mini
+    assert "private static let height: CGFloat = 60\n" in mini
+    assert "private static let button: CGFloat = 48\n" in mini
+    edge = re.search(r"private static let edge: CGFloat = (\d+)\n", mini)
+    assert edge and 12 <= int(edge.group(1)) <= 16
+    assert "Button(PlayerWords.nextSong) { player.next() }" in mini
+    assert "Button(PlayerWords.previousSong) { player.songBefore() }" in mini
+
+
 # Noto Sans (15 Nov): James chose "Noto Sans (the web's)". The phone's four faces are the web's own seven files made into
 # one font per weight (ios/scripts/make-fonts.py), named by Info.plist's UIAppFonts, and every text style the app sets is
 # ios/App/Shared/Typeface.swift's - nothing in ios/App names a system text font of its own. A symbol drawn alone keeps
