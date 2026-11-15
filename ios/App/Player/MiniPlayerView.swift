@@ -11,14 +11,20 @@ import SwiftUI
 ///   (PlayerWords.secondLine).
 /// - Play/Pause, busy while the song loads: a 48 pt target with room past it to the screen's edge, so a thumb finds it.
 ///   There is no Next button.
-/// - Along the top edge, the seek line (SeekLine).
+/// - Along the top edge, the seek line (SeekLine), drawn only: the bar's drag seeks with it.
 ///
-/// The title and the cover take the gestures (BarTitle): a tap or a drag up opens Now Playing, a swipe across goes to the
-/// next song or the one before. VoiceOver reads the bar as before, "Now playing: Roads, Portishead - open", with "Next
-/// song" and "Previous song" as its actions, the only way to skip from it without a swipe. It grows with the text size
-/// up to the tab bar's own cap (AppTabBar).
+/// One drag takes the whole bar (after its review, 15 Nov), read once as soon as the finger has moved (PlayBar.way and
+/// PlayBar.role, from where it began): across from the bar's top PlayBar.seekReach a seek, across from the title or the
+/// cover a skip, up from anywhere Now Playing, down nothing. It is a high-priority DragGesture with a minimum distance,
+/// so a tap is never one: a tap anywhere on the cover or the words opens Now Playing (BarTitle), and anywhere on
+/// Play/Pause toggles - its top edge, under the line, included. Nothing above the bar is the bar's: the page there keeps
+/// its taps and scrolls. A seek or a skip begun on one song and let go on another does nothing (PlayBar.atLetGo).
+///
+/// VoiceOver reads the title (with "Next song" and "Previous song" as its actions, the only way to skip from the bar
+/// without a swipe), then Play/Pause, then the line. It grows with the text size up to the tab bar's own cap (AppTabBar).
 struct MiniPlayerView: View {
     @Environment(PlayerModel.self) private var player
+    @Environment(AppNavigation.self) private var navigation
 
     /// The bar's height at the standard text size, and its cover's: the cover is the bar's full height.
     private static let height: CGFloat = 60
@@ -29,6 +35,27 @@ struct MiniPlayerView: View {
     /// The bar's height at the text size in use: its two lines' room, growing with them (never under 60).
     @ScaledMetric(relativeTo: .subheadline) private var scaled: CGFloat = 60
 
+    /// The bar's width: where a finger is along the seek line, and whether a drag began over Play/Pause.
+    @State private var width: CGFloat = 0
+    /// The drag on the bar, once read.
+    @State private var hold: Hold?
+    /// A seek's finger along the line (Scrub's drag, as Now Playing's scrubber keeps it).
+    @State private var seek: Scrub.Drag?
+    /// A skip's words under the finger, and which way they slide as the song changes - set while the skip's drag goes
+    /// across, so the words leaving already carry it; nil otherwise, so a song changing by itself (or from the lock
+    /// screen) changes the words at once.
+    @State private var offset: CGFloat = 0
+    @State private var sliding: PlayBar.Skip?
+    /// True while the drag is live - put back to false however it ends, so a drag still held when it does was taken by
+    /// the system, not let go (as ScrubberView's).
+    @GestureState private var touching = false
+
+    /// A drag read: what it does, and the entry it began on.
+    private struct Hold: Equatable {
+        let role: PlayBar.Role
+        let key: Int
+    }
+
     init() {}
 
     var body: some View {
@@ -36,7 +63,8 @@ struct MiniPlayerView: View {
             let row = max(Self.height, scaled)
             HStack(spacing: 0) {
                 BarTitle(entry: entry, line: PlayerWords.secondLine(error: player.errorLine, artist: entry.track.artist),
-                         row: row)
+                         row: row, offset: offset, sliding: sliding)
+                    .accessibilitySortPriority(3)
                 Button { player.toggle() } label: {
                     ZStack {
                         // the glyph keeps its room under the spinner, so the button doesn't change size as it loads
@@ -57,23 +85,127 @@ struct MiniPlayerView: View {
                     Label(PlayerWords.playPause(playing: player.isPlaying),
                           systemImage: player.isPlaying ? "pause.fill" : "play.fill")
                 }
+                .accessibilitySortPriority(2)
             }
             .frame(height: row)
-            .overlay(alignment: .top) { SeekLine() }
+            .overlay(alignment: .top) {
+                SeekLine(drag: seek)
+                    .accessibilitySortPriority(1)
+            }
+            .onGeometryChange(for: CGFloat.self) { (bar: GeometryProxy) -> CGFloat in
+                bar.size.width
+            } action: { (now: CGFloat) -> Void in
+                width = now
+            }
+            .contentShape(Rectangle())
+            .highPriorityGesture(drag)
+            // the title, Play/Pause, then the line - in that order, whatever their frames (the line's starts above the bar)
+            .accessibilityElement(children: .contain)
+            .onChange(of: entry.key) { (_: Int, _: Int) -> Void in
+                // the slide was taken by the words as they changed: the next change is a plain one unless a skip says
+                Task { @MainActor in sliding = nil }
+            }
+            .onChange(of: touching) { (_: Bool, live: Bool) -> Void in
+                //? the gesture went without an end of its own: the system took the touch - nothing seeks, skips or opens
+                guard !live, hold != nil else { return }
+                hold = nil
+                seek = nil
+                springBack()
+            }
         }
+    }
+
+    private var drag: some Gesture {
+        DragGesture(minimumDistance: PlayBar.decideAfter, coordinateSpace: .local)
+            .updating($touching) { (_: DragGesture.Value, live: inout Bool, _: inout Transaction) -> Void in live = true }
+            .onChanged { (value: DragGesture.Value) -> Void in
+                guard let now = player.current else { return }
+                let dx = value.translation.width
+                let held: Hold
+                if let hold {
+                    held = hold
+                } else {
+                    guard let way = PlayBar.way(dx: dx, dy: value.translation.height) else { return }
+                    let onTitle = value.startLocation.x < width - (Self.button + Self.edge)
+                    held = Hold(role: PlayBar.role(way, startY: value.startLocation.y, onTitle: onTitle), key: now.key)
+                    hold = held
+                }
+                //? the song changed under the finger: the drag is dropped, and stays dropped until it is let go
+                guard held.key == now.key else {
+                    seek = nil
+                    if offset != 0 { springBack() }
+                    return
+                }
+                switch held.role {
+                case .seek:
+                    let length = player.duration
+                    //? no length yet: the line is no target (as the scrubber)
+                    guard length > 0 else { return }
+                    let time = Scrub.timeAt(x: value.location.x, left: 0, width: width, length: length)
+                    if let seek {
+                        self.seek = Scrub.dragMove(seek, pointer: 0, time: time)
+                    } else {
+                        seek = Scrub.dragStart(pointer: 0, track: now.track.id, time: time)
+                    }
+                case .skip:
+                    sliding = dx < 0 ? .next : .before
+                    let there = PlayBar.songThere(dx: dx, before: player.hasSongBefore, after: player.hasSongAfter)
+                    offset = PlayBar.followed(dx: dx, songThere: there)
+                case .open, .nothing:
+                    break
+                }
+            }
+            .onEnded { (value: DragGesture.Value) -> Void in
+                guard let held = hold else { return }
+                hold = nil
+                let seeking = Scrub.dragFor(seek, track: player.current?.track.id ?? "")
+                seek = nil
+                switch PlayBar.atLetGo(held.role, began: held.key, now: player.current?.key) {
+                case .seek:
+                    if let target = Scrub.dragEnd(seeking, pointer: 0, how: .up).seek { player.seek(to: target) }
+                case .skip:
+                    skip(dx: value.translation.width, predicted: value.predictedEndTranslation.width)
+                case .open:
+                    if PlayBar.opens(dy: value.translation.height, predicted: value.predictedEndTranslation.height) {
+                        navigation.nowPlayingShown = true
+                    }
+                case .nothing:
+                    springBack()
+                }
+            }
+    }
+
+    /// A skip's drag let go: the next song or the one before past the threshold (or a flick) with a song there, the
+    /// words sliding; else back where they were.
+    private func skip(dx: CGFloat, predicted: CGFloat) {
+        guard let skip = PlayBar.skip(dx: dx, predicted: predicted),
+              skip == .next ? player.hasSongAfter : player.hasSongBefore else {
+            springBack()
+            return
+        }
+        sliding = skip
+        let was = player.current?.key
+        if skip == .next { player.next() } else { player.songBefore() }
+        if player.current?.key != was {
+            // the new song's words start at their place; the column's animation slides them in
+            offset = 0
+        } else {
+            springBack()
+        }
+    }
+
+    private func springBack() {
+        sliding = nil
+        withAnimation(.spring(duration: 0.3)) { offset = 0 }
     }
 }
 
-/// The cover and the words, and the bar's gestures. A drag's direction is read once, as soon as the finger has moved
-/// (PlayBar.way), and kept until it is let go:
-/// - across: the words follow the finger, and on letting go past PlayBar.skipPast (or a flick) left is the next song,
-///   right the song before - "right" always the song before, however far into this one (PlayerModel.songBefore, never
-///   Previous's restart). The words slide out and the new song's slide in from the other side. Under the threshold, or
-///   at the queue's first or last song, they spring back; toward a song that isn't there they hold back as they follow.
-/// - up: Now Playing opens on letting go past PlayBar.openPast (or a flick). It is a full-screen cover, which can't
-///   follow a finger, so it opens as it does for a tap.
-/// - down: nothing.
-/// A tap opens Now Playing.
+/// The cover and the words (the bar's drag is MiniPlayerView's). A tap anywhere on them opens Now Playing. Under a
+/// skip's finger the words follow it (`offset`); as the song changes on a skip they slide out and the new song's slide
+/// in from the other side (`sliding`), fading instead under Reduce Motion. VoiceOver reads them as one button, "Now
+/// playing: Roads, Portishead - open" (PlayerWords.miniPlayerLabel), whose actions are "Next song" and "Previous song",
+/// each only while there is a song that way - "previous" always the song before, however far into this one
+/// (PlayerModel.songBefore, never Previous's restart).
 private struct BarTitle: View {
     @Environment(PlayerModel.self) private var player
     @Environment(AppNavigation.self) private var navigation
@@ -82,22 +214,13 @@ private struct BarTitle: View {
     let entry: QueueEntry
     let line: String?
     let row: CGFloat
+    let offset: CGFloat
+    let sliding: PlayBar.Skip?
 
     /// Between the cover and the words.
     private static let gap: CGFloat = 12
     /// A skip's slide.
     private static let slide = Animation.easeOut(duration: 0.22)
-
-    /// The drag's direction, once it is read.
-    @State private var way: PlayBar.Way?
-    /// The words' offset under the finger.
-    @State private var offset: CGFloat = 0
-    /// Which way the words slide as the song changes: set while a drag goes across, so the words leaving already carry
-    /// it; nil otherwise, so a song changing by itself (or from the lock screen) changes the words at once, as before.
-    @State private var sliding: PlayBar.Skip?
-    /// True while the drag is live - put back to false however it ends, so a drag still read when it does was taken by
-    /// the system, not let go (as ScrubberView's).
-    @GestureState private var touching = false
 
     var body: some View {
         let track = entry.track
@@ -129,12 +252,11 @@ private struct BarTitle: View {
             .animation(Self.slide, value: entry.key)
         }
         .contentShape(Rectangle())
-        .onTapGesture { open() }
-        .gesture(drag)
+        .onTapGesture { navigation.nowPlayingShown = true }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(PlayerWords.miniPlayerLabel(title: track.title, line: line))
         .accessibilityAddTraits(.isButton)
-        .accessibilityAction { open() }
+        .accessibilityAction { navigation.nowPlayingShown = true }
         .accessibilityActions {
             if player.hasSongAfter {
                 Button(PlayerWords.nextSong) { player.next() }
@@ -143,20 +265,9 @@ private struct BarTitle: View {
                 Button(PlayerWords.previousSong) { player.songBefore() }
             }
         }
-        .onChange(of: entry.key) { (_: Int, _: Int) -> Void in
-            // the slide was taken by the words as they changed: the next change is a plain one unless a drag says
-            Task { @MainActor in sliding = nil }
-        }
-        .onChange(of: touching) { (_: Bool, live: Bool) -> Void in
-            //? the gesture went without an end of its own: the system took the touch - nothing skips or opens
-            guard !live, way != nil else { return }
-            way = nil
-            sliding = nil
-            withAnimation(.spring(duration: 0.3)) { offset = 0 }
-        }
     }
 
-    /// How the words leave and come in: sliding the drag's way, or, under Reduce Motion, fading; at once otherwise.
+    /// How the words leave and come in: sliding the skip's way, or, under Reduce Motion, fading; at once otherwise.
     private var transition: AnyTransition {
         guard let sliding else { return .identity }
         if reduceMotion { return .opacity }
@@ -165,82 +276,28 @@ private struct BarTitle: View {
         case .before: return .asymmetric(insertion: .move(edge: .leading), removal: .move(edge: .trailing))
         }
     }
-
-    private var drag: some Gesture {
-        DragGesture(minimumDistance: PlayBar.decideAfter, coordinateSpace: .local)
-            .updating($touching) { (_: DragGesture.Value, live: inout Bool, _: inout Transaction) -> Void in live = true }
-            .onChanged { (value: DragGesture.Value) -> Void in
-                let dx = value.translation.width
-                guard let decided = way ?? PlayBar.way(dx: dx, dy: value.translation.height) else { return }
-                way = decided
-                guard decided == .across else { return }
-                sliding = dx < 0 ? .next : .before
-                let there = PlayBar.songThere(dx: dx, before: player.hasSongBefore, after: player.hasSongAfter)
-                offset = PlayBar.followed(dx: dx, songThere: there)
-            }
-            .onEnded { (value: DragGesture.Value) -> Void in
-                let decided = way
-                way = nil
-                switch decided {
-                case .across:
-                    let dx = value.translation.width
-                    if let skip = PlayBar.skip(dx: dx, predicted: value.predictedEndTranslation.width),
-                       skip == .next ? player.hasSongAfter : player.hasSongBefore {
-                        sliding = skip
-                        let was = entry.key
-                        if skip == .next { player.next() } else { player.songBefore() }
-                        if player.current?.key != was {
-                            // the new song's words start at their place; the column's animation slides them in
-                            offset = 0
-                        } else {
-                            sliding = nil
-                            withAnimation(.spring(duration: 0.3)) { offset = 0 }
-                        }
-                    } else {
-                        sliding = nil
-                        withAnimation(.spring(duration: 0.3)) { offset = 0 }
-                    }
-                case .up:
-                    if PlayBar.opens(dy: value.translation.height, predicted: value.predictedEndTranslation.height) {
-                        open()
-                    }
-                case .down, nil:
-                    break
-                }
-            }
-    }
-
-    private func open() {
-        navigation.nowPlayingShown = true
-    }
 }
 
 /// The seek line along the play bar's top edge (James: "let's put the progress on top of the play bar"): at rest a 2 pt
-/// line of --dw-border, the part played in the accent; a finger on it thickens it to 8 pt, with the time under the
-/// finger over it ("1:23 / 4:56"). Every rule is Now Playing's scrubber's (Scrub): it follows the finger and seeks once,
-/// where it is let go; a drag the system takes away seeks nowhere; the song changing under it drops it; PlayerModel's
-/// `shownPosition` holds the seek's target until the engine says it landed. One rule is the bar's own: a touch that
-/// never moved PlayBar.seekSlop across seeks nowhere, since its 16 pt touch area reaches over the title's top and the
-/// page's foot, where a tap means something else. A slider to VoiceOver, "Position in the song", "0:12 of 5:00", 10 s a
-/// swipe (PlayBar.adjusted). A view of its own, so only it is drawn again as the position moves.
+/// line of --dw-border, the part played in the accent; under a seek's finger (MiniPlayerView's drag, `drag`) 8 pt
+/// thick, with the time under the finger over it ("1:23 / 4:56"). It is drawn only, taking no touch, so a tap at the
+/// bar's top edge is the cover's, the title's or Play/Pause's, and the page above keeps its own. Every rule of the seek
+/// is Now Playing's scrubber's (Scrub): it follows the finger and seeks once, where it is let go; a drag the system
+/// takes away seeks nowhere; the song changing under it drops it; PlayerModel's `shownPosition` holds the seek's target
+/// until the engine says it landed. A slider to VoiceOver, "Position in the song", "0:12 of 5:00", 10 s a swipe
+/// (PlayBar.adjusted). A view of its own, so only it is drawn again as the position moves.
 private struct SeekLine: View {
     @Environment(PlayerModel.self) private var player
     @Environment(\.displayScale) private var displayScale
 
-    /// The finger on the line.
-    @State private var drag: Scrub.Drag?
-    /// This touch has begun (ScrubberView's `pressed`).
-    @State private var pressed = false
-    /// The furthest this touch has gone across from where it went down.
-    @State private var moved: CGFloat = 0
-    /// True while the drag is live (ScrubberView's `touching`).
-    @GestureState private var touching = false
+    /// The seek's finger, while there is one.
+    let drag: Scrub.Drag?
 
     /// The line at rest, and under a finger.
     private static let rest: CGFloat = 2
     private static let held: CGFloat = 8
-    /// The touch area's height, centred on the line.
-    private static let reach: CGFloat = 16
+    /// The room the line is drawn in, centred on it (it takes no touch).
+    private static let room: CGFloat = 16
     /// The time's gap above the held line, and its least room from the screen's sides.
     private static let lift: CGFloat = 6
     private static let side: CGFloat = 8
@@ -264,17 +321,16 @@ private struct SeekLine: View {
                 .frame(height: held == nil ? Self.rest : Self.held)
                 .animation(.easeOut(duration: 0.15), value: held == nil)
             }
-            .contentShape(Rectangle())
-            .gesture(press(track: track, width: width, length: length))
             .overlay(alignment: .topLeading) {
                 if held != nil {
                     tag(PlayerWords.barTime(shown: shown, length: length), at: width * part, width: width)
                 }
             }
         }
-        .frame(height: Self.reach)
-        // the touch area centred on the line, whose top is the bar's top edge: the half above it overlaps the page
-        .offset(y: Self.rest / 2 - Self.reach / 2)
+        .frame(height: Self.room)
+        // centred on the line, whose top is the bar's top edge
+        .offset(y: Self.rest / 2 - Self.room / 2)
+        .allowsHitTesting(false)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(PlayerWords.scrubberName)
         .accessibilityValue(PlayerWords.scrubberValue(shown: shown, length: length))
@@ -288,13 +344,6 @@ private struct SeekLine: View {
             if let target = PlayBar.adjusted(increment: increment, from: shown, length: length) {
                 player.seek(to: target)
             }
-        }
-        .onChange(of: track) { (_: String, now: String) -> Void in drag = Scrub.dragFor(drag, track: now) }
-        .onChange(of: touching) { (_: Bool, live: Bool) -> Void in
-            //? the gesture went without an end of its own: the system took the touch - a cancel seeks nowhere
-            guard !live, pressed else { return }
-            pressed = false
-            drag = Scrub.dragEnd(drag, pointer: 0, how: .cancel).drag
         }
     }
 
@@ -311,34 +360,9 @@ private struct SeekLine: View {
                 -min(max(x - tag.width / 2, Self.side), max(width - tag.width - Self.side, Self.side))
             }
             .alignmentGuide(.top) { (tag: ViewDimensions) -> CGFloat in
-                // its foot `lift` above the held line's top, which is (reach - held) / 2 into the touch area
-                tag.height + Self.lift - (Self.reach - Self.held) / 2
+                // its foot `lift` above the held line's top, which is (room - held) / 2 into the room drawn in
+                tag.height + Self.lift - (Self.room - Self.held) / 2
             }
-            .allowsHitTesting(false)
             .accessibilityHidden(true)
-    }
-
-    private func press(track: String, width: CGFloat, length: Double) -> some Gesture {
-        DragGesture(minimumDistance: 0, coordinateSpace: .local)
-            .updating($touching) { (_: DragGesture.Value, live: inout Bool, _: inout Transaction) -> Void in live = true }
-            .onChanged { (value: DragGesture.Value) -> Void in
-                let time = Scrub.timeAt(x: value.location.x, left: 0, width: width, length: length)
-                if !pressed {
-                    pressed = true
-                    moved = 0
-                    //? no length yet: the line is no target (as the scrubber)
-                    if length > 0 { drag = Scrub.dragStart(pointer: 0, track: track, time: time) }
-                } else {
-                    moved = max(moved, abs(value.translation.width))
-                    drag = Scrub.dragMove(drag, pointer: 0, time: time)
-                }
-            }
-            .onEnded { (value: DragGesture.Value) -> Void in
-                pressed = false
-                let how: Scrub.Release = PlayBar.seeks(moved: max(moved, abs(value.translation.width))) ? .up : .cancel
-                let (next, seek) = Scrub.dragEnd(drag, pointer: 0, how: how)
-                drag = next
-                if let seek { player.seek(to: seek) }
-            }
     }
 }

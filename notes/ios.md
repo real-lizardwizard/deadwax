@@ -8873,7 +8873,8 @@ Next and seek are the ones already there.
     is a song that way.
 - **SeekLine** (along the top edge; a view of its own, so only it redraws as the position moves, as Hairline did):
   - At rest, a 2 pt line of --dw-border with the part played in the accent, its top on the bar's top edge.
-  - A 16 pt touch area centred on it, an overlay, so it adds no room and reaches 7 pt over the page.
+  - A 16 pt touch area centred on it, an overlay, so it adds no room and reaches 7 pt over the page. (Replaced after
+    review: see "The play bar after review (15 Nov)" - the line takes no touch now.)
   - A finger on it: 8 pt thick, and a tag over the finger, "1:23 / 4:56" (PlayerWords.barTime). The tag is caption
     with monospaced digits, on --dw-tab-bar with a --dw-border edge and `Corners.control`, 6 pt above the line and
     kept 8 pt from the screen's sides.
@@ -8906,7 +8907,7 @@ Next and seek are the ones already there.
 - **A tap on the seek line seeks nowhere.** ScrubberView seeks on a tap, but the line's 16 pt touch area reaches 7 pt
   over the page's foot and 9 pt into the title's top, where a tap means a row or Now Playing. A seek there would jump
   the song by surprise, so a touch must move PlayBar.seekSlop (4 pt) across before it seeks. It still thickens and
-  shows the time at once.
+  shows the time at once. (Replaced after review: see "The play bar after review (15 Nov)".)
 - **The keyboard covers the play bar.** It used to ride the keyboard as a card. As one block with the tabs, it goes
   under the keyboard with them, as Music's does. Check 202 now says so, and the notice still rides the keyboard.
 - **The cap covers the play bar.** The mini player had no Dynamic Type cap; the block now holds at `.xxxLarge`, the
@@ -8958,7 +8959,7 @@ Next and seek are the ones already there.
 Verified on the Mac: see the commit, which has the checks' results. Nothing has been seen on a screen, since no
 simulator was used.
 
-Not verified, so only the phone can show (docs/ios.md's checks 218-227):
+Not verified, so only the phone can show (docs/ios.md's checks 218-227, and 228 since the review):
 - that the block sits flush and opaque, the cover flush, and Play/Pause easy to hit one-handed;
 - that the 16 pt touch area above the bar takes a finger, with the overlay offset outside the block's frame, and that
   the tag sits where it should;
@@ -8994,3 +8995,135 @@ review. Slice 1 was folded onto both:
   that the last card clear the whole bar at the foot, and 179 that the badge sit clear of the play bar.
 
 Not verified - only the phone can tell: Requests in Noto Sans beside the web's, and the badge under the play bar.
+
+## The play bar after review (15 Nov)
+
+A review of Noto Sans and the play bar (merged into ios as 9a7fc74, installed on James's phone) found four things.
+The fix is built on ios's 8939ad9 (Requests merged). AppTabBar is untouched, so Requests' badge stays as it was.
+
+### 1. The seek line took too much (high)
+
+**What was wrong.** SeekLine's 16 pt touch area (7 pt over the page, 9 pt into the bar) was an overlay with
+`DragGesture(minimumDistance: 0)`, and its slop counted only the width. As a result:
+- a scroll, or a drag up, that began in it and drifted 4 pt sideways sought the song;
+- a tap on the last row's bottom 7 pt was lost;
+- a tap on the top 9 pt of the cover, the title or Play/Pause did nothing.
+
+**The fix: one drag for the whole bar, inside the bar, read once; the line drawn only.**
+- MiniPlayerView holds the bar's only gesture: a `.highPriorityGesture` DragGesture with `minimumDistance:
+  PlayBar.decideAfter` (10 pt) on the row, `.contentShape(Rectangle())`.
+- At its first change it is read once and kept until it is let go. Its way comes from PlayBar.way, and its role from
+  where it began, `PlayBar.role(way, startY:, onTitle:)`:
+  - across from the bar's top `PlayBar.seekReach` (14 pt) is a seek;
+  - across from the cover or title below that is a skip;
+  - across from Play/Pause is nothing;
+  - up from anywhere on the bar opens Now Playing;
+  - down does nothing.
+- A tap is never this drag, because it never moves 10 pt. The high-priority drag fails at lift, and the tap is the
+  cover's or title's (`.onTapGesture`, Now Playing) or Play/Pause's (its Button), wherever on them it lands, the
+  top edge included.
+- SeekLine is `.allowsHitTesting(false)`, drawn only, and keeps its accessibility element. Nothing above the bar is
+  hit-testable, so the page just above it keeps its taps and its scrolls.
+
+**Why this, and not the alternatives:**
+- A narrower band alone would still have swallowed taps on what it covered.
+- Forwarding a tap by its x could reach the cover, title and Play/Pause, but never a list row on the page above. SwiftUI
+  can't pass a touch to a sibling under an overlay.
+- A window-level UIKit pan that never cancels touches could have kept the band over the page. It would have had to
+  arbitrate with every list's swipe actions and scroll view.
+- With one gesture, the views underneath keep their own taps and the direction is read once.
+
+**14 pt.** That is the line (the top 2 pt) and the room above the title's letters. At the standard size, the two lines
+of words are 40 pt tall, centred in 60, and the title's capitals begin about 15 pt down; at larger sizes the bar grows
+and they sit lower. A swipe on the words is a skip, and one along the top edge is a seek.
+
+**What it costs.** A thumb aimed at the line now has to land on the bar (its top 14 pt), not above it. Check 220 asks
+whether the line is still easy to catch. If it isn't, the reach can grow into the bar, at the cost of the top of the
+title's swipe.
+
+**Seek's rules are unchanged.** It still follows Scrub: dragStart at the point the drag is read across, dragMove,
+dragEnd (`.up`) once at lift, dragFor by track, the cancel on a system takeover, and `shownPosition`'s hold. The drag
+lives in MiniPlayerView and is handed to SeekLine (`SeekLine(drag:)`). Only during a drag does MiniPlayerView redraw;
+SeekLine alone still reads the position. PlayBar.seekSlop and `seeks(moved:)` are gone: the drag's reading replaces
+them.
+
+### 2. A swipe across a song change skipped twice (low)
+
+**What was wrong.** BarTitle kept `way`, `offset` and `sliding` across a song change mid-drag, and acted at lift on
+whatever was playing then. A swipe held across a join could therefore skip the song after.
+
+**The fix.**
+- The drag's Hold keeps the entry's key from its first reading.
+- From then on, a change of the entry playing drops the drag: the words spring back, and any seek's finger is let
+  go. It stays dropped until the finger is lifted.
+- At lift, `PlayBar.atLetGo(role, began:, now:)` turns a seek or a skip into nothing when the key differs. Opening
+  Now Playing doesn't depend on the song, so it still opens.
+- PlayBarTests holds both rules.
+
+### 3. UIKit's fonts grew without a cap (medium)
+
+**What was wrong.** Typeface.uiFont used `UIFontMetrics.scaledFont(for:)` with no maximum. At AX5 the inline title
+and bar buttons (headline and body, 17) reached about 53 pt in a 44 pt bar, and a segmented control's 13 reached
+about 44 pt in a 32 pt control.
+
+**The fix.**
+- `uiFont` now uses `scaledFont(for:maximumPointSize:)`. The cap is `Typeface.cap`, the style's size at
+  `.extraExtraExtraLarge`, the tab bar's own cap: 23 pt for the 17s, 19 pt for the 13s.
+- At 19 pt, Noto's line is about 26 pt, which fits a 32 pt segmented control. At 23 pt the inline title's line is
+  about 31 pt in a 44 pt bar.
+
+**The large title is left uncapped** (`capped: false`), on UIFontMetrics' own curve, which is iOS's: 34 pt at the
+standard size, 40 at xxxLarge, 60 at AX5 by Apple's Dynamic Type table.
+- Noto's line at 60 pt is about 82 pt against SF's about 72.
+- Whether UINavigationBar's large-title area grows to fit that taller line, or clips it, isn't something this Mac
+  can show: UIKit's bar isn't on macOS. Check 227 asks.
+- As far as I know, iOS's own inline title and bar buttons stay at 17 pt at every text size (iOS shows them in the
+  Large Content Viewer instead). Ours growing up to 23 pt is more than iOS's own, but within the bar, as the review
+  asked.
+
+### 4. VoiceOver's order (a guess)
+
+**What was wrong.** The line's frame starts 7 pt above the bar (drawn there still, centred on the line), so VoiceOver
+might have read it first.
+
+**The fix.** The row is now `.accessibilityElement(children: .contain)`, with `.accessibilitySortPriority` 3 for the
+title, 2 for Play/Pause and 1 for the line. Check 225's order is set explicitly, not left to the frames.
+
+### Docs
+
+docs/ios.md:
+- The Playing section's line paragraph now states what holds. Only a sideways drag that starts on the mini player
+  seeks. A tap there is what's under it. A drag up there opens Now Playing. The page just above the mini player is
+  the page's.
+- The swipe's paragraph says a swipe held across a song change springs back.
+- Check 220 asks for the thumb on the top edge, and taps there; check 222 asks for a swipe held across a join.
+- Check 214 says what stops growing, and check 227 asks about the bars' fonts at the largest sizes and the big
+  titles.
+- **New check 228**, scrolling near the mini player: a scroll started just above it, a tap on a row's bottom edge, and
+  a drag up from its top edge.
+
+### Tests
+
+- **PlayBarTests**: the slop test is replaced by five tests.
+  - Across from the line's reach is a seek.
+  - Below the reach it is a skip on the title, and nothing over Play/Pause.
+  - Up from anywhere opens Now Playing, and down does nothing.
+  - A skip or a seek across a song change does nothing.
+  - Opening doesn't depend on the song.
+- **test_ios_palette.py**:
+  - The bar's test now holds one DragGesture, high-priority, with the minimum distance and no `minimumDistance: 0`;
+    the line with `allowsHitTesting(false)` and no gesture; and the three sort priorities.
+  - The Typeface test holds the cap: `maximumPointSize:`, xxxLarge's trait, only the large title `capped: false`,
+    and the tab bar's own `.xxxLarge`.
+
+### Verified, and not
+
+Verified on the Mac: see the commit, which has the checks' results.
+
+Not verified, so only the phone can show:
+- that the high-priority drag lets taps through to the title and to Play/Pause at once, its top edge included, with
+  no lag felt (check 220);
+- that a scroll started just above the bar is the page's (check 228);
+- that a thumb catches the line within the bar (check 220);
+- the sort order VoiceOver follows (check 225);
+- the bars' fonts at the largest sizes, and the large titles (check 227).

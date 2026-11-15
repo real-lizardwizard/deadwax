@@ -295,6 +295,14 @@ def test_the_play_bar_is_the_tab_bars_top():
     assert edge and 12 <= int(edge.group(1)) <= 16
     assert "Button(PlayerWords.nextSong) { player.next() }" in mini
     assert "Button(PlayerWords.previousSong) { player.songBefore() }" in mini
+    # after review: one drag takes the bar, never a touch that hasn't moved, so every tap is the cover's, the title's or
+    # Play/Pause's; the line is drawn only, nothing over the page above the bar takes a touch; VoiceOver's order is set
+    assert mini.count("DragGesture(") == 1 and "DragGesture(minimumDistance: PlayBar.decideAfter" in mini
+    assert ".highPriorityGesture(drag)" in mini and "minimumDistance: 0" not in mini
+    line = mini[mini.index("private struct SeekLine"):]
+    assert ".allowsHitTesting(false)" in line and "gesture" not in line.lower()
+    for priority in (3, 2, 1):
+        assert f".accessibilitySortPriority({priority})" in mini
 
 
 # Noto Sans (15 Nov): James chose "Noto Sans (the web's)". The phone's four faces are the web's own seven files made into
@@ -420,6 +428,13 @@ def test_every_text_style_is_noto_sans_scaled_as_ios_scales_it():
     for face in ("largeTitleTextAttributes", "titleTextAttributes", "UISearchTextField.appearance().font",
                  "UIBarButtonItem.appearance().setTitleTextAttributes", "UISegmentedControl.appearance()"):
         assert face in source, face
+    # after review: UIKit's fonts stop growing at xxxLarge, the tab bar's cap - all but the large title, as iOS's grows
+    assert "scaledFont(for: font, maximumPointSize: cap(size, style))" in source
+    assert "UITraitCollection(preferredContentSizeCategory: .extraExtraExtraLarge)" in source
+    assert source.count("capped: false)") == 1
+    assert "uiFont(.bold, size: 34, style: .largeTitle, capped: false)" in source
+    tabs = (APP / "Root" / "MainTabs.swift").read_text(encoding="utf-8")
+    assert ".dynamicTypeSize(...DynamicTypeSize.xxxLarge)" in tabs
 
 
 def test_no_system_text_font_is_left_in_the_app():

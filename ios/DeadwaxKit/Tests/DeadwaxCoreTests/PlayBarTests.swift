@@ -51,9 +51,33 @@ import Testing
         #expect(!PlayBar.opens(dy: -50, predicted: 10))
     }
 
-    @Test func aTouchOnTheLineThatNeverMovedSeeksNowhere() {
-        #expect(!PlayBar.seeks(moved: 3))
-        #expect(PlayBar.seeks(moved: 4))
+    // after review: a drag starting at the line seeks only when it goes across; a tap is never a drag at all
+    @Test func acrossFromTheLinesReachIsASeek() {
+        #expect(PlayBar.role(.across, startY: 0, onTitle: true) == .seek)
+        #expect(PlayBar.role(.across, startY: 13, onTitle: false) == .seek)
+    }
+
+    @Test func acrossBelowItIsASkipOnTheTitleAndNothingOverPlayPause() {
+        #expect(PlayBar.role(.across, startY: 14, onTitle: true) == .skip)
+        #expect(PlayBar.role(.across, startY: 30, onTitle: false) == .nothing)
+    }
+
+    @Test func upFromAnywhereOpensNowPlayingAndDownDoesNothing() {
+        #expect(PlayBar.role(.up, startY: 2, onTitle: true) == .open)
+        #expect(PlayBar.role(.up, startY: 30, onTitle: false) == .open)
+        #expect(PlayBar.role(.down, startY: 2, onTitle: true) == .nothing)
+    }
+
+    @Test func aSkipOrASeekAcrossASongChangeDoesNothing() {
+        #expect(PlayBar.atLetGo(.skip, began: 4, now: 4) == .skip)
+        #expect(PlayBar.atLetGo(.skip, began: 4, now: 5) == .nothing)
+        #expect(PlayBar.atLetGo(.seek, began: 4, now: 5) == .nothing)
+        #expect(PlayBar.atLetGo(.seek, began: 4, now: nil) == .nothing)
+    }
+
+    @Test func openingNowPlayingDoesntDependOnTheSong() {
+        #expect(PlayBar.atLetGo(.open, began: 4, now: 5) == .open)
+        #expect(PlayBar.atLetGo(.nothing, began: 4, now: 4) == .nothing)
     }
 
     @Test func voiceOverMovesTheLineTenSeconds() {

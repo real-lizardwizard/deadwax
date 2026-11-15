@@ -874,12 +874,16 @@ where it was in the list.
 and its artist, and play/pause, with room past it so a thumb finds it. It is solid, the tab bar's own colour, with
 nothing of the page showing through. There's no next button; instead:
 
-- **The line along its top** is how far in the song is. Put a finger on it and it thickens, with the time under
-  your finger over it ("1:23 / 4:56"); drag and let go, and the song goes there. A tap on the line that doesn't
-  move goes nowhere, so a tap meant for the song or the page above never jumps the song.
+- **The line along its top** is how far in the song is. To seek, put your finger on the mini player's top edge,
+  on the line or just under it, and drag sideways: the line thickens, with the time under your finger over it
+  ("1:23 / 4:56"), and the song goes there when you let go. Only a sideways drag that starts on the mini player
+  seeks. A tap there is the tap of whatever is under it: the cover or the song opens Now Playing, play/pause plays
+  or pauses. A drag up there opens Now Playing, and a drag that starts on the page just above the mini player is the
+  page's, so a scroll or a tap there never touches the song.
 - **Swipe the song's title** left for the next song, right for the song before - however far into this song you
   are, which Now Playing's previous button doesn't do. The title slides away and the new one comes in from the
-  other side. A short swipe springs back, and so does one past the first or the last song.
+  other side. A short swipe springs back, and so does one past the first or the last song, or one still held as
+  the song changes by itself.
 - **Tap the title or the cover**, or drag up on them, for Now Playing. Now Playing opens as you let go, without
   following your finger. A drag down does nothing.
 
@@ -3044,7 +3048,7 @@ not 166: Phase 6's checks are being written at the same time and take the number
   floating capsule. The tab you're on is purple. Tap each tab; tap the one you're on: back to its first screen,
   then to its top. Open an album and swipe back: the bar never moves or flickers, and iOS's own never shows.
 - **201 Above the bar.** With something playing, the mini player is the top of the bar (since the build after
-  Noto Sans: checks 218-227); Play Next a song: the line above the mini player. Scroll to the end of an album, Your
+  Noto Sans: checks 218-228); Play Next a song: the line above the mini player. Scroll to the end of an album, Your
   albums (grid and list), Playlists, Artists and You: the last row clears the mini player and the bar, and the letter
   index's last letter is above them. Nothing playing: the last row clears the bar, with no gap under it. Now
   Playing opens over everything, the bar included.
@@ -3094,7 +3098,8 @@ the squared look's.
   Downloads' sizes: the digits hold still as they change, with no jiggle.
 - **214 Text size.** At the smallest and the largest text sizes, Noto Sans shrinks and grows as iOS's face did.
   The navigation bars' titles take the size the app opened at: change the size with the app open, and they catch up
-  the next time it opens.
+  the next time it opens. A page's small title, the bars' buttons, the search fields and the segmented controls
+  stop growing at the largest of the standard sizes, as the tab bar does; the big titles keep growing.
 - **215 What iOS draws for the app.** These are in Noto Sans: You's and Info's section headings and the small notes
   under sections, the segmented controls (Search's filter, Info's, the EQ's ear), what you type in a search field,
   and the bars' buttons (**Done**, **Edit**). The menus, alerts, swipe buttons and Paste stay in iOS's face.
@@ -3103,7 +3108,7 @@ the squared look's.
   tight: the switch's names, the tab bar's words, the mini player's two lines, Now Playing's song, the tiles'
   title and artist, Up Next's rows, the EQ's numbers. Is anything cut off sooner than before, or overlapping?
 
-### The mini player on the tab bar's checks (218-227)
+### The mini player on the tab bar's checks (218-228)
 
 **Not done yet.** These come with the build that joins the mini player to the tab bar (still app 0.11 (11)), and
 follow Noto Sans's.
@@ -3116,16 +3121,18 @@ follow Noto Sans's.
 - **219 Play/Pause, one-handed.** Holding the phone in one hand, tap Play/Pause with your thumb a few times, then
   with the other hand's: is it easy to hit, and clear of the screen's edge? The spinner shows while a song loads.
   There's no next button.
-- **220 Seeking by the line.** The line along the mini player's top shows how far in the song is. Put a finger on
-  it: it thickens, and the time under your finger shows over it, "1:23 / 4:56", kept on the screen at either end.
-  Drag and let go: the song goes there, once, and the line doesn't jump back while it gets there. Tap the line
-  without moving: nothing changes. Paused, the same, and it stays paused.
+- **220 Seeking by the line.** The line along the mini player's top shows how far in the song is. Put your thumb on
+  the mini player's top edge and drag sideways: the line thickens, and the time under your thumb shows over it,
+  "1:23 / 4:56", kept on the screen at either end. Let go: the song goes there, once, and the line doesn't jump back
+  while it gets there. Paused, the same, and it stays paused. Is the line easy to catch with a thumb, aiming at the
+  top edge? Tap the top edge over the cover or the song: Now Playing opens; over play/pause: it plays or pauses.
 - **221 Swiping the title.** Swipe it left: the title slides away to the left, the next song's slides in from the
   right, and it plays (or stays paused). Swipe right well into a song: the song before, never the same song again.
   A short swipe springs back; a quick flick is enough. With Shuffle on, left and right follow Up Next's order.
 - **222 The queue's ends.** On the first song, swipe right: the title pulls a little way and springs back, and
   nothing changes. On the last song with Repeat off, swipe left: the same. With Repeat All on, the last song's
-  swipe left goes to the first.
+  swipe left goes to the first. In a song's last seconds, start a swipe left and hold it until the next song begins,
+  then let go: the title springs back, and no song is skipped.
 - **223 A tap opens Now Playing.** Tap the title, the artist's line or the cover: Now Playing opens. A swipe across
   never opens it.
 - **224 A drag up opens Now Playing.** Drag up on the title or the cover and let go: Now Playing opens as you let
@@ -3140,7 +3147,15 @@ follow Noto Sans's.
   and the tabs, and the last result clears the keyboard alone.
 - **227 The largest text and Reduce Motion.** At the largest text sizes, the mini player grows with its words as
   far as the tab bar's do, the cover with it; hold a finger on Play/Pause: it shows large. With Reduce Motion on, a
-  swipe's titles fade instead of sliding.
+  swipe's titles fade instead of sliding. Look at the navigation bars too: a page's small title, **Done**, the
+  back button, Search's field and the segmented controls (Search's filter, Info's) stop growing at the largest
+  standard size, so nothing is cut off in them. The big titles (Search, You, All music's pages) still grow: are
+  any cut off at the top or bottom?
+- **228 Scrolling near the mini player.** On a long list (an album, Your albums, Search's results), start a scroll
+  with your thumb just above the mini player, so close it nearly touches, going up and going down, slowly and
+  quickly, a little sideways too: the list scrolls, and the song never jumps. Tap the bottom edge of a row just
+  above the mini player: it opens. Start a drag up on the mini player's top edge: Now Playing opens as you let go,
+  and the song doesn't jump.
 
 ## What it can't do yet
 

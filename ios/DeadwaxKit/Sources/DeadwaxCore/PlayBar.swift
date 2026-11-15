@@ -4,14 +4,16 @@ import Foundation
 /// view in them. It is the phone's own, with no web code to hold it to: the web's mini player has a Next button and
 /// no gestures.
 ///
-/// - A drag on the title (or the cover) is read for its direction once, as soon as the finger has moved
-///   `decideAfter`: across is a skip, up opens Now Playing, down does nothing. It keeps that direction until let go.
-/// - Across: left is the next song, right the song before, past `skipPast` or flicked past `flickPast`. Under them,
-///   it goes back where it was. Toward a song that isn't there, the title moves `resistance` of the finger's way.
-/// - Up: Now Playing opens on letting go, past `openPast` or flicked past `openFlickPast`.
-/// - The seek line: a drag along it seeks once, where it is let go. A touch that never moved `seekSlop` across seeks
-///   nowhere, since the line's touch area reaches over the title's top and the page's foot. VoiceOver moves it
-///   `seekStep` at a time.
+/// - A drag on the bar is read once, as soon as the finger has moved `decideAfter`: its way (across, up or down) and,
+///   from where it began, what it does (`role`) - kept until it is let go. A tap is never a drag: it is the cover's,
+///   the title's or Play/Pause's, wherever on them it lands.
+/// - Across from the bar's top `seekReach` (the seek line, and the room above the title's letters): a seek, once,
+///   where it is let go. Across from the title or the cover below that: a skip - left the next song, right the song
+///   before, past `skipPast` or flicked past `flickPast`; under them it goes back where it was, and toward a song that
+///   isn't there the title moves `resistance` of the finger's way. Across from Play/Pause: nothing.
+/// - Up, from anywhere on the bar: Now Playing opens on letting go, past `openPast` or flicked past `openFlickPast`.
+/// - A seek or a skip begun on one song and let go on another does nothing (`atLetGo`), as the scrubber drops its drag.
+/// - VoiceOver moves the seek line `seekStep` at a time.
 ///
 /// Distances are points; `dy` and its prediction are negative upward, as SwiftUI's translation is.
 public enum PlayBar {
@@ -27,14 +29,40 @@ public enum PlayBar {
     public static let openFlickPast: Double = 120
     /// Pulled toward a song that isn't there, the title moves this much of the finger's way.
     public static let resistance: Double = 1.0 / 3
-    /// The seek line's touch moved less than this across seeks nowhere.
-    public static let seekSlop: Double = 4
+    /// The seek line's reach into the bar from its top edge: a drag across that starts within it seeks. The line is
+    /// the top 2 pt; the title's capitals begin about 15 pt down at the standard text size (lower as it grows), so
+    /// a swipe on the words is a skip. Nothing above the bar is the line's: the page there keeps its taps and scrolls.
+    public static let seekReach: Double = 14
     /// What VoiceOver's swipe up and down on the seek line move by.
     public static let seekStep: Double = 10
 
     /// A drag's direction, decided once.
     public enum Way: String, Sendable, Equatable {
         case across, up, down
+    }
+
+    /// What a drag on the bar does, read once with its way.
+    public enum Role: String, Sendable, Equatable {
+        case seek, skip, open, nothing
+    }
+
+    /// A drag's role from its way and where it began: across within `seekReach` of the bar's top a seek, across from
+    /// the title or the cover (`onTitle`) a skip, across from Play/Pause nothing; up, from anywhere, Now Playing; down
+    /// nothing.
+    public static func role(_ way: Way, startY: Double, onTitle: Bool) -> Role {
+        switch way {
+        case .across: return startY < seekReach ? .seek : (onTitle ? .skip : .nothing)
+        case .up: return .open
+        case .down: return .nothing
+        }
+    }
+
+    /// A drag let go: what it still does. A seek or a skip begun on the entry `began` does nothing once another
+    /// (`now`) is playing - the song changed under the finger - so a swipe across a join never skips twice. Opening
+    /// Now Playing doesn't depend on the song.
+    public static func atLetGo(_ role: Role, began: Int, now: Int?) -> Role {
+        guard role == .seek || role == .skip, began != now else { return role }
+        return .nothing
     }
 
     /// Which way a drag on the title goes: nil until the finger has moved `decideAfter`, then across when it has moved
@@ -80,11 +108,6 @@ public enum PlayBar {
     /// `openPast` while still going up, or flicked past `openFlickPast`.
     public static func opens(dy: Double, predicted: Double) -> Bool {
         (-dy >= openPast && predicted < 0) || -predicted >= openFlickPast
-    }
-
-    /// A touch on the seek line let go, `moved` the furthest it went across from where it went down: whether it seeks.
-    public static func seeks(moved: Double) -> Bool {
-        moved >= seekSlop
     }
 
     /// VoiceOver's adjust on the seek line: `seekStep` forward (increment) or back from `from`, never past the song's
