@@ -2,9 +2,10 @@ import Foundation
 import Testing
 @testable import DeadwaxCore
 
-/// Phase 6, slice 2 by hand: what the vectors can't hold - the phone's own store line without Add (the web has no such
-/// case), the bodies as JSON goes over the wire, a real answer of each route decoded, the client's four requests, and
-/// the album page taking the store line's word.
+/// Phase 6, slices 2 and 3 by hand: what the vectors can't hold - the store line as the phone draws it (Join only with
+/// Get albums), the bodies as JSON goes over the wire, a real answer of each route decoded, the client's requests, the
+/// album page taking the store line's word, a Get whose answer never came, and slice 3's auto-pick decision and You's
+/// choices laid over deadwax's word (useCandidateSearch.ts and useGetSettings.ts, which the exporter can't compile).
 @Suite struct GetTests {
     static let credit = [MBArtistCredit(name: "Portishead", artist: .init(id: "8f6bd1e4-fbe1-4f50-aa9b-94c450ec0f11", name: "Portishead"))]
     static let group = ReleaseGroup(id: "a4a5b1c6-0b43-3d1a-8e0b-3b0f9a1d0e01", title: "Third", firstReleaseDate: "2008-04-28",
@@ -18,35 +19,39 @@ import Testing
         eventDates: ["2008-04-28"], labelInfo: [.init(label: "Island", catalogNumber: "1764331")], artistCredit: credit,
         eventCountries: ["GB"])
 
-    // MARK: the store line, as slice 2 draws it
+    // MARK: the store line, as the phone draws it (slice 3)
 
-    @Test func withoutAddDropsTheLineTellingYouToAddIt() {
+    @Test func theCollectionsPressingIsSaidWithAddUnderIt() {
         let held = HeldPressing(path: "Portishead/Third (2008)", paths: ["Portishead/Third (2008)"], trackCount: 11,
                                 expectedTracks: 11, formats: ["flac"], complete: true, yours: false)
         let answer = StoreStateAnswer(held: held)
         let web = StoreLine.statusFor(answer, cancelIn: .requests, floor: nil)
         #expect(web?.title == StoreLine.inTheStore && web?.add == true && web?.lines.last == StoreLine.addNote)
-        let drawn = StoreLine.drawn(answer, floor: nil)
-        #expect(drawn?.title == StoreLine.inTheStore, "still true: it's the collection's, not yours")
-        #expect(drawn?.lines == ["Portishead/Third (2008)", "11 of 11 tracks \u{00B7} FLAC"])
-        #expect(drawn?.add == false && drawn?.joinJobId == nil)
+        // Add is drawn for anyone, as every page of the web's gives it - with Get albums or without
+        #expect(StoreLine.drawn(answer, floor: nil, joins: true) == web)
+        #expect(StoreLine.drawn(answer, floor: nil, joins: false) == web)
+        // added from the box: yours now, the add line gone, the button's place kept (it says it was added)
+        let added = StoreLine.addedStatus(web!)
+        #expect(added.title == StoreLine.heldTitle && added.add)
+        #expect(added.lines == ["Portishead/Third (2008)", "11 of 11 tracks \u{00B7} FLAC"])
         // a status with no Add is as it was
         let yours = StoreStateAnswer(held: HeldPressing(path: "P/T", trackCount: 2, expectedTracks: 0, complete: true))
-        #expect(StoreLine.drawn(yours, floor: nil) == StoreLine.statusFor(yours, cancelIn: .requests))
-        #expect(StoreLine.withoutAdd(StoreLine.statusFor(yours)!) == StoreLine.statusFor(yours))
+        let mine = StoreLine.statusFor(yours, cancelIn: .requests)!
+        #expect(StoreLine.drawn(yours, floor: nil, joins: true) == mine && StoreLine.addedStatus(mine) == mine)
     }
 
-    @Test func somebodyElsesDownloadIsSaidWithNoJoinUnderIt() {
+    @Test func somebodyElsesDownloadHasJoinOnlyForSomeoneWhoGetsAlbums() {
         let download = DownloadInFlight(jobId: 41, status: "downloading", username: "mellotron", files: 11, doneFiles: 4,
                                         yours: false, formats: ["mp3"], bitrates: [320])
         let answer = StoreStateAnswer(downloading: download)
         let web = StoreLine.statusFor(answer, cancelIn: .requests, floor: .lossless)
         #expect(web?.joinJobId == 41 && web?.lines.last == StoreLine.joinNote(.requests))
-        let drawn = StoreLine.drawn(answer, floor: .lossless)
-        #expect(drawn?.title == "Already downloading for someone else")
-        #expect(drawn?.lines == ["From mellotron \u{00B7} MP3 320k \u{00B7} 4 of 11 files",
-                                 "It's below your quality floor (Lossless), and getting a copy of your own isn't offered yet."])
-        #expect(drawn?.joinJobId == nil)
+        #expect(StoreLine.drawn(answer, floor: .lossless, joins: true) == web)
+        let without = StoreLine.drawn(answer, floor: .lossless, joins: false)
+        #expect(without?.title == "Already downloading for someone else")
+        #expect(without?.lines == ["From mellotron \u{00B7} MP3 320k \u{00B7} 4 of 11 files",
+                                   "It's below your quality floor (Lossless), and getting a copy of your own isn't offered yet."])
+        #expect(without?.joinJobId == nil)
     }
 
     // MARK: the bodies
@@ -166,10 +171,15 @@ import Testing
         #expect(queued.jobId == 9 && transport.last?.timeout == 300 && transport.last?.url.path == "/deadwax/download/enqueue")
 
         let settings = try await deadwax.getSettings()
-        #expect(settings == GetSettings(mode: .pick, floor: .lossless, format: .any))
+        #expect(settings == GetSettingsAnswer(settings: GetSettings(mode: .pick, floor: .lossless, format: .any), canSave: true))
         #expect(transport.last?.method == "GET" && transport.last?.body == nil)
         transport.answer("/deadwax/me/preferences", 200, #"{"get_mode":7,"quality_floor":"best"}"#)
-        #expect(try await deadwax.getSettings() == .defaults)
+        #expect(try await deadwax.getSettings() == GetSettingsAnswer(settings: .defaults, canSave: true))
+        //? only false is a database that won't keep them (readGetSettings: `can_save !== false`)
+        transport.answer("/deadwax/me/preferences", 200, #"{"can_save":false}"#)
+        #expect(try await deadwax.getSettings().canSave == false)
+        transport.answer("/deadwax/me/preferences", 200, #"{"can_save":"no"}"#)
+        #expect(try await deadwax.getSettings().canSave == true)
     }
 
     @Test func aRefusedEnqueueIsThrownInDeadwaxsWords() async throws {
@@ -321,5 +331,129 @@ import Testing
         let late = given.claimed([own])
         #expect(late.pending.first?.jobId == 9 && late.pending.first?.error == nil)
         #expect(late.reconcile([own]).pending.isEmpty)
+    }
+
+    // MARK: slice 3 - the auto-pick, as the hook decides it (useCandidateSearch.ts `run`)
+
+    @Test func aFreshGetSetToPickAsksForTheBestMatchThroughTheChips() {
+        let release = GetRelease.build(group: Self.group, release: Self.pressing)
+        let strong = Self.candidate("bob", "Third", score: 0.92)
+        let weak = Self.candidate("alice", "Third (MP3)", score: 0.6)
+        let answer = FindCandidatesAnswer(query: "Portishead Third", candidates: [strong, weak])
+        let none = GetSettings.candidateFilters(.none)
+        // When I tap Get shows the sources: nothing is picked, and nothing said
+        #expect(Sources.autoPick(fresh: true, mode: .sources, answer: answer, release: release, filters: none) == .off)
+        // a search again by hand never picks
+        #expect(Sources.autoPick(fresh: false, mode: .pick, answer: answer, release: release, filters: none) == .off)
+        // the best match through the chips, with the list it tops for its runners-up
+        #expect(Sources.autoPick(fresh: true, mode: .pick, answer: answer, release: release, filters: none)
+                == .picked(strong, list: [strong, weak]))
+        // the chips decide what passes: the best of what passes is picked, at 75 or more only
+        let starts = GetSettings.candidateFilters(SourceFilters(freeSlot: true))
+        let busy = Candidate(username: "bob", directory: "Music\\Third", directoryName: "Third", score: 0.92, hasFreeSlot: false)
+        let free = Candidate(username: "jo", directory: "Music\\Third 2", directoryName: "Third", score: 0.75, hasFreeSlot: true)
+        let either = FindCandidatesAnswer(query: "q", candidates: [busy, free])
+        #expect(Sources.autoPick(fresh: true, mode: .pick, answer: either, release: release, filters: starts)
+                == .picked(free, list: [free]))
+        let low = Candidate(username: "jo", directory: "Music\\Third 3", directoryName: "Third", score: 0.7449, hasFreeSlot: true)
+        #expect(Sources.autoPick(fresh: true, mode: .pick, answer: FindCandidatesAnswer(query: "q", candidates: [busy, low]),
+                                 release: release, filters: starts)
+                == .notPicked("No close match that passes your filters - choose a source yourself."))
+    }
+
+    @Test func aPickIsNeverMadeForAPressingHeldOrOnItsWayOrUnjudgeable() {
+        let release = GetRelease.build(group: Self.group, release: Self.pressing)
+        let strong = Self.candidate("bob", "Third", score: 0.98)
+        let none = GetSettings.candidateFilters(.none)
+        let part = HeldPressing(path: "Portishead/Third", trackCount: 5, expectedTracks: 11, complete: false)
+        let answer = FindCandidatesAnswer(query: "q", candidates: [strong], store: StoreStateAnswer(held: part))
+        #expect(Sources.autoPick(fresh: true, mode: .pick, answer: answer, release: release, filters: none)
+                == .notPicked("You already have part of it - choose a source yourself."))
+        // the album as a whole (no pressing): no tracklist and no release id, so no score can be trusted
+        let whole = GetRelease.build(group: Self.group, release: nil)
+        #expect(whole.tracks.isEmpty && (whole.releaseMbid ?? "").isEmpty)
+        let found = FindCandidatesAnswer(query: "q", candidates: [strong])
+        #expect(Sources.autoPick(fresh: true, mode: .pick, answer: found, release: whole, filters: none)
+                == .notPicked("This pressing has no tracklist to check the sources against - choose a source yourself."))
+        // nothing found at all: nothing to choose, and the empty state says it
+        #expect(Sources.autoPick(fresh: true, mode: .pick, answer: FindCandidatesAnswer(query: "q"), release: release,
+                                 filters: none) == .notPicked(nil))
+        // the overload reads the release as the web's does
+        #expect(Sources.autoPickBlocked(found, release: whole) == "This pressing has no tracklist to check the sources against")
+        #expect(Sources.autoPickBlocked(found, release: release) == nil)
+        #expect(Sources.autoPickBlocked(nil, release: whole) == nil)
+    }
+
+    // MARK: slice 3 - You > Getting albums, chosen on the phone (useGetSettings.ts `shown`)
+
+    @Test func aChoiceShowsAtOnceLaidOverDeadwaxsLastWord() {
+        let said = GetSettingsAnswer(settings: GetSettings(mode: .sources, floor: .lossless, format: .any), canSave: true)
+        // nothing known and nothing being saved: nothing is shown as chosen
+        #expect(GetSettingsAnswer.shown(nil, pending: []) == nil)
+        #expect(GetSettingsAnswer.shown(said, pending: []) == said)
+        // choices still being saved, laid over in the order made - the newer wins
+        let shown = GetSettingsAnswer.shown(said, pending: [GetChoice(mode: .pick), GetChoice(floor: .bit24),
+                                                            GetChoice(mode: .sources)])
+        #expect(shown?.settings == GetSettings(mode: .sources, floor: .bit24, format: .any))
+        // a choice before deadwax ever answered is laid over the defaults
+        #expect(GetSettingsAnswer.shown(nil, pending: [GetChoice(format: .losslessOnly)])?.settings
+                == GetSettings(mode: .sources, floor: .any, format: .losslessOnly))
+        // whether it can be kept is deadwax's word alone
+        let unkept = GetSettingsAnswer(settings: .defaults, canSave: false)
+        #expect(GetSettingsAnswer.shown(unkept, pending: [GetChoice(mode: .pick)])?.canSave == false)
+    }
+
+    @Test func aChoiceSendsOnlyWhatWasChosen() throws {
+        func sent(_ choice: GetChoice) throws -> [String: String] {
+            try JSONDecoder().decode([String: String].self, from: JSONEncoder().encode(choice))
+        }
+        #expect(try sent(GetChoice(mode: .pick)) == ["get_mode": "pick"])
+        #expect(try sent(GetChoice(floor: .kbps320)) == ["quality_floor": "320"])
+        #expect(try sent(GetChoice(format: .losslessOnly)) == ["format_preference": "lossless_only"])
+        #expect(try sent(GetChoice(mode: .sources, floor: .bit24, format: .any))
+                == ["get_mode": "sources", "quality_floor": "24bit", "format_preference": "any"])
+        #expect(try sent(GetChoice()) == [:])
+    }
+
+    // MARK: slice 3 - the client's Join, save and Add
+
+    @Test func joinSaveAndAddAreAskedAsTheServerDeclaresThem() async throws {
+        let (deadwax, transport) = client(session: "s.1")
+        transport.answer("/deadwax/download/jobs/41/join", 200, #"{"status":"ok","job_id":41,"joined":true}"#)
+        let joined = try await deadwax.joinJob(41)
+        #expect(joined == JoinAnswer(jobId: 41, joined: true))
+        #expect(transport.last?.method == "POST" && transport.last?.body == nil && transport.last?.timeout == 60)
+        transport.answer("/deadwax/download/jobs/41/join", 200, #"{"status":"ok","job_id":41,"joined":false}"#)
+        #expect(try await deadwax.joinJob(41).joined == false)
+
+        transport.answer("/deadwax/me/preferences", 200,
+                         #"{"get_mode":"pick","quality_floor":"any","format_preference":"prefer_lossless","can_save":true}"#)
+        let saved = try await deadwax.saveSettings(GetChoice(mode: .pick))
+        #expect(saved.settings.mode == .pick && saved.canSave)
+        #expect(transport.last?.method == "PUT" && transport.last?.url.path == "/deadwax/me/preferences")
+        #expect(try sentJSON(transport.last) == ["get_mode": .string("pick")])
+
+        transport.answer("/deadwax/me/library/add", 200, #"{"added":true,"already":false,"complete":true,"starred":true}"#)
+        let release = GetRelease.build(group: Self.group, release: Self.pressing)
+        let added = try await deadwax.addToLibrary(release)
+        #expect(added.added && added.complete)
+        #expect(transport.last?.method == "POST")
+        // the line's Add sends the pressing a Get would download, as the web's does - its tracks and all
+        let body = try sentJSON(transport.last)
+        #expect(body["release_mbid"] == .string("r-cd") && body["album"] == .string("Third"))
+        #expect(body["tracks"] != nil)
+    }
+
+    @Test func aRefusedJoinIsThrownInDeadwaxsWords() async throws {
+        let (deadwax, transport) = client(session: "s.1")
+        transport.answer("/deadwax/download/jobs/41/join", 409,
+                         #"{"detail":"that download has been cleared from the list since - get it again"}"#)
+        do {
+            _ = try await deadwax.joinJob(41)
+            Issue.record("expected a failure")
+        } catch {
+            #expect(ErrorWords.kind(of: error) == .refused)
+            #expect(ErrorWords.of(error).said.contains("cleared from the list since"))
+        }
     }
 }

@@ -64,6 +64,11 @@ the folder's files and quality - every field one the routes declare (pydantic dr
 StoreStateAnswer, HeldPressing, DownloadInFlight, OtherPressing, Candidate, FindCandidatesAnswer and EnqueueAnswer
 within what /store_state, /find_candidates and /enqueue build; GetSettings and its three enums the preferences route's
 own; a search's time to answer above what deadwax may take; and Get albums the routes' own permission.
+
+And slice 3's Join, Add and You's three: JoinAnswer within what the join route returns, its refusals 409s in words and
+Get albums its permission, and its time to answer above the release lock it waits on; Add from the store line sending
+the Get's release, FindCandidatesRequest's fields; GetChoice to the extra="forbid" Preferences it is PUT to (only
+what was chosen, each value one the route takes) and GetSettingsAnswer's `can_save` to what both preference routes answer.
 """
 
 import asyncio
@@ -108,7 +113,7 @@ from src.store import JobStore  # noqa: E402
 
 CORE = Path(__file__).resolve().parent.parent / "ios" / "DeadwaxKit" / "Sources" / "DeadwaxCore"
 ENDPOINT = re.compile(r'Endpoint\(method: "(\w+)", path: "([^"]+)", query: \[([^\]]*)\]\)')
-ROUTE_COUNT = 58
+ROUTE_COUNT = 60
 RAW_OPENING = re.compile(r'#+"')
 HASHES = re.compile(r"#*")
 
@@ -1749,3 +1754,85 @@ def test_get_albums_is_the_routes_own_permission():
         assert f'public static let {name} = Endpoint(method: "POST", path: "/deadwax/download/{route}", query: [])' in \
             (CORE / "Routes.swift").read_text(encoding="utf-8")
         assert "sending:" in swift_function("DeadwaxClient.swift", name), name
+
+
+# ---------------------------------------------------------------------------- Phase 6, slice 3: Join, Add, You's three
+
+def test_a_join_is_read_as_the_join_route_answers_it():
+    # one literal, the job and whether this asked joined it (false: already waiting for it) - read leniently
+    (joined,) = returned_literals(download_route.join_job)
+    assert set(fields("JoinAnswer")) == literal_keys(joined) == {"status", "job_id", "joined"}
+    assert swift_struct("JoinAnswer").count("looseField(") == len(fields("JoinAnswer"))
+    # its refusals are 409s in words, the phone's .refused (said as deadwax said them): cleared since, landed or
+    # stopped since, or only part of the pressing (cleared is said at three moments) - and a database that won't write, a
+    # 503 in words
+    source = inspect.getsource(download_route.join_job)
+    assert source.count("raise HTTPException(status_code=409") == 5
+    assert "status_code=503, detail=" in source
+    assert download_route.CLEARED_SINCE == "that download has been cleared from the list since - get it again"
+    # a POST with no body, Get albums its permission - as the line draws Join only for someone with it
+    route = app_routes()[("POST", "/deadwax/download/jobs/{job_id}/join")]
+    assert route.body_field is None
+    assert any(getattr(dependency.dependency, "__qualname__", "").startswith("require")
+               for dependency in route.dependencies)
+    assert "dependencies=GET_ALBUMS" in inspect.getsource(download_route.join_job).split("\n", 1)[0]
+    assert "sending:" not in swift_function("DeadwaxClient.swift", "joinJob")
+    app = CORE.parent.parent.parent / "App"
+    view = (app / "Search" / "GroupView.swift").read_text(encoding="utf-8")
+    assert "let allowed = server.access.can(.request)" in view and "onJoin: allowed ?" in view
+    assert "joins: allowed" in view
+    sheet = (app / "Get" / "SourcesSheet.swift").read_text(encoding="utf-8")
+    assert sheet.count("server.access.can(.request)") == 2
+    # it waits for the same release's lock an enqueue or Another source holds while it asks slskd: the phone gives
+    # it Another source's time, and a second Join is harmless (`joined` false)
+    assert "async with release_lock(job_lock_key(job)):" in source
+    text = (CORE / "Routes.swift").read_text(encoding="utf-8")
+    literal = re.search(r"public static let timeouts: \[Endpoint: Double\] = \[([^\]]*)\]", text)
+    timeouts = {name: float(seconds) for name, seconds in re.findall(r"(\w+): ([\d.]+)", literal.group(1))}
+    assert timeouts["joinJob"] >= timeouts["retryJob"] > 8
+
+
+def test_add_from_the_store_line_sends_the_gets_release():
+    # the web's line sends download.release - the Get's whole body - to /me/library/add, which takes a
+    # FindCandidatesRequest: every field the phone's GetRelease sends one it declares, and what it needs sent
+    import src.routes.my_library as library_route
+    assert inspect.signature(library_route.add_to_my_library).parameters["body"].annotation is FindCandidatesRequest
+    release = sent_fields("GetRelease")
+    assert release <= set(FindCandidatesRequest.model_fields)
+    needed = {name for name, field in FindCandidatesRequest.model_fields.items() if field.is_required()}
+    assert needed <= release, sorted(needed - release)
+    # the line's Add: the GetRelease itself is the body, as the album page's Add sends its AddRelease
+    client = _code((CORE / "DeadwaxClient.swift").read_text(encoding="utf-8"))
+    opened = client.index("func addToLibrary(_ release: GetRelease) async throws -> AddedToLibrary {")
+    assert "try await call(Routes.libraryAdd, sending: release)" in _block(client, client.index("{", opened))
+
+
+def test_you_getting_albums_is_saved_as_the_preferences_route_takes_it():
+    # PUT, its body the extra="forbid" Preferences: only the keys chosen, each one of the route's values
+    routes = app_routes()
+    assert ("PUT", "/deadwax/me/preferences") in routes
+    text = (CORE / "Routes.swift").read_text(encoding="utf-8")
+    assert 'public static let savePreferences = Endpoint(method: "PUT", path: "/deadwax/me/preferences", query: [])' \
+        in text
+    assert me_route.Preferences.model_config.get("extra") == "forbid"
+    sent = sent_fields("GetChoice")
+    assert sent == set(me_route.Preferences.model_fields) == {"get_mode", "quality_floor", "format_preference"}
+    assert not any(field.is_required() for field in me_route.Preferences.model_fields.values())
+    for key, enum in (("get_mode", "GetMode"), ("quality_floor", "QualityFloor"),
+                      ("format_preference", "FormatPreference")):
+        values = set(typing.get_args(typing.get_args(me_route.Preferences.model_fields[key].annotation)[0]))
+        assert swift_raw_values("GetSettings.swift", enum) == values == set(me_route.PREFERENCES[key]), key
+    # what isn't chosen is never sent - a null would be one of the keys, and the route takes none as "leave it"
+    encode = swift_struct("GetChoice")
+    assert encode.count("encodeIfPresent(") == 3 and "encodeNil" not in encode
+    assert "sending: choice" in swift_function("DeadwaxClient.swift", "saveSettings")
+    # both routes answer _answer: the three, and can_save - which the phone reads, true unless deadwax says false
+    answer = me_route._answer(None, False)
+    assert set(fields("GetSettingsAnswer")) == {"can_save"} <= set(answer) and answer["can_save"] is False
+    assert "return _answer(stored, can_save)" in inspect.getsource(me_route.preferences)
+    assert "return _answer(stored, can_save)" in inspect.getsource(me_route.save_preferences)
+    assert "looseField(Bool.self, .canSave) != false" in swift_struct("GetSettingsAnswer")
+    assert "settings = try GetSettings(from: decoder)" in swift_struct("GetSettingsAnswer")
+    # and a database that can't keep them is a 503 in words, said under the three ("Not saved. …")
+    source = inspect.getsource(me_route.save_preferences)
+    assert source.count("raise HTTPException(status_code=503, detail=") == 2

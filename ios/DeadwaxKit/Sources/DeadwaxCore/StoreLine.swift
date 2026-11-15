@@ -411,18 +411,30 @@ public enum StoreLine {
                            add: status.add)
     }
 
-    /// THE PHONE'S OWN, until slice 3 brings Add to my library: a store line drawn with no Add under it loses the line
-    /// telling you to add it (`addNote`) and its `add`, so it never says "add it" above no button. The title stays the
-    /// web's - "In the collection, not in your library" is still true. The web has no such case (every page of its
-    /// gives Add), so this is held by hand (GetTests), not by the vectors.
-    public static func withoutAdd(_ status: StoreStatus) -> StoreStatus {
+    /// The box once Add to my library has added the pressing from it (`addedStatus`): yours now - "Already in your
+    /// library", the line telling you to add it gone. `add` stays, so the button's place (keyed on the first folder)
+    /// keeps saying "Added to your library." under it until the next look of the store says it's yours.
+    public static func addedStatus(_ status: StoreStatus) -> StoreStatus {
         guard status.add else { return status }
-        return StoreStatus(kind: status.kind, title: status.title, lines: status.lines.filter { $0 != addNote },
-                           joinJobId: status.joinJobId)
+        return StoreStatus(kind: status.kind, title: heldTitle, lines: status.lines.filter { $0 != addNote },
+                           joinJobId: status.joinJobId, add: status.add)
     }
 
-    /// What the phone draws in slice 2: neither Join nor Add.
-    public static func drawn(_ answer: StoreStateAnswer?, floor: QualityFloor?) -> StoreStatus? {
-        statusFor(answer, cancelIn: .requests, floor: floor).map { withoutAdd(withoutJoin($0)) }
+    /// What the phone draws (Phase 6, slice 3): the web's line for Requests and your quality floor - with Join only for
+    /// someone with Get albums (`joins`: Access.can(.request)), as ReleaseGroupPage.tsx gives `onJoin` only then; Add
+    /// to my library for anyone, as every page of the web's gives `onAdd` (deadwax refuses it in words where it can't).
+    public static func drawn(_ answer: StoreStateAnswer?, floor: QualityFloor?, joins: Bool) -> StoreStatus? {
+        statusFor(answer, cancelIn: .requests, floor: floor).map { joins ? $0 : withoutJoin($0) }
     }
+}
+
+/// Join's and Add's words in the store line's box (StoreState.tsx JoinDownload, AddToLibrary; myLibrary.ts ADDED_WORDS):
+/// each button, what it says while deadwax is asked, and what stands in its place once deadwax has it.
+public enum StoreWords {
+    public static let join = "Join this download"
+    public static let joining = "Joining\u{2026}"
+    public static let joined = "Joined - it's in your Requests."
+    public static let add = "Add to my library"
+    public static let adding = "Adding\u{2026}"
+    public static let added = "Added to your library."
 }

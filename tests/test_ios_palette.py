@@ -313,6 +313,10 @@ def test_the_sources_sheet_is_drawn_in_the_webs_colours():
         assert drawn in card, drawn
     box = (APP / "Get" / "StoreLineView.swift").read_text(encoding="utf-8")
     assert "Palette.card" in box and "Palette.border" in box and "Palette.held" in box
+    # (slice 3) Join and Add waiting on deadwax: faded to --app-job-busy, as app.css fades .app-store-join
+    assert token(REPO / "interface" / "player" / "app.css", "app-job-busy") == "0.75"
+    assert "static let busy: Double = 0.75\n" in palette
+    assert "Palette.busy" in box and "SecondaryPill()" in box and "Palette.danger" in box
 
 def test_the_play_bar_is_the_tab_bars_top():
     # 15 Nov, James: "merge the play bar with the bottom bar so it doesn't look like it's floating", "opaque the whole

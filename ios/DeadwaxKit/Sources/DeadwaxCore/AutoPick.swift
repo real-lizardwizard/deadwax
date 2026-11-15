@@ -1,0 +1,79 @@
+import Foundation
+
+// "Pick the best source for me" (Phase 6, slice 3 - phase6-get-requests.md 2.11): You > Getting albums' When I tap Get
+// set to pick, a Get asks for the best match itself and Requests shows - unless nothing scores well enough through the
+// chips, or the pressing is held or on its way, when the sources show with a line saying why. The web's rules -
+// candidates.ts AUTO_GRAB_MIN_SCORE, autoGrabPick and autoPickBlocked, getSettings.ts PICK_SORT and notPickedLine - held
+// to them by Fixtures/get/get-vectors.json; and hooks/useCandidateSearch.ts's decision on an answer landing (`autoPick`),
+// which lives in a hook the exporter can't compile, held by hand (GetTests).
+
+/// What a search's answer leads to, when it lands (useCandidateSearch.ts `run`, after the answer).
+public enum AutoPick: Equatable, Sendable {
+    /// Nothing to pick: When I tap Get shows the sources, or this search isn't a fresh Get (a search again by hand).
+    case off
+    /// The best match, asked for straight away - with the list it tops, for its runners-up.
+    case picked(Candidate, list: [Candidate])
+    /// Wanted, and not made: the sources show, with why (nil when nothing was found at all - the empty state says it).
+    case notPicked(String?)
+}
+
+extension Sources {
+    /// The "good" band of the score colours (`AUTO_GRAB_MIN_SCORE`): below it, a pick leaves the choice to you.
+    public static let autoGrabMinScore: Double = 75
+
+    /// A pick is always by best match (`PICK_SORT`): "the best match that passes your quality floor".
+    public static let pickSort = CandidateSort.score
+
+    /// What a pick would ask for (`autoGrabPick`): the top of the list as the filters and the sort show it, only when it
+    /// scores `autoGrabMinScore` or better - a weak best match is exactly when you want to choose. The pick and the list
+    /// it tops (its runners-up), or nil.
+    public static func autoGrabPick(_ candidates: [Candidate], _ filters: CandidateFilters,
+                                    _ sort: CandidateSort) -> (pick: Candidate, list: [Candidate])? {
+        let list = sorted(candidates.filter { passes($0, filters) }, sort)
+        guard let pick = list.first, percent(pick) >= autoGrabMinScore else { return nil }
+        return (pick, list)
+    }
+
+    /// Why no pick may be made from an answer, as a sentence's start, or nil (`autoPickBlocked`): the pressing already
+    /// downloading or held - whole or in part - read off the answer itself; and, for the release searched for (nil for
+    /// none given), no tracklist to judge the folders by, or no release id to tell whether you have it.
+    public static func autoPickBlocked(_ store: StoreStateAnswer?, release: (releaseMbid: String?, trackCount: Int)?) -> String? {
+        guard let store else { return nil }
+        if store.downloading != nil { return "It's already downloading" }
+        if store.held?.complete == true { return "It's already in your library" }
+        if store.downloadingPart != nil { return "Part of it is already downloading" }
+        if store.held != nil { return "You already have part of it" }
+        //? no tracklist: nothing to match the sources against, so no score can be trusted
+        if let release, release.trackCount == 0 { return "This pressing has no tracklist to check the sources against" }
+        //? no release id: whether you have it already can't be told
+        if let release, (release.releaseMbid ?? "").isEmpty { return "It can't be told whether you already have this pressing" }
+        return nil
+    }
+
+    /// `autoPickBlocked` for a search's answer and the release it was for.
+    public static func autoPickBlocked(_ answer: FindCandidatesAnswer?, release: GetRelease?) -> String? {
+        autoPickBlocked(answer?.store, release: release.map { ($0.releaseMbid, $0.tracks.count) })
+    }
+
+    /// Why Get showed the sources when it was set to pick one (`notPickedLine`) - nil when nothing was found at all:
+    /// there is nothing to choose, and the empty state says so.
+    public static func notPickedLine(_ blocked: String?, found: Int) -> String? {
+        if found == 0 { return nil }
+        guard let blocked else { return "No close match that passes your filters - choose a source yourself." }
+        return "\(blocked) - choose a source yourself."
+    }
+
+    /// What an answer landing leads to (useCandidateSearch.ts): only for a FRESH Get - never a search again you are
+    /// steering by hand - with When I tap Get set to pick, both read as the answer lands; never for a pressing held or on
+    /// its way, or with no tracklist or release id; the top of the list through `filters` by best match, at
+    /// `autoGrabMinScore` or more - else why not.
+    public static func autoPick(fresh: Bool, mode: GetMode, answer: FindCandidatesAnswer, release: GetRelease,
+                                filters: CandidateFilters) -> AutoPick {
+        guard fresh, mode == .pick else { return .off }
+        let blocked = autoPickBlocked(answer, release: release)
+        if blocked == nil, let grab = autoGrabPick(answer.candidates, filters, pickSort) {
+            return .picked(grab.pick, list: grab.list)
+        }
+        return .notPicked(notPickedLine(blocked, found: answer.candidates.count))
+    }
+}

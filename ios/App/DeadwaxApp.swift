@@ -199,6 +199,9 @@ enum Palette {
     /// --app-job-dimmed 0.55, an opacity: a download being cancelled, until the server agrees - its cover, title, bar and
     /// line (Requests); and a Done row whose album is being looked up for its tap.
     static let dimmed: Double = 0.55
+    /// --app-job-busy 0.75, an opacity: a button waiting on deadwax - faded, and still legible (Phase 6, slice 3: the
+    /// store line's Join this download and Add to my library, as app.css fades `.app-store-join[aria-disabled]`).
+    static let busy: Double = 0.75
     /// --dw-track #121117, --dw-border #2c2a36 and --dw-bar-purple (#b56af5 to #9333ea, top to bottom): the Requests
     /// board's bar (app.css .app-bar), You > Downloads' bars - a download on the phone looks like one on the web.
     /// Named `bar…`: in a music app a track is a song.

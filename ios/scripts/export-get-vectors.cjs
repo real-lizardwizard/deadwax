@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Get, for the iPhone app (Phase 6, slice 2 - notes/ios-specs/phase6-get-requests.md 6.2): what the web app's own
+ * Get, for the iPhone app (Phase 6, slices 2 and 3 - notes/ios-specs/phase6-get-requests.md 6.2, 6.3): what the web app's own
  * TypeScript answers, written as a fixture for the Swift ports in ios/DeadwaxKit/Sources/DeadwaxCore (GetRelease.swift,
  * StoreLine.swift, Sources.swift, GetSettings.swift, Whose.withStoreLine) to replay
  * (Tests/DeadwaxCoreTests/GetVectorTests.swift) - so a Get on the phone sends the body the web's sends, its store line
@@ -8,11 +8,15 @@
  *
  * Compiles lib/releasePayload.ts, lib/release.ts, lib/pressings.ts, lib/candidates.ts, lib/getSettings.ts,
  * lib/perPerson.ts, lib/whose.ts and lib/format.ts with what they import, and reads the words that live in components -
- * Sources.tsx's, SourceCard.tsx's, ReleaseGroupPage.tsx's Get the album and permissions.ts's GET_OFF - from their source.
+ * Sources.tsx's, SourceCard.tsx's, ReleaseGroupPage.tsx's Get the album and permissions.ts's GET_OFF; and (slice 3)
+ * StoreState.tsx's Join and Add, GettingChoices.tsx's three titles, You.tsx's note and GETTING_UNSAVED, and
+ * useGetSettings.ts's two leads - from their source.
  * Writes ios/DeadwaxKit/Tests/DeadwaxCoreTests/Fixtures/get/get-vectors.json:
  *
- *   numbers     the speed bar's full rate, the score bands
- *   words       the sheet's, a card's, the store line's, the sort's, the floors', the signals'
+ *   numbers     the speed bar's full rate, the score bands, the pick's least score and its sort
+ *   words       the sheet's, a card's, the store line's, the sort's, the floors', the signals' - and slice 3's: Join's,
+ *               Add's, You > Getting albums' (the three titles, the modes, the formats in You's order, the note, the
+ *               unsaved line and the two leads)
  *   found       what each of the main page's two Find buttons sent (tests/fixtures/payloads/find-buttons.json) - each
  *               case's group and pressing, the body the one builder makes of them, and the album as a whole's
  *   groups      getGroup over the real pressings (tests/fixtures/pressings/, find-buttons.json's) - with and without the
@@ -28,9 +32,12 @@
  *   lists       seeded answers through seeded chips and every sort: what passes, what shows in what order, the best,
  *               every state's line and the announcement
  *   chips       sourceChips, floorFilters and pressedCount for every floor and every set of chips
- *   settings    readGetSettings over answers right and wrong
+ *   settings    readGetSettings over answers right and wrong, can_save among them
  *   searching   searchingLine over credits as credited and current, "N/A", white space and case
  *   overrides   queryOverride over what was typed and what was shown
+ *   picks       (slice 3) seeded answers, releases, chips and sorts: autoPickBlocked, autoGrabPick (the pick and the
+ *               list it tops) and notPickedLine
+ *   added       (slice 3) addedStatus over storeStatusFor's statuses of seeded store answers, at every floor
  *
  * Every random choice is seeded, and the output is plain ASCII (anything else as a \u escape), so a run on any machine
  * writes the same bytes. Never edit the fixture by hand - change the TypeScript, then run this.
@@ -98,6 +105,8 @@ function numbers() {
   return {
     speedBarFull: C.SPEED_BAR_FULL,
     bands: [0, 39, 39.5, 40, 74, 74.5, 75, 100].map((percent) => ({ percent, band: C.scoreClass(percent) })),
+    autoGrabMinScore: C.AUTO_GRAB_MIN_SCORE,
+    pickSort: G.PICK_SORT,
   }
 }
 
@@ -147,6 +156,42 @@ function words() {
     signals: Object.keys(C.SIGNAL_LABELS).map((signal) => ({ signal, label: C.SIGNAL_LABELS[signal], meaning: C.SIGNAL_MEANINGS[signal] })),
     losslessFormats: [...C.LOSSLESS_FORMATS],
     sourcesCount: [0, 1, 2, 41].map((count) => ({ count, said: C.sourcesCount(count), none: C.noneMatchLine(count) })),
+    join: joinWords(),
+    getting: gettingWords(),
+  }
+}
+
+/** (slice 3) Join's and Add's, under the store line's words (StoreState.tsx) - each button, its wait, and what follows. */
+function joinWords() {
+  const state = 'src/app/StoreState.tsx'
+  return {
+    join: sourceMatch(state, /\{state === 'joining' \? '[^']+' : '([^']+)'\}/),
+    joining: sourceMatch(state, /\{state === 'joining' \? '([^']+)' :/),
+    joined: sourceMatch(state, /role="status">(Joined[^<]+)<\/p>/),
+    add: sourceMatch(state, /\{state === 'adding' \? '[^']+' : '([^']+)'\}/),
+    adding: sourceMatch(state, /\{state === 'adding' \? '([^']+)' :/),
+    added: M.ADDED_WORDS,
+    addedShown: sourceHas(state, '{ADDED_WORDS}'),
+  }
+}
+
+/** (slice 3) You > Getting albums': GettingChoices.tsx's three, You.tsx's section, note and unsaved line, and
+ *  useGetSettings.ts's two leads. */
+function gettingWords() {
+  const you = 'src/app/You.tsx'
+  const store = 'src/app/useGetSettings.ts'
+  const choices = fs.readFileSync(path.join(UI, 'src/app/GettingChoices.tsx'), 'utf8')
+  const note = sourceMatch(you, /<p id="app-get-note" class="app-footnote">([^<]+)<\/p>/)
+  return {
+    section: sourceMatch(you, /<h2 id="app-getting-title" class="app-section-title">\s*([^<\s][^<]*?)\s*<\/h2>/),
+    titles: [...choices.matchAll(/\btitle="([^"]+)"/g)].map((m) => m[1]),
+    modes: G.GET_MODES.map(({ value, label }) => ({ value, label })),
+    formats: G.FORMATS.map(({ value, label }) => ({ value, label })),
+    note: note.replace(/\s+/g, ' ').trim(),
+    unsaved: sourceMatch(you, /export const GETTING_UNSAVED = "([^"]+)"/),
+    unsavedTold: sourceHas(you, "{GETTING_UNSAVED}{runsDeadwax ? '' : ` ${TELL}`}"),
+    readFailed: sourceMatch(store, /if \(!confirmed\) readProblem = sayError\(reason, "([^"]+)"\)/),
+    notSaved: sourceMatch(store, /saveProblem = sayError\(reason, '([^']+)'\)/),
   }
 }
 
@@ -596,10 +641,14 @@ function settings() {
     { get_mode: 'PICK', quality_floor: 320, format_preference: null }, { quality_floor: '24bit' },
     { get_mode: 'pick', quality_floor: '24-bit', format_preference: 'prefer_lossless', stored: ['get_mode'], seeded: true },
     { get_mode: ['pick'], quality_floor: { value: 'any' }, format_preference: 'Lossless only' },
+    { get_mode: 'pick', can_save: false }, { can_save: true }, { can_save: 'false' }, { can_save: 0 },
   ]
   return answers.map((answer) => {
     const read = G.readGetSettings(answer)
-    return { answer: answer === undefined ? null : answer, mode: read.get_mode, floor: read.quality_floor, format: read.format_preference }
+    return {
+      answer: answer === undefined ? null : answer, mode: read.get_mode, floor: read.quality_floor, format: read.format_preference,
+      canSave: read.can_save,
+    }
   })
 }
 
@@ -626,6 +675,56 @@ function overrides() {
   return typed.flatMap((text) => shown.map((last) => ({ typed: text, shown: last, override: C.queryOverride(text, last) })))
 }
 
+/* ===== slice 3: the pick, and the box once added ===== */
+
+const RELEASES = [
+  null,
+  { release_mbid: 'r-1', tracks: [{ position: 1, title: 'Silence' }] },
+  { release_mbid: 'r-1', tracks: [{ position: 1, title: 'Silence' }, { position: 2, title: 'Hunter' }] },
+  { release_mbid: 'r-1', tracks: [] },
+  { release_mbid: 'r-1' },
+  { release_mbid: '', tracks: [{ position: 1, title: 'Silence' }] },
+  { release_mbid: null, tracks: [{ position: 1, title: 'Silence' }] },
+  { tracks: [{ position: 1, title: 'Silence' }] },
+  { release_mbid: ' ', tracks: [{ position: 1, title: 'Silence' }] },
+  { release_mbid: '', tracks: [] },
+]
+
+function picks() {
+  const out = []
+  for (let n = 0; n < 160; n++) {
+    const answer = { ...result(), ...(chance(0.5) ? { held: null, downloading: null, downloading_part: null, other_pressings: [] } : storeAnswer()) }
+    const release = pick(RELEASES)
+    const filters = chance(0.3) ? { ...G.NO_SOURCE_FILTERS } : sourceFilters()
+    const sort = pick([G.PICK_SORT, G.PICK_SORT, ...Object.keys(C.SORT_LABELS)])
+    const blocked = C.autoPickBlocked(answer, release)
+    const grab = C.autoGrabPick(answer.candidates, G.candidateFilters(filters), sort)
+    out.push({
+      answer, release, filters, sort, blocked,
+      grab: grab ? { pick: C.candidateKey(grab.pick), list: grab.list.map(C.candidateKey) } : null,
+      notPicked: G.notPickedLine(blocked, answer.candidates.length),
+    })
+  }
+  //? with no answer at all, nothing blocks
+  out.push({ answer: null, release: pick(RELEASES), filters: { ...G.NO_SOURCE_FILTERS }, sort: G.PICK_SORT,
+    blocked: C.autoPickBlocked(null, RELEASES[1]), grab: null, notPicked: G.notPickedLine(null, 0) })
+  return out
+}
+
+function added() {
+  return [...Array(120).keys()].map(() => {
+    const answer = storeAnswer()
+    if (answer.held && chance(0.5)) answer.held = { ...answer.held, complete: true, yours: false }
+    return {
+      answer,
+      for: FLOORS.map((floor) => {
+        const status = P.storeStatusFor(answer, 'Requests', floor)
+        return { floor, status: statusOut(status), added: statusOut(status ? P.addedStatus(status) : null) }
+      }),
+    }
+  })
+}
+
 /* ===== out ===== */
 
 function vectors() {
@@ -645,6 +744,8 @@ function vectors() {
     settings: settings(),
     searching: searching(),
     overrides: overrides(),
+    picks: picks(),
+    added: added(),
   }
 }
 

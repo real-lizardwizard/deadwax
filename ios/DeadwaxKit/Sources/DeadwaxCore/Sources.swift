@@ -261,6 +261,32 @@ public struct EnqueueAnswer: Decodable, Sendable, Equatable {
     }
 }
 
+/// What a Join answers (`POST /download/jobs/{job_id}/join`, slice 3): the download, and whether this was news -
+/// `joined` false when you were already waiting for it. Read leniently.
+public struct JoinAnswer: Decodable, Sendable, Equatable {
+    public let status: String
+    public let jobId: Int?
+    public let joined: Bool
+
+    public init(status: String = "ok", jobId: Int?, joined: Bool) {
+        self.status = status
+        self.jobId = jobId
+        self.joined = joined
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case status, joined
+        case jobId = "job_id"
+    }
+
+    public init(from decoder: any Decoder) throws {
+        let fields = try decoder.container(keyedBy: CodingKeys.self)
+        status = fields.looseField(String.self, .status) ?? ""
+        jobId = fields.looseField(Int.self, .jobId)
+        joined = fields.looseField(Bool.self, .joined) ?? false
+    }
+}
+
 /// What a folder's files are, as its card showed them (`JobQuality`, routes/download.py Quality): kept with the job, so
 /// someone offered to join it is told what they'd get.
 public struct JobQuality: Encodable, Sendable, Equatable {

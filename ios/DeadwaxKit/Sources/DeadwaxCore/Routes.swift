@@ -146,6 +146,11 @@ public enum Routes {
     public static let findCandidates = Endpoint(method: "POST", path: "/deadwax/download/find_candidates", query: [])
     public static let enqueue = Endpoint(method: "POST", path: "/deadwax/download/enqueue", query: [])
     public static let preferences = Endpoint(method: "GET", path: "/deadwax/me/preferences", query: [])
+    // Phase 6, slice 3's (phase6-get-requests.md 0, 2.11, 2.12): a download somebody else asked for joined from the
+    // store line (`JoinAnswer`; 409 in words for one that landed, stopped or was cleared since), and You > Getting
+    // albums changed on the phone - only what was chosen (`GetChoice`), answered with all three as they stand after it
+    public static let joinJob = Endpoint(method: "POST", path: "/deadwax/download/jobs/{job_id}/join", query: [])
+    public static let savePreferences = Endpoint(method: "PUT", path: "/deadwax/me/preferences", query: [])
 
     /// The levels spec's name for `levelAlbum`: the album's levels warmed before its first play.
     public static var warmLevels: Endpoint { levelAlbum }
@@ -170,6 +175,7 @@ public enum Routes {
         savedSearch,
         jobs, cancelJob, retryJob, retryJobSame, clearJobs,
         storeState, findCandidates, enqueue, preferences,
+        joinJob, savePreferences,
     ]
 
     /// The routes given longer than the transport's own 8 seconds to answer, in seconds: the album index reads every
@@ -188,8 +194,9 @@ public enum Routes {
     /// names, and slskd's state, answers and ranking around them - 292 s at worst (slice 2's review, finding 3); and an
     /// enqueue has no bound on the server at all (the release's lock, then slskd's, which answers once the peer is
     /// reached), so it is given the search's, and an answer that never comes isn't taken for a refusal
-    /// (RequestOverlays.unanswered) - tests/test_ios_contract.py holds each above the server's.
-    public static let timeouts: [Endpoint: Double] = [albumIndex: 30, autoEqSearch: 20, autoEqProfile: 20, libraryOwned: 30, fullySearch: 20, releaseGroup: 60, searchArtists: 20, searchSongs: 20, artistFacts: 60, discography: 60, jobs: 20, cancelJob: 30, retryJob: 60, retryJobSame: 30, clearJobs: 30, storeState: 20, findCandidates: 300, enqueue: 300]
+    /// (RequestOverlays.unanswered); a join waits for the same release's lock as an enqueue or a move to the next source
+    /// does, so it is given a move's time - tests/test_ios_contract.py holds each above the server's.
+    public static let timeouts: [Endpoint: Double] = [albumIndex: 30, autoEqSearch: 20, autoEqProfile: 20, libraryOwned: 30, fullySearch: 20, releaseGroup: 60, searchArtists: 20, searchSongs: 20, artistFacts: 60, discography: 60, jobs: 20, cancelJob: 30, retryJob: 60, retryJobSame: 30, clearJobs: 30, storeState: 20, findCandidates: 300, enqueue: 300, joinJob: 60]
 }
 
 /// The Cover Art Archive's thumbnail sizes the app asks deadwax's relay for (`Routes.archiveCover`'s `size`, which takes

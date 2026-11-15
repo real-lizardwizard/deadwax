@@ -11,7 +11,8 @@ struct GetRequest: Identifiable {
     let subtitle: String
 }
 
-/// Choose a source (Phase 6, slice 2 - phase6-get-requests.md 2.10, 3.5; the web's app/Sources.tsx as a phone's sheet):
+/// Choose a source (Phase 6, slices 2 and 3 - phase6-get-requests.md 2.10, 2.11, 3.5; the web's app/Sources.tsx as a
+/// phone's sheet):
 /// the sheet Get the album opens. Soulseek is searched for the pressing the Get was for (SourcesSearch), and each folder
 /// found is a card (SourceCardView); a card's Get asks for the download in the tap - its row up in Requests from that
 /// moment - and the sheet goes, Requests showing at its root.
@@ -37,9 +38,18 @@ struct GetRequest: Identifiable {
 ///   searches again by itself, and Search again is still under the cards. A Get that couldn't be asked at all keeps
 ///   the sheet up, with why (`getFailure`).
 ///
-/// Cancel - or the sheet swiped away - lets the search go (its request cancelled, which stops it in slskd too). Not in
-/// slice 2: Join, Add to my library and Pick the best source for me (slice 3) - the store's box says neither "Join it"
-/// nor "add it" (StoreLine.drawn), and every Get shows the sources, whatever When I tap Get says.
+/// - (Slice 3) PICK THE BEST SOURCE FOR ME (You > Getting albums' When I tap Get): on a fresh Get - or Try again - the
+///   best match through the chips as they are when the answer lands, at 75 or more, is downloaded as a card's Get is,
+///   and the sheet hands over to Requests; never for a pressing held or on its way, nor one that can't be judged. When
+///   nothing qualifies, why is said above the sources ("… - choose a source yourself."), and to VoiceOver with the
+///   outcome. A search again by hand never picks.
+/// - (Slice 3) JOIN AND ADD, in the store's box: a download somebody else asked for, judged against your floor, is
+///   yours to join (Join this download - with Get albums, which the sheet needs to open at all), and joining hands over
+///   to Requests as a Get does, only while the sheet still shows the Get that joined; a pressing the store holds that
+///   isn't yours is added from the box (Add to my library), which then says it's yours (StoreLine.addedStatus) and
+///   tells your library and Search's marks.
+///
+/// Cancel - or the sheet swiped away - lets the search go (its request cancelled, which stops it in slskd too).
 struct SourcesSheet: View {
     let request: GetRequest
     /// A download asked for: the sheet goes, and Requests shows.
@@ -50,6 +60,8 @@ struct SourcesSheet: View {
     @Environment(RequestsModel.self) private var requests
     @Environment(GetSettingsModel.self) private var settings
     @Environment(Reachability.self) private var reachability
+    @Environment(LibraryModel.self) private var library
+    @Environment(SearchModel.self) private var searchModel
     @State private var model = SourcesSearch()
     @State private var filters = SourceFilters.none
     /// A chip was tapped since this Get began: the floor landing late doesn't re-make them then.
@@ -60,6 +72,8 @@ struct SourcesSheet: View {
     @FocusState private var againFocused: Bool
     /// A card's Get that couldn't be asked at all (no deadwax to ask): the sheet stays, saying so.
     @State private var getFailure: (any Error)?
+    /// (Slice 3) The answer Add to my library added from (SourcesSearch.landed): its box says it's yours now.
+    @State private var addedFrom: Int?
 
     private var floor: QualityFloor { settings.floorNow }
     private var online: Bool { reachability.online }
@@ -132,10 +146,16 @@ struct SourcesSheet: View {
 
     // MARK: the search
 
-    /// A search for `release` - a Get, or Try again - Search again closed.
+    /// A search for `release` - a Get, or Try again - Search again closed, and a pick made as it lands when When I tap
+    /// Get says so: the chips read then, the pick downloaded as a card's Get is.
     private func begin(_ release: GetRelease) {
         again = false
-        model.start(release, client: server.client, settings: settings)
+        let picking = SourcesSearch.Picking(
+            filters: { GetSettings.candidateFilters(filters) },
+            picked: { (candidate: Candidate, release: GetRelease, list: [Candidate]) -> Bool in
+                get(candidate, release: release, shown: list)
+            })
+        model.start(release, client: server.client, settings: settings, picking: picking)
     }
 
     /// The same pressing again, with the field's query where it was edited - Search again closed as it starts.
@@ -158,9 +178,18 @@ struct SourcesSheet: View {
             ErrorWords.of(error, admin: server.access.seesDetail, service: .downloads,
                           failed: ErrorWords.down[.downloads], retry: true).said
         }
-        let status = search.answer.flatMap { StoreLine.drawn($0.store, floor: floor) }
+        let status = search.answer.flatMap { storeBox($0) }
         return Sources.announcement(pending: search.pending, release: search.release, error: error, status: status,
-                                    answer: search.answer, shown: passing(search.answer).count, format: search.format)
+                                    answer: search.answer, shown: passing(search.answer).count,
+                                    notPicked: model.notPicked, format: search.format)
+    }
+
+    /// The store's box for an answer, as the web's sheet draws it: Join with Get albums, and once Add has added from
+    /// this very answer, yours.
+    private func storeBox(_ answer: FindCandidatesAnswer) -> StoreStatus? {
+        let found = StoreLine.drawn(answer.store, floor: floor, joins: server.access.can(.request))
+        guard let found, addedFrom == model.landed else { return found }
+        return StoreLine.addedStatus(found)
     }
 
     // MARK: the chips
@@ -245,11 +274,21 @@ struct SourcesSheet: View {
     @ViewBuilder private func found(_ answer: FindCandidatesAnswer, release: GetRelease,
                                     format: FormatPreference?) -> some View {
         let notes = StoreLine.notes(answer.store)
-        if let status = StoreLine.drawn(answer.store, floor: floor) {
+        if let status = storeBox(answer) {
             // held whole, or downloading whole: where the sources would be - the server searched nothing
-            StoreLineView(status: status, notes: notes)
+            StoreLineView(status: status, notes: notes,
+                          onJoin: server.access.can(.request) ? { (jobId: Int) in try await join(jobId) } : nil,
+                          onAdd: { try await add(release) })
         } else {
             StoreLineView(status: nil, notes: notes)
+            if let notPicked = model.notPicked {
+                // When I tap Get said pick, and nothing qualified: why, above the sources
+                Text(notPicked)
+                    .font(Typeface.footnote)
+                    .foregroundStyle(Palette.text2)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
             let through = self.passing(answer)
             let shown = Sources.sorted(through, sort)
             let best = Sources.best(through)
@@ -302,18 +341,38 @@ struct SourcesSheet: View {
         }
     }
 
-    /// A card's Get, in the tap: the download asked for as the release this search was for, with the list as shown for
-    /// the next peers - once per search - and the sheet handing over to Requests only once the request is out. Refused
-    /// in the tap while deadwax is out of reach; one that couldn't be asked keeps the sheet, saying why.
-    private func get(_ candidate: Candidate, release: GetRelease, shown: [Candidate]) {
-        guard online, model.download() else { return }
+    /// A card's Get, in the tap - or a pick, as its answer lands: the download asked for as the release this search was
+    /// for, with the list as shown (a pick's, the list it tops) for the next peers - once per search - and the sheet
+    /// handing over to Requests only once the request is out. Refused while deadwax is out of reach; one that couldn't
+    /// be asked keeps the sheet, saying why. True once it is asked for.
+    @discardableResult
+    private func get(_ candidate: Candidate, release: GetRelease, shown: [Candidate]) -> Bool {
+        guard online, model.download() else { return false }
         guard requests.enqueue(EnqueueBody(candidate: candidate, release: release, shown: shown)) else {
             model.downloadAgain()
             getFailure = URLError(.notConnectedToInternet)
-            return
+            return false
         }
         getFailure = nil
         onQueued()
+        return true
+    }
+
+    /// (Slice 3) Join this download, from the box: once deadwax has it, Requests - as a Get - but only while the sheet
+    /// still shows the Get that joined (GroupView's hand-over checks it is still up).
+    private func join(_ jobId: Int) async throws {
+        try await requests.join(jobId)
+        onQueued()
+    }
+
+    /// (Slice 3) Add to my library, from the box: the pressing this search is for, as a Get would download it. Once
+    /// deadwax has it, the box says it's yours (if it still shows the answer added from), and your library and Search's
+    /// marks are told.
+    private func add(_ release: GetRelease) async throws {
+        let from = model.landed
+        try await library.add(release)
+        addedFrom = from
+        searchModel.refreshOwned()
     }
 
     private func stateText(_ words: String) -> some View {

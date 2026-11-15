@@ -31,6 +31,13 @@ import SwiftUI
 /// answer also says whose each folder is, so the meta line never disagrees with it (GroupPage `store`). While deadwax
 /// can't be reached: no Get, and "Getting albums works once deadwax is back." in the line's place. A Get asked for from
 /// the sheet closes it and shows Requests' root, the new row already up.
+///
+/// (Phase 6, slice 3 - 2.11) In the line's box: **Join this download** under a download somebody else asked for -
+/// only with Get albums, as the web's page gives `onJoin` only then (without it, the box says nothing of joining) -
+/// and **Add to my library** under a pressing the store holds that isn't yours, for anyone (deadwax refuses it in
+/// words where it can't). After either, the store is asked again, so the line says it's yours; an Add also tells your
+/// library and Search's marks, and a Join the Requests poll. The page stays where it is: only the sheet's Join hands
+/// over to Requests.
 struct GroupView: View {
     let route: GroupRoute
 
@@ -41,6 +48,7 @@ struct GroupView: View {
     @Environment(AppNavigation.self) private var navigation
     @Environment(RequestsModel.self) private var requests
     @Environment(GetSettingsModel.self) private var getSettings
+    @Environment(LibraryModel.self) private var library
     @Environment(\.scenePhase) private var scenePhase
     @State private var model: GroupPageModel
     @State private var picking = false
@@ -56,6 +64,8 @@ struct GroupView: View {
     @State private var gets = 0
     /// A download was asked for from the sheet: Requests shows once it has gone.
     @State private var queued = false
+    /// (Slice 3) One more for every Join or Add answered from the line: the store asked again.
+    @State private var changed = 0
 
     private static let edge: CGFloat = 16
 
@@ -135,6 +145,8 @@ struct GroupView: View {
             navigation.showRequestsRoot()
         }) { (request: GetRequest) in
             SourcesSheet(request: request) {
+                // only while the sheet still shows this Get: a Join answering after it closed opens nothing
+                guard getting?.id == request.id else { return }
                 queued = true
                 getting = nil
             }
@@ -144,7 +156,7 @@ struct GroupView: View {
             await model.load(client: server.client, online: reachability.online)
         }
         // the store line asked as the pressing is chosen, as an album is filed, and as the page shows again
-        .task(id: StoreAsk(pressing: page.chosenId, filed: requests.filed, shown: storeShown,
+        .task(id: StoreAsk(pressing: page.chosenId, filed: requests.filed, changed: changed, shown: storeShown,
                            online: reachability.online, person: server.person)) {
             await askStore(page)
         }
@@ -177,6 +189,7 @@ struct GroupView: View {
     private struct StoreAsk: Equatable {
         let pressing: String?
         let filed: Int
+        let changed: Int
         let shown: Bool
         let online: Bool
         let person: Int
@@ -391,8 +404,10 @@ struct GroupView: View {
                 .padding(.top, 4)
             }
             if reachability.online {
-                let status = StoreLine.drawn(known(page), floor: getSettings.settings?.floor)
-                StoreLineView(status: status, notes: known(page).map { StoreLine.notes($0) } ?? [])
+                let status = StoreLine.drawn(known(page), floor: getSettings.settings?.floor, joins: allowed)
+                StoreLineView(status: status, notes: known(page).map { StoreLine.notes($0) } ?? [],
+                              onJoin: allowed ? { (jobId: Int) in try await join(jobId) } : nil,
+                              onAdd: { try await add(page) })
                     .onChange(of: status?.title) { _, title in
                         // what the line now says, for VoiceOver - only on the page shown (the web's aria-live)
                         if let title, isShown { Notice.announce(title) }
@@ -401,6 +416,22 @@ struct GroupView: View {
                 ShelfNote(StoreLine.offline)
             }
         }
+    }
+
+    /// (Slice 3) Join this download, from the line: once deadwax has it (and the Requests poll told), the store asked
+    /// again - the line says it's yours.
+    private func join(_ jobId: Int) async throws {
+        try await requests.join(jobId)
+        changed += 1
+    }
+
+    /// (Slice 3) Add to my library, from the line: the chosen pressing, as a Get would download it. Once deadwax has it,
+    /// your library and Search's marks are told, and the store asked again - the line says "Already in your library".
+    private func add(_ page: GroupPage) async throws {
+        guard let release = download(page) else { throw URLError(.badURL) }
+        try await library.add(release)
+        search.refreshOwned()
+        changed += 1
     }
 
     /// The store line's answer for the pressing shown - another pressing's never stands for it.
