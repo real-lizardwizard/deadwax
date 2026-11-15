@@ -8630,3 +8630,60 @@ and place to app.css's tokens, and its drawing to Requests' button and label.
 Verified: swift test, a Debug device build, check_project, the sims and pytest (the merge commit's message has the
 numbers). Not verified: the badge's look beside the web's, its place at the largest text sizes, and VoiceOver's
 reading of it - checks 166 and 168 on the phone.
+
+## Phase 6, slice 1's review (2026-11-15)
+
+Six findings on slice 1 (and on its move to the app's own tab bar), fixed in one commit on phase6-get after it merged
+ios at c8da2eb (main's 2.1.26).
+
+1. **The poll could stop for good** (MainTabs). `.onDisappear { requests.watch(.hidden) }` had no `.onAppear`, and the
+   way back relied on `onChange(of: watching, initial: true)` alone. If iOS takes the tabs away under Now Playing's
+   full-screen cover (it is not documented either way), `watching` reads `.other` before and after, so onChange never
+   fires on the way back and the model stays `.hidden`: no poll, the badge frozen until Requests' root or the
+   background. **Kept the onDisappear and added `.onAppear { requests.watch(watching) }`.** The onDisappear is still
+   needed: the tabs also go when the launch screen or the sign-in takes their place, and `asks` (launch ready, no
+   sign-in over, a client) stops a look going out then but never starts one again - it is the `.hidden` in between
+   that makes the return a change (`asksAgain(.hidden, .other)` asks once; back on Requests' root `open` turns, which
+   asks). Under a cover that does take the tabs, the poll now rests while Now Playing is up and asks the moment it
+   closes. Check 178.
+2. **A dropped connection left stale in-flight entries** (RequestsModel). `letLooksGo()` cancelled the looks but never
+   cleared `inFlight`, and a cancelled look returned at its `Task.isCancelled` guard before removing its release - so
+   back in reach `DoneLooks.looks` skipped those releases for good, and `open()` skipped its songs ask. Now
+   **DoneLooks.InFlight** (Core) holds each ask with a ticket: every way an ask ends - answered, failed or cancelled -
+   ends its ticket first, before any guard; `letLooksGo` ends the tickets of what it lets go at once; a reset clears
+   it. A ticket keeps an old ask that ends late from taking out a newer ask of the same release - the web's plain set
+   (whose rejection handler deletes too) has that hole. The web also empties its set at every change of the tab's
+   period; the phone no longer needs to, and doesn't, so a tapped row's songs ask still out stays in flight.
+3. **A tapped Done row's songs ask was always let go.** `open()` asks for the songs (`period: nil`, to land wherever
+   the app is) and then pushes the album page; the push makes `watching` `.other`, and `letLooksGo()` cancelled that
+   very ask - so past the first five rows a ▶ never had its songs. That ask is now its own task (`tappedSongs`), out of
+   what `letLooksGo` lets go, still guarded by the epoch (the person) and cancelled by a reset; it lands as the web's
+   does (`() => mounted.current`). Check 179's last sentence.
+4. **The accessibility sizes squeezed the words out** (RequestCards). The covers (44, 52) and the ✕'s and ▶'s faces
+   (32) were `@ScaledMetric(relativeTo: .body)`, uncapped: at AX5 a cover was about 160 points and a title about 30,
+   drawn as "…"; the two buttons of a question or of Needs attention sat side by side at one line each, cut to about
+   five letters. Now the covers and faces are fixed (CardSizes, as LibraryRow.cover and Up Next's 44 are), the glyphs
+   grow to xxxLarge and hold there, with the Large Content Viewer on a long press; a title takes up to 3 lines at the
+   accessibility sizes; and a pair of buttons is a **ButtonPair** - ViewThatFits, side by side when both fit on one
+   line each, one over the other otherwise, on up to 3 lines each at the accessibility sizes. The data line stays one
+   line (it mustn't jump as the speed comes and goes). Check 179.
+5. **Clear done's ids.** The finding said the web takes `finishedIds` of the visible list; it doesn't - its
+   clearFinished (useDownloadJobs.ts, line 306) reads the hook's own `jobs` state (line 109), the jobs as polled, which
+   is what the phone took. But the case it named is real on both: a second Clear done while the first waits for its
+   poll takes the first's ids again, and if it fails it gives them back - the first clear's rows return until the next
+   poll lands. **The phone now takes `RequestOverlays.toClear(polled)`, `finishedIds` of `visibleJobs`**: what a clear
+   hides isn't taken again, so a failure gives back only what it took. This departs from the web on purpose; the web
+   has the same flaw, and its fix would be main's (a patch of its own), after which the two agree again.
+6. **Two collections grew** (minor). `lookTasks` is now keyed by ticket and each task is removed as it ends (and all
+   at `letLooksGo`); `doneSince` is pruned at each answer to the jobs deadwax lists (**DoneLooks.kept**) - a row hidden
+   by a clear waiting for its poll is still listed, so a clear rolled back doesn't make its rows look new.
+
+Core: RequestsTests gains 5 (`aDoneRowsLookLetGoIsLookedForAgain`, `anOldAskEndingLateLeavesTheNewOneInFlight`,
+`anAskEndsHoweverItEnds`, `aSecondClearDoneThatFailsGivesBackOnlyWhatItTook`,
+`theDoneRowsTimesAreKeptOnlyForJobsStillListed`). `RequestRow.key(job:)` names the "job-<id>" key once, for jobRow and `kept`. The vectors are unchanged: InFlight,
+`toClear` and `kept` have no counterpart on the web to hold them to (`finishedIds`, `visibleJobs` and `doneLooks` keep
+theirs).
+
+Not verified - only the phone can tell: whether iOS does take the tabs from under a full-screen cover (check 178
+passes either way, if this is right); the cards at the accessibility sizes (179); and, as before, every in-app piece
+only in the compiler.

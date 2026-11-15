@@ -217,6 +217,47 @@ public enum DoneLooks {
         }
     }
 
+    /// The asks out for the Done rows' albums (the id bridge's and the songs'), by release, each with its ticket - the
+    /// web's `inFlight` set (Requests.tsx), made safe against an old ask ending after a new one of the same release
+    /// began. An ask that ends, however it ends - answered, failed or let go - takes its release out of flight, unless a
+    /// newer ask of it began since; letting every ask go (Requests' root left, deadwax out of reach, a new person)
+    /// empties it at once, so a release whose ask was let go is looked for again next time, not skipped for good
+    /// (slice 1's review, finding 2).
+    public struct InFlight: Sendable, Equatable {
+        private var asks: [String: Int] = [:]
+        private var last = 0
+
+        public init() {}
+
+        /// The releases asked for now (Held's `inFlight`).
+        public var releases: Set<String> { Set(asks.keys) }
+
+        public func contains(_ release: String) -> Bool { asks[release] != nil }
+
+        /// An ask begun: its ticket, for its end.
+        public mutating func begin(_ release: String) -> Int {
+            last += 1
+            asks[release] = last
+            return last
+        }
+
+        /// An ask ended: its release out of flight, unless a newer ask of it began since.
+        public mutating func end(_ release: String, ticket: Int) {
+            if asks[release] == ticket { asks[release] = nil }
+        }
+
+        /// Every ask let go: none in flight, and those let go end as nothing.
+        public mutating func clear() { asks.removeAll() }
+    }
+
+    /// When each Done row first showed as done, kept only for the jobs deadwax still lists (slice 1's review, finding 6):
+    /// a job it no longer lists - cleared, or gone - is forgotten; one it lists stays, a row a Clear done hides
+    /// included, so a clear rolled back doesn't make its rows new.
+    public static func kept(_ since: [String: Double], listed jobs: [DownloadJob]) -> [String: Double] {
+        let keys = Set(jobs.map { RequestRow.key(job: $0.id) })
+        return since.filter { keys.contains($0.key) }
+    }
+
     public struct Looks: Sendable, Equatable {
         /// Releases to look up (the id bridge).
         public let look: [String]

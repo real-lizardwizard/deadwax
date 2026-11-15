@@ -136,6 +136,15 @@ public struct RequestOverlays: Sendable, Equatable {
     public static func finishedIds(_ jobs: [DownloadJob]) -> [Int] {
         jobs.filter { !$0.isActive }.map { $0.id }
     }
+
+    /// The jobs a Clear done takes now: the finished ones still drawn (`finishedIds` of `visibleJobs`). A clear's own
+    /// rows, hidden while it waits for a poll to agree, aren't taken again, so a second Clear done that fails gives
+    /// back only what it took - not the first clear's rows (slice 1's review, finding 5). The phone's own rule: the
+    /// web's clearFinished (useDownloadJobs.ts) takes `finishedIds` of every job polled, and a second clear that fails
+    /// there brings the first one's rows back until the next poll.
+    public func toClear(_ polled: [DownloadJob]) -> [Int] {
+        Self.finishedIds(visibleJobs(polled))
+    }
 }
 
 // MARK: speeds (speed.ts)

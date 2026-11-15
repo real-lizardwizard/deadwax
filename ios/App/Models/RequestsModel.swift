@@ -19,8 +19,10 @@ import Observation
 /// - The overlays are set before a write goes out and dropped when a poll agrees, or after 15 s; a cancel or a clear
 ///   that fails is only rolled back, as the web's (its error goes to the console there).
 /// - A look that sees an album newly filed asks Search's owned index again (question 8).
-/// - The Done rows' albums are looked for only while Requests' root shows; leaving it lets every look go, and a tapped
-///   row's album opens only while the root is still what shows when the answer comes.
+/// - The Done rows' albums are looked for only while Requests' root shows; leaving it, or deadwax going out of reach,
+///   lets every look go - each out of flight at once, so the next look asks again (DoneLooks.InFlight). A tapped row's
+///   album opens only while the root is still what shows when the answer comes; its songs are asked on their own, and
+///   land wherever the app is by then (the tap's own push leaves the root).
 ///
 /// `reset()` - a new person - lets everything go, and nothing asked before it lands after it.
 @MainActor
@@ -79,12 +81,16 @@ final class RequestsModel {
     /// An album's songs in hand, and when they were asked for - what a ▶ plays.
     @ObservationIgnored private var ready: [String: (album: Album, at: Double)] = [:]
     @ObservationIgnored private var misses: [String: DoneLooks.Miss] = [:]
-    @ObservationIgnored private var inFlight: Set<String> = []
+    /// The asks out, by release, each with its ticket: every way an ask ends takes it out.
+    @ObservationIgnored private var inFlight = DoneLooks.InFlight()
     /// When Requests' root last came into view (ms).
     @ObservationIgnored private var activeSince: Double = 0
     /// One more each time Requests' root comes into view or leaves it: a look of an older period lands nothing.
     @ObservationIgnored private var period = 0
-    @ObservationIgnored private var lookTasks: [Task<Void, Never>] = []
+    /// The period's looks out, by ticket - each gone as it ends, all let go as the period ends.
+    @ObservationIgnored private var lookTasks: [Int: (release: String, task: Task<Void, Never>)] = [:]
+    /// A tapped row's songs asks, by ticket: outside the period, so its own push off the root doesn't let it go.
+    @ObservationIgnored private var tappedSongs: [Int: Task<Void, Never>] = [:]
     @ObservationIgnored private var dueClock: Task<Void, Never>?
     @ObservationIgnored private var openTask: Task<Void, Never>?
 
@@ -124,11 +130,9 @@ final class RequestsModel {
         watching = now
         if now == .requests {
             period += 1
-            inFlight.removeAll()
             activeSince = Self.nowMs()
         } else if before == .requests {
             period += 1
-            inFlight.removeAll()
             letLooksGo()
         }
         if now == .hidden {
@@ -162,6 +166,9 @@ final class RequestsModel {
         epoch += 1
         stopPolling()
         letLooksGo()
+        for task in tappedSongs.values { task.cancel() }
+        tappedSongs.removeAll()
+        inFlight.clear()
         for task in writes.values { task.cancel() }
         writes.removeAll()
         polled = []
@@ -180,7 +187,6 @@ final class RequestsModel {
         albumIds = [:]
         ready = [:]
         misses = [:]
-        inFlight = []
         notes = [:]
         board = .nothing
         wasOpen = open
@@ -257,6 +263,8 @@ final class RequestsModel {
         let jobs = answer.jobs
         speeds = samples.sample(jobs, now: Monotonic.seconds() * 1000)
         polled = jobs
+        // the Done rows' times kept only for the jobs listed (a row a clear hides among them)
+        doneSince = DoneLooks.kept(doneSince, listed: jobs)
         //? the album a look sees filed: Search's owned marks asked again, so the album you don't have says you have it
         let filed = RequestsWatch.newlyFiled(statuses, jobs)
         statuses = RequestsWatch.statuses(jobs)
@@ -349,10 +357,11 @@ final class RequestsModel {
         }
     }
 
-    /// Clear done: the finished jobs and the refused requests off the list at once, the jobs back if it fails.
+    /// Clear done: the finished jobs still drawn and the refused requests off the list at once, the jobs back if it
+    /// fails - only those it took, so a second clear failing never brings back a first one's (RequestOverlays.toClear).
     func clear() {
         guard reachability.online, let client = server.client else { return }
-        let ids = RequestOverlays.finishedIds(polled)
+        let ids = overlays.toClear(polled)
         overlays = overlays.withoutRefused()
         guard !ids.isEmpty else {
             redraw()
@@ -412,18 +421,26 @@ final class RequestsModel {
             }
             .prefix(DoneLooks.prefetched)
         guard !ahead.isEmpty else { return }
-        let held = DoneLooks.Held(ids: albumIds, asked: ready.mapValues { $0.at }, misses: misses, inFlight: inFlight,
-                                  activeSince: activeSince)
+        let held = DoneLooks.Held(ids: albumIds, asked: ready.mapValues { $0.at }, misses: misses,
+                                  inFlight: inFlight.releases, activeSince: activeSince)
         let due = DoneLooks.looks(Array(ahead), held: held, now: Self.nowMs())
         let epoch = self.epoch
         let period = self.period
         for release in due.look {
-            inFlight.insert(release)
-            lookTasks.append(Task { [weak self] in
+            let ticket = inFlight.begin(release)
+            let task = Task { [weak self] in
+                let result: Result<StoreAlbum, any Error>
                 do {
-                    let answer = try await client.storeAlbum(releaseMbid: release)
-                    guard !Task.isCancelled, let self, self.live(epoch, period) else { return }
-                    self.inFlight.remove(release)
+                    result = .success(try await client.storeAlbum(releaseMbid: release))
+                } catch {
+                    result = .failure(error)
+                }
+                guard let self else { return }
+                // out of flight however it ended - answered, failed or let go
+                self.ended(release, ticket)
+                guard !Task.isCancelled, self.live(epoch, period) else { return }
+                switch result {
+                case .success(let answer):
                     guard let id = answer.navidromeId, !id.isEmpty else {
                         self.missed(release)
                         self.runLooks()
@@ -431,14 +448,12 @@ final class RequestsModel {
                     }
                     self.found(release, id)
                     self.askSongs(release, id, client, period: period)
-                    self.runLooks()
-                } catch {
-                    guard !Task.isCancelled, let self, self.live(epoch, period) else { return }
-                    self.inFlight.remove(release)
+                case .failure(let error):
                     if !APIFailure.isCancellation(error) { self.missed(release) }
-                    self.runLooks()
                 }
-            })
+                self.runLooks()
+            }
+            lookTasks[ticket] = (release, task)
         }
         for release in due.songs {
             guard let id = albumIds[release] else { continue }
@@ -460,15 +475,18 @@ final class RequestsModel {
     }
 
     /// An album's songs asked for - a failure forgets its id (the album gone, or re-filed under another), so the next
-    /// look asks the bridge again.
+    /// look asks the bridge again. `period` nil: a tapped row's, its own task - leaving Requests' root (as the tap's
+    /// push does) doesn't let it go, and it lands wherever the app is, for the same person.
     private func askSongs(_ release: String, _ album: String, _ client: DeadwaxClient, period: Int?) {
-        inFlight.insert(release)
+        let ticket = inFlight.begin(release)
         let at = Self.nowMs()
         let epoch = self.epoch
-        lookTasks.append(Task { [weak self] in
+        let task = Task { [weak self] in
             let answer = try? await client.album(id: album)
-            guard !Task.isCancelled, let self, self.live(epoch, period) else { return }
-            self.inFlight.remove(release)
+            guard let self else { return }
+            // out of flight however it ended - answered, failed or let go
+            self.ended(release, ticket)
+            guard !Task.isCancelled, self.live(epoch, period) else { return }
             if let answer {
                 self.ready[release] = (answer, at)
             } else {
@@ -477,7 +495,19 @@ final class RequestsModel {
                 self.missed(release)
             }
             self.runLooks()
-        })
+        }
+        if period == nil {
+            tappedSongs[ticket] = task
+        } else {
+            lookTasks[ticket] = (release, task)
+        }
+    }
+
+    /// An ask ended, however it ended: out of flight (unless a newer ask of its release began since), its task gone.
+    private func ended(_ release: String, _ ticket: Int) {
+        inFlight.end(release, ticket: ticket)
+        lookTasks[ticket] = nil
+        tappedSongs[ticket] = nil
     }
 
     private func found(_ release: String, _ album: String) {
@@ -490,8 +520,13 @@ final class RequestsModel {
         misses[release] = DoneLooks.Miss(count: (misses[release]?.count ?? 0) + 1, at: Self.nowMs())
     }
 
+    /// The period's looks let go - each out of flight at once, so the next look asks again (a tapped row's songs ask
+    /// carries on: it isn't the period's).
     private func letLooksGo() {
-        for task in lookTasks { task.cancel() }
+        for (ticket, look) in lookTasks {
+            look.task.cancel()
+            inFlight.end(look.release, ticket: ticket)
+        }
         lookTasks.removeAll()
         dueClock?.cancel()
         dueClock = nil

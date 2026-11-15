@@ -390,9 +390,10 @@ See notes/ios.md, "Phase 6, slice 1: Requests".
 
 ## 8. James's checks
 
-Numbered after docs/ios.md's 165. Slice 1's (166-177) are written out in docs/ios.md; slices 2 and 3 will add theirs
-(178 on) when they are built: get an album end to end and play it from Requests (the plan's), its store line, Sources'
-reasoning, a refusal, Get albums taken away; Join and Add, the auto-pick, You's three choices.
+Numbered after docs/ios.md's 165. Slice 1's (166-179, 178 and 179 from its review) are written out in docs/ios.md;
+slices 2 and 3 will add theirs (180 on) when they are built: get an album end to end and play it from Requests (the
+plan's), its store line, Sources' reasoning, a refusal, Get albums taken away; Join and Add, the auto-pick, You's three
+choices.
 
 ## 9. What only the phone can tell
 

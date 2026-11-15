@@ -270,4 +270,76 @@ import Testing
         _ = samples.sample([job(2_000_000, "organized")], now: 8000)
         #expect(samples.isEmpty)
     }
+
+    // MARK: slice 1's review
+
+    @Test func aDoneRowsLookLetGoIsLookedForAgain() {
+        var flight = DoneLooks.InFlight()
+        let rows: [DoneLooks.Row] = [DoneLooks.Row(release: "r1", since: 0)]
+        _ = flight.begin("r1")
+        //? out: not asked again until it answers
+        let whileOut: DoneLooks.Looks = DoneLooks.looks(rows, held: DoneLooks.Held(inFlight: flight.releases), now: 20_000)
+        #expect(whileOut.look.isEmpty)
+        //? deadwax went out of reach: every look let go, so back in reach the release is looked for again
+        flight.clear()
+        let back: DoneLooks.Looks = DoneLooks.looks(rows, held: DoneLooks.Held(inFlight: flight.releases), now: 20_000)
+        #expect(back.look == ["r1"])
+    }
+
+    @Test func anOldAskEndingLateLeavesTheNewOneInFlight() {
+        var flight = DoneLooks.InFlight()
+        let first: Int = flight.begin("r1")
+        flight.clear()
+        let second: Int = flight.begin("r1")
+        //? the first, let go, ends after the second began: the second is still out
+        flight.end("r1", ticket: first)
+        #expect(flight.contains("r1"))
+        flight.end("r1", ticket: second)
+        #expect(!flight.contains("r1"))
+        #expect(flight.releases.isEmpty)
+    }
+
+    @Test func anAskEndsHoweverItEnds() {
+        var flight = DoneLooks.InFlight()
+        //? answered, failed or cancelled, the one end takes it out of flight
+        let ticket: Int = flight.begin("r2")
+        let other: Int = flight.begin("r3")
+        flight.end("r2", ticket: ticket)
+        #expect(!flight.contains("r2"))
+        #expect(flight.releases == ["r3"])
+        flight.end("r3", ticket: other)
+        #expect(flight.releases.isEmpty)
+    }
+
+    @Test func aSecondClearDoneThatFailsGivesBackOnlyWhatItTook() {
+        let done = DownloadJob(id: 1, status: "organized")
+        let failed = DownloadJob(id: 2, status: "failed")
+        let going = DownloadJob(id: 3, status: "downloading")
+        var overlays = RequestOverlays.none
+        let first: [Int] = overlays.toClear([done, failed, going])
+        #expect(first == [1, 2])
+        overlays.cleared.formUnion(first)
+        //? a second Clear done before a poll agrees with the first: nothing left to take
+        #expect(overlays.toClear([done, failed, going]).isEmpty)
+        //? one finished since: only it is taken, and a failure gives back only it
+        let late = DownloadJob(id: 4, status: "organized")
+        let second: [Int] = overlays.toClear([done, failed, going, late])
+        #expect(second == [4])
+        overlays.cleared.formUnion(second)
+        overlays.cleared.subtract(second)
+        let shown: [Int] = overlays.visibleJobs([done, failed, going, late]).map { $0.id }
+        #expect(shown == [3, 4])
+        //? (every finished job polled, the web's rule, would have taken the first clear's rows and given them back)
+        #expect(RequestOverlays.finishedIds([done, failed, going, late]) == [1, 2, 4])
+    }
+
+    @Test func theDoneRowsTimesAreKeptOnlyForJobsStillListed() {
+        let since: [String: Double] = ["job-1": 0, "job-2": 5_000, "job-3": 9_000]
+        //? job 1 cleared and gone, job 3 hidden by a clear still waiting for its poll: listed, so kept
+        let kept: [String: Double] = DoneLooks.kept(since, listed: [DownloadJob(id: 2, status: "organized"),
+                                                                    DownloadJob(id: 3, status: "failed")])
+        #expect(kept == ["job-2": 5_000, "job-3": 9_000])
+        #expect(DoneLooks.kept(since, listed: []).isEmpty)
+        #expect(RequestRow.key(job: 7) == "job-7")
+    }
 }

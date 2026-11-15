@@ -4,8 +4,11 @@ import SwiftUI
 // The Requests board's cards (Phase 6, slice 1 - phase6-get-requests.md 3.2; the web's app/JobCard.tsx): a card for a
 // download on its way or needing attention, a plain row for one done. Every word comes from the row (Core's
 // RequestsView); these only lay it out and hand a tap to the screen. A line that changes as answers land - the data
-// line - is one line high, drawn whether or not a speed is in it; the bar's height is fixed; the covers' sizes grow
-// with the text.
+// line - is one line high, drawn whether or not a speed is in it; the bar's height is fixed. The covers (44, and
+// Downloading's 52 - the web's) and the ✕'s and ▶'s 32-point faces are fixed, as the app's rows' covers are
+// (LibraryRow.cover, Up Next's 44), their glyphs growing to the largest standard size and holding there: at the
+// accessibility sizes the words take the room - a title on up to 3 lines, and a card's two buttons one over the other
+// when they don't fit side by side (slice 1's review, finding 4).
 
 /// The pressing's front through deadwax's relay (question 9), or the plain tile without one.
 struct RequestCover: View {
@@ -18,6 +21,35 @@ struct RequestCover: View {
         ArchiveCover(addresses: addresses, size: ArchiveCoverSize.row)
             .frame(width: size, height: size)
             .clipShape(Corners.artShape)
+    }
+}
+
+/// The cards' fixed sizes.
+private enum CardSizes {
+    /// A card's cover, and a Done row's.
+    static let cover: CGFloat = 44
+    /// Downloading's.
+    static let largeCover: CGFloat = 52
+    /// The ✕'s and the ▶'s round face, inside a 44-point target.
+    static let face: CGFloat = 32
+    /// A title's lines at the accessibility sizes (one otherwise).
+    static let titleLines = 3
+}
+
+/// Two buttons side by side, or one over the other when they don't fit (the accessibility sizes, a long label) - each
+/// label on one line beside the other, on up to 3 over it at the accessibility sizes.
+private struct ButtonPair<Buttons: View>: View {
+    @ViewBuilder let buttons: Buttons
+
+    @Environment(\.dynamicTypeSize) private var typeSize
+
+    var body: some View {
+        ViewThatFits(in: .horizontal) {
+            HStack(spacing: 8) { buttons.lineLimit(1) }
+            VStack(alignment: .leading, spacing: 8) {
+                buttons.lineLimit(typeSize.isAccessibilitySize ? CardSizes.titleLines : 1)
+            }
+        }
     }
 }
 
@@ -42,18 +74,17 @@ struct JobCardView: View {
     let onKeep: () -> Void
     let onConfirm: () -> Void
 
-    @ScaledMetric(relativeTo: .body) private var cover: CGFloat = 44
-    @ScaledMetric(relativeTo: .body) private var largeCover: CGFloat = 52
+    @Environment(\.dynamicTypeSize) private var typeSize
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(alignment: .top, spacing: 12) {
-                RequestCover(release: row.cover, size: downloading ? largeCover : cover)
+                RequestCover(release: row.cover, size: downloading ? CardSizes.largeCover : CardSizes.cover)
                     .opacity(row.dimmed ? Palette.dimmed : 1)
                 VStack(alignment: .leading, spacing: 2) {
                     Text(row.title)
                         .font(.body.weight(.semibold))
-                        .lineLimit(1)
+                        .lineLimit(typeSize.isAccessibilitySize ? CardSizes.titleLines : 1)
                         .opacity(row.dimmed ? Palette.dimmed : 1)
                     Text(row.line)
                         .font(.footnote)
@@ -97,14 +128,13 @@ private struct CancelButton: View {
     let row: RequestRow
     let action: () -> Void
 
-    @ScaledMetric(relativeTo: .body) private var face: CGFloat = 32
-
     var body: some View {
         Button(action: action) {
             Image(systemName: "xmark")
                 .font(.footnote.weight(.semibold))
+                .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
                 .foregroundStyle(Palette.onSecondary)
-                .frame(width: face, height: face)
+                .frame(width: CardSizes.face, height: CardSizes.face)
                 .background(Palette.secondaryFill, in: Circle())
                 .overlay(Circle().strokeBorder(Palette.secondaryEdge, lineWidth: 1))
                 .frame(minWidth: 44, minHeight: 44)
@@ -114,6 +144,9 @@ private struct CancelButton: View {
         .disabled(row.cancel == .cancelling)
         .opacity(row.cancel == .cancelling ? Palette.off : 1)
         .accessibilityLabel(RequestWords.cancelLabel(row))
+        .accessibilityShowsLargeContentViewer {
+            Label(RequestWords.cancelLabel(row), systemImage: "xmark")
+        }
     }
 }
 
@@ -129,7 +162,7 @@ private struct CancelQuestion: View {
             Text(row.cancelWords.question)
                 .font(.subheadline)
                 .fixedSize(horizontal: false, vertical: true)
-            HStack(spacing: 8) {
+            ButtonPair {
                 Button(action: onKeep) {
                     Text(RequestWords.keepIt)
                 }
@@ -157,17 +190,17 @@ struct AttentionCardView: View {
     let runs: Bool
     let onRetry: (_ same: Bool) -> Void
 
-    @ScaledMetric(relativeTo: .body) private var cover: CGFloat = 44
+    @Environment(\.dynamicTypeSize) private var typeSize
 
     var body: some View {
         let ways = row.nextPeer != nil || row.askAgain != nil
         VStack(alignment: .leading, spacing: 10) {
             HStack(alignment: .top, spacing: 12) {
-                RequestCover(release: row.cover, size: cover)
+                RequestCover(release: row.cover, size: CardSizes.cover)
                 VStack(alignment: .leading, spacing: 2) {
                     Text(row.title)
                         .font(.body.weight(.semibold))
-                        .lineLimit(1)
+                        .lineLimit(typeSize.isAccessibilitySize ? CardSizes.titleLines : 1)
                     if !row.line.isEmpty {
                         Text(row.line)
                             .font(.footnote)
@@ -197,18 +230,18 @@ struct AttentionCardView: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
             if gets && ways {
-                HStack(spacing: 8) {
+                ButtonPair {
                     if let next = row.nextPeer {
                         if next.primary {
-                            Button { onRetry(false) } label: { Text(next.label).lineLimit(1) }
+                            Button { onRetry(false) } label: { Text(next.label) }
                                 .buttonStyle(PrimaryFace())
                         } else {
-                            Button { onRetry(false) } label: { Text(next.label).lineLimit(1) }
+                            Button { onRetry(false) } label: { Text(next.label) }
                                 .buttonStyle(SecondaryPill())
                         }
                     }
                     if let again = row.askAgain {
-                        Button { onRetry(true) } label: { Text(again.label).lineLimit(1) }
+                        Button { onRetry(true) } label: { Text(again.label) }
                             .buttonStyle(SecondaryPill())
                     }
                 }
@@ -255,8 +288,7 @@ struct DoneRowView: View {
     let onOpen: () -> Void
     let onPlay: () -> Void
 
-    @ScaledMetric(relativeTo: .body) private var cover: CGFloat = 44
-    @ScaledMetric(relativeTo: .body) private var playFace: CGFloat = 32
+    @Environment(\.dynamicTypeSize) private var typeSize
 
     var body: some View {
         HStack(alignment: .center, spacing: 8) {
@@ -271,14 +303,18 @@ struct DoneRowView: View {
                 Button(action: onPlay) {
                     Image(systemName: "play.fill")
                         .font(.footnote.weight(.semibold))
+                        .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
                         .foregroundStyle(Palette.primaryLabel)
-                        .frame(width: playFace, height: playFace)
+                        .frame(width: CardSizes.face, height: CardSizes.face)
                         .background(Palette.primaryFill, in: Circle())
                         .frame(minWidth: 44, minHeight: 44)
                         .contentShape(Rectangle())
                 }
                 .buttonStyle(.borderless)
                 .accessibilityLabel(RequestWords.playLabel(row))
+                .accessibilityShowsLargeContentViewer {
+                    Label(RequestWords.playLabel(row), systemImage: "play.fill")
+                }
             }
         }
         .padding(.vertical, 2)
@@ -286,11 +322,11 @@ struct DoneRowView: View {
 
     private var face: some View {
         HStack(alignment: .top, spacing: 12) {
-            RequestCover(release: row.cover, size: cover)
+            RequestCover(release: row.cover, size: CardSizes.cover)
             VStack(alignment: .leading, spacing: 2) {
                 Text(row.title)
                     .font(.body.weight(.semibold))
-                    .lineLimit(1)
+                    .lineLimit(typeSize.isAccessibilitySize ? CardSizes.titleLines : 1)
                 Text(row.line)
                     .font(.footnote)
                     .foregroundStyle(toneColour(row.lineTone))

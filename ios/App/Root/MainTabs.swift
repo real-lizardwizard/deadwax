@@ -74,6 +74,10 @@ struct MainTabs: View {
             if !queued { navigation.nowPlayingShown = false }
         }
         .onChange(of: watching, initial: true) { _, now in requests.watch(now) }
+        // the tabs gone (the sign-in or the launch screen instead, or iOS taking them from under Now Playing's
+        // full-screen cover) watch nothing; back, they watch what shows - even when that's what they watched before
+        // they went, which onChange alone never says (slice 1's review, finding 1)
+        .onAppear { requests.watch(watching) }
         .onDisappear { requests.watch(.hidden) }
     }
 

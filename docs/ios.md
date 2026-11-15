@@ -2952,7 +2952,7 @@ artist you don't have's page (still app 0.10). Compare with the web app's Search
   albums.", then what MusicBrainz and what's saved brought ("Found earlier: 1 album. More found: 3 albums."), each
   once. More's button reads its words ("More albums", "Loading…", "Try again").
 
-### Requests' checks, slice 1 (166-177)
+### Requests' checks, slice 1 (166-179)
 
 **Not done yet.** These come with the build that adds Requests - still **app 0.11 (11)**, the first part of Phase 6.
 Compare with the web app's Requests on the Mac: the phone should show the same rows, in the same order, in the
@@ -3001,6 +3001,14 @@ same words. Check 175 wants logins on; the rest work either way. Getting an albu
   way: does it keep up, and what does it cost the battery (Settings > Battery)? With VoiceOver on, watch a
   download move from Waiting to Downloading: "…: downloading" is heard, and VoiceOver stays where it was. Open and
   close a card's question at the largest text size: does the row jump?
+- **178 Now Playing over the tabs.** With a download on its way and the Library shown, play something and open Now
+  Playing; wait a few seconds and close it. Without opening Requests, the badge still counts as the download moves,
+  and goes once it's filed. The same with Now Playing opened from Search, and opened twice in a row.
+- **179 The largest text** (Settings > Accessibility > Display & Text Size > Larger Text, all the way up). On
+  Requests the covers stay small and each title reads, on up to three lines; the ✕ and ▶ stay small circles. A
+  card's question puts **Keep it** over **Cancel download**, and Needs attention puts **Another source · 2 left**
+  over **Same source again**, each read whole. Nothing overlaps, and the last card clears the mini player and the
+  tab bar. Tap a Done row below the first five: its album opens; go Back and tap its ▶: it plays at once.
 
 ### The squared look's checks (200-209)
 

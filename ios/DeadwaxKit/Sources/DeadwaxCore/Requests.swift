@@ -245,6 +245,9 @@ public struct RequestRow: Sendable, Equatable, Identifiable {
 
     /// Stable across polls: "job-<id>", or a request's own key.
     public var key: String
+
+    /// A job's row's key: "job-<id>" (requestsView.ts jobRow's).
+    public static func key(job id: Int) -> String { "job-\(id)" }
     /// The job, for cancel and retry; nil for a request not yet a job.
     public var jobId: Int?
     public var section: RequestSection
@@ -646,8 +649,8 @@ public enum RequestWords {
 
     static func jobRow(_ job: DownloadJob, _ input: RequestsInput, now: Int64) -> RequestRow {
         let section = self.section(job)
-        var row = RequestRow(key: "job-\(job.id)", jobId: job.id, section: section, title: titleOf(job.album, job.edition),
-                             artist: job.artist ?? "", album: job.album ?? "")
+        var row = RequestRow(key: RequestRow.key(job: job.id), jobId: job.id, section: section,
+                             title: titleOf(job.album, job.edition), artist: job.artist ?? "", album: job.album ?? "")
         row.cover = said(job.releaseMbid)
         row.askedBy = PerPerson.askedByText(mine: job.mine, shared: job.shared, requestedBy: job.requestedBy)
         row.cancelWords = PerPerson.cancelWords(mine: job.mine, shared: job.shared, requestedBy: job.requestedBy)
