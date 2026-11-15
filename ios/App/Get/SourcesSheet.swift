@@ -31,17 +31,20 @@ struct GetRequest: Identifiable {
 ///   be (the server searched nothing), a part held, a part downloading and other pressings are notes above them;
 ///   nothing found (or nothing lossless, with Lossless only named), with the query to edit and Search; folders found
 ///   and none passing the chips, with Clear filters; and the cards, with what was searched under them.
-/// - SEARCH AGAIN, under folders found - and above the cards, at the right of how many there are (James, 2026-11-15:
-///   "search again should be somewhere near the top as well"), so a long list needn't be scrolled to the end to try
-///   other words: the query to edit opens under the one tapped (a second tap closes it, the other's tap moves it
-///   there), focused; only an EDITED query is searched as typed. A search starting closes it again.
+/// - SEARCH AGAIN, under folders found - and in the bar, at the right of "Choose a source" (James, 2026-11-15: "search
+///   again should be somewhere near the top as well", then "maybe on the right of 'choose a source'"), so a long list
+///   needn't be scrolled to the end to try other words. The bar's opens the query to edit above the chips, where no
+///   scroll can take it away; the list's, under it. A second tap closes it, the other's moves it; focused either way;
+///   only an EDITED query is searched as typed. A search starting closes it again. The bar's is there only while
+///   folders found are shown, in words up to the default text size and as a magnifying glass above it, where the words
+///   would cut the title short.
 /// - For VoiceOver, each outcome said in a line as it lands (Sources.announcement), so someone waiting hears the search
 ///   end.
 /// - OUT OF REACH (slice 2's review, finding 1): while deadwax can't be reached, "Getting albums works once deadwax is
 ///   back." over whatever the sheet shows, the cards found before dimmed and every Get, Try again and Search off - a Get
 ///   would close onto a Requests that can't show it. Back, they are live again; a search that failed for want of deadwax
-///   searches again by itself, and Search again is still above and under the cards. A Get that couldn't be asked at all keeps
-///   the sheet up, with why (`getFailure`).
+///   searches again by itself, and Search again is still in the bar and under the cards. A Get that couldn't be asked
+///   at all keeps the sheet up, with why (`getFailure`).
 ///
 /// - (Slice 3) PICK THE BEST SOURCE FOR ME (You > Getting albums' When I tap Get): on a fresh Get - or Try again - the
 ///   best match through the chips as they are when the answer lands, at 75 or more, is downloaded as a card's Get is,
@@ -84,8 +87,10 @@ struct SourcesSheet: View {
     /// A chip was tapped since this Get began: the floor landing late doesn't re-make them then.
     @State private var touched = false
     @State private var sort = CandidateSort.score
-    /// Search again, opened above the cards or under folders found - one at a time, nil closed.
+    /// Search again, opened from the bar (above the chips) or under folders found - one at a time, nil closed.
     @State private var again: AgainPlace?
+    /// The bar's Search again in words up to the default text size, a magnifying glass above it.
+    @Environment(\.dynamicTypeSize) private var typeSize
     @FocusState private var againFocused: Bool
     /// A card's Get that couldn't be asked at all (no deadwax to ask): the sheet stays, saying so.
     @State private var getFailure: (any Error)?
@@ -106,6 +111,13 @@ struct SourcesSheet: View {
                         .fixedSize(horizontal: false, vertical: true)
                         .frame(maxWidth: .infinity)
                         .padding(.horizontal, 16)
+                }
+                if again == .top && foundFolders {
+                    // the bar's Search again: the words to change above the chips, where no scroll takes them away
+                    queryForm(focus: true) {
+                        EmptyView()
+                    }
+                    .padding(.horizontal, 16)
                 }
                 chips
                 ScrollView {
@@ -128,6 +140,12 @@ struct SourcesSheet: View {
                         // the search let go in the tap, then the sheet closes
                         model.close()
                         dismiss()
+                    }
+                }
+                if foundFolders {
+                    // (James) at the right of the title, so a long list needn't be scrolled to its end to search again
+                    ToolbarItem(placement: .topBarTrailing) {
+                        againInBar
                     }
                 }
             }
@@ -343,10 +361,8 @@ struct SourcesSheet: View {
                 }
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 40)
-                searchAgain(.bottom)
+                searchAgain
             } else {
-                // above the cards as well as under them: a long list needn't be scrolled to its end to try other words
-                searchAgain(.top, shown: shown.count)
                 ForEach(shown) { (candidate: Candidate) in
                     SourceCardView(candidate: candidate, best: Sources.key(candidate) == best, gets: online) {
                         get(candidate, release: release, shown: shown)
@@ -359,7 +375,7 @@ struct SourcesSheet: View {
                     .fixedSize(horizontal: false, vertical: true)
                     .frame(maxWidth: .infinity)
                     .padding(.top, 4)
-                searchAgain(.bottom)
+                searchAgain
             }
         }
     }
@@ -431,55 +447,48 @@ struct SourcesSheet: View {
             .fixedSize(horizontal: false, vertical: true)
     }
 
-    /// Where Search again sits: above the cards, and under folders found.
+    /// Where Search again's words to change open: from the bar, above the chips (`top`); under folders found (`bottom`).
     private enum AgainPlace { case top, bottom }
 
-    /// "Search again", above the cards and under folders found: a disclosure - the query to edit opens under the one
-    /// tapped, focused; a second tap closes it, and the other's tap moves it there. Above the cards it sits at the right
-    /// of how many are shown (the count and the button one above the other when the text is too large for both on a
-    /// line), a 44-point target either way.
-    @ViewBuilder private func searchAgain(_ place: AgainPlace, shown: Int = 0) -> some View {
-        if place == .top {
-            againAbove(shown: shown)
-        } else {
-            Button(SourcesWords.searchAgain) { toggleAgain(.bottom) }
-                .font(Typeface.body)
-                .frame(maxWidth: .infinity, minHeight: 44)
-                .accessibilityValue(again == .bottom ? SourcesWords.expanded : SourcesWords.collapsed)
+    /// Folders were found and are shown - the cards, or none passing the chips - so Search again is offered: in the bar,
+    /// and under them. Not while searching, for an error, for the store's box, or when nothing was found (whose words to
+    /// change are already shown).
+    private var foundFolders: Bool {
+        guard let search = model.search, !search.pending, search.error == nil, let answer = search.answer else {
+            return false
         }
-        if again == place {
-            queryForm(focus: true) {
-                EmptyView()
-            }
-        }
+        return storeBox(answer) == nil && !answer.candidates.isEmpty
     }
 
-    /// Search again opened under `place`, or closed if it was open there already.
+    /// Search again opened at `place`, or closed if it was open there already.
     private func toggleAgain(_ place: AgainPlace) {
         again = again == place ? nil : place
     }
 
-    /// Search again above the cards: "12 sources" at the left, Search again at the right.
-    private func againAbove(shown: Int) -> some View {
-        let button = Button { toggleAgain(.top) } label: {
-            Text(SourcesWords.searchAgain)
-                .font(Typeface.subheadline)
-                .frame(minHeight: 44)
-                .contentShape(Rectangle())
-        }
-        .accessibilityValue(again == .top ? SourcesWords.expanded : SourcesWords.collapsed)
-        let count = Text(Sources.sourcesCount(shown))
-            .font(Typeface.footnote)
-            .foregroundStyle(Palette.text2)
-        return ViewThatFits(in: .horizontal) {
-            HStack(alignment: .center, spacing: 12) {
-                count
-                Spacer(minLength: 0)
-                button.fixedSize()
+    /// "Search again" at the right of the title: in words up to the default text size - beside Cancel and "Choose a
+    /// source" that fits a phone's bar - and above it a magnifying glass, where the words would cut the title short.
+    private var againInBar: some View {
+        Button { toggleAgain(.top) } label: {
+            if typeSize > .large {
+                Image(systemName: "magnifyingglass")
+            } else {
+                Text(SourcesWords.searchAgain)
             }
-            VStack(alignment: .leading, spacing: 0) {
-                count.fixedSize(horizontal: false, vertical: true)
-                button
+        }
+        .accessibilityLabel(SourcesWords.searchAgain)
+        .accessibilityValue(again == .top ? SourcesWords.expanded : SourcesWords.collapsed)
+    }
+
+    /// "Search again" under folders found: a disclosure - the query to edit opens under it, focused; a second tap closes
+    /// it, and the bar's moves it up there.
+    @ViewBuilder private var searchAgain: some View {
+        Button(SourcesWords.searchAgain) { toggleAgain(.bottom) }
+            .font(Typeface.body)
+            .frame(maxWidth: .infinity, minHeight: 44)
+            .accessibilityValue(again == .bottom ? SourcesWords.expanded : SourcesWords.collapsed)
+        if again == .bottom {
+            queryForm(focus: true) {
+                EmptyView()
             }
         }
     }

@@ -9918,29 +9918,37 @@ app 0.13 (13), the .xcodeproj unchanged and `check_project.py` ok; the exporter'
 **Not verified** - only the phone can tell: that openURL's completion says `false` with Safari turned off in Screen
 Time, so the notice shows (check 245); the notice read by VoiceOver after the tap.
 
-## Search again above the cards (2026-11-15)
+## Search again at the top of Choose a source (2026-11-15)
 
 James: "When finding a peer, search again should be somewhere near the top as well." Choose a source had Search again
 only under the cards (and under "none match your filters"), so with forty sources the way to try other words was a
-scroll to the end. The web's sheet (ui/src/app/Sources.tsx) has it in the same one place; this change is the phone's
-alone, and the web is left as it is until James says otherwise.
+scroll to the end. It went first into a row above the first card (how many shown, and Search again at its right -
+7fa2d2b); James then: "Maybe on the right of 'choose a source'", so it is in the bar instead, and that row is gone. The
+web's sheet (ui/src/app/Sources.tsx) has it in the one place under the cards still; this is the phone's alone until
+James says otherwise.
 
-- **Where**: above the first card, a row with how many cards are shown at the left (`Sources.sourcesCount(shown)` -
-  Core's words, the web's `sourcesCount`) and **Search again** at the right, in subheadline, its label framed to 44
-  points with a content shape so the whole height takes the tap. The one under the cards stays as it was; "none match"
-  keeps only its own, its page being short already. When the text is too large for the two on one line,
-  `ViewThatFits` stacks them (the count, then the button).
-- **One form at a time**: `again` is now `AgainPlace?` (`.top`, `.bottom`) rather than a Bool, and the query form opens
-  under whichever was tapped; a second tap closes it, the other's moves it there (its field focused again by the form's
-  own `.task`, as before). A search starting - begin() or requery() - closes it, as it did.
-- Nothing else changed: the field, Search, an edited query searched as typed, and offline (the form's Search off) are
+- **Where**: a `.topBarTrailing` item, beside Cancel's `.cancellationAction` - not `.confirmationAction`, which iOS 26
+  draws as the tinted, prominent action, and this is no sheet's Done. Only while folders found are shown
+  (`foundFolders`: not searching, no error, no store box, something found - nothing found already shows its words to
+  change).
+- **Words, then a glass**: measured in the app's Noto Sans at 17 points (fontTools' advances), "Choose a source" in
+  semibold is 135 points, "Search again" 103 and "Cancel" 53. On James's iPhone 17 Pro (402 points), with iOS 26's
+  glass capsules round both buttons, that leaves the title about 140 - it fits at the default text size, just; one size
+  up it would be cut short. So above `.large` the item is a magnifying glass, named "Search again" for VoiceOver either
+  way. The capsules' padding is a guess from the look, not a measurement: check 247 asks the phone whether the title
+  reads whole.
+- **Its field opens above the chips**, outside the list, so it is there however far the list was scrolled - no
+  ScrollViewReader needed - and it scrolls nothing away. The one under the cards opens under itself, as before.
+- **One form at a time**: `again` is `AgainPlace?` (`.top`, `.bottom`) rather than a Bool; a second tap closes it,
+  the other's moves it (its field focused again by the form's own `.task`). A search starting - begin() or requery() -
+  closes it, as it did. The field, Search, an edited query searched as typed, and offline (the form's Search off) are
   queryForm's, shared by both.
 
-**Tests**: `test_search_again_sits_above_the_cards_as_well_as_under_them` (tests/test_ios_contract.py) holds the top one
-before the cards and the bottom ones after "none match" and after the searched line, the optional place and its
-toggle, both closed by begin() and requery(), the 44-point target, each one's expanded/collapsed, the count from Core,
-and the stacking.
+**Tests**: `test_search_again_sits_in_the_bar_as_well_as_under_the_cards` (tests/test_ios_contract.py) holds the bar's
+item after Cancel and only with folders found, what `foundFolders` requires, the bar's form above the chips and outside
+the ScrollView, the list's two, one form at a time and both closed by a search starting, and the words-or-glass rule
+with its VoiceOver name and state.
 
 **Verified**: the unsigned Debug device build; the test above and the full pytest suite. **Not verified** - only the
-phone can tell: the row's look beside the first card, the field focusing under the top one, and the stacking at the
-largest text sizes (docs/ios.md check 247).
+phone can tell: that the title reads whole beside the words, the glass one size up, and the field opening above the
+chips with the keyboard (docs/ios.md check 247).

@@ -1904,31 +1904,40 @@ def test_the_sources_sheet_runs_the_very_search_again_offline_and_lets_it_go_as_
         assert "!closed" in body, function
 
 
-def test_search_again_sits_above_the_cards_as_well_as_under_them():
-    # (James, 2026-11-15: "search again should be somewhere near the top as well") - above the cards, at the right of
-    # how many are shown, so a long list needn't be scrolled to its end to try other words; still under folders found
+def test_search_again_sits_in_the_bar_as_well_as_under_the_cards():
+    # (James, 2026-11-15: "search again should be somewhere near the top as well", then "maybe on the right of 'choose
+    # a source'") - at the right of the title while folders found are shown, so a long list needn't be scrolled to its
+    # end to try other words; still under folders found
     app = CORE.parent.parent.parent / "App"
     sheet = _code((app / "Get" / "SourcesSheet.swift").read_text(encoding="utf-8"))
+    toolbar = _block(sheet, sheet.index("{", sheet.index(".toolbar {")))
+    assert "if foundFolders {" in toolbar and "ToolbarItem(placement: .topBarTrailing) {" in toolbar
+    assert toolbar.index("placement: .cancellationAction") < toolbar.index("againInBar")
+    # offered only while folders found are shown: not searching, no error, no store box, something found
+    found_folders = _block(sheet, sheet.index("{", sheet.index("private var foundFolders: Bool")))
+    for part in ("!search.pending", "search.error == nil", "storeBox(answer) == nil", "!answer.candidates.isEmpty"):
+        assert part in found_folders, part
+    # the bar's opens the words to change above the chips, outside the list, so no scroll takes them away
+    body = _block(sheet, sheet.index("{", sheet.index("var body: some View {")))
+    top = body.index("if again == .top && foundFolders {")
+    assert top < body.index("queryForm(focus: true)") < body.index("chips") < body.index("ScrollView {")
+    # the list's under the cards and under "none match", as before
     found = _block(sheet, sheet.index("{", sheet.index("private func found(")))
-    assert found.count("searchAgain(.top, shown: shown.count)") == 1 and found.count("searchAgain(.bottom)") == 2
-    cards = found.index("ForEach(shown)")
-    assert found.index("searchAgain(.top") < cards < found.index("Sources.searchedLine(answer") < found.rindex(
-        "searchAgain(.bottom)")
-    # none passing the chips is a short page: Search again only under "none match", as before
-    none = found.index("Sources.noneMatchLine(")
-    assert none < found.index("searchAgain(.bottom)") < cards
-    # one form at a time, under the one tapped - a second tap closes it, the other's moves it - closed as a search starts
+    assert found.count("searchAgain") == 2
+    assert found.index("Sources.noneMatchLine(") < found.index("searchAgain") < found.index("ForEach(shown)")
+    assert found.index("Sources.searchedLine(answer") < found.rindex("searchAgain")
+    # one form at a time - a second tap closes it, the other's moves it - closed as a search starts
     assert "@State private var again: AgainPlace?" in sheet
     assert "again = again == place ? nil : place" in sheet
     for function in ("private func begin(", "private func requery("):
         assert "again = nil" in _block(sheet, sheet.index("{", sheet.index(function))), function
-    again = _block(sheet, sheet.index("{", sheet.index("private func searchAgain(")))
-    assert "if again == place {" in again and "queryForm(focus: true)" in again
-    # each a 44-point target, saying whether it is open; the count beside it is the cards shown, in Core's words
-    above = _block(sheet, sheet.index("{", sheet.index("private func againAbove(")))
-    assert ".frame(minHeight: 44)" in above and ".contentShape(Rectangle())" in above
-    assert "again == .top ? SourcesWords.expanded : SourcesWords.collapsed" in above
-    assert "again == .bottom ? SourcesWords.expanded : SourcesWords.collapsed" in again
-    assert "Text(Sources.sourcesCount(shown))" in above
-    # and at the largest text sizes the two stack rather than squeeze
-    assert "ViewThatFits(in: .horizontal)" in above and "VStack(alignment: .leading" in above
+    below = _block(sheet, sheet.index("{", sheet.index("@ViewBuilder private var searchAgain: some View {")))
+    assert "toggleAgain(.bottom)" in below and "if again == .bottom {" in below
+    assert "again == .bottom ? SourcesWords.expanded : SourcesWords.collapsed" in below
+    # the bar's: in words up to the default text size, a magnifying glass above it (the words would cut the title
+    # short), named Search again either way and saying whether it is open
+    bar = _block(sheet, sheet.index("{", sheet.index("private var againInBar: some View {")))
+    assert "toggleAgain(.top)" in bar
+    assert "if typeSize > .large {" in bar and 'Image(systemName: "magnifyingglass")' in bar
+    assert "Text(SourcesWords.searchAgain)" in bar and ".accessibilityLabel(SourcesWords.searchAgain)" in bar
+    assert "again == .top ? SourcesWords.expanded : SourcesWords.collapsed" in bar

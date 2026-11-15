@@ -881,9 +881,10 @@ sheet (see [Downloading](downloading.md#choosing-a-source)):
   first** or **Smallest first**. The chips start as your **quality floor**, the sort at Best match, and the search is
   scored by your **Format**, both chosen in [You](#you) > Getting albums (or the web app's) and kept for you on
   deadwax.
-- **Search again** - above the cards, at the right of how many there are, and under them - opens the words searched
-  in a field just under it: change them and tap **Search**. Changed words are searched exactly as typed; unchanged,
-  it searches as Get did.
+- **Search again** - at the right of "Choose a source" at the top, and under the cards - opens the words searched in
+  a field: the top one's above the chips, the other's just under it. Change them and tap **Search**. Changed words
+  are searched exactly as typed; unchanged, it searches as Get did. At larger text sizes the top one is a magnifying
+  glass, so the title isn't cut short.
 
 Under the cards, what was searched: 'Searched for “Portishead Dummy” · 41 sources, 4 match your filters'. Otherwise:
 
@@ -930,7 +931,7 @@ this may have started anyway. If it doesn't appear here soon, get it again." **C
 (with Get albums). In a sheet already open, the same words stand at its top (VoiceOver says them as it happens).
 What it found stays, dimmed, and its **Get**, **Join this download**, **Add to my library**, **Try again** and
 **Search** are off until deadwax is back - a Get then would close onto a Requests that can't show it. Once deadwax is
-back they're on again, and Search again is above and under the cards if you want a fresh search. A search still under way when
+back they're on again, and Search again is at the top and under the cards if you want a fresh search. A search still under way when
 deadwax went out of reach carries on waiting for its answer. If the phone gives up on it first, the sheet says why,
 then runs the same search again by itself once deadwax is back: after a Search with your own words, those words
 again with the chips as you left them, and never picking a source for you.
@@ -3548,17 +3549,18 @@ with Wi-Fi off. 237-243 want logins on, and 241 two accounts (one an admin); 244
   album wrap, nothing cut off, the arrows growing with them. With VoiceOver, each row reads as one button - "Needs
   a look, button, Opens in Safari." - and Edit an album reads its line too; dimmed rows read as dimmed.
 
-### Search again above the cards' check (247)
+### Search again at the top's check (247)
 
 **Not done yet.** This comes with the build that puts Search again at the top of Choose a source as well (still app
 0.13 (13)).
 
-- **247 Search again, at the top.** Get an album that many peers share, so the cards run past the screen. Above the
-  first card: how many sources are shown ("41 sources") at the left, **Search again** at the right. Tap it: the field
-  opens right there with the words searched, the keyboard up; change them and tap **Search** - "Looking for …", then
-  the cards, with Search again above them again. Tap the top one, then scroll to the end and tap the one under the
-  cards: the field moves down there; tap that one again and it closes. Press chips until fewer match: the number at
-  the top follows the cards. At the largest text sizes, the number and Search again stack, nothing cut off. With
+- **247 Search again, at the top.** Get an album that many peers share, so the cards run past the screen. At the
+  top, **Cancel** at the left, "Choose a source" whole in the middle (not cut short) and **Search again** at the
+  right - there only once sources are shown, not while it's looking. Scroll down a little and tap it: the field opens
+  above the chips with the words searched, the keyboard up, the list still where you left it; change them and tap
+  **Search** - "Looking for …", then the cards. Tap the top one, then scroll to the end and tap the one under the
+  cards: the field moves down there; tap that one again and it closes. At a larger text size (Settings > Display &
+  Brightness > Text Size, one step up), the top one is a magnifying glass and the title still reads whole. With
   VoiceOver, both read "Search again, button, collapsed" (expanded once open).
 
 ## What it can't do yet
