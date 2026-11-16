@@ -202,6 +202,14 @@ public enum Routes {
     // the library's) - the list itself is the scan's (`libraryAlbums`), the marks slice 1's
     public static let queueSummary = Endpoint(method: "GET", path: "/deadwax/library/queue/summary", query: [])
     public static let queueReviewed = Endpoint(method: "POST", path: "/deadwax/library/queue/reviewed", query: [])
+    // Library care (Phase 8, slice 7 - notes/ios.md "Library care on the phone"): Rescan, answered as the scan without
+    // its tracks (server change A's `tracks=false`), and In nobody's library with its flags' Add for them and Dismiss
+    // (all Look after the library's) - the runs are slice 1's and 3's Get cover, Get CD art and Get lyrics, one album at
+    // a time
+    public static let rescan = Endpoint(method: "POST", path: "/deadwax/library/rescan", query: ["tracks"])
+    public static let held = Endpoint(method: "GET", path: "/deadwax/library/held", query: [])
+    public static let heldAdd = Endpoint(method: "POST", path: "/deadwax/library/held/flags/{flag_id}/add", query: [])
+    public static let heldDismiss = Endpoint(method: "POST", path: "/deadwax/library/held/flags/{flag_id}/dismiss", query: [])
 
     /// The levels spec's name for `levelAlbum`: the album's levels warmed before its first play.
     public static var warmLevels: Endpoint { levelAlbum }
@@ -240,6 +248,7 @@ public enum Routes {
         libraryArtist, artistArt, artistImagesPreview, artistImagesApply, artistPicture, artistSearch,
         refilePreview, refileApply,
         queueSummary, queueReviewed,
+        rescan, held, heldAdd, heldDismiss,
     ]
 
     /// The routes given longer than the transport's own 8 seconds to answer, in seconds: the album index reads every
@@ -310,8 +319,12 @@ public enum Routes {
     /// of the name's albums (ArtistWaits) - tests/test_ios_artist_manage.py holds each. Needs a look's (slice 6): the
     /// count reads the saved scan, never the disk - loaded from SQLite once after a restart - and waits for Navidrome's
     /// first listing at most LISTING_WAIT_SECONDS (3 s), so it is given ten times that; noting an album looked at is a
-    /// row of SQLite, as the marks are, so 20 - tests/test_ios_needs_look.py holds both.
-    public static let timeouts: [Endpoint: Double] = [albumIndex: 30, autoEqSearch: 20, autoEqProfile: 20, libraryOwned: 30, fullySearch: 20, releaseGroup: 60, searchArtists: 20, searchSongs: 20, artistFacts: 120, discography: 60, jobs: 20, cancelJob: 30, retryJob: 60, retryJobSame: 30, clearJobs: 30, storeState: 20, findCandidates: 300, enqueue: 300, joinJob: 60, libraryAdd: 60, libraryTracks: 30, libraryAlbums: 120, releases: 60, release: 60, retagPreview: 60, retagApply: 480, artFetch: 120, libraryArt: 30, queueIgnore: 20, queueUnignore: 20, tagsPreview: 60, tagsApply: 120, trackPicture: 30, lyricsFetch: 600, discArtFetch: 360, libraryDiscArt: 30, deletionSummary: 60, deleteAlbum: 120, libraryArtist: 120, artistArt: 30, artistImagesPreview: 660, artistImagesApply: 600, artistSearch: 120, refilePreview: 480, refileApply: 600, queueSummary: 30, queueReviewed: 20]
+    /// row of SQLite, as the marks are, so 20 - tests/test_ios_needs_look.py holds both. Library care's (slice 7): a
+    /// rescan drops the cache and reads every file of the library with no bound of its own, so it is given 300 s and one
+    /// that never answers may have finished (said, and the library read again); In nobody's library reads SQLite alone
+    /// (the ledger and the open flags, through to_thread), given the count's 30, and Add for them and Dismiss write rows
+    /// of it - the store's grants, the flag closed - as a mark does, so 20 - tests/test_ios_library_care.py holds them.
+    public static let timeouts: [Endpoint: Double] = [albumIndex: 30, autoEqSearch: 20, autoEqProfile: 20, libraryOwned: 30, fullySearch: 20, releaseGroup: 60, searchArtists: 20, searchSongs: 20, artistFacts: 120, discography: 60, jobs: 20, cancelJob: 30, retryJob: 60, retryJobSame: 30, clearJobs: 30, storeState: 20, findCandidates: 300, enqueue: 300, joinJob: 60, libraryAdd: 60, libraryTracks: 30, libraryAlbums: 120, releases: 60, release: 60, retagPreview: 60, retagApply: 480, artFetch: 120, libraryArt: 30, queueIgnore: 20, queueUnignore: 20, tagsPreview: 60, tagsApply: 120, trackPicture: 30, lyricsFetch: 600, discArtFetch: 360, libraryDiscArt: 30, deletionSummary: 60, deleteAlbum: 120, libraryArtist: 120, artistArt: 30, artistImagesPreview: 660, artistImagesApply: 600, artistSearch: 120, refilePreview: 480, refileApply: 600, queueSummary: 30, queueReviewed: 20, rescan: 300, held: 30, heldAdd: 20, heldDismiss: 20]
 }
 
 /// The Cover Art Archive's thumbnail sizes the app asks deadwax's relay for (`Routes.archiveCover`'s `size`, which takes

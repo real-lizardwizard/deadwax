@@ -9,6 +9,7 @@ struct RootView: View {
     @Environment(PlayerModel.self) private var player
     @Environment(EQModel.self) private var eq
     @Environment(AppNavigation.self) private var navigation
+    @Environment(CareRunModel.self) private var care
     @Environment(\.scenePhase) private var scenePhase
 
     var body: some View {
@@ -24,6 +25,8 @@ struct RootView: View {
         .animation(.default, value: server.signInOver)
         .task { await server.start() }
         .onChange(of: scenePhase) { _, phase in
+            // (Phase 8, slice 7) a Library care run stops after the album out as the app goes, its screen let sleep
+            care.scene(phase)
             switch phase {
             case .active:
                 CoverCache.shared.forgetFailures()

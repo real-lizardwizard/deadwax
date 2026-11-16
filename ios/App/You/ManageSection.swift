@@ -12,7 +12,8 @@ import SwiftUI
 /// pushes Choose the folder (ChooseFolderScreen), whose folder opens Edit album over the tabs - and that page says for
 /// itself that it needs deadwax, so the row is never dimmed. Since slice 6 Needs a look is too: it pushes the review
 /// queue (NeedsLookScreen), its count at the row's right (QueueCountModel - asked by YouView and MainTabs, never here).
-/// The others still open the web app in Safari (WebAppRow) until their slices land.
+/// Since slice 7 Library care is too: it pushes LibraryCareScreen (Rescan, Get covers, CD art and lyrics, In nobody's
+/// library). The others still open the web app in Safari (WebAppRow) until their slices land.
 ///
 /// The footer says those open in Safari (the app's own said apart, ManagingWords.othersOpen) and - with logins on -
 /// that Safari signs in apart from the app, the first time, with the same name and password, and that each page opens
@@ -47,6 +48,11 @@ struct ManageSection: View {
                             // read once: "Needs a look, 3 albums" (needsLookLabel)
                             .accessibilityElement(children: .ignore)
                             .accessibilityLabel(queueCount.count.spoken)
+                        }
+                    } else if tool == .care {
+                        // (Phase 8, slice 7) the app's own: Rescan, the runs and In nobody's library
+                        NavigationLink(value: AppRoute.libraryCare) {
+                            Text(ManagingWords.label(tool))
                         }
                     } else if let url = Managing.url(tool, at: server.address) {
                         WebAppRow(label: ManagingWords.label(tool), url: url, live: online)

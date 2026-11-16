@@ -374,7 +374,7 @@ func sentJSON(_ request: HTTPRequest?) throws -> [String: SentValue] {
     }
 
     @Test func everyRouteIsDeadwaxsOwn() {
-        #expect(Routes.all.count == 88)
+        #expect(Routes.all.count == 92)
         #expect(Set(Routes.all).count == Routes.all.count)
         for endpoint in Routes.all {
             #expect(endpoint.path.hasPrefix("/deadwax/"))
@@ -425,6 +425,8 @@ func sentJSON(_ request: HTTPRequest?) throws -> [String: SentValue] {
         // 8 s, over its 7 s deadline
         // (slice 6: Needs a look) the count, 30 s, the saved scan read and Navidrome's first listing waited for (3 s at
         // most); an album looked at, 20 s, one row written, as the marks
+        // (slice 7: Library care) a rescan, 300 s, every file read with no bound of the server's; In nobody's library,
+        // 30 s, SQLite alone; Add for them and Dismiss, 20 s, a few rows of it
         let longer: [Endpoint: Double] = [Routes.albumIndex: 30, Routes.autoEqSearch: 20, Routes.autoEqProfile: 20,
                                           Routes.libraryOwned: 30, Routes.fullySearch: 20, Routes.releaseGroup: 60,
                                           Routes.searchArtists: 20, Routes.searchSongs: 20, Routes.artistFacts: 120,
@@ -441,7 +443,8 @@ func sentJSON(_ request: HTTPRequest?) throws -> [String: SentValue] {
                                           Routes.libraryArtist: 120, Routes.artistArt: 30,
                                           Routes.artistImagesPreview: 660, Routes.artistImagesApply: 600,
                                           Routes.artistSearch: 120, Routes.refilePreview: 480, Routes.refileApply: 600,
-                                          Routes.queueSummary: 30, Routes.queueReviewed: 20]
+                                          Routes.queueSummary: 30, Routes.queueReviewed: 20, Routes.rescan: 300,
+                                          Routes.held: 30, Routes.heldAdd: 20, Routes.heldDismiss: 20]
         #expect(Routes.timeouts == longer)
         for endpoint in Routes.all {
             // each path parameter filled in: a brace left in a path is no URL

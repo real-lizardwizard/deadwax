@@ -44,6 +44,8 @@ public struct ScanAlbum: Decodable, Sendable, Equatable, Hashable, Identifiable 
     /// (slice 6) One folder of several holding a release's discs, by its discs ("Disc 2") - "" for any other folder
     /// (src/library.py `disc_label`): Needs a look's row says it before the edition.
     public let discLabel: String
+    /// (slice 7) Every file's size together, in bytes (`total_size`) - Library care's totals add them up.
+    public let totalSize: Double
 
     public var id: String { path }
 
@@ -60,13 +62,15 @@ public struct ScanAlbum: Decodable, Sendable, Equatable, Hashable, Identifiable 
         case needsAttention = "needs_attention"
         case severity
         case discLabel = "disc_label"
+        case totalSize = "total_size"
     }
 
     public init(path: String, artist: String = "", album: String = "", year: String = "", originalYear: String = "",
                 edition: String = "", releaseMbid: String = "", art: String = "", artMtime: Double = 0,
                 trackCount: Int = 0, discCount: Int = 0, formats: [String] = [], lyricsCount: Int = 0,
                 discArt: [String] = [], issues: [String] = [], ignoredIssues: [String] = [], needsAttention: Bool = false,
-                imported: Bool = false, reviewed: Bool = false, severity: Int = 0, discLabel: String = "") {
+                imported: Bool = false, reviewed: Bool = false, severity: Int = 0, discLabel: String = "",
+                totalSize: Double = 0) {
         self.path = path
         self.artist = artist
         self.album = album
@@ -88,6 +92,7 @@ public struct ScanAlbum: Decodable, Sendable, Equatable, Hashable, Identifiable 
         self.reviewed = reviewed
         self.severity = severity
         self.discLabel = discLabel
+        self.totalSize = totalSize
     }
 
     public init(from decoder: any Decoder) throws {
@@ -113,6 +118,7 @@ public struct ScanAlbum: Decodable, Sendable, Equatable, Hashable, Identifiable 
         reviewed = fields.looseField(Bool.self, .reviewed) ?? false
         severity = fields.looseField(Int.self, .severity) ?? 0
         discLabel = fields.looseField(String.self, .discLabel) ?? ""
+        totalSize = fields.looseField(Double.self, .totalSize) ?? 0
     }
 }
 
@@ -157,6 +163,9 @@ public struct ScanAnswer: Decodable, Sendable, Equatable {
     public var stale = false
     /// When the disk was last read, Unix seconds (X-Scanned-At) - nil when nobody knows.
     public var scannedAt: Double?
+    /// (slice 7) How long that read took, in seconds (X-Scan-Seconds) - 0 when the header doesn't say: Library care's
+    /// "Scanned 2 min ago in 4s".
+    public var scanSeconds: Double = 0
 
     enum CodingKeys: String, CodingKey {
         case albums, problem
@@ -192,11 +201,12 @@ public struct ScanAnswer: Decodable, Sendable, Equatable {
         albums.first { WebText.same($0.path, path) }
     }
 
-    /// `_SCAN_HEADERS`' two the editor reads: stale ("1") and when the disk was read.
+    /// `_SCAN_HEADERS`' three the phone reads: stale ("1"), when the disk was read and how long it took.
     public func with(headers response: HTTPResponse) -> ScanAnswer {
         var answer = self
         answer.stale = response.header("X-Scan-Stale") == "1"
         answer.scannedAt = response.header("X-Scanned-At").flatMap(Double.init)
+        answer.scanSeconds = response.header("X-Scan-Seconds").flatMap(Double.init) ?? 0
         return answer
     }
 }

@@ -12532,3 +12532,155 @@ with Node 22 (ioscare's `--check` over the regenerated fixture). Not verified - 
 for a full-screen cover over it; that SwiftUI calls Settings' and Needs a look's onAppear/onDisappear as the count's
 `showing` assumes (a push, a pop, another tab, Now Playing's full-screen cover); the steps coming back on as each
 write's read lands; and checks 349-354 as reworded.
+
+## Library care on the phone (Phase 8, slice 7 - 2026-11-16)
+
+The spec's section 6 (notes/ios-specs/phase8-managing.md), with 12's change A (the rescan without its tracks, on main
+since 2.1.28): Settings > Manage > **Library care** is the app's own page now - Rescan, the runs that fetch covers, CD
+art and lyrics for every album without, and In nobody's library pushed from it. Built on the `ios` branch at 460f049
+(Needs a look after its review). The app stays 0.13 (13); src/__init__.py untouched; no server or web change; the player
+engine has no diff.
+
+### Core (DeadwaxCore)
+
+- **LibraryCare.swift** (new). `BulkTargets` is lib/bulkTargets.ts: the kinds, `hasOwnDiscArt`, `targets`, `Run`
+  (`startRun`), `Outcome`, `adding` (`addOutcome`), `outcome(LyricsSummary)` and `failedAs` (useLibraryCare.ts's lyrics
+  step and a step that threw), `step(kind, album, failure:)` - a cover's or CD art's 404 is `missing`, any other 4xx a
+  failure answered, a 5xx, no answer or a timeout `unanswered` (counted as failed, as the web counts it, but it may
+  have written), a cancellation nothing - and `summary` (`bulkSummary`). `LibraryCare` is lib/libraryCare.ts and the
+  page's own: the words, `careLine`, `narrow` (`narrowAlbums`, TypedMatch), `scopeWords`, `scopeLine`, `planWords`,
+  `real`, `busy`, `targets`, `note`, `scopeNote`, `scanTotals` (groupAlbums' key, JavaScript's lower case),
+  `formatAge`, `scanAge`, `facts`, `startLabel`, `stopLabel` - and the phone's own sentences (`stopped`,
+  `screenOnNote`, `waiting`). **CareRuns** is every decision the page makes: one run at a time; a ticket per read, so
+  `real` is "a read landed that began since deadwax was last out of reach", and a kind whose run wrote (or may have) is
+  `behind` until a read begun after the run ended lands; `readsNow` (shown, in reach, nothing out; the first read, after
+  a gap, for a kind behind, and shown again); `rescan` / `rescanEnded` (landed: the count told when the scan lists
+  albums, as the web announces it; unanswered: may have finished, read again, then told; refused or dropped: nothing);
+  `start` (its own targets asked again, so Start carries on with only the albums still without); `next` - the only way
+  an album is asked for, so every stop lands after the album out: Stop, the app going to the background (`suspended`),
+  deadwax out of reach (`reach`), Edit albums gone (`allowed`), the session ending (`sessionEnded`); `finished(step)`
+  counting it and saying whether the count is told (it wrote, or may have); `result` (the web's summary, then the
+  phone's stop sentence); `keepsScreenOn(visible:)`. `Managing.careParts` and `heldShown` (permissions.ts careParts;
+  LibraryCare.tsx's `sessionMe()?.auth === 'on' && parts.held`). `Held` is HeldByNobody.tsx and myLibrary.ts: the
+  words, `line`, `listed`, `flagWords`, `flagName`, `albumName`, `saidName`, `added`, `dismissed`, `listedAlbums`,
+  `showLabel`; `Answer`, `UnheldAlbum` (so named because `Album` is Models.swift's, and the contract tests find structs
+  by name), `Flag`, `Added`, `Dismissed`, all read loosely; and `Held.Flow` - one write at a time, never out of reach
+  nor before a read to trust. The client's `rescan()` (`POST /library/rescan?tracks=false`, answered as `libraryScan`
+  is, its ETag kept), `heldByNobody()`, `addFlagged(_:)`, `dismissFlag(_:)`.
+- **ScanAlbums.swift**: ScanAlbum's `total_size` (the facts' size); ScanAnswer's `scanSeconds` from X-Scan-Seconds.
+- **Managing.swift**: `Tool.native` is Edit an album, Needs a look and Library care, so the footer names three.
+- **Routes.swift**: `rescan` (POST, query `tracks`, 300 s), `held` (GET, 30 s), `heldAdd` and `heldDismiss` (POST,
+  20 s) - 92 routes.
+
+### The app (ios/App/Manage/)
+
+- **CareRunModel** (new), held by the app: DeadwaxApp makes it and puts it in the environment, resets it with the rest
+  when the person changes, and Reachability's `whenChanged` tells it of reach; RootView's scene phase tells it of the
+  background (RootView, not MainTabs: the tabs may be under the sign-in). Its own LibraryScanModel (the scan with its
+  ETag, as Edit album and Needs a look read it), CareRuns, and a generation per person. It carries out what CareRuns
+  decides and nothing else: reads when `readsNow` says (as the page shows, comes back to the front, deadwax comes
+  back, a run or a rescan ends); Rescan through LibraryScanModel's new `rescan` (ticketed with the reads, so only the
+  newest lands), "deadwax may have finished this - looking again" announced and the library read again when it never
+  answered, then `navigation.managed()`; and `drive`: `next` -> the album's Get through the very client call Edit
+  album's Get makes (`getCover(path:)`, `getDiscArt(_:)`, `getLyrics(_:)`, each with its own wait), held through the
+  background by a BackgroundHold -> `finished` -> `managed()` when told; at the end the result announced and the library
+  read for the kind left behind. The screen: `isIdleTimerDisabled = runs.keepsScreenOn(visible:)` at every change of
+  the page showing, the app's phase and a run starting or ending - the only place the app touches it.
+- **LibraryCareScreen** (new): the care line by the parts; NO_PERMISSION with neither part; Managing needs deadwax when
+  opened out of reach before a read; the ladder (the problem, Reading the library, a first read failed with Try again);
+  Rescan's section (the facts in a TimelineView every 30 s so the age moves on, a read again that failed with Try again,
+  the button, RESCAN_WORDS as its footer); Narrow to and the scope note; a section per kind (Stop with a spinner and the
+  screen-on note while it runs; else Start with its count - none to take, no button - dimmed while another runs, with
+  "One run at a time - …"; its note; its result). In nobody's library is a row pushing `AppRoute.heldByNobody`. Out of
+  reach over a read scan: Edit album's amber line, nothing pressable. Kinds keyed by kind; Reduce Motion drops the
+  list's animations.
+- **HeldByNobodyScreen** and its page-held **HeldModel** (new): the line, the first 20 albums (name, then folder, read
+  once), Show all / Show fewer, the flags with Add for them (the primary face) and Dismiss, refused or failed words in an
+  ErrorNote under them; read on showing, back in reach, back in front, on a pull, and after every write. A write goes
+  through `Held.Flow.begin` (one at a time) under a BackgroundHold, its words announced; a 4xx says deadwax's words
+  (EditWords.said over the web's failure words); any other end may have gone through - `writeFailure`, "deadwax may
+  have finished this - looking again", and the read shows. Nothing past a sign-out (AppNavigation's session).
+- **ManageSection** pushes `AppRoute.libraryCare` for `.care`; **Shared/Routes.swift** has the two routes and their
+  destinations.
+
+### What the web's .tsx files hold, read by pattern
+
+As in slices 2-6, the page's own rules stay in the web's .tsx and the exporter reads each out (hashed into made_from,
+so ioscare fails when one changes): from **app/LibraryCare.tsx** who the page is for (`parts.shown`), a scan to trust
+(`real`), Rescan busy (`scanBusy`), Rescan refused while busy, a rescan telling the library, Try again never twice, the
+facts, the scope note, the albums in scope, a kind's albums (`targets`), a kind's note, the Stop label, Stop else Start
+with albums to take, Start's words, Stop pressed once, a kind's result, In nobody's library shown when, the state
+ladder, a first read failed, a read again failed, Rescan and the runs by their parts, the line by the parts, neither
+part, read again on showing, and the page's words (the title, Reading the library, Try again, the headings, Rescan and
+Rescanning…, Narrow to and its prompt, Checking the library…); from **app/useLibraryCare.ts** a picture's step written
+and failed (404 missing), the lyrics step, a step that threw counted, one run of a kind and never of none, Stop once, a
+run that wrote left behind, stopped asked before each album, a run that wrote telling the library; from
+**app/HeldByNobody.tsx** HELD_SHOWN, a flag's and an album's name, an album's folder, a flag's words, the name said,
+what a write says, Show all and Show fewer and when, the albums listed, one write at a time, read again after each
+write, the flags when, what is said and what is shown, and its words; from **lib/appRoutes.ts** MANAGING_ADMINS_ONLY
+being NO_PERMISSION. Moving them into lib/libraryCare.ts is a small no-change refactor on main whenever wanted.
+
+### Decided here, and where the phone departs from the spec (or the web)
+
+- **One run at a time** (the web runs the three kinds at once): writes go one at a time on the phone, and three runs
+  in parallel would triple what a suspension cuts short. The others' Start is dimmed, saying why.
+- **The phone's own stops**, each said after the web's summary and naming the button that carries on ("Got 14 covers.
+  Stopped at 14 of 60. It stopped as the app went to the background - Get covers carries on."): the background,
+  deadwax out of reach, Edit albums gone (the runs' sections go with it, so that one is only announced), the session
+  ended. The spec's sentence ("Stopped at 14 of 60 when the app went
+  to the background - Start carries on.") is reworded so the web's own "Stopped at" stays as the web says it.
+- **The session ending stops a run** (the phone's own): every album after a 401 would be refused too; the same person
+  signing in again keeps the result, and Start carries on.
+- **An album that never answered** (no answer, a timeout, a 5xx) counts as failed, as the web's catch counts it, but
+  leaves its kind behind and tells the count: it may have written.
+- **Rescan tells the count only when the scan lists albums** (the web's `if (albums.length)`); one that never answered
+  is read again first, then tells.
+- **A read again that failed is said under the runs** for someone with Edit albums but not Look after the library: the
+  web shows it only in Rescan's section, so says it nowhere for them.
+- **In nobody's library is a page pushed from a row** (the spec's), where the web draws it inline under the runs; its
+  words are the web's - "Add for them", "Dismiss", "In nobody's library" - not the spec's "Add to their libraries", "Put
+  away" and "Held by nobody" (the web renamed them in 2.0.8). Its writes don't tell Needs a look's count (the web
+  announces nothing for them: they change who holds an album, not its tags or files).
+- **The facts' age moves on** every 30 s while the page shows (the web's is drawn when the page renders).
+- **No saved scan first**: as in slices 1 and 6, the phone never draws the saved scan, so `stale` is always false.
+
+### Tests
+
+- **LibraryCareVectorTests** (new): every section of library-care-vectors.json - the words, 12 libraries, 228
+  narrowings, the plans and targets, own disc art, totals, ages and their words, sizes, care lines, 72 summaries, 30
+  runs through runBulk, each step (a 404, another 4xx, a 5xx, no answer) and failedAs, 60 pages (real, busy, facts, scope, each kind's targets, note, Stop label,
+  result, held shown, state), all 64 permission sets, and In nobody's library's lines, flags, albums, said and Show.
+- **LibraryCareTests** (new): the four routes as FakeTransport sees them (method, path, `tracks=false`, no body, the
+  waits), the answers read loosely, a 403 in a Managing page's words; CareRuns run by run - one at a time, Stop, the
+  background, out of reach, Edit albums gone, the session ended, a cancellation, behind and the read tickets, Rescan's
+  three ends, `readsNow`; Held.Flow; Show all.
+- **ManagingTests**, **ClientTests**: three native rows and the footer naming them; 92 routes and the four waits.
+- **tests/test_ios_library_care.py** (new, 8): the routes by method, path and permission (test_logins' ROUTES: all four
+  Look after the library's; the runs' Get routes Edit albums'); careParts; the bodies (none); a real rescan over real
+  FLACs answering the scan's own form, its ETag a 304 for the next read; In nobody's library's real answers with logins
+  on, a flag added, a second add's 409 and a dismiss decoded; the waits (the rescan has no bound, so 300 s; the list two
+  SQLite reads; the writes rows of it); the app carrying out CareRuns (the drive, the fetch through the single Gets,
+  the BackgroundHold, the rescan's order, `isIdleTimerDisabled` nowhere else, reset, nothing polled); the page by
+  permission and out of reach; In nobody's library one write at a time and read again after each.
+- test_ios_contract.py (92 routes); test_ios_settings.py (Manage's three native rows).
+- **ui/test/ioscare.sim.cjs**: both exporters' `--check`.
+
+### Verified, and not
+
+On the Mac: `swift test` (1912 Core tests in 200 suites, 158 Audio in 17, 12 more, all passing); the unsigned
+generic-iOS Debug build, BUILD SUCCEEDED, no warning; the full pytest suite, 4893 passed and 1 skipped (the palette
+rules caught two things first: Add for them drawn `.borderedProminent`, now PrimaryFace, and three section headers
+without Noto Sans); all 94 sims with Node 22 (ioscare running both exporters' `--check`). tests/test_ios_library_care.py
+runs a real rescan over real FLACs and the real In nobody's library routes with logins on. Assumed: that 300 s is
+ample for a rescan of James's library (the route has no bound; a first scan of a big library takes a minute or more,
+and one that runs past it says deadwax may have finished it, and reads the library again), and that a BackgroundHold's seconds cover the
+album out when the phone locks (a lyrics album can wait up to its own EditWaits.lyrics; one cut short is unanswered,
+counted failed and may have written).
+
+Not verified - only the phone can tell (docs/ios.md checks 355-360): `isIdleTimerDisabled` keeping the screen on
+through a run with the page in front, and letting it sleep on another page; what iOS does to a run when the phone
+locks mid-album (the hold, the stop after it, the sentence, Start carrying on); the rescan's facts and its age moving
+on; Narrow to's counts against the web's; In nobody's library's Add for them and Dismiss on a real flag; the parts by
+permission; SwiftUI's onAppear/onDisappear and RootView's scene phase as CareRunModel's `visible` assumes (a push over
+the page, another tab, Now Playing's full-screen cover, the sign-in over the tabs); VoiceOver hearing each run's result
+and the largest text; Reduce Motion.

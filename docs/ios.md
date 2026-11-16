@@ -60,7 +60,9 @@ it's in, asked once more before it goes - and with it nothing in Edit album open
 into their folder; **Which artist is this?**; and **Move albums to …**, their albums filed under an old name moved
 under the one they have now (see [Managing an artist](#managing-an-artist)). Then **Needs a look**: the albums that
 need fixing and the new downloads nobody has looked at, how many beside it in Settings > Manage, each worked through
-in Edit album with **Skip** and **Next album** (see [Needs a look](#needs-a-look)).
+in Edit album with **Skip** and **Next album** (see [Needs a look](#needs-a-look)). Then **Library care**: Rescan,
+and covers, CD art and lyrics fetched for every album without, one album at a time - with In nobody's library for an
+admin (see [Library care](#library-care)).
 
 **Nothing of Phase 2, the lyrics, the EQ, the turntable, play history, your library downloaded,
 playlists, artists, songs, Search, Requests, Get or Manage has been seen on an iPhone yet.** It's built and tested on a Mac,
@@ -1862,7 +1864,7 @@ Account and About ask deadwax again when you pull them down, as the first screen
 ### Manage
 
 Settings > **Manage** is deadwax's tools for looking after it, as many of them as you may use. They're coming into the
-app one build at a time (Phase 8): **Edit an album** and **Needs a look** are the app's own now, and the rest still
+app one build at a time (Phase 8): **Edit an album**, **Needs a look** and **Library care** are the app's own now, and the rest still
 **open in the web app, in Safari** - the web app has every one of them laid out for a phone ([Looking after deadwax from a
 phone](player.md#looking-after-deadwax-from-a-phone)). Top to bottom, each only for someone who may use it:
 
@@ -1870,7 +1872,7 @@ phone](player.md#looking-after-deadwax-from-a-phone)). Top to bottom, each only 
 | --- | --- | --- |
 | **Edit an album** | Edit albums or Look after the library | **Choose the folder**, in the app: every album folder deadwax's library has, with a search at the top - tap one and [Edit album](#edit-album) opens for it. It's the way to a folder Navidrome doesn't list. An album's top **•••** has **Edit album** too ([An album's page](#an-albums-page)). |
 | **Needs a look** | Look after the library | [**Needs a look**](#needs-a-look), in the app: the albums that need fixing and the new downloads nobody has looked at, worked through one after another in Edit album. How many albums it lists is at the row's right. |
-| **Library care** | Look after the library or Edit albums | Library care |
+| **Library care** | Look after the library or Edit albums | [**Library care**](#library-care), in the app: Rescan (Look after the library's), and covers, CD art and lyrics fetched for every album without (Edit albums') - and, with logins on, In nobody's library. |
 | **People** | an admin, with logins on | People - unlock it with your own Navidrome password, as in the web app |
 | **Server settings** | Settings and the log | Server settings, at its first tab |
 | **Event log** | Settings and the log | the event log |
@@ -1882,9 +1884,10 @@ down. If an admin took a permission away since, the page it opens says "This pag
 given you - ask one if you need it." - and People, its own words: "Only an admin can open People - it comes with
 being a Navidrome admin."
 
-Under the rows: "Edit an album and Needs a look are the app's own; the others open in the web app, in Safari." (with
-Edit albums but not Look after the library, "Edit an album is the app's own; the others open in the web app, in
-Safari."; with neither, "These open in the web app, in Safari.") - and with logins on, "Safari has its own
+Under the rows: "Edit an album, Needs a look and Library care are the app's own; the others open in the web app, in
+Safari." (with Edit albums but not Look after the library, "Edit an album and Library care are the app's own; the
+others open in the web app, in Safari."; with neither, "These open in the web app, in Safari."; and nothing at all
+when every row there is the app's own) - and with logins on, "Safari has its own
 sign-in, apart from the app's: the first time, sign in there with the same name and password you use here. The pages
 open as whoever is signed in there, who may not be who's signed in here." Nothing hands the app's sign-in to Safari (it
 could only go in the address, where it would sit in Safari's history), so the first time a row opens, the web app's
@@ -1901,14 +1904,14 @@ Screen, it keeps a sign-in of its own, and the rows open in Safari, not in it.
 The rows open deadwax's address as the app has it, plain `http://` included: Safari opens it as it would the address
 typed (its address bar says Not Secure), over your Wi-Fi or WireGuard. If the phone's default browser isn't Safari,
 they open in that one instead. While deadwax can't be reached the rows that open Safari are dimmed and can't be
-tapped, and "These open once deadwax is back." says why; so is Change password. Edit an album and Needs a look still
-open: each says it needs deadwax, and reads the library once it's back. If iOS won't open the address at all - Safari
+tapped, and "These open once deadwax is back." says why; so is Change password. Edit an album, Needs a look and
+Library care still open: each says it needs deadwax, and reads the library once it's back. If iOS won't open the address at all - Safari
 turned off in Screen Time, with no other browser - the app says "Couldn't open the web app - Safari may be turned off
 in Screen Time." over the tabs, and VoiceOver reads it. The same goes for Edit album's rows that still open the web app
 and the Library's Set up Navidrome.
 
-VoiceOver reads each Safari row as a button, with "Opens in Safari." after it; Edit an album and Needs a look as rows
-that open a page, Needs a look with its count ("Needs a look, 3 albums"). The rows grow with the text size.
+VoiceOver reads each Safari row as a button, with "Opens in Safari." after it; Edit an album, Needs a look and Library
+care as rows that open a page, Needs a look with its count ("Needs a look, 3 albums"). The rows grow with the text size.
 
 An artist's pictures and names are managed from [the artist's page](#managing-an-artist), as in the web app. What
 isn't linked from the phone: the web app's **Connections**, in its You.
@@ -1981,6 +1984,73 @@ Slow Rush, Tame Impala, New, No cover art"), with "Open" on the one Edit album h
 All". Edit album's foot reads as "Previous album", "2 of 9" and "Skip" (with "Leave this one for now and move on") or
 "Next album", and each step is said: "3 of 9: The Slow Rush". With Reduce Motion on, rows don't slide as the list
 changes. Every line grows with the text size.
+
+### Library care
+
+**Library care** (Settings > Manage > Library care) is the web app's Library care on the phone: **Rescan**, for
+someone with **Look after the library**, and the runs that fetch **covers, CD art and lyrics** for every album
+without, for someone with **Edit albums** - an admin, or everyone while logins are off, has both. It's a page pushed
+on Settings. Each part shows only for whoever has it, and the line at the top names only those: "Rescan the library
+after changing tags in another program, and fill in missing covers, CD art and lyrics across many albums at once -
+one album at a time, and Stop ends a run after the album it's on." with both; with Rescan alone, "Rescan reads every
+file of the library again - use it after changing tags in another program."; with the runs alone, "Fill in missing
+covers, CD art and lyrics across many albums at once - one album at a time, and Stop ends a run after the album it's
+on."
+
+"Reading the library" while deadwax reads it; if that fails, "Couldn't read the library." with **Try again**; when
+deadwax has no library to read (`LIBRARY_PATH` unset or missing), it says so instead. Then:
+
+- **Rescan**: what the library holds and how old the scan is ("7 albums · 87 tracks · 425 MB · Scanned 3 min ago in
+  2s"), the **Rescan** button, and under it why it's there: "Use Rescan after editing tags in another program:
+  deadwax spots a changed album by its folder's date, and editing tags in place doesn't change it. Albums added from a
+  download show up without it." Rescan reads every file again - "Rescanning…" on the button, "Rescanning - reading
+  every file again…" in the line above, a minute or more on a big library - and the count beside Needs a look follows
+  once it's done. If it gets no answer in five minutes, it says "deadwax may have finished this - looking again" and
+  reads the library to see. If reading it again fails, "Couldn't read the library just now." with **Try again**.
+- **Covers, CD art and lyrics**: **Narrow to** (Artist, album or folder) and what the runs act on ("The runs act on
+  the whole library: 8 album folders.", or "The runs act on 3 of 8 album folders: those matching "portishead"."),
+  then **Covers**, **CD art** and **Lyrics**, each with **Get covers · N**, **Get CD art · N** or **Get lyrics · N** -
+  N the album folders it would take, and no button when there are none - and what it will do, as the web app says it
+  ("14 album folders matched to a release with no cover in the whole library. Each cover comes from the Cover Art
+  Archive…"). A cover is fetched for an album matched to a release with no cover, CD art for one matched to a release
+  with no disc picture from deadwax yet, lyrics for one with no lyrics at all.
+
+**A run** fetches one album at a time, each through the same step as that album's own **Get** in [Edit
+album](#edit-album). While it runs, its button is **Stop after this album · 3 of 12** (the third album is the one
+being fetched): tap it and it says "Stopping after 3 of 12", finishes that album and goes no further. When it ends it
+says what it did, as the web app does ("Got 10 covers. 1 has none in the Cover Art Archive. 1 failed - run it again to
+try it again."; lyrics are counted in tracks), VoiceOver reads it, and it stays on the page until that run starts
+again. Needs a look's count follows each album a run saved something for. After a run that saved something, the page
+reads the library again before offering that run again - "Checking the library…" for that moment - so its button
+never comes back over the albums it has just done.
+
+**One run at a time on the phone** (the web app runs the three at once): while one goes, the others' buttons are
+dimmed, with "One run at a time - this one can start once Covers has finished." under them. The run is the app's, not
+the page's: go back to Settings, or to another tab, and it carries on, its result still there when you come back. **The
+screen stays on** while a run goes and Library care is in front ("The screen stays on while a run is under way and this
+page shows." under its button) - and only then. **A run stops after the album it's on** when the app goes to the
+background (lock the phone, or switch apps: iOS stops an app soon after), when deadwax goes out of reach, when your
+session ends, or when an admin takes Edit albums away - and says so after its result: "Got 14 covers. Stopped at 14 of
+60. It stopped as the app went to the background - Get covers carries on." (With Edit albums gone, the runs go from
+the page, and only VoiceOver says it.) Start it again and it takes only the albums still without, since it asks again
+which those are. Signing out stops a run before its next album, and the
+next person's Library care starts afresh.
+
+**In nobody's library** (with logins on, for someone with Look after the library) is a row under the runs, opening a
+page of its own: how many albums nobody has in their library ("3 albums nobody has in their library", or "Every album
+in the collection is in somebody's library."), the first 20 of them with their folders, then **Show all 37** (and
+**Show fewer**). Under **Flagged downloads**, each download nobody was given because every file was already in a
+folder that holds another pressing or an untagged copy - who asked for it and why - with **Add for them** (it goes
+into the libraries of those who asked) and **Dismiss**. One at a time: the buttons are dimmed while one is being done,
+then the list is read again. VoiceOver reads what was done ("Third · Portishead: given to ethan, sam"); if deadwax
+refuses, its own words are said under the list ("That has been dealt with already."). Pull it down to read it again.
+
+**While deadwax can't be reached**, a page that hasn't read the library yet says "Managing needs deadwax. This opens
+once it's back."; one that has keeps what it showed under the amber line Edit album shows, and nothing can be started
+or pressed until deadwax is back and the library has been read again. Without Look after the library and without Edit
+albums - an admin took them away - it says "This page needs a permission an admin hasn't given you - ask one if you
+need it." and asks nothing. VoiceOver reads each line once; with Reduce Motion on, nothing slides; every line grows
+with the text size.
 
 ### Debug
 
@@ -4675,6 +4745,53 @@ albums put in it for these checks (a test album filed from a download, or copied
   All", the foot's "Previous album", "2 of 9" and "Skip", each step said ("3 of 9: …"), every line whole. With Reduce
   Motion on, rows don't slide.
 
+### Library care's checks (355-360)
+
+**Not done yet.** These come with the build that brings [Library care](#library-care) into the app - Phase 8's seventh
+part (still app 0.13 (13)). No server change is needed: deadwax 2.1.28 or later rescans without the tracks, which an
+older one sends whole - slower, the same. As in 349-354: deadwax's plain `http://` address, on the home Wi-Fi and over
+WireGuard with Wi-Fi off, as an admin unless said; compare each with the web app's Library care (You > Library care).
+The runs write covers, CD art and lyrics into album folders: narrow them to albums put in the library for these checks.
+
+- **355 Rescan.** Settings > Manage > **Library care**: the line at the top, then Rescan with the web app's totals
+  ("7 albums · 87 tracks · 425 MB") and "Scanned … ago in …s". Tap **Rescan**: "Rescanning…" on the button and
+  "Rescanning - reading every file again…" above it, then "Scanned just now", and the same totals as the web app's.
+  Leave the page up a few minutes: does the age move on ("Scanned 2 min ago")? Change a tag of a test album in another
+  program, Rescan: does Edit album show the new tag?
+- **356 Fill in covers.** Narrow to a test album without a cover (its Get cover in Edit album not pressed). **Get
+  covers · 1**: the button says "Stop after this album · 1 of 1" with a spinner, and "The screen stays on while a run
+  is under way and this page shows." under it; then "Got 1 cover." (VoiceOver reads it), "Checking the library…" for a
+  moment, and no Get covers button for it after. Does the album show its cover in the Library? With a run of several
+  albums (Narrow to an artist with a few), tap Stop: "Stopping after 2 of 5", then "Got … Stopped at 2 of 5." Leave the
+  phone untouched through a long run on the page: does the screen stay on? On another page, does it dim and lock as it
+  usually does? Do the same with CD art and lyrics.
+- **357 Narrow to.** Type an artist's name: "The runs act on 3 of 8 album folders: those matching "…"." and each
+  run's count and words follow, as in the web app with the same words typed. Type something nothing matches: "No album
+  folder matches "…".", and no button. While a run goes, the other two buttons are dimmed, with "One run at a time -
+  this one can start once Covers has finished."
+- **358 Locked mid-run.** Start a run of a dozen albums or more, then lock the phone. Unlock after a minute and open
+  Library care: does it say "Stopped at N of M. It stopped as the app went to the background - Get covers carries on."
+  - and N the album it was on, not fewer? Start again: is the count only the albums still without? The same switching
+  to another app instead of locking. Start one, go back to Settings and to the Library tab, come back: is it still
+  going (or done), its result there? Wi-Fi and WireGuard off mid-run: "… It stopped as deadwax went out of reach - Get
+  covers carries on once it's back.", the amber line, nothing can be pressed - back on, "Checking the library…", then
+  Start is offered again.
+- **359 In nobody's library** (logins on). Under the runs, **In nobody's library**: tap it - the same count and the
+  same first 20 albums as the web app's, Show all and Show fewer. With a flagged download (a download of a pressing
+  whose folder already held another): its name, who asked and why, **Add for them** and **Dismiss**. Add for them: the
+  flag goes, and the people who asked have the album in their library (the web app's Your library, as them). Dismiss
+  another: it goes. Press Dismiss on one already dealt with in the web app: "That has been dealt with already." With
+  logins off there's no such row.
+- **360 One part each.** As someone with Look after the library but not Edit albums: Rescan, and In nobody's library,
+  no runs - the top line "Rescan reads every file of the library again - use it after changing tags in another
+  program.". As someone with Edit albums but not Look after the library: the runs alone, no Rescan, no In nobody's
+  library - and the Manage footer "Edit an album and Library care are the app's own; …" (or none, if those are their
+  only rows). Take Edit albums away on the Mac during a long run, then go back to Settings on the phone and pull it
+  down: the run stops after its album - with VoiceOver on, it says "… It stopped: running it needs Edit albums,
+  which an admin hasn't given you." - and Library care has no runs any more (or says it needs a permission, if they
+  were all the person had). With the largest text and VoiceOver: each line
+  read once, the run's button read with its count, every line whole. With Reduce Motion on, nothing slides.
+
 ### Add to Queue's checks (392-403)
 
 **Not done yet.** These come with the build that makes [Add to Queue](#adding-to-the-queue) the phone's one way to add
@@ -4749,8 +4866,8 @@ These are the web app's for now:
   new words wait for deadwax.
 - **Home** and **pins** - and so Home's Arriving: outside Requests, the tab's badge is the phone's only sign of a
   download on its way.
-- **Looking after deadwax**, but for [Edit album](#edit-album), [an artist's tools](#managing-an-artist) and
-  [Needs a look](#needs-a-look), all of it on the phone now: Settings > [Manage](#manage) opens each other tool in the
+- **Looking after deadwax**, but for [Edit album](#edit-album), [an artist's tools](#managing-an-artist),
+  [Needs a look](#needs-a-look) and [Library care](#library-care), all of it on the phone now: Settings > [Manage](#manage) opens each other tool in the
   web app, in Safari, and Change password too. Re-timing synced lyrics is Server settings', in the web app. Not linked
   from the phone: the web app's **Connections** (in its You).
 

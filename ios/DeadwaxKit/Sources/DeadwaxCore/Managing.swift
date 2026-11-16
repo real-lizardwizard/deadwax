@@ -115,12 +115,12 @@ public enum Managing {
     public enum Tool: String, Sendable, CaseIterable, Hashable {
         case edit, queue, care, people, settings, log
 
-        /// The app's own page (Phase 8 - one slice at a time): Edit an album since slice 1, Needs a look since slice 6.
-        /// The rest still open the web app in Safari.
+        /// The app's own page (Phase 8 - one slice at a time): Edit an album since slice 1, Needs a look since slice 6,
+        /// Library care since slice 7. The rest still open the web app in Safari.
         public var native: Bool {
             switch self {
-            case .edit, .queue: return true
-            case .care, .people, .settings, .log: return false
+            case .edit, .queue, .care: return true
+            case .people, .settings, .log: return false
             }
         }
     }
@@ -261,7 +261,8 @@ public enum ManagingWords {
 
     /// The section's footer, a sentence a line: where the rows that open Safari open (or, out of reach, when), then
     /// Safari's sign-in with logins on - nothing at all when every row drawn is the app's own (Edit an album since
-    /// Phase 8's slice 1, Needs a look since slice 6), whose pages say for themselves that they need deadwax.
+    /// Phase 8's slice 1, Needs a look since slice 6, Library care since slice 7), whose pages say for themselves that they
+    /// need deadwax.
     public static func footer(loginsOn: Bool, online: Bool, tools: [Managing.Tool] = Managing.Tool.allCases) -> [String] {
         let web = tools.filter { !$0.native }
         guard !web.isEmpty else { return [] }

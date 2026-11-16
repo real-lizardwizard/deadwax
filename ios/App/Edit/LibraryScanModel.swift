@@ -70,6 +70,32 @@ final class LibraryScanModel {
             return .failed
         }
     }
+
+    /// (Phase 8, slice 7) Library care's Rescan (`POST /library/rescan?tracks=false`): the cache dropped and every file
+    /// read again - its answer the scan in hand and its ETag kept, as a read's, and only the newest landing. What came of
+    /// it, for CareRuns: a refusal (a 4xx) and one that never answered (it may have finished) are kept in `failed` as a
+    /// read's failure is; a cancellation, or a newer read, changes nothing.
+    func rescan(client: DeadwaxClient?, admin: Bool) async -> CareRuns.Rescanned {
+        guard let client else { return .dropped }
+        reads += 1
+        let ticket = reads
+        reading = true
+        do {
+            let (fresh, tag) = try await client.rescan()
+            guard ticket == reads else { return .dropped }
+            answer = fresh
+            etag = tag
+            failed = nil
+            reading = false
+            return .landed(albums: fresh.albums.count)
+        } catch {
+            guard ticket == reads else { return .dropped }
+            reading = false
+            guard !APIFailure.isCancellation(error) else { return .dropped }
+            failed = (error, admin)
+            return RetagFlow.outcome(of: error) == .refused ? .refused : .unanswered
+        }
+    }
 }
 
 /// A folder's cover as deadwax's library has it (`/library/art?album=`), kept in memory by the server, the folder, its

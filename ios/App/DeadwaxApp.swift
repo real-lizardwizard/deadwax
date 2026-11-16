@@ -36,6 +36,7 @@ struct DeadwaxApp: App {
     @State private var requests: RequestsModel
     @State private var getSettings: GetSettingsModel
     @State private var queueCount: QueueCountModel
+    @State private var care: CareRunModel
 
     /// The one background session, made before anything else can ask it.
     private static let downloadSession = DownloadSession()
@@ -71,6 +72,9 @@ struct DeadwaxApp: App {
         let getSettings = GetSettingsModel(server: server)
         // Phase 8, slice 6: Needs a look's count, Settings > Manage's value
         let queueCount = QueueCountModel(server: server)
+        // Phase 8, slice 7: Library care's scan and runs - the app's, so leaving its page doesn't stop a run
+        let care = CareRunModel(server: server, reachability: reachability, navigation: navigation)
+        reachability.whenChanged { [weak care] in care?.reachChanged() }
         let downloads = DownloadModel(server: server, reachability: reachability, files: files, session: Self.downloadSession)
         player.connect(downloads: downloads, reachability: reachability)
         // Phase 4, slice 3: a write here to a downloaded playlist keeps it in step at once
@@ -104,6 +108,7 @@ struct DeadwaxApp: App {
             requests.reset()
             getSettings.reset()
             queueCount.reset()
+            care.reset()
         }
         _server = State(initialValue: server)
         _player = State(initialValue: player)
@@ -124,6 +129,7 @@ struct DeadwaxApp: App {
         _requests = State(initialValue: requests)
         _getSettings = State(initialValue: getSettings)
         _queueCount = State(initialValue: queueCount)
+        _care = State(initialValue: care)
     }
 
     var body: some Scene {
@@ -148,6 +154,7 @@ struct DeadwaxApp: App {
                 .environment(requests)
                 .environment(getSettings)
                 .environment(queueCount)
+                .environment(care)
                 .preferredColorScheme(.dark)
                 .tint(Palette.accent)
                 // (Noto Sans, 15 Nov) the words of every Text and control that sets no font of its own

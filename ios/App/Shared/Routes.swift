@@ -97,6 +97,12 @@ enum AppRoute: Hashable {
     /// (Phase 8, slice 6) Settings > Manage > Needs a look: the review queue (NeedsLookScreen), its rows opening Edit
     /// album over the tabs in queue mode.
     case needsALook
+    /// (Phase 8, slice 7) Settings > Manage > Library care (LibraryCareScreen): Rescan, and Get covers, CD art and lyrics
+    /// for every album without - its runs held by the app (CareRunModel).
+    case libraryCare
+    /// (Phase 8, slice 7) Library care > In nobody's library (HeldByNobodyScreen): the albums nobody has and the flagged
+    /// downloads - an admin's, with logins on.
+    case heldByNobody
 }
 
 /// The album you don't have's address: its release group's id as MusicBrainz gave it (lowercase - deadwax's routes take
@@ -558,6 +564,8 @@ extension View {
                 case .mbArtist(let artist): MBArtistView(route: artist)
                 case .chooseFolder: ChooseFolderScreen()
                 case .needsALook: NeedsLookScreen()
+                case .libraryCare: LibraryCareScreen()
+                case .heldByNobody: HeldByNobodyScreen()
                 }
             }
             .clearsPlayer()

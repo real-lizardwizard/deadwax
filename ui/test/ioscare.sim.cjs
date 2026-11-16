@@ -5,11 +5,16 @@
  * (startSession, markFor, rowChanged, stepTarget, leavingAtEnd), the notes (ignoresUnsaved, navidromeNote), the count's
  * words (needsLookLabel), who it is for (lib/permissions.ts asksQueueSummary) - and what app/NeedsALook.tsx,
  * components/MetadataEditor.tsx's queue buttons, app/You.tsx's Manage row, app/useQueueSummary.ts and app/App.tsx work
- * out themselves, read out of their source.
+ * out themselves, read out of their source. And (Phase 8, slice 7) its Library care does what this app's does too: Rescan's
+ * facts (lib/libraryCare.ts scanTotals, scanAge), the runs' narrowing, scope and plans (narrowAlbums, scopeLine,
+ * planWords), which albums each takes and what a run came to (lib/bulkTargets.ts bulkTargets, runBulk, bulkSummary), the
+ * parts by permission (lib/permissions.ts careParts), In nobody's library's words (lib/myLibrary.ts heldByNobodyLine,
+ * flagWords) - and what app/LibraryCare.tsx, app/useLibraryCare.ts and app/HeldByNobody.tsx work out themselves.
  *
  * The phone's Swift port (ios/DeadwaxKit/Sources/DeadwaxCore/NeedsLook.swift, ScanAlbums.swift's MetadataQueue and
  * Managing.swift) is held by its tests to ios/DeadwaxKit/Tests/DeadwaxCoreTests/Fixtures/care/care-vectors.json, which
- * ios/scripts/export-care-vectors.cjs makes by running the TypeScript as it is. This runs it with --check: every case
+ * ios/scripts/export-care-vectors.cjs makes by running the TypeScript as it is - and LibraryCare.swift to
+ * Fixtures/care/library-care-vectors.json, which ios/scripts/export-library-care-vectors.cjs makes. This runs each with --check: every case
  * made again from the TypeScript as it is today and compared byte for byte with the committed file - each source's
  * sha256 included, so even a change of words fails here. A web rule changed fails here until the fixture is written
  * again, and then the phone's Swift tests fail until the change is ported.
@@ -23,6 +28,7 @@ const path = require('path')
 const REPO = path.resolve(__dirname, '..', '..')
 const SCRIPTS = [
   ['export-care-vectors.cjs', "Needs a look's fixture"],
+  ['export-library-care-vectors.cjs', "Library care's fixture"],
 ]
 
 let failures = 0
