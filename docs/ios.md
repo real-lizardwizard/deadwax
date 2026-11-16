@@ -3855,8 +3855,10 @@ change is needed: it works with the deadwax you already run.
 
 ### Pull to shuffle on an album and a playlist's checks (282-288)
 
-**Not done yet.** These come with the build that adds pull to shuffle to an album's page and a playlist's (still app
-0.13 (13)). No server change is needed.
+**Partly done (15 Nov).** These come with the build that adds pull to shuffle to an album's page and a playlist's
+(still app 0.13 (13), 267ea8f). No server change is needed. On it, James: "pull to shuffle works on albums and
+playlists too" - the heart of 282 and 283. Their details (the graphic's place at your text size, Edit on a playlist)
+and 284-288 are not done yet.
 
 - **282 An album.** Open an album and, at the top of its page, pull down slowly: above the cover the ring fills and the
   mark grows and turns, "Pull to shuffle". At the line: a tick, the purple disc, "Release to shuffle". Push back up a

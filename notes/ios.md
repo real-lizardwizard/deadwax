@@ -10704,8 +10704,10 @@ call's or Siri's interruption against the lift.
 Verified: the probe (above); `swift test`; the unsigned Debug device build with no warnings in the files touched; the
 full pytest suite.
 
-Not verified - only the phone can tell (docs/ios.md checks 282-288):
-- The pull on a real finger on both pages: the tick once per arming, the graphic in the gap above the cover and clear
+Verified on the phone (15 Nov), James on 267ea8f's build: "pull to shuffle works on albums and playlists too".
+
+Not verified - only the phone can tell (docs/ios.md checks 282-288, beyond that):
+- The pull on a real finger on both pages, in detail: the tick once per arming, the graphic in the gap above the cover and clear
   of iOS's own bar at every text size, the music starting at the lift.
 - That nothing fights it: Back's edge swipe, the ••• menus, Album info, a song's tap and a fling's bounce at the top.
 - A pull a call, Siri or Notification Center cuts short shuffling nothing (the Library's wiring, check 95's caveat).
