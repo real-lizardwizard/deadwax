@@ -12,12 +12,18 @@ import SwiftUI
 /// capsule.
 ///
 /// Smooth (James, 15 Nov: "Can we make the progress bar smooth instead of updating every half second?"): while the song
-/// plays the bar and its clocks are drawn every frame, up to 30 a second, from PlayerModel's `barPosition(at:)` - the
-/// tick's reading carried on (PlayClock), the engine not asked. Paused, loading, or under a finger, the timeline stops
-/// and they show `shownPosition`, as before. The clocks read the same value as the bar, a view of their own that is
-/// drawn again only when their words change; VoiceOver's value stays on `shownPosition`, twice a second at most.
+/// plays the bar's fill and its clocks are drawn every frame, up to 30 a second, from PlayerModel's `barPosition(at:)` -
+/// the tick's reading carried on (PlayClock), the engine not asked - each in a timeline of its own, the bar's track and
+/// its touch outside them, as the seek line's. Hidden or covered (`visible` false), paused, or under a finger, the
+/// timelines stop and they show what PlayerModel says, as before. The clocks read the same value as the fill, a view
+/// of their own drawn again only when their words change; VoiceOver's value stays on `shownPosition`, twice a second
+/// at most.
 struct ScrubberView: View {
     @Environment(PlayerModel.self) private var player
+    /// The scrubber can be seen: on the cover, with no sheet over Now Playing. The turntable keeps its row (hidden, the
+    /// time line in its place) and Up Next's, Info's, the EQ's and the playlist picker's sheets cover it - and no
+    /// frame is drawn for a bar no one sees (review, 15 Nov).
+    let visible: Bool
     /// The finger on the bar (one: a phone's bar takes one touch).
     @State private var drag: Scrub.Drag?
     /// True while the drag gesture is live - SwiftUI puts it back to false however the gesture ends, so a drag still
@@ -38,29 +44,32 @@ struct ScrubberView: View {
         let held = Scrub.dragFor(drag, track: track)
         // VoiceOver's value and its swipes: the ticker's, never the frames'
         let shown = Scrub.shownTime(held, position: player.shownPosition, length: length)
-        // no frames paused, loading or under the finger (and none once Now Playing has closed: the view is gone)
-        let runs = player.barsRun && held == nil
-        TimelineView(.animation(minimumInterval: PlayClock.frame, paused: !runs)) { (_: TimelineViewDefaultContext) in
-            let position = player.barPosition(at: Monotonic.seconds())
-            let drawn = Scrub.shownTime(held, position: position, length: length)
-            let done = length > 0 ? min(max(drawn / length, 0), 1) : 0
-            VStack(spacing: 6) {
-                GeometryReader { (bar: GeometryProxy) in
-                    let width = bar.size.width
-                    ZStack(alignment: .leading) {
-                        Rectangle().fill(Color.primary.opacity(0.2))
+        // no frames hidden or covered (the turntable's look, a sheet over Now Playing), paused, loading or under the
+        // finger - and none once Now Playing has closed, the view gone with it
+        let runs = visible && player.barsRun && held == nil
+        VStack(spacing: 6) {
+            GeometryReader { (bar: GeometryProxy) in
+                let width = bar.size.width
+                ZStack(alignment: .leading) {
+                    Rectangle().fill(Color.primary.opacity(0.2))
+                    TimelineView(.animation(minimumInterval: PlayClock.frame, paused: !runs)) {
+                        (_: TimelineViewDefaultContext) in
                         Rectangle().fill(Color.primary.opacity(0.85))
-                            .frame(width: done.isFinite ? width * done : 0)
+                            .frame(width: width * Self.part(drawn(held, length: length), length: length))
                     }
-                    .frame(height: drag == nil ? Self.barHeight : Self.heldHeight)
-                    .frame(maxHeight: .infinity)
-                    .contentShape(Rectangle())
-                    .animation(.easeOut(duration: 0.15), value: drag == nil)
-                    .gesture(press(track: track, width: width, length: length))
                 }
-                .frame(height: Self.target)
-                ScrubberClocks(elapsed: PlayerWords.elapsed(shown: drawn),
-                               remaining: PlayerWords.remaining(shown: drawn, length: length))
+                .frame(height: drag == nil ? Self.barHeight : Self.heldHeight)
+                .frame(maxHeight: .infinity)
+                .contentShape(Rectangle())
+                .animation(.easeOut(duration: 0.15), value: drag == nil)
+                .gesture(press(track: track, width: width, length: length))
+            }
+            .frame(height: Self.target)
+            TimelineView(.animation(minimumInterval: PlayClock.frame, paused: !runs)) {
+                (_: TimelineViewDefaultContext) in
+                let time = drawn(held, length: length)
+                ScrubberClocks(elapsed: PlayerWords.elapsed(shown: time),
+                               remaining: PlayerWords.remaining(shown: time, length: length))
                     .equatable()
             }
         }
@@ -83,6 +92,19 @@ struct ScrubberView: View {
             pressed = false
             drag = Scrub.dragEnd(drag, pointer: 0, how: .cancel).drag
         }
+    }
+
+    /// The time the fill and the clocks draw now: the finger's, else PlayerModel's for the bars (the carried reading
+    /// while they run) - read inside their timelines alone.
+    private func drawn(_ held: Scrub.Drag?, length: Double) -> Double {
+        Scrub.shownTime(held, position: player.barPosition(at: Monotonic.seconds()), length: length)
+    }
+
+    /// The played part of the bar, 0...1 (none for no length).
+    private static func part(_ drawn: Double, length: Double) -> CGFloat {
+        guard length > 0 else { return 0 }
+        let done = min(max(drawn / length, 0), 1)
+        return done.isFinite ? CGFloat(done) : 0
     }
 
     private func press(track: String, width: CGFloat, length: Double) -> some Gesture {

@@ -8553,7 +8553,8 @@ picture, as the web draws them - `is-round` - and in Search's one list the circl
 album's; the brief's "every album or artist cover" was read as the album covers on an artist's page, and this is one
 line in ArtistPicture to change if James wants them square), the download rings, the EQ's knobs and handles, the
 pull's ring and disc, the Library's two circles. **The turntable's own**: TurntableFace.lookRadius (4) - the plinth's
-look button and Now Playing's speed chip - and its icons, as drawn; the scrubber was squared already (two Rectangles,
+look button and Now Playing's speed chip (square since "Actual corners", after its review) - and its icons, as drawn;
+the scrubber was squared already (two Rectangles,
 "Now Playing's bar, squared off"). The app icon is untouched. **Not squared, iOS's own**: grouped Lists' and Forms'
 section corners (You, Up Next, Downloads, the EQ's pages), sheets, menus, alerts, the keyboard, and the system search
 bars named above - SwiftUI has no say over those short of redrawing them.
@@ -9966,10 +9967,11 @@ so both stepped.
 - **Drawn every frame while the song plays**: each bar's fill is inside a `TimelineView(.animation(minimumInterval:
   PlayClock.frame, paused: !runs))`, 30 frames a second at most. `runs` is `player.barsRun` (playing and not loading -
   `isPlaying && !isLoading`, so a speed change's hidden restart keeps it running) with no finger on the bar, and for
-  the play bar Now Playing not over it (`navigation.nowPlayingShown`); the scrubber's goes with Now Playing. Paused,
-  the timeline stops and its content shows `shownPosition`, exactly as before. The seek line's timeline holds its
-  accent fill alone; the scrubber's holds the bar and its clocks, which are `ScrubberClocks` (Equatable, `.equatable()`)
-  fed the same value's words, so they are drawn again only when the words change - and never disagree with the bar.
+  the play bar Now Playing not over it (`navigation.nowPlayingShown`); for the scrubber, it seen (`visible`: on the
+  cover, no sheet over Now Playing - since the review, below). Paused, the timeline stops and its content shows
+  `shownPosition`, exactly as before. The seek line's timeline holds its accent fill alone; the scrubber's two (since
+  the review) its fill and its clocks, which are `ScrubberClocks` (Equatable, `.equatable()`) fed the same value's
+  words, so they are drawn again only when the words change - and never disagree with the bar.
   VoiceOver's value and its swipes stay on `shownPosition`, so it isn't told thirty times a second.
 - **The engine isn't asked per frame**: the brief allowed `clock()` (the lyrics' read) if it is trivially cheap.
   Measured with a temporary test on this Mac (a live offline engine, 5,000 reads; deleted after, so DeadwaxAudio has no
@@ -10048,7 +10050,8 @@ its items out the same way, over the whole 34.
 - **How**: AppTabBar ignores the container's bottom safe area itself, so it runs to the edge, and pads under its play bar
   and tabs by `TabBarFoot.below(home:)`; its fill still runs to the edge. The home indicator's room is the key window's
   bottom safe area (MainTabs's `home`), read from UIKit because a window's never counts the keyboard - a view's
-  safeAreaInsets would, and the bar would grow under the keyboard. The bar measures its play bar and tabs alone
+  safeAreaInsets would, and the bar would grow under the keyboard. (Since the review, below, it is read again each time
+  SwiftUI lays the screen out anew.) The bar measures its play bar and tabs alone
   (`measured`, before the padding), and `tabBarRoom` - the pages' room at their foot and the notice's lift, over the home
   indicator's own - is `TabBarFoot.room(content:home:)`: that height and the room under it, less the home indicator's
   (86 for a 100-point bar on a Face ID iPhone; 106 on an SE). So nothing sits under the bar, and its height follows the
@@ -10076,7 +10079,8 @@ square look. Even the library icon should be a bit more square."
   PrimaryButton.radius, the web's --dw-radius-control (4); they now draw Corners.control, so they are square too, and
   PrimaryButton.radius stays the web's number in Core, held to theme.css as before. Round stays round, as Corners' doc
   says: the dots, the avatar, artists' pictures, the rings, the sliders' knobs, the Library's two circles, Requests'
-  round ▶ and ✕, the turntable's own corners (TurntableFace.lookRadius) and the app icon. The squared look's table
+  round ▶ and ✕, the turntable's own corners (TurntableFace.lookRadius - the look button and the speed chip until the
+  review squared them, below; the plinth and its readout's well still) and the app icon. The squared look's table
   ("Corners, before and after") is history now: every "after" there is 0.
 - **What a 0 changed beyond the corners**: PrimaryFace's highlight - the light line inside its top edge - was masked
   to the top `radius` points, which at 0 is nothing, so the line would have gone; its band is now at least two
@@ -10125,3 +10129,56 @@ Viewer's images and the Library tab's.
 pytest. **Not verified** - only the phone can tell: how the corners read, the glyphs' size and weight beside the old
 ones' memory, the fade, the Library icon beside the others, at the default and largest text sizes (docs/ios.md checks
 251-252).
+
+## The bars, the tabs and the corners after review (15 Nov)
+
+The four commits above (the smooth bars, the Library's top, the tab bar lower, actual corners) were reviewed; nothing
+had to be fixed, and five things were, in one commit.
+
+- **The scrubber drew frames no one saw**: Now Playing keeps it in its row on the turntable, at opacity 0 (the time
+  line over it), and under its full-height sheets, and its timeline ran on through both - the whole row, 30 times a
+  second. ScrubberView takes `visible` (NowPlayingView: `!turntable && !sheetOver`, `sheetOver` being Up Next, Info,
+  the EQ or Add to a playlist over it), and `runs` is `visible && player.barsRun && held == nil`. Its timelines hold
+  only what moves, as the seek line's: one round the fill (the track and the touch outside it), one round the clocks;
+  the value both draw is `drawn(_:length:)`, read inside them alone. The lyrics' own `covered` (Up Next, Info, the EQ)
+  is as it was - it doesn't count the playlist picker, which the scrubber's does.
+- **Two controls kept rounded corners**: the look button (TurntableView's LookFace) and the speed chip (NowPlayingView's
+  SpeedChipFace) drew TurntableFace.lookRadius, 4. Both take Corners.control (0) now, and the look button's square
+  glyph (the web's SquareIcon, which stands for the cover) is drawn with points too. The look button's highlight was
+  masked to the top `lookRadius` points - at 0, nothing - so its band now runs to the line's foot (the inset and the
+  line, 2 points). **Kept, as hardware**: the plinth's corners (TurntableFace.plinthRadius, 6) and the speed readout's
+  well on it (TurntableFace.lookRadius, 4, drawn by DeadwaxTurntable's TurntableReadout among the plinth's own renders).
+  TurntableFace.lookRadius and squareIcon keep the web's numbers (test_ios_turntable_face.py), as PrimaryButton.radius
+  does.
+- **The bars could step back at a speed restart's wait**: a restart still loading past its 1 s hold shows the spinner,
+  and the expiry dropped the carried reading, so the bars went back to the last tick's position - up to half a second
+  at the speed behind what they had drawn - and each tick of the wait read the engine stood at the restart's point.
+  Now a wait (`barsWait`: loading to play - the restart past its hold, a seek's bytes, a stall) holds the reading where
+  the bars stopped, Core's new `PlayClock.held` (the reading at no rate), at the expiry and at each tick of the wait;
+  `barPosition(at:)` draws it while they wait; a speed sent meanwhile leaves it held (the reading after the wait takes
+  the speed up). The reading after the wait corrects it as any reading does - ahead, gone to; behind by less than
+  `holdWithin`, waited for - so nothing draws backwards through one. A pause still shows where the song is (it is where
+  Play goes on from); a retry's wait isn't playing, as before.
+- **The home indicator's room is read again on every new layout**: MainTabs's `home` was a computed read of the key
+  window's inset, evaluated only when the body was, so a first pass before the window had its insets could have left
+  the tabs over the home indicator until something else redrew it. It is `@State` now, set on appear and from a
+  `Color.clear.ignoresSafeArea()` background's `onGeometryChange` of its size and bottom safe area - SwiftUI says when
+  the screen is laid out anew (its first pass, a resize, its safe area's change), the window says what. Not the
+  geometry's own inset: with the keyboard up a view's bottom safe area can count it, and the bar would grow under the
+  keyboard. Cheap: one clear view, an action on a change of three numbers. (The app is portrait only.)
+- **Check 248's speed part**: it asked for the speed to be changed on the turntable, where the scrubber is hidden. It now
+  changes it on the turntable and flips back to the cover, and from the cover's chip and the ••• menu - and watches the
+  bar through a restart's spinner, and after Up Next, Info and the turntable.
+
+**Tests**: PlayClockTests (Core, 12 - 2 new: a wait holds the bars where they were, held again it stays; through a wait
+with the engine stood behind and after it, never back). tests/test_ios_palette.py - the bars' test holds the scrubber's
+`visible` in its `runs` and Now Playing's flag, the two timelines (fill and clocks) and the model's wait (`barsWait`, the
+held reading at the expiry and in the tick); the corners' test no longer keeps TurntableFace.lookRadius in a view, and
+holds the two faces' Corners.control and the look button's highlight; the tab bar's test the re-read; the Library top's
+counts MainTabs's clear reader among what reaches the top edge. tests/test_ios_turntable_face.py finds the scrubber's
+row by its new call.
+
+**Verified**: swift test, the unsigned Debug and Release device builds, check_project, npm run build, the sims and
+pytest. **Not verified** - only the phone can tell: that nothing is drawn for the hidden scrubber (no profiler here),
+the bars through a slow restart, the tabs' place from the first frame, and the square look button and speed chip
+beside the plinth's rounding (docs/ios.md checks 248, 250 and 251).

@@ -77,6 +77,45 @@ import Testing
         #expect(PlayClock.shown(nonsense, now: 0.5) == 5)
     }
 
+    @Test func aWaitHoldsTheBarsWhereTheyWere() {
+        // a speed's restart still loading past its hold, at 2x: the bars had carried the last reading, 60, on to 60.5
+        let reading = PlayClock.reading(entry: 2, seconds: 60, at: 10, rate: 2, shown: 60)
+        let held = PlayClock.held(reading, now: 10.25)
+        #expect(PlayClock.shown(held, now: 10.25) == 60.5)
+        // and there they stay through the wait - never back to the reading's 60
+        #expect(PlayClock.shown(held, now: 11) == 60.5)
+        #expect(PlayClock.shown(held, now: 14) == 60.5)
+        // held again, at each of the wait's ticks, it stays
+        let again = PlayClock.held(held, now: 12)
+        #expect(PlayClock.shown(again, now: 13) == 60.5)
+    }
+
+    @Test func throughAWaitAndAfterItTheyNeverGoBack() {
+        // PlayerModel's way through a wait: each tick reads the engine stood at the restart's 60.125, a reading behind
+        // what the bars drew, and holds it; after three, the song plays on from there at 2x
+        var reading = PlayClock.held(PlayClock.reading(entry: 2, seconds: 60, at: 10, rate: 2, shown: 60), now: 10.25)
+        var last = PlayClock.shown(reading, now: 10.25)
+        var backwards = 0
+        for tick in 1...6 {
+            let at = 10.25 + Double(tick) * 0.5
+            let shown = PlayClock.shown(reading, now: at)
+            if shown < last { backwards += 1 }
+            last = shown
+            let waiting = tick <= 3
+            let engine = waiting ? 60.125 : 60.125 + (at - 11.75) * 2
+            reading = PlayClock.reading(entry: 2, seconds: engine, at: at, rate: 2, shown: shown)
+            if waiting { reading = PlayClock.held(reading, now: at) }
+            for frame in 1..<15 {
+                let drawn = PlayClock.shown(reading, now: at + Double(frame) / 30)
+                if drawn < last { backwards += 1 }
+                last = drawn
+            }
+        }
+        #expect(backwards == 0)
+        // and on with the song after it: 63.125 at the last tick, carried on half a second's frames at 2x
+        #expect(last > 63)
+    }
+
     /// The engine as the ticker reads it - its heard position a few milliseconds either way of the truth, and its own
     /// clock 0.2 % slow against the phone's - and the bars drawn at 30 frames a second between: they never go back, and
     /// never stray from the song by more than a frame's worth and the readings' wobble.

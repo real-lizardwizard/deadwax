@@ -8,8 +8,8 @@ import SwiftUI
 ///   Now Playing's cover, the tiles, the rows, the play bar's cover, the cards of Up Next and Info.
 /// - `card`: what sits over the page or in it as a panel - the notice, the first ask, a list that
 ///   couldn't be asked again, the sign-in's reason, the song you searched for on its album.
-/// - `control`: what a finger takes - buttons (the primary and the secondary pill, PrimaryFace), chips, pills, badges,
-///   fields, the Library's switch and its segments.
+/// - `control`: what a finger takes - buttons (the primary and the secondary pill, PrimaryFace; Now Playing's look
+///   button and speed chip), chips, pills, badges, fields, the Library's switch and its segments.
 /// - `track` and `fill`: a bar's sunken track and the fill inside it (the web's --dw-radius-track and -fill).
 ///
 /// Actual corners (15 Nov, James: "let's square off everything already square a bit more. Actual corners. ... I like
@@ -17,9 +17,10 @@ import SwiftUI
 /// named, so what each is for stays said, and a corner can come back to one kind without touching the others.
 ///
 /// Round stays round: dots, the avatar, artists' pictures, the rings, a slider's knob, the Library's two buttons at its
-/// top ("the search button and options button at the top can be circles"), Requests' round ▶ and ✕. The turntable keeps
-/// its own corners (TurntableFace.lookRadius - the plinth, the look button, the speed chip), and the app icon is left
-/// alone.
+/// top ("the search button and options button at the top can be circles"), Requests' round ▶ and ✕. The turntable's
+/// plinth keeps its own rounding, as hardware - the plinth's corners (TurntableFace.plinthRadius, 6) and the speed
+/// readout's well drawn on it (TurntableFace.lookRadius, 4; DeadwaxTurntable's TurntableReadout) - and the app icon is
+/// left alone. The look button and the speed chip, the app's controls over it, are square (review, 15 Nov).
 ///
 /// Against the web (theme.css section 10): the web's --dw-radius-cover is 3, --dw-radius-card 6, --dw-radius-control 4
 /// (PrimaryButton.radius keeps it, the web's number), --dw-radius-track 2 and --dw-radius-fill 1 - the phone is square

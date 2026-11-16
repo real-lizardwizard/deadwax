@@ -190,11 +190,14 @@ def test_the_corners_are_the_squared_looks():
 
 
 def test_every_corner_in_the_app_is_a_token():
-    # no radius written in a view: a RoundedRectangle is Corners' own, the primary's (PrimaryButton.radius, the same as
-    # Corners.control) or the turntable's (TurntableFace.lookRadius - the plinth's look button and the speed chip)
-    kept = {"RoundedRectangle(cornerRadius: radius)", "RoundedRectangle(cornerRadius: CGFloat(TurntableFace.lookRadius))"}
+    # no radius written in a view: a RoundedRectangle is Corners' own, or a face's `radius` - Corners.control: the
+    # primary's, and (review, 15 Nov) the look button's and the speed chip's, which drew TurntableFace.lookRadius. That
+    # stays the web's number for the plinth's speed readout, drawn by DeadwaxTurntable, never by a view in the app.
+    kept = {"RoundedRectangle(cornerRadius: radius)"}
     left = []
     for name, number, code in app_code():
+        if "TurntableFace.lookRadius" in code or "squareIcon.radius" in code:
+            left.append(f"{name}:{number} the turntable's radius")
         if name == "Shared/Corners.swift":
             continue
         if re.search(r"cornerRadius:\s*[0-9]", code):
@@ -208,6 +211,14 @@ def test_every_corner_in_the_app_is_a_token():
     assert not left, left
     faces = (APP / "Shared" / "ButtonFaces.swift").read_text(encoding="utf-8")
     assert "let radius = Corners.control" in faces
+    look = (APP / "Player" / "Turntable" / "TurntableView.swift").read_text(encoding="utf-8")
+    look = look[look.index("private struct LookFace"):look.index("private struct LookGlyph")]
+    chip = (APP / "Player" / "NowPlayingView.swift").read_text(encoding="utf-8")
+    chip = chip[chip.index("private struct SpeedChipFace"):chip.index("private struct Backdrop")]
+    for face in (look, chip):
+        assert "let radius = Corners.control" in face
+    # the look button's highlight kept where it is square: its band down to the line's foot
+    assert "Rectangle().frame(height: max(radius, line))" in look
 
 
 def test_every_system_bordered_button_is_squared():
@@ -354,9 +365,11 @@ def test_the_play_bar_is_the_tab_bars_top():
 def test_the_bars_run_smooth_only_while_the_song_plays():
     # 15 Nov, James: "Can we make the progress bar smooth instead of updating every half second?" The seek line's part
     # played and Now Playing's bar (and its clocks) are drawn from a timeline of frames, 30 a second at most, that stops
-    # unless the song plays - paused, loading, under a finger, and for the play bar with Now Playing over it - and then
-    # they show shownPosition, as before. Between the ticker's readings they carry the last one on (Core's PlayClock),
-    # the engine not asked; the ticker and all it drives are as they were; VoiceOver's value stays on shownPosition.
+    # unless the song plays - paused, loading, under a finger, for the play bar with Now Playing over it, and (review)
+    # for Now Playing's bar unseen, on the turntable or under a sheet - and then they show shownPosition, as before.
+    # Between the ticker's readings they carry the last one on (Core's PlayClock), the engine not asked, and (review)
+    # through a wait - loading to play - they stand where they drew; the ticker and all it drives are as they were;
+    # VoiceOver's value stays on shownPosition.
     model = (APP / "Models" / "PlayerModel.swift").read_text(encoding="utf-8")
     mini = (APP / "Player" / "MiniPlayerView.swift").read_text(encoding="utf-8")
     scrubber = (APP / "Player" / "ScrubberView.swift").read_text(encoding="utf-8")
@@ -365,7 +378,8 @@ def test_the_bars_run_smooth_only_while_the_song_plays():
     assert "var barsRun: Bool { isPlaying && !isLoading }" in model
     reading = model[model.index("func barPosition(at now: Double) -> Double {"):]
     reading = reading[:reading.index("\n    }\n")]
-    assert "guard barsRun, let smooth, smooth.entry == heardEntry else { return shownPosition }" in reading
+    assert "guard barsRun || barsWait, let smooth, smooth.entry == heardEntry else { return shownPosition }" in reading
+    assert "private var barsWait: Bool { isPlaying && isLoading }" in model
     assert "PlayClock.shown(smooth, now: now)" in reading and "link" not in reading
     # the ticker: still twice a second, still driving the plays, Repeat's top-up, resume and the pace from `position`
     assert "Timer(timeInterval: 0.5, repeats: true)" in model
@@ -376,11 +390,16 @@ def test_the_bars_run_smooth_only_while_the_song_plays():
                  "if !isPlaying { stopTicking() }"):
         assert kept in tick
     assert "smooth = PlayClock.reading(entry: at.key, seconds: at.seconds, at: now, rate: speed, shown: before)" in tick
-    assert "if !barsRun { smooth = nil }" in tick
-    for view, runs in ((mini, "let runs = player.barsRun && held == nil && !navigation.nowPlayingShown"),
-                       (scrubber, "let runs = player.barsRun && held == nil")):
+    # stopped: a wait holds the reading where the bars drew (PlayClock.held), a pause drops it
+    assert "if !barsRun {\n            smooth = barsWait ? smooth.map" in tick and "PlayClock.held(reading, now: now)" in tick
+    # a speed restart's wait, past its hold, with no tick to say so: held there too, never dropped; a speed sent while
+    # they wait leaves it held
+    assert "if let reading = self.smooth { self.smooth = PlayClock.held(reading, now: now) }" in model
+    assert "self.smooth = nil" not in model and "if barsRun, let reading = smooth {" in model
+    for view, runs, timelines in ((mini, "let runs = player.barsRun && held == nil && !navigation.nowPlayingShown", 1),
+                                  (scrubber, "let runs = visible && player.barsRun && held == nil", 2)):
         assert runs in view
-        assert view.count("TimelineView(.animation(minimumInterval: PlayClock.frame, paused: !runs))") == 1
+        assert view.count("TimelineView(.animation(minimumInterval: PlayClock.frame, paused: !runs))") == timelines
         assert "let shown = Scrub.shownTime(held, position: player.shownPosition, length: length)" in view
         assert ".accessibilityValue(PlayerWords.scrubberValue(shown: shown, length: length))" in view
         # the frames' value is drawn inside the timeline alone
@@ -389,8 +408,21 @@ def test_the_bars_run_smooth_only_while_the_song_plays():
     # the seek line's timeline holds its fill alone; the scrubber's clocks are redrawn only when their words change
     fill = mini[mini.index("TimelineView("):]
     assert fill.index("Rectangle().fill(Palette.accent)") < fill.index("}")
+    # (review) the scrubber's two hold its fill and its clocks alone - the track and the touch outside them - and it
+    # runs only while it can be seen: Now Playing's flag, the turntable's look and the sheets over it
+    order = [scrubber.index(part) for part in ("Rectangle().fill(Color.primary.opacity(0.2))", "TimelineView(",
+                                               "Rectangle().fill(Color.primary.opacity(0.85))", ".gesture(press(",
+                                               "ScrubberClocks(elapsed:")]
+    assert order == sorted(order)
+    second = scrubber.index("TimelineView(", order[1] + 1)
+    assert order[3] < second < order[4]
+    assert scrubber.count("drawn(held, length: length)") == 2
+    assert "let visible: Bool" in scrubber
+    now_playing = (APP / "Player" / "NowPlayingView.swift").read_text(encoding="utf-8")
+    assert "ScrubberView(visible: !turntable && !sheetOver)" in now_playing
+    assert "private var sheetOver: Bool { showsUpNext || showsInfo || showsEQ || playlistPick != nil }" in now_playing
     assert "private struct ScrubberClocks: View, Equatable" in scrubber and ".equatable()" in scrubber
-    assert "PlayerWords.elapsed(shown: drawn)" in scrubber and "PlayerWords.remaining(shown: drawn, length: length)" in scrubber
+    assert "PlayerWords.elapsed(shown: time)" in scrubber and "PlayerWords.remaining(shown: time, length: length)" in scrubber
     # the lyrics keep their own clock
     assert "player.clock()" in (APP / "Player" / "LyricsView.swift").read_text(encoding="utf-8")
 
@@ -415,13 +447,17 @@ def test_the_librarys_top_sits_under_the_status_bar():
     assert [name for name, text in sources.items() if ".toolbar(.hidden, for: .navigationBar)" in text] == [
         "Library/LibraryView.swift"]
     # what reaches the top edge (any ignore but the bottom's alone): the Library top's fill, RootView's background, Now
-    # Playing's black and its blurred cover - a new one must be a fill too, or keep its content in the safe area
+    # Playing's black and its blurred cover, and (review) MainTabs's clear reader of the screen's layout - a new one must
+    # be a fill too, or keep its content in the safe area
     reaching = {}
     for name, text in sources.items():
         for line in text.splitlines():
             if ".ignoresSafeArea(" in line and "edges: .bottom" not in line:
                 reaching[name] = reaching.get(name, 0) + 1
-    assert reaching == {"Library/LibraryTop.swift": 1, "Root/RootView.swift": 1, "Player/NowPlayingView.swift": 2}
+    assert reaching == {"Library/LibraryTop.swift": 1, "Root/RootView.swift": 1, "Player/NowPlayingView.swift": 2,
+                        "Root/MainTabs.swift": 1}
+    tabs = sources["Root/MainTabs.swift"]
+    assert "Color.clear\n                .ignoresSafeArea()\n                .onGeometryChange(" in tabs
     now_playing = sources["Player/NowPlayingView.swift"]
     assert "Color.black.ignoresSafeArea()" in now_playing
     backdrop = now_playing[now_playing.index("private struct Backdrop"):]
@@ -446,6 +482,10 @@ def test_the_tab_bar_comes_down_into_the_home_indicators_room():
     assert ".environment(\\.tabBarRoom, keyboardUp ? 0 : CGFloat(TabBarFoot.room(content: barHeight, home: home)))" in tabs
     assert "AppTabBar(home: home)" in tabs and "barHeight = height" in tabs
     assert "window?.safeAreaInsets.bottom ?? 0" in tabs
+    # (review) read again whenever SwiftUI lays the screen out anew, never only when the body happens to be
+    assert "@State private var home: CGFloat = 0" in tabs and tabs.count("home = Self.windowHome()") == 2
+    assert ".onGeometryChange(for: [CGFloat].self)" in tabs
+    assert "[proxy.size.width, proxy.size.height, proxy.safeAreaInsets.bottom]" in tabs
     # the keyboard: the bar under it, the pages making no room meanwhile
     assert ".ignoresSafeArea(.keyboard, edges: .bottom)" in tabs and "keyboardUp = true" in tabs
 

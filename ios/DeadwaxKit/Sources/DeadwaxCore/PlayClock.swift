@@ -72,4 +72,13 @@ public enum PlayClock {
         return Reading(entry: reading.entry, seconds: here, at: now.isFinite ? now : reading.at,
                        rate: rate.isFinite && rate > 0 ? rate : 0, floor: here)
     }
+
+    /// The bars stopped for a wait - loading to play: a speed's restart past its hold, a seek's bytes, a stall - stand
+    /// still where they are at `now` (review, 15 Nov): the reading held there, at no rate, rather than dropped for the
+    /// last reading's seconds, which can be a tick behind what they drew (at a speed's restart, up to half a second at
+    /// the speed). A reading after the wait corrects it as any does - ahead gone to, behind by less than `holdWithin`
+    /// waited for - so through a wait they never draw backwards. Held again, a held reading stays where it is.
+    public static func held(_ reading: Reading, now: Double) -> Reading {
+        atRate(reading, rate: 0, now: now)
+    }
 }

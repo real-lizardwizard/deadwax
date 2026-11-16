@@ -43,13 +43,19 @@ final class PlayerModel {
         Scrub.reportedPosition(pendingSeek, position: position, now: Self.nowMs())
     }
     /// The bars run smooth (notes/ios.md "The bars, smooth"): playing and not loading - when the play bar's seek line
-    /// and Now Playing's scrubber are drawn every frame. Else they show `shownPosition`, and no frame runs.
+    /// and Now Playing's scrubber are drawn every frame. Else no frame runs, and they show `shownPosition` - or, while
+    /// they wait, where they stopped.
     var barsRun: Bool { isPlaying && !isLoading }
+    /// The bars wait (review, 15 Nov): loading to play - a speed's restart past its hold, a seek's bytes, a stall. They
+    /// stop, standing where they drew (PlayClock.held), not back at the last tick's reading. A pause isn't a wait: the
+    /// bars show where the song is, which is where Play goes on from.
+    private var barsWait: Bool { isPlaying && isLoading }
     /// What the seek line and the scrubber draw at `now` (monotonic seconds) while they run: the last reading of the entry
-    /// heard carried on at its speed (PlayClock) - a seek's target while it is on its way, as `shownPosition` - else
-    /// `shownPosition` itself. A read: nothing changes, and the engine isn't asked (its position waits on its queue).
+    /// heard carried on at its speed (PlayClock) - a seek's target while it is on its way, as `shownPosition` - and while
+    /// they wait, that reading held where they stopped; else `shownPosition` itself. A read: nothing changes, and the
+    /// engine isn't asked (its position waits on its queue).
     func barPosition(at now: Double) -> Double {
-        guard barsRun, let smooth, smooth.entry == heardEntry else { return shownPosition }
+        guard barsRun || barsWait, let smooth, smooth.entry == heardEntry else { return shownPosition }
         return Scrub.reportedPosition(pendingSeek, position: PlayClock.shown(smooth, now: now), now: Self.nowMs())
     }
     /// The entry heard's length: the engine's decoded length once it has one, else what Navidrome said (0 for none).
@@ -183,7 +189,8 @@ final class PlayerModel {
     /// The decoded length the engine reported for the entry heard.
     private var length: Double?
     private var pendingSeek: Scrub.PendingSeek?
-    /// The tick's last reading as the bars carry it on (PlayClock), while they run; nil else.
+    /// The tick's last reading as the bars carry it on (PlayClock), while they run; held where they stopped while they
+    /// wait (PlayClock.held); nil else.
     @ObservationIgnored private var smooth: PlayClock.Reading?
     private var normalizationSetting = Normalization.read(UserDefaults.standard.string(forKey: Normalization.storageKey))
     /// A song that failed to load is being asked for again (PlayerWords.retryDelaySeconds).
@@ -854,16 +861,21 @@ final class PlayerModel {
         reporter.speedChanged(send.speed)
         pace = []
         paceFrom = nil
-        if let reading = smooth { smooth = PlayClock.atRate(reading, rate: send.speed, now: Monotonic.seconds()) }
+        // running, the bars take the speed up at once; waiting, they stay held - the reading after the wait has it
+        if barsRun, let reading = smooth {
+            smooth = PlayClock.atRate(reading, rate: send.speed, now: Monotonic.seconds())
+        }
         if let link {
             if send.restarts, engineState.phase == .playing || speedHold.hiding, let key = engineState.key {
                 speedHold.asked(entry: key, at: Monotonic.seconds())
                 DispatchQueue.main.asyncAfter(deadline: .now() + SpeedRestartHold.seconds) { [weak self] in
                     MainActor.assumeIsolated {
                         // a restart still loading past the hold is a real wait: it shows
-                        guard let self, self.speedHold.expired(at: Monotonic.seconds()) else { return }
-                        // the bars stop for it, with no tick to say so: a reading from before the wait carries nothing on
-                        self.smooth = nil
+                        let now = Monotonic.seconds()
+                        guard let self, self.speedHold.expired(at: now) else { return }
+                        // the bars stop for it, with no tick to say so: standing where they drew - never back to the
+                        // last tick's reading, up to half a second at the speed behind them (review, 15 Nov)
+                        if let reading = self.smooth { self.smooth = PlayClock.held(reading, now: now) }
                         self.showNowPlaying()
                     }
                 }
@@ -1197,17 +1209,22 @@ final class PlayerModel {
     private func tick() {
         guard let link else { return }
         follow()
+        let now = Monotonic.seconds()
         if let at = link.position(), let entry = current, at.key == link.engineKey(entry.key) {
             // what the bars showed as it came: they never go back from it by less than a seek's landing (PlayClock)
-            let now = Monotonic.seconds()
             let before = barPosition(at: now)
             position = at.seconds
             length = at.length
             pendingSeek = Scrub.settled(pendingSeek, position: at.seconds, now: Self.nowMs())
             smooth = PlayClock.reading(entry: at.key, seconds: at.seconds, at: now, rate: speed, shown: before)
         }
-        // stopped (paused, loading, a retry's wait): nothing carried on, so a play goes on from what they showed
-        if !barsRun { smooth = nil }
+        // waiting to play (loading): the bars stand where they drew, the reading held; stopped (paused, a retry's
+        // wait): nothing carried on, so a play goes on from what they showed
+        if !barsRun {
+            smooth = barsWait ? smooth.map { (reading: PlayClock.Reading) -> PlayClock.Reading in
+                PlayClock.held(reading, now: now)
+            } : nil
+        }
         if engineState.phase == .playing {
             measurePace()
             reporter.tick(position: position, duration: duration)

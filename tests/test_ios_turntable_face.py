@@ -186,7 +186,7 @@ def test_the_scrubbers_row_never_asks_for_height():
     hidden scrubber's; nothing in it may ask for more.
     """
     view = (APP / "Player" / "NowPlayingView.swift").read_text()
-    row = braced(view, "ZStack {\n                ScrubberView()")
+    row = braced(view, "ZStack {\n                ScrubberView(visible:")
     assert "TurntableTimeLine()" in row
     assert "maxHeight" not in row
     line = braced((APP / "Player" / "Turntable" / "TurntableView.swift").read_text(), "struct TurntableTimeLine: View")

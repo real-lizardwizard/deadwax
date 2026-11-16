@@ -30,6 +30,11 @@ struct MainTabs: View {
     @State private var barHeight: CGFloat = 0
     /// The keyboard is up, over the bar: the pages and the player make no room for the bar meanwhile.
     @State private var keyboardUp = false
+    /// The home indicator's room at the screen's foot (TabBarFoot): the window's own bottom safe area - 34 on a Face ID
+    /// iPhone, 0 with a Home button. A window's rather than a view's, so it never counts the keyboard; read again each
+    /// time SwiftUI lays the screen out anew (review, 15 Nov), so a first read before the window has its insets can't
+    /// leave the tabs over the home indicator.
+    @State private var home: CGFloat = 0
 
     var body: some View {
         @Bindable var navigation = navigation
@@ -48,6 +53,18 @@ struct MainTabs: View {
             // under the keyboard, as iOS's bar was - never riding up on it
             .ignoresSafeArea(.keyboard, edges: .bottom)
         }
+        // the screen laid out anew - its first pass, a resize, its safe area changed: the home indicator's room read
+        // again. A view over the whole screen says when; the window says what (never the keyboard's room).
+        .background {
+            Color.clear
+                .ignoresSafeArea()
+                .onGeometryChange(for: [CGFloat].self) { (proxy: GeometryProxy) -> [CGFloat] in
+                    [proxy.size.width, proxy.size.height, proxy.safeAreaInsets.bottom]
+                } action: { (_: [CGFloat]) -> Void in
+                    home = Self.windowHome()
+                }
+        }
+        .onAppear { home = Self.windowHome() }
         .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillShowNotification)) {
             (_: Notification) -> Void in
             keyboardUp = true
@@ -79,9 +96,8 @@ struct MainTabs: View {
         .onDisappear { requests.watch(.hidden) }
     }
 
-    /// The home indicator's room at the screen's foot (TabBarFoot): the window's own bottom safe area - 34 on a Face ID
-    /// iPhone, 0 with a Home button. A window's rather than a view's, so it never counts the keyboard.
-    private var home: CGFloat {
+    /// The key window's bottom safe area (`home`'s), 0 before there is a window.
+    @MainActor private static func windowHome() -> CGFloat {
         let scenes = UIApplication.shared.connectedScenes.compactMap { (scene: UIScene) -> UIWindowScene? in
             scene as? UIWindowScene
         }
