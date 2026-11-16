@@ -1925,7 +1925,7 @@ says lived in components, so it moved, word for word and rule for rule, with not
   permissions.sim and routes.sim, which compile albumEdit.ts with no rootDir, would find it under lib/ instead of at
   their output's root.
 - **Not moved**: SettingsView's (`tabForGroup`, `tabMarks`, `retypeSecretNote`, `editedEnvDraft`) - the slice that
-  ports Server settings moves them. Nor the release search's, the fields' or the cover checkbox's words, which the
+  ports Server settings moves them (they moved in 2.1.33, below). Nor the release search's, the fields' or the cover checkbox's words, which the
   phone words its own way (the spec's 3.3).
 - **Where the JSX had two text pieces** (the merge's sentence and its "stays behind"; the summary's count and its
   clauses; the delete counts' tracks and size) it now draws one string of the same text.
@@ -1936,3 +1936,20 @@ says lived in components, so it moved, word for word and rule for rule, with not
   applied), against the new functions over 5,901 inputs - none differed. app-rules.sim.cjs's Lyrics re-timing check and
   mylibrary.sim.cjs's delete-warning order read the constants now; vocabulary.sim.cjs's batch 5 scans retagPlan.ts and
   tagEdit.ts too.
+
+### Server settings' rules, moved into lib/ (2.1.33)
+
+The iPhone app's Phase 8, slice 8 (notes/ios-specs/phase8-managing.md on `ios`, sections 7 and 12) ports Server
+settings, and its exporter (`ios/scripts/export-server-vectors.cjs`) runs the web's rules as they are. Four of them
+lived in components/SettingsView.tsx beside the rows that draw them, so they moved to **lib/serverSettings.ts**, word
+for word, with nothing a user sees changed: `tabForGroup` (a group's tab, an unknown one under Library), `tabMarks`
+(a tab's "attention" or "unsaved"), `retypeSecretNote` with its table `RETYPE_WITH_ADDRESS` (the note beside a secret
+whose address changed without it, and the revert's other half), and `editedEnvDraft` (a value set back to the saved one
+is no draft, a secret's always is). The `SettingsTab` type moved with them, since `tabForGroup` returns it; the lib
+imports only types from api/settings.ts and `SAVED_ANSWERS_GROUP` from lib/musicbrainzAnswers.ts. SettingsView's
+`ServerGroup` imports `retypeSecretNote` back; app/ServerSettings.tsx imports the other three and the type from the lib.
+
+- **Held by** ui/test/settingslog.sim.cjs, which called `retypeSecretNote` and `tabForGroup` through SettingsView and
+  calls them through the lib now, and checks the four are the lib's alone - SettingsView defines none of them nor the
+  table, and each file imports what it draws from the lib. tests/test_compose_example.py's check of the draft rule
+  (a value equal to the saved one dropped) reads lib/serverSettings.ts now.

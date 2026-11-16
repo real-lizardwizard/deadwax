@@ -1,11 +1,11 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'preact/hooks'
 
 import { getServerSettings, saveServerSettings, type ServerSetting, type ServerSettings as Settings, type SettingUpdate } from '../api/settings'
-import { OrganizingVerdict, ServerGroup, editedEnvDraft, tabForGroup, tabMarks, type SettingsTab } from '../components/SettingsView'
+import { OrganizingVerdict, ServerGroup } from '../components/SettingsView'
 import { RetimeLyrics } from '../components/RetimeLyrics'
 import { MusicBrainzAnswers } from '../components/MusicBrainzAnswers'
 import { SAVED_ANSWERS_GROUP, SAVED_ANSWERS_PATH, savedAnswersKey } from '../lib/musicbrainzAnswers'
-import { SERVER_TABS, draftsAfterSave, serverTabAfter } from '../lib/serverSettings'
+import { SERVER_TABS, draftsAfterSave, editedEnvDraft, serverTabAfter, tabForGroup, tabMarks, type SettingsTab } from '../lib/serverSettings'
 import { MANAGING_ADMINS_ONLY } from '../lib/appRoutes'
 import { isAbort, latestOnly } from '../lib/latest'
 import { ChevronLeftIcon } from '../player/icons'
