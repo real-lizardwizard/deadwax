@@ -123,7 +123,60 @@ import Testing
         #expect(transport.last?.url.absoluteString == "http://192.168.3.20:8090/deadwax/navidrome/cover/al-1_0")
         #expect(transport.last?.url.query == nil)
         #expect(transport.last?.headers["Accept"] == "image/*")
-        // the sized one is unchanged
+        // read no further than 30 MB; the sized one is unchanged, with no limit
+        #expect(transport.last?.mostBytes == 30 * 1024 * 1024)
         #expect(deadwax.coverRequest(coverID: "al-1_0", size: CoverSize.hero).url.query == "size=1024")
+        #expect(deadwax.coverRequest(coverID: "al-1_0", size: CoverSize.hero).mostBytes == nil)
+    }
+
+    @Test func aFullCoverPastThirtyMegabytesIsRefused() async throws {
+        let (deadwax, transport) = client()
+        let most = CoverZoom.fullMostBytes
+        transport.handle("/deadwax/navidrome/cover/al-2_0") { _ in
+            HTTPResponse(status: 200, headers: ["Content-Type": "image/png"], body: Data(count: most + 1))
+        }
+        transport.handle("/deadwax/navidrome/cover/al-3_0") { _ in
+            HTTPResponse(status: 200, headers: ["Content-Type": "image/png"], body: Data(count: most))
+        }
+        // a transport that read it all: refused here, as the app's transport refuses it as it reads
+        await #expect(throws: HTTPTooLarge(most: most)) { try await deadwax.fullCover(coverID: "al-2_0") }
+        #expect(try await deadwax.fullCover(coverID: "al-3_0").count == most)
+        #expect(CoverZoom.reads(bytes: most) && !CoverZoom.reads(bytes: most + 1))
+    }
+
+    @Test func aTransportsTooLargeIsSaidAsItself() async throws {
+        // the app's transport calls the read off past the request's most, and throws HTTPTooLarge: never "no answer"
+        let server = try ServerAddress.parse("192.168.3.20:8090").get()
+        let deadwax = DeadwaxClient(server: server, session: nil, transport: CalledOff())
+        await #expect(throws: HTTPTooLarge(most: CoverZoom.fullMostBytes)) {
+            try await deadwax.fullCover(coverID: "al-4_0")
+        }
+    }
+
+    @Test func onlyAFullCoverUpToTenMegabytesIsKeptOnceClosed() {
+        #expect(CoverZoom.keptMostBytes == 10 * 1024 * 1024)
+        #expect(CoverZoom.keeps(bytes: 3 * 1024 * 1024))
+        #expect(CoverZoom.keeps(bytes: CoverZoom.keptMostBytes))
+        #expect(!CoverZoom.keeps(bytes: CoverZoom.keptMostBytes + 1))
+        #expect(!CoverZoom.keeps(bytes: 0))
+    }
+
+    @Test func aCoverOpensOnlyWithAPictureOfItShown() {
+        // drawn by Now Playing, or kept with a downloaded album
+        #expect(CoverZoom.opens(coverID: "al-1_0", drawn: true, kept: false))
+        #expect(CoverZoom.opens(coverID: "al-1_0", drawn: false, kept: true))
+        // the grey square - loading, or failed - opens nothing
+        #expect(!CoverZoom.opens(coverID: "al-1_0", drawn: false, kept: false))
+        // no cover id, none
+        #expect(!CoverZoom.opens(coverID: nil, drawn: true, kept: true))
+        #expect(!CoverZoom.opens(coverID: " ", drawn: true, kept: true))
+        #expect(CoverViewerWords.notYet == "The cover hasn't loaded.")
+    }
+}
+
+/// A transport that calls every read off past its request's most, as the app's does with a cover past 30 MB.
+private struct CalledOff: HTTPTransport {
+    func send(_ request: HTTPRequest) async throws -> HTTPResponse {
+        throw HTTPTooLarge(most: request.mostBytes ?? 0)
     }
 }

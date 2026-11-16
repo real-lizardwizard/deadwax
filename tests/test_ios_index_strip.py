@@ -70,8 +70,10 @@ def test_voiceovers_jump_to_stops_the_list_too():
 def test_the_stop_is_uikits_own_and_only_for_momentum():
     stop = code(STOP)
     body = block(stop, stop.index("func stop() {") + len("func stop() {") - 1)
-    # never a list under a finger, nothing at rest
-    assert "guard let scrollView, scrollView.isDecelerating, !scrollView.isDragging else { return }" in body
+    # only a list gliding by momentum - UIKit's isDecelerating, which is the finger up already, and nothing else to
+    # leave a real fling unstopped (review: an isDragging guard too could)
+    assert "guard let scrollView, scrollView.isDecelerating else { return }" in body
+    assert "isDragging" not in body
     # setContentOffset(_:animated: false) ends a deceleration and tells the delegate (the contentOffset setter doesn't)
     assert "scrollView.setContentOffset(scrollView.contentOffset, animated: false)" in body
     # found from inside the list's content: the nearest scroll view up its superviews, the list's own (the Library's

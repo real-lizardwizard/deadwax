@@ -454,8 +454,16 @@ def test_the_librarys_top_sits_under_the_status_bar():
         for line in text.splitlines():
             if ".ignoresSafeArea(" in line and "edges: .bottom" not in line:
                 reaching[name] = reaching.get(name, 0) + 1
+    # The cover full screen's two (notes/ios.md "The cover, full screen"): its black ground, a fill, and the zoomed
+    # picture, edge to edge as Photos' is, with the status bar hidden - its ✕ keeps to the safe area.
     assert reaching == {"Library/LibraryTop.swift": 1, "Root/RootView.swift": 1, "Player/NowPlayingView.swift": 2,
-                        "Root/MainTabs.swift": 1}
+                        "Root/MainTabs.swift": 1, "Player/CoverViewer.swift": 2}
+    viewer = sources["Player/CoverViewer.swift"]
+    assert "Palette.page\n                .opacity(ground)\n                .ignoresSafeArea()\n" in viewer
+    assert "onDrag: held, onClose: close)\n                .ignoresSafeArea()\n" in viewer
+    assert ".statusBarHidden(true)" in viewer
+    close = viewer[viewer.index("CoverCloseButton(action: close)\n"):viewer.index(".statusBarHidden(true)")]
+    assert "ignoresSafeArea" not in close
     tabs = sources["Root/MainTabs.swift"]
     assert "Color.clear\n                .ignoresSafeArea()\n                .onGeometryChange(" in tabs
     now_playing = sources["Player/NowPlayingView.swift"]

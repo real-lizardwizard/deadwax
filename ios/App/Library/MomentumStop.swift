@@ -23,10 +23,11 @@ final class MomentumStop {
 
     init() {}
 
-    /// The list stopped where it is, if it is still moving by momentum - never under a finger dragging it, and nothing
-    /// at rest. The jump that follows then takes.
+    /// The list stopped where it is, if it is still moving by momentum - nothing at rest. `isDecelerating` is UIKit's
+    /// own "the finger is up and it glides on" (a finger on the list stops a glide and ends it), so it asks no more. The
+    /// jump that follows then takes.
     func stop() {
-        guard let scrollView, scrollView.isDecelerating, !scrollView.isDragging else { return }
+        guard let scrollView, scrollView.isDecelerating else { return }
         scrollView.setContentOffset(scrollView.contentOffset, animated: false)
     }
 }

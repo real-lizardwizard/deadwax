@@ -29,17 +29,21 @@ final class URLSessionTransport: HTTPTransport, @unchecked Sendable {
         lock.withLock { listener }?(answered)
     }
 
-    private func session(waiting timeout: Double) -> URLSession {
-        lock.lock()
-        defer { lock.unlock() }
-        if let session = sessions[timeout] { return session }
+    private static func configuration(waiting timeout: Double) -> URLSessionConfiguration {
         let configuration = URLSessionConfiguration.ephemeral
         configuration.httpShouldSetCookies = false
         configuration.httpCookieAcceptPolicy = .never
         configuration.requestCachePolicy = .reloadIgnoringLocalCacheData
         configuration.urlCache = nil
         configuration.timeoutIntervalForRequest = timeout
-        let session = URLSession(configuration: configuration)
+        return configuration
+    }
+
+    private func session(waiting timeout: Double) -> URLSession {
+        lock.lock()
+        defer { lock.unlock() }
+        if let session = sessions[timeout] { return session }
+        let session = URLSession(configuration: Self.configuration(waiting: timeout))
         sessions[timeout] = session
         return session
     }
@@ -51,9 +55,18 @@ final class URLSessionTransport: HTTPTransport, @unchecked Sendable {
         let data: Data
         let response: URLResponse
         do {
-            (data, response) = try await session(waiting: timeout).data(for: sent)
+            if let most = request.mostBytes {
+                (data, response) = try await CappedRead.read(sent, most: most,
+                                                             configuration: Self.configuration(waiting: timeout))
+            } else {
+                (data, response) = try await session(waiting: timeout).data(for: sent)
+            }
         } catch let error as URLError where error.code != .cancelled {
             heard(false)
+            throw error
+        } catch let error as HTTPTooLarge {
+            // deadwax answered, with more than the request reads
+            heard(true)
             throw error
         }
         heard(true)
@@ -76,5 +89,91 @@ extension URLRequest {
         for (name, value) in request.headers { setValue(value, forHTTPHeaderField: name) }
         httpBody = request.body
         if let timeout = request.timeout { timeoutInterval = timeout }
+    }
+}
+
+/// A body read as it comes and called off past `most` bytes - at once when the answer's Content-Length says it will
+/// be - so a file too big to hold is never held whole: the cover viewer's full size, past CoverZoom.fullMostBytes
+/// (notes/ios.md "The cover, full screen"). Its own URLSession, for the delegate, let go as the read ends; a task
+/// cancelled calls the read off too.
+private final class CappedRead: NSObject, URLSessionDataDelegate, @unchecked Sendable {
+    private let most: Int
+    private let lock = NSLock()
+    private var body = Data()
+    private var answer: URLResponse?
+    private var over = false
+    private var waiting: CheckedContinuation<(Data, URLResponse), Error>?
+    /// The read's end, when it came before anything waited for it (a task cancelled before it began).
+    private var ended: Result<(Data, URLResponse), Error>?
+
+    private init(most: Int) {
+        self.most = most
+    }
+
+    static func read(_ request: URLRequest, most: Int,
+                     configuration: URLSessionConfiguration) async throws -> (Data, URLResponse) {
+        let reader = CappedRead(most: most)
+        let session = URLSession(configuration: configuration, delegate: reader, delegateQueue: nil)
+        defer { session.finishTasksAndInvalidate() }
+        let task = session.dataTask(with: request)
+        return try await withTaskCancellationHandler {
+            try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<(Data, URLResponse), Error>) in
+                let early: Result<(Data, URLResponse), Error>? = reader.lock.withLock {
+                    if let ended = reader.ended { return ended }
+                    reader.waiting = continuation
+                    return nil
+                }
+                if let early {
+                    continuation.resume(with: early)
+                } else {
+                    task.resume()
+                }
+            }
+        } onCancel: {
+            task.cancel()
+        }
+    }
+
+    func urlSession(_ session: URLSession, dataTask: URLSessionDataTask, didReceive response: URLResponse,
+                    completionHandler: @escaping (URLSession.ResponseDisposition) -> Void) {
+        let past = response.expectedContentLength > Int64(most)
+        lock.withLock {
+            answer = response
+            if past { over = true }
+        }
+        completionHandler(past ? .cancel : .allow)
+    }
+
+    func urlSession(_ session: URLSession, dataTask: URLSessionDataTask, didReceive data: Data) {
+        let past: Bool = lock.withLock {
+            guard !over else { return false }
+            body.append(data)
+            guard body.count > most else { return false }
+            over = true
+            body = Data()
+            return true
+        }
+        if past { dataTask.cancel() }
+    }
+
+    func urlSession(_ session: URLSession, task: URLSessionTask, didCompleteWithError error: Error?) {
+        let (continuation, result) = lock.withLock {
+            () -> (CheckedContinuation<(Data, URLResponse), Error>?, Result<(Data, URLResponse), Error>) in
+            let result: Result<(Data, URLResponse), Error>
+            if over {
+                result = .failure(HTTPTooLarge(most: most))
+            } else if let error {
+                result = .failure(error)
+            } else if let answer {
+                result = .success((body, answer))
+            } else {
+                result = .failure(URLError(.badServerResponse))
+            }
+            let continuation = waiting
+            waiting = nil
+            if continuation == nil { ended = result }
+            return (continuation, result)
+        }
+        continuation?.resume(with: result)
     }
 }

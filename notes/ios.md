@@ -10192,17 +10192,19 @@ by a swipe down, ✕ or VoiceOver's escape. The rules are DeadwaxCore's `CoverZo
 ios/App/Player/CoverViewer.swift (the tap, the presentation, the loading) and CoverZoomView.swift (the zoom), and one
 line in NowPlayingView.swift.
 
-- **A tap, never the drag.** The cover is also Now Playing's grip: its `DragGesture` on the whole face closes Now
-  Playing by a drag down. The cover takes `.onTapGesture` alone (`opensCoverFullScreen(track)`, after its clip): the grip's
-  drag begins after 6 points' movement (`PlayerWords.dragStartDistance`) and the tap fails when it does, so a drag is
-  still entirely the grip's, unchanged. Only the plain
-  cover's branch has it: Lyrics' and the turntable's places open nothing. A song with no cover opens nothing and the
-  grey square isn't a button to VoiceOver.
-- **The presentation**: `fullScreenCover(item:)` with the transaction's animations off (no slide up) and a
+- **A tap, never the drag.** The cover is also Now Playing's grip: its `DragGesture` on the cover's room closes Now
+  Playing by a drag down. The cover takes `.onTapGesture` alone (`opensCoverFullScreen(track, into: $viewing)`, after
+  its clip), and since the review the room holds the grip as `.highPriorityGesture` (see "The cover and the index after
+  review" below): a drag is the grip's from its first 6 points (`PlayerWords.dragStartDistance`), and the tap fires at
+  lift only when no drag began. Only the plain cover's branch has it: Lyrics' and the turntable's places open nothing.
+  Only a cover shown opens (`CoverZoom.opens`, after review); a song with no cover id isn't a button to VoiceOver.
+- **The presentation**: `fullScreenCover(item:)`, on Now Playing's root since the review (`coverViewer($viewing)`),
+  with the transaction's animations off (no slide up) and a
   `.clear` presentation background, then a 0.2-second ease-out fade of the viewer's own ground and cover; closing fades
   out first, then dismisses. The ground is `Palette.page`, new: theme.css's `--dw-bg` #000, the darkest of the app's
-  grounds (`test_ios_cover_viewer.py` holds it to theme.css). The status bar is hidden while it shows. ✕ is a 36-point
-  glyph on `Palette.card` in `Corners.controlShape`, with a 44-point target, top right.
+  grounds (`test_ios_cover_viewer.py` holds it to theme.css). The status bar is hidden while it shows. ✕ is a glyph
+  on a 36-point square (scaled with the text since the review) of `Palette.card` in `Corners.controlShape`, with a
+  44-point target, top right.
 - **Drawn at once, then the full size.** The viewer opens on the cover Now Playing already has (CoverCache's
   largest step kept, 1024 down to 128; else the downloaded album's KeptCovers file at the hero size), then asks
   `fullCover(coverID:)` - the existing relay, `/deadwax/navidrome/cover/{cover_id}`, with no `size`, which the route
@@ -10212,7 +10214,7 @@ line in NowPlayingView.swift.
   and crossfaded in over the drawn one (0.2 s; at once under Reduce Motion) where it was, keeping the zoom and the
   place. It's only shown if it's at least as big as what's drawn (`showsFull`). Offline it asks nothing. The last
   cover's bytes are kept, one cover at a time, so opening it again fetches nothing (only the decode again); a memory
-  warning lets them go.
+  warning lets them go. Since the review the read stops past 30 MB and only a file up to 10 MB is kept.
 - **The zoom: a UIScrollView, through UIViewRepresentable.** iOS 17's SwiftUI has no zooming scroll view, so a pinch
   about the fingers, a pan that carries on after a flick and stops at the edges, a spring past the zoom's ends and
   zoom-to-a-rect would all be gestures written by hand and tuned without a phone. UIScrollView is the way Photos'
@@ -10286,8 +10288,8 @@ same way is what check 279 asks. Catalyst's scroll view is iOS's, not AppKit's, 
 hidden from VoiceOver, that finds the nearest UIScrollView up its superviews (the list's own; the pager is further up)
 and holds it weakly - and hands it to `ShelfIndexStrip(momentum:)`. At touch-down, the first `onChanged` (press
 still nil), the strip calls `momentum.stop()` before reading the entry and jumping; VoiceOver's "Jump to" buttons do
-the same. `stop()` does nothing unless the list is decelerating and not being dragged, so a list at rest, or under
-another finger, is untouched. Everything else is the strip's as it was: entryAt over the strip as drawn at
+the same. `stop()` does nothing unless the list is decelerating - UIKit's own "the finger is up and it glides on"
+(the `isDragging` guard it had at first was dropped in review) - so a list at rest is untouched. Everything else is the strip's as it was: entryAt over the strip as drawn at
 touch-down, the jump at once, the haptic tick per jump, the strip's own DragGesture, and the pull to shuffle on the
 same ScrollView. The only two uses of the strip are AlbumsScreen (grid and list, Title, Artist and the Year sorts) and
 ArtistsScreen.
@@ -10312,3 +10314,69 @@ source tests and the full pytest suite. **Not verified** - only the phone can te
 fling on Albums (grid and list) and Artists, and the Year sorts' decades - that it stops and jumps at once, with one
 tick; that a list at rest, the pull to shuffle, a touch on the list itself and VoiceOver's Jump to are as they were
 (docs/ios.md checks 279-281).
+
+## The cover and the index after review (2026-11-15)
+
+The review of e1b0653 and 06b6e4f, in one commit. Checks still 271-281.
+
+- **The viewer closed itself as Lyrics took the cover's place.** `viewing` and `.fullScreenCover` were on the cover,
+  the last branch of Now Playing's Lyrics / turntable / cover switch. With Lyrics on and a song with none, the next
+  song (or deadwax coming back, `.notKept` to `.unknown`) made `lyricsShown` true, the cover's branch went, and the
+  viewer with it, mid-zoom. Now the state is Now Playing's (`@State private var viewing: ViewedCover?`) and the
+  presentation is on its root beside its sheets (`.coverViewer($viewing, onDismiss: eqAfterSheet)`, in
+  CoverViewer.swift); the cover keeps only the tap and VoiceOver's button (`opensCoverFullScreen(track, into:)`, a
+  binding). test_ios_cover_viewer.py holds where it lives: in `var body` after the root's offset, after the sheets,
+  once, never in `content(_:)`, and CoverOpens with no `@State` and no presentation.
+- **The tap against the grip.** A child's `.onTapGesture` under a parent's plain `.gesture(DragGesture)` has
+  precedence, so the drag began only once the tap failed - at the tap's own slop, which is undocumented, not at the
+  grip's 6 points: the sheet could start late and jump, and a short drag could open the viewer. The cover's room now
+  holds the grip as `.highPriorityGesture(grip)`: the grip wins from its first `dragStartDistance`, and the tap fires
+  at lift only when no drag began (the drag fails at lift if it never moved 6 points). Only the room changed: the top
+  row keeps its plain `.gesture(grip)` (its chevron and look button are buttons, which a high-priority drag would sit
+  over), Lyrics and the turntable are outside the grip as before, and the transport, scrubber and footer have their own
+  gestures. Read from SwiftUI's documented precedence, not measured - check 271 is the phone's word on it.
+- **Placeholder or failed covers (check 272 was wrong).** Navidrome gives nearly every song a coverArt id, and answers
+  an album with no art with its own placeholder - so "a song with no cover opens nothing" almost never held. Decided:
+  a cover opens once a picture of it is shown - drawn by Now Playing (any size in CoverCache) or kept with a downloaded
+  album (`CoverZoom.opens(coverID:drawn:kept:)`, Core-tested). Navidrome's placeholder is such a picture (deadwax can't
+  tell it from art: a 200 with an image) and opens as drawn; the grey square of a cover still loading or that failed
+  opens nothing, and VoiceOver's double-tap on it says "The cover hasn't loaded." (`CoverViewerWords.notYet`). The
+  button is hidden from VoiceOver only for a song with no cover id. Not covered: CoverCache (an NSCache) letting go of
+  Now Playing's cover while it's still drawn would make a tap open nothing until it's drawn again - unlikely within 96
+  MB, with Now Playing's the cover used last.
+- **The spinner and the empty square** are under the image's fade, follow the drag down (`offset(y: dragged)`), and
+  take no touch (`allowsHitTesting(false)`) - the zoom beneath has them, so a drag down on them still closes; the
+  square is hidden from VoiceOver (the zoom is the cover, named, already).
+- **Size caps.** The full cover is read no further than `CoverZoom.fullMostBytes`, 30 MB (a 6000-pixel JPEG scan is
+  about 5 to 15): `fullCoverRequest` sets the new `HTTPRequest.mostBytes`, and the app's transport reads such a request
+  through a delegate (`CappedRead`, its own URLSession, let go as it ends), refusing at the answer when its
+  Content-Length is past it and calling the task off as the body passes it otherwise (whether Navidrome sends a cover's
+  length isn't checked here; the relay passes one on when it does) - throwing `HTTPTooLarge`, which the client passes
+  on as itself, not as "no
+  answer"; `fullCover` refuses a body past it too, for a transport that read it all. The cover drawn stays. A task
+  cancelled (the viewer closed) calls the read off; a read that ended before anything waited is kept for it. After
+  close, `FullCovers` keeps a file only up to `CoverZoom.keptMostBytes`, 10 MB (a 3000-pixel JPEG is about 1 to 5): a
+  larger one is let go and asked again next time.
+- **`MomentumStop.stop()`'s `!isDragging`** is gone: `isDecelerating` already means the finger is up, and the extra
+  guard could only leave a real fling unstopped.
+- **A shared EQ file while the viewer is up** waits for it too: `shared()` closes the viewer (instantly, with no
+  fade) and its `onDismiss` opens the EQ, as Up Next and Info do.
+- **✕ at the largest text sizes.** Its glyph grew with Dynamic Type inside a fixed 36-point square. The button is a
+  view of its own now, its square `@ScaledMetric(relativeTo: .body)` from 36, and the viewer holds it at
+  `...DynamicTypeSize.accessibility1`, so the glyph and its square grow together and stop there.
+- **The safe area (met in the merge of ios's b70e4a9).** "The Library's top, clear of the Dynamic Island" holds the
+  list of views that reach under the status bar, each a fill or keeping its content in the safe area. The viewer's two
+  are on it now: its black ground, a fill, and the zoomed picture, edge to edge as Photos' is, with the status bar
+  hidden; at rest a square cover fitted to the width sits well clear of the island, and ✕ keeps to the safe area
+  (test_ios_palette.py holds all three).
+
+**Tests**: CoverViewerTests adds the request's 30 MB and the sized one's none, a body past 30 MB refused and one at
+it read, a transport's HTTPTooLarge said as itself, the 10 MB kept rule and the opening rule;
+test_ios_cover_viewer.py adds the presentation's place, the grip's priority on the room alone, the EQ's wait, the
+placeholder, the caps through the transport and the ✕'s scaling; test_ios_index_strip.py holds the stop with no
+isDragging.
+
+**Verified**: the Core tests and the full swift test, the unsigned Debug device build (no warnings), the source tests
+and the full pytest suite. **Not verified** - only the phone can tell: the grip from its first points and the tap at
+lift (check 271), the placeholder and the grey square (272), ✕ at the largest text (276), and the viewer staying up as
+the song changes with Lyrics on, and a shared EQ file (278). The capped read hasn't met a real file over 30 MB.

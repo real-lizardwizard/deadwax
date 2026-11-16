@@ -3,12 +3,14 @@ The iPhone app's cover, full screen (notes/ios.md "The cover, full screen"; Jame
 the play screen it should become full screen so you can zoom in and look at it").
 
 Read from the Swift source, as the other ios tests read theirs: only a tap on Now Playing's cover opens the viewer -
-never the lyrics' or the turntable's place, and the drag that closes Now Playing stays the cover's parent's; the viewer
-is presented with no slide, on the page's black (theme.css's --dw-bg), the status bar hidden, closed by the button, a
-drag down at rest and VoiceOver's escape; the zoom is a UIScrollView that stops at the image's edges, double-taps, and
-is one adjustable VoiceOver element; the full size is asked with no size, and the route passes none to Navidrome; and
-nothing in the viewer touches the player. Core's rules (CoverZoom, CoverViewerWords, DeadwaxClient.fullCover) are held
-by CoverViewerTests.swift.
+never the lyrics' or the turntable's place, and only a cover shown - and the drag that closes Now Playing is the
+cover's room's at a high priority, so it wins from its first points; the viewer is Now Playing's, presented from its
+root (so Lyrics taking the cover's place never closes it), with no slide, on the page's black (theme.css's --dw-bg),
+the status bar hidden, closed by the button, a drag down at rest and VoiceOver's escape, and a shared EQ file waits for
+it; the zoom is a UIScrollView that stops at the image's edges, double-taps, and is one adjustable VoiceOver element;
+the full size is asked with no size, the route passes none to Navidrome, it is read no further than 30 MB and kept
+after closing up to 10; and nothing in the viewer touches the player. Core's rules (CoverZoom, CoverViewerWords,
+DeadwaxClient.fullCover) are held by CoverViewerTests.swift.
 """
 
 import asyncio
@@ -63,41 +65,101 @@ def func(text: str, name: str) -> str:
     return block(text, found[0].end() - 1)
 
 
+def body_of(source: str) -> str:
+    """Now Playing's `var body`, the root its presentations hang from."""
+    return block(source, source.index("{", source.index("var body: some View {")))
+
+
 def test_only_a_tap_on_now_playings_cover_opens_it():
     source = code(NOW_PLAYING)
     # once, and on the cover itself: the lyrics' and the turntable's places come before it and have none
-    assert source.count(".opensCoverFullScreen(track)") == 1
+    assert source.count(".opensCoverFullScreen(track, into: $viewing)") == 1
     lyrics = source.index("lyricsFace(track)\n")
     turntable = source.index("TurntableView()")
     cover = source.index("CoverImage(id: track.coverArt, size: 360)")
-    opens = source.index(".opensCoverFullScreen(track)")
-    room = source.index(".gesture(grip)", cover)
+    opens = source.index(".opensCoverFullScreen(track, into: $viewing)")
+    room = source.index(".highPriorityGesture(grip)", cover)
     assert lyrics < turntable < cover < opens < room
-    # on the cover's own shape (after its clip), not the room around it, which stays the grip's
+    # on the cover's own shape (after its clip), not the room around it, which is the grip's
     assert source.index(".clipShape(Corners.artShape)", cover) < opens
-    # the drag that closes Now Playing is untouched: the top row's and the cover's room, begun past dragStartDistance
-    assert source.count(".gesture(grip)") == 2
-    grip = source[source.index("private var grip: some Gesture"):]
-    assert "DragGesture(minimumDistance: PlayerWords.dragStartDistance, coordinateSpace: .global)" in grip
-    # a tap, never a drag of the viewer's own on the cover; a song with no cover opens nothing
+    # a tap, never a drag of the viewer's own on the cover
     viewer = code(VIEWER)
     opening = viewer[viewer.index("private struct CoverOpens"):viewer.index("struct CoverViewer: View")]
-    assert ".onTapGesture { open() }" in opening
+    assert ".onTapGesture { open(saying: false) }" in opening
     assert "DragGesture" not in viewer
-    assert "guard let id = track.coverArt, !id.isEmpty, viewing == nil else { return }" in opening
-    # VoiceOver: the cover is a button named for the album, hidden for a song with no cover
+    # only a cover shown opens - drawn by Now Playing, or kept - by Core's rule; never twice over
+    open = func(opening, "open")
+    assert "guard viewing == nil else { return }" in open
+    assert "CoverViewer.drawn(client: $0, coverID: id) != nil" in open
+    assert "KeptCovers.shared.url(for: id) != nil" in open
+    assert "guard CoverZoom.opens(coverID: id, drawn: drawn, kept: kept) else {" in open
+    # VoiceOver: the cover is a button named for the album, hidden for a song with no cover id; a double-tap on one
+    # not drawn says so rather than doing nothing silently
     assert ".accessibilityLabel(CoverViewerWords.open(album: track.album))" in opening
-    assert ".accessibilityAddTraits(.isButton)" in opening and ".accessibilityAction { open() }" in opening
-    assert ".accessibilityHidden(track.coverArt == nil)" in opening
+    assert ".accessibilityAddTraits(.isButton)" in opening and ".accessibilityAction { open(saying: true) }" in opening
+    assert ".accessibilityHidden(track.coverArt?.isEmpty ?? true)" in opening
+    assert "UIAccessibility.post(notification: .announcement, argument: CoverViewerWords.notYet)" in open
+
+
+def test_the_grip_beats_the_covers_tap_from_its_first_points():
+    source = code(NOW_PLAYING)
+    # the cover's room: the grip at a high priority over the cover's tap, so a drag is the grip's from its first
+    # dragStartDistance and the tap fires at lift only when none began (review: a child's tap under a plain
+    # .gesture took precedence, and the drag began only once it failed, at the tap's own slop)
+    content = func(source, "content")
+    ladder = content[content.index("if lyricsShown {"):]
+    room = ladder[ladder.index("} else {", ladder.index("TurntableView()")):]
+    assert ".highPriorityGesture(grip)" in room and ".gesture(grip)" not in room
+    # the rest is as it was: the top row's grip a plain one (its chevron and look button are buttons), the lyrics and
+    # the turntable outside the grip
+    assert source.count(".highPriorityGesture(grip)") == 1
+    assert source.count(".gesture(grip)") == 1
+    top = content[content.index("topRow"):content.index("ZStack {")]
+    assert ".gesture(grip)" in top
+    for place in ("lyricsFace(track)\n", "TurntableView()"):
+        start = ladder.index(place)
+        assert "grip" not in ladder[start:ladder.index("}", start)], place
+    grip = source[source.index("private var grip: some Gesture"):]
+    assert "DragGesture(minimumDistance: PlayerWords.dragStartDistance, coordinateSpace: .global)" in grip
+
+
+def test_the_viewer_is_presented_from_now_playings_root():
+    source = code(NOW_PLAYING)
+    # the state and the presentation are Now Playing's, on its root beside its sheets - never on the cover, which
+    # Lyrics replaces as the next song comes (review: a viewer on the cover went with it, mid-zoom)
+    assert "@State private var viewing: ViewedCover?" in source
+    body = body_of(source)
+    root = body[body.index(".offset(y: dragY)"):]
+    assert ".coverViewer($viewing, onDismiss: eqAfterSheet)" in root
+    assert root.index(".sheet(isPresented: $showsUpNext") < root.index(".coverViewer($viewing")
+    # once, and nowhere inside the content the cover lives in
+    assert source.count(".coverViewer(") == 1 and ".fullScreenCover(" not in source
+    assert ".coverViewer(" not in func(source, "content")
+    viewer = code(VIEWER)
+    opening = viewer[viewer.index("private struct CoverOpens"):viewer.index("struct CoverViewer: View")]
+    # the cover's modifier holds no state and presents nothing: the tap and VoiceOver's button
+    assert "@State" not in opening and "fullScreenCover" not in opening
+    assert "@Binding var viewing: ViewedCover?" in opening
+    presents = func(viewer, "coverViewer")
+    assert "fullScreenCover(item: viewing, onDismiss: onDismiss)" in presents
+    assert viewer.count("fullScreenCover(") == 1
+
+
+def test_a_shared_eq_file_waits_for_the_viewer_too():
+    shared = func(code(NOW_PLAYING), "shared")
+    assert "if showsUpNext || showsInfo || viewing != nil {" in shared
+    assert "eqWaits = true" in shared and "CoverViewing.put(nil, into: $viewing)" in shared
+    # its going opens the EQ the file waited for, as Up Next's and Info's do
+    assert ".coverViewer($viewing, onDismiss: eqAfterSheet)" in code(NOW_PLAYING)
 
 
 def test_the_viewer_opens_and_closes_with_no_slide_and_fades():
     viewer = code(VIEWER)
-    opening = viewer[viewer.index("private struct CoverOpens"):viewer.index("struct CoverViewer: View")]
-    # the cover tapped is the one shown: an item, not a flag reading the song playing
-    assert ".fullScreenCover(item: $viewing)" in opening
-    put = func(opening, "put")
-    assert "instant.disablesAnimations = true" in put and "withTransaction(instant) { viewing = cover }" in put
+    # the cover tapped is the one shown: an item, not a flag reading the song playing; up and down with no slide
+    put = func(viewer, "put")
+    assert "instant.disablesAnimations = true" in put
+    assert "withTransaction(instant) { viewing.wrappedValue = cover }" in put
+    assert "CoverViewer(cover: cover) { CoverViewing.put(nil, into: viewing) }" in viewer
     body = viewer[viewer.index("struct CoverViewer: View"):viewer.index("final class FullCovers")]
     # its own fade in and out, then gone
     assert "withAnimation(Self.fade) { shown = true }" in body
@@ -120,10 +182,61 @@ def test_the_viewer_is_the_pages_black_with_the_status_bar_hidden():
     assert found and found.group(1).strip().lower() in ("#000", "#000000")
 
 
+def test_the_close_button_grows_with_the_text_and_stops_at_the_first_accessibility_size():
+    viewer = code(VIEWER)
+    button = viewer[viewer.index("private struct CoverCloseButton"):viewer.index("final class FullCovers")]
+    # the square scaled with the text as the glyph is, from 36 points; a 44-point target
+    assert "@ScaledMetric(relativeTo: .body) private var side: CGFloat = 36" in button
+    assert ".frame(width: side, height: side)" in button and ".frame(minWidth: 44, minHeight: 44)" in button
+    # both held at the first accessibility size, where the viewer draws it
+    assert "CoverCloseButton(action: close)\n                .dynamicTypeSize(...DynamicTypeSize.accessibility1)" in viewer
+
+
+def test_the_placeholder_fades_with_the_cover_and_takes_no_touch():
+    viewer = code(VIEWER)
+    body = viewer[viewer.index("struct CoverViewer: View"):viewer.index("private struct CoverCloseButton")]
+    drawn = body[body.index("if image == nil {"):]
+    # under the same fade as the image, following a drag down, every touch passed to the zoom beneath
+    assert "placeholder\n                    .opacity(shown ? 1 : 0)" in drawn
+    assert ".offset(y: dragged)" in drawn[:200] and ".allowsHitTesting(false)" in drawn[:200]
+    # the empty square is no second element named for the cover: the zoom beneath is that already
+    placeholder = body[body.index("private var placeholder: some View {"):]
+    square = placeholder[placeholder.index("Corners.artShape"):placeholder.index("} else {")]
+    assert ".accessibilityHidden(true)" in square and "accessibilityLabel" not in square
+    assert ".accessibilityLabel(LibraryWords.loading)" in placeholder
+
+
+def test_the_full_size_is_read_no_further_than_thirty_megabytes_and_kept_up_to_ten():
+    core = re.sub(r"//[^\n]*", "", (CORE / "DeadwaxClient.swift").read_text(encoding="utf-8"))
+    assert "built.mostBytes = CoverZoom.fullMostBytes" in func(core, "fullCoverRequest")
+    assert "guard CoverZoom.reads(bytes: body.count) else { throw HTTPTooLarge(most: CoverZoom.fullMostBytes) }" in (
+        func(core, "fullCover"))
+    rules = (CORE / "CoverViewer.swift").read_text(encoding="utf-8")
+    assert "public static let fullMostBytes = 30 * 1024 * 1024" in rules
+    assert "public static let keptMostBytes = 10 * 1024 * 1024" in rules
+    # the app's transport reads such a request as it comes and calls it off past its most - at once when the
+    # Content-Length says so - and says it as deadwax answering, never as no answer
+    transport = code(APP / "URLSessionTransport.swift")
+    send = func(transport, "send")
+    assert "if let most = request.mostBytes {" in send and "CappedRead.read(sent, most: most," in send
+    assert "catch let error as HTTPTooLarge {" in send and "heard(true)" in send
+    capped = transport[transport.index("private final class CappedRead"):]
+    assert "response.expectedContentLength > Int64(most)" in capped and "completionHandler(past ? .cancel : .allow)" in capped
+    assert "guard body.count > most else { return false }" in capped and "dataTask.cancel()" in capped
+    assert "result = .failure(HTTPTooLarge(most: most))" in capped
+    # a task cancelled calls the read off, and a read ended before anything waited is never lost
+    assert "} onCancel: {\n            task.cancel()" in capped
+    assert "if let ended = reader.ended { return ended }" in capped and "if continuation == nil { ended = result }" in capped
+    # what's kept once the viewer closes: up to 10 MB, by Core's rule
+    viewer = code(VIEWER)
+    assert "last = CoverZoom.keeps(bytes: bytes.count) ? (key, bytes) : nil" in func(viewer, "keep")
+
+
 def test_it_closes_by_the_button_a_drag_down_and_voiceovers_escape():
     viewer = code(VIEWER)
     body = viewer[viewer.index("struct CoverViewer: View"):viewer.index("final class FullCovers")]
-    assert "Button(action: close)" in body and ".accessibilityLabel(CoverViewerWords.close)" in body
+    assert "Button(action: action)" in body and ".accessibilityLabel(CoverViewerWords.close)" in body
+    assert "CoverCloseButton(action: close)" in body
     assert "Corners.controlShape" in body
     assert ".accessibilityAction(.escape) { close() }" in body
     assert ".accessibilityAddTraits(.isModal)" in body
@@ -182,10 +295,11 @@ def test_for_voiceover_the_image_is_named_and_zoomable():
 
 def test_it_shows_the_cover_drawn_then_the_full_size():
     viewer = code(VIEWER)
-    drawn = func(viewer, "drawnCover")
+    drawn = func(viewer, "drawn")
     # the largest the cover cache holds, Now Playing's 1024 first
     assert "for size in CoverSize.steps.reversed()" in drawn
-    assert "CoverCache.shared.cached(client: client, id: cover.coverID, size: size)" in drawn
+    assert "CoverCache.shared.cached(client: client, id: coverID, size: size)" in drawn
+    assert "Self.drawn(client: client, coverID: cover.coverID)" in func(viewer, "drawnCover")
     load = func(viewer, "load")
     assert "KeptCovers.shared.url(for: cover.coverID)" in load
     # deadwax asked only while it can be reached, with no size

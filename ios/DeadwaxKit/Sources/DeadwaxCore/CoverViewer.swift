@@ -4,15 +4,17 @@ import Foundation
 /// screen it should become full screen so you can zoom in and look at it"): its rules, with no view in them. It is the
 /// phone's own - the web's Now Playing has no such view - so nothing here is held to web code.
 ///
-/// - A tap on Now Playing's cover opens it; a drag there is still Now Playing's own, closing it.
+/// - A tap on Now Playing's cover opens it (`opens`: a picture of it shown, never the grey square); a drag there is
+///   still Now Playing's own, closing it.
 /// - The cover is fitted to the screen, zoomed from 1 (fitted) to `maximum`: twice the zoom at which one of the
 ///   cover's pixels is one of the screen's, never under `leastMaximum` nor over `mostMaximum`.
 /// - A double-tap at rest zooms to `doubleTap` about the point tapped; zoomed, it goes back to 1.
 /// - VoiceOver's swipe up and down zoom by `step` (twice, or half), between 1 and the maximum.
 /// - At rest, a drag down that is let go past `closePast`, or flicked down faster than `flickClose`, closes it; the
 ///   ground fades as it goes (`groundOpacity`). Zoomed, a drag pans.
-/// - The full-size cover is decoded no larger than `decodeLongest` pixels along its longer side: a 64 MB image at
-///   most, however large the file Navidrome holds.
+/// - The full-size cover is read no further than `fullMostBytes` (past it, the cover drawn stays), decoded no larger
+///   than `decodeLongest` pixels along its longer side - a 64 MB image at most, however large the file Navidrome
+///   holds - and its file kept after the viewer closes only up to `keptMostBytes`.
 ///
 /// Distances are points, speeds points a second, downward positive (UIKit's).
 public enum CoverZoom {
@@ -36,6 +38,31 @@ public enum CoverZoom {
     public static let leastGround: Double = 0.25
     /// The full-size cover's longer side, decoded, at most (pixels).
     public static let decodeLongest = 4096
+    /// The most of a full-size cover's file read (bytes, 30 MB): past it the read is called off and the cover drawn
+    /// stays. A 6000-pixel JPEG scan is about 5 to 15 MB; a file past this is past anything the phone can show of it.
+    public static let fullMostBytes = 30 * 1024 * 1024
+    /// The most of a full-size cover's file kept once the viewer closes, to open it again without asking (bytes,
+    /// 10 MB - a 3000-pixel JPEG is about 1 to 5): a larger one is let go as the viewer closes, and asked again.
+    public static let keptMostBytes = 10 * 1024 * 1024
+
+    /// A tap on Now Playing's cover opens the viewer: the song has a cover id, and a picture of it is there to show at
+    /// once - drawn by Now Playing (a size of it in the cover cache) or kept with a downloaded album. The grey square,
+    /// a cover still loading or one that failed, opens nothing. An album with no art of its own is answered by
+    /// Navidrome's placeholder, a picture drawn like any other: it opens as Now Playing shows it.
+    public static func opens(coverID: String?, drawn: Bool, kept: Bool) -> Bool {
+        guard let coverID, !coverID.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return false }
+        return drawn || kept
+    }
+
+    /// A full-size cover's file of `bytes` read whole: up to `fullMostBytes`.
+    public static func reads(bytes: Int) -> Bool {
+        bytes <= fullMostBytes
+    }
+
+    /// A full-size cover's file of `bytes` kept after the viewer closes: up to `keptMostBytes`.
+    public static func keeps(bytes: Int) -> Bool {
+        bytes > 0 && bytes <= keptMostBytes
+    }
 
     /// The most the cover zooms: twice the zoom at which its pixels are the screen's (`pixels` the cover's longer side,
     /// `fitted` that side drawn at 1 in points, `scale` the screen's pixels to a point), within the two bounds.
@@ -110,6 +137,8 @@ public enum CoverZoom {
 public enum CoverViewerWords {
     /// The close button.
     public static let close = "Close"
+    /// VoiceOver's, for a double-tap on a cover not drawn yet (or that couldn't be): nothing opens.
+    public static let notYet = "The cover hasn't loaded."
 
     /// The album's name, or "the album" for a song that names none.
     private static func album(_ album: String) -> String {
