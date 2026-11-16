@@ -26,6 +26,16 @@ seconds rather than keeping the app waiting, and the app can draw the empty cove
 cover**, it needs deadwax's container to reach `coverartarchive.org` and `archive.org`. Nothing
 changes for the web app, which loads those covers from the Archive itself.
 
+deadwax 2.1.32 adds the route the app's **Artist images…** will draw its pictures from. The pictures
+it offers are on other sites (Wikimedia Commons, TheAudioDB and fanart.tv), so deadwax fetches each
+one when the app asks for it and passes it on, keeping nothing. It fetches only from those sites'
+picture addresses, over HTTPS: `commons.wikimedia.org`, plus `thumb.wikimedia.org` and
+`upload.wikimedia.org`, where Commons sends it; `r2.theaudiodb.com`; and `assets.fanart.tv`. It
+never fetches from anywhere else, and only for someone who can **Edit albums**. When a picture can't
+be had, deadwax says so within seven seconds rather than keeping the app waiting. Like **Artist
+images…** in the web app, it needs deadwax's container to reach those sites. Nothing changes for the
+web app, which loads those pictures from the sites itself.
+
 ## What you need
 
 - **A Mac with Xcode.** Xcode 16 or later opens the project. An iPhone on iOS 27 needs **Xcode 27**,

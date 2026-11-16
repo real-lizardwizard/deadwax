@@ -28,6 +28,7 @@ from src.api.lrclib_endpoint import lrclib
 from src.api.wikipedia_endpoint import wikipedia
 from src.api.autoeq_endpoint import autoeq_client
 from src.api.coverart_endpoint import archive_fronts
+from src.api.artist_images_endpoint import artist_pictures
 from src.api.same_origin import SameOriginWrites
 from src.api.navidrome_endpoint import SignedOut, navidrome as navidrome_client
 from src.config import Config, clear_retired_settings
@@ -41,6 +42,8 @@ MEDIA_PATHS = frozenset({
     "/deadwax/library/tracks/picture",
     #? the player's turntable face (2.0.0-player.11): CD art found by a Navidrome album id
     "/deadwax/library/disc_art/navidrome",
+    #? (2.1.32) an artist picture's preview passed on to the iPhone app, from Commons, TheAudioDB or fanart.tv
+    "/deadwax/library/artist/picture",
 })
 #? The player's, whose ids are in the path - the turntable's windows of a song (2.0.0-player.14)
 #? among them: FLAC, which gzip would only waste time on and take the length off - and (2.1.24) the
@@ -193,6 +196,7 @@ async def lifespan(app: FastAPI):
     await autoeq_client.close_client()
     await coverart.stop(app)
     await archive_fronts.close_client()
+    await artist_pictures.close_client()
     await navidrome_client.close_client()
     await auth.login_client.close_client()
     await navidrome_admin.close_client()

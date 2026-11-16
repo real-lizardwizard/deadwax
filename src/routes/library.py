@@ -11,7 +11,8 @@ from src.artist_art import artist_folder, execute_artist_art, plan_artist_art
 from src.artist_refile import execute_artist_refile, plan_artist_refile
 from src.artists import (ARTIST_ART_KINDS, KIND_LABELS, artist_facts, artist_match,
                          best_per_kind)
-from src.api.artist_images_endpoint import ArtistImagesClient
+from src.api.artist_images_endpoint import (PICTURE_URL_MAX, ArtistImagesClient, PictureHostDown, PictureHostSlow,
+                                            PictureRefused, PicturesBusy, artist_pictures, host_of, picture_address)
 from src.api.musicbrainz_endpoint import MusicBrainzUnavailable
 from src.config import COVER_ART_SIZES, rename_wait_seconds
 from src.disc_art import (choose_from_caa, choose_from_fanarttv, disc_art_filename, disc_face, plan_disc_art,
@@ -1992,6 +1993,86 @@ async def artist_images_apply(request: Request, body: ArtistImagesRequest):
         "results": results,
         "art": await asyncio.to_thread(find_artist_art, directory),
     }
+
+
+#? (2.1.32) The candidates' previews for the iPhone app (GET /artist/picture). A preview's address names a picture
+#? that doesn't change under it (fanart.tv's and TheAudioDB's carry the upload's own id, Commons' the file's title):
+#? a week, then asked again. Never `public`: it is behind a sign-in.
+PICTURE_CACHE = "private, max-age=604800"
+#? Nothing about a refusal or a failure is kept by anyone
+PICTURE_FAILED_CACHE = "no-store"
+
+PICTURE_WORDS = {
+    400: "That isn't a picture address deadwax passes on.",
+    404: "That picture isn't there any more.",
+    #? the host away or in trouble, or a fault in deadwax: worth asking again
+    502: "deadwax couldn't get that picture just now.",
+    503: "deadwax is fetching too many pictures just now.",
+    504: "The picture's site took too long to answer.",
+}
+#? (the review's) A 502 for good - PictureRefused: the site refused it (403, Wikimedia's robot policy), sent it
+#? elsewhere, or sent something deadwax won't pass on (not an image, too big). Asking again gets the same.
+PICTURE_REFUSED_WORDS = "That picture's site won't let deadwax pass it on."
+
+
+def _picture_refusal(status: int, words: str | None = None) -> HTTPException:
+    return HTTPException(status_code=status, detail=words or PICTURE_WORDS[status],
+                         headers={"Cache-Control": PICTURE_FAILED_CACHE})
+
+
+@router.get("/artist/picture", dependencies=EDIT)
+async def artist_picture(url: str = Query(..., max_length=PICTURE_URL_MAX)):
+    """
+    (2.1.32) One artist picture's preview - a candidate's `preview` from /artist/images/preview - passed on to the
+    iPhone app, which talks only to deadwax (Phase 8's server change B). Edit albums', like the preview that names
+    these addresses.
+
+    NOT A GENERAL PROXY (src/api/artist_images_endpoint.py ArtistPictures): `url` must be https on exactly one of
+    PICTURE_HOSTS - Commons and the two Wikimedia hosts it redirects to, TheAudioDB's and fanart.tv's image hosts -
+    with no user and no port, or it is a 400 and nothing is asked; a redirect is followed only within them. Nothing
+    is kept on disk. Answers: 200 with the picture as served_image_type() names it (an image type, or refused) and
+    PICTURE_CACHE; 404 when its host has no such picture (404 or 410); 502 when it couldn't be had - in words for now
+    when the host is away or in trouble, in PICTURE_REFUSED_WORDS when it refused it (403), sent it elsewhere or sent
+    something deadwax won't pass on; 503 when PICTURES_PENDING_MAX asks are under way already, nothing asked; 504 when
+    the host was too slow. Every refusal no-store, its `detail` PICTURE_WORDS'. Under GuardMedia's headers and never
+    gzipped (src/api/app.py MEDIA_PATHS).
+    """
+    address = picture_address(url)
+    if address is None:
+        logger.debug(f"artist picture: refused an address that isn't one deadwax passes on ({url[:200]!r})")
+        raise _picture_refusal(400)
+
+    try:
+        got = await artist_pictures.picture(address)
+    except PicturesBusy as e:
+        logger.debug(f"artist picture: {e}")
+        raise _picture_refusal(503)
+    except PictureHostSlow as e:
+        logger.debug(f"artist picture: {e}")
+        raise _picture_refusal(504)
+    except PictureHostDown as e:
+        logger.debug(f"artist picture: {e}")
+        raise _picture_refusal(502)
+    except PictureRefused as e:
+        logger.debug(f"artist picture: {e}")
+        raise _picture_refusal(502, PICTURE_REFUSED_WORDS)
+    except Exception:
+        #? a fault in deadwax while fetching: the phone draws the words either way, and the log has the traceback
+        logger.exception("artist picture: the fetch failed")
+        raise _picture_refusal(502)
+
+    if got is None:
+        raise _picture_refusal(404)
+
+    data, declared = got
+    #? the declared type when it is one deadwax serves pictures as, else what the bytes say - and nothing that is
+    #? neither (an SVG, which can carry script; something that only calls itself an image)
+    kind = served_image_type(declared, data)
+    if kind not in SERVED_IMAGE_TYPES:
+        logger.debug(f"artist picture: {host_of(address)} answered as {declared}, which deadwax doesn't pass on")
+        raise _picture_refusal(502, PICTURE_REFUSED_WORDS)
+
+    return Response(content=data, media_type=kind, headers={"Cache-Control": PICTURE_CACHE})
 
 
 class ArtistRefileRequest(BaseModel):

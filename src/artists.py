@@ -271,6 +271,21 @@ def _likes(image: dict) -> int:
         return 0
 
 
+#? (2.1.32) fanart.tv's v3 API names its pictures `http://assets.fanart.tv/...`. The same host serves them over
+#? https, and the iPhone app's relay (GET /library/artist/picture) asks https alone - so a candidate's address is
+#? upgraded here, once, and the URL the picker offers, the preview it shows and the choice apply checks are the same.
+#? Only this host's: no other source's scheme is touched.
+FANARTTV_ASSETS_HTTP = "http://assets.fanart.tv/"
+FANARTTV_ASSETS_HTTPS = "https://assets.fanart.tv/"
+
+
+def fanarttv_https(url: str) -> str:
+    """A fanart.tv picture's address over https, when fanart.tv gave it as http; any other address as it is."""
+    if url[:len(FANARTTV_ASSETS_HTTP)].lower() == FANARTTV_ASSETS_HTTP:
+        return FANARTTV_ASSETS_HTTPS + url[len(FANARTTV_ASSETS_HTTP):]
+    return url
+
+
 def from_fanarttv(payload: dict | None) -> list[dict]:
     """
     Image candidates from one fanart.tv music response.
@@ -278,7 +293,7 @@ def from_fanarttv(payload: dict | None) -> list[dict]:
     Sorted by what people voted for. fanart.tv is the one source here whose pictures were put
     there BY the people using them in media centres - so "most liked" is a real signal about
     which background belongs behind an artist, rather than whichever happened to be uploaded
-    first, which is the best any of the others can offer.
+    first, which is the best any of the others can offer. Each address over https (fanarttv_https).
     """
     found = []
 
@@ -291,8 +306,9 @@ def from_fanarttv(payload: dict | None) -> list[dict]:
             url = (image or {}).get("url")
             if isinstance(url, str) and url.strip():
                 likes = _likes(image)
+                #? the preview is the url itself (_candidate), so both are the https one
                 found.append(_candidate(
-                    kind, url.strip(), "fanarttv",
+                    kind, fanarttv_https(url.strip()), "fanarttv",
                     f"fanart.tv {label}" + (f" ({likes})" if likes else ""),
                 ))
 

@@ -275,6 +275,19 @@ FRONT_TIMEOUT = httpx.Timeout(10.0, connect=5.0)
 
 REDIRECTS = frozenset({301, 302, 303, 307, 308})
 
+#? (2.1.32, a fix to 2.1.24 - the review of the artist pictures' relay found it in both) The body is counted as it
+#? comes off the wire, so it must come undecoded: asked for as it is (`Accept-Encoding: identity`; httpx asks for gzip
+#? by default) and an answer encoded anyway refused unread. Read with aiter_bytes(), httpx inflated a gzip - or
+#? `gzip, gzip` - body far past FRONT_MAX_BYTES before the count saw it: 141 MB from 269 bytes on the wire, in the
+#? review. With identity alone let through, httpx decodes nothing, so the pieces counted are the bytes that came.
+#? Covers are compressed already, so nothing is lost. Shared with src/api/artist_images_endpoint.py.
+IDENTITY = "identity"
+
+
+def sent_as_it_is(response: httpx.Response) -> bool:
+    """Whether an answer's body is its bytes, undecoded: no Content-Encoding, or `identity`."""
+    return (response.headers.get("content-encoding") or "").strip().lower() in ("", IDENTITY)
+
 
 class ArchiveDown(Exception):
     """The Archive (or archive.org) didn't answer, or answered as a server in trouble (429, 5xx): an outage, most
@@ -336,7 +349,7 @@ class ArchiveFronts:
             raise ArchiveSlow(f"the Cover Art Archive took more than {deadline:g} s for {what}") from e
 
     async def _follow(self, address: httpx.URL, what: str) -> tuple[bytes, str] | None:
-        headers = {"User-Agent": CoverArtClient.user_agent()}
+        headers = {"User-Agent": CoverArtClient.user_agent(), "Accept-Encoding": IDENTITY}
         for _ in range(FRONT_REDIRECTS + 1):
             host = address.host
             try:
@@ -361,11 +374,16 @@ class ArchiveFronts:
                     mime = (response.headers.get("content-type") or "").split(";")[0].strip().lower()
                     if mime not in MIME_EXTENSIONS:
                         raise ArchiveRefused(f"{host} answered {what} as {mime or 'no type'}, which isn't an image")
+                    if not sent_as_it_is(response):
+                        raise ArchiveRefused(f"{host} answered {what} encoded as "
+                                             f"{response.headers.get('content-encoding')!r}, though it was asked for "
+                                             f"as it is")
                     declared = response.headers.get("content-length") or ""
                     if declared.isdigit() and int(declared) > FRONT_MAX_BYTES:
                         raise ArchiveRefused(f"{what} was refused: {_amount(int(declared))}, past "
                                              f"{_amount(FRONT_MAX_BYTES)}")
                     body = bytearray()
+                    #? identity or nothing (sent_as_it_is, above), so nothing is decoded: what is counted is what came
                     async for piece in response.aiter_bytes():
                         body += piece
                         if len(body) > FRONT_MAX_BYTES:

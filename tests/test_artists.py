@@ -172,6 +172,30 @@ def test_likes_that_are_not_numbers_do_not_take_the_page_down():
     assert len(from_fanarttv(odd)) == 2
 
 
+def test_fanarttvs_http_pictures_are_offered_over_https_and_nobody_elses_are_touched():
+    """(2.1.32) fanart.tv's v3 API names its pictures http://assets.fanart.tv/...; the iPhone app's relay asks https
+    alone, so the candidate - its url, its preview, and so the choice apply checks - is the https address."""
+    payload = {
+        "artistthumb": [{"url": "http://assets.fanart.tv/fanart/music/x/artistthumb/a.jpg", "likes": "2"}],
+        "musicbanner": [{"url": "HTTP://ASSETS.FANART.TV/fanart/music/x/musicbanner/b.jpg"}],
+        "hdmusiclogo": [{"url": "https://assets.fanart.tv/fanart/music/x/hdmusiclogo/c.png"}],
+        #? not fanart.tv's picture host: as it was
+        "musiclogo": [{"url": "http://example.com/assets.fanart.tv/d.png"}],
+    }
+    found = {c["kind"]: c for c in from_fanarttv(payload) if c["label"] != "fanart.tv Logo"}
+    plain = [c for c in from_fanarttv(payload) if c["label"] == "fanart.tv Logo"]
+
+    assert found["thumb"]["url"] == "https://assets.fanart.tv/fanart/music/x/artistthumb/a.jpg"
+    assert found["banner"]["url"] == "https://assets.fanart.tv/fanart/music/x/musicbanner/b.jpg"
+    assert found["logo"]["url"] == "https://assets.fanart.tv/fanart/music/x/hdmusiclogo/c.png"
+    for candidate in found.values():
+        assert candidate["preview"] == candidate["url"]
+    assert plain[0]["url"] == "http://example.com/assets.fanart.tv/d.png"
+    #? and no other source's scheme
+    assert from_theaudiodb({"strArtistThumb": "http://r2.theaudiodb.com/a.jpg"})[0]["url"] == \
+        "http://r2.theaudiodb.com/a.jpg"
+
+
 def test_fanarttv_is_asked_for_nothing_without_a_key(monkeypatch):
     import asyncio
 

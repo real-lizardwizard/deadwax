@@ -706,6 +706,13 @@ patch before Search's slice 2. The web doesn't change.
   chain), or a failure - ArchiveDown (unreachable, 429, 5xx), ArchiveSlow (the deadline, an httpx timeout: the 504)
   or ArchiveRefused (this answer's own: an off-Archive redirect, not an image, too big, empty, another status, too
   many redirects).
+  - **Fixed in 2.1.32: the cap counted bytes after decompression.** Found by the review of the artist pictures'
+    relay, which has the same pattern. httpx asks for gzip by default, and `aiter_bytes()` decodes it, so a gzip body
+    - or a nested `gzip, gzip` one - was inflated far past FRONT_MAX_BYTES before the count saw it: 141 MB from 269
+    bytes on the wire, in the review. Now every hop sends `Accept-Encoding: identity`, and an answer whose
+    Content-Encoding is anything but absent or `identity` is an ArchiveRefused (a 502) before its body is read
+    (`sent_as_it_is()`, shared with the pictures' relay). Nothing is lost: covers are JPEGs, compressed already.
+    tests/test_coverart_relay.py: identity asked on every hop, six encodings refused unread, `identity` passed on.
 - **The answers** (src/coverart_cache.py `CoverRelay`, one per app as `app.state.coverart`, made at the first ask):
   a kept cover from disk, at once; a 404 remembered MISS_SECONDS (five minutes) - brief, since one answer can't tell
   a missing cover from an outage (notes/tooling.md) - so a list of twenty albums with no art asks once, not on every
@@ -781,6 +788,150 @@ patch before Search's slice 2. The web doesn't change.
 - **Not seen**: deadwax itself has never asked the real Archive through this route - every answer it has read is the
   MockTransport's. How long the chain takes from James's server, what an outage really answers (a 503, a hang, a
   404), and the phone drawing them (slice 2) are unwatched.
+
+## The artist pictures' relay (2.1.32)
+
+Phase 8's server change B (notes/ios-specs/phase8-managing.md on `ios`, sections 4 and 12, decision 1): the app's
+Artist images (slice 5) draws the candidates `POST /library/artist/images/preview` offers, and their `preview`s are on
+other hosts - the web's ArtistPanel loads `candidate.preview` straight into an `<img>`. The app talks only to deadwax,
+so deadwax passes them on. The web doesn't change.
+
+- **The route**: `GET /deadwax/library/artist/picture?url=`, Edit albums' like the preview that names those
+  addresses (`dependencies=EDIT` on the library router, which is included with `current_user` - never middleware;
+  tests/test_logins.py ROUTES, "edit"). `url` is required, at most PICTURE_URL_MAX (2048) characters (422 otherwise).
+  Answers: 200 with the picture as `served_image_type()` names it - and refused unless that is one of
+  SERVED_IMAGE_TYPES (jpeg, png, gif, webp, bmp: never an SVG) - with `Cache-Control: private, max-age=604800` (a
+  week: fanart.tv's and TheAudioDB's addresses carry the upload's own id, Commons' the file's title); 400 for an
+  address the relay won't ask, before anything is asked; 404 when the host has no such picture (a 404 or a 410
+  anywhere in the chain); 502 when it couldn't be had; 503 when PICTURES_PENDING_MAX asks are under way already,
+  nothing asked; 504 when the host was too slow. Every refusal `no-store`, its `detail` one of routes/library.py
+  PICTURE_WORDS - the phone draws the words either way. A 502 has two sets of words (the review's): "deadwax couldn't
+  get that picture just now." when the host is away or in trouble, or deadwax faulted - worth asking again - and
+  PICTURE_REFUSED_WORDS, "That picture's site won't let deadwax pass it on.", for a PictureRefused - a 403
+  (Wikimedia's robot policy), a redirect elsewhere, not an image, too big - which asking again won't change. No ETag:
+  nothing is kept to make one from cheaply. Under GuardMedia's headers and never gzipped: the path is in app.py
+  MEDIA_PATHS (an exact path - the existing guard applied to one more route, no rule changed). FastAPI's own 401, 403
+  (NEEDS' words) and 422 are as every route's.
+- **With logins off** (the review's): anyone on the network is the implicit admin, so any page a browser on it opens
+  can make deadwax fetch these pictures; the same-origin Cross-Origin-Resource-Policy GuardMedia sends stops that
+  page reading what comes back. That is the cover relay's position too, and it stays: the fetch is of the five hosts
+  alone, and the caps bound it.
+- **The fetch** (src/api/artist_images_endpoint.py `ArtistPictures`, `artist_pictures`; closed with the app): its own
+  httpx client beside ArtistImagesClient, `follow_redirects=False`. **Not a general proxy**: `picture_address()`
+  parses the address once (the same parse is checked and fetched) and `passes_on()` lets through only `https`, no
+  userinfo, no port but https's own (`:443` is normalized away), and a host - read from `raw_host`, never decoded,
+  since httpx's `.host` raises for a malformed international name - exactly one of PICTURE_HOSTS. So
+  `https://commons.wikimedia.org@evil.example/` (host evil.example), `https://evil.example\@commons.wikimedia.org/`
+  (a user to httpx), an address by number, a subdomain, a trailing dot and the sources' API hosts are all a 400
+  with nothing asked. `picture()` checks again, so nothing reaches the network unchecked. Each redirect is followed by
+  hand, its target `passes_on()` or the answer is refused (502) and the target never asked; at most
+  PICTURE_REDIRECTS (4) hops. A Location that isn't an address is refused the same way - httpx reads it itself even
+  with redirects off, as its RemoteProtocolError "Invalid URL in location header", or idna's ValueError for a name
+  that can't be decoded; a RemoteProtocolError of any other kind (the host broke off) is an outage. Only a declared
+  `image/*` is read (anything else refused unread). **Undecoded** (the review's): every hop sends
+  `Accept-Encoding: identity`, and an answer with any Content-Encoding but none or `identity` is refused unread
+  (`sent_as_it_is()`, in coverart_endpoint.py) - before, httpx asked for gzip and `aiter_bytes()` inflated it, so the
+  cap counted bytes after decompression (141 MB from 269 bytes of nested gzip, in the review); the cover relay had
+  the same flaw, fixed in the same commit (above). So a Content-Length past PICTURE_MAX_BYTES is refused unread, a
+  body read a piece at a time is the bytes that came and is refused as soon as it passes, an empty one refused.
+  PICTURE_DEADLINE_SECONDS (7) for the whole fetch - the wait for a turn, every hop and the body - with httpx's 5 s
+  between pieces and 4 to connect. The agent is `image_user_agent()`, moved out of ArtistImagesClient.user_agent
+  (which now returns it): the MusicBrainz one with its contact, else `deadwax/<version>` - what Wikimedia, TheAudioDB
+  and fanart.tv are already sent by Artist images. The outcomes, as ArchiveFronts': a picture (a memoryview of what
+  was read - the answer goes out with no second copy), None (404 or 410), PicturesBusy (503), or PictureHostDown
+  (unreachable, broken off, 429, 5xx: 502), PictureHostSlow (the deadline, an httpx timeout: 504), PictureRefused
+  (this answer's own: off-list or broken redirect, not an image, encoded, too big, empty, another status - 403
+  included - too many redirects: 502). A fault in deadwax while fetching is a 502 with its traceback in the log.
+  Nothing is kept: no folder, no memory of a failure, each ask asks again.
+- **Bounded**: at most PICTURES_AT_ONCE (6) fetches at once (a semaphore per event loop, as the cover relay's), and
+  at most PICTURES_PENDING_MAX (64, the cover relay's PENDING_MAX - the review's) asks under way, waiting for a turn or
+  fetching; one more is a 503 at once, nothing asked or remembered, and counted down whatever ends it. What is true
+  of memory: **at most 6 bodies are being read at once, each refused past 8 MB - 48 MB being read, at most**; a
+  waiting ask holds nothing but itself. A picture once read leaves both counts and is held until its answer is handed
+  to the server to send, which neither count covers: in practice at once, but a phone reading slowly keeps its picture
+  (at most 8 MB) alive that long. (The first cut's notes said "at most 48 MB is held", which wasn't so.)
+- **The hosts** (PICTURE_HOSTS, where each came from):
+  - `commons.wikimedia.org` - every Commons candidate's preview (`artists.commons_file_url`: the `image` relation's
+    and Wikidata's P18/P154, Special:FilePath with `?width=`), and its own first hop.
+  - `thumb.wikimedia.org` and `upload.wikimedia.org` - where Commons sends it: **seen by hand, 2026-11-16, with curl
+    (not deadwax)**, `Special:FilePath/<file>?width=600` answers 302 to
+    `commons.wikimedia.org/w/index.php?title=Special:Redirect/file/<file>&width=600`, which answers 301 to
+    `thumb.wikimedia.org/wikipedia/commons/thumb/…/960px-<file>` for a file wider than asked (a 960px JPEG, 127 KB;
+    an SVG logo as a 960px PNG, 60 KB - Wikimedia now rounds a thumbnail up to its own sizes) or to
+    `upload.wikimedia.org/wikipedia/commons/…/<file>` for one no wider (Example.jpg, 9 KB, served as it is). The code
+    named only upload.wikimedia.org (the robot-policy comments); **thumb.wikimedia.org was found only by asking**, and
+    without it every Commons thumbnail would have been a 502.
+  - `r2.theaudiodb.com` - tests/test_artists.py's fixture, and **seen by hand**: every image field of a row asked
+    with TheAudioDB's public test key (Coldplay) is an `https://r2.theaudiodb.com/images/media/artist/…` address,
+    which answers 200 at once (a thumb 89 KB, a background 178 KB). `www.theaudiodb.com/images/…` answers 404, so the
+    API host isn't on the list.
+  - `assets.fanart.tv` - **assumed**, from fanart.tv's API documentation: no code or fixture names it (the fixtures
+    use `https://f/…`), there is no project key here to ask with, and on 2026-11-16 the host couldn't be reached
+    from where this was built (something on that network answered for it with a certificate of its own). Whether the
+    host redirects is unseen.
+  - **fanart.tv over https** (the review's): fanart.tv's v3 API is known to name its pictures
+    `http://assets.fanart.tv/…`, so every fanart.tv preview - fanart.tv leads SOURCE_ORDER - would have been a 400.
+    `artists.from_fanarttv` now upgrades exactly that prefix (`fanarttv_https()`, case-insensitive) to `https://`,
+    for the candidate's `url` and so its `preview` - one address, so the choice apply checks against the candidates is
+    the same URL the picker offered, and apply fetches it over https. No other host's scheme is touched, nor disc
+    art's (`fanarttv_cdart`), and fanart.tv's `/preview/` paths aren't used (unverified). The web's Artist images
+    loads those pictures over https now too - assumed to work, since the same host serving https is what everything
+    else that uses fanart.tv relies on, but not seen here.
+- **The cap**: PICTURE_MAX_BYTES, 8 MB - more than the cover relay's 4, because only Commons' preview is a
+  600px thumbnail: fanart.tv's and TheAudioDB's `preview` is the picture itself (`artists._candidate`), and fanart.tv
+  offers 4K backgrounds (`artist4kbackground`), a few MB each. Under it, no more than a picker should be sent.
+- **The deadline**: 7 s, the cover relay's ANSWER_SECONDS: nothing carries on past the ask here, so the deadline is
+  what the phone waits, under its 8 s (ios/App/URLSessionTransport.swift `timeoutIntervalForRequest`). A 4K background
+  on a slow host may not make it; the phone then shows that candidate as words.
+
+### Decided here (the spec didn't say)
+
+- **https only**, as asked - unlike the cover relay, which allows http on the Archive's hosts. Every hop seen was
+  https.
+- **One list for the first address and every hop**: the spec's "the hosts the previews are on, plus where they
+  redirect"; a phone may send a `thumb.wikimedia.org` address directly, and gets it.
+- **No cache, no single flight**: the spec's "nothing kept on disk". The phone's own URL cache (a week) is the cache;
+  a picker shows a picture once.
+- **A turn's wait inside the deadline**, unlike the cover relay (whose fetch carries on to keep the cover): here a
+  picture queued past 7 s would be thrown away anyway.
+
+### Review (before it shipped)
+
+A review of the first cut found no way off the host list - forty tricky addresses and thirty-one redirect Locations
+all handled - and five things, each fixed in the same commit: fanart.tv's `http://` addresses (upgraded in
+`from_fanarttv`, above); the cap counting decompressed bytes, in this relay and the cover relay's (identity only,
+above); the six at once covering only the fetch (PICTURES_PENDING_MAX, and the memory claim corrected, above); the
+words (a 410 a 404; a refusal's 502 said for good, not "just now"); and the logins-off position, written down above
+and unchanged.
+
+### Verified, and not
+
+- **pytest**: tests/test_artist_picture_relay.py, through start() with no lifespan, the hosts an httpx MockTransport
+  shaped as they were seen (above): each source's preview, Commons through its own two redirects (thumb and upload);
+  every preview the `from_*` functions make passing `picture_address()`; fanart.tv's `http://` pictures end to end -
+  the images preview offering them as https, the relay passing each on, apply honouring that address and fetching it
+  over https; forty addresses refused with a 400 and nothing asked; redirects followed within the hosts and refused
+  off them (seventeen targets - an undecodable name and a broken address among them - a chain leaving part way, none,
+  too many); the cap declared, streamed, at the cap, and a 6 MB picture under the real one; identity asked on every
+  hop, eight encodings refused unread (a nested-gzip bomb), `identity` passed on, the bytes counted the bytes sent;
+  the deadline over Commons' three hops; 404 and 410, 403 and the other statuses said for good, 429/5xx, unreachable
+  and broken off said for now, timeouts; non-images (an SVG, AVIF, an icon, HTML, an untyped answer refused unread
+  whatever its bytes); six at once over twenty; a turn's wait as a 504; the pending cap a refusal at once, nothing
+  asked, asked once they drain, the count back to 0 after a picture, an outage, a refusal, a 404 and a timeout, and
+  the route's 503; nothing kept; the agent, with and without a contact; GuardMedia's headers and no gzip; logins off
+  as the implicit admin. tests/test_artists.py: `from_fanarttv` upgrades fanart.tv's `http://` (any case) and
+  nothing else, TheAudioDB's left alone. tests/test_coverart_relay.py: the cover relay's identity fix.
+  tests/test_logins.py: ROUTES, and a test that signed out is a 401 and without Edit albums a 403 in NEEDS' words,
+  each with the host never asked, then let through for a person given Edit albums, a Navidrome admin and
+  break-glass. tests/test_media_headers.py names the path. Twenty-four mutations by hand - http allowed, userinfo,
+  port and host unchecked, redirect targets unchecked, no deadline, the declared length or the stream unchecked, any
+  type read, no turns, the route's type check gone, the client trusting its caller, a 410 as a 502, the route skipping
+  the address check; and the review's: gzip asked for and the encoding unchecked (in each relay), no pending cap, the
+  count never coming down, refusals said for now, busy as a 502, fanart.tv left on http, every http upgraded - each
+  fails a test.
+- **Not seen**: deadwax itself has never asked a real host through this route - every answer it has read is the
+  MockTransport's. fanart.tv (above), how long each chain takes from James's server, and the phone drawing them
+  (slice 5) are unwatched.
 
 ## The scan without its tracks (2.1.28)
 
