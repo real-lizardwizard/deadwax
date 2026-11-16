@@ -31,19 +31,21 @@ artwork and lyrics, with Get cover, Get CD art and Get lyrics, then its Delete, 
 once more, then the artist tools from an artist page's •••: Artist images (every picture found, through deadwax's
 relay), Which artist is this? and Move albums to their name now, then Needs a look: the review queue, its count
 beside it in Settings > Manage, each album worked through in Edit album with Skip and Next album, then Library care:
-Rescan, and Get covers, CD art and lyrics over every album without, one album at a time, with In nobody's library -
+Rescan, and Get covers, CD art and lyrics over every album without, one album at a time, with In nobody's library,
+then Server settings: Connections, the server's settings a group to a page and saved together, Re-time saved lyrics
+and MusicBrainz's saved answers, and the Library's Set up Navidrome opening its Connections page -
 and Add to Queue, the phone's one way to add
 songs: a swipe right on a song, or the one item on every •••, each song after the ones already added (the web app's
 Play Last; the web keeps Play Next too) - kept on the `ios` branch while it's being built. Nothing of Phase 2, the
 lyrics, the EQ, the turntable, play history, Phase 3, Phase 4, Search, Requests, Get, Manage, Edit album, the artist
-tools, Needs a look, Library care or Add to Queue's swipe has been seen on an iPhone yet.
+tools, Needs a look, Library care, Server settings or Add to Queue's swipe has been seen on an iPhone yet.
 Phase 0's test screen lives on in the app's Debug.
 
 - **To install it, and every week after:** [docs/ios.md](../docs/ios.md) - the steps once on the Mac
   and the iPhone, the weekly `ios/scripts/install.sh`, the test album
   (`ios/scripts/make-test-album.py`), what the app does, and the checks, phase by phase - Phase 7's are 237-246,
   Edit album's 320-329, its Tags' 330-334, its Artwork and Lyrics' 335-337, its Delete's 338-342, the artist
-  tools' 343-348, Needs a look's 349-354, Library care's 355-360, Add to Queue's 392-403.
+  tools' 343-348, Needs a look's 349-354, Library care's 355-360, Server settings' 361-369, Add to Queue's 392-403.
 - **How it is built, and why:** [notes/ios.md](../notes/ios.md).
 - **Before pushing a change here, on Linux:** `ios/scripts/check-linux.sh`. GitHub's `ios.yml` compiles
   the rest on macOS.

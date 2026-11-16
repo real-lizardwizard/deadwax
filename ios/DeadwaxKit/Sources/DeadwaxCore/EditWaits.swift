@@ -55,6 +55,18 @@ public enum EditWaits {
         return wait(rounds * track + margin, floor: Routes.timeouts[Routes.lyricsFetch])
     }
 
+    /// (Phase 8, slice 8) Re-time saved lyrics for `album`: every track WITH a lyrics file is looked at (plan_lyrics with
+    /// `retime` - the scan's lyricsCount counts the same files), `lyricsAtOnce` at a time, and each synced one asked of
+    /// LRCLIB for the entry it was written from (`candidates`: the exact lookup, then the search, under each name in
+    /// turn - stopping at the first match, but as many requests as Get lyrics' at worst), each as slow as it can be and
+    /// as busy; never less than the route's own.
+    public static func retime(_ album: ScanAlbum) -> Double {
+        let asked = max(1, album.lyricsCount)
+        let rounds = Double((asked + lyricsAtOnce - 1) / lyricsAtOnce)
+        let track = lrclibNames * lrclibRequestsPerName * (lrclibRequest + lrclibBusy)
+        return wait(rounds * track + margin, floor: Routes.timeouts[Routes.lyricsFetch])
+    }
+
     /// Get CD art for `album`: the Archive's listing, fanart.tv's when the Archive has none, then each disc's picture
     /// in turn - the Archive's, the slower of the two (fanart.tv's is one 40 s request).
     public static func discArt(_ album: ScanAlbum) -> Double {

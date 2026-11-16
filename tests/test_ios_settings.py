@@ -173,8 +173,11 @@ def test_manage_keeps_its_rules_and_opens_the_web_app():
     care = section.index("} else if tool == .care {")
     assert "NavigationLink(value: AppRoute.needsALook)" in section[queue:care]
     # (Phase 8, slice 7) Library care is the app's own too - Rescan, the runs and In nobody's library, pushed
-    assert "NavigationLink(value: AppRoute.libraryCare)" in section[care:section.index("} else if let url")]
-    assert section.count("NavigationLink") == 3
+    settings = section.index("} else if tool == .settings {")
+    assert "NavigationLink(value: AppRoute.libraryCare)" in section[care:settings]
+    # (Phase 8, slice 8) Server settings is the app's own too - Connections and the server's settings, pushed
+    assert "NavigationLink(value: AppRoute.serverSettings)" in section[settings:section.index("} else if let url")]
+    assert section.count("NavigationLink") == 4
     assert "WebAppRow(label: ManagingWords.label(tool), url: url, live: online)" in section
     # the footer is said of the rows drawn: Edit an album opens no Safari
     assert "ManagingWords.footer(loginsOn: server.access.on, online: online, tools: tools)" in section

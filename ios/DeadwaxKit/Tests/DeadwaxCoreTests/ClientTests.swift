@@ -374,14 +374,17 @@ func sentJSON(_ request: HTTPRequest?) throws -> [String: SentValue] {
     }
 
     @Test func everyRouteIsDeadwaxsOwn() {
-        #expect(Routes.all.count == 92)
+        #expect(Routes.all.count == 98)
         #expect(Set(Routes.all).count == Routes.all.count)
         for endpoint in Routes.all {
             #expect(endpoint.path.hasPrefix("/deadwax/"))
-            #expect(["GET", "POST"].contains(endpoint.method) || endpoint == Routes.savePreferences)
+            #expect(["GET", "POST"].contains(endpoint.method) || endpoint == Routes.savePreferences
+                    || endpoint == Routes.saveServerSettings)
         }
-        // (Phase 6, slice 3) the one PUT: You > Getting albums changed, as the route takes it
+        // (Phase 6, slice 3) a PUT: You > Getting albums changed, as the route takes it; (Phase 8, slice 8) the other,
+        // Server settings' drafts saved in one batch
         #expect(Routes.savePreferences.method == "PUT")
+        #expect(Routes.saveServerSettings.method == "PUT")
         #expect(Routes.warmLevels == Routes.levelAlbum)
     }
 
@@ -427,6 +430,9 @@ func sentJSON(_ request: HTTPRequest?) throws -> [String: SentValue] {
         // most); an album looked at, 20 s, one row written, as the marks
         // (slice 7: Library care) a rescan, 300 s, every file read with no bound of the server's; In nobody's library,
         // 30 s, and Add for them, 60 s, and Dismiss, 30 s: SQLite alone, 10 s of busy timeout for each store call
+        // (slice 8: Server settings) the settings read, 30 s; their save, 60 s at least (more for a long batch: one
+        // store call per setting); MusicBrainz's saved answers, 30 s, and Clear, 120 s, the cache file's own; the
+        // MusicBrainz ping, 120 s, one request with its ten attempts (111.5 s at worst); slskd's, 30 s
         let longer: [Endpoint: Double] = [Routes.albumIndex: 30, Routes.autoEqSearch: 20, Routes.autoEqProfile: 20,
                                           Routes.libraryOwned: 30, Routes.fullySearch: 20, Routes.releaseGroup: 60,
                                           Routes.searchArtists: 20, Routes.searchSongs: 20, Routes.artistFacts: 120,
@@ -444,7 +450,10 @@ func sentJSON(_ request: HTTPRequest?) throws -> [String: SentValue] {
                                           Routes.artistImagesPreview: 660, Routes.artistImagesApply: 600,
                                           Routes.artistSearch: 120, Routes.refilePreview: 480, Routes.refileApply: 600,
                                           Routes.queueSummary: 30, Routes.queueReviewed: 20, Routes.rescan: 300,
-                                          Routes.held: 30, Routes.heldAdd: 60, Routes.heldDismiss: 30]
+                                          Routes.held: 30, Routes.heldAdd: 60, Routes.heldDismiss: 30,
+                                          Routes.serverSettings: 30, Routes.saveServerSettings: 60,
+                                          Routes.savedAnswers: 30, Routes.clearSavedAnswers: 120,
+                                          Routes.pingMusicBrainz: 120, Routes.pingSlskd: 30]
         #expect(Routes.timeouts == longer)
         for endpoint in Routes.all {
             // each path parameter filled in: a brace left in a path is no URL

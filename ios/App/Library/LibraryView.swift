@@ -579,17 +579,16 @@ private struct EditOrderSheet: View {
 
 /// The Navidrome gate drawn (app/NeedsNavidrome.tsx): why the Library has no albums to show, in the words Core's
 /// NavidromeGate gives this reader, Try again (asks Navidrome again - also on a pull) and, for an admin, Set up
-/// Navidrome - the web app's Server settings opened in Safari (D8; since Phase 7 the page itself, not the web app's Home;
-/// said over the tabs if iOS refuses to open it - OpenURLAction.webApp). Navidrome's own words, for whoever runs
-/// deadwax, can be selected to copy.
+/// Navidrome - since Phase 8, slice 8 the app's own Server settings, its Connections group page in a sheet over the
+/// Library (SetUpNavidromeSheet; until then the web app's, in Safari). Saved, the Library asks Navidrome again, and the
+/// gate opening takes the sheet with it. Navidrome's own words, for whoever runs deadwax, can be selected to copy.
 struct NavidromeGateView: View {
     let closed: NavidromeGate.Closed
 
     @Environment(LibraryModel.self) private var library
-    @Environment(ServerModel.self) private var server
     @Environment(DownloadModel.self) private var downloads
-    @Environment(PlayerModel.self) private var player
-    @Environment(\.openURL) private var openURL
+    /// Set up Navidrome's sheet is up.
+    @State private var settingUp = false
 
     var body: some View {
         ScrollView {
@@ -618,8 +617,8 @@ struct NavidromeGateView: View {
                     .disabled(library.checkingNavidrome)
                     .accessibilityLabel(NavidromeGate.tryAgain)
                 }
-                if closed.setUp, let address = server.address, let url = NavidromeGate.setUpURL(address) {
-                    Button(NavidromeGate.setUp) { openURL.webApp(url, player: player) }
+                if closed.setUp {
+                    Button(NavidromeGate.setUp) { settingUp = true }
                         .buttonStyle(PrimaryFace())
                 }
                 if NavidromeGate.showsDownloaded(.closed(closed), anythingHere: downloads.anythingHere) {
@@ -636,6 +635,10 @@ struct NavidromeGateView: View {
         }
         .navigationTitle("Library")
         .refreshable { await library.checkNavidrome() }
+        // (Phase 8, slice 8) Server settings' Connections group page over the Library; the gate opening takes it away
+        .sheet(isPresented: $settingUp) {
+            SetUpNavidromeSheet()
+        }
     }
 }
 

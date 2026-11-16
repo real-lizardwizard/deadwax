@@ -210,6 +210,16 @@ public enum Routes {
     public static let held = Endpoint(method: "GET", path: "/deadwax/library/held", query: [])
     public static let heldAdd = Endpoint(method: "POST", path: "/deadwax/library/held/flags/{flag_id}/add", query: [])
     public static let heldDismiss = Endpoint(method: "POST", path: "/deadwax/library/held/flags/{flag_id}/dismiss", query: [])
+    // Server settings (Phase 8, slice 8 - notes/ios.md "Server settings on the phone"): the settings and their one save,
+    // MusicBrainz's saved answers and their Clear (all Settings and the log's), and Connections' two pings (a user's -
+    // the rows show only for whoever runs deadwax; Navidrome's row is `navidromeStatus`). Re-time saved lyrics is
+    // `lyricsFetch` with `retime`, one album at a time
+    public static let serverSettings = Endpoint(method: "GET", path: "/deadwax/settings", query: [])
+    public static let saveServerSettings = Endpoint(method: "PUT", path: "/deadwax/settings", query: [])
+    public static let savedAnswers = Endpoint(method: "GET", path: "/deadwax/settings/musicbrainz_cache", query: [])
+    public static let clearSavedAnswers = Endpoint(method: "POST", path: "/deadwax/settings/musicbrainz_cache/clear", query: [])
+    public static let pingMusicBrainz = Endpoint(method: "GET", path: "/deadwax/search_musicbrainz/ping", query: [])
+    public static let pingSlskd = Endpoint(method: "GET", path: "/deadwax/monitor_slskd/ping", query: [])
 
     /// The levels spec's name for `levelAlbum`: the album's levels warmed before its first play.
     public static var warmLevels: Endpoint { levelAlbum }
@@ -249,6 +259,7 @@ public enum Routes {
         refilePreview, refileApply,
         queueSummary, queueReviewed,
         rescan, held, heldAdd, heldDismiss,
+        serverSettings, saveServerSettings, savedAnswers, clearSavedAnswers, pingMusicBrainz, pingSlskd,
     ]
 
     /// The routes given longer than the transport's own 8 seconds to answer, in seconds: the album index reads every
@@ -325,8 +336,16 @@ public enum Routes {
     /// SQLite alone, each store call its own connection that may wait out the busy timeout (store._connect's 10 s)
     /// first: the list's two calls (the ledger, the open flags) 30, Add for them's five (the open flags, the album
     /// followed, the flag closed, the grants, the job's row) 60, Dismiss's two (the flag closed, the job's row) 30 -
-    /// tests/test_ios_library_care.py holds them to the handlers.
-    public static let timeouts: [Endpoint: Double] = [albumIndex: 30, autoEqSearch: 20, autoEqProfile: 20, libraryOwned: 30, fullySearch: 20, releaseGroup: 60, searchArtists: 20, searchSongs: 20, artistFacts: 120, discography: 60, jobs: 20, cancelJob: 30, retryJob: 60, retryJobSame: 30, clearJobs: 30, storeState: 20, findCandidates: 300, enqueue: 300, joinJob: 60, libraryAdd: 60, libraryTracks: 30, libraryAlbums: 120, releases: 60, release: 60, retagPreview: 60, retagApply: 480, artFetch: 120, libraryArt: 30, queueIgnore: 20, queueUnignore: 20, tagsPreview: 60, tagsApply: 120, trackPicture: 30, lyricsFetch: 600, discArtFetch: 360, libraryDiscArt: 30, deletionSummary: 60, deleteAlbum: 120, libraryArtist: 120, artistArt: 30, artistImagesPreview: 660, artistImagesApply: 600, artistSearch: 120, refilePreview: 480, refileApply: 600, queueSummary: 30, queueReviewed: 20, rescan: 300, held: 30, heldAdd: 60, heldDismiss: 30]
+    /// tests/test_ios_library_care.py holds them to the handlers. Server settings' (slice 8): the settings' read stats
+    /// every path and probes slskd's folder (at most PROBE_VISITS folders walked) with no bound of its own, so it is
+    /// given 30 and pinned there; the save writes each setting's row and reads the overrides back - each store call its
+    /// own connection that may wait out the busy timeout (10 s) - then reads the settings as the GET does, so it is given
+    /// 60 at least and 30 + 10 s a call (ServerSettings.saveWait); the saved answers' size is a SQLite count on the cache's
+    /// one thread, 30, and Clear a DELETE and a VACUUM of the file there, 120 - no bound on the server for either, so both
+    /// pinned; MusicBrainz's ping one request with MusicBrainz's ten attempts, 120, past its 111.5 (ArtistWaits); slskd's
+    /// ping a call through slskd's own client with no timeout of its own, 30, pinned - tests/test_ios_server_settings.py
+    /// holds each.
+    public static let timeouts: [Endpoint: Double] = [albumIndex: 30, autoEqSearch: 20, autoEqProfile: 20, libraryOwned: 30, fullySearch: 20, releaseGroup: 60, searchArtists: 20, searchSongs: 20, artistFacts: 120, discography: 60, jobs: 20, cancelJob: 30, retryJob: 60, retryJobSame: 30, clearJobs: 30, storeState: 20, findCandidates: 300, enqueue: 300, joinJob: 60, libraryAdd: 60, libraryTracks: 30, libraryAlbums: 120, releases: 60, release: 60, retagPreview: 60, retagApply: 480, artFetch: 120, libraryArt: 30, queueIgnore: 20, queueUnignore: 20, tagsPreview: 60, tagsApply: 120, trackPicture: 30, lyricsFetch: 600, discArtFetch: 360, libraryDiscArt: 30, deletionSummary: 60, deleteAlbum: 120, libraryArtist: 120, artistArt: 30, artistImagesPreview: 660, artistImagesApply: 600, artistSearch: 120, refilePreview: 480, refileApply: 600, queueSummary: 30, queueReviewed: 20, rescan: 300, held: 30, heldAdd: 60, heldDismiss: 30, serverSettings: 30, saveServerSettings: 60, savedAnswers: 30, clearSavedAnswers: 120, pingMusicBrainz: 120, pingSlskd: 30]
 }
 
 /// The Cover Art Archive's thumbnail sizes the app asks deadwax's relay for (`Routes.archiveCover`'s `size`, which takes

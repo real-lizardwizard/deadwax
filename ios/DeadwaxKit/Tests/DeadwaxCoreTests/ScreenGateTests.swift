@@ -93,13 +93,4 @@ import Testing
         let reached = NavidromeGate.Checked(status: NavidromeStatus(configured: true, ok: true, server: "Navidrome 0.64.2"))
         #expect(NavidromeGate.shownOnPhone(reached, access: listener) == .open)
     }
-
-    /// (Phase 7) Set up Navidrome opens the web app's Server settings, where the line says to set it up.
-    @Test func setUpOpensTheWebAppsServerSettingsAtThePhonesServer() throws {
-        let server = try ServerAddress.parse("192.168.1.20:8090").get()
-        #expect(NavidromeGate.setUpURL(server)?.absoluteString == "http://192.168.1.20:8090/player/#/you/settings/server")
-        let pasted = try ServerAddress.parse("http://deadwax.lan:8090/player/").get()
-        #expect(NavidromeGate.setUpURL(pasted)?.absoluteString == "http://deadwax.lan:8090/player/#/you/settings/server")
-        #expect(NavidromeGate.setUpURL(server) == Managing.url(.settings, at: server))
-    }
 }

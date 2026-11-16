@@ -10,6 +10,7 @@ struct RootView: View {
     @Environment(EQModel.self) private var eq
     @Environment(AppNavigation.self) private var navigation
     @Environment(CareRunModel.self) private var care
+    @Environment(ServerSettingsModel.self) private var serverSettings
     @Environment(\.scenePhase) private var scenePhase
 
     var body: some View {
@@ -25,8 +26,10 @@ struct RootView: View {
         .animation(.default, value: server.signInOver)
         .task { await server.start() }
         .onChange(of: scenePhase) { _, phase in
-            // (Phase 8, slice 7) a Library care run stops after the album out as the app goes, its screen let sleep
+            // (Phase 8, slice 7) a Library care run stops after the album out as the app goes, its screen let sleep - and
+            // (slice 8) a Re-time run the same
             care.scene(phase)
+            serverSettings.scene(phase)
             switch phase {
             case .active:
                 CoverCache.shared.forgetFailures()
@@ -43,6 +46,9 @@ struct RootView: View {
         .onChange(of: server.signInOver) { _, over in
             // the sign-in comes over everything: Now Playing closes under it (the web's leaveFullScreen)
             if over != nil { navigation.nowPlayingShown = false }
+            // (Phase 8, slice 8) gone: a Server settings page showing asks again what failed under it - told once
+            // here, as the root, a group page and Set up Navidrome's sheet may all be up at once
+            if over == nil { serverSettings.sessionBack() }
         }
         .onOpenURL { (url: URL) -> Void in shared(url) }
     }

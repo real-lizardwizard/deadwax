@@ -105,7 +105,7 @@ def test_the_routes_are_the_servers_by_method_path_and_permission():
     assert "loginsOn && parts.held" in swift_function("LibraryCare.swift", "heldShown")
     # the page is the app's own now: no Safari for Library care
     managing = _code((CORE / "Managing.swift").read_text(encoding="utf-8"))
-    assert "case .edit, .queue, .care: return true" in managing[managing.index("public var native: Bool {"):]
+    assert "case .edit, .queue, .care, .settings: return true" in managing[managing.index("public var native: Bool {"):]
 
 
 def test_a_rescan_sends_tracks_false_and_no_body_and_the_writes_none():
@@ -251,10 +251,11 @@ def test_the_runs_are_the_apps_and_only_carry_out_what_core_decides():
     assert "let after = runs.rescanEnded(ticket, how)" in rescan
     assert rescan.index("if after.readAgain { await read() }") < rescan.index("if after.tell { navigation?.managed() }")
     assert "EditWords.mayHaveFinished" in rescan
-    # the screen stays on only while a run goes and its page shows - nowhere else in the app
-    assert "UIApplication.shared.isIdleTimerDisabled = runs.keepsScreenOn(visible: visible)" in model
+    # the screen stays on only while a run goes and its page shows - through ScreenAwake, the one place the idle timer
+    # is set since slice 8's Re-time wants it too (tests/test_ios_server_settings.py holds the rest of the app to it)
+    assert "ScreenAwake.keep(runs.keepsScreenOn(visible: visible), for: .libraryCare)" in model
     for path in (CORE.parent.parent.parent / "App").rglob("*.swift"):
-        if path.name != "CareRunModel.swift":
+        if path.name != "ScreenAwake.swift":
             assert "isIdleTimerDisabled" not in path.read_text(encoding="utf-8"), path.name
     # to the background, the run stops after the album out; another person, it stops where it is
     assert "runs.suspended()" in swift_like(model, "scene")

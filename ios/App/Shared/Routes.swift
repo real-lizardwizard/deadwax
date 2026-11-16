@@ -103,6 +103,12 @@ enum AppRoute: Hashable {
     /// (Phase 8, slice 7) Library care > In nobody's library (HeldByNobodyScreen): the albums nobody has and the flagged
     /// downloads - an admin's, with logins on.
     case heldByNobody
+    /// (Phase 8, slice 8) Settings > Manage > Server settings (ServerSettingsScreen): Connections, the organizing verdict
+    /// and the groups of settings under Library, Downloads and Connections - the drafts held by the app
+    /// (ServerSettingsModel).
+    case serverSettings
+    /// (Phase 8, slice 8) A group of Server settings, its own page (ServerSettingsGroupScreen), by the group's id.
+    case serverSettingsGroup(String)
 }
 
 /// The album you don't have's address: its release group's id as MusicBrainz gave it (lowercase - deadwax's routes take
@@ -566,6 +572,8 @@ extension View {
                 case .needsALook: NeedsLookScreen()
                 case .libraryCare: LibraryCareScreen()
                 case .heldByNobody: HeldByNobodyScreen()
+                case .serverSettings: ServerSettingsScreen()
+                case .serverSettingsGroup(let id): ServerSettingsGroupScreen(id: id)
                 }
             }
             .clearsPlayer()

@@ -62,7 +62,10 @@ under the one they have now (see [Managing an artist](#managing-an-artist)). The
 need fixing and the new downloads nobody has looked at, how many beside it in Settings > Manage, each worked through
 in Edit album with **Skip** and **Next album** (see [Needs a look](#needs-a-look)). Then **Library care**: Rescan,
 and covers, CD art and lyrics fetched for every album without, one album at a time - with In nobody's library for an
-admin (see [Library care](#library-care)).
+admin (see [Library care](#library-care)). Then **Server settings**: whether deadwax reaches MusicBrainz, slskd and
+Navidrome, and every setting of the server's, each group a page of its own, saved together - with Re-time saved
+lyrics and MusicBrainz's saved answers - and the Library's **Set up Navidrome** opening it over the Library (see
+[Server settings](#server-settings)).
 
 **Nothing of Phase 2, the lyrics, the EQ, the turntable, play history, your library downloaded,
 playlists, artists, songs, Search, Requests, Get or Manage has been seen on an iPhone yet.** It's built and tested on a Mac,
@@ -393,7 +396,9 @@ words after the artist: "Downloaded", "Partly downloaded", "Downloading", "Waiti
 reach Navidrome, or hasn't been told where it is, the Library says so in place of its pages (see
 [When something goes wrong](#when-something-goes-wrong)) - with **On this phone > Downloaded** under
 it when anything is downloaded, since those play from the phone. It checks again each time you come
-back to the Library tab or the app, and when you pull down.
+back to the Library tab or the app, and when you pull down. When deadwax hasn't been told where Navidrome is, an
+admin sees **Set up Navidrome**: it opens [Server settings](#server-settings)' Connections page in a sheet over the
+Library - see [Set up Navidrome](#set-up-navidrome).
 
 ## An album's page
 
@@ -654,7 +659,7 @@ lyrics** while any track has none. It asks LRCLIB for each track without a .lrc 
 "Getting lyrics…" while it does, and then says what it came to ("Saved lyrics for 3 tracks (2 synced), 8 already had
 them, 1 not on LRCLIB."), the button now "Lyrics · 11 of 12" to ask again. With every track done, "Every track has
 lyrics." Lyrics saved show on Now Playing once Navidrome has scanned the folder. Under it, where to re-time synced
-lyrics - Lyrics in Server settings, which is still the web app's.
+lyrics - Lyrics in [Server settings](#server-settings), whose **Re-time saved lyrics** moves them to a new lead.
 
 **The Gets are writes**, like Apply: one at a time, never while Release or Edit tags applies (and those are dimmed
 while a Get runs), and off until the folder has been read again after any of them. Each says what went wrong under
@@ -982,7 +987,7 @@ again.
 "Showing Ye (rapper)" - with **Not them?**, which searches MusicBrainz for another artist ("as Kanye
 West" beside one an old name of theirs matched); tap one for their pictures instead. When MusicBrainz
 can't say who they are, the search is open from the start, under what went wrong. Next come the
-sources it couldn't ask - with no fanart.tv or TheAudioDB key in deadwax's Server settings (under
+sources it couldn't ask - with no fanart.tv or TheAudioDB key in deadwax's [Server settings](#server-settings) (under
 Connections), "Banners, logos and backgrounds come from fanart.tv and TheAudioDB, and both need a
 key…" - and then a section for each slot: **Square image**, **Banner**, **Background**, **Logo**,
 **Wide image** and **Clear art**, each with the file already in their folder ("artist.jpg on disk") or
@@ -1864,7 +1869,7 @@ Account and About ask deadwax again when you pull them down, as the first screen
 ### Manage
 
 Settings > **Manage** is deadwax's tools for looking after it, as many of them as you may use. They're coming into the
-app one build at a time (Phase 8): **Edit an album**, **Needs a look** and **Library care** are the app's own now, and the rest still
+app one build at a time (Phase 8): **Edit an album**, **Needs a look**, **Library care** and **Server settings** are the app's own now, and the rest still
 **open in the web app, in Safari** - the web app has every one of them laid out for a phone ([Looking after deadwax from a
 phone](player.md#looking-after-deadwax-from-a-phone)). Top to bottom, each only for someone who may use it:
 
@@ -1874,7 +1879,7 @@ phone](player.md#looking-after-deadwax-from-a-phone)). Top to bottom, each only 
 | **Needs a look** | Look after the library | [**Needs a look**](#needs-a-look), in the app: the albums that need fixing and the new downloads nobody has looked at, worked through one after another in Edit album. How many albums it lists is at the row's right. |
 | **Library care** | Look after the library or Edit albums | [**Library care**](#library-care), in the app: Rescan (Look after the library's), and covers, CD art and lyrics fetched for every album without (Edit albums') - and, with logins on, In nobody's library. |
 | **People** | an admin, with logins on | People - unlock it with your own Navidrome password, as in the web app |
-| **Server settings** | Settings and the log | Server settings, at its first tab |
+| **Server settings** | Settings and the log | [**Server settings**](#server-settings), in the app: whether deadwax reaches MusicBrainz, slskd and Navidrome, and every setting of the server's, a group to a page, saved together. |
 | **Event log** | Settings and the log | the event log |
 
 An admin has every row. With logins off everyone does, but People: there's nobody to manage. Someone with none of
@@ -1884,10 +1889,11 @@ down. If an admin took a permission away since, the page it opens says "This pag
 given you - ask one if you need it." - and People, its own words: "Only an admin can open People - it comes with
 being a Navidrome admin."
 
-Under the rows: "Edit an album, Needs a look and Library care are the app's own; the others open in the web app, in
-Safari." (with Edit albums but not Look after the library, "Edit an album and Library care are the app's own; the
-others open in the web app, in Safari."; with neither, "These open in the web app, in Safari."; and nothing at all
-when every row there is the app's own) - and with logins on, "Safari has its own
+Under the rows: "Edit an album, Needs a look, Library care and Server settings are the app's own; the others open in
+the web app, in Safari." - naming only the rows of the app's own you have (with Edit albums alone, "Edit an album and
+Library care are the app's own; the others open in the web app, in Safari."; with Settings and the log alone, "Server
+settings is the app's own; the others open in the web app, in Safari."; with none of them, "These open in the web app,
+in Safari."; and nothing at all when every row there is the app's own) - and with logins on, "Safari has its own
 sign-in, apart from the app's: the first time, sign in there with the same name and password you use here. The pages
 open as whoever is signed in there, who may not be who's signed in here." Nothing hands the app's sign-in to Safari (it
 could only go in the address, where it would sit in Safari's history), so the first time a row opens, the web app's
@@ -1904,17 +1910,17 @@ Screen, it keeps a sign-in of its own, and the rows open in Safari, not in it.
 The rows open deadwax's address as the app has it, plain `http://` included: Safari opens it as it would the address
 typed (its address bar says Not Secure), over your Wi-Fi or WireGuard. If the phone's default browser isn't Safari,
 they open in that one instead. While deadwax can't be reached the rows that open Safari are dimmed and can't be
-tapped, and "These open once deadwax is back." says why; so is Change password. Edit an album, Needs a look and
-Library care still open: each says it needs deadwax, and reads the library once it's back. If iOS won't open the address at all - Safari
-turned off in Screen Time, with no other browser - the app says "Couldn't open the web app - Safari may be turned off
-in Screen Time." over the tabs, and VoiceOver reads it. The same goes for Edit album's rows that still open the web app
-and the Library's Set up Navidrome.
+tapped, and "These open once deadwax is back." says why; so is Change password. Edit an album, Needs a look, Library
+care and Server settings still open: each says it needs deadwax, and reads what it shows once it's back. If iOS won't
+open the address at all - Safari turned off in Screen Time, with no other browser - the app says "Couldn't open the web
+app - Safari may be turned off in Screen Time." over the tabs, and VoiceOver reads it.
 
-VoiceOver reads each Safari row as a button, with "Opens in Safari." after it; Edit an album, Needs a look and Library
-care as rows that open a page, Needs a look with its count ("Needs a look, 3 albums"). The rows grow with the text size.
+VoiceOver reads each Safari row as a button, with "Opens in Safari." after it; Edit an album, Needs a look, Library
+care and Server settings as rows that open a page, Needs a look with its count ("Needs a look, 3 albums"). The rows
+grow with the text size.
 
-An artist's pictures and names are managed from [the artist's page](#managing-an-artist), as in the web app. What
-isn't linked from the phone: the web app's **Connections**, in its You.
+An artist's pictures and names are managed from [the artist's page](#managing-an-artist), as in the web app. The web
+app's **Connections**, in its You, is at the top of [Server settings](#server-settings) on the phone.
 
 ### Needs a look
 
@@ -2053,6 +2059,91 @@ or pressed until deadwax is back and the library has been read again. Without Lo
 albums - an admin took them away - it says "This page needs a permission an admin hasn't given you - ask one if you
 need it." and asks nothing. VoiceOver reads each line once; with Reduce Motion on, nothing slides; every line grows
 with the text size.
+
+### Server settings
+
+**Server settings** (Settings > Manage > Server settings, for someone with **Settings and the log** - an admin, or
+everyone while logins are off) is the web app's Server settings on the phone, with the web app's **Connections** at its
+top. It's a page pushed on Settings, and a list, top to bottom:
+
+- **What it's for**: "How deadwax runs, as your compose file or .env sets it. A change saved here takes effect at once,
+  with no restart, and is used instead of what the file says until you revert it. Your own choices - what Get does,
+  the quality floor, Format and whether cancelling asks first - are in Settings, under Getting albums."
+- **Connections**: MusicBrainz, slskd and Navidrome, each "Checking…" until it answers, then **Connected** (Navidrome's
+  own name and version, when it gives one) in green or what is wrong in red, in a word - "Can't reach it", "Not set
+  up", "Key refused", "Not running", "Not on Soulseek", "Couldn't check" - with the sentence saying why under it (the
+  web app's, which you can select and copy). **Check again** asks all three again; it's dimmed until they've been asked
+  once and while deadwax can't be reached. They're asked the first time the page shows - MusicBrainz's is a real
+  request to a service that limits how often it's asked, so never more - and again on Check again, after a save that
+  changed one of the Connections settings, once deadwax is back after being out of reach, and once you've signed in
+  again.
+- **The organizing verdict**: "Organizing is active — finished downloads will be moved into the library, tagged and
+  filed." in green, or "Organizing will not file anything right now." in amber with what stops it under it ("•
+  SLSKD_DOWNLOAD_PATH is not set").
+- **Library** (Paths, Organizing, Cover art, Lyrics), **Downloads** (Soulseek searches, When a download fails) and
+  **Connections** (Connections, MusicBrainz's saved answers, Logins) - the web app's three tabs - each group a row that
+  opens its own page, marked **Needs attention** (amber: one of its settings is wrong, or Organizing while it's
+  blocked) or **Unsaved** (a change of yours not saved yet). Under each section what it holds ("Paths, organizing,
+  covers and lyrics").
+
+**A group's page** has the group's note, then a section for each setting, headed by its name (`LIBRARY_PATH`): a menu
+for one that takes certain values, a field for the rest, with no capitals or corrections, and the address keyboard for
+an address (`NAVIDROME_URL`). A secret - a password or an API key - is a secure field that never shows what's saved:
+"•••••••• (set)" in it when there is one, "not set" when not; type a new one to replace it. One deadwax won't let you
+change here (`DB_PATH`, say) says **Locked**, and why. Under each: where its value came from ("Set here", "From the
+container environment", "From .env"), **Unsaved** or **Needs attention**, what it does, and what is wrong with it.
+Once a setting has been set here, **Revert to the environment (…)** brings back the compose file's value (shown in the
+brackets) on the next save - "Will revert to the environment on save." until then. Change `NAVIDROME_URL` or
+`SLSKD_URL` and the password or API key under it says "Type the password again to go with the new address - deadwax
+won't send the saved one to an address it wasn't entered for." until you do.
+
+**Saving is one press for every change, on every page.** Changes are kept as you go from group to group, and back to
+Settings and other tabs - they stay until saved or discarded, as long as the app runs. While there are any, every
+Server settings page has a bar at its foot: "2 unsaved changes", **Discard** and **Save changes**. Save changes sends
+them all at once: **Saving…** on the button, then "Saved." (VoiceOver reads it), each row's Unsaved gone, its new
+value in force. If deadwax refuses, nothing at all is saved: "Not saved: SLSKD_SEARCH_TIMEOUT: expected whole seconds,
+3 to 60 - 8 is the default" in red, as deadwax said it, every change still there to put right. If the save gets no
+answer - the network dropped, or deadwax answered with an error of its own - the bar says "deadwax may have finished
+this - looking again" while the settings are read again; what was saved is no longer Unsaved, and only what still
+differs is left to save. Save changes is dimmed while a save is going, and from the moment deadwax goes out of reach
+until the settings have been read again after it's back. The fields can be typed in while a save goes, as in the web
+app.
+
+Two groups do more than their settings:
+
+- **Lyrics** has **Re-time saved lyrics** under `LYRICS_LEAD_MS`: it moves the timings of synced lyrics already
+  saved to the lead in force, one album at a time - "Re-timing 4 of 60 albums · Stop after this album" while it goes
+  (tap it to stop after that album), then what it did ("Re-timed 212 tracks, 40 already at this lead."). Change the
+  lead and it says "Save the new lead first." until it's saved. As with Library care's runs, **the screen stays on**
+  while it runs and the page shows ("The screen stays on while it runs and this page shows."), and it stops after the
+  album it's on when the app goes to the background, deadwax goes out of reach, your session ends or Edit albums is
+  taken away, saying why ("It stopped as the app went to the background - running it again carries on."): running it
+  again is safe, an album already at the lead is left as it is. It needs **Edit albums** too: without it, "Re-timing
+  needs Edit albums, which an admin hasn't given you."
+- **MusicBrainz's saved answers** says what deadwax keeps of MusicBrainz's answers ("1,234 answers in 3.2 MB saved,
+  of 200 MB.", read each time the page shows), and **Clear MusicBrainz's saved answers** asks first ("Clear
+  MusicBrainz's saved answers?" - **Clear** or **Cancel**), then clears them: "Cleared. The next answers are asked of
+  MusicBrainz again." Only speed is lost. It's dimmed with nothing saved, and while a new path is unsaved ("Save the
+  new path first.").
+
+**While deadwax can't be reached**, a page that hasn't read the settings yet says "Managing needs deadwax. This opens
+once it's back."; one that has keeps what it showed under the amber line Edit album shows - your changes can still be
+typed, but not saved - and reads them again once deadwax is back. If the first read fails, "Couldn't read the
+settings." with **Try again**; a later one, "Couldn't read the settings again just now." over what was there. Without
+Settings and the log - an admin took it away - it says "This page needs a permission an admin hasn't given you - ask
+one if you need it." and asks nothing. When your session ends, nothing is asked under the sign-in; sign in again and
+the settings are read again. Signing out drops any unsaved change, and the next person's Server settings starts
+afresh. VoiceOver reads each row once - a group with its mark, a Connections row with its state and why; with Reduce
+Motion on, nothing slides; every line grows with the text size.
+
+#### Set up Navidrome
+
+When deadwax hasn't been told where Navidrome is, the Library shows "Connect Navidrome", and an admin **Set up
+Navidrome**. It opens Server settings' **Connections** page as a sheet over the Library, Connections' three rows at its
+top: fill in `NAVIDROME_URL`, `NAVIDROME_USER` and `NAVIDROME_PASSWORD` and **Save changes**. The Library asks
+Navidrome again as the save lands; once Navidrome answers, the sheet goes and the Library fills. If it doesn't, the
+Navidrome row says why. **Close** puts the sheet away - unsaved changes stay, for the next time it opens or for
+Settings > Manage > Server settings - and it can't be closed, or swiped away, while a save goes.
 
 ### Debug
 
@@ -4145,7 +4236,9 @@ in Safari. Use deadwax's plain `http://` address, as the app has it - once on th
 with Wi-Fi off. 237-243 want logins on, and 241 two accounts (one an admin); 244-246 work either way. Since the build
 with [Edit album](#edit-album), Edit an album opens Choose the folder in the app (no line under it, no arrow) and an
 album's ••• has **Edit album** where Edit in the web app was: those parts of 237, 238, 241 and 242 are 320 and 321's
-now, and the footer says "Edit an album is the app's own; the others open in the web app, in Safari."
+now, and the footer says "Edit an album is the app's own; the others open in the web app, in Safari." Since the
+build with [Server settings](#server-settings), Server settings opens in the app, and the Library's Set up Navidrome
+opens its Connections page over the Library: 244 is 369's now.
 
 - **237 The version, and Manage.** install.sh says "Installed deadwax 0.13 (13), runs until …", and You > About
   reads 0.13 (13). As an admin, You has **Manage** between Downloads and Account: **Edit an album** (with "Opens the
@@ -4803,6 +4896,66 @@ The runs write covers, CD art and lyrics into album folders: narrow them to albu
   With the largest text and VoiceOver: each line read once, the run's button read with its count, every line whole.
   With Reduce Motion on, nothing slides.
 
+### Server settings' checks (361-369)
+
+**Not done yet.** These come with the build that brings [Server settings](#server-settings) into the app - Phase 8's
+eighth part (still app 0.13 (13)). No server change is needed: any deadwax the first part works with. As in 355-360:
+deadwax's plain `http://` address, on the home Wi-Fi and over WireGuard with Wi-Fi off, as an admin unless said;
+compare each with the web app's Server settings (You > Server settings) and Connections (the web app's You). These
+change how the server runs: change only what you'll put back, and note each setting's value before you start.
+
+- **361 The root.** Settings > Manage > **Server settings**: the line about the compose file, then **Connections** -
+  MusicBrainz, slskd and Navidrome, "Checking…", then each as the web app's You says it (Connected, Navidrome with its
+  version). Then the organizing verdict, the web app's, and **Library**, **Downloads** and **Connections**, each
+  group the web app shows under that tab, in its order. Is any group marked **Needs attention** where the web app's
+  tab has its dot? Tap **Check again**: "Checking…", then the same. Stop slskd for a moment (only if you can): Check
+  again says "Can't reach it" or "Not on Soulseek" under slskd, with the web app's sentence - press and hold it to
+  select it. Start it, Check again: Connected. With VoiceOver: each row read once ("slskd, Connected").
+- **362 A menu.** Open **Cover art** (or When a download fails): a setting with choices is a menu, its value the web
+  app's. Pick another: the group's row and the setting say **Unsaved**, and the bar at the foot "1 unsaved change".
+  **Save changes**: "Saving…" on the button, then "Saved." (VoiceOver reads it), and "Set here" under it. Does the
+  web app's page, read again, show the new value? Put it back the same way.
+- **363 Changes across pages.** Change a setting in Cover art, go back, change one in Soulseek searches, go back to
+  Settings, to the Library tab, then back to Server settings: both rows say Unsaved, the bar "2 unsaved changes" on
+  every Server settings page. **Discard**: both gone. Make them again, and one **Save changes** saves both. Type
+  `abc` in `SLSKD_SEARCH_TIMEOUT` and save: "Not saved: SLSKD_SEARCH_TIMEOUT: expected whole seconds, 3 to 60 - 8 is
+  the default" in red, nothing saved - the other change still Unsaved. Put the timeout right and save.
+- **364 A secret.** Connections' `SLSKD_APIKEY` (or `FANARTTV_KEY`): "•••••••• (set)" in the field, never the key,
+  and a secure field when you type (the keyboard has no suggestions). Type the same key again and save: "Saved.", and
+  the field shows "•••••••• (set)" again, empty of what you typed. Does slskd still say Connected?
+- **365 An address without its secret.** Change `NAVIDROME_URL` to another address (one letter different), and
+  leave the password: under `NAVIDROME_PASSWORD`, "Type the password again to go with the new address - deadwax
+  won't send the saved one to an address it wasn't entered for." Save: "Not saved: NAVIDROME_URL: type the Navidrome
+  password again with the new address - deadwax won't send the saved one to an address it wasn't entered for", and
+  nothing saved. Discard.
+- **366 Revert to the environment.** A setting saved here (362's, before you put it back): "Set here", and **Revert
+  to the environment (…)** with the compose file's value. Tap it: "Will revert to the environment on save.", Unsaved,
+  the bar "1 unsaved change". Save: "From the container environment" (or "From .env"), the compose file's value, and
+  no Revert. Does the web app agree?
+- **367 MusicBrainz's saved answers.** Open **MusicBrainz's saved answers**: the line is the web app's ("… answers in
+  … MB saved, of 200 MB."). Tap **Clear MusicBrainz's saved answers**: "Clear MusicBrainz's saved answers?" with
+  Clear and Cancel. Cancel: nothing changes. Clear: "Cleared. The next answers are asked of MusicBrainz again.", and
+  the button dimmed with nothing to clear. Search for an artist in the app, come back: the line counts again. Change
+  `MUSICBRAINZ_CACHE_PATH` without saving: "Save the new path first.", Clear dimmed. Discard.
+- **368 Re-time saved lyrics.** Open **Lyrics**: **Re-time saved lyrics** under the lead. Tap it: "Reading the
+  library…", then "Re-timing 1 of N albums · Stop after this album" and "The screen stays on while it runs and this
+  page shows."; it ends saying what it did, as the web app's would ("Re-timed … tracks, … already at this lead.").
+  Change `LYRICS_LEAD_MS` without saving: "Save the new lead first.", the button dimmed - Discard. Start it again and
+  tap the button: it stops after the album it's on ("… Stopped at 3 of N albums."). Start it and lock the phone:
+  unlock, and does it say "It stopped as the app went to the background - running it again carries on."? As someone
+  with Settings and the log but not Edit albums: "Re-timing needs Edit albums, which an admin hasn't given you." and
+  the button dimmed.
+- **369 Set up Navidrome.** Only if you can take Navidrome's address away for a moment (on a test setup, with logins
+  off - with them on, signing in needs Navidrome too): in Server settings > Connections, note `NAVIDROME_URL`, clear
+  it and save. On the Library tab (pull down if it still shows albums): "Connect Navidrome" with **Set up
+  Navidrome**. Tap it: the Connections page as a sheet, Navidrome "Not set up". Type the address back, and the
+  password again (the note under it asks for it), and **Save changes**: does the sheet go and the Library fill,
+  without a pull? Again, but tap **Close** after typing: the sheet goes, and Settings > Manage > Server settings has
+  the changes Unsaved, ready to save. While a save goes, Close is dimmed and the sheet can't be swiped away. Wi-Fi
+  and WireGuard off on any Server settings page: the amber line, Save changes dimmed - your typing kept; back on, the
+  settings read again and Save changes on. Signed in as someone without Settings and the log: no Server settings in
+  Manage.
+
 ### Add to Queue's checks (392-403)
 
 **Not done yet.** These come with the build that makes [Add to Queue](#adding-to-the-queue) the phone's one way to add
@@ -4878,9 +5031,9 @@ These are the web app's for now:
 - **Home** and **pins** - and so Home's Arriving: outside Requests, the tab's badge is the phone's only sign of a
   download on its way.
 - **Looking after deadwax**, but for [Edit album](#edit-album), [an artist's tools](#managing-an-artist),
-  [Needs a look](#needs-a-look) and [Library care](#library-care), all of it on the phone now: Settings > [Manage](#manage) opens each other tool in the
-  web app, in Safari, and Change password too. Re-timing synced lyrics is Server settings', in the web app. Not linked
-  from the phone: the web app's **Connections** (in its You).
+  [Needs a look](#needs-a-look), [Library care](#library-care) and [Server settings](#server-settings) (with the web
+  app's Connections, and re-timing synced lyrics), all of it on the phone now: Settings > [Manage](#manage) opens each
+  other tool - People and the event log - in the web app, in Safari, and Change password too.
 
 ## When something goes wrong
 
@@ -4895,7 +5048,9 @@ These are the web app's for now:
 | Sign in: **"deadwax can't reach the music server, so nobody can sign in just now. Tell whoever runs deadwax."** | deadwax hasn't been told where Navidrome is, or the address it has can't be used. Whoever runs deadwax sets it in [Navidrome settings](configuration.md#navidrome-settings--connections); what's wrong is folded under "For whoever runs deadwax". (A deadwax older than 2.0.4 says "Something went wrong on the server - try again in a moment." here instead.) |
 | The sign-in comes up over the app, with a reason ("Your sign-in ran out after 30 days without use - sign in again.") | Sign in again. The music plays on underneath. |
 | Library: **"Your music isn't available right now"** (an admin sees **"Can't reach Navidrome"**) | deadwax can't reach Navidrome. Check Navidrome is running, then **Try again**. |
-| Library: **"Your music isn't available yet"** (an admin sees **"Connect Navidrome"**) | deadwax hasn't been told where Navidrome is. An admin's **Set up Navidrome** opens the web app's Server settings in Safari: set Navidrome up on its Connections tab, **Save changes**, then come back. |
+| Library: **"Your music isn't available yet"** (an admin sees **"Connect Navidrome"**) | deadwax hasn't been told where Navidrome is. An admin's **Set up Navidrome** opens Server settings' Connections page over the Library: fill in Navidrome's address, user and password, **Save changes**, and the Library fills once Navidrome answers ([Set up Navidrome](#set-up-navidrome)). |
+| Server settings: **"Not saved: …"** | deadwax refused the whole save, naming each setting and what's wrong with it - nothing was saved. Every change is still there to put right; then **Save changes** again. "Type the password again to go with the new address" (or the API key) means an address changed without its secret: type it on the same page. |
+| Server settings: **"deadwax may have finished this - looking again"** | The save's answer never reached the phone (it locked, or the network dropped). The settings are read again: what was saved is no longer marked Unsaved, and only what still differs stays to save. |
 | A row of Settings > **Manage** opens Safari on deadwax's **sign-in** | Safari has its own sign-in, apart from the app's. Sign in with the same name and password you use in the app: the page the row named opens, and Safari stays signed in after that (until it goes 30 days without use). See [Manage](#manage). |
 | A row of Settings > Manage opens a page saying **"This page needs a permission an admin hasn't given you"** (People: **"Only an admin can open People - it comes with being a Navidrome admin."**) | An admin took that permission away since deadwax last told the app - or Safari is signed in as someone other than you (below). Pull down on Settings: the row goes. Ask an admin if you need it. |
 | A Manage page opens with **someone else's access** - more than you have, or less | Safari is signed in as someone else: it signs in apart from the app, and the page is Safari's person's. In Safari, open the web app's You and look at the name at its top; **Sign out**, then sign in as yourself. |
@@ -4908,7 +5063,7 @@ These are the web app's for now:
 | Edit album's **Delete permanently** stays dimmed | deadwax is still reading what's in the folder ("Checking what's in there…"), or couldn't ("Couldn't read that folder." - **Look again**); another write is running, or the folder is still being read again after one; or deadwax can't be reached. |
 | Delete album: **"Couldn't delete it."** after "deadwax may have finished this - looking again" | The delete's answer never reached the phone, and the library read again still has the folder: it wasn't deleted. What's in it has been read again - **Delete permanently** to try again. |
 | Edit album's **Get cover**, **Get CD art** or **Get lyrics** stays dimmed | Another write is running (an Apply, a cover, another Get), the folder is still being read again after one, or deadwax can't be reached. Wait for it; after "Couldn't read the library.", **Look again**. |
-| Get CD art: **"No CD art on the Cover Art Archive for this release - a fanart.tv key in Server settings adds another source."** | Nobody has uploaded a picture of this pressing's disc. A fanart.tv key (Server settings, in the web app) lets deadwax look there too; then **Look again**. |
+| Get CD art: **"No CD art on the Cover Art Archive for this release - a fanart.tv key in Server settings adds another source."** | Nobody has uploaded a picture of this pressing's disc. A fanart.tv key ([Server settings](#server-settings) > Connections) lets deadwax look there too; then **Look again**. |
 | Get lyrics: **"… 2 failed - try again."** | LRCLIB didn't answer for those tracks just then (it's busy at times). Tap **Lyrics · …** to ask again: only the tracks still without lyrics are asked. "Not on LRCLIB" is LRCLIB having none - asking again won't change it. |
 | Edit album's Tags: **"Couldn't read the files."**, with **Look again** | deadwax couldn't read the folder's files just then - the disk asleep, or the folder moved. **Look again**; if the album was just applied with a new release, its files were renamed, so go back to Tags and choose them again. |
 | Library: **"Couldn't update this list - showing it as it was."** | deadwax didn't answer just then. ••• > Refresh to try again (pull down, on a list opened from the •••). |

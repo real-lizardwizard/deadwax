@@ -37,6 +37,7 @@ struct DeadwaxApp: App {
     @State private var getSettings: GetSettingsModel
     @State private var queueCount: QueueCountModel
     @State private var care: CareRunModel
+    @State private var serverSettings: ServerSettingsModel
 
     /// The one background session, made before anything else can ask it.
     private static let downloadSession = DownloadSession()
@@ -75,6 +76,10 @@ struct DeadwaxApp: App {
         // Phase 8, slice 7: Library care's scan and runs - the app's, so leaving its page doesn't stop a run
         let care = CareRunModel(server: server, reachability: reachability, navigation: navigation)
         reachability.whenChanged { [weak care] in care?.reachChanged() }
+        // Phase 8, slice 8: Server settings' drafts, saved answers, Re-time and Connections - the app's, so the drafts
+        // outlive a page and a run its page; a save of Navidrome's settings asks the Library's gate again
+        let serverSettings = ServerSettingsModel(server: server, reachability: reachability, library: library)
+        reachability.whenChanged { [weak serverSettings] in serverSettings?.reachChanged() }
         let downloads = DownloadModel(server: server, reachability: reachability, files: files, session: Self.downloadSession)
         player.connect(downloads: downloads, reachability: reachability)
         // Phase 4, slice 3: a write here to a downloaded playlist keeps it in step at once
@@ -109,6 +114,7 @@ struct DeadwaxApp: App {
             getSettings.reset()
             queueCount.reset()
             care.reset()
+            serverSettings.reset()
         }
         _server = State(initialValue: server)
         _player = State(initialValue: player)
@@ -130,6 +136,7 @@ struct DeadwaxApp: App {
         _getSettings = State(initialValue: getSettings)
         _queueCount = State(initialValue: queueCount)
         _care = State(initialValue: care)
+        _serverSettings = State(initialValue: serverSettings)
     }
 
     var body: some Scene {
@@ -155,6 +162,7 @@ struct DeadwaxApp: App {
                 .environment(getSettings)
                 .environment(queueCount)
                 .environment(care)
+                .environment(serverSettings)
                 .preferredColorScheme(.dark)
                 .tint(Palette.accent)
                 // (Noto Sans, 15 Nov) the words of every Text and control that sets no font of its own
@@ -206,6 +214,8 @@ enum Palette {
     static let heldEdge = Color(red: 110 / 255, green: 231 / 255, blue: 183 / 255).opacity(0.28)
     /// --dw-amber-icon #fbbf24: a download that didn't arrive, its mark (an amber the listener can act on).
     static let amberIcon = Color(red: 0xFB / 255, green: 0xBF / 255, blue: 0x24 / 255)
+    /// --dw-green-icon #34d399: a connection that answered, its dot (.app-dot.is-ok - Server settings' Connections).
+    static let greenIcon = Color(red: 0x34 / 255, green: 0xD3 / 255, blue: 0x99 / 255)
     /// --app-pin-off 0.45, an opacity: "a pin, or an Edit button, that can't be used just now" - a song or an album not
     /// on this phone while deadwax can't be reached.
     static let off: Double = 0.45

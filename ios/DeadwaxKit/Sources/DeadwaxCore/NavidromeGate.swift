@@ -73,18 +73,14 @@ public enum NavidromeGate {
     public static let navidromeRequired = "deadwax needs Navidrome for your library: the app shows and plays the albums "
         + "Navidrome lists, through deadwax - so the phone never needs Navidrome's password."
     public static let navidromeUnreached = "Your library comes from Navidrome, so it shows here once deadwax can reach it."
-    /// An admin's, after navidromeRequired (D8: the words kept, the button opening Server settings in Safari).
+    /// An admin's, after navidromeRequired (D8: the words kept). Since Phase 8's slice 8 the button opens the app's own
+    /// Server settings at Connections, as a sheet over the Library - the web's `showServerSettingsTab('connections')` -
+    /// where until then it opened the web app's in Safari, at its first tab.
     public static let setItUp = "Set it up in Server settings (Connections), then come back."
     public static let cantReach = "Can't reach Navidrome"
     public static let connect = "Connect Navidrome"
     public static let tryAgain = "Try again"
     public static let setUp = "Set up Navidrome"
-    /// Set up Navidrome's address: the web app's Server settings (Managing's), at the server this phone uses - the page
-    /// the line says to set it up in. The web's own button opens it at Connections, which no address can name, so it
-    /// opens at its first tab (phase7-managing.md question 8).
-    public static func setUpURL(_ server: ServerAddress) -> URL? {
-        Managing.url(.settings, at: server)
-    }
 
     // MARK: the rule
 

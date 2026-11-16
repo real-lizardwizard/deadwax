@@ -12789,3 +12789,172 @@ Core changed); the unsigned generic-iOS Debug build, BUILD SUCCEEDED, no warning
 4893 passed and 1 skipped (the cover-art relay's timing test with it, unloaded); all 94 sims with Node 22. Not
 verified - only the phone can tell (docs/ios.md check 354): the page and the count under the sign-in, and the read
 and the count after signing in again; and whether Edit album's sheet really stays up over the sign-in.
+
+## Server settings on the phone (Phase 8, slice 8 - 2026-11-16)
+
+The spec's section 7 (notes/ios-specs/phase8-managing.md), with 12-18's rules: Settings > Manage > **Server settings**
+is the app's own page now - the web app's Connections (its You's three rows) at the top, the organizing verdict, and
+the web's three tabs as sections whose groups each push a page of their own, saved together from a bar at the foot of
+every one of them; Lyrics' page carries Re-time saved lyrics, MusicBrainz's saved answers' carries their size and
+Clear; and the Library's **Set up Navidrome** opens Connections' page as a sheet over the Library rather than the web
+app in Safari. Part A was main's **2.1.33** (44224c5, nothing a user sees: tabForGroup, tabMarks, retypeSecretNote with
+RETYPE_WITH_ADDRESS, and editedEnvDraft moved from components/SettingsView.tsx into lib/serverSettings.ts word for
+word, so the exporter can run them - notes/app-desktop.md "Server settings' rules, moved into lib/ (2.1.33)"); the
+slice is built on the `ios` branch with it merged ("Merge main 2.1.33 into ios"). The app stays 0.13 (13);
+src/__init__.py untouched; no server change; the player engine has no diff.
+
+### Core (DeadwaxCore)
+
+- **ServerSettings.swift** (new). The answer (`ServerSettingsAnswer`: groups, settings, the organizing verdict) read
+  loosely, each setting's `choices` put in the web's order: the body is read once more as ordered JSON and each choice
+  map rebuilt as `JSON.parse` and `Object.entries` would leave it - a key written twice keeps its first place and its
+  last value, and array-index keys ("0", "12") come first, ascending (`jsOrder`), whatever order deadwax wrote them in.
+  `ServerSettings` is lib/serverSettings.ts and the pages' own: the tabs and their hints, `tab(forGroup:)`, `tabMarks`
+  and the phone's `groupMarks` (the same rule taken per group - the Organizing group carries the verdict's attention),
+  `sections`, the drafts (`Drafts`: typed values and reverts in the order made; `edited` - editedEnvDraft, a value typed
+  back to what is saved is no draft - `reverted`, `afterSave`, the phone's `stillDiffering`), `saveWait`, the retype
+  note (`retypeNote`, both of 2.0.0-player.65's cases), a setting's `Row` (SettingRow: its control, value, placeholder,
+  source, badges, effect, lock, revert, note, detail), `pickerChoices`, `isAddress`, the words, `barText`, and each
+  failure in its own words (`readFailure`, `saveFailure` - a 400's detail as it came, a 403 NO_PERMISSION -
+  `unansweredWords`). `Parts` says who sees what (the page with Settings and the log, Connections for whoever runs
+  deadwax, Re-time with Edit albums too). **SettingsFlow** is every decision the pages make: only the newest read
+  lands; a read to trust is one begun since deadwax was last out of reach (`real`), and Save waits for one; `readsNow`
+  (shown, in reach, allowed, nothing out - the first read, one not to trust, after a save that never answered, and shown
+  again with no draft); the one save (`save` - every draft, in order, any read out called off; `saved`; `refused` - a
+  4xx, nothing taken, every draft kept, its words in the bar; `unanswered` - no answer or a 5xx, said as "deadwax may
+  have finished this - looking again", the settings read again and only the drafts that still differ from them kept;
+  `saveDropped`); `discard`, `barText`, `barShown`, the marks. **SavedAnswers** is MusicBrainzAnswers.tsx: the line,
+  Clear's label, hint and refusal (a path drafted, nothing saved, a Clear out, out of reach), read again when either
+  setting changes as saved (`key`), and a Clear that never answered read again to see. **RetimeRun** is
+  RetimeLyrics.tsx's run: the library read, then `next` - the only way an album is asked for, so every stop lands after
+  the album out: Stop, the background (`suspended`), out of reach, the session ended, a 403 (`step(failure:)`
+  -> `.notAllowed`), the lead drafted (`leadDrafted`) - `finished`, the web's note and the phone's own stop sentence,
+  `keepsScreenOn`, `pageGone` (an ended run said once). **Connections** and **ConnectionChecks** are You.tsx's rows:
+  `fromPing`, `fromNavidrome`, `unanswered`, `spoken`; checked the first time a page drawing them shows for this
+  person, on Check again, and once more as such a page shows after a `want` - a save carrying a Connections-group key,
+  deadwax back in reach, the sign-in over the app gone - only the newest check's answers landing.
+  The client: `serverSettings()`, `saveServerSettings(_:)` (its wait grown by the batch), `savedAnswers()`,
+  `clearSavedAnswers()`, `pingMusicBrainz()`, `pingSlskd()`, `retime(_:)` (the lyrics fetch with `retime`, waited
+  for by EditWaits' new `retime(album)`).
+- **Routes.swift**: `serverSettings` (GET), `saveServerSettings` (PUT), `savedAnswers` (GET), `clearSavedAnswers`
+  (POST), `pingMusicBrainz`, `pingSlskd` (GET) - 98 routes - and their waits (30, 60 at least and 30 + 10 s a setting
+  saved, 30, 120, 120, 30), each held to the handler by tests/test_ios_server_settings.py or pinned with why.
+- **Managing.swift**: `Tool.native` takes in `.settings`, so the footer names four.
+- **NavidromeGate.swift**: `setUpURL` gone - the button opens the app's own sheet.
+
+### The app (ios/App/Manage/, and the Library's gate)
+
+- **ServerSettingsModel** (new), held by the app as CareRunModel is: DeadwaxApp makes it and puts it in the
+  environment, resets it with the rest when the person changes (the drafts with it), and Reachability's `whenChanged`
+  tells it of reach; RootView's scene phase tells it of the background, and of the sign-in over the app going
+  (`sessionBack`). Pages tell it as they show and go (`shows`, `hides`: counters for the pages, and for those drawing
+  the saved answers, Re-time and Connections). It carries out what Core decides: reads when `readsNow` says, never
+  while `server.signInOver` is set; a 403 asks /me again; the save under a BackgroundHold ("Server settings: save"), its
+  ends announced; after a save carrying a NAVIDROME_ key, `library.checkNavidrome()` (the web's
+  `onServerSettingsSaved`), so the gate opens by itself; the saved answers read and cleared; Connections' three asks,
+  each landing on its own; Re-time driven album by album through the client's `retime(_:)` under a BackgroundHold,
+  the library read with no ETag first. The drafts outlive the pages (the web keeps them in its module).
+- **ScreenAwake** (new): the one place the app touches `isIdleTimerDisabled`, from a set of reasons - Library care's
+  run and Re-time's - so one ending never lets the screen sleep under the other. CareRunModel goes through it now.
+- **ServerSettingsScreen** (new): NO_PERMISSION without Settings and the log; Managing needs deadwax when opened out of
+  reach before a read; the first read (Reading the settings, then its failure with Try again); then the page line,
+  **ConnectionsSection** (each row a dot, the word and the sentence under it - selectable - read once; Check again,
+  dimmed until a check began and out of reach), a read again that failed, the verdict, and the tabs' sections of group
+  rows (`NavigationLink(value: AppRoute.serverSettingsGroup(id))`, marked). Every page carries
+  `.serverSettingsPage(_:)`: the save bar as a bottom `safeAreaInset` (inside PlayerClearance, above the mini player
+  and the tabs - a toolbar's bottom bar sits under the app's tab bar), `editOutOfReach` once something was read, and
+  the shows/hides.
+- **ServerSettingsGroupScreen** (new): the group's note, Connections' rows on the Connections group's page, then a
+  section per setting headed by its key in mono: a menu (`pickerChoices`), a secure field or a field (the URL keyboard
+  for an address, no capitals, no corrections, the placeholder as the web's), "Locked"; Revert to the environment; the
+  footer's source and badges as one AttributedString, the effect, the lock, "Will revert…", the retype note in amber,
+  the detail in red. **RetimeSection** under Lyrics, **SavedAnswersSection** under MusicBrainz's saved answers (Clear
+  asked first by a confirmationDialog). `groupGone` when deadwax's answer has no such group.
+- **SetUpNavidromeSheet**: Connections' group page in its own NavigationStack, Close (dimmed while saving), not swiped
+  away while saving. **LibraryView**'s NavidromeGateView presents it for `closed.setUp`; when the gate opens the view
+  leaves the hierarchy and the sheet with it.
+- **ManageSection** pushes `AppRoute.serverSettings` for `.settings`; **Shared/Routes.swift** has the two routes and
+  their destinations; **Palette.greenIcon** (`--dw-green-icon`) for Connected's dot.
+
+### What the web's .tsx files hold, read by pattern
+
+As in slices 2-7, the pages' own rules stay in the .tsx and ios/scripts/export-server-vectors.cjs reads each out by a
+pattern (hashed into made_from, so iosserver fails when one changes) and runs it compiled: from **app/ServerSettings.tsx**
+the title, the spinner's words, Try again, Discard, Save and Saving…, the marks' titles, the bar's words, a save's
+refusal and the ladder; from **components/SettingsView.tsx** a row's value, placeholder, source, badges, revert label
+and lock, and the verdict; from **components/RetimeLyrics.tsx** the running label, the note, the hints and a run stepped
+album by album as the module steps it; from **components/MusicBrainzAnswers.tsx** Clear's label, hint, refusal and
+line; from **app/You.tsx** Connections' title, fromPing and fromNavidrome; from **app/App.tsx** and **app/access.ts** who
+sees the page. Moving those into lib/ too is a small no-change refactor on main whenever wanted.
+
+### Decided here, and where the phone departs from the spec (or the web)
+
+- **Marks per group**: the web marks a tab; the phone's root lists groups, so each group row carries the mark the
+  web's rule gives it (Organizing carrying the verdict's attention).
+- **One save bar on every Server settings page**, a bottom inset rather than a toolbar (the app's tab bar would hide a
+  bottom toolbar). Save is off from the moment deadwax goes out of reach until a read begun after it lands - a read out
+  as it went may land too early.
+- **A save that never answered** (no answer, a timeout, a 5xx) may have landed: the web says the failure and keeps
+  every draft; the phone reads the settings again and keeps only the drafts that still differ (`stillDiffering`). A 403
+  says a Managing page's NO_PERMISSION and asks /me again.
+- **A menu keeps a value that isn't one of its choices** (unset, or one this deadwax doesn't know) as its first entry
+  ("Not set" when empty), where the web's dropdown would show its first choice - which reads as a value that isn't
+  there.
+- **The page line names Settings, not You**: the phone's own choices are in its Settings, under Getting albums.
+- **Connections on the Connections group's page too**, so Set up Navidrome's sheet shows whether Navidrome answers
+  after a save; and checked again (the phone's own) after a save carrying a Connections setting, back in reach, and
+  after signing in again.
+- **Clear asks first** (the web clears at once): a phone's tap lands more easily, and "only speed is lost" is still
+  something lost.
+- **Re-time needs Edit albums too**, as its route does, and says so; its stops are the phone's (the background, out of
+  reach, the session ended, a 403, the lead drafted) with "running it again carries on", and an album that never
+  answered "may have been re-timed all the same". The screen stays on while it runs and Lyrics' page is in front, as
+  Library care's run - both through ScreenAwake.
+- **The settings are read each time a page shows with no draft** (the web reads each time its page renders), never
+  over a draft.
+- **Set up Navidrome opens Connections over the Library** (the web's `showServerSettingsTab('connections')`), not the
+  web app's Server settings at its first tab in Safari; the sheet goes as the gate opens, and Close keeps the drafts in
+  the model for Settings > Manage > Server settings.
+- **Fields stay editable offline and while a save goes** (as the web's); only Save, Clear and Re-time are writes.
+
+### Tests
+
+- **ServerSettingsVectorTests** (new, 15): every section of server-vectors.json - the words, 52 answers (every kind of
+  setting) and 5 bodies with choices written in every order JSON allows, 14 groups' tabs, 41 pages (marks, rows, bar,
+  ladder), 392 retype notes, 60 drafts edited, 50 saves' leftovers, 24 bars, 24 save errors, 24 read errors, 8
+  Navidrome-key saves, 12 sizes, 120 saved-answers lines, 48 Clears, 6 re-time sentences, labels and 10 notes, 30
+  runs, 26 pings, 7 Navidrome statuses, 7 unanswered asks and 65 permission sets.
+- **ServerSettingsTests** (new, 23): the marks per group, the sections, a menu's odd value, the batch (a revert as
+  null), what survives a save never answered, when the page reads, a first read failed, a save's three ends, Clear,
+  Re-time's start, stops, a 403 and an unanswered album, a ping's code, a save re-checking Connections and Navidrome,
+  the answer read loosely, a choice written twice, Connections checked once and again only when wanted, each part's
+  own failure words, the waits, who sees what.
+- **ClientTests**, **ManagingTests**, **ScreenGateTests**: the six routes, PUT allowed, their waits; four native rows
+  and the footer; the gate's button with no URL.
+- **tests/test_ios_server_settings.py** (new, 10): the routes by method, path and permission (test_logins' ROUTES);
+  the save's body against SettingUpdate (a revert as null) and Re-time's against LyricsRequest; a real GET answering
+  the fields, groups, choices and secrets the phone reads; a real save, a revert and a 400 naming each setting; the
+  real saved answers and Clear; each ping's answer; each wait against the handler or pinned; the app carrying out
+  Core (no rule of its own, nothing polled, the BackgroundHold, the sign-in gate); ScreenAwake the only
+  `isIdleTimerDisabled`; the pages drawn as the spec says (the root's order, the controls, Clear asked first, the bar
+  on every page, the sheet). tests/test_ios_palette.py holds the new screens to the palette and fonts.
+- test_ios_contract.py (98 routes); test_ios_settings.py and test_ios_library_care.py (four native rows; ScreenAwake).
+- **ui/test/iosserver.sim.cjs** (new): the exporter's `--check`.
+
+### Verified, and not
+
+On the Mac: `swift test` (1952 Core tests in 202 suites, 158 Audio in 17, 12 more, all passing); the unsigned
+generic-iOS Debug build, BUILD SUCCEEDED, with only the AppIntents metadata warning every build has; check_project.py;
+the full pytest suite run alone, 4909 passed and 1 skipped; all 95 sims with Node 22 (iosserver running the exporter's
+`--check`). tests/test_ios_server_settings.py runs the real GET and PUT /settings (a save, a revert, a 400 naming each
+setting), the real saved answers and Clear, and each ping's answer shape. Assumed: that the save's wait (60 s at
+least, 30 + 10 s a setting) covers a save under a busy SQLite - the handler has no bound of its own - and that a
+BackgroundHold's seconds cover a save or a re-timed album out as the phone locks (one cut short is unanswered: the
+settings read again, or the album counted failed and "may have been re-timed").
+
+Not verified - only the phone can tell (docs/ios.md checks 361-369): the pages against the web app's with James's
+settings; the save bar sitting above the mini player and the tabs, and the keyboard over it; a menu and a secure field
+as SwiftUI draws them in a Form; Connections' rows against real slskd, MusicBrainz and Navidrome failures; a save
+landing as the phone locks (the hold) and one that never answered; Revert against James's compose file; Clear's
+dialog; Re-time's run with the screen kept on, and its stop on locking; Set up Navidrome's sheet going as the gate
+opens, and Close keeping the drafts; the parts by permission; VoiceOver, the largest text, Reduce Motion.

@@ -163,9 +163,10 @@ final class CareRunModel {
         readIfNeeded(again: true)
     }
 
-    /// The screen stays on while a run goes and its page is in front - and only then.
+    /// The screen stays on while a run goes and its page is in front - and only then (ScreenAwake: with Re-time's, slice
+    /// 8's, the one place the idle timer is set).
     private func screen() {
-        UIApplication.shared.isIdleTimerDisabled = runs.keepsScreenOn(visible: visible)
+        ScreenAwake.keep(runs.keepsScreenOn(visible: visible), for: .libraryCare)
     }
 
     // MARK: reading
