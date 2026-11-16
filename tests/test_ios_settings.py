@@ -4,8 +4,9 @@ The iPhone app's Settings tab, the You tab until 16 Nov (notes/ios.md "Settings,
 instead of big lists", and of the ways shown him, "Pages, like iOS Settings").
 
 Read from the Swift source, as the other ios tests read theirs: the tab is called Settings and drawn with a gear; its
-root is the headline, then rows that each push a page - Getting albums, Playback and Downloads; Manage's rows, still
-opening the web app; Account (logins on), This phone and About - each page an AppRoute of its own; every choice that
+root is the headline, then rows that each push a page - Getting albums, Playback and Downloads; Manage's rows (Edit an
+album pushing Choose the folder since Phase 8's slice 1, the rest still opening the web app); Account (logins on), This
+phone and About - each page an AppRoute of its own; every choice that
 was a list of ticks is one menu Picker row, the chosen choice's own line moved into its footer; Getting albums' three
 are asked by their page (as it shows, on a pull, as deadwax comes back), /me by the root (its first show, a pull); the
 tab tapped again goes back to the root, then to the top, as every tab does; and no word the app shows calls the tab You.
@@ -164,8 +165,13 @@ def test_manage_keeps_its_rules_and_opens_the_web_app():
     manage = code(MANAGE)
     section = body(struct(manage, "ManageSection"))
     assert "let tools = Managing.tools(server.access)" in section and "if !tools.isEmpty" in section
-    assert "WebAppRow(label: ManagingWords.label(tool), line: ManagingWords.line(tool), url: url, live: online)" in section
-    assert "NavigationLink" not in section
+    # (Phase 8, slice 1) Edit an album is the app's own - Choose the folder, pushed; the others open the web app
+    edit = section.index("if tool == .edit {")
+    assert "NavigationLink(value: AppRoute.chooseFolder)" in section[edit:section.index("} else if let url")]
+    assert section.count("NavigationLink") == 1
+    assert "WebAppRow(label: ManagingWords.label(tool), url: url, live: online)" in section
+    # the footer is said of the rows drawn: Edit an album opens no Safari
+    assert "ManagingWords.footer(loginsOn: server.access.on, online: online, tools: tools)" in section
     assert "openURL.webApp(url, player: player)" in body(struct(manage, "WebAppRow"))
 
 

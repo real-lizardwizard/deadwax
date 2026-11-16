@@ -465,8 +465,13 @@ def test_the_librarys_top_sits_under_the_status_bar():
                 reaching[name] = reaching.get(name, 0) + 1
     # The cover full screen's two (notes/ios.md "The cover, full screen"): its black ground, a fill, and the zoomed
     # picture, edge to edge as Photos' is, with the status bar hidden - its ✕ keeps to the safe area.
+    # Edit album's cover full screen, from Compare covers (Phase 8, slice 1): its black ground alone, a fill - the
+    # picture and its Close keep to the safe area.
     assert reaching == {"Library/LibraryTop.swift": 1, "Root/RootView.swift": 1, "Player/NowPlayingView.swift": 2,
-                        "Root/MainTabs.swift": 1, "Player/CoverViewer.swift": 2}
+                        "Root/MainTabs.swift": 1, "Player/CoverViewer.swift": 2, "Edit/ReleasePage.swift": 1}
+    full = sources["Edit/ReleasePage.swift"]
+    full = full[full.index("struct FullCoverView"):]
+    assert "ZStack {\n            Color.black.ignoresSafeArea()\n" in full and full.count("ignoresSafeArea") == 1
     viewer = sources["Player/CoverViewer.swift"]
     assert "Palette.page\n                .opacity(ground)\n                .ignoresSafeArea()\n" in viewer
     assert "onDrag: held, onClose: close)\n                .ignoresSafeArea()\n" in viewer

@@ -11034,3 +11034,159 @@ user's, `/rescan` Look after the library's).
 - **Verified**: tests/test_library_cache.py - the lean body equals the full one less the two keys, key for key; its
   own ETag is a 304 and each form's ETag a 200 for the other; the snapshot form stale and from the saved scan; rescan's
   form, and an unchanged library's forced read the same lean answer. **Not seen**: the phone asking it (slice 1).
+
+## Edit album on the phone (Phase 8, slice 1 - 2026-11-16)
+
+James: "nothing in the app should take you to the web app", and "maybe some dropdowns instead of big lists". The
+design is notes/ios-specs/phase8-managing.md (sections 1-3, 13-15); this is its slice 1, **Edit album: the folder,
+what's wrong, Release**, on the `ios` branch at 2519279 (main's 2.1.31 merged). The app stays 0.13 (13);
+src/__init__.py untouched; no server or web change (server change A, the scan without its tracks, shipped as 2.1.28);
+the player engine has no diff.
+
+### Core (DeadwaxCore)
+
+- **ScanAlbums.swift**: `ScanAnswer` and `ScanAlbum` - `GET /library/albums?tracks=false` (2.1.28) read leniently,
+  with X-Scanned-At and X-Scan-Stale laid on - `MetadataIssueType` (the answer's `issue_types`), and `MetadataQueue`
+  (`outstanding`, `markedFine`, `label`, `hint` - metadataQueue.ts's).
+- **AlbumEdit.swift**: albumEdit.ts - `Subject` and `Bridge` (the album page's album and the id bridge's answer),
+  `folders` (editFolders: the store's present paths, else the scan's folders of the release, else the untagged ones
+  by folded name and artist narrowed by song count), `folderOnly`, `needsChoice`, `folderChoices` and
+  `folderChoicesWords` (FOLDER_CHOICES_SHOWN 50), `status` (editStatus), `parts` and `marksFine` (the permissions),
+  `followRelease`, `followsTo`, `noteMove`, `movedTo` (the follow); `TypedMatch` (typedMatch.ts).
+- **Retag.swift**: release.ts and MetadataEditor.tsx's rules - `fieldedQuery`, `plainQuery`, `firstQuery`,
+  `looseQuery`, `searchesAtOnce`, both scores (`scoreReleaseGroupMatch` - ReleaseGroup gains MusicBrainz's `score`,
+  optional - and `scoreReleaseMatch`), `rankGroups`, `rankReleases` (GROUPS_SEARCHED 3), `isCurrent`, `describe`,
+  `trackCount`, `countDiffers`, `seeded` (a pick's fields) and the album's own; `release(_:context:)` -
+  buildRetagRelease, not GetRelease.payload (below); the bodies `RetagRequestBody`, `RetagRelease` (exactly the web's
+  keys: the pressing's fourteen, or the album's seven with none chosen, `edition_label` only once the fields are laid
+  over), `CoverFetchBody`, `QueueMarkBody`; the answers `RetagPlan` (read with each file's changes in the body's own
+  order - `OrderedJSON`, since JSONDecoder loses it), `RetagFileChange`, `TagChange`, `RetagArtPlan`, `RetagMerge`,
+  `RetagResults`, `RetagResponse` (`pathAfter`), `CoverFetched`, `QueueMarked`.
+- **RetagFlow.swift**: `RetagFlow`, the Release page's state as a value - newest-answer tickets for searches, loads and
+  edits; `due` (a preview is asked only for the newest edit, with no tracklist loading, deadwax in reach, and not while
+  the folder must be read again); `planFor`, `failedFor`, `canApply`; the apply's `Outcome` (applied, refused, never
+  answered -> `mayHaveFinished`, `needsRead`); `whereAfter` (where the album is after an apply). `RetagWords` (the
+  preview's and the apply's sentences, the cover's lines, MetadataEditor's own words) and `EditWords` (the sheet's
+  rows, the phone's own sentences, `said(_:failed:admin:)` - a managing page's errors: deadwax's `detail` as it came,
+  a 403 as NO_PERMISSION, anything else ErrorWords.notice with the raw words for whoever runs deadwax).
+- **EditClient.swift**: the nine routes (`Routes.libraryAlbums`, `releases`, `release`, `retagPreview`, `retagApply`,
+  `artFetch`, `libraryArt`, `queueIgnore`, `queueUnignore` - 70 in all now), and `fullySearch` asked by the editor's own
+  `editorSearch` (no `quick`, as the web's editor; `Routes.editorSearchTimeout` 60 s). Timeouts: the scan 120 s, the
+  pressings 60, the preview 60, **the apply 420** (300 s of RETAG_RENAME_WAIT or 90 s of Navidrome's scan, plus a
+  cover's fetch), **the cover alone 120** (two fetches - the full size's 1200 px fallback - of 10 s to connect and 45 s
+  between chunks), the folder's cover 30, the marks 20. `ArchiveCoverSize.compare` 500.
+- **Managing.swift**: Manage's footer is said of the rows drawn (`footer(loginsOn:online:tools:)`): Edit an album alone
+  says nothing, with others "Edit an album is the app's own; the others open in the web app, in Safari.", without it
+  the old "These open in the web app, in Safari." `ManagingWords.editLine`, `line(_:)` and `editInWebApp` are gone
+  (slice 12 lists them; nothing reads them now).
+
+**Held to the web**: ios/scripts/export-edit-vectors.cjs compiles lib/albumEdit.ts, release.ts, retagPlan.ts,
+metadataQueue.ts, typedMatch.ts, owned.ts, format.ts, permissions.ts and releasePayload.ts and runs them as they are,
+and reads MetadataEditor.tsx's and EditPanel.tsx's own constants, payload, seeds, queries and sentences by pattern
+(each piece hashed into made_from), over made inputs and the four real pressings in tests/fixtures/pressings/:
+Fixtures/edit/edit-vectors.json, 1.2 MB - 160 folder cases, 117 typed matches, 220 statuses, the follow's runs, 40
+group and 40 release rankings, 140 payloads (each beside its download payload), 4 real pressing sets, 30 seeds, 120
+preview plans and their apply results. ui/test/iosedit.sim.cjs runs it with `--check` (seed 8320).
+
+### The app (ios/App/Edit/)
+
+- **EditAlbumSheet** - a sheet over the tabs from MainTabs' one `.sheet(item: $navigation.albumEdit)`, its own
+  `NavigationStack(path:)` of `EditPage`s, titled Edit album, Close in the cancellation place. With typed work or a
+  write under way: `interactiveDismissDisabled`, Close asks "Discard changes?" (Discard destructive, Keep editing);
+  Close off while an apply runs. `EditAlbumRoot`: the header (FolderCover 72 pt, album, artist · edition, formats · tracks ·
+  discs, the path in the data face, selectable), the Folder **menu Picker** (several folders; alone, under "Which
+  folder is this album?", while they're several by name), Needs a look, Edit (Release; Tags, Artwork and Lyrics as
+  WebAppRows opening the album in the web app until slices 2-3), Delete album… (a WebAppRow until slice 4); without an
+  album, AlbumEdit.status's words with Look again and Choose the folder.
+- **EditAlbumModel** - what the sheet holds: the scan, the bridge, the folder, the RetagModel. It looks up the bridge
+  and the scan together and settles on a folder only when a scan read landed; it follows the album after an apply (the
+  folder known, else `whereAfter`); `apply()` holds a background task (`BackgroundHold`, beginBackgroundTask ended
+  once), announces mayHaveFinished when the answer never came, reads the folder again, and tells AppNavigation the
+  album was written - at once and after EDIT_SETTLE_MS - then looks for its new id at FOLLOW_LOOKS_MS through the
+  bridge, and found, `albumMoved` replaces the album's route on all four tabs and announces `EditWords.followed`.
+- **RetagModel** - the Release page's model over RetagFlow: the search (fielded or typed, the loose fallback, the top
+  three groups' pressings ranked), a pick's tracklist load (newest only; a failure clears the choice), the 400 ms
+  debounced preview, `beginApply`/`applyEnded`, the cover alone; and what the folder read again changes.
+- **ReleasePage** (a Form: the pressing row pushing Choose a release, the fields with the number pad for the years
+  and Done on the keyboard, the cover Toggle and Compare covers…, What Apply does - its row pushing Changes - and
+  Apply), **ChooseReleaseView** (`.searchable`, a pull searches again), **ChangesView**, **CompareCoversView** (the
+  folder's cover beside the release's through the relay at 500, a tap full screen at 1200; Replace/Save cover only on
+  once the release's has loaded), `RetagPressingRow`.
+- **ChooseFolderView** / **ChooseFolderScreen** (Settings > Manage > Edit an album, `AppRoute.chooseFolder`): the scan's
+  folders by `folderChoices`, searchable; a pick opens the sheet for that folder.
+- **LibraryScanModel** (the scan in memory with its ETag, newest read only, never on disk), **FolderCoverCache** /
+  **FolderCover** (`/library/art?album=` by server, path, art_mtime and size, NSCache, one fetch per key, a miss
+  remembered a minute).
+- **The squared look, as everywhere**: every cover is `Corners.artShape`, the Current badge `Corners.controlShape`;
+  every section's header and footer is in the footnote face; the full cover's black ground is the one fill that reaches
+  under the status bar, its picture and Close in the safe area (tests/test_ios_palette.py holds all three).
+- **Wiring**: QueueMenu's `webEdit: URL?` is `editAlbum: (@MainActor () -> Void)?` - "Edit album"
+  (`square.and.pencil`) between Album info and Refresh, while deadwax can be reached and the album isn't gone; AlbumView
+  sets it with `Managing.albumEdit(...).shown` and refreshes on `navigation.albumWrites[route.id]`; an album route is
+  `.id(album.id)` so a moved album's page is made again. ManageSection's Edit an album is a NavigationLink to
+  Choose the folder.
+
+### Decided here, and where the phone departs from the spec
+
+- **Apply goes ahead through the plan's problems**, as the web's does (`MetadataEditor.tsx:1049`: off with no plan, an
+  empty one, or while planning, applying or a release loads - never for a problem); the spec's section 2 said "and no
+  problem". The problems are amber above it.
+- **The cover switch says the web's words** ("Download cover art" / "Replace cover.jpg", with its hint and size), not
+  the spec's "Save the release's cover"; Compare covers' button is the web's "Replace cover only" / "Save cover only".
+- **Needs a look's section is Edit albums'** (the web draws the issues and the marks on its Release tab), and It's fine
+  as it is and Ask about it again in it need Look after the library too (decision 2; AlbumEdit.marksFine is the web's
+  `marksFine`, composed with the editors in the App) - both, as main's 2.1.31 docs say. The spec's 3.2 tied the whole
+  section to Look after the library; its checks 338 and 342 (Edit albums alone: no marks; Look after the library
+  alone: Delete album… only) are what this does.
+- **The follow outlives the sheet**: closing it doesn't stop the looks for the album's new id (the web's panel lets go
+  as it closes) - the album page under it is the one that would otherwise be left on a gone id.
+- **A mark that fails is said in the phone's words** (`markFineFailed`, `askAgainFailed`, through EditWords.said); the
+  web leaves its rejection unhandled.
+- **No preview while the folder must be read again**: after an apply, `RetagFlow.due` holds the debounce until the
+  re-read lands, so a preview never plans against the folder as it was.
+- **The editor's search is the web editor's**, without `quick` (MusicBrainz's ten attempts), given 60 s.
+- **The retag payload is buildRetagRelease, not the download's** (the spec's 3.3): the credit's `?? ... || null`, the
+  country's `??`, no `album_artist`. The vectors hold each case beside its download payload; whether the two should
+  differ is the web's question (reported, unchanged).
+- **The cover alone waits 120 s, not 90**: the contract test found two fetches (the full size's fallback) can take 110.
+- **Tags, Artwork, Lyrics and Delete album… open the web app** (WebAppRow: the album's page, or the web app's Library
+  for a folder with no album page) until slices 2-4; the line under them says so.
+
+### Tests
+
+- **EditVectorTests** (16) over the fixture: the numbers and words, every folder case, Choose the folder's choices,
+  every status, the follow, the parts and marks, the queries, both rankings, the payloads (and that they aren't a
+  Get's), the real pressings ranked and built, the seeds, the preview's sentences.
+- **RetagModelTests** (16): the newest search, pick and preview draw; no preview while a tracklist loads or out of
+  reach; the web's debounce; Apply only for a current preview that changes something; a refusal keeps the preview; an
+  apply that never answered is said and read again; the album found where the apply left it; the long wait on the
+  button; back in reach everything asked again first; the scan asked without its tracks; the editor's search and one
+  body for preview and apply; the cover and the marks sending only declared keys; failures said as a managing page
+  says them; the root's rows' values.
+- **ClientTests**, **ManagingTests**: 70 routes and the new timeouts; Manage's footer by the rows drawn.
+- **tests/test_ios_edit_contract.py** (new, 10): every body within the model it's posted to; every vector's payload
+  taken by the real preview over a real folder; the writes past the same-origin guard; the real scan (`tracks=false`,
+  no tracks, its headers, a 304 on its ETag), preview, apply, cover and marks answering every field the phone reads;
+  the apply's and the cover's timeouts above the server's bounds; the pressings' at least Phase 6's.
+- **tests/test_ios_edit.py** (new, 11): the menu item and its place, the one sheet, Manage's push, the sheet's guards,
+  the background task and the announcements, the album page's refresh and the move on every tab, each part of the root
+  by its permissions, menus for choices, no URL opened in ios/App/Edit but WebAppRow's, the scan never on disk, rows
+  read as one.
+- test_ios_contract.py (70 routes, ReleaseGroup's `score`, the compare size), test_ios_settings.py and
+  test_ios_pull_to_shuffle.py follow the native row and `editAlbum`; test_ios_palette.py's list of what reaches under
+  the status bar takes the full cover's black ground.
+
+### Verified, and not
+
+Verified on the Mac: `swift test` (1753 Core tests in 186 suites, 158 Audio in 17, 12 more, all passing); the unsigned
+generic-iOS Debug build, BUILD SUCCEEDED, its one warning appintentsmetadataprocessor's own (no AppIntents), none in a
+touched file; the full pytest suite, 4644 passed and 1 skipped; all 92 sims with Node 22 (21 of them the iPhone's,
+iosedit among them); `export-edit-vectors.cjs --check` (160 folder cases, 220 statuses, 140 payloads, 120 plans).
+
+Not verified - only the phone can tell (docs/ios.md checks 320-329): the sheet, its pages and the menus as iOS 27
+draws them; the keyboard on Release (the number pad, Done, a field scrolled above the keyboard); a long apply with the
+phone locked (how long beginBackgroundTask gives, and that the re-read after it shows what deadwax did); Navidrome
+0.64's album id after an applied release (the follow, and a downloaded album shown as gone - spec 16); the Compare
+covers pair at 500 and full screen; VoiceOver and the largest text across the sheet. Nothing has run against a real
+deadwax: the routes' answers are the contract test's real routes over a two-file folder, MusicBrainz is the vectors'
+recorded pressings.

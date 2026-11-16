@@ -374,7 +374,7 @@ func sentJSON(_ request: HTTPRequest?) throws -> [String: SentValue] {
     }
 
     @Test func everyRouteIsDeadwaxsOwn() {
-        #expect(Routes.all.count == 61)
+        #expect(Routes.all.count == 70)
         #expect(Set(Routes.all).count == Routes.all.count)
         for endpoint in Routes.all {
             #expect(endpoint.path.hasPrefix("/deadwax/"))
@@ -405,14 +405,21 @@ func sentJSON(_ request: HTTPRequest?) throws -> [String: SentValue] {
         // two rounds of slskd's search behind deadwax's gate and the former names' lookup (test_ios_contract.py holds
         // it above deadwax's own worst case); an enqueue the same, as deadwax puts no bound on it. The preferences: the
         // transport's, read and saved (Phase 6, slice 3); a Join, 60 s, as Another source - it waits for the same
-        // release's lock. (Album info) a folder's files read from the disk, 30 s: every file opened as it is asked
+        // release's lock. (Album info) a folder's files read from the disk, 30 s: every file opened as it is asked.
+        // (Phase 8, slice 1: Edit album) the scan, 120 s, a walk of the library when the saved scan is behind; a
+        // release's pressings and a pressing, 60 s, MusicBrainz's browse and its retries; Changes, 60 s, every file
+        // read; Apply, 420 s, up to 300 s before the rename after the cover's fetch; a cover, 90 s, the Cover
+        // Art Archive's and the files'; the cover drawn, 30 s; the queue's marks, 20 s
         let longer: [Endpoint: Double] = [Routes.albumIndex: 30, Routes.autoEqSearch: 20, Routes.autoEqProfile: 20,
                                           Routes.libraryOwned: 30, Routes.fullySearch: 20, Routes.releaseGroup: 60,
                                           Routes.searchArtists: 20, Routes.searchSongs: 20, Routes.artistFacts: 60,
                                           Routes.discography: 60, Routes.jobs: 20, Routes.cancelJob: 30,
                                           Routes.retryJob: 60, Routes.retryJobSame: 30, Routes.clearJobs: 30,
                                           Routes.storeState: 20, Routes.findCandidates: 300, Routes.enqueue: 300,
-                                          Routes.joinJob: 60, Routes.libraryAdd: 60, Routes.libraryTracks: 30]
+                                          Routes.joinJob: 60, Routes.libraryAdd: 60, Routes.libraryTracks: 30,
+                                          Routes.libraryAlbums: 120, Routes.releases: 60, Routes.release: 60,
+                                          Routes.retagPreview: 60, Routes.retagApply: 420, Routes.artFetch: 120,
+                                          Routes.libraryArt: 30, Routes.queueIgnore: 20, Routes.queueUnignore: 20]
         #expect(Routes.timeouts == longer)
         for endpoint in Routes.all {
             // each path parameter filled in: a brace left in a path is no URL

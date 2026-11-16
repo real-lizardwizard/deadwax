@@ -121,7 +121,7 @@ from src.store import JobStore  # noqa: E402
 
 CORE = Path(__file__).resolve().parent.parent / "ios" / "DeadwaxKit" / "Sources" / "DeadwaxCore"
 ENDPOINT = re.compile(r'Endpoint\(method: "(\w+)", path: "([^"]+)", query: \[([^\]]*)\]\)')
-ROUTE_COUNT = 61
+ROUTE_COUNT = 70
 RAW_OPENING = re.compile(r'#+"')
 HASHES = re.compile(r"#*")
 
@@ -1248,8 +1248,11 @@ def test_musicbrainzs_albums_are_asked_and_read_as_the_server_answers(monkeypatc
     assert 'counted = {"count": count}' in source
     assert set(fields("FullySearchAnswer")) == {"release-groups", "count"}
     assert required_fields("ReleaseGroup") == {"id"}
+    # (Phase 8, slice 1) and MusicBrainz's own `score`, which Edit album's group ranking breaks ties by
+    # (release.ts scoreReleaseGroupMatch) - passed through untouched in the release groups MusicBrainz sent
     assert set(fields("ReleaseGroup")) == {"id", "title", "first-release-date", "primary-type", "secondary-types",
-                                           "artist-credit"}
+                                           "artist-credit", "score"}
+    assert fields("ReleaseGroup")["score"], "optional: a browse's groups carry none"
 
 
 def test_an_albums_pressings_are_read_as_the_route_answers_them():
@@ -1271,7 +1274,9 @@ def test_the_cover_relay_is_asked_for_a_kind_and_a_size_it_takes(monkeypatch):
     route = app_routes()[("GET", "/deadwax/coverart/{kind}/{mbid}")]
     taken = {field.alias: set(typing.get_args(field.field_info.annotation)) for field in
              route.dependant.query_params + route.dependant.path_params if field.alias in ("kind", "size")}
-    assert {str(swift_constant("Routes.swift", "ArchiveCoverSize", name)) for name in ("row", "hero")} <= taken["size"]
+    # (Phase 8, slice 1) and Edit album's Compare covers' 500
+    sizes = {str(swift_constant("Routes.swift", "ArchiveCoverSize", name)) for name in ("row", "hero", "compare")}
+    assert sizes <= taken["size"]
     assert swift_raw_values("MusicBrainz.swift", "Kind") == taken["kind"] == {"release", "release-group"}
     # anything but a front (none, the Archive away, a server before 2.1.24 that answers the route's own 404) is nil
     body = swift_function("DeadwaxClient.swift", "archiveCover")

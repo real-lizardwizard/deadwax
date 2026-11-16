@@ -56,9 +56,12 @@ public struct ReleaseGroup: Decodable, Sendable, Equatable, Hashable, Identifiab
     public let primaryType: String?
     public let secondaryTypes: [String]?
     public let artistCredit: [MBArtistCredit]?
+    /// (Phase 8, slice 1) MusicBrainz's own score for the search that found it (0-100) - the album editor's weakest
+    /// tiebreak (Retag.score(_:fields:), release.ts `scoreReleaseGroupMatch`). nil where it gave none.
+    public let score: Double?
 
     enum CodingKeys: String, CodingKey {
-        case id, title
+        case id, title, score
         case firstReleaseDate = "first-release-date"
         case primaryType = "primary-type"
         case secondaryTypes = "secondary-types"
@@ -66,13 +69,14 @@ public struct ReleaseGroup: Decodable, Sendable, Equatable, Hashable, Identifiab
     }
 
     public init(id: String, title: String? = nil, firstReleaseDate: String? = nil, primaryType: String? = nil,
-                secondaryTypes: [String]? = nil, artistCredit: [MBArtistCredit]? = nil) {
+                secondaryTypes: [String]? = nil, artistCredit: [MBArtistCredit]? = nil, score: Double? = nil) {
         self.id = id
         self.title = title
         self.firstReleaseDate = firstReleaseDate
         self.primaryType = primaryType
         self.secondaryTypes = secondaryTypes
         self.artistCredit = artistCredit
+        self.score = score
     }
 
     public init(from decoder: any Decoder) throws {
@@ -83,6 +87,7 @@ public struct ReleaseGroup: Decodable, Sendable, Equatable, Hashable, Identifiab
         primaryType = fields.looseField(String.self, .primaryType)
         secondaryTypes = fields.looseList(String.self, .secondaryTypes)
         artistCredit = fields.looseList(MBArtistCredit.self, .artistCredit)
+        score = fields.looseField(Double.self, .score)
     }
 }
 
@@ -185,15 +190,23 @@ public struct MBMedium: Decodable, Sendable, Equatable, Hashable {
     public let format: String?
     public let title: String?
     public let tracks: [MBTrack]
+    /// (Phase 8, slice 1) How many tracks it has as MusicBrainz counts them - there without the tracks themselves, in a
+    /// pressing listed `?tracks=false` (the album editor's Choose a release: release.ts `releaseTrackCount`).
+    public let trackCount: Int?
 
-    public init(position: Int? = nil, format: String? = nil, title: String? = nil, tracks: [MBTrack] = []) {
+    public init(position: Int? = nil, format: String? = nil, title: String? = nil, tracks: [MBTrack] = [],
+                trackCount: Int? = nil) {
         self.position = position
         self.format = format
         self.title = title
         self.tracks = tracks
+        self.trackCount = trackCount
     }
 
-    enum CodingKeys: String, CodingKey { case position, format, title, tracks }
+    enum CodingKeys: String, CodingKey {
+        case position, format, title, tracks
+        case trackCount = "track-count"
+    }
 
     public init(from decoder: any Decoder) throws {
         let fields = try decoder.container(keyedBy: CodingKeys.self)
@@ -201,6 +214,7 @@ public struct MBMedium: Decodable, Sendable, Equatable, Hashable {
         format = fields.looseField(String.self, .format)
         title = fields.looseField(String.self, .title)
         tracks = fields.looseList(MBTrack.self, .tracks) ?? []
+        trackCount = fields.looseField(Int.self, .trackCount)
     }
 }
 

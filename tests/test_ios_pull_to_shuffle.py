@@ -173,10 +173,10 @@ def test_refresh_is_the_bar_menus_now():
     menu = code(QUEUE_MENU)
     request = block(menu, menu.index("{", menu.index("struct QueueMenuRequest {")))
     assert "var refresh: (@MainActor () -> Void)?" in request
-    assert "if request.albumInfo != nil || webEdit != nil || request.refresh != nil {" in menu
+    assert "if request.albumInfo != nil || editAlbum != nil || request.refresh != nil {" in menu
     item = menu.index("if let refresh = request.refresh {")
     # the last section's last item, the Library's word and symbol
-    assert menu.index("if let webEdit {") < item
+    assert menu.index("if let editAlbum {") < item
     assert 'Button(LibrarySwitchWords.refresh, systemImage: "arrow.clockwise") {' in menu[item:item + 160]
     for path, model_call in (
         (ALBUM, "model.refresh(client: server.client, player: player, downloads: downloads)"),

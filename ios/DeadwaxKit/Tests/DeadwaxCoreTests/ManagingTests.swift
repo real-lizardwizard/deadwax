@@ -78,13 +78,18 @@ import Testing
     }
 
     @Test func theFooterSaysWhereTheyOpenAndHowSafariSignsIn() {
-        #expect(ManagingWords.footer(loginsOn: true, online: true) == [ManagingWords.opens, ManagingWords.signIn])
-        #expect(ManagingWords.footer(loginsOn: false, online: true) == [ManagingWords.opens])
-        #expect(ManagingWords.footer(loginsOn: true, online: false) == [ManagingWords.offline, ManagingWords.signIn])
-        #expect(ManagingWords.footer(loginsOn: false, online: false) == [ManagingWords.offline])
-        // only the row that can't open its tool's own page says where it is once open
-        for tool in Managing.Tool.allCases { #expect((ManagingWords.line(tool) != nil) == (tool == .edit), "\(tool)") }
-        #expect(ManagingWords.editLine.contains(ManagingWords.editInWebApp))
+        let web: [Managing.Tool] = [.queue, .care, .settings]
+        #expect(ManagingWords.footer(loginsOn: true, online: true, tools: web) == [ManagingWords.opens, ManagingWords.signIn])
+        #expect(ManagingWords.footer(loginsOn: false, online: true, tools: web) == [ManagingWords.opens])
+        #expect(ManagingWords.footer(loginsOn: true, online: false, tools: web) == [ManagingWords.offline, ManagingWords.signIn])
+        #expect(ManagingWords.footer(loginsOn: false, online: false, tools: web) == [ManagingWords.offline])
+        // (Phase 8, slice 1) Edit an album is the app's own: said apart from the rest - and alone, nothing about Safari
+        #expect(ManagingWords.footer(loginsOn: true, online: true) == [ManagingWords.othersOpen, ManagingWords.signIn])
+        #expect(ManagingWords.footer(loginsOn: false, online: true, tools: [.edit, .care]) == [ManagingWords.othersOpen])
+        #expect(ManagingWords.footer(loginsOn: true, online: false, tools: [.edit, .log])
+                == [ManagingWords.offline, ManagingWords.signIn])
+        #expect(ManagingWords.footer(loginsOn: true, online: true, tools: [.edit]).isEmpty)
+        #expect(ManagingWords.othersOpen.hasPrefix(ManagingWords.editAnAlbum))
         // the page is Safari's person's, not the app's: said wherever a row opens one
         #expect(ManagingWords.signIn.contains("whoever is signed in there"))
         #expect(ManagingWords.changePasswordLine.contains("whoever is signed in in Safari"))

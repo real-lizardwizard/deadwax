@@ -155,9 +155,28 @@ public enum Routes {
     // from the disk as it is asked (`AlbumFiles`) - the track viewer's route, a user's: what only the files' tags hold
     // (Media, Catalogue number, Barcode, Country, Status), by the folder the id bridge names
     public static let libraryTracks = Endpoint(method: "GET", path: "/deadwax/library/tracks", query: ["album"])
+    // Edit album (Phase 8, slice 1 - notes/ios.md "Edit album on the phone"): the library's scan without its tracks
+    // (server 2.1.28's `tracks=false`, kept per page with its ETag), MusicBrainz's pressings of a group without their
+    // tracklists and one pressing with its tracklist (the editor's two asks), the retag's preview and apply (Edit
+    // albums'; the plan worked out again by apply, never sent), the cover alone (`art/fetch`), the folder's cover
+    // (`/library/art`, by its path), and It's fine as it is / Ask about it again (Look after the library's)
+    public static let libraryAlbums = Endpoint(method: "GET", path: "/deadwax/library/albums", query: ["tracks"])
+    public static let releases = Endpoint(method: "GET", path: "/deadwax/search_musicbrainz/releases", query: ["release_group_mbid", "tracks"])
+    public static let release = Endpoint(method: "GET", path: "/deadwax/search_musicbrainz/release", query: ["release_mbid"])
+    public static let retagPreview = Endpoint(method: "POST", path: "/deadwax/library/retag/preview", query: [])
+    public static let retagApply = Endpoint(method: "POST", path: "/deadwax/library/retag/apply", query: [])
+    public static let artFetch = Endpoint(method: "POST", path: "/deadwax/library/art/fetch", query: [])
+    public static let libraryArt = Endpoint(method: "GET", path: "/deadwax/library/art", query: ["album"])
+    public static let queueIgnore = Endpoint(method: "POST", path: "/deadwax/library/queue/ignore", query: [])
+    public static let queueUnignore = Endpoint(method: "POST", path: "/deadwax/library/queue/unignore", query: [])
 
     /// The levels spec's name for `levelAlbum`: the album's levels warmed before its first play.
     public static var warmLevels: Endpoint { levelAlbum }
+
+    /// Edit album's search (Phase 8, slice 1): `fullySearch` asked as the web's editor asks it - no `quick`, so
+    /// MusicBrainz's ten attempts, 3 s apart while it is busy, as an artist's facts are - given an artist's facts' time
+    /// rather than the box's 20 s (tests/test_ios_contract.py holds it there).
+    public static let editorSearchTimeout: Double = 60
 
     /// Every route the app calls - what the contract test checks.
     public static let all: [Endpoint] = [
@@ -181,6 +200,7 @@ public enum Routes {
         storeState, findCandidates, enqueue, preferences,
         joinJob, savePreferences,
         libraryTracks,
+        libraryAlbums, releases, release, retagPreview, retagApply, artFetch, libraryArt, queueIgnore, queueUnignore,
     ]
 
     /// The routes given longer than the transport's own 8 seconds to answer, in seconds: the album index reads every
@@ -207,8 +227,15 @@ public enum Routes {
     /// its pictures' sizes), which a box set on a disk that has to spin up can take a while over - nothing waits on it
     /// past AlbumInfoWords.settleSeconds, so it is given time to land late rather than fail -
     /// tests/test_ios_contract.py holds each above the server's: Album info's above the transport's own 8 s and the
-    /// sheet's hold, and the route still with no bound of its own (nothing there to wait longer than).
-    public static let timeouts: [Endpoint: Double] = [albumIndex: 30, autoEqSearch: 20, autoEqProfile: 20, libraryOwned: 30, fullySearch: 20, releaseGroup: 60, searchArtists: 20, searchSongs: 20, artistFacts: 60, discography: 60, jobs: 20, cancelJob: 30, retryJob: 60, retryJobSame: 30, clearJobs: 30, storeState: 20, findCandidates: 300, enqueue: 300, joinJob: 60, libraryAdd: 60, libraryTracks: 30]
+    /// sheet's hold, and the route still with no bound of its own (nothing there to wait longer than). Edit album's
+    /// (Phase 8, slice 1): the library's scan reads every folder whose mtime moved, and a first scan of a large library
+    /// takes minutes, with no bound on the server; a group's pressings and one pressing's tracklist are MusicBrainz's
+    /// pages with its ten attempts; a preview reads every file of the folder; an apply pauses before the rename up to
+    /// RENAME_WAIT_RANGE's 300 s on the timer (90 s waiting on Navidrome) after the cover's fetch (45 s to read), so it
+    /// is given 420; the cover alone that fetch twice (the full size's 1200 px fallback) and a write, so 120; the
+    /// folder's cover a read of a file, or of the audio's pictures; the marks a row of SQLite -
+    /// tests/test_ios_edit_contract.py holds each.
+    public static let timeouts: [Endpoint: Double] = [albumIndex: 30, autoEqSearch: 20, autoEqProfile: 20, libraryOwned: 30, fullySearch: 20, releaseGroup: 60, searchArtists: 20, searchSongs: 20, artistFacts: 60, discography: 60, jobs: 20, cancelJob: 30, retryJob: 60, retryJobSame: 30, clearJobs: 30, storeState: 20, findCandidates: 300, enqueue: 300, joinJob: 60, libraryAdd: 60, libraryTracks: 30, libraryAlbums: 120, releases: 60, release: 60, retagPreview: 60, retagApply: 420, artFetch: 120, libraryArt: 30, queueIgnore: 20, queueUnignore: 20]
 }
 
 /// The Cover Art Archive's thumbnail sizes the app asks deadwax's relay for (`Routes.archiveCover`'s `size`, which takes
@@ -216,8 +243,10 @@ public enum Routes {
 public enum ArchiveCoverSize {
     /// A list's row.
     public static let row = 250
-    /// The album you don't have's own cover.
+    /// The album you don't have's own cover, and Edit album's Compare covers full screen.
     public static let hero = 1200
+    /// (Phase 8, slice 1) Edit album's Compare covers, beside the folder's (phase8-managing.md 3.3).
+    public static let compare = 500
 }
 
 /// The cover sizes the app asks for (`Routes.cover`'s `size`) - the contract test checks each is within the server's

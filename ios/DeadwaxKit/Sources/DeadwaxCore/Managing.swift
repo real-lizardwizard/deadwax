@@ -126,7 +126,8 @@ public enum Managing {
         url(fragment: fragment(tool), at: server)
     }
 
-    /// An album's page in the web app (an album's ••• - Edit in the web app); nil with no address or no id.
+    /// An album's page in the web app (Edit album's rows still there - Tags, Artwork, Lyrics, Delete); nil with no
+    /// address or no id.
     public static func albumURL(id: String, at server: ServerAddress?) -> URL? {
         id.isEmpty ? nil : url(fragment: albumFragment(id: id), at: server)
     }
@@ -168,17 +169,8 @@ public enum ManagingWords {
         }
     }
 
-    /// The phone's own row for the editors, and the line under it: where they are once it opens.
+    /// The phone's own row for the editors (Phase 8, slice 1: the app's own - Choose the folder, then Edit album).
     public static let editAnAlbum = "Edit an album"
-    public static let editLine = "Opens the web app's Library: open an album there, then Edit. An album's ••• here has "
-        + "Edit in the web app too."
-    /// The line under a row, if it has one: only the rows that can't open their tool's own page.
-    public static func line(_ tool: Managing.Tool) -> String? {
-        tool == .edit ? editLine : nil
-    }
-
-    /// An album's ••• (its page's bar): that album's page in the web app, its Edit one tap away.
-    public static let editInWebApp = "Edit in the web app"
 
     /// Account's row (ownPassword.ts CHANGE_TITLE), and the line under it: where it is once open, and whose password
     /// it changes there - Safari's person's, who may not be the app's (Safari signs in apart).
@@ -190,6 +182,8 @@ public enum ManagingWords {
     public static let opensInSafari = "Opens in Safari."
 
     public static let opens = "These open in the web app, in Safari."
+    /// (Phase 8, slice 1) With Edit an album, the app's own now, above the rows that still open Safari.
+    public static let othersOpen = "Edit an album is the app's own; the others open in the web app, in Safari."
     /// With logins on: Safari signs in apart from the app - and each page is Safari's person's, not the app's: nothing
     /// compares the two.
     public static let signIn = "Safari has its own sign-in, apart from the app's: the first time, sign in there with the "
@@ -201,10 +195,14 @@ public enum ManagingWords {
     /// iOS refused to open the address (Managing.notice(opened:)): said over the tabs, announced.
     public static let notOpened = "Couldn't open the web app - Safari may be turned off in Screen Time."
 
-    /// The section's footer, a sentence a line: where they open (or, out of reach, when), then Safari's sign-in with
-    /// logins on.
-    public static func footer(loginsOn: Bool, online: Bool) -> [String] {
-        [online ? opens : offline] + (loginsOn ? [signIn] : [])
+    /// The section's footer, a sentence a line: where the rows that open Safari open (or, out of reach, when), then
+    /// Safari's sign-in with logins on - nothing at all when the only row is Edit an album, the app's own (Phase 8,
+    /// slice 1), whose page says for itself that it needs deadwax.
+    public static func footer(loginsOn: Bool, online: Bool, tools: [Managing.Tool] = Managing.Tool.allCases) -> [String] {
+        let web = tools.filter { $0 != .edit }
+        guard !web.isEmpty else { return [] }
+        let lead = !online ? offline : web.count == tools.count ? opens : othersOpen
+        return [lead] + (loginsOn ? [signIn] : [])
     }
 
     /// The trailing sign on a row that opens elsewhere (where a pushed page's row has a chevron), and the menu item's.

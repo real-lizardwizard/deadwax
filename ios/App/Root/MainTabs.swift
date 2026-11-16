@@ -86,6 +86,11 @@ struct MainTabs: View {
         .sheet(item: $navigation.playlistPick) { (request: PlaylistPickRequest) in
             PlaylistPicker(request: request)
         }
+        // (Phase 8, slice 1) Edit album, from an album page's ••• or Choose the folder - over the tabs, so the album
+        // page beneath can follow the album to a new id while it is up
+        .sheet(item: $navigation.albumEdit) { (request: AlbumEditRequest) in
+            EditAlbumSheet(request: request)
+        }
         .onChange(of: player.hasQueue) { _, queued in
             if !queued { navigation.nowPlayingShown = false }
         }

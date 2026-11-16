@@ -5,8 +5,10 @@ import SwiftUI
 /// (the Library's row, Now Playing's Go to the album) drawn at once while the album loads. Top to bottom: the hero
 /// (cover, title, artist, meta line, the badge, Play and Shuffle), the mine block (logins on with a library of your
 /// own), the songs with their disc headings, the footer; the bar's ••• is the whole album's Play Next and Play Last -
-/// and (Phase 7) Edit in the web app, for someone the web gives the album's Edit - and Album info (notes/ios.md "Album
-/// info"), the album's sheet of everything known of it, for everyone.
+/// and (Phase 8, slice 1) Edit album, for someone the web gives the album's Edit - and Album info (notes/ios.md "Album
+/// info"), the album's sheet of everything known of it, for everyone. After Edit album writes to the album's folder the
+/// page asks again (AppNavigation.albumWrites); an apply that gave the album a new id in Navidrome moves the page to it
+/// (AppNavigation.albumMoved).
 ///
 /// What it asks as it opens, at once (AlbumModel): the album; the id bridge only with a library of your own (D12);
 /// and, as the songs come, the album's levels warmed (PlayerModel.albumShown) - wanted again each time the page is
@@ -38,6 +40,7 @@ struct AlbumView: View {
     @Environment(LibraryModel.self) private var library
     @Environment(DownloadModel.self) private var downloads
     @Environment(Reachability.self) private var reachability
+    @Environment(AppNavigation.self) private var navigation
     @State private var model: AlbumModel
     /// On screen - the page on top of its tab.
     @State private var shown = false
@@ -200,6 +203,8 @@ struct AlbumView: View {
             AlbumInfoSheet(album: album)
         }
         .onChange(of: download) { _, now in ended(now) }
+        // (Phase 8, slice 1) Edit album wrote to this album's folder: asked again, as the web's page is after an edit
+        .onChange(of: navigation.albumWrites[route.id]) { _, _ in refresh() }
         .onChange(of: model.answered) { _, _ in told() }
         .onAppear {
             shown = true
@@ -250,15 +255,17 @@ struct AlbumView: View {
         }
     }
 
-    /// The bar's •••: the whole album, as an album - nil (the ••• dimmed) until its songs are in. (Phase 7) With the
-    /// album's Edit in the web app (Edit albums or Look after the library - Managing.albumEdit), its page there. And
+    /// The bar's •••: the whole album, as an album - nil (the ••• dimmed) until its songs are in. (Phase 8, slice 1)
+    /// With the album's Edit (Edit albums or Look after the library - Managing.albumEdit), Edit album over the tabs. And
     /// Album info, for everyone.
     private var albumMenu: QueueMenuRequest? {
         guard let album = model.album, let pick = model.albumPick else { return nil }
         var request = QueueMenuRequest(pick: pick, album: album, gone: model.goneButHere)
         request.albumInfo = { albumInfo = album }
         if Managing.albumEdit(server.access.permissions).shown {
-            request.webEdit = Managing.albumURL(id: album.id, at: server.address)
+            request.editAlbum = {
+                navigation.editAlbum(AlbumEditRequest(target: .album(AlbumEdit.Subject(album))))
+            }
         }
         request.refresh = { refresh() }
         return request

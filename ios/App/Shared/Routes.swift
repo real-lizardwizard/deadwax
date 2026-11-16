@@ -91,6 +91,9 @@ enum AppRoute: Hashable {
     /// (Phase 5, slice 3) A MusicBrainz artist's page (question 9): their albums, by their MusicBrainz id - from Search's
     /// MusicBrainz artists and the album you don't have's credit.
     case mbArtist(MBArtistRoute)
+    /// (Phase 8, slice 1) Settings > Manage > Edit an album: Choose the folder - any folder of the library, its Edit
+    /// album opened over the tabs.
+    case chooseFolder
 }
 
 /// The album you don't have's address: its release group's id as MusicBrainz gave it (lowercase - deadwax's routes take
@@ -261,6 +264,15 @@ final class AppNavigation {
     /// Add to a playlist (Phase 4, slice 2), opened from a page's ••• (QueueMenu): the picker over the tabs, with the
     /// songs in hand. Now Playing opens its own, over itself.
     var playlistPick: PlaylistPickRequest?
+    /// (Phase 8, slice 1) Edit album, over the tabs (EditAlbumSheet): from an album page's ••• or Choose the folder.
+    /// Over the tabs, not the album page, so the page beneath can be moved to the album's new id while it is up.
+    var albumEdit: AlbumEditRequest?
+    /// (Phase 8, slice 1) One more each time Edit album wrote to an album's folder, by the album's id: its page asks
+    /// again (now, and once Navidrome has scanned - EditAlbumModel).
+    private(set) var albumWrites: [String: Int] = [:]
+    /// (Phase 8, slice 1) Albums an apply gave a new id in Navidrome (AlbumEdit.noteMove): a page opened by the old id
+    /// opens the new one.
+    private var moves: [String: String] = [:]
     /// The playlist whose Edit is open on a tab's page: the tab tapped again goes back no further than that page, so
     /// Edit's changes are never thrown away without Cancel's question (PlaylistEdit.pagesKept).
     private(set) var editingPlaylist: String?
@@ -343,8 +355,9 @@ final class AppNavigation {
         if !held { editingPlaylist = nil }
     }
 
-    /// `route` pushed on the tab shown.
+    /// `route` pushed on the tab shown - an album an apply gave a new id opened by that id (AlbumEdit.movedTo).
     func open(_ route: AppRoute) {
+        let route = followed(route)
         switch tab {
         case .library: library.append(route)
         case .search: search.append(route)
@@ -368,9 +381,47 @@ final class AppNavigation {
     /// goToAlbum: "opens the album page on the current tab"). An album already on top of it isn't pushed twice.
     func openAlbum(_ album: AlbumRoute) {
         nowPlayingShown = false
+        guard case .album(let album) = followed(.album(album)) else { return }
         let top = shownStack.last
         if case .album(let shown)? = top, shown.id == album.id { return }
         open(.album(album))
+    }
+
+    // MARK: Edit album (Phase 8, slice 1)
+
+    /// Edit album opened over the tabs (a page's ••• or Choose the folder; Now Playing is never over either).
+    func editAlbum(_ request: AlbumEditRequest) {
+        albumEdit = request
+    }
+
+    /// Edit album wrote to the album `id`'s folder: its page asks again.
+    func albumWritten(_ id: String) {
+        albumWrites[id, default: 0] += 1
+    }
+
+    /// An apply gave the album `from` a new id in Navidrome, `to` (EditPanel's 'moved'): every page of it, on every
+    /// tab, now the page of `to` - what it knew of the album kept to draw while it loads - and a page opened by `from`
+    /// from now on opens `to`.
+    func albumMoved(from: String, to: String) {
+        AlbumEdit.noteMove(&moves, from: from, to: to)
+        func moved(_ stack: inout [AppRoute]) {
+            for index in stack.indices {
+                guard case .album(let shown) = stack[index], shown.id == from else { continue }
+                stack[index] = .album(AlbumRoute(id: to, name: shown.name, artist: shown.artist, year: shown.year,
+                                                 genre: shown.genre, artistId: shown.artistId))
+            }
+        }
+        moved(&library)
+        moved(&search)
+        moved(&requests)
+        moved(&you)
+    }
+
+    /// An album route by the id its album has now (AlbumEdit.movedTo); every other route as it is.
+    private func followed(_ route: AppRoute) -> AppRoute {
+        guard case .album(let album) = route, let to = AlbumEdit.movedTo(moves, album.id) else { return route }
+        return .album(AlbumRoute(id: to, name: album.name, artist: album.artist, year: album.year, genre: album.genre,
+                                 artistId: album.artistId))
     }
 
     /// A playlist's page gone from the top of the tab shown (deleted on it, Phase 4 slice 2) - only while it is still
@@ -416,6 +467,9 @@ final class AppNavigation {
         eqImportSheet = false
         playlistPick = nil
         editingPlaylist = nil
+        albumEdit = nil
+        albumWrites = [:]
+        moves = [:]
         importAnswered()
         tab = .library
     }
@@ -430,7 +484,8 @@ extension View {
         navigationDestination(for: AppRoute.self) { route in
             Group {
                 switch route {
-                case .album(let album): AlbumView(route: album)
+                // by its id: a page moved to an album's new id (AppNavigation.albumMoved) is that album's page afresh
+                case .album(let album): AlbumView(route: album).id(album.id)
                 case .albums(let scope): AlbumsScreen(scope: scope)
                 case .downloaded: AlbumsScreen(list: .downloaded)
                 case .downloads: DownloadsScreen()
@@ -449,6 +504,7 @@ extension View {
                 case .allSongs: SongsScreen()
                 case .group(let group): GroupView(route: group)
                 case .mbArtist(let artist): MBArtistView(route: artist)
+                case .chooseFolder: ChooseFolderScreen()
                 }
             }
             .clearsPlayer()

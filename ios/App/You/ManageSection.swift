@@ -2,19 +2,23 @@ import DeadwaxCore
 import SwiftUI
 
 /// Settings > Manage (Phase 7 - notes/ios-specs/phase7-managing.md; the web's You.tsx Manage section; since 16 Nov a
-/// group of the Settings root, its rules unchanged - each row still opens the web app): deadwax's managing
-/// tools this person may use, each opened in the web app, in Safari - never rebuilt on the phone. Top to bottom, each
-/// only with its permission (Core's Managing.tools, the web's `managing` and `albumEdit` by what /me last said):
-/// Edit an album (the phone's own: the web's editors open from an album's page, so the row opens the web app's Library,
-/// and says so under it), Needs a look, Library care, People (logins on), Server settings and Event log - the web's
-/// five, in its order and words. Drawn only with a row to draw, between Downloads and Account (the web's Manage comes
-/// before its Account).
+/// group of the Settings root): deadwax's managing tools this person may use. Top to bottom, each only with its
+/// permission (Core's Managing.tools, the web's `managing` and `albumEdit` by what /me last said): Edit an album (the
+/// phone's own row), Needs a look, Library care, People (logins on), Server settings and Event log - the web's five, in
+/// its order and words. Drawn only with a row to draw, between Downloads and Account (the web's Manage comes before its
+/// Account).
 ///
-/// The footer says they open in Safari and - with logins on - that Safari signs in apart from the app, the first
-/// time, with the same name and password, and that each page opens as Safari's person, who may not be the app's:
-/// nothing compares the two. While deadwax can't be reached the rows are dimmed and off, the footer
-/// saying they open once it's back: Safari would only fail at the same address. Nothing is asked of deadwax here -
-/// the page each opens asks it itself, and refuses for itself without its permission.
+/// Phase 8 brings them into the app one at a time (phase8-managing.md 11). Since slice 1 Edit an album is the app's: it
+/// pushes Choose the folder (ChooseFolderScreen), whose folder opens Edit album over the tabs - and that page says for
+/// itself that it needs deadwax, so the row is never dimmed. The others still open the web app in Safari (WebAppRow)
+/// until their slices land.
+///
+/// The footer says those open in Safari (Edit an album said apart, ManagingWords.othersOpen) and - with logins on -
+/// that Safari signs in apart from the app, the first time, with the same name and password, and that each page opens
+/// as Safari's person, who may not be the app's: nothing compares the two. While deadwax can't be reached the Safari
+/// rows are dimmed and off, the footer saying they open once it's back: Safari would only fail at the same address.
+/// Nothing is asked of deadwax here - the page each opens asks it itself, and refuses for itself without its
+/// permission.
 struct ManageSection: View {
     @Environment(ServerModel.self) private var server
     @Environment(Reachability.self) private var reachability
@@ -25,8 +29,13 @@ struct ManageSection: View {
             let online = reachability.online
             Section {
                 ForEach(tools, id: \.self) { (tool: Managing.Tool) in
-                    if let url = Managing.url(tool, at: server.address) {
-                        WebAppRow(label: ManagingWords.label(tool), line: ManagingWords.line(tool), url: url, live: online)
+                    if tool == .edit {
+                        // (Phase 8, slice 1) the app's own: Choose the folder
+                        NavigationLink(value: AppRoute.chooseFolder) {
+                            Text(ManagingWords.label(tool))
+                        }
+                    } else if let url = Managing.url(tool, at: server.address) {
+                        WebAppRow(label: ManagingWords.label(tool), url: url, live: online)
                     }
                 }
             } header: {
@@ -34,7 +43,8 @@ struct ManageSection: View {
                     .font(Typeface.footnote)
             } footer: {
                 VStack(alignment: .leading, spacing: 6) {
-                    ForEach(ManagingWords.footer(loginsOn: server.access.on, online: online), id: \.self) { (line: String) in
+                    ForEach(ManagingWords.footer(loginsOn: server.access.on, online: online, tools: tools), id: \.self) {
+                        (line: String) in
                         Text(line)
                     }
                 }
@@ -46,10 +56,10 @@ struct ManageSection: View {
 }
 
 extension OpenURLAction {
-    /// Opens a web-app address - Manage's rows, Change password, an album's Edit in the web app, Set up Navidrome - in
-    /// the default browser (never a web view in the app), and when iOS refuses it (Safari turned off in Screen Time, no
-    /// other browser to take it) says so over the tabs, announced: Core's Managing.notice(opened:). A tap that opens
-    /// nothing never says nothing.
+    /// Opens a web-app address - Manage's rows, Change password, Edit album's rows still in the web app, Set up
+    /// Navidrome - in the default browser (never a web view in the app), and when iOS refuses it (Safari turned off in
+    /// Screen Time, no other browser to take it) says so over the tabs, announced: Core's Managing.notice(opened:). A
+    /// tap that opens nothing never says nothing.
     @MainActor
     func webApp(_ url: URL, player: PlayerModel) {
         self(url) { (accepted: Bool) in

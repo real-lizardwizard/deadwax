@@ -1,4 +1,4 @@
-# The iPhone app (early: app 0.13, downloads, lyrics, the EQ, the turntable, play history, your library, the Library, Search, Requests, getting albums and Manage)
+# The iPhone app (early: app 0.13, downloads, lyrics, the EQ, the turntable, play history, your library, the Library, Search, Requests, getting albums, Manage and Edit album)
 
 deadwax is getting a native iPhone app, built with SwiftUI and its own audio engine, for what a web
 page can't do well: seamless joins and normalization done on the phone, downloads to play offline,
@@ -49,7 +49,10 @@ after deadwax that you may use - editing an album, Needs a look, Library care, P
 log - and each opens in the web app, in Safari, where it's already built for a phone; so does **Change password** (see
 [Manage](#manage)). Still 0.13, the tab that was **You** is **Settings** now: a short list of groups, each opening a
 page of its own, and every choice on them one row with a menu rather than a list of ticks (see
-[Settings](#settings)). The web app's tab is still called You.
+[Settings](#settings)). The web app's tab is still called You. Still 0.13, **Phase 8** begins bringing those tools into
+the app itself, one build at a time: first **Edit album** - an album's folder, what's wrong with it, and the release
+it's matched to, chosen and applied on the phone, from the album's ••• or Settings > Manage > Edit an album (see [Edit
+album](#edit-album)). Its tags, artwork, lyrics and Delete still open the web app until their builds.
 
 **Nothing of Phase 2, the lyrics, the EQ, the turntable, play history, your library downloaded,
 playlists, artists, songs, Search, Requests, Get or Manage has been seen on an iPhone yet.** It's built and tested on a Mac,
@@ -396,11 +399,10 @@ back to the Library tab or the app, and when you pull down.
   that song; the **•••** at the top has them for the whole album (see [Up Next](#up-next) and [Add to
   a playlist](#add-to-a-playlist)). Each menu opens from the ••• you tapped, and a tap anywhere else
   closes it.
-- **Edit in the web app**, at the end of the top •••'s menu, for someone who may edit albums (Edit albums or Look
-  after the library - an admin, or everyone with logins off): this album's page in the web app, in Safari, with
-  **Edit** at its top (see [Manage](#manage)). It isn't there while deadwax can't be reached, or for an album gone
-  from the collection.
-- **Album info**, in the same last part of the top •••'s menu (above Edit in the web app), for everyone: everything
+- **Edit album**, in the last part of the top •••'s menu, for someone who may edit albums (Edit albums or Look after
+  the library - an admin, or everyone with logins off): the album's editor, on a sheet over the tabs - see [Edit
+  album](#edit-album). It isn't there while deadwax can't be reached, or for an album gone from the collection.
+- **Album info**, in the same last part of the top •••'s menu (above Edit album), for everyone: everything
   known about the album, on a sheet of its own with **Done**. See [Album info](#album-info). **Refresh** ends that
   part: the album asked for again now.
 - **Add to my library** and **Remove from my library**, with logins on. Removing takes the album out
@@ -499,6 +501,111 @@ it, the page doesn't change under you. Back returns to Info, which by then shows
 Each id, the barcode, the catalogue number and the folder are in the typewriter face; you can select them, and
 **Copy** puts the whole of one on the clipboard, its button a tick for a moment. If Safari can't open a MusicBrainz
 page (turned off in Screen Time), the sheet says so under the link.
+
+### Edit album
+
+**Edit album** is the web app's album editor, on the phone: which release the album on disk really is, and its tags
+and folder put right to match. It opens from an album page's top **•••** (**Edit album**, between Album info and
+Refresh) or from Settings > Manage > **Edit an album**, for someone who may edit albums - Edit albums or Look after the
+library: an admin, or everyone with logins off. It's a sheet over the tabs, titled Edit album, laid out as iOS
+Settings is: a header, then rows that each open a page. **Close** is at its top left.
+
+**Finding the folder.** The editor works on the album's folder in deadwax's library, which the phone finds as the web
+app does: the folder deadwax knows the album by, else the folder tagged with the album's release, else an untagged one
+with its name and artist. "Finding the album's folder…" shows while deadwax reads the library (the first time on a big
+library, a minute or more). When it can't find one it says why ("deadwax can't find this album's folder: …") with
+**Look again** and **Choose the folder**. Several folders with the album's name and nothing to tell them apart:
+"Which folder is this album?" over a **Folder** menu of their paths - pick the right one. An album kept as one folder
+per disc opens on the first, with the Folder menu to move between them.
+
+**Choose the folder** (Settings > Manage > Edit an album, or the editor's own when it can't find the folder) is every
+album folder deadwax's library has, with a search at the top ("Folder, artist or album"): type any words of its
+artist, album or path, accents and capitals aside. The first 50 matches show, and the line over them says how many
+there are ("The first 50 of 1060 folders - type more of the folder's name to narrow them."). Each row is the folder's
+cover, its album, its artist and its path. Tap one and Edit album opens for it - the way to a folder Navidrome
+doesn't list. Pull down to read the library again.
+
+**The editor's first page:**
+
+- **The header**: the folder's cover, the album, the artist (and its edition), the folder's formats and track count
+  ("FLAC · 12 tracks · 2 discs"), and the folder's path under them, which you can select.
+- **Folder**, a menu, when the album is in more than one folder.
+- **Needs a look**, with Edit albums, when something's wrong with the album: each issue, with what it means ("Not
+  matched to MusicBrainz", "No cover art"...), as Needs a look in the web app says them. With **Look after the
+  library** too, **It's fine as it is** under them takes the album out of Needs a look for those issues; after it,
+  "Marked fine: …" says which, with **Ask about it again** to put it back. Someone with Edit albums alone sees the
+  issues, but not the two buttons - marking an album fine is the library's keeper's call - and someone with Look after
+  the library alone has only Delete album…, as in the web app.
+- **Edit**, with Edit albums: **Release** - the release the album is matched to, or "Not matched to a release" - opens
+  the Release page (below). **Tags** ("12 tracks"), **Artwork** ("Cover, CD art", "No cover") and **Lyrics** ("8 of
+  12") still open the album in the web app, in Safari, until the app has them; the line under the section says so.
+- **Delete album…**, with Look after the library, still opens the web app too.
+
+**Release** is the release, the fields, the cover and what Apply will do, top to bottom:
+
+- **Release**: the pressing chosen - its cover, title, artist, its year and what tells it apart ("2011 · CD · GB ·
+  SHVL 804"), its track count (in amber when it isn't the folder's), and **Current** when the folder is already tagged
+  with it. Tap it to **Choose a release**. With none chosen yet, "Choose a release".
+- **Fields**: **Artist**, **Album**, **Year**, **Original year** and **Edition**, as the web app's editor has them -
+  the years with the number pad, **Done** above the keyboard. Choosing a release fills them in from it (Edition left
+  blank, worked out from the release). "Blank fields are left alone rather than cleared. The folder is named after the
+  original year and the edition, so a remaster files under the album's own year."
+- **Cover**: a switch, "Download cover art" - or "Replace cover.jpg" when the folder has one - on at first only when it
+  has none, with where it comes from and the size it's saved at under it. **Compare covers…** opens the folder's cover
+  beside the release's (below).
+- **What Apply does**, worked out by deadwax as you go: "Working out the changes…" (or "Fetching the tracklist…" while
+  a release you chose loads), then anything worth reading first - a track count that differs, files the tracklist
+  didn't reach - in amber; when the folder will be renamed, **Folder** with its path now and → its new path (**Merge**
+  when the discs of one release join one folder, and what moves where); when the rename waits, why ("Writes the tags
+  first and renames the folder once Navidrome has scanned them (usually a few seconds), so Navidrome keeps this
+  album's plays, ratings and favourites."); and "3 of 12 files would change, and the folder would be renamed", which
+  opens **Changes** - each file's tags, what each holds now and what it would hold. Or "Nothing to change." It's worked
+  out again a moment after you stop typing.
+- **Apply**: on once What Apply does is for what the page shows now and has something to change. It writes the tags,
+  renames the folder and saves the cover, as the web app's Apply does; nothing on the sheet can close it while it runs,
+  and it says what it's waiting for: "Applying, waiting for Navidrome", or "Applying, renaming in 20s". Then what it
+  did: "Updated the tags in 12 files, moved the folder to match its tags." The folder is read again, and the album page
+  under the sheet shows the album as it is now.
+
+**Choose a release** is MusicBrainz's pressings of the album, best first, as the web app's editor lists them: it
+searches for the fields' artist and album (or for words you type at the top), takes the three albums that match best
+and lists every pressing of them, the closest first - the one the folder is tagged with marked Current. Each row is as
+on Release. Tap one: its tracklist loads (a spinner on the row), the fields fill in, and you're back on Release. While
+MusicBrainz is away: "MusicBrainz is unreachable right now, so there's nothing to match against. You can still correct
+the fields by hand." - and the fields still apply.
+
+**Compare covers** shows the folder's cover ("Current", or "No cover on disk") beside the release's ("From this
+release", through deadwax). Tap either for it full screen. **Replace cover only** (or **Save cover only**, when the
+folder has none) saves the release's cover into the folder and changes nothing else: "Saved cover.jpg, replacing
+cover.png." It's off until the release's cover has shown, so you never save one you haven't seen.
+
+**Typed work isn't lost by a swipe.** With something typed or chosen and not applied, the sheet can't be swiped away,
+and Close asks "Discard changes?" - **Discard**, or **Keep editing**.
+
+**An Apply that waits can take minutes** - up to five on the timer in deadwax's settings, or until Navidrome has
+scanned - and the phone waits up to seven. Locked, it keeps waiting only as long as iOS lets an app run in the
+background (often under a minute); deadwax carries on either way. If the answer never comes (the phone locked too
+long, WireGuard dropped), the sheet says "deadwax may have finished this - looking again", reads the folder again and
+works What Apply does out afresh: never the same Apply again on the old answer.
+
+**When Navidrome gives the album a new id** - an applied release can - the album page under the sheet becomes the
+album's page as Navidrome has it now, on every tab it was open in, and VoiceOver says "The album page now shows the
+album as Navidrome has it after the change."
+
+**While deadwax can't be reached**, Edit album says "Managing needs deadwax. This opens once it's back." and asks
+nothing, opening by itself once deadwax is back. If deadwax goes out of reach with it open, every page keeps what it
+showed under an amber line - "deadwax is out of reach - this is how it was, and nothing here can change until it's
+back." - and Apply, the cover and the marks are off; what you typed is kept. Once deadwax is back, the folder and What
+Apply does are asked again before Apply comes back on. Nothing of it is kept on the phone.
+
+**Errors** that deadwax put into words are shown as it said them, as the web app's editor shows them ("The Cover Art
+Archive has no front cover for that release."); anything else in the app's own words, what failed added in brackets
+for whoever runs deadwax. "This page needs a permission an admin hasn't given you - ask one if you need it." means an
+admin took Edit albums (or Look after the library) away since the app last asked: pull down on Settings and it asks
+again.
+
+VoiceOver reads each folder and pressing row as one ("Third, Portishead, Portishead/Third (2008)"), a pressing's with
+Current and its track count, and the header as a heading. Every word grows with the text size.
 
 ## Playlists
 
@@ -1422,7 +1529,8 @@ pages and it goes back to the first screen; tap it again there, and it goes to t
   right ("2.1 GB"). Under the three, only while something is happening: "Downloading - 6 songs to go", what it's
   waiting for, or, in amber, "2 songs didn't download".
 - **Manage**, for someone who may look after deadwax - an admin, everyone with logins off, or someone an admin gave
-  a permission to: the tools you may use, each opening in the web app, in Safari, as before (see [Manage](#manage)).
+  a permission to: the tools you may use - Edit an album the app's own, the others opening in the web app, in Safari,
+  as before (see [Manage](#manage)).
 - **Account**, with logins on.
 - **This phone**, with the name or IP deadwax is at on its right ("192.168.1.20", "bearded-dragon").
 - **About**, with the app's own version on its right, **0.13 (13)**.
@@ -1512,14 +1620,14 @@ Account and About ask deadwax again when you pull them down, as the first screen
 
 ### Manage
 
-Settings > **Manage** is deadwax's tools for looking after it, as many of them as you may use. Each one **opens in the web
-app, in Safari** - the web app has every one of them laid out for a phone ([Looking after deadwax from a
-phone](player.md#looking-after-deadwax-from-a-phone)), so the app doesn't build them again. Top to bottom, each only
-for someone who may use it:
+Settings > **Manage** is deadwax's tools for looking after it, as many of them as you may use. They're coming into the
+app one build at a time (Phase 8): **Edit an album** is the app's own now, and the rest still **open in the web app, in
+Safari** - the web app has every one of them laid out for a phone ([Looking after deadwax from a
+phone](player.md#looking-after-deadwax-from-a-phone)). Top to bottom, each only for someone who may use it:
 
-| row | who has it | opens in the web app |
+| row | who has it | opens |
 | --- | --- | --- |
-| **Edit an album** | Edit albums or Look after the library | the Library: open an album there, then **Edit** at its top - the line under the row says so. An album's top **•••** here has **Edit in the web app**, which opens that album's own page there ([An album's page](#an-albums-page)). |
+| **Edit an album** | Edit albums or Look after the library | **Choose the folder**, in the app: every album folder deadwax's library has, with a search at the top - tap one and [Edit album](#edit-album) opens for it. It's the way to a folder Navidrome doesn't list. An album's top **•••** has **Edit album** too ([An album's page](#an-albums-page)). |
 | **Needs a look** | Look after the library | Needs a look |
 | **Library care** | Look after the library or Edit albums | Library care |
 | **People** | an admin, with logins on | People - unlock it with your own Navidrome password, as in the web app |
@@ -1533,12 +1641,14 @@ down. If an admin took a permission away since, the page it opens says "This pag
 given you - ask one if you need it." - and People, its own words: "Only an admin can open People - it comes with
 being a Navidrome admin."
 
-Under the rows: "These open in the web app, in Safari." - and with logins on, "Safari has its own sign-in, apart from
-the app's: the first time, sign in there with the same name and password you use here. The pages open as whoever is
-signed in there, who may not be who's signed in here." Nothing hands the app's sign-in to Safari (it could only go in
-the address, where it would sit in Safari's history), so the first time a row opens, the web app's sign-in comes
-first. Sign in, and the page the row named opens. Safari stays signed in after that, as any browser does, until its
-sign-in goes 30 days without use. Signing out of the app doesn't sign Safari out, nor the other way round.
+Under the rows: "Edit an album is the app's own; the others open in the web app, in Safari." (without Edit an album,
+"These open in the web app, in Safari."; with Edit an album alone, nothing) - and with logins on, "Safari has its own
+sign-in, apart from the app's: the first time, sign in there with the same name and password you use here. The pages
+open as whoever is signed in there, who may not be who's signed in here." Nothing hands the app's sign-in to Safari (it
+could only go in the address, where it would sit in Safari's history), so the first time a row opens, the web app's
+sign-in comes first. Sign in, and the page the row named opens. Safari stays signed in after that, as any browser
+does, until its sign-in goes 30 days without use. Signing out of the app doesn't sign Safari out, nor the other way
+round.
 
 **The page opens as whoever is signed in in Safari, which may not be who's signed in to the app.** The app shows the
 rows its own sign-in may use; nothing checks Safari's against it. Sign in to the app as one person and Safari as
@@ -1548,13 +1658,15 @@ Screen, it keeps a sign-in of its own, and the rows open in Safari, not in it.
 
 The rows open deadwax's address as the app has it, plain `http://` included: Safari opens it as it would the address
 typed (its address bar says Not Secure), over your Wi-Fi or WireGuard. If the phone's default browser isn't Safari,
-they open in that one instead. While deadwax can't be reached the rows are dimmed and can't be tapped, and "These
-open once deadwax is back." says why; so is Change password, and the album's Edit in the web app isn't in its menu.
-If iOS won't open the address at all - Safari turned off in Screen Time, with no other browser - the app says
-"Couldn't open the web app - Safari may be turned off in Screen Time." over the tabs, and VoiceOver reads it. The same
-goes for the album's Edit in the web app and the Library's Set up Navidrome.
+they open in that one instead. While deadwax can't be reached the rows that open Safari are dimmed and can't be
+tapped, and "These open once deadwax is back." says why; so is Change password. Edit an album still opens: Choose the
+folder says it needs deadwax, and reads the library once it's back. If iOS won't open the address at all - Safari
+turned off in Screen Time, with no other browser - the app says "Couldn't open the web app - Safari may be turned off
+in Screen Time." over the tabs, and VoiceOver reads it. The same goes for Edit album's rows that still open the web app
+and the Library's Set up Navidrome.
 
-VoiceOver reads each row as a button, with "Opens in Safari." after it. The rows grow with the text size.
+VoiceOver reads each Safari row as a button, with "Opens in Safari." after it; Edit an album as a row that opens a
+page. The rows grow with the text size.
 
 What isn't linked from the phone: an artist's managing (pictures, names), on the artist's page in the web app; the
 web app's **Connections**, in its You; and Needs a look's count.
@@ -3647,7 +3759,10 @@ follow Noto Sans's.
 
 **Not done yet.** These come with **app 0.13 (13)**, Phase 7: You's [Manage](#manage), each row opening the web app
 in Safari. Use deadwax's plain `http://` address, as the app has it - once on the home Wi-Fi, once over WireGuard
-with Wi-Fi off. 237-243 want logins on, and 241 two accounts (one an admin); 244-246 work either way.
+with Wi-Fi off. 237-243 want logins on, and 241 two accounts (one an admin); 244-246 work either way. Since the build
+with [Edit album](#edit-album), Edit an album opens Choose the folder in the app (no line under it, no arrow) and an
+album's ••• has **Edit album** where Edit in the web app was: those parts of 237, 238, 241 and 242 are 320 and 321's
+now, and the footer says "Edit an album is the app's own; the others open in the web app, in Safari."
 
 - **237 The version, and Manage.** install.sh says "Installed deadwax 0.13 (13), runs until …", and You > About
   reads 0.13 (13). As an admin, You has **Manage** between Downloads and Account: **Edit an album** (with "Opens the
@@ -3789,8 +3904,9 @@ and the Library's icon sharp (still app 0.13 (13)).
 change is needed: it works with the deadwax you already run.
 
 - **260 From an album's •••.** Open an album of FLACs (a 24-bit one if there is one) and tap the top •••: the last part
-  of the menu has **Album info** with an ⓘ - above Edit in the web app, as an admin. Tap it: a sheet with the cover,
-  title and artist, then **Quality** ("FLAC · 24-bit / 96 kHz · all 10 songs", Bitrate, Channels "Stereo"), **The
+  of the menu has **Album info** with an ⓘ - above Edit album (Edit in the web app before Phase 8), as an admin. Tap
+  it: a sheet with the cover, title and artist, then **Quality** ("FLAC · 24-bit / 96 kHz · all 10 songs", Bitrate,
+  Channels "Stereo"), **The
   album** (Songs, Length, Size) and **On this phone**, at once. Then, after a moment of "Reading the album's
   files…", **The release** and **MusicBrainz**. Does the reading line show for long? **Done** closes it. A song's
   ••• has no Album info.
@@ -4018,6 +4134,47 @@ choice (still app 0.13 (13)). No server change is needed. Compare the choices wi
   and choice still show whole (wrapped, never over each other)? Do This phone's and About's values on the first
   screen stay clear of their names?
 
+### Edit album's checks (320-329)
+
+**Not done yet.** These come with the build that brings [Edit album](#edit-album) into the app - Phase 8's first part
+(still app 0.13 (13)). No server change is needed: deadwax 2.1.28 or later sends the library without its tracks, which
+an older one sends whole - slower, the same. Use deadwax's plain
+`http://` address, on the home Wi-Fi and over WireGuard with Wi-Fi off, as an admin unless said. Compare each with the
+same album's Edit in the web app.
+
+- **320 Edit album is the app's.** An album's top ••• ends with Album info, **Edit album**, Refresh - nothing opens
+  Safari. It opens a sheet titled Edit album: the cover, name, artist, the folder's path, then Release, Tags, Artwork,
+  Lyrics and Delete album…. Tags, Artwork, Lyrics and Delete album… still open the album in the web app (the line under
+  them says so); Release opens a page in the sheet.
+- **321 The folder.** An album kept as one folder per disc shows a **Folder** menu with each disc's folder; choosing
+  another opens the editor on it. Settings > Manage > **Edit an album** opens Choose the folder: type part of a name,
+  the list narrows (the line over it says how many), pick one - Edit album opens for that folder.
+- **322 What's wrong.** An album in Needs a look shows its issues with their hints under Needs a look. **It's fine as
+  it is**: "Marked fine: …" with **Ask about it again**; the web app's Needs a look no longer lists it. Ask about it
+  again: it's back, in both.
+- **323 Choose a release.** Release > the release row: a list of pressings, the album's own among the first and marked
+  Current. Pick another: a spinner on its row, then back on Release with the fields filled in. Within a second of
+  typing in a field, What Apply does changes.
+- **324 Apply, with Navidrome.** Pick a pressing that renames the folder: What Apply does says the folder's new path
+  and that it renames once Navidrome has scanned. Apply: the button says "Applying, waiting for Navidrome", then what it
+  did. The album page behind the sheet shows the new pressing; Navidrome still has its plays and stars. If its id
+  changed, the album page is the new one (and VoiceOver says so).
+- **325 Locked mid-apply.** Start an apply that waits and lock the phone at once. Unlock after a minute: does it say
+  what it did, or "deadwax may have finished this - looking again" - and never offer the same Apply again? Does the web
+  app show the album as applied?
+- **326 Covers.** Release > **Compare covers…**: the folder's and the release's side by side; a tap opens one full
+  screen. **Replace cover only**: "Saved cover.jpg, replacing …", the header's cover changes, and so does the album
+  page's after a moment.
+- **327 Typed work.** Type in a field, then swipe the sheet down: it stays. **Close**: "Discard changes?" - Keep editing
+  keeps what you typed; Discard closes it. During an Apply, Close is dimmed.
+- **328 Out of reach mid-edit.** With the editor open on Release, turn Wi-Fi and WireGuard off: the amber line at the
+  top, Apply dimmed, the fields as you typed them. Turn them back on: "Working out the changes…" again before Apply
+  comes back. Open Edit album with deadwax out of reach: "Managing needs deadwax. This opens once it's back." - and it
+  opens by itself when deadwax is back.
+- **329 The largest text, and VoiceOver** across the sheet, Release, Choose a release, Changes and Choose the folder:
+  every word whole, wrapped rather than cut off; each folder and pressing read as one line (a pressing with Current
+  and its track count), the header as a heading, the Folder menu its choice, and the Discard question's two buttons.
+
 ## What it can't do yet
 
 These are the web app's for now:
@@ -4030,9 +4187,10 @@ These are the web app's for now:
   new words wait for deadwax.
 - **Home** and **pins** - and so Home's Arriving: outside Requests, the tab's badge is the phone's only sign of a
   download on its way.
-- **Looking after deadwax** stays the web app's: Settings > [Manage](#manage) opens each tool there, in Safari, and
-  Change password too. Not linked from the phone: the artist's managing (above), the web app's **Connections** (in
-  its You) and Needs a look's count.
+- **Looking after deadwax**, but for [Edit album](#edit-album)'s folder, Needs a look marks and Release: Settings >
+  [Manage](#manage) opens each other tool in the web app, in Safari, and Change password too; so do Edit album's Tags,
+  Artwork, Lyrics and Delete album…. Not linked from the phone: the artist's managing (above), the web app's
+  **Connections** (in its You) and Needs a look's count.
 
 ## When something goes wrong
 
@@ -4053,6 +4211,9 @@ These are the web app's for now:
 | A Manage page opens with **someone else's access** - more than you have, or less | Safari is signed in as someone else: it signs in apart from the app, and the page is Safari's person's. In Safari, open the web app's You and look at the name at its top; **Sign out**, then sign in as yourself. |
 | **"Couldn't open the web app - Safari may be turned off in Screen Time."** | iOS wouldn't open the address. Turn Safari back on in the iPhone's Settings > Screen Time > Content & Privacy Restrictions > Allowed Apps (or ask whoever set Screen Time up), then tap the row again. |
 | Settings > Manage's rows are **dimmed** | deadwax can't be reached ("These open once deadwax is back."). They work again as soon as it can. |
+| Edit album: **"deadwax can't find this album's folder: …"** | No folder in deadwax's library is matched to the album, or none has its name. **Choose the folder** and pick it yourself - or, if it was only just filed, **Look again** in a moment. See [Edit album](#edit-album). |
+| Edit album: **"deadwax may have finished this - looking again"** | The Apply's answer didn't reach the phone (locked too long, or the connection dropped); deadwax carried on regardless. The sheet reads the folder again: check What Apply does - often "Nothing to change." - before applying again. |
+| Edit album's **Apply** stays dimmed | What Apply does is still being worked out (or a release's tracklist is loading), there's nothing to change, or deadwax can't be reached. |
 | Library: **"Couldn't update this list - showing it as it was."** | deadwax didn't answer just then. ••• > Refresh to try again (pull down, on a list opened from the •••). |
 | An album's page: **"This album isn't here any more - it may have been moved or deleted."** | Go back, and ••• > Refresh in the Library to bring it up to date. |
 | An artist's page: **"This artist isn't here any more - their albums may have been moved or deleted."** | The same: go back, and ••• > Refresh. |

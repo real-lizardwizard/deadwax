@@ -17,9 +17,9 @@ struct QueueMenuRequest {
     /// (Phase 4, slice 3) The whole playlist the songs are - its page's bar •••: the playlist's own download items
     /// (PlaylistDownloadMenuSection) in place of the songs'.
     var playlist: PlaylistWithSongs?
-    /// (Phase 7) The album's page in the web app - its page's bar •••, for someone the web gives the album's Edit
-    /// (Managing.albumEdit): "Edit in the web app", opened in Safari, the web's Edit one tap away there.
-    var webEdit: URL?
+    /// (Phase 8, slice 1) The album page's bar •••, for someone the web gives the album's Edit (Managing.albumEdit):
+    /// "Edit album", which opens Edit album over the tabs. (Phase 7's Edit in the web app was here.)
+    var editAlbum: (@MainActor () -> Void)?
     /// (Album info) The album page's bar •••: "Album info", which opens the album's sheet of everything known of it.
     var albumInfo: (@MainActor () -> Void)?
     /// (Pull to shuffle on an album's and a playlist's page) The page's bar •••: "Refresh" - the page asked again now
@@ -57,15 +57,14 @@ struct QueueMenuRequest {
 /// Phase 4, slice 3: a playlist page's bar ••• (`request.playlist`) has the playlist's own download items instead -
 /// Download, Download Again, Remove Download - the same as the control beside it.
 ///
-/// Phase 7 (phase7-managing.md 1): an album page's bar ••• (`request.webEdit`) ends with "Edit in the web app", in a
-/// section of its own - that album's page in the web app, in Safari (openURL), where its Edit is one tap away: the
-/// editors have no address of their own. Left out while deadwax can't be reached and for an album gone from the
-/// collection, as Add to a playlist is. It plays nothing; if iOS refuses to open it, the notice says so
-/// (OpenURLAction.webApp).
+/// Phase 8, slice 1 (phase8-managing.md 1): an album page's bar ••• (`request.editAlbum`) has "Edit album" in its last
+/// section, after Album info - Edit album over the tabs (AppNavigation.albumEdit), the app's own since Phase 7's Edit in
+/// the web app. Left out while deadwax can't be reached and for an album gone from the collection, as Add to a playlist
+/// is. It plays nothing.
 ///
 /// Album info (notes/ios.md "Album info"): the album page's bar ••• (`request.albumInfo`) has "Album info" in that last
-/// section, above Edit in the web app - offline too (it draws what the phone has), and for an album gone from the
-/// collection. It plays nothing.
+/// section, above Edit album - offline too (it draws what the phone has), and for an album gone from the collection. It
+/// plays nothing.
 ///
 /// Refresh (notes/ios.md "Pull to shuffle on an album's and a playlist's page"): an album's and a playlist's bar •••
 /// (`request.refresh`) end that last section with "Refresh", as the Library's ••• ends with it - online and off (off,
@@ -78,7 +77,6 @@ struct QueueMenu<Label: View>: View {
     @Environment(DownloadModel.self) private var downloads
     @Environment(Reachability.self) private var reachability
     @Environment(AppNavigation.self) private var navigation
-    @Environment(\.openURL) private var openURL
 
     var body: some View {
         Menu {
@@ -104,17 +102,17 @@ struct QueueMenu<Label: View>: View {
                                         album: request.pick.queuedAs == .album ? request.album : nil,
                                         gone: request.gone, name: request.pick.title)
                 }
-                let webEdit = reachability.online && !request.gone ? request.webEdit : nil
-                if request.albumInfo != nil || webEdit != nil || request.refresh != nil {
+                let editAlbum = reachability.online && !request.gone ? request.editAlbum : nil
+                if request.albumInfo != nil || editAlbum != nil || request.refresh != nil {
                     Section {
                         if let albumInfo = request.albumInfo {
                             Button(AlbumInfoWords.title, systemImage: AlbumInfoWords.symbol) {
                                 albumInfo()
                             }
                         }
-                        if let webEdit {
-                            Button(ManagingWords.editInWebApp, systemImage: ManagingWords.safariSymbol) {
-                                openURL.webApp(webEdit, player: player)
+                        if let editAlbum {
+                            Button(EditWords.menuItem, systemImage: EditWords.symbol) {
+                                editAlbum()
                             }
                         }
                         if let refresh = request.refresh {

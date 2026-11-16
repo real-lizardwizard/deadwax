@@ -89,7 +89,7 @@ import Testing
             diffs.check("\(label): managing", Managing.parts(access.permissions, loginsOn: access.on), parts)
             let edit = Self.albumEdit(row["albumEdit"])
             diffs.check("\(label): the album's Edit", Managing.albumEdit(access.permissions), edit)
-            // App's own rule for the album page's Edit chip, which Edit an album and Edit in the web app follow
+            // App's own rule for the album page's Edit chip, which Edit an album and the album's Edit album follow
             let chip = row["albumPage"].bool!
             diffs.check("\(label): the album page's Edit chip", Managing.albumEdit(access.permissions).shown, chip)
             diffs.check("\(label): sees the detail", access.seesDetail, row["seesDetail"].bool!)
