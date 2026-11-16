@@ -67,6 +67,10 @@ struct NowPlayingView: View {
     /// The look showing, the button's or You's.
     private var look: TurntableSettings.Look { switched ?? deck.opensAs }
 
+    /// A sheet is over Now Playing, at its full height: Up Next, Info, the EQ or Add to a playlist - the scrubber under
+    /// it unseen.
+    private var sheetOver: Bool { showsUpNext || showsInfo || showsEQ || playlistPick != nil }
+
     /// The turntable shows: its look, with the lyrics off (NowPlaying.tsx:269).
     private var turntable: Bool { TurntableSettings.showsTurntable(look, lyricsOn: lyrics.showing) }
 
@@ -182,9 +186,9 @@ struct NowPlayingView: View {
             .padding(.bottom, 12)
 
             // the scrubber's row either way: the scrubber on the cover, the time line centred in it on the turntable,
-            // so the swap moves no row (2.1)
+            // so the swap moves no row (2.1) - and hidden there or under a sheet, no frames drawn for it (review, 15 Nov)
             ZStack {
-                ScrubberView()
+                ScrubberView(visible: !turntable && !sheetOver)
                     .opacity(turntable ? 0 : 1)
                     .allowsHitTesting(!turntable)
                     .accessibilityHidden(turntable)
@@ -367,7 +371,7 @@ struct NowPlayingView: View {
                 if turntable { deck.wake() }
                 player.previous()
             } label: {
-                Image(systemName: "backward.fill").font(Typeface.symbol(.title))
+                SharpSymbol(.previous).font(Typeface.symbol(.title))
                     .frame(minWidth: 56, minHeight: 56)
                     .contentShape(Rectangle())
             }
@@ -378,7 +382,7 @@ struct NowPlayingView: View {
                 if turntable { deck.toggle() } else { player.toggle() }
             } label: {
                 ZStack {
-                    Image(systemName: player.isPlaying ? "pause.fill" : "play.fill")
+                    PlayPauseGlyph(playing: player.isPlaying)
                         .font(Typeface.symbol(size: 44))
                         .opacity(player.isLoading ? 0.35 : 1)
                     if player.isLoading { ProgressView().controlSize(.large) }
@@ -392,7 +396,7 @@ struct NowPlayingView: View {
                 if turntable { deck.wake() }
                 player.next()
             } label: {
-                Image(systemName: "forward.fill").font(Typeface.symbol(.title))
+                SharpSymbol(.next).font(Typeface.symbol(.title))
                     .frame(minWidth: 56, minHeight: 56)
                     .contentShape(Rectangle())
             }
@@ -540,11 +544,13 @@ private struct SpeedChip: View {
     }
 }
 
-/// STYLE.md's toggled chip (app.css .app-speed-chip-face): 28 pt tall, 8 pt across, radius 4, the toggled edge and
-/// fill - `--dw-pressed` under a finger - in a 44 pt target.
+/// STYLE.md's toggled chip (app.css .app-speed-chip-face): 28 pt tall, 8 pt across, square (actual corners, 15 Nov:
+/// Corners.control, where the web's radius is 4), the toggled edge and fill - `--dw-pressed` under a finger - in a 44 pt
+/// target.
 private struct SpeedChipFace: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
-        let shape = RoundedRectangle(cornerRadius: CGFloat(TurntableFace.lookRadius))
+        let radius = Corners.control
+        let shape = RoundedRectangle(cornerRadius: radius)
         return configuration.label
             .padding(.horizontal, CGFloat(TurntableFace.chipPad))
             .frame(height: CGFloat(TurntableFace.chipFace))

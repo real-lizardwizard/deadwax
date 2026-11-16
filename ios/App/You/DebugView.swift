@@ -207,16 +207,16 @@ struct DebugView: View {
                 }
                 HStack {
                     Spacer()
-                    Button { player.previous() } label: { Image(systemName: "backward.fill") }
+                    Button { player.previous() } label: { SharpSymbol(.previous) }
                         .accessibilityLabel("Previous")
                     Spacer()
                     Button { player.toggle() } label: {
-                        Image(systemName: player.engineState.phase == .playing ? "pause.fill" : "play.fill")
+                        PlayPauseGlyph(playing: player.engineState.phase == .playing)
                             .font(Typeface.symbol(.title))
                     }
                     .accessibilityLabel(player.engineState.phase == .playing ? "Pause" : "Play")
                     Spacer()
-                    Button { player.next() } label: { Image(systemName: "forward.fill") }
+                    Button { player.next() } label: { SharpSymbol(.next) }
                         .accessibilityLabel("Next")
                         .disabled(nextIndex(player.queue) == nil)
                     Spacer()

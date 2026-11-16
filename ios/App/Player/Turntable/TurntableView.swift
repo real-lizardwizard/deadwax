@@ -200,9 +200,10 @@ struct TurntableFootLine: View {
     }
 }
 
-/// The look button (2.1): the boards' secondary button drawn at 36 pt inside a 44 pt target - a rounded square with a
-/// hairline edge, the web's top-to-bottom fill (reversed while pressed) and a 1 pt highlight inside its top edge -
-/// holding the web's own glyph: the record while the cover shows, the square while the turntable does.
+/// The look button (2.1): the boards' secondary button drawn at 36 pt inside a 44 pt target - a square (actual corners,
+/// 15 Nov: Corners.control, where the web's is rounded by --dw-radius-control) with a hairline edge, the web's
+/// top-to-bottom fill (reversed while pressed) and a 1 pt highlight inside its top edge - holding the web's own glyph:
+/// the record while the cover shows, the square while the turntable does, its corners points too.
 struct LookButton: View {
     let showingTurntable: Bool
     let action: () -> Void
@@ -222,7 +223,8 @@ struct LookButton: View {
 /// STYLE.md's secondary button at the boards' 36 pt.
 private struct LookFace: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
-        let shape = RoundedRectangle(cornerRadius: CGFloat(TurntableFace.lookRadius))
+        let radius = Corners.control
+        let shape = RoundedRectangle(cornerRadius: radius)
         return configuration.label
             .frame(width: CGFloat(TurntableFace.lookFace), height: CGFloat(TurntableFace.lookFace))
             .background(shape.fill(configuration.isPressed ? Palette.secondaryFillPressed : Palette.secondaryFill))
@@ -230,8 +232,11 @@ private struct LookFace: ButtonStyle {
                 // --dw-highlight: inset 0 1px 0 - a line inside the top edge, following its corners
                 shape.inset(by: CGFloat(TurntableFace.hairline + TurntableFace.highlight / 2))
                     .stroke(Palette.highlight, lineWidth: CGFloat(TurntableFace.highlight))
+                    // the top line alone: its corners' band, or down to the line's foot where it is square (a 0
+                    // would hide it) - the inset and half the line, and the line's other half
                     .mask(alignment: .top) {
-                        Rectangle().frame(height: CGFloat(TurntableFace.lookRadius))
+                        let line = CGFloat(TurntableFace.hairline + TurntableFace.highlight)
+                        Rectangle().frame(height: max(radius, line))
                     }
             }
             .overlay(shape.strokeBorder(Palette.secondaryEdge, lineWidth: CGFloat(TurntableFace.hairline)))
@@ -241,8 +246,9 @@ private struct LookFace: ButtonStyle {
     }
 }
 
-/// The web's RecordIcon (two circles, r 8.5 and 2.5) and SquareIcon (15 by 15, radius 2), on their 24 grid, drawn at
-/// the frame's size.
+/// The web's RecordIcon (two circles, r 8.5 and 2.5) and SquareIcon (15 by 15), on their 24 grid, drawn at the frame's
+/// size - the square with actual corners (15 Nov), where the web's rounds them by 2 (TurntableFace.squareIcon.radius):
+/// it stands for the cover, square now too.
 private struct LookGlyph: Shape {
     let record: Bool
 
@@ -257,9 +263,7 @@ private struct LookGlyph: Shape {
             }
         } else {
             let side = CGFloat(TurntableFace.squareIcon.side) * k
-            let corner = CGFloat(TurntableFace.squareIcon.radius) * k
-            path.addRoundedRect(in: CGRect(x: centre.x - side / 2, y: centre.y - side / 2, width: side, height: side),
-                                cornerSize: CGSize(width: corner, height: corner))
+            path.addRect(CGRect(x: centre.x - side / 2, y: centre.y - side / 2, width: side, height: side))
         }
         return path
     }

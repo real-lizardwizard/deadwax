@@ -116,7 +116,8 @@ private struct ButtonFace: View {
     }
 
     var body: some View {
-        let radius = CGFloat(PrimaryButton.radius)
+        // square (actual corners, 15 Nov): the phone's control corner, where the web's buttons keep their 4
+        let radius = Corners.control
         let shape = RoundedRectangle(cornerRadius: radius)
         let pressed = configuration.isPressed
         configuration.label
@@ -137,7 +138,8 @@ private struct ButtonFace: View {
                 // the highlight: a line inside the top edge, following its corners (LookFace's)
                 shape.inset(by: Self.hairline * 1.5)
                     .stroke(primary ? Palette.primaryHighlight : Palette.highlight, lineWidth: Self.hairline)
-                    .mask(alignment: .top) { Rectangle().frame(height: radius) }
+                    // the top line alone where it is square: at least two hairlines' band, or a 0 radius hides it
+                    .mask(alignment: .top) { Rectangle().frame(height: max(radius, Self.hairline * 2)) }
             }
             .overlay(shape.strokeBorder(edge(pressed), lineWidth: Self.hairline))
             .opacity(isEnabled ? 1 : Palette.off)
