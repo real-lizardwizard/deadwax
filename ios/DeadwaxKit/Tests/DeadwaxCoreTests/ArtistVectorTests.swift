@@ -14,6 +14,36 @@ enum ArtistVectors {
         let playOrders: [PlayOrderCase]
         let playsLine: [PlaysCase]
         let turns: [TurnsCase]
+        let joined: [JoinedCase]
+        let mbids: [MbidCase]
+    }
+
+    /// One of MusicBrainz's albums none of yours claims, as the web's artistRows makes its row.
+    struct TheirRow: Decodable {
+        let key: String
+        let title: String
+        let year: String?
+        let held: Bool?
+        let yours: Bool?
+        let editions: Int
+        let releases: [String]
+        let kind: String?
+        let line: String
+        let personalLine: String
+    }
+    struct JoinedCase: Decodable {
+        let name: String
+        let held: [Album]
+        let groups: [ReleaseGroup]
+        let folders: [OwnedAlbum]?
+        let claimed: [String]
+        let theirs: [TheirRow]
+    }
+    struct MbidCase: Decodable {
+        let name: String
+        let artist: ArtistWithAlbums?
+        let folders: [OwnedAlbum]?
+        let mbid: String?
     }
 
     struct Words: Decodable {
@@ -240,6 +270,57 @@ enum ArtistVectors {
                 }
                 #expect(started == step.started, "\(each.name), after \(step.op) \(String(describing: step.item))")
             }
+        }
+    }
+
+    // MARK: the albums you don't have (15 Nov)
+
+    @Test func theAlbumsYouDontHaveAreTheWebs() throws {
+        let cases = try ArtistVectors.load().joined
+        #expect(cases.count == 92)
+        for each in cases {
+            let index = each.folders.map { OwnedIndex($0) }
+            let theirs = ArtistJoin.theirs(albums: each.held, groups: each.groups, index: index)
+            #expect(theirs.map(\.key) == each.theirs.map(\.key), "\(each.name): which, in order")
+            #expect(theirs.map(\.title) == each.theirs.map(\.title), "\(each.name): the titles")
+            #expect(theirs.map(\.year) == each.theirs.map(\.year), "\(each.name): the years")
+            #expect(theirs.map(\.held) == each.theirs.map(\.held), "\(each.name): what the library holds")
+            #expect(theirs.map(\.yours) == each.theirs.map(\.yours), "\(each.name): whose")
+            #expect(theirs.map(\.editions) == each.theirs.map(\.editions), "\(each.name): the pressings")
+            #expect(theirs.map(\.releases) == each.theirs.map(\.releases), "\(each.name): what the bridge is asked")
+            #expect(theirs.map(\.kind) == each.theirs.map(\.kind), "\(each.name): the kinds")
+            #expect(theirs.map { (row: MBArtistPage.Row) -> String in MBArtistPage.line(row, personal: false) }
+                    == each.theirs.map(\.line), "\(each.name): the lines")
+            #expect(theirs.map { (row: MBArtistPage.Row) -> String in MBArtistPage.line(row, personal: true) }
+                    == each.theirs.map(\.personalLine), "\(each.name): the lines with a library of your own")
+            let claimed = ArtistJoin.claimed(each.held, each.groups, index: index).map { (key: FoldKey) -> String in
+                "group:" + String(decoding: key.units, as: UTF16.self)
+            }
+            #expect(Set(claimed) == Set(each.claimed) && claimed.count == each.claimed.count,
+                    "\(each.name): the groups an album of yours claims")
+            // the page: your albums as Phase 4 drew them and in that order, theirs in theirs' order, each once
+            let rows = ArtistJoin.rows(albums: each.held, groups: each.groups, index: index)
+            let mine = rows.compactMap { (row: ArtistJoin.Row) -> String? in
+                if case .yours(let yours) = row { return yours.key }
+                return nil
+            }
+            let other = rows.compactMap { (row: ArtistJoin.Row) -> String? in
+                if case .theirs(let theirs) = row { return theirs.key }
+                return nil
+            }
+            #expect(mine == ArtistPage.rows(each.held).map(\.key), "\(each.name): your albums, as they were")
+            #expect(other == each.theirs.map(\.key), "\(each.name): theirs, in the web's order")
+            #expect(Set(rows.map(\.key)).count == rows.count, "\(each.name): each row once")
+            #expect(ArtistJoin.playOrder(rows) == ArtistPage.playOrder(ArtistPage.rows(each.held)),
+                    "\(each.name): Play plays what you have, as before")
+        }
+    }
+
+    @Test func whoTheyAreOnMusicBrainzIsTheWebs() throws {
+        let cases = try ArtistVectors.load().mbids
+        #expect(cases.count == 17)
+        for each in cases {
+            #expect(ArtistJoin.mbid(each.artist, index: each.folders.map { OwnedIndex($0) }) == each.mbid, "\(each.name)")
         }
     }
 }

@@ -180,8 +180,8 @@ struct MBArtistView: View {
 
 /// One of their albums (ArtistPage.tsx's row, MusicBrainz's): its cover through deadwax's relay, its title, and "1994 ·
 /// in your library · 2 pressings" with the tick for one marked (MBArtistPage.marked). Read as one; busy while the id
-/// bridge is asked.
-private struct MBArtistAlbumRow: View {
+/// bridge is asked. The library's artist page draws their albums you don't have with it too (15 Nov).
+struct MBArtistAlbumRow: View {
     let row: MBArtistPage.Row
     let line: String
     let marked: Bool

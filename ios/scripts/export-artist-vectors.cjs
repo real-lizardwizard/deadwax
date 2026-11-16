@@ -24,6 +24,12 @@
  *   turns      inTurns driven step by step: what has been started after each settle and stop
  *   words      the words and numbers the Swift copies say - ARTIST_ORDERS and artistOrderFrom over saved values among
  *              them
+ *   joined     (15 Nov, the albums you don't have - ArtistJoin.swift) artistRows(held, groups, index) over albums,
+ *              MusicBrainz's groups and the library's folders - fixed ones crossed, and 30 seeded: the groups an album
+ *              of yours claims (a row with a group and an album), and the rest as the page draws them (a row with a
+ *              group and no album), in the web's order, each with its line both ways
+ *   mbids      artistMbid over an artist's answer and the library's folders: their own id, the folders agreeing or
+ *              not, a collaboration, by name, none
  *
  * The rows' ties are ICU's localeCompare on the web (foldName(title), then the row's key), which nothing on Linux has:
  * the phone compares folded titles by code unit and keys as ASCII collates. Every row vector here is checked to be one
@@ -419,6 +425,190 @@ async function turnVectors() {
   return traces
 }
 
+/* ===== the albums you don't have: artistRows over MusicBrainz's groups, and artistMbid ===== */
+
+//? MusicBrainz ids made to the pattern mbidOf accepts: groups, releases and artists apart by their first block
+const gid = (n) => `aaaaaaaa-0000-4000-8000-${String(n).padStart(12, '0')}`
+const rid = (n) => `bbbbbbbb-0000-4000-8000-${String(n).padStart(12, '0')}`
+const ART = { portishead: '8f6bd1e4-fbe1-4f50-aa9b-94c450ec0f11', tricky: 'cccccccc-0000-4000-8000-000000000002', beth: 'cccccccc-0000-4000-8000-000000000003' }
+const group = (n, title, date, primary, secondary) => {
+  const made = { id: gid(n) }
+  if (title !== undefined) made.title = title
+  if (date !== undefined) made['first-release-date'] = date
+  if (primary !== undefined) made['primary-type'] = primary
+  if (secondary !== undefined) made['secondary-types'] = secondary
+  return made
+}
+const shelf = (path, artist, album, extra = {}) => ({ path, artist, album, ...extra })
+
+const J_GROUPS = {
+  dummy: group(1, 'Dummy', '1994-08-22', 'Album', []),
+  third: group(2, 'Third', '2008-04-28', 'Album', []),
+  self: group(3, 'Portishead', '1997-09-29', 'Album', []),
+  roseland: group(4, 'Roseland NYC Live', '1998-11-02', 'Album', ['Live']),
+  remixed: group(5, 'Dummy Remixed', '1995-06', 'Album', ['Remix']),
+  plainA: group(6, 'Plain', '2001', 'Album', []),
+  plainB: group(7, 'plain', '2003-02', 'Album', []),
+  undated: group(8, 'Untitled', undefined, 'Album'),
+  glory: group(9, 'Glory Times', '19xx', 'Album', []),
+  bristol: group(10, 'Bristol', '2001', 'Album', ['Compilation']),
+  noTitle: group(11, undefined, '2003'),
+  ete: group(12, 'Été', '1997', 'Album', []),
+  zebra: group(13, 'Zebra', '1997-01', 'EP'),
+  noId: { id: '', title: 'No id', 'first-release-date': '2004' },
+}
+
+/** The albums Navidrome has of theirs: claimed by release (an uppercase id with spaces among them), by title, by
+ *  neither (two groups share the title; a folder ties it to a group MusicBrainz doesn't list), an id twice. */
+const J_HELD = [
+  { id: 'a-dummy', name: 'Dummy', year: 1994, coverArt: 'a-dummy', musicBrainzId: rid(1), starred: '2026-10-01T12:00:00Z' },
+  { id: 'a-dummy-us', name: 'Dummy', year: 1995, musicBrainzId: ` ${rid(2).toUpperCase()} ` },
+  { id: 'a-third', name: 'Third - 2018 Remaster', year: 2018, musicBrainzId: rid(4) },
+  { id: 'a-self', name: 'Portishead', year: 1997 },
+  { id: 'a-plain', name: 'Plain', year: 2001 },
+  { id: 'a-roseland', name: 'Roseland NYC Live', year: 1998, musicBrainzId: rid(7) },
+  { id: 'a-ep', name: 'Glory Times EP', year: 2000, musicBrainzId: rid(8) },
+  { id: 'a-glory', name: 'Glory Times' },
+  { id: 'a-dummy', name: 'Dummy', year: 1994 },
+  { id: 'a-ete', name: 'ete', year: 1997 },
+  { id: 'a-zebra', name: 'Zebra', year: 1997, musicBrainzId: rid(13) },
+]
+
+/** The library's folders: two pressings of one album, another's releases one with Navidrome's and one without, one
+ *  held only by the store's word, a bootleg's group MusicBrainz doesn't list, an EP's, an untagged folder, and a
+ *  release whose folder carries no group id (an .m4a). */
+const J_FOLDERS = [
+  shelf('Portishead/Dummy', 'Portishead', 'Dummy', { release_mbid: rid(1), release_group_mbid: gid(1), yours: true, albumartist_mbids: [ART.portishead] }),
+  shelf('Portishead/Dummy (US)', 'Portishead', 'Dummy', { release_mbid: rid(2), release_group_mbid: gid(1), edition: 'US', yours: false, albumartist_mbids: [ART.portishead] }),
+  shelf('Portishead/Third', 'Portishead', 'Third', { release_mbid: rid(3), release_group_mbid: gid(2), year: '2008' }),
+  shelf('Portishead/Third (2018 Remaster)', 'Portishead', 'Third', { release_mbid: rid(4), release_group_mbid: gid(2), edition: '2018 Remaster', yours: false }),
+  shelf('Portishead/Portishead', 'Portishead', 'Portishead', { release_mbid: rid(5), release_group_mbid: gid(3) }),
+  shelf('Portishead/Dummy Remixed', 'Portishead', 'Dummy Remixed', { release_mbid: rid(6), release_group_mbid: gid(5), yours: true }),
+  shelf('Portishead/Roseland (bootleg)', 'Portishead', 'Roseland NYC Live', { release_mbid: rid(7), release_group_mbid: gid(20), albumartist_mbids: [ART.portishead, ART.tricky] }),
+  shelf('Portishead/Glory Times EP', 'Portishead', 'Glory Times EP', { release_mbid: rid(8), release_group_mbid: gid(21), albumartist_mbids: [ART.portishead] }),
+  shelf('Portishead/Plain', 'Portishead', 'Plain'),
+  shelf('Portishead/Zebra', 'Portishead', 'Zebra', { release_mbid: rid(13) }),
+]
+
+/** One case: the web's rows for the albums, the groups and the folders - the groups an album of yours claims, and
+ *  the rest as the page draws them (artistRows' rows with a group and no album of Navidrome's), in its order. */
+function joinedCase(name, held, groups, folders) {
+  const rows = A.artistRows(held, groups, folders ? owned.buildOwnedIndex(folders) : null)
+  return {
+    name,
+    held,
+    groups,
+    folders,
+    claimed: rows.filter((row) => row.group && row.albumId).map((row) => row.key),
+    theirs: rows.filter((row) => row.group && !row.albumId).map((row) => ({
+      key: row.key, title: row.title, year: row.year, held: row.held, yours: row.yours ?? null, editions: row.editions,
+      releases: row.releases, kind: row.kind, line: A.rowLine(row, false), personalLine: A.rowLine(row, true),
+    })),
+  }
+}
+
+const J_TITLES = ['Dummy', 'dummy', 'Third', 'Plain', 'Glory Times', 'Zebra', 'Album', 'Live', 'Été', 'ete', '']
+const J_DATES = ['1994', '1994-08-22', '2001-02', '1997', '19xx', '', undefined, '2008-04-28', '1999']
+const J_KINDS = [['Album', []], ['Album', ['Live']], ['EP', []], ['Album', ['Compilation']], [undefined, undefined], ['Single', []]]
+
+/** A seeded case: groups from a pool (a title shared, a group twice), releases each of one group, folders of some
+ *  (with and without their group's id, yours or not, untagged by name), and albums of some releases, of none, or
+ *  titled as a group. */
+function randomJoined(at) {
+  const groups = Array.from({ length: between(0, 9) }, (_, n) => {
+    const [primary, secondary] = pick(J_KINDS)
+    return group(100 * at + n, pick(J_TITLES), pick(J_DATES), primary, secondary)
+  })
+  if (groups.length && rand() < 0.25) groups.push(pick(groups))
+  const releases = groups.flatMap((each, n) => Array.from({ length: between(0, 2) }, (_, k) => ({ id: rid(1000 * at + 10 * n + k), group: each.id })))
+  const folders = rand() < 0.15 ? null : releases.filter(() => rand() < 0.6).map((release, n) => {
+    const extra = { release_mbid: rand() < 0.1 ? release.id.toUpperCase() : release.id }
+    if (rand() < 0.8) extra.release_group_mbid = release.group
+    if (rand() < 0.5) extra.yours = rand() < 0.6
+    if (rand() < 0.3) extra.edition = pick(['Deluxe', 'Standard', '2011 Remaster'])
+    return shelf(`Artist/${n}`, 'Artist', pick(J_TITLES), extra)
+  })
+  if (folders && rand() < 0.4) folders.push(shelf('Artist/untagged', 'Artist', pick(J_TITLES)))
+  const held = Array.from({ length: between(0, 7) }, (_, n) => {
+    const album = { id: `r${at}-${n}`, name: pick(J_TITLES) }
+    const year = pick([1994, 1997, 2001, 0, undefined, 2008])
+    if (year !== undefined) album.year = year
+    const roll = rand()
+    if (roll < 0.5 && releases.length) album.musicBrainzId = pick(releases).id
+    else if (roll < 0.6) album.musicBrainzId = rid(99999)
+    return album
+  })
+  return joinedCase(`random ${at}`, held, groups, folders)
+}
+
+function joinedVectors() {
+  const G = J_GROUPS
+  const groupLists = [
+    ['none', []],
+    ['all', Object.values(G)],
+    ['studio only', [G.dummy, G.third, G.self, G.plainA, G.plainB, G.undated, G.glory, G.ete, G.noTitle]],
+    ['a group twice', [G.dummy, G.third, G.dummy, G.self, G.zebra]],
+    ['the other way round', Object.values(G).reverse()],
+  ]
+  const heldLists = [['nothing held', []], ['every album', J_HELD], ['two', [J_HELD[0], J_HELD[3]]]]
+  const folderLists = [
+    ['no library answer', null],
+    ['an empty library', []],
+    ['the library', J_FOLDERS],
+    ['no group ids', J_FOLDERS.map(({ release_group_mbid, ...rest }) => rest)],
+  ]
+  const out = []
+  for (const [heldName, held] of heldLists) {
+    for (const [groupsName, groups] of groupLists) {
+      for (const [foldersName, folders] of folderLists) out.push(joinedCase(`${heldName}, ${groupsName}, ${foldersName}`, held, groups, folders))
+    }
+  }
+  for (let at = 0; at < 30; at++) out.push(randomJoined(at))
+  // one release under two groups (a folder's stale group id): the first group listed claims the album, and the other
+  // is listed as theirs, held by the folder alone
+  const regrouped = [
+    shelf('Portishead/Dummy', 'Portishead', 'Dummy', { release_mbid: rid(1), release_group_mbid: gid(1), yours: true }),
+    shelf('Portishead/Dummy (old tags)', 'Portishead', 'Dummy', { release_mbid: rid(1), release_group_mbid: gid(5) }),
+  ]
+  out.push(joinedCase('a release under two groups', [J_HELD[0]], [G.dummy, G.remixed], regrouped))
+  out.push(joinedCase('a release under two groups, the other way round', [J_HELD[0]], [G.remixed, G.dummy], regrouped))
+  return out
+}
+
+/** artistMbid: Navidrome's own id for them (trimmed, any case), else the folders of their albums' releases agreeing
+ *  on one artist - or, with none of their albums carrying a release, the folders filed under their name. */
+function mbidVectors() {
+  const artist = (extra, albums) => ({ id: 'ar-1', name: 'Portishead', ...extra, album: albums })
+  const withRelease = [{ id: 'a1', name: 'Dummy', musicBrainzId: rid(1) }, { id: 'a2', name: 'Third', musicBrainzId: ` ${rid(4)}` }]
+  const plain = [{ id: 'a1', name: 'Dummy' }, { id: 'a2', name: 'Third' }]
+  const sole = (path, release, ids, name = 'Portishead') => shelf(path, name, path, release ? { release_mbid: release, albumartist_mbids: ids } : { albumartist_mbids: ids })
+  const cases = [
+    ['no artist', null, J_FOLDERS],
+    ['their own id', artist({ musicBrainzId: ART.portishead }, plain), null],
+    ['their own id, any case and spaced', artist({ musicBrainzId: `  ${ART.portishead.toUpperCase()} ` }, plain), null],
+    ['not an id of their own: the folders say', artist({ musicBrainzId: 'not-an-id' }, withRelease), [sole('f1', rid(1), [ART.portishead]), sole('f2', rid(4), [` ${ART.portishead.toUpperCase()}`])]],
+    ['the folders disagree', artist({}, withRelease), [sole('f1', rid(1), [ART.portishead]), sole('f2', rid(4), [ART.tricky])]],
+    ['a collaboration says nothing', artist({}, withRelease), [sole('f1', rid(1), [ART.portishead, ART.tricky]), sole('f2', rid(4), [ART.portishead])]],
+    ['only a collaboration', artist({}, withRelease), [sole('f1', rid(1), [ART.portishead, ART.beth])]],
+    ['a folder of another release', artist({}, withRelease), [sole('f1', rid(9), [ART.tricky])]],
+    ['a folder release in capitals', artist({}, withRelease), [sole('f1', rid(1).toUpperCase(), [ART.portishead])]],
+    ['a folder release with spaces', artist({}, withRelease), [sole('f1', ` ${rid(1)}`, [ART.portishead])]],
+    ['by their name, with no release', artist({}, plain), [sole('f1', null, [ART.portishead], 'The Portishead'), sole('f2', null, [ART.portishead], 'PORTISHEAD')]],
+    ['by their name, two say others', artist({}, plain), [sole('f1', null, [ART.portishead]), sole('f2', null, [ART.beth])]],
+    ['not by name once a release is known', artist({}, withRelease), [sole('f1', null, [ART.portishead]), sole('f2', rid(7), [ART.tricky])]],
+    ['nameless', artist({ name: '' }, plain), [sole('f1', null, [ART.portishead], '')]],
+    ['no library answer', artist({}, withRelease), null],
+    ['no albums', artist({}, []), [sole('f1', null, [ART.portishead])]],
+    ['the library', artist({}, J_HELD), J_FOLDERS],
+  ]
+  return cases.map(([name, given, folders]) => ({
+    name,
+    artist: given,
+    folders,
+    mbid: A.artistMbid(given, given?.album ?? [], folders ? owned.buildOwnedIndex(folders) : null),
+  }))
+}
+
 /* ===== the words ===== */
 
 function wordVectors() {
@@ -470,6 +660,9 @@ async function vectors() {
     playOrders: playOrderVectors(),
     playsLine: playsVectors(),
     turns: await turnVectors(),
+    //? last, so the seeded draws before them are as they were
+    joined: joinedVectors(),
+    mbids: mbidVectors(),
   }
 }
 

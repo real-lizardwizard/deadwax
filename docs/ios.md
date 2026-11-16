@@ -691,10 +691,23 @@ the rest). With logins off every album is ticked. **Tap an album** to open its p
   ("in the collection" with a library of your own), and Play and Shuffle are dimmed. Then "Plays the 3
   albums you have". An album that wouldn't come is left out - "Plays 2 of the 3 albums you have - the rest
   didn't load" - with **Try again** under it.
+- **Their albums you don't have** come in among yours a moment later, from MusicBrainz, as the web app's
+  artist page lists them: newest first, each once, with its cover, its title and a line like "2008 · Live
+  album · not in your library". Tap one: the album you don't have's page, as from Search. One the
+  library holds that Navidrome lists under another artist is ticked, "in your library", and opens your
+  album. **Studio only**, at the end of the Albums heading, is on until you turn it off; off, their live
+  albums, compilations and the rest join the list. It's kept for each artist, and shared with that
+  artist's page in Search. Your own albums don't change: the same rows, ticks and lines, and **Play** and
+  **Shuffle** still play only what you have. Under the list: "Loading their albums…" while they come,
+  "Showing their first 500 albums." for an artist with more, or - if MusicBrainz couldn't list them -
+  "Their other albums can't be shown right now - try again in a few minutes." and **Try again**.
+- deadwax finds the artist on MusicBrainz by Navidrome's MusicBrainz id for them, or else by the
+  MusicBrainz tags in their albums' folders. For an artist it can't find, or while deadwax can't be
+  reached, the page lists only your albums and says nothing about the rest.
 - An artist deadwax no longer has says "This artist isn't here any more - their albums may have been moved
   or deleted."
-- Not on the phone yet: the web app's discography from MusicBrainz, the description, the facts, pins, and
-  the pictures and names managed from the artist's page. Those come with Search and Get.
+- Not on the phone yet: the description, the facts, pins, and the pictures and names managed from the
+  artist's page.
 
 **Offline**, the Artists page lists what it last listed, an artist with nothing on this phone dimmed (it
 opens nothing). With no list in hand it lists the artists of the albums on the phone, under "Only the
@@ -3819,14 +3832,50 @@ change is needed: it works with the deadwax you already run.
   has. Swipe back across the Library's pages: nothing changed. With VoiceOver, flick the list with three fingers and
   double-tap a "Jump to" letter: it lands there.
 
+### The artist's albums you don't have's checks (300-309)
+
+**Not done yet.** These come with the build that lists an artist's albums you don't have on their page in the
+Library (still app 0.13 (13)). Compare each with the same artist's page in the web app.
+
+- **300 Their albums among yours.** In Library > Artists, open an artist with albums on MusicBrainz you don't have.
+  Your albums show at once, as before; a moment later their others come in among them, newest first, each with its
+  cover, its title and "2008 · not in your library", with no tick. The web app's page for them: the same albums of
+  theirs, in the same places among yours. (Yours keep their own titles and years on the phone; the web app shows
+  MusicBrainz's.) Is any album listed twice, or one you have listed as one you don't?
+- **301 Yours as they were.** Your albums keep their lines and ticks; tap one: its page. **Play** and **Shuffle**
+  play only your albums, and the line under them counts only yours ("Plays the 3 albums you have"). Tap one of
+  theirs: the album you don't have's page, with its pressings.
+- **302 Studio only.** At the end of the Albums heading, **Studio only** is on. Turn it off: their live albums,
+  compilations and the like join the list ("1998 · Live album · not in your library"), the list on screen until
+  they're in. Search for the same artist and open their page from Search's MusicBrainz artists: Studio only is off
+  there too. Turn it back on.
+- **303 Nothing jumps.** Open an artist you haven't opened since the app started: as their albums come in, does
+  anything you're looking at jump, or a row appear and then go? Over WireGuard, scroll down to your albums before
+  theirs come in: does the row under your finger stay put? Does the Albums heading keep its height as Studio only
+  appears? Go back and open the artist again: everything is there at once.
+- **304 One you have elsewhere.** If you have an album filed under another artist (a collaboration, a different
+  spelling) that MusicBrainz lists as theirs: it's ticked, "in your library"; tap it: the row spins, then your
+  album's page. Tap it and switch tab before it opens: nothing opens there, nor when you come back.
+- **305 An artist MusicBrainz doesn't know.** An artist with no MusicBrainz tags in their files (and none in
+  Navidrome): the page is as before - your albums, no Studio only, nothing said about the rest.
+- **306 When MusicBrainz is away.** If MusicBrainz can't answer (it goes away for minutes at a time): under your
+  albums, once, "Their other albums can't be shown right now - try again in a few minutes." and **Try again**; your
+  albums still open and play. Pull down to refresh: it asks again.
+- **307 Offline.** With the page open, turn on Airplane Mode: their albums leave the page, and Studio only and the
+  line under the list go too; your albums stay as before (dimmed if nothing of them is on the phone). Turn it off:
+  their albums come back.
+- **308 Someone else's.** With logins on, an album as in 304 that someone else has, not you: "in the collection", with
+  no tick. With logins off, the same album is ticked, "in your library", as every album of yours is.
+- **309 VoiceOver.** A row of theirs reads its title and line ("Third, 2008 · not in your library"); Studio only says
+  whether it's on. Before their albums are known, VoiceOver doesn't find Studio only.
+
 ## What it can't do yet
 
 These are the web app's for now:
 
 - **The visualizer**: it stays the web app's, on a desktop.
 
-- On an artist's page their **discography** from MusicBrainz, the **description** and the artist's
-  managing (pictures, names).
+- On an artist's page their **description** and the artist's managing (pictures, names).
 - In **Search**, an artist you don't have's page lists their albums, without their description or links. A search
   of what's downloaded while deadwax can't be reached isn't built: offline, Search keeps a list already drawn, and
   new words wait for deadwax.
