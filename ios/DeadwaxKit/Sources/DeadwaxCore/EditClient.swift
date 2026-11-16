@@ -122,6 +122,39 @@ extension DeadwaxClient {
         return response.status == 200 ? response.body : nil
     }
 
+    // MARK: Artwork and Lyrics (slice 3)
+
+    /// Get cover (`POST /library/art/fetch`, GetArtButton's): the front of the release the folder is tagged with,
+    /// never replacing one - a 404 when the Cover Art Archive has none for it.
+    public func getCover(path: String) async throws -> CoverFetched {
+        try await call(Routes.artFetch, sending: CoverFetchBody(albumPath: path, replace: false, releaseMbid: nil))
+    }
+
+    /// Get lyrics (`POST /library/lyrics/fetch`): LRCLIB asked for every track without a .lrc, none replaced, none
+    /// re-timed.
+    public func getLyrics(path: String) async throws -> LyricsSummary {
+        try await call(Routes.lyricsFetch, sending: LyricsFetchBody(albumPath: path))
+    }
+
+    /// Get CD art (`POST /library/disc_art/fetch`): a picture of each disc, by the folder's own release - a 404 when
+    /// neither the Archive nor fanart.tv has one, a 400 when the folder already has deadwax's own.
+    public func getDiscArt(path: String) async throws -> DiscArtFetched {
+        try await call(Routes.discArtFetch, sending: DiscArtFetchBody(albumPath: path))
+    }
+
+    /// One CD art picture beside the tracks (`/library/disc_art?album=&file=`) - only a name the scan counts as disc art.
+    public func libraryDiscArtRequest(path: String, file: String) -> HTTPRequest {
+        var built = request(Routes.libraryDiscArt, query: [("album", path), ("file", file)])
+        built.headers["Accept"] = "image/*"
+        return built
+    }
+
+    /// That picture's bytes - nil when it isn't there (a 404); anything else deadwax answers is thrown.
+    public func libraryDiscArt(path: String, file: String) async throws -> Data? {
+        let response = try await answer(libraryDiscArtRequest(path: path, file: file), accept: [200, 404])
+        return response.status == 200 ? response.body : nil
+    }
+
     static func json<Body: Encodable>(_ body: Body) throws -> Data {
         do {
             return try JSONEncoder().encode(body)

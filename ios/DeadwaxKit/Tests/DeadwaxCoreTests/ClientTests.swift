@@ -374,7 +374,7 @@ func sentJSON(_ request: HTTPRequest?) throws -> [String: SentValue] {
     }
 
     @Test func everyRouteIsDeadwaxsOwn() {
-        #expect(Routes.all.count == 73)
+        #expect(Routes.all.count == 76)
         #expect(Set(Routes.all).count == Routes.all.count)
         for endpoint in Routes.all {
             #expect(endpoint.path.hasPrefix("/deadwax/"))
@@ -412,6 +412,8 @@ func sentJSON(_ request: HTTPRequest?) throws -> [String: SentValue] {
         // the Cover Art Archive's and the files'; the cover drawn, 30 s; the queue's marks, 20 s
         // (slice 2: Tags) a tag edit's preview, 60 s, every file named read; its apply, 120 s, read and written again;
         // a picture inside a track, 30 s
+        // (slice 3: Artwork and Lyrics) Get lyrics, 600 s, LRCLIB asked for each track two at a time; Get CD art, 360 s,
+        // the Archive's listing (or fanart.tv's) and each disc's picture; a CD art picture, 30 s
         let longer: [Endpoint: Double] = [Routes.albumIndex: 30, Routes.autoEqSearch: 20, Routes.autoEqProfile: 20,
                                           Routes.libraryOwned: 30, Routes.fullySearch: 20, Routes.releaseGroup: 60,
                                           Routes.searchArtists: 20, Routes.searchSongs: 20, Routes.artistFacts: 60,
@@ -422,7 +424,8 @@ func sentJSON(_ request: HTTPRequest?) throws -> [String: SentValue] {
                                           Routes.libraryAlbums: 120, Routes.releases: 60, Routes.release: 60,
                                           Routes.retagPreview: 60, Routes.retagApply: 480, Routes.artFetch: 120,
                                           Routes.libraryArt: 30, Routes.queueIgnore: 20, Routes.queueUnignore: 20,
-                                          Routes.tagsPreview: 60, Routes.tagsApply: 120, Routes.trackPicture: 30]
+                                          Routes.tagsPreview: 60, Routes.tagsApply: 120, Routes.trackPicture: 30,
+                                          Routes.lyricsFetch: 600, Routes.discArtFetch: 360, Routes.libraryDiscArt: 30]
         #expect(Routes.timeouts == longer)
         for endpoint in Routes.all {
             // each path parameter filled in: a brace left in a path is no URL

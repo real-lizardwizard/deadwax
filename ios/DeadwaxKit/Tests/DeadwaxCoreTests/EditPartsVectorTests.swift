@@ -5,7 +5,8 @@ import Testing
 /// Fixtures/edit/edit-parts-vectors.json: the web's lib/tagEdit.ts, lib/trackInspector.ts (over lib/trackFields.ts) and
 /// lib/albumEdit.ts run as they are, and components/TrackTagEditor.tsx's, app/EditPanel.tsx's and app/TrackInspector.tsx's
 /// words read out of their sources - replayed here through TagEdit, TagEditWords and TrackInspector, case for case
-/// (notes/ios-specs/phase8-managing.md 3.4).
+/// (notes/ios-specs/phase8-managing.md 3.4); and lib/getResults.ts, lib/lyrics.ts and components/LibraryParts.tsx's
+/// three Get buttons through GetResults and GetRun (3.5).
 @Suite struct EditPartsVectorTests {
     let fixture = try! JSONDecoder().decode(Web.self, from: Fixtures.data("edit/edit-parts-vectors.json"))
 
@@ -210,5 +211,135 @@ import Testing
         }
         diffs.done()
         #expect(TrackInspector.pixels(width: 500, height: 500) == "500 \u{d7} 500")
+    }
+
+    // MARK: Artwork and Lyrics (slice 3)
+
+    /// An error as the fixture describes it, made as the app meets it: deadwax's answer, no answer, none in time, another.
+    static func failure(_ spec: Web) -> APIFailure {
+        spec["answer"].isNull ? screenFailure(spec, path: "/library/art/fetch")
+            : screenFailure(spec["answer"], path: "/library/art/fetch")
+    }
+
+    static func album(_ web: Web) -> ScanAlbum {
+        ScanAlbum(path: "A/B", releaseMbid: web["release_mbid"].string!, art: web["art"].string!,
+                  trackCount: web["track_count"].int!, lyricsCount: web["lyrics_count"].int!,
+                  discArt: web["disc_art"].list.compactMap(\.string))
+    }
+
+    static func summary(_ web: Web) -> LyricsSummary {
+        LyricsSummary(written: web["written"].int!, replaced: web["replaced"].int!, kept: web["kept"].int!,
+                      instrumental: web["instrumental"].int!, missing: web["missing"].int!, failed: web["failed"].int!,
+                      untagged: web["untagged"].int!, synced: web["synced"].int!)
+    }
+
+    @Test func theArtworkAndLyricsWordsAreTheWebs() {
+        let words = fixture["artwork"]["words"]
+        let diffs = ScreenDiffs()
+        for kind in GetResults.Kind.allCases {
+            diffs.text("getting \(kind)", GetResults.getting(kind), words["GETTING"][kind.rawValue])
+            diffs.text("failed \(kind)", GetResults.failed(kind), words["GET_FAILED"][kind.rawValue])
+        }
+        diffs.text("COVER_MISSING", GetResults.coverMissing, words["COVER_MISSING"])
+        diffs.text("DISC_ART_BESIDE", GetResults.discArtBeside, words["DISC_ART_BESIDE"])
+        diffs.text("NO_DISC_ART", GetResults.noDiscArt, words["NO_DISC_ART"])
+        diffs.text("RETIME_POINTER", GetResults.retimePointer, words["RETIME_POINTER"])
+        diffs.text("cover", GetResults.cover, words["cover"])
+        diffs.text("discArt", GetResults.discArt, words["discArt"])
+        diffs.text("lyrics", GetResults.lyrics, words["lyrics"])
+        diffs.text("seeCover", GetResults.seeCover, words["seeCover"])
+        diffs.text("seeDiscArt", GetResults.seeDiscArt("disc2.png"), words["seeDiscArt"])
+        diffs.done()
+        #expect(fixture["artwork"]["albums"].list.count == 81)
+        #expect(fixture["artwork"]["problems"].list.count == 126)
+        expectMadeFrom(fixture, ["ui/src/lib/getResults.ts", "ui/src/lib/lyrics.ts",
+                                 "ui/src/components/LibraryParts.tsx the cover button",
+                                 "ui/src/components/LibraryParts.tsx a 404 is none"])
+    }
+
+    @Test func eachFolderSaysWhatTheWebsArtworkAndLyricsTabsSay() {
+        let diffs = ScreenDiffs()
+        for (at, row) in fixture["artwork"]["albums"].list.enumerated() {
+            let album = Self.album(row["album"])
+            diffs.text("\(at) coverNote", GetResults.coverNote(album.art), row["coverNote"])
+            diffs.text("\(at) coverPointer", GetResults.webCoverPointer(album), row["coverPointer"])
+            diffs.text("\(at) discArtPointer", GetResults.webDiscArtPointer(album), row["discArtPointer"])
+            diffs.text("\(at) lyricsLine", GetResults.lyricsLine(album.lyricsCount, album.trackCount), row["lyricsLine"])
+            diffs.text("\(at) allLyricsNote", GetResults.allLyricsNote(album), row["allLyricsNote"])
+            diffs.flag("\(at) offersCover", GetResults.offersCover(album), row["offersCover"])
+            diffs.flag("\(at) hasOwnDiscArt", GetResults.hasOwnDiscArt(album), row["hasOwnDiscArt"])
+            diffs.flag("\(at) offersDiscArt", GetResults.offersDiscArt(album), row["offersDiscArt"])
+            for (ran, web) in zip([false, true], row["offersLyrics"].list) {
+                diffs.flag("\(at) offersLyrics \(ran)", GetResults.offersLyrics(album, ran: ran), web)
+            }
+            // on the phone: the Release page, and its Compare covers…
+            if let web = row["coverPointer"].string {
+                diffs.check("\(at) phone cover", GetResults.coverPointer(album) ?? "",
+                            web.replacingOccurrences(of: "in the Release tab (Compare full size\u{2026})",
+                                                     with: "on the Release page (Compare covers\u{2026})")
+                                .replacingOccurrences(of: "in the Release tab", with: "on the Release page"))
+            }
+        }
+        diffs.done()
+        let tagged = ScanAlbum(path: "A", releaseMbid: "x", art: "file")
+        #expect(GetResults.coverPointer(tagged) == "To replace it, compare it with the release's on the Release page (Compare covers\u{2026}).")
+        #expect(GetResults.discArtPointer(ScanAlbum(path: "A")) == "To get CD art, first match the album to a release on the Release page.")
+    }
+
+    @Test func aGetThatDidntWorkIsSaidAsTheWebSaysIt() {
+        let diffs = ScreenDiffs()
+        for (at, row) in fixture["artwork"]["problems"].list.enumerated() {
+            let kind = GetResults.Kind(rawValue: row["kind"].string!)!
+            diffs.text("\(at) \(kind) admin \(row["admin"])",
+                       GetResults.problem(Self.failure(row["error"]), kind, admin: row["admin"].bool!), row["said"])
+        }
+        diffs.done()
+    }
+
+    @Test func whatGetLyricsCameToIsTheWebs() {
+        let diffs = ScreenDiffs()
+        for (at, row) in fixture["artwork"]["summaries"].list.enumerated() {
+            let summary = Self.summary(row["summary"])
+            diffs.text("\(at) described", GetResults.describeLyrics(summary), row["described"])
+            diffs.text("\(at) result", GetResults.lyricsResult(summary), row["result"])
+            diffs.check("\(at) on disk", GetResults.lyricsOnDisk(summary), row["onDisk"].int!)
+        }
+        diffs.done()
+    }
+
+    @Test func eachButtonSaysWhatTheWebsSays() {
+        let diffs = ScreenDiffs()
+        let refused = APIFailure.answered(.init(status: 400, method: "POST", path: "/x", detail: "no"))
+        let missing = APIFailure.answered(.init(status: 404, method: "POST", path: "/x", detail: "none"))
+        for row in fixture["artwork"]["labels"].list {
+            let kind = GetResults.Kind(rawValue: row["kind"].string!)!
+            let tracks = row["tracks"].int!
+            var run = GetRun(kind: kind, path: "A")
+            switch row["state"].string! {
+            case "working": break
+            case "none": run.failed(missing, admin: false)
+            case "failed": run.failed(refused, admin: false)
+            case "done": run.done(Self.summary(row["summary"]))
+            default:
+                diffs.text("\(kind) idle \(tracks)", GetResults.label(kind, nil, trackCount: tracks), row["label"])
+                continue
+            }
+            diffs.text("\(kind) \(row["state"]) \(tracks)", GetResults.label(kind, run, trackCount: tracks), row["label"])
+        }
+        diffs.done()
+        // the phone's own: an answer that never came, or a 5xx, is Try again too - and the folder is read again
+        var lost = GetRun(kind: .cover, path: "A")
+        lost.failed(APIFailure.answered(.init(status: 502, method: "POST", path: "/x", detail: "the Cover Art Archive couldn't be reached - try again")), admin: false)
+        #expect(lost.state == .unanswered && lost.wrote && GetResults.label(.cover, lost, trackCount: 1) == "Try again")
+        #expect(lost.said?.hasPrefix("The Cover Art Archive couldn't be reached - try again.") == true, "the route's words")
+        var none = GetRun(kind: .disc, path: "A")
+        none.failed(missing, admin: false)
+        #expect(none.state == .none && !none.wrote)
+        var lyrics = GetRun(kind: .lyrics, path: "A")
+        lyrics.failed(missing, admin: false)
+        #expect(lyrics.state == .failed && !lyrics.wrote, "a lyrics fetch has no 404 of its own: the web's failed")
+        var cover = GetRun(kind: .cover, path: "A")
+        cover.done()
+        #expect(cover.wrote && cover.said == nil && GetResults.label(.cover, cover, trackCount: 1) == "Get cover")
     }
 }

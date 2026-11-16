@@ -53,7 +53,8 @@ page of its own, and every choice on them one row with a menu rather than a list
 the app itself, one build at a time: first **Edit album** - an album's folder, what's wrong with it, and the release
 it's matched to, chosen and applied on the phone, from the album's ••• or Settings > Manage > Edit an album (see [Edit
 album](#edit-album)). Then its **Tags**: each track's file, everything in it, and its tags edited on one track or many
-at once. Its artwork, lyrics and Delete still open the web app until their builds.
+at once. Then its **Artwork** and **Lyrics**: the cover and CD art, each full screen, and Get cover, Get CD art and
+Get lyrics on the phone. Its Delete still opens the web app until its build.
 
 **Nothing of Phase 2, the lyrics, the EQ, the turntable, play history, your library downloaded,
 playlists, artists, songs, Search, Requests, Get or Manage has been seen on an iPhone yet.** It's built and tested on a Mac,
@@ -538,10 +539,10 @@ doesn't list. Pull down to read the library again.
   issues, but not the two buttons - marking an album fine is the library's keeper's call - and someone with Look after
   the library alone has only Delete album…, as in the web app.
 - **Edit**, with Edit albums: **Release** - the release the album is matched to, or "Not matched to a release" - opens
-  the Release page (below), and **Tags** ("12 tracks") the album's files (below). **Artwork** ("Cover, CD art", "No
-  cover") and **Lyrics** ("8 of 12") still open the album in the web app, in Safari, until the app has them; the line
-  under the section says so.
-- **Delete album…**, with Look after the library, still opens the web app too.
+  the Release page (below), **Tags** ("12 tracks") the album's files, **Artwork** ("Cover, CD art", "No cover") its
+  cover and CD art, and **Lyrics** ("8 of 12") how many tracks have lyrics (all below).
+- **Delete album…**, with Look after the library, still opens the album in the web app, in Safari, until the app has
+  it; the line under it says so.
 
 **Release** is the release, the fields, the cover and what Apply will do, top to bottom:
 
@@ -610,6 +611,33 @@ folder stays where it is - Release moves an album's folder to where its tags say
 again, and the album page under the sheet shows the album as it is now. An Apply whose answer never comes is said as
 Release's is (below), and the files read again before Apply comes back on.
 
+**Artwork** is the web app's Artwork tab. **Cover**: the folder's cover - tap it to see it full screen - and where it
+is ("A cover is saved beside the tracks.", "The cover is inside the files, with none beside them.", or "No cover is
+saved with the album."). With none, and the album matched to a release, **Get cover** saves the release's front from
+the Cover Art Archive beside the tracks - "Getting the cover…" while it does - and once the folder has been read
+again the cover shows, here and on the album page. When the Archive has none for that release it says so ("The Cover
+Art Archive has no front cover for that release.") and the button becomes **Look again**. With no release, "To get a
+cover, first match the album to a release on the Release page." opens Release; with a cover, "To replace it, compare
+it with the release's on the Release page (Compare covers…)." opens Compare covers. **CD art**: the pictures of the
+disc beside the tracks, in a grid with their names ("Beside the tracks - what players show for a song with a disc
+number:") - tap one to see it full screen - or "No picture of the disc beside the tracks." With the album matched to a
+release and no CD art deadwax saved itself (a `disc` picture), **Get CD art** saves a picture of each disc - the
+Cover Art Archive's, else fanart.tv's when deadwax has its key - and after it "deadwax never replaces CD art it
+saved.": a second Get is never offered.
+
+**Lyrics** is the web app's Lyrics tab: "8 of 12 tracks have lyrics saved beside them, as a .lrc.", then **Get
+lyrics** while any track has none. It asks LRCLIB for each track without a .lrc - never replacing one that's there -
+"Getting lyrics…" while it does, and then says what it came to ("Saved lyrics for 3 tracks (2 synced), 8 already had
+them, 1 not on LRCLIB."), the button now "Lyrics · 11 of 12" to ask again. With every track done, "Every track has
+lyrics." Lyrics saved show on Now Playing once Navidrome has scanned the folder. Under it, where to re-time synced
+lyrics - Lyrics in Server settings, which is still the web app's.
+
+**The Gets are writes**, like Apply: one at a time, never while Release or Edit tags applies (and those are dimmed
+while a Get runs), and off until the folder has been read again after any of them. Each says what went wrong under
+its button, with **Try again**; a lyrics fetch of a long album can take a few minutes, and the phone waits up to ten.
+If its answer never comes, it's said as an Apply's is (below): the folder is read again, so whatever deadwax saved
+meanwhile shows.
+
 **Typed work isn't lost by a swipe.** With something typed or chosen and not applied, the sheet can't be swiped away,
 and Close asks "Discard changes?" - **Discard**, or **Keep editing**.
 
@@ -621,8 +649,8 @@ the wait - the sheet says "deadwax may have finished this - looking again", read
 does out afresh: never the same Apply again on the old answer. Only a refusal (deadwax saying no before it wrote
 anything) keeps What Apply does as it was. If the library can't be read then, the sheet says "Couldn't read the
 library." with **Look again**, and nothing can be applied until it has been read. Only one write runs at a time: while
-Release applies or saves a cover, Edit tags' Apply is dimmed, and the other way round - and after either, the other's
-preview is worked out again once the folder has been read.
+Release applies or saves a cover, Edit tags' Apply and the Gets are dimmed, and the other way round - and after any of
+them, the others' previews are worked out again once the folder has been read.
 
 **When Navidrome gives the album a new id** - an applied release can - the album page under the sheet becomes the
 album's page as Navidrome has it now, on every tab it was open in, and VoiceOver says "The album page now shows the
@@ -4182,7 +4210,8 @@ same album's Edit in the web app.
 - **320 Edit album is the app's.** An album's top ••• ends with Album info, **Edit album**, Refresh - nothing opens
   Safari. It opens a sheet titled Edit album: the cover, name, artist, the folder's path, then Release, Tags, Artwork,
   Lyrics and Delete album…. Artwork, Lyrics and Delete album… still open the album in the web app (the line under
-  them says so); Release opens a page in the sheet, and so does Tags since the build after it (330).
+  them says so); Release opens a page in the sheet, and so does Tags since the build after it (330), and Artwork and
+  Lyrics since the one after that (335).
 - **321 The folder.** An album kept as one folder per disc shows a **Folder** menu with each disc's folder; choosing
   another opens the editor on it. Settings > Manage > **Edit an album** opens Choose the folder: type part of a name,
   the list narrows (the line over it says how many), pick one - Edit album opens for that folder.
@@ -4245,6 +4274,35 @@ the same album's Tags in the web app.
   ("Track 3, Title, Artist"), each picture row as "Front cover - see it full size", Undo with its hint, every word
   whole.
 
+### Edit album's Artwork and Lyrics checks (335-337)
+
+**Not done yet.** These come with the build that brings Edit album's [Artwork and Lyrics](#edit-album) into the app -
+Phase 8's third part (still app 0.13 (13)). No server change is needed: any deadwax the first part works with. As in
+320-329: deadwax's plain `http://` address, on the home Wi-Fi and over WireGuard with Wi-Fi off, as an admin; compare
+each with the same album's Artwork and Lyrics in the web app. Edit album's root now has Release, Tags, Artwork and
+Lyrics as pages of its own, and only Delete album… opening the web app, "Delete album… opens the album in the web app,
+in Safari, until the app has it." under it.
+
+- **335 A missing cover.** An album matched to a release with no cover (Needs a look's "No cover art"): Edit album >
+  **Artwork** says "No cover is saved with the album." over **Get cover**. Tap it: "Getting the cover…", then the
+  cover shows here, on the root's header and - after a moment - on the album page, and the button has gone. An album
+  whose release has none on the Cover Art Archive: "The Cover Art Archive has no front cover for that release." and
+  **Look again**. An album with a cover: tap it for full screen; "To replace it, … (Compare covers…)" opens Compare
+  covers. An album with no release: "To get a cover, first match the album to a release on the Release page." opens
+  Release.
+- **336 CD art.** An album matched to a release with CD art on the Cover Art Archive (or with a fanart.tv key set):
+  **Get CD art**: "Getting CD art…", then the pictures in the grid with their names - "disc.jpg", or one a disc - each
+  opening full screen on a tap, and "deadwax never replaces CD art it saved." where the button was: there is no second
+  Get. Does the web app's Artwork show the same pictures?
+- **337 Lyrics.** An album with tracks missing lyrics: **Lyrics** says "8 of 12 tracks have lyrics saved beside them,
+  as a .lrc." **Get lyrics**: "Getting lyrics…", then how many it saved ("Saved lyrics for 3 tracks (2 synced), 1 not
+  on LRCLIB."), the line over it counting them and the root's row with it; the button says "Lyrics · 11 of 12". Play a
+  track it saved them for, once Navidrome has scanned: Now Playing shows them. With every track done: "Every track
+  has lyrics." Then, as 325: lock the phone the moment you tap Get lyrics on a long album - unlocked, does it say what
+  it saved, or "deadwax may have finished this - looking again" with the count read again? While a Get runs, are
+  Release's and Edit tags' Apply dimmed, and Close? With the largest text and VoiceOver: each CD art picture read as
+  "disc.jpg - see it full size", the cover as "See the cover full size", every word whole.
+
 ## What it can't do yet
 
 These are the web app's for now:
@@ -4257,10 +4315,10 @@ These are the web app's for now:
   new words wait for deadwax.
 - **Home** and **pins** - and so Home's Arriving: outside Requests, the tab's badge is the phone's only sign of a
   download on its way.
-- **Looking after deadwax**, but for [Edit album](#edit-album)'s folder, Needs a look marks and Release: Settings >
-  [Manage](#manage) opens each other tool in the web app, in Safari, and Change password too; so do Edit album's
-  Artwork, Lyrics and Delete album…. Not linked from the phone: the artist's managing (above), the web app's
-  **Connections** (in its You) and Needs a look's count.
+- **Looking after deadwax**, but for [Edit album](#edit-album)'s folder, Needs a look marks, Release, Tags, Artwork
+  and Lyrics: Settings > [Manage](#manage) opens each other tool in the web app, in Safari, and Change password too; so
+  does Edit album's Delete album…. Re-timing synced lyrics is Server settings', in the web app. Not linked from the
+  phone: the artist's managing (above), the web app's **Connections** (in its You) and Needs a look's count.
 
 ## When something goes wrong
 
@@ -4285,6 +4343,9 @@ These are the web app's for now:
 | Edit album: **"deadwax may have finished this - looking again"** | The Apply's answer didn't reach the phone (locked too long, or the connection dropped); deadwax carried on regardless. The sheet reads the folder again: check What Apply does - often "Nothing to change." - before applying again. |
 | Edit album's **Apply** stays dimmed | What Apply does is still being worked out (or a release's tracklist is loading), there's nothing to change, or deadwax can't be reached. |
 | Edit tags' **Apply** stays dimmed | A field says in amber what's wrong with it, What would change says "Nothing to change", it's still being worked out - or Release is applying or saving a cover, and Edit tags waits for it. |
+| Edit album's **Get cover**, **Get CD art** or **Get lyrics** stays dimmed | Another write is running (an Apply, a cover, another Get), the folder is still being read again after one, or deadwax can't be reached. Wait for it; after "Couldn't read the library.", **Look again**. |
+| Get CD art: **"No CD art on the Cover Art Archive for this release - a fanart.tv key in Server settings adds another source."** | Nobody has uploaded a picture of this pressing's disc. A fanart.tv key (Server settings, in the web app) lets deadwax look there too; then **Look again**. |
+| Get lyrics: **"… 2 failed - try again."** | LRCLIB didn't answer for those tracks just then (it's busy at times). Tap **Lyrics · …** to ask again: only the tracks still without lyrics are asked. "Not on LRCLIB" is LRCLIB having none - asking again won't change it. |
 | Edit album's Tags: **"Couldn't read the files."**, with **Look again** | deadwax couldn't read the folder's files just then - the disk asleep, or the folder moved. **Look again**; if the album was just applied with a new release, its files were renamed, so go back to Tags and choose them again. |
 | Library: **"Couldn't update this list - showing it as it was."** | deadwax didn't answer just then. ••• > Refresh to try again (pull down, on a list opened from the •••). |
 | An album's page: **"This album isn't here any more - it may have been moved or deleted."** | Go back, and ••• > Refresh in the Library to bring it up to date. |

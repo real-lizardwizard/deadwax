@@ -6,8 +6,12 @@ Read from the Swift source, as tests/test_ios_edit.py reads slice 1's. Tags: the
 (no web app row); Select is a List's selection with the bottom bar's Edit N tracks…; a track's page pushes the editor;
 Edit tags is a Form whose Apply is on only as RetagFlow says, and never beside another write; its Apply holds a
 background task, says an answer that never came, reads the folder again, and stops at a sign-out; its reads drop a
-cancellation and only the newest lands; out of reach and back it reads again. Core's rules and words are held by
-EditPartsVectorTests and TagEditFlowTests, the routes by tests/test_ios_edit_parts_contract.py.
+cancellation and only the newest lands; out of reach and back it reads again. Artwork and Lyrics: rows pushing pages of
+the phone's own (Delete album… the one web app row left); the cover and CD art drawn, each full screen; each Get offered
+as LibraryParts offers it, its words by its last run, on only as EditAlbumModel.canGet says - never beside another
+write - held with a background task, the folder read again after anything that may have written, the other parts'
+previews waiting for that read, nothing more after a sign-out. Core's rules and words are held by EditPartsVectorTests,
+TagEditFlowTests and GetResultsTests, the routes by tests/test_ios_edit_parts_contract.py.
 """
 
 from tests.test_ios_edit import EDIT, MODEL, SHEET, RELEASE, block, code, declared
@@ -80,9 +84,9 @@ def test_edit_tags_applies_only_as_the_flow_says_and_never_beside_another_write(
     assert "var canApply: Bool { ready && flow.canApply(plan, problems: problems.count) }" in model
     # the Release's writes are off while Tags' runs, and Tags' while one of them does
     release = code(RELEASE)
-    assert ".disabled(!retag.canApply || model.tagsApplying)" in release
+    assert ".disabled(!retag.canApply || model.tagsApplying || model.getting)" in release
     edit = code(MODEL)
-    assert "var applying: Bool { retag?.flow.applying == true || tagsApplying }" in edit
+    assert "var applying: Bool { retag?.flow.applying == true || tagsApplying || getting }" in edit
     for name in ("func apply()", "func saveCoverOnly()"):
         assert "guard !tagsApplying," in body(edit, name), name
     tags_apply = body(edit, "func applyTags()")
@@ -132,3 +136,109 @@ def test_tags_reads_drop_a_cancellation_and_only_the_newest_lands():
     ended = body(model, "func applyEnded(")
     assert "RetagFlow.outcome(of: error)" in ended
     assert "EditWords.writeFailure(error, failed: TagEditWords.applyFailed, admin: admin)" in ended
+
+
+# ---------------------------------------------------------------------------- Artwork and Lyrics (slice 3)
+
+ART_PAGES = EDIT / "ArtworkLyricsPages.swift"
+
+
+def test_artwork_and_lyrics_are_pages_of_the_phones_own():
+    sheet = code(SHEET)
+    assert "case artwork" in sheet and "case lyrics" in sheet
+    view = declared(sheet, "struct", "EditPageView")
+    assert "ArtworkPage(model: model, album: album)" in view and "LyricsPage(model: model, album: album)" in view
+    sections = body(declared(sheet, "struct", "EditAlbumRoot"), "private func albumSections(")
+    artwork = body(sections, "NavigationLink(value: EditPage.artwork)")
+    assert "LabeledContent(AlbumEdit.Part.artwork.label)" in artwork and "EditWords.artworkValue(album)" in artwork
+    lyrics = body(sections, "NavigationLink(value: EditPage.lyrics)")
+    assert "LabeledContent(AlbumEdit.Part.lyrics.label)" in lyrics and "EditWords.lyricsValue(album)" in lyrics
+    # Delete album… is the one row left in the web app, its line under it
+    delete = body(sections, "if edit.delete, let url = webURL {")
+    assert "WebAppRow(label: EditWords.deleteAlbum" in delete and "Text(EditWords.inWebAppLine)" in delete
+
+
+def test_artwork_draws_the_cover_and_cd_art_and_offers_each_get_as_the_web_does():
+    pages = code(ART_PAGES)
+    page = declared(pages, "struct", "ArtworkPage")
+    # the cover, a tap full screen; where it is said; Get cover only as LibraryParts offers it
+    assert "FullCover(source: .folder(album.path, album.artMtime))" in page
+    assert ".accessibilityLabel(GetResults.seeCover)" in page
+    assert "Text(GetResults.coverNote(album.art))" in page
+    assert "if GetResults.offersCover(album) {" in page and "GetButton(model: model, kind: .cover" in page
+    # the web's pointer to the Release tab's comparison: a row pushing it - the Release page with no release
+    assert "if let pointer = GetResults.coverPointer(album) {" in page
+    assert "NavigationLink(value: album.releaseMbid.isEmpty ? EditPage.release : EditPage.compareCovers)" in page
+    # CD art: the scan's pictures in a grid, each by name and full screen; Get CD art as the web offers it
+    assert "LazyVGrid(" in page and "ForEach(album.discArt, id: \\.self)" in page
+    assert "DiscArtPicture(path: album.path, file: name)" in page
+    assert "FullCover(source: .discArt(path: album.path, file: name))" in page
+    assert ".accessibilityLabel(GetResults.seeDiscArt(name))" in page
+    assert "Text(GetResults.noDiscArt)" in page and "Text(GetResults.discArtBeside)" in page
+    assert "if GetResults.offersDiscArt(album) {" in page and "GetButton(model: model, kind: .disc" in page
+    assert "if let pointer = GetResults.discArtPointer(album) {" in page
+    assert ".fullScreenCover(item: $full)" in page
+    picture = declared(pages, "struct", "DiscArtPicture")
+    assert "client.libraryDiscArt(path: path, file: file)" in picture and ".clipShape(Corners.artShape)" in picture
+    release = code(RELEASE)
+    assert "case discArt(path: String, file: String)" in release
+    assert "client.libraryDiscArt(path: path, file: file)" in release
+
+
+def test_lyrics_counts_and_offers_get_lyrics_as_the_web_does():
+    pages = code(ART_PAGES)
+    page = declared(pages, "struct", "LyricsPage")
+    assert "Text(GetResults.lyricsLine(album.lyricsCount, album.trackCount))" in page
+    assert "if GetResults.offersLyrics(album, ran: model.run(.lyrics) != nil) {" in page
+    assert "GetButton(model: model, kind: .lyrics" in page
+    assert "GetResults.allLyricsNote(album)" in page
+    # the pointer to re-timing is said: Server settings is still the web app's
+    assert "Text(GetResults.retimePointer)" in page and "WebAppRow" not in pages and "openURL" not in pages
+
+
+def test_a_get_says_its_words_and_is_on_only_as_the_model_says():
+    pages = code(ART_PAGES)
+    button = declared(pages, "struct", "GetButton")
+    assert "GetResults.label(kind, run, trackCount: trackCount)" in button
+    assert "Task { await model.get(kind) }" in button and ".disabled(!model.canGet)" in button
+    assert "if run?.state == .working { ProgressView() }" in button
+    assert "if let said = run?.said, run?.state != .working {" in button
+    wait = declared(pages, "struct", "GetWait")
+    assert "if model.unansweredGet != nil {" in wait and "MayHaveFinished(reading: model.scan.reading)" in wait
+    assert "if model.retag?.flow.readFailed == true {" in wait and "ReadAgainFailed(model: model)" in wait
+    for name in ("ArtworkPage", "LyricsPage"):
+        assert "GetWait(model: model)" in declared(pages, "struct", name), name
+    edit = code(MODEL)
+    # a Get is a write: never beside another, nor a mark, nor before the folder's read after a write or a gap
+    can = body(edit, "var canGet: Bool")
+    for part in ("online", "album != nil", "!writing", "!marking", "!scan.reading", "retag?.flow.needsRead != true"):
+        assert part in can, part
+    assert "var applying: Bool { retag?.flow.applying == true || tagsApplying || getting }" in edit
+    assert "var getting: Bool { runs.values.contains { $0.state == .working } }" in edit
+    # another folder's run is never shown
+    assert "guard let run = runs[kind], run.path == album?.path else { return nil }" in body(edit, "func run(")
+    for name in ("func apply()", "func saveCoverOnly()"):
+        assert "!getting," in body(edit, name), name
+    assert "!getting," in body(edit, "func applyTags()")
+    release = code(RELEASE)
+    assert ".disabled(incoming == nil || !retag.flow.canSaveCover || model.tagsApplying || model.getting)" in release
+
+
+def test_a_get_holds_a_background_task_reads_again_after_any_write_and_stops_at_a_sign_out():
+    edit = code(MODEL)
+    get = body(edit, "func get(_ kind: GetResults.Kind)")
+    assert "guard canGet, let client, let before = album else { return }" in get
+    assert 'BackgroundHold(named: "Edit album: ' in get and "defer { hold.end() }" in get
+    for call in ("client.getCover(path: path)", "client.getDiscArt(path: path)", "client.getLyrics(path: path)"):
+        assert call in get, call
+    assert "run.failed(error, admin: admin)" in get
+    # the other parts' previews wait for the read too - before anything is asked of the person signed in
+    assert get.index("if run.wrote {") < get.index("retag?.folderChanged()") < get.index("guard samePerson else")
+    assert "tags?.folderChanged()" in get
+    assert "unansweredGet = kind" in get and "AccessibilityNotification.Announcement(EditWords.mayHaveFinished)" in get
+    # a 404 or a refusal wrote nothing: nothing read; anything else read again, the page beneath asked again
+    assert get.index("guard samePerson else { return }") < get.index("guard run.wrote else { return }")
+    assert get.index("guard run.wrote else { return }") < get.index("await lookUp()") < get.index("wrote(before: before)")
+    # the maybe-finished line lasts until a read lands
+    look = body(edit, "func lookUp()")
+    assert look.index("case .landed:") < look.index("unansweredGet = nil") < look.index("settle()")

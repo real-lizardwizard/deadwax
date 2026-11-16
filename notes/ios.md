@@ -11380,3 +11380,125 @@ Not verified - only the phone can tell (docs/ios.md checks 330-334): the List's 
 draws it, the bottom bar beside the sheet's, the keyboard (numbers and punctuation, a field scrolled above it), the
 pictures' thumbnails and full screen, a long apply locked, VoiceOver and the largest text. Nothing has run against a
 real deadwax: the routes' answers are the contract test's real routes over a two-file folder.
+
+## Edit album's Artwork and Lyrics on the phone (Phase 8, slice 3 - 2026-11-16)
+
+The spec's 3.5 (notes/ios-specs/phase8-managing.md): Edit album's **Artwork** - the folder's cover, Get cover, its CD
+art in a grid, Get CD art - and **Lyrics** - the count, Get lyrics - on the phone, their WebAppRows gone; Delete
+album… is the one row left in the web app. On the `ios` branch after slice 2 (4452f5c); the app stays 0.13 (13);
+src/__init__.py untouched; no server or web change; the player engine has no diff.
+
+### Core (DeadwaxCore)
+
+- **GetResults.swift** (new): lib/getResults.ts (`GETTING`, `GET_FAILED`, `getProblem` - ErrorWords with the Get's
+  own lead and the page's Try again, the error's own words in brackets for whoever runs deadwax - `lyricsResult`),
+  lib/lyrics.ts (`describeLyrics`, `lyricsOnDisk`), the three buttons as components/LibraryParts.tsx draws them -
+  when each is offered (`offersCover`, `hasOwnDiscArt`, `offersDiscArt`, `offersLyrics(album, ran:)`) and its words
+  by its last run (`label`) - and the two tabs' lines lib/albumEdit.ts has held since 2.1.30 (`coverNote`,
+  `coverPointer`, `discArtPointer`, `lyricsLine`, `allLyricsNote`, `COVER_MISSING`, `DISC_ART_BESIDE`,
+  `NO_DISC_ART`, `RETIME_POINTER`), the headings and VoiceOver's words. `GetRun` is LibraryParts' `run` - keyed to
+  the folder it ran for - with the phone's outcome split: `working`, `none` (a 404: a fact, Look again), `failed` (a
+  refusal: nothing written), `unanswered` (no answer, or a 5xx: it may have written - RetagFlow.outcome's rule, as
+  Release's apply), `done`; `wrote` is done or unanswered. `LyricsSummary` (fetch_album_lyrics' counts, loose),
+  `LyricsFetchBody` (LyricsRequest, `replace` and `retime` always false), `DiscArtFetchBody` (DiscArtRequest),
+  `DiscArtFetched`.
+- **EditClient.swift / Routes.swift**: `getCover` (POST `/library/art/fetch` with `replace: false` and no
+  `release_mbid` - GetArtButton's body: the folder's own release), `getLyrics` (POST `/library/lyrics/fetch`),
+  `getDiscArt` (POST `/library/disc_art/fetch`) and `libraryDiscArt` (GET `/library/disc_art?album&file`, a 404 as
+  nil) - 76 routes. Timeouts, worked out from the server's own (tests/test_ios_edit_parts_contract.py does the sum):
+  **Get lyrics 600 s** - LRCLIB's two asks for a track's artist name (connect 10 + read 30 each), CONCURRENCY 2 at
+  once, a 12-track album: 6 x 80 = 480, and a margin; **Get CD art 360** - the Archive's listing (55), fanart.tv's
+  (25), and four discs' pictures at the slower source's 55: 300, and a margin; a CD art picture 30, as the cover.
+  Get cover is the cover alone's route and wait (120). A longer album may outlast its wait: then it is said as maybe
+  finished and the folder read again, never asked again unseen.
+- **EditWords.inWebAppLine** names Delete album… alone: "Delete album… opens the album in the web app, in Safari,
+  until the app has it."
+
+**Held to the web**: ios/scripts/export-edit-parts-vectors.cjs gains an artwork section - lib/getResults.ts and
+lib/lyrics.ts compiled and run over 21 made errors (the web's own ApiError, fetch's TypeError, a TimeoutError, any
+Error) x three kinds x admin or not (126), 46 lyrics summaries (six fixed, 40 seeded), albumEdit.ts's lines over 81
+made folders (the art, the release, a dozen CD art listings including Turkish dotted capitals, the counts), and
+LibraryParts.tsx's three buttons - when each is drawn and the JSX of its words, read by pattern and hashed into
+made_from, so a change there fails the sim. The fixture is 387 KB. EditPartsVectorTests replays it (5 tests more).
+
+### The app (ios/App/Edit/)
+
+- **ArtworkLyricsPages.swift** (new): `ArtworkPage` - **Cover**: the folder's cover at 96 pt (a tap: FullCover's
+  folder source, full screen) or the empty square, `coverNote` beside it, `GetButton(.cover)` when offered, and the
+  pointer as a row - pushing **Compare covers** (with a cover) or **Release** (no release); **CD art**: `NO_DISC_ART`,
+  or `DISC_ART_BESIDE` over a `LazyVGrid` of `DiscArtPicture`s (`/library/disc_art` for each of the scan's
+  `disc_art`, square on the empty cover, a thumbnail at 360 px) with their names, each a button opening FullCover's new
+  `.discArt` source; `GetButton(.disc)` when offered, the pointer (a row to Release with no release, else the words).
+  `LyricsPage` - `lyricsLine`, `GetButton(.lyrics)` while offered (and after a run, saying what it came to),
+  `allLyricsNote`, and `RETIME_POINTER` as the section's footer. `GetButton` - the label by the run, a spinner while
+  it works, the line it left under it. `GetWait` - over both pages: "deadwax may have finished this - looking again"
+  after an unanswered Get until a read lands, and Couldn't read the library with Look again.
+- **EditAlbumModel**: `runs` (one GetRun per kind), `run(kind)` (only the held folder's), `getting`, `canGet`
+  (in reach, an album, no write - `writing` takes `getting` through `applying` - no mark, the scan not being read, and
+  the Release's `needsRead` clear: the folder read since the last write or gap), `unansweredGet` (cleared when a read
+  lands). `get(kind)`: a BackgroundHold ("Edit album: Get cover"...), the route, `GetRun.done`/`failed`; anything that
+  may have written tells Release's and Tags' flows the folder changed (their previews wait for the read), then -
+  still the person the sheet opened for - says it (VoiceOver: maybe finished, or the line), reads the folder again and
+  asks the album page beneath again (`wrote(before:)`: now, and once Navidrome has scanned). A 404 or a refusal reads
+  nothing.
+- **One write at a time**: Release's Apply and the cover alone are dimmed (and guarded) while a Get runs, Tags'
+  through `model.writing`; a Get is dimmed while any of them runs. Close is off while a Get runs, as for an apply
+  (`applying`), and the sheet can't be swiped away.
+- **The root**: Artwork ("Cover, CD art") and Lyrics ("8 of 12") are NavigationLinks under Edit, as Tags is; the Edit
+  section has no footer now; Delete album…'s section always has the web-app line under it.
+
+### Decided here, and where the phone departs from the spec
+
+- **The re-timing pointer is words, not a row**: the spec asked for a row to Server settings > Lyrics with Settings
+  and the log. Server settings is still the web app's (Phase 8's slice 8), so a row could only open Safari at the
+  settings page, not its Lyrics group; the web's own sentence ("…see Lyrics in Server settings (Library).") says where.
+- **The pointers name the phone's pages**: the web's "in the Release tab (Compare full size…)" is "on the Release page
+  (Compare covers…)" (`GetResults.onThePhone`), and each pointer that names a page is a row pushing it - Compare
+  covers with a cover, Release with no release; "deadwax never replaces CD art it saved." stays words.
+- **No cover is the web's line** ("No cover is saved with the album."), not the spec's "No cover", beside the empty
+  square - the root's row keeps "No cover".
+- **A Get that never answered (or answered a 5xx) reads the folder again** and says "deadwax may have finished this -
+  looking again" over the page, as Release's apply does; the web just says the error. Its button still says Try again
+  (the web's), and the route's own words stay under it. A cancellation counts as unanswered, as a write's does.
+- **A Get is a write**: off while another write, a mark or a read after a write runs, and Close off while it runs - the
+  web lets you close its panel mid-Get. Kept to slice 1's review rule (one write at a time, nothing drops the held
+  album mid-write).
+- **Get cover says nothing on success** (as the web, whose button goes once the scan has the cover) - the cover
+  appearing is the answer; Get CD art likewise (its pointer appears). VoiceOver hears only the failures and Get lyrics'
+  line.
+- **CD art pictures aren't cached across openings**: each grid asks deadwax for its thumbnails (the route keeps them five
+  minutes in a browser; the phone's transport keeps nothing). They're small, and a grid is rarely more than four.
+- **The web's `&v=` cache-buster isn't sent** with a CD art picture (the server takes only `album` and `file`, and the
+  phone keeps no cache to bust).
+
+### Tests
+
+- **EditPartsVectorTests** (16, 5 more): the words; each of the 81 folders' lines, offers and the phone's pointers;
+  the 126 Get problems through errors remade as the app meets them; the 46 summaries; each button's words by state.
+- **GetResultsTests** (new, 5): each Get's body (the web's, never replacing) and answer, its timeout; a CD art picture
+  asked by name, a 404 as nothing, a 500 thrown; answers missing fields read as nothing; how a run ended decides
+  whether the folder is read again (404 none, 400 failed, timeout and 500 unanswered); the offers.
+- **tests/test_ios_edit_parts_contract.py** (6 more, 15): the bodies within LyricsRequest and DiscArtRequest, and
+  Get cover's the cover alone's body, none replacing anything; a real lyrics fetch over the real folder (LRCLIB faked) answering every field
+  LyricsSummary reads, the scan's count after it, a second fetch asking only the missing track and keeping the .lrc,
+  a refusal's 400; Get cover's 404 for a release with none, 502 unreachable, then the cover written and the scan
+  saying so; Get CD art (the Archive faked) answering DiscArtFetched, the picture served by name and refused by any
+  other, a second Get refused with its words, nothing on the Archive a 404; the timeouts from the server's constants;
+  the permissions.
+- **tests/test_ios_edit_parts.py** (5 more, 11): the root's rows and the one web app row left; Artwork's cover, grid,
+  full screens and offers; Lyrics' lines and the footer; GetButton, GetWait and canGet; `get()`'s background task,
+  read-again and sign-out order.
+- test_ios_edit.py (one WebAppRow - Delete album…; the cover alone off during a Get), test_ios_contract.py (76
+  routes), ClientTests (76 routes and the timeouts).
+
+### Verified, and not
+
+On the Mac: `swift test` (1786 Core tests in 189 suites, 158 Audio in 17, 12 more, all passing); the unsigned
+generic-iOS Debug build, BUILD SUCCEEDED; the full pytest suite, 4681 passed and 1 skipped; all 92 sims with Node 22
+(iosedit running both exporters' `--check`).
+
+Not verified - only the phone can tell (docs/ios.md checks 335-337): the grid in a List row at every width and text
+size, the thumbnails and full screen, Get cover's cover appearing on the album page after Navidrome scans, LRCLIB's
+real answers (synced or plain), a long Get lyrics locked, VoiceOver and the largest text. Nothing has run against a
+real deadwax, LRCLIB, the Cover Art Archive or fanart.tv: the routes' answers are the contract test's real routes over
+a two-file folder with those three faked.

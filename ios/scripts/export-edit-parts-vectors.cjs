@@ -4,8 +4,10 @@
  * Tags - the fields, what a selection holds in each, the edits sent, what a value can't be, the line under a field, a
  * track's number, and a track's page (lib/tagEdit.ts, lib/trackInspector.ts over lib/trackFields.ts, lib/albumEdit.ts
  * trackLabel) - with the words components/TrackTagEditor.tsx and app/EditPanel.tsx's TagsList say, read out of their
- * sources by pattern; written as a fixture the Swift port (ios/DeadwaxKit/Sources/DeadwaxCore/TagEdit.swift,
- * TrackInspector.swift) replays in Tests/DeadwaxCoreTests/EditPartsVectorTests.swift.
+ * sources by pattern; and Artwork and Lyrics (slice 3) - lib/getResults.ts and lib/lyrics.ts run over made errors and
+ * summaries, albumEdit.ts's lines over made folders, and components/LibraryParts.tsx's three Get buttons (when each is
+ * drawn, its words) read by pattern; written as a fixture the Swift port (ios/DeadwaxKit/Sources/DeadwaxCore/
+ * TagEdit.swift, TrackInspector.swift, GetResults.swift) replays in Tests/DeadwaxCoreTests/EditPartsVectorTests.swift.
  *
  * Compiles the libraries with the repo's TypeScript and runs them AS THEY ARE over made inputs, plain to awkward (a
  * value with JavaScript's own white space round it, digits that aren't ASCII, a date of "July 2022", 1000 characters
@@ -42,7 +44,7 @@ const FIXTURE = path.join(REPO, 'ios', 'DeadwaxKit', 'Tests', 'DeadwaxCoreTests'
 const CHECK = process.argv.includes('--check')
 const MADE_BY = 'ios/scripts/export-edit-parts-vectors.cjs'
 const SOURCES = ['lib/tagEdit.ts', 'lib/trackInspector.ts', 'lib/trackFields.ts', 'lib/format.ts', 'lib/libraryTree.ts',
-  'lib/albumEdit.ts', 'lib/errorWords.ts']
+  'lib/albumEdit.ts', 'lib/errorWords.ts', 'lib/getResults.ts', 'lib/lyrics.ts']
 const EDITOR = 'components/TrackTagEditor.tsx'
 const PANEL = 'app/EditPanel.tsx'
 
@@ -347,6 +349,152 @@ const inspectorWords = {
   pictureLabel: compiled(['picture'], `return (${piece('app/TrackInspector.tsx', /aria-label=\{(`\$\{picture\.label\} - see it full size`)\}/, "a picture's label")[1]})`)({ label: 'Front cover' }),
 }
 
+/* ===== Artwork and Lyrics: lib/getResults.ts, lib/lyrics.ts, albumEdit.ts's lines, and LibraryParts.tsx's buttons ===== */
+
+const PARTS = 'components/LibraryParts.tsx'
+const { ApiError } = require(path.join(OUT, 'api/http.js'))
+
+//? when each button is drawn, and what a 404 is - read as LibraryParts writes them
+says(PARTS, 'if (album.art || !album.release_mbid) return null', 'Get cover offered')
+const offersCoverOf = (album) => !(album.art || !album.release_mbid)
+says(PARTS, 'if (!mine && album.lyrics_count >= album.track_count) return null', 'Get lyrics offered')
+const offersLyricsOf = (album, ran) => !(!ran && album.lyrics_count >= album.track_count)
+const hasOwnOf = compiled(['album'], `return ${piece(PARTS, /const hasOwn = (\(album\.disc_art \?\? \[\]\)\.some\(\(name\) => name\.toLowerCase\(\)\.startsWith\('disc'\)\))/, 'own CD art')[1]}`)
+says(PARTS, 'if (!album.release_mbid || hasOwn) return null', 'Get CD art offered')
+const offersDiscOf = (album) => !(!album.release_mbid || hasOwnOf(album))
+const noneOn404 = "const state = caught instanceof ApiError && caught.status === 404 ? 'none' : 'failed'"
+if (source(PARTS).split(noneOn404).length !== 3) throw new Error(`ui/src/${PARTS} no longer says a 404 is none for both covers`)
+madeFrom[`ui/src/${PARTS} a 404 is none`] = sha256(noneOn404)
+
+//? the buttons' words, as the JSX picks them
+says(PARTS, "{state === 'working' ? <Loading label={GETTING.cover} /> : state === 'none' ? 'Look again' : state === 'failed' ? 'Try again' : 'Get cover'}", 'the cover button')
+says(PARTS, "{mine?.state === 'working'\n          ? <Loading label={GETTING.lyrics} />\n          : summary\n            ? `Lyrics \u00b7 ${lyricsOnDisk(summary)} of ${album.track_count}`\n            : mine?.state === 'failed' ? 'Try again' : 'Get lyrics'}", 'the lyrics button')
+says(PARTS, "{mine?.state === 'working'\n          ? <Loading label={GETTING.disc} />\n          : mine?.state === 'none' ? 'Look again' : mine?.state === 'failed' ? 'Try again' : 'Get CD art'}", 'the CD art button')
+const G = require(path.join(OUT, 'lib/getResults.js'))
+const L = require(path.join(OUT, 'lib/lyrics.js'))
+function labelOf(kind, state, summary, tracks) {
+  if (kind === 'cover') return state === 'working' ? G.GETTING.cover : state === 'none' ? 'Look again' : state === 'failed' ? 'Try again' : 'Get cover'
+  if (kind === 'disc') return state === 'working' ? G.GETTING.disc : state === 'none' ? 'Look again' : state === 'failed' ? 'Try again' : 'Get CD art'
+  return state === 'working' ? G.GETTING.lyrics : summary ? `Lyrics \u00b7 ${L.lyricsOnDisk(summary)} of ${tracks}` : state === 'failed' ? 'Try again' : 'Get lyrics'
+}
+
+const artworkWords = {
+  GETTING: G.GETTING,
+  GET_FAILED: G.GET_FAILED,
+  COVER_MISSING: E.COVER_MISSING,
+  DISC_ART_BESIDE: E.DISC_ART_BESIDE,
+  NO_DISC_ART: E.NO_DISC_ART,
+  RETIME_POINTER: E.RETIME_POINTER,
+  cover: piece(PANEL, /<h3 id="app-edit-cover" class="app-edit-heading">(Cover)<\/h3>/, 'the cover heading')[1],
+  discArt: piece(PANEL, /<h3 id="app-edit-disc" class="app-edit-heading">(CD art)<\/h3>/, 'the CD art heading')[1],
+  lyrics: piece(PANEL, /<h3 id="app-edit-lyrics" class="app-edit-heading">(Lyrics)<\/h3>/, 'the lyrics heading')[1],
+  seeCover: piece(PANEL, /aria-label="(See the cover full size)"/, 'the cover full size')[1],
+  seeDiscArt: compiled(['name'], `return (${piece(PANEL, /aria-label=\{(`\$\{name\} - see it full size`)\}/, 'a CD art picture full size')[1]})`)('disc2.png'),
+}
+
+const ART = ['', 'file', 'embedded']
+const DISC_ART = [[], ['disc.jpg'], ['cd.jpg'], ['Disc2.PNG'], ['cd.jpg', 'disc1.png'], ['DISC.jpg'], ['xdisc.jpg'],
+  ['d\u0130sc.jpg'], ['\u0130disc.png'], ['disc'], ['cdart.png', 'disc10.webp'], ['Disc.Jpg', 'disc2.jpg']]
+const COUNTS = [[0, 0], [0, 1], [1, 1], [3, 12], [11, 12], [12, 12], [13, 12], [0, 12], [1, 2]]
+function artAlbums() {
+  const out = []
+  for (const art of ART) for (const release_mbid of ['', 'b84ee12a-09ef-421b-82de-0441a926375b']) for (const disc_art of DISC_ART) {
+    const [lyrics_count, track_count] = COUNTS[out.length % COUNTS.length]
+    out.push({ art, release_mbid, disc_art, lyrics_count, track_count })
+  }
+  for (const [lyrics_count, track_count] of COUNTS) out.push({ art: 'file', release_mbid: 'x', disc_art: [], lyrics_count, track_count })
+  return out.map((album) => ({
+    album,
+    coverNote: E.coverNote(album.art),
+    coverPointer: E.coverPointer(album),
+    discArtPointer: E.discArtPointer(album),
+    lyricsLine: E.lyricsLine(album.lyrics_count, album.track_count),
+    allLyricsNote: E.allLyricsNote(album),
+    offersCover: offersCoverOf(album),
+    hasOwnDiscArt: hasOwnOf(album),
+    offersDiscArt: offersDiscOf(album),
+    offersLyrics: [false, true].map((ran) => offersLyricsOf(album, ran)),
+  }))
+}
+
+/** An error as the web meets it - its own ApiError (message `detail || "METHOD path failed"`), fetch's TypeError,
+ *  a TimeoutError, or any other Error - and the spec the Swift remakes it from. */
+function madeError(spec) {
+  if (spec.answer) {
+    const a = spec.answer
+    return new ApiError(a.status, a.detail ?? null, `POST ${a.path} failed`, false, null, a.why ?? null, a.path)
+  }
+  if ('offline' in spec) return new TypeError(spec.offline)
+  if ('timeout' in spec) return Object.assign(new Error(spec.timeout), { name: 'TimeoutError' })
+  return new Error(spec.other)
+}
+const answered = (status, detail, route, why) => ({ answer: { status, path: route, ...(detail === null ? {} : { detail }), ...(why ? { why } : {}) } })
+const GET_ERRORS = [
+  answered(404, 'the Cover Art Archive has no front cover for that release', '/library/art/fetch'),
+  answered(404, 'no CD art on the Cover Art Archive for this release - a fanart.tv key in Server settings adds another source', '/library/disc_art/fetch'),
+  answered(404, 'no CD art on the Cover Art Archive for this release, or on fanart.tv for the album', '/library/disc_art/fetch'),
+  answered(502, "the Cover Art Archive couldn't be reached - try again", '/library/art/fetch'),
+  answered(502, "the CD art couldn't be downloaded from fanart.tv - try again", '/library/disc_art/fetch'),
+  answered(400, 'this album already has CD art: disc.jpg', '/library/disc_art/fetch'),
+  answered(400, 'not tagged with a MusicBrainz release - match it to one first', '/library/disc_art/fetch'),
+  answered(400, 'that album is not inside the library', '/library/lyrics/fetch'),
+  answered(400, 'LIBRARY_PATH is not set', '/library/art/fetch'),
+  answered(500, 'Error fetching the cover art: [Errno 28] No space left on device', '/library/art/fetch'),
+  answered(500, null, '/library/lyrics/fetch'),
+  answered(504, null, '/library/lyrics/fetch'),
+  answered(502, null, '/library/disc_art/fetch'),
+  answered(403, "That needs Edit albums, which an admin hasn't given you.", '/library/art/fetch'),
+  answered(401, 'Sign in to use deadwax.', '/library/lyrics/fetch'),
+  answered(404, 'Not Found', '/library/lyrics/fetch'),
+  answered(422, 'album_path: Field required', '/library/disc_art/fetch'),
+  { offline: 'Failed to fetch' },
+  { offline: 'Load failed' },
+  { timeout: 'signal timed out' },
+  { other: 'Unexpected token < in JSON at position 0' },
+]
+function getProblems() {
+  const out = []
+  for (const error of GET_ERRORS) for (const kind of ['cover', 'disc', 'lyrics']) for (const admin of [false, true]) {
+    out.push({ error, kind, admin, said: G.getProblem(madeError(error), kind, admin) })
+  }
+  return out
+}
+
+function summaries() {
+  const fixed = [
+    { written: 0, replaced: 0, kept: 0, instrumental: 0, missing: 0, failed: 0, untagged: 0, synced: 0 },
+    { written: 1, replaced: 0, kept: 0, instrumental: 0, missing: 0, failed: 0, untagged: 0, synced: 1 },
+    { written: 3, replaced: 2, kept: 4, instrumental: 1, missing: 2, failed: 1, untagged: 1, synced: 5 },
+    { written: 0, replaced: 0, kept: 12, instrumental: 0, missing: 0, failed: 0, untagged: 0, synced: 0 },
+    { written: 0, replaced: 0, kept: 0, instrumental: 0, missing: 0, failed: 3, untagged: 0, synced: 0 },
+    { written: 2, replaced: 0, kept: 0, instrumental: 0, missing: 0, failed: 0, untagged: 0, synced: 1 },
+  ]
+  for (let n = 0; n < 40; n++) {
+    const summary = {}
+    for (const key of ['written', 'replaced', 'kept', 'instrumental', 'missing', 'failed', 'untagged']) summary[key] = pick([0, 0, 1, 2, 7])
+    summary.synced = between(0, summary.written + summary.replaced)
+    fixed.push(summary)
+  }
+  return fixed.map((summary) => ({
+    summary,
+    described: L.describeLyrics(summary),
+    result: G.lyricsResult(summary),
+    onDisk: L.lyricsOnDisk(summary),
+  }))
+}
+
+function buttonLabels() {
+  const out = []
+  for (const kind of ['cover', 'disc', 'lyrics']) {
+    const states = kind === 'lyrics' ? ['idle', 'working', 'done', 'failed'] : ['idle', 'working', 'none', 'failed']
+    for (const state of states) for (const tracks of [1, 12]) {
+      const summary = state === 'done' ? { written: 2, replaced: 1, kept: 4, instrumental: 0, missing: 1, failed: 0, untagged: 0, synced: 2 } : undefined
+      out.push({ kind, state, tracks, ...(summary ? { summary } : {}), label: labelOf(kind, state, summary, tracks) })
+    }
+  }
+  return out
+}
+
 /* ===== written ===== */
 
 const out = {
@@ -361,6 +509,13 @@ const out = {
     plans: plans(),
   },
   inspector: { words: inspectorWords, tracks: inspector() },
+  artwork: {
+    words: artworkWords,
+    albums: artAlbums(),
+    problems: getProblems(),
+    summaries: summaries(),
+    labels: buttonLabels(),
+  },
 }
 fs.rmSync(OUT, { recursive: true, force: true })
 
@@ -376,7 +531,7 @@ function ascii(json) {
 const flat = (value) => ascii(JSON.stringify(value))
 
 const fixture = {
-  about: "Edit album's other parts (lib/tagEdit.ts, lib/trackInspector.ts, lib/trackFields.ts, lib/albumEdit.ts run as they are; components/TrackTagEditor.tsx's, app/EditPanel.tsx's and app/TrackInspector.tsx's words read out of their sources): Tags - the fields, shared values, edits, problems, notes, numbers and a track's page.",
+  about: "Edit album's other parts (lib/tagEdit.ts, lib/trackInspector.ts, lib/trackFields.ts, lib/albumEdit.ts run as they are; components/TrackTagEditor.tsx's, app/EditPanel.tsx's and app/TrackInspector.tsx's words read out of their sources): Tags - the fields, shared values, edits, problems, notes, numbers and a track's page; Artwork and Lyrics (lib/getResults.ts, lib/lyrics.ts, components/LibraryParts.tsx's buttons) - when each Get is offered, its words, what it came to, and the pages' lines.",
   made_by: MADE_BY,
   made_from: Object.fromEntries(Object.keys(madeFrom).sort().map((key) => [key, madeFrom[key]])),
   ...out,
@@ -392,7 +547,8 @@ const body = [
   '',
 ].join('\n')
 
-const counted = `${out.tags.problems.length} problems, ${out.tags.notes.length} notes, ${out.tags.edits.length} edits, ${out.inspector.tracks.length} tracks`
+const counted = `${out.tags.problems.length} problems, ${out.tags.notes.length} notes, ${out.tags.edits.length} edits, ${out.inspector.tracks.length} tracks, `
+  + `${out.artwork.albums.length} albums, ${out.artwork.problems.length} Get problems, ${out.artwork.summaries.length} lyrics summaries`
 if (CHECK) {
   if (!fs.existsSync(FIXTURE) || fs.readFileSync(FIXTURE, 'utf8') !== body) {
     console.log(`Edit album's parts' fixture differs from what the web app's TypeScript answers now: ${path.relative(REPO, FIXTURE)}.`)

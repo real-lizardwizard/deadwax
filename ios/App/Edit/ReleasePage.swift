@@ -182,7 +182,7 @@ struct ReleasePage: View {
                 }
                 .frame(maxWidth: .infinity)
             }
-            .disabled(!retag.canApply || model.tagsApplying)
+            .disabled(!retag.canApply || model.tagsApplying || model.getting)
         }
     }
 
@@ -442,7 +442,7 @@ struct CompareCoversView: View {
                     }
                     // only once the pressing's cover has come (what it saves is what was looked at), no write under
                     // way, and the folder read since the last gap or write (RetagFlow.canSaveCover)
-                    .disabled(incoming == nil || !retag.flow.canSaveCover || model.tagsApplying)
+                    .disabled(incoming == nil || !retag.flow.canSaveCover || model.tagsApplying || model.getting)
                     if let result = retag.coverResult {
                         Text(result)
                             .font(Typeface.footnote)
@@ -495,12 +495,14 @@ struct CompareCoversView: View {
 }
 
 /// A cover opened full screen from Compare covers: the folder's as it is, or the pressing's from the relay at its
-/// largest - and (slice 2) a picture inside a track, from a track's page.
+/// largest - and (slice 2) a picture inside a track, from a track's page; (slice 3) a CD art picture beside the tracks,
+/// from Artwork.
 struct FullCover: Identifiable {
     enum Source {
         case folder(String, Double)
         case release(String)
         case picture(path: String, file: String, index: Int)
+        case discArt(path: String, file: String)
     }
 
     let id = UUID()
@@ -517,6 +519,12 @@ struct FullCoverView: View {
     /// A picture fetched for itself (not a cover) that couldn't be.
     @State private var failed = false
 
+    /// What VoiceOver says of it: a CD art picture by its name, anything else as the cover.
+    private var label: String {
+        if case .discArt(_, let file) = cover.source { return file }
+        return EditWords.coverFullScreen
+    }
+
     var body: some View {
         ZStack {
             Color.black.ignoresSafeArea()
@@ -524,7 +532,7 @@ struct FullCoverView: View {
                 Image(uiImage: image)
                     .resizable()
                     .scaledToFit()
-                    .accessibilityLabel(EditWords.coverFullScreen)
+                    .accessibilityLabel(label)
             } else if failed {
                 Text(EditWords.pictureFailed)
                     .foregroundStyle(.primary)
@@ -550,6 +558,10 @@ struct FullCoverView: View {
                                                             size: ArchiveCoverSize.hero)
             case .picture(let path, let file, let index):
                 let data = try? await client.trackPicture(path: path, file: file, index: index)
+                image = data.flatMap { UIImage(data: $0) }
+                failed = image == nil
+            case .discArt(let path, let file):
+                let data = try? await client.libraryDiscArt(path: path, file: file)
                 image = data.flatMap { UIImage(data: $0) }
                 failed = image == nil
             }

@@ -204,7 +204,7 @@ def test_a_failed_read_is_said_with_look_again():
     release = code(RELEASE)
     assert "if retag.flow.readFailed {" in release and "ReadAgainFailed(model: model)" in release
     # the cover alone: off while the folder is to be read again or a write runs
-    assert ".disabled(incoming == nil || !retag.flow.canSaveCover || model.tagsApplying)" in release
+    assert ".disabled(incoming == nil || !retag.flow.canSaveCover || model.tagsApplying || model.getting)" in release
 
 
 def test_a_cancellation_is_neither_failure_nor_answer():
@@ -266,11 +266,11 @@ def test_nothing_in_edit_album_opens_a_url_but_the_web_app_rows():
             assert word not in text, f"{path.name} has {word}"
     # the rows still in the web app are WebAppRow's (its own openURL.webApp, which says if iOS refuses it)
     sheet = code(SHEET)
-    assert sheet.count("WebAppRow(") == 3
-    for part in ("AlbumEdit.Part.artwork.label", "AlbumEdit.Part.lyrics.label", "EditWords.deleteAlbum"):
-        assert f"WebAppRow(label: {part}" in sheet, part
-    # Tags is the phone's own since slice 2 (tests/test_ios_edit_parts.py)
-    assert "WebAppRow(label: AlbumEdit.Part.tags.label" not in sheet
+    assert sheet.count("WebAppRow(") == 1
+    assert "WebAppRow(label: EditWords.deleteAlbum" in sheet
+    # Tags is the phone's own since slice 2, Artwork and Lyrics since slice 3 (tests/test_ios_edit_parts.py)
+    for part in ("tags", "artwork", "lyrics"):
+        assert f"WebAppRow(label: AlbumEdit.Part.{part}.label" not in sheet, part
 
 
 def test_the_scan_is_the_editors_own_and_asked_without_tracks():

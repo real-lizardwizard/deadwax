@@ -19,6 +19,10 @@ enum EditPage: Hashable {
     case track(String)
     /// Edit tags: the fields of the tracks chosen, what would change, Apply.
     case editTags
+    /// Artwork: the cover and CD art, and their Gets.
+    case artwork
+    /// Lyrics: how many tracks have them, and Get lyrics.
+    case lyrics
 }
 
 /// Edit album (notes/ios-specs/phase8-managing.md 3.2; the web's EditPanel, its title): a sheet over the tabs, its own
@@ -131,6 +135,10 @@ struct EditPageView: View {
                 if let tags = model.tags { TrackPageView(model: model, tags: tags, filename: filename, path: $path) }
             case .editTags:
                 if let tags = model.tags { EditTagsView(model: model, tags: tags) }
+            case .artwork:
+                if let album = model.album { ArtworkPage(model: model, album: album) }
+            case .lyrics:
+                if let album = model.album { LyricsPage(model: model, album: album) }
             }
         }
         .editOutOfReach(!model.online)
@@ -138,7 +146,7 @@ struct EditPageView: View {
 }
 
 /// Edit album's root: the album's header, then its sections - the Folder menu with several folders, Needs a look, Edit
-/// (Release, Tags, and the editors still in the web app), Delete album… - each by the person's permissions (Core's
+/// (Release, Tags, Artwork, Lyrics), Delete album… (still the web app's) - each by the person's permissions (Core's
 /// Managing.albumEdit and AlbumEdit.marksFine). Without an album, what AlbumEdit.status says, with Look again and
 /// Choose the folder; several folders by name alone, the Folder menu alone, "Which folder is this album?" over it.
 struct EditAlbumRoot: View {
@@ -242,17 +250,18 @@ struct EditAlbumRoot: View {
                         Text(EditWords.tracks(album.trackCount))
                     }
                 }
-                if let url = webURL {
-                    WebAppRow(label: AlbumEdit.Part.artwork.label, line: EditWords.artworkValue(album), url: url,
-                              live: model.online)
-                    WebAppRow(label: AlbumEdit.Part.lyrics.label, line: EditWords.lyricsValue(album), url: url,
-                              live: model.online)
+                NavigationLink(value: EditPage.artwork) {
+                    LabeledContent(AlbumEdit.Part.artwork.label) {
+                        Text(EditWords.artworkValue(album))
+                    }
+                }
+                NavigationLink(value: EditPage.lyrics) {
+                    LabeledContent(AlbumEdit.Part.lyrics.label) {
+                        Text(EditWords.lyricsValue(album))
+                    }
                 }
             } header: {
                 Text(EditWords.edit)
-                    .font(Typeface.footnote)
-            } footer: {
-                Text(EditWords.inWebAppLine)
                     .font(Typeface.footnote)
             }
         }
@@ -260,15 +269,13 @@ struct EditAlbumRoot: View {
             Section {
                 WebAppRow(label: EditWords.deleteAlbum, url: url, live: model.online)
             } footer: {
-                if !edit.editors {
-                    Text(EditWords.inWebAppLine)
-                        .font(Typeface.footnote)
-                }
+                Text(EditWords.inWebAppLine)
+                    .font(Typeface.footnote)
             }
         }
     }
 
-    /// The editors not yet on the phone open the album in the web app: its page there, else (a folder opened from
+    /// Delete album…, not yet on the phone, opens the album in the web app: its page there, else (a folder opened from
     /// Choose the folder, no album page behind it) the web app's Library.
     private var webURL: URL? {
         if let subject = model.subject { return Managing.albumURL(id: subject.id, at: server.address) }

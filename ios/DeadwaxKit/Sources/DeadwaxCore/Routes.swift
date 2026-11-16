@@ -175,6 +175,11 @@ public enum Routes {
     public static let tagsPreview = Endpoint(method: "POST", path: "/deadwax/library/tags/preview", query: [])
     public static let tagsApply = Endpoint(method: "POST", path: "/deadwax/library/tags/apply", query: [])
     public static let trackPicture = Endpoint(method: "GET", path: "/deadwax/library/tracks/picture", query: ["album", "file", "index"])
+    // Edit album's Artwork and Lyrics (Phase 8, slice 3): Get lyrics and Get CD art for the folder (Edit albums'; each
+    // chooses nothing, so it needs no preview), and one CD art picture beside the tracks, by the folder and its name
+    public static let lyricsFetch = Endpoint(method: "POST", path: "/deadwax/library/lyrics/fetch", query: [])
+    public static let discArtFetch = Endpoint(method: "POST", path: "/deadwax/library/disc_art/fetch", query: [])
+    public static let libraryDiscArt = Endpoint(method: "GET", path: "/deadwax/library/disc_art", query: ["album", "file"])
 
     /// The levels spec's name for `levelAlbum`: the album's levels warmed before its first play.
     public static var warmLevels: Endpoint { levelAlbum }
@@ -208,6 +213,7 @@ public enum Routes {
         libraryTracks,
         libraryAlbums, releases, release, retagPreview, retagApply, artFetch, libraryArt, queueIgnore, queueUnignore,
         tagsPreview, tagsApply, trackPicture,
+        lyricsFetch, discArtFetch, libraryDiscArt,
     ]
 
     /// The routes given longer than the transport's own 8 seconds to answer, in seconds: the album index reads every
@@ -247,8 +253,13 @@ public enum Routes {
     /// MAX_EDITS), as a retag's preview does, so it is given a retag preview's 60; its apply reads them again and
     /// writes each changed one, then the scan's cache and the store index's row - no network, no wait, no bound of its
     /// own - so it is given twice that; a track's picture a read of one file - tests/test_ios_edit_parts_contract.py
-    /// holds each.
-    public static let timeouts: [Endpoint: Double] = [albumIndex: 30, autoEqSearch: 20, autoEqProfile: 20, libraryOwned: 30, fullySearch: 20, releaseGroup: 60, searchArtists: 20, searchSongs: 20, artistFacts: 60, discography: 60, jobs: 20, cancelJob: 30, retryJob: 60, retryJobSame: 30, clearJobs: 30, storeState: 20, findCandidates: 300, enqueue: 300, joinJob: 60, libraryAdd: 60, libraryTracks: 30, libraryAlbums: 120, releases: 60, release: 60, retagPreview: 60, retagApply: 480, artFetch: 120, libraryArt: 30, queueIgnore: 20, queueUnignore: 20, tagsPreview: 60, tagsApply: 120, trackPicture: 30]
+    /// holds each. Artwork's and Lyrics' (slice 3): Get lyrics asks LRCLIB for every track without lyrics, two at a time
+    /// (src/lyrics.py CONCURRENCY), each by its exact lookup and then a search (10 s to connect and 30 s to answer
+    /// apiece), so a disc of twelve tracks takes 480 s at worst - given 600, and one still longer is said as maybe
+    /// finished (Get lyrics only adds, so asking again is harmless); Get CD art lists the release's images on the
+    /// Cover Art Archive (55 s), else asks fanart.tv (25 s), then fetches each disc's picture (55 s) - a box of four
+    /// discs 300 s at worst, given 360; a CD art picture a read of one file.
+    public static let timeouts: [Endpoint: Double] = [albumIndex: 30, autoEqSearch: 20, autoEqProfile: 20, libraryOwned: 30, fullySearch: 20, releaseGroup: 60, searchArtists: 20, searchSongs: 20, artistFacts: 60, discography: 60, jobs: 20, cancelJob: 30, retryJob: 60, retryJobSame: 30, clearJobs: 30, storeState: 20, findCandidates: 300, enqueue: 300, joinJob: 60, libraryAdd: 60, libraryTracks: 30, libraryAlbums: 120, releases: 60, release: 60, retagPreview: 60, retagApply: 480, artFetch: 120, libraryArt: 30, queueIgnore: 20, queueUnignore: 20, tagsPreview: 60, tagsApply: 120, trackPicture: 30, lyricsFetch: 600, discArtFetch: 360, libraryDiscArt: 30]
 }
 
 /// The Cover Art Archive's thumbnail sizes the app asks deadwax's relay for (`Routes.archiveCover`'s `size`, which takes
