@@ -1819,3 +1819,24 @@ address, exception or WireGuard in the line anyone reads; where whoever runs dea
 answers an **Explained** (`{"detail", "why"}`, the status unchanged) and the sign-in screen folds the why under
 **For whoever runs deadwax**. The whole write-up - the words, the classes the app says errors by, who sees the
 detail - is notes/app.md's "Errors and connections in a listener's words (2.0.4)".
+
+### It's fine as it is, Look after the library's (2.1.29)
+
+Edit album's **It's fine as it is** and **Ask about it again** (`MetadataEditor.tsx`) were offered to anyone in the
+editor, but their routes - `POST /library/queue/ignore` and `/unignore` - are Look after the library's (`LIBRARY` in
+src/routes/library.py, ROUTES "library"), so someone given Edit albums alone tapped them into a 403. Found writing
+the iPhone app's Phase 8 spec (notes/ios-specs/phase8-managing.md on `ios`, decision 2), and James chose, 2026-11-16:
+the buttons only with Look after the library, on the phone and on the web - marking an album fine takes it out of
+Needs a look, the admin's queue, which is Look after the library's call, not an editor's.
+
+- **The rule** is `marksFine(perms)` in `lib/albumEdit.ts` (pure, permissions.sim.cjs: true with `library` alone,
+  never with every other permission but it). EditPanel hands the release editor `onIgnore` and `onUnignore` only when
+  it holds; both are optional on MetadataEditor, and each button is drawn only when its handler is there
+  (app-rules.sim.cjs reads both off the source). The issues and their hints, and the "Marked fine: …" line, are still
+  said to everyone in the editor: they say what to fix. The server was always right; nothing there changed.
+- **Why `albumEdit.ts` and not `permissions.ts`'s `albumEdit()`**: the ios branch's managing exporter hashes
+  `lib/permissions.ts` whole (iosmanaging.sim.cjs fails on any change to it until the fixture is written again and
+  ManagingVectorTests follow), and three more replay parts of it, where `albumEdit.ts` is replayed by none yet -
+  Phase 8's slice 1 exporter (`export-edit-vectors.cjs`) will take `albumEdit.ts`, this rule with it.
+- **Not verified**: the panel drawn in a browser as someone with Edit albums alone (the sims read the source, the
+  rule is run).

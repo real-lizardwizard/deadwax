@@ -13,7 +13,7 @@ import { useLibrary } from '../hooks/useLibrary'
 import { useTrackDetails } from '../hooks/useTrackDetails'
 import {
   EDIT_SETTLE_MS, EDIT_SLIDE_MS, FOLLOW_LOOKS_MS, deletesAll, editFolders, editStatus, folderOnly, followRelease, followsTo, needsChoice,
-  cancelDeleteTo, editTabs, tabAfter, trackLabel,
+  cancelDeleteTo, editTabs, marksFine, tabAfter, trackLabel,
   type EditAlbum, type EditTab,
 } from '../lib/albumEdit'
 import { panelIsModal, type PanelStyle } from '../lib/appFrame'
@@ -249,8 +249,11 @@ export function EditPanel({
   //? a new editor for each album and folder: the release editor keeps itself across an apply
   const [session, setSession] = useState(0)
   //? (2.0.0-player.61) the tabs this person may use: the editors with Edit albums, Delete with Look after the library
-  const allowed = albumEdit(useAccess().permissions)
+  const permissions = useAccess().permissions
+  const allowed = albumEdit(permissions)
   const shownTabs = editTabs(allowed.editors, allowed.delete)
+  //? (2.1.29) It's fine as it is and Ask about it again: Look after the library's, as their routes are
+  const fine = marksFine(permissions)
   const firstTab: EditTab = shownTabs[0]?.id ?? 'release'
   const [chosenTab, setTab] = useState<EditTab>(firstTab)
   //? a tab a permission taken away hides: the first one left
@@ -898,8 +901,8 @@ export function EditPanel({
                   queue={queue}
                   onClose={closeFromEditor}
                   onApplied={releaseApplied(request, subject)}
-                  onIgnore={ignoreAlbum}
-                  onUnignore={unignoreAlbum}
+                  onIgnore={fine ? ignoreAlbum : undefined}
+                  onUnignore={fine ? unignoreAlbum : undefined}
                 />
               </div>
 

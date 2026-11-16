@@ -38,6 +38,7 @@
  */
 
 import { foldName } from './owned'
+import type { Permissions } from './permissions'
 import { matchesTyped } from './typedMatch'
 
 /** What the panel reads of the id bridge's answer (api/types.ts StoreAlbumResponse). */
@@ -70,6 +71,16 @@ export const EDIT_TABS: readonly { id: EditTab; label: string }[] = [
  *  albums, Delete with Look after the library - in EDIT_TABS' order. */
 export function editTabs(editors: boolean, remove: boolean): readonly { id: EditTab; label: string }[] {
   return EDIT_TABS.filter((entry) => (entry.id === 'delete' ? remove : editors))
+}
+
+/** (2.1.29) Whether Edit album offers "It's fine as it is" and, for what was marked fine, "Ask about it again": with
+ *  Look after the library - the permission their routes need (POST /library/queue/ignore and /unignore, LIBRARY in
+ *  src/routes/library.py). Marking an album fine takes it out of Needs a look, the admin's queue: Look after the
+ *  library's call, not an editor's (James, 2026-11-16 - the iPhone app's Phase 8, decision 2). They were offered to
+ *  anyone in the editor, so Edit albums alone tapped them into a refusal. What the album still has, and what was
+ *  marked fine, are said to everyone in the editor either way. */
+export function marksFine(perms: Permissions): boolean {
+  return perms.has('library')
 }
 
 /** Where Delete's Cancel (and its Escape) goes back to: the first tab shown that isn't Delete - or, when Delete is

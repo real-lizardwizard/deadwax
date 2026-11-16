@@ -1895,6 +1895,15 @@ console.log('\nediting an album on a desktop: the Edit panel, a side panel by th
       /chooseFolder\(path\)\s*focusNext\.current = toTab\(tab\)/.test(panel),
       /editOpener\.current = document\.querySelector<HTMLElement>\(`\.app-pane\[data-tab="\$\{nav\.tab\}"\] \.app-edit-toggle\[aria-pressed="true"\]`\)/.test(app)],
     [true, true, true, true, true, true, true])
+  //? (2.1.29, the iPhone app's Phase 8 decision 2) queue/ignore and unignore are Look after the library's routes
+  const editor = code(read('components/MetadataEditor.tsx'))
+  check("It's fine as it is and Ask about it again handed to the release editor only by marksFine - and drawn only when handed",
+    [/const fine = marksFine\(permissions\)/.test(panel), /onIgnore=\{fine \? ignoreAlbum : undefined\}/.test(panel),
+      /onUnignore=\{fine \? unignoreAlbum : undefined\}/.test(panel), /onIgnore=\{ignoreAlbum\}|onUnignore=\{unignoreAlbum\}/.test(panel),
+      /\{onIgnore && issues\.length > 0 && \(\s*<button\b[^>]*class="columns-toggle-button metadata-ignore-button"/.test(editor),
+      /\{onUnignore && \(\s*<button\b[^>]*class="metadata-issue-undo"/.test(editor),
+      (editor.match(/metadata-ignore-button|metadata-issue-undo/g) ?? []).length],
+    [true, true, true, false, true, true, 2])
   check('the main page\'s editors, reused - not rewritten, nor copied',
     ['MetadataEditor', 'TrackTagEditor', 'DeleteAlbumDialog', 'LibraryParts'].map((name) => new RegExp(`from '\\.\\./components/${name}'`).test(panel)),
     [true, true, true, true])

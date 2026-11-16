@@ -70,11 +70,12 @@ interface Props {
   onApplied: (newPath: string) => void
   /**
    * Accept this album as it is. Given the codes on screen rather than left to the server, so
-   * it can only ever mute what you were actually shown.
+   * it can only ever mute what you were actually shown. Absent without Look after the library
+   * (lib/albumEdit.ts marksFine, 2.1.29), and its button with it.
    */
-  onIgnore: (album: LibraryAlbum, issues: string[]) => Promise<void>
-  /** Put an ignored album back into the queue. */
-  onUnignore: (album: LibraryAlbum) => Promise<void>
+  onIgnore?: ((album: LibraryAlbum, issues: string[]) => Promise<void>) | undefined
+  /** Put an ignored album back into the queue - absent, and its button with it, as onIgnore is. */
+  onUnignore?: ((album: LibraryAlbum) => Promise<void>) | undefined
 }
 
 /** The fields you can type into. Everything else comes from the release you pick. */
@@ -661,6 +662,7 @@ export function MetadataEditor(
   }
 
   const ignore = async () => {
+    if (!onIgnore) return
     setIgnoring(true)
     try {
       await onIgnore(album, issues)
@@ -709,14 +711,16 @@ export function MetadataEditor(
                   <span class="text default-muted">
                     Marked fine: {markedFine.map((code) => issueLabel(code, issueTypes)).join(', ')}
                   </span>
-                  <button
-                    type="button"
-                    class="metadata-issue-undo"
-                    title="Put this album back in Needs a look"
-                    onClick={() => void onUnignore(album)}
-                  >
-                    Ask about it again
-                  </button>
+                  {onUnignore && (
+                    <button
+                      type="button"
+                      class="metadata-issue-undo"
+                      title="Put this album back in Needs a look"
+                      onClick={() => void onUnignore(album)}
+                    >
+                      Ask about it again
+                    </button>
+                  )}
                 </span>
               )}
             </div>
@@ -1001,9 +1005,10 @@ export function MetadataEditor(
               Accepting an album as it is. Offered wherever the editor is opened from, not just
               in queue mode: deciding a bootleg will never be in MusicBrainz is a thing you
               realise while looking at it, and making you find a different button for that would
-              mean the queue keeps asking.
+              mean the queue keeps asking. (2.1.29) Only with Look after the library, whose call it
+              is: without it there is no onIgnore, and no button.
             */}
-            {issues.length > 0 && (
+            {onIgnore && issues.length > 0 && (
               <button
                 type="button"
                 class="columns-toggle-button metadata-ignore-button"

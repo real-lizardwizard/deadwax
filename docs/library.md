@@ -62,7 +62,10 @@ For an album that's right as it is (a bootleg that will never be on MusicBrainz,
 as it is**, in **Edit → Release**, marks it fine: it stops being flagged for the issues it has now.
 It's still flagged if something new goes wrong, such as the cover going missing. Such an album leaves
 the queue, and **Needs a look → Marked fine** lists it, so it can always be opened again - to undo
-that with **Ask about it again**, fix it after all, or delete it ([below](#needs-a-look)).
+that with **Ask about it again**, fix it after all, or delete it ([below](#needs-a-look)). Taking an
+album out of **Needs a look** is Look after the library's call, so both buttons are there for an admin
+and for someone given Look after the library; someone given Edit albums alone still sees the album's
+issues, and what was marked fine, but not the buttons.
 
 ### Not in Navidrome
 
