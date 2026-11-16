@@ -3687,9 +3687,11 @@ with Wi-Fi off. 237-243 want logins on, and 241 two accounts (one an admin); 244
 
 ### The Library's top under the Dynamic Island's check (249)
 
-**Not done yet.** This comes with the build that lays the Library's top out under the status bar (still app 0.13
-(13)). The first build of it (282e9b9) still had the row in the island's strip; the build after that one makes the row
-measure where it is on the screen and come down by what it lacks of the window's own top safe area.
+**Partly done (15 Nov).** This comes with the build that lays the Library's top out under the status bar (still app
+0.13 (13)). The first build of it (282e9b9) still had the row in the island's strip; the build after that one (267ea8f)
+makes the row measure where it is on the screen and come down by what it lacks of the window's own top safe area. On
+it, James: "the library top clears the island now" - the first sentence below. The rest of 249 (scrolling, Find, the
+offline banner, the largest text size, another phone, no jump as sheets and pages come and go) is not done yet.
 
 - **249 Clear of the Dynamic Island.** Open the Library: the magnifying glass, the switch and the ••• sit wholly
   below the Dynamic Island and the status bar's time and battery, none of them touching it, with the bar's colour

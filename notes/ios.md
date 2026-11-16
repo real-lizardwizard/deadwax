@@ -10062,9 +10062,10 @@ nothing, no inset or no number nothing, above the screen at most the inset; kept
 `test_the_librarys_top_sits_under_the_status_bar` holds the padding, the measure and its order, and KeyWindow's use by
 both; the tab bar's test reads the bottom through KeyWindow.
 
-**Not verified** - only the phone can tell: that the row now clears the island (check 249), and no jump as sheets,
-Now Playing and pushed pages come and go. If it still doesn't clear, a screenshot says whether the row is measured
-wrong or drawn where it is measured.
+**Verified on the phone (15 Nov)**: James, on 267ea8f's build: "the library top clears the island now" - so the
+safe area SwiftUI gave the Library's views really was short of the window's, and measuring against the window is what
+works. Why SwiftUI's was short is still not known. **Not verified**: the rest of check 249 - no jump as sheets, Now
+Playing and pushed pages come and go, Find, the offline banner, the largest text size, a phone with a notch or an SE.
 
 ## The tab bar, lower (15 Nov)
 
