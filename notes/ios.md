@@ -10034,6 +10034,38 @@ Library as the only page hiding the navigation bar, and the four views that reac
 pytest. **Not verified** - only the phone can tell: the row clear of the island, the fill behind the status bar, Find
 and the banner under the row, at the normal and the largest text sizes (docs/ios.md check 249).
 
+### The Library's top, measured (15 Nov, the second time)
+
+James, on 282e9b9 (the VStack above in it): "it looks good, but the library's top still doesn't clear the dynamic
+island". The row was laid out in SwiftUI's safe area twice - an inset on the pager, then a VStack - and stood in the
+island's strip both times on his iPhone 17 Pro on iOS 27.2. Nothing in the app's own code takes the top safe area away
+(every `ignoresSafeArea` that reaches the top is a fill, the test above holds them), so the safe area the Library's views
+are given there isn't the screen's, for a reason inside SwiftUI and the TabView with iOS's bars hidden that can't be
+found without the phone, or a simulator - which the rules rule out.
+
+- **What it does now**: the row no longer trusts that safe area. LibraryTop measures where its own top is on the screen
+  (`proxy.frame(in: .global).minY`, through `onGeometryChange`, with its safe area's top in the measured value too so a
+  change of it measures again) and pads its row down by whatever of the key window's top safe area (`KeyWindow`,
+  about 62 points on an iPhone 17 Pro, 20 with a Home button) that top doesn't clear - Core's `TopClearance.extra`.
+  Laid out as it should be, under the status bar, that is 0, so a layout that was right stays right. The padding is
+  inside the view measured, so coming down never moves what it measures: no loop.
+- **Kept, not followed down**: `TopClearance.kept` keeps the larger of the room kept and the room measured, so a
+  measurement taken with the screen drawn smaller under a sheet (iOS's presentation can shrink what's under it) never
+  lifts the row back into the strip for the moment the sheet is up and drops it as it goes. A new window inset (the
+  only thing that can make less room right - the app is portrait only) starts it afresh.
+- **KeyWindow** (ios/App/Shared): the key window's safe area, shared with MainTabs's home indicator room - the window's,
+  never a view's, as that one already was.
+- **The banner and the pages** follow the row down, as the VStack has them; Find's field opens under the row as before.
+
+**Tests**: TopClearanceTests (Core: the row at the top edge comes down the inset, part way the rest, already clear
+nothing, no inset or no number nothing, above the screen at most the inset; kept under a sheet, afresh with a new inset);
+`test_the_librarys_top_sits_under_the_status_bar` holds the padding, the measure and its order, and KeyWindow's use by
+both; the tab bar's test reads the bottom through KeyWindow.
+
+**Not verified** - only the phone can tell: that the row now clears the island (check 249), and no jump as sheets,
+Now Playing and pushed pages come and go. If it still doesn't clear, a screenshot says whether the row is measured
+wrong or drawn where it is measured.
+
 ## The tab bar, lower (15 Nov)
 
 James: "there might be a little too much space below the bottom tab bar". AppTabBar was an overlay inside the safe

@@ -3659,7 +3659,8 @@ with Wi-Fi off. 237-243 want logins on, and 241 two accounts (one an admin); 244
 ### The Library's top under the Dynamic Island's check (249)
 
 **Not done yet.** This comes with the build that lays the Library's top out under the status bar (still app 0.13
-(13)).
+(13)). The first build of it (282e9b9) still had the row in the island's strip; the build after that one makes the row
+measure where it is on the screen and come down by what it lacks of the window's own top safe area.
 
 - **249 Clear of the Dynamic Island.** Open the Library: the magnifying glass, the switch and the ••• sit wholly
   below the Dynamic Island and the status bar's time and battery, none of them touching it, with the bar's colour
@@ -3667,7 +3668,9 @@ with Wi-Fi off. 237-243 want logins on, and 241 two accounts (one an admin); 244
   foot, never up behind the status bar. Tap the magnifying glass: Find's field opens under the row, the keyboard up,
   and the row stays put; type, Cancel. Swipe between the pages, and tap the switch: as before. Turn off Wi-Fi and
   WireGuard: the offline banner shows under the row, not over it. Do it all again at the largest text size. If you
-  can, try a phone with a notch, or an SE.
+  can, try a phone with a notch, or an SE. Open Now Playing, an album's •••, Find and a sheet (the switch's Edit
+  order), and close each: the row is where it was, with no jump as each goes. Push an album and swipe back: the row
+  doesn't move. If any of the row still touches the island, a screenshot of it says where it stands.
 
 ### The tab bar, lower's check (250)
 

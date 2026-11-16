@@ -98,12 +98,7 @@ struct MainTabs: View {
 
     /// The key window's bottom safe area (`home`'s), 0 before there is a window.
     @MainActor private static func windowHome() -> CGFloat {
-        let scenes = UIApplication.shared.connectedScenes.compactMap { (scene: UIScene) -> UIWindowScene? in
-            scene as? UIWindowScene
-        }
-        let windows = scenes.flatMap { (scene: UIWindowScene) -> [UIWindow] in scene.windows }
-        let window = windows.first { (window: UIWindow) -> Bool in window.isKeyWindow } ?? windows.first
-        return window?.safeAreaInsets.bottom ?? 0
+        KeyWindow.safeArea.bottom
     }
 
     /// What the app is looking at, as far as downloads go: nothing in the background or under the sign-in; a tab at

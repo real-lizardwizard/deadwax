@@ -444,6 +444,14 @@ def test_the_librarys_top_sits_under_the_status_bar():
     top = (APP / "Library" / "LibraryTop.swift").read_text(encoding="utf-8")
     assert top.count("ignoresSafeArea") == 1
     assert ".background {\n            Palette.tabBar\n                .ignoresSafeArea(.container, edges: .top)\n" in top
+    # the second time (15 Nov, "the library's top still doesn't clear the dynamic island"): the row measures where its
+    # own top is on the screen and comes down by what of the key window's top safe area that doesn't clear
+    # (TopClearance), its padding inside what it measures so coming down never moves it
+    assert ".padding(.top, clearance)" in top
+    assert "proxy.frame(in: .global).minY" in top and "KeyWindow.safeArea.top" in top
+    assert "TopClearance.extra(top: Double(top), windowTop: Double(window))" in top and "TopClearance.kept(" in top
+    assert top.index(".padding(.top, clearance)") < top.index(".onGeometryChange(")
+    assert "KeyWindow.safeArea.bottom" in (APP / "Root" / "MainTabs.swift").read_text(encoding="utf-8")
     sources = {path.relative_to(APP).as_posix(): path.read_text(encoding="utf-8") for path in APP.rglob("*.swift")}
     assert [name for name, text in sources.items() if ".toolbar(.hidden, for: .navigationBar)" in text] == [
         "Library/LibraryView.swift"]
@@ -490,7 +498,10 @@ def test_the_tab_bar_comes_down_into_the_home_indicators_room():
     assert order == sorted(order)
     assert ".environment(\\.tabBarRoom, keyboardUp ? 0 : CGFloat(TabBarFoot.room(content: barHeight, home: home)))" in tabs
     assert "AppTabBar(home: home)" in tabs and "barHeight = height" in tabs
-    assert "window?.safeAreaInsets.bottom ?? 0" in tabs
+    # the window's bottom safe area, never a view's (which counts the keyboard): KeyWindow's, shared with LibraryTop
+    assert "KeyWindow.safeArea.bottom" in tabs
+    key_window = (APP / "Shared" / "KeyWindow.swift").read_text(encoding="utf-8")
+    assert "window.isKeyWindow" in key_window and "return window?.safeAreaInsets ?? .zero" in key_window
     # (review) read again whenever SwiftUI lays the screen out anew, never only when the body happens to be
     assert "@State private var home: CGFloat = 0" in tabs and tabs.count("home = Self.windowHome()") == 2
     assert ".onGeometryChange(for: [CGFloat].self)" in tabs

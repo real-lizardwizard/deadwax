@@ -9,6 +9,11 @@ import SwiftUI
 /// round it, 16 pt in from each edge as the pages are - and, only while Find is open, its field under them, with
 /// Cancel. On --dw-tab-bar, as the tab bar is, running up under the status bar, a hairline of --dw-border at its foot;
 /// the offline banner under it (LibraryView).
+///
+/// The row measures itself (15 Nov, James, a second time: "the library's top still doesn't clear the dynamic island"):
+/// laid out in the safe area its views are given, it still stood in the island's strip on his iPhone 17 Pro, so it
+/// comes down by whatever of the window's own top safe area its top, as drawn on the screen, doesn't clear
+/// (TopClearance) - nothing, laid out as it should be.
 struct LibraryTop<Find: View, Switch: View, More: View>: View {
     /// Find is open: its field drawn under the row.
     let finding: Bool
@@ -21,6 +26,10 @@ struct LibraryTop<Find: View, Switch: View, More: View>: View {
     @ViewBuilder let more: More
 
     @Environment(\.displayScale) private var displayScale
+    /// How far the row comes down under the status bar and the island (TopClearance), kept while it shows.
+    @State private var clearance: CGFloat = 0
+    /// The window's top safe area `clearance` was worked out under.
+    @State private var windowTop: CGFloat = 0
 
     /// Between the circles' targets and the switch: their faces' 4 pt of target and this make 12 pt either side.
     private static var gap: CGFloat { 8 }
@@ -49,6 +58,7 @@ struct LibraryTop<Find: View, Switch: View, More: View>: View {
             }
         }
         .padding(.horizontal, Self.side)
+        .padding(.top, clearance)
         .padding(.bottom, finding ? 8 : 2)
         .frame(maxWidth: .infinity)
         .background {
@@ -60,6 +70,21 @@ struct LibraryTop<Find: View, Switch: View, More: View>: View {
                 .frame(height: 1 / max(displayScale, 1))
                 .accessibilityHidden(true)
         }
+        // where the row's own top is on the screen (its padding inside it, so coming down never moves it), and the safe
+        // area it is given - either changed, the room under the island worked out again
+        .onGeometryChange(for: [CGFloat].self) { (proxy: GeometryProxy) -> [CGFloat] in
+            [proxy.frame(in: .global).minY, proxy.safeAreaInsets.top]
+        } action: { (measured: [CGFloat]) -> Void in
+            clear(top: measured[0])
+        }
+    }
+
+    /// The row's top at `top` on the screen: it comes down by what of the key window's top safe area that doesn't clear.
+    private func clear(top: CGFloat) {
+        let window = KeyWindow.safeArea.top
+        let now = TopClearance.extra(top: Double(top), windowTop: Double(window))
+        clearance = CGFloat(TopClearance.kept(Double(clearance), now: now, windowChanged: window != windowTop))
+        windowTop = window
     }
 }
 
