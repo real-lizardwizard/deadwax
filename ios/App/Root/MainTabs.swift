@@ -2,8 +2,9 @@ import DeadwaxCore
 import SwiftUI
 import UIKit
 
-/// The app's tabs (D1), Library, Search (Phase 5), Requests (Phase 6) and You, each its own NavigationStack. Tapping the
-/// tab shown again pops it to its root (and, at its root, scrolls its list to the top - AppNavigation.select). With
+/// The app's tabs (D1), Library, Search (Phase 5), Requests (Phase 6) and Settings (the web's You, and the phone's until
+/// 16 Nov), each its own NavigationStack. Tapping the tab shown again pops it to its root (and, at its root, scrolls
+/// its list to the top - AppNavigation.select). With
 /// something queued the play bar is the top of the tab bar (MiniPlayerView, since 15 Nov), and a notice (D11) sits
 /// above them; Now Playing opens over everything.
 ///

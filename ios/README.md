@@ -22,8 +22,8 @@ tried again and cleared on the phone, a finished album opened or played from its
 what's on its way - and Get: an album you don't have got from its page, the store's word on the pressing under
 the button, Soulseek's sources in a sheet with each one's reasoning, the one picked in Requests from the tap, or
 picked for you with Pick the best source for me; a download somebody else asked for joined, a pressing in the
-collection added to your library, and You's When I tap Get, Quality floor and Format chosen on the phone - and
-Phase 7's Manage, the last of the plan: You's list of the managing tools you may use (editing an album, Needs a
+collection added to your library, and When I tap Get, Quality floor and Format chosen on the phone - and
+Phase 7's Manage, the last of the plan: the list of the managing tools you may use (editing an album, Needs a
 look, Library care, People, Server settings and the event log) and Change password, each opened in the web app in
 Safari, never rebuilt on the phone - kept on the `ios` branch while it's being built. Nothing of Phase 2, the
 lyrics, the EQ, the turntable, play history, Phase 3, Phase 4, Search, Requests, Get or Manage has been seen on an

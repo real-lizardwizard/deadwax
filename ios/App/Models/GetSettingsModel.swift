@@ -8,7 +8,7 @@ import Observation
 /// floor, a search is scored by the Format, and the store line under Get the album judges somebody else's download
 /// against the floor.
 ///
-/// - ASKED as You shows and on its pull, as the album you don't have shows, as the Sources sheet opens and before every
+/// - ASKED as Settings > Getting albums shows, on its pull and as deadwax comes back into reach, as the album you don't have shows, as the Sources sheet opens and before every
 ///   search it starts, so a Format changed on another device meanwhile is the one searched by (the web's `begin`); one
 ///   read at a time - an ask while one is out joins it. An answer in hand stands until the next lands.
 /// - (Slice 3) A CHOICE (`choose`) shows at once and is saved behind it: what shows is deadwax's last word with every
@@ -18,7 +18,7 @@ import Observation
 ///   deadwax - and come back - in the order they were asked. A read's answer is never older than a save before it.
 /// - `format()` is the web's formatPreferenceNow: a read out is waited for, else the value in hand at once, else deadwax
 ///   is asked and its word waited for - the defaults when it can't say (a Get then shows the sources, the safe way round).
-/// - A read that fails leaves what was known; with nothing known, You says deadwax didn't answer. Nothing is seeded from
+/// - A read that fails leaves what was known; with nothing known, Getting albums says deadwax didn't answer. Nothing is seeded from
 ///   this phone: the web seeds a person's first answer from the old main page's settings in its browser, and the phone
 ///   never had them (a save here marks them seeded on deadwax, as any save does).
 ///
@@ -91,7 +91,7 @@ final class GetSettingsModel {
                 self.readProblem = nil
             } catch {
                 guard epoch == self.epoch, !APIFailure.isCancellation(error) else { return }
-                // an answer in hand stands, said nothing against; with none, You says deadwax didn't answer
+                // an answer in hand stands, said nothing against; with none, Getting albums says deadwax didn't answer
                 if self.confirmed == nil { self.readProblem = error }
             }
         }

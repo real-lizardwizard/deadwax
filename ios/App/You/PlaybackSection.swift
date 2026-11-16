@@ -1,23 +1,37 @@
 import DeadwaxCore
 import SwiftUI
 
-/// You > Playback (screens.md 8): Gapless, which the phone can't turn off - its engine joins every song end to end,
-/// so the row says On and the line under it what that means (Open question 1) - and Normalization, the web's four
-/// choices with the web's names and notes (Core's Normalization: Off's note without "unless Maximum quality converts
-/// it", D3), Automatic by default.
+/// Settings > Playback (16 Nov, a page of its own - You's Playback section before; screens.md 8): PlaybackSection, and
+/// the EQ pushed from it as before. Everything on it is this phone's own, so nothing is asked of deadwax here.
+struct PlaybackPage: View {
+    var body: some View {
+        List {
+            PlaybackSection()
+        }
+        .navigationTitle(YouWords.playback)
+    }
+}
+
+/// Playback's choices (screens.md 8), in the web's order (You.tsx:296-320):
 ///
-/// The choice is PlayerModel's `normalization`, kept on this phone (UserDefaults, the web's key) and read at each
-/// play's tap - so it changes from the next thing played, never what is already queued (the footer says so). The
-/// rows are a radio group: one chosen, a tap picks, VoiceOver hears each choice's name, whether it is chosen, and its
-/// note.
+/// - **Gapless**, which the phone can't turn off - its engine joins every song end to end, so the row says On and the
+///   line under it what that means (Open question 1).
+/// - The turntable's two (turntable.md 6.1, app 0.6): **Now Playing opens as** - Cover or Turntable - and **Pause
+///   winds the record down**, each a Section with the web's note as its footer, less the note's last sentence about the
+///   web's desktop frame. Both DeckController's, kept on this phone under the web's keys.
+/// - **Normalization**, the web's four choices with the web's names (Core's Normalization: Off's note without "unless
+///   Maximum quality converts it", D3), Automatic by default. The choice is PlayerModel's `normalization`, kept on this
+///   phone (UserDefaults, the web's key) and read at each play's tap - so it changes from the next thing played, never
+///   what is already queued (the footer says so).
+/// - The **EQ** (eq.md 3.1, app 0.5): one row - "EQ", the output now under it, its short setting at the right - pushing
+///   the EQ page of the output now; its footer ends as Normalization's does, "This is kept on this phone."
 ///
-/// Between them, in the web's order (You.tsx:296-320), the turntable's two (turntable.md 6.1, app 0.6): "Now Playing
-/// opens as" - Cover or Turntable, a radio group as Normalization's is - and "Pause winds the record down", each a
-/// Section with the web's note as its footer, less the note's last sentence about the web's desktop frame. Both
-/// DeckController's, kept on this phone under the web's keys.
-///
-/// Then the EQ (eq.md 3.1, app 0.5): one row - "EQ", the output now under it, its short setting at the right - pushing
-/// the EQ page of the output now; its footer ends as Normalization's does, "This is kept on this phone."
+/// (16 Nov) Now Playing opens as and Normalization are each one row with the choice at its right, a menu of the
+/// choices (`.pickerStyle(.menu)`) - lists of ticks until then; James: "maybe some dropdowns instead of big lists".
+/// Normalization's choices each had a line of their own under their name: the chosen one's line now leads the footer,
+/// before the web's note, and VoiceOver hears it as the row's hint. The others' lines show only once chosen: the menu
+/// names each choice, nothing more. VoiceOver reads
+/// each row's name and its choice. The toggle stays a toggle.
 struct PlaybackSection: View {
     @Environment(PlayerModel.self) private var player
     @Environment(EQModel.self) private var eq
@@ -26,21 +40,21 @@ struct PlaybackSection: View {
     var body: some View {
         Section {
             LabeledContent(YouWords.gapless, value: YouWords.gaplessOn)
-        } header: {
-            Text(YouWords.playback)
-                .font(Typeface.footnote)
         } footer: {
             Text(YouWords.gaplessLine)
                 .font(Typeface.footnote)
         }
 
         Section {
-            ForEach(TurntableSettings.Look.allCases, id: \.self) { (look: TurntableSettings.Look) in
-                lookRow(look)
+            Picker(TurntableWords.opensAs, selection: Binding<TurntableSettings.Look>(get: { deck.opensAs },
+                                                                                   set: { (look: TurntableSettings.Look) -> Void in
+                                                                                       deck.opensAs = look
+                                                                                   })) {
+                ForEach(TurntableSettings.Look.allCases, id: \.self) { (look: TurntableSettings.Look) in
+                    Text(Self.name(look)).tag(look)
+                }
             }
-        } header: {
-            Text(TurntableWords.opensAs)
-                .font(Typeface.footnote)
+            .pickerStyle(.menu)
         } footer: {
             Text(TurntableWords.lookNote)
                 .font(Typeface.footnote)
@@ -56,15 +70,22 @@ struct PlaybackSection: View {
         }
 
         Section {
-            ForEach(Normalization.allCases, id: \.self) { choice in
-                row(choice)
+            Picker(Normalization.title, selection: Binding<Normalization>(get: { player.normalization },
+                                                                        set: { (choice: Normalization) -> Void in
+                                                                            player.normalization = choice
+                                                                        })) {
+                ForEach(Normalization.allCases, id: \.self) { (choice: Normalization) in
+                    Text(choice.label).tag(choice)
+                }
             }
-        } header: {
-            Text(Normalization.title)
-                .font(Typeface.footnote)
+            .pickerStyle(.menu)
+            // what the chosen one does, as its row's line said under it
+            .accessibilityHint(player.normalization.note)
         } footer: {
             Group {
                 VStack(alignment: .leading, spacing: 8) {
+                    // the chosen one's own line first: what it does
+                    Text(player.normalization.note)
                     Text(YouWords.normalizationNote)
                     Text(YouWords.kept)
                 }
@@ -92,54 +113,8 @@ struct PlaybackSection: View {
         }
     }
 
-    /// A look: its name, the checkmark on the chosen one (LookChoice.tsx's radio).
-    private func lookRow(_ look: TurntableSettings.Look) -> some View {
-        let chosen = deck.opensAs == look
-        let label = look == .turntable ? TurntableWords.lookTurntable : TurntableWords.lookCover
-        return Button {
-            deck.opensAs = look
-        } label: {
-            HStack(spacing: 12) {
-                Text(label)
-                    .foregroundStyle(.primary)
-                Spacer(minLength: 8)
-                Image(systemName: "checkmark")
-                    .font(Typeface.symbol(.body).weight(.semibold))
-                    .foregroundStyle(Palette.accent)
-                    .opacity(chosen ? 1 : 0)
-            }
-            .contentShape(Rectangle())
-        }
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel(label)
-        .accessibilityAddTraits(chosen ? [.isButton, .isSelected] : .isButton)
-    }
-
-    private func row(_ choice: Normalization) -> some View {
-        let chosen = player.normalization == choice
-        return Button {
-            player.normalization = choice
-        } label: {
-            HStack(alignment: .firstTextBaseline, spacing: 12) {
-                VStack(alignment: .leading, spacing: 3) {
-                    Text(choice.label)
-                        .foregroundStyle(.primary)
-                    Text(choice.note)
-                        .font(Typeface.footnote)
-                        .foregroundStyle(Palette.quiet)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-                Spacer(minLength: 8)
-                Image(systemName: "checkmark")
-                    .font(Typeface.symbol(.body).weight(.semibold))
-                    .foregroundStyle(Palette.accent)
-                    .opacity(chosen ? 1 : 0)
-            }
-            .contentShape(Rectangle())
-        }
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel(choice.label)
-        .accessibilityHint(choice.note)
-        .accessibilityAddTraits(chosen ? [.isButton, .isSelected] : .isButton)
+    /// A look's name (LookChoice.tsx's): Cover, Turntable.
+    private static func name(_ look: TurntableSettings.Look) -> String {
+        look == .turntable ? TurntableWords.lookTurntable : TurntableWords.lookCover
     }
 }

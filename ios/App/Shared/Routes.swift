@@ -3,13 +3,15 @@ import Observation
 import SwiftUI
 
 /// The app's tabs (D1): Library, Search (Phase 5 - phase5-search.md 3.1, question 1: the web's order, You at the end),
-/// Requests (Phase 6 - phase6-get-requests.md 3.1, question 1: the web's order less Home) and You. The one list of
-/// them: the tab bar draws `allCases` in this order and MainTabs builds a stack for each, so a tab is one case here,
-/// with its words and symbol below and its stack in MainTabs.
+/// Requests (Phase 6 - phase6-get-requests.md 3.1, question 1: the web's order less Home) and Settings - the web's You,
+/// and the phone's too until 16 Nov (the case keeps its name, `you`). The one list of them: the tab bar draws `allCases`
+/// in this order and MainTabs builds a stack for each, so a tab is one case here, with its words and symbol below and
+/// its stack in MainTabs.
 enum AppTab: Hashable, CaseIterable {
     case library
     case search
     case requests
+    /// Settings (YouWords.title), the web's You.
     case you
 
     /// Its words in the tab bar, and to VoiceOver.
@@ -18,7 +20,7 @@ enum AppTab: Hashable, CaseIterable {
         case .library: return "Library"
         case .search: return SearchWords.title
         case .requests: return RequestWords.tab
-        case .you: return "You"
+        case .you: return YouWords.title
         }
     }
 
@@ -29,7 +31,8 @@ enum AppTab: Hashable, CaseIterable {
         case .search: return "magnifyingglass"
         // the web's RequestsIcon: an arrow into an open box
         case .requests: return "square.and.arrow.down"
-        case .you: return "person.crop.circle"
+        // (16 Nov) Settings' gear, as iOS's own Settings has it - the person's circle was You's
+        case .you: return "gearshape"
         }
     }
 
@@ -52,14 +55,23 @@ enum AppRoute: Hashable {
     case albums(AlbumScope)
     /// The Library's Downloaded (Phase 2): every album on this phone, as an Albums screen - from the Library's •••.
     case downloaded
-    /// You > Downloads (Phase 2): what's on this phone, the two settings, what's on its way and what didn't arrive.
+    /// Settings > Downloads (Phase 2): what's on this phone, the two settings, what's on its way and what didn't arrive.
     case downloads
-    /// You's This phone > Server: the Server address screen, pushed.
+    /// Settings > This phone > Change address: the Server address screen, pushed.
     case serverAddress
-    /// You's Debug (admins only).
+    /// Settings > This phone > Debug (admins only).
     case debug
-    /// You > Playback > EQ, and the EQ's own pages (eq.md 3.1-3.2): the EQ page, an output's, the presets.
+    /// Settings > Playback > EQ, and the EQ's own pages (eq.md 3.1-3.2): the EQ page, an output's, the presets.
     case eq(EQRoute)
+    /// (16 Nov) Settings' own pages, each a row of its root (YouView): Getting albums (When I tap Get, Quality floor,
+    /// Format, Confirm before cancelling), Playback (Gapless, Now Playing opens as, Pause winds the record down,
+    /// Normalization, EQ), Account (logins on: Change password, Sign out), This phone (the address, Change address,
+    /// Debug) and About (the versions, Logins).
+    case gettingAlbums
+    case playback
+    case account
+    case thisPhone
+    case about
     /// One playlist's page (3.3), by Navidrome's playlist id. (The Playlists list itself is a page of the Library's
     /// switch since slice 3b, not a page pushed.)
     case playlist(PlaylistRoute)
@@ -225,7 +237,8 @@ final class AppNavigation {
     var search: [AppRoute] = []
     /// (Phase 6) The Requests tab's pages - the album a Done row opens, and anything it pushes.
     var requests: [AppRoute] = []
-    /// The You tab's pages.
+    /// The Settings tab's pages (16 Nov: its groups' pages - Getting albums, Playback, Downloads, Account, This phone,
+    /// About - and what they push). Tapped again, it goes back to its root as every tab does, then to the top.
     var you: [AppRoute] = []
     /// Now Playing is open (a full-screen cover over the tabs).
     var nowPlayingShown = false
@@ -424,6 +437,11 @@ extension View {
                 case .serverAddress: ServerAddressView()
                 case .debug: DebugView()
                 case .eq(let page): EQDestination(route: page)
+                case .gettingAlbums: GettingAlbumsPage()
+                case .playback: PlaybackPage()
+                case .account: AccountPage()
+                case .thisPhone: ThisPhonePage()
+                case .about: AboutPage()
                 case .playlist(let playlist): PlaylistView(route: playlist)
                 case .downloadedPlaylists: DownloadedPlaylistsScreen()
                 case .artist(let artist): ArtistView(route: artist)

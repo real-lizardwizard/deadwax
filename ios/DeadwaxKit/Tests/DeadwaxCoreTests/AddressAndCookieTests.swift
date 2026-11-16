@@ -42,6 +42,15 @@ import Testing
         let b = try ServerAddress.parse("deadwax.lan:8090").get()
         #expect(a.key == b.key)
     }
+
+    /// (16 Nov) Settings' This phone row: the name or IP alone, as typed - no scheme, port or path.
+    @Test func theHostIsTheNameOrIPAlone() throws {
+        #expect(try ServerAddress.parse("192.168.3.20:8090").get().host == "192.168.3.20")
+        #expect(try ServerAddress.parse("bearded-dragon:8090").get().host == "bearded-dragon")
+        #expect(try ServerAddress.parse("https://music.example.org/player/").get().host == "music.example.org")
+        #expect(try ServerAddress.parse("HTTP://Deadwax.Lan:8090/").get().host == "Deadwax.Lan")
+        #expect(try ServerAddress.parse("http://[fd00::20]:8090").get().host == "[fd00::20]")
+    }
 }
 
 @Suite struct SessionCookieTests {

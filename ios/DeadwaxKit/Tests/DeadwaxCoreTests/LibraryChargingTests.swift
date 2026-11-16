@@ -154,7 +154,7 @@ private func tasks(_ plan: [String: DownloadPlan.Decision], album: String) -> [S
 
     @Test func theWordsSayIt() {
         #expect(DownloadWords.wait(.charging) == "Waiting for the phone to charge")
-        #expect(DownloadWords.waitSetting(.charging, limit: .gb20) == "Only while charging is on - in You > Downloads.")
+        #expect(DownloadWords.waitSetting(.charging, limit: .gb20) == "Only while charging is on - in Settings > Downloads.")
         #expect(AutoDownloadWords.onlyWhileCharging == "Only while charging")
         #expect(AutoDownloadWords.chargingNote(.yours)
                 == "Your library's albums download only while the phone is charging. Albums you download yourself don't wait.")

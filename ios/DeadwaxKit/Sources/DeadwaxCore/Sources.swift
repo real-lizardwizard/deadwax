@@ -762,9 +762,10 @@ public enum Sources {
         "Nothing lossless found for \(queriesText(answer))."
     }
 
-    /// ...and under it, why - and where the setting is (`NOTHING_LOSSLESS_NOTE`).
+    /// ...and under it, why - and where the setting is (`NOTHING_LOSSLESS_NOTE`): the web's word for word but the tab's
+    /// name, the phone's Settings where the web's says You (16 Nov - GetVectorTests holds the one word that departs).
     public static let nothingLosslessNote =
-        "Some were found, but none with lossless files - your Format is Lossless only, which leaves the rest out. You can change it in You, under Getting albums."
+        "Some were found, but none with lossless files - your Format is Lossless only, which leaves the rest out. You can change it in Settings, under Getting albums."
 
     /// "41 sources", "1 source" (`sourcesCount`).
     public static func sourcesCount(_ count: Int) -> String { "\(count) \(count == 1 ? "source" : "sources")" }

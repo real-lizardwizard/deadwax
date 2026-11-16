@@ -41,11 +41,12 @@ import Testing
             let line = DownloadWords.waitSetting(wait, limit: .gb20)
             #expect((line != nil) == wait.isTheSettings, "\(wait)")
         }
-        #expect(DownloadWords.waitSetting(.wifi, limit: .gb20) == "Download over is Wi-Fi only - in You > Downloads.")
-        #expect(DownloadWords.waitSetting(.hotspot, limit: .gb20) == "Download over is Wi-Fi only - in You > Downloads.")
-        #expect(DownloadWords.waitSetting(.room, limit: .gb20) == "The storage limit is 20 GB - in You > Downloads.")
+        // (16 Nov) the tab You was is Settings
+        #expect(DownloadWords.waitSetting(.wifi, limit: .gb20) == "Download over is Wi-Fi only - in Settings > Downloads.")
+        #expect(DownloadWords.waitSetting(.hotspot, limit: .gb20) == "Download over is Wi-Fi only - in Settings > Downloads.")
+        #expect(DownloadWords.waitSetting(.room, limit: .gb20) == "The storage limit is 20 GB - in Settings > Downloads.")
         #expect(DownloadWords.controlMenuTitle(.waiting(.wifi, here: 0, of: 12), limit: .gb20, bytesHere: 0)
-                == "Waiting for Wi-Fi\nDownload over is Wi-Fi only - in You > Downloads.")
+                == "Waiting for Wi-Fi\nDownload over is Wi-Fi only - in Settings > Downloads.")
         #expect(DownloadWords.controlMenuTitle(.waiting(.queued, here: 0, of: 12), limit: .gb20, bytesHere: 0) == "Waiting to download")
         #expect(DownloadWords.controlMenuTitle(.downloaded(checking: false), limit: .gb20, bytesHere: 412_000_000) == "Downloaded \u{00B7} 412 MB")
         #expect(DownloadWords.controlMenuTitle(.downloading(here: 4, of: 12, fraction: 0.3), limit: .gb20, bytesHere: 0)

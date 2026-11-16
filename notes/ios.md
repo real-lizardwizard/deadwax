@@ -50,7 +50,8 @@ ios/
                             PlayerModel and its +Engine/+Resume, LoudnessBook, PlayReporter, LibraryModel,
                             AlbumIndexStore, AlbumModel, DebugModel), Root/ (the gates, MainTabs), Shared/
                             (Routes, CoverImage, ErrorNote, Notice), Library/, Album/, Player/, UpNext/,
-                            Info/, You/ (DebugView is Phase 0's test screen), EQ/ (app 0.5: EQModel,
+                            Info/, You/ (the Settings tab since 16 Nov, its root and pages; DebugView is
+                            Phase 0's test screen), EQ/ (app 0.5: EQModel,
                             EQStore, EQRouteReader, and the screens - EQScreen, EQCurveView (and slice 5's
                             handles), EQSliders, EQPresetsScreen, EQOutputViews, EQNameAlert, EQRoute;
                             slice 4's EQCorrectionScreen and EQProfileScreen; slice 5's EQFilterEditor,
@@ -10867,3 +10868,148 @@ Each of these follows the web unless it says otherwise.
 - the Studio only toggle's look in the heading, and the hidden toggle's few points;
 - the id bridge from this page on a real library;
 - VoiceOver.
+
+## Settings, pages like iOS Settings (2026-11-16)
+
+James: "also instead of "you", let's just use settings", and "with maybe some better organization, and maybe some
+dropdowns instead of big lists". Asked how to organize it, he chose **"Pages, like iOS Settings"**: a short list of
+groups at the top, each opening its own page, and on a page each choice one row with a menu, not a list of ticks. The
+app stays 0.13 (13); src/__init__.py untouched; no server change; the player engine has no diff. The web app keeps
+its You - the phone departs on purpose, and says so where the web's words are held. The managing tools stay the web
+app's in this change (other slices make them native); Needs a look's count isn't on the root yet.
+
+### What changed
+
+- **The tab is Settings**, drawn with `gearshape` (`person.crop.circle` was You's): AppTab.you's words are
+  `YouWords.title`, now "Settings", so the tab bar, VoiceOver's label, the Large Content Viewer and the root's title
+  all say it. The words that named the tab say Settings: the Download over / storage limit / only-while-charging
+  lines of an album's download menu ("- in Settings > Downloads."), Debug's two Your library lines, and the Sources
+  sheet's nothing-lossless note ("You can change it in Settings, under Getting albums."). Change password's line still
+  says "Opens the web app's You": it is about the web app's tab, which is still You.
+- **The root** (YouView) is the headline and its UNVERIFIED footer as before, then three groups:
+  - **Getting albums**, **Playback**, **Downloads** - one section, Downloads last so its footer (DownloadsFooter, split
+    out of DownloadsRow) sits under its row; Downloads keeps its size at the right.
+  - **Manage**: ManageSection exactly as it was - the rows Managing.tools gives, each a WebAppRow opening Safari, the
+    footer as before - only placed under the groups.
+  - **Account** (only with `YouLines.account`, logins on), **This phone** - the server's host at its right
+    (`ServerAddress.host`, new in Core: the name or IP alone, IPv6 in its brackets) - and **About**, the app's own
+    version at its right ("0.13 (13)", `YouView.appVersion`). Both values in the data face, as the pages draw them.
+- **Five new AppRoute cases**, `.gettingAlbums`, `.playback`, `.account`, `.thisPhone`, `.about`, drawn by
+  `appRoutes()` as GettingAlbumsPage, PlaybackPage, AccountPage, ThisPhonePage and AboutPage - each a List holding
+  the section that was You's, with the page's own title in place of the section's header (dropped where it would
+  only say the title again). Downloads, Change address, Debug and the EQ are pushed as before, now one page deeper.
+- **Every list of ticks is one menu Picker** (`.pickerStyle(.menu)`): Getting albums' When I tap Get (GetMode),
+  Quality floor (QualityFloor) and Format (FormatPreference.youOrder); Playback's Now Playing opens as
+  (TurntableSettings.Look) and Normalization; and, on Settings > Downloads, Download over (DownloadOver) - the one
+  tick list left on a Settings page, beside Storage limit, which was already a menu. The toggles (Confirm before
+  cancelling, Pause winds the record down) stay toggles. No `"checkmark"` or `.isSelected` is left in ios/App/You.
+- **What each choice's own line said moved into its section's footer, for the chosen one**: Normalization's
+  (`player.normalization.note`) and Download over's (`DownloadWords.over(...).note`) now lead their footers, before
+  the notes that were there, and are each Picker's `accessibilityHint` - so VoiceOver still hears what the chosen one
+  does on the control itself. Getting albums' choices and the two looks had no lines of their own; their footers are
+  as they were.
+- **Who asks what, and when.** The root asks /me the first time it shows and on its pull, as You did. Getting
+  albums' three are asked by **their page**: as it shows (`onAppear`), on its pull, and as deadwax comes back into reach
+  - the three things You did for the whole tab. The root no longer asks for them: it draws none, and Get asks for
+  itself (GroupView as the album you don't have shows, the Sources sheet before every search). About and Account ask
+  /me on their own pull, since both draw from it (About's error note is the place a failed /me is said).
+- **Tapped again**, the tab goes back to the root, then to the top - as it already did and as every tab does
+  (AppNavigation.select pops a non-empty stack, else bumps `youScrollToTop`, which YouView scrolls on). Nothing there
+  changed; with pages it now has somewhere to pop from.
+
+### Held to the web, and where the phone departs
+
+- **The tab's name**: export-you-vectors.cjs now reads the web's name for the tab out of lib/appRoutes.ts's
+  TAB_LABELS (`you: 'You'`, a new `made_from` piece) into you.json's `words.tab`, and writes a `departures` list
+  beside it, by hand: the tab's name, You on the web, Settings on the phone, since 2026-11-16 and why. ScreenYouTests'
+  `theTabIsSettingsWhereTheWebSaysYou` holds `YouWords.webTitle` to the web's word and `YouWords.title` to the
+  departure's, and fails if the two ever meet again. iosyou.sim.cjs still checks the fixture byte for byte (136 cases).
+- **The nothing-lossless note** (NOTHING_LOSSLESS_NOTE, held by get-vectors.json): GetVectorTests makes the web's
+  words the phone's by one named replacement, `GetVectors.phones` ("in You, under Getting albums" -> "in Settings,
+  under Getting albums", built from YouWords' two titles), used for the note and for every list's VoiceOver
+  announcement; `theTabsNameIsTheOneWord` asserts the web's note names You there exactly once, the phone's names
+  Settings, and that the replacement is the whole difference. The get fixture and its exporter are untouched (the web
+  didn't change).
+- The Download and Debug lines that said "You > Downloads" are the phone's own (no web counterpart): their tests now
+  say Settings.
+
+### Decided here (the ask was silent)
+
+- **Swift names kept**: `YouView`, `AppTab.you`, `AppNavigation.you` and `youScrollToTop`, `YouWords`, `YouLines`,
+  the section types and the file names under App/You - renaming them was a large diff for nothing a person sees.
+  RequestsWatch's tab string stays "you" (internal). New types: GettingAlbumsPage, PlaybackPage, AccountPage,
+  ThisPhonePage, AboutPage (AboutPage in YouView.swift, beside the About lines it took), DownloadsFooter.
+- **The order inside Playback is the web's**, as it was (Gapless, Now Playing opens as, Pause winds the record down,
+  Normalization, EQ) - not the mock's (Normalization, Turntable look, Gapless, EQ), which illustrated the pages, not an
+  order; and Gapless stays a value ("On"), never the mock's toggle: the phone can't turn it off (screens.md Open
+  question 1). The mock's "Turntable look Wood" is today's "Now Playing opens as" (Cover, Turntable) - no new setting.
+- **The root's order is the mock's**: Account, This phone, About (You had About before This phone).
+- **Before deadwax answers, a Getting albums row shows nothing**: its Picker carries a blank choice tagged nil only
+  while nothing is known, so the row's value is empty (no default claimed, as no tick was before) and SwiftUI has a tag
+  for the nil selection. The row is `.disabled` until deadwax answers and while it can't be reached; a choice already
+  chosen chooses nothing, as before.
+- **Values on the root**: This phone shows the host only (the full address is the page's), About the app's version
+  (deadwax's is "…" until /me answers). Getting albums and Playback carry none: their choices are long, and three
+  values on one row would only be cut short.
+- **A failed /me is said on About's page only**, where it was said before (under About). The root shows nothing of it
+  beyond what it always did (no identity line); its pull asks again. A Needs-a-look-style count or warning on the root
+  is left to the later slice.
+- **Account's page is empty** if a pull finds logins off while it's open (it draws from the same `YouLines.account`
+  as the root's row), rather than offering a Sign out there's nothing to sign out of.
+- **The guide**: docs/ios.md's You section is Settings now (the root, then Getting albums, Playback, and Downloads,
+  Account, This phone and About), "### You > Downloads" is "### Settings > Downloads" (its anchor with it), every
+  guide line naming the tab says Settings, and the iPhone's own Settings app is "the iPhone's Settings" where the two
+  could be mixed up (Background App Refresh). The numbered checks keep their words; one line at the top of the checks
+  says how to read "You > ..." in them, and 310-319 are the new layout's.
+
+### Tests
+
+- **tests/test_ios_settings.py** (new, 10), read from the Swift as the other iOS tests are: the tab's words and gear;
+  no `"You"` in the App's code and no Core string naming "You >", "in You" or "You, under" (Change password's line
+  about the web app's tab held as it is); the root's rows in order, the Downloads group with its footer, the two
+  values, nothing of the pages left on the root; Manage's rules and its WebAppRow; each page an AppRoute case drawn by
+  `appRoutes()` with its title; each page holding its section (Account, This phone with Debug for an admin, About's
+  error note, the EQ push); who asks what and when; every choice one menu Picker, no tick list left, the Getting
+  albums Picker's nil tag, disabling and guard; the chosen line first in Normalization's and Download over's footers
+  and their hints; and the tab tapped again popping, then scrolling.
+- **ScreenYouTests**: `theTabIsSettingsWhereTheWebSaysYou` (new); the new made_from piece. **GetVectorTests**:
+  `theTabsNameIsTheOneWord` (new); the note and the announcements through `GetVectors.phones`.
+  **AddressAndCookieTests**: `theHostIsTheNameOrIPAlone` (new). **DownloadWordsTests**, **LibraryChargingTests**:
+  Settings > Downloads.
+
+### Verified, and not
+
+Verified: `swift test` (all of DeadwaxKit: 1721 Core tests in 184 suites, 158 Audio, 12 more); the unsigned Debug
+device build - BUILD SUCCEEDED, no warning in any file touched (the only one is appintentsmetadataprocessor's, as on
+every build); the full pytest suite (4610 passed, 1 skipped), test_ios_settings.py's 10 among them; every `ui/test/ios*.sim.cjs` (20) with a writable TMPDIR, iosyou's `--check`
+against the regenerated fixture among them.
+
+Not verified - only the phone can tell (docs/ios.md checks 310-319):
+- How the menus look and behave in a List on iOS 27.2: the value and its chevrons at the row's right, the menu's tick
+  on the chosen one, a dimmed row before deadwax answers and offline, the blank value while nothing is known.
+- The long values at the largest text sizes ("Pick the best source for me" beside "When I tap Get"): wrapped or cut.
+- VoiceOver on a menu Picker: that it reads the name and the choice, the hint after it, and the new choice once
+  picked; that a disabled one is read as dimmed.
+- The root's two values beside their labels at every text size, and an IPv6 host.
+- That Getting albums' ask on the page's appearance fires again on coming back to the tab with the page shown (it did
+  for You's tab as a whole).
+- The pops: Settings tapped from the EQ (two pages deep) back to the root, then to the top.
+
+### After review (16 Nov)
+
+One review of 3185583 found no bug in the code (the menus' bindings, what asks when, the routes, the departure from the
+web's "You" recorded in the vectors) and these in the words, fixed in the commit after it:
+- **About keeps deadwax's last version.** ServerModel keeps `me` across a failed ask and restores it at launch, so About
+  shows the version deadwax last gave, with why it didn't answer under it - "Not known" only if it never has. The guide
+  and check 317 had said "Not known".
+- **The last "You"s naming the tab**: two in docs/ios.md's tables, troubleshooting.md's iPhone list, docs/README.md, the
+  READMEs' phase lines (the README now says the tab is Settings), GetSettingsModel's comments.
+- **"Settings" now names two things**, so every path into the iPhone's own Settings says so: "the iPhone's Settings >
+  Privacy & Security > Local Network" in HTTP.swift's words (what can't reach deadwax says), and every such path in
+  docs/ios.md.
+- **What's not claimed any more**: a menu names each choice and nothing more, so a choice's own line (Normalization's,
+  Download over's) shows only once it's chosen - before, each sat under its row. Apple's own Settings does the same; the
+  name says what each does, and the footer says the rest once chosen.
+- **Left as it is**: Getting albums' three are asked again on coming back into reach only while their page is open
+  (before, while the tab had been opened). Sources asks before every search and an album you don't have asks as it
+  shows, so nothing reads a stale floor or format for a Get.
