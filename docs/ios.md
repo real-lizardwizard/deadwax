@@ -58,7 +58,9 @@ Get lyrics on the phone. Then its **Delete**: what deleting the folder takes, re
 it's in, asked once more before it goes - and with it nothing in Edit album opens the web app any more. Then
 **the artist tools**, from an artist page's •••: **Artist images…**, every picture of them found, chosen and saved
 into their folder; **Which artist is this?**; and **Move albums to …**, their albums filed under an old name moved
-under the one they have now (see [Managing an artist](#managing-an-artist)).
+under the one they have now (see [Managing an artist](#managing-an-artist)). Then **Needs a look**: the albums that
+need fixing and the new downloads nobody has looked at, how many beside it in Settings > Manage, each worked through
+in Edit album with **Skip** and **Next album** (see [Needs a look](#needs-a-look)).
 
 **Nothing of Phase 2, the lyrics, the EQ, the turntable, play history, your library downloaded,
 playlists, artists, songs, Search, Requests, Get or Manage has been seen on an iPhone yet.** It's built and tested on a Mac,
@@ -522,7 +524,8 @@ page (turned off in Screen Time), the sheet says so under the link.
 
 **Edit album** is the web app's album editor, on the phone: which release the album on disk really is, and its tags
 and folder put right to match. It opens from an album page's top **•••** (**Edit album**, between Album info and
-Refresh) or from Settings > Manage > **Edit an album**, for someone who may edit albums - Edit albums or Look after the
+Refresh), from Settings > Manage > **Edit an album**, or from a row of [Needs a look](#needs-a-look) - with ‹, Skip and
+Next album at its foot to work through the list - for someone who may edit albums - Edit albums or Look after the
 library: an admin, or everyone with logins off. It's a sheet over the tabs, titled Edit album, laid out as iOS
 Settings is: a header, then rows that each open a page. **Close** is at its top left.
 
@@ -1857,14 +1860,14 @@ Account and About ask deadwax again when you pull them down, as the first screen
 ### Manage
 
 Settings > **Manage** is deadwax's tools for looking after it, as many of them as you may use. They're coming into the
-app one build at a time (Phase 8): **Edit an album** is the app's own now, and the rest still **open in the web app, in
-Safari** - the web app has every one of them laid out for a phone ([Looking after deadwax from a
+app one build at a time (Phase 8): **Edit an album** and **Needs a look** are the app's own now, and the rest still
+**open in the web app, in Safari** - the web app has every one of them laid out for a phone ([Looking after deadwax from a
 phone](player.md#looking-after-deadwax-from-a-phone)). Top to bottom, each only for someone who may use it:
 
 | row | who has it | opens |
 | --- | --- | --- |
 | **Edit an album** | Edit albums or Look after the library | **Choose the folder**, in the app: every album folder deadwax's library has, with a search at the top - tap one and [Edit album](#edit-album) opens for it. It's the way to a folder Navidrome doesn't list. An album's top **•••** has **Edit album** too ([An album's page](#an-albums-page)). |
-| **Needs a look** | Look after the library | Needs a look |
+| **Needs a look** | Look after the library | [**Needs a look**](#needs-a-look), in the app: the albums that need fixing and the new downloads nobody has looked at, worked through one after another in Edit album. How many albums it lists is at the row's right. |
 | **Library care** | Look after the library or Edit albums | Library care |
 | **People** | an admin, with logins on | People - unlock it with your own Navidrome password, as in the web app |
 | **Server settings** | Settings and the log | Server settings, at its first tab |
@@ -1877,8 +1880,9 @@ down. If an admin took a permission away since, the page it opens says "This pag
 given you - ask one if you need it." - and People, its own words: "Only an admin can open People - it comes with
 being a Navidrome admin."
 
-Under the rows: "Edit an album is the app's own; the others open in the web app, in Safari." (without Edit an album,
-"These open in the web app, in Safari."; with Edit an album alone, nothing) - and with logins on, "Safari has its own
+Under the rows: "Edit an album and Needs a look are the app's own; the others open in the web app, in Safari." (with
+Edit albums but not Look after the library, "Edit an album is the app's own; the others open in the web app, in
+Safari."; with neither, "These open in the web app, in Safari.") - and with logins on, "Safari has its own
 sign-in, apart from the app's: the first time, sign in there with the same name and password you use here. The pages
 open as whoever is signed in there, who may not be who's signed in here." Nothing hands the app's sign-in to Safari (it
 could only go in the address, where it would sit in Safari's history), so the first time a row opens, the web app's
@@ -1895,17 +1899,77 @@ Screen, it keeps a sign-in of its own, and the rows open in Safari, not in it.
 The rows open deadwax's address as the app has it, plain `http://` included: Safari opens it as it would the address
 typed (its address bar says Not Secure), over your Wi-Fi or WireGuard. If the phone's default browser isn't Safari,
 they open in that one instead. While deadwax can't be reached the rows that open Safari are dimmed and can't be
-tapped, and "These open once deadwax is back." says why; so is Change password. Edit an album still opens: Choose the
-folder says it needs deadwax, and reads the library once it's back. If iOS won't open the address at all - Safari
+tapped, and "These open once deadwax is back." says why; so is Change password. Edit an album and Needs a look still
+open: each says it needs deadwax, and reads the library once it's back. If iOS won't open the address at all - Safari
 turned off in Screen Time, with no other browser - the app says "Couldn't open the web app - Safari may be turned off
 in Screen Time." over the tabs, and VoiceOver reads it. The same goes for Edit album's rows that still open the web app
 and the Library's Set up Navidrome.
 
-VoiceOver reads each Safari row as a button, with "Opens in Safari." after it; Edit an album as a row that opens a
-page. The rows grow with the text size.
+VoiceOver reads each Safari row as a button, with "Opens in Safari." after it; Edit an album and Needs a look as rows
+that open a page, Needs a look with its count ("Needs a look, 3 albums"). The rows grow with the text size.
 
 An artist's pictures and names are managed from [the artist's page](#managing-an-artist), as in the web app. What
-isn't linked from the phone: the web app's **Connections**, in its You; and Needs a look's count.
+isn't linked from the phone: the web app's **Connections**, in its You.
+
+### Needs a look
+
+**Needs a look** (Settings > Manage > Needs a look, for someone with **Look after the library** - an admin, or
+everyone while logins are off) is the web app's review queue on the phone: the albums whose tags, folder or cover need
+fixing, the albums Navidrome doesn't list, and the new downloads nobody has looked at yet. It's a page pushed on
+Settings, and each album on it opens [Edit album](#edit-album).
+
+**Its count** - how many albums it lists - is at the right of its row in Settings > Manage ("99+" past 99; nothing
+when there are none, or before deadwax has said), never on a tab. It's asked when Settings shows and on a pull down
+there, as the app comes back to the front, and after anything Edit album or an artist's tools write - an apply, a Get,
+a delete, a mark, Save, Move - and deadwax answers it from its saved scan, without reading the disk. A count that
+can't be had leaves the last one. Someone without Look after the library has no row, so no count.
+
+**At the top**, what the page is for: "Albums whose tags, folder or cover need fixing, albums Navidrome doesn't list,
+and new downloads nobody has looked at yet. Open one to fix it, or to mark it fine as it is." Without Edit albums it
+ends "Open one to see what it has, or to delete it.", and "Fixing it needs Edit albums, which an admin hasn't given
+you." follows. When deadwax can't save to its database, an amber line warns that an album you mark "It's fine as it
+is" will come back (check `DB_PATH`).
+
+**The list.** "Reading the library" while deadwax reads the library (the first time on a big library, a minute or
+more); if that fails, "Couldn't read the library." with **Try again**. Then a section headed by what it shows and how
+many ("All · 12"), and a line under that heading, there even when empty so nothing jumps: "Checking the library…"
+while it's read again, "Couldn't check the library just now." with **Try again** when that failed, or why some albums
+may not have been checked against Navidrome ("Navidrome isn't set up, so no album is checked against what it lists.
+…"). Each row is the album's cover, its name, its artist and edition, and what's wrong, in amber: **New** for a
+download nobody has looked at, then each issue as Edit album names it ("No cover art", "Not matched to MusicBrainz"…).
+"Nothing needs a look." when nothing does. When deadwax has no library to read (`LIBRARY_PATH` unset or missing), it
+says so in the list's place. Pull down to read the library again; it's read again too each time the page shows anew,
+and when deadwax comes back into reach.
+
+**Show**, the menu at the top right (filled while it narrows the list), picks what the list shows, as the web app's
+chips do, each with how many: **All**, **Newly added** (when there are any), one per kind of issue (the most albums
+first), and **Marked fine** (when there are any) - the albums whose every issue you marked fine, the one way back to
+such an album's Edit album when Navidrome doesn't list it, each with "Marked fine" in its row. A choice that empties
+goes back to All.
+
+**Working through it.** Tap an album: Edit album opens on its folder, with ‹, where you are ("2 of 9") and **Skip ›**
+along its foot. Do whatever the album needs - apply a release, edit its tags, get its cover, mark it fine, delete it -
+and **Skip** becomes **Next album ›**; ‹ goes back one. Each step opens that album in the same Edit album. Underneath,
+the list holds still while you work: an album you fixed, marked fine or deleted keeps its row, saying **Fixed**,
+**Marked fine** or **Deleted** in green, followed through a rename, and the one open is shaded. Stepping away from an
+album - ‹, Skip, Next album, or closing Edit album - notes it as looked at, which is what stops a new download being
+New (its issues stay), and the count follows. Deleting an album leaves Edit album up, saying "Deleted …", with **Next
+album** to go on. If the album you step to has gone from the library since the list was read (deleted or moved
+elsewhere), the run ends and Edit album closes. Once it ends, the list stays as it was until deadwax has read the
+library again, then it's worked out afresh - albums put right leave it. The steps are dimmed while something is being
+written or marked, and while deadwax can't be reached; with something typed and not applied, a step asks "Discard
+changes?" first, as Close does.
+
+**While deadwax can't be reached**, a page that hasn't read the library yet says "Managing needs deadwax. This opens
+once it's back." and reads it once deadwax is back; one that has keeps its list, and its rows can't be tapped. If an
+admin took Look after the library away, it says "This page needs a permission an admin hasn't given you - ask one if
+you need it.", and asks nothing.
+
+VoiceOver reads each row once - its album, artist and edition, and what's wrong with it or what became of it ("The
+Slow Rush, Tame Impala, New, No cover art"), with "Open" on the one Edit album has open - and the Show menu as "Show,
+All". Edit album's foot reads as "Previous album", "2 of 9" and "Skip" (with "Leave this one for now and move on") or
+"Next album", and each step is said: "3 of 9: The Slow Rush". With Reduce Motion on, rows don't slide as the list
+changes. Every line grows with the text size.
 
 ### Debug
 
@@ -4553,6 +4617,46 @@ Artist images and Move albums write into the library: use an artist whose pictur
   this artist", each picture read with its name and where it's from ("…, from fanarttv") and "Chosen" on the one
   chosen, every line whole in all three sheets.
 
+### Needs a look's checks (349-354)
+
+**Not done yet.** These come with the build that brings [Needs a look](#needs-a-look) into the app - Phase 8's sixth
+part (still app 0.13 (13)). No server change is needed: any deadwax the first part works with. As in 320-329:
+deadwax's plain `http://` address, on the home Wi-Fi and over WireGuard with Wi-Fi off, as an admin unless said;
+compare each with the web app's Needs a look (You > Needs a look). Fixing and deleting write into the library: use
+albums put in it for these checks (a test album filed from a download, or copied in).
+
+- **349 The count.** Settings > Manage > **Needs a look** has a number at its right: is it the web app's You badge's?
+  With VoiceOver: "Needs a look, 3 albums" (the number it shows). Open an album from it, mark it fine, close Edit
+  album and go back: is the number one less, without a pull? Lock and unlock the phone after marking one fine in the
+  web app: does the number follow? With nothing to look at, nothing at the row's right - and no tab ever shows the
+  count. With Wi-Fi and WireGuard off, the number stays as it was.
+- **350 The list and Show.** Open Needs a look: "Reading the library", then the same albums in the same order as the
+  web app's All, each with the same chips (New, then its issues), headed "All · N". **Show** (top right): All, Newly
+  added, each kind of issue and Marked fine, with the web app's counts. Pick Newly added: only the new downloads, the
+  heading "Newly added · N", the menu's symbol filled. Pick Marked fine: the albums you marked fine, each saying so.
+  Back to All. Pull down: "Checking the library…" under the heading while it's read, and no row moves when the line
+  comes and goes.
+- **351 Working through.** Tap the first album: Edit album, with ‹ (dimmed), "1 of N" and **Skip ›** at its foot.
+  Skip: "2 of N", the second album, and ‹ is on; ‹ goes back to the first. Mark one fine (or apply a release): Skip
+  becomes **Next album ›**. Close: its row says **Marked fine** (or **Fixed**) in green and stays where it was; once
+  the library has been read again, is it gone from the list - and from the web app's?
+- **352 Looked at.** A test album filed from a download (New): open it from Needs a look and Skip past it (or Close).
+  Once the list is read again, is it no longer New - in the web app too - and the count one less, if New was all that
+  was wrong with it?
+- **353 Not in Navidrome, deleted and gone.** An album Navidrome doesn't list (a folder Navidrome can't read, or
+  before its scan) shows "Not in Navidrome" and opens by its folder. Delete a test album from the run (Delete album… >
+  Delete permanently): Edit album stays up, saying "Deleted …", with Next album; its row says **Deleted**. In the web
+  app, delete (or move) the album after the one open on the phone, then tap Skip on the phone: Edit album closes, and
+  the list is read again.
+- **354 Edits, reach, and who.** Type in a Release field and tap Skip: "Discard changes?" - Keep editing keeps it,
+  Discard steps on. Tap Apply and look at the foot at once: ‹ and Skip dimmed until it's done. Wi-Fi and WireGuard
+  off: the steps dimmed and the rows can't be tapped; open Needs a look from Settings while off: "Managing needs
+  deadwax. This opens once it's back.", then the list once it's back. As someone with Look after the library but not
+  Edit albums: the top line ends "to see what it has, or to delete it." with "Fixing it needs Edit albums, which an
+  admin hasn't given you."; an album opens with Delete album… alone. With the largest text and VoiceOver: each row
+  read once ("The Slow Rush, Tame Impala, New, No cover art"), Show as "Show, All", the foot's "Previous album",
+  "2 of 9" and "Skip", each step said ("3 of 9: …"), every line whole. With Reduce Motion on, rows don't slide.
+
 ### Add to Queue's checks (392-403)
 
 **Not done yet.** These come with the build that makes [Add to Queue](#adding-to-the-queue) the phone's one way to add
@@ -4627,10 +4731,10 @@ These are the web app's for now:
   new words wait for deadwax.
 - **Home** and **pins** - and so Home's Arriving: outside Requests, the tab's badge is the phone's only sign of a
   download on its way.
-- **Looking after deadwax**, but for [Edit album](#edit-album) and [an artist's tools](#managing-an-artist), all of
-  it on the phone now: Settings > [Manage](#manage) opens each other tool in the web app, in Safari, and Change
-  password too. Re-timing synced lyrics is Server settings', in the web app. Not linked from the phone: the web app's
-  **Connections** (in its You) and Needs a look's count.
+- **Looking after deadwax**, but for [Edit album](#edit-album), [an artist's tools](#managing-an-artist) and
+  [Needs a look](#needs-a-look), all of it on the phone now: Settings > [Manage](#manage) opens each other tool in the
+  web app, in Safari, and Change password too. Re-timing synced lyrics is Server settings', in the web app. Not linked
+  from the phone: the web app's **Connections** (in its You).
 
 ## When something goes wrong
 

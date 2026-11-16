@@ -374,7 +374,7 @@ func sentJSON(_ request: HTTPRequest?) throws -> [String: SentValue] {
     }
 
     @Test func everyRouteIsDeadwaxsOwn() {
-        #expect(Routes.all.count == 86)
+        #expect(Routes.all.count == 88)
         #expect(Set(Routes.all).count == Routes.all.count)
         for endpoint in Routes.all {
             #expect(endpoint.path.hasPrefix("/deadwax/"))
@@ -423,6 +423,8 @@ func sentJSON(_ request: HTTPRequest?) throws -> [String: SentValue] {
         // the scan,
         // who they are and every file read; its apply, 600 s at least - and the relay's pictures the transport's own
         // 8 s, over its 7 s deadline
+        // (slice 6: Needs a look) the count, 30 s, the saved scan read and Navidrome's first listing waited for (3 s at
+        // most); an album looked at, 20 s, one row written, as the marks
         let longer: [Endpoint: Double] = [Routes.albumIndex: 30, Routes.autoEqSearch: 20, Routes.autoEqProfile: 20,
                                           Routes.libraryOwned: 30, Routes.fullySearch: 20, Routes.releaseGroup: 60,
                                           Routes.searchArtists: 20, Routes.searchSongs: 20, Routes.artistFacts: 120,
@@ -438,7 +440,8 @@ func sentJSON(_ request: HTTPRequest?) throws -> [String: SentValue] {
                                           Routes.deletionSummary: 60, Routes.deleteAlbum: 120,
                                           Routes.libraryArtist: 120, Routes.artistArt: 30,
                                           Routes.artistImagesPreview: 660, Routes.artistImagesApply: 600,
-                                          Routes.artistSearch: 120, Routes.refilePreview: 480, Routes.refileApply: 600]
+                                          Routes.artistSearch: 120, Routes.refilePreview: 480, Routes.refileApply: 600,
+                                          Routes.queueSummary: 30, Routes.queueReviewed: 20]
         #expect(Routes.timeouts == longer)
         for endpoint in Routes.all {
             // each path parameter filled in: a brace left in a path is no URL

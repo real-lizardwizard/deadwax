@@ -167,8 +167,11 @@ def test_manage_keeps_its_rules_and_opens_the_web_app():
     assert "let tools = Managing.tools(server.access)" in section and "if !tools.isEmpty" in section
     # (Phase 8, slice 1) Edit an album is the app's own - Choose the folder, pushed; the others open the web app
     edit = section.index("if tool == .edit {")
-    assert "NavigationLink(value: AppRoute.chooseFolder)" in section[edit:section.index("} else if let url")]
-    assert section.count("NavigationLink") == 1
+    queue = section.index("} else if tool == .queue {")
+    assert "NavigationLink(value: AppRoute.chooseFolder)" in section[edit:queue]
+    # (Phase 8, slice 6) Needs a look is the app's own too - the review queue, pushed, its count at the row's right
+    assert "NavigationLink(value: AppRoute.needsALook)" in section[queue:section.index("} else if let url")]
+    assert section.count("NavigationLink") == 2
     assert "WebAppRow(label: ManagingWords.label(tool), url: url, live: online)" in section
     # the footer is said of the rows drawn: Edit an album opens no Safari
     assert "ManagingWords.footer(loginsOn: server.access.on, online: online, tools: tools)" in section
@@ -223,7 +226,9 @@ def test_who_asks_what_and_when():
     task = block(view, view.index("{", view.index(".task {")))
     assert "guard !asked else { return }" in task and "asked = true" in task and "await server.refreshMe()" in task
     pull = block(view, view.index("{", view.index(".refreshable {")))
-    assert pull.strip() == "await server.refreshMe()"
+    # (Phase 8, slice 6) and Needs a look's count after it
+    assert [line.strip() for line in pull.strip().splitlines() if line.strip()] == ["await server.refreshMe()",
+                                                                                  "queueCount.ask()"]
     assert "GetSettingsModel" not in view and "getSettings" not in view and "Reachability" not in view
     # Getting albums: as the page shows, on its pull, and as deadwax comes back into reach
     page = struct(code(GETTING), "GettingAlbumsPage")

@@ -6,6 +6,9 @@ import UIKit
 /// What Edit album is opened for (notes/ios-specs/phase8-managing.md 1): an album page's album, by Navidrome's id and
 /// what the page knew of it - its folders found from the id bridge, else the scan - or one folder of the library,
 /// picked in Choose the folder. One opening each: a second Edit album is a new one.
+///
+/// (Phase 8, slice 6) Opened from Needs a look, it carries the page's session (`queue`): the editor is in queue mode,
+/// its folder the session's current album, stepping through the rest in the same sheet.
 struct AlbumEditRequest: Identifiable, Equatable {
     enum Target: Equatable {
         case album(AlbumEdit.Subject)
@@ -14,6 +17,16 @@ struct AlbumEditRequest: Identifiable, Equatable {
 
     let id = UUID()
     let target: Target
+    /// Needs a look's page, when the editor was opened from it - nil from anywhere else.
+    var queue: NeedsLookModel?
+
+    init(target: Target, queue: NeedsLookModel? = nil) {
+        self.target = target
+        self.queue = queue
+    }
+
+    /// One opening each: the same request is the same opening.
+    static func == (one: AlbumEditRequest, other: AlbumEditRequest) -> Bool { one.id == other.id }
 }
 
 /// Edit album's state (phase8-managing.md 3.1, 3.2, 3.7; the web's app/EditPanel.tsx): which folder the album is - the
@@ -33,11 +46,20 @@ struct AlbumEditRequest: Identifiable, Equatable {
 /// a write runs, nothing a read brings drops the album held or its Release. What comes after a write outlives the sheet
 /// (it ends within about 45 s): an album page left open beneath still follows the album - but never past a sign-out, or
 /// into the next person's pages (`session`, AppNavigation's when the sheet opened).
+///
+/// (Phase 8, slice 6) In queue mode (opened from Needs a look) the scan is the page's - one read, one ETag - and every
+/// write tells the page what became of the album (NeedsLookModel.heard: its row followed and marked); a delete leaves
+/// the sheet up saying so, the queue going on from there (the web's "Next album" after a delete), where anywhere else it
+/// closes. Every write, here or not, asks Needs a look's count again (AppNavigation.managed).
 @MainActor
 @Observable
 final class EditAlbumModel {
     private(set) var target: AlbumEditRequest.Target
-    let scan = LibraryScanModel()
+    let scan: LibraryScanModel
+    /// Needs a look's page, in queue mode.
+    @ObservationIgnored private(set) weak var queue: NeedsLookModel?
+    /// (slice 6) The folder a delete took, in queue mode: the sheet says so (AlbumEdit.status), and stays.
+    private(set) var deletedPath: String?
     /// The id bridge's answer - nil before it answers, and when it couldn't.
     private(set) var bridge: AlbumEdit.Bridge?
     /// The bridge has answered or failed (a folder opening asks none).
@@ -86,12 +108,17 @@ final class EditAlbumModel {
     @ObservationIgnored private var after: (path: String, known: Bool)?
     @ObservationIgnored private var opened = false
 
-    init(request: AlbumEditRequest, client: DeadwaxClient?, admin: Bool, online: Bool) {
-        target = request.target
+    /// `target` the folder or album to open - in queue mode, the session's current folder; `scan` the page's, then.
+    init(request: AlbumEditRequest, target: AlbumEditRequest.Target? = nil, scan: LibraryScanModel? = nil,
+         client: DeadwaxClient?, admin: Bool, online: Bool) {
+        let target = target ?? request.target
+        self.target = target
+        self.scan = scan ?? LibraryScanModel()
+        queue = request.queue
         self.client = client
         self.admin = admin
         self.online = online
-        if case .folder = request.target { asked = true }
+        if case .folder = target { asked = true }
     }
 
     /// The app's navigation - and the person the sheet opened for, with it - and the Library's lists.
@@ -133,6 +160,7 @@ final class EditAlbumModel {
         let folders = self.folders
         let listed = folders.map { $0.paths.count == 1 && scan.answer?.album(at: $0.paths[0]) != nil } ?? false
         return AlbumEdit.status(AlbumEdit.StatusFacts(
+            deleted: deletedPath,
             problem: scan.answer?.problem, error: scan.failure, albums: scan.albums.count, loaded: scan.loaded,
             asked: asked, folders: folders, holding: album != nil, listed: listed,
             release: bridge?.releaseMbid ?? subject?.musicBrainzId))
@@ -167,6 +195,11 @@ final class EditAlbumModel {
 
     /// An apply or the cover alone is under way: the album held and its Release stay, whatever a read brings.
     var writing: Bool { applying || retag?.flow.savingCover == true }
+
+    /// (slice 6) Queue mode's ‹, Skip and Next album may be pressed: in reach (a step notes the album left looked at,
+    /// and opens the next from deadwax), and no write or mark under way - as Close is off while one runs. Typed work
+    /// asks first, as Close does (the sheet's).
+    var canStep: Bool { online && !writing && !marking }
 
     /// The read a write or a gap waits for couldn't be made - the Release's or Tags' (RetagFlow.readFailed) - in the
     /// phone's words (review, 16 Nov): what holds Delete and the Gets off, said with Look again wherever they are.
@@ -539,9 +572,19 @@ final class EditAlbumModel {
     /// Library's lists asked again now and once Navidrome has scanned (AlbumEdit.settleMs) - and the album page beneath,
     /// with nothing of the album left in Navidrome (`all`), goes back while it is what shows; a folder of several, the
     /// page is asked again now and once Navidrome has scanned instead. A folder opened from Choose the folder has no page.
+    ///
+    /// (slice 6) In queue mode the sheet stays, saying "Deleted …" where the album was, and Needs a look's row says
+    /// Deleted: the queue goes on from here (EditPanel's `albumDeleted` for a folder request, its Next album).
     private func gone(_ before: ScanAlbum, all: Bool) {
-        deleted = true
         AccessibilityNotification.Announcement(DeleteWords.deleted(before.path)).post()
+        if queue != nil {
+            deletedPath = before.path
+            album = nil
+            retag = nil
+            tags = nil
+        }
+        deleted = true
+        told(from: before.path, deleted: true)
         library?.albumDeleted()
         Task {
             try? await Task.sleep(for: .milliseconds(AlbumEdit.settleMs))
@@ -575,13 +618,15 @@ final class EditAlbumModel {
     }
 
     private func mark(failed: String, _ send: (DeadwaxClient) async throws -> Void) async {
-        guard let client, online, !marking, !deleting else { return }
+        guard let client, online, !marking, !deleting, let from = album?.path else { return }
         marking = true
         markFailure = nil
         do {
             try await send(client)
             // an ignore changes no file - only the review row: the folder read again, so the list follows
             await lookUp()
+            // (slice 6) Needs a look's row says Marked fine (or nothing, asked about again), and its count follows
+            told(from: from)
         } catch {
             markFailure = EditWords.said(error, failed: failed, admin: admin)
         }
@@ -590,13 +635,25 @@ final class EditAlbumModel {
 
     // MARK: after a write
 
+    /// (slice 6) A write to the folder that was at `from` landed, or may have, and the folder has been read again: Needs
+    /// a look's count asked again, and - in queue mode - its row told what became of the album (the album as this read
+    /// has it, nil when it isn't listed; or deleted). The web's `toFolder`.
+    private func told(from: String, deleted: Bool = false) {
+        guard samePerson else { return }
+        navigation?.managed()
+        queue?.heard(NeedsLook.FolderChange(from: from, album: deleted ? nil : album, deleted: deleted))
+    }
+
     /// The id the album page beneath has now (a move changes it).
     private var pageId: String? { subject?.id }
 
     /// After a write (EditPanel's `afterWrite`): the page beneath asked again now and once Navidrome has scanned
     /// (AlbumEdit.settleMs) and - when the album's release changed - its new id looked for until Navidrome has it.
+    /// (slice 6) Needs a look's count asked again, and - in queue mode - the page told what became of the album.
     private func wrote(before: ScanAlbum) {
-        guard samePerson, let id = pageId else { return }
+        guard samePerson else { return }
+        told(from: before.path)
+        guard let id = pageId else { return }
         navigation?.albumWritten(id)
         settles += 1
         let ticket = settles

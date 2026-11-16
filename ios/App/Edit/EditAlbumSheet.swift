@@ -39,6 +39,13 @@ enum EditPage: Hashable {
 /// until deadwax is back, every write off - and back, everything is asked again before a write comes back on
 /// (EditAlbumModel.reach). An apply that ended while the phone was locked has the folder read again as the app comes back
 /// to the front.
+///
+/// (Phase 8, slice 6) Opened from Needs a look it is in queue mode (phase8-managing.md 3.2, 5; MetadataEditor.tsx's
+/// queue nav): a bottom toolbar on its root holds ‹, "2 of 9" and Skip › - Next album › once a write was told of the
+/// album (the web's Apply becoming Next) - stepping through the session (NeedsLookModel.go), each album opened afresh in
+/// the same sheet with the page's scan. A step is off while a write or a mark runs, or out of reach, and asks "Discard
+/// changes?" over typed work as Close does. A delete leaves the sheet up, saying so, the queue going on from it; the
+/// sheet going, however it goes, ends the session (NeedsLookModel.editorClosed).
 struct EditAlbumSheet: View {
     let request: AlbumEditRequest
 
@@ -49,14 +56,25 @@ struct EditAlbumSheet: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.scenePhase) private var scenePhase
     @State private var model: EditAlbumModel?
+    /// The queue's step the model is for (NeedsLookModel.steps): a step builds the next album's.
+    @State private var step = 0
     @State private var path: [EditPage] = []
     @State private var askingDiscard = false
+    /// A step asked over typed work: taken once Discard is pressed.
+    @State private var pendingStep: Int?
 
     var body: some View {
         NavigationStack(path: $path) {
             Group {
                 if let model {
                     EditAlbumRoot(model: model)
+                        .toolbar {
+                            if let queue = request.queue, let nav = queue.nav {
+                                ToolbarItemGroup(placement: .bottomBar) {
+                                    queueBar(nav, model: model)
+                                }
+                            }
+                        }
                 } else {
                     Color.clear
                 }
@@ -68,8 +86,15 @@ struct EditAlbumSheet: View {
                     Button(EditWords.close, action: close)
                         .disabled(model?.applying == true)
                         .confirmationDialog(EditWords.discardTitle, isPresented: $askingDiscard, titleVisibility: .visible) {
-                            Button(EditWords.discard, role: .destructive) { dismiss() }
-                            Button(EditWords.keepEditing, role: .cancel) {}
+                            Button(EditWords.discard, role: .destructive) {
+                                if let delta = pendingStep {
+                                    pendingStep = nil
+                                    request.queue?.go(by: delta)
+                                } else {
+                                    dismiss()
+                                }
+                            }
+                            Button(EditWords.keepEditing, role: .cancel) { pendingStep = nil }
                         }
                 }
             }
@@ -81,18 +106,32 @@ struct EditAlbumSheet: View {
         }
         // typed work isn't lost by a swipe: Close asks
         .interactiveDismissDisabled(model?.holdsWork == true)
-        .task {
-            if model == nil {
-                let made = EditAlbumModel(request: request, client: server.client, admin: server.access.seesDetail,
-                                          online: reachability.online)
+        // (slice 6) in queue mode, each step opens the session's next album afresh - with the page's scan
+        .task(id: request.queue?.steps ?? 0) {
+            let wanted = request.queue?.steps ?? 0
+            if model == nil || step != wanted {
+                let made = EditAlbumModel(request: request, target: request.queue?.folder.map { .folder($0) },
+                                          scan: request.queue?.scan, client: server.client,
+                                          admin: server.access.seesDetail, online: reachability.online)
                 made.attach(navigation, library: library)
+                path.removeAll()
                 model = made
+                step = wanted
             }
             await model?.open()
         }
-        // the folder deleted: nothing left to edit
+        // the folder deleted: nothing left to edit - in queue mode, the sheet stays saying so, the queue going on
         .onChange(of: model?.deleted == true) { _, gone in
-            if gone { dismiss() }
+            guard gone else { return }
+            if request.queue != nil {
+                path.removeAll()
+            } else {
+                dismiss()
+            }
+        }
+        // however the sheet goes - Close, a swipe, a step to an album gone, a sign-out - Needs a look's session ends
+        .onDisappear {
+            request.queue?.editorClosed()
         }
         .onChange(of: reachability.online) { _, now in
             Task { await model?.reach(now) }
@@ -106,10 +145,46 @@ struct EditAlbumSheet: View {
     private func close() {
         guard let model, !model.applying else { return }
         if model.holdsWork {
+            pendingStep = nil
             askingDiscard = true
         } else {
             dismiss()
         }
+    }
+
+    /// (slice 6) Queue mode's bar: ‹ (Previous album), where it is ("2 of 9"), and Skip › - or Next album ›, once a
+    /// write was told of the album and it isn't the last.
+    @ViewBuilder private func queueBar(_ nav: NeedsLook.Nav, model: EditAlbumModel) -> some View {
+        Button {
+            take(-1, model: model)
+        } label: {
+            Image(systemName: "chevron.left")
+        }
+        .accessibilityLabel(NeedsLookWords.previous)
+        .disabled(!nav.back || !model.canStep)
+        Spacer()
+        Text(nav.place)
+            .font(Typeface.footnote)
+            .monospacedDigit()
+            .foregroundStyle(Palette.quiet)
+        Spacer()
+        Button(nav.forward) {
+            take(1, model: model)
+        }
+        .accessibilityLabel(nav.forwardSpoken)
+        .accessibilityHint(nav.nextAlbum ? "" : NeedsLookWords.skipHint)
+        .disabled(!nav.on || !model.canStep)
+    }
+
+    /// A step through the queue: typed work asks first, as Close does.
+    private func take(_ delta: Int, model: EditAlbumModel) {
+        guard let queue = request.queue, model.canStep else { return }
+        if model.holdsWork {
+            pendingStep = delta
+            askingDiscard = true
+            return
+        }
+        queue.go(by: delta)
     }
 }
 

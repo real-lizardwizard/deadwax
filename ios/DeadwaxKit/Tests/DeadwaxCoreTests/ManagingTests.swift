@@ -78,18 +78,26 @@ import Testing
     }
 
     @Test func theFooterSaysWhereTheyOpenAndHowSafariSignsIn() {
-        let web: [Managing.Tool] = [.queue, .care, .settings]
+        let web: [Managing.Tool] = [.care, .settings, .log]
         #expect(ManagingWords.footer(loginsOn: true, online: true, tools: web) == [ManagingWords.opens, ManagingWords.signIn])
         #expect(ManagingWords.footer(loginsOn: false, online: true, tools: web) == [ManagingWords.opens])
         #expect(ManagingWords.footer(loginsOn: true, online: false, tools: web) == [ManagingWords.offline, ManagingWords.signIn])
         #expect(ManagingWords.footer(loginsOn: false, online: false, tools: web) == [ManagingWords.offline])
         // (Phase 8, slice 1) Edit an album is the app's own: said apart from the rest - and alone, nothing about Safari
-        #expect(ManagingWords.footer(loginsOn: true, online: true) == [ManagingWords.othersOpen, ManagingWords.signIn])
         #expect(ManagingWords.footer(loginsOn: false, online: true, tools: [.edit, .care]) == [ManagingWords.othersOpen])
         #expect(ManagingWords.footer(loginsOn: true, online: false, tools: [.edit, .log])
                 == [ManagingWords.offline, ManagingWords.signIn])
         #expect(ManagingWords.footer(loginsOn: true, online: true, tools: [.edit]).isEmpty)
         #expect(ManagingWords.othersOpen.hasPrefix(ManagingWords.editAnAlbum))
+        #expect(ManagingWords.othersOpen([.edit]) == ManagingWords.othersOpen)
+        // (slice 6) Needs a look is the app's own too: both named, in Manage's order - and with nothing else, nothing
+        let both = "Edit an album and Needs a look are the app's own; the others open in the web app, in Safari."
+        #expect(ManagingWords.footer(loginsOn: true, online: true) == [both, ManagingWords.signIn])
+        #expect(ManagingWords.footer(loginsOn: false, online: true, tools: [.queue, .care])
+                == ["Needs a look is the app's own; the others open in the web app, in Safari."])
+        #expect(ManagingWords.footer(loginsOn: true, online: true, tools: [.edit, .queue]).isEmpty)
+        #expect(ManagingWords.footer(loginsOn: true, online: true, tools: [.queue]).isEmpty)
+        #expect(Managing.Tool.allCases.filter(\.native) == [.edit, .queue])
         // the page is Safari's person's, not the app's: said wherever a row opens one
         #expect(ManagingWords.signIn.contains("whoever is signed in there"))
         #expect(ManagingWords.changePasswordLine.contains("whoever is signed in in Safari"))

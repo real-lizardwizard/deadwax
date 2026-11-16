@@ -111,8 +111,10 @@ def test_the_sheet_keeps_typed_work_and_a_running_apply():
     assert "ToolbarItem(placement: .cancellationAction)" in view
     assert ".disabled(model?.applying == true)" in view
     assert ".confirmationDialog(EditWords.discardTitle, isPresented: $askingDiscard" in view
-    assert "Button(EditWords.discard, role: .destructive) { dismiss() }" in view
-    assert "Button(EditWords.keepEditing, role: .cancel) {}" in view
+    # (Phase 8, slice 6) Discard closes the sheet - or, asked by a step through Needs a look's queue, takes the step
+    discard = view[view.index("Button(EditWords.discard, role: .destructive) {"):view.index("Button(EditWords.keepEditing")]
+    assert "dismiss()" in discard and "request.queue?.go(by: delta)" in discard and "pendingStep = nil" in discard
+    assert "Button(EditWords.keepEditing, role: .cancel) { pendingStep = nil }" in view
     close = block(view, view.index("{", view.index("private func close()")))
     assert "guard let model, !model.applying else { return }" in close
     assert close.index("if model.holdsWork {") < close.index("askingDiscard = true")

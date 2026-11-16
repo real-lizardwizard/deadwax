@@ -34,9 +34,10 @@ final class LibraryScanModel {
     var loaded: Bool { answer != nil }
     var albums: [ScanAlbum] { answer?.albums ?? [] }
 
-    /// The scan read again.
+    /// The scan read again - `failed` what a failure says didn't work (Needs a look's own, slice 6: READ_FAILED for a
+    /// first read, CHECK_FAILED for one again over the list on screen).
     @discardableResult
-    func read(client: DeadwaxClient?, admin: Bool) async -> Read {
+    func read(client: DeadwaxClient?, admin: Bool, failed: String = EditWords.readFailed) async -> Read {
         guard let client else { return .dropped }
         reads += 1
         let ticket = reads
@@ -56,7 +57,7 @@ final class LibraryScanModel {
             reading = false
             // a cancellation (the page gone) is neither a failure nor an answer: what was there stays
             guard !APIFailure.isCancellation(error) else { return .dropped }
-            failure = EditWords.said(error, failed: EditWords.readFailed, admin: admin)
+            failure = EditWords.said(error, failed: failed, admin: admin)
             return .failed
         }
     }

@@ -402,7 +402,11 @@ def test_once_gone_the_sheet_closes_the_page_goes_back_and_the_library_asks_agai
     assert "navigation?.leaveAlbum(id)" in body(gone, "if all {") and "wrote(before: before)" in gone
     sheet = code(SHEET)
     view = declared(sheet, "struct", "EditAlbumSheet")
-    assert ".onChange(of: model?.deleted == true) { _, gone in" in view and "if gone { dismiss() }" in view
+    assert ".onChange(of: model?.deleted == true) { _, gone in" in view
+    # (Phase 8, slice 6) anywhere but Needs a look's queue the sheet closes; there it stays, saying so, the queue going on
+    gone_view = block(view, view.index("{", view.index(".onChange(of: model?.deleted == true)")))
+    assert "guard gone else { return }" in gone_view and "if request.queue != nil {" in gone_view
+    assert gone_view.index("path.removeAll()") < gone_view.index("dismiss()")
     assert "@Environment(LibraryModel.self) private var library" in view
     # the page beneath goes back only while it is what shows (App.tsx's `else if (showing) router.back()`)
     navigation = declared(code(ROUTES), "class", "AppNavigation")

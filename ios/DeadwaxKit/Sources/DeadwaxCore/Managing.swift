@@ -87,10 +87,42 @@ public enum Managing {
         return ArtistManaging(images: edit, whichArtist: edit, move: library, any: edit || library)
     }
 
+    /// (Phase 8, slice 6) permissions.ts `asksQueueSummary(perms)`: Needs a look's count is asked only with Look after
+    /// the library - the server answers 403 otherwise.
+    public static func asksQueueSummary(_ permissions: Set<Access.Permission>) -> Bool {
+        permissions.contains(.library)
+    }
+
+    /// (slice 6) Needs a look's page for this person (App.tsx's `allowed={perms.has('library')}` and
+    /// `canEdit={perms.has('edit')}`): whether it opens at all, and whether fixing an album is theirs - without Edit
+    /// albums the page says NEEDS_EDIT, and the editor it opens has no Edit section.
+    public struct NeedsLookPage: Sendable, Equatable {
+        public let allowed: Bool
+        public let canEdit: Bool
+
+        public init(allowed: Bool, canEdit: Bool) {
+            self.allowed = allowed
+            self.canEdit = canEdit
+        }
+    }
+
+    public static func needsLook(_ permissions: Set<Access.Permission>) -> NeedsLookPage {
+        NeedsLookPage(allowed: permissions.contains(.library), canEdit: permissions.contains(.edit))
+    }
+
     /// One of Manage's rows, in the order You draws them: the phone's own Edit an album first (the web's editors live
     /// on an album's page, not in You), then the web's five in You.tsx's order.
     public enum Tool: String, Sendable, CaseIterable, Hashable {
         case edit, queue, care, people, settings, log
+
+        /// The app's own page (Phase 8 - one slice at a time): Edit an album since slice 1, Needs a look since slice 6.
+        /// The rest still open the web app in Safari.
+        public var native: Bool {
+            switch self {
+            case .edit, .queue: return true
+            case .care, .people, .settings, .log: return false
+            }
+        }
     }
 
     /// The rows for this person (You.tsx: `managing(access.permissions, access.on)`; the first by `albumEdit`).
@@ -206,6 +238,16 @@ public enum ManagingWords {
     public static let opens = "These open in the web app, in Safari."
     /// (Phase 8, slice 1) With Edit an album, the app's own now, above the rows that still open Safari.
     public static let othersOpen = "Edit an album is the app's own; the others open in the web app, in Safari."
+
+    /// (slice 6) The same, of every row drawn that is the app's own (Tool.native), in Manage's order: "Edit an album and
+    /// Needs a look are the app's own; the others open in the web app, in Safari."
+    public static func othersOpen(_ native: [Managing.Tool]) -> String {
+        let names = native.map(label)
+        guard names.count > 1 else { return names.first.map { "\($0) is the app's own; \(rest)" } ?? opens }
+        return "\(names.dropLast().joined(separator: ", ")) and \(names.last ?? "") are the app's own; \(rest)"
+    }
+
+    private static let rest = "the others open in the web app, in Safari."
     /// With logins on: Safari signs in apart from the app - and each page is Safari's person's, not the app's: nothing
     /// compares the two.
     public static let signIn = "Safari has its own sign-in, apart from the app's: the first time, sign in there with the "
@@ -218,12 +260,13 @@ public enum ManagingWords {
     public static let notOpened = "Couldn't open the web app - Safari may be turned off in Screen Time."
 
     /// The section's footer, a sentence a line: where the rows that open Safari open (or, out of reach, when), then
-    /// Safari's sign-in with logins on - nothing at all when the only row is Edit an album, the app's own (Phase 8,
-    /// slice 1), whose page says for itself that it needs deadwax.
+    /// Safari's sign-in with logins on - nothing at all when every row drawn is the app's own (Edit an album since
+    /// Phase 8's slice 1, Needs a look since slice 6), whose pages say for themselves that they need deadwax.
     public static func footer(loginsOn: Bool, online: Bool, tools: [Managing.Tool] = Managing.Tool.allCases) -> [String] {
-        let web = tools.filter { $0 != .edit }
+        let web = tools.filter { !$0.native }
         guard !web.isEmpty else { return [] }
-        let lead = !online ? offline : web.count == tools.count ? opens : othersOpen
+        let native = tools.filter(\.native)
+        let lead = !online ? offline : native.isEmpty ? opens : othersOpen(native)
         return [lead] + (loginsOn ? [signIn] : [])
     }
 

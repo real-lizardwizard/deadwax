@@ -10,10 +10,11 @@ import SwiftUI
 ///
 /// Phase 8 brings them into the app one at a time (phase8-managing.md 11). Since slice 1 Edit an album is the app's: it
 /// pushes Choose the folder (ChooseFolderScreen), whose folder opens Edit album over the tabs - and that page says for
-/// itself that it needs deadwax, so the row is never dimmed. The others still open the web app in Safari (WebAppRow)
-/// until their slices land.
+/// itself that it needs deadwax, so the row is never dimmed. Since slice 6 Needs a look is too: it pushes the review
+/// queue (NeedsLookScreen), its count at the row's right (QueueCountModel - asked by YouView and MainTabs, never here).
+/// The others still open the web app in Safari (WebAppRow) until their slices land.
 ///
-/// The footer says those open in Safari (Edit an album said apart, ManagingWords.othersOpen) and - with logins on -
+/// The footer says those open in Safari (the app's own said apart, ManagingWords.othersOpen) and - with logins on -
 /// that Safari signs in apart from the app, the first time, with the same name and password, and that each page opens
 /// as Safari's person, who may not be the app's: nothing compares the two. While deadwax can't be reached the Safari
 /// rows are dimmed and off, the footer saying they open once it's back: Safari would only fail at the same address.
@@ -22,6 +23,7 @@ import SwiftUI
 struct ManageSection: View {
     @Environment(ServerModel.self) private var server
     @Environment(Reachability.self) private var reachability
+    @Environment(QueueCountModel.self) private var queueCount
 
     var body: some View {
         let tools = Managing.tools(server.access)
@@ -33,6 +35,18 @@ struct ManageSection: View {
                         // (Phase 8, slice 1) the app's own: Choose the folder
                         NavigationLink(value: AppRoute.chooseFolder) {
                             Text(ManagingWords.label(tool))
+                        }
+                    } else if tool == .queue {
+                        // (Phase 8, slice 6) the app's own: the review queue - its count at the right, as a value
+                        // (You.tsx's badge; never on a tab), nothing while nobody knows it or it is none
+                        NavigationLink(value: AppRoute.needsALook) {
+                            LabeledContent(ManagingWords.label(tool)) {
+                                Text(queueCount.count.value)
+                                    .monospacedDigit()
+                            }
+                            // read once: "Needs a look, 3 albums" (needsLookLabel)
+                            .accessibilityElement(children: .ignore)
+                            .accessibilityLabel(queueCount.count.spoken)
                         }
                     } else if let url = Managing.url(tool, at: server.address) {
                         WebAppRow(label: ManagingWords.label(tool), url: url, live: online)

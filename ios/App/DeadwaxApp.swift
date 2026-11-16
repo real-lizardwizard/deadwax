@@ -35,6 +35,7 @@ struct DeadwaxApp: App {
     @State private var search: SearchModel
     @State private var requests: RequestsModel
     @State private var getSettings: GetSettingsModel
+    @State private var queueCount: QueueCountModel
 
     /// The one background session, made before anything else can ask it.
     private static let downloadSession = DownloadSession()
@@ -68,6 +69,8 @@ struct DeadwaxApp: App {
         reachability.whenChanged { [weak requests] in requests?.reachChanged() }
         // Phase 6, slice 2: You > Getting albums as kept on deadwax - the Format a search is scored by, the floor
         let getSettings = GetSettingsModel(server: server)
+        // Phase 8, slice 6: Needs a look's count, Settings > Manage's value
+        let queueCount = QueueCountModel(server: server)
         let downloads = DownloadModel(server: server, reachability: reachability, files: files, session: Self.downloadSession)
         player.connect(downloads: downloads, reachability: reachability)
         // Phase 4, slice 3: a write here to a downloaded playlist keeps it in step at once
@@ -100,6 +103,7 @@ struct DeadwaxApp: App {
             search.reset()
             requests.reset()
             getSettings.reset()
+            queueCount.reset()
         }
         _server = State(initialValue: server)
         _player = State(initialValue: player)
@@ -119,6 +123,7 @@ struct DeadwaxApp: App {
         _search = State(initialValue: search)
         _requests = State(initialValue: requests)
         _getSettings = State(initialValue: getSettings)
+        _queueCount = State(initialValue: queueCount)
     }
 
     var body: some Scene {
@@ -142,6 +147,7 @@ struct DeadwaxApp: App {
                 .environment(search)
                 .environment(requests)
                 .environment(getSettings)
+                .environment(queueCount)
                 .preferredColorScheme(.dark)
                 .tint(Palette.accent)
                 // (Noto Sans, 15 Nov) the words of every Text and control that sets no font of its own

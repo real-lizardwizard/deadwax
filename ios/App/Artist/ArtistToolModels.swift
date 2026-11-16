@@ -138,6 +138,8 @@ final class ArtistImagesModel {
             AccessibilityNotification.Announcement(flow.saved ?? "").post()
             guard samePerson else { return }
             onSaved?()
+            // (slice 6) a write anywhere in managing: Needs a look's count asked again
+            navigation?.managed()
             if owed { await lookAgain() }
         } catch {
             // a cancellation of a write is no refusal: it may have written
@@ -155,6 +157,7 @@ final class ArtistImagesModel {
             AccessibilityNotification.Announcement(EditWords.mayHaveFinished).post()
             guard samePerson else { return }
             onSaved?()
+            navigation?.managed()
             await lookAgain()
         }
     }
@@ -313,6 +316,8 @@ final class ArtistMoveModel {
         AccessibilityNotification.Announcement(again ? EditWords.mayHaveFinished : flow.outcome?.text ?? "").post()
         guard samePerson else { return }
         if flow.wrote > before { onMoved?() }
+        // (slice 6) a write anywhere in managing, or one that may have been: Needs a look's count asked again
+        if flow.wrote > before || again { navigation?.managed() }
         if again { await preview() }
     }
 

@@ -94,6 +94,9 @@ enum AppRoute: Hashable {
     /// (Phase 8, slice 1) Settings > Manage > Edit an album: Choose the folder - any folder of the library, its Edit
     /// album opened over the tabs.
     case chooseFolder
+    /// (Phase 8, slice 6) Settings > Manage > Needs a look: the review queue (NeedsLookScreen), its rows opening Edit
+    /// album over the tabs in queue mode.
+    case needsALook
 }
 
 /// The album you don't have's address: its release group's id as MusicBrainz gave it (lowercase - deadwax's routes take
@@ -276,6 +279,9 @@ final class AppNavigation {
     /// (Phase 8, slice 1) One more each time the person changes (`reset`): an Edit album opened for one person stops
     /// writing into these pages - its page refreshes, its follow - once it isn't theirs (EditAlbumModel).
     private(set) var session = 0
+    /// (Phase 8, slice 6) One more after every write anywhere in managing - an editor's apply, a Get, a delete, a mark,
+    /// the artist tools' Save and Move: Needs a look's count is asked again (MainTabs, QueueCountModel).
+    private(set) var managingWrites = 0
     /// The playlist whose Edit is open on a tab's page: the tab tapped again goes back no further than that page, so
     /// Edit's changes are never thrown away without Cancel's question (PlaylistEdit.pagesKept).
     private(set) var editingPlaylist: String?
@@ -402,6 +408,11 @@ final class AppNavigation {
         albumWrites[id, default: 0] += 1
     }
 
+    /// (Phase 8, slice 6) A managing write landed, or may have: what counts the albums that need a look asks again.
+    func managed() {
+        managingWrites += 1
+    }
+
     /// An apply gave the album `from` a new id in Navidrome, `to` (EditPanel's 'moved'): every page of it, on every
     /// tab, now the page of `to` - what it knew of the album kept to draw while it loads - and a page opened by `from`
     /// from now on opens `to`.
@@ -523,6 +534,7 @@ extension View {
                 case .group(let group): GroupView(route: group)
                 case .mbArtist(let artist): MBArtistView(route: artist)
                 case .chooseFolder: ChooseFolderScreen()
+                case .needsALook: NeedsLookScreen()
                 }
             }
             .clearsPlayer()

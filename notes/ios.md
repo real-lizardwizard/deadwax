@@ -12310,3 +12310,138 @@ screens, and that the List's and the hand-drawn swipe look and feel alike; that 
 coordinator as the pan's delegate and the pager really waits; that `TouchDown` on the window shuts an open row and
 leaves the touch to what it was for; Reduce Motion; the haptics; VoiceOver's Add to Queue on each row's song (once or
 twice on a List row).
+
+## Needs a look on the phone (Phase 8, slice 6 - 2026-11-16)
+
+The spec's section 5, with 3.1-3.2's queue mode (notes/ios-specs/phase8-managing.md): Settings > Manage > **Needs a
+look** is the app's own page now, the review queue with its facets, each album opening Edit album in queue mode, and
+the count as the row's value. Built on the `ios` branch at 375b3cf (Add to Queue after its review). The app stays 0.13
+(13); src/__init__.py untouched; no server or web change; the player engine has no diff.
+
+James's two decisions, kept: the count is on Settings > Manage's row only, never on a tab; and "It's fine as it is"
+shows only with Look after the library - which main already does (EditPanel.tsx's `const fine = marksFine(permissions)`
+since 2.1.29) and the phone's Edit album already did (AlbumEdit.marksFine, slice 1), so nothing changed for it here.
+
+### Core (DeadwaxCore)
+
+- **NeedsLook.swift** (new): lib/needsLook.ts as it is - `facets` (All; Newly added; one per kind of issue, the most
+  albums first and then by label under the web's collation, a JS Map's first-set order breaking ties; Marked fine),
+  `facetAlbums`, `facetShown`, `summaryTotal`, `isIgnoredOnly`, the session (`Session`, `SessionRow`, `startSession`,
+  `markFor`, `FolderChange`, `rowChanged` - the current row first, as two rows share a path after a disc folder
+  merges - `StepTarget`, `stepTarget`, `leavingAtEnd`), `RowMark` and its words, `ignoresUnsaved`, `navidromeNote`
+  (Navidrome's own words for whoever runs deadwax only), `label` (needsLookLabel) and the page's sentences.
+  NeedsALook.tsx's own rules beside them - `DrawnRow`, `Ending` (`ending`, `released`), `real`, `facetGivenUp`,
+  `readsAgain`, `asRows`, `sessionRows`, `drawn`, `chips`, `showing`, `pressed`, `rows`, `title`, `byline`, `chipWords`,
+  `markedFineTitle`, `lead`, the `state` and `status` ladders; MetadataEditor.tsx's queue footer as `Nav` (`place`,
+  `back`, `on`, `done`, `nextAlbum`, `forward`); the phone's own words (`NeedsLookWords`: the Show menu, its header,
+  the bar, a step said, a row read once); `chip(_:pressed:)` (the header's chip) and `lists(_:)` (the scan's paths as
+  go()'s `Set.has` - code unit by code unit, never Swift's canonical equivalence). `QueueSummary` and `QueueReviewed`,
+  read loosely (`tracking_enabled` absent is true, as the web reads it); `QueueCount`, useQueueSummary.ts's rule (one
+  request out, one more after it when asked meanwhile, a failure keeping the number, nothing while unknown, never
+  without Look after the library); `queueSummary()` and `markReviewed(path:)` (QueueMarkBody with no `issues` key).
+- **ScanAlbums.swift**: ScanAlbum's `severity` and `disc_label`; ScanAnswer's `review_tracking_enabled` and
+  `navidrome_check` (`NavidromeCheck`); MetadataQueue's `isNewImport` and `queueAlbums` (metadataQueue.ts: new imports
+  first, then severity, artist, album - the web's collation - and the scan's order).
+- **Managing.swift**: `asksQueueSummary` (permissions.ts), `needsLook` (App.tsx's `allowed` and `canEdit`),
+  `Tool.native` (Edit an album and Needs a look), and the footer's `othersOpen(_:)` naming every native row drawn
+  ("Edit an album and Needs a look are the app's own; …").
+- **Routes.swift**: `queueSummary` (GET, 30 s) and `queueReviewed` (POST, 20 s) - 88 routes.
+
+### The app (ios/App/Manage/, and Edit album's queue mode)
+
+- **QueueCountModel** (new): the count, asked through QueueCount - when Settings shows (YouView's onAppear) and on
+  its pull, as the app comes to the front, when Look after the library becomes the person's (MainTabs, `initial`), and
+  after every managing write (`AppNavigation.managed()`, MainTabs' onChange of `managingWrites`): Edit album's
+  `told` (every apply, Tags' apply, the cover alone, a Get, a delete, a mark) and the artist tools' Save and Move. A
+  ticket per person; `reset` with the rest when the person changes. Nothing polls.
+- **ManageSection**: Needs a look pushes `AppRoute.needsALook`, its count as a `LabeledContent` value ("99+" past 99,
+  nothing at 0 or unknown), read once by VoiceOver as `count.spoken`.
+- **NeedsLookModel** (new): the page's state - its own LibraryScanModel (`GET /library/albums?tracks=false` with its
+  ETag; READ_FAILED words for a first read, CHECK_FAILED after), the facet chosen, the session, the facets held, the
+  ending, and `steps`. The first read as the page shows; again underneath as it shows anew (another tab and back, the
+  app back in front, deadwax back in reach) with no session and no ending (readsAgain). `settle()` after any read of the
+  scan ends - the page's or the editor's (the screen's onChange of `scan.reading`) - lets an ending go and gives up an
+  emptied facet. `open` begins a session and opens Edit album over the tabs with the request's `queue`; `heard` takes
+  the editor's FolderChange; `go(by:)` notes the album left (`markReviewed`, then the count), steps (`steps += 1`, the
+  step said to VoiceOver) or ends the session and closes the sheet; `editorClosed` ends it however the sheet went. The
+  ending's read waits for the note, as the web's does. Nothing past a sign-out (`samePerson`).
+- **NeedsLookScreen** (new): the lead (by Edit albums), NEEDS_EDIT, the ignores warning; the state ladder; the list's
+  header (the facet and its count) over the status line, a line held even when empty; rows keyed by the path they
+  were listed at, each `NeedsLookRow` (FolderCover, the title, the byline, its words in amber - or its mark in green,
+  the row faded), the open one shaded; Show as a toolbar Menu with a Picker. Without Look after the library,
+  NO_PERMISSION and nothing asked; opened out of reach and unread, Managing needs deadwax; out of reach with a list,
+  rows off. Reduce Motion takes the list's animations away.
+- **AlbumEditRequest** carries `queue` (equal by its id); **EditAlbumModel** takes the session's folder and the page's
+  scan (`target:`, `scan:`) in queue mode, tells the page and the count after every write (`told`), keeps a deleted
+  folder's sheet up in queue mode (`deletedPath`, "Deleted …" from AlbumEdit.status), and has `canStep`.
+  **EditAlbumSheet** in queue mode: `.task(id: queue.steps)` builds the next album's model in the same sheet (its
+  pages popped); a bottom bar on the root - ‹, "2 of 9", Skip › / Next album › - off unless `canStep`; a step over
+  typed work asks Discard changes? (`pendingStep`); a delete pops to the root instead of closing; `.onDisappear` ends
+  the session.
+
+### Decided here, and where the phone departs from the spec (or the web)
+
+- **NeedsALook.tsx's own rules stay in the .tsx, held by pattern**, as slices 2-5 did: the pieces read out of
+  NeedsALook.tsx, MetadataEditor.tsx, You.tsx, useQueueSummary.ts and App.tsx (each hashed into made_from - the sim
+  fails when one changes) and run as written where they are expressions. Moving them into lib/needsLook.ts is a small
+  no-change refactor on main whenever wanted.
+- **The real scan only, never the saved one first** (the web's useLibrary draws `snapshot=true` at once, then the real
+  scan): the phone's managing shows nothing stale as live (LibraryScanModel, slice 1), so `stale` is always false and
+  the status line's "Checking the library…" is a read again under a list, never a saved scan's.
+- **The page's own count never stands in for the server's** (setPageQueueCount): the row isn't on screen while the
+  page is, and the count is asked again as Settings shows.
+- **Not asked when a download is filed** (App.tsx's `onAlbumsFiled`): the phone's Requests don't say so to the
+  Settings tab; the count is asked again the next time Settings shows, which is the only place it's drawn.
+- **"Marked fine", not "Ignored"**: the spec's check 350 says Ignored; the web renamed it (2.0.8) and the phone says
+  the web's word.
+- **Skip becomes Next album once any write was told of the album** (a mark, an apply, tags, a Get, a delete), where the
+  web's Apply becomes Next after a release applied and its delete shows a Next album button: one rule for every write,
+  from the session's own `heard` and `mark`. The last album keeps Skip, off, as the web's keeps its plain buttons.
+- **A delete leaves the sheet up** saying "Deleted …", with Next album (the web's folder request after a delete); the
+  spec said the editor moves on.
+- **The bar is on Edit album's first page only**: a pushed page (Release, Tags, …) has its own back; stepping from deep
+  in would throw its state away unseen.
+- **A step is off while a write or a mark runs and out of reach**, and over typed work asks Discard changes? first -
+  the web's footer steps whatever is typed.
+- **A note that fails is said nowhere**, as the web's isn't: the album stays new and comes back.
+- **Show is a menu**, the web's chips its items with their counts; a chip's hint (its title) isn't shown.
+- **"›", not "▷"**: the web's arrows are drawn glyphs; the phone's words use the chevron the bar's ‹ matches.
+- **Navidrome's note wraps** where the web keeps it to one line with the rest in its title: the phone has no title.
+- **The care exporter holds asksQueueSummary and the page's permissions** rather than the managing one, so one fixture
+  holds the whole slice.
+
+### Tests
+
+- **CareVectorTests** (new, 10): every vector section - the words (▷ as ›), 77 scan lists and their facets, 320 mark
+  pairs, 90 sessions step by step, 60 pages' holds, shows and draws, the small rules, the editor's queue buttons, the
+  count's 11 runs, and 64 sets of permissions.
+- **NeedsLookTests** (new, 8): the two routes as the web asks them (GET, 30 s; POST with `album_path` alone, 20 s; a
+  503 and a 403 in deadwax's words), the summary read loosely, the scan's new fields, QueueCount one at a time, a session
+  told as a person works through it, the phone's words, the header's chip, a path found code unit by code unit, the
+  page and the count over every permission set.
+- **ManagingTests**, **ClientTests**: the footer with two native rows; 88 routes and the two timeouts.
+- **tests/test_ios_needs_look.py** (new, 8): the routes by method, path and permission (test_logins' ROUTES - the
+  scan is `user`, asked by the page only with Look after the library); the note's body; the real count before a scan
+  and after one, a real note clearing a new import, and with no store the count's `tracking_enabled` false and the
+  note's 503; the waits against the route's (the saved scan, Navidrome's first listing at most LISTING_WAIT_SECONDS,
+  one store row); the app asking the count as the web does and never on a tab; every write telling the page and the
+  count; the editor's steps.
+- test_ios_contract.py (88 routes); test_ios_settings.py (Manage's two native rows, the pull asking the count);
+  test_ios_edit.py and test_ios_edit_parts.py (Discard taking a step, a delete in queue mode).
+- **ui/test/ioscare.sim.cjs** (new): the exporter's `--check`.
+
+### Verified, and not
+
+On the Mac: `swift test` (1873 Core tests in 198 suites, 158 Audio in 17, 12 more, all passing); the unsigned
+generic-iOS Debug build, BUILD SUCCEEDED, no warning; the full pytest suite, 4875 passed and 1 skipped; all 94 sims
+with Node 22 (ioscare running the exporter's `--check`). tests/test_ios_needs_look.py runs the two real routes
+over a real folder of FLACs, Navidrome not set up. Assumed: that the count's 30 s is ample - the route reads the saved
+scan and waits at most LISTING_WAIT_SECONDS (3 s) for Navidrome, but the saved scan's load from SQLite on a cold
+start was not timed on a big library.
+
+Not verified - only the phone can tell (docs/ios.md checks 349-354): the count against the web's badge on a real
+library and its asks (Settings, the front, after a write); the list and Show against the web's for real albums; a run
+through the queue - the steps, the rows' marks, the list holding still and then worked out again, a new import noted;
+a delete in queue mode and a step to an album gone; Discard over typed work, the steps off during a write and out of
+reach; that SwiftUI fires the sheet's onDisappear however it goes (a swipe, Close, a sign-out) and none on the page
+beneath it; the bottom bar in a sheet; VoiceOver (each row once, the step said), the largest text and Reduce Motion.
