@@ -127,7 +127,9 @@ searches the sheet says **Looking for "Third" by Portishead…** ("This takes a 
 under the sources it says what was searched: "Searched for "Portishead Third" · 41 sources, 4 match
 your filters". **Search again**, under that line, opens the query (**Search for**) to edit: press
 **Search** (or Enter) and an unedited query searches every name again, while an edited one searches exactly what
-you typed. How long each search waits for answers is `SLSKD_SEARCH_TIMEOUT`, 8 seconds by default.
+you typed. There's a second **Search again** at the top, so you needn't scroll past a long list: at the right of
+**Choose a source** on a phone (a magnifying glass on a phone narrower than 390 pixels), and beside the close
+button on a desktop's panel. Its query opens above the filters. How long each search waits for answers is `SLSKD_SEARCH_TIMEOUT`, 8 seconds by default.
 
 **Cancel**, Escape or a tap above the sheet closes it (on a desktop, the panel's close button, or
 Escape while you're in it), and stops the search in slskd - at once, so an answer arriving as you

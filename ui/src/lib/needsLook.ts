@@ -232,6 +232,13 @@ export const NEEDS_LOOK_LINE =
   "Albums whose tags, folder or cover need fixing, albums Navidrome doesn't list, and new downloads nobody has looked "
   + 'at yet. Open one to fix it, or to mark it fine as it is.'
 
+/** (2.1.31) The same line for someone without Edit albums (Look after the library alone): they can't fix an album or
+ *  mark it fine - both are in Edit's tabs, which need Edit albums - but they can open one to see what it has, and
+ *  delete it. The page says NEEDS_EDIT under it. */
+export const NEEDS_LOOK_LINE_NO_EDIT =
+  "Albums whose tags, folder or cover need fixing, albums Navidrome doesn't list, and new downloads nobody has looked "
+  + 'at yet. Open one to see what it has, or to delete it.'
+
 /** Said when ignores can't be saved (2.0.0-player.42) - the main page's warning, in the app's words. */
 export const IGNORES_UNSAVED = "deadwax can't save to its database (check DB_PATH), so an album you mark "
   + "\u201cIt's fine as it is\u201d will come back."

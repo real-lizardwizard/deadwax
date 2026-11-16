@@ -166,6 +166,8 @@ fetched the album list TWICE (the snapshot, then the scan), each 4.3 MB, uncompr
   copies, but their track lists are the cache's own, and trimming them in place would strip the
   cache. **Anything that reads `/library/albums` other than `listAlbums()`/`rescan()` must go
   through the same expansion.**
+  `?tracks=false` (2.1.28, the iPhone app's editor) leaves `tracks` and `track_defaults` out
+  altogether, so it needs none - notes/ios.md "The scan without its tracks".
 - **An unchanged library is a 304.** `_json_with_etag()` hashes the body and answers
   `If-None-Match` with no body, with `Cache-Control: no-cache` so the browser always asks. That
   only works if the body is the same when the library is, and a scan's body never was:

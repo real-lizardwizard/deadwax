@@ -62,7 +62,10 @@ For an album that's right as it is (a bootleg that will never be on MusicBrainz,
 as it is**, in **Edit → Release**, marks it fine: it stops being flagged for the issues it has now.
 It's still flagged if something new goes wrong, such as the cover going missing. Such an album leaves
 the queue, and **Needs a look → Marked fine** lists it, so it can always be opened again - to undo
-that with **Ask about it again**, fix it after all, or delete it ([below](#needs-a-look)).
+that with **Ask about it again**, fix it after all, or delete it ([below](#needs-a-look)). Taking an
+album out of **Needs a look** is Look after the library's call, so both buttons are there for an admin
+and for someone given both Edit albums and Look after the library (the Release tab is Edit albums'); someone
+given Edit albums alone still sees the album's issues, and what was marked fine, but not the buttons.
 
 ### Not in Navidrome
 
@@ -343,7 +346,8 @@ back (the browser's Back, a mouse's back button, a phone's back gesture), which 
 beside it, or **You → Manage → Needs a look** on a phone, with the same count - is the library's
 review queue. The line at its top says what it's for: *Albums whose tags, folder or cover need fixing,
 albums Navidrome doesn't list, and new downloads nobody has looked at yet. Open one to fix it, or to
-mark it fine as it is.*
+mark it fine as it is.* Without Edit albums it ends *Open one to see what it has, or to delete it.*, with a line
+under it saying fixing needs Edit albums.
 
 - **The albums, in order**: every album with an issue you haven't accepted, and every album deadwax
   filed that nobody has looked at yet - those first, then the worst first, then by artist and album.

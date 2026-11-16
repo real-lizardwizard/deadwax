@@ -442,7 +442,8 @@ async function run() {
     const marking = ['src/app/LibrarySection.tsx', 'src/app/LibraryHome.tsx'].map((file) => fs.readFileSync(path.join(UI, file), 'utf8'))
     check('the dialog: the summary\'s holders in its words, above the warning',
       [/\{summary && holdersText\(summary\) && \(\s*<p class="text yellow delete-warning delete-holders">\{holdersText\(summary\)\}<\/p>/.test(dialog),
-        dialog.indexOf('delete-holders') < dialog.indexOf('This deletes the folder')], [true, true])
+        //? (2.1.30) the warning's words are lib/albumEdit.ts's DELETE_WARNING (editwords.sim.cjs holds them)
+        dialog.indexOf('delete-holders') < dialog.indexOf('{DELETE_WARNING}') && dialog.indexOf('{DELETE_WARNING}') > 0], [true, true])
     const css = fs.readFileSync(path.join(UI, '../interface/player/app.css'), 'utf8')
     check('Your library\'s album names break anywhere - the waiting lines and the removed rows (review: a one-word title pushed the page sideways, or was cut off)',
       /\.app-mylib-waiting,\s*\.app-mylib-removed \.app-row-label \{ overflow-wrap: anywhere; \}/.test(css), true)

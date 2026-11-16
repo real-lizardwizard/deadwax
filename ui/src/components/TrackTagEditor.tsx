@@ -4,7 +4,7 @@ import * as libraryApi from '../api/library'
 import type { LibraryAlbum, TagEditPlan, TrackDetails } from '../api/types'
 import type { TrackDetailsState } from '../hooks/useTrackDetails'
 import {
-  buildEdits, EDIT_FIELDS, sharedValue, tagProblem, type EditField, type SharedValue,
+  buildEdits, EDIT_FIELDS, fieldNote, fieldPlaceholder, sharedValue, tagProblem, type EditField, type SharedValue,
 } from '../lib/tagEdit'
 import { Loading, LoadingPanel } from './Loading'
 import { sayError } from '../app/sayError'
@@ -327,18 +327,9 @@ function TagField(
   const edited = draft !== undefined
   const id = `tag-field-${field.key}`
 
-  //? emptying a field removes the tag - but only from tracks that have one to remove
-  const removing = edited && !draft.trim() && (shared.mixed || shared.value !== '')
-
-  const placeholder = shared.mixed && !edited
-    ? 'Several values'
-    //? a disc number defaults to 1, so an untagged one says so rather than looking blank
-    : field.key === 'discnumber' ? '1' : 'Not set'
-
-  const note = problem
-    ?? (removing ? 'Will be removed' : null)
-    ?? (shared.mixed && !edited ? 'Differs between tracks - left alone, each keeps its own' : null)
-    ?? (field.key === 'discnumber' && !edited && !shared.value ? 'Not tagged - reads as disc 1' : null)
+  //? (2.1.30) what an empty field shows, and the line under it - lib/tagEdit.ts, pure, moved there unchanged
+  const placeholder = fieldPlaceholder(field.key, shared, edited)
+  const note = fieldNote(field.key, shared, draft, problem)
 
   return (
     <div

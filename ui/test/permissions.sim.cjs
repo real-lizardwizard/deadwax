@@ -7,7 +7,8 @@
  *  - Every managing part for every single-permission set and for none: Managing deadwax's rows (Albums that need a
  *    look by Look after the library, Library care by it or Edit albums, People by People - with logins on only -,
  *    Server settings and Log by Settings and the log), the group gone with none; Library care's parts; the album
- *    page's Edit and its tabs; the artist page's managing; Get; the queue count.
+ *    page's Edit and its tabs, and Edit album's It's fine as it is (Look after the library's, 2.1.29); the artist
+ *    page's managing; Get; the queue count.
  *  - People's checkboxes: an admin's all ticked and locked ("Admins can do everything."), a refused row locked with
  *    the server's words, an ordinary person's as ticked - with the warnings Settings and the log and Look after the
  *    library add, and unticking Get albums' line; a draft changed or not; Save's words.
@@ -83,6 +84,13 @@ check('...its tabs: the editors with Edit albums, Delete with Look after the lib
 check('Delete\'s Cancel goes back to the first editor\'s tab - or, Delete the only tab, closes the panel (second review)',
   [E.cancelDeleteTo(E.editTabs(true, true)), E.cancelDeleteTo(E.editTabs(false, true)), E.cancelDeleteTo(E.editTabs(true, false)), E.cancelDeleteTo([])],
   ['release', null, 'release', null])
+//? (2.1.29, the iPhone app's Phase 8 decision 2) the route needs Look after the library, so Edit albums alone was refused
+check("It's fine as it is and Ask about it again: with Look after the library alone - its routes', never an editor's",
+  [E.marksFine(set('library')), E.marksFine(set('edit')), E.marksFine(set('edit', 'request', 'downloads', 'server', 'people')), E.marksFine(P.NONE), E.marksFine(P.ALL)],
+  [true, false, false, false, true])
+check('...so of the editor\'s two ways in, Edit albums alone opens the editors without them, Look after the library alone neither',
+  [[P.albumEdit(set('edit')).editors, E.marksFine(set('edit'))], [P.albumEdit(set('library')).editors, E.marksFine(set('library'))]],
+  [[true, false], [false, true]])
 check('...the arrow keys go round the tabs shown, never to one hidden', [E.tabAfter('lyrics', 1, E.editTabs(true, false)), E.tabAfter('delete', 1, E.editTabs(false, true)), E.tabAfter('release', -1)],
   ['release', 'delete', 'delete'])
 

@@ -17,7 +17,7 @@ import {
   GET_SETTINGS_DEFAULT, NO_SOURCE_FILTERS, PICK_SORT, SAMPLE_RATE_FLOORS, candidateFilters, floorFilters, pressedCount, sampleRateChip, signalsSet,
   sourceChips, type SourceFilters,
 } from '../lib/getSettings'
-import { ChevronDownIcon, CloseIcon } from '../player/icons'
+import { ChevronDownIcon, CloseIcon, SearchIcon } from '../player/icons'
 import { SourceCard } from './SourceCard'
 import { StoreState } from './StoreState'
 import { askGetSettings, formatPreferenceNow, getSettingsNow, useGetSettings } from './useGetSettings'
@@ -187,7 +187,11 @@ export function RateChip({ rate, onChange }: { rate: number; onChange: (rate: nu
  * "Search again" text button under them, after the line saying what was searched, opens the same
  * query to edit under it (a disclosure: aria-expanded, focus to the field, a second tap closes it),
  * as the main page's candidates panel always had it. The edited-query rule is the hook's, unchanged.
- * A search starting closes it again.
+ * A search starting closes it again. Since 2.1.27 (James: "search again should be somewhere near the
+ * top as well", then "maybe on the right of 'choose a source'", as the iPhone app has it) a second
+ * one is in the head - at the right of "Choose a source" on a phone, the words or under 390px the
+ * search icon; before the close button on a desktop's panel - whose query form opens above the
+ * chips, outside the list, so no scroll takes it away. One form at a time: the other's tap moves it.
  *
  * WHY EACH SCORED AS IT DID (2.0.0-player.41): each card's signals and the edition words in its
  * folder's name (SourceCard.tsx) - always shown on a desktop's panel, behind a tap on the score in a
@@ -287,9 +291,12 @@ export function Sources({
     formatPreference: formatPreferenceNow,
   })
 
-  //? Search again, when folders were found: the query to edit, opened under them
-  const [again, setAgain] = useState(false)
+  //? Search again, when folders were found: the query to edit, opened under them ('bottom') or, from
+  //? the head's (2.1.27), above the chips ('top') - one at a time, null closed
+  const [again, setAgain] = useState<'top' | 'bottom' | null>(null)
   const againId = useMemo(() => `app-sources-again-${++queryForms}`, [])
+  const againTopId = useMemo(() => `app-sources-again-top-${++queryForms}`, [])
+  const toggleAgain = (place: 'top' | 'bottom') => setAgain((was) => (was === place ? null : place))
   const againField = useRef<HTMLInputElement>(null)
 
   //? Every search the sheet starts asks deadwax for the settings first (review): set going before the
@@ -315,7 +322,7 @@ export function Sources({
     if (!open || !request) return
     if (scroller.current) scroller.current.scrollTop = 0
     //? a new search - a Get, or the panel following the page - starts with Search again closed
-    setAgain(false)
+    setAgain(null)
     if (request.again) {
       begin(request.release, false)
       return
@@ -351,7 +358,7 @@ export function Sources({
   //? a Re-search - from Search again or from nothing found - closes Search again as it starts
   const requery = () => {
     keepFocus()
-    setAgain(false)
+    setAgain(null)
     void askGetSettings()
     state.requery()
   }
@@ -380,7 +387,7 @@ export function Sources({
   const queryForm = (said: JSX.Element | null, id?: string) => (
     <form
       {...(id ? { id } : {})}
-      class={`app-sources-state${id ? ' is-again' : ''}`}
+      class={`app-sources-state${id ? ' is-again' : ''}${id === againTopId ? ' is-top' : ''}`}
       onSubmit={(event) => {
         event.preventDefault()
         requery()
@@ -407,16 +414,16 @@ export function Sources({
     </form>
   )
 
-  //? "Search again" under folders found: a disclosure - the query to edit opens under it, and a second
-  //? tap closes it again
+  //? "Search again" under folders found: a disclosure - the query to edit opens under it, a second tap
+  //? closes it again, and the head's moves it up there
   const searchAgain = (
     <>
       <div class="app-sources-again">
-        <button type="button" class="app-text-button" aria-expanded={again} aria-controls={againId} onClick={() => setAgain((was) => !was)}>
+        <button type="button" class="app-text-button" aria-expanded={again === 'bottom'} aria-controls={againId} onClick={() => toggleAgain('bottom')}>
           Search again
         </button>
       </div>
-      {again && queryForm(null, againId)}
+      {again === 'bottom' && queryForm(null, againId)}
     </>
   )
 
@@ -461,6 +468,24 @@ export function Sources({
     })
   }
   const notes = result ? storeNotes(result) : []
+  //? (2.1.27) folders were found and are shown - the cards, or none passing the chips - so the head offers
+  //? Search again too: not while asking, for an error, for the store's box, nor when nothing was found
+  //? (whose query form is already there)
+  const foundFolders = !!search && !search.pending && !search.error && !status && !!result && result.candidates.length > 0
+  //? the head's Search again: the words, or under 390px the search icon (CSS), named the same either way
+  const againInHead = foundFolders ? (
+    <button
+      type="button"
+      class="app-sources-again-head"
+      aria-label="Search again"
+      aria-expanded={again === 'top'}
+      aria-controls={againTopId}
+      onClick={() => toggleAgain('top')}
+    >
+      <span class="app-sources-again-words" aria-hidden="true">Search again</span>
+      <SearchIcon class="app-sources-again-icon" />
+    </button>
+  ) : null
   const announcement = search
     ? sourcesAnnouncement({
       pending: search.pending, release: search.release, error: search.error, status, result, shown: shown.length, notPicked: state.notPicked,
@@ -483,6 +508,7 @@ export function Sources({
               Cancel
             </button>
             <h2 id="app-sources-title" class="app-sources-title">Choose a source</h2>
+            {againInHead}
             {request && <p class="app-sources-subtitle" dir="auto">{request.subtitle}</p>}
           </header>
         ) : (
@@ -493,12 +519,17 @@ export function Sources({
               <h2 id="app-sources-title" class="app-sources-title">Sources</h2>
               {request && <p class="app-sources-subtitle" dir="auto">for <bdi>{request.subtitle}</bdi></p>}
             </div>
-            <button ref={cancel} type="button" class="app-sources-close" onClick={onClose} aria-label="Close the sources">
-              <CloseIcon class="app-sources-close-icon" />
-            </button>
+            <div class="app-sources-head-end">
+              {againInHead}
+              <button ref={cancel} type="button" class="app-sources-close" onClick={onClose} aria-label="Close the sources">
+                <CloseIcon class="app-sources-close-icon" />
+              </button>
+            </div>
           </header>
         )}
         <p class="app-visually-hidden" role="status" aria-live="polite" aria-atomic="true">{announcement}</p>
+        {/* the head's Search again: the query to edit above the chips, outside the list (2.1.27) */}
+        {foundFolders && again === 'top' && queryForm(null, againTopId)}
 
         <div class="app-sources-chips" role="group" aria-label="Filter the sources">
           {chipList.filter((chip) => modal || chip.key !== 'complete').map(chipButton)}

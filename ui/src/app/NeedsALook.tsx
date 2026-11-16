@@ -6,7 +6,7 @@ import { useLibrary } from '../hooks/useLibrary'
 import { albumArtUrl } from '../lib/format'
 import { isNewImport, issueLabel, markedFineIssues, outstandingIssues } from '../lib/metadataQueue'
 import {
-  IGNORED_FACET, IGNORES_UNSAVED, MARK_WORDS, MARKED_FINE, NEEDS_LOOK_LINE, facetAlbums, facetShown, facets, ignoresUnsaved, isIgnoredOnly, leavingAtEnd,
+  IGNORED_FACET, IGNORES_UNSAVED, MARK_WORDS, MARKED_FINE, NEEDS_LOOK_LINE, NEEDS_LOOK_LINE_NO_EDIT, facetAlbums, facetShown, facets, ignoresUnsaved, isIgnoredOnly, leavingAtEnd,
   navidromeNote, rowChanged, startSession, stepTarget, summaryTotal,
   type Facet, type FolderChange, type LookSession, type RowMark,
 } from '../lib/needsLook'
@@ -365,7 +365,7 @@ export function NeedsALook({
     <section class="app-queue">
       {header}
       <div ref={body} class="app-queue-body" tabIndex={-1}>
-        <p class="app-queue-line">{NEEDS_LOOK_LINE}</p>
+        <p class="app-queue-line">{canEdit ? NEEDS_LOOK_LINE : NEEDS_LOOK_LINE_NO_EDIT}</p>
         {!canEdit && <p class="app-queue-line app-queue-no-edit">{NEEDS_EDIT}</p>}
         {ignoresUnsaved(library, tracking) && <p class="app-queue-warning">{IGNORES_UNSAVED}</p>}
 

@@ -547,3 +547,92 @@ def test_tracks_travel_compact_and_say_only_where_they_differ(tmp_path, monkeypa
     album = make_client(tmp_path, monkeypatch, store).get("/deadwax/library/albums").json()["albums"][0]
     assert album["track_defaults"]["album"] == "The Slow Rush"
     assert all("album" not in track and "has_title_tag" not in track for track in album["tracks"])
+
+
+# ---------------------------------------------------------------- the scan without its tracks (2.1.28)
+
+TRACK_KEYS = ("tracks", "track_defaults")
+
+
+def without_tracks(body):
+    """A full answer's body as `?tracks=false` should send it."""
+    return {**body, "albums": [{k: v for k, v in album.items() if k not in TRACK_KEYS} for album in body["albums"]]}
+
+
+def warm_client(tmp_path, monkeypatch, store):
+    """Two albums, scanned once - the first scan enrols first_seen, which later answers carry."""
+    seed_album(tmp_path)
+    seed_album(tmp_path, artist="Portishead", folder="Dummy (1994)", album="Dummy", tracks=3)
+    client = make_client(tmp_path, monkeypatch, store)
+    client.get("/deadwax/library/albums")
+    return client
+
+
+def test_the_scan_without_its_tracks_is_the_same_answer_less_them(tmp_path, monkeypatch, store):
+    """For the iPhone app's editor: every album-level field as the web is sent it, and nothing of a track's."""
+    client = warm_client(tmp_path, monkeypatch, store)
+
+    full = client.get("/deadwax/library/albums")
+    lean = client.get("/deadwax/library/albums", params={"tracks": "false"})
+
+    assert lean.status_code == 200
+    assert lean.json() == without_tracks(full.json())
+    #? the same keys in the same order, not merely equal: the body is what the ETag is of
+    assert [list(a) for a in lean.json()["albums"]] == [list(a) for a in without_tracks(full.json())["albums"]]
+    assert all(key not in album for album in lean.json()["albums"] for key in TRACK_KEYS)
+    #? the decoration is there - the queue, its issue types, each album's issues - and the counts
+    body = lean.json()
+    assert body["album_count"] == 2 and body["queue"] == full.json()["queue"] and body["issue_types"]
+    assert all("no_art" in album["issues"] for album in body["albums"])
+    assert [a["track_count"] for a in body["albums"]] == [a["track_count"] for a in full.json()["albums"]]
+    #? the scan's volatile fields are headers on both
+    for name in ("x-scanned-at", "x-scan-seconds", "x-scan-cached", "x-scan-stale"):
+        assert name in lean.headers
+    assert lean.headers["x-scan-stale"] == "0"
+    #? and the default is untouched: the web's answer still carries every track
+    assert all(album["tracks"] and album["track_defaults"] for album in full.json()["albums"])
+
+
+def test_the_two_forms_never_share_an_etag(tmp_path, monkeypatch, store):
+    client = warm_client(tmp_path, monkeypatch, store)
+    full = client.get("/deadwax/library/albums")
+    lean = client.get("/deadwax/library/albums", params={"tracks": "false"})
+
+    assert lean.headers["etag"] != full.headers["etag"]
+
+    again = client.get("/deadwax/library/albums", params={"tracks": "false"},
+                       headers={"If-None-Match": lean.headers["etag"]})
+    assert again.status_code == 304
+    assert "x-scanned-at" in again.headers
+
+    #? each form's ETag is a 200 for the other - never a 304 that hands back the wrong body
+    crossed = client.get("/deadwax/library/albums", params={"tracks": "false"},
+                         headers={"If-None-Match": full.headers["etag"]})
+    assert crossed.status_code == 200 and "tracks" not in crossed.json()["albums"][0]
+    crossed = client.get("/deadwax/library/albums", headers={"If-None-Match": lean.headers["etag"]})
+    assert crossed.status_code == 200 and crossed.json()["albums"][0]["tracks"]
+
+
+def test_a_snapshot_without_its_tracks(tmp_path, monkeypatch, store):
+    client = warm_client(tmp_path, monkeypatch, store)
+    shutil.rmtree(tmp_path / "Portishead")
+
+    full = client.get("/deadwax/library/albums", params={"snapshot": "true"})
+    lean = client.get("/deadwax/library/albums", params={"snapshot": "true", "tracks": "false"})
+
+    assert lean.headers["x-scan-stale"] == "1"
+    assert lean.json()["album_count"] == 2, "the saved scan, not the disk"
+    assert lean.json() == without_tracks(full.json())
+
+
+def test_a_rescan_without_its_tracks(tmp_path, monkeypatch, store):
+    client = warm_client(tmp_path, monkeypatch, store)
+    lean_scan = client.get("/deadwax/library/albums", params={"tracks": "false"}).json()
+
+    full = client.post("/deadwax/library/rescan")
+    lean = client.post("/deadwax/library/rescan", params={"tracks": "false"})
+
+    assert lean.status_code == 200
+    assert lean.json() == without_tracks(full.json())
+    assert lean.json() == lean_scan, "a forced read of an unchanged library is the same answer"
+    assert all(album["tracks"] for album in full.json()["albums"]), "rescan's default is untouched"

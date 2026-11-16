@@ -1895,6 +1895,15 @@ console.log('\nediting an album on a desktop: the Edit panel, a side panel by th
       /chooseFolder\(path\)\s*focusNext\.current = toTab\(tab\)/.test(panel),
       /editOpener\.current = document\.querySelector<HTMLElement>\(`\.app-pane\[data-tab="\$\{nav\.tab\}"\] \.app-edit-toggle\[aria-pressed="true"\]`\)/.test(app)],
     [true, true, true, true, true, true, true])
+  //? (2.1.29, the iPhone app's Phase 8 decision 2) queue/ignore and unignore are Look after the library's routes
+  const editor = code(read('components/MetadataEditor.tsx'))
+  check("It's fine as it is and Ask about it again handed to the release editor only by marksFine - and drawn only when handed",
+    [/const fine = marksFine\(permissions\)/.test(panel), /onIgnore=\{fine \? ignoreAlbum : undefined\}/.test(panel),
+      /onUnignore=\{fine \? unignoreAlbum : undefined\}/.test(panel), /onIgnore=\{ignoreAlbum\}|onUnignore=\{unignoreAlbum\}/.test(panel),
+      /\{onIgnore && issues\.length > 0 && \(\s*<button\b[^>]*class="columns-toggle-button metadata-ignore-button"/.test(editor),
+      /\{onUnignore && \(\s*<button\b[^>]*class="metadata-issue-undo"/.test(editor),
+      (editor.match(/metadata-ignore-button|metadata-issue-undo/g) ?? []).length],
+    [true, true, true, false, true, true, 2])
   check('the main page\'s editors, reused - not rewritten, nor copied',
     ['MetadataEditor', 'TrackTagEditor', 'DeleteAlbumDialog', 'LibraryParts'].map((name) => new RegExp(`from '\\.\\./components/${name}'`).test(panel)),
     [true, true, true, true])
@@ -2321,9 +2330,12 @@ console.log('\nLooking after the library in the app, on a desktop (2.0.0-player.
   //? doing so" - ServerSettings' line is pinned in settingslog.sim; the Edit panel's Lyrics note is words, not a
   //? link, so the links-out count can't see it (review). Read raw: an apostrophe in JSX text isn't a string
   const lyricsNote = (read('app/EditPanel.tsx').match(/<h3 id="app-edit-lyrics"[\s\S]*?<\/section>/) ?? [''])[0]
+  //? (2.1.30) its words are lib/albumEdit.ts's RETIME_POINTER, which the tab draws
+  const retimeWords = /export const RETIME_POINTER = '([^'\n]*)'/.exec(read('lib/albumEdit.ts'))?.[1] ?? ''
   //? (2.0.8, UX batch 5) by the page's own name and group - there was never a "Managing's Settings"
   check('the Edit panel\'s Lyrics tab: re-timing named where it is - Lyrics in Server settings (Library) - never the main page',
-    [/re-time the ones already saved, see Lyrics in Server settings \(Library\)\./.test(lyricsNote), /main page|Managing/i.test(lyricsNote)], [true, false])
+    [/<p class="app-edit-note">\{RETIME_POINTER\}<\/p>/.test(lyricsNote), /re-time the ones already saved, see Lyrics in Server settings \(Library\)\./.test(retimeWords),
+      /main page|Managing/i.test(lyricsNote + retimeWords)], [true, true, false])
   //? (2.0.0-player.66) the main page retired: Managing lists only its pages - its "Open the main page" went, and
   //? so did You's row and footnote (read raw, comments and all: no link to `/` in any form)
   check('Managing has no link to `/` - the sidebar\'s nor You\'s',
@@ -2643,11 +2655,18 @@ console.log('\nGet, as the main page had it (2.0.0-player.41)')
       files.filter((file) => file.startsWith('app/') && /readPreferences\(/.test(code(read(file))))], [true, ['app/useGetSettings.ts']])
   //? Search again: a disclosure under folders found, its field focused as it opens, closed as a search starts
   check('Search again: a disclosure controlling the query form, focus to its field as it opens, closed as a search starts',
-    [/<button type="button" class="app-text-button" aria-expanded=\{again\} aria-controls=\{againId\} onClick=\{\(\) => setAgain\(\(was\) => !was\)\}>/.test(sheet),
+    [/<button type="button" class="app-text-button" aria-expanded=\{again === 'bottom'\} aria-controls=\{againId\} onClick=\{\(\) => toggleAgain\('bottom'\)\}>/.test(sheet),
       /useLayoutEffect\(\(\) => \{\s*if \(again\) againField\.current\?\.focus\(/.test(sheet),
-      /const requery = \(\) => \{\s*keepFocus\(\)\s*setAgain\(false\)\s*void askGetSettings\(\)\s*state\.requery\(\)/.test(sheet),
-      /if \(scroller\.current\) scroller\.current\.scrollTop = 0\s*setAgain\(false\)/.test(sheet)],
+      /const requery = \(\) => \{\s*keepFocus\(\)\s*setAgain\(null\)\s*void askGetSettings\(\)\s*state\.requery\(\)/.test(sheet),
+      /if \(scroller\.current\) scroller\.current\.scrollTop = 0\s*setAgain\(null\)/.test(sheet)],
     [true, true, true, true])
+  //? (2.1.27) ...and the head's: one form at a time, the other's tap moving it - named Search again whether
+  //? its words or its icon show
+  check('Search again in the head too: its own form, one open at a time, named the same as words or icon',
+    [/const toggleAgain = \(place: 'top' \| 'bottom'\) => setAgain\(\(was\) => \(was === place \? null : place\)\)/.test(sheet),
+      /aria-label="Search again"\s*aria-expanded=\{again === 'top'\}\s*aria-controls=\{againTopId\}\s*onClick=\{\(\) => toggleAgain\('top'\)\}/.test(sheet),
+      /\{foundFolders && again === 'top' && queryForm\(null, againTopId\)\}/.test(sheet)],
+    [true, true, true])
 }
 
 //? LOADING (the audit): the Library asks Navidrome for nothing until its tab has been shown once, and a

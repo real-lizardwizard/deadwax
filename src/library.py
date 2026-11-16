@@ -1413,3 +1413,16 @@ def compact_for_wire(albums: list[dict]) -> list[dict]:
         kept = {k: v for k, v in album.items() if k not in ALBUM_SERVER_ONLY_FIELDS}
         wire.append({**kept, "tracks": compact, "track_defaults": defaults})
     return wire
+
+
+def albums_without_tracks(albums: list[dict]) -> list[dict]:
+    """
+    The albums as compact_for_wire() sends them less each one's `tracks` and `track_defaults`:
+    every album-level field, the same values in the same order, and nothing of a track's.
+
+    The scan's `?tracks=false` (2.1.28), for the iPhone app's album editor, whose every field of an
+    album is album-level - the tracks are most of the body even compacted, and it asks twice a visit.
+    New dicts, as compact_for_wire's, so the cache's albums are never trimmed.
+    """
+    return [{k: v for k, v in album.items() if k not in ALBUM_SERVER_ONLY_FIELDS and k != "tracks"}
+            for album in albums]
