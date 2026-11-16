@@ -11,7 +11,9 @@ import SwiftUI
 /// read to trust. After each, whatever came of it, the list is read again. A refusal is said in deadwax's words (EditWords
 /// .said over the web's "Couldn't add it for them."); one that never answered may have finished - said, and the list read
 /// again to see. What a write did is spoken as the web's hidden line says it. Rows are known by their ids; VoiceOver reads
-/// each once. Nothing is done past a sign-out: the model's session is AppNavigation's when the page opened.
+/// each once. Nothing is done past a sign-out: the model's session is AppNavigation's when the page opened. Nothing is
+/// read under the sign-in over the app (its 401 would only be said as a failure); once it goes, the list is read again.
+/// A flag's buttons stay off while the list is read - the read after a write included.
 struct HeldByNobodyScreen: View {
     @Environment(ServerModel.self) private var server
     @Environment(Reachability.self) private var reachability
@@ -66,6 +68,11 @@ struct HeldByNobodyScreen: View {
         }
         .onChange(of: shown) { _, now in
             guard now, visible else { return }
+            Task { await model.read() }
+        }
+        // signed in again over the app: what failed under it is read again
+        .onChange(of: server.signInOver == nil) { _, clear in
+            guard clear, visible, shown else { return }
             Task { await model.read() }
         }
     }
@@ -135,7 +142,7 @@ struct HeldByNobodyScreen: View {
 
     /// A flagged download: its name, who asked and why nobody was given it, and its two buttons.
     private func flagRow(_ flag: Held.Flag, online: Bool) -> some View {
-        let open = model.flow.open(online: online)
+        let open = model.flow.open(online: online, reading: model.reading)
         return VStack(alignment: .leading, spacing: 8) {
             VStack(alignment: .leading, spacing: 2) {
                 Text(Held.flagName(flag))
@@ -213,9 +220,11 @@ final class HeldModel {
 
     private var admin: Bool { server?.access.seesDetail ?? false }
 
-    /// The list read (`GET /library/held`) - in reach only.
+    /// The list read (`GET /library/held`) - in reach only, and never under the sign-in over the app.
     func read() async {
-        guard reachability?.online == true, samePerson, let client = server?.client else { return }
+        guard reachability?.online == true, samePerson, server?.signInOver == nil, let client = server?.client else {
+            return
+        }
         let ticket = flow.readBegan()
         reading = true
         do {
@@ -240,7 +249,9 @@ final class HeldModel {
 
     /// Add for them or Dismiss pressed: one at a time, its answer said, and the list read again whatever came of it.
     func act(_ flag: Held.Flag, _ write: Held.Write, online: Bool) {
-        guard samePerson, let client = server?.client, flow.begin(flag.id, online: online) else { return }
+        guard samePerson, let client = server?.client, flow.begin(flag.id, online: online, reading: reading) else {
+            return
+        }
         refused = nil
         let name = Held.saidName(answer?.flags.first { $0.id == flag.id })
         let hold = BackgroundHold(named: "In nobody's library")

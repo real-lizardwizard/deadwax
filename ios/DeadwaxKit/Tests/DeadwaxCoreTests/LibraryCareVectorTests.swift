@@ -219,7 +219,10 @@ import Testing
                 let expected = Self.outcome(each["outcome"])
                 for kind in [BulkTargets.Kind.covers, .disc] {
                     let step = BulkTargets.step(kind, album, failure: failure)
-                    if let status = each["status"].int, status < 500 {
+                    // counted as the web counts it; a 403 the phone's own step (it stops the run), the count the same
+                    if each["status"].int == 403 {
+                        #expect(step == .forbidden(expected), "\(each)")
+                    } else if let status = each["status"].int, status < 500 {
                         #expect(step == .answered(expected), "\(each)")
                     } else {
                         #expect(step == .unanswered(expected), "\(each)")

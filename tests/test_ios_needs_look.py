@@ -268,7 +268,10 @@ def test_a_mark_is_judged_as_every_write_is():
 
 def test_the_page_says_its_own_failures_and_shows_when_deadwax_is_out_of_reach():
     page = app_file("Manage", "NeedsLookModel.swift")
-    assert "scan.failure(saying: scan.loaded ? NeedsLook.checkFailed : NeedsLook.readFailed)" in page
+    # (slice 7's review) READ_FAILED whenever there are no albums to show, and a read ended (answered or failed) the
+    # ladder's `loaded`, as the web's: a failed first read is Try again, not the spinner for good
+    assert "scan.failure(saying: scan.albums.isEmpty ? NeedsLook.readFailed : NeedsLook.checkFailed)" in page
+    assert "NeedsLook.state(problem: scan.answer?.problem, loaded: scan.ended, failed: scan.failed != nil," in page
     screen = app_file("Manage", "NeedsLookScreen.swift")
     assert "ErrorNote(text: model.failure ?? NeedsLook.readFailed)" in screen
     assert "Text(model.failure ?? NeedsLook.checkFailed)" in screen

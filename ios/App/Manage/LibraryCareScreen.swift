@@ -13,10 +13,12 @@ import SwiftUI
 /// result stays. One run at a time - the others' Start off while one goes, saying so. The screen stays on while a run goes
 /// and this page shows. Out of reach, what is drawn is how it was under the amber line Edit album has, and nothing can be
 /// pressed until it is back and the library read again. Without either part it says so and asks nothing; opened out of
-/// reach before anything was read, it says it needs deadwax. With Reduce Motion nothing slides; VoiceOver reads each
-/// row once, and hears each run's result as it ends.
+/// reach before anything was read, it says it needs deadwax. Nothing is read under the sign-in over the app; once it
+/// goes, the page reads again. With Reduce Motion nothing slides; VoiceOver reads each row once, and hears each run's
+/// result as it ends.
 struct LibraryCareScreen: View {
     @Environment(CareRunModel.self) private var care
+    @Environment(ServerModel.self) private var server
     @Environment(Reachability.self) private var reachability
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
@@ -46,6 +48,10 @@ struct LibraryCareScreen: View {
         // a part given while the page is up: read now
         .onChange(of: parts.shown) { _, shown in
             if shown { care.shows() }
+        }
+        // signed in again over the app: what failed under it is read again
+        .onChange(of: server.signInOver == nil) { _, clear in
+            if clear { care.sessionBack() }
         }
     }
 

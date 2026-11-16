@@ -4,8 +4,9 @@ import Testing
 
 /// Library care (Phase 8, slice 7 - phase8-managing.md 6): what the vectors can't reach - the four routes as the web asks
 /// them, the scan's size and time the page reads, and every decision CareRuns and Held.Flow make for the page: one run
-/// at a time, Stop and the phone's own stops landing after the album out, a kind held behind until a read begun after
-/// its run, Rescan's busy and what follows it, the reads the page makes, and In nobody's library one write at a time.
+/// at a time, Stop and the phone's own stops landing after the album out (a 403 among them), a kind held behind until a
+/// read begun after its run, Rescan's busy and what follows it, the reads the page makes - a read that landed too early
+/// followed by one to trust - and In nobody's library one write at a time, never while its list is read.
 @Suite struct LibraryCareTests {
     static func album(_ path: String, art: String = "", release: String = "mbid", discArt: [String] = [], lyrics: Int = 0,
                       tracks: Int = 10, artist: String = "Björk", name: String = "Post") -> ScanAlbum {
@@ -24,6 +25,10 @@ import Testing
 
     static let server = try! ServerAddress.parse("192.168.3.20:8090").get()
     static let noAnswer = APIFailure.timeout(.init(server: server, method: "POST", path: "/library/art/fetch", reason: "timed out"))
+
+    static func refusal(_ status: Int) -> APIFailure {
+        .answered(.init(status: status, method: "POST", path: "/library/art/fetch"))
+    }
 
     // MARK: the routes
 
@@ -85,10 +90,10 @@ import Testing
 
         transport.answer("/deadwax/library/held/flags/7/add", 200, #"{"added": true, "users": ["ana", "ben"]}"#)
         #expect(try await deadwax.addFlagged(7) == Held.Added(added: true, users: ["ana", "ben"]))
-        #expect(transport.last?.method == "POST" && transport.last?.body == nil && transport.last?.timeout == 20)
+        #expect(transport.last?.method == "POST" && transport.last?.body == nil && transport.last?.timeout == 60)
         transport.answer("/deadwax/library/held/flags/7/dismiss", 200, #"{"dismissed": true}"#)
         #expect(try await deadwax.dismissFlag(7) == Held.Dismissed(dismissed: true))
-        #expect(transport.last?.url.path == "/deadwax/library/held/flags/7/dismiss" && transport.last?.timeout == 20)
+        #expect(transport.last?.url.path == "/deadwax/library/held/flags/7/dismiss" && transport.last?.timeout == 30)
 
         // dealt with already: deadwax's own words, shown as they came
         transport.answer("/deadwax/library/held/flags/7/add", 409, #"{"detail": "That has been dealt with already."}"#)
@@ -117,10 +122,13 @@ import Testing
         #expect(Routes.held.method == "GET")
         #expect(Routes.timeouts[Routes.rescan] == 300)
         #expect(Routes.timeouts[Routes.held] == 30)
-        #expect(Routes.timeouts[Routes.heldAdd] == 20 && Routes.timeouts[Routes.heldDismiss] == 20)
-        // the runs' steps are slice 1's and 3's routes, each with its own wait
+        // each store call may wait out SQLite's 10 s busy timeout: Add for them makes five, Dismiss two (+ 10 s)
+        #expect(Routes.timeouts[Routes.heldAdd] == 60 && Routes.timeouts[Routes.heldDismiss] == 30)
+        // the runs' steps are slice 1's and 3's routes, each with its own wait - lyrics' grown with the album: 40
+        // tracks are 20 rounds of two at once, each 2 names x 2 requests x (40 + 15) s, + 60, to the minute
         #expect(Routes.timeouts[Routes.artFetch] == 120)
-        #expect(EditWaits.lyrics(Self.album("A/B", tracks: 40)) >= Routes.timeouts[Routes.lyricsFetch]!)
+        #expect(EditWaits.lyrics(Self.album("A/B", tracks: 40)) == 4500)
+        #expect(EditWaits.lyrics(Self.album("A/B", tracks: 1)) == Routes.timeouts[Routes.lyricsFetch])
     }
 
     // MARK: runs
@@ -305,19 +313,76 @@ import Testing
         #expect(idle == Self.ready())
     }
 
-    @Test func aCancelledAlbumCountsNothingAndEndsTheRun() {
+    /// (Slice 7's review) A cancellation - nothing in the app cancels a run's request - is counted as one that never
+    /// answered: failed, as the web counts any throw, and it may have written, so the kind is left behind; the run
+    /// carries on.
+    @Test func aCancelledAlbumCountsAsOneThatNeverAnswered() {
         var runs = Self.ready()
         _ = runs.start(.covers, Self.five, allowed: true, online: true)
         guard case .album(let album) = runs.next(allowed: true, online: true) else { Issue.record("an album"); return }
         let step = BulkTargets.step(.covers, album, failure: CancellationError())
-        #expect(step == .cancelled)
+        #expect(step == .unanswered(.init(failed: 1)))
+        #expect(BulkTargets.step(.lyrics, album, failure: URLError(.cancelled)) == .unanswered(.init(failed: 10)))
         let got30 = runs.finished(step)
-        #expect(!got30)
+        #expect(got30, "it may have written")
         let got31 = runs.next(allowed: true, online: true)
-        #expect(got31 == .ended(.covers))
-        #expect(runs.run(.covers)?.done == 0)
-        #expect(runs.result(.covers) == "Got 0 covers. Stopped at 0 of 5.")
-        #expect(runs.behind[.covers] == nil, "nothing written, nothing that may have been")
+        #expect(got31 != .ended(.covers), "the run carries on")
+        runs.stop(.covers)
+        runs.finished(.answered(.init()))
+        _ = runs.next(allowed: true, online: true)
+        #expect(runs.result(.covers) == "Got 0 covers. 1 failed - run it again to try it again. Stopped at 2 of 5.")
+        #expect(runs.behind[.covers] != nil, "it may have written")
+    }
+
+    /// (Slice 7's review) A 403 is deadwax saying Edit albums is no longer this person's: the album counted as the web
+    /// counts it (failed - every track for lyrics), nothing told (nothing written), and the run stops after it with the
+    /// phone's words, where the web's carries on refused album by album. Every other 4xx carries on, as the web's does.
+    @Test func a403StopsTheRunAfterItsAlbumAndEveryOther4xxCarriesOn() {
+        let table: [(status: Int, step: BulkTargets.Step, stops: Bool)] = [
+            (403, .forbidden(.init(failed: 1)), true),
+            (400, .answered(.init(failed: 1)), false),
+            (404, .answered(.init(missing: 1)), false),
+            (409, .answered(.init(failed: 1)), false),
+            (422, .answered(.init(failed: 1)), false),
+            (500, .unanswered(.init(failed: 1)), false),
+        ]
+        for row in table {
+            var runs = Self.ready()
+            _ = runs.start(.covers, Self.five, allowed: true, online: true)
+            guard case .album(let album) = runs.next(allowed: true, online: true) else {
+                Issue.record("an album")
+                continue
+            }
+            let step = BulkTargets.step(.covers, album, failure: Self.refusal(row.status))
+            #expect(step == row.step, "\(row.status)")
+            let told = runs.finished(step)
+            #expect(told == (row.status >= 500), "\(row.status)")
+            #expect(runs.run(.covers)?.done == 1)
+            let after = runs.next(allowed: true, online: true)
+            #expect((after == .ended(.covers)) == row.stops, "\(row.status)")
+        }
+        // the run's words: the web's summary, then the phone's
+        var runs = Self.ready()
+        _ = runs.start(.lyrics, Self.five, allowed: true, online: true)
+        guard case .album(let album) = runs.next(allowed: true, online: true) else { Issue.record("an album"); return }
+        let step = BulkTargets.step(.lyrics, album, failure: Self.refusal(403))
+        #expect(step == .forbidden(.init(failed: 10)))
+        runs.finished(step)
+        let ended = runs.next(allowed: true, online: true)
+        #expect(ended == .ended(.lyrics))
+        #expect(runs.ended[.lyrics]?.stop == .notAllowed)
+        #expect(runs.result(.lyrics) == "Saved lyrics for 0 tracks. 10 failed - try them again from the album's own Get "
+                + "lyrics, in Edit album. Stopped at 1 of 5 albums. It stopped: running it needs Edit albums, which an "
+                + "admin hasn't given you.")
+        #expect(runs.behind[.lyrics] == nil, "refused: nothing written")
+        // Stop pressed first keeps its own word
+        var pressed = Self.ready()
+        _ = pressed.start(.covers, Self.five, allowed: true, online: true)
+        _ = pressed.next(allowed: true, online: true)
+        pressed.stop(.covers)
+        pressed.finished(.forbidden(.init(failed: 1)))
+        _ = pressed.next(allowed: true, online: true)
+        #expect(pressed.ended[.covers]?.stop == .pressed)
     }
 
     @Test func aKindIsBehindOnlyUntilAReadBegunAfterItsRunLands() {
@@ -340,6 +405,51 @@ import Testing
         runs.stop(.disc)
         _ = runs.next(allowed: true, online: true)
         #expect(runs.behind.isEmpty)
+    }
+
+    /// (Slice 7's review) A read already out as a run ends began too early to clear its kind, and the page asks none
+    /// over it: once it lands, CareRuns says to read again (CareRunModel asks after every read that lands), and the one
+    /// after clears it.
+    @Test func aReadOutAsARunEndsIsFollowedByOneToTrust() {
+        var runs = Self.ready()
+        _ = runs.start(.covers, Self.five, allowed: true, online: true)
+        _ = runs.next(allowed: true, online: true)
+        let early = runs.readBegan()
+        runs.finished(.answered(.init(written: 1)))
+        runs.stop(.covers)
+        _ = runs.next(allowed: true, online: true)
+        let over = runs.readsNow(shown: true, online: true, again: false, loaded: true, reading: true)
+        #expect(!over, "one is out")
+        runs.readLanded(early)
+        #expect(runs.behind[.covers] != nil && runs.targets(.covers, Self.five) == nil)
+        let again = runs.readsNow(shown: true, online: true, again: false, loaded: true, reading: false)
+        #expect(again, "it began before the run ended: read again")
+        runs.readLanded(runs.readBegan())
+        #expect(runs.behind.isEmpty)
+        let done = runs.readsNow(shown: true, online: true, again: false, loaded: true, reading: false)
+        #expect(!done, "and no more")
+        #expect(runs.startOpen(.covers, Self.five, allowed: true, online: true))
+    }
+
+    /// (Slice 7's review) The same for a read out as deadwax comes back into reach: it began before the gap, so it isn't
+    /// trusted, and once it lands the page reads again.
+    @Test func aReadOutAsDeadwaxComesBackIsFollowedByOneToTrust() {
+        var runs = Self.ready()
+        let during = runs.readBegan()
+        runs.reach(false)
+        runs.reach(true)
+        let over = runs.readsNow(shown: true, online: true, again: false, loaded: true, reading: true)
+        #expect(!over, "one is out")
+        runs.readLanded(during)
+        #expect(!runs.real, "begun before the gap")
+        #expect(!runs.startOpen(.covers, Self.five, allowed: true, online: true))
+        let again = runs.readsNow(shown: true, online: true, again: false, loaded: true, reading: false)
+        #expect(again, "it began before the gap: read again")
+        runs.readLanded(runs.readBegan())
+        #expect(runs.real)
+        let done = runs.readsNow(shown: true, online: true, again: false, loaded: true, reading: false)
+        #expect(!done, "and no more")
+        #expect(runs.startOpen(.covers, Self.five, allowed: true, online: true))
     }
 
     @Test func theScreenStaysOnOnlyWhileARunGoesAndItsPageShows() {
@@ -412,8 +522,8 @@ import Testing
             #expect(LibraryCare.stopped(.background, kind: kind)?.contains(LibraryCare.label(kind)) == true)
             #expect(LibraryCare.stopped(.outOfReach, kind: kind)?.contains(LibraryCare.label(kind)) == true)
             #expect(LibraryCare.stopped(.sessionEnded, kind: kind)?.contains(LibraryCare.label(kind)) == true)
+            #expect(LibraryCare.stopped(.notAllowed, kind: kind)?.contains("Edit albums") == true)
             #expect(LibraryCare.stopped(.pressed, kind: kind) == nil, "the web's Stopped at says it")
-            #expect(LibraryCare.stopped(.cancelled, kind: kind) == nil)
         }
         #expect(LibraryCare.startLabel(.lyrics, count: 14) == "Get lyrics · 14")
         #expect(LibraryCare.waiting(for: .covers) == "One run at a time - this one can start once Covers has finished.")
@@ -424,26 +534,30 @@ import Testing
 
     @Test func inNobodysLibraryWritesOneAtATimeFromAReadToTrust() {
         var flow = Held.Flow()
-        let got42 = flow.begin(7, online: true)
+        let got42 = flow.begin(7, online: true, reading: false)
         #expect(!got42, "nothing read yet")
         let first = flow.readBegan()
         flow.readLanded(first)
-        let got43 = flow.begin(7, online: false)
+        let got43 = flow.begin(7, online: false, reading: false)
         #expect(!got43, "out of reach")
-        let got44 = flow.begin(7, online: true)
+        let gotReading = flow.begin(7, online: true, reading: true)
+        #expect(!gotReading, "the list is being read")
+        let got44 = flow.begin(7, online: true, reading: false)
         #expect(got44)
         #expect(flow.acting == 7)
-        let got45 = flow.begin(8, online: true)
+        let got45 = flow.begin(8, online: true, reading: false)
         #expect(!got45, "one at a time: a second tap asks nothing")
-        #expect(!flow.open(online: true))
+        #expect(!flow.open(online: true, reading: false))
         flow.ended()
-        #expect(flow.open(online: true))
+        // (slice 7's review) the read after the write: the buttons stay off until it lands
+        #expect(!flow.open(online: true, reading: true), "the list read again after the write")
+        #expect(flow.open(online: true, reading: false))
         flow.outOfReach()
-        #expect(!flow.open(online: true), "back in reach, the list is read again first")
+        #expect(!flow.open(online: true, reading: false), "back in reach, the list is read again first")
         flow.readLanded(first)
         #expect(!flow.real, "a read from before the gap")
         flow.readLanded(flow.readBegan())
-        #expect(flow.open(online: true))
+        #expect(flow.open(online: true, reading: false))
         #expect(Held.Write.add.failed == Held.addFailed && Held.Write.dismiss.failed == Held.dismissFailed)
     }
 

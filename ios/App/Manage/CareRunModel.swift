@@ -16,8 +16,10 @@ import UIKit
 /// Needs a look's count is told, and when the screen stays on. This only carries them out (`drive`, `reading`): asks,
 /// keeps and hands on. Each album's request is held through the app going to the background (BackgroundHold), and the
 /// run stops after it (CareRuns.suspended - the phone's own: iOS suspends the app soon after); deadwax going out of reach,
-/// Edit albums going or the session ending (the sign-in over the app) stops it the same way. Start carries on: it asks
-/// again which albums still lack one.
+/// Edit albums going (/me says so, or deadwax refuses an album with a 403 - /me is then asked again) or the session
+/// ending (the sign-in over the app) stops it the same way. Start carries on: it asks again which albums still lack one.
+/// Nothing is read while the sign-in is over the app (its 401 would only be said as a failure); once it goes, the page
+/// reads again.
 ///
 /// Another person (`reset`): the run stops before its next album - the album out is let go, its answer dropped -
 /// nothing of the last person's kept, the screen let sleep.
@@ -69,16 +71,17 @@ final class CareRunModel {
         set { runs.narrow = newValue }
     }
 
-    /// The page's state before its sections (the web's ladder: LIBRARY_PATH's problem, reading, a first read failed).
+    /// The page's state before its sections (the web's ladder: LIBRARY_PATH's problem, reading, a failed read with no
+    /// albums to show, else the sections) - a read ended, answered or not, being the web's `loaded`.
     var state: NeedsLook.State {
-        NeedsLook.state(problem: scan.answer?.problem, loaded: scan.loaded, failed: scan.failed != nil,
+        NeedsLook.state(problem: scan.answer?.problem, loaded: scan.ended, failed: scan.failed != nil,
                         albums: scan.albums.count)
     }
 
-    /// The last read's failure in the page's words: READ_FAILED before anything was read, REREAD_FAILED over the scan
-    /// on screen - or deadwax's own words.
+    /// The last read's failure in the page's words, as the web's ladder says it: READ_FAILED with no albums to show
+    /// (nothing read yet, or a library read empty), REREAD_FAILED over the albums on screen - or deadwax's own words.
     var failure: String? {
-        scan.failure(saying: scan.loaded ? LibraryCare.rereadFailed : LibraryCare.readFailed)
+        scan.failure(saying: scan.albums.isEmpty ? LibraryCare.readFailed : LibraryCare.rereadFailed)
     }
 
     /// The facts under Rescan, at `now` (milliseconds).
@@ -154,6 +157,12 @@ final class CareRunModel {
         if now { readIfNeeded(again: false) }
     }
 
+    /// The sign-in over the app went (signed in again as the same person, or logins turned off): what failed while it
+    /// was there is read again, as the page shown again would.
+    func sessionBack() {
+        readIfNeeded(again: true)
+    }
+
     /// The screen stays on while a run goes and its page is in front - and only then.
     private func screen() {
         UIApplication.shared.isIdleTimerDisabled = runs.keepsScreenOn(visible: visible)
@@ -161,15 +170,19 @@ final class CareRunModel {
 
     // MARK: reading
 
-    /// The library read, when CareRuns says the page reads now.
+    /// The library read, when CareRuns says the page reads now - never under the sign-in over the app, where the page
+    /// still counts as shown (nothing over it disappears it) and its 401 would only be said as a failure; `sessionBack`
+    /// reads once it goes.
     private func readIfNeeded(again: Bool) {
-        guard parts.shown,
+        guard parts.shown, server.signInOver == nil,
               runs.readsNow(shown: visible, online: reachability.online, again: again, loaded: scan.loaded,
                             reading: scan.reading) else { return }
         Task { await read() }
     }
 
-    /// The library read (its failure in the page's words - `failure`).
+    /// The library read (its failure in the page's words - `failure`). Once it lands, CareRuns is asked again: a read
+    /// already out as a run ended, or as deadwax came back into reach, began too early to trust - it isn't asked for
+    /// then (one is out), so it is asked for now.
     func read() async {
         guard parts.shown, let client = server.client else { return }
         let ticket = runs.readBegan()
@@ -177,6 +190,7 @@ final class CareRunModel {
         let read = await scan.read(client: client, admin: admin)
         guard mine == generation, read == .landed else { return }
         runs.readLanded(ticket)
+        readIfNeeded(again: false)
     }
 
     /// Try again (the first read's, or the line over the sections): never while a read or a rescan is out.
@@ -220,17 +234,21 @@ final class CareRunModel {
     }
 
     /// The run, one album at a time, as CareRuns says: each album fetched (held through the background), counted, and
-    /// Needs a look's count told after each that wrote or may have; once over, its result announced, the screen let
-    /// sleep, and the library read for the kind it left behind.
+    /// Needs a look's count told after each that wrote or may have; a 403 stops it, and /me is asked again so the page
+    /// draws what this person may do now; once over, its result announced, the screen let sleep, and the library read
+    /// for the kind it left behind.
     private func drive(_ mine: Int) async {
         while mine == generation {
-            // the session ended (the sign-in over the app): every album after would be refused
-            if server.signInOver != nil { runs.sessionEnded() }
+            // the session ended (the sign-in over the app), or there is none to ask with: every album after would be
+            // refused
+            let client = server.client
+            if server.signInOver != nil || client == nil { runs.sessionEnded() }
             switch runs.next(allowed: parts.bulk, online: reachability.online) {
             case .album(let album):
-                guard let kind = runs.under?.kind else { return }
-                let step = await fetch(kind, album)
+                guard let kind = runs.under?.kind, let client else { return }
+                let step = await fetch(kind, album, with: client)
                 guard mine == generation else { return }
+                if case .forbidden = step { Task { await server.refreshMe() } }
                 if runs.finished(step) { navigation?.managed() }
             case .ended(let kind):
                 AccessibilityNotification.Announcement(runs.result(kind)).post()
@@ -244,8 +262,8 @@ final class CareRunModel {
     }
 
     /// One album's step: the route a single Get uses, its answer or its failure as CareRuns counts it.
-    private func fetch(_ kind: BulkTargets.Kind, _ album: ScanAlbum) async -> BulkTargets.Step {
-        guard let client = server.client else { return .cancelled }
+    private func fetch(_ kind: BulkTargets.Kind, _ album: ScanAlbum,
+                       with client: DeadwaxClient) async -> BulkTargets.Step {
         let hold = BackgroundHold(named: "Library care: \(LibraryCare.label(kind))")
         defer { hold.end() }
         do {

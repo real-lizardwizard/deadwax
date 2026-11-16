@@ -12684,3 +12684,69 @@ on; Narrow to's counts against the web's; In nobody's library's Add for them and
 permission; SwiftUI's onAppear/onDisappear and RootView's scene phase as CareRunModel's `visible` assumes (a push over
 the page, another tab, Now Playing's full-screen cover, the sign-in over the tabs); VoiceOver hearing each run's result
 and the largest text; Reduce Motion.
+
+### After review (16 Nov)
+
+The review of ea9f7af (code read only) found three real bugs and seven smaller things; each was traced before it was
+changed. One - a rescan's refusal - turned out to match the web, and is left as it is.
+
+- **The page could stay on "Checking the library…" with no Start.** A read already out as a run ended had a ticket no
+  newer than the run's (`behind[kind]`), so landing it kept the kind behind; one out as deadwax came back into reach had
+  a ticket no newer than the gap, so `real` stayed false. Nothing asked again - `readsNow` had said no while it was
+  out. Now `CareRunModel.read()` asks `readIfNeeded(again: false)` after every read that lands (under the generation
+  guard), and CareRuns says read again exactly when the one that landed began too early. LibraryCareTests:
+  `aReadOutAsARunEndsIsFollowedByOneToTrust`, `aReadOutAsDeadwaxComesBackIsFollowedByOneToTrust`.
+- **A 403 mid-run didn't stop the run** (the phone's own departure from the web, written down here): an admin taking
+  Edit albums away left the run asking album after album, each refused and counted failed, until /me happened to be
+  read again. Core's `BulkTargets.Step` has a `.forbidden(Outcome)` for a 403: counted as the web counts it (failed -
+  every track for lyrics; the vectors' 403 row still gives the web's count), told to nobody (nothing written), and
+  `CareRuns.finished` stops the run with `.notAllowed` (Stop pressed first keeps its own word). The web's runBulk counts
+  any throw as `failedAs` and carries on, so its run goes on refused to the end; the phone stops after the first, says
+  "It stopped: running it needs Edit albums, which an admin hasn't given you.", and asks /me again
+  (`server.refreshMe()`) so the runs leave the page. Every other 4xx carries on, as the web's. LibraryCareTests:
+  `a403StopsTheRunAfterItsAlbumAndEveryOther4xxCarriesOn` (a table: 403, 400, 404, 409, 422, 500).
+- **Under the sign-in over the app the page still counted as shown** (a ZStack overlay fires no onDisappear), so a
+  scene or reach change read the library, got a 401 and left "Couldn't read the library just now." under the sign-in,
+  with nothing to read again after it. `readIfNeeded` is now gated on `server.signInOver == nil`, and
+  LibraryCareScreen's `.onChange(of: server.signInOver == nil)` calls `care.sessionBack()` (a read as shown again) when
+  it clears. In nobody's library had the same problem - its scene and reach reads under the overlay - and has the
+  same fix: HeldModel's `read()` asks nothing under it, and the screen reads again when it clears while visible.
+  tests/test_ios_library_care.py pins both gates and both onChanges.
+- **In nobody's library's buttons came back before the read after a write** (`Held.Flow.ended()` cleared `acting`
+  while the re-read was out, so the flag just dealt with could be pressed again). `open` and `begin` take `reading`
+  now, and the buttons stay off while any read of the list is out.
+- **The ladder's words are the web's.** A failed read with no albums to show says READ_FAILED ("Couldn't read the
+  library."), as the web's `library.error && !library.albums.length` does - it said REREAD_FAILED for a library read
+  empty. Tracing it found a worse one, in Needs a look too (slice 6): the phone passed `scan.loaded` (an answer in hand)
+  as the ladder's `loaded`, where the web's means a read has ended (useLibrary sets it in its `finally`), so **a failed
+  first read showed the spinner for good**, with no Try again. LibraryScanModel has `ended` (an answer or a failure),
+  both pages pass it, and both say READ_FAILED whenever there are no albums (Needs a look's CHECK_FAILED, Library care's
+  REREAD_FAILED, over albums on screen). tests/test_ios_needs_look.py's pin moved with it.
+- **A rescan's refusal stays in the read-again slot, Try again reading again** (not changed): the web's Rescan is
+  `library.reload(true)`, whose error lands in `library.error` - drawn as REREAD_FAILED in Rescan's section, its Try
+  again `reload(false)`, a plain read. The phone's is the same.
+- **No `.cancelled` step or stop.** Nothing in the app cancels a run's request (the drive's Task is never cancelled,
+  the transport is never invalidated, BackgroundHold's expiry only ends the hold), so `Step.cancelled` and
+  `Stop.cancelled` were unreachable. A cancellation, should one come, is counted as an album that never answered -
+  failed, as the web counts any throw, and it may have written. A missing client is no longer a step either: before
+  each album the drive checks `server.client` beside the sign-in, and either one stops the run as the session ending
+  (`sessionEnded`); the album is then fetched with that same client.
+- **The writes' waits are pinned to the server.** Each store call opens its own connection, which may wait out SQLite's
+  busy timeout (store._connect's `timeout=10`) first: the list's two calls stay 30 s, Add for them's five (the open
+  flags, the album followed, the flag closed, the grants, the job's row) are 60 s (from 20), Dismiss's two 30 s (from
+  20). tests/test_ios_library_care.py counts `await store.` in each handler and holds each wait to calls x busy + 10.
+  The rescan has no server bound to pin to, so its 300 s is pinned as a value, with a comment saying so.
+- **LibraryCareTests' lyrics wait is the real number**: 40 tracks are 4500 s (20 rounds x 220 s + 60, to the minute),
+  and one track the route's 600 floor - not `>=` the floor, which held for anything.
+- **docs/ios.md** checks 358 (a reach blip during the read; a session ended mid-run by a password reset in People, the
+  sign-in, nothing left over after) and 360 (Edit albums taken away: the run stops at the next album by itself, with
+  the count) say what the phone does now; the section says the 403 and the sign-in.
+
+Verified after review, on the Mac: `swift test` (1915 Core tests in 200 suites - the three new above, the
+cancellation one rewritten - 158 Audio in 17, 12 more, all passing); the unsigned generic-iOS Debug build, BUILD
+SUCCEEDED, no warning; the full pytest suite, 4892 passed and 1 skipped, with one failure that was timing under load:
+test_coverart_relay's pending-cap test (it ran beside `swift test` and xcodebuild; no server file changed here, and
+that file passed 125 of 125 three times on its own); all 94 sims with Node 22, ioscare's `--check` among them (the
+vectors are unchanged: the 403 row's count is the web's). Not verified - only the phone can tell: checks 358 (the
+read after a reach blip, the session ended mid-run and signed in again) and 360 (a run stopping at the next album when
+Edit albums is taken away, and /me read again taking the runs from the page).

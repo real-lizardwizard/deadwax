@@ -2030,11 +2030,12 @@ the page's: go back to Settings, or to another tab, and it carries on, its resul
 screen stays on** while a run goes and Library care is in front ("The screen stays on while a run is under way and this
 page shows." under its button) - and only then. **A run stops after the album it's on** when the app goes to the
 background (lock the phone, or switch apps: iOS stops an app soon after), when deadwax goes out of reach, when your
-session ends, or when an admin takes Edit albums away - and says so after its result: "Got 14 covers. Stopped at 14 of
-60. It stopped as the app went to the background - Get covers carries on." (With Edit albums gone, the runs go from
-the page, and only VoiceOver says it.) Start it again and it takes only the albums still without, since it asks again
-which those are. Signing out stops a run before its next album, and the
-next person's Library care starts afresh.
+session ends, or when an admin takes Edit albums away (deadwax refuses the next album - counted as failed - and the run
+stops there) - and says so after its result: "Got 14 covers. Stopped at 14 of 60. It stopped as the app went to the
+background - Get covers carries on." (With Edit albums gone, the runs go from the page, and only VoiceOver says it.)
+Start it again and it takes only the albums still without, since it asks again which those are. When your session
+ends, nothing is read under the sign-in; sign in again and Library care reads the library again. Signing out stops a
+run before its next album, and the next person's Library care starts afresh.
 
 **In nobody's library** (with logins on, for someone with Look after the library) is a row under the runs, opening a
 page of its own: how many albums nobody has in their library ("3 albums nobody has in their library", or "Every album
@@ -2042,7 +2043,7 @@ in the collection is in somebody's library."), the first 20 of them with their f
 **Show fewer**). Under **Flagged downloads**, each download nobody was given because every file was already in a
 folder that holds another pressing or an untagged copy - who asked for it and why - with **Add for them** (it goes
 into the libraries of those who asked) and **Dismiss**. One at a time: the buttons are dimmed while one is being done,
-then the list is read again. VoiceOver reads what was done ("Third · Portishead: given to ethan, sam"); if deadwax
+and while the list is read again after it. VoiceOver reads what was done ("Third · Portishead: given to ethan, sam"); if deadwax
 refuses, its own words are said under the list ("That has been dealt with already."). Pull it down to read it again.
 
 **While deadwax can't be reached**, a page that hasn't read the library yet says "Managing needs deadwax. This opens
@@ -4775,7 +4776,12 @@ The runs write covers, CD art and lyrics into album folders: narrow them to albu
   to another app instead of locking. Start one, go back to Settings and to the Library tab, come back: is it still
   going (or done), its result there? Wi-Fi and WireGuard off mid-run: "… It stopped as deadwax went out of reach - Get
   covers carries on once it's back.", the amber line, nothing can be pressed - back on, "Checking the library…", then
-  Start is offered again.
+  Start is offered again. Off and straight back on while "Checking the library…" shows: does Start still come back,
+  rather than the note staying? As a second person (logins on), start a run, then on the Mac reset their password in
+  People (it ends their sessions): the sign-in comes over the app - sign in again: "… It stopped as your session ended
+  - sign in again, and Get covers carries on.", the library read again with no "Couldn't read the library just now."
+  left over, and Start offered again. The same on In nobody's library: no "Couldn't read who has which albums." left
+  once signed in again.
 - **359 In nobody's library** (logins on). Under the runs, **In nobody's library**: tap it - the same count and the
   same first 20 albums as the web app's, Show all and Show fewer. With a flagged download (a download of a pressing
   whose folder already held another): its name, who asked and why, **Add for them** and **Dismiss**. Add for them: the
@@ -4786,11 +4792,12 @@ The runs write covers, CD art and lyrics into album folders: narrow them to albu
   no runs - the top line "Rescan reads every file of the library again - use it after changing tags in another
   program.". As someone with Edit albums but not Look after the library: the runs alone, no Rescan, no In nobody's
   library - and the Manage footer "Edit an album and Library care are the app's own; …" (or none, if those are their
-  only rows). Take Edit albums away on the Mac during a long run, then go back to Settings on the phone and pull it
-  down: the run stops after its album - with VoiceOver on, it says "… It stopped: running it needs Edit albums,
-  which an admin hasn't given you." - and Library care has no runs any more (or says it needs a permission, if they
-  were all the person had). With the largest text and VoiceOver: each line
-  read once, the run's button read with its count, every line whole. With Reduce Motion on, nothing slides.
+  only rows). Take Edit albums away on the Mac during a long run, and leave the phone on Library care: deadwax refuses
+  the next album and the run stops there, with nothing pulled down - with VoiceOver on, it says "… 1 failed - run it
+  again to try it again. Stopped at N of M. It stopped: running it needs Edit albums, which an admin hasn't given
+  you." - and Library care has no runs any more (or says it needs a permission, if they were all the person had).
+  With the largest text and VoiceOver: each line read once, the run's button read with its count, every line whole.
+  With Reduce Motion on, nothing slides.
 
 ### Add to Queue's checks (392-403)
 

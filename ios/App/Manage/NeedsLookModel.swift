@@ -100,7 +100,7 @@ final class NeedsLookModel {
 
     /// The page's state before its list.
     var state: NeedsLook.State {
-        NeedsLook.state(problem: scan.answer?.problem, loaded: scan.loaded, failed: scan.failed != nil,
+        NeedsLook.state(problem: scan.answer?.problem, loaded: scan.ended, failed: scan.failed != nil,
                         albums: scan.albums.count)
     }
 
@@ -112,10 +112,11 @@ final class NeedsLookModel {
     }
 
     /// The last read's failure in the page's own words (slice 6's review) - never the editor's, though they share the
-    /// scan: READ_FAILED while nothing has been read (the first read's, with Try again), CHECK_FAILED over the list on
-    /// screen (the status line's) - or deadwax's own words, as the web's errorNote and sayError say them.
+    /// scan: READ_FAILED with no albums to show (the ladder's, with Try again - nothing read yet, or a library read
+    /// empty), CHECK_FAILED over the list on screen (the status line's) - or deadwax's own words, as the web's
+    /// errorNote and sayError say them.
     var failure: String? {
-        scan.failure(saying: scan.loaded ? NeedsLook.checkFailed : NeedsLook.readFailed)
+        scan.failure(saying: scan.albums.isEmpty ? NeedsLook.readFailed : NeedsLook.checkFailed)
     }
 
     /// An "It's fine as it is" will come back: deadwax has no job store, as the scan or the count says.

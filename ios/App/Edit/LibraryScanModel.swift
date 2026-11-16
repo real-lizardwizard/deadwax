@@ -33,6 +33,9 @@ final class LibraryScanModel {
 
     /// The scan has answered at least once.
     var loaded: Bool { answer != nil }
+    /// (Slice 7's review) A read has ended, answered or failed - the web's `loaded` (useLibrary sets it as each read
+    /// ends), which its ladders mean: a failed first read is Try again, not the spinner for good.
+    var ended: Bool { answer != nil || failed != nil }
     var albums: [ScanAlbum] { answer?.albums ?? [] }
 
     /// The last read's failure in the editor's words (EditWords.said over READ_FAILED's "Couldn't read the library.").

@@ -6,8 +6,8 @@ import Foundation
 // myLibrary.ts. Every rule and word here is the web's, held to it by Tests/DeadwaxCoreTests/Fixtures/care/
 // library-care-vectors.json (ios/scripts/export-library-care-vectors.cjs runs the TypeScript as it is; ui/test/
 // ioscare.sim.cjs checks it is current) - but for the phone's own few, said where they are: a run that stopped because the
-// app went to the background or deadwax out of reach (CareRuns.Stop), one run at a time, and a step that may have
-// written without saying (BulkTargets.Step).
+// app went to the background, deadwax out of reach, the session ended or deadwax refused Edit albums (CareRuns.Stop),
+// one run at a time, and a step that may have written without saying (BulkTargets.Step).
 
 /// The bulk runs' rules (bulkTargets.ts): which albums each kind takes, what one album came to, a run's progress and its
 /// words once it has finished.
@@ -108,25 +108,29 @@ public enum BulkTargets {
     /// What a step's failure came to, as the web counts it - a cover's or CD art's 404 is none to find (a fact about the
     /// release), anything else failed (worth another go); lyrics' every track failed - and, the phone's own, whether it
     /// may have written all the same: deadwax refused it (a 4xx) and wrote nothing, or it never answered, timed out or
-    /// answered a 5xx (`unanswered` - RetagFlow.outcome: the server carries on when the phone goes). A cancellation is
-    /// neither: the run stops there, that album not counted.
+    /// answered a 5xx (`unanswered` - RetagFlow.outcome: the server carries on when the phone goes; a cancellation too,
+    /// though nothing in the app cancels a run's request). And a 403, the phone's own: deadwax refused it because Edit
+    /// albums is no longer this person's - counted as the web counts it (failed), and the run stops after it, where the
+    /// web's carries on through every album left, each refused the same way (`forbidden`).
     public enum Step: Sendable, Equatable {
         case answered(Outcome)
         case unanswered(Outcome)
-        case cancelled
+        case forbidden(Outcome)
     }
 
     /// The step a failure is (`pictureStep`'s catch, runBulk's for lyrics).
     public static func step(_ kind: Kind, _ album: ScanAlbum, failure error: any Error) -> Step {
-        if APIFailure.isCancellation(error) { return .cancelled }
+        var status: Int?
+        if case .answered(let answer)? = error as? APIFailure { status = answer.status }
         let outcome: Outcome
         if kind == .lyrics {
             outcome = Outcome(failed: failedAs(kind, album))
-        } else if case .answered(let answer)? = error as? APIFailure, answer.status == 404 {
+        } else if status == 404 {
             outcome = Outcome(missing: 1)
         } else {
             outcome = Outcome(failed: 1)
         }
+        if status == 403 { return .forbidden(outcome) }
         return RetagFlow.outcome(of: error) == .refused ? .answered(outcome) : .unanswered(outcome)
     }
 
@@ -372,7 +376,7 @@ public enum LibraryCare {
     /// where to carry on - Start takes only the albums still without, since the run's own targets are asked again.
     public static func stopped(_ stop: CareRuns.Stop, kind: BulkTargets.Kind) -> String? {
         switch stop {
-        case .pressed, .cancelled:
+        case .pressed:
             return nil
         case .background:
             return "It stopped as the app went to the background - \(label(kind)) carries on."
@@ -409,12 +413,12 @@ public struct CareRuns: Sendable, Equatable {
         case background
         /// deadwax went out of reach (the phone's own: nothing is asked while it is).
         case outOfReach
-        /// Edit albums is no longer this person's (the phone's own).
+        /// Edit albums is no longer this person's - /me says so, or deadwax refused an album with a 403 (the phone's
+        /// own).
         case notAllowed
-        /// The session ended - the sign-in came over the app (the phone's own: every album after would be refused).
+        /// The session ended - the sign-in came over the app, or the app has no session to ask with (the phone's own:
+        /// every album after would be refused).
         case sessionEnded
-        /// The album's request was cancelled - that album not counted.
-        case cancelled
     }
 
     /// The run under way: its kind, the albums it takes (as worked out when Start was pressed), how far it has got, why
@@ -605,7 +609,7 @@ public struct CareRuns: Sendable, Equatable {
     }
 
     /// The album out came to `step`: counted as the web counts it - true when Needs a look's count is told (it wrote,
-    /// or may have). A cancellation counts nothing and stops the run.
+    /// or may have). A 403 stops the run after it: Edit albums is no longer this person's.
     @discardableResult
     public mutating func finished(_ step: BulkTargets.Step) -> Bool {
         guard var now = under, now.out != nil else { return false }
@@ -619,8 +623,9 @@ public struct CareRuns: Sendable, Equatable {
             now.run = BulkTargets.adding(now.run, outcome)
             now.maybe = true
             tell = true
-        case .cancelled:
-            if now.stop == nil { now.stop = .cancelled }
+        case .forbidden(let outcome):
+            now.run = BulkTargets.adding(now.run, outcome)
+            if now.stop == nil { now.stop = .notAllowed }
             tell = false
         }
         under = now
@@ -946,8 +951,9 @@ public enum Held {
     }
 
     /// In nobody's library's writes and reads - every decision the page makes, the App carrying them out: one write at
-    /// a time (`acting`, HeldByNobody.tsx's - a second tap asks nothing more), never out of reach nor before a read to
-    /// trust (one begun since deadwax was last out of reach), and the list read again after each, whatever came of it.
+    /// a time (`acting`, HeldByNobody.tsx's - a second tap asks nothing more), never out of reach, nor before a read to
+    /// trust (one begun since deadwax was last out of reach), nor while a read is out; and the list read again after
+    /// each, whatever came of it.
     public struct Flow: Sendable, Equatable {
         /// The flag being dealt with.
         public private(set) var acting: Int?
@@ -974,19 +980,20 @@ public enum Held {
             gap = reads
         }
 
-        /// A flag's buttons are on: in reach, a read to trust, nothing being dealt with.
-        public func open(online: Bool) -> Bool {
-            online && real && acting == nil
+        /// A flag's buttons are on: in reach, a read to trust, nothing being dealt with, and no read out - the one
+        /// after a write included, so a flag the write put away can't be pressed again before the list says so.
+        public func open(online: Bool, reading: Bool) -> Bool {
+            online && real && acting == nil && !reading
         }
 
         /// Add for them or Dismiss pressed on `flag`: false, and nothing asked, when it may not go now.
-        public mutating func begin(_ flag: Int, online: Bool) -> Bool {
-            guard open(online: online) else { return false }
+        public mutating func begin(_ flag: Int, online: Bool, reading: Bool) -> Bool {
+            guard open(online: online, reading: reading) else { return false }
             acting = flag
             return true
         }
 
-        /// The write answered, failed or never answered: the next may go - and the list is read again.
+        /// The write answered, failed or never answered: the list is read again, and the next may go once it has been.
         public mutating func ended() {
             acting = nil
         }

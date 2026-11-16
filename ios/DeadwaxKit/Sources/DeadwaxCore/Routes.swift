@@ -321,10 +321,12 @@ public enum Routes {
     /// first listing at most LISTING_WAIT_SECONDS (3 s), so it is given ten times that; noting an album looked at is a
     /// row of SQLite, as the marks are, so 20 - tests/test_ios_needs_look.py holds both. Library care's (slice 7): a
     /// rescan drops the cache and reads every file of the library with no bound of its own, so it is given 300 s and one
-    /// that never answers may have finished (said, and the library read again); In nobody's library reads SQLite alone
-    /// (the ledger and the open flags, through to_thread), given the count's 30, and Add for them and Dismiss write rows
-    /// of it - the store's grants, the flag closed - as a mark does, so 20 - tests/test_ios_library_care.py holds them.
-    public static let timeouts: [Endpoint: Double] = [albumIndex: 30, autoEqSearch: 20, autoEqProfile: 20, libraryOwned: 30, fullySearch: 20, releaseGroup: 60, searchArtists: 20, searchSongs: 20, artistFacts: 120, discography: 60, jobs: 20, cancelJob: 30, retryJob: 60, retryJobSame: 30, clearJobs: 30, storeState: 20, findCandidates: 300, enqueue: 300, joinJob: 60, libraryAdd: 60, libraryTracks: 30, libraryAlbums: 120, releases: 60, release: 60, retagPreview: 60, retagApply: 480, artFetch: 120, libraryArt: 30, queueIgnore: 20, queueUnignore: 20, tagsPreview: 60, tagsApply: 120, trackPicture: 30, lyricsFetch: 600, discArtFetch: 360, libraryDiscArt: 30, deletionSummary: 60, deleteAlbum: 120, libraryArtist: 120, artistArt: 30, artistImagesPreview: 660, artistImagesApply: 600, artistSearch: 120, refilePreview: 480, refileApply: 600, queueSummary: 30, queueReviewed: 20, rescan: 300, held: 30, heldAdd: 20, heldDismiss: 20]
+    /// that never answers may have finished (said, and the library read again); In nobody's library and its writes are
+    /// SQLite alone, each store call its own connection that may wait out the busy timeout (store._connect's 10 s)
+    /// first: the list's two calls (the ledger, the open flags) 30, Add for them's five (the open flags, the album
+    /// followed, the flag closed, the grants, the job's row) 60, Dismiss's two (the flag closed, the job's row) 30 -
+    /// tests/test_ios_library_care.py holds them to the handlers.
+    public static let timeouts: [Endpoint: Double] = [albumIndex: 30, autoEqSearch: 20, autoEqProfile: 20, libraryOwned: 30, fullySearch: 20, releaseGroup: 60, searchArtists: 20, searchSongs: 20, artistFacts: 120, discography: 60, jobs: 20, cancelJob: 30, retryJob: 60, retryJobSame: 30, clearJobs: 30, storeState: 20, findCandidates: 300, enqueue: 300, joinJob: 60, libraryAdd: 60, libraryTracks: 30, libraryAlbums: 120, releases: 60, release: 60, retagPreview: 60, retagApply: 480, artFetch: 120, libraryArt: 30, queueIgnore: 20, queueUnignore: 20, tagsPreview: 60, tagsApply: 120, trackPicture: 30, lyricsFetch: 600, discArtFetch: 360, libraryDiscArt: 30, deletionSummary: 60, deleteAlbum: 120, libraryArtist: 120, artistArt: 30, artistImagesPreview: 660, artistImagesApply: 600, artistSearch: 120, refilePreview: 480, refileApply: 600, queueSummary: 30, queueReviewed: 20, rescan: 300, held: 30, heldAdd: 60, heldDismiss: 30]
 }
 
 /// The Cover Art Archive's thumbnail sizes the app asks deadwax's relay for (`Routes.archiveCover`'s `size`, which takes

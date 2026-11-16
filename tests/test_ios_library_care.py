@@ -9,8 +9,8 @@ one album at a time from the phone.
 - what it SENDS - a rescan with `tracks=false` and no body; Add for them and Dismiss with none either;
 - what it READS - the rescan's answer, the scan's own form with its ETag and headers, from a real rescan over real FLACs;
   In nobody's library's answer and each write's, from the real routes with logins on;
-- how long it waits - a rescan past the route's worst case, which has no bound of its own (300 s, and one that never
-  answers may have finished); the list and its writes as rows of SQLite;
+- how long it waits - a rescan 300 s, the route having no bound of its own (and one that never answers may have
+  finished); the list and its writes each SQLite's busy timeout for every store call they make, and 10 s more;
 - who may: Rescan and In nobody's library by Look after the library, the runs by Edit albums, as the server's routes are
   (tests/test_logins.py ROUTES) - and the app only carrying out what Core's CareRuns decides.
 """
@@ -183,17 +183,22 @@ def test_a_rescan_and_the_list_are_waited_for_past_the_routes_worst_case():
     assert "await _scan_with_queue(request, True)" in handler
     scan = inspect.getsource(library_route._scan_with_queue)
     assert "wait_for" not in handler + scan and "timeout" not in handler, "the rescan has no bound of its own"
-    assert given["rescan"] >= 300
+    #? no server constant to pin it to: the value itself is pinned, and the phone says a rescan that never answered may
+    #? have finished (CareRuns.rescanEnded), so the wait is a choice, not a bound
+    assert given["rescan"] == 300
     assert "case .unanswered:\n            return AfterRescan(readAgain: true, tell: true, mayHaveFinished: true)" \
         in swift_function("LibraryCare.swift", "rescanEnded")
-    # In nobody's library reads two SQLite tables; its writes are rows of it, as a mark is
-    listing = inspect.getsource(held_route.held_by_nobody)
-    assert listing.count("await store.") == 2
-    assert given["held"] >= given["queueSummary"]
-    for write in (held_route.add_flagged, held_route.dismiss_flag):
-        source = inspect.getsource(write)
+    # In nobody's library and its writes are SQLite alone, each store call its own connection - which may wait out the
+    # busy timeout (store._connect's) before it gets the database: the list's two calls, Add for them's five (the open
+    # flags, the album followed, the flag closed, the grants, the job's row) and Dismiss's two, each that long, and 10 s
+    busy = re.search(r"sqlite3\.connect\(self\.path, timeout=(\d+)\)", inspect.getsource(JobStore._connect))
+    assert busy, "store._connect's busy timeout"
+    for route, handler, calls in (("held", held_route.held_by_nobody, 2), ("heldAdd", held_route.add_flagged, 5),
+                                  ("heldDismiss", held_route.dismiss_flag, 2)):
+        source = inspect.getsource(handler)
+        assert source.count("await store.") == calls, route
         assert "httpx" not in source and "navidrome" not in source.lower(), "nothing asked of another server"
-    assert given["heldAdd"] == given["heldDismiss"] == given["queueReviewed"]
+        assert given[route] == calls * int(busy.group(1)) + 10, route
 
 
 # ---------------------------------------------------------------------------- the app
@@ -210,7 +215,13 @@ def test_the_runs_are_the_apps_and_only_carry_out_what_core_decides():
     drive = swift_like(model, "drive")
     assert "switch runs.next(allowed: parts.bulk, online: reachability.online) {" in drive
     assert "if runs.finished(step) { navigation?.managed() }" in drive
-    assert "if server.signInOver != nil { runs.sessionEnded() }" in drive
+    # the session ended, or none to ask with: the run stops after the album out (no step of its own for it)
+    assert "if server.signInOver != nil || client == nil { runs.sessionEnded() }" in drive
+    assert "let step = await fetch(kind, album, with: client)" in drive
+    # (slice 7's review) a 403 stops the run (Core's .forbidden) and asks /me again, so the page draws what they may do
+    assert "if case .forbidden = step { Task { await server.refreshMe() } }" in drive
+    assert drive.index("if case .forbidden = step") < drive.index("if runs.finished(step)")
+    assert ".cancelled" not in model + CARE, "nothing in the app cancels a run's request"
     assert drive.count("guard mine == generation else { return }") == 1 and "while mine == generation {" in drive
     # each album through the route a single Get uses, held through the background
     fetch = swift_like(model, "fetch")
@@ -218,6 +229,23 @@ def test_the_runs_are_the_apps_and_only_carry_out_what_core_decides():
     for call in ("client.getCover(path: album.path)", "client.getDiscArt(album)", "client.getLyrics(album)"):
         assert call in fetch, call
     assert "return BulkTargets.step(kind, album, failure: error)" in fetch
+    assert "server.client" not in fetch, "the client drive checked is the one asked"
+    # (slice 7's review) a read that lands asks again: one already out as a run ended, or as deadwax came back, began
+    # too early to trust, and nothing else would ask for the one after it
+    read = swift_like(model, "read")
+    assert read.index("runs.readLanded(ticket)") < read.index("readIfNeeded(again: false)")
+    assert read.index("guard mine == generation, read == .landed else { return }") < read.index("runs.readLanded(ticket)")
+    # (slice 7's review) nothing read under the sign-in over the app (the page still counts as shown there); once it
+    # goes, read again
+    assert "guard parts.shown, server.signInOver == nil," in swift_like(model, "readIfNeeded")
+    assert "readIfNeeded(again: true)" in swift_like(model, "sessionBack")
+    screen = app_file("Manage", "LibraryCareScreen.swift")
+    assert ".onChange(of: server.signInOver == nil) { _, clear in\n            if clear { care.sessionBack() }" in screen
+    # (slice 7's review) the ladder as the web's: a read ended (answered or failed) is its `loaded`, and READ_FAILED is
+    # said whenever there are no albums to show
+    assert "NeedsLook.state(problem: scan.answer?.problem, loaded: scan.ended, failed: scan.failed != nil," in model
+    assert "scan.failure(saying: scan.albums.isEmpty ? LibraryCare.readFailed : LibraryCare.rereadFailed)" in model
+    assert "var ended: Bool { answer != nil || failed != nil }" in app_file("Edit", "LibraryScanModel.swift")
     # Rescan: Core decides, the count is told after it
     rescan = swift_like(model, "rescan")
     assert "let after = runs.rescanEnded(ticket, how)" in rescan
@@ -261,7 +289,9 @@ def test_the_page_draws_by_permission_and_out_of_reach_as_edit_album_does():
 def test_in_nobodys_library_writes_one_at_a_time_and_reads_again_after_each():
     page = app_file("Manage", "HeldByNobodyScreen.swift")
     act = swift_like(page, "act")
-    assert "flow.begin(flag.id, online: online)" in act
+    # (slice 7's review) never while the list is read - the read after a write included
+    assert "flow.begin(flag.id, online: online, reading: reading)" in act
+    assert "let open = model.flow.open(online: online, reading: model.reading)" in page
     assert "BackgroundHold(named:" in act
     assert "refused = EditWords.said(error, failed: write.failed, admin: admin)" in act
     assert "refused = EditWords.writeFailure(error, failed: write.failed, admin: admin)" in act
@@ -270,7 +300,10 @@ def test_in_nobodys_library_writes_one_at_a_time_and_reads_again_after_each():
     assert act.index("flow.ended()") < act.index("await read()")
     assert act.index("} catch {") < act.index("await read()")
     read = swift_like(page, "read")
-    assert "guard reachability?.online == true, samePerson" in read
+    # (slice 7's review) nothing read under the sign-in over the app; once it goes, read again while the page shows
+    assert "guard reachability?.online == true, samePerson, server?.signInOver == nil, let client = server?.client" in read
+    assert ".onChange(of: server.signInOver == nil) { _, clear in\n            guard clear, visible, shown else { return }" \
+        in page
     assert "guard ticket == flow.reads, samePerson else { return }" in read
     assert "problem = EditWords.said(error, failed: Held.readFailed, admin: admin)" in read
     assert "ForEach(answer.flags)" in page and "ForEach(Held.listedAlbums(answer.albums, all: model.all))" in page
