@@ -706,6 +706,10 @@ Use deadwax's plain `http://` address, on the home Wi-Fi and over WireGuard with
 
 ## 17. Decisions for James
 
+**Answered 16 Nov: James chose all four as recommended** - the artist-picture relay (server change B), It's fine as it
+is only with Look after the library on the phone and on the web (fixed on main), Delete as a page then a dialog, and
+Needs a look's count on its Manage row only.
+
 1. **Artist pictures' previews.** The candidates are pictures on Commons, fanart.tv and TheAudioDB, and the phone talks
    only to deadwax. *Recommend:* a relay on deadwax (server change B) shaped like the Cover Art Archive's - a fixed list
    of hosts, no redirects off it, a size cap, a deadline, nothing kept. Without it Artist images on the phone chooses

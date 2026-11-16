@@ -70,3 +70,11 @@ patterns. The app is then built to the spec and reviewed against it. notes/ios.m
   web app"), Account's Change password, Set up Navidrome on Server settings, Safari's own sign-in in a listener's
   words, plain http and ATS, offline, Dynamic Type and VoiceOver; no server addition; James's checks (237-246) and 11
   open questions, each built with its recommendation.
+- `phase8-managing.md` - managing on the phone (Phase 8), designed 2026-11-16 at ios c571580, overruling Phase 7's
+  "opened in the web app": James asked that nothing in the app take you to the web app. Where managing opens from
+  (an album's •••, the artist page's •••, Settings > Manage, Account), every tool the web has - the album editor
+  (the folder, its issues, Release, tags by hand, artwork and lyrics, Delete), the artist tools, Needs a look,
+  Library care, Server settings and Connections, the event log, Change password, People - with its routes, payloads,
+  permission and the rules ported to Core; two server changes on main (A: the library scan without its tracks, B:
+  the artist-picture relay) and the web refactors the exporters need; 12 slices in order, editing albums first;
+  James's checks (320-391); four decisions, all answered as recommended on 16 Nov.
