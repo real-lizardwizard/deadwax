@@ -146,8 +146,10 @@ import Testing
              "results": {"mode": "apply", "dry_run": false, "written": 1, "failed": 0,
                          "problems": ["originaldate can't be written to 01.flac"]}}
             """#)
-        let response = try await deadwax.tagsApply(body)
+        let response = try await deadwax.tagsApply(body, bytes: 60_000_000)
         #expect(try sentJSON(transport.last) == sent, "Apply sends the preview's very body; the server works it out again")
+        #expect(transport.last?.timeout == 180,
+                "the route's 120 s and 60 MB written whole at 20 MB a second, to the minute")
         let saved = TagEditWords.saved(response.results, filenames: ["01.flac", "02.flac"])
         #expect(saved.text == "Saved 1 file. Originaldate can't be written to 01.flac." && !saved.failed)
 
@@ -181,5 +183,33 @@ import Testing
         // the track's page says what the web's inspector says
         #expect(TrackInspector.place(file, discs: 1) == "Track 1 · 4:05 · FLAC")
         #expect(TrackInspector.rawTitle(file) == "All tags in this file (1)")
+    }
+
+    // MARK: after review (16 Nov)
+
+    /// Typing over a field is text that differs from what it shows: over files that disagree the field shows "" under
+    /// "Several values", and a "" handed back without a key pressed (SwiftUI's TextField writing its text back) is no
+    /// typing - never "Will be removed". Typed, then cleared, it does reach "" and removes each track's own.
+    @Test func aFieldOverFilesThatDisagreeIsNeverEmptiedWithoutTyping() {
+        let mixed = TagEdit.Shared(value: "", mixed: true)
+        #expect(TagEdit.typed("", key: "genre", draft: [:], shared: mixed) == nil)
+        #expect(TagEdit.note("genre", mixed, draft: nil, problem: nil)
+                == "Differs between tracks - left alone, each keeps its own")
+
+        let typed = TagEdit.typed("Ro", key: "genre", draft: [:], shared: mixed)
+        #expect(typed == ["genre": "Ro"])
+        let cleared = TagEdit.typed("", key: "genre", draft: typed ?? [:], shared: mixed)
+        #expect(cleared == ["genre": ""], "typed and then cleared: emptied, on purpose")
+        #expect(TagEdit.note("genre", mixed, draft: cleared?["genre"], problem: nil) == "Will be removed")
+        #expect(TagEdit.typed("", key: "genre", draft: cleared ?? [:], shared: mixed) == nil, "already empty")
+
+        // a field the files agree on: its own value handed back is no typing either (no edit of nothing to preview)
+        let rock = TagEdit.Shared(value: "Rock", mixed: false)
+        #expect(TagEdit.typed("Rock", key: "genre", draft: [:], shared: rock) == nil)
+        #expect(TagEdit.typed("", key: "genre", draft: [:], shared: rock) == ["genre": ""])
+        #expect(TagEdit.typed("Rock", key: "genre", draft: ["genre": "Roc"], shared: rock) == ["genre": "Rock"],
+                "typed back to what the files say: still typed, as the web keeps it")
+        // the other fields typed over are kept as they are
+        #expect(TagEdit.typed("x", key: "title", draft: ["genre": ""], shared: rock) == ["genre": "", "title": "x"])
     }
 }

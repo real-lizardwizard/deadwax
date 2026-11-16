@@ -17,19 +17,25 @@ import Testing
 
         transport.answer("/deadwax/library/lyrics/fetch", 200,
                          #"{"written": 3, "replaced": 0, "kept": 8, "instrumental": 0, "missing": 1, "failed": 0, "untagged": 0, "synced": 2, "unexpected": 1}"#)
-        let lyrics = try await deadwax.getLyrics(path: "A/B")
+        let lyrics = try await deadwax.getLyrics(ScanAlbum(path: "A/B", trackCount: 12, lyricsCount: 8))
         #expect(lyrics == LyricsSummary(written: 3, kept: 8, missing: 1, synced: 2))
         #expect(GetResults.lyricsResult(lyrics) == "Saved lyrics for 3 tracks (2 synced), 8 already had them, 1 not on LRCLIB.")
         #expect(GetResults.label(.lyrics, { var run = GetRun(kind: .lyrics, path: "A/B"); run.done(lyrics); return run }(),
                                  trackCount: 12) == "Lyrics \u{b7} 11 of 12")
         #expect(try sentJSON(transport.last) == ["album_path": .string("A/B"), "replace": .bool(false), "retime": .bool(false)])
+        // four tracks to ask, two at a time: 540 s, under the route's own 600
         #expect(transport.last?.timeout == 600)
+        _ = try await deadwax.getLyrics(ScanAlbum(path: "A/B", trackCount: 12))
+        #expect(transport.last?.timeout == 1380, "twelve tracks asked: six rounds of 220 s, and the minute's margin")
 
         transport.answer("/deadwax/library/disc_art/fetch", 200, #"{"written": ["disc1.png", "disc2.png"], "source": "fanart.tv"}"#)
-        let disc = try await deadwax.getDiscArt(path: "A/B")
+        let disc = try await deadwax.getDiscArt(ScanAlbum(path: "A/B", discCount: 2))
         #expect(disc == DiscArtFetched(written: ["disc1.png", "disc2.png"], source: "fanart.tv"))
         #expect(try sentJSON(transport.last) == ["album_path": .string("A/B")])
-        #expect(transport.last?.timeout == 360)
+        #expect(transport.last?.timeout == 600,
+                "two discs: the listing, fanart.tv's, two pictures and the margin - 580 s")
+        _ = try await deadwax.getDiscArt(ScanAlbum(path: "A/B", discCount: 1))
+        #expect(transport.last?.timeout == 420)
     }
 
     @Test func aCDArtPictureIsAskedByItsNameAndAMissingOneIsNothing() async throws {

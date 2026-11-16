@@ -21,7 +21,7 @@ import Testing
                                  "ui/src/lib/albumEdit.ts", "ui/src/components/TrackTagEditor.tsx the heading",
                                  "ui/src/app/EditPanel.tsx the Edit tracks button",
                                  "ui/src/app/TrackInspector.tsx edit this track"])
-        #expect(fixture["tags"]["problems"].list.count == 399)
+        #expect(fixture["tags"]["problems"].list.count == 471, "the separators below 0x20 too (review, 16 Nov)")
         #expect(fixture["tags"]["notes"].list.count == 112)
         #expect(fixture["tags"]["shared"].list.count == 47)
         #expect(fixture["inspector"]["tracks"].list.count == 33)

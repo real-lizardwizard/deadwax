@@ -175,4 +175,81 @@ import Testing
         #expect(DeleteFlow.went(ScanAnswer(albums: [], problem: "LIBRARY_PATH is not set"), path: "A/B") == nil)
         #expect(DeleteFlow.went(ScanAnswer(albums: [], problem: ""), path: "A/B") == true)
     }
+
+    // MARK: after review (16 Nov)
+
+    /// The phone's question is tied to the folder and the summary it was asked over: answered Delete after the page
+    /// was followed to another folder (a scan moved it), or after the summary was read again into something else,
+    /// nothing is deleted - only the folder the question named, with that summary still in hand.
+    @Test func theQuestionDeletesOnlyTheFolderAndSummaryItWasAskedOver() {
+        var flow = DeleteFlow()
+        let asked = DeletionSummary(audioFiles: 4, totalBytes: 2_097_152)
+        flow.read(flow.beginRead("A/B"), asked)
+        let elsewhere = flow.beginDelete("A/B", over: asked, holding: "A/B [Deluxe]")
+        #expect(!elsewhere && !flow.deleting, "the page holds another folder now")
+        let nothingHeld = flow.beginDelete("A/B", over: asked, holding: nil)
+        #expect(!nothingHeld && !flow.deleting)
+
+        // read again meanwhile, and the folder has more in it now: not what the question was asked over
+        flow.read(flow.beginRead("A/B"), DeletionSummary(audioFiles: 5, totalBytes: 2_097_152))
+        let changed = flow.beginDelete("A/B", over: asked, holding: "A/B")
+        #expect(!changed && !flow.deleting, "the summary in hand isn't the one the question showed")
+
+        // followed to B and B read: a question asked over A's summary deletes nothing, B's own does
+        let b = DeletionSummary(audioFiles: 7)
+        flow.read(flow.beginRead("A/C"), b)
+        let stale = flow.beginDelete("A/B", over: asked, holding: "A/C")
+        #expect(!stale && !flow.deleting)
+        let staleOverB = flow.beginDelete("A/B", over: b, holding: "A/C")
+        #expect(!staleOverB && !flow.deleting, "asked about A, though B's summary matches")
+        let own = flow.beginDelete("A/C", over: b, holding: "A/C")
+        #expect(own && flow.deleting)
+    }
+
+    /// Another folder's summary never carries over to the next (mutation M12): read A, begin B's read and have it
+    /// called off - B has no summary, so nothing can be deleted by A's.
+    @Test func anotherFoldersSummaryGoesTheMomentItsReadBegins() {
+        var flow = DeleteFlow()
+        flow.read(flow.beginRead("A/B"), DeletionSummary(audioFiles: 4))
+        #expect(flow.canDelete("A/B"))
+        let b = flow.beginRead("A/C")
+        #expect(flow.summary == nil, "A's summary isn't B's")
+        flow.readCancelled(b)
+        #expect(flow.summary == nil && !flow.reading && !flow.canDelete("A/C") && !flow.canDelete("A/B"))
+        let started = flow.beginDelete("A/C")
+        #expect(!started && !flow.deleting)
+    }
+
+    /// Delete permanently is off while the same folder's summary is read again (mutation M13): the summary in hand is
+    /// about to be replaced by what the folder holds now.
+    @Test func nothingIsDeletedWhileTheSummaryIsReadAgain() {
+        var flow = DeleteFlow()
+        flow.read(flow.beginRead("A/B"), DeletionSummary(audioFiles: 4))
+        let again = flow.beginRead("A/B")
+        #expect(flow.summary != nil && flow.reading, "the summary stays drawn while Look again reads")
+        #expect(!flow.canDelete("A/B"))
+        let started = flow.beginDelete("A/B")
+        #expect(!started && !flow.deleting)
+        flow.read(again, DeletionSummary(audioFiles: 4))
+        #expect(flow.canDelete("A/B"))
+    }
+
+    /// A delete that never answered and didn't go keeps deadwax's own words when it gave some (mutation M14): a 5xx's
+    /// detail says more than ours, which are only for an answer that had none.
+    @Test func aDeleteThatDidntGoKeepsDeadwaxsOwnWords() {
+        var flow = DeleteFlow()
+        flow.read(flow.beginRead("A/B"), DeletionSummary(audioFiles: 4))
+        let started = flow.beginDelete("A/B")
+        #expect(started)
+        flow.deleteEnded(.unanswered, said: "Error deleting the album: disk I/O error.")
+        flow.settled(gone: false)
+        #expect(!flow.mayHaveFinished && flow.failure == "Error deleting the album: disk I/O error.")
+
+        flow.read(flow.beginRead("A/B"), DeletionSummary(audioFiles: 4))
+        let again = flow.beginDelete("A/B")
+        #expect(again && flow.failure == nil, "a new delete clears the last one's words")
+        flow.deleteEnded(.unanswered, said: nil)
+        flow.settled(gone: false)
+        #expect(flow.failure == DeleteWords.failed, "no words of deadwax's: ours")
+    }
 }

@@ -36,6 +36,10 @@ final class TagsModel {
     /// What the last apply did ("Saved 3 files."), and what it couldn't do.
     private(set) var applied: String?
     private(set) var applyError: String?
+    /// Saved, and the fields given back to the files - which are being read again (review, 16 Nov): until that read
+    /// lands the fields aren't drawn (they would show what the files said before), only "Saved…" and "Reading the
+    /// files…" - or, the read failed, its failure with Look again.
+    private(set) var refreshing = false
     private(set) var flow: RetagFlow
 
     @ObservationIgnored var client: DeadwaxClient?
@@ -132,8 +136,12 @@ final class TagsModel {
             reading = false
             files = found
             readFailure = nil
-            // a file edited that has gone since (a release applied renames them): the editor's selection with it
-            selection = selection.filter { name in found.contains { $0.filename == name } }
+            refreshing = false
+            // a file edited that has gone since (a release applied renames them): the selection, and the editor's
+            // files, without it - Apply never sends a name the folder no longer holds (flow.read makes a new preview)
+            let held = { (name: String) in found.contains { $0.filename == name } }
+            selection = selection.filter(held)
+            editing = editing.filter(held)
             flow.read()
             schedulePreview()
         } catch {
@@ -180,12 +188,13 @@ final class TagsModel {
         changed()
     }
 
-    /// Typing over a field.
+    /// Typing over a field - only text that differs from what the field shows (TagEdit.typed: a "" handed back by the
+    /// field over files that disagree is no typing, and never reads as "Will be removed").
     func set(_ key: String, _ value: String) {
-        guard draft[key] != value else { return }
+        guard let next = TagEdit.typed(value, key: key, draft: draft, shared: shared(key)) else { return }
         // the message describes a write that has happened: changed, it no longer describes what Apply would do
         applied = nil
-        draft[key] = value
+        draft = next
         changed()
     }
 
@@ -261,14 +270,19 @@ final class TagsModel {
             } else {
                 applied = said.text
                 draft = [:]
+                // the fields would show the files as last read until the read the apply waits for lands
+                refreshing = true
             }
             plan = nil
         case .failure(let error):
             outcome = RetagFlow.outcome(of: error)
             applyError = EditWords.writeFailure(error, failed: TagEditWords.applyFailed, admin: admin)
+            plan = nil
         }
         flow.applyEnded(outcome)
-        if outcome == .refused { schedulePreview() }
+        // refused, nothing was written - but the preview in hand is the one the server just refused: out of date
+        // (planning, its spinner) until it is asked again, never shown as what Apply would do meanwhile
+        if outcome == .refused { changed() }
         return outcome
     }
 

@@ -257,13 +257,16 @@ public enum Routes {
     /// tests/test_ios_edit_contract.py holds each. Tags' (slice 2): a tag edit's preview reads every file named (up to
     /// MAX_EDITS), as a retag's preview does, so it is given a retag preview's 60; its apply reads them again and
     /// writes each changed one, then the scan's cache and the store index's row - no network, no wait, no bound of its
-    /// own - so it is given twice that; a track's picture a read of one file - tests/test_ios_edit_parts_contract.py
-    /// holds each. Artwork's and Lyrics' (slice 3): Get lyrics asks LRCLIB for every track without lyrics, two at a time
-    /// (src/lyrics.py CONCURRENCY), each by its exact lookup and then a search (10 s to connect and 30 s to answer
-    /// apiece), so a disc of twelve tracks takes 480 s at worst - given 600, and one still longer is said as maybe
-    /// finished (Get lyrics only adds, so asking again is harmless); Get CD art lists the release's images on the
-    /// Cover Art Archive (55 s), else asks fanart.tv (25 s), then fetches each disc's picture (55 s) - a box of four
-    /// discs 300 s at worst, given 360; a CD art picture a read of one file. Delete's (slice 4): the summary walks the
+    /// own - so it is given twice that at least, and a minute more for each 1.2 GB of the files edited (EditWaits,
+    /// review 16 Nov: a file whose new tags outgrow the room before its audio is written whole); a track's picture a
+    /// read of one file - tests/test_ios_edit_parts_contract.py holds each. Artwork's and Lyrics' (slice 3): Get lyrics
+    /// and Get CD art are given these at least, and as long as the album in hand needs (EditWaits, review 16 Nov) - Get
+    /// lyrics asks LRCLIB for every track without lyrics, two at a time (src/lyrics.py CONCURRENCY), under each of up
+    /// to two names, by its exact lookup and then a search (10 s to connect, 30 s to answer and 15 s of busy pauses
+    /// apiece), so a disc of twelve tracks is given 23 minutes; Get CD art lists the release's images on the Cover Art
+    /// Archive, else asks fanart.tv (25 s), then fetches each disc's picture - each Archive address three requests of
+    /// 55 s through its redirects; one still longer is said as maybe finished (a Get only adds, so asking again is
+    /// harmless); a CD art picture a read of one file. Delete's (slice 4): the summary walks the
     /// folder (every file under it, the scan's ignored ones too) and, with logins on, reads who holds it from SQLite -
     /// a folder's read, given a preview's 60; the delete removes the folder, then writes the saved scan and the store's
     /// rows - no network, no wait - so it is given a tag apply's 120.

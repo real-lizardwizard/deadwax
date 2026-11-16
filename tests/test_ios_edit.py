@@ -201,6 +201,13 @@ def test_a_failed_read_is_said_with_look_again():
     failed = declared(sheet, "struct", "ReadAgainFailed")
     assert "ErrorNote(text: failure)" in failed and "Button(EditWords.lookAgain)" in failed
     assert "await model.lookUp()" in failed
+    # whichever part's read is waited for (review, 16 Nov): the Release's or Tags', else the scan's
+    assert "if let failure = model.readBlocking ?? model.scan.failure {" in failed
+    model = code(MODEL)
+    blocking = block(model, model.index("{", model.index("var readBlocking: String?")))
+    assert "if tags?.flow.readFailed == true, let said = tags?.readFailure { return said }" in blocking
+    assert "guard retag?.flow.readFailed == true || tags?.flow.readFailed == true else { return nil }" in blocking
+    assert "return scan.failure ?? EditWords.readFailed" in blocking
     release = code(RELEASE)
     assert "if retag.flow.readFailed {" in release and "ReadAgainFailed(model: model)" in release
     # the cover alone: off while the folder is to be read again or a write runs

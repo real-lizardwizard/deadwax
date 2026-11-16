@@ -107,7 +107,8 @@ struct TagsListView: View {
 
 /// The files read, or reading, or not read - over the Tags list and a track's page: "Reading the files…" while the
 /// first read is on its way; the read's failure in the phone's words with Look again (the scan read again, and with it
-/// the files).
+/// the files) - the files' own read's, or (review, 16 Nov) the scan's, when the read a write or a gap waits for
+/// couldn't be made there.
 struct TagsReadState: View {
     let model: EditAlbumModel
     let tags: TagsModel
@@ -122,7 +123,7 @@ struct TagsReadState: View {
                 .accessibilityElement(children: .combine)
             }
         }
-        if let failure = tags.readFailure {
+        if let failure = tags.readFailure ?? (tags.flow.readFailed ? model.scan.failure ?? EditWords.readFailed : nil) {
             Section {
                 ErrorNote(text: failure)
                 Button(EditWords.lookAgain) {
@@ -131,7 +132,7 @@ struct TagsReadState: View {
                         await tags.readFiles()
                     }
                 }
-                .disabled(!model.online || tags.reading)
+                .disabled(!model.online || tags.reading || model.scan.reading)
             }
         }
     }
@@ -249,7 +250,11 @@ struct TrackPageView: View {
                     .foregroundStyle(Palette.quiet)
                     .fixedSize(horizontal: false, vertical: true)
             }
-            ForEach(file.pictures, id: \.index) { (picture: EmbeddedPicture) in
+            // by place, not by the server's index: an index read loosely (missing, malformed) is 0, and two pictures
+            // with one id would be drawn as one
+            ForEach(Array(file.pictures.enumerated()), id: \.offset) {
+                (entry: (offset: Int, element: EmbeddedPicture)) in
+                let picture = entry.element
                 Button {
                     full = FullCover(source: .picture(path: tags.album.path, file: file.filename, index: picture.index))
                 } label: {
@@ -402,7 +407,24 @@ struct EditTagsView: View {
                 }
             }
             TagsReadState(model: model, tags: tags)
-            if tags.ready {
+            if tags.refreshing {
+                // saved: the fields come back once the files are read again (TagsModel.refreshing) - never what they
+                // said before under "Saved"; a read that failed is said above, with Look again
+                Section {
+                    if let applied = tags.applied {
+                        Text(applied)
+                            .foregroundStyle(Palette.held)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    if tags.readFailure == nil, !tags.flow.readFailed {
+                        HStack(spacing: 10) {
+                            ProgressView()
+                            Text(TagEditWords.readingFiles).foregroundStyle(Palette.quiet)
+                        }
+                        .accessibilityElement(children: .combine)
+                    }
+                }
+            } else if tags.ready {
                 editingSection
                 ForEach(TagEdit.sections, id: \.title) { (section: (title: String, keys: [String])) in
                     Section {

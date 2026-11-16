@@ -95,12 +95,18 @@ def test_the_forms_fields_are_the_tags_the_server_lets_be_edited():
     assert re.findall(r'Field\(key: "(\w+)"', source) == fields
 
 
+#: the values the web refuses and the server would take - each explained below
+STRICTER = 21
+
+
 def test_a_value_the_web_takes_is_never_one_the_server_refuses():
     # the phone offers Apply only with no field wrong as TagEdit.problem judges it (the web's own rule, held to the web
     # by EditPartsVectorTests): every value it takes, the server's validate_tag takes too, trimmed as the phone sends it
-    # and stripped again as the server does. The web is stricter in three places only, which refuse something the
+    # and stripped again as the server does. The web is stricter in four places only, which refuse something the
     # server would have written - never the other way: digits from other scripts (Python's \d takes them), a NEL after
-    # a number (Python's strip removes it, JS's trim doesn't), and a length counted in UTF-16 units, not characters
+    # a number (Python's strip removes it, JS's trim doesn't), a length counted in UTF-16 units, not characters, and
+    # (review, 16 Nov) the separators 0x1C-0x1F at either end - Python's strip removes them too, JS's trim keeps them
+    # and its control check refuses them
     stricter = 0
     for case in vectors()["tags"]["problems"]:
         key, value, web = case["key"], case["value"], case["problem"]
@@ -115,8 +121,9 @@ def test_a_value_the_web_takes_is_never_one_the_server_refuses():
             other_digits = any(ch.isdigit() and not ch.isascii() for ch in value)
             nel = "\x85" in value
             astral = len(text.encode("utf-16-le")) // 2 > track_tags.MAX_VALUE_LENGTH >= len(text)
-            assert other_digits or nel or astral, (key, value, web)
-    assert stricter <= 10, "the web's rule drifted further from the server's"
+            separators = any(ch in "\x1c\x1d\x1e\x1f" for ch in value[:1] + value[-1:])
+            assert other_digits or nel or astral or separators, (key, value, web)
+    assert stricter <= STRICTER, "the web's rule drifted further from the server's"
 
 
 def test_every_draft_the_vectors_hold_is_taken_by_the_real_preview(client):
@@ -215,6 +222,11 @@ def test_the_tag_routes_are_waited_for_past_a_folders_read():
     wait = timeouts()
     assert wait["tagsPreview"] >= wait["libraryTracks"]
     assert wait["tagsApply"] >= 2 * wait["tagsPreview"]
+    # and on top, by the files edited (review, 16 Nov): mutagen writes a file whole when its new tags outgrow the room
+    # before the audio - at a slow disk's 20 MB a second, an assumption about the disk, not read from anything
+    assert "audio.save()" in inspect.getsource(track_tags.execute_tag_edits)
+    assert edit_waits()["rewriteBytesPerSecond"] == 20_000_000
+    assert "EditWaits.tagsApply(bytes: bytes)" in swift_function("EditClient.swift", "tagsApply")
     apply = inspect.getsource(library_route.tags_apply)
     for slow in ("_pause_before_rename", "coverart_client", "_wait_for_navidrome_scan", "_album_lock"):
         assert slow not in apply, slow
@@ -262,8 +274,8 @@ def test_the_get_bodies_are_the_servers_models_and_never_replace():
                                                                                                  "getCover")
     lyrics = swift_struct("LyricsFetchBody")
     assert "self.replace = false" in lyrics and "self.retime = false" in lyrics
-    assert "LyricsFetchBody(albumPath: path)" in swift_function("EditClient.swift", "getLyrics")
-    assert "DiscArtFetchBody(albumPath: path)" in swift_function("EditClient.swift", "getDiscArt")
+    assert "LyricsFetchBody(albumPath: album.path)" in swift_function("EditClient.swift", "getLyrics")
+    assert "DiscArtFetchBody(albumPath: album.path)" in swift_function("EditClient.swift", "getDiscArt")
 
 
 # ---------------------------------------------------------------------------- Artwork and Lyrics: what the phone reads
@@ -372,10 +384,9 @@ def test_get_cd_art_answers_what_the_phone_reads_and_never_replaces(client, monk
 
 # ---------------------------------------------------------------------------- Artwork and Lyrics: how long the phone waits
 
-#: tracks of an album Get lyrics is held for in full - a long LP's; one longer may outlast it, and is then said as "may
-#: have finished" and read again (GetRun's unanswered), never asked again unseen
+#: the albums EditWaitsTests.swift pins the phone's waits for - a long LP's twelve tracks, none with lyrics, and a
+#: four-disc set - worked out again here from the server's own figures
 LYRICS_TRACKS = 12
-#: CD art pictures held for in full - a four-disc set's
 DISC_ART_DISCS = 4
 
 
@@ -383,31 +394,75 @@ def _seconds(source: str, connect: str = r"connect=([\d.]+)", read: str = r"read
     return float(re.search(connect, source).group(1)) + float(re.search(read, source).group(1))
 
 
+def edit_waits() -> dict[str, float]:
+    """EditWaits' figures (ios/DeadwaxKit/Sources/DeadwaxCore/EditWaits.swift), by name."""
+    text = (CORE / "EditWaits.swift").read_text(encoding="utf-8")
+    return {name: float(value.replace("_", ""))
+            for name, value in re.findall(r"public static let (\w+)(?:: \w+)? = ([\d_.]+)", text)}
+
+
+def _minute(seconds: float) -> int:
+    return -(-int(seconds) // 60) * 60
+
+
 def test_the_gets_are_waited_for_past_their_worst_case():
+    """Review, 16 Nov: a fixed wait was passed by a long album, so the phone waits by the album in hand (EditWaits) -
+    each figure it works with read here from the server's source, and the waits EditWaitsTests.swift pins worked out
+    again from them. Never under the route's own (Routes.timeouts)."""
     from src import lyrics as lyrics_module
     from src.api import artist_images_endpoint, coverart_endpoint, lrclib_endpoint
     wait = timeouts()
-    # Get lyrics: each track asked by its own artist name (LRCLIB's exact lookup, then its search - two requests at
-    # most for a name: a folder whose artist is its album artist, as most are), each request's longest silence its
-    # connection and its read, CONCURRENCY tracks at once
-    client = inspect.getsource(lrclib_endpoint.LrclibClient.get_client)
-    request = _seconds(client)
-    assert request == 40
-    assert "CONCURRENCY" in inspect.getsource(lyrics_module.fetch_album_lyrics)
+    figure = edit_waits()
+    pinned = (CORE.parent.parent / "Tests" / "DeadwaxCoreTests" / "EditWaitsTests.swift").read_text(encoding="utf-8")
+    assert figure["margin"] == 60
+    # Get lyrics: each LRCLIB request's longest silence its connection and its read
+    request = _seconds(inspect.getsource(lrclib_endpoint.LrclibClient.get_client))
+    assert request == figure["lrclibRequest"] == 40
+    # ...and while LRCLIB says it is busy (429, 503), asked again after each of RETRY_PAUSES - none past
+    # _retry_after's cap
+    cap = float(re.search(r"min\(.*, ([\d.]+)\)", inspect.getsource(lrclib_endpoint._retry_after)).group(1))
+    assert "await asyncio.sleep(_retry_after(response, pause))" in inspect.getsource(lrclib_endpoint.LrclibClient._get)
+    busy = len(lrclib_endpoint.RETRY_PAUSES) * cap
+    assert busy == figure["lrclibBusy"] == 15
+    # each track asked under its artist, then its album artist - two names at most, whatever else it is tagged with
+    most = lyrics_module.lookup_from_tags({"title": "T", "artist": "A", "albumartist": "B", "artists": "C",
+                                           "composer": "D", "performer": "E"}, 200)
+    assert len(most["artists"]) == figure["lrclibNames"] == 2
+    # each name by the exact lookup, then the search
+    find = inspect.getsource(lrclib_endpoint.LrclibClient.find)
+    names = find[find.index('for artist in lookup["artists"]:'):]
+    assert names.count("await self._get(") == figure["lrclibRequestsPerName"] == 2
+    assert lyrics_module.CONCURRENCY == figure["lyricsAtOnce"] == 2
+    assert "async with semaphore:" in inspect.getsource(lyrics_module.fetch_album_lyrics)
+    # the tracks asked are the ones without a lyrics file - the very files the scan's lyrics_count counts
+    assert "has_lyrics_file(entry.name, names)" in inspect.getsource(lyrics_module.plan_lyrics)
+    assert "lyrics_count = sum(1 for t in tracks if has_lyrics_file(" in inspect.getsource(library)
+    track = figure["lrclibNames"] * figure["lrclibRequestsPerName"] * (request + busy)
     rounds = -(-LYRICS_TRACKS // lyrics_module.CONCURRENCY)
-    lyrics = rounds * 2 * request
-    assert lyrics == 480
-    assert wait["lyricsFetch"] >= lyrics + 60
-    # Get CD art: the Archive's listing, fanart.tv's (with a key) when it has none, then one picture a disc - the
-    # Archive's or fanart.tv's, the slower of the two
-    archive = _seconds(inspect.getsource(coverart_endpoint.CoverArtClient.get_client))
-    images = artist_images_endpoint.IMAGE_TIMEOUT
+    lyrics = _minute(rounds * track + figure["margin"])
+    assert lyrics == 1380 and lyrics > wait["lyricsFetch"]
+    assert f'EditWaits.lyrics(ScanAlbum(path: "A/B", trackCount: {LYRICS_TRACKS})) == {lyrics}' in pinned
+    # Get CD art: the Archive's listing, fanart.tv's when the Archive has none, then each disc's picture in turn
+    route = inspect.getsource(library_route.fetch_disc_art)
+    assert route.index("coverart_client.release_images(") < route.index("artist_images_client.fanarttv_cdart(") < (
+        route.index("for disc, url in chosen.items():")) < route.index("got = await fetch(url)")
+    client = inspect.getsource(coverart_endpoint.CoverArtClient.get_client)
+    archive = _seconds(client)
+    assert archive == figure["archiveRequest"] == 55
+    # each Archive address through its redirects (coverartarchive.org's to archive.org, archive.org's to the server
+    # holding the item): three requests, each its own silence - the Archive's way, assumed, not read from here
+    assert "follow_redirects=True" in client and figure["archiveHops"] == 3
     listing = artist_images_endpoint.JSON_TIMEOUT
-    fanart = listing.connect + listing.read
-    picture = max(archive, images.connect + images.read)
-    disc = archive + fanart + DISC_ART_DISCS * picture
-    assert disc == 300
-    assert wait["discArtFetch"] >= disc + 60
+    assert listing.connect + listing.read == figure["fanartListing"] == 25
+    images = artist_images_endpoint.IMAGE_TIMEOUT
+    assert images.connect + images.read <= archive, "fanart.tv's picture is the quicker of the two"
+    address = archive * figure["archiveHops"]
+    disc = _minute(address + figure["fanartListing"] + DISC_ART_DISCS * address + figure["margin"])
+    assert disc == 960 and disc > wait["discArtFetch"]
+    assert f'EditWaits.discArt(ScanAlbum(path: "A/B", discCount: {DISC_ART_DISCS})) == {disc}' in pinned
+    # the phone hands the album in, so the wait is never forgotten
+    assert "built.timeout = EditWaits.lyrics(album)" in swift_function("EditClient.swift", "getLyrics")
+    assert "built.timeout = EditWaits.discArt(album)" in swift_function("EditClient.swift", "getDiscArt")
     # a CD art picture is one file read off disk, as the cover's
     assert wait["libraryDiscArt"] >= wait["libraryArt"]
     # Get cover is the cover alone's route, with no replacing: the same wait

@@ -600,16 +600,20 @@ number." Last, **All tags in this file (24)**: every tag under its own name, and
 
 **Edit tags** is the web app's tag editor: **Title**, **Artist** and **Track**; **Album**, **Album artist**, **Disc**
 and **Disc title**; **Year** and **Original year**; **Genre** and **Composer** - each showing what the tracks say, or
-"Several values" where they disagree ("Differs between tracks - left alone, each keeps its own"). Type over a field
-and only that field is written, to every track chosen; **Undo** under it puts back what the files say, and emptying a
+"Several values" where they disagree ("Differs between tracks - left alone, each keeps its own"); tapping into one
+and out again changes nothing - only typing does. Type over a field and only that field is written, to every track
+chosen; **Undo** under it puts back what the files say, and emptying a
 field removes the tag ("Will be removed"). A track or disc number has to be a number ("3" or "3/12"), a year a year
 or a date ("2022" or "2022-07-29"): anything else is said under the field in amber, and nothing is asked until it's
 put right. **What would change** is worked out by deadwax a moment after you stop typing: each file that would change,
 each tag with what it says now and what it would say ("removed" for a tag taken away) - or "Nothing to change - every
 track already says that." **Apply** writes them, as the web app's does: "Saved 12 files." No file is renamed and the
 folder stays where it is - Release moves an album's folder to where its tags say it belongs. Then the files are read
-again, and the album page under the sheet shows the album as it is now. An Apply whose answer never comes is said as
-Release's is (below), and the files read again before Apply comes back on.
+again - until they have been, Edit tags shows "Saved 12 files." and "Reading the files…" rather than the fields, which
+would still say what the files said before (if they can't be read, it says why, with **Look again**) - and the album
+page under the sheet shows the album as it is now. A big album takes longer to write - a file is sometimes written out
+whole - so the phone waits two minutes and more by how much the files hold. An Apply whose answer never comes is said
+as Release's is (below), and the files read again before Apply comes back on.
 
 **Artwork** is the web app's Artwork tab. **Cover**: the folder's cover - tap it to see it full screen - and where it
 is ("A cover is saved beside the tracks.", "The cover is inside the files, with none beside them.", or "No cover is
@@ -634,9 +638,10 @@ lyrics - Lyrics in Server settings, which is still the web app's.
 
 **The Gets are writes**, like Apply: one at a time, never while Release or Edit tags applies (and those are dimmed
 while a Get runs), and off until the folder has been read again after any of them. Each says what went wrong under
-its button, with **Try again**; a lyrics fetch of a long album can take a few minutes, and the phone waits up to ten.
-If its answer never comes, it's said as an Apply's is (below): the folder is read again, so whatever deadwax saved
-meanwhile shows.
+its button, with **Try again**. A Get can take minutes when LRCLIB or the Cover Art Archive is slow, and the phone
+waits as long as that album could take at worst: for lyrics at least ten minutes, more for each track without them
+(23 for twelve), and for CD art at least seven, more for each disc. If its answer never comes, it's said as an
+Apply's is (below): the folder is read again, so whatever deadwax saved meanwhile shows.
 
 **Delete album** is the web app's Delete tab: it removes the album's folder from deadwax's library, with everything
 in it, for good. As it opens, deadwax reads the folder as it is now ("Checking what's in there…"): how many tracks
@@ -646,8 +651,12 @@ on, whose libraries it's in, in amber: "In ana and bo's libraries: deleting it t
 removed by an admin.", "In your library: deleting it takes it out.", or "Nobody has it in their library." When deadwax
 couldn't read who has it, it says so - never "nobody". If the folder can't be read, "Couldn't read that folder." and
 why, with **Look again**. Then, in red, "This deletes the folder and everything in it, permanently. There is no
-undo." over **Delete permanently**, which is off until all that has been read. Tap it and the phone asks once more -
-"Delete Dummy?", "There is no undo." - **Delete** in red, or **Cancel**, the one a stray tap lands on. "Deleting…";
+undo." over **Delete permanently**, which is off until all that has been read - and, when the library couldn't be read
+again after a write, says so ("Couldn't read the library.", with **Look again**) rather than staying dimmed with no
+reason. Tap it and the phone asks once more - "Delete Dummy?", "There is no undo." - **Delete** in red, or
+**Cancel**, the one a stray tap lands on. The question is about that folder as it was just read: if the page moves to
+another folder while it's up (the library read again found the album moved), it goes away, and if what's in the
+folder has changed meanwhile, nothing is deleted. "Deleting…";
 then the sheet closes (VoiceOver says "Deleted Portishead/Dummy (1994).") and the Library asks for its albums again,
 now and once Navidrome has scanned. When that folder was all the album had, its page goes back as well; an album in
 several folders keeps its page, which shows the rest once Navidrome has scanned. Songs of it downloaded to the phone
@@ -668,7 +677,8 @@ long, WireGuard dropped) - or comes as a server error, from deadwax or from a re
 the wait - the sheet says "deadwax may have finished this - looking again", reads the folder again and works What Apply
 does out afresh: never the same Apply again on the old answer. Only a refusal (deadwax saying no before it wrote
 anything) keeps What Apply does as it was. If the library can't be read then, the sheet says "Couldn't read the
-library." with **Look again**, and nothing can be applied until it has been read. Only one write runs at a time: while
+library." with **Look again** - on every page waiting for it, Delete album's too - and nothing can be applied until it
+has been read. Only one write runs at a time: while
 Release applies or saves a cover, Edit tags' Apply, the Gets and Delete permanently are dimmed, and the other way round
 - and after any of them, the others' previews are worked out again once the folder has been read.
 
@@ -4272,12 +4282,14 @@ the same album's Tags in the web app.
 - **330 Tags.** Edit album > **Tags**: "Reading the files…", then every track in running order - on a set a section
   for each disc and numbers like "2-04"; a guest artist's track shows them under its title. **Select**, tick three:
   "3 of 12 selected", and **Edit 3 tracks…** at the bottom opens Edit tags with the fields they share filled in and
-  those that differ saying "Several values" ("Differs between tracks - left alone, each keeps its own"). **Select every
-  track**, then **Deselect every track**; **Done** clears the ticks, and with none ticked the button is **Edit all
-  tracks…**.
+  those that differ saying "Several values" ("Differs between tracks - left alone, each keeps its own"); tap into one
+  and out again without typing: it still says "Several values", never "Will be removed", and nothing is worked out.
+  **Select every track**, then **Deselect every track**; **Done** clears the ticks, and with none ticked the button is
+  **Edit all tracks…**.
 - **331 A genre for all.** Edit all tracks…, type a genre: within a second What would change lists each file's change,
   its genre now struck through and the new one under it; a field left at "Several values" changes no file's own.
-  **Apply**: "Saved 12 files.", and Navidrome - and the web app's Tags - shows the new genre. Again, locking the phone
+  **Apply**: "Saved 12 files." with "Reading the files…" under it - not the old genre in the field - then the fields
+  again, with the new genre, and Navidrome - and the web app's Tags - shows it. Again, locking the phone
   the moment you tap Apply: unlocked, does it say what it did, or "deadwax may have finished this - looking again" -
   and never offer the same Apply on the old preview?
 - **332 Remove and undo.** Empty a field the track has (Composer, say): "Will be removed" under it, and the preview says

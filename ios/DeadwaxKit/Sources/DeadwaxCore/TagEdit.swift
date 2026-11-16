@@ -119,6 +119,20 @@ public enum TagEdit {
 
     static func isDigit(_ unit: UInt16) -> Bool { (0x30...0x39).contains(unit) }
 
+    /// What typing `text` over the field `key` makes of the draft - nil when it changes nothing (review, 16 Nov): text
+    /// the field already shows (what was typed over it, else what the files share) is no typing. A field over files
+    /// that disagree shows "" under "Several values", and SwiftUI's TextField can hand its text back without a key
+    /// pressed - taken as typing, that "" would read as emptied and remove every track's own value ("Will be
+    /// removed"). Typing and then clearing it still reaches "": the draft then holds what was typed, so the "" is a
+    /// change.
+    public static func typed(_ text: String, key: String, draft: [String: String],
+                             shared: Shared) -> [String: String]? {
+        guard text != (draft[key] ?? shared.value) else { return nil }
+        var next = draft
+        next[key] = text
+        return next
+    }
+
     /// `removesTag(shared, draft)`: edited to nothing - but only from tracks that have one to remove. `draft` is what
     /// was typed over the field, nil while it is left alone.
     public static func removes(_ shared: Shared, draft: String?) -> Bool {

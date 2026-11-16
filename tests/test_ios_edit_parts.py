@@ -104,7 +104,8 @@ def test_the_tag_apply_holds_a_background_task_reads_again_and_stops_at_a_sign_o
     edit = code(MODEL)
     apply = body(edit, "func applyTags()")
     assert 'BackgroundHold(named: "Edit album: Edit tags")' in apply and "defer { hold.end() }" in apply
-    assert "client.tagsApply(body)" in apply
+    # waited for by the size of the files it edits (EditWaits.tagsApply, review 16 Nov)
+    assert "client.tagsApply(body, bytes: tags.editingFiles.reduce(0) { $0 + $1.size })" in apply
     assert apply.index("guard samePerson else { return }") < apply.index("await lookUp()")
     assert "AccessibilityNotification.Announcement(EditWords.mayHaveFinished).post()" in apply
     assert apply.index("guard tags.flow.needsRead else { return }") < apply.index("await lookUp()")
@@ -142,6 +143,41 @@ def test_tags_reads_drop_a_cancellation_and_only_the_newest_lands():
     ended = body(model, "func applyEnded(")
     assert "RetagFlow.outcome(of: error)" in ended
     assert "EditWords.writeFailure(error, failed: TagEditWords.applyFailed, admin: admin)" in ended
+
+
+def test_after_review_tags_types_only_what_differs_and_never_shows_stale_fields():
+    # review, 16 Nov: a field's "" handed back without a key pressed is no typing (TagEdit.typed - Core's, tested there)
+    model = code(TAGS_MODEL)
+    typed = body(model, "func set(_ key: String, _ value: String)")
+    assert "guard let next = TagEdit.typed(value, key: key, draft: draft, shared: shared(key)) else { return }" in typed
+    assert "draft[key] != value" not in typed and "draft = next" in typed
+    # saved: the fields wait for the files' read (refreshing), set as the draft goes and cleared only as a read lands
+    ended = body(model, "func applyEnded(")
+    assert ended.index("draft = [:]") < ended.index("refreshing = true") < ended.index("case .failure(let error):")
+    read = body(model, "func readFiles()")
+    assert read.index("files = found") < read.index("refreshing = false") < read.index("} catch {")
+    assert "refreshing" not in read[read.index("} catch {"):], "a read that failed leaves the fields away"
+    pages = code(TAGS_PAGES)
+    view = declared(pages, "struct", "EditTagsView")
+    assert view.index("if tags.refreshing {") < view.index("} else if tags.ready {") < view.index("editingSection")
+    shown = view[view.index("if tags.refreshing {"):view.index("} else if tags.ready {")]
+    assert "TextField" not in shown and "Text(applied)" in shown and "TagEditWords.readingFiles" in shown
+    assert "if tags.readFailure == nil, !tags.flow.readFailed {" in shown
+    # a read that failed is said with Look again - the files' own, or the scan's the flow waited for
+    state = declared(pages, "struct", "TagsReadState")
+    assert ("if let failure = tags.readFailure ?? (tags.flow.readFailed ? model.scan.failure ?? EditWords.readFailed"
+            " : nil) {") in state
+    # a refused apply's preview is out of date until asked again (changed: planning, then a new preview)
+    assert "if outcome == .refused { changed() }" in ended
+    assert ended.count("plan = nil") == 2, "the plan in hand goes whatever came of the apply"
+    # a file gone since (a release applied renames them) leaves the editor's files as it leaves the selection
+    assert read.index("let held = { (name: String) in found.contains { $0.filename == name } }") < read.index(
+        "editing = editing.filter(held)") < read.index("flow.read()")
+    assert "selection = selection.filter(held)" in read
+    # a track's pictures by place: an index read loosely as 0 twice is still two rows
+    page = declared(pages, "struct", "TrackPageView")
+    assert "ForEach(Array(file.pictures.enumerated()), id: \\.offset)" in page
+    assert "ForEach(file.pictures, id: \\.index)" not in page
 
 
 # ---------------------------------------------------------------------------- Artwork and Lyrics (slice 3)
@@ -212,6 +248,9 @@ def test_a_get_says_its_words_and_is_on_only_as_the_model_says():
     wait = declared(pages, "struct", "GetWait")
     assert "if model.unansweredGet != nil {" in wait and "MayHaveFinished(reading: model.scan.reading)" in wait
     assert "if model.retag?.flow.readFailed == true {" in wait and "ReadAgainFailed(model: model)" in wait
+    # the read that holds the Gets off, said in the phone's words with Look again (review, 16 Nov)
+    failed = declared(code(SHEET), "struct", "ReadAgainFailed")
+    assert "if let failure = model.readBlocking ?? model.scan.failure {" in failed
     for name in ("ArtworkPage", "LyricsPage"):
         assert "GetWait(model: model)" in declared(pages, "struct", name), name
     edit = code(MODEL)
@@ -236,7 +275,8 @@ def test_a_get_holds_a_background_task_reads_again_after_any_write_and_stops_at_
     get = body(edit, "func get(_ kind: GetResults.Kind)")
     assert "guard canGet, let client, let before = album else { return }" in get
     assert 'BackgroundHold(named: "Edit album: ' in get and "defer { hold.end() }" in get
-    for call in ("client.getCover(path: path)", "client.getDiscArt(path: path)", "client.getLyrics(path: path)"):
+    # the long two waited for by the album in hand (EditWaits, review 16 Nov): handed the album, not its path
+    for call in ("client.getCover(path: path)", "client.getDiscArt(before)", "client.getLyrics(before)"):
         assert call in get, call
     assert "run.failed(error, admin: admin)" in get
     # the other parts' previews wait for the read too - before anything is asked of the person signed in
@@ -290,16 +330,25 @@ def test_the_page_says_what_goes_and_who_holds_it_as_the_dialog_does():
 def test_delete_permanently_asks_first_with_cancel_the_default():
     page = declared(code(DELETE_PAGE), "struct", "DeletePage")
     button = body(page, "Button(role: .destructive) {")
-    assert "asking = true" in button and "model.delete()" not in button
+    # the question keeps the folder and the summary it was raised over (review, 16 Nov) - nothing deleted from here
+    assert "if let summary = delete.summary { asking = (album.path, summary) }" in button
+    assert "model.delete(" not in button
+    assert "@State private var asking: (path: String, summary: DeletionSummary)?" in page
     assert "delete.deleting ? DeleteWords.deleting : DeleteWords.confirm" in page
     assert ".disabled(!model.canDelete)" in page
-    dialog = page[page.index(".confirmationDialog(DeleteWords.question(album.album), isPresented: $asking"):]
-    assert "titleVisibility: .visible" in dialog
-    assert "Button(DeleteWords.delete, role: .destructive) {" in dialog and "Task { await model.delete() }" in dialog
+    dialog = page[page.index(".confirmationDialog(DeleteWords.question(album.album),"):]
+    assert "isPresented: Binding(get: { asking != nil }, set: { if !$0 { asking = nil } })" in dialog
+    assert "titleVisibility: .visible, presenting: asking) { asked in" in dialog
+    assert "Button(DeleteWords.delete, role: .destructive) {" in dialog
+    assert "Task { await model.delete(path: asked.path, summary: asked.summary) }" in dialog
     assert "Button(DeleteWords.cancel, role: .cancel) {}" in dialog
     assert "Text(DeleteWords.noUndo)" in dialog
-    # a delete that never answered is said over the page, and a read that failed after it with Look again
+    # followed to another folder while it is up: put away
+    assert ".onChange(of: album.path) { asking = nil }" in page
+    # a delete that never answered is said over the page, and a read that failed after it with Look again - as is
+    # any read Delete waits for that couldn't be made, the Release's or Tags' (review, 16 Nov)
     assert "if delete.mayHaveFinished {" in page and "MayHaveFinished(reading: model.scan.reading)" in page
+    assert "if model.readBlocking != nil || (delete.mayHaveFinished && model.scan.failure != nil) {" in page
     assert "ReadAgainFailed(model: model)" in page
     assert "if let failure = delete.failure {" in page
 
@@ -320,8 +369,9 @@ def test_a_delete_is_a_write_never_beside_another():
 
 def test_a_delete_holds_a_background_task_and_settles_one_that_never_answered():
     edit = code(MODEL)
-    delete = body(edit, "func delete()")
-    assert "guard canDelete, let client, let before = album, deletion.beginDelete(before.path) else { return }" in delete
+    delete = body(edit, "func delete(path: String, summary: DeletionSummary)")
+    assert "guard canDelete, let client, let before = album," in delete
+    assert "deletion.beginDelete(path, over: summary, holding: before.path) else { return }" in delete
     # decided before the folder goes, as the web's dialog is given it
     assert delete.index("AlbumEdit.deletesAll(folders, tracks: before.trackCount, subject)") < delete.index(
         "client.deleteAlbum(path: before.path)")

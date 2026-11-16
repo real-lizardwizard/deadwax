@@ -168,6 +168,15 @@ final class EditAlbumModel {
     /// An apply or the cover alone is under way: the album held and its Release stay, whatever a read brings.
     var writing: Bool { applying || retag?.flow.savingCover == true }
 
+    /// The read a write or a gap waits for couldn't be made - the Release's or Tags' (RetagFlow.readFailed) - in the
+    /// phone's words (review, 16 Nov): what holds Delete and the Gets off, said with Look again wherever they are.
+    /// Tags' own read of the files first, else the scan's failure.
+    var readBlocking: String? {
+        if tags?.flow.readFailed == true, let said = tags?.readFailure { return said }
+        guard retag?.flow.readFailed == true || tags?.flow.readFailed == true else { return nil }
+        return scan.failure ?? EditWords.readFailed
+    }
+
     // MARK: opening, and looking again
 
     /// The sheet opened: the bridge and the scan, at once - once.
@@ -386,7 +395,7 @@ final class EditAlbumModel {
         defer { hold.end() }
         let result: Result<TagEditResponse, any Error>
         do {
-            result = .success(try await client.tagsApply(body))
+            result = .success(try await client.tagsApply(body, bytes: tags.editingFiles.reduce(0) { $0 + $1.size }))
         } catch {
             result = .failure(error)
         }
@@ -430,10 +439,10 @@ final class EditAlbumModel {
                 _ = try await client.getCover(path: path)
                 run.done()
             case .disc:
-                _ = try await client.getDiscArt(path: path)
+                _ = try await client.getDiscArt(before)
                 run.done()
             case .lyrics:
-                run.done(try await client.getLyrics(path: path))
+                run.done(try await client.getLyrics(before))
             }
         } catch {
             // a refusal or a 404 wrote nothing; no answer, a 5xx - or the phone calling it off - may have
@@ -490,8 +499,12 @@ final class EditAlbumModel {
     /// button, nothing deleted. No answer, or a 5xx (the folder can go before deadwax's index is told): said as maybe
     /// finished, the other parts' previews waiting, the folder read again - gone from the scan, it went; still there, it
     /// didn't, said, and its summary read again. Signed out meanwhile, nothing more.
-    func delete() async {
-        guard canDelete, let client, let before = album, deletion.beginDelete(before.path) else { return }
+    ///
+    /// `path` and `summary` are the folder and the summary the question was asked over (review, 16 Nov): the delete
+    /// starts only while the page holds that folder and that summary is still the one in hand (DeleteFlow.beginDelete).
+    func delete(path: String, summary: DeletionSummary) async {
+        guard canDelete, let client, let before = album,
+              deletion.beginDelete(path, over: summary, holding: before.path) else { return }
         // decided now, from the folders as they are - as the web's dialog is given it: once the folder is gone the
         // scan can't say what the album had
         let all = AlbumEdit.deletesAll(folders, tracks: before.trackCount, subject)

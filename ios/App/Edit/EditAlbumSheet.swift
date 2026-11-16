@@ -402,13 +402,15 @@ struct ReadAgainFailed: View {
     let model: EditAlbumModel
 
     var body: some View {
-        if let failure = model.scan.failure {
+        // the read a write or a gap waits for, whichever part's (EditAlbumModel.readBlocking), else the scan's
+        if let failure = model.readBlocking ?? model.scan.failure {
             ErrorNote(text: failure)
         }
+        // the scan read again - and with it, once it lands, Tags' files (TagsModel.albumRead)
         Button(EditWords.lookAgain) {
             Task { await model.lookUp() }
         }
-        .disabled(!model.online || model.scan.reading)
+        .disabled(!model.online || model.scan.reading || model.tags?.reading == true)
     }
 }
 

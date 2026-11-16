@@ -225,6 +225,15 @@ public struct DeleteFlow: Sendable, Equatable {
         return true
     }
 
+    /// The phone's question answered Delete (review, 16 Nov): the question is tied to the folder it was asked about and
+    /// the summary it was asked over - `asked` and `over`, kept when it was raised - so it starts only while the page
+    /// still holds that folder (`holding`, the album's path now) and that summary is still the one in hand. A page
+    /// followed to another folder, or a summary read again into something else, meanwhile: nothing deleted.
+    public mutating func beginDelete(_ asked: String, over: DeletionSummary, holding: String?) -> Bool {
+        guard asked == holding, summary == over else { return false }
+        return beginDelete(asked)
+    }
+
     /// How the delete ended (RetagFlow.outcome's rule). A refusal is said; no answer is said as maybe finished, until
     /// `settled` says whether the folder went. `said` is EditWords.writeFailure's - nil for no words of deadwax's.
     public mutating func deleteEnded(_ outcome: RetagFlow.Outcome, said: String?) {
@@ -249,6 +258,8 @@ public struct DeleteFlow: Sendable, Equatable {
 
     /// The folder read again after a delete that never answered: `gone` - the scan no longer lists it - is a delete
     /// that went (nothing more said here - the sheet closes); still there, the delete didn't, and its summary is read again.
+    /// The words under the button stay deadwax's own when it gave some (a 5xx's detail says more than ours); ours
+    /// (DeleteWords.failed) only when the answer had none.
     public mutating func settled(gone: Bool) {
         mayHaveFinished = false
         if gone {

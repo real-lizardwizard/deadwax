@@ -103,9 +103,11 @@ extension DeadwaxClient {
 
     /// Writes the edited tags and nothing else - no file renamed, no folder moved (`POST /library/tags/apply`): the
     /// same body as the preview, the plan worked out again on the server; the whole batch refused (a 400 with its
-    /// problems) when any of it is wrong.
-    public func tagsApply(_ body: TagEditBody) async throws -> TagEditResponse {
-        try await call(Routes.tagsApply, sending: body)
+    /// problems) when any of it is wrong. Waited for by the files' size (`bytes`, EditWaits.tagsApply).
+    public func tagsApply(_ body: TagEditBody, bytes: Double) async throws -> TagEditResponse {
+        var built = request(Routes.tagsApply, json: try Self.json(body))
+        built.timeout = EditWaits.tagsApply(bytes: bytes)
+        return try decode(TagEditResponse.self, try await answer(built))
     }
 
     /// One picture inside one track (`/library/tracks/picture?album=&file=&index=`) - a 404 when the file or the
@@ -130,16 +132,21 @@ extension DeadwaxClient {
         try await call(Routes.artFetch, sending: CoverFetchBody(albumPath: path, replace: false, releaseMbid: nil))
     }
 
-    /// Get lyrics (`POST /library/lyrics/fetch`): LRCLIB asked for every track without a .lrc, none replaced, none
-    /// re-timed.
-    public func getLyrics(path: String) async throws -> LyricsSummary {
-        try await call(Routes.lyricsFetch, sending: LyricsFetchBody(albumPath: path))
+    /// Get lyrics (`POST /library/lyrics/fetch`): LRCLIB asked for every track of `album` without a .lrc, none
+    /// replaced, none re-timed - waited for by how many that is (EditWaits.lyrics).
+    public func getLyrics(_ album: ScanAlbum) async throws -> LyricsSummary {
+        var built = request(Routes.lyricsFetch, json: try Self.json(LyricsFetchBody(albumPath: album.path)))
+        built.timeout = EditWaits.lyrics(album)
+        return try decode(LyricsSummary.self, try await answer(built))
     }
 
-    /// Get CD art (`POST /library/disc_art/fetch`): a picture of each disc, by the folder's own release - a 404 when
-    /// neither the Archive nor fanart.tv has one, a 400 when the folder already has deadwax's own.
-    public func getDiscArt(path: String) async throws -> DiscArtFetched {
-        try await call(Routes.discArtFetch, sending: DiscArtFetchBody(albumPath: path))
+    /// Get CD art (`POST /library/disc_art/fetch`): a picture of each disc of `album`, by the folder's own release - a
+    /// 404 when neither the Archive nor fanart.tv has one, a 400 when the folder already has deadwax's own. Waited for
+    /// by its discs (EditWaits.discArt).
+    public func getDiscArt(_ album: ScanAlbum) async throws -> DiscArtFetched {
+        var built = request(Routes.discArtFetch, json: try Self.json(DiscArtFetchBody(albumPath: album.path)))
+        built.timeout = EditWaits.discArt(album)
+        return try decode(DiscArtFetched.self, try await answer(built))
     }
 
     /// One CD art picture beside the tracks (`/library/disc_art?album=&file=`) - only a name the scan counts as disc art.

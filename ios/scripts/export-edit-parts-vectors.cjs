@@ -209,7 +209,8 @@ function edits() {
 function problems() {
   const values = ['', '   ', '3', '03', '3/12', '0003/0012', '12345', '3/', '/3', '3/12/1', '\u0663', '\uff13', ' 3 ', '3 / 12',
     'July 2022', '2022', '2022-07', '2022-07-29', '2024-13', '22', '2022-7-29', '2022-07-29T10:00', '2022/07/29', '20220',
-    'a\tb', 'a\nb', '\tx\t', 'x\u007f', '\u0085x', '\u03a9', '3\u0085', '\u00a02022\u00a0']
+    'a\tb', 'a\nb', '\tx\t', 'x\u007f', '\u0085x', '\u03a9', '3\u0085', '\u00a02022\u00a0',
+    'a\u001cb', 'a\u001db', 'a\u001eb', 'a\u001fb', '\u001f', 'a\u0020b']
   //? the long ones (by JavaScript's length: UTF-16 units) asked of a few fields, to keep the fixture small
   const long = ['x'.repeat(1000), 'x'.repeat(1001), ` ${'x'.repeat(1000)} `, '\u{1F3B5}'.repeat(500), '\u{1F3B5}'.repeat(501)]
   const out = []

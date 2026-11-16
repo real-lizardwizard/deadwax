@@ -11628,3 +11628,77 @@ Not verified - only the phone can tell (docs/ios.md checks 338-342): the confirm
 bold, the sheet closing and the album page going back beneath it, the Library dropping the album once Navidrome has
 scanned, a downloaded album still playing, VoiceOver and the largest text. Nothing has run against a real deadwax with
 logins on: the holders lines are the vectors' and the route's source, not a real ledger's answer.
+
+### After review (16 Nov) - slices 2-4
+
+A review of slices 2-4 (the permissions, the query and picture-URL encoding, the Codable keys against pydantic's
+fields, one write at a time, Close, the newest-answer tickets and the cancellations confirmed) found five things and
+three smaller ones, and four mutations that survived; all fixed in one commit on top of slice 4, with nothing on the
+server or the web changed.
+
+1. **Delete's question wasn't tied to its folder.** `delete()` read `album.path` when Delete was tapped, so a scan that
+   followed the page to another folder while the action sheet was up would delete that one. The question now keeps the
+   folder and the summary it was raised over (`asking`, handed to the sheet's buttons by `presenting:`), goes away when
+   `album.path` changes, and `delete(path:summary:)` starts only through `DeleteFlow.beginDelete(_:over:holding:)` -
+   the page still holding that folder, and that summary still the one in hand (a summary read again into something
+   else meanwhile deletes nothing).
+2. **"Several values" could become "Will be removed" with no typing.** `set` guarded on `draft[key] != value`, and a
+   field over files that disagree shows "" - so a "" SwiftUI's TextField hands back (as it can on focus, without a key
+   pressed) went into the draft as emptied, and Apply would have stripped every track's own value. `TagEdit.typed`
+   (Core) now takes only text that differs from what the field shows (what was typed, else what the files share);
+   typing and then clearing still reaches "", the draft then holding what was typed. A field the files agree on, handed
+   its own value back, isn't an edit either (it used to make a preview of nothing).
+3. **Delete was off with no reason after a failed Tags read.** `canDelete` waits for Tags' read as well as the
+   Release's, but the page said only the Release's failure. `EditAlbumModel.readBlocking` says whichever is waited
+   for - Tags' own read of the files first, else the scan's failure - and ReadAgainFailed (Release, Delete, the Gets'
+   pages) shows it with Look again; Tags' TagsReadState shows the scan's failure too when it is what Tags waits for.
+4. **After a clean apply the fields showed the old values until the read.** The draft was cleared at once, so each field
+   fell back to what the files said before the write, under "Saved 12 files.". `TagsModel.refreshing` (set as the draft
+   goes, cleared only as a read of the files lands) keeps the fields away meanwhile: "Saved…" and "Reading the files…",
+   or - the read failed - its failure with Look again, never the stale values. Typed work isn't kept in them instead
+   (the phone's departure from the web stays): a field would then disagree with its note, which reads the files.
+5. **The long writes' waits were under the server's worst case.** Get lyrics' 600 s assumed one name a track; LRCLIB's
+   `find` tries the track's artist and then its album artist, each by `/api/get` and then `/api/search`, with up to 15 s
+   of busy pauses a request on top of 10 s to connect and 30 s to answer - twelve tracks two at a time are 22 minutes at
+   worst. Get CD art's 360 s counted one request an Archive address, but the Archive answers through two redirects
+   (coverartarchive.org, archive.org, the item's server), each its own 55 s silence - a single disc 355 s, four 850.
+   Tags' 120 s ignored that mutagen writes a file whole when its new tags outgrow the room before the audio. Rather than
+   one bigger fixed wait each (the sheet's Close is off while one runs), `EditWaits` (Core) works the wait out for the
+   album in hand, a minute's margin on top, rounded up to the minute (URLSessionTransport keeps one session per wait)
+   and never under `Routes.timeouts`' floor: lyrics by the tracks without a lyrics file, `ceil(n / 2) * 2 names * 2
+   requests * 55 s` (twelve: 1380 s); CD art by the discs, `165 + 25 + discs * 165` (one: 420 s, four: 960); Tags'
+   Apply by the files' size, `120 s + bytes / 20 MB a second` (3 GB of hi-res: 300 s). EditClient's `getLyrics`,
+   `getDiscArt` (handed the album now) and `tagsApply(_:bytes:)` set the request's timeout from it.
+   tests/test_ios_edit_parts_contract.py reads every figure against the server's source (the clients' timeouts,
+   RETRY_PAUSES and `_retry_after`'s cap, `lookup_from_tags`' two names, `find`'s two requests a name, CONCURRENCY,
+   `has_lyrics_file` on both sides, `fetch_disc_art`'s order) and works the pinned waits out again; the Archive's two
+   redirects and the disk's 20 MB a second are assumptions, said there. A wait that still runs out is unchanged: said
+   as maybe finished, the folder read again, never sent again unseen.
+
+Smaller: a track's pictures are drawn by place (`enumerated()`'s offset), not by the server's index, which a missing or
+malformed field reads as 0 for two pictures alike; a refused tag apply marks its preview out of date at once
+(`changed()`: the spinner, then a new preview) rather than leaving the refused plan drawn; and a read after the files
+were renamed filters the editor's files (`editing`) as it does the selection, so Apply never names a file the folder no
+longer holds.
+
+Mutations that survived, now killed (each run against the new tests, then put back): **M1** TagEdit.problem's `<= 0x1F`
+as `< 0x1F` - the exporter now asks the web's rule about the separators 0x1C-0x1F (inside a value and alone; 72 more
+problem vectors, 471), which also showed the web stricter than the server a fourth way: Python's strip removes those
+separators at either end, JS's trim keeps them and its control check refuses them (the contract test counts the values
+the web refuses and the server would take: 18 now, 11 of them these, at most 21); **M12** beginRead keeping another
+folder's summary (A read, B's read called off: nothing deletable); **M13** canDelete without `!reading` (the same
+folder read again with its summary drawn: off); **M14** settled(gone: false) overwriting a 5xx's words (deadwax's own
+words stay; ours only when it gave none).
+
+Tests: DeleteAlbumTests 4 more (11), TagEditFlowTests 1 more, EditWaitsTests (new, 4), GetResultsTests and
+TagEditFlowTests' client tests with the waits; tests/test_ios_edit_parts.py 1 more (Tags' fixes) and the Delete,
+Gets and apply tests moved to the new calls; test_ios_edit.py (readBlocking); the contract test's waits rewritten.
+docs/ios.md: Edit tags' "Saved…" and "Reading the files…", a "Several values" field left alone by a tap, the Gets' and
+Apply's waits, Delete's question and its unreadable library; checks 330 and 331 reworded.
+
+Verified on the Mac: `swift test` (1805 Core tests in 191 suites, 158 Audio in 17, 12 more, all passing); the unsigned
+generic-iOS Debug build, BUILD SUCCEEDED; the full pytest suite, 4696 passed and 1 skipped; all 92 sims with Node 22
+(iosedit running both exporters' `--check`); each of the four mutations run against the new tests (all four failed
+them), then put back. Not verified - the phone's: whether a TextField over "Several values" really hands back "" on
+focus (the guard holds either way), the action sheet put away when the page is followed elsewhere, and "Reading the
+files…" after an Apply; nor any wait against a real LRCLIB or Archive at their slowest.
