@@ -97,6 +97,38 @@ export function tagProblem(key: string, value: string): string | null {
 }
 
 /**
+ * Whether a field, emptied, removes its tag: edited to nothing - but only from tracks that have one to remove.
+ * `draft` is what was typed over the field, undefined while it is left alone.
+ */
+export function removesTag(shared: SharedValue, draft: string | undefined): boolean {
+  return draft !== undefined && !draft.trim() && (shared.mixed || shared.value !== '')
+}
+
+/**
+ * What an empty field shows (2.1.30, moved unchanged out of components/TrackTagEditor.tsx): "Several values" over
+ * files that disagree while it is left alone; a disc number defaults to 1, so an untagged one says so rather than
+ * looking blank; "Not set" otherwise.
+ */
+export function fieldPlaceholder(key: string, shared: SharedValue, edited: boolean): string {
+  return shared.mixed && !edited
+    ? 'Several values'
+    : key === 'discnumber' ? '1' : 'Not set'
+}
+
+/**
+ * The line under a field, or null (2.1.30, moved unchanged out of components/TrackTagEditor.tsx): its problem as
+ * typed (`problem`, tagProblem's) first; then that emptying it removes the tag; that the files disagree and, left
+ * alone, each keeps its own; or that a disc number never tagged reads as disc 1.
+ */
+export function fieldNote(key: string, shared: SharedValue, draft: string | undefined, problem: string | null): string | null {
+  const edited = draft !== undefined
+  return problem
+    ?? (removesTag(shared, draft) ? 'Will be removed' : null)
+    ?? (shared.mixed && !edited ? 'Differs between tracks - left alone, each keeps its own' : null)
+    ?? (key === 'discnumber' && !edited && !shared.value ? 'Not tagged - reads as disc 1' : null)
+}
+
+/**
  * Tick one track, or a run of them.
  *
  * A shift-click takes every track between the last one clicked and this one to the state this

@@ -2330,9 +2330,12 @@ console.log('\nLooking after the library in the app, on a desktop (2.0.0-player.
   //? doing so" - ServerSettings' line is pinned in settingslog.sim; the Edit panel's Lyrics note is words, not a
   //? link, so the links-out count can't see it (review). Read raw: an apostrophe in JSX text isn't a string
   const lyricsNote = (read('app/EditPanel.tsx').match(/<h3 id="app-edit-lyrics"[\s\S]*?<\/section>/) ?? [''])[0]
+  //? (2.1.30) its words are lib/albumEdit.ts's RETIME_POINTER, which the tab draws
+  const retimeWords = /export const RETIME_POINTER = '([^'\n]*)'/.exec(read('lib/albumEdit.ts'))?.[1] ?? ''
   //? (2.0.8, UX batch 5) by the page's own name and group - there was never a "Managing's Settings"
   check('the Edit panel\'s Lyrics tab: re-timing named where it is - Lyrics in Server settings (Library) - never the main page',
-    [/re-time the ones already saved, see Lyrics in Server settings \(Library\)\./.test(lyricsNote), /main page|Managing/i.test(lyricsNote)], [true, false])
+    [/<p class="app-edit-note">\{RETIME_POINTER\}<\/p>/.test(lyricsNote), /re-time the ones already saved, see Lyrics in Server settings \(Library\)\./.test(retimeWords),
+      /main page|Managing/i.test(lyricsNote + retimeWords)], [true, true, false])
   //? (2.0.0-player.66) the main page retired: Managing lists only its pages - its "Open the main page" went, and
   //? so did You's row and footnote (read raw, comments and all: no link to `/` in any form)
   check('Managing has no link to `/` - the sidebar\'s nor You\'s',

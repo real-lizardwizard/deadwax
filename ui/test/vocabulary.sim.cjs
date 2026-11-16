@@ -288,6 +288,8 @@ const BATCH5 = [
   'app/FolderPicker.tsx', 'app/TrackInspector.tsx', 'hooks/useTrackDetails.ts', 'components/MetadataEditor.tsx', 'components/TrackTagEditor.tsx',
   'components/LibraryParts.tsx', 'components/DeleteAlbumDialog.tsx', 'components/RetimeLyrics.tsx', 'components/MusicBrainzAnswers.tsx',
   'lib/getResults.ts', 'lib/lyrics.ts', 'app/ArtistPanel.tsx', 'app/Sidebar.tsx', 'lib/appFrame.ts', 'lib/appRoutes.ts',
+  //? (2.1.30) the editors' words moved out of MetadataEditor.tsx and TrackTagEditor.tsx (albumEdit.ts is above)
+  'lib/retagPlan.ts', 'lib/tagEdit.ts',
 ]
 
 /** The words batch 5's files never say - each with a sample that says it. */

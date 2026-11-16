@@ -6,7 +6,7 @@ import * as musicbrainz from '../api/musicbrainz'
 import type {
   LibraryAlbum, MetadataIssueType, Release, RetagPlan, RetagRelease,
 } from '../api/types'
-import { albumArtUrl, filesWord } from '../lib/format'
+import { albumArtUrl } from '../lib/format'
 import { latestOnly } from '../lib/latest'
 import { sayError } from '../app/sayError'
 //? (2.0.8, UX batch 5) the writers' problems are said as sentences - a capital, a full stop - however the server wrote them
@@ -26,6 +26,20 @@ import {
   scoreReleaseGroupMatch,
   scoreReleaseMatch,
 } from '../lib/release'
+//? (2.1.30) the preview's and the apply's words, pure - moved there unchanged
+import {
+  APPLY_FAILED,
+  NOTHING_TO_CHANGE,
+  PREVIEW_FAILED,
+  appliedWords,
+  applyingLabel,
+  changeSummary,
+  mergeWords,
+  moveLabel,
+  planningLabel,
+  renameWaitWords,
+  writeFailedWords,
+} from '../lib/retagPlan'
 
 /**
  * How many release groups get their releases fetched.
@@ -575,7 +589,7 @@ export function MetadataEditor(
         setApplyError(null)
       } catch (caught) {
         if (!live) return
-        setApplyError(sayError(caught, '', { failed: "Couldn't work out the changes." }))
+        setApplyError(sayError(caught, '', { failed: PREVIEW_FAILED }))
         setPlan(null)
       } finally {
         if (live) setPlanning(false)
@@ -599,30 +613,24 @@ export function MetadataEditor(
       setAppliedProblems(results.problems.filter((problem) => !plan?.problems.includes(problem)))
 
       if (results.failed) {
-        setApplyError(`Couldn't write ${filesWord(results.failed)}.`)
+        setApplyError(writeFailedWords(results.failed))
       } else {
-        //? "Updated the tags in 0 files" is a silly thing to say when only the folder changed, which
-        //? is exactly what happens if you edit nothing but the edition name. (2.0.8, UX batch 5) In words:
-        //? it said "Retagged 12 file(s)" and "re-filed the folder"
-        setApplied(
-          [
-            results.tagged ? `updated the tags in ${filesWord(results.tagged)}` : '',
-            results.art_written ? `saved ${results.art_written}` : '',
-            results.merged ? 'moved it in beside the other discs'
-              : results.moved_to ? 'moved the folder to match its tags' : '',
-          ].filter(Boolean).join(', ').replace(/^./, (c) => c.toUpperCase()) + '.',
-        )
+        //? what it did, in one sentence - never "updated the tags in 0 files" (lib/retagPlan.ts)
+        setApplied(appliedWords(results))
         //? where the album lives now - the same path unless the folder was renamed
         onApplied(results.moved_to && plan?.target_path ? plan.target_path : album.path)
       }
     } catch (caught) {
-      setApplyError(sayError(caught, '', { failed: "Couldn't apply the changes." }))
+      setApplyError(sayError(caught, '', { failed: APPLY_FAILED }))
     } finally {
       setApplying(false)
     }
   }
 
   const taggedRelease = album.release_mbid
+  //? the preview's two lines that are there only sometimes - the pause before the rename, a merge - or null
+  const renameWait = plan ? renameWaitWords(plan) : null
+  const merging = plan ? mergeWords(plan) : null
   const foundCurrent = releases.some((r) => isCurrentRelease(r, taggedRelease))
 
   //? What put this album in the queue. Recomputed from the album prop rather than passed in,
@@ -915,7 +923,7 @@ export function MetadataEditor(
                 <h5 class="metadata-status">
                   {/* naming the actual wait: the tracklist arrives separately from the list of
                       pressings, so "working out the changes" would be describing the wrong step */}
-                  <Loading label={loadingRelease ? 'Fetching the tracklist…' : 'Working out the changes…'} />
+                  <Loading label={planningLabel(loadingRelease)} />
                 </h5>
               )}
 
@@ -932,43 +940,25 @@ export function MetadataEditor(
 
                   {plan.moves && (
                     <div class="metadata-move">
-                      <span class="text default-secondary">{plan.merge ? 'Merge' : 'Folder'}</span>
+                      <span class="text default-secondary">{moveLabel(plan)}</span>
                       <span class="text white-tertiary">{plan.album_path}</span>
                       <span class="text default">→ {plan.target_path}</span>
                     </div>
                   )}
 
-                  {/* said before the click, so a paused Apply doesn't read as stuck (v1.0.1). Asking
-                      Navidrome (v1.0.3) has no fixed length, so it gets no number: the cap is a
-                      ceiling, and quoting it would make a few seconds' wait sound like ninety */}
-                  {plan.moves && Boolean(plan.rename_wait) && (
-                    <h5 class="text white-tertiary metadata-status">
-                      {plan.rename_by === 'navidrome'
-                        ? (plan.changed_file_count === 0
-                          //? a rename held back earlier: the tags are on disk already, and it still
-                          //? waits for Navidrome to have scanned them (1.0.3 review)
-                          ? 'The tags were written by an earlier apply. Renames the folder once Navidrome '
-                            + "has scanned them, so Navidrome keeps this album's plays, ratings and favourites."
-                          : 'Writes the tags first and renames the folder once Navidrome has scanned them '
-                            + "(usually a few seconds), so Navidrome keeps this album's plays, ratings and favourites.")
-                        : `Writes the tags first and renames ${plan.rename_wait}s later, so Navidrome keeps `
-                          + `this album's plays, ratings and favourites.`}
-                    </h5>
+                  {/* said before the click, so a paused Apply doesn't read as stuck (v1.0.1) -
+                      lib/retagPlan.ts renameWaitWords, null with no pause */}
+                  {renameWait !== null && (
+                    <h5 class="text white-tertiary metadata-status">{renameWait}</h5>
                   )}
 
                   {/* the discs of one release stored one folder per disc (v0.9.13) */}
-                  {plan.merge && plan.merge_detail && (
-                    <h5 class="text default metadata-status">
-                      {`Moves ${discWords(plan.merge_detail.discs_here)} in beside `
-                        + `${discWords(plan.merge_detail.discs_there)}, which ${plan.merge_detail.discs_there.length > 1 ? 'are' : 'is'} `
-                        + 'already there as the same release, and removes this folder once it is empty.'}
-                      {plan.merge_detail.kept_back.length > 0
-                        && ` ${plan.merge_detail.kept_back.join(', ')} stays behind - there's one of that name already.`}
-                    </h5>
+                  {merging !== null && (
+                    <h5 class="text default metadata-status">{merging}</h5>
                   )}
 
                   {plan.empty && (
-                    <h5 class="text default-muted metadata-status">Nothing to change.</h5>
+                    <h5 class="text default-muted metadata-status">{NOTHING_TO_CHANGE}</h5>
                   )}
 
                   {plan.files.filter((file) => Object.keys(file.changes).length).map((file) => (
@@ -993,12 +983,7 @@ export function MetadataEditor(
             {applyError && <span class="text red metadata-result">{applyError}</span>}
 
             {!applyError && plan && !plan.empty && (
-              <span class="text default-muted metadata-summary">
-                {plan.changed_file_count} of {filesWord(plan.file_count)} would change
-                {plan.art.action === 'download' ? ', the cover would be downloaded' : ''}
-                {plan.art.action === 'replace' ? ', the cover would be replaced' : ''}
-                {plan.moves ? (plan.merge ? ', and the files would join the other disc' : ', and the folder would be renamed') : ''}
-              </span>
+              <span class="text default-muted metadata-summary">{changeSummary(plan)}</span>
             )}
 
             {/*
@@ -1122,21 +1107,4 @@ export function MetadataEditor(
       })()}
     </>
   )
-}
-
-/** "disc 2", "discs 1, 2, 3" */
-function discWords(discs: readonly number[]): string {
-  return `disc${discs.length > 1 ? 's' : ''} ${discs.join(', ')}`
-}
-
-/**
- * What the Apply button says while it works. A pause before the rename is named, so a button
- * busy for a while doesn't read as stuck: the seconds when it is a fixed wait, and no number when
- * it is waiting for Navidrome, which ends when Navidrome has scanned rather than on a clock.
- */
-function applyingLabel(plan: RetagPlan | null): string {
-  if (!plan?.rename_wait) return 'Applying'
-  return plan.rename_by === 'navidrome'
-    ? 'Applying, waiting for Navidrome'
-    : `Applying, renaming in ${plan.rename_wait}s`
 }

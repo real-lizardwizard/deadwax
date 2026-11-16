@@ -2,7 +2,10 @@ import { useEffect, useState } from 'preact/hooks'
 
 import * as libraryApi from '../api/library'
 import type { DeletionSummary, LibraryAlbum } from '../api/types'
-import { formatSize } from '../lib/format'
+//? (2.1.30) its words, pure - moved there unchanged
+import {
+  DELETE_CHECKING, DELETE_CONFIRM, DELETE_FAILED, DELETE_READ_FAILED, DELETE_TITLE, DELETE_WARNING, DELETING, deleteCounts, deleteOthers,
+} from '../lib/albumEdit'
 import { holdersText } from '../lib/myLibrary'
 import { Loading, LoadingPanel } from './Loading'
 import { sayError } from '../app/sayError'
@@ -53,7 +56,7 @@ export function DeleteAlbumDialog({ album, onCancel, onDeleted }: Props) {
         const result = await libraryApi.deletionSummary(album.path)
         if (!cancelled) setSummary(result)
       } catch (caught) {
-        if (!cancelled) setError(sayError(caught, '', { failed: "Couldn't read that folder." }))
+        if (!cancelled) setError(sayError(caught, '', { failed: DELETE_READ_FAILED }))
       } finally {
         if (!cancelled) setLoading(false)
       }
@@ -70,15 +73,18 @@ export function DeleteAlbumDialog({ album, onCancel, onDeleted }: Props) {
       await libraryApi.deleteAlbum(album.path)
       onDeleted()
     } catch (caught) {
-      setError(sayError(caught, '', { failed: "Couldn't delete it." }))
+      setError(sayError(caught, '', { failed: DELETE_FAILED }))
       setDeleting(false)
     }
   }
 
+  //? the other files, named - null with none (lib/albumEdit.ts)
+  const others = summary ? deleteOthers(summary) : null
+
   return (
     <div id="delete-window" onClick={(event) => event.stopPropagation()}>
       <div id="delete-panel">
-        <h4 class="text red">Delete this album?</h4>
+        <h4 class="text red">{DELETE_TITLE}</h4>
 
         <div class="delete-subject">
           <span class="text white">{album.album}</span>
@@ -88,28 +94,19 @@ export function DeleteAlbumDialog({ album, onCancel, onDeleted }: Props) {
 
         <div class="text white-tertiary delete-path">{album.path}</div>
 
-        {loading && <LoadingPanel label="Checking what's in there…" />}
+        {loading && <LoadingPanel label={DELETE_CHECKING} />}
 
         {error && <h5 class="text red delete-problem">{error}</h5>}
 
         {summary && (
           <>
-            <div class="text default-muted delete-counts">
-              {summary.audio_files} track{summary.audio_files === 1 ? '' : 's'}
-              {summary.total_bytes ? ` · ${formatSize(summary.total_bytes)}` : ''}
-            </div>
+            <div class="text default-muted delete-counts">{deleteCounts(summary)}</div>
 
             {/* named individually, because these are the ones that might not exist elsewhere */}
-            {summary.other_file_count > 0 && (
+            {others && (
               <div class="delete-others">
-                <span class="text yellow">
-                  and {summary.other_file_count} other file
-                  {summary.other_file_count === 1 ? '' : 's'}:
-                </span>
-                <span class="text white-tertiary">
-                  {summary.other_files.join(', ')}
-                  {summary.other_file_count > summary.other_files.length ? ', …' : ''}
-                </span>
+                <span class="text yellow">{others.lead}</span>
+                <span class="text white-tertiary">{others.names}</span>
               </div>
             )}
           </>
@@ -120,9 +117,7 @@ export function DeleteAlbumDialog({ album, onCancel, onDeleted }: Props) {
           <p class="text yellow delete-warning delete-holders">{holdersText(summary)}</p>
         )}
 
-        <p class="text red delete-warning">
-          This deletes the folder and everything in it, permanently. There is no undo.
-        </p>
+        <p class="text red delete-warning">{DELETE_WARNING}</p>
 
         <div id="delete-actions">
           <button type="button" class="columns-toggle-button" disabled={deleting} onClick={onCancel}>
@@ -134,7 +129,7 @@ export function DeleteAlbumDialog({ album, onCancel, onDeleted }: Props) {
             disabled={loading || deleting || !summary}
             onClick={() => void confirm()}
           >
-            {deleting ? <Loading label="Deleting…" /> : 'Delete permanently'}
+            {deleting ? <Loading label={DELETING} /> : DELETE_CONFIRM}
           </button>
         </div>
       </div>

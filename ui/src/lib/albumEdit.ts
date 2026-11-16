@@ -30,6 +30,10 @@
  * WHAT THE PANEL SAYS (`editStatus`) while it has no album to edit, and `deletesAll`: whether a
  * delete leaves Navidrome's album with nothing, so the page goes back from it.
  *
+ * WHAT THE ARTWORK, LYRICS AND DELETE TABS SAY (2.1.30, at the end): their lines, moved unchanged out of the panel's
+ * ArtworkTab and LyricsTab and out of components/DeleteAlbumDialog.tsx, so the iPhone app's exporter can run them as
+ * they are (its Phase 8, notes/ios-specs/phase8-managing.md on `ios`, section 12); ui/test/editwords.sim.cjs holds them.
+ *
  * CHOOSE THE FOLDER (2.0.0-player.42, `folderChoices`): when no folder is found - by release or by name
  * - the user picks it from the library's scan, typing to narrow the list (every word somewhere in the
  * folder's path, artist or album), and the folder chosen is the subject from then on, as an album opened
@@ -37,6 +41,7 @@
  * main page's library.
  */
 
+import { formatSize } from './format'
 import { foldName } from './owned'
 import type { Permissions } from './permissions'
 import { matchesTyped } from './typedMatch'
@@ -330,3 +335,76 @@ export function trackLabel(track: { position: number | null; disc: number | null
   if (discs <= 1) return String(track.position)
   return `${track.disc ?? 1}-${String(track.position).padStart(2, '0')}`
 }
+
+/* ----- what the Artwork and Lyrics tabs say, and Delete (2.1.30) ----- */
+
+/** The Artwork tab's line beside the cover: where the folder's cover is, if it has one. */
+export function coverNote(art: string): string {
+  return art === 'file' ? 'A cover is saved beside the tracks.'
+    : art === 'embedded' ? 'The cover is inside the files, with none beside them.'
+      : 'No cover is saved with the album.'
+}
+
+/** What the cover viewer says when it has no cover to show. */
+export const COVER_MISSING = 'No cover on disk, and none on the Cover Art Archive for this release'
+
+/** The line under Get cover: with no release, that one comes first; with a cover, where replacing it is - else none. */
+export function coverPointer(album: { release_mbid: string; art: string }): string | null {
+  if (!album.release_mbid) return 'To get a cover, first match the album to a release in the Release tab.'
+  if (album.art) return "To replace it, compare it with the release's in the Release tab (Compare full size…)."
+  return null
+}
+
+/** CD art: over the pictures beside the tracks, or in their place. */
+export const DISC_ART_BESIDE = 'Beside the tracks - what players show for a song with a disc number:'
+export const NO_DISC_ART = 'No picture of the disc beside the tracks.'
+
+/** The line under Get CD art: with no release, that one comes first; with CD art deadwax saved (a `disc*` picture
+ *  beside the tracks), that it never replaces it - else none. */
+export function discArtPointer(album: { release_mbid: string; disc_art?: readonly string[] | null | undefined }): string | null {
+  if (!album.release_mbid) return 'To get CD art, first match the album to a release in the Release tab.'
+  if ((album.disc_art ?? []).some((name) => name.toLowerCase().startsWith('disc'))) return 'deadwax never replaces CD art it saved.'
+  return null
+}
+
+/** The Lyrics tab's count: "8 of 12 tracks have lyrics saved beside them, as a .lrc." */
+export function lyricsLine(lyricsCount: number, trackCount: number): string {
+  return `${lyricsCount} of ${trackCount} track${trackCount === 1 ? ' has' : 's have'} lyrics saved beside`
+    + `${trackCount === 1 ? ' it' : ' them'}, as a .lrc.`
+}
+
+/** Under Get lyrics once every track has them - else none. */
+export function allLyricsNote(album: { lyrics_count: number; track_count: number }): string | null {
+  return album.lyrics_count >= album.track_count ? 'Every track has lyrics.' : null
+}
+
+/** (2.0.8, UX batch 5) Where re-timing saved lyrics is, by the page and group it is on. */
+export const RETIME_POINTER = 'To shift when synced lyrics appear, or re-time the ones already saved, see Lyrics in Server settings (Library).'
+
+/** Delete's title, its wait while it reads the folder, and its failures (said through sayError). */
+export const DELETE_TITLE = 'Delete this album?'
+export const DELETE_CHECKING = "Checking what's in there…"
+export const DELETE_READ_FAILED = "Couldn't read that folder."
+export const DELETE_FAILED = "Couldn't delete it."
+
+/** What goes: "12 tracks · 300 MB". (The summary's fields as api/types.ts DeletionSummary has them - written out, not
+ *  imported, so the sims compiling this file alone keep it at their output's root.) */
+export function deleteCounts(summary: { audio_files: number; total_bytes: number }): string {
+  return `${summary.audio_files} track${summary.audio_files === 1 ? '' : 's'}`
+    + (summary.total_bytes ? ` · ${formatSize(summary.total_bytes)}` : '')
+}
+
+/** The other files, named, because they might not exist anywhere else: "and 3 other files:" over their names, a
+ *  ", …" when there are more than the summary lists - or null with none. */
+export function deleteOthers(summary: { other_file_count: number; other_files: readonly string[] }): { lead: string; names: string } | null {
+  if (!(summary.other_file_count > 0)) return null
+  return {
+    lead: `and ${summary.other_file_count} other file${summary.other_file_count === 1 ? '' : 's'}:`,
+    names: summary.other_files.join(', ') + (summary.other_file_count > summary.other_files.length ? ', …' : ''),
+  }
+}
+
+/** The warning over the buttons, and the button. */
+export const DELETE_WARNING = 'This deletes the folder and everything in it, permanently. There is no undo.'
+export const DELETE_CONFIRM = 'Delete permanently'
+export const DELETING = 'Deleting…'

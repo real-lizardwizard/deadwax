@@ -14,6 +14,8 @@ import { useTrackDetails } from '../hooks/useTrackDetails'
 import {
   EDIT_SETTLE_MS, EDIT_SLIDE_MS, FOLLOW_LOOKS_MS, deletesAll, editFolders, editStatus, folderOnly, followRelease, followsTo, needsChoice,
   cancelDeleteTo, editTabs, marksFine, tabAfter, trackLabel,
+  //? (2.1.30) the Artwork and Lyrics tabs' words, pure - moved there unchanged
+  COVER_MISSING, DISC_ART_BESIDE, NO_DISC_ART, RETIME_POINTER, allLyricsNote, coverNote, coverPointer, discArtPointer, lyricsLine,
   type EditAlbum, type EditTab,
 } from '../lib/albumEdit'
 import { panelIsModal, type PanelStyle } from '../lib/appFrame'
@@ -1069,7 +1071,9 @@ function TagsList({
  */
 function ArtworkTab({ album, onDone }: { album: LibraryAlbum; onDone: () => void }) {
   const discArt = album.disc_art ?? []
-  const ownDisc = discArt.filter((name) => name.toLowerCase().startsWith('disc'))
+  //? the lines under Get cover and Get CD art, or none (lib/albumEdit.ts)
+  const coverLine = coverPointer(album)
+  const discLine = discArtPointer(album)
   const [viewing, setViewing] = useState<ViewerImage[] | null>(null)
   const opener = useRef<HTMLElement | null>(null)
   const view = (event: MouseEvent, images: ViewerImage[]) => {
@@ -1089,7 +1093,7 @@ function ArtworkTab({ album, onDone }: { album: LibraryAlbum; onDone: () => void
               onClick={(event) => view(event as unknown as MouseEvent, [{
                 label: album.album,
                 sources: coverSources(album, 'full'),
-                missing: 'No cover on disk, and none on the Cover Art Archive for this release',
+                missing: COVER_MISSING,
               }])}
             >
               <img class="app-edit-cover" src={albumArtUrl(album)} alt="" />
@@ -1098,17 +1102,9 @@ function ArtworkTab({ album, onDone }: { album: LibraryAlbum; onDone: () => void
             <span class="app-edit-cover is-empty" aria-hidden="true" />
           )}
           <div class="app-edit-lines">
-            <p class="app-edit-note">
-              {album.art === 'file' ? 'A cover is saved beside the tracks.'
-                : album.art === 'embedded' ? 'The cover is inside the files, with none beside them.'
-                : 'No cover is saved with the album.'}
-            </p>
+            <p class="app-edit-note">{coverNote(album.art)}</p>
             <GetArtButton album={album} onDone={onDone} class="app-edit-button" />
-            {!album.release_mbid ? (
-              <p class="app-edit-note">To get a cover, first match the album to a release in the Release tab.</p>
-            ) : album.art ? (
-              <p class="app-edit-note">To replace it, compare it with the release's in the Release tab (Compare full size…).</p>
-            ) : null}
+            {coverLine !== null && <p class="app-edit-note">{coverLine}</p>}
           </div>
         </div>
       </section>
@@ -1117,7 +1113,7 @@ function ArtworkTab({ album, onDone }: { album: LibraryAlbum; onDone: () => void
         <h3 id="app-edit-disc" class="app-edit-heading">CD art</h3>
         {discArt.length ? (
           <>
-            <p class="app-edit-note">Beside the tracks - what players show for a song with a disc number:</p>
+            <p class="app-edit-note">{DISC_ART_BESIDE}</p>
             <div class="app-edit-discs">
               {discArt.map((name) => (
                 <button
@@ -1134,14 +1130,10 @@ function ArtworkTab({ album, onDone }: { album: LibraryAlbum; onDone: () => void
             </div>
           </>
         ) : (
-          <p class="app-edit-note">No picture of the disc beside the tracks.</p>
+          <p class="app-edit-note">{NO_DISC_ART}</p>
         )}
         <GetDiscArtButton album={album} onDone={onDone} class="app-edit-button" />
-        {!album.release_mbid ? (
-          <p class="app-edit-note">To get CD art, first match the album to a release in the Release tab.</p>
-        ) : ownDisc.length ? (
-          <p class="app-edit-note">deadwax never replaces CD art it saved.</p>
-        ) : null}
+        {discLine !== null && <p class="app-edit-note">{discLine}</p>}
       </section>
 
       <CoverViewer images={viewing} onClose={() => setViewing(null)} opener={opener} />
@@ -1151,18 +1143,16 @@ function ArtworkTab({ album, onDone }: { album: LibraryAlbum; onDone: () => void
 
 /** How many tracks have lyrics, and Get lyrics for the rest. */
 function LyricsTab({ album, onDone }: { album: LibraryAlbum; onDone: () => void }) {
+  const allLine = allLyricsNote(album)
   return (
     <div class="app-edit-sections">
       <section class="app-edit-section" aria-labelledby="app-edit-lyrics">
         <h3 id="app-edit-lyrics" class="app-edit-heading">Lyrics</h3>
-        <p class="app-edit-note">
-          {album.lyrics_count} of {album.track_count} track{album.track_count === 1 ? ' has' : 's have'} lyrics saved beside
-          {album.track_count === 1 ? ' it' : ' them'}, as a .lrc.
-        </p>
+        <p class="app-edit-note">{lyricsLine(album.lyrics_count, album.track_count)}</p>
         <GetLyricsButton album={album} onDone={onDone} class="app-edit-button" />
-        {album.lyrics_count >= album.track_count && <p class="app-edit-note">Every track has lyrics.</p>}
+        {allLine !== null && <p class="app-edit-note">{allLine}</p>}
         {/* (2.0.8, UX batch 5) the page and group it is on, by their own names */}
-        <p class="app-edit-note">To shift when synced lyrics appear, or re-time the ones already saved, see Lyrics in Server settings (Library).</p>
+        <p class="app-edit-note">{RETIME_POINTER}</p>
       </section>
     </div>
   )

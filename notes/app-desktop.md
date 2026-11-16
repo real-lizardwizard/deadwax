@@ -1900,3 +1900,39 @@ paragraph says the same in a clause.
 - The checkout lives in an iCloud-synced folder whose `.venv` and `ui/node_modules` macOS had evicted
   (`ls -lO` shows `dataless`): each read downloaded them again, so the server took minutes to start and a build
   about eight. Not deadwax's; worth knowing before timing anything in that checkout.
+
+### Edit album's words, moved into lib/ (2.1.30)
+
+The iPhone app's Phase 8 (notes/ios-specs/phase8-managing.md on `ios`, section 12) ports the album editor, and its
+committed exporters run the web's TypeScript as it is - which they can only do for pure files. Some of what the phone
+says lived in components, so it moved, word for word and rule for rule, with nothing a user sees changed:
+
+- **lib/retagPlan.ts** (new), from components/MetadataEditor.tsx: `planningLabel` (Fetching the tracklist… / Working
+  out the changes…), `PREVIEW_FAILED` and `APPLY_FAILED` (sayError's fallbacks), `moveLabel` (Merge / Folder),
+  `renameWaitWords` (the pause before a rename, by Navidrome's scan or the timer, null with none), `discWords`,
+  `mergeWords` (null with no merge), `NOTHING_TO_CHANGE`, `changeSummary` (the foot's "N of M files would change…"),
+  `applyingLabel`, `writeFailedWords` and `appliedWords` (an apply's sentence). The component computes the two
+  optional lines once a render and draws each where it was.
+- **lib/tagEdit.ts**, from components/TrackTagEditor.tsx's TagField: `removesTag`, `fieldPlaceholder` (Several values
+  / 1 / Not set) and `fieldNote` (a problem first, Will be removed, Differs between tracks…, Not tagged - reads as disc
+  1).
+- **lib/albumEdit.ts**, from app/EditPanel.tsx's ArtworkTab and LyricsTab and components/DeleteAlbumDialog.tsx:
+  `coverNote`, `COVER_MISSING`, `coverPointer`, `DISC_ART_BESIDE`, `NO_DISC_ART`, `discArtPointer` (the same `disc*`
+  rule the tab used inline, not bulkTargets' hasOwnDiscArt, though they agree), `lyricsLine`, `allLyricsNote`,
+  `RETIME_POINTER`, and Delete's `DELETE_TITLE`, `DELETE_CHECKING`, `DELETE_READ_FAILED`, `DELETE_FAILED`,
+  `deleteCounts`, `deleteOthers`, `DELETE_WARNING`, `DELETE_CONFIRM`, `DELETING`. The summary's fields are written
+  out rather than imported from api/types.ts: a type from src/api pulls that folder into the program, and
+  permissions.sim and routes.sim, which compile albumEdit.ts with no rootDir, would find it under lib/ instead of at
+  their output's root.
+- **Not moved**: SettingsView's (`tabForGroup`, `tabMarks`, `retypeSecretNote`, `editedEnvDraft`) - the slice that
+  ports Server settings moves them. Nor the release search's, the fields' or the cover checkbox's words, which the
+  phone words its own way (the spec's 3.3).
+- **Where the JSX had two text pieces** (the merge's sentence and its "stays behind"; the summary's count and its
+  clauses; the delete counts' tracks and size) it now draws one string of the same text.
+- **Held by** ui/test/editwords.sim.cjs (new): every function's words from the plain to the awkward, and each editor
+  drawing them through these, keeping none of the words itself. **Checked unchanged** once, outside the repo: the
+  original JSX of the summary, the pause, the merge, the applied sentence, the lyrics count and Delete's counts and
+  other files, copied from 2.1.29 and compiled by tsc with a factory that joins text (so JSX's own whitespace rules
+  applied), against the new functions over 5,901 inputs - none differed. app-rules.sim.cjs's Lyrics re-timing check and
+  mylibrary.sim.cjs's delete-warning order read the constants now; vocabulary.sim.cjs's batch 5 scans retagPlan.ts and
+  tagEdit.ts too.
