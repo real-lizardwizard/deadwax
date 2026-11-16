@@ -3576,6 +3576,75 @@ with Wi-Fi off. 237-243 want logins on, and 241 two accounts (one an admin); 244
   Brightness > Text Size, one step up), the top one is a magnifying glass and the title still reads whole. With
   VoiceOver, both read "Search again, button, collapsed" (expanded once open).
 
+### The smooth progress bars' check (248)
+
+**Not done yet.** This comes with the build that draws the progress smooth (still app 0.13 (13)).
+
+- **248 Smooth, and still on pause.** Play a short song (two or three minutes, so the line moves quickly) and
+  watch the line along the mini player's top: it creeps along evenly, with no step twice a second. Open Now Playing:
+  its bar does the same, and its two clocks still change once a second, each in step with the bar - "1:23" never
+  lingers after the bar has passed a second, nor comes before it. Pause: both stop dead at once, with no creep on
+  and no jump back; play: on from there. Seek on each (drag the mini player's line, drag and tap Now Playing's bar):
+  it lands where you let go and carries on from there, never jumping back first. Change the speed on the turntable
+  (the fader, or a tap on the readout to 2x), then flip back to the cover with the look button: the bar is where the
+  song is and runs at the new speed. On the cover, tap the speed chip back to 1x, then pick a speed from the •••
+  menu: each time the bar keeps up, with no jump. If a change ever brings up the spinner over Play/Pause (a slow
+  restart), the bar stands still under it and goes on from there - never back. Open Up Next over Now Playing and
+  close it, then Info, then flip to the turntable and back: each time the bar is where the song is. Do it all again
+  at the largest text size. With VoiceOver on, the line and the bar still read their time ("0:12 of 5:00") without
+  repeating it as the song plays. Say whether anything feels slower or warmer than before.
+
+### The Library's top under the Dynamic Island's check (249)
+
+**Not done yet.** This comes with the build that lays the Library's top out under the status bar (still app 0.13
+(13)).
+
+- **249 Clear of the Dynamic Island.** Open the Library: the magnifying glass, the switch and the ••• sit wholly
+  below the Dynamic Island and the status bar's time and battery, none of them touching it, with the bar's colour
+  running up behind the status bar and nothing of the pages showing there. Scroll a page up: it goes under the row's
+  foot, never up behind the status bar. Tap the magnifying glass: Find's field opens under the row, the keyboard up,
+  and the row stays put; type, Cancel. Swipe between the pages, and tap the switch: as before. Turn off Wi-Fi and
+  WireGuard: the offline banner shows under the row, not over it. Do it all again at the largest text size. If you
+  can, try a phone with a notch, or an SE.
+
+### The tab bar, lower's check (250)
+
+**Not done yet.** This comes with the build that brings the tabs down into the home indicator's room (still app 0.13
+(13)).
+
+- **250 The room under the tabs.** On the iPhone 17 Pro, look at the tabs' words: they sit nearer the bottom edge
+  than before, with clear room between them and the home indicator - the indicator never touches or overlaps a
+  word, and the bar's colour still runs down to the very edge. Does the gap look right, or still too much (or now
+  too little)? Tap each tab near its foot: it opens. Scroll a long list to its end (an album, Your albums, Search's
+  results): the last row clears the bar, with no gap and nothing under it; Play Next a song: its notice sits just
+  over the bar. In Search, tap the field: the keyboard comes up over the bar, as before, and the bar is back in its
+  place once it goes. At the largest text size, the words still clear the home indicator. Swipe deadwax away in the
+  app switcher and open it again: from the first frame the tabs are in their place, never over the home indicator,
+  even for a moment. If you can, an SE: a small margin under the words, not flush with the edge.
+
+### Actual corners' checks (251-252)
+
+**Not done yet.** These come with the build that takes every squared corner to a true corner and draws the transport
+and the Library's icon sharp (still app 0.13 (13)).
+
+- **251 Square corners.** Look for any rounding left on what was squared: covers (an album's page, Now Playing, the
+  Library's tiles, the rows, the play bar's), the album page's Play and Shuffle, the chips and pills, the badges (In
+  your library, New, Requests' count), the Library's switch and its chosen segment, Find's field, the notice, the
+  first ask, the sign-in's fields, the EQ's buttons and Paste, You > Downloads' bars, and on Now Playing the look
+  button at the top right (and its square glyph, on the turntable) and the speed chip on the cover off 1x. Every
+  corner is a point. Say if any reads badly square - the switch's chosen segment inside its well, Play's light line
+  along its top, a badge over the Requests icon. Still round, as they should be: the dots, your avatar, artists'
+  pictures, the rings, the sliders' knobs, the Library's search and ••• circles, Requests' round ▶. Still slightly
+  rounded, as hardware: the turntable's plinth and the speed readout's well at its bottom right - say if you'd rather
+  they were square too.
+- **252 Sharp glyphs, and the Library icon.** Play, pause, next and previous have sharp points and square bars,
+  the same size as before: the play bar's Play/Pause, Now Playing's three, the album and playlist pages' Play,
+  Requests' ▶, Search's ▶ beside a song, and Debug's. Tap Play/Pause on each: it turns between the two with a short
+  fade. The Library tab's icon is a square stack with sharp corners, the same size and weight as Search's, Requests'
+  and You's beside it, in the accent when the Library is shown and grey when not. At the largest text size, all of
+  them grow as the words do; hold a finger on Play/Pause in the play bar and on the Library tab: the large view
+  shows the sharp glyph. With VoiceOver, each still reads its name ("Pause", "Next", "Library").
+
 ### The cover full screen's checks (271-278)
 
 **Not done yet.** These come with the build that lets Now Playing's cover open full screen (still app 0.13 (13)).

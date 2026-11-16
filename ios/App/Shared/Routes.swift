@@ -32,6 +32,15 @@ enum AppTab: Hashable, CaseIterable {
         case .you: return "person.crop.circle"
         }
     }
+
+    /// (15 Nov, actual corners) Its sharp-cornered glyph, drawn where its symbol was: the Library's squared stack
+    /// (SharpGlyph). The others keep their SF Symbols.
+    var sharp: SharpGlyph? {
+        switch self {
+        case .library: return .library
+        case .search, .requests, .you: return nil
+        }
+    }
 }
 
 /// A page pushed on a tab's NavigationStack. Every page the parts add is a case here, drawn in `appRoutes()`.

@@ -8518,6 +8518,10 @@ it the top would take a fifth of the screen to say three words that the Large Co
 
 ### Corners, before and after
 
+**Since 15 Nov every "after" below is 0**, the primary button and the secondary pill's with them: James asked for
+actual corners, and Corners' five went to 0 (see "Actual corners (15 Nov)"). The table still says which kind each
+place takes.
+
 | where | before | after |
 | --- | --- | --- |
 | the album page's, the playlist page's and the album you don't have's cover (the hero) | 10 | art 2 |
@@ -8549,7 +8553,8 @@ picture, as the web draws them - `is-round` - and in Search's one list the circl
 album's; the brief's "every album or artist cover" was read as the album covers on an artist's page, and this is one
 line in ArtistPicture to change if James wants them square), the download rings, the EQ's knobs and handles, the
 pull's ring and disc, the Library's two circles. **The turntable's own**: TurntableFace.lookRadius (4) - the plinth's
-look button and Now Playing's speed chip - and its icons, as drawn; the scrubber was squared already (two Rectangles,
+look button and Now Playing's speed chip (square since "Actual corners", after its review) - and its icons, as drawn;
+the scrubber was squared already (two Rectangles,
 "Now Playing's bar, squared off"). The app icon is untouched. **Not squared, iOS's own**: grouped Lists' and Forms'
 section corners (You, Up Next, Downloads, the EQ's pages), sheets, menus, alerts, the keyboard, and the system search
 bars named above - SwiftUI has no say over those short of redrawing them.
@@ -9952,6 +9957,231 @@ with its VoiceOver name and state.
 **Verified**: the unsigned Debug device build; the test above and the full pytest suite. **Not verified** - only the
 phone can tell: that the title reads whole beside the words, the glass one size up, and the field opening above the
 chips with the keyboard (docs/ios.md check 247).
+
+## The bars, smooth (15 Nov)
+
+James: "Can we make the progress bar smooth instead of updating every half second?" The play bar's seek line and Now
+Playing's scrubber drew PlayerModel's `shownPosition`, which moves when the ticker reads the engine - twice a second -
+so both stepped.
+
+- **Drawn every frame while the song plays**: each bar's fill is inside a `TimelineView(.animation(minimumInterval:
+  PlayClock.frame, paused: !runs))`, 30 frames a second at most. `runs` is `player.barsRun` (playing and not loading -
+  `isPlaying && !isLoading`, so a speed change's hidden restart keeps it running) with no finger on the bar, and for
+  the play bar Now Playing not over it (`navigation.nowPlayingShown`); for the scrubber, it seen (`visible`: on the
+  cover, no sheet over Now Playing - since the review, below). Paused, the timeline stops and its content shows
+  `shownPosition`, exactly as before. The seek line's timeline holds its accent fill alone; the scrubber's two (since
+  the review) its fill and its clocks, which are `ScrubberClocks` (Equatable, `.equatable()`) fed the same value's
+  words, so they are drawn again only when the words change - and never disagree with the bar.
+  VoiceOver's value and its swipes stay on `shownPosition`, so it isn't told thirty times a second.
+- **The engine isn't asked per frame**: the brief allowed `clock()` (the lyrics' read) if it is trivially cheap.
+  Measured with a temporary test on this Mac (a live offline engine, 5,000 reads; deleted after, so DeadwaxAudio has no
+  diff): 3.4 us a read with the engine's queue idle, 13 us straight after a render's completions, and 0.4-1.9 ms
+  straight after a play or a seek, waiting behind the start being decoded - and the phone decodes FLAC there, slower.
+  Thirty of those a second on the main thread, landing exactly when a song starts or a seek lands, is not trivial.
+- **So the tick's reading is carried on (Core's PlayClock, pure)**: at each tick, `PlayClock.reading(entry:seconds:at:
+  rate:shown:)` keeps the engine's seconds, when (Monotonic), and the speed; `PlayClock.shown(_:now:)` is those seconds
+  plus the time since at the speed - at most `reach` (1 s, two ticks), so with no reading it stops rather than running
+  on - never under the reading's `floor`. The floor is what the bars showed as the reading came, when that was ahead of
+  it by less than `holdWithin` (Scrub.landedWithin, 1.5 s): a reading behind is waited for, the line standing still
+  until the song catches up, never jumped back to. Between ticks that is milliseconds; at a seek's landing it is the
+  target the bars held (Scrub lets a target go within 1.5 s of it), so a seek never lands with a jump back. Further
+  behind is a real move (AirPlay's 2 s of latency) and is gone to. A speed change carries on from where the bars are
+  at the new rate (`PlayClock.atRate`), with no wait for the next tick.
+- **PlayerModel** gains `barsRun`, `barPosition(at:)` - nil reading, another entry's, or not running: `shownPosition`;
+  else the carried reading under a seek's target (Scrub.reportedPosition) - and `smooth`, set in `tick()` from the very
+  reading it already takes (`before` read first) and dropped whenever the bars don't run, at the speed hold's expiry
+  (they stop with no tick) and at a stop. Nothing the ticker drives changed: still 0.5 s, and the plays, Repeat's
+  top-up, resume and the pace all read `position` as before. The lyrics keep `clock()`; the turntable and Debug read
+  `shownPosition`, as before. No engine file has a diff.
+
+**Tests**: PlayClockTests (Core, 10): the carry at 1x, 0.5x and 2x; the reach; a time before the reading; a reading
+ahead gone to; one behind waited for and then moved on from; a seek landing short of its target holding it; far behind
+gone to; a speed change; no rate; and 240 readings with a few ms of wobble and the engine's clock 0.2% slow, drawn at
+30 frames a second - never back, never more than 20 ms off. `test_the_bars_run_smooth_only_while_the_song_plays`
+(tests/test_ios_palette.py) holds the timelines and what pauses them, VoiceOver on `shownPosition`, the frame's value
+read inside the timeline alone, the clocks' Equatable view, the ticker and what it drives, and the lyrics' clock.
+
+**Verified**: swift test, the unsigned Debug and Release device builds, check_project, npm run build, the sims and
+pytest. **Not verified** - only the phone can tell: that it looks smooth, that the frames cost nothing a listener
+notices (no warmth, no stutter), the stop on pause, and the landings (docs/ios.md check 248).
+
+## The Library's top, clear of the Dynamic Island (15 Nov)
+
+James: "on the app the top bar is obstructed by the Dynamic Island" - the Library's own top (the round search button,
+the switch, the round •••), on his iPhone 17 Pro on iOS 27.2.
+
+- **How it was**: LibraryTop was a `.safeAreaInset(edge: .top)` on the pager - a horizontal ScrollView whose pages are
+  `.containerRelativeFrame([.horizontal, .vertical])` - with the offline banner a second inset inside it, under
+  `.toolbar(.hidden, for: .navigationBar)`. An inset is placed against the safe area the modified view has, and a
+  scroll view is free to run under the status bar; which of the two put the row in the island's strip on iOS 27.2
+  was not found out - no simulator here, by the rules - and it didn't need to be: the new layout doesn't depend on it.
+- **How it is**: the pager's page is a `VStack(spacing: 0)` of LibraryTop, then the OfflineBanner, then the pager. A
+  VStack is laid out inside the safe area, whatever its children do, so the row starts under the status bar and the
+  island on every iPhone (notch, island, none), and the banner and the pages follow it down; only LibraryTop's own
+  background, Palette.tabBar, ignores the top safe area, filling up behind the status bar so nothing of the pages
+  shows there. The pages now end at the row's foot instead of scrolling under it (it was opaque, so nothing showed
+  through it anyway); the pull to shuffle measures from the list's own inset (`contentOffset.y + contentInsets.top`),
+  so it is the same either way. Find still opens under the switch, inside LibraryTop, and the pager gives it the room.
+- **The other pages**: the Library is the only page that hides iOS's navigation bar; every other page's top is iOS's
+  own bar. The other views that reach under the status bar are fills alone: RootView's background, and Now Playing's
+  black and its blurred cover - its content stays in the safe area.
+
+**Tests**: `test_the_librarys_top_sits_under_the_status_bar` (tests/test_ios_palette.py) holds the VStack's order
+(the top, the banner, the pager), no top inset left in LibraryView, LibraryTop's one ignore on its background, the
+Library as the only page hiding the navigation bar, and the four views that reach under the status bar, all fills.
+
+**Verified**: swift test, the unsigned Debug and Release device builds, check_project, npm run build, the sims and
+pytest. **Not verified** - only the phone can tell: the row clear of the island, the fill behind the status bar, Find
+and the banner under the row, at the normal and the largest text sizes (docs/ios.md check 249).
+
+## The tab bar, lower (15 Nov)
+
+James: "there might be a little too much space below the bottom tab bar". AppTabBar was an overlay inside the safe
+area, so on a Face ID iPhone the whole 34 points of the home indicator's room were under it, and each tab's 49 points
+(a 26-point symbol, 3 between, then the words, about 15 in Noto Sans's caption2 - about 2.5 points of slack under
+them) stood on top of that: the words' baseline about 40 points off the screen's edge. iOS's own bar before iOS 26 lays
+its items out the same way, over the whole 34.
+
+- **The number - 14 points down (Core's `TabBarFoot.drop`)**: the tabs' foot 20 points off the edge, so the words' line
+  is about 22 up and their baseline about 26. The home indicator is a 5-point bar about 8 points off the edge, its top
+  about 13 up: that leaves some 9 points of clear room between the words and it - clear at a glance, and the words no
+  longer floating. On a phone with a Home button (no such room, 0) the tabs keep 6 points off the edge
+  (`TabBarFoot.least`), where they had none.
+- **How**: AppTabBar ignores the container's bottom safe area itself, so it runs to the edge, and pads under its play bar
+  and tabs by `TabBarFoot.below(home:)`; its fill still runs to the edge. The home indicator's room is the key window's
+  bottom safe area (MainTabs's `home`), read from UIKit because a window's never counts the keyboard - a view's
+  safeAreaInsets would, and the bar would grow under the keyboard. (Since the review, below, it is read again each time
+  SwiftUI lays the screen out anew.) The bar measures its play bar and tabs alone
+  (`measured`, before the padding), and `tabBarRoom` - the pages' room at their foot and the notice's lift, over the home
+  indicator's own - is `TabBarFoot.room(content:home:)`: that height and the room under it, less the home indicator's
+  (86 for a 100-point bar on a Face ID iPhone; 106 on an SE). So nothing sits under the bar, and its height follows the
+  text size as before.
+- **Unchanged**: the keyboard - the bar stays under it (`.ignoresSafeArea(.keyboard, edges: .bottom)`) and the pages make
+  no room for it meanwhile (`keyboardUp`); the bar's sizes and its tabs' look.
+
+**Tests**: TabBarFootTests (Core, 4): 20 on a Face ID iPhone, clear of the indicator, 6 with none (and nonsense), and the
+pages' room. `test_the_tab_bar_comes_down_into_the_home_indicators_room` (tests/test_ios_palette.py) holds the bar's
+padding and its own ignore, the measure before the padding, the room from TabBarFoot, the window's inset, and the
+keyboard's ignore and `keyboardUp`.
+
+**Verified**: swift test, the unsigned Debug and Release device builds, check_project, npm run build, the sims and
+pytest. **Not verified** - only the phone can tell: how the gap looks, the indicator clear of the words, the last rows
+and the notice over the bar, the keyboard, and an SE's margin (docs/ios.md check 250).
+
+## Actual corners (15 Nov)
+
+James: "let's square off everything already square a bit more. Actual corners. The pause, skip buttons, etc. I like the
+square look. Even the library icon should be a bit more square."
+
+- **Every corner 0**: Corners.art, card, control, track and fill all go from 2, 4, 4, 2 and 1 to 0, and with them
+  `controlBorder` (a system button's border: the `.bordered` buttons and Paste). The kinds keep their names, so what
+  each is for stays said. The primary button and the secondary pill (ButtonFaces' PrimaryFace) drew
+  PrimaryButton.radius, the web's --dw-radius-control (4); they now draw Corners.control, so they are square too, and
+  PrimaryButton.radius stays the web's number in Core, held to theme.css as before. Round stays round, as Corners' doc
+  says: the dots, the avatar, artists' pictures, the rings, the sliders' knobs, the Library's two circles, Requests'
+  round ▶ and ✕, the turntable's own corners (TurntableFace.lookRadius - the look button and the speed chip until the
+  review squared them, below; the plinth and its readout's well still) and the app icon. The squared look's table
+  ("Corners, before and after") is history now: every "after" there is 0.
+- **What a 0 changed beyond the corners**: PrimaryFace's highlight - the light line inside its top edge - was masked
+  to the top `radius` points, which at 0 is nothing, so the line would have gone; its band is now at least two
+  hairlines tall, which holds the top line (and its square ends). The switch's well shade inside its top edge was
+  kept off the corners by `Corners.control`, and now runs edge to edge inside the border, as a square well's should.
+  To look at on the phone (check 251): the switch's chosen segment, a square 1 point inside a square well, and the
+  Requests count, a square badge over the icon's corner.
+- **Sharp transport glyphs** (Core's SharpGlyph, the shapes; the app's Shared/SharpGlyphs.swift, the views): SF
+  Symbols has no sharp-cornered play, pause, forward or backward, so they are drawn - the play triangle, pause's two
+  bars, forward's and backward's two triangles point to base - as straight lines meeting at points. **Measured, not
+  guessed**: SwiftUI's own rendering of each symbol at 44 points (ImageRenderer at 8x on the Mac - the symbols are
+  iOS's artwork; scratch scripts, not kept) gave the frame SwiftUI lays it into, where its ink sits there (play.fill's
+  from 14% to 98% across and 9% to 91% down; pause's bars 0.405 of their box each, 0.19 between) and how much of the
+  frame it inks. Each sharp glyph is its shape in the symbol's ink box, grown or shrunk about the box's centre until
+  it inks just as much: the same weight. Rounding a triangle cuts most at its points, so a sharp one in the rounded
+  one's box would ink 15-16% less: play grows 8% and the skip pair 9%, their points reaching where the rounding had
+  cut them (the skip pair's a little past their frames' edges, under 3% of the frame - the overlay isn't clipped);
+  pause's bars and the stack shrink under 1.5%. Filling the whole frame would have drawn each glyph about a fifth
+  larger than its symbol: SF Symbols' frames hold 8-14% of room around the ink. `SharpSymbol` lays a glyph into the
+  frame of its SF Symbol at the font in use (the symbol is still there, `.hidden()`, as the template), so each is the
+  size it was at every text size and grows with Dynamic Type as the symbol did. Measured at the regular weight; at
+  semibold (Requests' ▶, the album page's Play) the template's larger frame carries the weight's size, its ink about
+  5% heavier than the sharp glyph's. `PlayPauseGlyph` holds both, crossfading 0.15 s as Play/Pause turns (the symbols
+  swapped at once; at once under Reduce Motion, as the EQ's animations are), in the larger's room, so the button never
+  changes size. Used in the play bar, Now Playing (previous, play/pause, next), the album and playlist pages' Play
+  (AlbumHero), Requests' ▶, Search's ▶ and Debug's three. The Large Content Viewer shows images, so `SharpGlyph.image`
+  is the same path in a template UIImage, the symbol's own size at 44 points. The lock screen's controls are iOS's and
+  keep its symbols. The Library's ••• menu keeps its "square.stack" beside Albums: a menu row's icon, iOS's to draw,
+  not the Library's icon.
+- **The Library's icon**: AppTab's `sharp` (Routes.swift) is `.library` for the Library alone: square.stack.fill's own
+  parts measured the same way and squared - the front card a true square at the foot (37.6 points a side at 44), the
+  two cards behind it strips above, each narrower, with the symbol's gaps - in square.stack.fill's frame. The tab bar
+  draws every tab's symbol in its fill variant, shown or not (`.symbolVariant(.fill)`, unconditional before this too),
+  so the stack is always filled, in the accent when shown and --dw-tab-inactive when not, like the other three, which
+  keep their SF Symbols. Its Large Content Viewer shows the sharp image.
+
+**Tests**: Core's SharpGlyphTests (9) - each glyph inks what its symbol did, centred on its ink, the triangles grown
+and the rectangles hardly, none far past its frame, pause's bars, previous as next turned round, the Library's front
+card square. tests/test_ios_palette.py - `test_the_corners_are_the_squared_looks` holds every corner at 0 and the
+web's above it, `test_every_corner_in_the_app_is_a_token` the face's Corners.control, the primary's test every
+PrimaryButton number but the radius, and `test_the_transport_and_the_librarys_icon_have_actual_corners` that no
+transport symbol is named in the app but Core's templates, each place's glyph, the crossfade, the Large Content
+Viewer's images and the Library tab's.
+
+**Verified**: swift test, the unsigned Debug and Release device builds, check_project, npm run build, the sims and
+pytest. **Not verified** - only the phone can tell: how the corners read, the glyphs' size and weight beside the old
+ones' memory, the fade, the Library icon beside the others, at the default and largest text sizes (docs/ios.md checks
+251-252).
+
+## The bars, the tabs and the corners after review (15 Nov)
+
+The four commits above (the smooth bars, the Library's top, the tab bar lower, actual corners) were reviewed; nothing
+had to be fixed, and five things were, in one commit.
+
+- **The scrubber drew frames no one saw**: Now Playing keeps it in its row on the turntable, at opacity 0 (the time
+  line over it), and under its full-height sheets, and its timeline ran on through both - the whole row, 30 times a
+  second. ScrubberView takes `visible` (NowPlayingView: `!turntable && !sheetOver`, `sheetOver` being Up Next, Info,
+  the EQ or Add to a playlist over it), and `runs` is `visible && player.barsRun && held == nil`. Its timelines hold
+  only what moves, as the seek line's: one round the fill (the track and the touch outside it), one round the clocks;
+  the value both draw is `drawn(_:length:)`, read inside them alone. The lyrics' own `covered` (Up Next, Info, the EQ)
+  is as it was - it doesn't count the playlist picker, which the scrubber's does.
+- **Two controls kept rounded corners**: the look button (TurntableView's LookFace) and the speed chip (NowPlayingView's
+  SpeedChipFace) drew TurntableFace.lookRadius, 4. Both take Corners.control (0) now, and the look button's square
+  glyph (the web's SquareIcon, which stands for the cover) is drawn with points too. The look button's highlight was
+  masked to the top `lookRadius` points - at 0, nothing - so its band now runs to the line's foot (the inset and the
+  line, 2 points). **Kept, as hardware**: the plinth's corners (TurntableFace.plinthRadius, 6) and the speed readout's
+  well on it (TurntableFace.lookRadius, 4, drawn by DeadwaxTurntable's TurntableReadout among the plinth's own renders).
+  TurntableFace.lookRadius and squareIcon keep the web's numbers (test_ios_turntable_face.py), as PrimaryButton.radius
+  does.
+- **The bars could step back at a speed restart's wait**: a restart still loading past its 1 s hold shows the spinner,
+  and the expiry dropped the carried reading, so the bars went back to the last tick's position - up to half a second
+  at the speed behind what they had drawn - and each tick of the wait read the engine stood at the restart's point.
+  Now a wait (`barsWait`: loading to play - the restart past its hold, a seek's bytes, a stall) holds the reading where
+  the bars stopped, Core's new `PlayClock.held` (the reading at no rate), at the expiry and at each tick of the wait;
+  `barPosition(at:)` draws it while they wait; a speed sent meanwhile leaves it held (the reading after the wait takes
+  the speed up). The reading after the wait corrects it as any reading does - ahead, gone to; behind by less than
+  `holdWithin`, waited for - so nothing draws backwards through one. A pause still shows where the song is (it is where
+  Play goes on from); a retry's wait isn't playing, as before.
+- **The home indicator's room is read again on every new layout**: MainTabs's `home` was a computed read of the key
+  window's inset, evaluated only when the body was, so a first pass before the window had its insets could have left
+  the tabs over the home indicator until something else redrew it. It is `@State` now, set on appear and from a
+  `Color.clear.ignoresSafeArea()` background's `onGeometryChange` of its size and bottom safe area - SwiftUI says when
+  the screen is laid out anew (its first pass, a resize, its safe area's change), the window says what. Not the
+  geometry's own inset: with the keyboard up a view's bottom safe area can count it, and the bar would grow under the
+  keyboard. Cheap: one clear view, an action on a change of three numbers. (The app is portrait only.)
+- **Check 248's speed part**: it asked for the speed to be changed on the turntable, where the scrubber is hidden. It now
+  changes it on the turntable and flips back to the cover, and from the cover's chip and the ••• menu - and watches the
+  bar through a restart's spinner, and after Up Next, Info and the turntable.
+
+**Tests**: PlayClockTests (Core, 12 - 2 new: a wait holds the bars where they were, held again it stays; through a wait
+with the engine stood behind and after it, never back). tests/test_ios_palette.py - the bars' test holds the scrubber's
+`visible` in its `runs` and Now Playing's flag, the two timelines (fill and clocks) and the model's wait (`barsWait`, the
+held reading at the expiry and in the tick); the corners' test no longer keeps TurntableFace.lookRadius in a view, and
+holds the two faces' Corners.control and the look button's highlight; the tab bar's test the re-read; the Library top's
+counts MainTabs's clear reader among what reaches the top edge. tests/test_ios_turntable_face.py finds the scrubber's
+row by its new call.
+
+**Verified**: swift test, the unsigned Debug and Release device builds, check_project, npm run build, the sims and
+pytest. **Not verified** - only the phone can tell: that nothing is drawn for the hidden scrubber (no profiler here),
+the bars through a slow restart, the tabs' place from the first frame, and the square look button and speed chip
+beside the plinth's rounding (docs/ios.md checks 248, 250 and 251).
 
 ## The cover, full screen (2026-11-15)
 

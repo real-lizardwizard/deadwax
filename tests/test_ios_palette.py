@@ -4,7 +4,8 @@ James: "the color of the play button on the album page doesn't show the play ico
 SwiftUI's `.borderedProminent` under the app's tint (#C084FC, the web's accent for text on black) and a white glyph -
 2.64:1. It now draws the web's primary button, as player.css's `.pl-pill.is-primary` and app.css's primary buttons do:
 theme.css's --dw-primary-bg gradient, --dw-primary-border edge, --dw-primary-highlight line, a --dw-text label, 4 pt
-corners (--dw-radius-control), and the album's and playlist's pills 48 pt tall (--pl-pill-height). Pressed, its fill
+corners (--dw-radius-control; square on the phone since 15 Nov, Corners.control), and the album's and playlist's pills
+48 pt tall (--pl-pill-height). Pressed, its fill
 and edge are darkened by brightness(0.92) (--dw-primary-pressed) and its label left white - the web's filter darkens the
 label too, under AA at its top (slice 3b's review) - and the secondary pill beside it turns its gradient over
 (--dw-secondary-bg-active), as the web's .pl-pill does. PrimaryButton (ios/DeadwaxKit/Sources/DeadwaxCore/PrimaryButton.swift) holds those
@@ -119,9 +120,12 @@ def test_no_button_in_the_app_is_drawn_with_the_tint():
     assert not left, left
     faces = REPO / "ios" / "App" / "Shared" / "ButtonFaces.swift"
     text = faces.read_text(encoding="utf-8")
+    # (15 Nov, actual corners) every number but the radius: PrimaryButton.radius keeps the web's 4, and the phone's
+    # face takes Corners.control, square
     for name in ("top", "bottom", "edge", "highlight", "label", "pressedTop", "pressedBottom", "pressedEdge",
-                 "radius", "largeHeight"):
+                 "largeHeight"):
         assert re.search(rf"\bPrimaryButton\.{name}\b", text), f"the app's face doesn't draw PrimaryButton.{name}"
+    assert "PrimaryButton.radius" not in text and "let radius = Corners.control" in text
     # the label is never darkened with the fill: no multiply over the whole button
     assert "colorMultiply" not in text and ".brightness(" not in text
 
@@ -173,23 +177,27 @@ def app_code() -> list[tuple[str, int, str]]:
 
 
 def test_the_corners_are_the_squared_looks():
-    assert (corner("art"), corner("card"), corner("control"), corner("track"), corner("fill")) == (2, 4, 4, 2, 1)
-    # the controls, tracks and fills are the web's own - the primary button's corners among them (PrimaryButton.radius,
-    # held to --dw-radius-control above), so a button is the same shape on both
-    assert corner("control") == px(token(THEME_CSS, "dw-radius-control")) == swift_number("radius")
-    assert corner("track") == px(token(THEME_CSS, "dw-radius-track"))
-    assert corner("fill") == px(token(THEME_CSS, "dw-radius-fill"))
-    # the departure, on purpose: covers and cards squarer on the phone than the web's 3 and 6
-    assert corner("art") < px(token(THEME_CSS, "dw-radius-cover"))
-    assert corner("card") < px(token(THEME_CSS, "dw-radius-card"))
+    # 15 Nov, James: "let's square off everything already square a bit more. Actual corners." Every corner is 0 - truly
+    # square - a system button's border with them
+    assert (corner("art"), corner("card"), corner("control"), corner("track"), corner("fill")) == (0, 0, 0, 0, 0)
+    assert "static let controlBorder = ButtonBorderShape.roundedRectangle(radius: control)\n" in CORNERS.read_text(
+        encoding="utf-8")
+    # the departure from the web, on purpose: square where the web's cover, card, control, track and fill are rounded -
+    # PrimaryButton.radius keeps the web's control radius (held above), which the phone's face no longer draws
+    for web in ("dw-radius-cover", "dw-radius-card", "dw-radius-control", "dw-radius-track", "dw-radius-fill"):
+        assert px(token(THEME_CSS, web)) > 0
+    assert swift_number("radius") == px(token(THEME_CSS, "dw-radius-control"))
 
 
 def test_every_corner_in_the_app_is_a_token():
-    # no radius written in a view: a RoundedRectangle is Corners' own, the primary's (PrimaryButton.radius, the same as
-    # Corners.control) or the turntable's (TurntableFace.lookRadius - the plinth's look button and the speed chip)
-    kept = {"RoundedRectangle(cornerRadius: radius)", "RoundedRectangle(cornerRadius: CGFloat(TurntableFace.lookRadius))"}
+    # no radius written in a view: a RoundedRectangle is Corners' own, or a face's `radius` - Corners.control: the
+    # primary's, and (review, 15 Nov) the look button's and the speed chip's, which drew TurntableFace.lookRadius. That
+    # stays the web's number for the plinth's speed readout, drawn by DeadwaxTurntable, never by a view in the app.
+    kept = {"RoundedRectangle(cornerRadius: radius)"}
     left = []
     for name, number, code in app_code():
+        if "TurntableFace.lookRadius" in code or "squareIcon.radius" in code:
+            left.append(f"{name}:{number} the turntable's radius")
         if name == "Shared/Corners.swift":
             continue
         if re.search(r"cornerRadius:\s*[0-9]", code):
@@ -202,7 +210,15 @@ def test_every_corner_in_the_app_is_a_token():
             left.append(f"{name}:{number} a capsule")
     assert not left, left
     faces = (APP / "Shared" / "ButtonFaces.swift").read_text(encoding="utf-8")
-    assert "let radius = CGFloat(PrimaryButton.radius)" in faces
+    assert "let radius = Corners.control" in faces
+    look = (APP / "Player" / "Turntable" / "TurntableView.swift").read_text(encoding="utf-8")
+    look = look[look.index("private struct LookFace"):look.index("private struct LookGlyph")]
+    chip = (APP / "Player" / "NowPlayingView.swift").read_text(encoding="utf-8")
+    chip = chip[chip.index("private struct SpeedChipFace"):chip.index("private struct Backdrop")]
+    for face in (look, chip):
+        assert "let radius = Corners.control" in face
+    # the look button's highlight kept where it is square: its band down to the line's foot
+    assert "Rectangle().frame(height: max(radius, line))" in look
 
 
 def test_every_system_bordered_button_is_squared():
@@ -344,6 +360,167 @@ def test_the_play_bar_is_the_tab_bars_top():
     assert ".allowsHitTesting(false)" in line and "gesture" not in line.lower()
     for priority in (3, 2, 1):
         assert f".accessibilitySortPriority({priority})" in mini
+
+
+def test_the_bars_run_smooth_only_while_the_song_plays():
+    # 15 Nov, James: "Can we make the progress bar smooth instead of updating every half second?" The seek line's part
+    # played and Now Playing's bar (and its clocks) are drawn from a timeline of frames, 30 a second at most, that stops
+    # unless the song plays - paused, loading, under a finger, for the play bar with Now Playing over it, and (review)
+    # for Now Playing's bar unseen, on the turntable or under a sheet - and then they show shownPosition, as before.
+    # Between the ticker's readings they carry the last one on (Core's PlayClock), the engine not asked, and (review)
+    # through a wait - loading to play - they stand where they drew; the ticker and all it drives are as they were;
+    # VoiceOver's value stays on shownPosition.
+    model = (APP / "Models" / "PlayerModel.swift").read_text(encoding="utf-8")
+    mini = (APP / "Player" / "MiniPlayerView.swift").read_text(encoding="utf-8")
+    scrubber = (APP / "Player" / "ScrubberView.swift").read_text(encoding="utf-8")
+    clock = (REPO / "ios" / "DeadwaxKit" / "Sources" / "DeadwaxCore" / "PlayClock.swift").read_text(encoding="utf-8")
+    assert "public static let frame = 1.0 / 30\n" in clock
+    assert "var barsRun: Bool { isPlaying && !isLoading }" in model
+    reading = model[model.index("func barPosition(at now: Double) -> Double {"):]
+    reading = reading[:reading.index("\n    }\n")]
+    assert "guard barsRun || barsWait, let smooth, smooth.entry == heardEntry else { return shownPosition }" in reading
+    assert "private var barsWait: Bool { isPlaying && isLoading }" in model
+    assert "PlayClock.shown(smooth, now: now)" in reading and "link" not in reading
+    # the ticker: still twice a second, still driving the plays, Repeat's top-up, resume and the pace from `position`
+    assert "Timer(timeInterval: 0.5, repeats: true)" in model
+    tick = model[model.index("    private func tick() {"):]
+    tick = tick[:tick.index("\n    }\n")]
+    for kept in ("measurePace()", "reporter.tick(position: position, duration: duration)",
+                 "controller?.tick(heard: reporter.heard, length: length)", "resuming?.position(position)",
+                 "if !isPlaying { stopTicking() }"):
+        assert kept in tick
+    assert "smooth = PlayClock.reading(entry: at.key, seconds: at.seconds, at: now, rate: speed, shown: before)" in tick
+    # stopped: a wait holds the reading where the bars drew (PlayClock.held), a pause drops it
+    assert "if !barsRun {\n            smooth = barsWait ? smooth.map" in tick and "PlayClock.held(reading, now: now)" in tick
+    # a speed restart's wait, past its hold, with no tick to say so: held there too, never dropped; a speed sent while
+    # they wait leaves it held
+    assert "if let reading = self.smooth { self.smooth = PlayClock.held(reading, now: now) }" in model
+    assert "self.smooth = nil" not in model and "if barsRun, let reading = smooth {" in model
+    for view, runs, timelines in ((mini, "let runs = player.barsRun && held == nil && !navigation.nowPlayingShown", 1),
+                                  (scrubber, "let runs = visible && player.barsRun && held == nil", 2)):
+        assert runs in view
+        assert view.count("TimelineView(.animation(minimumInterval: PlayClock.frame, paused: !runs))") == timelines
+        assert "let shown = Scrub.shownTime(held, position: player.shownPosition, length: length)" in view
+        assert ".accessibilityValue(PlayerWords.scrubberValue(shown: shown, length: length))" in view
+        # the frames' value is drawn inside the timeline alone
+        assert view.count("player.barPosition(at: Monotonic.seconds())") == 1
+        assert view.index("TimelineView(") < view.index("player.barPosition(")
+    # the seek line's timeline holds its fill alone; the scrubber's clocks are redrawn only when their words change
+    fill = mini[mini.index("TimelineView("):]
+    assert fill.index("Rectangle().fill(Palette.accent)") < fill.index("}")
+    # (review) the scrubber's two hold its fill and its clocks alone - the track and the touch outside them - and it
+    # runs only while it can be seen: Now Playing's flag, the turntable's look and the sheets over it
+    order = [scrubber.index(part) for part in ("Rectangle().fill(Color.primary.opacity(0.2))", "TimelineView(",
+                                               "Rectangle().fill(Color.primary.opacity(0.85))", ".gesture(press(",
+                                               "ScrubberClocks(elapsed:")]
+    assert order == sorted(order)
+    second = scrubber.index("TimelineView(", order[1] + 1)
+    assert order[3] < second < order[4]
+    assert scrubber.count("drawn(held, length: length)") == 2
+    assert "let visible: Bool" in scrubber
+    now_playing = (APP / "Player" / "NowPlayingView.swift").read_text(encoding="utf-8")
+    assert "ScrubberView(visible: !turntable && !sheetOver)" in now_playing
+    assert "private var sheetOver: Bool { showsUpNext || showsInfo || showsEQ || playlistPick != nil }" in now_playing
+    assert "private struct ScrubberClocks: View, Equatable" in scrubber and ".equatable()" in scrubber
+    assert "PlayerWords.elapsed(shown: time)" in scrubber and "PlayerWords.remaining(shown: time, length: length)" in scrubber
+    # the lyrics keep their own clock
+    assert "player.clock()" in (APP / "Player" / "LyricsView.swift").read_text(encoding="utf-8")
+
+
+def test_the_librarys_top_sits_under_the_status_bar():
+    # 15 Nov, James: "on the app the top bar is obstructed by the Dynamic Island". The Library's own top was an inset on
+    # its pager, a scroll view free to run under the status bar; now the top, the offline banner and the pager stand
+    # in a VStack, which is laid out in the safe area whatever they do, and only the top's fill reaches up behind the
+    # status bar. The Library is the only page that hides iOS's navigation bar, and every other view that reaches
+    # under the status bar is a fill.
+    library = (APP / "Library" / "LibraryView.swift").read_text(encoding="utf-8")
+    pager = library[library.index("private func pager(albums: AlbumList)"):library.index("private func pageView(")]
+    assert ".safeAreaInset(edge: .top" not in library and ".showsOfflineBanner()" not in pager
+    order = [pager.index(part) for part in ("return VStack(spacing: 0) {", "LibraryTop(", "OfflineBanner()",
+                                             "ScrollView(.horizontal)", ".containerRelativeFrame([.horizontal, .vertical])",
+                                             ".toolbar(.hidden, for: .navigationBar)")]
+    assert order == sorted(order)
+    top = (APP / "Library" / "LibraryTop.swift").read_text(encoding="utf-8")
+    assert top.count("ignoresSafeArea") == 1
+    assert ".background {\n            Palette.tabBar\n                .ignoresSafeArea(.container, edges: .top)\n" in top
+    sources = {path.relative_to(APP).as_posix(): path.read_text(encoding="utf-8") for path in APP.rglob("*.swift")}
+    assert [name for name, text in sources.items() if ".toolbar(.hidden, for: .navigationBar)" in text] == [
+        "Library/LibraryView.swift"]
+    # what reaches the top edge (any ignore but the bottom's alone): the Library top's fill, RootView's background, Now
+    # Playing's black and its blurred cover, and (review) MainTabs's clear reader of the screen's layout - a new one must
+    # be a fill too, or keep its content in the safe area
+    reaching = {}
+    for name, text in sources.items():
+        for line in text.splitlines():
+            if ".ignoresSafeArea(" in line and "edges: .bottom" not in line:
+                reaching[name] = reaching.get(name, 0) + 1
+    assert reaching == {"Library/LibraryTop.swift": 1, "Root/RootView.swift": 1, "Player/NowPlayingView.swift": 2,
+                        "Root/MainTabs.swift": 1}
+    tabs = sources["Root/MainTabs.swift"]
+    assert "Color.clear\n                .ignoresSafeArea()\n                .onGeometryChange(" in tabs
+    now_playing = sources["Player/NowPlayingView.swift"]
+    assert "Color.black.ignoresSafeArea()" in now_playing
+    backdrop = now_playing[now_playing.index("private struct Backdrop"):]
+    assert ".ignoresSafeArea()" in backdrop and "CoverImage(" in backdrop
+    assert ".background(Color(.systemBackground).ignoresSafeArea())" in sources["Root/RootView.swift"]
+
+
+def test_the_tab_bar_comes_down_into_the_home_indicators_room():
+    # 15 Nov, James: "there might be a little too much space below the bottom tab bar". The bar runs to the screen's edge
+    # itself, its play bar and tabs padded off it by Core's TabBarFoot (20 on a Face ID iPhone, where they stood on the
+    # home indicator's whole 34; 6 with a Home button); the pages' room is the bar over the home indicator's, so nothing
+    # sits under it; the keyboard is as it was.
+    tabs = (APP / "Root" / "MainTabs.swift").read_text(encoding="utf-8")
+    foot = (REPO / "ios" / "DeadwaxKit" / "Sources" / "DeadwaxCore" / "TabBarFoot.swift").read_text(encoding="utf-8")
+    assert "public static let drop = 14.0\n" in foot and "public static let least = 6.0\n" in foot
+    bar = tabs[tabs.index("struct AppTabBar"):tabs.index("private struct AppTabButton")]
+    body = bar[bar.index("var body: some View {"):]
+    order = [body.index(part) for part in ("measured(height)", ".padding(.bottom, CGFloat(TabBarFoot.below(home: home)))",
+                                           ".background {", ".dynamicTypeSize(...DynamicTypeSize.xxxLarge)",
+                                           ".ignoresSafeArea(.container, edges: .bottom)\n    }")]
+    assert order == sorted(order)
+    assert ".environment(\\.tabBarRoom, keyboardUp ? 0 : CGFloat(TabBarFoot.room(content: barHeight, home: home)))" in tabs
+    assert "AppTabBar(home: home)" in tabs and "barHeight = height" in tabs
+    assert "window?.safeAreaInsets.bottom ?? 0" in tabs
+    # (review) read again whenever SwiftUI lays the screen out anew, never only when the body happens to be
+    assert "@State private var home: CGFloat = 0" in tabs and tabs.count("home = Self.windowHome()") == 2
+    assert ".onGeometryChange(for: [CGFloat].self)" in tabs
+    assert "[proxy.size.width, proxy.size.height, proxy.safeAreaInsets.bottom]" in tabs
+    # the keyboard: the bar under it, the pages making no room meanwhile
+    assert ".ignoresSafeArea(.keyboard, edges: .bottom)" in tabs and "keyboardUp = true" in tabs
+
+
+def test_the_transport_and_the_librarys_icon_have_actual_corners():
+    # 15 Nov, James: "Actual corners. The pause, skip buttons, etc. ... Even the library icon should be a bit more square."
+    # SF Symbols' play, pause, forward and backward are rounded, so each place draws SharpGlyph's sharp-cornered shapes
+    # instead (Core: measured from the symbols, at their weight - SharpGlyphTests), in the frame of the symbol it
+    # replaced (hidden, as the template); the Library's tab its squared stack. No transport symbol is named anywhere in
+    # the app now - only Core's templates; the other tabs keep their SF Symbols.
+    core = (REPO / "ios" / "DeadwaxKit" / "Sources" / "DeadwaxCore" / "SharpGlyph.swift").read_text(encoding="utf-8")
+    for template in ('"play.fill"', '"pause.fill"', '"forward.fill"', '"backward.fill"', '"square.stack.fill"'):
+        assert template in core
+    glyphs = (APP / "Shared" / "SharpGlyphs.swift").read_text(encoding="utf-8")
+    assert "Image(systemName: glyph.template)\n            .hidden()" in glyphs
+    assert ".animation(reduceMotion ? nil : .easeInOut(duration: 0.15), value: playing)" in glyphs
+    left = [f"{name}:{number}" for name, number, code in app_code()
+            if re.search(r'"(play|pause|forward|backward)(\.fill|\.end\.fill|\.end)?"', code)]
+    assert not left, left
+    places = {"Player/MiniPlayerView.swift": "PlayPauseGlyph(playing: player.isPlaying)",
+              "Player/NowPlayingView.swift": "PlayPauseGlyph(playing: player.isPlaying)",
+              "Album/AlbumHero.swift": "SharpSymbol(.play)", "Requests/RequestCards.swift": "SharpSymbol(.play)",
+              "Search/SearchScreen.swift": "SharpSymbol(.play)", "You/DebugView.swift": "PlayPauseGlyph("}
+    for name, drawn in places.items():
+        assert drawn in (APP / name).read_text(encoding="utf-8"), name
+    now_playing = (APP / "Player" / "NowPlayingView.swift").read_text(encoding="utf-8")
+    assert "SharpSymbol(.previous)" in now_playing and "SharpSymbol(.next)" in now_playing
+    # the Large Content Viewer keeps an image of each
+    mini = (APP / "Player" / "MiniPlayerView.swift").read_text(encoding="utf-8")
+    assert "Image(uiImage: (player.isPlaying ? SharpGlyph.pause : SharpGlyph.play).image)" in mini
+    tabs = (APP / "Root" / "MainTabs.swift").read_text(encoding="utf-8")
+    button = tabs[tabs.index("private struct AppTabButton"):]
+    assert "SharpSymbol(sharp)" in button and ".symbolVariant(.fill)" in button and "Image(uiImage: sharp.image)" in button
+    routes = (APP / "Shared" / "Routes.swift").read_text(encoding="utf-8")
+    assert "case .library: return .library" in routes
 
 
 # Noto Sans (15 Nov): James chose "Noto Sans (the web's)". The phone's four faces are the web's own seven files made into

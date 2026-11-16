@@ -993,7 +993,7 @@ struct SearchRowView: View {
     /// ▶ for a song that plays from its tap, › for an artist (the library's or MusicBrainz's).
     @ViewBuilder private func trailing(plays: Bool) -> some View {
         if plays {
-            Image(systemName: "play.fill")
+            SharpSymbol(.play)
                 .font(Typeface.symbol(.caption2))
                 .foregroundStyle(Palette.quiet)
                 .accessibilityHidden(true)
