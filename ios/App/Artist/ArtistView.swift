@@ -213,14 +213,16 @@ struct ArtistView: View {
 
     // MARK: the hero
 
-    /// Their picture and name - (Phase 8, slice 5) the square from their folder once Artist images saved one this visit,
-    /// or where Navidrome has none (the web's `square`: Navidrome keeps its own copy of the picture it had); and, who
-    /// they are chosen here, that it was.
+    /// Their picture and name - (Phase 8, slice 5) the square from their folder once Artist images wrote to it while the
+    /// app runs, or where Navidrome has none (the web's `square`: Navidrome keeps its own copy of the picture it had);
+    /// and, who they are chosen here, that it was.
     private func hero(_ managing: ArtistManaged) -> some View {
         VStack(spacing: 0) {
             Group {
-                if let square = managing.square(saved: tools.version, navidrome: model.coverArt) {
-                    ArtistFolderPicture(path: square, kind: "thumb", version: tools.version, square: true, round: true)
+                if let square = managing.square(navidrome: model.coverArt, written: { (path: String) -> Int in
+                    server.client.map { ArtistFolderVersions.shared.version($0, path: path) } ?? 0
+                }) {
+                    ArtistFolderPicture(path: square, kind: "thumb", square: true, round: true)
                         .frame(width: Self.pictureSide, height: Self.pictureSide)
                         .clipShape(Circle())
                 } else {
@@ -269,28 +271,16 @@ struct ArtistView: View {
                              }, uniquingKeysWith: { (first: Double, _: Double) -> Double in first }))
     }
 
-    /// Which of the ••• items the page offers now.
-    private struct ToolsOffered {
-        let images: Bool
-        let who: Bool
-        let move: Bool
-        var any: Bool { images || who || move }
-    }
-
-    /// What the person may do here - nothing while deadwax is out of reach or the artist is gone: Artist images… once
-    /// the library files their albums under a name; Which artist is this? while nothing says who they are (once the
-    /// library has had its say), or it was chosen here; Move albums to {name}… while a name the library files them under
-    /// isn't their name now.
-    private func offered(_ managing: ArtistManaged, online: Bool) -> ToolsOffered {
-        guard online, !model.gone else { return ToolsOffered(images: false, who: false, move: false) }
-        return ToolsOffered(
-            images: managing.may.images && !managing.names.isEmpty,
-            who: managing.may.whichArtist && model.answer != nil && search.ownedIndex != nil && (mbid == nil || byChoice),
-            move: managing.may.move && managing.current != nil && !managing.moveNames.isEmpty)
+    /// Which of the ••• items the page offers now (ArtistManage.offered: each by its permission, nothing while deadwax
+    /// is out of reach or the artist is gone).
+    private func offered(_ managing: ArtistManaged, online: Bool) -> ArtistManage.Offered {
+        ArtistManage.offered(may: managing.may, online: online, gone: model.gone, names: managing.names,
+                             answered: model.answer != nil, indexKnown: search.ownedIndex != nil, mbid: mbid,
+                             byChoice: byChoice, current: managing.current, moveNames: managing.moveNames)
     }
 
     /// The bar's •••: the artist tools offered, each opening its sheet.
-    private func toolsMenu(_ managing: ArtistManaged, _ offered: ToolsOffered) -> some View {
+    private func toolsMenu(_ managing: ArtistManaged, _ offered: ArtistManage.Offered) -> some View {
         Menu {
             if offered.images {
                 Button {
@@ -327,7 +317,6 @@ struct ArtistView: View {
         case .images:
             ArtistImagesSheet(request: ArtistImagesRequest(folder: managing.folder.name, reason: managing.folder.reason,
                                                            mbid: mbid, name: model.name)) {
-                tools.saved()
                 summaryAsks += 1
             }
         case .who:
@@ -336,7 +325,7 @@ struct ArtistView: View {
             }
         case .move:
             ArtistMoveSheet(ask: ArtistRefileFlow.Ask(names: managing.moveNames, mbid: mbid, current: managing.current),
-                            sizes: managing.sizes) {
+                            name: model.name, sizes: managing.sizes) {
                 moved()
             }
         }

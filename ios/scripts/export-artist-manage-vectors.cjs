@@ -12,7 +12,8 @@
  * unread or with no folder), toggleChoice, byKind, slotLine, imageNotes, savedLine, matchLine, refileView over several
  * names' plans (two names planning one target), canMove, moveLine, moveButton, refileAfter, refileOutcome and listed.
  * And reads out of app/ArtistPanel.tsx what the panel works out itself - the Move albums subtitle, the names Move
- * applies (its loop's skip), a slot's other pictures, "Showing \u2026" - each by a pattern, compiled and run as written;
+ * applies (its loop's skip), a slot's other pictures and when it offers them (Use another picture (N)), "Showing \u2026"
+ * and who it names - each by a pattern, compiled and run as written;
  * and every sentence the panel and app/ArtistPage.tsx say that the phone says too. A pattern that no longer matches
  * stops this script, naming what moved.
  * Writes ios/DeadwaxKit/Tests/DeadwaxCoreTests/Fixtures/artists/artist-manage-vectors.json.
@@ -100,8 +101,14 @@ const skip = piece(PANEL, /const moving = new Set\(view!\.moves\.map\(\(move\) =
 const namesAppliedOf = compiled(['plans', 'view'], `const moving = new Set(view.moves.map((move) => move.path))\nconst out = []\nfor (const { name, plan } of plans) {\n${skip}\nout.push(name)\n}\nreturn out`)
 //? a slot's other pictures: every picture found of another kind
 const othersOf = compiled(['preview', 'kind'], `${piece(PANEL, /(const others = preview\.candidates\.filter\(\(candidate\) => candidate\.kind !== kind\))\n/, "a slot's other pictures")[1]}\nreturn others`)
+//? a slot's "Use another picture (N)": drawn only with another kind's pictures to offer, N those (the phone's button
+//? is the same; it pushes the grid where the web expands the slot)
+const another = piece(PANEL, /\{(others\.length > 0) && \(\n[\s\S]*?\{more \? 'Fewer' : (`Use another picture \(\$\{others\.length\}\)`)\}/, 'use another picture, when')
+const anotherOf = compiled(['others'], `return ${another[1]} ? ${another[2]} : null`)
 says(PANEL, "Showing {who}{preview.facts?.disambiguation ? ` (${preview.facts.disambiguation})` : ''}", 'showing')
 const showingOf = (who, disambiguation) => `Showing ${who}${disambiguation ? ` (${disambiguation})` : ''}`
+//? who "Showing ..." names: MusicBrainz's name for them, else the page's own
+const whoOf = compiled(['preview', 'request'], `return ${piece(PANEL, /const who = (preview\?\.facts\?\.name \|\| request\.name)\n/, 'who is shown')[1]}`)
 //? Save's guard and the pictures' order, as the flow holds them
 says(PANEL, "const canSave = !!preview?.mbid && !!Object.keys(chosen).length && loading === null && !problem", 'canSave')
 says(PANEL, '{[...options, ...(more ? others : [])].map((candidate) => {', "a slot's pictures, its own first")
@@ -291,6 +298,11 @@ const others = []
 for (const kind of ['thumb', 'banner', 'fanart', 'logo', 'landscape', 'clearart', 'nothing']) {
   others.push({ candidates: CANDIDATES, kind, others: othersOf({ candidates: CANDIDATES }, kind) })
 }
+const ONE_KIND = [cand('thumb', 1), cand('thumb', 2, 'TheAudioDB')]
+for (const [candidates, kind] of [[ONE_KIND, 'thumb'], [ONE_KIND, 'banner'], [[], 'thumb']]) {
+  others.push({ candidates, kind, others: othersOf({ candidates }, kind) })
+}
+for (const each of others) each.another = anotherOf(each.others)
 const best = { thumb: cand('thumb', 1), banner: cand('banner', 1) }
 const bests = [{ best, urls: M.bestUrls({ best }) }, { best: {}, urls: M.bestUrls({ best: {} }) }]
 const choices = []
@@ -314,6 +326,10 @@ const matches = [match('Nirvana'), match('Nirvana', { disambiguation: '90s US gr
   match('X', { type: 'Group' }), match('Y', { matched_as: '' }), match('Bj\u00f6rk', { matched_as: 'Bjo\u0308rk' })]
   .map((one) => ({ match: one, line: M.matchLine(one) }))
 const showing = [['Nirvana', '90s US grunge band'], ['Ye', ''], ['Ye', null]].map(([who, disambiguation]) => ({ who, disambiguation, text: showingOf(who, disambiguation) }))
+const whoShown = [[{ facts: { name: 'Ye' } }, 'Kanye West'], [{ facts: { name: '' } }, 'Kanye West'], [{ facts: null }, 'Kanye West'],
+  [null, 'Kanye West'], [{ facts: { name: 'Bj\u00f6rk' } }, '']].map(([preview, name]) => ({
+  factsName: preview?.facts?.name ?? null, name, who: whoOf(preview, { name }),
+}))
 
 //? Move albums: each name's plan as the route answers it
 const move = (from, to, files, retagged) => ({ album: from.split('/').pop(), path: from, target_path: to, files,
@@ -398,7 +414,7 @@ function ascii(json) {
 const flat = (value) => ascii(JSON.stringify(value))
 
 const fixture = {
-  about: "The artist tools (lib/artistManage.ts run as it is; app/ArtistPanel.tsx's subtitle, the names Move applies, a slot's other pictures and its words, and app/ArtistPage.tsx's buttons, read out of their source).",
+  about: "The artist tools (lib/artistManage.ts run as it is; app/ArtistPanel.tsx's subtitle, the names Move applies, a slot's other pictures and its Use another picture, who Showing names, and its words, and app/ArtistPage.tsx's buttons, read out of their source).",
   made_by: MADE_BY,
   made_from: Object.fromEntries(Object.keys(madeFrom).sort().map((key) => [key, madeFrom[key]])),
   words,
@@ -415,11 +431,12 @@ const fixture = {
   saved,
   matches,
   showing,
+  whoShown,
   refile,
   listed,
   subtitles,
 }
-const listedKeys = new Set(['names', 'toMove', 'folders', 'kinds', 'others', 'bests', 'choices', 'slots', 'notes', 'saved', 'matches', 'showing', 'refile', 'listed', 'subtitles'])
+const listedKeys = new Set(['names', 'toMove', 'folders', 'kinds', 'others', 'bests', 'choices', 'slots', 'notes', 'saved', 'matches', 'showing', 'whoShown', 'refile', 'listed', 'subtitles'])
 const body = [
   '{',
   Object.entries(fixture).map(([key, value]) => listedKeys.has(key)

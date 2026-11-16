@@ -24,13 +24,14 @@ import Testing
         let saved: [SavedCase]
         let matches: [MatchCase]
         let showing: [ShowingCase]
+        let whoShown: [WhoShownCase]
         let refile: [RefileCase]
         let listed: [ListedCase]
         let subtitles: [SubtitleCase]
 
         enum CodingKeys: String, CodingKey {
             case words, sentences, names, toMove, folders, kinds, others, bests, choices, slots, notes, saved, matches,
-                 showing, refile, listed, subtitles
+                 showing, whoShown, refile, listed, subtitles
             case madeBy = "made_by"
             case madeFrom = "made_from"
         }
@@ -74,7 +75,12 @@ import Testing
     struct Folder: Decodable { let name: String?; let reason: String? }
     struct FolderCase: Decodable { let names: [String]; let current: String?; let summaries: [Pair]; let folder: Folder }
     struct KindsCase: Decodable { let candidates: [ArtistImageCandidate]; let byKind: [String: [ArtistImageCandidate]] }
-    struct OthersCase: Decodable { let candidates: [ArtistImageCandidate]; let kind: String; let others: [ArtistImageCandidate] }
+    struct OthersCase: Decodable {
+        let candidates: [ArtistImageCandidate]
+        let kind: String
+        let others: [ArtistImageCandidate]
+        let another: String?
+    }
     struct BestCase: Decodable { let best: [String: ArtistImageCandidate]; let urls: [String: String] }
     struct ChoiceCase: Decodable { let chosen: [String: String]; let kind: String; let url: String; let next: [String: String] }
     struct SlotCase: Decodable { let existing: String?; let found: Int; let line: String }
@@ -88,6 +94,7 @@ import Testing
     struct SavedCase: Decodable { let written: [String]; let problems: [String]; let line: String }
     struct MatchCase: Decodable { let match: MBArtistMatch; let line: String }
     struct ShowingCase: Decodable { let who: String; let disambiguation: String?; let text: String }
+    struct WhoShownCase: Decodable { let factsName: String?; let name: String; let who: String }
     struct Named: Decodable { let name: String; let plan: ArtistRefilePlan }
     struct Applied: Decodable { let name: String; let plan: ArtistRefilePlan; let results: ArtistRefileResults }
     struct View: Decodable {
@@ -123,6 +130,7 @@ import Testing
         for source in ["ui/src/lib/artistManage.ts", "ui/src/lib/artistPage.ts", "ui/src/lib/owned.ts",
                        "ui/src/app/ArtistPanel.tsx the subtitle", "ui/src/app/ArtistPanel.tsx the names Move applies",
                        "ui/src/app/ArtistPanel.tsx a slot's other pictures", "ui/src/app/ArtistPanel.tsx canSave",
+                       "ui/src/app/ArtistPanel.tsx use another picture, when", "ui/src/app/ArtistPanel.tsx who is shown",
                        "ui/src/app/ArtistPage.tsx the Move albums button"] {
             #expect(fixture.madeFrom[source]?.utf8.count == 64, "made_from names \(source)")
         }
@@ -166,8 +174,11 @@ import Testing
         for each in fixture.kinds {
             #expect(ArtistManage.byKind(each.candidates) == each.byKind)
         }
+        #expect(fixture.others.count == 10)
         for each in fixture.others {
             #expect(ArtistManage.others(each.candidates, kind: each.kind) == each.others, "\(each.kind)")
+            // the button the sheet draws (ArtistImagesSheet's slotSection calls this), and when
+            #expect(ArtistManage.anotherPicture(each.candidates, kind: each.kind) == each.another, "\(each.kind)")
         }
         for each in fixture.bests {
             #expect(ArtistManage.bestUrls(each.best) == each.urls)
@@ -192,6 +203,10 @@ import Testing
         }
         for each in fixture.showing {
             #expect(ArtistManage.showing(each.who, disambiguation: each.disambiguation ?? "") == each.text)
+        }
+        #expect(fixture.whoShown.count == 5)
+        for each in fixture.whoShown {
+            #expect(ArtistManage.showingWho(factsName: each.factsName, pageName: each.name) == each.who)
         }
     }
 

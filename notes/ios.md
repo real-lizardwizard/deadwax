@@ -11892,11 +11892,12 @@ server or web change; the player engine has no diff.
   relay's own cap, Accept `image/*`), `artistSearch`, `refilePreview`, `refileApply(_:bytes:)`. **Routes.swift**: the
   eight (86 routes) and their floors - `/library/artist` 120 s (the scan's, as `/library/albums`), `/artist/art` 30,
   images preview 240 (the scan, one MusicBrainz lookup, three sources and Commons' widths), images apply 600, search
-  60, refile preview 240, refile apply 480 (as Release's apply: every file read, tagged and moved). **Managing.swift**:
+  60, refile preview 240, refile apply 480 (as Release's apply: every file read, tagged and moved) - raised after
+  review to 660, 600, 120 (and facts 120), 480 and 600: "After review (16 Nov) - slice 5" below. **Managing.swift**:
   `artistManaging(permissions)` (permissions.ts's, vectors over all 64 sets). **Models.swift**: `looseMap`.
 
 **The waits** (`ArtistWaits`), as EditWaits works Edit album's out: Save's is the scan (120) + one MusicBrainz lookup
-(60) + the three sources and a width for each Commons candidate (25 s each: JSON_TIMEOUT's 10 + 15) + each picture
+(60; 111.5 at its worst, worked out again after review - below) + the three sources and a width for each Commons candidate (25 s each: JSON_TIMEOUT's 10 + 15) + each picture
 chosen fetched through Commons' two redirects (3 x 40 s: IMAGE_TIMEOUT's 10 + 30) + the minute's margin, rounded up
 to the minute, never under 600 s. Move's, a name at a time: 480 s + that name's albums' size (its summary's
 `total_size`) at 20 MB a second, for a retag that outgrows its room and rewrites a file. The relay has no wait of its
@@ -12016,3 +12017,101 @@ at their real sizes and speeds), the grid's scrolling and the four at a time; a 
 and Navidrome's scan after it (the page asked again at 10 s); the page of an old name after a move; Save or Move with
 the phone locked; VoiceOver and the largest text. Nothing has run against a real MusicBrainz or fanart.tv: their
 answers are fakes shaped from the server's source.
+
+### After review (16 Nov) - slice 5
+
+A review of 8ea5bfc found eight real problems and a handful of small ones. All are fixed in one commit on the `ios`
+branch's worktree; the app stays 0.13 (13), src/__init__.py untouched, no server or web change.
+
+1. **A gap no longer throws away the person's picture choices.** `ArtistImagesFlow.looked` used to start every look
+   from the best of each kind - so deadwax going away and coming back (or Look again, or the read after a save that
+   may have written) undid an edit and made Close stop asking. Now a look of the SAME artist (the same id as the
+   pictures in hand) keeps each choice the new look still offers, what the choices started from (`baseline`, so
+   `holdsWork` still holds) and what the last save said; a choice no longer offered is dropped and said in amber
+   above the slots (`notOffered`: "The picture you chose for the banner isn't offered any more, so it won't be saved
+   - choose another."), cleared by the next save. A look of ANOTHER artist starts from the best, as the web's does.
+   The web never looks again unasked, so this is the phone's own rule.
+2. **A Move that never answered is checked, never stuck.** Its previews asked again used to 404 on the name it had
+   emptied ("no such artist" - the preview failed, Look again failing the same way), and once the page's names lost
+   it, `preview()` asked for nothing and Look again did nothing. Now `moveEnded` records what is being checked
+   (`settling`: the name whose answer never came, the albums its preview showed moving, where to, what the names
+   before it said); a name's 404 is read as nothing left under it (`gone`, ArtistMoveModel.preview), and the check
+   (`settle`) counts the name as moved when it is gone, the page's names no longer hold it, or none of those albums is
+   under it any more. Had finished: "deadwax had finished: N albums from X moved into Y/." with the outcome and Done -
+   or, with names after it still to move, over their plan with Move offered again. Hadn't: "deadwax hadn't moved the
+   albums under X - they're below, to move again." or "deadwax had moved M of the N albums under X - the rest are
+   below, to move again." over the plan, Move offered. With no name left `preview()` settles without a request, so
+   Look again always does something. A check whose preview fails keeps "maybe finished" said.
+3. **Each guard has a test of its own that fails without it** (each mutation run alone against ArtistManageFlowTests,
+   the source put back after): `canSave` without `loading == nil` fails saveWaitsForALookUnderWay; without
+   `problem == nil`, saveWaitsAfterALookFailed; `beginSave` sending `lastAsked.mbid`, saveSendsTheIdTheLookAnswered;
+   `canMove` without `outcome == nil`, moveIsOffOnceItIsOver; `ArtistManage.offered` with `may.images` and `may.move`
+   swapped (either side), theMenuOffersEachToolByItsOwnPermission.
+4. **A replaced picture is drawn as the new one.** The folder pictures' cache key carried a per-sheet counter
+   (`flow.wrote`, the page's `tools.version`) while the cache lives for the app: a sheet or page opened again started
+   at 0 and found the old picture under the old key. Now `ArtistFolderVersions` (an @Observable singleton, as long-lived
+   as ArtistPictureCache.shared) counts the writes to each folder by server and path - bumped by every save that wrote
+   or may have, and by a Move that moved (it carries the pictures into the folder of their name now) - and
+   ArtistFolderPicture keys on it. The hero's square comes from the folder once that folder's count is past nought
+   (was: saved this visit).
+5. **Move's wait reads each name's size when Move starts.** The sizes were taken as the sheet opened; one the page read
+   later was never seen, and an unread one was waited for as nought. The sheet now passes the page's sizes on as they
+   come (`onChange(of: sizes)`, merged), and `move()` asks `/library/artist` for any name still without one
+   (`ArtistRefileFlow.unsized`; a 404 is nought - nothing filed under it). If that fails, Move doesn't start: nothing
+   sent, "Couldn't read their folders just now, so nothing was moved - try again." under Move, Move offered again
+   (`moveNotStarted`).
+6. **The look's wait is past the server's worst case, every term summed.** One MusicBrainz request at its worst
+   (`ArtistWaits.musicBrainz`): its ten attempts (RETRIES), each waiting out the rate limiter's 5 s window and then
+   paused at its longest - a 429's `sleep(6)`, a 503's 3 s, or a failed connection's `2.0 + attempt * 0.5` (6.5 and 7
+   at the last two attempts, and paused after the last as well) - 50 + 61.5 = 111.5 s. Artist images' look: the scan
+   (120) + a search and a lookup (2 x 111.5) + the three sources in turn and a width for each Commons picture (25 s
+   each, JSON_TIMEOUT's connect and read), at least five Commons pictures (the next look may be someone else's) + the
+   minute's margin = 603, so 660 s (was 240, then 600); with the last look's Commons count when it found more (nine:
+   720). An artist's facts and the search, one request each, are given 120 (were 60). Move's preview 480, its apply
+   600 at least plus the size term. tests/test_ios_artist_manage.py reads every pause from `MusicBrainzClient._ask`'s
+   own source, holds each Swift constant to it, sums the same terms and checks each route's floor and the formulas.
+   **Assumed, not waited out**: each answer comes promptly - a network silent to its timeouts on every attempt (10 s
+   to connect, 30 to read, ten times) would be over eight minutes; an attempt waits at most one window for its turn
+   (more only with other MusicBrainz work queued ahead of it); five Commons widths before a look has said; JSON's
+   write and pool timeouts (the requests send nothing and the pool isn't contended); Commons' two redirects; the disk's
+   20 MB/s for a rewrite. A look past its wait writes nothing and says so with Look again.
+7. **"Use another picture (N)" counts as the web counts**: N is the other kinds' pictures (`others.length`), and the
+   button is there only when N > 0 (`ArtistManage.anotherPicture`, the sheet's only call for it). The exporter reads the
+   web's condition and template out of ArtistPanel.tsx by pattern ("use another picture, when") and the fixture's
+   `others` cases carry the label the web draws - ten cases now, a slot with no other kind among them - so the call
+   site can't drift. Where the phone departs: it draws only the chosen picture in a slot (the web draws every one of
+   its own kind in a row), so a slot whose pictures are all its own kind still needs the grid - "Pictures for this
+   slot (N)", N its own. **"Showing …" names the page's name** when MusicBrainz gave none (`ArtistManage.showingWho`,
+   the web's `preview?.facts?.name || request.name`, read out by pattern into `whoShown`), never a pick's or a
+   search's. **Move's subtitle names the page's name** too (`request.name`; was the first name moving).
+8. **Move checks the person before each name.** The samePerson guard ran only after the loop; now it runs before each
+   name's apply, and a change stops the rest - "Stopped before the rest - someone else signed in." with what moved.
+
+And the small ones:
+
+- The ••• offer rule is Core's (`ArtistManage.offered`), table-tested.
+- The outcome screen's subtitle keeps naming what the Move was for (`shownFor`, from `movedFor`) as the page's names
+  empty under it - it used to go blank.
+- Picture fetches nobody waits for any more are cancelled: ArtistPictureCache counts each fetch's waiting views, and
+  the last one leaving (the grid or the sheet closed) cancels it - or, still waiting its turn among the four, it is
+  never sent. Nothing is kept of a cancelled fetch, so it is asked afresh when drawn again.
+- "deadwax may have finished" after a Save that never answered stays said when the look after it fails (it was inside
+  the section a failed look hides).
+- A look while Save runs is never sent: deadwax coming back during a save owes the look, asked once the save is over
+  (`saveAnswered` and a refused `saveFailed` say so) - one sent before could land after it with the folder as it was,
+  and clear "Saved …".
+- `ForEach(id: \.self)` over words (problems, notes, failures) and over the grid's candidates keyed by place instead:
+  two the same would have been one row.
+- Which artist is this?'s failed search is asked again trimmed, as it was searched (`ArtistWhoFlow.failed`).
+
+Left alone, and why: the waits outside the artist tools that cover a MusicBrainz request asked with all ten attempts
+are under the 111.5 s worked out above too - Edit album's search (`editorSearchTimeout`, 60), a release group, its
+pressings and a release (60 each), an artist's albums (`discography`, 60, up to five pages). The review named the
+artist tools' waits; raising Phase 6's and slice 1's is a change of its own, for James to decide. An artist's facts
+(`artistFacts`), which the artist tools ask, went to 120 here - the artist page and Info's artist card are given that
+too now (SearchSongsTests follows).
+
+Checked again on the Mac: `swift test` - 1836 Core tests in 193 suites, 158 Audio in 17 and 12 more, all passing; the
+unsigned generic-iOS Debug build, BUILD SUCCEEDED; the full pytest suite, 4865 passed and 1 skipped; all 93 sims with
+Node 22 (iosartistmanage's `--check` against the regenerated fixture). Not on a phone: docs/ios.md's checks 344 and
+347 now ask after the kept choices, the redrawn picture and a lost Move's check.

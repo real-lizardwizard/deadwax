@@ -13,9 +13,13 @@ import SwiftUI
 /// The eighth writer, plan/execute: the apply sends what its preview did, and the server works the plan out again. It
 /// needs deadwax (section 2's rules, as Artist images'); while Move runs, Cancel is off and a swipe doesn't close it.
 /// A Move that never answered is said as maybe finished, with what is known to have moved, and the moves previewed
-/// again.
+/// again - which say whether it had finished (the outcome, and Done, when nothing is left) or how far it got (the plan
+/// for the rest, Move offered again). The subtitle keeps naming what a Move was made for while it runs and once it is
+/// over, as the page's names change under it.
 struct ArtistMoveSheet: View {
     let ask: ArtistRefileFlow.Ask
+    /// The page's name for them: the subtitle's when no name moves (the web's `request.name`).
+    let name: String
     let sizes: [String: Double]
     let onMoved: () -> Void
 
@@ -30,7 +34,7 @@ struct ArtistMoveSheet: View {
         NavigationStack {
             Group {
                 if let model {
-                    ArtistMoveRoot(model: model)
+                    ArtistMoveRoot(model: model, name: name)
                 } else {
                     Color.clear
                 }
@@ -61,8 +65,11 @@ struct ArtistMoveSheet: View {
         }
         // the page's names, id or their name now changed: previewed again, never applied blind
         .onChange(of: ask) { _, now in
-            model?.sizes = sizes
             Task { await model?.changed(now) }
+        }
+        // each name's size as the page reads it, for how long its apply is given - read as Move starts
+        .onChange(of: sizes) { _, now in
+            model?.sizes.merge(now) { (_: Double, read: Double) -> Double in read }
         }
         .onChange(of: reachability.online) { _, now in
             Task { await model?.reach(now) }
@@ -76,6 +83,7 @@ struct ArtistMoveSheet: View {
 
 private struct ArtistMoveRoot: View {
     let model: ArtistMoveModel
+    let name: String
 
     var body: some View {
         let flow = model.flow
@@ -88,10 +96,11 @@ private struct ArtistMoveRoot: View {
                 }
             } else {
                 List {
-                    // the web's subtitle: whose albums move, and to which name ("Kanye West → Ye")
+                    // the web's subtitle: whose albums move, and to which name ("Kanye West → Ye") - what a Move was
+                    // made for while it runs and once it is over, the page's names emptied by it or not
                     Section {
-                        Text(ArtistManage.refileSubtitle(moveNames: flow.ask.names, current: flow.ask.current,
-                                                         name: flow.ask.names.first ?? ""))
+                        let shown = flow.shownFor
+                        Text(ArtistManage.refileSubtitle(moveNames: shown.names, current: shown.current, name: name))
                             .font(Typeface.subheadline)
                             .foregroundStyle(Palette.quiet)
                             .fixedSize(horizontal: false, vertical: true)
@@ -100,7 +109,7 @@ private struct ArtistMoveRoot: View {
                         Section {
                             Text(outcome.text)
                                 .fixedSize(horizontal: false, vertical: true)
-                            ForEach(outcome.failures, id: \.self) { (failure: String) in
+                            ForEach(Array(outcome.failures.enumerated()), id: \.offset) { (_: Int, failure: String) in
                                 Text(failure)
                                     .foregroundStyle(Palette.amber)
                                     .fixedSize(horizontal: false, vertical: true)
@@ -114,6 +123,13 @@ private struct ArtistMoveRoot: View {
                                         .fixedSize(horizontal: false, vertical: true)
                                 }
                                 MayHaveFinished(reading: flow.loading)
+                            }
+                        }
+                        if let settled = flow.settled {
+                            // what the check after a Move that never answered found
+                            Section {
+                                Text(settled)
+                                    .fixedSize(horizontal: false, vertical: true)
                             }
                         }
                         if let error = flow.error {
@@ -132,6 +148,12 @@ private struct ArtistMoveRoot: View {
                             }
                         } else if let view = flow.view {
                             plan(view)
+                        } else if flow.plans != nil {
+                            // no name left to move them from
+                            Section {
+                                Text(ArtistManageWords.nothingToMove(flow.ask.current ?? name))
+                                    .fixedSize(horizontal: false, vertical: true)
+                            }
                         }
                         Section {
                             Button {
@@ -144,6 +166,12 @@ private struct ArtistMoveRoot: View {
                                 }
                             }
                             .disabled(!flow.canMove)
+                            if let words = flow.notStarted {
+                                Text(words)
+                                    .font(Typeface.footnote)
+                                    .foregroundStyle(Palette.amber)
+                                    .fixedSize(horizontal: false, vertical: true)
+                            }
                         }
                     }
                 }
@@ -158,7 +186,7 @@ private struct ArtistMoveRoot: View {
         Section {
             Text(Self.note(note))
                 .fixedSize(horizontal: false, vertical: true)
-            ForEach(view.problems, id: \.self) { (problem: String) in
+            ForEach(Array(view.problems.enumerated()), id: \.offset) { (_: Int, problem: String) in
                 Text(problem)
                     .foregroundStyle(Palette.amber)
                     .fixedSize(horizontal: false, vertical: true)

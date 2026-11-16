@@ -339,7 +339,8 @@ import Testing
         let facts = try await deadwax.artistFacts(mbid: Self.portisheadMB)
         #expect(facts.type == "Group")
         let factsQuery = Self.query(transport)
-        #expect(factsQuery == ["mbid=\(Self.portisheadMB)"] && transport.last?.timeout == 60)
+        // one MusicBrainz lookup at its worst, 111.5 s (ArtistWaits.musicBrainz): 120 since the artist tools' review
+        #expect(factsQuery == ["mbid=\(Self.portisheadMB)"] && transport.last?.timeout == 120)
         transport.answer("/deadwax/search_musicbrainz/discography", 200, #"{"release-groups":[{"id":"g1"}],"truncated":false,"problem":null}"#)
         let studio = try await deadwax.discography(mbid: Self.portisheadMB, studioOnly: true)
         #expect(studio.releaseGroups.count == 1)

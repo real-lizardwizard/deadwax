@@ -4,10 +4,12 @@ import SwiftUI
 /// Artist images (Phase 8, slice 5 - phase8-managing.md 4; the web's ImagesBody): a sheet with its own stack, from the
 /// artist page's •••. Who the pictures are of ("Showing Ye (rapper)", with Not them? and the search), the notes on the
 /// sources it couldn't ask, then a section per slot (the preview's `kinds`, their labels): the picture chosen for it
-/// large - or what is on disk, or that nothing was found - and Use another picture (N), pushing every picture the slot
-/// can take as a grid, a tap choosing one and a second taking it back (toggleChoice). Then Replace pictures that are
-/// already there, what is in their folder now, and Save - on only as Core's ArtistImagesFlow.canSave says - with what
-/// it wrote (savedLine) under it.
+/// large - or what is on disk, or that nothing was found - and Use another picture (N), N the pictures of every other
+/// kind, as the web counts them (ArtistManage.anotherPicture), pushing every picture the slot can take as a grid, its own
+/// kind's first; a tap chooses one and a second takes it back (toggleChoice). With no other kind's to offer, the slot's
+/// own still need the grid on a phone (the slot draws only the one chosen): "Pictures for this slot (N)". Then Replace
+/// pictures that are already there, what is in their folder now, and Save - on only as Core's ArtistImagesFlow.canSave
+/// says - with what it wrote (savedLine) under it, and a choice a look no longer offers said (notOffered).
 ///
 /// Every picture of a candidate comes through deadwax's relay (RelayedArtistPicture): the phone talks only to deadwax.
 /// One the relay couldn't pass on is drawn as words, never a blank. Pictures load as they are drawn (the grid is lazy),
@@ -119,6 +121,12 @@ private struct ArtistImagesRoot: View {
                 }
             } else {
                 List {
+                    if flow.mayHaveFinished {
+                        // kept whatever the look after it does - a look that fails leaves it said
+                        Section {
+                            MayHaveFinished(reading: flow.loading != nil)
+                        }
+                    }
                     who(flow)
                     if flow.searchOpen { searchSections(flow) }
                     if let name = flow.loading {
@@ -148,7 +156,7 @@ private struct ArtistImagesRoot: View {
     @ViewBuilder private func who(_ flow: ArtistImagesFlow) -> some View {
         if let preview = flow.preview, preview.mbid != nil, flow.loading == nil {
             Section {
-                let name = preview.facts?.name.isEmpty == false ? preview.facts?.name ?? "" : flow.lastAsked.name
+                let name = ArtistManage.showingWho(factsName: preview.facts?.name, pageName: model.pageName)
                 Text(ArtistManage.showing(name, disambiguation: preview.facts?.disambiguation ?? ""))
                     .font(Typeface.subheadline)
                     .fixedSize(horizontal: false, vertical: true)
@@ -212,24 +220,31 @@ private struct ArtistImagesRoot: View {
             Section {
                 // with no one settled, the problems first, as warnings; settled, after the notes, as notes
                 if preview.mbid == nil {
-                    ForEach(preview.problems, id: \.self) { (said: String) in
+                    ForEach(Array(preview.problems.enumerated()), id: \.offset) { (_: Int, said: String) in
                         Text(said)
                             .foregroundStyle(Palette.amber)
                             .fixedSize(horizontal: false, vertical: true)
                     }
                 }
-                ForEach(notes, id: \.self) { (note: String) in
+                ForEach(Array(notes.enumerated()), id: \.offset) { (_: Int, note: String) in
                     Text(note)
                         .font(Typeface.footnote)
                         .fixedSize(horizontal: false, vertical: true)
                 }
                 if preview.mbid != nil {
-                    ForEach(preview.problems, id: \.self) { (said: String) in
+                    ForEach(Array(preview.problems.enumerated()), id: \.offset) { (_: Int, said: String) in
                         Text(said)
                             .font(Typeface.footnote)
                             .fixedSize(horizontal: false, vertical: true)
                     }
                 }
+            }
+        }
+        if preview.mbid != nil, let dropped = flow.notOffered {
+            Section {
+                Text(dropped)
+                    .foregroundStyle(Palette.amber)
+                    .fixedSize(horizontal: false, vertical: true)
             }
         }
         if preview.mbid != nil {
@@ -246,6 +261,9 @@ private struct ArtistImagesRoot: View {
         let existing = preview.art[slot.kind]
         let line = ArtistManage.slotLine(existing: existing, found: options.count)
         let every = options + ArtistManage.others(preview.candidates, kind: slot.kind)
+        // the web's button, counted as it counts it; the slot's own pictures alone still need the grid here
+        let another = ArtistManage.anotherPicture(preview.candidates, kind: slot.kind)
+            ?? (options.isEmpty ? nil : ArtistManageWords.slotPictures(options.count))
         let chosen = flow.chosen[slot.kind].flatMap { (url: String) -> ArtistImageCandidate? in
             every.first { ArtistManage.sameAddress($0.url, url) }
         }
@@ -263,8 +281,7 @@ private struct ArtistImagesRoot: View {
                 .accessibilityValue(ArtistManageWords.chosenMark)
             } else if let existing, !existing.isEmpty, let path = preview.path, !path.isEmpty {
                 VStack(alignment: .leading, spacing: 6) {
-                    ArtistFolderPicture(path: path, kind: slot.kind, version: model.flow.wrote,
-                                        square: slot.kind == "thumb")
+                    ArtistFolderPicture(path: path, kind: slot.kind, square: slot.kind == "thumb")
                         .frame(maxWidth: slot.kind == "thumb" ? 240 : .infinity)
                     Text(ArtistManageWords.onDisk(slot.label))
                         .font(Typeface.footnote)
@@ -272,9 +289,9 @@ private struct ArtistImagesRoot: View {
                 }
                 .accessibilityElement(children: .combine)
             }
-            if !every.isEmpty {
+            if let another {
                 NavigationLink(value: ArtistImageSlot(kind: slot.kind, label: slot.label)) {
-                    Text(ArtistManageWords.useAnother(every.count))
+                    Text(another)
                 }
                 .disabled(flow.saving)
             }
@@ -304,8 +321,7 @@ private struct ArtistImagesRoot: View {
             Section {
                 ForEach(kept, id: \.kind) { (slot: ArtistImageKind) in
                     HStack(spacing: 12) {
-                        ArtistFolderPicture(path: path, kind: slot.kind, version: flow.wrote,
-                                            square: slot.kind == "thumb")
+                        ArtistFolderPicture(path: path, kind: slot.kind, square: slot.kind == "thumb")
                             .frame(width: slot.kind == "thumb" ? 48 : 86)
                             .clipShape(Corners.artShape)
                         VStack(alignment: .leading, spacing: 2) {
@@ -323,9 +339,6 @@ private struct ArtistImagesRoot: View {
             }
         }
         Section {
-            if flow.mayHaveFinished {
-                MayHaveFinished(reading: flow.loading != nil)
-            }
             Button {
                 Task { await model.save() }
             } label: {
@@ -359,7 +372,7 @@ private struct ArtistPictureGrid: View {
         let square = slot.kind == "thumb"
         ScrollView {
             LazyVGrid(columns: [GridItem(.adaptive(minimum: square ? 130 : 160), spacing: 12)], spacing: 16) {
-                ForEach(every, id: \.self) { (candidate: ArtistImageCandidate) in
+                ForEach(Array(every.enumerated()), id: \.offset) { (_: Int, candidate: ArtistImageCandidate) in
                     let on = flow.isChosen(kind: slot.kind, url: candidate.url)
                     Button {
                         model.toggle(kind: slot.kind, url: candidate.url)

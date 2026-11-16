@@ -984,9 +984,14 @@ key…" - and then a section for each slot: **Square image**, **Banner**, **Back
 - The best picture of each slot is chosen to start with, and shown large with its name and its source,
   as the web app names them ("fanart.tv Thumb (3) · fanarttv", the 3 its likes on fanart.tv); a slot
   with nothing chosen shows what's in their folder ("Banner on disk").
-- **Use another picture (7)** opens every picture found - that slot's first, then the rest, so a photo
-  can be the background - as a grid. Tap one to choose it; tap the chosen one again to leave that slot
-  alone, so it isn't written.
+- **Use another picture (7)** - the 7 counting the pictures found for the other slots, as the web app
+  counts them - opens every picture the slot can take, its own first, then the rest, so a photo can be
+  the background, as a grid. Tap one to choose it; tap the chosen one again to leave that slot alone, so
+  it isn't written. A slot with pictures of its own but none of another kind shows **Pictures for this
+  slot (2)** instead.
+- If deadwax goes away and comes back, or you look again, your choices are kept - except one it no
+  longer finds, which is dropped and said ("The picture you chose for the banner isn't offered any
+  more, so it won't be saved - choose another.").
 - **Replace pictures that are already there** (off to start) says whether a slot with a file in it is
   written over. **In their folder now** shows the pictures already there, with their file names.
 - **Save** writes the chosen pictures into their folder, then says what it wrote ("Saved artist.jpg,
@@ -1021,7 +1026,13 @@ doesn't yet) - open them from the Artists page.
 While Save or Move runs, the sheet can't be closed. If the phone locks or loses deadwax before the
 answer comes, the sheet says "deadwax may have finished this - looking again", with what it knows
 moved, and looks again before offering Save or Move once more - it never sends the same thing twice
-unseen. With a picture chosen or taken back, or Replace changed, and not saved, a swipe doesn't close
+unseen. For a move, looking again works out how far it got: "deadwax had finished: 2 albums from Kanye
+West moved into Ye/." (then **Done**), or "deadwax had moved 1 of the 2 albums under Kanye West - the
+rest are below, to move again." with **Move** offered for the rest. Move needs to know how big each
+name's albums are, to know how long to wait: if deadwax can't say just then, nothing moves and the
+sheet says "Couldn't read their folders just now, so nothing was moved - try again." If someone else
+signs in on the phone while albums are moving, the rest aren't moved ("Stopped before the rest -
+someone else signed in."). With a picture chosen or taken back, or Replace changed, and not saved, a swipe doesn't close
 Artist images, and Close asks first.
 
 ## Songs
@@ -4471,8 +4482,10 @@ Artist images and Move albums write into the library: use an artist whose pictur
   (N)**: the grid; tap one (it's ringed, with a tick), tap it again (not chosen). Choose a square image, **Save**:
   "Saved artist.jpg." (or the names it wrote), and the page's round picture is the new one; **In their folder now**
   lists it. Do the same pictures show in the web app's Artist images? With no fanart.tv or TheAudioDB key set: the note
-  about the keys, and only Wikimedia Commons' pictures. Lock the phone the moment you tap Save: unlocked, does it say
-  what it saved, or "deadwax may have finished this - looking again" and the folder looked at again?
+  about the keys, and only Wikimedia Commons' pictures. Choose another picture for a slot, then turn Wi-Fi and
+  WireGuard off and on: once deadwax is back and has looked again, is your choice still chosen? Lock the phone the
+  moment you tap Save: unlocked, does it say what it saved, or "deadwax may have finished this - looking again" and the
+  folder looked at again? Open Artist images again after a save: is the new picture shown, not the old one?
 - **345 Replace.** With a square image already in their folder, choose another and **Save** with **Replace pictures
   that are already there** off: "Nothing needed writing.", and the folder's picture is the one it was. On, Save again:
   the new picture is in the folder and on the page. Choose something else, then Close: "Discard changes?" (Edit
@@ -4487,7 +4500,9 @@ Artist images and Move albums write into the library: use an artist whose pictur
   with why. Does it list what the web app's Move albums lists? **Move 1 album**: "Moving…" (Cancel dimmed, a swipe
   doesn't close it), then "Moved 1 album into Ye/." with what came with it, and **Done**. Once Navidrome has scanned,
   does it list the album under Ye alone, and the web app's page agree? The old name's page, if every album moved,
-  says the artist isn't here any more. Then as 344, lock the phone the moment you tap Move.
+  says the artist isn't here any more. Then as 344, lock the phone the moment you tap Move: unlocked, does it say
+  "deadwax had finished: …" with **Done**, or how many had moved with the rest offered to move again - never stuck on
+  "looking again"?
 - **348 Without the permissions.** Signed in as someone with neither Edit albums nor Look after the library: no
   **•••** on any artist's page. With Edit albums alone: Artist images… (and Which artist is this? where 343 had it),
   never Move albums. With Look after the library alone: only Move albums, and no ••• on an artist with nothing to

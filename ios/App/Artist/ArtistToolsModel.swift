@@ -16,11 +16,12 @@ struct ArtistManaged {
     var current: String?
     var sizes: [String: Double] = [:]
 
-    /// The folder holding the square the page draws in place of Navidrome's picture - once a save wrote one this visit,
-    /// or where Navidrome has none (the web's `square`) - nil: Navidrome's.
-    func square(saved: Int, navidrome: String?) -> String? {
-        guard saved > 0 || navidrome == nil, let summary = folderSummary, let path = summary.path, !path.isEmpty,
-              !(summary.art["thumb"] ?? "").isEmpty else { return nil }
+    /// The folder holding the square the page draws in place of Navidrome's picture - once Artist images wrote to that
+    /// folder while the app runs (`written`, ArtistFolderVersions), or where Navidrome has none (the web's `square`) -
+    /// nil: Navidrome's.
+    func square(navidrome: String?, written: (String) -> Int) -> String? {
+        guard let summary = folderSummary, let path = summary.path, !path.isEmpty,
+              !(summary.art["thumb"] ?? "").isEmpty, written(path) > 0 || navidrome == nil else { return nil }
         return path
     }
 }
@@ -31,9 +32,6 @@ struct ArtistManaged {
 /// together, only the newest round landing), from which the folder Artist images writes to (imagesFolder) and the
 /// names Move albums moves (namesToMove). Asked only for someone the ••• has something for, and only while deadwax is
 /// in reach; nothing is kept past the page.
-///
-/// `version` is one more each time Artist images saved: the page draws the square from their folder (the web's
-/// `square`), since Navidrome keeps its own copy of the picture it had.
 @MainActor
 @Observable
 final class ArtistToolsModel {
@@ -42,8 +40,6 @@ final class ArtistToolsModel {
     /// The names (joined) the summaries answer - nil before any answer.
     private(set) var summaryKey: String?
     private(set) var asking = false
-    /// One more each time Artist images saved.
-    private(set) var version = 0
 
     @ObservationIgnored private var asks = 0
     /// The names as last made, with what they were made from: `/library/owned` reads every folder of the library.
@@ -117,16 +113,40 @@ final class ArtistToolsModel {
         summaries = zip(names, said).map { (name: $0, said: $1) }
         summaryKey = key
     }
+}
 
-    /// Artist images saved: the folder's pictures drawn again.
-    func saved() { version += 1 }
+/// How many times Artist images (or a Move, which carries the pictures along) wrote each artist folder's pictures, or
+/// may have, while the app runs - by server and folder. The folder pictures' cache keys on it, so a picture replaced
+/// under the same file name is asked again everywhere it is drawn, whichever sheet or page wrote it and however they
+/// came and went; it lives as long as ArtistPictureCache.shared. The page draws its square from the folder once its
+/// folder's count is past nought (the web's `square`): Navidrome keeps its own copy of the picture it had.
+@MainActor
+@Observable
+final class ArtistFolderVersions {
+    static let shared = ArtistFolderVersions()
+
+    private var counts: [String: Int] = [:]
+
+    private init() {}
+
+    private static func key(_ client: DeadwaxClient, path: String) -> String { "\(client.server.key)|\(path)" }
+
+    func version(_ client: DeadwaxClient, path: String) -> Int { counts[Self.key(client, path: path)] ?? 0 }
+
+    /// The folder's pictures were written, or may have been.
+    func wrote(_ client: DeadwaxClient, path: String) {
+        guard !path.isEmpty else { return }
+        counts[Self.key(client, path: path), default: 0] += 1
+    }
 }
 
 /// A picture the artist tools draw - a candidate's preview through deadwax's relay (`GET /library/artist/picture`), or
 /// one in their folder (`GET /library/artist/art`) - kept in memory by the server and the address (and, for their
-/// folder, the page's saves), never on disk. One fetch however many views wait, at most `atOnce` at a time (the relay
-/// takes six at once and refuses past 64 waiting); a relay that is busy (503) asked again twice, a moment apart. One
-/// that couldn't be had answers deadwax's words, kept a minute.
+/// folder, its count of writes - ArtistFolderVersions), never on disk. One fetch however many views wait, at most
+/// `atOnce` at a time (the relay takes six at once and refuses past 64 waiting); a relay that is busy (503) asked again
+/// twice, a moment apart. One that couldn't be had answers deadwax's words, kept a minute. A fetch nobody waits for any
+/// more - its views gone with the grid or the sheet - is cancelled, or never sent once its turn comes, and nothing is
+/// kept of it.
 @MainActor
 final class ArtistPictureCache {
     enum Answer: Sendable {
@@ -139,7 +159,8 @@ final class ArtistPictureCache {
     static let atOnce = 4
 
     private let images = NSCache<NSString, UIImage>()
-    private var loading: [String: Task<Answer, Never>] = [:]
+    /// Each fetch under way, and how many views wait for it.
+    private var loading: [String: (task: Task<Answer, Never>, waiters: Int)] = [:]
     private var failed: [String: (at: Date, words: String?)] = [:]
     private var running = 0
     private var waiting: [CheckedContinuation<Void, Never>] = []
@@ -193,11 +214,14 @@ final class ArtistPictureCache {
         if let held = failed[key], Date().timeIntervalSince(held.at) < CoverCache.againAfter { return .none(held.words) }
         let task: Task<Answer, Never>
         if let asking = loading[key] {
-            task = asking
+            task = asking.task
+            loading[key] = (asking.task, asking.waiters + 1)
         } else {
             task = Task<Answer, Never> { @MainActor in
                 await self.turn()
                 defer { self.done() }
+                // every view that wanted it gone while it waited its turn: never sent
+                guard !Task.isCancelled else { return .none(nil) }
                 do {
                     guard let data = try await fetch(), let raw = UIImage(data: data) else { return .none(nil) }
                     let side: CGFloat = 900
@@ -208,10 +232,16 @@ final class ArtistPictureCache {
                     return .none(words(error))
                 }
             }
-            loading[key] = task
+            loading[key] = (task, 1)
         }
-        let answer = await task.value
-        loading[key] = nil
+        let answer = await withTaskCancellationHandler {
+            await task.value
+        } onCancel: {
+            Task { @MainActor in self.leave(key, task) }
+        }
+        if loading[key]?.task == task { loading[key] = nil }
+        // cancelled: nothing learned of the picture, so nothing kept - asked afresh when it is drawn again
+        if task.isCancelled { return .none(nil) }
         switch answer {
         case .image(let image):
             let cost = image.cgImage.map { $0.bytesPerRow * $0.height } ?? 1
@@ -221,6 +251,17 @@ final class ArtistPictureCache {
             failed[key] = (Date(), said)
         }
         return answer
+    }
+
+    /// A view waiting for `task` went away: the fetch cancelled once none is left.
+    private func leave(_ key: String, _ task: Task<Answer, Never>) {
+        guard let asking = loading[key], asking.task == task else { return }
+        if asking.waiters > 1 {
+            loading[key] = (task, asking.waiters - 1)
+        } else {
+            loading[key] = nil
+            task.cancel()
+        }
     }
 
     private func turn() async {
@@ -295,12 +336,11 @@ struct RelayedArtistPicture: View {
 }
 
 /// A picture in the artist's folder (`/library/artist/art`), fitted in its slot's box - the empty box while it comes and
-/// when there is none. Hidden from VoiceOver: what is around it says what it is.
+/// when there is none - asked again whenever the folder's pictures are written (ArtistFolderVersions), a picture replaced
+/// under the same name included. Hidden from VoiceOver: what is around it says what it is.
 struct ArtistFolderPicture: View {
     let path: String
     let kind: String
-    /// The page's saves: a picture replaced under the same name is asked again.
-    let version: Int
     let square: Bool
     /// Round, for the page's hero.
     var round = false
@@ -309,6 +349,7 @@ struct ArtistFolderPicture: View {
     @State private var image: UIImage?
 
     var body: some View {
+        let version = server.client.map { ArtistFolderVersions.shared.version($0, path: path) } ?? 0
         let key = server.client.map {
             ArtistPictureCache.folderKey($0, path: path, kind: kind, version: version)
         } ?? ""

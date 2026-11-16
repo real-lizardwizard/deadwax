@@ -284,21 +284,25 @@ public enum Routes {
     /// harmless); a CD art picture a read of one file. Delete's (slice 4): the summary walks the
     /// folder (every file under it, the scan's ignored ones too) and, with logins on, reads who holds it from SQLite -
     /// a folder's read, given a preview's 60; the delete removes the folder, then writes the saved scan and the store's
-    /// rows - no network, no wait - so it is given a tag apply's 120. The artist tools' (slice 5): one name's summary
-    /// reads the saved scan (a walk of the library where there is none), so it is given the scan's 120; a picture in
-    /// their folder a read of one file; Artist images' preview the scan, who they are (a MusicBrainz search when neither
-    /// the page nor the files say, then their lookup - each with MusicBrainz's ten attempts), TheAudioDB's, fanart.tv's
-    /// and Wikidata's answers in turn (10 s to connect and 15 to answer each) and one more such request for each Commons
-    /// picture's width, so it is given 240 - one past it writes nothing, and is said with Look again; its apply the same
-    /// lookup and sources again and then each picture chosen fetched in turn (10 s and 30 s a request, through Commons'
-    /// two redirects), so it is given 600 at least and as long as the pictures in hand need (ArtistWaits); a candidate's
-    /// picture through deadwax's relay answers within its 7 s deadline (PICTURE_DEADLINE_SECONDS), under the transport's
-    /// own 8 s, so it has no entry; the search one MusicBrainz search, an artist's facts' 60; Move albums' preview the
-    /// scan, who they are and every file of the name's albums read, so 240; its apply the lookup, every file read and
-    /// the album artist tag written, then each folder moved and the saved scan and the store index's rows written - no
-    /// bound of its own - so it is given 480 at least, and a minute more for each 1.2 GB of the name's albums
-    /// (ArtistWaits) - tests/test_ios_artist_manage.py holds each.
-    public static let timeouts: [Endpoint: Double] = [albumIndex: 30, autoEqSearch: 20, autoEqProfile: 20, libraryOwned: 30, fullySearch: 20, releaseGroup: 60, searchArtists: 20, searchSongs: 20, artistFacts: 60, discography: 60, jobs: 20, cancelJob: 30, retryJob: 60, retryJobSame: 30, clearJobs: 30, storeState: 20, findCandidates: 300, enqueue: 300, joinJob: 60, libraryAdd: 60, libraryTracks: 30, libraryAlbums: 120, releases: 60, release: 60, retagPreview: 60, retagApply: 480, artFetch: 120, libraryArt: 30, queueIgnore: 20, queueUnignore: 20, tagsPreview: 60, tagsApply: 120, trackPicture: 30, lyricsFetch: 600, discArtFetch: 360, libraryDiscArt: 30, deletionSummary: 60, deleteAlbum: 120, libraryArtist: 120, artistArt: 30, artistImagesPreview: 240, artistImagesApply: 600, artistSearch: 60, refilePreview: 240, refileApply: 480]
+    /// rows - no network, no wait - so it is given a tag apply's 120. The artist tools' (slice 5, its waits worked
+    /// out again after review, 16 Nov): one MusicBrainz request at its worst is ten attempts, each waiting out the
+    /// rate limiter's 5 s window and then turned away and paused at its longest - a 429's 6 s, a failed connection's
+    /// 6.5 and 7 at the last two - 111.5 s (ArtistWaits.musicBrainz). One name's
+    /// summary reads the saved scan (a walk of the library where there is none), so it is given the scan's 120; a
+    /// picture in their folder a read of one file; Artist images' preview the scan, who they are (a MusicBrainz search
+    /// when neither the page nor the files say, then their lookup - two requests at their worst), TheAudioDB's,
+    /// fanart.tv's and Wikidata's answers in turn (10 s to connect and 15 to answer each) and one more such request for
+    /// each Commons picture's width - with five, 660 at least, and as long as the last look's Commons pictures need
+    /// (ArtistWaits); one past it writes nothing, and is said with Look again; its apply the same lookup and sources
+    /// again and then each picture chosen fetched in turn (10 s and 30 s a request, through Commons' two redirects), so
+    /// it is given 600 at least and as long as the pictures in hand need; a candidate's picture through deadwax's relay
+    /// answers within its 7 s deadline (PICTURE_DEADLINE_SECONDS), under the transport's own 8 s, so it has no entry;
+    /// the search one MusicBrainz search, and an artist's facts one lookup, each given 120, past its 111.5; Move albums'
+    /// preview the scan, who they are (a search and a lookup at their worst) and every file of the name's albums read,
+    /// so 480; its apply the same and the album artist tag written, then each folder moved and the saved scan and the
+    /// store index's rows written - no bound of its own - so it is given 600 at least, and a minute more for each 1.2 GB
+    /// of the name's albums (ArtistWaits) - tests/test_ios_artist_manage.py holds each.
+    public static let timeouts: [Endpoint: Double] = [albumIndex: 30, autoEqSearch: 20, autoEqProfile: 20, libraryOwned: 30, fullySearch: 20, releaseGroup: 60, searchArtists: 20, searchSongs: 20, artistFacts: 120, discography: 60, jobs: 20, cancelJob: 30, retryJob: 60, retryJobSame: 30, clearJobs: 30, storeState: 20, findCandidates: 300, enqueue: 300, joinJob: 60, libraryAdd: 60, libraryTracks: 30, libraryAlbums: 120, releases: 60, release: 60, retagPreview: 60, retagApply: 480, artFetch: 120, libraryArt: 30, queueIgnore: 20, queueUnignore: 20, tagsPreview: 60, tagsApply: 120, trackPicture: 30, lyricsFetch: 600, discArtFetch: 360, libraryDiscArt: 30, deletionSummary: 60, deleteAlbum: 120, libraryArtist: 120, artistArt: 30, artistImagesPreview: 660, artistImagesApply: 600, artistSearch: 120, refilePreview: 480, refileApply: 600]
 }
 
 /// The Cover Art Archive's thumbnail sizes the app asks deadwax's relay for (`Routes.archiveCover`'s `size`, which takes

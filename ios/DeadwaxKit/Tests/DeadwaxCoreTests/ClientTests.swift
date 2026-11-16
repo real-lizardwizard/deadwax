@@ -417,12 +417,15 @@ func sentJSON(_ request: HTTPRequest?) throws -> [String: SentValue] {
         // (slice 4: Delete) what deleting it takes, 60 s, the folder walked; the delete, 120 s, the folder removed and
         // the saved scan and the store written
         // (slice 5: the artist tools) a name's summary, 120 s, the scan's; a picture in their folder, 30 s; Artist
-        // images' preview, 240 s, who they are and three sources and Commons' widths; its Save, 600 s at least; the
-        // search, 60 s, MusicBrainz's; Move albums' preview, 240 s, every file read; its apply, 480 s at least - and
-        // the relay's pictures the transport's own 8 s, over its 7 s deadline
+        // images' preview, 660 s at least, the scan, a search and a lookup (111.5 s each at worst: ten attempts, each
+        // the rate limiter's turn and its longest pause), three sources and five Commons widths; its Save, 600 s at
+        // least; the search and an artist's facts, 120 s, one MusicBrainz request at worst; Move albums' preview, 480 s,
+        // the scan,
+        // who they are and every file read; its apply, 600 s at least - and the relay's pictures the transport's own
+        // 8 s, over its 7 s deadline
         let longer: [Endpoint: Double] = [Routes.albumIndex: 30, Routes.autoEqSearch: 20, Routes.autoEqProfile: 20,
                                           Routes.libraryOwned: 30, Routes.fullySearch: 20, Routes.releaseGroup: 60,
-                                          Routes.searchArtists: 20, Routes.searchSongs: 20, Routes.artistFacts: 60,
+                                          Routes.searchArtists: 20, Routes.searchSongs: 20, Routes.artistFacts: 120,
                                           Routes.discography: 60, Routes.jobs: 20, Routes.cancelJob: 30,
                                           Routes.retryJob: 60, Routes.retryJobSame: 30, Routes.clearJobs: 30,
                                           Routes.storeState: 20, Routes.findCandidates: 300, Routes.enqueue: 300,
@@ -434,8 +437,8 @@ func sentJSON(_ request: HTTPRequest?) throws -> [String: SentValue] {
                                           Routes.lyricsFetch: 600, Routes.discArtFetch: 360, Routes.libraryDiscArt: 30,
                                           Routes.deletionSummary: 60, Routes.deleteAlbum: 120,
                                           Routes.libraryArtist: 120, Routes.artistArt: 30,
-                                          Routes.artistImagesPreview: 240, Routes.artistImagesApply: 600,
-                                          Routes.artistSearch: 60, Routes.refilePreview: 240, Routes.refileApply: 480]
+                                          Routes.artistImagesPreview: 660, Routes.artistImagesApply: 600,
+                                          Routes.artistSearch: 120, Routes.refilePreview: 480, Routes.refileApply: 600]
         #expect(Routes.timeouts == longer)
         for endpoint in Routes.all {
             // each path parameter filled in: a brace left in a path is no URL

@@ -115,6 +115,35 @@ public enum ArtistManage {
         }
     }
 
+    /// Which of the artist page's ••• items are offered (the phone's menu; the web draws each as a button).
+    public struct Offered: Sendable, Equatable {
+        public let images: Bool
+        public let who: Bool
+        public let move: Bool
+
+        public init(images: Bool, who: Bool, move: Bool) {
+            self.images = images
+            self.who = who
+            self.move = move
+        }
+
+        public var any: Bool { images || who || move }
+    }
+
+    /// What the person may do on an artist page now - each by its own permission, and nothing while deadwax is out of
+    /// reach or the artist is gone: Artist images… once the library files their albums under a name (`names`); Which
+    /// artist is this? once the artist's answer is in and the library has had its say (`indexKnown`), while nothing
+    /// says who they are on MusicBrainz (`mbid` nil) or it was chosen on this visit (`byChoice`); Move albums to
+    /// {name}… while their name now is known and a name the library files them under isn't it (`moveNames`).
+    public static func offered(may: Managing.ArtistManaging, online: Bool, gone: Bool, names: [String], answered: Bool,
+                               indexKnown: Bool, mbid: String?, byChoice: Bool, current: String?,
+                               moveNames: [String]) -> Offered {
+        guard online, !gone else { return Offered(images: false, who: false, move: false) }
+        return Offered(images: may.images && !names.isEmpty,
+                       who: may.whichArtist && answered && indexKnown && (mbid == nil || byChoice),
+                       move: may.move && current != nil && !moveNames.isEmpty)
+    }
+
     /// `charAt(0).toUpperCase() + slice(1)`: the first UTF-16 unit's character uppercased (a lone surrogate has none).
     static func capital(_ text: String) -> String {
         guard let first = text.unicodeScalars.first, first.value <= 0xFFFF else { return text }
@@ -186,6 +215,20 @@ public enum ArtistManage {
     /// this slot's background (ImagesBody's `others`).
     public static func others(_ candidates: [ArtistImageCandidate], kind: String) -> [ArtistImageCandidate] {
         candidates.filter { !WebText.same($0.kind, kind) }
+    }
+
+    /// A slot's "Use another picture (N)" (ImagesBody's button, `others.length > 0 &&`): N the pictures of every other
+    /// kind - nil when there are none, and no such button.
+    public static func anotherPicture(_ candidates: [ArtistImageCandidate], kind: String) -> String? {
+        let count = others(candidates, kind: kind).count
+        return count > 0 ? ArtistManageWords.useAnother(count) : nil
+    }
+
+    /// Who "Showing …" names (ImagesBody's `who`): the name MusicBrainz gave the pictures' artist, else the page's own
+    /// name - never the name a pick or a search was made under.
+    public static func showingWho(factsName: String?, pageName: String) -> String {
+        guard let factsName, !factsName.isEmpty else { return pageName }
+        return factsName
     }
 
     /// Move albums' second line under its title (ArtistPanel's `subtitle`): the names whose albums move and where -

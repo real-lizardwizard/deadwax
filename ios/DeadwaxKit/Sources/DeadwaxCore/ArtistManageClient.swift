@@ -26,8 +26,12 @@ extension DeadwaxClient {
         return response.status == 200 ? response.body : nil
     }
 
-    public func artistImagesPreview(_ body: ArtistImagesBody) async throws -> ArtistImagesPreview {
-        try await call(Routes.artistImagesPreview, sending: body)
+    /// Artist images' look - given as long as its sources need (ArtistWaits.imagesPreview): `commons`, the Commons
+    /// pictures the last look found (nil before one).
+    public func artistImagesPreview(_ body: ArtistImagesBody, commons: Int? = nil) async throws -> ArtistImagesPreview {
+        var built = request(Routes.artistImagesPreview, json: try Self.json(body))
+        built.timeout = ArtistWaits.imagesPreview(commons: commons)
+        return try decode(ArtistImagesPreview.self, try await answer(built))
     }
 
     /// Save: the pictures chosen fetched and written - given as long as the pictures in hand need (ArtistWaits).

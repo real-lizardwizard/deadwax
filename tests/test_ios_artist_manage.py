@@ -14,6 +14,7 @@ ArtistManage.swift, ArtistManageFlow.swift, ArtistManageClient.swift, Routes.swi
 - and that its writes, sent with no Origin or Referer, are what the same-origin guard lets through.
 """
 
+import inspect
 import re
 import sys
 from contextlib import asynccontextmanager
@@ -68,9 +69,9 @@ def timeouts() -> dict[str, float]:
 def waits(name: str) -> float:
     """One of ArtistWaits' own figures, read from its source."""
     text = (CORE / "ArtistManageFlow.swift").read_text(encoding="utf-8")
-    found = re.search(rf"public static let {name}(?:: Double)? = ([\d_* ]+)\n", text)
+    found = re.search(rf"public static let {name}(?:: Double)? = ([\d_*. ]+)\n", text)
     assert found, f"ArtistWaits has no {name}"
-    return float(eval(found.group(1).replace("_", "")))  # noqa: S307 - a literal of digits and *
+    return float(eval(found.group(1).replace("_", "")))  # noqa: S307 - a literal of digits, points and *
 
 
 def album(root: Path, folder: str, name: str, albumartist: str, titles=("One", "Two")) -> Path:
@@ -288,10 +289,41 @@ def test_a_move_refused_is_a_4xx_with_deadwaxs_words(env, monkeypatch):
 
 # ---------------------------------------------------------------------------- how long it waits
 
+def musicbrainz_worst() -> float:
+    """One MusicBrainz request at its worst, from MusicBrainzClient._ask's own source: RETRIES attempts, each waiting out
+    the rate limiter's window for its turn, then turned away and paused at its longest - a 429's sleep, a 503's, or a
+    failed connection's (more each attempt, and after the last one too). Each pause read from the source, and each held
+    to the app's figure of it."""
+    source = inspect.getsource(MusicBrainzClient._ask)
+    numeric = r"await asyncio\.sleep\((\d+(?:\.\d+)?)\)"
+    limited = float(re.search(numeric, source[source.index("if status == 429:"):source.index("if status == 404:")])
+                    .group(1))
+    overloaded = float(re.search(numeric, source[source.index("if status == 503:"):source.index("if status == 403:")])
+                       .group(1))
+    network = re.search(r"else (\d+(?:\.\d+)?) \+ \(attempt \* (\d+(?:\.\d+)?)\)", source)
+    first, step = float(network.group(1)), float(network.group(2))
+    #? the failed connection's pause comes after the last attempt as well (no `if attempt < attempts` around it)
+    assert re.search(r"\n {16}await asyncio\.sleep\(delay\)\n", source)
+    assert (waits("musicBrainzAttempts"), waits("rateWindow")) == (MusicBrainzClient.RETRIES, RateLimit.time_window)
+    assert (waits("rateLimitedPause"), waits("overloadedPause")) == (limited, overloaded) == (6, 3)
+    assert (waits("networkPause"), waits("networkPauseStep")) == (first, step)
+    pauses = sum(max(limited, overloaded, first + step * attempt)
+                 for attempt in range(1, MusicBrainzClient.RETRIES + 1))
+    return MusicBrainzClient.RETRIES * RateLimit.time_window + pauses
+
+
 def test_each_wait_is_past_the_servers_own_worst_case():
     given = timeouts()
-    # one MusicBrainz lookup: its ten tries a busy 3 s apart, and the rate limit's window
-    assert given["artistFacts"] > MusicBrainzClient.RETRIES * 3.0 + RateLimit.time_window
+    lookup = musicbrainz_worst()
+    assert lookup == 111.5
+    flow = (CORE / "ArtistManageFlow.swift").read_text(encoding="utf-8")
+    assert "public static var musicBrainz: Double { musicBrainzAttempts * rateWindow + musicBrainzPauses }" in flow
+    assert "max(rateLimitedPause, overloadedPause, networkPause + networkPauseStep * Double(attempt))" in flow
+    margin = float(re.search(r"public static let margin: Double = (\d+)\n",
+                             (CORE / "EditWaits.swift").read_text(encoding="utf-8")).group(1))
+    assert "public static var margin: Double { EditWaits.margin }" in flow
+    # one MusicBrainz request: an artist's facts (get_artist), the search (search_artists)
+    assert given["artistFacts"] >= lookup and given["artistSearch"] >= lookup
     # the sources and the pictures: httpx's connection and read, each request
     assert waits("sourceRequest") == images_endpoint.JSON_TIMEOUT.connect + images_endpoint.JSON_TIMEOUT.read
     assert waits("pictureRequest") == images_endpoint.IMAGE_TIMEOUT.connect + images_endpoint.IMAGE_TIMEOUT.read
@@ -300,24 +332,46 @@ def test_each_wait_is_past_the_servers_own_worst_case():
     # the sources asked in turn: TheAudioDB, fanart.tv, Wikidata
     candidates = (Path(images_endpoint.__file__)).read_text(encoding="utf-8")
     assert waits("sources") >= 3 and "theaudiodb" in candidates and "fanarttv" in candidates
-    # the floors: the scan's as the library's own, an apply's never less than its preview's
+    # the scan's floor as the library's own
     assert given["libraryArtist"] >= given["libraryAlbums"]
-    assert given["artistImagesApply"] >= given["artistImagesPreview"] >= given["artistFacts"] + 3 * waits("sourceRequest")
-    assert given["refileApply"] >= given["refilePreview"] >= given["libraryArtist"] + given["artistFacts"]
-    assert given["artistSearch"] >= given["artistFacts"]
+    # Artist images' look, every term: the scan, a search and a lookup, the sources in turn and a width asked of
+    # Commons for each Commons picture (five at least), and the margin - its route's floor past it
+    look = (given["libraryArtist"] + 2 * lookup
+            + (waits("sources") + waits("assumedCommons")) * waits("sourceRequest") + margin)
+    assert given["artistImagesPreview"] >= look, (given["artistImagesPreview"], look)
+    assert "EditWaits.wait(scan + 2 * musicBrainz + sourceRequest * (sources + widths) + margin, floor: floor)" in flow
+    assert "let widths = Double(max(assumedCommons, commons ?? 0))" in flow
+    assert "public static var scan: Double { Routes.timeouts[Routes.libraryArtist] ?? 120 }" in flow
+    # ...asked by the route as counted: the scan, who they are (a search only when nothing says), their lookup
+    resolve = inspect.getsource(route._resolve_artist_mbid)
+    assert resolve.count("await client.search_artists(") == 1
+    handler = inspect.getsource(route.artist_images_preview)
+    assert handler.count(".get_artist(") == 1 and "await artist_images_client.candidates(found)" in handler
+    # Save: the scan, the lookup (the id sent), the sources and widths, each picture through its redirects
+    apply = swift_function("ArtistManageFlow.swift", "imagesApply")
+    assert "EditWaits.wait(scan + musicBrainz + candidates + fetches + margin, floor: floor)" in apply
+    assert given["artistImagesApply"] >= (given["libraryArtist"] + lookup + waits("sources") * waits("sourceRequest")
+                                          + waits("pictureRequest") * waits("pictureHops") + margin)
+    # Move albums: its preview the scan, a search and a lookup at their worst and the margin, with time left to read
+    # the name's files; its apply at least as long, and longer for the name's albums' size
+    assert given["refilePreview"] >= given["libraryArtist"] + 2 * lookup + margin
+    assert given["refileApply"] >= given["refilePreview"]
+    refile = swift_function("ArtistManageFlow.swift", "refileApply")
+    assert "EditWaits.wait(floor + rewrite, floor: floor)" in refile
     # the relay: no wait of the route's own - the transport's 8 s, past its 7 s deadline - and its cap, read as is
     assert "artistPicture" not in given
     assert images_endpoint.PICTURE_DEADLINE_SECONDS < 8
     assert waits("pictureMostBytes") == images_endpoint.PICTURE_MAX_BYTES
-    # Save's and Move's waits are worked out for what is in hand, never less than the route's
-    apply = swift_function("ArtistManageFlow.swift", "imagesApply")
-    assert "EditWaits.wait(scan + musicBrainz + candidates + fetches + margin, floor: floor)" in apply
-    refile = swift_function("ArtistManageFlow.swift", "refileApply")
-    assert "EditWaits.wait(floor + rewrite, floor: floor)" in refile
     client = (CORE / "ArtistManageClient.swift").read_text(encoding="utf-8")
+    assert "built.timeout = ArtistWaits.imagesPreview(commons: commons)" in client
     assert "built.timeout = ArtistWaits.imagesApply(pictures: body.choices.count, commons: commons)" in client
     assert "built.timeout = ArtistWaits.refileApply(bytes: bytes)" in client
     assert "built.mostBytes = ArtistWaits.pictureMostBytes" in client
+    # the look given as long as the last look's Commons pictures need; Move each name's size, read as it starts
+    models = (APP / "Artist" / "ArtistToolModels.swift").read_text(encoding="utf-8")
+    assert "let commons = flow.preview.map { ArtistWaits.commons($0.candidates) }" in models
+    assert "for name in ArtistRefileFlow.unsized(names, in: sizes) {" in models
+    assert "bytes: sizes[named.name] ?? 0)" in models
 
 
 # ---------------------------------------------------------------------------- who may, and the app
@@ -358,3 +412,31 @@ def test_the_writes_are_held_and_said_as_maybe_finished():
     view = (APP / "Artist" / "ArtistView.swift").read_text(encoding="utf-8")
     assert "Managing.artistManaging(server.access.permissions)" in view
     assert "guard navigation.session == session else { return }" in view
+
+
+def test_the_sheets_draw_the_webs_own_rules():
+    """After review (16 Nov): what the sheets draw is Core's, each held by the web's vectors - the button's count, who
+    "Showing" names, the subtitle's name, the menu - and each write is kept from a sign-out and drawn again everywhere."""
+    artist = APP / "Artist"
+    images = (artist / "ArtistImagesSheet.swift").read_text(encoding="utf-8")
+    assert "ArtistManage.anotherPicture(preview.candidates, kind: slot.kind)" in images
+    assert "ArtistManage.showingWho(factsName: preview.facts?.name, pageName: model.pageName)" in images
+    assert "lastAsked.name" not in images, "Showing names the page's name, never a pick's"
+    assert "id: \\.self" not in images.replace("ForEach(flow.matches, id: \\.mbid)", "")
+    move = (artist / "ArtistMoveSheet.swift").read_text(encoding="utf-8")
+    assert "ArtistManage.refileSubtitle(moveNames: shown.names, current: shown.current, name: name)" in move
+    assert "id: \\.self" not in move
+    view = (artist / "ArtistView.swift").read_text(encoding="utf-8")
+    assert "ArtistManage.offered(may: managing.may," in view
+    models = (artist / "ArtistToolModels.swift").read_text(encoding="utf-8")
+    # no name of a Move is sent once the person has changed
+    assert re.search(r"for named in names \{\n\s*// [^\n]*\n\s*guard samePerson else \{\n\s*stopped = \(\.refused, "
+                     r"ArtistManageWords\.moveStopped\)", models)
+    # a 404 for a name is nothing left under it - the check after a Move that never answered counts it as moved
+    assert "catch let failure as APIFailure where failure.status == 404" in models
+    assert "flow.previewed(ticket, plans, gone: gone)" in models
+    # every write draws the folder's pictures again, wherever they are drawn
+    assert models.count("ArtistFolderVersions.shared.wrote(client, path:") == 3
+    cache = (artist / "ArtistToolsModel.swift").read_text(encoding="utf-8")
+    assert "ArtistFolderVersions.shared.version($0, path: path)" in cache
+    assert "withTaskCancellationHandler" in cache and "task.cancel()" in cache
