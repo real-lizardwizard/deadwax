@@ -19,15 +19,22 @@ import Foundation
 /// isn't refused by them either.
 ///
 /// THE LONG WAIT. An apply can hold its answer for minutes, and deadwax carries on when the phone goes; so an apply
-/// whose answer never came (`unanswered`) is said as maybe finished, and the folder is read again before anything is
-/// offered - never the same Apply on the old preview.
+/// whose answer never came (`unanswered`) - or came as a 5xx, deadwax failing after it may have written, or a proxy
+/// giving up on the wait - is said as maybe finished, and the folder is read again before anything is offered - never
+/// the same Apply on the old preview. The cover alone is the same (`beginCover`, `coverEnded`). A read of the folder
+/// that fails ends the wait for it (`couldNotRead`): said, with Look again, and nothing offered until one lands.
+///
+/// BACK IN REACH. Everything is asked again (section 2): the folder read, a search that failed or never finished
+/// searched again (`searchesOnReturn`), the tagged pressing's tracklist loaded if it never came (Retag.currentToLoad).
 public struct RetagFlow: Sendable, Equatable {
     public enum Outcome: Sendable, Equatable {
-        /// deadwax answered the apply (with what it did, or with files it couldn't write).
+        /// deadwax answered the write (with what it did, or with files it couldn't write).
         case applied
-        /// deadwax refused it, in words - nothing was written.
+        /// deadwax refused it with a 4xx - nothing was written.
         case refused
-        /// No answer came: the phone went, the connection dropped, it took too long. deadwax may have finished.
+        /// No answer that says nothing was written: none came (the phone went, the connection dropped, it took too
+        /// long), or a 5xx - deadwax failing after the files were written and the folder moved, or a reverse proxy
+        /// answering 502 or 504 while the scan wait runs on. deadwax may have finished.
         case unanswered
     }
 
@@ -45,14 +52,23 @@ public struct RetagFlow: Sendable, Equatable {
     // MARK: what's under way
 
     public private(set) var searching = false
+    /// A search has finished, answered or failed (a cancelled one doesn't count).
+    public private(set) var searched = false
+    /// The newest search to finish failed - asked again when deadwax is back.
+    public private(set) var searchFailed = false
     /// A pressing's tracklist is on its way: no preview, no Apply.
     public private(set) var loadingRelease = false
     public private(set) var applying = false
+    /// The cover alone is being saved: no preview, no Apply, no second save.
+    public private(set) var savingCover = false
     /// deadwax is in reach (Reachability).
     public private(set) var online = true
-    /// The folder must be read again before Apply comes back: deadwax came back into reach, or an apply ended.
+    /// The folder must be read again before Apply comes back: deadwax came back into reach, or a write ended.
     public private(set) var needsRead = false
-    /// The last apply never answered: deadwax may have finished it - said until the folder is read again.
+    /// The read `needsRead` waits for failed: nothing is planning (the wait has ended, said with Look again), and
+    /// nothing is offered until a read lands.
+    public private(set) var readFailed = false
+    /// The last write never answered: deadwax may have finished it - said until the folder is read again.
     public private(set) var mayHaveFinished = false
 
     public init(online: Bool = true) {
@@ -70,9 +86,23 @@ public struct RetagFlow: Sendable, Equatable {
     /// Whether the search `ticket` may still draw.
     public func isNewest(search ticket: Int) -> Bool { ticket == searches }
 
-    /// The search `ticket` is over (answered or failed) - only the newest's end stops the spinner.
-    public mutating func searchEnded(_ ticket: Int) {
+    /// The search `ticket` is over (answered, or `failed`) - only the newest's end stops the spinner and counts.
+    public mutating func searchEnded(_ ticket: Int, failed: Bool = false) {
+        guard ticket == searches else { return }
+        searching = false
+        searched = true
+        searchFailed = failed
+    }
+
+    /// The search `ticket` was cancelled: neither an answer nor a failure - the spinner stops, nothing else changes.
+    public mutating func searchCancelled(_ ticket: Int) {
         if ticket == searches { searching = false }
+    }
+
+    /// Back in reach: whether to search again - the last search failed, or none ever finished on a page that searches
+    /// as it opens (`atOnce`: Retag.searchesAtOnce). Never over one on its way.
+    public func searchesOnReturn(atOnce: Bool) -> Bool {
+        !searching && (searchFailed || (!searched && atOnce))
     }
 
     // MARK: a pressing's tracklist
@@ -101,10 +131,10 @@ public struct RetagFlow: Sendable, Equatable {
     }
 
     /// The debounce's end: whether the preview of `edit` should go now - still the newest, nothing loading, in reach,
-    /// and the folder read since the last gap or apply (a preview of the folder as it was would describe a path the
-    /// apply may have moved).
+    /// no write under way, and the folder read since the last gap or write (a preview of the folder as it was would
+    /// describe a path the apply may have moved).
     public func due(_ edit: Int) -> Bool {
-        edit == edits && !loadingRelease && online && !needsRead
+        edit == edits && !loadingRelease && online && !needsRead && !applying && !savingCover
     }
 
     /// The preview of `edit` answered: true when it may draw (still the newest edit).
@@ -124,9 +154,9 @@ public struct RetagFlow: Sendable, Equatable {
     }
 
     /// A preview is due or on its way for what the page shows now (`planningLabel` says which step) - the old preview
-    /// isn't drawn meanwhile.
+    /// isn't drawn meanwhile. Never while a write runs (no preview goes then) or once the read it waits for has failed.
     public var planning: Bool {
-        online && (loadingRelease || (planFor != edits && failedFor != edits))
+        online && !applying && !readFailed && (loadingRelease || (planFor != edits && failedFor != edits))
     }
 
     /// The preview in hand describes what Apply would send now.
@@ -135,10 +165,10 @@ public struct RetagFlow: Sendable, Equatable {
     // MARK: Apply
 
     /// MetadataEditor's `disabled={!plan || plan.empty || planning || applying || loadingRelease}`, with section 2's
-    /// rules: in reach, and the folder read since the last gap or apply.
+    /// rules: in reach, no cover being saved, and the folder read since the last gap or write.
     public func canApply(_ plan: RetagPlan?) -> Bool {
         guard let plan, !plan.empty else { return false }
-        return current && !planning && !applying && !loadingRelease && online && !needsRead
+        return current && !planning && !applying && !savingCover && !loadingRelease && online && !needsRead
     }
 
     /// Apply pressed: false when it isn't on.
@@ -153,6 +183,40 @@ public struct RetagFlow: Sendable, Equatable {
     /// changed it (or some of it), and an unanswered one may have. Only a refusal - nothing written - keeps it.
     public mutating func applyEnded(_ outcome: Outcome) {
         applying = false
+        wrote(outcome)
+    }
+
+    /// How a write's failure is taken (Apply's, the cover's): a 4xx - deadwax refusing before it wrote anything - is
+    /// `refused`; anything else is `unanswered`, the write may have gone ahead on the server: nothing answering, or not
+    /// in time, and every 5xx - `_retag_apply` answers 500 for an exception raised after the files are written and the
+    /// folder moved, and a reverse proxy answers 502 or 504 while the scan wait runs on.
+    public static func outcome(of error: any Error) -> Outcome {
+        if case .answered(let answer)? = error as? APIFailure, (400..<500).contains(answer.status) { return .refused }
+        return .unanswered
+    }
+
+    // MARK: the cover alone
+
+    /// Replace cover only / Save cover only may be pressed: in reach, no write under way, the folder read since the last
+    /// gap or write.
+    public var canSaveCover: Bool { online && !applying && !savingCover && !needsRead }
+
+    /// The cover alone pressed: false when it isn't on.
+    public mutating func beginCover() -> Bool {
+        guard canSaveCover else { return false }
+        savingCover = true
+        mayHaveFinished = false
+        return true
+    }
+
+    /// The cover alone is over: as an apply's end - written or maybe written, the folder read again (its cover is
+    /// part of what the preview describes); refused, nothing changed.
+    public mutating func coverEnded(_ outcome: Outcome) {
+        savingCover = false
+        wrote(outcome)
+    }
+
+    private mutating func wrote(_ outcome: Outcome) {
         switch outcome {
         case .refused:
             return
@@ -162,15 +226,9 @@ public struct RetagFlow: Sendable, Equatable {
             needsRead = true
             mayHaveFinished = true
         }
+        readFailed = false
         planFor = nil
         changed()
-    }
-
-    /// How an apply's failure is taken: deadwax answering with a refusal is `refused`; nothing answering - or not in
-    /// time - is `unanswered` (the apply may have gone ahead on the server).
-    public static func outcome(of error: any Error) -> Outcome {
-        if case .answered? = error as? APIFailure { return .refused }
-        return .unanswered
     }
 
     // MARK: in and out of reach
@@ -186,14 +244,23 @@ public struct RetagFlow: Sendable, Equatable {
         guard !online else { return }
         online = true
         needsRead = true
+        readFailed = false
         changed()
     }
 
     /// The folder was read again: Apply may come back once the preview of what it now holds is in.
     public mutating func read() {
         needsRead = false
+        readFailed = false
         mayHaveFinished = false
         changed()
+    }
+
+    /// The read the folder needed failed: the wait for it ends - said, with Look again - and nothing is offered until a
+    /// read lands. Nothing, when no read was needed.
+    public mutating func couldNotRead() {
+        guard needsRead else { return }
+        readFailed = true
     }
 
     /// Where the album is after an apply that never answered (or after one that answered without saying where): the
@@ -529,5 +596,17 @@ public enum EditWords {
             }
         }
         return ErrorWords.notice("", error, admin: admin, failed: failed)
+    }
+
+    /// What a write's failure says beside RetagFlow's outcome: a refusal (a 4xx) as `said`; one that may have gone ahead
+    /// (`unanswered`: no answer, or a 5xx) says deadwax's own words when it sent some - an exception's, or the Cover Art
+    /// Archive out of reach - and nothing more: the line over the page says it may have finished, and the folder is
+    /// read again.
+    public static func writeFailure(_ error: any Error, failed: String, admin: Bool) -> String? {
+        if RetagFlow.outcome(of: error) == .refused { return said(error, failed: failed, admin: admin) }
+        guard case .answered(let answer)? = error as? APIFailure, !ErrorWords.trim(answer.detail ?? "").isEmpty else {
+            return nil
+        }
+        return said(error, failed: failed, admin: admin)
     }
 }

@@ -151,6 +151,88 @@ def test_the_album_page_asks_again_after_a_write_and_follows_a_move():
     assert "followed(" in block(navigation, navigation.index("{", navigation.index("func open(")))
 
 
+def test_nothing_after_a_write_reaches_the_next_persons_pages():
+    # (review, 16 Nov) an apply in flight at a sign-out carries on on the server, but its read, its page refreshes and
+    # its follow stop there: the model keeps the session the sheet opened in (AppNavigation's, moved on by reset)
+    routes = code(ROUTES)
+    navigation = declared(routes, "class", "AppNavigation")
+    assert "private(set) var session = 0" in navigation
+    assert "session += 1" in block(navigation, navigation.index("{", navigation.index("func reset(")))
+    assert "made.attach(navigation)" in code(SHEET)
+    model = code(MODEL)
+    assert "session = navigation.session" in block(model, model.index("{", model.index("func attach(")))
+    for name in ("func apply()", "func saveCoverOnly()", "private func wrote(", "private func lookForMove(",
+                 "private func moved("):
+        assert "samePerson" in block(model, model.index("{", model.index(name))), name
+    apply = block(model, model.index("{", model.index("func apply()")))
+    assert apply.index("guard samePerson else { return }") < apply.index("await lookUp()")
+    follow = block(model, model.index("{", model.index("private func lookForMove(")))
+    assert follow.count("self.samePerson") == 2, "before each look, and before its answer moves anything"
+
+
+def test_a_read_never_drops_the_album_mid_write():
+    # (review, 16 Nov) settle lets neither the album nor its Release go while an apply or the cover alone runs - Close
+    # would come back on and the write's end would land on a dropped model - and no folder is picked meanwhile
+    model = code(MODEL)
+    assert "var writing: Bool { applying || retag?.flow.savingCover == true }" in model
+    settle = block(model, model.index("{", model.index("private func settle()")))
+    assert settle.lstrip().startswith("guard !writing, let answer = scan.answer else { return }")
+    assert "guard !writing," in block(model, model.index("{", model.index("func choose(")))
+    sheet = code(SHEET)
+    assert ".disabled(model.writing)" in block(sheet, sheet.index("{", sheet.index("private func folderMenu(")))
+    assert sheet.count(".disabled(!model.online || model.marking || model.writing)") == 2
+    # a write's end reads the folder only when it wrote, or a gap asked for it
+    for name in ("func apply()", "func saveCoverOnly()"):
+        body = block(model, model.index("{", model.index(name)))
+        assert body.index("guard retag.flow.needsRead else { return }") < body.index("await lookUp()"), name
+        assert "if outcome != .refused { wrote(before: before) }" in body, name
+
+
+def test_a_failed_read_is_said_with_look_again():
+    # (review, 16 Nov) a read after a write or a gap that fails ends the wait (RetagFlow.couldNotRead) and is said in
+    # the phone's words with Look again - on the root (no longer hidden while an album is held) and on Release
+    model = code(MODEL)
+    look = block(model, model.index("{", model.index("func lookUp()")))
+    assert "case .failed:" in look and "retag?.couldNotRead()" in look
+    sheet = code(SHEET)
+    root = declared(sheet, "struct", "EditAlbumRoot")
+    sections = block(root, root.index("{", root.index("private func albumSections(")))
+    assert "if model.scan.failure != nil {" in sections and "ReadAgainFailed(model: model)" in sections
+    failed = declared(sheet, "struct", "ReadAgainFailed")
+    assert "ErrorNote(text: failure)" in failed and "Button(EditWords.lookAgain)" in failed
+    assert "await model.lookUp()" in failed
+    release = code(RELEASE)
+    assert "if retag.flow.readFailed {" in release and "ReadAgainFailed(model: model)" in release
+    # the cover alone: off while the folder is to be read again or a write runs
+    assert ".disabled(incoming == nil || !retag.flow.canSaveCover)" in release
+
+
+def test_a_cancellation_is_neither_failure_nor_answer():
+    # (review, 16 Nov) the search, the preview (wentAway cancels one in flight) and the scan's read each leave what was
+    # there when cancelled
+    retag = code(RETAG)
+    search = block(retag, retag.index("{", retag.index("func search()")))
+    assert "guard !APIFailure.isCancellation(error) else {" in search and "flow.searchCancelled(ticket)" in search
+    assert search.index("isCancellation") < search.index("candidates = []")
+    preview = block(retag, retag.index("{", retag.index("private func schedulePreview()")))
+    assert "guard !APIFailure.isCancellation(error) else { return }" in preview
+    assert preview.index("isCancellation") < preview.index("self.flow.failed(edit)")
+    scan = code(SCAN)
+    read = block(scan, scan.index("{", scan.index("func read(")))
+    assert "guard !APIFailure.isCancellation(error) else { return .dropped }" in read
+    assert read.index("isCancellation") < read.index("failure = EditWords.said(")
+
+
+def test_back_in_reach_the_search_and_the_pressing_are_asked_again():
+    # (review, 16 Nov) section 2: everything asked again - Core's rules (RetagFlow.searchesOnReturn,
+    # Retag.currentToLoad) held by RetagModelTests
+    retag = code(RETAG)
+    back = block(retag, retag.index("{", retag.index("func cameBack()")))
+    assert "flow.searchesOnReturn(atOnce: Retag.searchesAtOnce(album))" in back
+    assert "Retag.currentToLoad(candidates, album: album, selectedId: selectedId," in back
+    assert "await load(current, seed: false)" in back
+
+
 def test_each_part_of_the_root_is_its_permissions():
     # the web's issues and marks are on its Release tab (Edit albums'), the marks Look after the library's too - so with
     # Look after the library alone the editor has Delete album… only, with Edit albums alone no marks (checks 338, 342)

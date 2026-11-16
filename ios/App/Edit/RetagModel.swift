@@ -25,8 +25,6 @@ final class RetagModel {
     var typed = ""
     /// The pressings found, best first.
     private(set) var candidates: [RetagCandidate] = []
-    /// A search has finished at least once.
-    private(set) var searched = false
     private(set) var searchError: String?
     /// The pressing chosen - its tracklist in hand once `selected` is it.
     private(set) var selectedId: String?
@@ -41,8 +39,7 @@ final class RetagModel {
     private(set) var applied: String?
     private(set) var applyError: String?
     private(set) var appliedProblems: [String] = []
-    /// The cover alone being saved, and what came of it.
-    private(set) var savingCover = false
+    /// What came of the cover alone (RetagFlow says while it is being saved).
     private(set) var coverResult: String?
     private(set) var flow: RetagFlow
 
@@ -67,6 +64,10 @@ final class RetagModel {
     /// The preview, only while it describes what Apply would send now.
     var currentPlan: RetagPlan? { flow.current ? plan : nil }
     var canApply: Bool { flow.canApply(plan) }
+    /// A search has finished at least once (a cancelled one doesn't count).
+    var searched: Bool { flow.searched }
+    /// The cover alone is being saved.
+    var savingCover: Bool { flow.savingCover }
     /// Typed work Close would throw away: a field changed from the folder's, the cover's toggle moved, a pressing picked.
     var unsaved: Bool { fields != RetagFields(album) || fetchArt != album.art.isEmpty || pickedByHand }
     /// The pressing whose cover Compare covers shows and the cover alone saves.
@@ -119,12 +120,10 @@ final class RetagModel {
     func search() async {
         guard let client else { return }
         let ticket = flow.beginSearch()
+        let said = searchError
         searchError = nil
-        defer {
-            if flow.isNewest(search: ticket) { searched = true }
-            flow.searchEnded(ticket)
-        }
         do {
+            // (a newer search owns the spinner and the list: an older one just stops)
             var groups = try await client.editorSearch(Retag.firstQuery(typed: typed, fields: fields)).releaseGroups
             guard flow.isNewest(search: ticket) else { return }
             if groups.isEmpty, let loose = Retag.looseQuery(typed: typed, fields: fields) {
@@ -138,11 +137,19 @@ final class RetagModel {
                 found += RetagCandidate.found(answer.releases, in: group)
             }
             candidates = Retag.rankReleases(found, album: album)
+            flow.searchEnded(ticket)
             if let current = candidates.first(where: { Retag.isCurrent($0.release, album.releaseMbid) }) {
                 Task { await load(current, seed: false) }
             }
         } catch {
             guard flow.isNewest(search: ticket) else { return }
+            // a cancellation is neither a failure nor an answer: the list and what was said stay as they were
+            guard !APIFailure.isCancellation(error) else {
+                flow.searchCancelled(ticket)
+                searchError = said
+                return
+            }
+            flow.searchEnded(ticket, failed: true)
             searchError = RetagWords.searchError(error, admin: admin)
             candidates = []
         }
@@ -207,6 +214,9 @@ final class RetagModel {
                     self.previewError = nil
                 }
             } catch {
+                // cancelled (an edit since, deadwax gone out of reach): neither a failure nor an answer - the next
+                // preview is scheduled by what cancelled it
+                guard !APIFailure.isCancellation(error) else { return }
                 if self.flow.failed(edit) {
                     self.plan = nil
                     self.previewError = EditWords.said(error, failed: RetagWords.previewFailed, admin: self.admin)
@@ -241,10 +251,10 @@ final class RetagModel {
                 pickedByHand = false
             }
         case .failure(let error):
+            // a 4xx refused (said); no answer or a 5xx may have gone ahead - said over the page, deadwax's own words
+            // here when it sent some, and the folder read again
             outcome = RetagFlow.outcome(of: error)
-            if outcome == .refused {
-                applyError = EditWords.said(error, failed: RetagWords.applyFailed, admin: admin)
-            }
+            applyError = EditWords.writeFailure(error, failed: RetagWords.applyFailed, admin: admin)
         }
         flow.applyEnded(outcome)
         if outcome == .refused { schedulePreview() }
@@ -254,20 +264,25 @@ final class RetagModel {
     // MARK: the cover alone
 
     /// Replace cover only / Save cover only (MetadataEditor's `saveArtOnly`): the pressing's cover written into the
-    /// folder, nothing else changed. True when it was written.
-    func saveCoverOnly(path: String) async -> Bool {
-        guard let client, flow.online, !savingCover else { return false }
-        savingCover = true
+    /// folder, nothing else changed - off while a write runs or the folder is to be read again (RetagFlow.canSaveCover).
+    /// What came of it, as an apply's: written, refused (said), or maybe written - no answer, or a 5xx - the folder
+    /// read again. Nil when it couldn't start.
+    func saveCoverOnly(path: String) async -> RetagFlow.Outcome? {
+        guard let client, flow.beginCover() else { return nil }
         coverResult = nil
-        defer { savingCover = false }
+        let outcome: RetagFlow.Outcome
         do {
             let saved = try await client.fetchCover(CoverFetchBody(albumPath: path, replace: true, releaseMbid: coverRelease))
             coverResult = RetagWords.coverSaved(saved)
-            return true
+            outcome = .applied
         } catch {
-            coverResult = EditWords.said(error, failed: RetagWords.coverFailed, admin: admin)
-            return false
+            outcome = RetagFlow.outcome(of: error)
+            coverResult = EditWords.writeFailure(error, failed: RetagWords.coverFailed, admin: admin)
+                ?? EditWords.mayHaveFinished
         }
+        flow.coverEnded(outcome)
+        if outcome == .refused { schedulePreview() }
+        return outcome
     }
 
     // MARK: the folder read again, and reach
@@ -291,8 +306,21 @@ final class RetagModel {
         previewTask?.cancel()
     }
 
-    /// Back in reach: nothing is offered until the folder is read again (EditAlbumModel reads it and calls albumRead).
+    /// Back in reach (section 2: everything asked again): nothing is offered until the folder is read again
+    /// (EditAlbumModel reads it and calls albumRead); a search that failed or never finished searched again
+    /// (RetagFlow.searchesOnReturn) - else the tagged pressing's tracklist loaded if it never came (Retag.currentToLoad).
     func cameBack() {
         flow.cameBack()
+        if flow.searchesOnReturn(atOnce: Retag.searchesAtOnce(album)) {
+            Task { await search() }
+        } else if let current = Retag.currentToLoad(candidates, album: album, selectedId: selectedId,
+                                                    loading: flow.loadingRelease) {
+            Task { await load(current, seed: false) }
+        }
+    }
+
+    /// The folder couldn't be read again: the wait for it ends, said with Look again (RetagFlow.couldNotRead).
+    func couldNotRead() {
+        flow.couldNotRead()
     }
 }

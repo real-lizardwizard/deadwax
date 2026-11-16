@@ -65,6 +65,15 @@ public enum Retag {
         !JSText.trim(album.artist).isEmpty || !JSText.trim(album.album).isEmpty
     }
 
+    /// Back in reach (phase8-managing.md 2: everything asked again): the pressing the folder is tagged with, when the
+    /// search found it and its tracklist never came - nothing chosen and nothing on its way - to be loaded as the search
+    /// loads it, its fields left alone. Nil otherwise.
+    public static func currentToLoad(_ candidates: [RetagCandidate], album: ScanAlbum, selectedId: String?,
+                                     loading: Bool) -> RetagCandidate? {
+        guard selectedId == nil, !loading else { return nil }
+        return candidates.first { isCurrent($0.release, album.releaseMbid) }
+    }
+
     // MARK: the scores
 
     /// `releaseTrackCount`: every disc's `track-count`, summed.
@@ -780,9 +789,12 @@ public struct RetagResponse: Sendable, Equatable, Decodable {
         results = try fields.decode(RetagResults.self, forKey: .results)
     }
 
-    /// Where the album lives after it: the plan's target when the folder moved, else where it was.
-    public func pathAfter(_ before: String, preview: RetagPlan?) -> String {
-        guard results.movedTo != nil, let target = preview?.targetPath ?? plan.targetPath, !target.isEmpty else { return before }
+    /// Where the album lives after it, as the apply itself said: its own plan's target when it moved the folder (the
+    /// plan it worked out again, not the preview's - the folder may have changed between them), else where it was. Nil
+    /// when it moved the folder without saying where to: the phone then looks where the scan lists it.
+    public func pathAfter(_ before: String) -> String? {
+        guard results.movedTo != nil else { return before }
+        guard let target = plan.targetPath, !target.isEmpty else { return nil }
         return target
     }
 }

@@ -230,12 +230,14 @@ public enum Routes {
     /// sheet's hold, and the route still with no bound of its own (nothing there to wait longer than). Edit album's
     /// (Phase 8, slice 1): the library's scan reads every folder whose mtime moved, and a first scan of a large library
     /// takes minutes, with no bound on the server; a group's pressings and one pressing's tracklist are MusicBrainz's
-    /// pages with its ten attempts; a preview reads every file of the folder; an apply pauses before the rename up to
-    /// RENAME_WAIT_RANGE's 300 s on the timer (90 s waiting on Navidrome) after the cover's fetch (45 s to read), so it
-    /// is given 420; the cover alone that fetch twice (the full size's 1200 px fallback) and a write, so 120; the
+    /// pages with its ten attempts; a preview reads every file of the folder; an apply's worst case is 420 s - the
+    /// cover fetched twice (the full size's 1200 px fallback, 55 s each), Navidrome's two baseline calls (5 s each)
+    /// and then RENAME_WAIT_RANGE's 300 s on the timer when they can't be read (the wait on Navidrome's scan, 90 s and
+    /// one last poll, is shorter) - with the plan, the writes and the move on top, so it is given 480; the cover alone
+    /// that fetch twice and a write, so 120; the
     /// folder's cover a read of a file, or of the audio's pictures; the marks a row of SQLite -
     /// tests/test_ios_edit_contract.py holds each.
-    public static let timeouts: [Endpoint: Double] = [albumIndex: 30, autoEqSearch: 20, autoEqProfile: 20, libraryOwned: 30, fullySearch: 20, releaseGroup: 60, searchArtists: 20, searchSongs: 20, artistFacts: 60, discography: 60, jobs: 20, cancelJob: 30, retryJob: 60, retryJobSame: 30, clearJobs: 30, storeState: 20, findCandidates: 300, enqueue: 300, joinJob: 60, libraryAdd: 60, libraryTracks: 30, libraryAlbums: 120, releases: 60, release: 60, retagPreview: 60, retagApply: 420, artFetch: 120, libraryArt: 30, queueIgnore: 20, queueUnignore: 20]
+    public static let timeouts: [Endpoint: Double] = [albumIndex: 30, autoEqSearch: 20, autoEqProfile: 20, libraryOwned: 30, fullySearch: 20, releaseGroup: 60, searchArtists: 20, searchSongs: 20, artistFacts: 60, discography: 60, jobs: 20, cancelJob: 30, retryJob: 60, retryJobSame: 30, clearJobs: 30, storeState: 20, findCandidates: 300, enqueue: 300, joinJob: 60, libraryAdd: 60, libraryTracks: 30, libraryAlbums: 120, releases: 60, release: 60, retagPreview: 60, retagApply: 480, artFetch: 120, libraryArt: 30, queueIgnore: 20, queueUnignore: 20]
 }
 
 /// The Cover Art Archive's thumbnail sizes the app asks deadwax's relay for (`Routes.archiveCover`'s `size`, which takes

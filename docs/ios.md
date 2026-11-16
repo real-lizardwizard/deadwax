@@ -577,16 +577,20 @@ the fields by hand." - and the fields still apply.
 **Compare covers** shows the folder's cover ("Current", or "No cover on disk") beside the release's ("From this
 release", through deadwax). Tap either for it full screen. **Replace cover only** (or **Save cover only**, when the
 folder has none) saves the release's cover into the folder and changes nothing else: "Saved cover.jpg, replacing
-cover.png." It's off until the release's cover has shown, so you never save one you haven't seen.
+cover.png." It's off until the release's cover has shown, so you never save one you haven't seen - and while an Apply
+runs, or the folder is still being read again after one. If its answer never comes, it's said as an Apply's is (below).
 
 **Typed work isn't lost by a swipe.** With something typed or chosen and not applied, the sheet can't be swiped away,
 and Close asks "Discard changes?" - **Discard**, or **Keep editing**.
 
 **An Apply that waits can take minutes** - up to five on the timer in deadwax's settings, or until Navidrome has
-scanned - and the phone waits up to seven. Locked, it keeps waiting only as long as iOS lets an app run in the
+scanned - and the phone waits up to eight. Locked, it keeps waiting only as long as iOS lets an app run in the
 background (often under a minute); deadwax carries on either way. If the answer never comes (the phone locked too
-long, WireGuard dropped), the sheet says "deadwax may have finished this - looking again", reads the folder again and
-works What Apply does out afresh: never the same Apply again on the old answer.
+long, WireGuard dropped) - or comes as a server error, from deadwax or from a reverse proxy in front of it giving up on
+the wait - the sheet says "deadwax may have finished this - looking again", reads the folder again and works What Apply
+does out afresh: never the same Apply again on the old answer. Only a refusal (deadwax saying no before it wrote
+anything) keeps What Apply does as it was. If the library can't be read then, the sheet says "Couldn't read the
+library." with **Look again**, and nothing can be applied until it has been read.
 
 **When Navidrome gives the album a new id** - an applied release can - the album page under the sheet becomes the
 album's page as Navidrome has it now, on every tab it was open in, and VoiceOver says "The album page now shows the
@@ -596,7 +600,8 @@ album as Navidrome has it after the change."
 nothing, opening by itself once deadwax is back. If deadwax goes out of reach with it open, every page keeps what it
 showed under an amber line - "deadwax is out of reach - this is how it was, and nothing here can change until it's
 back." - and Apply, the cover and the marks are off; what you typed is kept. Once deadwax is back, the folder and What
-Apply does are asked again before Apply comes back on. Nothing of it is kept on the phone.
+Apply does are asked again before Apply comes back on, and a search that didn't work (or the release's tracklist that
+never came) is asked for again. Nothing of it is kept on the phone.
 
 **Errors** that deadwax put into words are shown as it said them, as the web app's editor shows them ("The Cover Art
 Archive has no front cover for that release."); anything else in the app's own words, what failed added in brackets
@@ -4169,8 +4174,9 @@ same album's Edit in the web app.
   keeps what you typed; Discard closes it. During an Apply, Close is dimmed.
 - **328 Out of reach mid-edit.** With the editor open on Release, turn Wi-Fi and WireGuard off: the amber line at the
   top, Apply dimmed, the fields as you typed them. Turn them back on: "Working out the changes…" again before Apply
-  comes back. Open Edit album with deadwax out of reach: "Managing needs deadwax. This opens once it's back." - and it
-  opens by itself when deadwax is back.
+  comes back. Turn them off again the moment Edit album has opened, before Choose a release has its list (it says the
+  search didn't work); turn them back on: the list comes without a pull. Open Edit album with deadwax out of reach:
+  "Managing needs deadwax. This opens once it's back." - and it opens by itself when deadwax is back.
 - **329 The largest text, and VoiceOver** across the sheet, Release, Choose a release, Changes and Choose the folder:
   every word whole, wrapped rather than cut off; each folder and pressing read as one line (a pressing with Current
   and its track count), the header as a heading, the Folder menu its choice, and the Discard question's two buttons.

@@ -35,7 +35,7 @@ from src.api.app import start  # noqa: E402
 from src.api.coverart_endpoint import CoverArtClient  # noqa: E402
 from src.config import RENAME_WAIT_RANGE, Config  # noqa: E402
 from src.routes import library as library_route  # noqa: E402
-from src.scan_wait import SCAN_WAIT_CAP_SECONDS  # noqa: E402
+from src.scan_wait import SCAN_CALL_TIMEOUT_SECONDS, SCAN_POLL_SECONDS, SCAN_WAIT_CAP_SECONDS  # noqa: E402
 from src.store import JobStore  # noqa: E402
 from tests.test_ios_contract import CORE, coding_keys, returned_keys, swift_function, swift_struct  # noqa: E402
 from tests.test_retag import RELEASE, seed  # noqa: E402
@@ -220,17 +220,37 @@ def _cover_fetch_seconds() -> float:
     return connect + read
 
 
-def test_the_apply_is_waited_for_past_its_longest_pause_and_a_cover():
-    # an apply that moves the folder and changes an id pauses before the rename - RETAG_RENAME_WAIT (up to 300 s) or
-    # until Navidrome has scanned (up to SCAN_WAIT_CAP_SECONDS) - and may fetch the cover first; the phone holds its
-    # answer longer than both, and one that never comes is said as "may have finished" (RetagWords.mayHaveFinished)
+#: what the phone allows past an apply's waits, for the plan, the tag writes, the move and the bookkeeping after it
+APPLY_MARGIN_SECONDS = 60
+
+
+def test_the_apply_is_waited_for_past_its_worst_case():
+    # (review, 16 Nov) the apply's worst case, from the server's code: the cover fetched first (fetch_front ->
+    # fetch_front_why: the full size's 1200 px fallback after it, so two fetches), then - an apply that moves the folder
+    # and changes an id - the pause before the rename: Navidrome's wait (getScanStatus asked twice for the baseline,
+    # then polled until SCAN_WAIT_CAP_SECONDS, the last poll starting just before it) or, the baseline unreadable or no
+    # Navidrome, RETAG_RENAME_WAIT's fixed sleep (up to RENAME_WAIT_RANGE's 300 s) after those two calls. The phone
+    # holds its answer past that by APPLY_MARGIN_SECONDS; one that never comes is said as "may have finished"
+    # (RetagWords.mayHaveFinished)
     wait = timeouts()
     source = inspect.getsource(library_route._retag_apply)
     assert "coverart_client.fetch_front(" in source and "_pause_before_rename(" in source
-    longest_pause = max(RENAME_WAIT_RANGE[1], SCAN_WAIT_CAP_SECONDS)
-    assert wait["retagApply"] > longest_pause + _cover_fetch_seconds()
-    # the cover alone: one fetch, and the full size's 1200 px fallback after it
     assert "FULL_SIZE_FALLBACK" in inspect.getsource(CoverArtClient.fetch_front_why)
+    cover = 2 * _cover_fetch_seconds()
+    scan_wait = inspect.getsource(library_route._wait_for_navidrome_scan)
+    assert scan_wait.count("await _navidrome_scan_status()") == 3, "the baseline's two calls and the poll's one"
+    assert "loop.time() >= deadline" in scan_wait and "await asyncio.sleep(SCAN_POLL_SECONDS)" in scan_wait
+    assert 'asyncio.wait_for(navidrome.call("getScanStatus"), SCAN_CALL_TIMEOUT_SECONDS)' in inspect.getsource(
+        library_route._navidrome_scan_status)
+    baseline = 2 * SCAN_CALL_TIMEOUT_SECONDS
+    navidrome = baseline + SCAN_WAIT_CAP_SECONDS + SCAN_POLL_SECONDS + SCAN_CALL_TIMEOUT_SECONDS
+    assert "await asyncio.sleep(seconds)" in inspect.getsource(library_route._pause_before_rename)
+    timer = baseline + RENAME_WAIT_RANGE[1]
+    worst = cover + max(navidrome, timer)
+    # the number notes/ios.md and Routes.swift say: a change on the server that moves it is a change to look at
+    assert worst == 420
+    assert wait["retagApply"] >= worst + APPLY_MARGIN_SECONDS
+    # the cover alone: one fetch, and the full size's 1200 px fallback after it
     assert wait["artFetch"] > 2 * _cover_fetch_seconds()
     # the preview reads the folder's files, as the album info's tracks do
     assert wait["retagPreview"] >= wait["libraryTracks"]

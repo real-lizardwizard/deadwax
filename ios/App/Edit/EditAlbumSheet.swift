@@ -71,7 +71,7 @@ struct EditAlbumSheet: View {
             if model == nil {
                 let made = EditAlbumModel(request: request, client: server.client, admin: server.access.seesDetail,
                                           online: reachability.online)
-                made.navigation = navigation
+                made.attach(navigation)
                 model = made
             }
             await model?.open()
@@ -202,6 +202,12 @@ struct EditAlbumRoot: View {
                 MayHaveFinished(reading: model.scan.reading)
             }
         }
+        // the library couldn't be read again: what is drawn is the last read's, said, with Look again
+        if model.scan.failure != nil {
+            Section {
+                ReadAgainFailed(model: model)
+            }
+        }
         if let folders = model.folders, folders.paths.count > 1 {
             Section {
                 folderMenu(folders.paths, chosen: album.path)
@@ -302,7 +308,7 @@ struct EditAlbumRoot: View {
             }
         }
         .pickerStyle(.menu)
-        .disabled(model.applying)
+        .disabled(model.writing)
     }
 
     /// Needs a look (metadataQueue.ts): each issue the album still has, its label and hint, and what was marked fine -
@@ -339,7 +345,7 @@ struct EditAlbumRoot: View {
                             Text(RetagWords.fine)
                         }
                     }
-                    .disabled(!model.online || model.marking)
+                    .disabled(!model.online || model.marking || model.writing)
                 }
                 if !fine.isEmpty {
                     Text(RetagWords.markedFine(fine.map { MetadataQueue.label($0, types) }))
@@ -349,7 +355,7 @@ struct EditAlbumRoot: View {
                         Button(RetagWords.askAgain) {
                             Task { await model.askAgain() }
                         }
-                        .disabled(!model.online || model.marking)
+                        .disabled(!model.online || model.marking || model.writing)
                     }
                 }
                 if let failure = model.markFailure {
@@ -360,6 +366,23 @@ struct EditAlbumRoot: View {
                     .font(Typeface.footnote)
             }
         }
+    }
+}
+
+/// The library couldn't be read again while an album is held - after a write, a gap, a mark, Look again: deadwax's
+/// failure in the phone's words (LibraryScanModel's, EditWords.said), and Look again, which reads it again. Until one
+/// lands nothing is planned or applied (RetagFlow.couldNotRead), and the page drawn is the last read's.
+struct ReadAgainFailed: View {
+    let model: EditAlbumModel
+
+    var body: some View {
+        if let failure = model.scan.failure {
+            ErrorNote(text: failure)
+        }
+        Button(EditWords.lookAgain) {
+            Task { await model.lookUp() }
+        }
+        .disabled(!model.online || model.scan.reading)
     }
 }
 

@@ -32,8 +32,27 @@ import Testing
         #expect(flow.isNewest(search: second))
         flow.searchEnded(first)
         #expect(flow.searching, "an older search ending leaves the newer one's spinner")
+        #expect(!flow.searched, "an older search's end doesn't count")
         flow.searchEnded(second)
-        #expect(!flow.searching)
+        #expect(!flow.searching && flow.searched && !flow.searchFailed)
+    }
+
+    /// (review, 16 Nov) A cancellation is neither a failure nor an answer: the spinner stops and nothing else changes.
+    @Test func aCancelledSearchChangesNothing() {
+        var flow = RetagFlow()
+        let first = flow.beginSearch()
+        flow.searchCancelled(first)
+        #expect(!flow.searching && !flow.searched && !flow.searchFailed, "never searched: still never searched")
+        let failing = flow.beginSearch()
+        flow.searchEnded(failing, failed: true)
+        #expect(flow.searched && flow.searchFailed)
+        let cancelled = flow.beginSearch()
+        flow.searchCancelled(cancelled)
+        #expect(!flow.searching && flow.searchFailed, "the failure before it still stands")
+        let older = flow.beginSearch()
+        _ = flow.beginSearch()
+        flow.searchCancelled(older)
+        #expect(flow.searching, "an older search's cancellation leaves the newer one's spinner")
     }
 
     @Test func onlyTheNewestPickLands() {
@@ -134,6 +153,7 @@ import Testing
         let refused = APIFailure.answered(.init(status: 400, method: "POST", path: "/library/retag/apply",
                                                 detail: "the folder has moved"))
         #expect(RetagFlow.outcome(of: refused) == .refused)
+        #expect(RetagFlow.outcome(of: CancellationError()) == .unanswered, "a write cancelled may have gone ahead")
 
         flow.applyEnded(.unanswered)
         #expect(flow.mayHaveFinished && flow.needsRead)
@@ -147,22 +167,132 @@ import Testing
         #expect(EditWords.mayHaveFinished == "deadwax may have finished this - looking again")
     }
 
+    /// (review, 16 Nov) Only a 4xx is a refusal. `_retag_apply` answers 500 for an exception raised after the files are
+    /// written and the folder moved, and a reverse proxy answers 502 or 504 while the scan wait runs on: each may have
+    /// gone ahead, so each is said as maybe finished and the folder read again - deadwax's own words beside it when it
+    /// sent some.
+    @Test func onlyA4xxIsARefusalAndA5xxMayHaveWritten() {
+        func answered(_ status: Int, _ detail: String? = nil) -> APIFailure {
+            .answered(.init(status: status, method: "POST", path: "/library/retag/apply", detail: detail))
+        }
+        for status in [400, 403] {
+            #expect(RetagFlow.outcome(of: answered(status)) == .refused, "\(status)")
+        }
+        for status in [500, 502, 504] {
+            #expect(RetagFlow.outcome(of: answered(status)) == .unanswered, "\(status)")
+            var flow = Self.previewed()
+            #expect(Self.take(&flow) { $0.beginApply(Self.plan) })
+            flow.applyEnded(RetagFlow.outcome(of: answered(status)))
+            #expect(flow.mayHaveFinished && flow.needsRead, "\(status): the folder read again")
+            #expect(!flow.canApply(Self.plan), "\(status): never the same Apply on the old preview")
+        }
+        // the words beside it: a refusal's, as `said`; a 5xx's deadwax words when it sent some, else none - the line
+        // over the page says it may have finished
+        let failed = RetagWords.applyFailed
+        #expect(EditWords.writeFailure(answered(400, "the folder has moved"), failed: failed, admin: false)
+                == "The folder has moved.")
+        #expect(EditWords.writeFailure(answered(403), failed: failed, admin: false) == EditWords.noPermission)
+        #expect(EditWords.writeFailure(answered(500, "Error applying the retag: disk full"), failed: failed, admin: false)
+                == "Error applying the retag: disk full.")
+        #expect(EditWords.writeFailure(answered(502), failed: failed, admin: true) == nil)
+        #expect(EditWords.writeFailure(answered(504, "  "), failed: failed, admin: true) == nil)
+        #expect(EditWords.writeFailure(APIFailure.other("lost"), failed: failed, admin: true) == nil)
+    }
+
+    /// (review, 16 Nov) A read of the folder that fails after a write ends the wait for it - nothing planning, said with
+    /// Look again - and nothing is offered until one lands.
+    @Test func aFailedReadEndsTheWaitAndOffersNothing() {
+        var flow = Self.previewed()
+        #expect(Self.take(&flow) { $0.beginApply(Self.plan) })
+        flow.applyEnded(.applied)
+        #expect(flow.planning && !flow.readFailed, "waiting for the read")
+        flow.couldNotRead()
+        #expect(flow.readFailed && !flow.planning, "the spinner ends: the failure is said instead")
+        #expect(!flow.due(flow.edits) && !flow.canApply(Self.plan) && !flow.canSaveCover, "nothing until a read lands")
+        flow.read()
+        #expect(!flow.readFailed && flow.planning && flow.due(flow.edits))
+        #expect(Self.take(&flow) { $0.answered($0.edits) })
+        #expect(flow.canApply(Self.plan))
+        // a read failing with none needed (a mark's, Look again) changes nothing here
+        flow.couldNotRead()
+        #expect(!flow.readFailed && flow.canApply(Self.plan))
+        // a gap, then a failed read: the same - and coming back asks again
+        flow.wentAway()
+        flow.cameBack()
+        flow.couldNotRead()
+        #expect(flow.readFailed && !flow.planning)
+        flow.wentAway()
+        flow.cameBack()
+        #expect(!flow.readFailed && flow.needsRead, "back again: read again, waited for")
+    }
+
+    /// (review, 16 Nov) No preview goes while a write runs, and none is waited for: a read landing mid-apply leaves
+    /// the page as it was.
+    @Test func noPreviewGoesWhileAWriteRuns() {
+        var flow = Self.previewed()
+        #expect(Self.take(&flow) { $0.beginApply(Self.plan) })
+        let edit = flow.changed()
+        #expect(!flow.due(edit), "nothing previewed during an apply")
+        #expect(!flow.planning, "and no spinner for one")
+        #expect(!flow.canSaveCover, "nor the cover alone")
+        flow.applyEnded(.refused)
+        #expect(flow.due(flow.edits) && flow.planning, "refused: the preview of the newest edit goes")
+    }
+
+    /// (review, 16 Nov) The cover alone is a write as Apply is: off while the folder is to be read again or a write
+    /// runs; written, the folder read again; no answer or a 5xx, said as maybe finished and read again; refused,
+    /// nothing changed.
+    @Test func theCoverAloneIsAWriteAsApplyIs() {
+        var flow = Self.previewed()
+        #expect(flow.canSaveCover)
+        #expect(Self.take(&flow) { $0.beginCover() })
+        #expect(!Self.take(&flow) { $0.beginCover() }, "one at a time")
+        #expect(!flow.canApply(Self.plan), "no Apply while the cover is saved")
+        #expect(!flow.due(flow.changed()), "no preview either")
+        flow.coverEnded(.refused)
+        #expect(!flow.needsRead && flow.due(flow.edits))
+        #expect(Self.take(&flow) { $0.answered($0.edits) })
+        #expect(Self.take(&flow) { $0.beginCover() })
+        flow.coverEnded(.applied)
+        #expect(flow.needsRead && !flow.mayHaveFinished && !flow.canSaveCover, "the cover is part of the preview")
+        flow.read()
+        #expect(Self.take(&flow) { $0.answered($0.edits) })
+        #expect(Self.take(&flow) { $0.beginCover() })
+        flow.coverEnded(RetagFlow.outcome(of: APIFailure.answered(.init(status: 504, method: "POST",
+                                                                         path: "/library/art/fetch"))))
+        #expect(flow.needsRead && flow.mayHaveFinished, "a 504 may have written it")
+        #expect(!flow.canSaveCover && !flow.canApply(Self.plan))
+        // off while applying, and while out of reach
+        var other = Self.previewed()
+        #expect(Self.take(&other) { $0.beginApply(Self.plan) })
+        #expect(!Self.take(&other) { $0.beginCover() })
+        var away = Self.previewed()
+        away.wentAway()
+        #expect(!away.canSaveCover)
+    }
+
     @Test func theAlbumIsFoundWhereTheApplyLeftIt() {
         let scan = ScanAnswer(albums: [ScanAlbum(path: "A/B [Deluxe]"), ScanAlbum(path: "C/D")])
         #expect(RetagFlow.whereAfter(scan, was: "C/D", target: "C/D [Deluxe]") == "C/D", "not moved: where it was")
         #expect(RetagFlow.whereAfter(scan, was: "A/B", target: "A/B [Deluxe]") == "A/B [Deluxe]", "the rename went through")
         #expect(RetagFlow.whereAfter(scan, was: "A/B", target: nil) == "A/B")
         #expect(RetagFlow.whereAfter(scan, was: "A/B", target: "E/F") == "A/B", "listed nowhere: said as not listed yet")
+        // (review, 16 Nov) the apply's own plan, worked out again, is followed - never the preview's
         let response = RetagResponse(plan: RetagPlan(targetPath: "A/B [Deluxe]"), results: RetagResults(movedTo: "/music/A/B [Deluxe]"))
-        #expect(response.pathAfter("A/B", preview: nil) == "A/B [Deluxe]")
-        #expect(RetagResponse(plan: RetagPlan(targetPath: "X"), results: RetagResults()).pathAfter("A/B", preview: nil) == "A/B")
+        #expect(response.pathAfter("A/B") == "A/B [Deluxe]")
+        #expect(RetagResponse(plan: RetagPlan(targetPath: "X"), results: RetagResults()).pathAfter("A/B") == "A/B",
+                "not moved: where it was")
+        #expect(RetagResponse(plan: RetagPlan(), results: RetagResults(movedTo: "/music/A/B [Deluxe]")).pathAfter("A/B")
+                == nil, "moved without saying where: looked for where the scan lists it")
     }
 
     @Test func theLongWaitIsSaidOnTheButton() {
         #expect(RetagWords.applying(nil) == "Applying")
         #expect(RetagWords.applying(RetagPlan(renameWait: 90, renameBy: "navidrome")) == "Applying, waiting for Navidrome")
         #expect(RetagWords.applying(RetagPlan(renameWait: 30, renameBy: "timer")) == "Applying, renaming in 30s")
-        #expect(Routes.timeouts[Routes.retagApply] == 420, "past RENAME_WAIT_RANGE's 300 s and the cover's 45 s read")
+        // (review, 16 Nov) two cover fetches (110 s), Navidrome's two baseline calls (10 s) and RENAME_WAIT_RANGE's
+        // 300 s - 420 s - with the plan, the writes and the move on top
+        #expect(Routes.timeouts[Routes.retagApply] == 480)
     }
 
     // MARK: in and out of reach
@@ -181,6 +311,34 @@ import Testing
         let edits = flow.edits
         flow.cameBack()
         #expect(flow.edits == edits && !flow.needsRead)
+    }
+
+    /// (review, 16 Nov) Back in reach, everything is asked again (section 2): a search that failed - or never
+    /// finished, on a page that searches as it opens - searched again; else the tagged pressing's tracklist, when the
+    /// search found it and it never came.
+    @Test func backInReachTheSearchAndThePressingAreAskedAgain() {
+        var flow = RetagFlow()
+        #expect(flow.searchesOnReturn(atOnce: true), "never searched")
+        #expect(!flow.searchesOnReturn(atOnce: false), "an untagged folder searches only when asked")
+        let ticket = flow.beginSearch()
+        #expect(!flow.searchesOnReturn(atOnce: true), "never over one on its way")
+        flow.searchEnded(ticket, failed: true)
+        #expect(flow.searchesOnReturn(atOnce: false), "a failed search is asked again")
+        let again = flow.beginSearch()
+        flow.searchEnded(again)
+        #expect(!flow.searchesOnReturn(atOnce: true), "answered: kept")
+
+        let album = ScanAlbum(path: "A/B", artist: "Portishead", album: "Third", releaseMbid: "r-2")
+        func candidate(_ id: String) -> RetagCandidate {
+            RetagCandidate(release: PageRelease(id: id), groupMbid: "g", firstReleaseDate: nil)
+        }
+        let found = [candidate("r-1"), candidate("r-2")]
+        #expect(Retag.currentToLoad(found, album: album, selectedId: nil, loading: false)?.id == "r-2")
+        #expect(Retag.currentToLoad(found, album: album, selectedId: "r-1", loading: false) == nil, "one is chosen")
+        #expect(Retag.currentToLoad(found, album: album, selectedId: nil, loading: true) == nil, "one is on its way")
+        #expect(Retag.currentToLoad([candidate("r-1")], album: album, selectedId: nil, loading: false) == nil)
+        #expect(Retag.currentToLoad(found, album: ScanAlbum(path: "A/B"), selectedId: nil, loading: false) == nil,
+                "a folder tagged with no release")
     }
 
     // MARK: the routes as the phone asks them
@@ -255,7 +413,7 @@ import Testing
         #expect(applied.plan.files[0].changes.map(\.tag) == ["z", "a"])
         #expect(RetagWords.applied(applied.results) == "Updated the tags in 1 file, saved cover.jpg.")
         #expect(try sentJSON(transport.last) == sent, "Apply sends the preview's very body; the server works it out again")
-        #expect(transport.last?.timeout == 420)
+        #expect(transport.last?.timeout == 480)
     }
 
     @Test func theCoverAndTheMarksSendOnlyWhatTheServerDeclares() async throws {

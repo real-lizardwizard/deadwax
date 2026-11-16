@@ -26,6 +26,12 @@ struct ReleasePage: View {
                     MayHaveFinished(reading: model.scan.reading)
                 }
             }
+            // the folder couldn't be read again after a write or a gap: the wait ends here, said, with Look again
+            if retag.flow.readFailed {
+                Section {
+                    ReadAgainFailed(model: model)
+                }
+            }
             pressingSection
             fieldsSection
             coverSection
@@ -434,8 +440,9 @@ struct CompareCoversView: View {
                             Text(retag.savingCover ? EditWords.savingCover : RetagWords.coverOnly(hasArt: !album.art.isEmpty))
                         }
                     }
-                    // only once the pressing's cover has come: what it saves is what was looked at
-                    .disabled(incoming == nil || retag.savingCover || retag.flow.applying || !model.online)
+                    // only once the pressing's cover has come (what it saves is what was looked at), no write under
+                    // way, and the folder read since the last gap or write (RetagFlow.canSaveCover)
+                    .disabled(incoming == nil || !retag.flow.canSaveCover)
                     if let result = retag.coverResult {
                         Text(result)
                             .font(Typeface.footnote)

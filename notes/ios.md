@@ -11072,8 +11072,8 @@ the player engine has no diff.
 - **EditClient.swift**: the nine routes (`Routes.libraryAlbums`, `releases`, `release`, `retagPreview`, `retagApply`,
   `artFetch`, `libraryArt`, `queueIgnore`, `queueUnignore` - 70 in all now), and `fullySearch` asked by the editor's own
   `editorSearch` (no `quick`, as the web's editor; `Routes.editorSearchTimeout` 60 s). Timeouts: the scan 120 s, the
-  pressings 60, the preview 60, **the apply 420** (300 s of RETAG_RENAME_WAIT or 90 s of Navidrome's scan, plus a
-  cover's fetch), **the cover alone 120** (two fetches - the full size's 1200 px fallback - of 10 s to connect and 45 s
+  pressings 60, the preview 60, **the apply 480** (its worst case is 420 - see "After review (16 Nov)" below - with 60
+  s on top), **the cover alone 120** (two fetches - the full size's 1200 px fallback - of 10 s to connect and 45 s
   between chunks), the folder's cover 30, the marks 20. `ArchiveCoverSize.compare` 500.
 - **Managing.swift**: Manage's footer is said of the rows drawn (`footer(loginsOn:online:tools:)`): Edit an album alone
   says nothing, with others "Edit an album is the app's own; the others open in the web app, in Safari.", without it
@@ -11139,7 +11139,13 @@ preview plans and their apply results. ui/test/iosedit.sim.cjs runs it with `--c
   section to Look after the library; its checks 338 and 342 (Edit albums alone: no marks; Look after the library
   alone: Delete album… only) are what this does.
 - **The follow outlives the sheet**: closing it doesn't stop the looks for the album's new id (the web's panel lets go
-  as it closes) - the album page under it is the one that would otherwise be left on a gone id.
+  as it closes) - the album page under it is the one that would otherwise be left on a gone id. A sign-out does stop
+  it (after review, below).
+- **The album is followed to where the apply said it left it** (after review): the apply's own plan's `target_path`,
+  worked out again on the server, once `moved_to` says it moved - the preview's target only for an apply that never
+  answered (or moved it without saying where). The web takes the preview's alone (MetadataEditor.tsx's apply:
+  `results.moved_to && plan?.target_path ? plan.target_path : album.path`, `plan` the preview in state); the folder can
+  change between the two, and the apply's is what happened. The web is unchanged.
 - **A mark that fails is said in the phone's words** (`markFineFailed`, `askAgainFailed`, through EditWords.said); the
   web leaves its rejection unhandled.
 - **No preview while the folder must be read again**: after an apply, `RetagFlow.due` holds the debounce until the
@@ -11157,31 +11163,89 @@ preview plans and their apply results. ui/test/iosedit.sim.cjs runs it with `--c
 - **EditVectorTests** (16) over the fixture: the numbers and words, every folder case, Choose the folder's choices,
   every status, the follow, the parts and marks, the queries, both rankings, the payloads (and that they aren't a
   Get's), the real pressings ranked and built, the seeds, the preview's sentences.
-- **RetagModelTests** (16): the newest search, pick and preview draw; no preview while a tracklist loads or out of
-  reach; the web's debounce; Apply only for a current preview that changes something; a refusal keeps the preview; an
-  apply that never answered is said and read again; the album found where the apply left it; the long wait on the
-  button; back in reach everything asked again first; the scan asked without its tracks; the editor's search and one
-  body for preview and apply; the cover and the marks sending only declared keys; failures said as a managing page
-  says them; the root's rows' values.
+- **RetagModelTests** (22 since the review): the newest search, pick and preview draw; a cancelled search changes
+  nothing; no preview while a tracklist loads, out of reach or a write runs; the web's debounce; Apply only for a
+  current preview that changes something; a refusal keeps the preview; an apply that never answered - or answered a
+  5xx - is said and read again, a 4xx alone a refusal; a failed read ends the wait and offers nothing; the cover alone
+  a write as Apply is; the album found where the apply said it left it; the long wait on the button; back in reach
+  everything asked again first, the search and the tagged pressing with it; the scan asked without its tracks; the
+  editor's search and one body for preview and apply; the cover and the marks sending only declared keys; failures
+  said as a managing page says them; the root's rows' values.
 - **ClientTests**, **ManagingTests**: 70 routes and the new timeouts; Manage's footer by the rows drawn.
 - **tests/test_ios_edit_contract.py** (new, 10): every body within the model it's posted to; every vector's payload
   taken by the real preview over a real folder; the writes past the same-origin guard; the real scan (`tracks=false`,
   no tracks, its headers, a 304 on its ETag), preview, apply, cover and marks answering every field the phone reads;
   the apply's and the cover's timeouts above the server's bounds; the pressings' at least Phase 6's.
-- **tests/test_ios_edit.py** (new, 11): the menu item and its place, the one sheet, Manage's push, the sheet's guards,
-  the background task and the announcements, the album page's refresh and the move on every tab, each part of the root
-  by its permissions, menus for choices, no URL opened in ios/App/Edit but WebAppRow's, the scan never on disk, rows
-  read as one.
+- **tests/test_ios_edit.py** (new, 16 since the review): the menu item and its place, the one sheet, Manage's push, the
+  sheet's guards, the background task and the announcements, the album page's refresh and the move on every tab,
+  nothing after a write past a sign-out, no album dropped mid-write, a failed read said with Look again, cancellations
+  neither failure nor answer, the search and the pressing asked again on return, each part of the root by its
+  permissions, menus for choices, no URL opened in ios/App/Edit but WebAppRow's, the scan never on disk, rows read as
+  one.
 - test_ios_contract.py (70 routes, ReleaseGroup's `score`, the compare size), test_ios_settings.py and
   test_ios_pull_to_shuffle.py follow the native row and `editAlbum`; test_ios_palette.py's list of what reaches under
   the status bar takes the full cover's black ground.
 
+### After review (16 Nov)
+
+A review of the slice (the payload vectors, the URL encoding, the Codable keys, the double-Apply guard, the permission
+gates and the newest-answer tickets confirmed) found nine things, all fixed in one commit:
+
+1. **A 5xx from Apply was taken as a refusal.** `RetagFlow.outcome(of:)` took every answered failure as `.refused`, but
+   `_retag_apply` answers 500 for an exception raised after the files are written and the folder moved, and a reverse
+   proxy answers 502 or 504 while the scan wait runs on. Now only a 4xx is a refusal; any other answer goes the
+   unanswered way - said as maybe finished, the folder read again, the album followed. deadwax's own words, when a 5xx
+   carries some, are said under it (`EditWords.writeFailure`).
+2. **A failed read after an apply spun for ever** ("Working out the changes…" while `needsRead` stayed set, and the
+   sheet hid `scan.failure` with an album held). `LibraryScanModel.read` now says how it ended (`landed`, `failed`,
+   `dropped`); a failed one calls `RetagFlow.couldNotRead()`, which ends the wait (`readFailed`: `planning` false) and
+   keeps Apply and the cover off until a read lands. The root, whenever the scan's read has failed, and Release, while
+   `readFailed`, draw `ReadAgainFailed`: the failure in the phone's words and Look again.
+3. **Back in reach didn't search again.** `RetagModel.cameBack` now searches again when the last search failed or none
+   ever finished on a folder that searches as it opens (`RetagFlow.searchesOnReturn`, with `searched` and
+   `searchFailed` moved into the flow), else loads the tagged pressing's tracklist if the search found it and it never
+   came (`Retag.currentToLoad`).
+4. **A cancellation was shown as a failure** - the search's (the list wiped, searchError set), the preview's (wentAway
+   cancels one in flight: `flow.failed`) and the scan's read (`failure` set). Each now checks
+   `APIFailure.isCancellation` first and leaves what was there; a cancelled search stops its spinner only
+   (`searchCancelled`).
+5. **Close could come back on mid-apply.** `RetagFlow.due` is false while a write runs (and `planning` with it), and
+   `EditAlbumModel.settle` touches neither the album held nor its Release while one does (`writing`: an apply or the
+   cover alone) - the write's end reads the folder and decides; the Folder menu and the marks are off meanwhile. A
+   refusal reads the folder only when a gap during it asked for a read.
+6. **The follow used the preview's target.** `RetagResponse.pathAfter(_:)` takes the apply's own plan's target when it
+   moved the folder (nil when it moved it without saying where - then the preview's, if the scan lists it). A departure
+   from the web, which takes the preview's (above).
+7. **Save cover only had no guard** against a folder still to be read or a write under way, and took a timeout or a
+   5xx as a plain failure. It is now a write in the flow as Apply is (`beginCover`, `canSaveCover`, `coverEnded`):
+   off while the folder is to be read again or a write runs, Apply off while it runs, and a timeout or a 5xx said as
+   maybe finished ("deadwax may have finished this - looking again", announced) with the folder read again.
+8. **The apply's timeout.** Worked out from the server: the cover fetched twice (fetch_front_why's full-size 1200 px
+   fallback; 10 s to connect and 45 s between chunks each, 110 s), then Navidrome's two baseline getScanStatus calls
+   (5 s each) and either the wait on its scan (90 s, plus one last 0.5 s sleep and 5 s poll started just before the
+   deadline: 105.5 s with the baseline) or - the baseline unreadable, or no Navidrome - RETAG_RENAME_WAIT's fixed sleep,
+   up to RENAME_WAIT_RANGE's 300 s (310 s with the baseline). Worst case 420 s; the phone waits **480 s**, 60 s for the
+   plan, the tag writes, the move and the bookkeeping. test_ios_edit_contract.py works the 420 out of the server's
+   source and constants and holds the timeout at least 60 s past it. (A second apply of the same folder queued behind
+   another on the server's lock - from the web, say - can still outlast it: said as maybe finished, and read again.)
+9. **An apply's follow outlived sign-out**: an apply in flight at a sign-out carried on, and its follow could write
+   `albumMoved` into the next person's pages (AppNavigation.reset didn't stop it). AppNavigation has a `session`,
+   moved on by `reset()`; the model keeps the one the sheet opened in (`attach`), and nothing after a write - the read,
+   the page refreshes, each look of the follow, the move - runs once it has moved on.
+
 ### Verified, and not
 
-Verified on the Mac: `swift test` (1753 Core tests in 186 suites, 158 Audio in 17, 12 more, all passing); the unsigned
-generic-iOS Debug build, BUILD SUCCEEDED, its one warning appintentsmetadataprocessor's own (no AppIntents), none in a
-touched file; the full pytest suite, 4644 passed and 1 skipped; all 92 sims with Node 22 (21 of them the iPhone's,
-iosedit among them); `export-edit-vectors.cjs --check` (160 folder cases, 220 statuses, 140 payloads, 120 plans).
+After the review, on the Mac: `swift test` (1759 Core tests in 186 suites, 158 Audio in 17, 12 more, all passing);
+the unsigned generic-iOS Debug build, BUILD SUCCEEDED, its one warning appintentsmetadataprocessor's own, none in a
+touched file; the full pytest suite, 4649 passed and 1 skipped; all 92 sims with Node 22. Not verified: a real 5xx or a
+proxy's 504 mid-apply, a failed read and Look again on screen, a sign-out during a long apply, and the search asked
+again after a real gap.
+
+Before it (the slice's first commit): `swift test` (1753 Core tests in 186 suites, 158 Audio in 17, 12 more, all
+passing); the unsigned generic-iOS Debug build, BUILD SUCCEEDED, its one warning appintentsmetadataprocessor's own (no
+AppIntents), none in a touched file; the full pytest suite, 4644 passed and 1 skipped; all 92 sims with Node 22 (21 of
+them the iPhone's, iosedit among them); `export-edit-vectors.cjs --check` (160 folder cases, 220 statuses, 140
+payloads, 120 plans).
 
 Not verified - only the phone can tell (docs/ios.md checks 320-329): the sheet, its pages and the menus as iOS 27
 draws them; the keyboard on Release (the number pad, Done, a field scrolled above the keyboard); a long apply with the

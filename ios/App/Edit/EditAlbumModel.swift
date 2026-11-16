@@ -26,9 +26,11 @@ struct AlbumEditRequest: Identifiable, Equatable {
 /// every write is off; back, everything is asked again before a write comes back on. Nothing is kept on disk.
 ///
 /// An apply can hold its answer for minutes, and deadwax carries on when the phone goes: it is held with a background
-/// task for the seconds iOS gives, and one whose answer never came is said as maybe finished, the folder read again
-/// (RetagFlow.whereAfter: where the scan now lists it) - never the same Apply on the old preview. What comes after a
-/// write outlives the sheet (it ends within about 45 s): an album page left open beneath still follows the album.
+/// task for the seconds iOS gives, and one whose answer never came (or came as a 5xx) is said as maybe finished, the
+/// folder read again (RetagFlow.whereAfter: where the scan now lists it) - never the same Apply on the old preview. While
+/// a write runs, nothing a read brings drops the album held or its Release. What comes after a write outlives the sheet
+/// (it ends within about 45 s): an album page left open beneath still follows the album - but never past a sign-out, or
+/// into the next person's pages (`session`, AppNavigation's when the sheet opened).
 @MainActor
 @Observable
 final class EditAlbumModel {
@@ -54,7 +56,10 @@ final class EditAlbumModel {
 
     @ObservationIgnored var client: DeadwaxClient?
     @ObservationIgnored let admin: Bool
-    @ObservationIgnored weak var navigation: AppNavigation?
+    @ObservationIgnored private(set) weak var navigation: AppNavigation?
+    /// AppNavigation's session when the sheet opened: once it moves on (a sign-out, another person), nothing after a
+    /// write asks deadwax again or touches the pages.
+    @ObservationIgnored private var session: Int?
     @ObservationIgnored private var lookups = 0
     @ObservationIgnored private var follows = 0
     @ObservationIgnored private var settles = 0
@@ -69,6 +74,18 @@ final class EditAlbumModel {
         self.admin = admin
         self.online = online
         if case .folder = request.target { asked = true }
+    }
+
+    /// The app's navigation - and the person the sheet opened for, with it.
+    func attach(_ navigation: AppNavigation) {
+        self.navigation = navigation
+        session = navigation.session
+    }
+
+    /// Still the person the sheet opened for (AppNavigation.reset moves the session on).
+    private var samePerson: Bool {
+        guard let navigation, let session else { return false }
+        return navigation.session == session
     }
 
     // MARK: what the sheet reads
@@ -103,10 +120,13 @@ final class EditAlbumModel {
     }
 
     /// Typed work, or a write under way: the sheet isn't swiped away, and Close asks first.
-    var holdsWork: Bool { retag?.unsaved == true || retag?.flow.applying == true || marking }
+    var holdsWork: Bool { retag?.unsaved == true || writing || marking }
 
     /// An apply is under way.
     var applying: Bool { retag?.flow.applying == true }
+
+    /// An apply or the cover alone is under way: the album held and its Release stay, whatever a read brings.
+    var writing: Bool { applying || retag?.flow.savingCover == true }
 
     // MARK: opening, and looking again
 
@@ -122,16 +142,26 @@ final class EditAlbumModel {
     /// - or let go, its folder gone, to be found again from what the scan says.
     func lookUp() async {
         // only a read that landed moves anything: the scan in hand from before says nothing of what a write did
-        var landed = false
-        await withTaskGroup(of: Bool.self) { group in
+        var read = LibraryScanModel.Read.dropped
+        await withTaskGroup(of: LibraryScanModel.Read?.self) { group in
             group.addTask {
                 await self.askBridge()
-                return false
+                return nil
             }
             group.addTask { await self.scan.read(client: self.client, admin: self.admin) }
-            for await read in group where read { landed = true }
+            for await ended in group {
+                if let ended { read = ended }
+            }
         }
-        if landed { settle() }
+        switch read {
+        case .landed:
+            settle()
+        case .failed:
+            // the read a write or a gap waits for: the wait ends, said with Look again (the sheet draws scan.failure)
+            retag?.couldNotRead()
+        case .dropped:
+            break
+        }
     }
 
     private func askBridge() async {
@@ -157,9 +187,10 @@ final class EditAlbumModel {
     }
 
     /// After a read: the album held followed to the scan (or let go, its folder gone), else taken once its folder is
-    /// known and listed.
+    /// known and listed. Never while a write runs: its end reads the folder again and decides (the apply's answer, the
+    /// follow) - an album let go mid-apply would bring Close back, and the apply's end would land on a dropped model.
     private func settle() {
-        guard let answer = scan.answer else { return }
+        guard !writing, let answer = scan.answer else { return }
         if let held = album {
             let path: String
             if let after, after.known, answer.album(at: after.path) != nil {
@@ -198,7 +229,7 @@ final class EditAlbumModel {
     /// A folder picked - from the Folder menu (another of the album's folders) or from Choose the folder (any of the
     /// library's, the album's folder from now on).
     func choose(_ path: String, fromScan: Bool) {
-        guard let found = scan.answer?.album(at: path) else { return }
+        guard !writing, let found = scan.answer?.album(at: path) else { return }
         if fromScan { chosen = path }
         guard album?.path != path else { return }
         hold(found)
@@ -229,7 +260,8 @@ final class EditAlbumModel {
 
     /// Apply (MetadataEditor's `apply`, EditPanel's `releaseApplied`): the preview's very body sent, the server working
     /// the plan out again; held with a background task while iOS allows; then the folder read again and the album
-    /// followed - and, the release changed, its new id looked for.
+    /// followed - and, the release changed, its new id looked for. Signed out meanwhile, nothing more: the next person's
+    /// pages are none of this apply's business.
     func apply() async {
         guard let retag, let client, let before = album, let body = retag.beginApply() else { return }
         let preview = retag.plan
@@ -242,26 +274,40 @@ final class EditAlbumModel {
             result = .failure(error)
         }
         let outcome = retag.applyEnded(result)
+        guard samePerson else { return }
         switch (outcome, result) {
         case (.refused, _):
-            return
+            break
         case (.applied, .success(let response)):
-            after = (response.pathAfter(before.path, preview: preview), true)
+            // where the apply itself said it left the folder - its own plan's target, worked out again, not the
+            // preview's; one that moved it without saying where: the preview's, if the scan lists it
+            if let path = response.pathAfter(before.path) {
+                after = (path, true)
+            } else {
+                after = preview?.targetPath.map { ($0, false) }
+            }
         default:
-            // never answered: where the scan lists it next - moved, or still where it was
+            // never answered, or a 5xx: where the scan lists it next - moved, or still where it was
             after = preview?.targetPath.map { ($0, false) }
             AccessibilityNotification.Announcement(EditWords.mayHaveFinished).post()
         }
+        // a refusal wrote nothing: read only when a gap meanwhile asked for it
+        guard retag.flow.needsRead else { return }
         await lookUp()
-        wrote(before: before)
+        if outcome != .refused { wrote(before: before) }
     }
 
-    /// The cover alone, written - the folder read again, the page beneath asked again.
+    /// The cover alone (RetagModel.saveCoverOnly): written - or maybe written, no answer or a 5xx, said as an apply's -
+    /// the folder read again and the page beneath asked again; refused, nothing more.
     func saveCoverOnly() async {
-        guard let retag, let before = album else { return }
-        guard await retag.saveCoverOnly(path: before.path) else { return }
+        guard let retag, let before = album, let outcome = await retag.saveCoverOnly(path: before.path) else { return }
+        guard samePerson else { return }
+        if outcome == .unanswered {
+            AccessibilityNotification.Announcement(EditWords.mayHaveFinished).post()
+        }
+        guard retag.flow.needsRead else { return }
         await lookUp()
-        wrote(before: before)
+        if outcome != .refused { wrote(before: before) }
     }
 
     // MARK: Needs a look's marks
@@ -304,13 +350,13 @@ final class EditAlbumModel {
     /// After a write (EditPanel's `afterWrite`): the page beneath asked again now and once Navidrome has scanned
     /// (AlbumEdit.settleMs) and - when the album's release changed - its new id looked for until Navidrome has it.
     private func wrote(before: ScanAlbum) {
-        guard let id = pageId else { return }
+        guard samePerson, let id = pageId else { return }
         navigation?.albumWritten(id)
         settles += 1
         let ticket = settles
         Task {
             try? await Task.sleep(for: .milliseconds(AlbumEdit.settleMs))
-            guard ticket == self.settles, let now = self.pageId else { return }
+            guard ticket == self.settles, self.samePerson, let now = self.pageId else { return }
             self.navigation?.albumWritten(now)
         }
         if let release = AlbumEdit.followRelease(before: before.releaseMbid, after: album?.releaseMbid) {
@@ -318,17 +364,17 @@ final class EditAlbumModel {
         }
     }
 
-    /// The album's new id in Navidrome, looked for by its new release at AlbumEdit.followLooksMs - only a newer look
-    /// calls it off. Found: the page beneath moved to it, said once.
+    /// The album's new id in Navidrome, looked for by its new release at AlbumEdit.followLooksMs - only a newer look,
+    /// or a sign-out (the session moved on), calls it off. Found: the page beneath moved to it, said once.
     private func lookForMove(from id: String, release: String) {
         follows += 1
         let ticket = follows
         Task {
             for delay in AlbumEdit.followLooksMs {
                 try? await Task.sleep(for: .milliseconds(delay))
-                guard ticket == self.follows, let client = self.client else { return }
+                guard ticket == self.follows, self.samePerson, let client = self.client else { return }
                 guard let found = try? await client.storeAlbum(releaseMbid: release) else { continue }
-                guard ticket == self.follows else { return }
+                guard ticket == self.follows, self.samePerson else { return }
                 // the page's own id is no answer: Navidrome can still list the album at the folder the rename left
                 guard let to = AlbumEdit.followsTo(pageId: id, found: found.navidromeId) else { continue }
                 self.moved(from: id, to: to)
@@ -338,6 +384,7 @@ final class EditAlbumModel {
     }
 
     private func moved(from id: String, to: String) {
+        guard samePerson else { return }
         if case .album(let subject) = target {
             target = .album(AlbumEdit.Subject(id: to, name: subject.name, artist: subject.artist,
                                               songCount: subject.songCount, musicBrainzId: album?.releaseMbid))

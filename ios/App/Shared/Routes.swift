@@ -273,6 +273,9 @@ final class AppNavigation {
     /// (Phase 8, slice 1) Albums an apply gave a new id in Navidrome (AlbumEdit.noteMove): a page opened by the old id
     /// opens the new one.
     private var moves: [String: String] = [:]
+    /// (Phase 8, slice 1) One more each time the person changes (`reset`): an Edit album opened for one person stops
+    /// writing into these pages - its page refreshes, its follow - once it isn't theirs (EditAlbumModel).
+    private(set) var session = 0
     /// The playlist whose Edit is open on a tab's page: the tab tapped again goes back no further than that page, so
     /// Edit's changes are never thrown away without Cancel's question (PlaylistEdit.pagesKept).
     private(set) var editingPlaylist: String?
@@ -470,6 +473,7 @@ final class AppNavigation {
         albumEdit = nil
         albumWrites = [:]
         moves = [:]
+        session += 1
         importAnswered()
         tab = .library
     }

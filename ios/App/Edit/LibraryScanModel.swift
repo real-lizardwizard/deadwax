@@ -7,10 +7,20 @@ import UIKit
 /// album folder deadwax's scan lists, without its tracks (`GET /library/albums?tracks=false`), held in memory by the
 /// page that asked it with its ETag - so asking again is a 304 when nothing changed - and never on disk: managing shows
 /// nothing stale as live. Only the newest read lands; a read that fails keeps what is in hand and says why
-/// (EditWords.said, the library's own words for whoever runs deadwax).
+/// (EditWords.said, the library's own words for whoever runs deadwax); a read cancelled is neither, and changes nothing.
 @MainActor
 @Observable
 final class LibraryScanModel {
+    /// How a read ended.
+    enum Read: Sendable {
+        /// It landed: fresh, or the one in hand still the answer.
+        case landed
+        /// It failed - said in `failure`.
+        case failed
+        /// A newer read took over, or it was cancelled: nothing changed.
+        case dropped
+    }
+
     /// The scan in hand - nil until one lands.
     private(set) var answer: ScanAnswer?
     /// A read is on its way.
@@ -24,29 +34,30 @@ final class LibraryScanModel {
     var loaded: Bool { answer != nil }
     var albums: [ScanAlbum] { answer?.albums ?? [] }
 
-    /// The scan read again: true when it landed (fresh, or the one in hand still the answer), false when it failed or a
-    /// newer read took over.
+    /// The scan read again.
     @discardableResult
-    func read(client: DeadwaxClient?, admin: Bool) async -> Bool {
-        guard let client else { return false }
+    func read(client: DeadwaxClient?, admin: Bool) async -> Read {
+        guard let client else { return .dropped }
         reads += 1
         let ticket = reads
         reading = true
         do {
             let got = try await client.libraryScan(ifNoneMatch: answer == nil ? nil : etag)
-            guard ticket == reads else { return false }
+            guard ticket == reads else { return .dropped }
             if case .fresh(let fresh, let tag) = got {
                 answer = fresh
                 etag = tag
             }
             failure = nil
             reading = false
-            return true
+            return .landed
         } catch {
-            guard ticket == reads else { return false }
-            failure = EditWords.said(error, failed: EditWords.readFailed, admin: admin)
+            guard ticket == reads else { return .dropped }
             reading = false
-            return false
+            // a cancellation (the page gone) is neither a failure nor an answer: what was there stays
+            guard !APIFailure.isCancellation(error) else { return .dropped }
+            failure = EditWords.said(error, failed: EditWords.readFailed, admin: admin)
+            return .failed
         }
     }
 }

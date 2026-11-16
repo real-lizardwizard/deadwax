@@ -408,8 +408,8 @@ func sentJSON(_ request: HTTPRequest?) throws -> [String: SentValue] {
         // release's lock. (Album info) a folder's files read from the disk, 30 s: every file opened as it is asked.
         // (Phase 8, slice 1: Edit album) the scan, 120 s, a walk of the library when the saved scan is behind; a
         // release's pressings and a pressing, 60 s, MusicBrainz's browse and its retries; Changes, 60 s, every file
-        // read; Apply, 420 s, up to 300 s before the rename after the cover's fetch; a cover, 90 s, the Cover
-        // Art Archive's and the files'; the cover drawn, 30 s; the queue's marks, 20 s
+        // read; Apply, 480 s, two cover fetches, Navidrome asked twice and 300 s before the rename; a cover, 120 s,
+        // the Cover Art Archive's and the files'; the cover drawn, 30 s; the queue's marks, 20 s
         let longer: [Endpoint: Double] = [Routes.albumIndex: 30, Routes.autoEqSearch: 20, Routes.autoEqProfile: 20,
                                           Routes.libraryOwned: 30, Routes.fullySearch: 20, Routes.releaseGroup: 60,
                                           Routes.searchArtists: 20, Routes.searchSongs: 20, Routes.artistFacts: 60,
@@ -418,7 +418,7 @@ func sentJSON(_ request: HTTPRequest?) throws -> [String: SentValue] {
                                           Routes.storeState: 20, Routes.findCandidates: 300, Routes.enqueue: 300,
                                           Routes.joinJob: 60, Routes.libraryAdd: 60, Routes.libraryTracks: 30,
                                           Routes.libraryAlbums: 120, Routes.releases: 60, Routes.release: 60,
-                                          Routes.retagPreview: 60, Routes.retagApply: 420, Routes.artFetch: 120,
+                                          Routes.retagPreview: 60, Routes.retagApply: 480, Routes.artFetch: 120,
                                           Routes.libraryArt: 30, Routes.queueIgnore: 20, Routes.queueUnignore: 20]
         #expect(Routes.timeouts == longer)
         for endpoint in Routes.all {
