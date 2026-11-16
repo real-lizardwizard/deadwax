@@ -781,3 +781,24 @@ patch before Search's slice 2. The web doesn't change.
 - **Not seen**: deadwax itself has never asked the real Archive through this route - every answer it has read is the
   MockTransport's. How long the chain takes from James's server, what an outage really answers (a 503, a hang, a
   404), and the phone drawing them (slice 2) are unwatched.
+
+## The scan without its tracks (2.1.28)
+
+Phase 8's server change A (notes/ios-specs/phase8-managing.md on `ios`, sections 3.1 and 12): the app's album editor
+finds an album's folder from the scan's albums, as the web's does (`albumEdit.ts` `editFolders`), but every field it
+reads of an album is album-level, and `/library/albums` carries every track of every album - most of the body even
+compacted (notes/performance.md, "Tracks travel compact"), twice a visit. So `GET /deadwax/library/albums` and `POST
+/deadwax/library/rescan` take `tracks` (a query parameter, default true). `?tracks=false` sends each album as
+`compact_for_wire()` would, less its `tracks` and `track_defaults` (`library.albums_without_tracks()`: the same keys in
+the same order, the server-only fields dropped as ever, new dicts so the cache is never trimmed); everything else is
+the same answer - the scan, `queue`, `issue_types`, each album's issues, the `X-Scan-*` headers, the snapshot form.
+The ETag is of the body, so the two forms never answer each other's If-None-Match. The web never sends it, so nothing
+it reads changed; no route was added (tests/test_logins.py ROUTES as it was) and no permission moved (`/albums` a
+user's, `/rescan` Look after the library's).
+
+- **Not chosen**: the full scan on the phone (megabytes a visit), and a one-folder route (`edition_count`,
+  `split_discs` and `disc_label` are worked out across the whole scan, and Needs a look and Library care read the list
+  anyway).
+- **Verified**: tests/test_library_cache.py - the lean body equals the full one less the two keys, key for key; its
+  own ETag is a 304 and each form's ETag a 200 for the other; the snapshot form stale and from the saved scan; rescan's
+  form, and an unchanged library's forced read the same lean answer. **Not seen**: the phone asking it (slice 1).

@@ -16,7 +16,7 @@ from src.api.musicbrainz_endpoint import MusicBrainzUnavailable
 from src.config import COVER_ART_SIZES, rename_wait_seconds
 from src.disc_art import (choose_from_caa, choose_from_fanarttv, disc_art_filename, disc_face, plan_disc_art,
                           save_disc_art)
-from src.library import (MIME_BY_EXTENSION, SCAN_FORMAT, compact_for_wire, delete_album,
+from src.library import (MIME_BY_EXTENSION, SCAN_FORMAT, albums_without_tracks, compact_for_wire, delete_album,
                          drain_cache_changes, embedded_pictures, find_artist_art, find_disc_art, library_is_behind,
                          forget_cached_album, load_album_art, load_artist_art,
                          read_album_details, read_artist_mbid, scan_library, seed_cache,
@@ -286,8 +286,14 @@ _SCAN_HEADERS = {"scanned_at": "X-Scanned-At", "scan_seconds": "X-Scan-Seconds",
                  "cached": "X-Scan-Cached", "stale": "X-Scan-Stale"}
 
 
-def _library_response(request: Request, result: dict) -> Response:
-    """A scan as the interface is sent it: compact tracks, the volatile fields as headers."""
+def _library_response(request: Request, result: dict, tracks: bool = True) -> Response:
+    """
+    A scan as the interface is sent it: compact tracks, the volatile fields as headers.
+
+    `tracks=False` (2.1.28) leaves each album's tracks and track_defaults out and changes nothing
+    else - the scan, the queue, the headers - so its ETag is of a different body and the two forms
+    never answer each other's If-None-Match.
+    """
     def header(key: str) -> str:
         value = result.get(key)
         if value is None:
@@ -296,12 +302,12 @@ def _library_response(request: Request, result: dict) -> Response:
 
     headers = {name: header(key) for key, name in _SCAN_HEADERS.items()}
     body = {k: v for k, v in result.items() if k not in _SCAN_HEADERS}
-    body["albums"] = compact_for_wire(result["albums"])
+    body["albums"] = compact_for_wire(result["albums"]) if tracks else albums_without_tracks(result["albums"])
     return json_with_etag(request, body, headers)
 
 
 @router.get("/albums")
-async def albums(request: Request, snapshot: bool = False):
+async def albums(request: Request, snapshot: bool = False, tracks: bool = True):
     """
     Everything currently in LIBRARY_PATH, and what's wrong with it.
 
@@ -315,6 +321,9 @@ async def albums(request: Request, snapshot: bool = False):
 
     `?snapshot=true` answers from the saved scan without touching the disk, marked `stale`.
     The interface draws that at once and then asks again without it - see useLibrary.
+
+    `?tracks=false` (2.1.28) is the same answer without each album's tracks - for the iPhone app's
+    album editor, which reads only album-level fields. The web never sends it.
     """
     try:
         result = await _scan_with_queue(request, False, snapshot)
@@ -335,7 +344,7 @@ async def albums(request: Request, snapshot: bool = False):
                 extra={"frontend": True},
             )
 
-        return _library_response(request, result)
+        return _library_response(request, result, tracks)
 
     except Exception as e:
         logger.error(f"Exception in /albums endpoint: {e}")
@@ -396,16 +405,18 @@ async def owned(request: Request, user: str = Depends(current_user)):
 
 
 @router.post("/rescan", dependencies=LIBRARY)
-async def rescan(request: Request):
+async def rescan(request: Request, tracks: bool = True):
     """
     Drop the per-folder cache and read everything again.
 
     The cache keys on directory mtime, which catches tracks being added or removed but not a
     file being re-tagged in place on some filesystems. This is the manual escape hatch for
     that, and for when you simply don't trust what you're looking at.
+
+    `?tracks=false` answers as /albums' does (2.1.28).
     """
     try:
-        return _library_response(request, await _scan_with_queue(request, True))
+        return _library_response(request, await _scan_with_queue(request, True), tracks)
 
     except Exception as e:
         logger.error(f"Exception in /rescan endpoint: {e}")
