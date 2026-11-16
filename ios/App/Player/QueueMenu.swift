@@ -22,6 +22,10 @@ struct QueueMenuRequest {
     var webEdit: URL?
     /// (Album info) The album page's bar •••: "Album info", which opens the album's sheet of everything known of it.
     var albumInfo: (@MainActor () -> Void)?
+    /// (Pull to shuffle on an album's and a playlist's page) The page's bar •••: "Refresh" - the page asked again now
+    /// or, while deadwax can't be reached, whether it is back - as the Library's ••• has it, the page's pull being the
+    /// shuffle's now.
+    var refresh: (@MainActor () -> Void)?
 }
 
 /// The queue menu (screens.md 5; the web's app/QueueMenu.tsx): Play Next and Play Last, opened FROM the ••• tapped -
@@ -62,6 +66,10 @@ struct QueueMenuRequest {
 /// Album info (notes/ios.md "Album info"): the album page's bar ••• (`request.albumInfo`) has "Album info" in that last
 /// section, above Edit in the web app - offline too (it draws what the phone has), and for an album gone from the
 /// collection. It plays nothing.
+///
+/// Refresh (notes/ios.md "Pull to shuffle on an album's and a playlist's page"): an album's and a playlist's bar •••
+/// (`request.refresh`) end that last section with "Refresh", as the Library's ••• ends with it - online and off (off,
+/// it asks whether deadwax is back). It plays nothing.
 struct QueueMenu<Label: View>: View {
     let request: QueueMenuRequest?
     @ViewBuilder let label: () -> Label
@@ -97,7 +105,7 @@ struct QueueMenu<Label: View>: View {
                                         gone: request.gone, name: request.pick.title)
                 }
                 let webEdit = reachability.online && !request.gone ? request.webEdit : nil
-                if request.albumInfo != nil || webEdit != nil {
+                if request.albumInfo != nil || webEdit != nil || request.refresh != nil {
                     Section {
                         if let albumInfo = request.albumInfo {
                             Button(AlbumInfoWords.title, systemImage: AlbumInfoWords.symbol) {
@@ -107,6 +115,12 @@ struct QueueMenu<Label: View>: View {
                         if let webEdit {
                             Button(ManagingWords.editInWebApp, systemImage: ManagingWords.safariSymbol) {
                                 openURL.webApp(webEdit, player: player)
+                            }
+                        }
+                        if let refresh = request.refresh {
+                            // the Library's own Refresh, word and symbol
+                            Button(LibrarySwitchWords.refresh, systemImage: "arrow.clockwise") {
+                                refresh()
                             }
                         }
                     }

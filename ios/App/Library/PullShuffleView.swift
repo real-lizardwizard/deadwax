@@ -6,8 +6,10 @@ import UIKit
 
 /// Pull to shuffle (Phase 4, slice 3b - phase4-library.md 2.8, 3.5; James: "if you drag down far enough there can be a
 /// cool little shuffle graphic that changes as you pull down, and then once you go far enough, it changes, and starts
-/// shuffling when you release"). One per page of the Library's switch: Core's PullShuffle, fed by the page's scroll
-/// view (`pullsToShuffle`) and drawn by `PullShuffleGraphic` above the page's first row. Its ticks are the haptic's.
+/// shuffling when you release"). One per page of the Library's switch, and (2026-11-15, James: "also let's add pull to
+/// shuffle to the album and playlists pages") one per album's and playlist's page: Core's PullShuffle, fed by the
+/// page's scroll view (`pullsToShuffle` - a ScrollView's, or the page's List: the same scroll geometry and phase) and
+/// drawn by `PullShuffleGraphic` above the page's first row. Its ticks are the haptic's.
 @MainActor
 @Observable
 final class ShufflePull {
@@ -124,11 +126,15 @@ private struct PullsToShuffle: ViewModifier {
 /// to its full size and turning a half turn by it, its line under it; armed, a solid disc of the primary's purple with
 /// the mark white on it; released, the mark going round once. Not ready, the ring and the mark as pulling - never the
 /// disc - and why. Reduce Motion: the mark keeps its size and never turns; the ring still fills with the finger, and
-/// the states swap at once. VoiceOver doesn't read it: the •••'s Shuffle is the way there. Drawn from its bottom up,
-/// so it sits in the room the pull opens above the first row.
+/// the states swap at once. VoiceOver doesn't read it: the •••'s Shuffle is the way there (an album's or a playlist's
+/// page: its own Shuffle). Drawn from its bottom up, so it sits in the room the pull opens above the first row.
+///
+/// `of` (notes/ios.md "Pull to shuffle on an album's and a playlist's page"): the Library's pages shuffle the library,
+/// an album's or a playlist's its own songs - only its line for the songs on this phone differs (PullShuffleWords).
 struct PullShuffleGraphic: View {
     let state: ShufflePull
     let can: ShuffleCan
+    var of: PullShuffleOf = .library
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var spun = false
@@ -138,7 +144,7 @@ struct PullShuffleGraphic: View {
 
     var body: some View {
         let phase = state.pull.phase
-        let line = PullShuffleWords.line(phase, can: can)
+        let line = PullShuffleWords.line(phase, can: can, of: of)
         let progress = state.pull.progress
         let armed = phase == .armed || phase == .released
         VStack(spacing: 6) {

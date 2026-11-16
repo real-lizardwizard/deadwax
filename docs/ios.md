@@ -317,7 +317,8 @@ becomes a purple disc, and it says "Release to shuffle" - let go then, and your 
 ("Shuffling"). Push back up a little before you let go and it's the ring again (pull down again for
 another tick); let go before the line and nothing plays. A pull never refreshes the Library now: it asks
 for itself as it comes into view, and ••• > Refresh asks now. The lists opened from the ••• - All albums,
-All artists, All songs, Downloaded, Downloaded playlists - still refresh when pulled.
+All artists, All songs, Downloaded, Downloaded playlists - still refresh when pulled. An album's page and a
+playlist's pull the same way, shuffling that album or playlist (see [An album's page](#an-albums-page)).
 
 It's deadwax's shuffle, the web app's Library > Shuffle: every song of your library (of the collection,
 without a library of your own) once, in an order deadwax makes, played from the first. Its first 200
@@ -376,6 +377,14 @@ back to the Library tab or the app, and when you pull down.
   sign-in, every album reads In your library.
 - **Play** plays the album from its first song. **Shuffle** plays it in a random order, with Shuffle
   on. Play is the web app's purple button, white on purple; Shuffle beside it the web app's grey one.
+- **Pull down** at the top of the page, a good way past it, as on the Library's pages (see [Shuffling your
+  library](#shuffling-your-library)): the ring over the cover fills, "Pull to shuffle"; at the line a tick and the
+  purple disc, "Release to shuffle"; let go and the album plays just as **Shuffle** plays it. While deadwax can't be
+  reached, or for an album gone from the collection, it's only the album's songs on the phone ("Pull to shuffle the
+  songs on this phone"), or "Nothing on this phone to shuffle" with none. While the album is still loading, or
+  couldn't be loaded, the pull shows nothing and plays nothing. A pull doesn't refresh the page any more: ••• >
+  **Refresh** does (while deadwax can't be reached, it checks whether it's back), and an album that couldn't be
+  loaded has **Try again** under why.
 - **The songs**, under a heading for each disc when there's more than one, or a disc has a title
   ("Disc 2", or "Disc 2 · Live" with its title). The song playing has moving bars instead of its
   number. **Tap a song** to play the album from it. Under the songs: how many and how long ("10
@@ -389,7 +398,8 @@ back to the Library tab or the app, and when you pull down.
   **Edit** at its top (see [Manage](#manage)). It isn't there while deadwax can't be reached, or for an album gone
   from the collection.
 - **Album info**, in the same last part of the top •••'s menu (above Edit in the web app), for everyone: everything
-  known about the album, on a sheet of its own with **Done**. See [Album info](#album-info).
+  known about the album, on a sheet of its own with **Done**. See [Album info](#album-info). **Refresh** ends that
+  part: the album asked for again now.
 - **Add to my library** and **Remove from my library**, with logins on. Removing takes the album out
   of your library only: "it's still in the collection, and nothing was deleted."
 - **The artist's name**, in purple, opens [their page](#artists). An album that names no artist to go to
@@ -522,6 +532,11 @@ with **Add to a playlist…**. If it can't be made, the sheet stays open and say
   many songs and how long ("12 songs, 48 min").
 - **Play** plays it from its first song. **Shuffle** plays it in a random order, with Shuffle on. **Tap
   a song** to play the playlist from it.
+- **Pull down** at the top of the page, as on an [album's page](#an-albums-page): let go at the purple disc and the
+  playlist plays just as **Shuffle** plays it - offline, only its songs on the phone, or "Nothing on this phone to
+  shuffle". It shows nothing while the playlist is loading, couldn't be loaded, has gone or is empty, and while
+  **Edit** is open. A pull doesn't refresh the page any more: it's asked for as it shows, as before, and ••• >
+  **Refresh** (at the end of the top •••'s menu) asks now.
 - **The songs**, each with its own album's cover, and its artist and album under its title; the song
   playing has moving bars over its cover. A song that's in the playlist twice is there twice. Under the
   songs: how many and how long.
@@ -2210,9 +2225,9 @@ answering, **Try again**. It goes by itself once deadwax answers.
   downloads**, or a pull, shuffles the songs on the phone (see [Shuffling your
   library](#shuffling-your-library)).
 - **Up Next** dims the songs that aren't on the phone; a tap on one does nothing (see [Up Next](#up-next)).
-- **An album's page** shows what's on the phone, dims the rest, and Play and Shuffle play only the
-  songs here. An album with nothing here says "This album isn't on this phone - it plays once deadwax
-  is back."
+- **An album's page** shows what's on the phone, dims the rest, and Play, Shuffle and a pull down play only
+  the songs here ("Pull to shuffle the songs on this phone"). An album with nothing here says "This album isn't on
+  this phone - it plays once deadwax is back."
 - **Songs**: the songs already fetched stay, the ones not on the phone dimmed, and no more are fetched (see
   [Songs](#songs)).
 - **Search**: a list already drawn for the words stays, what isn't on the phone dimmed; new words wait for
@@ -2823,7 +2838,8 @@ first - one with songs from several albums - and, if you can, one someone else s
   at the top queues the whole playlist. Go to album from Now Playing opens the song's own album, whole.
 - **68 Changed elsewhere.** Add a song to a playlist in the web app or Amperfy; back on the phone, go
   back to Playlists and open the playlist again: it has the song. Delete a playlist in the web app with
-  its page open on the phone, then pull down on it: it says it isn't on Navidrome any more.
+  its page open on the phone, then pull down on it (since check 286, ••• > Refresh: a pull shuffles): it says it
+  isn't on Navidrome any more.
 - **69 Offline.** Download a song of a playlist (its •••), then turn on Airplane Mode with the playlist
   open: only that song is bright, and Play plays it. Go back to the Library (it may open on Downloaded):
   Playlists is there, and that playlist opens; one you haven't opened, or with nothing on the phone, is
@@ -3821,6 +3837,38 @@ change is needed: it works with the deadwax you already run.
   shuffle still shuffles. Flick the list and touch the list itself (not the index): it stops where it is, as it always
   has. Swipe back across the Library's pages: nothing changed. With VoiceOver, flick the list with three fingers and
   double-tap a "Jump to" letter: it lands there.
+
+### Pull to shuffle on an album and a playlist's checks (282-288)
+
+**Not done yet.** These come with the build that adds pull to shuffle to an album's page and a playlist's (still app
+0.13 (13)). No server change is needed.
+
+- **282 An album.** Open an album and, at the top of its page, pull down slowly: above the cover the ring fills and the
+  mark grows and turns, "Pull to shuffle". At the line: a tick, the purple disc, "Release to shuffle". Push back up a
+  little: the ring again, no tick; down again: another tick. Let go armed: "Shuffling", and the album plays shuffled,
+  as its **Shuffle** button plays it - Shuffle on in Now Playing, only this album's songs in Up Next. Let go before
+  the line: nothing plays. Does the graphic sit in the gap above the cover, clear of the bar at the top, at your text
+  size? Does the music start the moment you let go?
+- **283 A playlist.** The same on a playlist's page: it plays the playlist shuffled, each song as itself (Now
+  Playing's cover and Go to album are the song's own album). Tap **Edit** and pull: nothing shows and nothing plays.
+  Done (or Cancel), and it pulls again.
+- **284 Nothing to play.** Open an album and pull at once, while it's still loading (WireGuard over mobile data
+  helps): nothing shows, nothing plays. An empty playlist: the same. An album that couldn't be loaded says why, with
+  **Try again** under it: tap it and the album comes (or says why again); the pull shows nothing meanwhile.
+- **285 Offline.** Turn on Airplane Mode. Open an album with only some of its songs on the phone and pull: "Pull to
+  shuffle the songs on this phone", and only those play, shuffled. An album you had open before going offline with
+  none of it downloaded: the ring fills but never turns purple, "Nothing on this phone to shuffle", and nothing plays.
+  The same on a playlist. Back online, an album gone from the collection with songs on the phone says "the songs on
+  this phone" too.
+- **286 Refresh.** A pull no longer refreshes either page. An album's top •••: **Refresh** at the end. Change the
+  album in the web app (its Edit), then ••• > Refresh: the change shows. A playlist: add a song to it in the web app,
+  then ••• > Refresh: it's there. Offline, ••• > Refresh checks whether deadwax is back.
+- **287 Nothing else changes.** On an album, swipe in from the left edge - at the top and scrolled down - it goes back,
+  and nothing plays. The top ••• and a song's ••• open as before; Album info opens and closes. Scroll the songs and
+  fling back to the top: the bounce shows nothing and never shuffles. Pull to the purple disc, then pull down
+  Notification Center (or take a call) before letting go: nothing plays. A song's tap plays from it, as before.
+- **288 VoiceOver and Reduce Motion.** VoiceOver doesn't read the graphic: the page's **Shuffle** is the way there.
+  With Reduce Motion on, the mark doesn't grow or turn, and the states change at once, as on the Library.
 
 ## What it can't do yet
 

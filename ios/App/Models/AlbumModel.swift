@@ -16,8 +16,9 @@ import Observation
 /// Only the newest answer draws (AlbumPage.tsx's two latestOnly): each ask takes the next number, and an answer for
 /// an older one is dropped; the page's `.task` is cancelled when the page goes, which calls its requests off. What is
 /// in hand is kept while the page is covered and shown again (a NavigationStack re-runs the task on the way back), so
-/// only what isn't in hand is asked again then. A pull to refresh asks both afresh and draws over what is on screen,
-/// as the web's refresh after an edit does: a refresh that fails keeps what is drawn.
+/// only what isn't in hand is asked again then. A refresh (the bar •••'s - a pull, until the page's pull shuffled) asks
+/// both afresh and draws over what is on screen, as the web's refresh after an edit does: a refresh that fails keeps
+/// what is drawn.
 @MainActor
 @Observable
 final class AlbumModel {
@@ -157,8 +158,9 @@ final class AlbumModel {
         }
     }
 
-    /// A pull to refresh: both asked afresh, drawn over what is on screen (what the page last did is told by deadwax's
-    /// answer now); a failure keeps what is drawn - and with nothing drawn, says it.
+    /// The bar •••'s Refresh, or a failure's Try again (a pull to refresh until 2026-11-15): both asked afresh, drawn
+    /// over what is on screen (what the page last did is told by deadwax's answer now); a failure keeps what is drawn -
+    /// and with nothing drawn, says it.
     func refresh(client: DeadwaxClient?, player: PlayerModel, downloads: DownloadModel) async {
         guard let client, online else { return }
         changed = nil

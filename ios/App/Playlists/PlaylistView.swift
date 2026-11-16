@@ -33,8 +33,16 @@ import SwiftUI
 /// Edit stays open with why at the top of the form, the page scrolled to it. Cancel takes Back's place, and asks first
 /// when there are changes ("Discard your changes?"); the tab tapped again goes back no further than this page while Edit
 /// is open (AppNavigation.editing). Delete asks (deleteQuestion) - there is no undo - and, deleted (or answered gone),
-/// says so and goes back while the page is still what shows. The hero stays; Play, Shuffle and the ••• wait while Edit is
-/// open.
+/// says so and goes back while the page is still what shows. The hero stays; Play, Shuffle, the pull and the ••• wait
+/// while Edit is open.
+///
+/// PULL TO SHUFFLE (2026-11-15, James: "also let's add pull to shuffle to the album and playlists pages"; notes/ios.md
+/// "Pull to shuffle on an album's and a playlist's page"): the Library's pull (ShufflePull, `pullsToShuffle`,
+/// PullShuffleGraphic) on the page's List, its graphic above the hero; let go armed, it is the hero's Shuffle - the
+/// same songs, each with its own album, from the same call, in the lift. Offline only the songs on this phone, or
+/// "Nothing on this phone to shuffle"; with no songs to draw (loading, failed, gone, empty) nothing is drawn and
+/// nothing plays (ShuffleCan.page). The pull never refreshes now, as the Library's doesn't: the page is asked as it
+/// shows, as before, and the bar's •••'s Refresh asks now (offline, whether deadwax is back).
 struct PlaylistView: View {
     let route: PlaylistRoute
 
@@ -52,6 +60,10 @@ struct PlaylistView: View {
     @State private var asksDiscard = false
     /// Delete playlist: the question is up.
     @State private var asksDelete = false
+    /// The page's pull to shuffle.
+    @State private var pull = ShufflePull()
+    /// On screen - the page on top of its tab: it pulls only then.
+    @State private var shown = false
     @AccessibilityFocusState private var focus: EditFocus?
 
     /// Where VoiceOver's focus goes after a change in Edit - never dropped to the page's top.
@@ -79,12 +91,21 @@ struct PlaylistView: View {
         let online = reachability.online
         let songs = model.songs
         let editing = model.editing
+        let playable = self.playable
+        let can = pullCan(playable)
         ScrollViewReader { proxy in
             List {
                 PlaylistHero(model: model, download: model.gone ? nil : downloads.playlistState(route.id),
                              smart: downloads.playlistIsSmart(route.id, answer: model.answer),
                              playable: !playable.isEmpty && !editing,
                              play: { play(at: 0) }, shuffle: { play(at: nil, shuffle: true) })
+                    .overlay(alignment: .top) {
+                        // the pull's graphic, in the room the pull opens above the hero, as the Library's above its
+                        // first row: its foot at the hero's top
+                        PullShuffleGraphic(state: pull, can: can, of: .page)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .alignmentGuide(.top) { (drawn: ViewDimensions) -> CGFloat in drawn[.bottom] }
+                    }
                     .listRowSeparator(.hidden)
                     .id(Place.top)
                     .onAppear { setTitleInBar(false) }
@@ -108,6 +129,8 @@ struct PlaylistView: View {
                 }
             }
             .listStyle(.plain)
+            // the pull shuffles the playlist (never refreshes), while the page is the one on top and Edit isn't open
+            .pullsToShuffle(PullShuffling(state: pull, can: can, on: shown && !editing, start: pulled))
             .environment(\.editMode, .constant(editing ? .active : .inactive))
             .navigationTitle(model.name)
             .navigationBarTitleDisplayMode(.inline)
@@ -125,13 +148,6 @@ struct PlaylistView: View {
                 await model.load(key: taskKey, client: server.client, playlists: playlists)
             }
             .task { await downloads.followProgress() }
-            .refreshable {
-                guard reachability.online else {
-                    reachability.tryNow()
-                    return
-                }
-                await model.load(key: taskKey, client: server.client, playlists: playlists)
-            }
             .onChange(of: reachability.online) { _, online in
                 model.online = online
                 // back: the playlist asked of deadwax now
@@ -157,7 +173,9 @@ struct PlaylistView: View {
             .onChange(of: model.editing) { _, editing in
                 navigation.editing(route.id, editing)
             }
+            .onAppear { shown = true }
             .onDisappear {
+                shown = false
                 // popped, not covered: a tab tapped again needn't stop at it any more
                 navigation.pageGone(route.id)
             }
@@ -273,7 +291,35 @@ struct PlaylistView: View {
     private var playlistMenu: QueueMenuRequest? {
         guard !model.gone, !model.editing,
               let pick = PlaylistPlay.pick(name: model.name, songs: model.songs) else { return nil }
-        return QueueMenuRequest(pick: pick, album: nil, playlist: model.answer)
+        var request = QueueMenuRequest(pick: pick, album: nil, playlist: model.answer)
+        request.refresh = { refresh() }
+        return request
+    }
+
+    /// What the pull can do (ShuffleCan.page): the playlist's songs, as the hero's Shuffle takes them (`playable`) - while
+    /// deadwax can't be reached, only those on this phone; nothing while there are no songs to draw.
+    private func pullCan(_ playable: [Song]) -> ShuffleCan {
+        ShuffleCan.page(songs: model.songs.count, phoneOnly: !reachability.online, onPhone: playable.count)
+    }
+
+    /// The pull let go armed: the hero's Shuffle, in the lift - nothing awaited first. Should the songs on this phone have
+    /// gone since it armed (a removal), said, as the Library's pull says it.
+    private func pulled() {
+        if playable.isEmpty, !reachability.online {
+            player.say(PullShuffleWords.nothingHere)
+            return
+        }
+        play(at: nil, shuffle: true)
+    }
+
+    /// The •••'s Refresh (the pull was this until it shuffled): the playlist asked again now - or, while deadwax can't be
+    /// reached, whether it is back.
+    private func refresh() {
+        guard reachability.online else {
+            reachability.tryNow()
+            return
+        }
+        Task { await model.load(key: taskKey, client: server.client, playlists: playlists) }
     }
 
     /// What Play and Shuffle take: the songs - offline, those on this phone, in the playlist's order.
