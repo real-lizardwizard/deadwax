@@ -195,6 +195,24 @@ public struct DeadwaxClient: Sendable {
         try await answer(coverRequest(coverID: coverID, size: size)).body
     }
 
+    /// A cover as large as Navidrome has it - the cover viewer's (notes/ios.md "The cover, full screen"): the same
+    /// route with no `size`, which deadwax passes on to getCoverArt as none, and Navidrome then sends the picture
+    /// unresized. Read no further than `CoverZoom.fullMostBytes`.
+    public func fullCoverRequest(coverID: String) -> HTTPRequest {
+        var built = request(Routes.cover, path: ["cover_id": coverID])
+        built.headers["Accept"] = "image/*"
+        built.mostBytes = CoverZoom.fullMostBytes
+        return built
+    }
+
+    /// Fetches a cover's bytes at the largest size there is - `HTTPTooLarge` past `CoverZoom.fullMostBytes`, from the
+    /// transport as it reads, or here from a transport that read it all.
+    public func fullCover(coverID: String) async throws -> Data {
+        let body = try await answer(fullCoverRequest(coverID: coverID)).body
+        guard CoverZoom.reads(bytes: body.count) else { throw HTTPTooLarge(most: CoverZoom.fullMostBytes) }
+        return body
+    }
+
     /// A cover's bytes, or `.unchanged` when the copy kept (its ETag `ifNoneMatch`) is still the cover - deadwax
     /// passes Navidrome's revalidation on as a 304 with no body.
     public func cover(coverID: String, size: Int, ifNoneMatch etag: String?) async throws -> Fetched<Data> {
@@ -630,6 +648,8 @@ public struct DeadwaxClient: Sendable {
             return try await transport.send(request)
         } catch {
             if APIFailure.isCancellation(error) { throw CancellationError() }
+            // deadwax answered, past the request's mostBytes: said as itself, never as no answer
+            if error is HTTPTooLarge { throw error }
             throw APIFailure.noAnswer(error, to: request, server: server)
         }
     }

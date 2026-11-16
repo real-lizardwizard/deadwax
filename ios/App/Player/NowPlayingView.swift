@@ -54,6 +54,9 @@ struct NowPlayingView: View {
     @State private var switched: TurntableSettings.Look?
     /// Add to a playlist, from the •••: the picker over Now Playing, with the song playing (Phase 4, slice 2).
     @State private var playlistPick: PlaylistPickRequest?
+    /// The cover full screen, from a tap on it (CoverViewer.swift): presented from the root, so it stays up as the
+    /// cover's place gives way to Lyrics.
+    @State private var viewing: ViewedCover?
     @Environment(Reachability.self) private var reachability
 
     /// The cover's scale while paused (--pl-paused-scale).
@@ -67,9 +70,9 @@ struct NowPlayingView: View {
     /// The look showing, the button's or You's.
     private var look: TurntableSettings.Look { switched ?? deck.opensAs }
 
-    /// A sheet is over Now Playing, at its full height: Up Next, Info, the EQ or Add to a playlist - the scrubber under
-    /// it unseen.
-    private var sheetOver: Bool { showsUpNext || showsInfo || showsEQ || playlistPick != nil }
+    /// A sheet is over Now Playing, at its full height: Up Next, Info, the EQ, Add to a playlist or the cover full screen
+    /// - the scrubber under it unseen.
+    private var sheetOver: Bool { showsUpNext || showsInfo || showsEQ || playlistPick != nil || viewing != nil }
 
     /// The turntable shows: its look, with the lyrics off (NowPlaying.tsx:269).
     private var turntable: Bool { TurntableSettings.showsTurntable(look, lyricsOn: lyrics.showing) }
@@ -100,6 +103,7 @@ struct NowPlayingView: View {
         .sheet(isPresented: $showsInfo, onDismiss: eqAfterSheet) { InfoView() }
         .sheet(isPresented: $showsEQ) { EQSheet() }
         .sheet(item: $playlistPick) { (request: PlaylistPickRequest) in PlaylistPicker(request: request) }
+        .coverViewer($viewing, onDismiss: eqAfterSheet)
         .onAppear { lyrics.opened() }
         // the deck told what shows as it opens and as the look changes - and that it doesn't, as it closes (2.1)
         .onChange(of: turntable, initial: true) { (_: Bool, now: Bool) -> Void in deck.screen(turntable: now) }
@@ -108,19 +112,20 @@ struct NowPlayingView: View {
     }
 
     /// A file shared to deadwax while Now Playing is up (eq.md 3.9): the EQ sheet opens, the preview over it - over the
-    /// EQ sheet already up, the preview shows in it as it stands; Up Next or Info is closed first.
+    /// EQ sheet already up, the preview shows in it as it stands; Up Next, Info or the cover full screen is closed first.
     private func shared() {
         guard navigation.eqImport != nil, navigation.eqImportPage == nil, !navigation.eqPreviewUp, !showsEQ else { return }
-        if showsUpNext || showsInfo {
+        if showsUpNext || showsInfo || viewing != nil {
             eqWaits = true
             showsUpNext = false
             showsInfo = false
+            if viewing != nil { CoverViewing.put(nil, into: $viewing) }
         } else {
             showsEQ = true
         }
     }
 
-    /// Up Next or Info gone: the EQ sheet a shared file waited for.
+    /// Up Next, Info or the cover full screen gone: the EQ sheet a shared file waited for.
     private func eqAfterSheet() {
         guard eqWaits else { return }
         eqWaits = false
@@ -153,6 +158,8 @@ struct NowPlayingView: View {
                         CoverImage(id: track.coverArt, size: 360)
                             .frame(maxWidth: 360)
                             .clipShape(Corners.artShape)
+                            // a tap opens the cover full screen; a drag is still the grip's (CoverViewer.swift)
+                            .opensCoverFullScreen(track, into: $viewing)
                             .shadow(color: .black.opacity(0.4), radius: 24, y: 12)
                             .scaleEffect(player.isPlaying ? 1 : Self.pausedScale)
                             .animation(.spring(response: 0.45, dampingFraction: 0.7), value: player.isPlaying)
@@ -161,7 +168,9 @@ struct NowPlayingView: View {
                     }
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .contentShape(Rectangle())
-                    .gesture(grip)
+                    // high priority over the cover's tap: a drag is the grip's from its first dragStartDistance, and
+                    // the tap fires at lift only when no drag began
+                    .highPriorityGesture(grip)
                     .transition(.opacity)
                 }
             }

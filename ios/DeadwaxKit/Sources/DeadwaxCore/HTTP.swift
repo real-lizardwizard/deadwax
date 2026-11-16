@@ -11,13 +11,28 @@ public struct HTTPRequest: Sendable, Equatable {
     /// Seconds to wait for an answer, when the route needs other than the transport's own (album_index's 30 -
     /// `Routes.timeouts`); nil for the transport's.
     public var timeout: Double?
+    /// The most of an answer's body to read (bytes), when the route needs a limit (the cover viewer's full size,
+    /// `CoverZoom.fullMostBytes`); past it the transport calls the request off and throws `HTTPTooLarge`. nil: all of it.
+    public var mostBytes: Int?
 
-    public init(method: String, url: URL, headers: [String: String] = [:], body: Data? = nil, timeout: Double? = nil) {
+    public init(method: String, url: URL, headers: [String: String] = [:], body: Data? = nil, timeout: Double? = nil,
+                mostBytes: Int? = nil) {
         self.method = method
         self.url = url
         self.headers = headers
         self.body = body
         self.timeout = timeout
+        self.mostBytes = mostBytes
+    }
+}
+
+/// An answer past its request's `mostBytes`, called off before more of it was read: deadwax answered, with too much.
+public struct HTTPTooLarge: Error, Sendable, Equatable {
+    /// The request's most, in bytes.
+    public let most: Int
+
+    public init(most: Int) {
+        self.most = most
     }
 }
 

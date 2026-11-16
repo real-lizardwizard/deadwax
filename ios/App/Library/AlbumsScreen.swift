@@ -63,6 +63,8 @@ struct AlbumsScreen: View {
     @State private var ownTyped = ""
     /// On screen (not covered by a page pushed over it).
     @State private var shown = false
+    /// The list's momentum, stopped by the index before it jumps (notes/ios.md "The letter bar beats momentum").
+    @State private var momentum = MomentumStop()
 
     /// The tiles' gap, and the screen's side margins.
     private static let gap: CGFloat = 14
@@ -165,6 +167,7 @@ struct AlbumsScreen: View {
                     }
                     content(drawn, failure: failure, personal: personal, online: online)
                 }
+                .stopsMomentum(momentum)
                 .padding(.leading, Self.edge)
                 .padding(.trailing, entries.isEmpty ? Self.edge : ShelfIndexStrip.width(years: years) + 4)
                 .padding(.bottom, 24)
@@ -175,7 +178,7 @@ struct AlbumsScreen: View {
             })
             .overlay(alignment: .trailing) {
                 if !entries.isEmpty {
-                    ShelfIndexStrip(entries: entries, years: years) { group in
+                    ShelfIndexStrip(entries: entries, years: years, momentum: momentum) { group in
                         jump(proxy, to: .group(group))
                     }
                     .dynamicTypeSize(...DynamicTypeSize.accessibility1)

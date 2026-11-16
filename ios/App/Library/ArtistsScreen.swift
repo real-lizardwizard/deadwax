@@ -61,6 +61,8 @@ struct ArtistsScreen: View {
     @State private var ownTyped = ""
     /// On screen (not covered by a page pushed over it).
     @State private var shown = false
+    /// The list's momentum, stopped by the index before it jumps (notes/ios.md "The letter bar beats momentum").
+    @State private var momentum = MomentumStop()
 
     private static let edge: CGFloat = 16
 
@@ -181,6 +183,7 @@ struct ArtistsScreen: View {
                         }
                     content(drawn, personal: personal, online: online)
                 }
+                .stopsMomentum(momentum)
                 .padding(.leading, Self.edge)
                 .padding(.trailing, entries.isEmpty ? Self.edge : ShelfIndexStrip.width(years: false) + 4)
                 .padding(.bottom, 24)
@@ -189,7 +192,7 @@ struct ArtistsScreen: View {
             .pullsToShuffle(page?.pulling)
             .overlay(alignment: .trailing) {
                 if !entries.isEmpty {
-                    ShelfIndexStrip(entries: entries, years: false) { (group: Int) -> Void in
+                    ShelfIndexStrip(entries: entries, years: false, momentum: momentum) { (group: Int) -> Void in
                         jump(proxy, to: .group(group))
                     }
                     .dynamicTypeSize(...DynamicTypeSize.accessibility1)

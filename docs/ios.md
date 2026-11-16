@@ -294,7 +294,8 @@ On the Albums page:
   3012 albums". Each page keeps its own words in Find.
 - **The index** down the right edge, once a list has 50 albums or more: A to Z and # for Artist and
   Title, decades for the two Year orders. There's none for Recently added, or while you're finding.
-  Touch or slide along it to jump.
+  Touch or slide along it to jump - even while the list is still gliding from a flick: the touch stops it and
+  jumps.
 - **New** marks an album that came into your library and that you haven't opened yet, here or on the
   web app. Opening it clears the mark, on both.
 - **Tap an album** to open its page. Nothing plays from the Library itself, but the pull.
@@ -1106,6 +1107,23 @@ bar does.
   1.25x - back to normal speed"), and does the same. The speed is set on [the turntable](#the-speed).
 - **The button at the top right** shows Now Playing as [a turntable](#the-turntable) instead, and back.
 - The chevron at the top, or a swipe down, closes it.
+
+**Tap the cover** to see it full screen, on black, as large as Navidrome has it: the cover Now Playing shows comes at
+once, and the full-size picture takes its place as it arrives. Pinch to zoom (as far as 3 times for an ordinary cover,
+further for a large one, up to 8), double-tap to zoom in where you tapped and again to zoom back out, and drag to look
+around while zoomed - it stops at the cover's edges. To close it, swipe down when it isn't zoomed, or tap **✕** at the
+top right. Only a tap opens it: a drag down on the cover is Now Playing's from its first few points, and closes it as
+before. With Lyrics or the turntable showing, there's no cover to tap. A cover opens once it shows: the grey square of
+one still loading, or that couldn't load, opens nothing, and an album with no art of its own opens Navidrome's
+placeholder, as Now Playing shows it. The full size is asked of deadwax only while it can be reached, and a file
+larger than 30 MB isn't fetched whole - the cover stays at Now Playing's sharpness; offline, a downloaded album's cover
+opens at Now Playing's size. Once open, it stays up until you close it, whatever the music does behind it (the next
+song, Lyrics taking the cover's place). The music isn't touched by any of it.
+
+With VoiceOver, Now Playing's cover reads "Cover of Dummy - show full screen" (a double-tap on one that hasn't loaded
+says so). Full screen, the picture reads "Cover of Dummy, by Portishead" and says how far it's zoomed: swipe up or down
+to zoom, scroll with three fingers to look around while zoomed, and the escape gesture (a two-finger Z) or **Close**
+closes it.
 
 ### The turntable
 
@@ -3742,6 +3760,64 @@ change is needed: it works with the deadwax you already run.
   buttons beside their ids and the arrows beside the links growing with them. With VoiceOver: each line reads as one
   ("Format, FLAC · 24-bit / 96 kHz · all 10 songs"); a Copy button reads "Copy release, button" and says "Copied";
   a link reads "This pressing on MusicBrainz, button, Opens in Safari."
+
+### The cover full screen's checks (271-278)
+
+**Not done yet.** These come with the build that lets Now Playing's cover open full screen (still app 0.13 (13)).
+
+- **271 A tap, or a drag.** Play something and open Now Playing. Tap the cover: it fades in full screen on black, the
+  status bar gone, **✕** at the top right. Close it. Now drag down on the cover: Now Playing follows your finger from
+  its first few points, with no catch or jump as it starts, and closes as it always has; the cover never opens. Drag
+  it down a little and let go: it springs back, and the cover doesn't open. A tap with a slight wobble still opens it
+  (a drag is Now Playing's after 6 points). Does a slow drag that starts very gently ever open the cover instead? With
+  Lyrics on, and with the turntable, tapping their place opens nothing, and the record and the lyrics scroll as before.
+- **272 The full size, and covers that aren't there.** Open a cover you know is large in its file (a scan of 3000
+  pixels or more): Now Playing's cover shows at once, then sharpens a moment later without moving or jumping. Zoom
+  right in: the detail holds. Close and open it again: it sharpens almost at once, with nothing fetched again. Over
+  WireGuard, the same, slower. With Wi-Fi and WireGuard off, a downloaded album's cover still opens, at Now Playing's
+  sharpness. An album with no art of its own shows Navidrome's placeholder on Now Playing: a tap opens the placeholder
+  full screen, as it's drawn. While a cover is still loading, or if it couldn't load (the grey square), a tap opens
+  nothing; with VoiceOver a double-tap says "The cover hasn't loaded."
+- **273 Pinching.** Pinch to zoom in: it zooms about your fingers and stops at a sensible most - about 3 times for an
+  ordinary cover, more for a big one - with a small spring past it. Pinch it smaller than the screen: it springs back.
+- **274 Double-tap.** Double-tap near a corner of the cover: it zooms in on that corner. Double-tap again: back to the
+  whole cover. Both slide smoothly (at once with Reduce Motion on).
+- **275 Panning.** Zoomed in, drag around: it follows, carries on a little when flicked, and stops at each of the
+  cover's edges - no black opens past them, and it never pulls past an edge and springs back. Does stopping dead at an
+  edge feel right, or would Photos' little spring be better?
+- **276 Closing.** Not zoomed, drag the cover down: it follows your finger and the black fades; let go a short way down
+  and it springs back; let go further (about a thumb's length), or flick it down, and it fades away to Now Playing just
+  as you left it. As you drag, does Now Playing show through the fading black, or is it black behind? Zoomed in, a drag
+  down moves around the cover instead and never closes it. **✕** closes it. At the largest text size (Settings >
+  Accessibility > Display & Text Size > Larger Text), **✕** is a little bigger and its cross sits inside its square.
+- **277 VoiceOver.** On Now Playing, the cover reads "Cover of Dummy - show full screen, button"; a double-tap opens it.
+  Full screen, **Close** reads "Close, button" and the picture "Cover of Dummy, by Portishead, Not zoomed, adjustable,
+  image". Swipe up: "Zoomed 2 times", then twice that, up to the most (3 times for most covers); swipe down goes back,
+  to "Not zoomed". Zoomed, a three-finger swipe moves about it and says where ("Showing the top left of the cover");
+  at an edge it says there's no more. The two-finger Z closes it, from the picture and from Close.
+- **278 The music, and what happens behind it.** Open, zoom and close the cover a few times while a song plays: the
+  song plays on with no gap or glitch, and the lock screen and Control Center don't change. Turn Lyrics on and play a
+  song that has none, so the cover shows; open it full screen and let the song end, or skip from Control Center: the
+  viewer stays up, on the cover you opened, until you close it - then Now Playing shows the new song (and its lyrics,
+  if it has some). With the cover full screen, share an EQ file to deadwax from Files: the viewer goes and the EQ opens
+  with the file's preview.
+
+### The index during a fling's checks (279-281)
+
+**Not done yet.** These come with the build that lets the Library's index beat the list's momentum (still app 0.13
+(13)).
+
+- **279 Albums, mid-fling.** In Library > Albums, sorted by Title, flick the list hard so it glides. While it's still
+  moving, touch a letter on the index at the right: the list stops dead and is at that letter at once, with one tick.
+  Slide on along the index: it follows letter by letter, a tick each. Try it a few times, early in the glide and near
+  its end, and at the bottom of the list as it bounces. Does the first touch ever miss - a tick but no jump, or no tick
+  at all? The same in the grid and as a list (••• > **Show as list**). The index needs 50 albums or more.
+- **280 Artists, and the years.** The same in Library > Artists, ordered by Name. Then Albums ordered **Year, newest
+  first** and **Year, oldest first**: flick it and touch a decade: it stops and jumps there.
+- **281 At rest, and the rest.** With the list still, the index jumps as before. Pull down at the top: the pull to
+  shuffle still shuffles. Flick the list and touch the list itself (not the index): it stops where it is, as it always
+  has. Swipe back across the Library's pages: nothing changed. With VoiceOver, flick the list with three fingers and
+  double-tap a "Jump to" letter: it lands there.
 
 ## What it can't do yet
 
