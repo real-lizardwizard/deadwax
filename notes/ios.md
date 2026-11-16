@@ -10994,3 +10994,22 @@ Not verified - only the phone can tell (docs/ios.md checks 310-319):
 - That Getting albums' ask on the page's appearance fires again on coming back to the tab with the page shown (it did
   for You's tab as a whole).
 - The pops: Settings tapped from the EQ (two pages deep) back to the root, then to the top.
+
+### After review (16 Nov)
+
+One review of 3185583 found no bug in the code (the menus' bindings, what asks when, the routes, the departure from the
+web's "You" recorded in the vectors) and these in the words, fixed in the commit after it:
+- **About keeps deadwax's last version.** ServerModel keeps `me` across a failed ask and restores it at launch, so About
+  shows the version deadwax last gave, with why it didn't answer under it - "Not known" only if it never has. The guide
+  and check 317 had said "Not known".
+- **The last "You"s naming the tab**: two in docs/ios.md's tables, troubleshooting.md's iPhone list, docs/README.md, the
+  READMEs' phase lines (the README now says the tab is Settings), GetSettingsModel's comments.
+- **"Settings" now names two things**, so every path into the iPhone's own Settings says so: "the iPhone's Settings >
+  Privacy & Security > Local Network" in HTTP.swift's words (what can't reach deadwax says), and every such path in
+  docs/ios.md.
+- **What's not claimed any more**: a menu names each choice and nothing more, so a choice's own line (Normalization's,
+  Download over's) shows only once it's chosen - before, each sat under its row. Apple's own Settings does the same; the
+  name says what each does, and the footer says the rest once chosen.
+- **Left as it is**: Getting albums' three are asked again on coming back into reach only while their page is open
+  (before, while the tab had been opened). Sources asks before every search and an album you don't have asks as it
+  shows, so nothing reads a stale floor or format for a Get.

@@ -83,6 +83,6 @@ public func unreachableWords(_ address: ServerAddress, reason: String?) -> Strin
     var words = "Couldn't reach deadwax at \(address)."
     if let reason, !reason.isEmpty { words += " (\(reason))" }
     words += " Is the phone on your home Wi-Fi, or on WireGuard? If you said no when asked about the local"
-    words += " network, turn deadwax on in Settings > Privacy & Security > Local Network."
+    words += " network, turn deadwax on in the iPhone's Settings > Privacy & Security > Local Network."
     return words
 }

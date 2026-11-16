@@ -29,7 +29,8 @@ struct PlaybackPage: View {
 /// (16 Nov) Now Playing opens as and Normalization are each one row with the choice at its right, a menu of the
 /// choices (`.pickerStyle(.menu)`) - lists of ticks until then; James: "maybe some dropdowns instead of big lists".
 /// Normalization's choices each had a line of their own under their name: the chosen one's line now leads the footer,
-/// before the web's note, and VoiceOver hears it as the row's hint - so no choice loses what it does. VoiceOver reads
+/// before the web's note, and VoiceOver hears it as the row's hint. The others' lines show only once chosen: the menu
+/// names each choice, nothing more. VoiceOver reads
 /// each row's name and its choice. The toggle stays a toggle.
 struct PlaybackSection: View {
     @Environment(PlayerModel.self) private var player

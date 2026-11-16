@@ -151,9 +151,9 @@ changes for the web app, which loads those covers from the Archive itself.
    iPhone at the top, and press Run. Signing & Capabilities shows your team, read from
    Local.xcconfig. Xcode registers the phone, makes the free signing profile, and prepares the phone
    for development. Then, on the iPhone:
-   - turn on **Settings > Privacy & Security > Developer Mode**, which appears after that first
+   - turn on the iPhone's **Settings > Privacy & Security > Developer Mode**, which appears after that first
      connection, and restart when asked;
-   - trust yourself as the developer: **Settings > General > VPN & Device Management > your Apple ID
+   - trust yourself as the developer: the iPhone's **Settings > General > VPN & Device Management > your Apple ID
      > Trust**.
 6. *(Optional)* In Xcode > Window > Devices and Simulators, select the iPhone and tick **Connect via
    network**. Later installs then need no cable while both are on your home Wi-Fi.
@@ -233,7 +233,7 @@ letters the web app's does: Latin with every European language's accents, Vietna
 Anything else, such as Japanese, Korean or Arabic, is drawn in iOS's own face. It grows and shrinks with your text
 size as iOS's own did. Times and track numbers keep their place as they count. A few things are still in iOS's
 face: the symbols, the menus, alerts and swipe buttons (iOS draws those itself), and ids, paths and versions,
-which keep the phone's monospace. **Bold Text** (Settings > Accessibility > Display & Text Size) makes iOS's face
+which keep the phone's monospace. **Bold Text** (the iPhone's Settings > Accessibility > Display & Text Size) makes iOS's face
 heavier, but not Noto Sans.
 
 ## The Library
@@ -1506,7 +1506,7 @@ as it is each browser's in the web app.
   off, everyone is one).
 - **About**: deadwax's version, whether logins are on (for an admin), and the app's own version,
   **0.13 (13)**. If deadwax didn't answer when it was last asked who you are, why is said under them, and deadwax's
-  version is "Not known"; pull the page down to ask again.
+  version stays the one it last gave ("Not known" only if it has never answered); pull the page down to ask again.
 
 Account and About ask deadwax again when you pull them down, as the first screen does.
 
@@ -1892,7 +1892,7 @@ to move it a decibel, and its actions include **Reset to 0**. At the largest tex
 sliders become ten rows, each with a - and + button. With Reduce Motion, the curve and the sliders
 jump to a new setting rather than gliding.
 
-**Headphone Accommodations.** iOS's own Headphone Accommodations (Settings > Accessibility > Audio &
+**Headphone Accommodations.** iOS's own Headphone Accommodations (the iPhone's Settings > Accessibility > Audio &
 Visual), on AirPods and some Beats, shapes the sound after deadwax's EQ, on every app. With a
 correction on, turn it off - otherwise the two stack, and the headphones no longer sound neutral.
 Spatialize Stereo works after the EQ too: whether a correction still sounds right with it on is for
@@ -2251,7 +2251,7 @@ whoever is signed in. This is app 0.9's, on the `ios` branch - not yet in a rele
   plugged in - even if, when you left the app, it was waiting for Wi-Fi or for deadwax rather than
   the charger. Albums below one whose songs it hasn't read yet wait until it has, so nothing is
   downloaded only to make way again. iOS decides when, possibly rarely; Background App Refresh off
-  (Settings > General > Background App Refresh), or Low Power Mode, can stop it. It follows the same
+  (the iPhone's Settings > General > Background App Refresh), or Low Power Mode, can stop it. It follows the same
   rules as with the app open: nothing goes that wouldn't then - the ten minutes between two checks
   hold, and the phone being short of space is never believed within a run that started the app,
   which iOS gives only seconds. Just after the phone restarts, before you first unlock it, the app
@@ -2366,7 +2366,7 @@ The tests can't reach these either. Note what happens.
   install.sh afterwards to put the Release build back.
 - **Sign out, then sign in as someone else.** Their Library, and nothing of the first person's queue.
 - **Download your library on a phone with little space left.** It keeps 2 GB free by the phone's own
-  measure of free space, the one iOS uses for what it would make room for. Does Settings > General >
+  measure of free space, the one iOS uses for what it would make room for. Does the iPhone's Settings > General >
   iPhone Storage agree with what You > Downloads says, and does anything else on the phone complain?
   When the phone dips under 2 GB, Debug says "under the reserve · confirming", then after a few minutes
   "giving way" - does only the bottom album go, and only as much as was needed?
@@ -2399,7 +2399,7 @@ The tests can't reach these either. Note what happens.
 11. **Sign out and in.** Your downloads stay through a sign-out; signed in as someone else, they're
     "Other accounts on this phone".
 12. **Remove All Downloads**: it asks, then the screen is empty and the Library's Downloaded row goes,
-    and Settings > General > iPhone Storage > deadwax shows the space back.
+    and the iPhone's Settings > General > iPhone Storage > deadwax shows the space back.
 13. **A downloaded album opens at once**, online too: no spinner before its songs.
 14. **deadwax up, Navidrome down** (Navidrome's container stopped): the Library's "isn't available"
     screen has On this phone > Downloaded under it, and a downloaded album plays.
@@ -2456,7 +2456,7 @@ hand: several of these ask how it compares.
 - **P6 None, and on from song to song.** The instrumental: Lyrics is dimmed and does nothing. With
   lyrics on, let a song with lyrics run into it: the cover shows and Lyrics stays lit; the next song
   with lyrics shows them again. Close Now Playing with lyrics on and open it again: still lyrics.
-- **P7 Larger Text.** Settings > Accessibility > Display & Text Size > Larger Text at the largest:
+- **P7 Larger Text.** The iPhone's Settings > Accessibility > Display & Text Size > Larger Text at the largest:
   the lines wrap and stay readable, the line being sung clear of the soft edges, and the bottom row's
   four buttons fit.
 - **P8 Increase Contrast, Reduce Motion, Bold Text** - and the brightest cover you have (a white
@@ -2532,7 +2532,7 @@ The EQ's own page, with AirPods unless it says. Install the usual way, not with 
   swipe up: "plus 1 decibel".
 - **E15 The outputs' IDs.** Debug's EQ, **Output**: tell me the AirPods' ID; switch the phone off and
   on, and tell me again - and the same for the car, and a USB DAC if you have one.
-- **E16 The largest text.** Settings > Accessibility > Display & Text Size > Larger Text at the
+- **E16 The largest text.** The iPhone's Settings > Accessibility > Display & Text Size > Larger Text at the
   largest: the sliders are ten rows with - and + buttons; everything else wraps.
 
 ### AutoEq's checks (app 0.5)
@@ -2557,7 +2557,7 @@ Needs deadwax 2.1.7 or later (`:experimental` for now). AirPods with no correcti
 - **E20 Offline.** Airplane mode (or WireGuard off away from home), then search: "Can't connect to
   deadwax." with Try again - and the correction still plays. The suggestion isn't shown while
   offline.
-- **E21 Headphone Accommodations.** If you use Headphone Accommodations (Settings > Accessibility >
+- **E21 Headphone Accommodations.** If you use Headphone Accommodations (the iPhone's Settings > Accessibility >
   Audio & Visual), turn it off with a correction on: the two stack otherwise.
 
 ### Advanced's checks (app 0.5)
@@ -2870,7 +2870,7 @@ You > Debug have a "library" line for everything it asks for and lets go, and wh
   "Waiting for the phone to charge". Then plug it in overnight with the app closed: note in the morning
   whether it carried on by itself (In the background has a **Charger** line if iOS ran it).
 - **63 VoiceOver and the largest text.** With VoiceOver on, and again at the largest text size
-  (Settings > Accessibility > Display & Text Size > Larger Text): You > Downloads' Your library section
+  (the iPhone's Settings > Accessibility > Display & Text Size > Larger Text): You > Downloads' Your library section
   - each switch read as one, with its note as the hint, the line of what fits as one - the Library's
   card, and Downloading's row for your library. Nothing cut off or overlapping.
 
@@ -3379,13 +3379,13 @@ one on the phone is checked from 180.
   With something on its way and music playing, put the app in the background for a few minutes and bring it
   back: the board is current within a moment, as if it had been watching.
 - **177 Twice a second, and VoiceOver.** Leave Requests open over WireGuard for ten minutes with a download on its
-  way: does it keep up, and what does it cost the battery (Settings > Battery)? With VoiceOver on, watch a
+  way: does it keep up, and what does it cost the battery (the iPhone's Settings > Battery)? With VoiceOver on, watch a
   download move from Waiting to Downloading: "…: downloading" is heard, and VoiceOver stays where it was. Open and
   close a card's question at the largest text size: does the row jump?
 - **178 Now Playing over the tabs.** With a download on its way and the Library shown, play something and open Now
   Playing; wait a few seconds and close it. Without opening Requests, the badge still counts as the download moves,
   and goes once it's filed. The same with Now Playing opened from Search, and opened twice in a row.
-- **179 The largest text** (Settings > Accessibility > Display & Text Size > Larger Text, all the way up). On
+- **179 The largest text** (the iPhone's Settings > Accessibility > Display & Text Size > Larger Text, all the way up). On
   Requests the covers stay small and each title reads, on up to three lines; the ✕ and ▶ stay small circles. A
   card's question puts **Keep it** over **Cancel download**, and Needs attention puts **Another source · 2 left**
   over **Same source again**, each read whole. Nothing overlaps, and the last card clears the whole bar at the
@@ -3441,7 +3441,7 @@ same words. Check 187 wants logins on; the rest work either way. Use an album yo
 - **189 Only the newest answer.** On a slow connection, choose one pressing and then another quickly: the line never
   shows the first pressing's answer under the second. Open the sheet, Cancel, and Get the album again at once: only
   the second search's cards ever show.
-- **190 The largest text** (Settings > Accessibility > Display & Text Size > Larger Text, all the way up). Get the
+- **190 The largest text** (the iPhone's Settings > Accessibility > Display & Text Size > Larger Text, all the way up). Get the
   album reads whole; the line wraps rather than clips. In the sheet the chips scroll sideways, a card's facts go two
   by two and then one over another, each fact read whole ("FLAC, MP3 VBR 128-320k" on two lines, not cut off with
   "…"), the reasons read whole, and every Get stays in reach. Nothing overlaps.
@@ -3560,11 +3560,11 @@ not 166: Phase 6's checks are being written at the same time and take the number
 - **207 VoiceOver.** The bar reads as a tab bar, each tab its name, the one you're on selected. The switch reads
   "Library pages", each page a button, the one shown selected; the magnifying glass "Find in albums" (the page's
   own words); the ••• "More for the Library"; then Find's field and **Cancel**.
-- **208 The largest text** (Settings > Accessibility > Display & Text Size > Larger Text, all the way up): the
+- **208 The largest text** (the iPhone's Settings > Accessibility > Display & Text Size > Larger Text, all the way up): the
   tab bar's words stop growing; hold a finger on a tab: it shows large. The switch's names grow, then hold; one too
   long for its segment shrinks a little, then ends in "…", and holding a finger on it shows it large. Nothing
   overlaps, and every list still ends above the mini player and the bar.
-- **209 Reduce Motion** (Settings > Accessibility > Motion): a tap on the switch moves the page and its purple at
+- **209 Reduce Motion** (the iPhone's Settings > Accessibility > Motion): a tap on the switch moves the page and its purple at
   once, with no slide; Find comes and goes without sliding.
 
 ### Noto Sans's checks (210-217)
@@ -3688,7 +3688,7 @@ with Wi-Fi off. 237-243 want logins on, and 241 two accounts (one an admin); 244
 - **245 Offline, and Safari turned off.** Turn off Wi-Fi and WireGuard: Manage's rows dim and do nothing when
   tapped, the footer says "These open once deadwax is back.", Change password dims, and the album's ••• has no Edit
   in the web app. Turn the network back on: all of it works again without leaving You. Then, only if you're happy
-  to change Screen Time for a minute: turn Safari off (Settings > Screen Time > Content & Privacy Restrictions >
+  to change Screen Time for a minute: turn Safari off (the iPhone's Settings > Screen Time > Content & Privacy Restrictions >
   Allowed Apps) and tap Needs a look: nothing opens, and "Couldn't open the web app - Safari may be turned off in
   Screen Time." shows over the tabs for a few seconds. Turn Safari back on.
 - **246 The largest text, and VoiceOver.** At the largest text sizes, Manage's rows and the line under Edit an
@@ -3705,7 +3705,7 @@ with Wi-Fi off. 237-243 want logins on, and 241 two accounts (one an admin); 244
   right - there only once sources are shown, not while it's looking. Scroll down a little and tap it: the field opens
   above the chips with the words searched, the keyboard up, the list still where you left it; change them and tap
   **Search** - "Looking for …", then the cards. Tap the top one, then scroll to the end and tap the one under the
-  cards: the field moves down there; tap that one again and it closes. At a larger text size (Settings > Display &
+  cards: the field moves down there; tap that one again and it closes. At a larger text size (the iPhone's Settings > Display &
   Brightness > Text Size, one step up), the top one is a magnifying glass and the title still reads whole. With
   VoiceOver, both read "Search again, button, collapsed" (expanded once open).
 
@@ -3979,7 +3979,7 @@ choice (still app 0.13 (13)). No server change is needed. Compare the choices wi
 - **311 The first screen.** Top to bottom: you (the avatar and your name, or "No sign-in needed"); **Getting
   albums**, **Playback** and **Downloads** (its size at the right); Manage's rows, if you may look after deadwax;
   then **Account** (with logins on only), **This phone** - at its right the name or IP of deadwax's address: is it
-  the address's? - and **About**, "0.13 (13)" at its right. Each of the six opens its page, with **Back** and the
+  the address's? - and **About**, "0.13 (13)" at its right. Each opens its page, with **Back** and the
   edge swipe home again; Manage's rows still have their arrow and open Safari, as before. Pull the first screen down:
   it asks deadwax again (no spinner left behind).
 - **312 Getting albums' menus.** Open Getting albums: **When I tap Get**, **Quality floor** and **Format**, each one
@@ -4007,8 +4007,8 @@ choice (still app 0.13 (13)). No server change is needed. Compare the choices wi
   **Change address**, and **Debug** for an admin alone (signed in as someone who isn't one: no Debug). About:
   deadwax's version, Logins for an admin, App 0.13 (13). With logins off there's no Account row.
 - **317 About, when deadwax didn't answer.** Stop deadwax (or turn on Airplane Mode) and pull the first screen down,
-  then open About: the version says "Not known", with why under it. Start deadwax again (or turn Airplane Mode off)
-  and pull About down: the version is back and the note gone.
+  then open About: deadwax's version stays the one it last gave, with why it didn't answer under it. Start deadwax
+  again (or turn Airplane Mode off) and pull About down: the note goes.
 - **318 Back up.** Open Settings > Playback > EQ, then tap **Settings** in the tab bar: the first screen. At a large
   text size, scroll the first screen down and tap Settings again: its top. Library, Search and Requests do as they
   did.
@@ -4038,7 +4038,7 @@ These are the web app's for now:
 
 | what you see | what to do |
 | --- | --- |
-| **"Couldn't reach deadwax at ..."** on the address screen | Check the address, and that the phone is on your home Wi-Fi or WireGuard. If you said no to the local network question, turn deadwax on in Settings > Privacy & Security > Local Network. |
+| **"Couldn't reach deadwax at ..."** on the address screen | Check the address, and that the phone is on your home Wi-Fi or WireGuard. If you said no to the local network question, turn deadwax on in the iPhone's Settings > Privacy & Security > Local Network. |
 | **"Can't reach deadwax. Check you're on the right network (or your VPN is on) and try again."** as the app opens | The same: the phone's network, or deadwax itself. **Try again**, or **Change address** if deadwax has moved. What failed, for whoever runs deadwax, is folded away under it. |
 | **"Something went wrong on the server - try again in a moment."** as the app opens | deadwax answered, with an error. **Try again**; if it lasts, deadwax's log says why. |
 | Sign in: **"That user name and password didn't work."** | Your Navidrome user name and password, as on the web app. |
@@ -4049,9 +4049,9 @@ These are the web app's for now:
 | Library: **"Your music isn't available right now"** (an admin sees **"Can't reach Navidrome"**) | deadwax can't reach Navidrome. Check Navidrome is running, then **Try again**. |
 | Library: **"Your music isn't available yet"** (an admin sees **"Connect Navidrome"**) | deadwax hasn't been told where Navidrome is. An admin's **Set up Navidrome** opens the web app's Server settings in Safari: set Navidrome up on its Connections tab, **Save changes**, then come back. |
 | A row of Settings > **Manage** opens Safari on deadwax's **sign-in** | Safari has its own sign-in, apart from the app's. Sign in with the same name and password you use in the app: the page the row named opens, and Safari stays signed in after that (until it goes 30 days without use). See [Manage](#manage). |
-| A row of Settings > Manage opens a page saying **"This page needs a permission an admin hasn't given you"** (People: **"Only an admin can open People - it comes with being a Navidrome admin."**) | An admin took that permission away since deadwax last told the app - or Safari is signed in as someone other than you (below). Pull down on You: the row goes. Ask an admin if you need it. |
+| A row of Settings > Manage opens a page saying **"This page needs a permission an admin hasn't given you"** (People: **"Only an admin can open People - it comes with being a Navidrome admin."**) | An admin took that permission away since deadwax last told the app - or Safari is signed in as someone other than you (below). Pull down on Settings: the row goes. Ask an admin if you need it. |
 | A Manage page opens with **someone else's access** - more than you have, or less | Safari is signed in as someone else: it signs in apart from the app, and the page is Safari's person's. In Safari, open the web app's You and look at the name at its top; **Sign out**, then sign in as yourself. |
-| **"Couldn't open the web app - Safari may be turned off in Screen Time."** | iOS wouldn't open the address. Turn Safari back on in Settings > Screen Time > Content & Privacy Restrictions > Allowed Apps (or ask whoever set Screen Time up), then tap the row again. |
+| **"Couldn't open the web app - Safari may be turned off in Screen Time."** | iOS wouldn't open the address. Turn Safari back on in the iPhone's Settings > Screen Time > Content & Privacy Restrictions > Allowed Apps (or ask whoever set Screen Time up), then tap the row again. |
 | Settings > Manage's rows are **dimmed** | deadwax can't be reached ("These open once deadwax is back."). They work again as soon as it can. |
 | Library: **"Couldn't update this list - showing it as it was."** | deadwax didn't answer just then. ••• > Refresh to try again (pull down, on a list opened from the •••). |
 | An album's page: **"This album isn't here any more - it may have been moved or deleted."** | Go back, and ••• > Refresh in the Library to bring it up to date. |
@@ -4084,13 +4084,13 @@ These are the web app's for now:
 | An album stays on **"Waiting for Wi-Fi"** | Download over is Wi-Fi only (Settings > Downloads): join a Wi-Fi network that isn't a phone's hotspot, with Low Data Mode off - or choose Wi-Fi and cellular. |
 | **"Waiting for room - the storage limit is reached"** | Raise the Storage limit in Settings > Downloads, or remove something there (largest first). |
 | Your library's albums stay on **"Waiting for the phone to charge"** | Only while charging is on (Settings > Downloads, under Download your library): plug the phone in, or turn it off. Albums you download yourself don't wait for it. |
-| Your library didn't download with the app closed | iOS decides when the app runs in the background, and may not for hours; Background App Refresh off (the iPhone's Settings > General) or Low Power Mode stops it, and so does swiping deadwax away in the app switcher. Opening the app checks and downloads at once. You > Debug > Your library > In the background (an admin's) says whether iOS ran it. |
-| **"Waiting for space on this phone"** | The phone itself is full: make room in Settings > General > iPhone Storage. |
+| Your library didn't download with the app closed | iOS decides when the app runs in the background, and may not for hours; Background App Refresh off (the iPhone's Settings > General) or Low Power Mode stops it, and so does swiping deadwax away in the app switcher. Opening the app checks and downloads at once. Settings > This phone > Debug > Your library > In the background (an admin's) says whether iOS ran it. |
+| **"Waiting for space on this phone"** | The phone itself is full: make room in the iPhone's Settings > General > iPhone Storage. |
 | **"2 songs didn't download"**, with why ("The copy kept arriving the wrong size.", "The copy's sound didn't match the original.", "This song isn't on deadwax any more.") | **Try again** in Settings > Downloads. If it keeps failing, the file on the server may be damaged: play it on the web app. |
 | Settings > Downloads: **"This phone couldn't read its downloads - close deadwax from the app switcher and open it again."** | Downloads are off until the app opens again; nothing is deleted, and downloaded songs stream meanwhile. If it lasts, the phone may be nearly full. |
 | **"Not on this phone - it plays once deadwax is back."** | The song isn't downloaded and deadwax can't be reached. Download what you want offline before you go. |
 | The beep album isn't found | Make it with `make-test-album.py` into your music library (see "What you need"), let Navidrome scan it, then Check again in Settings > This phone > Debug (an admin's). |
-| **"Untrusted Developer"** when opening the app | Settings > General > VPN & Device Management > your Apple ID > Trust. |
+| **"Untrusted Developer"** when opening the app | The iPhone's Settings > General > VPN & Device Management > your Apple ID > Trust. |
 | The app won't open at all after a week | The free install ran out. Run `install.sh` again: nothing on the phone is lost. |
 | install.sh: **"No paired iPhone the Mac can reach now"** | Connect the cable and unlock the phone (or turn on Connect via network in Xcode, with the Mac and the phone on the same Wi-Fi), then run it again. |
 | install.sh: **"Xcode has changed ios/Deadwax.xcodeproj here"** | A team was picked in Xcode's Signing & Capabilities. Run `git checkout ios/Deadwax.xcodeproj`, keep the team in `ios/Config/Local.xcconfig`, and run install.sh again. |
