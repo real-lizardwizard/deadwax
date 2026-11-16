@@ -6,8 +6,10 @@
  * trackLabel) - with the words components/TrackTagEditor.tsx and app/EditPanel.tsx's TagsList say, read out of their
  * sources by pattern; and Artwork and Lyrics (slice 3) - lib/getResults.ts and lib/lyrics.ts run over made errors and
  * summaries, albumEdit.ts's lines over made folders, and components/LibraryParts.tsx's three Get buttons (when each is
- * drawn, its words) read by pattern; written as a fixture the Swift port (ios/DeadwaxKit/Sources/DeadwaxCore/
- * TagEdit.swift, TrackInspector.swift, GetResults.swift) replays in Tests/DeadwaxCoreTests/EditPartsVectorTests.swift.
+ * drawn, its words) read by pattern; and Delete (slice 4) - albumEdit.ts's deleteCounts, deleteOthers, deletesAll
+ * and words, myLibrary.ts's holdersText over made summaries and folders, and components/DeleteAlbumDialog.tsx's flow
+ * read by pattern; written as a fixture the Swift port (ios/DeadwaxKit/Sources/DeadwaxCore/TagEdit.swift,
+ * TrackInspector.swift, GetResults.swift, DeleteAlbum.swift) replays in Tests/DeadwaxCoreTests/EditPartsVectorTests.swift.
  *
  * Compiles the libraries with the repo's TypeScript and runs them AS THEY ARE over made inputs, plain to awkward (a
  * value with JavaScript's own white space round it, digits that aren't ASCII, a date of "July 2022", 1000 characters
@@ -44,7 +46,7 @@ const FIXTURE = path.join(REPO, 'ios', 'DeadwaxKit', 'Tests', 'DeadwaxCoreTests'
 const CHECK = process.argv.includes('--check')
 const MADE_BY = 'ios/scripts/export-edit-parts-vectors.cjs'
 const SOURCES = ['lib/tagEdit.ts', 'lib/trackInspector.ts', 'lib/trackFields.ts', 'lib/format.ts', 'lib/libraryTree.ts',
-  'lib/albumEdit.ts', 'lib/errorWords.ts', 'lib/getResults.ts', 'lib/lyrics.ts']
+  'lib/albumEdit.ts', 'lib/errorWords.ts', 'lib/getResults.ts', 'lib/lyrics.ts', 'lib/myLibrary.ts']
 const EDITOR = 'components/TrackTagEditor.tsx'
 const PANEL = 'app/EditPanel.tsx'
 
@@ -495,6 +497,70 @@ function buttonLabels() {
   return out
 }
 
+/* ===== Delete album: lib/albumEdit.ts's words and rules, lib/myLibrary.ts's holdersText, DeleteAlbumDialog's own ===== */
+
+const DIALOG = 'components/DeleteAlbumDialog.tsx'
+const M = require(path.join(OUT, 'lib/myLibrary.js'))
+
+//? the dialog's flow, as it is written: the summary read live, the button off until it has come, Cancel beside it
+says(DIALOG, 'const result = await libraryApi.deletionSummary(album.path)', 'the summary read as it opens')
+says(DIALOG, "setError(sayError(caught, '', { failed: DELETE_READ_FAILED }))", 'a failed read said')
+says(DIALOG, "setError(sayError(caught, '', { failed: DELETE_FAILED }))", 'a failed delete said')
+says(DIALOG, 'disabled={loading || deleting || !summary}', 'the button off until the summary')
+says(DIALOG, '{summary && holdersText(summary) && (', 'who holds it')
+
+const deleteWords = {
+  DELETE_TITLE: E.DELETE_TITLE,
+  DELETE_CHECKING: E.DELETE_CHECKING,
+  DELETE_READ_FAILED: E.DELETE_READ_FAILED,
+  DELETE_FAILED: E.DELETE_FAILED,
+  DELETE_WARNING: E.DELETE_WARNING,
+  DELETE_CONFIRM: E.DELETE_CONFIRM,
+  DELETING: E.DELETING,
+  cancel: piece(DIALOG, />\s*(Cancel)\s*<\/button>/, 'the Cancel button')[1],
+  //? what the panel says once its folder is gone (editStatus's first rule) - the phone says it to VoiceOver
+  deleted: E.editStatus({ deleted: 'Portishead/Dummy (1994)' }).text,
+}
+
+const SIZES = [0, 1, 1024 * 1024, 300 * 1024 * 1024, 524288 + 1048576 * 2, 1023.5 * 1048576, 1024 * 1048576,
+  1.25 * 1073741824, 1.05 * 1073741824, 12.96 * 1073741824]
+const NAMES = ['rip.log', 'album.cue', 'notes.txt', 'scans', 'Thumbs.db', 'booklet.pdf', 'folder.jpg', 'back.jpg',
+  'cd.m3u', 'EAC.log', 'info.nfo', 'lyrics.txt', 'spare.wav.bak', 'x']
+const HOLDERS = [undefined, [], ['ana'], ['ana', 'bo'], ['ana', 'bo', 'cy'], ['Zoë', 'O\'Neil', 'jim', 'x']]
+function deleteSummaries() {
+  const out = []
+  for (const total_bytes of SIZES) {
+    const audio_files = pick([0, 1, 2, 12, 37])
+    const other_file_count = pick([0, 0, 1, 3, 12, 13, 40])
+    const other_files = NAMES.slice(0, Math.min(other_file_count, 12))
+    for (const holders of HOLDERS) for (const yours of [undefined, false, true]) {
+      if ((holders === undefined) !== (yours === undefined)) continue
+      out.push({ audio_files, total_bytes, other_file_count, other_files, ...(holders ? { holders, yours } : {}) })
+    }
+  }
+  out.push({ audio_files: 3, total_bytes: 0, other_file_count: 0, other_files: [], holders_unknown: true })
+  out.push({ audio_files: 3, total_bytes: 0, other_file_count: 0, other_files: [], holders_unknown: true, holders: ['ana'], yours: true })
+  return out.map((summary) => ({
+    summary,
+    counts: E.deleteCounts(summary),
+    others: E.deleteOthers(summary),
+    holders: M.holdersText(summary),
+  }))
+}
+
+function deletesAllCases() {
+  const out = []
+  for (const from of ['store', 'release', 'name', 'folder', 'none']) for (const count of [0, 1, 2, 3]) {
+    for (const tracks of [0, 5, 12]) for (const songCount of [undefined, 5, 12, 13]) {
+      const folders = { from, paths: Array.from({ length: count }, (_, at) => `A/B ${at}`) }
+      const album = { id: 'al-1', name: 'B', ...(songCount === undefined ? {} : { songCount }) }
+      out.push({ folders, tracks, songCount: songCount ?? null, all: E.deletesAll(folders, tracks, album) })
+    }
+  }
+  out.push({ folders: null, tracks: 3, songCount: null, all: E.deletesAll(null, 3, undefined) })
+  return out
+}
+
 /* ===== written ===== */
 
 const out = {
@@ -516,6 +582,11 @@ const out = {
     summaries: summaries(),
     labels: buttonLabels(),
   },
+  delete: {
+    words: deleteWords,
+    summaries: deleteSummaries(),
+    deletesAll: deletesAllCases(),
+  },
 }
 fs.rmSync(OUT, { recursive: true, force: true })
 
@@ -531,7 +602,7 @@ function ascii(json) {
 const flat = (value) => ascii(JSON.stringify(value))
 
 const fixture = {
-  about: "Edit album's other parts (lib/tagEdit.ts, lib/trackInspector.ts, lib/trackFields.ts, lib/albumEdit.ts run as they are; components/TrackTagEditor.tsx's, app/EditPanel.tsx's and app/TrackInspector.tsx's words read out of their sources): Tags - the fields, shared values, edits, problems, notes, numbers and a track's page; Artwork and Lyrics (lib/getResults.ts, lib/lyrics.ts, components/LibraryParts.tsx's buttons) - when each Get is offered, its words, what it came to, and the pages' lines.",
+  about: "Edit album's other parts (lib/tagEdit.ts, lib/trackInspector.ts, lib/trackFields.ts, lib/albumEdit.ts run as they are; components/TrackTagEditor.tsx's, app/EditPanel.tsx's and app/TrackInspector.tsx's words read out of their sources): Tags - the fields, shared values, edits, problems, notes, numbers and a track's page; Artwork and Lyrics (lib/getResults.ts, lib/lyrics.ts, components/LibraryParts.tsx's buttons) - when each Get is offered, its words, what it came to, and the pages' lines; Delete (lib/albumEdit.ts, lib/myLibrary.ts holdersText, components/DeleteAlbumDialog.tsx) - what goes, who holds it, the words, and whether the album page goes back.",
   made_by: MADE_BY,
   made_from: Object.fromEntries(Object.keys(madeFrom).sort().map((key) => [key, madeFrom[key]])),
   ...out,
@@ -548,7 +619,8 @@ const body = [
 ].join('\n')
 
 const counted = `${out.tags.problems.length} problems, ${out.tags.notes.length} notes, ${out.tags.edits.length} edits, ${out.inspector.tracks.length} tracks, `
-  + `${out.artwork.albums.length} albums, ${out.artwork.problems.length} Get problems, ${out.artwork.summaries.length} lyrics summaries`
+  + `${out.artwork.albums.length} albums, ${out.artwork.problems.length} Get problems, ${out.artwork.summaries.length} lyrics summaries, `
+  + `${out.delete.summaries.length} deletion summaries, ${out.delete.deletesAll.length} deletesAll cases`
 if (CHECK) {
   if (!fs.existsSync(FIXTURE) || fs.readFileSync(FIXTURE, 'utf8') !== body) {
     console.log(`Edit album's parts' fixture differs from what the web app's TypeScript answers now: ${path.relative(REPO, FIXTURE)}.`)

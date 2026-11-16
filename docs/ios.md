@@ -54,7 +54,8 @@ the app itself, one build at a time: first **Edit album** - an album's folder, w
 it's matched to, chosen and applied on the phone, from the album's ••• or Settings > Manage > Edit an album (see [Edit
 album](#edit-album)). Then its **Tags**: each track's file, everything in it, and its tags edited on one track or many
 at once. Then its **Artwork** and **Lyrics**: the cover and CD art, each full screen, and Get cover, Get CD art and
-Get lyrics on the phone. Its Delete still opens the web app until its build.
+Get lyrics on the phone. Then its **Delete**: what deleting the folder takes, read as it is now, and whose libraries
+it's in, asked once more before it goes - and with it nothing in Edit album opens the web app any more.
 
 **Nothing of Phase 2, the lyrics, the EQ, the turntable, play history, your library downloaded,
 playlists, artists, songs, Search, Requests, Get or Manage has been seen on an iPhone yet.** It's built and tested on a Mac,
@@ -541,8 +542,7 @@ doesn't list. Pull down to read the library again.
 - **Edit**, with Edit albums: **Release** - the release the album is matched to, or "Not matched to a release" - opens
   the Release page (below), **Tags** ("12 tracks") the album's files, **Artwork** ("Cover, CD art", "No cover") its
   cover and CD art, and **Lyrics** ("8 of 12") how many tracks have lyrics (all below).
-- **Delete album…**, with Look after the library, still opens the album in the web app, in Safari, until the app has
-  it; the line under it says so.
+- **Delete album…**, in red, with Look after the library, opens the Delete album page (below).
 
 **Release** is the release, the fields, the cover and what Apply will do, top to bottom:
 
@@ -638,6 +638,26 @@ its button, with **Try again**; a lyrics fetch of a long album can take a few mi
 If its answer never comes, it's said as an Apply's is (below): the folder is read again, so whatever deadwax saved
 meanwhile shows.
 
+**Delete album** is the web app's Delete tab: it removes the album's folder from deadwax's library, with everything
+in it, for good. As it opens, deadwax reads the folder as it is now ("Checking what's in there…"): how many tracks
+and how big ("12 tracks · 412 MB"), then any other files in it by name, in amber, since one might be the only copy
+("and 2 other files:" over "rip.log, album.cue" - pictures and each track's own .lrc aren't counted), and, with logins
+on, whose libraries it's in, in amber: "In ana and bo's libraries: deleting it takes it out, and they'll see it was
+removed by an admin.", "In your library: deleting it takes it out.", or "Nobody has it in their library." When deadwax
+couldn't read who has it, it says so - never "nobody". If the folder can't be read, "Couldn't read that folder." and
+why, with **Look again**. Then, in red, "This deletes the folder and everything in it, permanently. There is no
+undo." over **Delete permanently**, which is off until all that has been read. Tap it and the phone asks once more -
+"Delete Dummy?", "There is no undo." - **Delete** in red, or **Cancel**, the one a stray tap lands on. "Deleting…";
+then the sheet closes (VoiceOver says "Deleted Portishead/Dummy (1994).") and the Library asks for its albums again,
+now and once Navidrome has scanned. When that folder was all the album had, its page goes back as well; an album in
+several folders keeps its page, which shows the rest once Navidrome has scanned. Songs of it downloaded to the phone
+still play from there, its page saying "This album isn't in the collection any more - the songs on this phone still
+play." Deleting is a write, as an Apply is: never beside one, or a Get, and off until the folder has been read again
+after one; nothing on the sheet can close it while it runs. If its answer never comes - or comes as a server error -
+it says "deadwax may have finished this - looking again" and reads the library again: the folder gone, it went, and
+the sheet closes; still there, "Couldn't delete it." under the button, and what's in it read again. A refusal says
+why, as deadwax put it ("That folder is not there any more.").
+
 **Typed work isn't lost by a swipe.** With something typed or chosen and not applied, the sheet can't be swiped away,
 and Close asks "Discard changes?" - **Discard**, or **Keep editing**.
 
@@ -649,8 +669,8 @@ the wait - the sheet says "deadwax may have finished this - looking again", read
 does out afresh: never the same Apply again on the old answer. Only a refusal (deadwax saying no before it wrote
 anything) keeps What Apply does as it was. If the library can't be read then, the sheet says "Couldn't read the
 library." with **Look again**, and nothing can be applied until it has been read. Only one write runs at a time: while
-Release applies or saves a cover, Edit tags' Apply and the Gets are dimmed, and the other way round - and after any of
-them, the others' previews are worked out again once the folder has been read.
+Release applies or saves a cover, Edit tags' Apply, the Gets and Delete permanently are dimmed, and the other way round
+- and after any of them, the others' previews are worked out again once the folder has been read.
 
 **When Navidrome gives the album a new id** - an applied release can - the album page under the sheet becomes the
 album's page as Navidrome has it now, on every tab it was open in, and VoiceOver says "The album page now shows the
@@ -4303,6 +4323,36 @@ in Safari, until the app has it." under it.
   Release's and Edit tags' Apply dimmed, and Close? With the largest text and VoiceOver: each CD art picture read as
   "disc.jpg - see it full size", the cover as "See the cover full size", every word whole.
 
+### Edit album's Delete checks (338-342)
+
+**Not done yet.** These come with the build that brings Edit album's [Delete album](#edit-album) into the app - Phase
+8's fourth part (still app 0.13 (13)). No server change is needed: any deadwax the first part works with. As in
+320-329: deadwax's plain `http://` address, on the home Wi-Fi and over WireGuard with Wi-Fi off; compare each with the
+same album's Delete tab in the web app. **There is no undo**: delete only folders put in the library for these checks
+(a test album filed from a download, or copied in), never one you want. Edit album opens the web app nowhere now -
+Release, Tags, Artwork, Lyrics and Delete album… are all pages of its own.
+
+- **338 Edit albums alone.** Signed in as someone an admin gave Edit albums but not Look after the library: Edit album
+  has Release, Tags, Artwork and Lyrics, and Needs a look's issues - but no **Delete album…** and no **It's fine as it
+  is**.
+- **339 What it deletes.** As an admin, a test album with a rip log or a cue sheet beside its tracks: **Delete
+  album…** says "Checking what's in there…", then its tracks and size ("12 tracks · 412 MB", as the web app's Delete
+  tab says), "and 1 other file:" in amber over "rip.log", and - with logins on - who has it ("In your library and
+  ana's: …", "Nobody has it in their library."). **Delete permanently** is dimmed until all of that has shown. Open it
+  with Wi-Fi and WireGuard off: the amber line, Delete permanently dimmed; back on, it's read again.
+- **340 Delete.** **Delete permanently**: "Delete Dummy?" and "There is no undo.", Delete in red and Cancel in bold -
+  **Cancel** deletes nothing. Again, and **Delete**: "Deleting…", then the sheet closes, the album page goes back, and
+  the Library no longer lists the album (pull down if it still does once Navidrome has scanned); nor does the web app's,
+  and the folder has gone from the disk. An album kept as one folder per disc: deleting one disc's folder keeps the
+  album page, which shows the other discs once Navidrome has scanned.
+- **341 Downloaded, then deleted.** Download a test album to the phone, then delete it: its songs still play from the
+  phone (find it under the Library's Downloaded), and its page says "This album isn't in the collection any more - the
+  songs on this phone still play.", with only Remove Download.
+- **342 Look after the library alone.** Signed in as someone with Look after the library but not Edit albums: Edit
+  album has the header and **Delete album…** only - no Release, Tags, Artwork, Lyrics or Needs a look. With the
+  largest text and VoiceOver on the Delete page: every line whole, Delete permanently read as a button, and the
+  question's Delete and Cancel.
+
 ## What it can't do yet
 
 These are the web app's for now:
@@ -4315,10 +4365,10 @@ These are the web app's for now:
   new words wait for deadwax.
 - **Home** and **pins** - and so Home's Arriving: outside Requests, the tab's badge is the phone's only sign of a
   download on its way.
-- **Looking after deadwax**, but for [Edit album](#edit-album)'s folder, Needs a look marks, Release, Tags, Artwork
-  and Lyrics: Settings > [Manage](#manage) opens each other tool in the web app, in Safari, and Change password too; so
-  does Edit album's Delete album…. Re-timing synced lyrics is Server settings', in the web app. Not linked from the
-  phone: the artist's managing (above), the web app's **Connections** (in its You) and Needs a look's count.
+- **Looking after deadwax**, but for [Edit album](#edit-album), all of it on the phone now: Settings >
+  [Manage](#manage) opens each other tool in the web app, in Safari, and Change password too. Re-timing synced lyrics
+  is Server settings', in the web app. Not linked from the phone: the artist's managing (above), the web app's
+  **Connections** (in its You) and Needs a look's count.
 
 ## When something goes wrong
 
@@ -4343,6 +4393,8 @@ These are the web app's for now:
 | Edit album: **"deadwax may have finished this - looking again"** | The Apply's answer didn't reach the phone (locked too long, or the connection dropped); deadwax carried on regardless. The sheet reads the folder again: check What Apply does - often "Nothing to change." - before applying again. |
 | Edit album's **Apply** stays dimmed | What Apply does is still being worked out (or a release's tracklist is loading), there's nothing to change, or deadwax can't be reached. |
 | Edit tags' **Apply** stays dimmed | A field says in amber what's wrong with it, What would change says "Nothing to change", it's still being worked out - or Release is applying or saving a cover, and Edit tags waits for it. |
+| Edit album's **Delete permanently** stays dimmed | deadwax is still reading what's in the folder ("Checking what's in there…"), or couldn't ("Couldn't read that folder." - **Look again**); another write is running, or the folder is still being read again after one; or deadwax can't be reached. |
+| Delete album: **"Couldn't delete it."** after "deadwax may have finished this - looking again" | The delete's answer never reached the phone, and the library read again still has the folder: it wasn't deleted. What's in it has been read again - **Delete permanently** to try again. |
 | Edit album's **Get cover**, **Get CD art** or **Get lyrics** stays dimmed | Another write is running (an Apply, a cover, another Get), the folder is still being read again after one, or deadwax can't be reached. Wait for it; after "Couldn't read the library.", **Look again**. |
 | Get CD art: **"No CD art on the Cover Art Archive for this release - a fanart.tv key in Server settings adds another source."** | Nobody has uploaded a picture of this pressing's disc. A fanart.tv key (Server settings, in the web app) lets deadwax look there too; then **Look again**. |
 | Get lyrics: **"… 2 failed - try again."** | LRCLIB didn't answer for those tracks just then (it's busy at times). Tap **Lyrics · …** to ask again: only the tracks still without lyrics are asked. "Not on LRCLIB" is LRCLIB having none - asking again won't change it. |

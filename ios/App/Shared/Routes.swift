@@ -442,6 +442,20 @@ final class AppNavigation {
         }
     }
 
+    /// (Phase 8, slice 4) An album Edit album deleted, nothing of it left in Navidrome (AlbumEdit.deletesAll): its page
+    /// gone from the top of the tab shown - only while it is what shows (App.tsx's `else if (showing) router.back()`).
+    func leaveAlbum(_ id: String) {
+        func left(_ stack: inout [AppRoute]) {
+            if case .album(let shown)? = stack.last, shown.id == id { stack.removeLast() }
+        }
+        switch tab {
+        case .library: left(&library)
+        case .search: left(&search)
+        case .requests: left(&requests)
+        case .you: left(&you)
+        }
+    }
+
     /// Back to the EQ page a page was pushed from ("Use for …", eq.md 3.7): every page over the topmost EQ page on the
     /// tab shown popped at once. Nothing when the tab holds no EQ page.
     func backToEQPage() {

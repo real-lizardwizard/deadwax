@@ -8,8 +8,8 @@ Edit, deadwax in reach, the album not gone), between Album info and Refresh, and
 (AppNavigation.albumEdit, MainTabs' one `.sheet(item:)`); Settings > Manage > Edit an album pushes Choose the folder,
 whose folder opens the same sheet; the sheet is its own NavigationStack, can't be swiped away with work in it, asks
 before discarding, and Close is off while an apply runs; the apply holds a background task; the album page asks again
-after a write and follows a new id; the choices are menu Pickers; nothing in Edit album opens a URL but the rows still
-in the web app (WebAppRow); the scan is asked without its tracks. Core's rules and words are held by EditVectorTests and
+after a write and follows a new id; the choices are menu Pickers; nothing in Edit album opens a URL (the last row
+in the web app, Delete album…, became a page of the phone's own in slice 4); the scan is asked without its tracks. Core's rules and words are held by EditVectorTests and
 RetagModelTests, the routes by tests/test_ios_edit_contract.py.
 """
 
@@ -158,7 +158,7 @@ def test_nothing_after_a_write_reaches_the_next_persons_pages():
     navigation = declared(routes, "class", "AppNavigation")
     assert "private(set) var session = 0" in navigation
     assert "session += 1" in block(navigation, navigation.index("{", navigation.index("func reset(")))
-    assert "made.attach(navigation)" in code(SHEET)
+    assert "made.attach(navigation, library: library)" in code(SHEET)
     model = code(MODEL)
     assert "session = navigation.session" in block(model, model.index("{", model.index("func attach(")))
     for name in ("func apply()", "func saveCoverOnly()", "private func wrote(", "private func lookForMove(",
@@ -204,7 +204,8 @@ def test_a_failed_read_is_said_with_look_again():
     release = code(RELEASE)
     assert "if retag.flow.readFailed {" in release and "ReadAgainFailed(model: model)" in release
     # the cover alone: off while the folder is to be read again or a write runs
-    assert ".disabled(incoming == nil || !retag.flow.canSaveCover || model.tagsApplying || model.getting)" in release
+    assert re.search(r"\.disabled\(incoming == nil \|\| !retag\.flow\.canSaveCover \|\| model\.tagsApplying \|\| "
+                     r"model\.getting\s*\|\| model\.deleting\)", release)
 
 
 def test_a_cancellation_is_neither_failure_nor_answer():
@@ -244,7 +245,8 @@ def test_each_part_of_the_root_is_its_permissions():
     assert "needsALook(album)" in block(sections, sections.index("{", gate))
     assert sections.count("needsALook(album)") == 1
     assert "if edit.editors, let retag = model.retag {" in sections
-    assert "if edit.delete, let url = webURL {" in sections
+    assert "if edit.delete {" in sections
+    assert "NavigationLink(value: EditPage.delete)" in block(sections, sections.index("{", sections.index("if edit.delete {")))
     marks = block(root, root.index("{", root.index("private func needsALook(")))
     assert "let marks = AlbumEdit.marksFine(server.access.permissions)" in marks
     assert "if marks, !outstanding.isEmpty {" in marks and "if marks {" in marks
@@ -259,18 +261,16 @@ def test_every_choice_is_a_menu():
             assert style not in text, f"{path.name} has {style}"
 
 
-def test_nothing_in_edit_album_opens_a_url_but_the_web_app_rows():
+def test_nothing_in_edit_album_opens_a_url():
+    # James: "nothing in the app should take you to the web app" - Tags since slice 2, Artwork and Lyrics since slice 3,
+    # Delete album… since slice 4 (tests/test_ios_edit_parts.py): no WebAppRow is left in Edit album
     for path in sorted(EDIT.glob("*.swift")):
         text = code(path)
-        for word in ("openURL", "UIApplication.shared.open(", "Link(destination:", "SFSafariViewController", "WKWebView"):
+        for word in ("openURL", "UIApplication.shared.open(", "Link(destination:", "SFSafariViewController", "WKWebView",
+                     "WebAppRow", "Managing.albumURL(", "Managing.url("):
             assert word not in text, f"{path.name} has {word}"
-    # the rows still in the web app are WebAppRow's (its own openURL.webApp, which says if iOS refuses it)
-    sheet = code(SHEET)
-    assert sheet.count("WebAppRow(") == 1
-    assert "WebAppRow(label: EditWords.deleteAlbum" in sheet
-    # Tags is the phone's own since slice 2, Artwork and Lyrics since slice 3 (tests/test_ios_edit_parts.py)
-    for part in ("tags", "artwork", "lyrics"):
-        assert f"WebAppRow(label: AlbumEdit.Part.{part}.label" not in sheet, part
+    core = (REPO / "ios" / "DeadwaxKit" / "Sources" / "DeadwaxCore" / "RetagFlow.swift").read_text(encoding="utf-8")
+    assert "inWebApp" not in core, "the words of a row that is gone"
 
 
 def test_the_scan_is_the_editors_own_and_asked_without_tracks():

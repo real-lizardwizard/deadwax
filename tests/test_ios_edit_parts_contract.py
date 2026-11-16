@@ -15,6 +15,10 @@ server's, as tests/test_ios_edit_contract.py holds slice 1's:
   folder (LRCLIB faked), CoverFetched and the 404 a release with no cover is, DiscArtFetched and a CD art picture asked
   by name (the Archive faked), a second Get never replacing what the first saved; how long each is waited for, worked
   out from the server's own timeouts; and the permission each is asked with.
+- Delete album (slice 4): what it SENDS - DeleteAlbumBody, DeleteRequest's one field, and the summary asked by the
+  folder - and what it READS: DeletionSummary from a real summary of a real folder holding a file the scan ignores (and
+  the logins-on keys the route writes), AlbumDeleted from a real delete, after which the scan no longer lists the folder
+  (what settles a delete that never answered); each refusal's words; how long each is waited for; and its permission.
 - and that its writes, sent with no Origin or Referer, are what the same-origin guard lets through.
 """
 
@@ -420,3 +424,82 @@ def test_artwork_and_lyrics_are_asked_with_the_permission_the_root_shows_them_fo
     editors = sheet.index("if edit.editors, let retag = model.retag {")
     assert editors < sheet.index("NavigationLink(value: EditPage.artwork)") < sheet.index("if edit.delete")
     assert editors < sheet.index("NavigationLink(value: EditPage.lyrics)") < sheet.index("if edit.delete")
+
+
+# ---------------------------------------------------------------------------- Delete album (slice 4)
+
+def test_the_delete_body_is_the_servers_model_and_the_summary_is_asked_for_the_folder():
+    assert sends("DeleteAlbumBody") == {"album_path"} <= set(library_route.DeleteRequest.model_fields)
+    assert "DeleteAlbumBody(albumPath: path)" in swift_function("EditClient.swift", "deleteAlbum")
+    # the dialog's read: the folder by its path, the route's one query name
+    assert '[("album", path)]' in swift_function("EditClient.swift", "deletionSummary")
+    assert "album" in inspect.signature(library_route.deletion_summary).parameters
+
+
+def test_the_summary_is_what_the_phone_reads_and_names_what_the_scan_ignores(client):
+    root = Path(Config.LIBRARY_PATH)
+    (root / ALBUM / "rip.log").write_text("Exact Audio Copy", encoding="utf-8")
+    answer = client.get("/deadwax/library/deletion_summary", params={"album": ALBUM})
+    assert answer.status_code == 200, answer.text
+    summary = answer.json()
+    fields = reads("DeletionSummary")
+    # logins off: what goes, and nobody to name (holdersText's null - nothing drawn)
+    assert {"audio_files", "total_bytes", "other_files", "other_file_count"} <= set(summary) <= fields, set(summary) - fields
+    assert summary["audio_files"] == len(FILES) and summary["total_bytes"] > 0
+    assert "rip.log" in summary["other_files"] and summary["other_file_count"] >= 1
+    # logins on: who holds it, or that deadwax couldn't read who does - the route's own keys, each one the phone reads
+    source = inspect.getsource(library_route.deletion_summary)
+    for key in ("holders_unknown", "yours", "holders"):
+        assert f'summary["{key}"]' in source and key in fields, key
+    # a folder that isn't the library's: refused with its words (the page's read failure, Look again)
+    refused = client.get("/deadwax/library/deletion_summary", params={"album": "../.."})
+    assert refused.status_code == 400 and refused.json()["detail"] == "that album is not inside the library"
+
+
+def test_a_delete_answers_what_the_phone_reads_and_the_next_read_no_longer_lists_it(client):
+    root = Path(Config.LIBRARY_PATH)
+    assert scanned(client)["path"] == ALBUM
+    answer = client.post("/deadwax/library/delete", json={"album_path": ALBUM})
+    assert answer.status_code == 200, answer.text
+    assert reads("AlbumDeleted") <= set(answer.json()) and answer.json()["deleted"] is True
+    assert not (root / ALBUM).exists()
+    # what settles a delete that never answered (DeleteFlow.went): the scan, read again, no longer lists it
+    albums = client.get("/deadwax/library/albums", params={"tracks": "false"}).json()
+    assert not albums.get("problem") and ALBUM not in [album["path"] for album in albums["albums"]]
+    # a second Delete is refused with its words, nothing deleted - a refusal, said under the button
+    again = client.post("/deadwax/library/delete", json={"album_path": ALBUM})
+    assert again.status_code == 400 and again.json()["detail"] == "that folder is not there any more"
+    outside = client.post("/deadwax/library/delete", json={"album_path": "../.."})
+    assert outside.status_code == 400 and outside.json()["detail"] == "that album is not inside the library"
+
+
+def test_a_folder_without_audio_is_refused_and_kept(client):
+    root = Path(Config.LIBRARY_PATH)
+    artist = ALBUM.split("/")[0]
+    answer = client.post("/deadwax/library/delete", json={"album_path": artist})
+    assert answer.status_code == 400 and answer.json()["detail"] == "that folder holds no audio, so it isn't an album"
+    assert (root / ALBUM).is_dir()
+
+
+def test_delete_is_waited_for_past_its_worst_case():
+    # the summary walks the folder once (no network); the delete walks it again, removes it, saves the scan and writes
+    # the store index - nothing on the network, no pause, no lock: as long as a folder's read, with margin
+    wait = timeouts()
+    assert wait["deletionSummary"] >= wait["libraryTracks"]
+    assert wait["deleteAlbum"] >= 2 * wait["deletionSummary"]
+    for route in (library_route.delete, library_route.deletion_summary):
+        source = inspect.getsource(route)
+        for slow in ("_pause_before_rename", "coverart_client", "_wait_for_navidrome_scan", "_album_lock", "lrclib"):
+            assert slow not in source, (route.__name__, slow)
+
+
+def test_delete_is_asked_with_the_permission_the_root_shows_it_for():
+    # Look after the library's (Managing.albumEdit's `delete`), as both routes are; the row is under its gate alone,
+    # never under Edit albums'
+    from tests.test_logins import ROUTES
+    assert ROUTES[("POST", "/deadwax/library/delete")] == "library"
+    assert ROUTES[("GET", "/deadwax/library/deletion_summary")] == "library"
+    sheet = (CORE.parent.parent.parent / "App" / "Edit" / "EditAlbumSheet.swift").read_text(encoding="utf-8")
+    gate = sheet.index("if edit.delete {")
+    assert gate < sheet.index("NavigationLink(value: EditPage.delete)")
+    assert sheet.index("NavigationLink(value: EditPage.lyrics)") < gate

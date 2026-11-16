@@ -23,13 +23,16 @@ enum EditPage: Hashable {
     case artwork
     /// Lyrics: how many tracks have them, and Get lyrics.
     case lyrics
+    /// Delete album: what deleting the folder takes, who holds it, and Delete permanently.
+    case delete
 }
 
 /// Edit album (notes/ios-specs/phase8-managing.md 3.2; the web's EditPanel, its title): a sheet over the tabs, its own
 /// navigation stack, drawn as iOS Settings is - a header and sections of rows, each row pushing a page - where the web
 /// has five tabs, which don't fit a phone's segmented control. Close at the leading edge; with typed work, or a write
 /// under way, the sheet can't be swiped away and Close asks "Discard changes?" first (Discard destructive, Keep
-/// editing the default); while an apply runs, Close is off - nothing on the sheet can close it.
+/// editing the default); while an apply runs, Close is off - nothing on the sheet can close it. A delete that went closes
+/// it (EditAlbumModel.deleted).
 ///
 /// It needs deadwax: opened while deadwax can't be reached it says so and asks nothing, opening by itself once it is
 /// back; gone out of reach while open, every page keeps what it drew under the amber line saying nothing can change
@@ -42,6 +45,7 @@ struct EditAlbumSheet: View {
     @Environment(ServerModel.self) private var server
     @Environment(Reachability.self) private var reachability
     @Environment(AppNavigation.self) private var navigation
+    @Environment(LibraryModel.self) private var library
     @Environment(\.dismiss) private var dismiss
     @Environment(\.scenePhase) private var scenePhase
     @State private var model: EditAlbumModel?
@@ -81,10 +85,14 @@ struct EditAlbumSheet: View {
             if model == nil {
                 let made = EditAlbumModel(request: request, client: server.client, admin: server.access.seesDetail,
                                           online: reachability.online)
-                made.attach(navigation)
+                made.attach(navigation, library: library)
                 model = made
             }
             await model?.open()
+        }
+        // the folder deleted: nothing left to edit
+        .onChange(of: model?.deleted == true) { _, gone in
+            if gone { dismiss() }
         }
         .onChange(of: reachability.online) { _, now in
             Task { await model?.reach(now) }
@@ -139,6 +147,8 @@ struct EditPageView: View {
                 if let album = model.album { ArtworkPage(model: model, album: album) }
             case .lyrics:
                 if let album = model.album { LyricsPage(model: model, album: album) }
+            case .delete:
+                if let album = model.album { DeletePage(model: model, album: album) }
             }
         }
         .editOutOfReach(!model.online)
@@ -146,7 +156,7 @@ struct EditPageView: View {
 }
 
 /// Edit album's root: the album's header, then its sections - the Folder menu with several folders, Needs a look, Edit
-/// (Release, Tags, Artwork, Lyrics), Delete album… (still the web app's) - each by the person's permissions (Core's
+/// (Release, Tags, Artwork, Lyrics), Delete album… (slice 4: its page) - each by the person's permissions (Core's
 /// Managing.albumEdit and AlbumEdit.marksFine). Without an album, what AlbumEdit.status says, with Look again and
 /// Choose the folder; several folders by name alone, the Folder menu alone, "Which folder is this album?" over it.
 struct EditAlbumRoot: View {
@@ -265,21 +275,15 @@ struct EditAlbumRoot: View {
                     .font(Typeface.footnote)
             }
         }
-        if edit.delete, let url = webURL {
+        // Look after the library's: its page says what goes and asks before anything does
+        if edit.delete {
             Section {
-                WebAppRow(label: EditWords.deleteAlbum, url: url, live: model.online)
-            } footer: {
-                Text(EditWords.inWebAppLine)
-                    .font(Typeface.footnote)
+                NavigationLink(value: EditPage.delete) {
+                    Text(EditWords.deleteAlbum)
+                        .foregroundStyle(Palette.danger)
+                }
             }
         }
-    }
-
-    /// Delete album…, not yet on the phone, opens the album in the web app: its page there, else (a folder opened from
-    /// Choose the folder, no album page behind it) the web app's Library.
-    private var webURL: URL? {
-        if let subject = model.subject { return Managing.albumURL(id: subject.id, at: server.address) }
-        return Managing.url(.edit, at: server.address)
     }
 
     private func header(_ album: ScanAlbum) -> some View {

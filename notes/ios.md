@@ -11502,3 +11502,129 @@ size, the thumbnails and full screen, Get cover's cover appearing on the album p
 real answers (synced or plain), a long Get lyrics locked, VoiceOver and the largest text. Nothing has run against a
 real deadwax, LRCLIB, the Cover Art Archive or fanart.tv: the routes' answers are the contract test's real routes over
 a two-file folder with those three faked.
+
+## Edit album's Delete on the phone (Phase 8, slice 4 - 2026-11-16)
+
+The spec's 3.6 (notes/ios-specs/phase8-managing.md): Edit album's **Delete album…** - what deleting the folder takes,
+read live, who holds it, the warning and Delete permanently, asked once more - on the phone, the last WebAppRow in Edit
+album gone. On the `ios` branch after slice 3 (310c21f); the app stays 0.13 (13); src/__init__.py untouched; no server
+or web change; the player engine has no diff.
+
+### Core (DeadwaxCore)
+
+- **DeleteAlbum.swift** (new): `DeleteWords` - DeleteAlbumDialog's words, lib/albumEdit.ts's since 2.1.30
+  (`DELETE_TITLE`, `DELETE_CHECKING`, `DELETE_READ_FAILED`, `DELETE_FAILED`, `DELETE_WARNING`, `DELETE_CONFIRM`,
+  `DELETING`, `deleteCounts` through Sources.size - the web's formatSize - and `deleteOthers`), myLibrary.ts's
+  `holdersText` (with its `listed`; `holders_unknown` said as unread, never as "nobody"), editStatus's "Deleted …."
+  for VoiceOver, and the phone's own question ("Delete Dummy?", "There is no undo.", Delete, Cancel) and page title.
+  `AlbumEdit.deletesAll` - albumEdit.ts's rule for whether the album page goes back. `DeletionSummary` (loose: the four
+  counts, and with logins on `holders`, `yours`, `holders_unknown`), `DeleteAlbumBody` (DeleteRequest's `album_path`),
+  `AlbumDeleted`. `DeleteFlow` - the page's state: the summary keyed to its folder, read with tickets (only the newest
+  lands; a cancelled read says nothing; a failed one leaves no summary), `canDelete(path)` only with this folder's
+  summary and nothing reading or deleting, `deleteEnded` by RetagFlow.outcome's rule (a refusal said; no answer or a
+  5xx said as maybe finished), `went(scan, path:)` (gone from a scan that read the library - nil for a scan with a
+  `problem`, which says nothing either way) and `settled(gone:)`.
+- **EditClient.swift / Routes.swift**: `deletionSummary(path:)` (GET `/library/deletion_summary?album`) and
+  `deleteAlbum(path:)` (POST `/library/delete`) - 78 routes. Timeouts from the server's own work (the contract test
+  checks them): the summary walks the folder once, nothing on the network - **60 s**, twice the track listing's; the
+  delete walks it again, removes it, saves the scan and writes the store index - **120 s**.
+- **EditWords.inWebApp** and **inWebAppLine** are gone (nothing says "in the web app" in Edit album now);
+  `EditWords.deleteAlbum` ("Delete album…") is the root's row.
+
+**Held to the web**: ios/scripts/export-edit-parts-vectors.cjs gains a delete section, appended after the others so their
+output is unchanged - lib/myLibrary.ts compiled with the rest, albumEdit.ts's words and `deleteCounts`/`deleteOthers`
+and myLibrary.ts's `holdersText` run over 112 made summaries (ten sizes from 0 to 13 GB, other-file counts past the
+twelve listed, holders from none to four - an accent, an apostrophe - with and without `yours`, and `holders_unknown`
+with and without holders beside it), `deletesAll` over 241 cases (each folder source x 0-3 folders x track and song
+counts, and no folders), editStatus's deleted line, and DeleteAlbumDialog.tsx's flow read by pattern and hashed into
+made_from (the summary read as it opens, the button off until it, a failed read's and a failed delete's words, the
+holders line, the Cancel button). The fixture is 454 KB. EditPartsVectorTests replays it (3 tests more).
+
+### The app
+
+- **Edit/DeletePage.swift** (new): `DeletePage`, pushed from the root's **Delete album…** (Palette.danger, under
+  `if edit.delete` - Look after the library's gate alone). Under the heading "Delete this album?": the album, its byline
+  and its path; then "Checking what's in there…", the counts, the other files (the lead in amber, the names quiet), who
+  holds it (amber), or the read's failure with Look again; then the warning in red over **Delete permanently**
+  (destructive, `.disabled(!model.canDelete)`, "Deleting…" with a spinner while it runs) and the delete's failure under
+  it. The button opens a `confirmationDialog` - title "Delete Dummy?" shown, message "There is no undo.", **Delete**
+  (destructive) and **Cancel** (`role: .cancel`, the default). Over the page: "deadwax may have finished this -
+  looking again" after a delete that never answered, and Couldn't read the library with Look again. The summary is read
+  by `.task(id: path|online)`: every time the page opens, for a folder the album is followed to, and back in reach -
+  never kept from before.
+- **EditAlbumModel**: `deletion` (DeleteFlow), `deleted`, `deleting` (in `applying`, so Close is off and the sheet can't
+  be swiped away while it runs), `canDelete` (in reach, an album, no write, no mark, the scan not being read, Release's
+  and Tags' `needsRead` clear, and the flow's own), `readDeletion()`, `delete()`: `deletesAll` decided before the
+  folder goes (from the folders as they are, as the web's dialog is given it), a BackgroundHold ("Edit album: Delete
+  album"), then - still the person the sheet opened for - gone; refused (said to VoiceOver, nothing more); or
+  unanswered: said as maybe finished, Release's and Tags' previews told the folder changed, the folder read again. The
+  next read that lands settles it (`lookUp`, by `DeleteFlow.went`): gone, it went; still there, "Couldn't delete it."
+  (or the 5xx's own words), the album followed and its summary read again. `gone()`: `deleted` (the sheet's
+  `.onChange` dismisses it), "Deleted …." to VoiceOver, the Library's lists asked again now and after
+  AlbumEdit.settleMs, and with an album page beneath - `deletesAll`: `AppNavigation.leaveAlbum(id)`; else
+  `wrote(before:)` (the page asked again now and once Navidrome has scanned). Apply, the cover alone, Tags' Apply and
+  the marks are guarded by `!deleting`, and Release's Apply and cover buttons dimmed by it.
+- **AppNavigation.leaveAlbum(id)**: the album's page popped from the tab shown, only while it's on top (App.tsx's
+  `else if (showing) router.back()`).
+- **LibraryModel.albumDeleted()**: the store's album index forgotten (asked again by the screen showing it), and with
+  a library of your own yours too, and your library asked again (the deleting admin's own entry is put away by the
+  server as the folder goes).
+- **EditAlbumSheet**: `EditPage.delete`, the root's row (the WebAppRow, its line and `webURL` gone), the LibraryModel
+  from the environment passed to `attach(_:library:)`, and the dismiss once `deleted`.
+
+### Decided here, and where the phone departs from the spec (or the web)
+
+- **The question's title isn't italic**: the spec's "Delete *Album*? There is no undo." - a confirmation dialog's title
+  is plain text on iOS, so the album's name is plain, and "There is no undo." is the dialog's message under it.
+- **The phone asks once more; the web doesn't** - its dialog is the confirmation, Enter deliberately not confirming.
+  On a phone the button is a tap away from a scroll, so the spec's action sheet is the second step, Cancel the default.
+- **A failed summary read has Look again** - the web's dialog has none (reopening it reads again); the phone's page
+  would otherwise have to be left and opened again.
+- **A delete that never answered, or answered a 5xx, is settled by the library's next read**, said as maybe finished
+  until then - the web just says the error. A 5xx can come after the folder has gone (the store index written after
+  the rmtree), so a 5xx is never taken as "not deleted". A read whose scan has a `problem` (the library unreadable)
+  decides nothing: the delete stays maybe finished until one that read the library lands.
+- **Its failure words sit under the button**, not at the top in red as the web's do - beside what was pressed, as the
+  Gets' are.
+- **A delete is a write**: never beside an Apply, the cover alone, a Get or a mark, off until the folder has been read
+  after one, and Close off while it runs (the web's panel can be closed mid-delete). Slice 1's review rule.
+- **The album page goes back only on the tab shown, and only while it's on top** - App.tsx's rule. A page of the same
+  album open on another tab stays; it shows what Navidrome says the next time it's looked at.
+- **The Library is asked again twice** - now (the store's list, and yours with a library of your own) and once
+  Navidrome has scanned (EDIT_SETTLE_MS, 10 s): Navidrome lists the album until its watcher scans the folder gone, so
+  the first answer may still have it. The web's album index isn't asked again on a delete at all (it ages a minute); the
+  spec asked for the phone's.
+- **Managing.albumURL stays in Core** with its vectors, though the app no longer opens an album in the web app;
+  WebAppRow stays for Manage's rows and Change password.
+- **Check 341 needs nothing new**: a downloaded album gone from the collection already plays from the phone and says
+  so (DownloadChoice's `gone`, the album page's line).
+
+### Tests
+
+- **DeleteAlbumTests** (new, 7): the summary asked by the folder and the delete's body (the web's), their timeouts, no
+  Origin; a 400's words and a refusal that can be tried again; answers missing fields read as nothing, unread holders
+  never "nobody"; only the newest summary landing, a cancelled read and a failed one; a delete that never answered or
+  answered a 5xx settled by the next read; deletesAll; `went` with a scan that couldn't read the library.
+- **EditPartsVectorTests** (3 more, 19): the delete words (and made_from); the 112 summaries' counts, others and
+  holders; the 241 deletesAll cases.
+- **tests/test_ios_edit_parts_contract.py** (6 more, 21): DeleteAlbumBody within DeleteRequest and the summary's one
+  query name; a real summary of a real folder with a rip log in it answering what DeletionSummary reads, the logins-on
+  keys in the route's source, a refusal's 400; a real delete answering AlbumDeleted, the folder gone from disk and from
+  the next scan (what `went` reads), a second delete and one outside the library refused with their words; an artist
+  folder refused as holding no audio, and kept; the timeouts against the routes' work; the permissions.
+- **tests/test_ios_edit_parts.py** (6 more, 17): the page and the root's row under its gate; the page's lines and its
+  read; Delete permanently asking first, Cancel the default; canDelete and the guards; `delete()`'s background task,
+  the unanswered path and lookUp's settling; gone - the dismiss, leaveAlbum, the Library's ask.
+- test_ios_edit.py (no WebAppRow or Managing URL left in Edit album, nor inWebApp in Core; the delete row's gate),
+  test_ios_contract.py (78 routes), ClientTests (78 routes and the timeouts).
+
+### Verified, and not
+
+On the Mac: `swift test` (1796 Core tests in 190 suites, 158 Audio in 17, 12 more, all passing); the unsigned
+generic-iOS Debug build, BUILD SUCCEEDED; the full pytest suite,
+4695 passed and 1 skipped; all 92 sims with Node 22 (iosedit running both exporters' `--check`).
+
+Not verified - only the phone can tell (docs/ios.md checks 338-342): the confirmation dialog's look and its Cancel in
+bold, the sheet closing and the album page going back beneath it, the Library dropping the album once Navidrome has
+scanned, a downloaded album still playing, VoiceOver and the largest text. Nothing has run against a real deadwax with
+logins on: the holders lines are the vectors' and the route's source, not a real ledger's answer.

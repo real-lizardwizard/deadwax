@@ -7,12 +7,18 @@ Read from the Swift source, as tests/test_ios_edit.py reads slice 1's. Tags: the
 Edit tags is a Form whose Apply is on only as RetagFlow says, and never beside another write; its Apply holds a
 background task, says an answer that never came, reads the folder again, and stops at a sign-out; its reads drop a
 cancellation and only the newest lands; out of reach and back it reads again. Artwork and Lyrics: rows pushing pages of
-the phone's own (Delete album… the one web app row left); the cover and CD art drawn, each full screen; each Get offered
-as LibraryParts offers it, its words by its last run, on only as EditAlbumModel.canGet says - never beside another
-write - held with a background task, the folder read again after anything that may have written, the other parts'
-previews waiting for that read, nothing more after a sign-out. Core's rules and words are held by EditPartsVectorTests,
-TagEditFlowTests and GetResultsTests, the routes by tests/test_ios_edit_parts_contract.py.
+the phone's own; the cover and CD art drawn, each full screen; each Get offered as LibraryParts offers it, its words by
+its last run, on only as EditAlbumModel.canGet says - never beside another write - held with a background task, the
+folder read again after anything that may have written, the other parts' previews waiting for that read, nothing more
+after a sign-out. Delete album (slice 4, the last web app row gone): a row of Look after the library's pushing a page of
+the phone's own that reads what goes live, names it and who holds it, and asks once more before Delete permanently,
+Cancel the default; never beside another write; held with a background task; one that never answered settled by the
+next read; once gone, the sheet closes, the album page goes back when nothing of it is left, and the Library asks
+again. Core's rules and words are held by EditPartsVectorTests, TagEditFlowTests, GetResultsTests and DeleteAlbumTests,
+the routes by tests/test_ios_edit_parts_contract.py.
 """
+
+import re
 
 from tests.test_ios_edit import EDIT, MODEL, SHEET, RELEASE, block, code, declared
 
@@ -84,9 +90,9 @@ def test_edit_tags_applies_only_as_the_flow_says_and_never_beside_another_write(
     assert "var canApply: Bool { ready && flow.canApply(plan, problems: problems.count) }" in model
     # the Release's writes are off while Tags' runs, and Tags' while one of them does
     release = code(RELEASE)
-    assert ".disabled(!retag.canApply || model.tagsApplying || model.getting)" in release
+    assert ".disabled(!retag.canApply || model.tagsApplying || model.getting || model.deleting)" in release
     edit = code(MODEL)
-    assert "var applying: Bool { retag?.flow.applying == true || tagsApplying || getting }" in edit
+    assert "var applying: Bool { retag?.flow.applying == true || tagsApplying || getting || deleting }" in edit
     for name in ("func apply()", "func saveCoverOnly()"):
         assert "guard !tagsApplying," in body(edit, name), name
     tags_apply = body(edit, "func applyTags()")
@@ -153,9 +159,9 @@ def test_artwork_and_lyrics_are_pages_of_the_phones_own():
     assert "LabeledContent(AlbumEdit.Part.artwork.label)" in artwork and "EditWords.artworkValue(album)" in artwork
     lyrics = body(sections, "NavigationLink(value: EditPage.lyrics)")
     assert "LabeledContent(AlbumEdit.Part.lyrics.label)" in lyrics and "EditWords.lyricsValue(album)" in lyrics
-    # Delete album… is the one row left in the web app, its line under it
-    delete = body(sections, "if edit.delete, let url = webURL {")
-    assert "WebAppRow(label: EditWords.deleteAlbum" in delete and "Text(EditWords.inWebAppLine)" in delete
+    # Delete album…, the last row that was the web app's, is a page of the phone's own since slice 4
+    delete = body(sections, "if edit.delete {")
+    assert "NavigationLink(value: EditPage.delete)" in delete and "WebAppRow" not in sheet
 
 
 def test_artwork_draws_the_cover_and_cd_art_and_offers_each_get_as_the_web_does():
@@ -213,7 +219,7 @@ def test_a_get_says_its_words_and_is_on_only_as_the_model_says():
     can = body(edit, "var canGet: Bool")
     for part in ("online", "album != nil", "!writing", "!marking", "!scan.reading", "retag?.flow.needsRead != true"):
         assert part in can, part
-    assert "var applying: Bool { retag?.flow.applying == true || tagsApplying || getting }" in edit
+    assert "var applying: Bool { retag?.flow.applying == true || tagsApplying || getting || deleting }" in edit
     assert "var getting: Bool { runs.values.contains { $0.state == .working } }" in edit
     # another folder's run is never shown
     assert "guard let run = runs[kind], run.path == album?.path else { return nil }" in body(edit, "func run(")
@@ -221,7 +227,8 @@ def test_a_get_says_its_words_and_is_on_only_as_the_model_says():
         assert "!getting," in body(edit, name), name
     assert "!getting," in body(edit, "func applyTags()")
     release = code(RELEASE)
-    assert ".disabled(incoming == nil || !retag.flow.canSaveCover || model.tagsApplying || model.getting)" in release
+    assert re.search(r"\.disabled\(incoming == nil \|\| !retag\.flow\.canSaveCover \|\| model\.tagsApplying \|\| "
+                     r"model\.getting\s*\|\| model\.deleting\)", release)
 
 
 def test_a_get_holds_a_background_task_reads_again_after_any_write_and_stops_at_a_sign_out():
@@ -242,3 +249,116 @@ def test_a_get_holds_a_background_task_reads_again_after_any_write_and_stops_at_
     # the maybe-finished line lasts until a read lands
     look = body(edit, "func lookUp()")
     assert look.index("case .landed:") < look.index("unansweredGet = nil") < look.index("settle()")
+
+
+# ---------------------------------------------------------------------------- Delete album (slice 4)
+
+DELETE_PAGE = EDIT / "DeletePage.swift"
+LIBRARY_MODEL = EDIT.parent / "Models" / "LibraryModel.swift"
+ROUTES = EDIT.parent / "Shared" / "Routes.swift"
+
+
+def test_delete_album_is_a_page_of_the_phones_own():
+    sheet = code(SHEET)
+    assert "case delete" in sheet
+    view = declared(sheet, "struct", "EditPageView")
+    assert "DeletePage(model: model, album: album)" in view
+    sections = body(declared(sheet, "struct", "EditAlbumRoot"), "private func albumSections(")
+    row = body(sections, "if edit.delete {")
+    assert "NavigationLink(value: EditPage.delete)" in row and "Text(EditWords.deleteAlbum)" in row
+    assert ".foregroundStyle(Palette.danger)" in row
+    # under Look after the library's gate alone: Edit albums alone has no Delete album… (check 338), Look after the
+    # library alone only it (342)
+    assert sections.index("if edit.editors, let retag = model.retag {") < sections.index("if edit.delete {")
+    assert "webURL" not in sheet and "inWebAppLine" not in sheet
+
+
+def test_the_page_says_what_goes_and_who_holds_it_as_the_dialog_does():
+    page = declared(code(DELETE_PAGE), "struct", "DeletePage")
+    # read live as the page opens - and for the folder followed to, and back in reach - never kept
+    assert '.task(id: "\\(album.path)|\\(model.online)") { await model.readDeletion() }' in page
+    assert "if delete.reading {" in page and "Text(DeleteWords.checking)" in page
+    assert "Text(DeleteWords.counts(summary))" in page
+    assert "if let others = DeleteWords.others(summary) {" in page and "Text(others.lead)" in page
+    assert "Text(others.names)" in page
+    assert "if let holders = DeleteWords.holders(summary) {" in page
+    assert "if let failure = delete.readFailure {" in page and "Task { await model.readDeletion() }" in page
+    assert "Text(DeleteWords.warning)" in page and "Text(DeleteWords.title)" in page
+    assert ".navigationTitle(DeleteWords.page)" in page
+
+
+def test_delete_permanently_asks_first_with_cancel_the_default():
+    page = declared(code(DELETE_PAGE), "struct", "DeletePage")
+    button = body(page, "Button(role: .destructive) {")
+    assert "asking = true" in button and "model.delete()" not in button
+    assert "delete.deleting ? DeleteWords.deleting : DeleteWords.confirm" in page
+    assert ".disabled(!model.canDelete)" in page
+    dialog = page[page.index(".confirmationDialog(DeleteWords.question(album.album), isPresented: $asking"):]
+    assert "titleVisibility: .visible" in dialog
+    assert "Button(DeleteWords.delete, role: .destructive) {" in dialog and "Task { await model.delete() }" in dialog
+    assert "Button(DeleteWords.cancel, role: .cancel) {}" in dialog
+    assert "Text(DeleteWords.noUndo)" in dialog
+    # a delete that never answered is said over the page, and a read that failed after it with Look again
+    assert "if delete.mayHaveFinished {" in page and "MayHaveFinished(reading: model.scan.reading)" in page
+    assert "ReadAgainFailed(model: model)" in page
+    assert "if let failure = delete.failure {" in page
+
+
+def test_a_delete_is_a_write_never_beside_another():
+    edit = code(MODEL)
+    can = body(edit, "var canDelete: Bool")
+    for part in ("online", "let album", "!writing", "!marking", "!scan.reading", "retag?.flow.needsRead != true",
+                 "tags?.flow.needsRead != true", "deletion.canDelete(album.path)"):
+        assert part in can, part
+    assert "var deleting: Bool { deletion.deleting }" in edit
+    for name in ("func apply()", "func saveCoverOnly()", "func applyTags()"):
+        assert "!deleting," in body(edit, name), name
+    assert "!deleting" in body(edit, "private func mark(")
+    release = code(RELEASE)
+    assert ".disabled(!retag.canApply || model.tagsApplying || model.getting || model.deleting)" in release
+
+
+def test_a_delete_holds_a_background_task_and_settles_one_that_never_answered():
+    edit = code(MODEL)
+    delete = body(edit, "func delete()")
+    assert "guard canDelete, let client, let before = album, deletion.beginDelete(before.path) else { return }" in delete
+    # decided before the folder goes, as the web's dialog is given it
+    assert delete.index("AlbumEdit.deletesAll(folders, tracks: before.trackCount, subject)") < delete.index(
+        "client.deleteAlbum(path: before.path)")
+    assert "BackgroundHold(named:" in delete and "defer { hold.end() }" in delete
+    assert "outcome = RetagFlow.outcome(of: error)" in delete
+    assert "said = EditWords.writeFailure(error, failed: DeleteWords.failed, admin: admin)" in delete
+    assert delete.index("guard samePerson else { return }") < delete.index("gone(before, all: all)")
+    unanswered = delete[delete.index("case .unanswered:"):]
+    for part in ("EditWords.mayHaveFinished", "retag?.folderChanged()", "tags?.folderChanged()",
+                 "unansweredDelete = (before, all)", "await lookUp()"):
+        assert part in unanswered, part
+    # the next read that lands says whether it went: gone from a scan that read the library - else read it again
+    look = body(edit, "func lookUp()")
+    assert "DeleteFlow.went(answer, path: pending.before.path)" in look
+    assert "deletion.settled(gone: went)" in look and "gone(pending.before, all: pending.all)" in look
+    assert look.index("deletion.settled(gone: went)") < look.index("await readDeletion()")
+    read = body(edit, "func readDeletion()")
+    assert "APIFailure.isCancellation(error)" in read and "deletion.readCancelled(ticket)" in read
+    assert "EditWords.said(error, failed: DeleteWords.readFailed, admin: admin)" in read
+
+
+def test_once_gone_the_sheet_closes_the_page_goes_back_and_the_library_asks_again():
+    edit = code(MODEL)
+    gone = body(edit, "private func gone(")
+    assert "deleted = true" in gone and "DeleteWords.deleted(before.path)" in gone
+    assert gone.count("library?.albumDeleted()") == 2 and "AlbumEdit.settleMs" in gone
+    assert "guard self.samePerson else { return }" in gone
+    assert "navigation?.leaveAlbum(id)" in body(gone, "if all {") and "wrote(before: before)" in gone
+    sheet = code(SHEET)
+    view = declared(sheet, "struct", "EditAlbumSheet")
+    assert ".onChange(of: model?.deleted == true) { _, gone in" in view and "if gone { dismiss() }" in view
+    assert "@Environment(LibraryModel.self) private var library" in view
+    # the page beneath goes back only while it is what shows (App.tsx's `else if (showing) router.back()`)
+    navigation = declared(code(ROUTES), "class", "AppNavigation")
+    leave = body(navigation, "func leaveAlbum(")
+    assert "if case .album(let shown)? = stack.last, shown.id == id { stack.removeLast() }" in leave
+    assert "switch tab {" in leave
+    library = body(code(LIBRARY_MODEL), "func albumDeleted()")
+    assert "index.forget(.store)" in library and "index.forget(.yours)" in library
+    assert "guard server.access.hasLibrary else { return }" in library and "await askMine()" in library

@@ -6,7 +6,8 @@ import Testing
 /// lib/albumEdit.ts run as they are, and components/TrackTagEditor.tsx's, app/EditPanel.tsx's and app/TrackInspector.tsx's
 /// words read out of their sources - replayed here through TagEdit, TagEditWords and TrackInspector, case for case
 /// (notes/ios-specs/phase8-managing.md 3.4); and lib/getResults.ts, lib/lyrics.ts and components/LibraryParts.tsx's
-/// three Get buttons through GetResults and GetRun (3.5).
+/// three Get buttons through GetResults and GetRun (3.5); and Delete album - lib/albumEdit.ts's delete words and deletesAll,
+/// lib/myLibrary.ts's holdersText and components/DeleteAlbumDialog.tsx's flow - through DeleteWords and AlbumEdit (3.6).
 @Suite struct EditPartsVectorTests {
     let fixture = try! JSONDecoder().decode(Web.self, from: Fixtures.data("edit/edit-parts-vectors.json"))
 
@@ -341,5 +342,62 @@ import Testing
         var cover = GetRun(kind: .cover, path: "A")
         cover.done()
         #expect(cover.wrote && cover.said == nil && GetResults.label(.cover, cover, trackCount: 1) == "Get cover")
+    }
+
+    // MARK: Delete album (slice 4)
+
+    static func deletion(_ web: Web) -> DeletionSummary {
+        EditVectorTests.decoded(DeletionSummary.self, web)
+    }
+
+    @Test func theDeleteWordsAreTheWebs() {
+        let words = fixture["delete"]["words"]
+        let diffs = ScreenDiffs()
+        diffs.text("DELETE_TITLE", DeleteWords.title, words["DELETE_TITLE"])
+        diffs.text("DELETE_CHECKING", DeleteWords.checking, words["DELETE_CHECKING"])
+        diffs.text("DELETE_READ_FAILED", DeleteWords.readFailed, words["DELETE_READ_FAILED"])
+        diffs.text("DELETE_FAILED", DeleteWords.failed, words["DELETE_FAILED"])
+        diffs.text("DELETE_WARNING", DeleteWords.warning, words["DELETE_WARNING"])
+        diffs.text("DELETE_CONFIRM", DeleteWords.confirm, words["DELETE_CONFIRM"])
+        diffs.text("DELETING", DeleteWords.deleting, words["DELETING"])
+        diffs.text("Cancel", DeleteWords.cancel, words["cancel"])
+        diffs.text("deleted", DeleteWords.deleted("Portishead/Dummy (1994)"), words["deleted"])
+        diffs.done()
+        expectMadeFrom(fixture, ["ui/src/lib/myLibrary.ts", "ui/src/components/DeleteAlbumDialog.tsx the Cancel button",
+                                 "ui/src/components/DeleteAlbumDialog.tsx the button off until the summary"])
+    }
+
+    @Test func whatGoesAndWhoHoldsItAreSaidAsTheWebSaysThem() {
+        let diffs = ScreenDiffs()
+        let rows = fixture["delete"]["summaries"].list
+        #expect(rows.count >= 100)
+        for (at, row) in rows.enumerated() {
+            let summary = Self.deletion(row["summary"])
+            diffs.text("\(at) counts", DeleteWords.counts(summary), row["counts"])
+            let others = DeleteWords.others(summary)
+            diffs.text("\(at) others lead", others?.lead, row["others"]["lead"])
+            diffs.text("\(at) others names", others?.names, row["others"]["names"])
+            diffs.text("\(at) holders", DeleteWords.holders(summary), row["holders"])
+        }
+        diffs.done()
+        // unread is never "nobody", whatever else came with it
+        let unread = DeletionSummary(audioFiles: 1, holders: [], yours: false, holdersUnknown: true)
+        #expect(DeleteWords.holders(unread)?.hasPrefix("deadwax couldn't read who has it") == true)
+        #expect(DeleteWords.holders(nil) == nil && DeleteWords.holders(DeletionSummary(audioFiles: 1)) == nil)
+    }
+
+    @Test func whetherTheAlbumPageGoesBackIsTheWebs() {
+        let diffs = ScreenDiffs()
+        let rows = fixture["delete"]["deletesAll"].list
+        #expect(rows.count > 200)
+        for (at, row) in rows.enumerated() {
+            let folders: AlbumEdit.Folders? = row["folders"].isNull ? nil
+                : AlbumEdit.Folders(paths: row["folders"]["paths"].list.compactMap(\.string),
+                                    from: AlbumEdit.From(rawValue: row["folders"]["from"].string!)!)
+            let subject = AlbumEdit.Subject(id: "al-1", name: "B", songCount: row["songCount"].int)
+            diffs.flag("\(at)", AlbumEdit.deletesAll(folders, tracks: row["tracks"].int!, row["folders"].isNull ? nil : subject),
+                       row["all"])
+        }
+        diffs.done()
     }
 }

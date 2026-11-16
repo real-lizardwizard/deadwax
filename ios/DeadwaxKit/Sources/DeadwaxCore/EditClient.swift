@@ -155,6 +155,19 @@ extension DeadwaxClient {
         return response.status == 200 ? response.body : nil
     }
 
+    // MARK: Delete (slice 4)
+
+    /// What deleting the folder takes (`/library/deletion_summary?album=`), read live - touches nothing.
+    public func deletionSummary(path: String) async throws -> DeletionSummary {
+        try await call(Routes.deletionSummary, as: DeletionSummary.self, query: [("album", path)])
+    }
+
+    /// Delete permanently (`POST /library/delete`): the folder and everything in it. A refusal (outside the library,
+    /// gone, no audio in it) is a 400 with its words.
+    public func deleteAlbum(path: String) async throws -> AlbumDeleted {
+        try await call(Routes.deleteAlbum, sending: DeleteAlbumBody(albumPath: path))
+    }
+
     static func json<Body: Encodable>(_ body: Body) throws -> Data {
         do {
             return try JSONEncoder().encode(body)

@@ -532,10 +532,7 @@ public enum EditWords {
     public static let edition = "Edition"
     public static let coverFullScreen = "The cover, full screen"
 
-    /// The editor slice 3 hasn't brought to the phone (Delete album…): a row that opens the album in the web app,
-    /// saying so, until its own slice lands.
-    public static let inWebApp = "In the web app"
-    public static let inWebAppLine = "Delete album… opens the album in the web app, in Safari, until the app has it."
+    /// The root's row pushing Delete album's page (slice 4) - the web's Delete album… button.
     public static let deleteAlbum = "Delete album…"
 
     /// A row's track count: "12 tracks".

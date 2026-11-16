@@ -182,7 +182,7 @@ struct ReleasePage: View {
                 }
                 .frame(maxWidth: .infinity)
             }
-            .disabled(!retag.canApply || model.tagsApplying || model.getting)
+            .disabled(!retag.canApply || model.tagsApplying || model.getting || model.deleting)
         }
     }
 
@@ -442,7 +442,8 @@ struct CompareCoversView: View {
                     }
                     // only once the pressing's cover has come (what it saves is what was looked at), no write under
                     // way, and the folder read since the last gap or write (RetagFlow.canSaveCover)
-                    .disabled(incoming == nil || !retag.flow.canSaveCover || model.tagsApplying || model.getting)
+                    .disabled(incoming == nil || !retag.flow.canSaveCover || model.tagsApplying || model.getting
+                              || model.deleting)
                     if let result = retag.coverResult {
                         Text(result)
                             .font(Typeface.footnote)

@@ -18,8 +18,9 @@ struct AlbumEditRequest: Identifiable, Equatable {
 
 /// Edit album's state (phase8-managing.md 3.1, 3.2, 3.7; the web's app/EditPanel.tsx): which folder the album is - the
 /// bridge's and the scan's answers through AlbumEdit.folders, or the folder picked - the album held once it is known,
-/// its Release (RetagModel), its Tags (TagsModel), its Gets (slice 3: Get cover, Get CD art, Get lyrics), what Needs a
-/// look says of it and the two marks, and everything after a write: the folder
+/// its Release (RetagModel), its Tags (TagsModel), its Gets (slice 3: Get cover, Get CD art, Get lyrics), Delete album
+/// (slice 4: the summary, Delete permanently, the sheet closing and the page going back), what Needs a look says of it
+/// and the two marks, and everything after a write: the folder
 /// read again, the album page beneath asked again now and once Navidrome has scanned, and - when the release changed -
 /// the album's new id in Navidrome looked for, the page beneath moved to it. Every rule is Core's; this asks and keeps.
 ///
@@ -58,12 +59,22 @@ final class EditAlbumModel {
     private(set) var runs: [GetResults.Kind: GetRun] = [:]
     /// A Get whose answer never came (or came as a 5xx): said as maybe finished until the folder's next read lands.
     private(set) var unansweredGet: GetResults.Kind?
+    /// Delete album (slice 4): the folder's summary, read live as its page opens, Delete permanently and how it ended.
+    private(set) var deletion = DeleteFlow()
+    /// The folder is gone - Delete permanently answered, or a delete that never answered isn't in the next read: the
+    /// sheet closes.
+    private(set) var deleted = false
     /// The cover drawn in the header and Compare covers - its mtime, so a cover replaced is asked again.
     var coverKey: String { album.map { "\($0.path)|\($0.artMtime)" } ?? "" }
 
     @ObservationIgnored var client: DeadwaxClient?
     @ObservationIgnored let admin: Bool
     @ObservationIgnored private(set) weak var navigation: AppNavigation?
+    /// The Library's lists, asked again once a folder is deleted.
+    @ObservationIgnored private weak var library: LibraryModel?
+    /// A delete whose answer never came (or came as a 5xx): the folder it was for, and whether it was all the album had
+    /// - settled by the next read that lands (gone from the scan: it went).
+    @ObservationIgnored private var unansweredDelete: (before: ScanAlbum, all: Bool)?
     /// AppNavigation's session when the sheet opened: once it moves on (a sign-out, another person), nothing after a
     /// write asks deadwax again or touches the pages.
     @ObservationIgnored private var session: Int?
@@ -83,9 +94,10 @@ final class EditAlbumModel {
         if case .folder = request.target { asked = true }
     }
 
-    /// The app's navigation - and the person the sheet opened for, with it.
-    func attach(_ navigation: AppNavigation) {
+    /// The app's navigation - and the person the sheet opened for, with it - and the Library's lists.
+    func attach(_ navigation: AppNavigation, library: LibraryModel) {
         self.navigation = navigation
+        self.library = library
         session = navigation.session
     }
 
@@ -129,8 +141,11 @@ final class EditAlbumModel {
     /// Typed work, or a write under way: the sheet isn't swiped away, and Close asks first.
     var holdsWork: Bool { retag?.unsaved == true || tags?.unsaved == true || writing || marking }
 
-    /// An apply is under way - a release's, (slice 2) a tag edit's or (slice 3) a Get: Close is off.
-    var applying: Bool { retag?.flow.applying == true || tagsApplying || getting }
+    /// An apply is under way - a release's, (slice 2) a tag edit's, (slice 3) a Get or (slice 4) a delete: Close is off.
+    var applying: Bool { retag?.flow.applying == true || tagsApplying || getting || deleting }
+
+    /// Delete permanently is under way: no other write starts.
+    var deleting: Bool { deletion.deleting }
 
     /// A tag edit's Apply is under way: no other write starts.
     var tagsApplying: Bool { tags?.flow.applying == true }
@@ -181,6 +196,19 @@ final class EditAlbumModel {
         switch read {
         case .landed:
             unansweredGet = nil
+            // a delete that never answered: the scan says whether it went
+            if let pending = unansweredDelete, let answer = scan.answer,
+               let went = DeleteFlow.went(answer, path: pending.before.path) {
+                unansweredDelete = nil
+                deletion.settled(gone: went)
+                if went {
+                    if samePerson { gone(pending.before, all: pending.all) }
+                    return
+                }
+                settle()
+                await readDeletion()
+                return
+            }
             settle()
         case .failed:
             // the read a write or a gap waits for: the wait ends, said with Look again (the sheet draws scan.failure)
@@ -296,7 +324,8 @@ final class EditAlbumModel {
     /// followed - and, the release changed, its new id looked for. Signed out meanwhile, nothing more: the next person's
     /// pages are none of this apply's business.
     func apply() async {
-        guard !tagsApplying, !getting, let retag, let client, let before = album, let body = retag.beginApply() else { return }
+        guard !tagsApplying, !getting, !deleting, let retag, let client, let before = album,
+              let body = retag.beginApply() else { return }
         let preview = retag.plan
         let hold = BackgroundHold(named: "Edit album: Apply")
         defer { hold.end() }
@@ -335,7 +364,7 @@ final class EditAlbumModel {
     /// The cover alone (RetagModel.saveCoverOnly): written - or maybe written, no answer or a 5xx, said as an apply's -
     /// the folder read again and the page beneath asked again; refused, nothing more.
     func saveCoverOnly() async {
-        guard !tagsApplying, !getting, let retag, let before = album,
+        guard !tagsApplying, !getting, !deleting, let retag, let before = album,
               let outcome = await retag.saveCoverOnly(path: before.path) else { return }
         guard samePerson else { return }
         if outcome == .unanswered {
@@ -352,7 +381,7 @@ final class EditAlbumModel {
     /// the same Apply on the old preview. Never while the Release is writing; signed out meanwhile, nothing more.
     func applyTags() async {
         guard let tags, let client, let before = album, !(retag?.flow.applying == true),
-              retag?.flow.savingCover != true, !getting, !marking, let body = tags.beginApply() else { return }
+              retag?.flow.savingCover != true, !getting, !deleting, !marking, let body = tags.beginApply() else { return }
         let hold = BackgroundHold(named: "Edit album: Edit tags")
         defer { hold.end() }
         let result: Result<TagEditResponse, any Error>
@@ -428,6 +457,92 @@ final class EditAlbumModel {
         wrote(before: before)
     }
 
+    // MARK: Delete album (slice 4)
+
+    /// Delete permanently may be pressed: in reach, an album held, no write or mark under way, the folder read since the
+    /// last write or gap, and this folder's summary in hand (DeleteAlbumDialog's `disabled={loading || deleting ||
+    /// !summary}`).
+    var canDelete: Bool {
+        guard online, let album, !writing, !marking, !scan.reading, retag?.flow.needsRead != true,
+              tags?.flow.needsRead != true else { return false }
+        return deletion.canDelete(album.path)
+    }
+
+    /// What deleting the folder held takes (DeleteAlbumDialog's read as it opens, and Look again): read live, only the
+    /// newest landing; a read the page called off (it left) says nothing, and a failed one leaves nothing to delete by.
+    func readDeletion() async {
+        guard let client, online, !deleting, let album else { return }
+        let ticket = deletion.beginRead(album.path)
+        do {
+            let summary = try await client.deletionSummary(path: album.path)
+            deletion.read(ticket, summary)
+        } catch {
+            if APIFailure.isCancellation(error) {
+                deletion.readCancelled(ticket)
+            } else {
+                deletion.readFailed(ticket, said: EditWords.said(error, failed: DeleteWords.readFailed, admin: admin))
+            }
+        }
+    }
+
+    /// Delete permanently, confirmed (DeleteAlbumDialog's `remove`, EditPanel's `albumDeleted`): the folder and
+    /// everything in it, held with a background task while iOS allows. Gone: `gone`. Refused (a 4xx): said under the
+    /// button, nothing deleted. No answer, or a 5xx (the folder can go before deadwax's index is told): said as maybe
+    /// finished, the other parts' previews waiting, the folder read again - gone from the scan, it went; still there, it
+    /// didn't, said, and its summary read again. Signed out meanwhile, nothing more.
+    func delete() async {
+        guard canDelete, let client, let before = album, deletion.beginDelete(before.path) else { return }
+        // decided now, from the folders as they are - as the web's dialog is given it: once the folder is gone the
+        // scan can't say what the album had
+        let all = AlbumEdit.deletesAll(folders, tracks: before.trackCount, subject)
+        let hold = BackgroundHold(named: "Edit album: \(DeleteWords.page)")
+        defer { hold.end() }
+        let outcome: RetagFlow.Outcome
+        var said: String?
+        do {
+            _ = try await client.deleteAlbum(path: before.path)
+            outcome = .applied
+        } catch {
+            outcome = RetagFlow.outcome(of: error)
+            said = EditWords.writeFailure(error, failed: DeleteWords.failed, admin: admin)
+        }
+        deletion.deleteEnded(outcome, said: said)
+        guard samePerson else { return }
+        switch outcome {
+        case .applied:
+            gone(before, all: all)
+        case .refused:
+            if let said { AccessibilityNotification.Announcement(said).post() }
+        case .unanswered:
+            AccessibilityNotification.Announcement(EditWords.mayHaveFinished).post()
+            retag?.folderChanged()
+            tags?.folderChanged()
+            unansweredDelete = (before, all)
+            await lookUp()
+        }
+    }
+
+    /// The folder is gone (EditPanel's `albumDeleted`, App.tsx's 'deleted'): said, the sheet closes (`deleted`), the
+    /// Library's lists asked again now and once Navidrome has scanned (AlbumEdit.settleMs) - and the album page beneath,
+    /// with nothing of the album left in Navidrome (`all`), goes back while it is what shows; a folder of several, the
+    /// page is asked again now and once Navidrome has scanned instead. A folder opened from Choose the folder has no page.
+    private func gone(_ before: ScanAlbum, all: Bool) {
+        deleted = true
+        AccessibilityNotification.Announcement(DeleteWords.deleted(before.path)).post()
+        library?.albumDeleted()
+        Task {
+            try? await Task.sleep(for: .milliseconds(AlbumEdit.settleMs))
+            guard self.samePerson else { return }
+            self.library?.albumDeleted()
+        }
+        guard let id = pageId else { return }
+        if all {
+            navigation?.leaveAlbum(id)
+        } else {
+            wrote(before: before)
+        }
+    }
+
     // MARK: Needs a look's marks
 
     /// It's fine as it is: exactly the issues shown marked fine (QueueRequest's note).
@@ -447,7 +562,7 @@ final class EditAlbumModel {
     }
 
     private func mark(failed: String, _ send: (DeadwaxClient) async throws -> Void) async {
-        guard let client, online, !marking else { return }
+        guard let client, online, !marking, !deleting else { return }
         marking = true
         markFailure = nil
         do {

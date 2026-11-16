@@ -180,6 +180,10 @@ public enum Routes {
     public static let lyricsFetch = Endpoint(method: "POST", path: "/deadwax/library/lyrics/fetch", query: [])
     public static let discArtFetch = Endpoint(method: "POST", path: "/deadwax/library/disc_art/fetch", query: [])
     public static let libraryDiscArt = Endpoint(method: "GET", path: "/deadwax/library/disc_art", query: ["album", "file"])
+    // Edit album's Delete (Phase 8, slice 4): what deleting the folder takes, read live, and the delete itself (both
+    // Look after the library's)
+    public static let deletionSummary = Endpoint(method: "GET", path: "/deadwax/library/deletion_summary", query: ["album"])
+    public static let deleteAlbum = Endpoint(method: "POST", path: "/deadwax/library/delete", query: [])
 
     /// The levels spec's name for `levelAlbum`: the album's levels warmed before its first play.
     public static var warmLevels: Endpoint { levelAlbum }
@@ -214,6 +218,7 @@ public enum Routes {
         libraryAlbums, releases, release, retagPreview, retagApply, artFetch, libraryArt, queueIgnore, queueUnignore,
         tagsPreview, tagsApply, trackPicture,
         lyricsFetch, discArtFetch, libraryDiscArt,
+        deletionSummary, deleteAlbum,
     ]
 
     /// The routes given longer than the transport's own 8 seconds to answer, in seconds: the album index reads every
@@ -258,8 +263,11 @@ public enum Routes {
     /// apiece), so a disc of twelve tracks takes 480 s at worst - given 600, and one still longer is said as maybe
     /// finished (Get lyrics only adds, so asking again is harmless); Get CD art lists the release's images on the
     /// Cover Art Archive (55 s), else asks fanart.tv (25 s), then fetches each disc's picture (55 s) - a box of four
-    /// discs 300 s at worst, given 360; a CD art picture a read of one file.
-    public static let timeouts: [Endpoint: Double] = [albumIndex: 30, autoEqSearch: 20, autoEqProfile: 20, libraryOwned: 30, fullySearch: 20, releaseGroup: 60, searchArtists: 20, searchSongs: 20, artistFacts: 60, discography: 60, jobs: 20, cancelJob: 30, retryJob: 60, retryJobSame: 30, clearJobs: 30, storeState: 20, findCandidates: 300, enqueue: 300, joinJob: 60, libraryAdd: 60, libraryTracks: 30, libraryAlbums: 120, releases: 60, release: 60, retagPreview: 60, retagApply: 480, artFetch: 120, libraryArt: 30, queueIgnore: 20, queueUnignore: 20, tagsPreview: 60, tagsApply: 120, trackPicture: 30, lyricsFetch: 600, discArtFetch: 360, libraryDiscArt: 30]
+    /// discs 300 s at worst, given 360; a CD art picture a read of one file. Delete's (slice 4): the summary walks the
+    /// folder (every file under it, the scan's ignored ones too) and, with logins on, reads who holds it from SQLite -
+    /// a folder's read, given a preview's 60; the delete removes the folder, then writes the saved scan and the store's
+    /// rows - no network, no wait - so it is given a tag apply's 120.
+    public static let timeouts: [Endpoint: Double] = [albumIndex: 30, autoEqSearch: 20, autoEqProfile: 20, libraryOwned: 30, fullySearch: 20, releaseGroup: 60, searchArtists: 20, searchSongs: 20, artistFacts: 60, discography: 60, jobs: 20, cancelJob: 30, retryJob: 60, retryJobSame: 30, clearJobs: 30, storeState: 20, findCandidates: 300, enqueue: 300, joinJob: 60, libraryAdd: 60, libraryTracks: 30, libraryAlbums: 120, releases: 60, release: 60, retagPreview: 60, retagApply: 480, artFetch: 120, libraryArt: 30, queueIgnore: 20, queueUnignore: 20, tagsPreview: 60, tagsApply: 120, trackPicture: 30, lyricsFetch: 600, discArtFetch: 360, libraryDiscArt: 30, deletionSummary: 60, deleteAlbum: 120]
 }
 
 /// The Cover Art Archive's thumbnail sizes the app asks deadwax's relay for (`Routes.archiveCover`'s `size`, which takes

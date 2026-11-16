@@ -438,6 +438,18 @@ final class LibraryModel {
         Task { await askMine() }
     }
 
+    /// (Phase 8, slice 4) Edit album deleted a folder: the store's albums asked again at the next look - and, with a
+    /// library of your own, yours and your library with them (the deleting admin's own entry is put away as it goes;
+    /// the web's announceAlbumsFiled after a delete). Called again once Navidrome has scanned (EditAlbumModel.gone).
+    func albumDeleted() {
+        index.forget(.store)
+        syncGeneration(.store)
+        guard server.access.hasLibrary else { return }
+        index.forget(.yours)
+        syncGeneration(.yours)
+        Task { await askMine() }
+    }
+
     /// (Phase 6, slice 3) Add to my library from the store line - a pressing the store holds that isn't yours, sent as a
     /// Get would download it (`POST /me/library/add`, the web's addToMyLibrary(download.release)): once deadwax has it,
     /// your library is asked again (libraryChanged - the web's announceAddedToLibrary). Throws deadwax's refusal for the
