@@ -16,7 +16,8 @@ import SwiftUI
 /// Without Look after the library it says so and asks nothing; opened out of reach it says it needs deadwax, and reads
 /// once deadwax is back. Gone out of reach over a list, the list stays under the amber line Edit album has, its rows off
 /// and a pull asking nothing; back, the library is read again (slice 6's review). A failed read is said in the page's
-/// own words (NeedsLookModel.failure), never the editor's, though they share the scan.
+/// own words (NeedsLookModel.failure), never the editor's, though they share the scan. Nothing is read under the sign-in
+/// over the app; once it goes, the page reads again (slice 7's review).
 struct NeedsLookScreen: View {
     @Environment(ServerModel.self) private var server
     @Environment(Reachability.self) private var reachability
@@ -92,6 +93,11 @@ struct NeedsLookScreen: View {
         .onChange(of: page.allowed) { _, allowed in
             guard allowed, visible else { return }
             Task { await model.shows(online: reachability.online) }
+        }
+        // signed in again over the app: what failed or was skipped under it is read again
+        .onChange(of: server.signInOver == nil) { _, clear in
+            guard clear, visible else { return }
+            Task { await model.signedInAgain() }
         }
     }
 

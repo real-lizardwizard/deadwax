@@ -12750,3 +12750,42 @@ that file passed 125 of 125 three times on its own); all 94 sims with Node 22, i
 vectors are unchanged: the 403 row's count is the web's). Not verified - only the phone can tell: checks 358 (the
 read after a reach blip, the session ended mid-run and signed in again) and 360 (a run stopping at the next album when
 Edit albums is taken away, and /me read again taking the runs from the page).
+
+### Needs a look and its count under the sign-in (16 Nov, from slice 7's review)
+
+Library care's review found the page still counted as shown under the sign-in over the app; traced on Needs a look
+(slice 6) and its count, the same was true, and each could ask:
+
+- **NeedsLookScreen's reach and scene reads.** The sign-in is a ZStack layer over MainTabs, so nothing under it gets
+  onDisappear: `.onChange(of: reachability.online)` (`model.reach`) and the scene coming back to the front
+  (`model.shows`) read the library under it, got a 401 and left "Couldn't check the library just now." (or a failed
+  first read) with nothing reading again after the sign-in. So could the page coming back on screen as Now Playing
+  closes under the sign-in (RootView closes it as the sign-in comes: the page's `.task` runs again).
+- **The steps.** Edit album is a `.sheet` on MainTabs, and a presented sheet sits above the root's ZStack, so (as
+  SwiftUI presents it - not seen on a phone) the editor stays up over the sign-in: ‹, Skip, Next album and Close still
+  reach `carry` - `review` (`POST /library/queue/reviewed`) and a session's ending read.
+- **The count** (QueueCountModel): Settings and Needs a look stay in `showing` under the sign-in, so the scene coming
+  back (`scene` -> `changed`), a page coming on screen as Now Playing closes (`shows`), or a write from the editor over
+  it (`managingWrites`) asked `/library/queue/summary` - a 401, the old number kept, and nothing asking again after.
+
+Gated as Library care's are, in the App (there is no rule of Core's to move: each is the App's own guard):
+NeedsLookModel's `read()` - every read of the page's goes through it: reach, shows, the pull, Try again, an ending - and
+`review()` ask nothing while `server.signInOver` is set (a read skipped is a read failed, a note skipped an album left
+new, as a 401 would leave them); NeedsLookScreen's `.onChange(of: server.signInOver == nil)` calls
+`model.signedInAgain()` while the page is visible - a read, unless Edit album is open on a session, whose scan this is
+(as `reach`). QueueCountModel's `ask()` passes `allowed` false under it (QueueCount.ask then changes nothing), its run
+loop treats a sign-in that came meanwhile as a failure (the one asked again waits), and MainTabs'
+`.onChange(of: server.signInOver == nil)` calls `queueCount.changed()` as it goes - asked only with a page up that
+uses it. tests/test_ios_needs_look.py pins each gate and both onChanges, and that the page has one scan read and one
+note to gate.
+
+Not touched, for the coordinator: Edit album itself over the sign-in. Its sheet (like the EQ's and Add to a playlist's)
+stays up over it, so its own reads and writes can still be asked and refused with a 401 - RootView closes only Now
+Playing as the sign-in comes. Whether to close the editor (losing anything typed) or gate its writes is Edit album's
+decision, not this page's.
+
+Verified on the Mac: `swift test` (1915 Core tests in 200 suites, 158 Audio in 17, 12 more, all passing - nothing of
+Core changed); the unsigned generic-iOS Debug build, BUILD SUCCEEDED, no warning; the full pytest suite run alone,
+4893 passed and 1 skipped (the cover-art relay's timing test with it, unloaded); all 94 sims with Node 22. Not
+verified - only the phone can tell (docs/ios.md check 354): the page and the count under the sign-in, and the read
+and the count after signing in again; and whether Edit album's sheet really stays up over the sign-in.

@@ -13,7 +13,9 @@ import SwiftUI
 /// one comes on screen, on its pull, as the app comes back from the background with one up, and when something may have
 /// moved the count meanwhile - a managing write, an album noted as looked at, Look after the library given. Never at
 /// start-up on another tab, and once for each of those (a page that comes on screen asks once, however often SwiftUI
-/// says it appeared). Another person: let go (`reset`), an answer still out for the last one dropped.
+/// says it appeared). Never under the sign-in over the app (slice 7's review: the pages under it still count as shown,
+/// and Now Playing closing under it brings one on screen) - its 401 would only keep the old number; MainTabs asks again
+/// as it goes. Another person: let go (`reset`), an answer still out for the last one dropped.
 @MainActor
 @Observable
 final class QueueCountModel {
@@ -75,9 +77,12 @@ final class QueueCountModel {
         }
     }
 
-    /// Ask (again) - when this person may: one request out at a time, one more once it is over when asked meanwhile.
+    /// Ask (again) - when this person may, and not under the sign-in over the app: one request out at a time, one more
+    /// once it is over when asked meanwhile.
     private func ask() {
-        guard count.ask(allowed: Managing.asksQueueSummary(server.access.permissions)) else { return }
+        guard count.ask(allowed: Managing.asksQueueSummary(server.access.permissions) && server.signInOver == nil) else {
+            return
+        }
         let ticket = generation
         Task { await run(ticket) }
     }
@@ -87,7 +92,8 @@ final class QueueCountModel {
         var again = true
         while again {
             guard ticket == generation else { return }
-            guard let client = server.client else {
+            // the sign-in came over the app meanwhile: the one asked again waits for it to go (MainTabs)
+            guard let client = server.client, server.signInOver == nil else {
                 again = count.failed()
                 continue
             }

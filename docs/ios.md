@@ -1977,7 +1977,8 @@ once it's back." and reads it once deadwax is back; one that has keeps its list 
 ("deadwax is out of reach - this is how it was, and nothing here can change until it's back."), its rows can't be
 tapped and a pull asks nothing - and the library is read again once deadwax is back. If an
 admin took Look after the library away, it says "This page needs a permission an admin hasn't given you - ask one if
-you need it.", and asks nothing.
+you need it.", and asks nothing. When your session ends, nothing is read, noted or counted under the sign-in; sign in
+again and the page reads the library again, and the count follows.
 
 VoiceOver reads each row once - its album, artist and edition, and what's wrong with it or what became of it ("The
 Slow Rush, Tame Impala, New, No cover art"), with "Open" on the one Edit album has open - and the Show menu as "Show,
@@ -4739,8 +4740,11 @@ albums put in it for these checks (a test album filed from a download, or copied
   been read again - Skip then says Next album. Tap "It's fine as it is": the same, until the album has been read
   again. Wi-Fi and WireGuard off: the steps dimmed; on Needs a look the amber line at the top, the rows can't be
   tapped, and a pull asks nothing - back on, "Checking the library…" and the list read again. Open Needs a look from
-  Settings while off: "Managing needs deadwax. This opens once it's back.", then the list once it's back. As someone
-  with Look after the library but not Edit albums: the top line ends "to see what it has, or to delete it." with
+  Settings while off: "Managing needs deadwax. This opens once it's back.", then the list once it's back. As a second
+  person (logins on) on Needs a look, have an admin reset their password in People on the Mac (it ends their
+  sessions): the sign-in comes over the app; lock and unlock the phone, Wi-Fi off and on - then sign in again: the list
+  is read again, with no "Couldn't check the library just now." left over, and Settings' count is the web app's. As
+  someone with Look after the library but not Edit albums: the top line ends "to see what it has, or to delete it." with
   "Fixing it needs Edit albums, which an admin hasn't given you."; an album opens with Delete album… alone. With the
   largest text and VoiceOver: each row read once ("The Slow Rush, Tame Impala, New, No cover art"), Show as "Show,
   All", the foot's "Previous album", "2 of 9" and "Skip", each step said ("3 of 9: …"), every line whole. With Reduce

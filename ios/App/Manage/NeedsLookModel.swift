@@ -18,7 +18,10 @@ import SwiftUI
 /// after it has landed (Ending), and the list is worked out again from it.
 ///
 /// Nothing is done past a sign-out (`samePerson`, AppNavigation's session when the page opened): the next person's
-/// page is none of this one's business.
+/// page is none of this one's business. Nothing is read or noted under the sign-in over the app (slice 7's review): the
+/// page still counts as shown under it, and Edit album's sheet stays up over it, so a reach or scene change, the page
+/// coming back as Now Playing closes, or a step in the editor would only get a 401 - a read skipped is a read failed,
+/// a note skipped an album left new, as a 401 would leave them; once the sign-in goes, the page reads again.
 @MainActor
 @Observable
 final class NeedsLookModel {
@@ -174,11 +177,18 @@ final class NeedsLookModel {
         await read()
     }
 
-    /// The library read again (the page's failure words are its own - `failure`).
+    /// The library read again (the page's failure words are its own - `failure`) - never under the sign-in over the app.
     func read() async {
-        guard samePerson, page.allowed else { return }
+        guard samePerson, page.allowed, server?.signInOver == nil else { return }
         await scan.read(client: server?.client, admin: admin)
         settle()
+    }
+
+    /// The sign-in over the app went (signed in again as the same person, or logins turned off), the page showing: what
+    /// failed or was skipped under it read again - unless Edit album is open on a session, whose scan this is (`reach`).
+    func signedInAgain() async {
+        guard shown, online, session == nil else { return }
+        await read()
     }
 
     /// A pull: the count asked and the library read again - never out of reach (the line at the top says so).
@@ -268,9 +278,9 @@ final class NeedsLookModel {
     }
 
     /// The album noted as looked at, then the count asked again. Settles either way: a failure is said nowhere, as the
-    /// web's isn't - the album stays new, and comes back.
+    /// web's isn't - the album stays new, and comes back. Never under the sign-in over the app (a 401 for certain).
     private func review(_ path: String?) async {
-        guard let path, samePerson, let client = server?.client else { return }
+        guard let path, samePerson, server?.signInOver == nil, let client = server?.client else { return }
         do {
             _ = try await client.markReviewed(path: path)
             guard samePerson else { return }

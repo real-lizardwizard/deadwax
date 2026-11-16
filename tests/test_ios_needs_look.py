@@ -101,7 +101,7 @@ def test_the_routes_are_the_servers_by_method_path_and_permission():
     # asks only with Look after the library (NeedsLookModel's reads are guarded by page.allowed)
     assert ROUTES[("GET", "/deadwax/library/albums")] == "user"
     page_model = app_file("Manage", "NeedsLookModel.swift")
-    assert "guard samePerson, page.allowed else { return }" in swift_like(page_model, "read")
+    assert "guard samePerson, page.allowed, server?.signInOver == nil else { return }" in swift_like(page_model, "read")
     assert "guard page.allowed, online, samePerson else { return }" in swift_like(page_model, "look")
     assert 'request(Routes.libraryAlbums, query: [("tracks", "false")])' in swift_function("EditClient.swift",
                                                                                            "libraryScan")
@@ -178,7 +178,8 @@ def test_the_count_and_a_note_are_waited_for_past_the_routes_worst_case():
 def test_the_count_is_asked_as_the_web_asks_it():
     model = app_file("Manage", "QueueCountModel.swift")
     # one request out at a time, never without Look after the library, an answer for the last person dropped
-    assert "guard count.ask(allowed: Managing.asksQueueSummary(server.access.permissions)) else { return }" in model
+    assert ("guard count.ask(allowed: Managing.asksQueueSummary(server.access.permissions) && server.signInOver == nil)"
+            " else {") in model
     assert "let summary = try await client.queueSummary()" in model
     assert model.count("guard ticket == generation else { return }") == 3
     assert "Timer" not in model and "sleep" not in model, "the count is never polled"
@@ -215,6 +216,11 @@ def test_the_count_is_asked_only_while_a_page_that_uses_it_shows():
     assert ".onChange(of: navigation.managingWrites) { _, _ in queueCount.changed() }" in tabs
     assert ".onChange(of: scenePhase) { _, phase in queueCount.scene(phase) }" in tabs
     assert ".onChange(of: Managing.asksQueueSummary(server.access.permissions)) { _, asks in" in tabs
+    # (slice 7's review) never under the sign-in over the app - Settings and Needs a look still count as shown under
+    # it, and Now Playing closing under it brings one on screen - and asked again as it goes; one asked again while a
+    # request was out waits for it too
+    assert "guard let client = server.client, server.signInOver == nil else {" in swift_like(model, "run")
+    assert ".onChange(of: server.signInOver == nil) { _, clear in\n            if clear { queueCount.changed() }" in tabs
     assert "Managing.asksQueueSummary(server.access.permissions), initial: true" not in tabs, "never at start-up on another tab"
     # nothing anywhere else asks it
     for path in APP.rglob("*.swift"):
@@ -228,6 +234,17 @@ def test_the_count_is_asked_only_while_a_page_that_uses_it_shows():
     assert "guard online, samePerson, page.allowed else { return }" in pulled
     assert pulled.index("count?.pulled()") < pulled.index("await read()")
     assert ".refreshable {\n            await model.pulled()\n        }" in screen
+    # (slice 7's review) nothing read or noted under the sign-in over the app: every read of the page's goes through
+    # read() (reach, shows, the pull, Try again, a session's ending) and every note through review() - the editor's
+    # sheet stays up over the sign-in, so its steps reach them - and once it goes, the page reads again
+    assert "guard samePerson, page.allowed, server?.signInOver == nil else { return }" in swift_like(page, "read")
+    assert "guard let path, samePerson, server?.signInOver == nil, let client = server?.client else { return }" \
+        in swift_like(page, "review")
+    assert page.count("scan.read(client:") == 1 and page.count("client.markReviewed(") == 1
+    again = swift_like(page, "signedInAgain")
+    assert "guard shown, online, session == nil else { return }" in again and "await read()" in again
+    assert ".onChange(of: server.signInOver == nil) { _, clear in\n            guard clear, visible else { return }\n" \
+           "            Task { await model.signedInAgain() }" in screen
 
 
 def test_every_write_asks_the_count_again_and_tells_the_page():

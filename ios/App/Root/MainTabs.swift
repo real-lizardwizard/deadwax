@@ -111,6 +111,10 @@ struct MainTabs: View {
         .onChange(of: Managing.asksQueueSummary(server.access.permissions)) { _, asks in
             if asks { queueCount.changed() }
         }
+        // (slice 7's review) nothing is asked under the sign-in over the app: once it goes, asked again with a page up
+        .onChange(of: server.signInOver == nil) { _, clear in
+            if clear { queueCount.changed() }
+        }
     }
 
     /// The key window's bottom safe area (`home`'s), 0 before there is a window.
