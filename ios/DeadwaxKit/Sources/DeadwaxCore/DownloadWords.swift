@@ -156,11 +156,12 @@ public enum DownloadWords {
     }
 
     /// A wait a setting causes, its second line in the control's menu (3.1): where the setting is - never a way round it.
+    /// (16 Nov) Settings > Downloads, the tab You was.
     public static func waitSetting(_ reason: DownloadWait, limit: StorageLimit) -> String? {
         switch reason {
-        case .wifi, .hotspot, .lowData: return "Download over is Wi-Fi only - in You > Downloads."
-        case .room: return "The storage limit is \(limit.label) - in You > Downloads."
-        case .charging: return "Only while charging is on - in You > Downloads."
+        case .wifi, .hotspot, .lowData: return "Download over is Wi-Fi only - in Settings > Downloads."
+        case .room: return "The storage limit is \(limit.label) - in Settings > Downloads."
+        case .charging: return "Only while charging is on - in Settings > Downloads."
         default: return nil
         }
     }

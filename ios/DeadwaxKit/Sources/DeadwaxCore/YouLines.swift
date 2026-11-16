@@ -1,12 +1,16 @@
 import Foundation
 
-/// The You tab's words (Phase 1, app 0.2): the web's ui/src/app/You.tsx and lib/permissions.ts where the phone shows
-/// what the web does, and the phone's own where it doesn't (screens.md 8). Held to the TypeScript by
-/// Tests/DeadwaxCoreTests/Fixtures/you/you.json, which ios/scripts/export-you-vectors.cjs reads out of You.tsx and
-/// permissions.ts as written (ui/test/iosyou.sim.cjs runs it with --check).
+/// The Settings tab's words - the You tab until 16 Nov (Phase 1, app 0.2): the web's ui/src/app/You.tsx and
+/// lib/permissions.ts where the phone shows what the web does, and the phone's own where it doesn't (screens.md 8).
+/// Held to the TypeScript by Tests/DeadwaxCoreTests/Fixtures/you/you.json, which ios/scripts/export-you-vectors.cjs
+/// reads out of You.tsx and permissions.ts as written (ui/test/iosyou.sim.cjs runs it with --check).
 public enum YouWords {
-    /// The tab's name and title.
-    public static let title = "You"
+    /// The tab's name and its root's title: Settings (16 Nov, James: "instead of "you", let's just use settings"). The
+    /// web app's tab is still You (`webTitle`), a departure on purpose that ScreenYouTests names; the phone's lines that
+    /// point at the web app's own tab (Change password's) keep the web's name.
+    public static let title = "Settings"
+    /// The web app's name for the tab the phone calls Settings.
+    public static let webTitle = "You"
     /// The headline's line with logins off (You.tsx NO_SIGN_IN).
     public static let noSignIn = "No sign-in needed"
     /// About's value for what deadwax didn't answer (You.tsx NOT_KNOWN).

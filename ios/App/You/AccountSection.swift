@@ -1,12 +1,33 @@
 import DeadwaxCore
 import SwiftUI
 
-/// You > Account (screens.md 3 and 8, the web's app/SignOutRow.tsx), drawn only with logins on: (Phase 7) Change
+/// Settings > Account (16 Nov, a page of its own - You's Account section before), its row on the root only with logins
+/// on (YouLines.account). The section, while /me still says logins are on - should a pull find them off with the page
+/// open, it is left empty rather than offering a Sign out there is nothing to sign out of. A pull asks /me again, as
+/// the root's does: Change password is offered by what /me last said.
+struct AccountPage: View {
+    @Environment(ServerModel.self) private var server
+
+    var body: some View {
+        let lines = YouLines(me: server.me, failure: server.meFailure, asking: server.askingMe, access: server.access)
+        List {
+            if lines.account, let me = server.me {
+                AccountSection(user: me.user)
+            }
+        }
+        .navigationTitle(YouWords.account)
+        .refreshable {
+            await server.refreshMe()
+        }
+    }
+}
+
+/// Account (screens.md 3 and 8, the web's app/SignOutRow.tsx), drawn only with logins on: (Phase 7) Change
 /// password first, as the web's Account has it - for a Navidrome sign-in, never break-glass (Core's
 /// Managing.changeOffered, the web's changeOffered) - opening the web app's You in Safari, where it is under Account
 /// (it has no address of its own), the line under the row saying so; off while deadwax can't be reached. Then Sign out,
 /// the user name beside it, "Signing out…" while it asks, and the footnote - who is signed in and how, break-glass's
-/// 12 hours.
+/// 12 hours. (16 Nov) No header: the page's title says Account.
 ///
 /// Signing out is leaving: ServerModel.signOut asks POST /auth/logout, and any answer from deadwax ends the session -
 /// the music stops (the player is reset with the person), the Keychain's session goes, every page pops and the sign-in
@@ -46,9 +67,6 @@ struct AccountSection: View {
                     .foregroundStyle(Palette.danger)
                     .fixedSize(horizontal: false, vertical: true)
             }
-        } header: {
-            Text(YouWords.account)
-                .font(Typeface.footnote)
         } footer: {
             Group {
                 // with anything on the phone, where someone signing out wonders: the downloads stay (6.1)

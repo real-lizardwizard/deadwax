@@ -1,7 +1,8 @@
 import DeadwaxCore
 import SwiftUI
 
-/// You > Manage (Phase 7 - notes/ios-specs/phase7-managing.md; the web's You.tsx Manage section): deadwax's managing
+/// Settings > Manage (Phase 7 - notes/ios-specs/phase7-managing.md; the web's You.tsx Manage section; since 16 Nov a
+/// group of the Settings root, its rules unchanged - each row still opens the web app): deadwax's managing
 /// tools this person may use, each opened in the web app, in Safari - never rebuilt on the phone. Top to bottom, each
 /// only with its permission (Core's Managing.tools, the web's `managing` and `albumEdit` by what /me last said):
 /// Edit an album (the phone's own: the web's editors open from an album's page, so the row opens the web app's Library,

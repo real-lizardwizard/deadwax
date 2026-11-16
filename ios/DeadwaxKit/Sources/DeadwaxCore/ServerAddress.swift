@@ -51,4 +51,14 @@ public struct ServerAddress: Sendable, Equatable, Hashable, CustomStringConverti
 
     /// A key for what is kept per server (the session in the Keychain): the base, lowercased.
     public var key: String { base.absoluteString.lowercased() }
+
+    /// (16 Nov) The server's name or IP alone, as the base has it - "192.168.1.20", "bearded-dragon", an IPv6 address
+    /// in its brackets: Settings' This phone row's value, where the whole address is the page's. The whole base when
+    /// it has no host (never, for an address `parse` made).
+    public var host: String {
+        guard let host = URLComponents(url: base, resolvingAgainstBaseURL: false)?.host, !host.isEmpty else {
+            return base.absoluteString
+        }
+        return host.contains(":") && !host.hasPrefix("[") ? "[\(host)]" : host
+    }
 }

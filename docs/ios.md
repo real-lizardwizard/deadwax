@@ -43,11 +43,13 @@ album you don't have got from the phone - what deadwax already has of the pressi
 sources Soulseek has for it in a sheet, each with why it scored what it did, and the one you pick on its way in
 Requests from your tap (see [Getting an album](#getting-an-album)). **App 0.12** finishes getting albums on the
 phone: a download somebody else asked for **joined**, a pressing in the collection **added to your library**,
-**Pick the best source for me**, and You's **When I tap Get**, **Quality floor** and **Format** chosen on the phone
-(see [You](#you)). **App 0.13** is Phase 7, the last of the plan: You's **Manage** lists the tools for looking after
-deadwax that you may use - editing an album, Needs a look, Library care, People, Server settings and the event log -
-and each opens in the web app, in Safari, where it's already built for a phone; so does **Change password** (see
-[Manage](#manage)).
+**Pick the best source for me**, and **When I tap Get**, **Quality floor** and **Format** chosen on the phone
+(see [Settings](#settings)). **App 0.13** is Phase 7, the last of the plan: **Manage** lists the tools for looking
+after deadwax that you may use - editing an album, Needs a look, Library care, People, Server settings and the event
+log - and each opens in the web app, in Safari, where it's already built for a phone; so does **Change password** (see
+[Manage](#manage)). Still 0.13, the tab that was **You** is **Settings** now: a short list of groups, each opening a
+page of its own, and every choice on them one row with a menu rather than a list of ticks (see
+[Settings](#settings)). The web app's tab is still called You.
 
 **Nothing of Phase 2, the lyrics, the EQ, the turntable, play history, your library downloaded,
 playlists, artists, songs, Search, Requests, Get or Manage has been seen on an iPhone yet.** It's built and tested on a Mac,
@@ -67,7 +69,7 @@ what's there and never measures anything itself, and it only answers about an al
 person can see in Navidrome. With an older deadwax, songs play as they are, and Info says "Not this
 time - the album's volume couldn't be checked" ("the song's" for a song levelled on its own). 2.1.1
 isn't a release yet: until it is, it's in the `:experimental` image, not `:latest` (see "Which image
-tag" under [The compose file](getting-started.md#the-compose-file)). You > About shows which deadwax
+tag" under [The compose file](getting-started.md#the-compose-file)). Settings > About shows which deadwax
 you have. [Lyrics](#lyrics) need **deadwax 2.1.5 or later** - for now also only in `:experimental` -
 and with an older one say "Couldn't load the lyrics." The EQ's
 [AutoEq corrections](#autoeq-a-correction-for-your-headphones) need **deadwax 2.1.7 or later**, also only
@@ -101,7 +103,7 @@ changes for the web app, which loads those covers from the Archive itself.
 - **An iPhone on iOS 17 or later** and its cable, for the first install.
 - **A free Apple account.** Its catch: **each install runs for 7 days**, and then the app won't open
   until you install it again. Installing it again is one command, below, and keeps everything on
-  the phone. For an admin (with logins off, everyone), **You > Debug** says when the install runs
+  the phone. For an admin (with logins off, everyone), **Settings > This phone > Debug** says when the install runs
   out; anyone else just finds the app won't open after the 7 days.
 - **The test album.** "Start test (2026)" by "deadwax test" is ten short FLAC songs: eight of three
   beeps each, with the first beep at a known time, and two that are one steady tone cut in two. It's
@@ -194,7 +196,7 @@ happens in `~/Library/Caches/deadwax-build`, and the last build's whole log is `
 
 From then on the app opens straight into your music. It keeps who deadwax last said you are, so it
 opens at once and asks deadwax behind it: if your sign-in has ended, the sign-in comes up over the
-app, and if deadwax doesn't answer, the app stays open (You says it couldn't check). Only a phone that
+app, and if deadwax doesn't answer, the app stays open (Settings > About says it couldn't check). Only a phone that
 has never been let in at that address waits for deadwax; if it doesn't answer, that one says "Can't
 reach deadwax. Check you're on the right network (or your VPN is on) and try again.", with **Try
 again** and **Change address**, and tries again by itself whenever you come back to the app.
@@ -209,8 +211,9 @@ app with deadwax's reason, Now Playing closes, and the music plays on underneath
 the same person carries on where you were. Signing in as someone else starts afresh: nothing of the
 first person's queue stays.
 
-The app has four tabs, **Library**, **Search**, **Requests** and **You**, along a bar at the foot of the screen:
-square, the full width, flush with the bottom edge, with a thin line along its top - as the web app's tab bar is.
+The app has four tabs, **Library**, **Search**, **Requests** and **Settings** (a gear - the web app's **You**), along
+a bar at the foot of the screen: square, the full width, flush with the bottom edge, with a thin line along its top -
+as the web app's tab bar is.
 The tab you're on is purple. Requests carries a small purple count of the downloads on their way, as on the web
 app, and none when there are none. Tapping the tab you're on goes back to its first screen, or to the top of it.
 Once something is playing, the mini player is the top of the tab bar: one solid block with the tabs, a thin line
@@ -355,7 +358,7 @@ nothing on the phone it says "Nothing downloaded yet." At its top, **Downloaded 
 **Keep your library on this phone?** The first time you open Downloaded while your library has albums, a
 card at its top asks whether to [download your library](#your-library-on-this-phone) by itself ("Keep the
 collection on this phone?" with logins off), as much as fits in your storage limit. **Turn On** turns it
-on; **Not Now** puts the card away. Either way it doesn't come back, and the setting is in You > Downloads.
+on; **Not Now** puts the card away. Either way it doesn't come back, and the setting is in Settings > Downloads.
 
 **The download marks**, at the end of an album's artist line on every list (and on a song's row on an
 album's page): a filled arrow for downloaded (all of it, or some of its songs), a dotted one while it
@@ -414,7 +417,7 @@ back to the Library tab or the app, and when you pull down.
   of the album that isn't on the phone yet. Once it's asked for, the button shows how it's going - a
   ring filling while it downloads, a dotted arrow while it waits, a filled arrow once it's all here,
   an amber **!** if a song didn't download - and a tap opens a menu that says so in words ("Waiting
-  for Wi-Fi" with "Download over is Wi-Fi only - in You > Downloads." under it, "Downloaded · 412 MB",
+  for Wi-Fi" with "Download over is Wi-Fi only - in Settings > Downloads." under it, "Downloaded · 412 MB",
   "2 songs didn't download" and why), with **Remove Download** (and **Download Again** when a song
   didn't download). So a tap meant for the ••• beside it never throws a download away.
 - **Under the title**, the same in words: "Downloading - 4 of 12", "Waiting for Wi-Fi", "Downloaded",
@@ -640,7 +643,7 @@ Again** for songs that didn't come.
   "Downloaded with Late night" instead; remove the playlist's download. Your library never removes a
   playlist's songs.
 - **Where.** The Library's **Downloaded** (under On this phone) has **Downloaded playlists**, with how
-  many - a list of them that opens with no connection too. In You > Downloads, **Downloading** has a
+  many - a list of them that opens with no connection too. In Settings > Downloads, **Downloading** has a
   row for each one with songs to come ("3 of 12 songs to go", or what they wait for), and
   **Downloaded** lists each one first, with its songs here and their size. Tap one to open it; swipe it
   to **Remove** its download. **Remove All Downloads** takes them too, and says so: the playlists
@@ -766,7 +769,7 @@ and All artists, rather than a page among your own albums and artists.
 
 ## Search
 
-**Search** is the tab between Library and You. Its field is always there at the top - tap it to type -
+**Search** is the tab between Library and Requests. Its field is always there at the top - tap it to type -
 with "Search your library and albums you don't have yet." under it while it's empty ("Search your
 library, the collection, and albums nobody has yet." with a library of your own). It searches what
 deadwax has, as the web app's Search does, and the artists, albums and songs you don't have yet from
@@ -963,7 +966,7 @@ sheet (see [Downloading](downloading.md#choosing-a-source)):
 - **The chips** - **Lossless**, **24-bit**, **Starts now** and **Complete albums only** (and **320 kbps** with that
   quality floor) - narrow the list, and **the sort** orders it: **Best match**, **Highest quality**, **Largest
   first** or **Smallest first**. The chips start as your **quality floor**, the sort at Best match, and the search is
-  scored by your **Format**, both chosen in [You](#you) > Getting albums (or the web app's) and kept for you on
+  scored by your **Format**, both chosen in [Settings](#settings) > Getting albums (or the web app's You) and kept for you on
   deadwax.
 - **Search again** - at the right of "Choose a source" at the top, and under the cards - opens the words searched in
   a field: the top one's above the chips, the other's just under it. Change them and tap **Search**. Changed words
@@ -974,14 +977,14 @@ Under the cards, what was searched: 'Searched for “Portishead Dummy” · 41 s
 
 - **Nothing found**: 'Nothing found for “Portishead Dummy”.', the words there to change, with Search.
 - With your Format **Lossless only** and no lossless copy found: 'Nothing lossless found for “Portishead Dummy”.'
-  and why - your Format leaves the rest out.
+  and why - your Format leaves the rest out, and "You can change it in Settings, under Getting albums."
 - **None through the chips**: "41 sources found - none match your filters." and **Clear filters**.
 - **Already in your library**, or **already downloading**: the line from the page, in the cards' place. deadwax
   searched nothing.
 - **Soulseek couldn't be searched**: why - slskd's own sentence where it gave one ("slskd is not connected to the
   Soulseek network, so it cannot search"), otherwise "Downloads aren't working right now." - with **Try again**.
 
-**Pick the best source for me** (You > Getting albums' When I tap Get): Get the album opens the sheet and searches
+**Pick the best source for me** (Settings > Getting albums' When I tap Get): Get the album opens the sheet and searches
 as ever, and as the answer comes, the best match through the chips as they are then (your quality floor's, unless
 you've tapped one) at 75% or more is got for you, as a card's Get would be: the sheet closes onto Requests, the
 download there. Never for a pressing you have or that's on its way, nor one deadwax can't judge (a pressing
@@ -1028,7 +1031,7 @@ lines rather than cut short.
 
 ## Requests
 
-The **Requests** tab, between Search and You, lists every download you asked for - on this phone (see [Getting an
+The **Requests** tab, between Search and Settings, lists every download you asked for - on this phone (see [Getting an
 album](#getting-an-album)), in the web app, or on another phone - under the web app's four headings, in the web
 app's words. A heading shows only when it has something under it.
 
@@ -1057,7 +1060,7 @@ app's words. A heading shows only when it has something under it.
 With logins on, a row says who else is waiting for it: "Someone else asked for it too" - and, for an admin, who
 ("Asked by you and ethan", or "Nobody is waiting for this any more").
 
-**The ✕** on a downloading or waiting card cancels it. With **Confirm before cancelling** on (You > Getting
+**The ✕** on a downloading or waiting card cancels it. With **Confirm before cancelling** on (Settings > Getting
 albums - on unless you turn it off, and kept on this phone, not your account) it asks first, in the card: "Cancel
 this download? You'll lose your place in their queue." with **Keep it** and **Cancel download**. A second tap on
 the ✕ closes the question, and one card asks at a time. With logins on, a download someone else is waiting for
@@ -1158,8 +1161,8 @@ closes it.
 Now Playing has a second look, as the web app's does: the song on a record turning on a turntable.
 **The button at the top right** - a round record on the cover, a square on the turntable - switches
 between the two for as long as Now Playing stays open. Which one it opens as is **Now Playing opens
-as** in [You](#you) > Playback: **Cover**, the default, or **Turntable**. The button never changes
-that: close Now Playing and open it again, and it's back to what You says. With lyrics showing, the
+as** in [Settings](#settings) > Playback: **Cover**, the default, or **Turntable**. The button never changes
+that: close Now Playing and open it again, and it's back to what Settings says. With lyrics showing, the
 button turns them off and shows the other look; **Lyrics** shows them in the record's place, and
 turning them off brings the record back.
 
@@ -1182,7 +1185,7 @@ nothing below it moves: the buttons and the row under them stay as they are. The
   in the song - its middle end is the song's end. While you hold it, the time line says **Needle up**
   and where letting go will go; the song jumps there as you let go.
 - **Tap the record** to pause or play. **Play/pause** under it does the same on the turntable, and a
-  pause from either winds the record down (see **Pause winds the record down** in [You](#you)). If
+  pause from either winds the record down (see **Pause winds the record down** in [Settings](#settings) > Playback). If
   the song changes while your finger is on the record - it reaches its end under a resting finger,
   say - lifting your finger does nothing to the new song: it plays on, or stays paused, just as the
   change left it, and the record follows it.
@@ -1406,77 +1409,110 @@ rate and channels -, **Normalization** in numbers like "Album, -3.60 dB · the a
 "Changing: crossfading to the new curve"), and every field Navidrome sent about the song and its
 album.
 
-## You
+## Settings
 
-- **At the top**: who you're signed in as, or "No sign-in needed" with logins off.
-- **Getting albums**, the web app's three, each a list with a tick on the one chosen - a tap chooses:
-  - **When I tap Get**: **Show me the sources** (the default) or **Pick the best source for me**.
-  - **Quality floor**: **Any** (the default), **320 kbps**, **Lossless** or **24-bit**.
-  - **Format**: **Any**, **Prefer lossless** (the default) or **Lossless only**.
+**Settings** is the tab the web app calls **You** (the phone called it You too, until the build after app 0.13's
+Manage - still 0.13 (13)). Its first screen is a short list, as the iPhone's own Settings is: each row opens a page of
+its own, and **Back**, or a swipe in from the left edge, comes back. Tap **Settings** in the tab bar on one of its
+pages and it goes back to the first screen; tap it again there, and it goes to the top.
 
-  Under them, the web app's note: "“Show me the sources” lets you choose each download yourself. “Pick the best
-  source for me” downloads the best match that meets your quality floor, and shows you the sources instead when
-  nothing matches well, or when you already have the album or are getting it." - and how the floor and the Format
-  are used (see [Getting an album](#getting-an-album)). They're your account's, kept on deadwax, so a choice on the
-  phone is the web app's too, and the other way round: You asks deadwax for them each time it shows and on a pull
-  down, so one changed in the web app shows here. A choice shows at once and is saved behind it. Until deadwax has
-  first answered, nothing is ticked and nothing can be chosen; while it can't be reached, nothing can be chosen and
-  "Getting albums works once deadwax is back." says why. A choice deadwax doesn't keep goes back, with "Not saved."
-  and why under the three (VoiceOver says it). With deadwax's database unwritable, "deadwax can't keep these: its
-  database isn't writable." - and "Tell whoever runs deadwax." for anyone but an admin.
-
-  Then **Confirm before cancelling**, on by default - "The ✕ on a download in Requests asks first. Kept on this
-  device." Off, the ✕ on a card in [Requests](#requests) cancels at once. It's this phone's, not your account's, as
-  it is each browser's in the web app.
-- **Playback**:
-  - **Gapless**: On. "Albums play straight through, with no gap between songs." It isn't a setting:
-    the app always plays this way.
-  - **Now Playing opens as**: **Cover** (the default) or **Turntable** - what Now Playing shows each
-    time it opens. "What you see first when you open Now Playing. The button at its top right switches
-    between the two while it's open." See [The turntable](#the-turntable).
-  - **Pause winds the record down**: on by default. On the turntable, a pause - a tap on the record,
-    or play/pause while it shows - slows the music to a stop over about a second, as a real record deck
-    does, and the song stays paused where the sound stopped. Off, the sound stops at once (the record
-    still spins down). Pausing from the cover, the lock screen or the mini player always stops at once.
-    Both are kept on this phone.
-  - **Normalization**: brings songs to an even loudness, the way the web app's does. Four choices:
-
-    | choice | what it does |
-    | --- | --- |
-    | **Automatic** (the default) | An album you play keeps one level for the whole album, so its quiet songs stay quiet beside its loud ones. Anything else - a song you add with Play Next, say - is levelled song by song. |
-    | **By song** | Every song brought to the same loudness, even the quiet and loud songs of one album. |
-    | **By album** | Every song at its album's level, even when it plays on its own. |
-    | **Off** | No levelling: every song plays exactly as the file is, bit for bit. |
-
-    Only FLAC songs are levelled; other files play as they are. The level is held under each song's
-    peak, so nothing is made louder than it can go without distorting. The first time an album is
-    levelled, deadwax measures it, so its first song can take a few seconds to start. It waits 20
-    seconds at most, then plays the song as it is that time, and Info says "Not this time - the
-    album was still being measured" ("the song was" for a song levelled on its own). One song
-    running into the next never waits. The choice is kept on this phone, and takes effect from the
-    next thing you play.
-  - **EQ**: the output playing now under it ("iPhone speaker", "James's AirPods Pro") and its setting
-    at the right ("Off", "Bass Boost", "Custom"). It opens the [EQ](#eq) for that output. Each output
-    keeps its own EQ, and it's kept on this phone.
-- **Downloads**: what's on this phone ("2.1 GB"), opening [You > Downloads](#you--downloads). Under
-  it, only while something is happening: "Downloading - 6 songs to go", what it's waiting for, or, in
-  amber, "2 songs didn't download".
+- **At the top**: who you're signed in as, or "No sign-in needed" with logins off - and, in amber, "Some things an
+  admin let you do are off for now - sign out and in again to get them back." when deadwax says so.
+- **Getting albums**, **Playback** and **Downloads**, each opening its page - Downloads with what's on this phone at its
+  right ("2.1 GB"). Under the three, only while something is happening: "Downloading - 6 songs to go", what it's
+  waiting for, or, in amber, "2 songs didn't download".
 - **Manage**, for someone who may look after deadwax - an admin, everyone with logins off, or someone an admin gave
-  a permission to: the tools you may use, each opening in the web app, in Safari (see [Manage](#manage)).
+  a permission to: the tools you may use, each opening in the web app, in Safari, as before (see [Manage](#manage)).
+- **Account**, with logins on.
+- **This phone**, with the name or IP deadwax is at on its right ("192.168.1.20", "bearded-dragon").
+- **About**, with the app's own version on its right, **0.13 (13)**.
+
+The first screen asks deadwax who you are the first time it shows, and again when you pull it down: Manage, Account
+and About follow what it last said.
+
+**Each choice is one row with a menu.** A row says the setting's name, and what's chosen at its right. Tap it and a
+menu of the choices opens, the chosen one ticked; tap another to choose it. What a choice does is said under the row -
+for Normalization and Download over, what the chosen one does, first. VoiceOver reads the row's name and what's chosen
+("Normalization, Automatic"), and Normalization and Download over add what the chosen one does; a double tap opens the
+menu. A switch (Confirm before cancelling, Pause winds the record down) is still a switch.
+
+### Getting albums
+
+The web app's three, each a menu:
+
+- **When I tap Get**: **Show me the sources** (the default) or **Pick the best source for me**.
+- **Quality floor**: **Any** (the default), **320 kbps**, **Lossless** or **24-bit**.
+- **Format**: **Any**, **Prefer lossless** (the default) or **Lossless only**.
+
+Under them, the web app's note: "“Show me the sources” lets you choose each download yourself. “Pick the best
+source for me” downloads the best match that meets your quality floor, and shows you the sources instead when
+nothing matches well, or when you already have the album or are getting it." - and how the floor and the Format
+are used (see [Getting an album](#getting-an-album)). They're your account's, kept on deadwax, so a choice on the
+phone is the web app's too, and the other way round: the page asks deadwax for them each time it opens, on a pull
+down and when deadwax can be reached again, so one changed in the web app shows here. A choice shows at once and is
+saved behind it. Until deadwax has first answered, the three rows show nothing chosen and can't be tapped; while it
+can't be reached, they show what was chosen but can't be tapped, and "Getting albums works once deadwax is back."
+says why. A choice deadwax doesn't keep goes back, with "Not saved." and why under the three (VoiceOver says it).
+With deadwax's database unwritable, "deadwax can't keep these: its database isn't writable." - and "Tell whoever
+runs deadwax." for anyone but an admin.
+
+Then **Confirm before cancelling**, a switch, on by default - "The ✕ on a download in Requests asks first. Kept on
+this device." Off, the ✕ on a card in [Requests](#requests) cancels at once. It's this phone's, not your account's,
+as it is each browser's in the web app.
+
+### Playback
+
+- **Gapless**: On. "Albums play straight through, with no gap between songs." It isn't a setting:
+  the app always plays this way.
+- **Now Playing opens as**, a menu: **Cover** (the default) or **Turntable** - what Now Playing shows each
+  time it opens. "What you see first when you open Now Playing. The button at its top right switches
+  between the two while it's open." See [The turntable](#the-turntable).
+- **Pause winds the record down**, a switch: on by default. On the turntable, a pause - a tap on the record,
+  or play/pause while it shows - slows the music to a stop over about a second, as a real record deck
+  does, and the song stays paused where the sound stopped. Off, the sound stops at once (the record
+  still spins down). Pausing from the cover, the lock screen or the mini player always stops at once.
+  Both are kept on this phone.
+- **Normalization**, a menu: brings songs to an even loudness, the way the web app's does. Four choices, and under
+  the row what the chosen one does:
+
+  | choice | what it does |
+  | --- | --- |
+  | **Automatic** (the default) | An album you play keeps one level for the whole album, so its quiet songs stay quiet beside its loud ones. Anything else - a playlist, a shuffle, a song you add with Play Next - is levelled song by song. |
+  | **By song** | Every song brought to the same loudness, even the quiet and loud songs of one album. |
+  | **By album** | Every song at its album's level, even when it plays on its own or in a playlist. |
+  | **Off** | No levelling: every song plays exactly as the file is, bit for bit. |
+
+  Only FLAC songs are levelled; other files play as they are. The level is held under each song's
+  peak, so nothing is made louder than it can go without distorting. The first time an album is
+  levelled, deadwax measures it, so its first song can take a few seconds to start. It waits 20
+  seconds at most, then plays the song as it is that time, and Info says "Not this time - the
+  album was still being measured" ("the song was" for a song levelled on its own). One song
+  running into the next never waits. The choice is kept on this phone, and takes effect from the
+  next thing you play.
+- **EQ**: the output playing now under it ("iPhone speaker", "James's AirPods Pro") and its setting
+  at the right ("Off", "Bass Boost", "Custom"). It opens the [EQ](#eq) for that output. Each output
+  keeps its own EQ, and it's kept on this phone.
+
+### Downloads, Account, This phone and About
+
+- **Downloads** is [Settings > Downloads](#settings--downloads).
 - **Account**, with logins on: **Change password**, then **Sign out**. Change password opens the web app's You in
   Safari - "Opens the web app's You: Change password is under Account there. It changes the password of whoever is
   signed in in Safari." under it: Safari signs in apart from the app ([Manage](#manage)), so check the name there
   first. It isn't there for the emergency `deadwax` sign-in, which has no Navidrome password to change. **Sign out** ends this phone's session and
   stops what's playing. With anything downloaded, it adds that your downloads stay on this phone for when you sign in
   again. If deadwax can't be reached, it says "Couldn't reach deadwax, so you're still signed in - try again."
-- **About**: deadwax's version, whether logins are on (for an admin), and the app's own version,
-  **0.13 (13)**.
 - **This phone**: deadwax's address, **Change address**, and **Debug**, for an admin (with logins
   off, everyone is one).
+- **About**: deadwax's version, whether logins are on (for an admin), and the app's own version,
+  **0.13 (13)**. If deadwax didn't answer when it was last asked who you are, why is said under them, and deadwax's
+  version is "Not known"; pull the page down to ask again.
+
+Account and About ask deadwax again when you pull them down, as the first screen does.
 
 ### Manage
 
-You > **Manage** is deadwax's tools for looking after it, as many of them as you may use. Each one **opens in the web
+Settings > **Manage** is deadwax's tools for looking after it, as many of them as you may use. Each one **opens in the web
 app, in Safari** - the web app has every one of them laid out for a phone ([Looking after deadwax from a
 phone](player.md#looking-after-deadwax-from-a-phone)), so the app doesn't build them again. Top to bottom, each only
 for someone who may use it:
@@ -1492,7 +1528,7 @@ for someone who may use it:
 
 An admin has every row. With logins off everyone does, but People: there's nobody to manage. Someone with none of
 these permissions has no Manage at all ([Sharing deadwax](sharing.md#admins-permissions-and-everyone-else) has what each
-one gives). The rows follow what deadwax last said of you: You asks again the first time it shows and on a pull
+one gives). The rows follow what deadwax last said of you: Settings asks again the first time it shows and on a pull
 down. If an admin took a permission away since, the page it opens says "This page needs a permission an admin hasn't
 given you - ask one if you need it." - and People, its own words: "Only an admin can open People - it comes with
 being a Navidrome admin."
@@ -1525,7 +1561,7 @@ web app's **Connections**, in its You; and Needs a look's count.
 
 ### Debug
 
-Debug is where Phase 0's test screen lives now:
+Debug, under Settings > This phone for an admin, is where Phase 0's test screen lives now:
 
 - **deadwax**: **Check** (it runs as Debug opens) says deadwax's version and whether logins are on.
 - **Test sounds**, once Check is OK: the test album's songs. Tap one to play the album from it.
@@ -1639,7 +1675,7 @@ Debug is where Phase 0's test screen lives now:
   yet (**Starts waiting to be sent**); how long the sound checks took; and the last 50 download events
   (a backlog of starts sent, or one deadwax refused or couldn't take, is one of them).
 - **Your library**: what [Download your library](#your-library-on-this-phone) follows - it's turned
-  on and off in You > Downloads (this section had its own switch while that was being built). On, it
+  on and off in Settings > Downloads (this section had its own switch while that was being built). On, it
   asks deadwax for your library - the albums you've added, or with logins off every album deadwax
   holds - and reads each album's songs, four at a time, in the order they come onto the phone: the
   album you added or played most recently first (a play counts for 30 days).
@@ -1651,7 +1687,7 @@ Debug is where Phase 0's test screen lives now:
     **Remove from my library** goes at once.
   - **Held back**: "No", or why the last list's missing albums weren't believed: deadwax listed none,
     more than half went at once, or the list stopped at 10,000 albums. Nothing goes then. "believing
-    (Remove)" after you answered Remove to You > Downloads' question, "kept them" after Keep Them.
+    (Remove)" after you answered Remove to Settings > Downloads' question, "kept them" after Keep Them.
   - **Removed, to let go**: albums a check removed whose downloads haven't gone yet (usually 0).
   - **Leaving their albums**: songs a read found had left their album, waiting for the second read
     ten minutes on ("None", or "3 songs on 2 albums").
@@ -1689,7 +1725,7 @@ headphones, the iPhone's speaker, the car, an AirPlay speaker each keep their ow
 switches to the right one by itself whenever the output changes - AirPods connecting mid-song have
 their own EQ from the first sound in them. An output the phone hasn't met before starts **Off**.
 
-Open it from **You > Playback > EQ**, or from Now Playing's **•••** > **EQ**, which opens it over Now
+Open it from **Settings > Playback > EQ**, or from Now Playing's **•••** > **EQ**, which opens it over Now
 Playing (**Done** closes it). Either way it opens on the output playing now.
 
 **The EQ page**, top to bottom:
@@ -1728,7 +1764,7 @@ to the name iOS gives it.
 moving a slider switches it on (VoiceOver says "EQ on"). Turning the switch off brings back the
 sound exactly as it was: off, the EQ passes every sample through untouched.
 
-**The page follows the output.** Opened from You or Now Playing, it changes to the output that's
+**The page follows the output.** Opened from Settings or Now Playing, it changes to the output that's
 playing when that changes (VoiceOver says "EQ for James's AirPods Pro") - but not while your finger
 is on a slider, and not while something is open over it; it catches up when you let go or come back
 to it. The presets page always stays with the output it was opened for: a preset chosen there goes
@@ -2102,7 +2138,7 @@ normalization as a stream.
 - **Per person.** Each person signed in on the phone has their own downloads. Signing out keeps
   yours, for when you sign in again; another person's are listed as "Other accounts on this phone".
 
-### You > Downloads
+### Settings > Downloads
 
 - **Storage**: what's downloaded ("2.1 GB of 20 GB"), a bar, and "12 albums · 148 songs · 41.2 GB
   free on this phone". **Storage limit**: 5, 10, **20 GB** (the default), 50, 100 GB, or No limit.
@@ -2112,10 +2148,11 @@ normalization as a stream.
   the phone, **Other accounts on this phone** has their size and **Remove** (it asks first).
 - **Your library** ("The collection" with logins off): **Download your library**, what it's doing,
   and **Only while charging** - see [Your library on this phone](#your-library-on-this-phone).
-- **Download over**: **Wi-Fi only** (the default) - never mobile data, a phone's hotspot or Low Data
-  Mode - or **Wi-Fi and cellular**. Under them, what the phone is on now ("On mobile data now -
-  downloads wait for Wi-Fi."), in amber while a download waits for it. Changing it applies at once.
-  Both settings are kept on this phone.
+- **Download over**, a menu, as Storage limit is: **Wi-Fi only** (the default) or **Wi-Fi and cellular**. Under it,
+  what the chosen one does ("Downloads use Wi-Fi alone - never mobile data, a hotspot or Low Data Mode.", or
+  "Downloads use mobile data too, whenever there's no Wi-Fi."), then what the phone is on now ("On mobile data now -
+  downloads wait for Wi-Fi."), in amber while a download waits for it. Changing it applies at once. Both settings
+  are kept on this phone.
 - **Downloading**: each album on its way - "4 of 12 songs", or what it waits for, with a bar while it
   downloads. While your library is downloading, one row says so for all of it: "Your library - 38 of
   412 albums to go · 12.4 GB", or what it waits for, with a bar; a tap opens the Library's Downloaded.
@@ -2138,7 +2175,7 @@ normalization as a stream.
 
 ### Your library on this phone
 
-**Download your library** (You > Downloads, off until you turn it on - or Turn On on the Library's
+**Download your library** (Settings > Downloads, off until you turn it on - or Turn On on the Library's
 card) keeps your library on the phone by itself: the albums you've added, newest first, as many as
 fit in your storage limit. With logins off, and for the break-glass `deadwax` sign-in, it's **Download
 the collection**: every album deadwax holds, newest first. The phone remembers the setting, for
@@ -2157,7 +2194,7 @@ whoever is signed in. This is app 0.9's, on the `ios` branch - not yet in a rele
   minutes ago" - or "Couldn't check with deadwax - showing what was there last time."
 - **When it checks**: as the app opens, when you come back to it after a minute or more, every 15
   minutes while it's open or playing, when deadwax answers again, straight after Add to or Remove from
-  my library - and when you pull down on You > Downloads. A check that fails doesn't put off the
+  my library - and when you pull down on Settings > Downloads. A check that fails doesn't put off the
   next one. It downloads ten albums at a time, and the next as those arrive (one at a time with Only
   while charging on, below).
 - **Keeping up with deadwax**: each album's songs are read once, then again when its album page is
@@ -2185,7 +2222,7 @@ whoever is signed in. This is app 0.9's, on the `ios` branch - not yet in a rele
     they take - with **Turn Off and Remove** and Cancel. It remembers your library, so turning it on
     again says what fits at once.
 - **When deadwax's list looks wrong** - empty while the phone has albums of your library, or missing
-  more than half of them at once (more than 10) - **nothing goes**. You > Downloads asks instead, in
+  more than half of them at once (more than 10) - **nothing goes**. Settings > Downloads asks instead, in
   amber: "deadwax says your library is empty. Remove the 212 albums downloaded with it from this
   phone?", with **Keep Them** and **Remove**. Keep Them keeps them and puts the question away. Remove
   doesn't remove anything at once either: they go only if deadwax still says the same at a check ten
@@ -2198,7 +2235,7 @@ whoever is signed in. This is app 0.9's, on the `ios` branch - not yet in a rele
 - **Only while charging** (under the line of what fits, off until you turn it on, kept on this phone):
   "Your library's albums download only while the phone is charging. Albums you download yourself don't
   wait." On, with the phone unplugged, your library's albums wait, and say "Waiting for the phone to
-  charge" - in an album's download menu, with "Only while charging is on - in You > Downloads." under
+  charge" - in an album's download menu, with "Only while charging is on - in Settings > Downloads." under
   it, and in Downloading's row for your library. Unplug it
   while the app is open or playing and what's downloading for your library stops at once, keeping
   what had come, and carries on from there when you plug it in again. With the app in the background,
@@ -2266,6 +2303,11 @@ answering, **Try again**. It goes by itself once deadwax answers.
   or deadwax, is back.
 
 ## The checks
+
+**You is Settings now.** The checks were written while the tab was called You, and are left as written: read "You >
+Getting albums", "You > Playback", "You > Downloads" and "You > About" as the Settings page of that name, "You >
+Debug" as Settings > This phone > Debug, and a list of ticks as a row with a menu ([Settings](#settings)). Checks
+310-319 are the new layout's own.
 
 Phase 1 exists to answer these on the phone. Note what you see for each.
 
@@ -3924,6 +3966,58 @@ Library (still app 0.13 (13)). Compare each with the same artist's page in the w
 - **309 VoiceOver.** A row of theirs reads its title and line ("Third, 2008 · not in your library"); Studio only says
   whether it's on. Before their albums are known, VoiceOver doesn't find Studio only.
 
+### Settings' checks (310-319)
+
+**Not done yet.** These come with the build that makes You into Settings, a list of pages with a menu for each
+choice (still app 0.13 (13)). No server change is needed. Compare the choices with the web app's You.
+
+- **310 The tab.** The fourth tab says **Settings**, with a gear, and its first screen is titled Settings. VoiceOver
+  reads it as "Settings"; holding a finger on it shows the gear and "Settings" large. Nothing calls the tab You any
+  more: an album's download menu, waiting for Wi-Fi, says "Download over is Wi-Fi only - in Settings > Downloads.",
+  and Choose a source with Lossless only and nothing lossless says "You can change it in Settings, under Getting
+  albums."
+- **311 The first screen.** Top to bottom: you (the avatar and your name, or "No sign-in needed"); **Getting
+  albums**, **Playback** and **Downloads** (its size at the right); Manage's rows, if you may look after deadwax;
+  then **Account** (with logins on only), **This phone** - at its right the name or IP of deadwax's address: is it
+  the address's? - and **About**, "0.13 (13)" at its right. Each of the six opens its page, with **Back** and the
+  edge swipe home again; Manage's rows still have their arrow and open Safari, as before. Pull the first screen down:
+  it asks deadwax again (no spinner left behind).
+- **312 Getting albums' menus.** Open Getting albums: **When I tap Get**, **Quality floor** and **Format**, each one
+  row with its choice at the right. Tap Quality floor: a menu of Any, 320 kbps, Lossless and 24-bit, the chosen one
+  ticked; choose Lossless and the row says Lossless at once. The web app's You says Lossless too. Change Format in the
+  web app, then open Getting albums again: the web app's choice shows. Change it once more in the web app and pull
+  the page down: it shows. **Confirm before cancelling** is still a switch, and the ✕ in Requests follows it.
+- **313 Before deadwax answers, and offline.** Turn on Airplane Mode and open Getting albums: the three rows are
+  dimmed and don't open, what was chosen still shows, and "Getting albums works once deadwax is back." is under them.
+  Turn Airplane Mode off with the page open: the rows come back, and a choice changed in the web app meanwhile shows.
+  Over a slow connection (WireGuard on mobile data), straight after opening the app: do the rows show nothing chosen
+  until deadwax answers - never a default?
+- **314 Playback's menus.** Open Playback: **Gapless** On; **Now Playing opens as** a menu of Cover and Turntable;
+  **Pause winds the record down** a switch; **Normalization** a menu of four; **EQ**. Choose Turntable, then open Now
+  Playing: it opens on the turntable. Choose **By album**: the first line under it says "Every song at its album's
+  level, even when it plays on its own or in a playlist.", then the FLAC note and "This is kept on this phone.
+  Normalization changes from the next thing you play." Play an album: Info's Normalization says "Album volume
+  matching". **EQ** opens the EQ for the output playing, and Back comes back to Playback.
+- **315 Download over.** Settings > Downloads: **Download over** is one row now, "Wi-Fi only" at its right, a menu
+  like Storage limit above it. Under it: "Downloads use Wi-Fi alone - never mobile data, a hotspot or Low Data
+  Mode.", then what the phone is on now. On mobile data with a download waiting for Wi-Fi, choose **Wi-Fi and
+  cellular**: the line under it changes, and the download starts.
+- **316 Account, This phone and About.** With logins on, Account: **Change password**, then **Sign out** with your
+  name; Sign out from the page signs you out - every page goes and the sign-in shows. This phone: the whole address,
+  **Change address**, and **Debug** for an admin alone (signed in as someone who isn't one: no Debug). About:
+  deadwax's version, Logins for an admin, App 0.13 (13). With logins off there's no Account row.
+- **317 About, when deadwax didn't answer.** Stop deadwax (or turn on Airplane Mode) and pull the first screen down,
+  then open About: the version says "Not known", with why under it. Start deadwax again (or turn Airplane Mode off)
+  and pull About down: the version is back and the note gone.
+- **318 Back up.** Open Settings > Playback > EQ, then tap **Settings** in the tab bar: the first screen. At a large
+  text size, scroll the first screen down and tap Settings again: its top. Library, Search and Requests do as they
+  did.
+- **319 VoiceOver and text sizes.** With VoiceOver, each menu row reads its name and its choice ("Quality floor,
+  Any"), Normalization and Download over adding what the chosen one does; a double tap opens the menu, and choosing
+  reads the new choice. A row that can't be used is read as dimmed. At the largest text sizes, does each row's name
+  and choice still show whole (wrapped, never over each other)? Do This phone's and About's values on the first
+  screen stay clear of their names?
+
 ## What it can't do yet
 
 These are the web app's for now:
@@ -3936,7 +4030,7 @@ These are the web app's for now:
   new words wait for deadwax.
 - **Home** and **pins** - and so Home's Arriving: outside Requests, the tab's badge is the phone's only sign of a
   download on its way.
-- **Looking after deadwax** stays the web app's: You > [Manage](#manage) opens each tool there, in Safari, and
+- **Looking after deadwax** stays the web app's: Settings > [Manage](#manage) opens each tool there, in Safari, and
   Change password too. Not linked from the phone: the artist's managing (above), the web app's **Connections** (in
   its You) and Needs a look's count.
 
@@ -3954,17 +4048,17 @@ These are the web app's for now:
 | The sign-in comes up over the app, with a reason ("Your sign-in ran out after 30 days without use - sign in again.") | Sign in again. The music plays on underneath. |
 | Library: **"Your music isn't available right now"** (an admin sees **"Can't reach Navidrome"**) | deadwax can't reach Navidrome. Check Navidrome is running, then **Try again**. |
 | Library: **"Your music isn't available yet"** (an admin sees **"Connect Navidrome"**) | deadwax hasn't been told where Navidrome is. An admin's **Set up Navidrome** opens the web app's Server settings in Safari: set Navidrome up on its Connections tab, **Save changes**, then come back. |
-| A row of You > **Manage** opens Safari on deadwax's **sign-in** | Safari has its own sign-in, apart from the app's. Sign in with the same name and password you use in the app: the page the row named opens, and Safari stays signed in after that (until it goes 30 days without use). See [Manage](#manage). |
-| A row of You > Manage opens a page saying **"This page needs a permission an admin hasn't given you"** (People: **"Only an admin can open People - it comes with being a Navidrome admin."**) | An admin took that permission away since deadwax last told the app - or Safari is signed in as someone other than you (below). Pull down on You: the row goes. Ask an admin if you need it. |
+| A row of Settings > **Manage** opens Safari on deadwax's **sign-in** | Safari has its own sign-in, apart from the app's. Sign in with the same name and password you use in the app: the page the row named opens, and Safari stays signed in after that (until it goes 30 days without use). See [Manage](#manage). |
+| A row of Settings > Manage opens a page saying **"This page needs a permission an admin hasn't given you"** (People: **"Only an admin can open People - it comes with being a Navidrome admin."**) | An admin took that permission away since deadwax last told the app - or Safari is signed in as someone other than you (below). Pull down on You: the row goes. Ask an admin if you need it. |
 | A Manage page opens with **someone else's access** - more than you have, or less | Safari is signed in as someone else: it signs in apart from the app, and the page is Safari's person's. In Safari, open the web app's You and look at the name at its top; **Sign out**, then sign in as yourself. |
 | **"Couldn't open the web app - Safari may be turned off in Screen Time."** | iOS wouldn't open the address. Turn Safari back on in Settings > Screen Time > Content & Privacy Restrictions > Allowed Apps (or ask whoever set Screen Time up), then tap the row again. |
-| You > Manage's rows are **dimmed** | deadwax can't be reached ("These open once deadwax is back."). They work again as soon as it can. |
+| Settings > Manage's rows are **dimmed** | deadwax can't be reached ("These open once deadwax is back."). They work again as soon as it can. |
 | Library: **"Couldn't update this list - showing it as it was."** | deadwax didn't answer just then. ••• > Refresh to try again (pull down, on a list opened from the •••). |
 | An album's page: **"This album isn't here any more - it may have been moved or deleted."** | Go back, and ••• > Refresh in the Library to bring it up to date. |
 | An artist's page: **"This artist isn't here any more - their albums may have been moved or deleted."** | The same: go back, and ••• > Refresh. |
 | An artist's page: **"Plays 2 of the 5 albums you have - the rest didn't load"**, or **"Couldn't load their songs."** | deadwax didn't send those albums' songs just then. **Try again** under it; Play and Shuffle meanwhile play the albums that came. |
 | A song's line says **"The connection dropped while this song was loading"**, or the next song's says **"Skipped "..." - it wouldn't play"** | The app asks for a song once more after a moment, then goes on past it. Check the phone's network. |
-| **"This device couldn't play this song's audio"**, or **"Skipped "..." - this device couldn't play its audio"** | The file is damaged, or in a form iPhones can't play. Try it on the web app; an admin finds the details in You > Debug > Playing. |
+| **"This device couldn't play this song's audio"**, or **"Skipped "..." - this device couldn't play its audio"** | The file is damaged, or in a form iPhones can't play. Try it on the web app; an admin finds the details in Settings > This phone > Debug > Playing. |
 | Info's Normalization: **"Not this time - the album's volume couldn't be checked"** ("the song's" for a song levelled on its own) | deadwax is older than 2.1.1, or didn't answer in time. The song plays as it is; with 2.1.1 or later, the album's next play is levelled. |
 | Lyrics: **"Couldn't load the lyrics."** | deadwax, or Navidrome behind it, couldn't give them just then: **Try again**. If it's every song, deadwax may be older than 2.1.5, which has no lyrics for the app (an admin sees why, folded under it). |
 | Lyrics: **"This song isn't here any more - it may have been moved or deleted."** | Navidrome no longer has the song the queue names (a rescan moved it). Play it again from its album. |
@@ -3978,24 +4072,24 @@ These are the web app's for now:
 | Search: **"Searching for more isn't working right now - try again in a few minutes."** (or **"Too many searches just now - try again in a moment."**), or an album you don't have says **"This album's details can't be loaded right now - try again in a few minutes."** | MusicBrainz is away, or turning searches away, for a while - it does, for minutes at a time. Your library's rows are still there; **Try again** in a minute. **"That took too long."** is the same, MusicBrainz slow enough that the phone stopped waiting. [The troubleshooting page](troubleshooting.md#the-apps-search-says-it-cant-search-for-more-or-keeps-searching) has the rest. |
 | Search: an album you don't have shows an **empty square** for its cover | Its cover comes from the Cover Art Archive through deadwax, which needs deadwax 2.1.24 or later - see [the troubleshooting page](troubleshooting.md#the-iphone-app-shows-no-cover-for-an-album-you-dont-have). |
 | Choose a source: **"slskd is not connected to the Soulseek network, so it cannot search"** (or **"Downloads aren't working right now."**), with **Try again** | slskd isn't logged in to Soulseek, or deadwax can't reach slskd. Whoever runs deadwax checks You > Connections in the web app - [troubleshooting](troubleshooting.md#a-search-fails-with-not-logged-in-or-slskd-refused-it) has the rest - then **Try again**. |
-| Choose a source: **'Nothing lossless found for “…”.'** | Your Format is Lossless only, which leaves out every copy that isn't. Change it in You > Getting albums, or **Search again** with other words. |
-| Choose a source, with **Pick the best source for me** on: **"No close match that passes your filters - choose a source yourself."** (or **"You already have part of it - …"**, **"Part of it is already downloading - …"**) | Nothing through the chips scored 75% or more, or the pressing is partly here or on its way, so nothing was picked: choose one yourself. Clearing a chip, or a lower quality floor in You > Getting albums, lets more through. [The troubleshooting page](troubleshooting.md#get-shows-downloads-arent-working-right-now-or-nothing-to-choose-from) has the rest. |
+| Choose a source: **'Nothing lossless found for “…”.'** | Your Format is Lossless only, which leaves out every copy that isn't. Change it in Settings > Getting albums, or **Search again** with other words. |
+| Choose a source, with **Pick the best source for me** on: **"No close match that passes your filters - choose a source yourself."** (or **"You already have part of it - …"**, **"Part of it is already downloading - …"**) | Nothing through the chips scored 75% or more, or the pressing is partly here or on its way, so nothing was picked: choose one yourself. Clearing a chip, or a lower quality floor in Settings > Getting albums, lets more through. [The troubleshooting page](troubleshooting.md#get-shows-downloads-arent-working-right-now-or-nothing-to-choose-from) has the rest. |
 | **Join this download** says **"That download has been cleared from the list since - get it again."** (or that it has finished, failed or been cancelled) | The download moved on after the line was drawn. Get the album again: the line then says what's true now. [The troubleshooting page](troubleshooting.md#join-this-download-says-the-download-has-finished-failed-or-been-cancelled) has the rest. |
 | **Join this download** says **"deadwax didn't answer in time, so you may have joined it anyway. …"** (or **Add to my library**, **"… it may have been added anyway. …"**) | The phone waited a minute with no answer - a join waits for any other Get of the album to reach its source, and an add stars the album in Navidrome before it answers, so a slow slskd or Navidrome (or the connection dropping) does this. It may well have gone through: look in Requests (or Your albums) in a moment, and if it isn't there, tap it again - a second Join or Add does no harm. |
 | Choose a source, with **Pick the best source for me** on: **"deadwax went out of reach as the sources came in - choose a source yourself once it's back."** | The phone lost deadwax just as the answer came, so nothing was got for you - a Get then would close onto a Requests that can't show it - and nothing is got later by itself. Once deadwax is back, tap a source's **Get**. |
-| You > Getting albums: **"deadwax can't keep these: its database isn't writable."**, or a choice going back with **"Not saved. …"** | deadwax keeps the three in its database. Whoever runs deadwax checks `DB_PATH`, and that its folder can be written as `PUID`/`PGID`, then restarts the deadwax container - the choices in hand still apply to a Get meanwhile. |
+| Settings > Getting albums: **"deadwax can't keep these: its database isn't writable."**, or a choice going back with **"Not saved. …"** | deadwax keeps the three in its database. Whoever runs deadwax checks `DB_PATH`, and that its folder can be written as `PUID`/`PGID`, then restarts the deadwax container - the choices in hand still apply to a Get meanwhile. |
 | A Get's row under Needs attention says **"didn't start"** and **"It's already downloading."** (or **"…already in your library."**) | It was got - by you elsewhere, or by someone else - after the sheet searched. It's already in Requests, or already yours; **Clear done** takes the refused row away. |
 | A Get's row under Needs attention says **"no answer"** and **"deadwax didn't answer in time, so this may have started anyway."** | The person sharing it took more than ten minutes to be reached, or deadwax was stuck. Look under Waiting and Downloading - it may be there - and if it isn't, get it again. **Clear done** takes the row away. |
-| An album you don't have says **"Getting albums is off for you - ask an admin."** where Get the album goes | With logins on, an admin gives **Get albums** in the web app's People. Open You afterwards, so the phone asks deadwax again. |
-| An album stays on **"Waiting for Wi-Fi"** | Download over is Wi-Fi only (You > Downloads): join a Wi-Fi network that isn't a phone's hotspot, with Low Data Mode off - or choose Wi-Fi and cellular. |
-| **"Waiting for room - the storage limit is reached"** | Raise the Storage limit in You > Downloads, or remove something there (largest first). |
-| Your library's albums stay on **"Waiting for the phone to charge"** | Only while charging is on (You > Downloads, under Download your library): plug the phone in, or turn it off. Albums you download yourself don't wait for it. |
-| Your library didn't download with the app closed | iOS decides when the app runs in the background, and may not for hours; Background App Refresh off (Settings > General) or Low Power Mode stops it, and so does swiping deadwax away in the app switcher. Opening the app checks and downloads at once. You > Debug > Your library > In the background (an admin's) says whether iOS ran it. |
+| An album you don't have says **"Getting albums is off for you - ask an admin."** where Get the album goes | With logins on, an admin gives **Get albums** in the web app's People. Open Settings afterwards, so the phone asks deadwax again. |
+| An album stays on **"Waiting for Wi-Fi"** | Download over is Wi-Fi only (Settings > Downloads): join a Wi-Fi network that isn't a phone's hotspot, with Low Data Mode off - or choose Wi-Fi and cellular. |
+| **"Waiting for room - the storage limit is reached"** | Raise the Storage limit in Settings > Downloads, or remove something there (largest first). |
+| Your library's albums stay on **"Waiting for the phone to charge"** | Only while charging is on (Settings > Downloads, under Download your library): plug the phone in, or turn it off. Albums you download yourself don't wait for it. |
+| Your library didn't download with the app closed | iOS decides when the app runs in the background, and may not for hours; Background App Refresh off (the iPhone's Settings > General) or Low Power Mode stops it, and so does swiping deadwax away in the app switcher. Opening the app checks and downloads at once. You > Debug > Your library > In the background (an admin's) says whether iOS ran it. |
 | **"Waiting for space on this phone"** | The phone itself is full: make room in Settings > General > iPhone Storage. |
-| **"2 songs didn't download"**, with why ("The copy kept arriving the wrong size.", "The copy's sound didn't match the original.", "This song isn't on deadwax any more.") | **Try again** in You > Downloads. If it keeps failing, the file on the server may be damaged: play it on the web app. |
-| You > Downloads: **"This phone couldn't read its downloads - close deadwax from the app switcher and open it again."** | Downloads are off until the app opens again; nothing is deleted, and downloaded songs stream meanwhile. If it lasts, the phone may be nearly full. |
+| **"2 songs didn't download"**, with why ("The copy kept arriving the wrong size.", "The copy's sound didn't match the original.", "This song isn't on deadwax any more.") | **Try again** in Settings > Downloads. If it keeps failing, the file on the server may be damaged: play it on the web app. |
+| Settings > Downloads: **"This phone couldn't read its downloads - close deadwax from the app switcher and open it again."** | Downloads are off until the app opens again; nothing is deleted, and downloaded songs stream meanwhile. If it lasts, the phone may be nearly full. |
 | **"Not on this phone - it plays once deadwax is back."** | The song isn't downloaded and deadwax can't be reached. Download what you want offline before you go. |
-| The beep album isn't found | Make it with `make-test-album.py` into your music library (see "What you need"), let Navidrome scan it, then Check again in You > Debug (an admin's). |
+| The beep album isn't found | Make it with `make-test-album.py` into your music library (see "What you need"), let Navidrome scan it, then Check again in Settings > This phone > Debug (an admin's). |
 | **"Untrusted Developer"** when opening the app | Settings > General > VPN & Device Management > your Apple ID > Trust. |
 | The app won't open at all after a week | The free install ran out. Run `install.sh` again: nothing on the phone is lost. |
 | install.sh: **"No paired iPhone the Mac can reach now"** | Connect the cable and unlock the phone (or turn on Connect via network in Xcode, with the Mac and the phone on the same Wi-Fi), then run it again. |

@@ -1,16 +1,17 @@
 import DeadwaxCore
 import SwiftUI
 
-/// You > Downloads (notes/ios-specs/phase2-downloads.md 6), an inset-grouped list, top to bottom: Storage - what's
-/// used, the bar, the storage limit under it, other accounts' downloads; Your library (Phase 3, phase3-autodownload.md
-/// 3.1) - its switch, what fits, the last check, the question an empty list asks; Download over - its two choices and the
-/// network in use now; Downloading and Didn't download, only while there is something in them; Downloaded, every album
+/// Settings > Downloads (notes/ios-specs/phase2-downloads.md 6; You > Downloads until 16 Nov), an inset-grouped list,
+/// top to bottom: Storage - what's used, the bar, the storage limit under it, other accounts' downloads; Your library
+/// (Phase 3, phase3-autodownload.md 3.1) - its switch, what fits, the last check, the question an empty list asks;
+/// Download over - one row, a menu of its two choices since 16 Nov, and the network in use now under it; Downloading
+/// and Didn't download, only while there is something in them; Downloaded, every album
 /// with a song on the phone, largest first; Remove All Downloads; and the last footer. With nothing downloaded,
 /// waiting or failed, the lists give way to the Library's own empty words, the settings staying above them: they are
 /// chosen before the first download.
 ///
 /// Every word is DownloadWords', every rule Core's; this draws DownloadModel's records, by album (the app is album-
-/// shaped: an album's page shows its songs one by one). A row opens its album's page, pushed on You's stack; a swipe
+/// shaped: an album's page shows its songs one by one). A row opens its album's page, pushed on Settings' stack; a swipe
 /// removes it (VoiceOver has it as an action); progress moves while the screen shows (`followProgress`).
 struct DownloadsScreen: View {
     @Environment(DownloadModel.self) private var downloads
@@ -617,8 +618,10 @@ private struct LibraryDownloadingRow: View {
 
 // MARK: Download over (6.4)
 
-/// Drawn as Normalization is (PlaybackSection): one row per choice, its note under it, the accent checkmark on the
-/// chosen - a radio group for VoiceOver - and under them what's used now, amber while something waits for it.
+/// Drawn as Normalization is (PlaybackSection): (16 Nov) one row, "Download over" and the choice at its right, a menu of
+/// the two (`.pickerStyle(.menu)`, as the Storage limit above it is) - a list of ticks until then. Each choice had its
+/// line under its name: the chosen one's leads the footer now, and VoiceOver hears it as the row's hint. Then what's used
+/// now, amber while something waits for it, and that both are kept on this phone.
 private struct DownloadOverSection: View {
     let waitingForIt: Bool
 
@@ -626,16 +629,23 @@ private struct DownloadOverSection: View {
     @Environment(Reachability.self) private var reachability
 
     var body: some View {
+        let chosen = DownloadWords.over(downloads.downloadOver)
         Section {
-            ForEach(DownloadOver.allCases, id: \.self) { choice in
-                row(choice)
+            Picker(DownloadWords.downloadOver, selection: Binding<DownloadOver>(get: { downloads.downloadOver },
+                                                                              set: { (choice: DownloadOver) -> Void in
+                                                                                  downloads.downloadOver = choice
+                                                                              })) {
+                ForEach(DownloadOver.allCases, id: \.self) { (choice: DownloadOver) in
+                    Text(DownloadWords.over(choice).name).tag(choice)
+                }
             }
-        } header: {
-            Text(DownloadWords.downloadOver)
-                .font(Typeface.footnote)
+            .pickerStyle(.menu)
+            .accessibilityHint(chosen.note)
         } footer: {
             Group {
                 VStack(alignment: .leading, spacing: 8) {
+                    // the chosen one's own line first: what it does
+                    Text(chosen.note)
                     Text(DownloadWords.overNow(reachability.path, setting: downloads.downloadOver))
                         .foregroundStyle(waitingForIt ? Palette.amber : Palette.quiet)
                     Text(DownloadWords.overKept)
@@ -643,35 +653,6 @@ private struct DownloadOverSection: View {
             }
             .font(Typeface.footnote)
         }
-    }
-
-    private func row(_ choice: DownloadOver) -> some View {
-        let chosen = downloads.downloadOver == choice
-        let words = DownloadWords.over(choice)
-        return Button {
-            downloads.downloadOver = choice
-        } label: {
-            HStack(alignment: .firstTextBaseline, spacing: 12) {
-                VStack(alignment: .leading, spacing: 3) {
-                    Text(words.name)
-                        .foregroundStyle(.primary)
-                    Text(words.note)
-                        .font(Typeface.footnote)
-                        .foregroundStyle(Palette.quiet)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-                Spacer(minLength: 8)
-                Image(systemName: "checkmark")
-                    .font(Typeface.symbol(.body).weight(.semibold))
-                    .foregroundStyle(Palette.accent)
-                    .opacity(chosen ? 1 : 0)
-            }
-            .contentShape(Rectangle())
-        }
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel(words.name)
-        .accessibilityHint(words.note)
-        .accessibilityAddTraits(chosen ? [.isButton, .isSelected] : .isButton)
     }
 }
 
