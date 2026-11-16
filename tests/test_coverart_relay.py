@@ -20,6 +20,7 @@ route decided in tests/test_logins.py ROUTES, and a signed-out ask refused with 
 """
 
 import asyncio
+import gzip
 import os
 import re
 import stat
@@ -370,6 +371,33 @@ class Pieces(httpx.AsyncByteStream):
         for piece in self.pieces:
             self.taken += 1
             yield piece
+
+
+def test_every_hop_asks_for_the_cover_as_it_is(env):
+    """(2.1.32, a fix to 2.1.24) Accept-Encoding: identity on every hop - httpx asks for gzip unless told otherwise."""
+    assert cover(env).status_code == 200
+    assert len(env.archive.requests) == 3
+    assert all(request.headers["accept-encoding"] == "identity" for request in env.archive.requests)
+
+
+@pytest.mark.parametrize("encoding", ["gzip", "gzip, gzip", "deflate", "br", "zstd", "GZIP"])
+def test_a_cover_encoded_anyway_is_refused_unread(env, encoding):
+    """(2.1.32, a fix to 2.1.24 - the artist pictures' review) read with aiter_bytes(), a gzip body was inflated past
+    FRONT_MAX_BYTES before the cap counted it: 141 MB from 269 bytes of nested gzip. Refused before it is read."""
+    stream = Pieces([gzip.compress(gzip.compress(bytes(16 << 20)))])
+    env.archive.instead = lambda request: httpx.Response(
+        200, headers={"content-type": "image/jpeg", "content-encoding": encoding}, stream=stream)
+
+    assert cover(env).status_code == 502
+    assert stream.taken == 0
+    assert not env.folder.exists() or kept_names(env) == []
+
+
+def test_a_cover_said_to_be_identity_is_passed_on(env):
+    env.archive.instead = lambda request: httpx.Response(
+        200, headers={"content-type": "image/jpeg", "content-encoding": "identity"}, content=jpeg("250"))
+    answer = cover(env)
+    assert answer.status_code == 200 and answer.content == jpeg("250")
 
 
 def test_a_body_declared_past_the_cap_is_refused_unread(env, monkeypatch):

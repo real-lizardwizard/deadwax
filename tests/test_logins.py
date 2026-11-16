@@ -152,6 +152,8 @@ ROUTES = {
     ("GET", "/deadwax/library/artist/art"): "user",
     ("POST", "/deadwax/library/artist/images/preview"): "edit",
     ("POST", "/deadwax/library/artist/images/apply"): "edit",
+    #? (2.1.32) a candidate's preview passed on to the iPhone app - tests/test_artist_picture_relay.py
+    ("GET", "/deadwax/library/artist/picture"): "edit",
     ("POST", "/deadwax/library/artist/refile/preview"): "library",
     ("POST", "/deadwax/library/artist/refile/apply"): "library",
     ("POST", "/deadwax/library/artist/search"): "edit",
@@ -561,6 +563,40 @@ def test_the_cover_relay_is_refused_signed_out_and_the_archive_never_asked(on, m
     answer = ethan.get(path)
     assert answer.status_code == 200 and answer.headers["content-type"] == "image/jpeg"
     assert asked == ["coverartarchive.org"]
+
+
+def test_the_artist_picture_relay_is_edit_albums_and_nothing_is_asked_for_anyone_else(on, monkeypatch):
+    """(2.1.32) GET /deadwax/library/artist/picture with logins on: a 401 signed out, a 403 in NEEDS' words to a person
+    without Edit albums - each before anything is asked of the picture's host - and the picture passed on to one given
+    it, to a Navidrome admin and to break-glass (tests/test_artist_picture_relay.py holds the rest, logins off)."""
+    from src.api.artist_images_endpoint import artist_pictures
+
+    asked = []
+
+    def host(request: httpx.Request) -> httpx.Response:
+        asked.append(request.url.host)
+        return httpx.Response(200, headers={"content-type": "image/jpeg"}, content=b"\xff\xd8\xff" + b"\x00" * 2000)
+
+    monkeypatch.setattr(artist_pictures, "_client",
+                        httpx.AsyncClient(transport=httpx.MockTransport(host), follow_redirects=False))
+    path = "/deadwax/library/artist/picture"
+    params = {"url": "https://r2.theaudiodb.com/images/media/artist/thumb/uxrqxy1347913147.jpg"}
+
+    assert on.client.get(path, params=params).status_code == 401
+    #? given every category but Edit albums before he signs in, so his account's id is read as he does (as the walk's)
+    #? and the later grant is honoured
+    give(on, "ethan", {category: category != "edit" for category in CATEGORIES})
+    ethan = signed_in(on, "ethan")
+    refused = ethan.get(path, params=params)
+    assert refused.status_code == 403
+    assert refused.json()["detail"] == NEEDS.format(label=LABELS["edit"], user="ethan")
+    assert asked == []
+
+    give(on, "ethan", {"request": True, "edit": True})
+    for who in (ethan, signed_in(on, "james"), signed_in(on, auth.BREAK_GLASS_USER)):
+        answer = who.get(path, params=params)
+        assert answer.status_code == 200 and answer.headers["content-type"] == "image/jpeg"
+    assert asked == ["r2.theaudiodb.com"] * 3
 
 
 def test_an_admin_reaches_the_admin_routes(on):

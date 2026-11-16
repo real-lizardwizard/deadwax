@@ -90,7 +90,9 @@ def test_exactly_the_media_routes_are_named():
                  "/deadwax/navidrome/scrub/song-1",
                  #? (2.1.24) the Cover Art Archive's fronts for the iPhone app - tests/test_coverart_relay.py
                  "/deadwax/coverart/release/30702389-5c67-4438-9ea0-2351c8de0f1d",
-                 "/deadwax/coverart/release-group/b1392450-e666-3926-a536-22c65f834433"):
+                 "/deadwax/coverart/release-group/b1392450-e666-3926-a536-22c65f834433",
+                 #? (2.1.32) an artist picture's preview for the iPhone app - tests/test_artist_picture_relay.py
+                 "/deadwax/library/artist/picture"):
         assert serves_media(path), path
 
     #? "/deadwax/library/art" as a prefix caught all of these, and kept their JSON from being gzipped
