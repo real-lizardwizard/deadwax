@@ -624,7 +624,8 @@ Use deadwax's plain `http://` address, on the home Wi-Fi and over WireGuard with
   differing ones say so.
 - **331 A genre for all.** Edit all tracks, type a genre: each file's change listed; Apply; Navidrome shows it.
 - **332 Remove and undo.** Clear a field: "Will be removed"; Undo brings it back.
-- **333 Refused as typed.** A date of "2024-13": refused in words, Apply off.
+- **333 Refused as typed.** A date of "July 2022": refused in words, Apply off. (Not "2024-13": neither the web's
+  `tagProblem` nor the server's `DATE_PATTERN` checks the month, so that is accepted - found while main was readied.)
 - **334 A track's page.** Tap a track: its tags, its raw tags, its audio and pictures; Edit tags… edits that one.
 - **335 A missing cover.** An album with none: Artwork > Get cover; it appears, and on the album page.
 - **336 CD art.** Get CD art; the pictures in the grid; a second Get never replaces them.
