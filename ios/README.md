@@ -40,7 +40,7 @@ Phase 0's test screen lives on in the app's Debug.
   and the iPhone, the weekly `ios/scripts/install.sh`, the test album
   (`ios/scripts/make-test-album.py`), what the app does, and the checks, phase by phase - Phase 7's are 237-246,
   Edit album's 320-329, its Tags' 330-334, its Artwork and Lyrics' 335-337, its Delete's 338-342, the artist
-  tools' 343-348, Add to Queue's 392-400.
+  tools' 343-348, Add to Queue's 392-403.
 - **How it is built, and why:** [notes/ios.md](../notes/ios.md).
 - **Before pushing a change here, on Linux:** `ios/scripts/check-linux.sh`. GitHub's `ios.yml` compiles
   the rest on macOS.

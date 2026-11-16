@@ -359,8 +359,8 @@ final class PlayerModel {
     @discardableResult
     func choose(_ choice: QueueChoice, _ pick: QueuePick<Song>, album: Album?) -> Bool {
         guard let queued = pick.choose(choice, setting: normalization) else { return false }
-        // no engine (iOS wouldn't make one): nothing queued, and the song's line says so
-        guard ensureController() != nil else { return true }
+        // no engine (iOS wouldn't make one): nothing queued, and the song's line says so - false, so no success haptic
+        guard ensureController() != nil else { return false }
         let tracks: [QueueTrack]
         if let album {
             tracks = queued.tracks.map { QueueTrack(song: $0, albumId: album.id, albumName: album.name ?? "",

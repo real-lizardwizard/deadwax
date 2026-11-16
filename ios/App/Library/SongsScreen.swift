@@ -151,6 +151,8 @@ struct SongsScreen: View {
                 .padding(.bottom, 24)
             }
             .pullsToShuffle(page?.pulling)
+            // a row's Add to Queue swipe standing open shuts when the songs change (a refresh, a page landing, Find)
+            .shutsQueueSwipes(on: songs.paging.items.map(\.id))
             .onChange(of: typed) { _, _ in jump(proxy) }
             .onChange(of: songs.landed) { _, _ in jump(proxy) }
             .onChange(of: navigation.libraryScrollToTop) { _, _ in
@@ -266,16 +268,18 @@ struct SongsScreen: View {
         }
     }
 
-    /// The rows - a song twice in one page is two rows, as the web keeps it, so each row is known by its place. Each row
-    /// appearing is how far the reader got, and a row near the end of what is drawn asks for the next page as it
-    /// appears (never while deadwax can't be reached - `resumed` then, once it is back).
+    /// The rows - a song twice in one page is two rows, as the web keeps it - each known by its song and which time it
+    /// appears (SongsList.rows), never its place: a list replaced in place (Refresh's first page) would otherwise hand
+    /// a row's swipe, standing open, to another song. Each row appearing is how far the reader got, and a row near the
+    /// end of what is drawn asks for the next page as it appears (never while deadwax can't be reached - `resumed`
+    /// then, once it is back).
     @ViewBuilder private func rows(_ items: [Song], online: Bool) -> some View {
-        ForEach(Array(items.enumerated()), id: \.offset) { (row: (offset: Int, element: Song)) in
-            SongRow(song: row.element, dimmed: SongsList.dimmed(row.element, online: online, here: { (id: String) -> Bool in
+        ForEach(SongsList.rows(items)) { (row: SongsList.Row) in
+            SongRow(song: row.song, dimmed: SongsList.dimmed(row.song, online: online, here: { (id: String) -> Bool in
                 downloads.state(id).isHere
             }))
             .onAppear {
-                songs.appeared(row.offset, online: reachability.online)
+                songs.appeared(row.place, online: reachability.online)
             }
         }
     }

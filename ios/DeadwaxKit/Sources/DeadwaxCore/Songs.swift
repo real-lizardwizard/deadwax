@@ -271,6 +271,38 @@ public enum SongsList {
 
     /// The row at `index` of `count` drawn is near enough the end to ask for more.
     public static func asksMore(at index: Int, of count: Int) -> Bool { index >= count - nearTheEnd }
+
+    /// Each row's key, for songs listed in this order (`ids`): the song, and which time it appears - "1:<id>" the
+    /// first, "2:<id>" the second (a page can hold a song twice, which stays two rows, as the web keeps it). So a row
+    /// is known by its song, not its place: a list replaced in place (Refresh's first page, a page landing) never hands
+    /// one row's state - a swipe standing open on Add to Queue - to another song. Unique for any ids: the count runs
+    /// to the first colon.
+    public static func rowKeys(_ ids: [String]) -> [String] {
+        var seen: [String: Int] = [:]
+        return ids.map { (id: String) -> String in
+            let time = (seen[id] ?? 0) + 1
+            seen[id] = time
+            return "\(time):\(id)"
+        }
+    }
+
+    /// A row as drawn: its key (rowKeys), its place in the list (how far the reader got, for the next page) and its song.
+    public struct Row: Identifiable {
+        public let id: String
+        public let place: Int
+        public let song: Song
+    }
+
+    /// The rows for `songs`, in their order, each known by rowKeys.
+    public static func rows(_ songs: [Song]) -> [Row] {
+        let keys = rowKeys(songs.map(\.id))
+        var rows: [Row] = []
+        rows.reserveCapacity(songs.count)
+        for (place, song) in songs.enumerated() {
+            rows.append(Row(id: keys[place], place: place, song: song))
+        }
+        return rows
+    }
 }
 
 /// All songs' Shuffle button (ShuffleSongs.tsx's, at the head of the collection's songs with a library of your own):

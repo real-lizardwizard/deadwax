@@ -973,4 +973,35 @@ private extension QueueController {
         let copies = after.prefix { $0 == "1" }.count
         #expect(copies > 0 && after.dropFirst(copies).first == "a")
     }
+
+    // Where "after the ones already added" doesn't hold - the engine's own withLast and layoutAt, the web's Play Last
+    // too, kept as they are (docs/ios.md "Adding to the queue" says both, checks 401 and 402 ask after them).
+
+    @Test func afterPreviousTheNextAddedPlaysBeforeTheOnesAddedEarlier() {
+        let (player, engine) = rig()
+        player.playTracks(simAlbum(6), start: 4)
+        player.playLast([simTrack("a")])
+        player.playLast([simTrack("b")])
+        #expect(player.queue.current?.id == "5" && player.after == ["a", "b", "6"])
+        engine.seconds = 1
+        player.previous()
+        #expect(player.queue.current?.id == "4" && player.after == ["5", "a", "b", "6"],
+                "Previous: the songs added wait where they were, after the song gone back from")
+        player.playLast([simTrack("c")])
+        #expect(player.after == ["c", "5", "a", "b", "6"],
+                "none added straight after the song playing: c plays next, ahead of a and b")
+    }
+
+    @Test func addedInASongsLastSecondsItPlaysAfterTheNextSong() {
+        let (player, engine) = rig()
+        player.playTracks(simAlbum(3), start: 0)
+        engine.seconds = 195
+        engine.nextScheduled = true
+        #expect(!player.playLast([simTrack("a")]))
+        #expect(player.after == ["2", "3"] && player.holdsAnEdit, "song 2 already lined up: the add waits")
+        engine.join()
+        player.engineChanged()
+        #expect(player.queue.current?.id == "2" && player.after == ["a", "3"] && !player.holdsAnEdit,
+                "made at the join: after song 2, not straight after song 1")
+    }
 }

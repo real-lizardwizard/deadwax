@@ -246,6 +246,25 @@ import Testing
         #expect(SongsList.asksMore(at: 0, of: 10), "a short list: its first row")
     }
 
+    @Test func aRowIsKnownByItsSongNotItsPlace() {
+        // Refresh's first page replacing the list in place: the third row is another song, so it is another row - a
+        // swipe standing open on it never carries over to the song now there
+        let before = SongsList.rowKeys(["a", "b", "c", "d"])
+        let after = SongsList.rowKeys(["a", "b", "x", "d"])
+        #expect(before == ["1:a", "1:b", "1:c", "1:d"])
+        #expect(before[2] != after[2] && before[3] == after[3])
+        // a song twice in a page stays two rows, each its own
+        #expect(SongsList.rowKeys(["a", "b", "a", "a"]) == ["1:a", "1:b", "2:a", "3:a"])
+        // no id can pass for another's second time: the count runs to the first colon
+        let odd = SongsList.rowKeys(["2:a", "a", "a"])
+        #expect(Set(odd).count == 3)
+        // a page landing after them leaves the rows above as they were
+        #expect(Array(SongsList.rowKeys(["a", "b", "a", "c"]).prefix(3)) == SongsList.rowKeys(["a", "b", "a"]))
+        let rows = SongsList.rows([Song(id: "a"), Song(id: "b"), Song(id: "a")])
+        #expect(rows.map(\.id) == ["1:a", "1:b", "2:a"] && rows.map(\.place) == [0, 1, 2])
+        #expect(rows.map(\.song.id) == ["a", "b", "a"])
+    }
+
     @Test func aRowAsVoiceOverReadsIt() {
         #expect(SongWords.spoken(Song(id: "1", title: "Roads", album: "Dummy", albumId: "al", artist: "Portishead"))
                 == "Roads, Portishead \u{00B7} Dummy, opens its album")

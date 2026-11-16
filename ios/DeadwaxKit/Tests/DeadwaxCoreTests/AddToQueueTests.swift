@@ -122,5 +122,11 @@ import Testing
         #expect(QueueSwipe.release(at: 120, velocity: -600, width: width) == .shut, "flung left: it shuts")
         #expect(QueueSwipe.release(at: 0, velocity: 900, width: width) == .shut, "nothing out")
         #expect(QueueSwipe.release(at: 179, velocity: 2000, width: width) == .open, "a fling never adds: only the full swipe")
+        // the fling's bounds, exactly: 500 pt/s is a fling either way, a hair under it isn't
+        #expect(QueueSwipe.fling == 500)
+        #expect(QueueSwipe.release(at: 20, velocity: 500, width: width) == .open, "flung right at exactly 500: it opens")
+        #expect(QueueSwipe.release(at: 20, velocity: 499.9, width: width) == .shut, "just under: the button's half decides")
+        #expect(QueueSwipe.release(at: 120, velocity: -500, width: width) == .shut, "flung left at exactly 500: it shuts")
+        #expect(QueueSwipe.release(at: 120, velocity: -499.9, width: width) == .open, "just under: the button's half decides")
     }
 }

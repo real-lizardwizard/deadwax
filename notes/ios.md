@@ -12133,6 +12133,16 @@ album, playlist or shuffle; with none added it lands at `copiesEnd`, straight af
 That is exactly "the first swipe is play next, then the next play last", and Spotify's Add to queue. With nothing
 playing (or a queue played out) `QueueController.addSongs` plays the songs instead, as Play Next did.
 
+**Where it isn't strict order** (found in review; the engine left as it is, docs/ios.md "Adding to the queue" says
+both and checks 401-402 ask after them, `AddToQueueOrderTests` holds them):
+- **After a roll-back** (Previous, or a History row tapped): `addedEnd` counts only the `.added` units straight after
+  the song playing's copies. Going back leaves the songs added after the song gone back from, so a song added then
+  lands before them. An album of 6 played to song 5, a and b added, Previous at 1 s: 4 plays, then [5, a, b, 6]; c
+  added: [c, 5, a, b, 6]. The web's Play Last (layoutAt, the same port) does the same.
+- **In a song's last ~2.5 s** (D4): the next song is already scheduled on a player node, `replaceUpcoming` refuses,
+  and the controller holds the add and makes it at the join, against the queue then - so it lands after the song that
+  was next, not straight after the one ending. With an added song next, the order comes out as usual.
+
 - **Core** (`ios/DeadwaxKit/Sources/DeadwaxCore/AddToQueue.swift`): `AddToQueue.words` ("Add to Queue", title case as
   the menus' other words), `choice` (`.last`), `symbol` (Play Last's, `DownloadWords.playLastSymbol`), `fill` and
   `glyph` (below), and **`AddToQueue.pick(_:online:gone:here:)` - the one rule** for both the ••• and the swipe:
@@ -12163,27 +12173,40 @@ it by passing its request. Not on Up Next's rows, the grids' tiles, MusicBrainz'
 - **A List's row** (album, playlist) takes SwiftUI's `.swipeActions(edge: .leading, allowsFullSwipe: true)` - one
   Button, `Label(AddToQueue.words, systemImage: AddToQueue.symbol)`, `.tint(Palette.queueSwipe)`. UIKit's own swipe:
   it already lives with the List's scroll, the back swipe and the pull to shuffle (which reads scroll geometry and
-  phase, no gesture of its own), closes on scroll, and is the row's VoiceOver action.
+  phase, no gesture of its own), and closes on any touch. Its VoiceOver action belongs to the row, which is two
+  elements (the song's button and the •••), so the song's element carries `addToQueueAction` too (after review).
 - **A ScrollView's stack** (Songs, Search: `.swipeActions` does nothing there) is drawn by hand, `HandSwipe` over Core's
   `QueueSwipe`: the row follows the finger rightwards (`moved`, never left of shut, never past the row); past half the
   row (`fullAt`: max(2 x 74, half the width)) a light tick, and letting go there adds (`release` -> `.add`); let go with
   the button half out or more, or flung right (500 pt/s), and it stands open on one 74 pt button; less, or flung left,
   it shuts. Standing open, a tap on the button adds, and a tap on the row (swallowed - it plays or opens nothing), a
-  swipe back, another row opening (`OpenQueueSwipe`, one open row in the app) or the row moving on screen (a scroll,
-  rows landing above: `onGeometryChange` of its global minY) shuts it. Drawn as a List cell's: the purple from the
-  screen's edge (`inset` 16, the stacks' own padding) to `offset`, the symbol in its last 74 pt, beside the row - which
-  keeps its 16 pt gap, as a cell's content keeps its inset. VoiceOver: those rows put `.accessibilityActions { Add to
-  Queue }` on their main element (the opener, the song's button) via `addToQueueAction`, offered by the same rule; the
+  swipe back, another row opening (`OpenQueueSwipe`, one open row in the app), the row moving on screen (a scroll,
+  rows landing above, the Library's page turning: `onGeometryChange` of its global frame's origin), a touch going down
+  anywhere outside its band (`TouchDown`, below) or its list's songs changing (`shutsQueueSwipes`) shuts it. Drawn as
+  a List cell's: the purple from the screen's edge (`inset` 16, the stacks' own padding) to `offset`, the symbol in
+  its last 74 pt, beside the row - which keeps its 16 pt gap, as a cell's content keeps its inset; always in the row's
+  background, so it shrinks with the row as it shuts (no width and no hits while shut). Opening and shutting slide
+  (`.snappy`, 0.25 s), at once under Reduce Motion. VoiceOver: every row puts `.accessibilityActions { Add to Queue }`
+  on its song's own element (the opener, the song's button) via `addToQueueAction`, offered by the same rule; the
   drawn button is hidden from it.
 - **The pan is UIKit's** (`UIGestureRecognizerRepresentable`, iOS 18), because it can refuse to begin: its delegate's
   `gestureRecognizerShouldBegin` is `QueueSwipe.begins` - sideways more than up or down (so the list's vertical pan
   keeps every vertical touch), rightwards, or leftwards only while open, and never from within 24 pt of the screen's
-  left edge (`backEdge`: UIKit's edge back swipe, which this never makes wait). `shouldBeRequiredToFailBy` makes any
-  other sideways pan on the same touch wait for the row's to fail: iOS 26's back swipe from a page's content, and a
-  horizontally scrolling scroll view's pan - the Library's pager (below) - but never the list's own vertical scroll (a
-  scroll view as wide as its content) nor the screen-edge pan. A SwiftUI DragGesture can't refuse that way inside a
-  ScrollView (as `.gesture` it takes the scroll's touches on iOS 18; as `.simultaneousGesture` both move - SwiftUI's
-  behaviour as known, not measured here).
+  left edge (`backEdge`: UIKit's edge back swipe, which this never makes wait). `shouldBeRequiredToFailBy` makes every
+  other UIPanGestureRecognizer on the same touch wait for the row's to begin or fail, but two: a
+  UIScreenEdgePanGestureRecognizer (the edge back swipe) and a scroll view that scrolls only up and down (the list's
+  own, as wide as its content). It isn't only sideways pans, then: iOS 26's back swipe from a page's content and a
+  horizontally scrolling scroll view's pan - the Library's pager (below) - are the ones meant, but any other pan
+  above the row (a SwiftUI drag, if SwiftUI makes it one) waits too - for no longer than the row's pan takes to decide,
+  its first few points, where `begins` refuses anything not sideways-rightwards (or leftwards on an open row) from away
+  from the edge. A SwiftUI DragGesture can't refuse that way inside a ScrollView (as `.gesture` it takes the scroll's
+  touches on iOS 18; as `.simultaneousGesture` both move - SwiftUI's behaviour as known, not measured here).
+- **A touch elsewhere** (`TouchDown`, after review): while a hand-swiped row stands open (or is being swiped) its
+  pan's coordinator puts a gesture recognizer on the window that only watches touches go down - it fails as each
+  begins, never cancels or delays a touch, and recognizes beside every other - and a touch outside the row's band
+  (its global frame's top to bottom) shuts the row, as a List's row shuts on any touch. Inside the band the row's own
+  views decide (the button adds, the row's overlay shuts). Taken off the window as the row shuts; one whose row went
+  without shutting takes itself off at its next touch. Touches in another window (the keyboard's) aren't seen.
 - **Why not Lists for Songs and Search**: both would have had to be re-laid-out as List rows - Search's sections, slots,
   More buttons and disclosures most of all, its rows inside other views' bodies - and "styled to look exactly as they
   do now" checked on nothing but the phone. The hand swipe changes nothing about how either screen looks at rest.
@@ -12228,21 +12251,62 @@ it by passing its request. Not on Up Next's rows, the grids' tiles, MusicBrainz'
   offered; no songs never offered; the purple's 5.9:1 against the tint's under 3:1.
 - **QueueSwipeTests** (new, 5): a pan is the row's only sideways (vertical, diagonal and leftwards-when-shut refused,
   leftwards-when-open taken); the screen's edge is the back swipe's; the row follows the finger rightwards only; the
-  full swipe is half the row, never under twice the button; letting go (add, open, shut, flings, a fling never adds).
-- **AddToQueueOrderTests** (new, 4, in QueueControllerTests over the fake engine): the first plays next and each after
+  full swipe is half the row, never under twice the button; letting go (add, open, shut, flings, a fling never adds) -
+  and the fling's bounds exactly: 500 pt/s either way is a fling, 499.9 isn't (after review: `<` for `<=` or `>` for
+  `>=` in `release` passed every test before; each now fails `lettingGo`, tried both ways).
+- **AddToQueueOrderTests** (new, 6, in QueueControllerTests over the fake engine): the first plays next and each after
   it in the order added, an album's songs after them, the engine's entries the same; once the added are playing, the
   next goes after those still waiting, and with none waiting plays next again; with nothing playing the first plays;
-  Repeat One's copies stay ahead, where Play Next put songs too.
+  Repeat One's copies stay ahead, where Play Next put songs too; and (after review) the two places it isn't strict
+  order - after Previous [c, 5, a, b, 6], and added in a song's last seconds after the next song.
+- **SongsTests.aRowIsKnownByItsSongNotItsPlace** (after review): `SongsList.rowKeys` - a song replaced in place is
+  another row, a song twice is two rows, no id passes for another's second time, a page landing leaves the rows above.
 - **ScreenQueueTests.thePhonesOneItemIsTheWebsPlayLast** and the Automatic line in **LevelsTests** (above).
+
+### After review (16 Nov)
+
+A review of the first commit found nothing serious; each point fixed in a second commit:
+- **Reduce Motion**: the hand swipe's open and shut animated regardless. Now `settle(at:)` sets the offset at once
+  under `accessibilityReduceMotion`, as LibraryTop, the pager, the EQ and PullShuffle do. (The List rows' motion is
+  iOS's own.)
+- **The order's two exceptions** (above): said plainly in docs/ios.md instead of promising strict order; checks 401
+  and 402; two tests. The engine is unchanged.
+- **An open row could carry over to another song on Songs**: rows were keyed by place (`\.offset`) and the open state
+  is a row's `@State`, so Refresh's first page replacing the list in place left row 3 open on whatever song was now
+  third, its button adding that song - the minY watcher never fired, nothing having moved. Rows are now keyed by
+  `SongsList.rows` (the song, and which time it appears - a song can be in a page twice), and `shutsQueueSwipes(on:)`
+  on the Songs scroll view shuts any open row when the songs' ids change (`OpenQueueSwipe.shutAll`). Search's rows
+  were keyed by `row.key` already. Check 403.
+- **The fling mutation** (Tests, above).
+- **VoiceOver on the List rows** rested on SwiftUI handing the row's swipe action to the song's element. Now the song's
+  button in `TrackRow` and `PlaylistSongRow` carries `addToQueueAction` itself. Whether iOS also lists its own (from
+  the swipe) on that element - which would make two - can't be told from here: check 400 says to expect it at least
+  once, possibly twice, and to say if twice (then ours goes).
+- **iOS 17**: docs/ios.md says where the swipe is that the Songs, All songs and Search rows have none below iOS 18.
+- **The purple disappeared on shutting** rather than shrinking with the row (it was drawn only while `offset > 0`,
+  so it went with the shut's first frame). It is now always in the background, `offset` wide, `allowsHitTesting`
+  only while open.
+- **An open stack row stayed open through touches elsewhere**: now `TouchDown` (The swipe, above) and the origin
+  watcher (a page turn moves the row sideways, which the old minY watcher missed).
+- **`shouldBeRequiredToFailBy`'s comment** said sideways pans; it is every pan but the two (The swipe, above). The
+  comment and these notes now say so; the behaviour is unchanged.
+- **The success haptic with nothing queued**: `PlayerModel.choose` answered true when no engine could be made (older
+  than Add to Queue - its only reader is `QueueAdder`). It answers false now; no engine file touched.
+- **Check 395** promised a tick at halfway on every row; on an album's and a playlist's page the swipe is UIKit's, its
+  full-swipe point and any tick its own. Reworded.
+- The notice still reads "Added to Up Next: …" - James hasn't said.
 
 ### Verified, and not
 
-Verified on the Mac: `swift test` (all of it, passing: 1821 tests in Core's 194 suites, and 12 and 158 in the
-others); the unsigned generic-iOS Debug build, BUILD SUCCEEDED, no warning in the files touched; tests/test_ios*.py
-(375 passed, 1 skipped). The order was read from `withLast` and `layoutAt` and is held by the tests above.
+Verified on the Mac, after the rebase onto 67480d5 and the review's fixes: `swift test` (all of it, passing: 1855
+tests in Core's 196 suites, and 12 and 158 in the others); the unsigned generic-iOS Debug build, BUILD SUCCEEDED, no
+warning in the files touched; tests/test_ios*.py with tests/test_source_bytes.py (400 passed, 1 skipped); all 93 sims
+on Node 22 (iosartistmanage's among them). The order was read from `withLast` and `layoutAt` and is held by the tests
+above.
 
-Not verified - only the phone can tell (docs/ios.md checks 392-400): the swipe's feel on a real finger on all four
+Not verified - only the phone can tell (docs/ios.md checks 392-403): the swipe's feel on a real finger on all four
 screens, and that the List's and the hand-drawn swipe look and feel alike; that vertical scrolling, a row's tap and its
 •••, the pull to shuffle, the edge back swipe (and iOS 26's content back swipe) are untouched; that SwiftUI keeps the
-coordinator as the pan's delegate and the pager really waits; the haptics; VoiceOver's one Add to Queue on a List row
-(SwiftUI's own, expected but not seen) and on a stack row's main element.
+coordinator as the pan's delegate and the pager really waits; that `TouchDown` on the window shuts an open row and
+leaves the touch to what it was for; Reduce Motion; the haptics; VoiceOver's Add to Queue on each row's song (once or
+twice on a List row).

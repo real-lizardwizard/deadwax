@@ -1049,6 +1049,7 @@ and All artists, rather than a page among your own albums and artists.
   it right** to add it to the queue (see [Adding to the queue](#adding-to-the-queue)) - on the Library's Songs
   page too, where a swipe right that starts on a song adds it rather than turning back a page: start it at the
   very left edge of the screen (or tap the switch) to go to the page before. A swipe left still turns the page.
+  The swipe needs iOS 18; on iOS 17 the ••• adds.
 - **Find** (the magnifying glass, or All songs' own field), asks Navidrome for the songs that match what you type -
   by title, artist or album, as Navidrome's own search matches them - a moment after you stop typing. The
   songs come 100 at a time, so the phone can't look through the ones it hasn't fetched; Find here is
@@ -1152,7 +1153,8 @@ go.
   of the first songs found as the list comes in, so a song with **▶** after it plays the moment you tap.
   One without (its album not fetched yet) opens its album's page instead. Its **•••** is the song's own
   menu: Add to Queue, Add to a playlist… and Download. **Swipe it right** to add it to the queue (see [Adding
-  to the queue](#adding-to-the-queue)). A song you don't have (MusicBrainz's) has no ••• and no swipe.
+  to the queue](#adding-to-the-queue)) - on iOS 18 and later; on iOS 17 the ••• adds. A song you don't have
+  (MusicBrainz's) has no ••• and no swipe.
 - **An album** opens its page; **an artist**, theirs. Back takes you to the list as you left it.
 - **An album you don't have** opens its page: its cover, its title and artist, "2008 · Album · not in your
   library", then **Pressing** - tap it for every pressing MusicBrainz knows, the usual one ticked, each
@@ -1564,11 +1566,22 @@ of the hand is still 1.8 seconds of the song.
 
 ### Adding to the queue
 
-**Add to Queue** puts a song - or a whole album or playlist - after the songs you've already added, still
-ahead of the rest of the album, playlist or shuffle that's playing. So with nothing added yet, the first
-song you add plays next, the second after it, and so on, in the order you added them; once they've played,
-the next one you add plays next again. A line above the mini player says so ("Added to Up Next: Roads") for
-5 seconds, and VoiceOver reads it. With nothing playing, it just plays.
+**Add to Queue** puts a song - or a whole album or playlist - after the songs you've already added that are
+waiting straight after the song playing, still ahead of the rest of the album, playlist or shuffle that's
+playing. So with nothing added yet, the first song you add plays next, the second after it, and so on, in
+the order you added them; once they've played, the next one you add plays next again. A line above the mini
+player says so ("Added to Up Next: Roads") for 5 seconds, and VoiceOver reads it. With nothing playing, it
+just plays.
+
+Two times the order isn't that simple (the web app's Play Last works the same way after going back):
+
+- **After going back.** Previous, or a song tapped in Up Next's history, leaves the songs you'd added where
+  they were - after the song you went back from. A song you add now goes straight after the one playing,
+  ahead of them. Say you play an album of six to song 5, add **a** then **b**, and press Previous: song 4
+  plays, then 5, a, b, 6. Add **c** now and it plays next: c, 5, a, b, 6.
+- **In a song's last two or three seconds.** By then the next song is already lined up to follow without a
+  gap, so a song you add waits for it and goes in as it starts: it plays after that next song, not straight
+  after the one that was ending. If the next song was one you'd added, the order comes out as usual.
 
 It's the one way to add songs on the phone (since app 0.13 (13)'s build of 16 Nov): every **•••** has
 **Add to Queue** where it had Play Next and Play Last - a song's, and the one at the top of an album's or a
@@ -1576,16 +1589,21 @@ playlist's page for all of it. The web app keeps **Play Next** and **Play Last**
 is the web app's Play Last.
 
 **Swipe a song right** to add it, as Apple Music's rows swipe: on an album's page, a playlist's, the
-Library's Songs and All songs, and Search's songs.
+Library's Songs and All songs, and Search's songs. **On iOS 17**, the Library's Songs and All songs and
+Search's songs have no swipe (it needs iOS 18): their **•••** and VoiceOver's Add to Queue still add the
+song. Album and playlist pages swipe on iOS 17 too.
 
-- **A full swipe** - past about half the row - adds the song as you let go, with a light tap you can feel
-  (and a tick as you pass the halfway point).
+- **A full swipe** adds the song as you let go, with a short tap you can feel. On an album's and a
+  playlist's page the swipe is iOS's own, as in Mail: how far is "full" is iOS's. On the Library's Songs and
+  All songs and in Search it's past half the row, with a light tick as you pass it.
 - **A shorter swipe** leaves one purple button, **Add to Queue**, standing beside the row: tap it to add the
-  song. Tap the row, swipe it back, scroll, or swipe another row, and it closes.
+  song. Tap the row, swipe it back, or touch anywhere else - scroll, another row or its •••, the search
+  field, the Library's pages - and it closes, the purple shrinking back with the row. With **Reduce Motion**
+  on, the row on the Library's Songs and All songs and in Search opens and closes at once, without sliding.
 - It does just what the song's **•••** > Add to Queue does, and it's on every song row whose ••• has Add to
   Queue: while deadwax can't be reached, only on the songs on the phone (as the ••• offers it). Up Next's
   own rows, the Library's grids and a song you don't have (Search's MusicBrainz songs) have no swipe.
-- **VoiceOver**: the row's actions (swipe up or down) include **Add to Queue**.
+- **VoiceOver**: on the song itself (not its •••), the actions (swipe up or down) include **Add to Queue**.
 - A swipe that starts at the very left edge of the screen still goes back, on a page you opened - and on the
   Library's Songs page, turns back to the page before (a swipe right that starts on a song adds it there).
 
@@ -4535,7 +4553,7 @@ Artist images and Move albums write into the library: use an artist whose pictur
   this artist", each picture read with its name and where it's from ("…, from fanarttv") and "Chosen" on the one
   chosen, every line whole in all three sheets.
 
-### Add to Queue's checks (392-400)
+### Add to Queue's checks (392-403)
 
 **Not done yet.** These come with the build that makes [Add to Queue](#adding-to-the-queue) the phone's one way to add
 songs - a swipe right on a song, and the one item where every ••• had Play Next and Play Last (still app 0.13 (13)).
@@ -4552,13 +4570,20 @@ No server change is needed. Use an album of a dozen songs, headphones on; the we
 - **394 A whole album, a playlist, and nothing playing.** Another album's top ••• > Add to Queue: all its songs under
   Playing Next, in its order, after any you'd added. A playlist's top •••: the same. With nothing playing (a fresh
   start, or after the queue ended), Add to Queue on a song plays it at once - no line, the mini player shows it.
-- **395 Swipe all the way.** On an album's page, swipe a song right, past about half the row, and let go: a light tap
-  you can feel (a tick as you passed halfway), the row slides back, and "Added to Up Next: …" - just as its •••'s Add
-  to Queue. Then on a playlist's page, All songs, and a song in Search (Top results and Songs). Does each look and
-  feel the same - the purple out from the screen's edge, the symbol by the row, the tick?
+- **395 Swipe all the way.** On an album's page, swipe a song right as far as it goes and let go: a short tap you can
+  feel, the row slides back, and "Added to Up Next: …" - just as its •••'s Add to Queue. There the swipe is iOS's own
+  (as in Mail), so where "all the way" begins, and any tick on the way, are iOS's. Then on a playlist's page (the
+  same), and on All songs and a song in Search (Top results and Songs), where the swipe is deadwax's: a light tick as
+  you pass half the row, and letting go past it adds. Do all four look and feel alike - the purple out from the
+  screen's edge, the symbol by the row?
 - **396 Swipe part way.** Swipe a song a little way and let go: one purple Add to Queue button stands beside it. Tap it:
-  added, and it closes. Swipe again a little, then tap the row: it closes, and nothing plays or opens. Again, then
-  scroll: it closes. Again, then swipe another row: the first closes. Swipe an open row back left: it closes.
+  added, and it closes, the purple shrinking back with the row. Swipe again a little, then tap the row: it closes, and
+  nothing plays or opens. Again, then scroll: it closes. Again, then swipe another row: the first closes. Swipe an
+  open row back left: it closes. On All songs and in Search, open one again and touch somewhere else - another song's
+  •••, the search field, the tab bar: it closes as your finger goes down, and what you touched still works (the •••
+  opens, the field takes the typing). On the Library's Songs page, open one and turn the page with the switch: it's
+  closed when you come back. Then turn on Settings > Accessibility > Motion > Reduce Motion: on All songs and in
+  Search the row opens and closes at once, without sliding.
 - **397 Nothing else changes.** On each of those lists, flick up and down starting on a song: the list scrolls, no row
   slides, nothing is added. A song's tap and its ••• work as before. On an album's page and All songs, swipe in from
   the very left edge: it goes back, nothing added. The pull to shuffle on an album, a playlist and the Library still
@@ -4569,9 +4594,25 @@ No server change is needed. Use an album of a dozen songs, headphones on; the we
 - **399 Offline.** Turn on Airplane Mode. An album with only some songs on the phone: a dimmed song has no swipe and
   no Add to Queue in its •••; a song on the phone swipes and adds. The album's top •••'s Add to Queue adds only the
   songs on the phone.
-- **400 VoiceOver.** On an album's song, a playlist's, a Songs row and a Search song: swipe up or down through the
-  actions - **Add to Queue** once (not twice, and not missing), and it adds the song, VoiceOver reading "Added to Up
-  Next: …". Settings > Playback > Normalization, Automatic's line: "… a song you add with Add to Queue …".
+- **400 VoiceOver.** Focus a song itself (not its •••) on an album's page, a playlist's, All songs and Search, and
+  swipe up or down through its actions. On All songs and in Search you should hear **Add to Queue** once. On an
+  album's and a playlist's page you should hear it at least once, among the song's download items (Download,
+  Remove Download…); you may hear it twice there, one deadwax's and one iOS's own from the swipe - either adds the
+  song once. Tell me if it's twice, or if the ••• has one too. Whichever you choose, it adds the song and VoiceOver
+  reads "Added to Up Next: …". Settings > Playback > Normalization, Automatic's line: "… a song you add with Add to
+  Queue …".
+- **401 After going back.** Play an album of six or more to song 5, add a song **a**, then **b** (Add to Queue), and
+  press Previous within its first seconds: song 4 plays, and Up Next shows 5, a, b, 6. Add **c**: it goes straight
+  after song 4 - c, 5, a, b, 6 - ahead of a and b, as [Adding to the queue](#adding-to-the-queue) says. The same after
+  tapping a song in Up Next's history instead of Previous.
+- **402 In a song's last seconds.** Play an album, and in the last two or three seconds of song 1, with nothing added,
+  Add to Queue a song **a**: song 2 plays next as it would have, and **a** after it (Up Next shows a, 3, …), not
+  between 1 and 2. Then add a song early in a song: it plays next, as usual. Does the join into song 2 still sound
+  seamless?
+- **403 Songs refreshed under an open row.** At the top of All songs, swipe the third song part way open, then pull
+  to refresh; on the Library's Songs page (logins off), the same with the Library's ••• > Refresh. The row closes, and
+  no other song stands open in its place: a row only ever stands open on the song it was opened on, and its button
+  adds that song. Then open one, scroll down until the next page loads, and come back: nothing stands open.
 
 ## What it can't do yet
 

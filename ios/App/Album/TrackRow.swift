@@ -14,7 +14,8 @@ import SwiftUI
 /// button (VoiceOver: "dimmed"); its ••• still offers Download, which waits.
 ///
 /// Add to Queue (notes/ios.md "Add to Queue: the swipe, and the menus' one item"): swiped right, the List's own leading
-/// swipe action adds the song - wherever its ••• offers Add to Queue (AddToQueueSwipe.swift).
+/// swipe action adds the song - wherever its ••• offers Add to Queue (AddToQueueSwipe.swift) - and the song's element
+/// has it as a VoiceOver action of its own.
 struct TrackRow: View {
     let song: Song
     let albumArtist: String?
@@ -72,6 +73,9 @@ struct TrackRow: View {
                     Button(choice.label) { act(choice) }
                 }
             }
+            // on the song's own element, where VoiceOver rests: the swipe's action, said for certain (the List's own
+            // swipe action is the row's, and the row is two elements - this and the •••)
+            .addToQueueAction(menu)
 
             QueueMenu(request: menu) {
                 Image(systemName: "ellipsis")

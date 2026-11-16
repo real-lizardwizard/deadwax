@@ -707,8 +707,8 @@ private struct PlaylistHero: View {
 /// song the player has (still while paused); its title; its artist and album; the download slot (as an album's rows:
 /// on every row where any song has a state); its time; its ••• ("More for Roads"). A tap plays the playlist from it.
 /// VoiceOver reads it as one: "Roads, Portishead · Dummy, Downloaded, 5:04" - "playing" or "paused" for the song the
-/// player has - with the song's download items as its actions. Swiped right, the List's own leading swipe action adds the
-/// song to the queue, wherever its ••• offers Add to Queue (AddToQueueSwipe.swift).
+/// player has - with the song's download items as its actions, and Add to Queue. Swiped right, the List's own leading
+/// swipe action adds the song to the queue, wherever its ••• offers Add to Queue (AddToQueueSwipe.swift).
 private struct PlaylistSongRow: View {
     let song: Song
     let current: Bool
@@ -777,6 +777,8 @@ private struct PlaylistSongRow: View {
                     Button(choice.label) { act(choice) }
                 }
             }
+            // on the song's own element, where VoiceOver rests: the swipe's action, said for certain (TrackRow's)
+            .addToQueueAction(menu)
 
             QueueMenu(request: menu) {
                 Image(systemName: "ellipsis")
