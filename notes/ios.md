@@ -10709,3 +10709,158 @@ Not verified - only the phone can tell (docs/ios.md checks 282-288):
 - That nothing fights it: Back's edge swipe, the ••• menus, Album info, a song's tap and a fling's bounce at the top.
 - A pull a call, Siri or Notification Center cuts short shuffling nothing (the Library's wiring, check 95's caveat).
 - Edit on a playlist's page showing nothing when pulled; Try again on an album that couldn't load.
+
+## The artist's albums you don't have (2026-11-15)
+
+James: "also on the artists page I'd like to also see albums I don't have yet". The library's artist page
+(Artist/ArtistView.swift) now lists, among your albums, their albums on MusicBrainz that you don't have, as the web's
+artist page (ArtistPage.tsx, lib/artistPage.ts's `artistRows`) does: each album once. Still app 0.13 (13); the
+.xcodeproj unchanged (ArtistJoin.swift is in the package, the views in the synchronized folder).
+
+**No server change, and no new route** (Routes.all stays 61). Who the artist is comes from `GET /artists/{id}`, which
+passes Navidrome's `musicBrainzId` through, and from `/library/owned`, which Search already asks. Their albums come
+from `/search_musicbrainz/discography`, asked by the MusicBrainz artist page's own model (MBArtistModel). The covers
+come through the Cover Art Archive relay (ArchiveCover).
+
+### Core (DeadwaxCore)
+
+**ArtistJoin.swift** (new):
+
+- `mbid` is the web's `artistMbid`. It takes Navidrome's own id for the artist. Without one, it takes what the
+  library's folders say: folders of their albums' releases, or (when none of their albums carries a release id)
+  folders filed under their name. It answers only when every folder that says agrees, and only on a single artist's
+  id. Otherwise it is nil, and no guess is made.
+- `claimed` is `artistRows`' own claim: which of MusicBrainz's groups an album of yours already is.
+  - A group is claimed by its folders' releases, when they are an album Navidrome has that no other group claimed
+    first.
+  - Or it is claimed by an exact folded title, but only when no other listed group shares that title (a group listed
+    twice counts twice), and only for an album whose release no folder ties to a group of its own (`knownGroup`).
+- `theirs` is `MBArtistPage.rows` without the claimed groups.
+- `rows` is your rows as `ArtistPage.rows` makes them, with theirs merged in among them by the web's order: the
+  newest year first (compared as words), the undated last, then the folded title, then the key. `playOrder` takes your
+  rows alone.
+- `drawsTheirs` and `Foot`/`foot` decide when their rows are drawn and the one thing said under the rows.
+
+### The app
+
+- **ArtistPageModel**
+  - `discography`: an MBArtistModel for the artist's MusicBrainz id. It is made again when the id changes, and let go
+    (standDown) for none.
+  - `theirAlbums(mbid:client:online:retry:)`: asks once, never offline, and never while an ask is out. After a
+    failure it asks only with `retry`, and only then past the session's answer.
+  - The id and the joined rows are kept until the artist's answer, MusicBrainz's groups or the library's folders
+    change. The library is tracked by SearchModel's new `ownedVersion`. The view is drawn again as each album's songs
+    land and as the name scrolls into the bar, and the id's fallback reads every folder.
+- **ArtistView**
+  - It asks `/library/owned` (`search.refreshOwned()`) as the page opens.
+  - It asks their albums once the id is known, again with the id.
+  - It waits `SearchPacing.ownedWaitMs` (1.5 s, the web's `ROWS_WAIT_MS`) at most for the library before drawing
+    their rows.
+  - It draws the joined rows: yours with ArtistAlbumRow, as before, and theirs with the MusicBrainz page's
+    MBArtistAlbumRow (made non-private for this).
+  - Under the rows, MusicBrainz's foot, once.
+  - The Albums heading gains Studio only at its end.
+  - Play, Shuffle, their line and the empty and offline states all read `ArtistPage.rows` (yours), as before.
+- **SearchModel** gains `ownedVersion`, bumped whenever `ownedIndex` changes.
+
+### Decided here
+
+Each of these follows the web unless it says otherwise.
+
+- **Finding the artist** is `artistMbid` exactly, held to the web by 17 vectors.
+  - With no id, the page is today's, and says nothing.
+  - **Departure:** the web says "Only the albums you have are shown - their other albums can't be found." The brief
+    was that with no id the page says nothing went wrong.
+- **Which are yours** is `artistRows`' claim exactly, held by 92 vectors.
+- **Your rows are unchanged.** They keep Navidrome's title and year, "1994 · in your library", one row per album (two
+  pressings stay two rows), ticks as before, and they open and play as before.
+  - **Departure:** the web draws a claimed album as MusicBrainz's group: its title, its first year, the kind, and
+    "· 2 pressings".
+  - Because of that, the merge compares a row of theirs with yours by your album's own title and year. An album of
+    yours dated by its pressing sorts by that date, as it did before.
+  - Your rows never move among themselves; theirs come in between them.
+- **The order** is the web's: newest year first, undated last, then folded title, then key.
+  - Yours and theirs never tie, because `album:` keys sort before `group:` keys.
+- **Their rows are the MusicBrainz artist page's.**
+  - Each shows its cover through the relay, its title, and MBArtistPage's line ("2008 · Live album · not in your
+    library").
+  - A tap opens the album you don't have's page. A row held only by the store's word ("in your library", ticked)
+    opens yours through the id bridge, spinning meanwhile, and lets go on a tab change, Now Playing or leaving (as that
+    page does).
+  - No Get chip on a row, as that page has none: Get is on the album you don't have's page.
+- **Studio only** is on by default, at the heading's end, as on the web.
+  - **Departure:** it is shared with the MusicBrainz artist page's per-artist memory (MBArtistModel's session
+    `keptStudio`), so turning it off on one turns it off on the other. The web keeps the library page's and the `mb:`
+    page's separately (keptArtists is by route id).
+  - **Departure:** the toggle is laid out from the first frame and hidden until the id is known, so the heading is one
+    height before and after. The web's chip appears with the id. The cost is that the heading of an artist MusicBrainz
+    doesn't know is a few points taller than before. That is the only change to such a page.
+- **When their rows come in.** Your rows never wait. Theirs are drawn once MusicBrainz has answered and the library
+  has answered (or 1.5 s has passed), so that an album the library's folders alone tie to a group is never drawn as
+  one you don't have and then taken away.
+  - The web holds all its rows until every answer is in, or 1.5 s has passed. Within those 1.5 s the phone draws
+    yours first, and theirs then come in among them once: the one movement the web doesn't have. The brief put "your
+    albums never wait" first.
+  - After that, the phone moves as the web does.
+  - Studio only keeps the last answer on screen until the new one lands.
+  - An answer the session kept draws at once.
+- **What is said under the rows**, once (ArtistJoin.foot):
+  - "Loading their albums…" while asking, and during the moment theirs wait for the library.
+  - Their trouble, with **Try again**: MusicBrainz away is MBArtistPage.away; anything else is ErrorNote, in a
+    listener's words.
+  - "Showing their first 500 albums." at the cut.
+  - "No studio albums found - turn off Studio only to see them all." only when the page has no row at all, as the
+    web's `!rows.length`.
+- **Asking again.** A pull, or deadwax coming back, asks MusicBrainz again only after a failure (and asks for the
+  first time when the page opened offline). An answer in hand is the session's for `MBArtistPage.kept` artists, as on
+  the MusicBrainz page.
+- **Offline.** Nothing of MusicBrainz's is drawn, said or asked: the page is today's. Their rows come back with
+  deadwax, from the session's answer.
+
+### Tests
+
+- **ArtistJoinTests** (9) cover:
+  - your rows never waiting;
+  - an album you have never listed again (by release, by title, before the library answers, twins, a bootleg's
+    group);
+  - theirs among yours, newest first, with their lines;
+  - the key tie-break;
+  - Play;
+  - the wait for the library, and offline;
+  - the foot's choices;
+  - who they are;
+  - 400 seeded pages where yours never move and the merge keeps the web's order.
+- **ArtistVectorTests** checks the `joined` vectors (92: 60 crossed fixtures, 30 seeded, and two of one release under
+  two groups) and the `mbids` vectors (17). They are exported from lib/artistPage.ts by
+  ios/scripts/export-artist-vectors.cjs and checked by ui/test/iosartists.sim.cjs.
+- **tests/test_ios_artist_discography.py** reads these from the Swift:
+  - Play and Shuffle take yours alone;
+  - offline nothing of MusicBrainz's is drawn, said or asked;
+  - a row of theirs is the MusicBrainz page's (its model's open, its relay cover, standDown);
+  - the trouble is said once, through ErrorNote and Core's words;
+  - the library is asked as the page opens.
+- **Mutations.** 17 mutations of ArtistJoin.swift were tried, each alone; 15 were killed.
+  - "An album claimed twice" survived the first round, so the two "release under two groups" vectors were added; it
+    is killed now.
+  - Two mutations are equivalent, and survive because nothing can tell them apart:
+    - Ties going to theirs: the keys never tie.
+    - The first album of a release kept versus the last: either claims the same group, and a group's folders carry
+      its id, so the other album's title claim is blocked by `knownGroup`.
+
+### Verified, and not
+
+**Verified**:
+
+- `swift test` (all of DeadwaxKit);
+- the unsigned Debug device build, with no warnings in the touched files;
+- the full pytest suite;
+- the iosartists sim's `--check`.
+
+**Not verified** (docs/ios.md checks 300-309):
+
+- a real artist's discography against the web's, side by side;
+- whether rows of theirs coming in above the visible ones move what's under a finger when the list was scrolled
+  before MusicBrainz answered;
+- the Studio only toggle's look in the heading, and the hidden toggle's few points;
+- the id bridge from this page on a real library;
+- VoiceOver.

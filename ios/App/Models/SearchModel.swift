@@ -52,6 +52,9 @@ final class SearchModel {
     /// `/library/owned`'s answer for the person, and its index - nil until it has answered.
     private(set) var owned: OwnedAnswer?
     private(set) var ownedIndex: OwnedIndex?
+    /// One more each time `ownedIndex` changes - what a page keeping something made from it compares, rather than the
+    /// whole index (the artist page's rows, 15 Nov).
+    private(set) var ownedVersion = 0
     /// The MusicBrainz album whose row is asking the id bridge (its busy look) - a group's id, or a song's key and its
     /// album's id (`songAlbumKey`) - nil when none is.
     private(set) var opening: String?
@@ -497,6 +500,7 @@ final class SearchModel {
         state = SearchState()
         owned = nil
         ownedIndex = nil
+        ownedVersion += 1
         ownedTag = nil
         askingOwned = false
     }
@@ -852,6 +856,7 @@ final class SearchModel {
             if answer != self.owned {
                 self.owned = answer
                 self.ownedIndex = OwnedIndex(answer.albums)
+                self.ownedVersion += 1
                 self.state.ownedArtists = answer.artists
             }
         }
