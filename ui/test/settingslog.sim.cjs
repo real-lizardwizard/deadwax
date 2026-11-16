@@ -138,7 +138,6 @@ const S = require(path.join(OUT, 'lib/serverSettings.js'))
 const API = require(path.join(OUT, 'api/logs.js'))
 const hooks = require(path.join(OUT, 'node_modules/preact/hooks.js'))
 const { ServerSettings, forgetServerSettingsPage, showServerSettingsTab, onServerSettingsSaved } = require(path.join(OUT, 'app/ServerSettings.js'))
-const SV = require(path.join(OUT, 'components/SettingsView.js'))
 const MBA = require(path.join(OUT, 'components/MusicBrainzAnswers.js'))
 const MBL = require(path.join(OUT, 'lib/musicbrainzAnswers.js'))
 const R = require(path.join(OUT, 'lib/appRoutes.js'))
@@ -478,12 +477,25 @@ async function settingsPage() {
     const server = (url, secret) => ({ groups: [{ settings: [setting('SLSKD_URL', url), setting('SLSKD_APIKEY', { secret: true, value: 'set', overridden: true, ...secret })] }] })
     const saved = { value: 'http://slskd-box:5030', overridden: true, env_value: 'http://slskd:5030' }
     const note = "Reverting brings back the environment's API key, which was given for the environment's address - type the key again, or revert SLSKD_URL in the same save."
-    check('the key reverted at a saved address that is another: the note', SV.retypeSecretNote('SLSKD_APIKEY', server(saved, { env_set: true }), { SLSKD_APIKEY: null }), note)
-    check('...at a new address typed now, the address never saved: the note', SV.retypeSecretNote('SLSKD_APIKEY', server({ value: 'http://slskd:5030' }, { env_set: true }), { SLSKD_APIKEY: null, SLSKD_URL: 'http://slskd-box:5030' }), note)
-    check('...at the environment\'s address: none', SV.retypeSecretNote('SLSKD_APIKEY', server({ value: 'http://slskd:5030' }, { env_set: true }), { SLSKD_APIKEY: null }), null)
-    check('...a saved address that is the environment\'s own: none', SV.retypeSecretNote('SLSKD_APIKEY', server({ ...saved, value: 'http://slskd:5030' }, { env_set: true }), { SLSKD_APIKEY: null }), null)
-    check('...the address reverted too: none', SV.retypeSecretNote('SLSKD_APIKEY', server(saved, { env_set: true }), { SLSKD_APIKEY: null, SLSKD_URL: null }), null)
-    check('...no key in the environment, so nothing to bring back: none', SV.retypeSecretNote('SLSKD_APIKEY', server(saved, { env_set: false }), { SLSKD_APIKEY: null }), null)
+    check('the key reverted at a saved address that is another: the note', S.retypeSecretNote('SLSKD_APIKEY', server(saved, { env_set: true }), { SLSKD_APIKEY: null }), note)
+    check('...at a new address typed now, the address never saved: the note', S.retypeSecretNote('SLSKD_APIKEY', server({ value: 'http://slskd:5030' }, { env_set: true }), { SLSKD_APIKEY: null, SLSKD_URL: 'http://slskd-box:5030' }), note)
+    check('...at the environment\'s address: none', S.retypeSecretNote('SLSKD_APIKEY', server({ value: 'http://slskd:5030' }, { env_set: true }), { SLSKD_APIKEY: null }), null)
+    check('...a saved address that is the environment\'s own: none', S.retypeSecretNote('SLSKD_APIKEY', server({ ...saved, value: 'http://slskd:5030' }, { env_set: true }), { SLSKD_APIKEY: null }), null)
+    check('...the address reverted too: none', S.retypeSecretNote('SLSKD_APIKEY', server(saved, { env_set: true }), { SLSKD_APIKEY: null, SLSKD_URL: null }), null)
+    check('...no key in the environment, so nothing to bring back: none', S.retypeSecretNote('SLSKD_APIKEY', server(saved, { env_set: false }), { SLSKD_APIKEY: null }), null)
+  }
+
+  console.log('\nserver settings: the rules in lib/serverSettings.ts alone (2.1.33), where the iPhone app\'s exporter runs them')
+  {
+    const view = fs.readFileSync(path.join(UI, 'src/components/SettingsView.tsx'), 'utf8')
+    const page = fs.readFileSync(path.join(UI, 'src/app/ServerSettings.tsx'), 'utf8')
+    const rules = ['tabForGroup', 'tabMarks', 'retypeSecretNote', 'editedEnvDraft']
+    check('lib/serverSettings.ts exports the four', rules.map((name) => typeof S[name]), rules.map(() => 'function'))
+    check('...and SettingsView.tsx defines none of them, nor the retype table',
+      [...rules, 'RETYPE_WITH_ADDRESS'].filter((name) => new RegExp(`(function|const) ${name}\\b`).test(view)), [])
+    check('...the rows take the note from the lib', /import \{ retypeSecretNote \} from '\.\.\/lib\/serverSettings'/.test(view), true)
+    check('...and the page its drafts, tabs and marks from the lib',
+      /import \{[^}]*\beditedEnvDraft\b[^}]*\btabForGroup\b[^}]*\btabMarks\b[^}]*\} from '\.\.\/lib\/serverSettings'/.test(page), true)
   }
 
   console.log('\nserver settings: read when it shows, its groups drawn from the settings tab\'s parts')
@@ -916,7 +928,7 @@ async function settingsPage() {
   console.log("\nserver settings: Clear MusicBrainz's saved answers, under their two settings on Connections (2.0.0-player.54)")
   {
     reset()
-    check('their group sits on Connections (tabForGroup)', SV.tabForGroup('musicbrainz-cache'), 'connections')
+    check('their group sits on Connections (tabForGroup)', S.tabForGroup('musicbrainz-cache'), 'connections')
     const withAnswers = () => {
       const settings = SETTINGS()
       settings.groups.splice(1, 0, { id: 'musicbrainz-cache', label: "MusicBrainz's saved answers", note: 'Saved on disk.', settings: [

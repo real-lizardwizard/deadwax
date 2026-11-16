@@ -236,8 +236,9 @@ def test_trimming_an_old_compose_file_is_said_in_an_order_that_works():
     assert trim.index("take a setting's line out") < trim.index("set the setting again in Server settings")
     assert "With logins on, leave the three `NAVIDROME_` lines" in trim
     assert "An `ORGANIZE_MODE` line can simply go: deadwax no longer reads it" in trim
-    view = (REPO / "ui/src/components/SettingsView.tsx").read_text(encoding="utf-8")
-    assert "(committed.value ?? '') === value) delete next[key]" in view
+    #? (2.1.33) the rule moved to lib/serverSettings.ts with the other settings rules, word for word
+    rules = (REPO / "ui/src/lib/serverSettings.ts").read_text(encoding="utf-8")
+    assert "(committed.value ?? '') === value) delete next[key]" in rules
 
 
 def test_the_example_env_says_to_set_organizing_before_logins():
