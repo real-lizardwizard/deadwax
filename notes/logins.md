@@ -1840,3 +1840,9 @@ Needs a look, the admin's queue, which is Look after the library's call, not an 
   Phase 8's slice 1 exporter (`export-edit-vectors.cjs`) will take `albumEdit.ts`, this rule with it.
 - **Not verified**: the panel drawn in a browser as someone with Edit albums alone (the sims read the source, the
   rule is run).
+- **After review (2.1.31)**: the buttons are on the Release tab, which is Edit albums', so they need BOTH Edit albums
+  and Look after the library - docs/library.md and sharing.md's table had promised them with Look after the library
+  alone; they say both now. And Needs a look's own line told someone without Edit albums (who has the page with Look
+  after the library) to "fix it, or to mark it fine as it is" - neither of which they can, right above NEEDS_EDIT
+  saying so (since 2.0.0-player.61). Without Edit albums it now says `NEEDS_LOOK_LINE_NO_EDIT`: "Open one to see what
+  it has, or to delete it." (needslook.sim.cjs).

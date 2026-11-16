@@ -183,6 +183,9 @@ console.log('\nNot in Navidrome (2.0.0-player.46): what the page says about the 
   check('...the scan in the past tense - still true once it has ended, with nothing reading again on its own',
     [/^Navidrome was scanning when last asked/.test(N.NAVIDROME_SCANNING), /is scanning/.test(N.NAVIDROME_SCANNING)], [true, false])
   check('the page\'s own line names the albums Navidrome doesn\'t list - and says what to do (2.0.8)', [/albums Navidrome doesn't list/.test(N.NEEDS_LOOK_LINE), /Open one to fix it, or to mark it fine as it is\.$/.test(N.NEEDS_LOOK_LINE), /want attention|filed/.test(N.NEEDS_LOOK_LINE)], [true, true, false])
+  check('(2.1.31) without Edit albums the line promises neither a fix nor marking fine - only seeing and deleting',
+    [/albums Navidrome doesn't list/.test(N.NEEDS_LOOK_LINE_NO_EDIT), /fix it|mark it fine/.test(N.NEEDS_LOOK_LINE_NO_EDIT),
+      /Open one to see what it has, or to delete it\.$/.test(N.NEEDS_LOOK_LINE_NO_EDIT)], [true, false, true])
 }
 
 console.log('\nthe session')
