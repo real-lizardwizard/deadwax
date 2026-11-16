@@ -409,11 +409,11 @@ back to the Library tab or the app, and when you pull down.
   loaded has **Try again** under why.
 - **The songs**, under a heading for each disc when there's more than one, or a disc has a title
   ("Disc 2", or "Disc 2 · Live" with its title). The song playing has moving bars instead of its
-  number. **Tap a song** to play the album from it. Under the songs: how many and how long ("10
-  songs, 42 min").
-- **•••** at the end of a song's row has **Play Next**, **Play Last** and **Add to a playlist…** for
-  that song; the **•••** at the top has them for the whole album (see [Up Next](#up-next) and [Add to
-  a playlist](#add-to-a-playlist)). Each menu opens from the ••• you tapped, and a tap anywhere else
+  number. **Tap a song** to play the album from it. **Swipe a song right** to add it to the queue (see [Adding
+  to the queue](#adding-to-the-queue)). Under the songs: how many and how long ("10 songs, 42 min").
+- **•••** at the end of a song's row has **Add to Queue** and **Add to a playlist…** for that song; the
+  **•••** at the top has them for the whole album (see [Up Next](#up-next) and [Add to a
+  playlist](#add-to-a-playlist)). Each menu opens from the ••• you tapped, and a tap anywhere else
   closes it.
 - **Edit album**, in the last part of the top •••'s menu, for someone who may edit albums (Edit albums or Look after
   the library - an admin, or everyone with logins off): the album's editor, on a sheet over the tabs - see [Edit
@@ -756,13 +756,13 @@ with **Add to a playlist…**. If it can't be made, the sheet stays open and say
   **Edit** is open. A pull doesn't refresh the page any more: it's asked for as it shows, as before, and ••• >
   **Refresh** (at the end of the top •••'s menu) asks now.
 - **The songs**, each with its own album's cover, and its artist and album under its title; the song
-  playing has moving bars over its cover. A song that's in the playlist twice is there twice. Under the
-  songs: how many and how long.
-- **•••** at the end of a song's row has **Play Next**, **Play Last** and **Add to a playlist…** for
-  that song, and **Download** (or **Remove Download**, or **Download Again**) for it alone; the **•••**
-  at the top has Play Next, Play Last and Add to a playlist… for the whole playlist, and **Download**
-  for the playlist as one (see [Downloading a playlist](#downloading-a-playlist)), as the arrow beside
-  it does.
+  playing has moving bars over its cover. A song that's in the playlist twice is there twice. **Swipe a
+  song right** to add it to the queue (see [Adding to the queue](#adding-to-the-queue)). Under the songs: how
+  many and how long.
+- **•••** at the end of a song's row has **Add to Queue** and **Add to a playlist…** for that song, and
+  **Download** (or **Remove Download**, or **Download Again**) for it alone; the **•••** at the top has Add
+  to Queue and Add to a playlist… for the whole playlist, and **Download** for the playlist as one (see
+  [Downloading a playlist](#downloading-a-playlist)), as the arrow beside it does.
 - When Navidrome counts songs it isn't listing just now: "2 songs in this playlist aren't in the
   library just now - deleted, or being moved."
 - A playlist deleted elsewhere says "This playlist isn't on Navidrome any more - deleted in another
@@ -1045,8 +1045,10 @@ and All artists, rather than a page among your own albums and artists.
 
 - **A row** is the song's cover, its title, and its artist and album ("Portishead · Dummy"). **Tap it** to
   open its album's page, and play it from there - nothing plays from the list but the pull and Shuffle. Its
-  **•••** is the song's own menu, as on an album's page: Play Next, Play Last, Add to a playlist…, and
-  Download.
+  **•••** is the song's own menu, as on an album's page: Add to Queue, Add to a playlist…, and Download. **Swipe
+  it right** to add it to the queue (see [Adding to the queue](#adding-to-the-queue)) - on the Library's Songs
+  page too, where a swipe right that starts on a song adds it rather than turning back a page: start it at the
+  very left edge of the screen (or tap the switch) to go to the page before. A swipe left still turns the page.
 - **Find** (the magnifying glass, or All songs' own field), asks Navidrome for the songs that match what you type -
   by title, artist or album, as Navidrome's own search matches them - a moment after you stop typing. The
   songs come 100 at a time, so the phone can't look through the ones it hasn't fetched; Find here is
@@ -1149,7 +1151,8 @@ go.
 - **A song**: tap it to play it, with its album's songs after it in Up Next. The phone fetches the albums
   of the first songs found as the list comes in, so a song with **▶** after it plays the moment you tap.
   One without (its album not fetched yet) opens its album's page instead. Its **•••** is the song's own
-  menu: Play Next, Play Last, Add to a playlist… and Download.
+  menu: Add to Queue, Add to a playlist… and Download. **Swipe it right** to add it to the queue (see [Adding
+  to the queue](#adding-to-the-queue)). A song you don't have (MusicBrainz's) has no ••• and no swipe.
 - **An album** opens its page; **an artist**, theirs. Back takes you to the list as you left it.
 - **An album you don't have** opens its page: its cover, its title and artist, "2008 · Album · not in your
   library", then **Pressing** - tap it for every pressing MusicBrainz knows, the usual one ticked, each
@@ -1559,12 +1562,34 @@ of the hand is still 1.8 seconds of the song.
   normal speed", a double-tap going back to 1x - at 1x it says "Speed: normal" and is dimmed. The chip
   on the cover reads "1.25x, 1.25 times the song's speed: back to normal speed".
 
-### Up Next
+### Adding to the queue
 
-**Play Next** puts a song (or an album) straight after the song playing; **Play Last** puts it after
-the songs you've already added, still ahead of the rest of the album. A line above the mini player
-says which ("Playing next: Roads", "Added to Up Next: Dummy") for 5 seconds. With nothing playing,
-either just plays it.
+**Add to Queue** puts a song - or a whole album or playlist - after the songs you've already added, still
+ahead of the rest of the album, playlist or shuffle that's playing. So with nothing added yet, the first
+song you add plays next, the second after it, and so on, in the order you added them; once they've played,
+the next one you add plays next again. A line above the mini player says so ("Added to Up Next: Roads") for
+5 seconds, and VoiceOver reads it. With nothing playing, it just plays.
+
+It's the one way to add songs on the phone (since app 0.13 (13)'s build of 16 Nov): every **•••** has
+**Add to Queue** where it had Play Next and Play Last - a song's, and the one at the top of an album's or a
+playlist's page for all of it. The web app keeps **Play Next** and **Play Last**; the phone's Add to Queue
+is the web app's Play Last.
+
+**Swipe a song right** to add it, as Apple Music's rows swipe: on an album's page, a playlist's, the
+Library's Songs and All songs, and Search's songs.
+
+- **A full swipe** - past about half the row - adds the song as you let go, with a light tap you can feel
+  (and a tick as you pass the halfway point).
+- **A shorter swipe** leaves one purple button, **Add to Queue**, standing beside the row: tap it to add the
+  song. Tap the row, swipe it back, scroll, or swipe another row, and it closes.
+- It does just what the song's **•••** > Add to Queue does, and it's on every song row whose ••• has Add to
+  Queue: while deadwax can't be reached, only on the songs on the phone (as the ••• offers it). Up Next's
+  own rows, the Library's grids and a song you don't have (Search's MusicBrainz songs) have no swipe.
+- **VoiceOver**: the row's actions (swipe up or down) include **Add to Queue**.
+- A swipe that starts at the very left edge of the screen still goes back, on a page you opened - and on the
+  Library's Songs page, turns back to the page before (a swipe right that starts on a song adds it there).
+
+### Up Next
 
 **Up Next** on Now Playing opens what plays after the song playing - and, above it, what you've
 already played:
@@ -1584,7 +1609,7 @@ already played:
   it plays now, from its start, and everything played after it moves back down into Up Next, in the
   order you see it - the songs between, the song that was playing (from its start, when it comes round),
   then Playing Next and the rest of the album or list, as they were. The song you tapped is where your
-  finger was. Nothing is lost or reshuffled: songs you added with Play Next that were still waiting keep
+  finger was. Nothing is lost or reshuffled: songs you added (Add to Queue) that were still waiting keep
   their place, after the song that was playing; with Shuffle on, what comes back keeps the order it
   played in (turned on afterwards, Shuffle shuffles it with the rest - a later time round of Repeat
   All's on its own, after this one's - and off, the album or list carries on in its own order); with
@@ -1778,7 +1803,7 @@ as it is each browser's in the web app.
 
   | choice | what it does |
   | --- | --- |
-  | **Automatic** (the default) | An album you play keeps one level for the whole album, so its quiet songs stay quiet beside its loud ones. Anything else - a playlist, a shuffle, a song you add with Play Next - is levelled song by song. |
+  | **Automatic** (the default) | An album you play keeps one level for the whole album, so its quiet songs stay quiet beside its loud ones. Anything else - a playlist, a shuffle, a song you add with Add to Queue - is levelled song by song. |
   | **By song** | Every song brought to the same loudness, even the quiet and loud songs of one album. |
   | **By album** | Every song at its album's level, even when it plays on its own or in a playlist. |
   | **Off** | No levelling: every song plays exactly as the file is, bit for bit. |
@@ -2626,13 +2651,13 @@ Phase 1 exists to answer these on the phone. Note what you see for each.
    it goes to the song before, and after that it starts the song again.
 3. **Normalization, Automatic.** With Normalization on Automatic (You > Playback), play an album. Info
    > About > Sound > Normalization says "Album volume matching, ..." with the same change for every
-   song of it. While it plays, add a song from another album with **•••** > Play Next: when it plays,
-   Info says "Song volume matching, ...". (The app has no Search yet, so Play Next stands in for a
-   song played on its own.) Then set Normalization to Off and play the album again: Info says "Off".
-   Note how long the first song of an album never measured before takes to start.
-4. **Quiet and loud.** A quiet old album, then a loud new one (Play Last it): about the same
+   song of it. While it plays, add a song from another album with **•••** > Add to Queue (Play Next until
+   16 Nov): when it plays, Info says "Song volume matching, ...". (The app had no Search yet, so a song added
+   stands in for a song played on its own.) Then set Normalization to Off and play the album again: Info
+   says "Off". Note how long the first song of an album never measured before takes to start.
+4. **Quiet and loud.** A quiet old album, then a loud new one (add it with Add to Queue): about the same
    loudness, and no distortion on the quiet one brought up. Info says how much each was changed.
-5. **Up Next.** While an album plays: Play Next a song and Play Last another, then open Up Next. Are
+5. **Up Next.** While an album plays: add a song with Add to Queue, then another, then open Up Next. Are
    they under Playing Next, in that order? Edit: drag one, take one out with its red minus button
    (one tap), Done. Clear. Shuffle on and off: the song playing goes on untouched. Repeat One plays the
    song again; Repeat All starts the album again after its last song. Then **what you've played**: play
@@ -2657,7 +2682,7 @@ The tests can't reach these either. Note what happens.
 
 - **A phone call in the middle of a song.** It pauses, and after the call it carries on from the
   same place.
-- **Repeat One, or a change in Up Next (move or take out a song, Play Next), in a song's last two or
+- **Repeat One, or a change in Up Next (move or take out a song, Add to Queue), in a song's last two or
   three seconds.** By then the next song is lined up for a seamless join, so a change to the queue is
   held and made after it: Repeat One turned on there repeats the next song, not this one. A tap on a
   row isn't held: it still plays that row at once. Try a tap there too. Does any of them sound wrong
@@ -2723,7 +2748,7 @@ The tests can't reach these either. Note what happens.
     pause and close the app; then play something else on the Mac for a minute. Turn Airplane Mode off
     and open the phone: "Picked up from your Mac", on the Mac's song - the phone's offline queue
     didn't overwrite it.
-19. **Up Next's marks.** Play a downloaded album, then Play Last one that isn't; open Up Next: the
+19. **Up Next's marks.** Play a downloaded album, then add one that isn't with Add to Queue; open Up Next: the
     first album's songs have the grey filled mark at the end of their line, the second's none. Now
     Playing's **•••** > **Download Up Next**, then Up Next again: the second album's songs go dotted,
     then a ring fills, then the filled mark, and nothing else in a row moves. With VoiceOver, a row
@@ -3194,8 +3219,8 @@ first - one with songs from several albums - and, if you can, one someone else s
   from the Library, and skip to the playlist's last songs: Info still names each one's album and year.
 - **66 Normalization.** With Normalization on Automatic, play a playlist: Info > About > Sound >
   Normalization says "Song volume matching, ..." for each song, never "Album volume matching".
-- **67 Play Next from a playlist.** A song's •••: Play Next and Play Last queue that song; the •••
-  at the top queues the whole playlist. Go to album from Now Playing opens the song's own album, whole.
+- **67 Add to Queue from a playlist** (Play Next until 16 Nov). A song's •••: Add to Queue queues that song;
+  the ••• at the top queues the whole playlist. Go to album from Now Playing opens the song's own album, whole.
 - **68 Changed elsewhere.** Add a song to a playlist in the web app or Amperfy; back on the phone, go
   back to Playlists and open the playlist again: it has the song. Delete a playlist in the web app with
   its page open on the phone, then pull down on it (since check 286, ••• > Refresh: a pull shuffles): it says it
@@ -3292,8 +3317,8 @@ songs from a few albums, on Wi-Fi, with the web app open beside the phone.
 These come with the build that learns going back in Up Next (still app 0.9), and want deadwax 2.1.18 or
 later. Use an album of a dozen songs, headphones on, with the web app open beside the phone.
 
-- **85 A song you played, tapped.** Play the album from song 1 to song 5 (Next is fine), then Play Next
-  two songs from another album. Open Up Next and tap song 2 above the song playing: it plays at once,
+- **85 A song you played, tapped.** Play the album from song 1 to song 5 (Next is fine), then add two songs
+  from another album with Add to Queue. Open Up Next and tap song 2 above the song playing: it plays at once,
   from its start, with no gap you wouldn't hear at a Previous. Does the row you tapped stay under your
   finger, now as the song playing? Under it: 3, 4, 5, the two songs you added, then 6 on - and nothing
   above it but song 1. Next, Next, Next: 3, 4, then 5 from its start; Next again: the first song you
@@ -3430,8 +3455,8 @@ break-glass `deadwax` sign-in.
   more songs come before you reach the end, never stopping at 100 or 200. At the very end, "12480 songs"
   (your count) at the top - the web app's number.
 - **114 A row.** Tap a song: its album's page. Back: All songs where you left it, nothing fetched again.
-  A song's •••: Play Next - Up Next has it next; Play Last; Add to a playlist… adds it; Download downloads
-  it. Does the music start from Play Next with nothing playing?
+  A song's •••: Add to Queue - Up Next has it next, with nothing added before it; Add to a playlist… adds it;
+  Download downloads it. Does the music start from Add to Queue with nothing playing?
 - **115 Find.** On All songs, type "roads": the songs Navidrome finds for it, by title, artist or album -
   songs further down the list than you've scrolled among them. Type a word quickly: one list, not one a
   letter. Clear Find: every song again, from the top - a spinner first, never "No songs yet.". Nonsense:
@@ -3839,7 +3864,7 @@ not 166: Phase 6's checks are being written at the same time and take the number
   floating capsule. The tab you're on is purple. Tap each tab; tap the one you're on: back to its first screen,
   then to its top. Open an album and swipe back: the bar never moves or flickers, and iOS's own never shows.
 - **201 Above the bar.** With something playing, the mini player is the top of the bar (since the build after
-  Noto Sans: checks 218-228); Play Next a song: the line above the mini player. Scroll to the end of an album, Your
+  Noto Sans: checks 218-228); add a song to the queue: the line above the mini player. Scroll to the end of an album, Your
   albums (grid and list), Playlists, Artists and You: the last row clears the mini player and the bar, and the letter
   index's last letter is above them. Nothing playing: the last row clears the bar, with no gap under it. Now
   Playing opens over everything, the bar included.
@@ -3933,7 +3958,7 @@ follow Noto Sans's.
   Swipe up or down on it: **Next song** and **Previous song**, each only when there's a song that way. Then
   Play/Pause, then the line: "Position in the song", "0:12 of 5:00", and swiping up or down moves it 10 seconds.
 - **226 The last row.** Scroll to the end of an album, Your albums (grid and list), Playlists, Artists, You and
-  Search's results: the last row clears the mini player and the tabs, with no gap. Play Next a song: the line above
+  Search's results: the last row clears the mini player and the tabs, with no gap. Add a song to the queue: the line above
   the mini player, and the last row clears that too. In Search, tap the field: the keyboard covers the mini player
   and the tabs, and the last result clears the keyboard alone.
 - **227 The largest text and Reduce Motion.** At the largest text sizes, the mini player grows with its words as
@@ -4062,7 +4087,7 @@ offline banner, the largest text size, another phone, no jump as sheets and page
   than before, with clear room between them and the home indicator - the indicator never touches or overlaps a
   word, and the bar's colour still runs down to the very edge. Does the gap look right, or still too much (or now
   too little)? Tap each tab near its foot: it opens. Scroll a long list to its end (an album, Your albums, Search's
-  results): the last row clears the bar, with no gap and nothing under it; Play Next a song: its notice sits just
+  results): the last row clears the bar, with no gap and nothing under it; add a song to the queue: its notice sits just
   over the bar. In Search, tap the field: the keyboard comes up over the bar, as before, and the bar is back in its
   place once it goes. At the largest text size, the words still clear the home indicator. Swipe deadwax away in the
   app switcher and open it again: from the first frame the tabs are in their place, never over the home indicator,
@@ -4509,6 +4534,44 @@ Artist images and Move albums write into the library: use an artist whose pictur
   move. With the largest text and VoiceOver: the ••• read as "More for
   this artist", each picture read with its name and where it's from ("…, from fanarttv") and "Chosen" on the one
   chosen, every line whole in all three sheets.
+
+### Add to Queue's checks (392-400)
+
+**Not done yet.** These come with the build that makes [Add to Queue](#adding-to-the-queue) the phone's one way to add
+songs - a swipe right on a song, and the one item where every ••• had Play Next and Play Last (still app 0.13 (13)).
+No server change is needed. Use an album of a dozen songs, headphones on; the web app keeps Play Next and Play Last.
+
+- **392 The menus.** A song's ••• on an album's page: **Add to Queue**, then Add to a playlist… - no Play Next, no Play
+  Last. The same on a playlist's page, All songs (or the Library's Songs page), Search's songs, and the ••• at the
+  top of an album's and of a playlist's page. Its symbol is Play Last's (lines, an arrow at the foot).
+- **393 The order.** Play an album from song 1. A song of another album, ••• > Add to Queue: "Added to Up Next: …"
+  above the mini player; Up Next has it first under Playing Next - it plays next. Add two more: they follow it, in
+  the order you added them, all before song 2. Next: the first you added plays; add another: it goes after the two
+  still waiting, not straight after the one playing. Once the songs you added have played, the next one you add
+  plays next again.
+- **394 A whole album, a playlist, and nothing playing.** Another album's top ••• > Add to Queue: all its songs under
+  Playing Next, in its order, after any you'd added. A playlist's top •••: the same. With nothing playing (a fresh
+  start, or after the queue ended), Add to Queue on a song plays it at once - no line, the mini player shows it.
+- **395 Swipe all the way.** On an album's page, swipe a song right, past about half the row, and let go: a light tap
+  you can feel (a tick as you passed halfway), the row slides back, and "Added to Up Next: …" - just as its •••'s Add
+  to Queue. Then on a playlist's page, All songs, and a song in Search (Top results and Songs). Does each look and
+  feel the same - the purple out from the screen's edge, the symbol by the row, the tick?
+- **396 Swipe part way.** Swipe a song a little way and let go: one purple Add to Queue button stands beside it. Tap it:
+  added, and it closes. Swipe again a little, then tap the row: it closes, and nothing plays or opens. Again, then
+  scroll: it closes. Again, then swipe another row: the first closes. Swipe an open row back left: it closes.
+- **397 Nothing else changes.** On each of those lists, flick up and down starting on a song: the list scrolls, no row
+  slides, nothing is added. A song's tap and its ••• work as before. On an album's page and All songs, swipe in from
+  the very left edge: it goes back, nothing added. The pull to shuffle on an album, a playlist and the Library still
+  shuffles. Up Next's rows and the Library's grids have no swipe.
+- **398 The Library's Songs page** (logins off, Songs not the first page). A swipe right that starts on a song adds
+  it; one that starts at the very left edge of the screen turns back to the page before; a swipe left anywhere turns
+  to the page after (if there is one). Is that how you'd want it, or should turning the page win there?
+- **399 Offline.** Turn on Airplane Mode. An album with only some songs on the phone: a dimmed song has no swipe and
+  no Add to Queue in its •••; a song on the phone swipes and adds. The album's top •••'s Add to Queue adds only the
+  songs on the phone.
+- **400 VoiceOver.** On an album's song, a playlist's, a Songs row and a Search song: swipe up or down through the
+  actions - **Add to Queue** once (not twice, and not missing), and it adds the song, VoiceOver reading "Added to Up
+  Next: …". Settings > Playback > Normalization, Automatic's line: "… a song you add with Add to Queue …".
 
 ## What it can't do yet
 

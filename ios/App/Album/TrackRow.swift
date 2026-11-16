@@ -12,6 +12,9 @@ import SwiftUI
 /// square: the row's tap plays). VoiceOver hears the state after the title ("Roads, Downloaded, 4:12"), and the song's
 /// download items as the row's actions. While deadwax can't be reached, a song not on this phone is dimmed and isn't a
 /// button (VoiceOver: "dimmed"); its ••• still offers Download, which waits.
+///
+/// Add to Queue (notes/ios.md "Add to Queue: the swipe, and the menus' one item"): swiped right, the List's own leading
+/// swipe action adds the song - wherever its ••• offers Add to Queue (AddToQueueSwipe.swift).
 struct TrackRow: View {
     let song: Song
     let albumArtist: String?
@@ -83,6 +86,7 @@ struct TrackRow: View {
             .buttonStyle(.plain)
             .accessibilityLabel(AlbumPageLines.moreForSong(song.title ?? ""))
         }
+        .addsToQueue(menu, in: .list)
     }
 
     /// The one slot (1.2): the song's mark, or the room for one held - every row of the album lines up. Its words are

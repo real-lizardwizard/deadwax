@@ -280,6 +280,11 @@ enum Palette {
     /// --dw-highlight: a 1 pt line inside the top edge.
     static let highlight = colour(TurntablePalette.highlight)
 
+    /// Add to Queue's swipe (notes/ios.md "Add to Queue: the swipe, and the menus' one item"): its purple, the primary
+    /// button's (Core's AddToQueue.fill), and the white symbol on it - the tint under white is too faint to read.
+    static let queueSwipe = colour(AddToQueue.fill)
+    static let onQueueSwipe = colour(AddToQueue.glyph)
+
     static func colour(_ rgba: DeckRGBA) -> Color {
         Color(.sRGB, red: Double(rgba.red) / 255, green: Double(rgba.green) / 255, blue: Double(rgba.blue) / 255,
               opacity: rgba.alpha)

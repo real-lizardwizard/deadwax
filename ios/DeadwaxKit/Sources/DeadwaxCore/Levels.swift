@@ -44,21 +44,27 @@ public enum Normalization: String, CaseIterable, Sendable {
     }
 
     /// The line under it: the web's words, but Off's, which on the web ends "unless Maximum quality converts
-    /// it" - a setting the phone hasn't got (D3: the clause dropped). "bit for bit" stays, as the web pins it.
+    /// it" - a setting the phone hasn't got (D3: the clause dropped). "bit for bit" stays, as the web pins it. And
+    /// Automatic's, whose "a song you add with Play Next" names Add to Queue on the phone (`addedWith`), the phone's
+    /// one way to add a song since 16 Nov (AddToQueue) - the web's line keeps Play Next.
     public var note: String {
         switch self {
         case .auto:
             return "An album you play keeps one level for the whole album, so its quiet songs stay quiet beside its loud ones. "
-                + "Anything else - a playlist, a shuffle, a song you add with Play Next - is levelled song by song."
+                + "Anything else - a playlist, a shuffle, a song you add with \(Self.addedWith) - is levelled song by song."
         case .song: return "Every song brought to the same loudness, even the quiet and loud songs of one album."
         case .album: return "Every song at its album's level, even when it plays on its own or in a playlist."
         case .off: return "No levelling: every song plays exactly as the file is, bit for bit."
         }
     }
+
+    /// What Automatic's line says a song is added with: the phone's Add to Queue, where the web's says Play Next.
+    public static let addedWith = AddToQueue.words
 }
 
 /// How songs were queued: an album played as an album (its page's Play, Shuffle or a row, its own Play Next
-/// or Play Last), or songs (a song's Play Next or Play Last, and later a playlist or a shuffle).
+/// or Play Last - on the phone its •••'s Add to Queue), or songs (a song's Play Next or Play Last - the phone's Add to
+/// Queue, from its ••• or its swipe - and later a playlist or a shuffle).
 public enum QueuedAs: String, Sendable, CaseIterable {
     case album, songs
 }

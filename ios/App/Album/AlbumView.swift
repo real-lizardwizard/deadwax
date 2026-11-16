@@ -4,11 +4,11 @@ import SwiftUI
 /// An album's page (screens.md 4; the web's ui/src/player/AlbumPage.tsx), by Navidrome's album id - what opened it
 /// (the Library's row, Now Playing's Go to the album) drawn at once while the album loads. Top to bottom: the hero
 /// (cover, title, artist, meta line, the badge, Play and Shuffle), the mine block (logins on with a library of your
-/// own), the songs with their disc headings, the footer; the bar's ••• is the whole album's Play Next and Play Last -
-/// and (Phase 8, slice 1) Edit album, for someone the web gives the album's Edit - and Album info (notes/ios.md "Album
-/// info"), the album's sheet of everything known of it, for everyone. After Edit album writes to the album's folder the
-/// page asks again (AppNavigation.albumWrites); an apply that gave the album a new id in Navidrome moves the page to it
-/// (AppNavigation.albumMoved).
+/// own), the songs with their disc headings (each swiped right adds it to the queue), the footer; the bar's ••• is the
+/// whole album's Add to Queue - and (Phase 8, slice 1) Edit album, for someone the web gives the album's Edit - and
+/// Album info (notes/ios.md "Album info"), the album's sheet of everything known of it, for everyone. After Edit album
+/// writes to the album's folder the page asks again (AppNavigation.albumWrites); an apply that gave the album a new id
+/// in Navidrome moves the page to it (AppNavigation.albumMoved).
 ///
 /// What it asks as it opens, at once (AlbumModel): the album; the id bridge only with a library of your own (D12);
 /// and, as the songs come, the album's levels warmed (PlayerModel.albumShown) - wanted again each time the page is

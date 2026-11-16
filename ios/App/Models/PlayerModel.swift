@@ -332,18 +332,28 @@ final class PlayerModel {
         startQueue { $0.playTracks(taken.tracks, start: 0, shuffle: false, paged: taken.paged) }
     }
 
-    /// Play Next from a ••• menu: the pick queued straight after the song playing's copies (pick.choose(.next,
-    /// setting: normalization)), and the notice said when the music didn't start from it (pick.notice). True when
-    /// something was queued (the menu closes). QueueController.playNext(tracks).
+    /// Add to Queue (notes/ios.md "Add to Queue: the swipe, and the menus' one item") - a song row's swipe, its VoiceOver
+    /// action, and every •••'s one item, all through here: the pick (Core's AddToQueue.pick of the row's or the menu's)
+    /// queued as the web's Play Last does it (AddToQueue.choice) - after the songs already added, still ahead of the
+    /// rest - at its level, its album remembered, the notice said when the music didn't start from it; with nothing
+    /// playing it plays. True when something was queued (the success haptic).
+    @discardableResult
+    func addToQueue(_ pick: QueuePick<Song>, album: Album?) -> Bool { choose(AddToQueue.choice, pick, album: album) }
+
+    /// Play Next: the pick queued straight after the song playing's copies (pick.choose(.next, setting:
+    /// normalization)), and the notice said when the music didn't start from it (pick.notice). True when something was
+    /// queued. QueueController.playNext(tracks). No longer offered on the phone (Add to Queue is its one way, 16 Nov):
+    /// kept with the engine's, which the web's Play Next still matches.
     @discardableResult
     func playNext(_ pick: QueuePick<Song>, album: Album?) -> Bool { choose(.next, pick, album: album) }
 
-    /// Play Last from a ••• menu: the pick queued at the end of Playing Next. QueueController.playLast.
+    /// Play Last: the pick queued at the end of Playing Next. QueueController.playLast. What Add to Queue does.
     @discardableResult
     func playLast(_ pick: QueuePick<Song>, album: Album?) -> Bool { choose(.last, pick, album: album) }
 
-    /// Play Next or Play Last, by the choice (QueuedHow). With nothing playing - or a queue played out with nothing
-    /// after it - the songs play from the first, and the mini player is the notice. `album` nil: a playlist's songs,
+    /// Play Next or Play Last, by the choice (QueuedHow) - on the phone, only Add to Queue's Play Last. With nothing
+    /// playing - or a queue played out with nothing after it - the songs play from the first, and the mini player is
+    /// the notice. `album` nil: a playlist's songs,
     /// each queued with its own album and its stub remembered beside what is held (PlaylistPlay; the web's
     /// rememberAdded) - an album's own answer held already kept as it is.
     @discardableResult

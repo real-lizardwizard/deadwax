@@ -15,7 +15,8 @@ import SwiftUI
 ///   view, under an artist's name alone, says a title is needed with it - (slice 4) what's saved leading them, drawn
 ///   as MusicBrainz's own rows are, and More from MusicBrainz under them while there is another page.
 /// - A song plays from its tap when its album's songs are in hand (▶), else its album's page opens (question 10); its
-///   ••• is the album page's song menu, or the song's own before its album is in hand (question 11). An artist and an
+///   ••• is the album page's song menu, or the song's own before its album is in hand (question 11), and a swipe right
+///   adds what that ••• would (Add to Queue - SearchRowView). An artist and an
 ///   album open their pages; a MusicBrainz album the album you don't have - or yours, held (the id bridge); a
 ///   MusicBrainz artist their page; a MusicBrainz song, in its section, opens onto the albums it is on (in Top results,
 ///   its named album) - each album yours when you hold the song on it, else the album you don't have, the song marked.
@@ -732,6 +733,18 @@ struct SearchRowView: View {
     // (7291225's review), and CI's older Swift is slower still.
     var body: some View {
         let line: SearchList.Line = SearchList.line(row, marks, top: top)
+        if case .song(let song) = row {
+            // a song's swipe right adds it to the queue, wherever its ••• offers Add to Queue - drawn by hand, the list
+            // being a stack (AddToQueueSwipe.swift); the list's own padding (SearchScreen), the purple running out to
+            // the screen's edge
+            stacked(line)
+                .addsToQueue(menu(song), in: .stack(inset: 16))
+        } else {
+            stacked(line)
+        }
+    }
+
+    private func stacked(_ line: SearchList.Line) -> some View {
         VStack(spacing: 0) {
             content(line)
             Divider().padding(.leading, LibraryRow.textInset)
@@ -920,6 +933,7 @@ struct SearchRowView: View {
             .accessibilityElement(children: .combine)
             .accessibilityLabel(said)
             .accessibilityValue(value)
+            .addToQueueAction(menu(song))
             songMenu(song)
         }
     }

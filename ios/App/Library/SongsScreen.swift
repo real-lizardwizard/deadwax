@@ -4,7 +4,8 @@ import SwiftUI
 /// Songs (Phase 4, slice 5 - phase4-library.md 2.7, 3.1, 6.5; the web's LibraryViews.tsx SongsView and LibrarySection.tsx
 /// SongSection): every song of the collection, 100 a page, in Navidrome's order. A row is the song's cover, its title,
 /// its artist and album, and opens its album - a fetch-then-play would start the music outside the tap; its ••• is the
-/// song's own menu (Play Next, Play Last, Add to a playlist…). Every rule and word is Core's (SongsPaging, SongsBody,
+/// song's own menu (Add to Queue, Add to a playlist…), and a swipe right adds it to the queue too (SongRow). Every rule
+/// and word is Core's (SongsPaging, SongsBody,
 /// SongsFoot, SongsList, SongWords); SongsModel holds the list.
 ///
 /// Two ways it is drawn (question 32). As the Library's Songs page (`page`), under the switch, where the collection is
@@ -314,18 +315,25 @@ struct SongsScreen: View {
 /// One song's row (SongsView's): its cover at the rows' size, its title, its artist and album, opening its album on the
 /// tab's path - and its ••• beside it, the song's own menu. Read as one: "Roads, Portishead · Dummy, opens its album".
 /// Dimmed, and opening nothing, while deadwax can't be reached and the song isn't on this phone; a song with no album
-/// opens nothing.
+/// opens nothing. Swiped right it adds the song to the queue, wherever its ••• offers Add to Queue - the swipe drawn by
+/// hand, the list being a stack (AddToQueueSwipe.swift), with Add to Queue as the row's VoiceOver action.
 struct SongRow: View {
     let song: Song
     var dimmed = false
 
     @Environment(\.dynamicTypeSize) private var typeSize
 
+    /// The row's ••• - and its swipe's: the one song, as a song, with its own album.
+    private var menu: QueueMenuRequest {
+        QueueMenuRequest(pick: PlaylistPlay.pick(song: song), album: nil)
+    }
+
     var body: some View {
         VStack(spacing: 0) {
             HStack(spacing: 4) {
                 opener
-                QueueMenu(request: QueueMenuRequest(pick: PlaylistPlay.pick(song: song), album: nil)) {
+                    .addToQueueAction(menu)
+                QueueMenu(request: menu) {
                     Image(systemName: "ellipsis")
                         .font(Typeface.symbol(.body).weight(.semibold))
                         .foregroundStyle(Palette.quiet)
@@ -338,6 +346,8 @@ struct SongRow: View {
             }
             Divider().padding(.leading, LibraryRow.textInset)
         }
+        // the list's own padding (`list(page:)`): the purple runs out to the screen's edge
+        .addsToQueue(menu, in: .stack(inset: 16))
     }
 
     /// The row's link to its album - or, with none to open, the row alone.

@@ -201,6 +201,13 @@ struct SplitMix {
                 //? the web's, so a change to the web's line fails here until it is looked at
                 #expect(choice.note.hasSuffix(", unless Maximum quality converts it."))
                 #expect(mine.note == choice.note.replacingOccurrences(of: ", unless Maximum quality converts it.", with: "."))
+            } else if mine == .auto {
+                //? (16 Nov) the phone adds a song with Add to Queue, never Play Next (AddToQueue): the web's line names
+                //? its Play Next, the phone's the phone's own item - the rest the web's, held as Off's is
+                #expect(choice.note.contains("a song you add with Play Next"))
+                #expect(mine.note == choice.note.replacingOccurrences(of: "a song you add with Play Next",
+                                                                      with: "a song you add with Add to Queue"))
+                #expect(!mine.note.contains("Play Next") && !mine.note.contains("Play Last"))
             } else {
                 #expect(mine.note == choice.note)
             }

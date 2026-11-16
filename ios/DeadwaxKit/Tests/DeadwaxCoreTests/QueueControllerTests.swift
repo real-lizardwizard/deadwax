@@ -918,3 +918,59 @@ private extension QueueController {
         #expect(player.queue.current?.id == "1")
     }
 }
+
+/// Add to Queue (16 Nov; notes/ios.md "Add to Queue: the swipe, and the menus' one item") - the phone's one way to
+/// queue, its swipe and every •••'s one item - is the web's Play Last (AddToQueue.choice): James wanted "the first swipe
+/// is play next, and then the next would be play last", then simply "add to queue that just puts it at the end of the
+/// queue" - the end of the songs added, ahead of the rest of what plays, as Spotify's Add to queue.
+@Suite struct AddToQueueOrderTests {
+    @Test func theFirstPlaysNextAndEachAfterItInTheOrderAdded() {
+        let (player, engine) = rig()
+        player.playTracks(simAlbum(4), start: 0)
+        engine.seconds = 2
+        #expect(AddToQueue.choice == .last)
+        #expect(!player.playLast([simTrack("a")]), "something was playing: added, not started")
+        #expect(player.after == ["a", "2", "3", "4"], "nothing added yet: it plays next")
+        player.playLast([simTrack("b")])
+        player.playLast([simTrack("c")])
+        #expect(player.after == ["a", "b", "c", "2", "3", "4"], "each after the ones already added, in the order swiped")
+        // an album's or a playlist's ••• adds all of it, in its order, after them
+        player.playLast([simTrack("x"), simTrack("y")])
+        #expect(player.after == ["a", "b", "c", "x", "y", "2", "3", "4"])
+        #expect(engine.ids == ["1", "a", "b", "c", "x", "y", "2", "3", "4"])
+    }
+
+    @Test func onceTheAddedArePlayingTheNextGoesAfterTheRestOfThem() {
+        let (player, _) = rig()
+        player.playTracks(simAlbum(3), start: 0)
+        player.playLast([simTrack("a")])
+        player.playLast([simTrack("b")])
+        player.next()
+        #expect(player.queue.current?.id == "a" && player.after == ["b", "2", "3"])
+        player.playLast([simTrack("c")])
+        #expect(player.after == ["b", "c", "2", "3"], "after b, still waiting - not straight after a")
+        player.next()
+        player.next()
+        #expect(player.queue.current?.id == "c" && player.after == ["2", "3"])
+        player.playLast([simTrack("d")])
+        #expect(player.after == ["d", "2", "3"], "none waiting: it plays next again")
+    }
+
+    @Test func withNothingPlayingTheFirstPlaysAndTheNextFollowsIt() {
+        let (player, engine) = rig()
+        #expect(player.playLast([simTrack("a")]), "the music starts from it")
+        #expect(player.queue.ids == ["a"] && engine.log.last == "play 0")
+        #expect(!player.playLast([simTrack("b")]))
+        #expect(player.after == ["b"])
+    }
+
+    @Test func repeatOnesCopiesStayAheadAsPlayNextsDid() {
+        // the song playing's Repeat One copies first, then what is added - where Play Next put it too
+        let (player, _) = rig(.one)
+        player.playTracks(simAlbum(3), start: 0)
+        player.playLast([simTrack("a")])
+        let after = player.after
+        let copies = after.prefix { $0 == "1" }.count
+        #expect(copies > 0 && after.dropFirst(copies).first == "a")
+    }
+}

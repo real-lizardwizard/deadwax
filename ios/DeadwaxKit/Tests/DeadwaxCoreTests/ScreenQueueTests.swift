@@ -44,6 +44,38 @@ import Testing
         diffs.done()
     }
 
+    /// (16 Nov) Where the phone departs from the web's menu, on purpose (notes/ios.md "Add to Queue: the swipe, and the
+    /// menus' one item"; James: "Only Add to Queue"): the web's two items, Play Next and Play Last, are the phone's one,
+    /// Add to Queue - the web's Play Last under the phone's own word, its call, levels, albums and notice the web's to
+    /// the letter. Held against the fixture, so a change to the web's menu fails here until it is looked at.
+    @Test func thePhonesOneItemIsTheWebsPlayLast() {
+        let web = fixture["words"]["items"].list.compactMap(\.string)
+        #expect(web == ["Play Next", "Play Last"], "the web's two, which the phone's menus no longer offer")
+        #expect(AddToQueue.choice.label == web[1], "Add to Queue does what the web's Play Last does")
+        #expect(!web.contains(AddToQueue.words), "under the phone's own word")
+        let diffs = ScreenDiffs()
+        var driven = 0
+        for menu in fixture["menus"].list where menu["how"].string == AddToQueue.choice.rawValue {
+            let tracks = (0..<(menu["count"].int ?? 0)).map { "s\($0)" }
+            let pick = QueuePick(label: menu["label"].string!, tracks: tracks, albumIds: ["al-1"],
+                                 queuedAs: menu["as"].string.flatMap(QueuedAs.init(rawValue:)))
+            let setting = Normalization(rawValue: menu["setting"].string!)!
+            let started = menu["started"].bool!
+            let label = "Add to Queue: \(menu["name"].string ?? "?") / \(setting) / started \(started)"
+            guard let queued = pick.choose(AddToQueue.choice, setting: setting), let call = menu["calls"].list.first else {
+                diffs.check("\(label): a call", false, !menu["calls"].list.isEmpty)
+                continue
+            }
+            driven += 1
+            diffs.check("\(label): the web's call", "playLast", call[0].string ?? "")
+            for level in call[1].list { diffs.text("\(label): level", queued.level?.rawValue, level) }
+            diffs.check("\(label): remembered", queued.remember, menu["remembered"][0].list.compactMap(\.string))
+            diffs.text("\(label): notice", pick.notice(AddToQueue.choice, started: started), menu["notice"])
+        }
+        diffs.done()
+        #expect(driven > 0, "the fixture drives the web's Play Last")
+    }
+
     /// The album page's picks: a row's one song as songs, the album's songs as an album - and Play and Shuffle, which
     /// queue as an album (AlbumPage.tsx's `queued(tracks, 'album')`).
     @Test func theAlbumPagesPicks() {

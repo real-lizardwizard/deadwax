@@ -12115,3 +12115,134 @@ Checked again on the Mac: `swift test` - 1836 Core tests in 193 suites, 158 Audi
 unsigned generic-iOS Debug build, BUILD SUCCEEDED; the full pytest suite, 4865 passed and 1 skipped; all 93 sims with
 Node 22 (iosartistmanage's `--check` against the regenerated fixture). Not on a phone: docs/ios.md's checks 344 and
 347 now ask after the kept choices, the redrawn picture and a lost Move's check.
+
+## Add to Queue: the swipe, and the menus' one item (2026-11-16)
+
+James: "Can we also add swiping to add to queue", then "it should be intelligent so the first swipe is play next, and
+then the next would be play last. In fact I'd prefer if instead of next and last, we could just use 'add to queue' that
+just puts it at the end of the queue." Asked whether the ••• menus should change to match, he chose **"Only Add to
+Queue"**: every ••• on the phone offers one item where it had Play Next and Play Last. The web app keeps both. The app
+stays 0.13 (13); src/__init__.py untouched; no server change; the engine files (QueueController, UpNext) have no diff.
+
+### What Add to Queue is
+
+**The web's Play Last, under the phone's own word** - checked first, because the ask depends on it: `withLast` inserts
+at `layout(queue, state).addedEnd`, past the song playing's Repeat One copies and every `.added` unit after them (the
+group Up Next draws as Playing Next), so each song added goes after the ones already added and still ahead of the
+album, playlist or shuffle; with none added it lands at `copiesEnd`, straight after the song playing - it plays next.
+That is exactly "the first swipe is play next, then the next play last", and Spotify's Add to queue. With nothing
+playing (or a queue played out) `QueueController.addSongs` plays the songs instead, as Play Next did.
+
+- **Core** (`ios/DeadwaxKit/Sources/DeadwaxCore/AddToQueue.swift`): `AddToQueue.words` ("Add to Queue", title case as
+  the menus' other words), `choice` (`.last`), `symbol` (Play Last's, `DownloadWords.playLastSymbol`), `fill` and
+  `glyph` (below), and **`AddToQueue.pick(_:online:gone:here:)` - the one rule** for both the ••• and the swipe:
+  the pick while deadwax answers; offline, or for an album gone from the collection, only its songs on this phone in
+  their order; none, or no songs at all: nil (not offered). It is QueueMenu's old private `playable` moved into Core,
+  so the menu and the row can't drift. `QueueSwipe` holds the hand-drawn swipe's numbers and decisions (below).
+- **One call**: `PlayerModel.addToQueue(_:album:)` = `choose(AddToQueue.choice, …)` - the path the menu's Play Last
+  took (`QueuePick.choose` at the level an album's ••• or a song's says, Levels' QueuedHow, the album or the playlist's
+  stubs remembered, the songs shelved, the notice when the music didn't start, the retry kept). The menu, the swipe and
+  the swipe's VoiceOver action all call it, through `QueueAdder` (AddToQueueSwipe.swift), which asks `AddToQueue.pick`
+  again at the moment of the add.
+- **The menus** (`QueueMenu`): one Button, `AddToQueue.words` with `AddToQueue.symbol`, then Add to a playlist… in the
+  same titled section - the order fixed, Add to Queue first. Every ••• is a `QueueMenu` (a song row's on an album, a
+  playlist, Songs and Search; an album's and a playlist's bar •••), so every one changed at once. Now Playing's ••• never
+  had Play Next or Play Last.
+
+### The swipe
+
+**Where**: every row whose ••• is a `QueueMenu` with Add to Queue offered - the song rows of an album's page
+(`TrackRow`), a playlist's (`PlaylistSongRow`), the Library's Songs page and All songs (`SongRow`), and Search's library
+songs (`SearchRowView`'s `.song`, Top results included). Each passes its own •••'s `QueueMenuRequest` (pick, album,
+`gone`), so the swipe adds exactly what that ••• would. **No album or playlist row in a list has a ••• today** (the
+Library's, Artists' and Search's album rows, Playlists' rows), so none gets a swipe; one that gains a `QueueMenu` gets
+it by passing its request. Not on Up Next's rows, the grids' tiles, MusicBrainz's songs (no •••), a playlist in Edit
+(its edit rows are others), or a song the rule leaves out.
+
+**Two mechanisms, one look**:
+- **A List's row** (album, playlist) takes SwiftUI's `.swipeActions(edge: .leading, allowsFullSwipe: true)` - one
+  Button, `Label(AddToQueue.words, systemImage: AddToQueue.symbol)`, `.tint(Palette.queueSwipe)`. UIKit's own swipe:
+  it already lives with the List's scroll, the back swipe and the pull to shuffle (which reads scroll geometry and
+  phase, no gesture of its own), closes on scroll, and is the row's VoiceOver action.
+- **A ScrollView's stack** (Songs, Search: `.swipeActions` does nothing there) is drawn by hand, `HandSwipe` over Core's
+  `QueueSwipe`: the row follows the finger rightwards (`moved`, never left of shut, never past the row); past half the
+  row (`fullAt`: max(2 x 74, half the width)) a light tick, and letting go there adds (`release` -> `.add`); let go with
+  the button half out or more, or flung right (500 pt/s), and it stands open on one 74 pt button; less, or flung left,
+  it shuts. Standing open, a tap on the button adds, and a tap on the row (swallowed - it plays or opens nothing), a
+  swipe back, another row opening (`OpenQueueSwipe`, one open row in the app) or the row moving on screen (a scroll,
+  rows landing above: `onGeometryChange` of its global minY) shuts it. Drawn as a List cell's: the purple from the
+  screen's edge (`inset` 16, the stacks' own padding) to `offset`, the symbol in its last 74 pt, beside the row - which
+  keeps its 16 pt gap, as a cell's content keeps its inset. VoiceOver: those rows put `.accessibilityActions { Add to
+  Queue }` on their main element (the opener, the song's button) via `addToQueueAction`, offered by the same rule; the
+  drawn button is hidden from it.
+- **The pan is UIKit's** (`UIGestureRecognizerRepresentable`, iOS 18), because it can refuse to begin: its delegate's
+  `gestureRecognizerShouldBegin` is `QueueSwipe.begins` - sideways more than up or down (so the list's vertical pan
+  keeps every vertical touch), rightwards, or leftwards only while open, and never from within 24 pt of the screen's
+  left edge (`backEdge`: UIKit's edge back swipe, which this never makes wait). `shouldBeRequiredToFailBy` makes any
+  other sideways pan on the same touch wait for the row's to fail: iOS 26's back swipe from a page's content, and a
+  horizontally scrolling scroll view's pan - the Library's pager (below) - but never the list's own vertical scroll (a
+  scroll view as wide as its content) nor the screen-edge pan. A SwiftUI DragGesture can't refuse that way inside a
+  ScrollView (as `.gesture` it takes the scroll's touches on iOS 18; as `.simultaneousGesture` both move - SwiftUI's
+  behaviour as known, not measured here).
+- **Why not Lists for Songs and Search**: both would have had to be re-laid-out as List rows - Search's sections, slots,
+  More buttons and disclosures most of all, its rows inside other views' bodies - and "styled to look exactly as they
+  do now" checked on nothing but the phone. The hand swipe changes nothing about how either screen looks at rest.
+
+### Decided here, and where the phone departs from the web
+
+- **The purple is the primary button's, not the tint**: `AddToQueue.fill` is `PrimaryButton.bottom` (#8a2ee0, the
+  foot of --dw-primary-bg) under a white symbol, 5.9:1. The app's tint (#C084FC) under white is 2.64:1 - the very pair
+  James couldn't see on the album page's Play (Phase 4, slice 3b), and SwiftUI draws a swipe action's label white.
+  `Palette.queueSwipe` / `onQueueSwipe` carry it to both mechanisms.
+- **The confirmation is the menu's own**: the notice the menu's Play Last said, "Added to Up Next: Roads" (`queuedWords`,
+  held to the web's fixture), over the mini player for 5 s and announced to VoiceOver by `PlayerModel.say`; nothing when
+  the music starts from it (the mini player says so). Plus `.sensoryFeedback(.success)` when something was queued, on
+  both mechanisms, and the hand swipe's light tick at the full-swipe line. The notice's "Up Next" is the screen's name;
+  "Added to Queue: Roads" would be the phone departing from the web's words again - left for James.
+- **The Library's Songs page** (logins off, a page of the horizontal pager): a swipe right that starts on a song adds
+  it, as on every other song list, and the pager waits for the row's pan to fail; a swipe left (the row's fails at
+  once while shut) and a swipe from the screen's left edge turn the page. With most of that page rows, turning back a
+  page is by the edge or the switch there. The other way round (the pager winning, no swipe on that page) is one line
+  in `shouldBeRequiredToFailBy`; docs/ios.md check 398 asks James.
+- **iOS 17**: no hand swipe (UIGestureRecognizerRepresentable is iOS 18); the rows keep their VoiceOver action and •••.
+  The List rows swipe on 17 too.
+- **Play Next stays in Core and the engine** (`QueueChoice.next`, `withNext`, `QueueController.playNext` and its tests,
+  the history and resume vectors that drive it, the web's fixture) and `PlayerModel.playNext` stays beside
+  `addToQueue`; nothing in the app calls either now.
+- **Held against the web, on purpose**: `ScreenQueueTests.thePhonesOneItemIsTheWebsPlayLast` - the fixture's items are
+  still the web's ["Play Next", "Play Last"], the phone's one is the web's Play Last (`AddToQueue.choice.label` is the
+  fixture's second item) under a word the web hasn't got, and every fixture drive of the web's Play Last (its call, each
+  song's level, the albums remembered, the notice) is what `choose(AddToQueue.choice, …)` answers. The fixture and
+  `theMenusWordsAreTheWebs` are untouched: `QueuedHow.label` is still the web's two words, which the phone no longer
+  draws.
+- **Normalization's Automatic line** names the phone's item: "…a song you add with Add to Queue…" (`Normalization
+  .addedWith`), where the web's says "with Play Next". `LevelsTests.theChoicesAreTheWebsWordsButOffsClause` holds it as
+  it holds Off's dropped clause: the web's line must still say "with Play Next", and the phone's is the web's with that
+  phrase swapped - so a change to the web's line fails until it's looked at. No exporter or sim reads the phone's
+  words for either, so neither needed a change.
+
+### Tests
+
+- **AddToQueueTests** (new, 6): the words, choice and symbol; that it is Play Last's call, level, albums and notice;
+  online every pick whole; offline and gone only the songs here, in order, label and level kept, a song not here not
+  offered; no songs never offered; the purple's 5.9:1 against the tint's under 3:1.
+- **QueueSwipeTests** (new, 5): a pan is the row's only sideways (vertical, diagonal and leftwards-when-shut refused,
+  leftwards-when-open taken); the screen's edge is the back swipe's; the row follows the finger rightwards only; the
+  full swipe is half the row, never under twice the button; letting go (add, open, shut, flings, a fling never adds).
+- **AddToQueueOrderTests** (new, 4, in QueueControllerTests over the fake engine): the first plays next and each after
+  it in the order added, an album's songs after them, the engine's entries the same; once the added are playing, the
+  next goes after those still waiting, and with none waiting plays next again; with nothing playing the first plays;
+  Repeat One's copies stay ahead, where Play Next put songs too.
+- **ScreenQueueTests.thePhonesOneItemIsTheWebsPlayLast** and the Automatic line in **LevelsTests** (above).
+
+### Verified, and not
+
+Verified on the Mac: `swift test` (all of it, passing: 1821 tests in Core's 194 suites, and 12 and 158 in the
+others); the unsigned generic-iOS Debug build, BUILD SUCCEEDED, no warning in the files touched; tests/test_ios*.py
+(375 passed, 1 skipped). The order was read from `withLast` and `layoutAt` and is held by the tests above.
+
+Not verified - only the phone can tell (docs/ios.md checks 392-400): the swipe's feel on a real finger on all four
+screens, and that the List's and the hand-drawn swipe look and feel alike; that vertical scrolling, a row's tap and its
+•••, the pull to shuffle, the edge back swipe (and iOS 26's content back swipe) are untouched; that SwiftUI keeps the
+coordinator as the pan's delegate and the pager really waits; the haptics; VoiceOver's one Add to Queue on a List row
+(SwiftUI's own, expected but not seen) and on a stack row's main element.

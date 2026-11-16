@@ -4,12 +4,13 @@ import SwiftUI
 /// One playlist's page (Phase 4, phase4-library.md 3.3; the web's app/PlaylistPage.tsx), laid out as an album's page:
 /// Navidrome's 2x2 mosaic, the name, whose it is, why there is no Edit (when there is none), its description, the count
 /// and length, Play and Shuffle; the songs not listed just now; the songs, each with its own cover; the footer. The bar's
-/// ••• is the whole playlist's Play Next, Play Last and Add to a playlist….
+/// ••• is the whole playlist's Add to Queue and Add to a playlist….
 ///
 /// PLAYING is PlayerModel.play(playlist:) with the songs in hand - from Play, Shuffle and a row's tap, in the tap,
 /// nothing awaited first (the gesture rule): each song with its own album, at the songs level, the albums its songs are
-/// on remembered first (PlaylistPlay: stubs, an album held whole kept as it is). A row's ••• is the song's own Play
-/// Next, Play Last, Add to a playlist… and its download items; the bar's has the playlist's own, as one (slice 3,
+/// on remembered first (PlaylistPlay: stubs, an album held whole kept as it is). A row's ••• is the song's own Add to
+/// Queue, Add to a playlist… and its download items (and a row's swipe right, Add to Queue); the bar's has the
+/// playlist's own, as one (slice 3,
 /// question 7) - Download, Download Again, Remove Download - as the control beside it (PlaylistDownloadControl).
 ///
 /// ASKED as it opens (PlaylistPageModel) - drawn at once from the answer kept for it (PlaylistsModel), else the hero
@@ -706,7 +707,8 @@ private struct PlaylistHero: View {
 /// song the player has (still while paused); its title; its artist and album; the download slot (as an album's rows:
 /// on every row where any song has a state); its time; its ••• ("More for Roads"). A tap plays the playlist from it.
 /// VoiceOver reads it as one: "Roads, Portishead · Dummy, Downloaded, 5:04" - "playing" or "paused" for the song the
-/// player has - with the song's download items as its actions.
+/// player has - with the song's download items as its actions. Swiped right, the List's own leading swipe action adds the
+/// song to the queue, wherever its ••• offers Add to Queue (AddToQueueSwipe.swift).
 private struct PlaylistSongRow: View {
     let song: Song
     let current: Bool
@@ -787,6 +789,7 @@ private struct PlaylistSongRow: View {
             .buttonStyle(.plain)
             .accessibilityLabel(AlbumPageLines.moreForSong(song.title ?? ""))
         }
+        .addsToQueue(menu, in: .list)
     }
 
     /// The row as VoiceOver reads it: the title, playing or paused, the line, the download state, the time.
