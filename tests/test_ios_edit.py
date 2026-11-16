@@ -77,7 +77,7 @@ def test_an_albums_menu_has_edit_album_with_the_albums_edit():
 
 def test_the_sheet_is_opened_over_the_tabs_once():
     tabs = code(TABS)
-    assert tabs.count(".sheet(item: $navigation.albumEdit)") == 1
+    assert tabs.count(".sheet(item: $navigation.albumEdit, onDismiss: { navigation.editorDismissed() })") == 1
     assert "EditAlbumSheet(request: request)" in tabs
     routes = code(ROUTES)
     navigation = declared(routes, "class", "AppNavigation")
@@ -112,8 +112,11 @@ def test_the_sheet_keeps_typed_work_and_a_running_apply():
     assert ".disabled(model?.applying == true)" in view
     assert ".confirmationDialog(EditWords.discardTitle, isPresented: $askingDiscard" in view
     # (Phase 8, slice 6) Discard closes the sheet - or, asked by a step through Needs a look's queue, takes the step
+    # (slice 6's review: through the gate as it is then); closing ends the queue's session, then dismisses
     discard = view[view.index("Button(EditWords.discard, role: .destructive) {"):view.index("Button(EditWords.keepEditing")]
-    assert "dismiss()" in discard and "request.queue?.go(by: delta)" in discard and "pendingStep = nil" in discard
+    assert "closeSheet()" in discard and "request.queue?.go(by: delta, gate: model.stepGate)" in discard
+    assert "pendingStep = nil" in discard
+    assert "dismiss()" in view[view.index("private func closeSheet()"):]
     assert "Button(EditWords.keepEditing, role: .cancel) { pendingStep = nil }" in view
     close = block(view, view.index("{", view.index("private func close()")))
     assert "guard let model, !model.applying else { return }" in close
@@ -230,7 +233,7 @@ def test_a_cancellation_is_neither_failure_nor_answer():
     scan = code(SCAN)
     read = block(scan, scan.index("{", scan.index("func read(")))
     assert "guard !APIFailure.isCancellation(error) else { return .dropped }" in read
-    assert read.index("isCancellation") < read.index("failure = EditWords.said(")
+    assert read.index("isCancellation") < read.index("failed = (error, admin)")
 
 
 def test_back_in_reach_the_search_and_the_pressing_are_asked_again():

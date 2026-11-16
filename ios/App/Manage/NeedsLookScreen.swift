@@ -14,7 +14,9 @@ import SwiftUI
 /// held after it, and while deadwax can't be reached, rows are off. Rows are known by the path they were listed at, so a
 /// rename moves nothing; with Reduce Motion nothing slides. VoiceOver reads each row once (NeedsLookWords.row).
 /// Without Look after the library it says so and asks nothing; opened out of reach it says it needs deadwax, and reads
-/// once deadwax is back.
+/// once deadwax is back. Gone out of reach over a list, the list stays under the amber line Edit album has, its rows off
+/// and a pull asking nothing; back, the library is read again (slice 6's review). A failed read is said in the page's
+/// own words (NeedsLookModel.failure), never the editor's, though they share the scan.
 struct NeedsLookScreen: View {
     @Environment(ServerModel.self) private var server
     @Environment(Reachability.self) private var reachability
@@ -57,6 +59,7 @@ struct NeedsLookScreen: View {
         .onAppear {
             model.attach(server: server, navigation: navigation, count: count)
             visible = true
+            count.shows(.needsLook)
         }
         .task {
             model.attach(server: server, navigation: navigation, count: count)
@@ -65,6 +68,7 @@ struct NeedsLookScreen: View {
         .onDisappear {
             visible = false
             model.hidden()
+            count.hides(.needsLook)
         }
         .onChange(of: reachability.online) { _, now in
             Task { await model.reach(now) }
@@ -128,7 +132,7 @@ struct NeedsLookScreen: View {
                 }
             case .failed:
                 Section {
-                    ErrorNote(text: model.scan.failure ?? NeedsLook.readFailed)
+                    ErrorNote(text: model.failure ?? NeedsLook.readFailed)
                     Button(NeedsLook.tryAgain) {
                         model.retry()
                     }
@@ -152,8 +156,10 @@ struct NeedsLookScreen: View {
         .transaction { (transaction: inout Transaction) -> Void in
             if reduceMotion { transaction.animation = nil }
         }
+        // out of reach, the list stays as last read under the amber line, and a pull asks nothing (review, 16 Nov)
+        .editOutOfReach(!reachability.online && model.scan.loaded)
         .refreshable {
-            await model.read()
+            await model.pulled()
         }
     }
 
@@ -167,7 +173,7 @@ struct NeedsLookScreen: View {
                 switch model.status {
                 case .failed?:
                     HStack(alignment: .firstTextBaseline, spacing: 8) {
-                        Text(model.scan.failure ?? NeedsLook.checkFailed)
+                        Text(model.failure ?? NeedsLook.checkFailed)
                             .foregroundStyle(Palette.danger)
                             .fixedSize(horizontal: false, vertical: true)
                         Button(NeedsLook.tryAgain) {

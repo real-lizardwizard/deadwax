@@ -88,8 +88,10 @@ struct MainTabs: View {
             PlaylistPicker(request: request)
         }
         // (Phase 8, slice 1) Edit album, from an album page's ••• or Choose the folder - over the tabs, so the album
-        // page beneath can follow the album to a new id while it is up
-        .sheet(item: $navigation.albumEdit) { (request: AlbumEditRequest) in
+        // page beneath can follow the album to a new id while it is up. (slice 6's review) Its dismissal, however it
+        // comes - Close, a swipe, Discard, a step to an album gone, a sign-out - ends Needs a look's session: here, where
+        // the sheet really goes, never on its content disappearing (a full-screen cover over it does that too)
+        .sheet(item: $navigation.albumEdit, onDismiss: { navigation.editorDismissed() }) { (request: AlbumEditRequest) in
             EditAlbumSheet(request: request)
         }
         .onChange(of: player.hasQueue) { _, queued in
@@ -101,15 +103,13 @@ struct MainTabs: View {
         // they went, which onChange alone never says (slice 1's review, finding 1)
         .onAppear { requests.watch(watching) }
         .onDisappear { requests.watch(.hidden) }
-        // (Phase 8, slice 6) Needs a look's count (Settings > Manage's value) asked again after every managing write,
-        // as the app comes to the front, and once Look after the library is this person's - QueueCountModel asks
-        // nothing without it
-        .onChange(of: navigation.managingWrites) { _, _ in queueCount.ask() }
-        .onChange(of: scenePhase) { _, phase in
-            if phase == .active { queueCount.ask() }
-        }
-        .onChange(of: Managing.asksQueueSummary(server.access.permissions), initial: true) { _, asks in
-            if asks { queueCount.ask() }
+        // (Phase 8, slice 6) Needs a look's count (Settings > Manage's value) asked again after a managing write, back
+        // from the background, and once Look after the library is this person's - each only while Settings or Needs a
+        // look shows (QueueCountModel), never at start-up on another tab; it asks nothing without the permission
+        .onChange(of: navigation.managingWrites) { _, _ in queueCount.changed() }
+        .onChange(of: scenePhase) { _, phase in queueCount.scene(phase) }
+        .onChange(of: Managing.asksQueueSummary(server.access.permissions)) { _, asks in
+            if asks { queueCount.changed() }
         }
     }
 

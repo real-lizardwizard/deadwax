@@ -25,8 +25,9 @@ final class LibraryScanModel {
     private(set) var answer: ScanAnswer?
     /// A read is on its way.
     private(set) var reading = false
-    /// The last read failed, in words - nil once one lands.
-    private(set) var failure: String?
+    /// The last read failed: why, and whether whoever asked may see deadwax's own words - nil once one lands. Kept as
+    /// the error, so each place that draws it says it its own way (`failure(saying:)` - slice 6's review).
+    private(set) var failed: (error: any Error, admin: Bool)?
     @ObservationIgnored private var etag: String?
     @ObservationIgnored private var reads = 0
 
@@ -34,10 +35,18 @@ final class LibraryScanModel {
     var loaded: Bool { answer != nil }
     var albums: [ScanAlbum] { answer?.albums ?? [] }
 
-    /// The scan read again - `failed` what a failure says didn't work (Needs a look's own, slice 6: READ_FAILED for a
-    /// first read, CHECK_FAILED for one again over the list on screen).
+    /// The last read's failure in the editor's words (EditWords.said over READ_FAILED's "Couldn't read the library.").
+    var failure: String? { failure(saying: EditWords.readFailed) }
+
+    /// The last read's failure, `what` saying what didn't work when deadwax gave no words of its own - Needs a look's
+    /// READ_FAILED for its first read, CHECK_FAILED for one again over the list on screen (slice 6).
+    func failure(saying what: String) -> String? {
+        failed.map { EditWords.said($0.error, failed: what, admin: $0.admin) }
+    }
+
+    /// The scan read again.
     @discardableResult
-    func read(client: DeadwaxClient?, admin: Bool, failed: String = EditWords.readFailed) async -> Read {
+    func read(client: DeadwaxClient?, admin: Bool) async -> Read {
         guard let client else { return .dropped }
         reads += 1
         let ticket = reads
@@ -49,7 +58,7 @@ final class LibraryScanModel {
                 answer = fresh
                 etag = tag
             }
-            failure = nil
+            failed = nil
             reading = false
             return .landed
         } catch {
@@ -57,7 +66,7 @@ final class LibraryScanModel {
             reading = false
             // a cancellation (the page gone) is neither a failure nor an answer: what was there stays
             guard !APIFailure.isCancellation(error) else { return .dropped }
-            failure = EditWords.said(error, failed: failed, admin: admin)
+            failed = (error, admin)
             return .failed
         }
     }

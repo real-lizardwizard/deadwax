@@ -173,8 +173,6 @@ def test_the_count_and_a_note_are_waited_for_past_the_routes_worst_case():
     note = inspect.getsource(library_route.reviewed)
     assert note.count("await store.") == 1 and "await store.mark_album_reviewed(body.album_path)" in note
     assert given["queueReviewed"] == given["queueIgnore"] == given["queueUnignore"]
-
-
 # ---------------------------------------------------------------------------- the app
 
 def test_the_count_is_asked_as_the_web_asks_it():
@@ -184,21 +182,52 @@ def test_the_count_is_asked_as_the_web_asks_it():
     assert "let summary = try await client.queueSummary()" in model
     assert model.count("guard ticket == generation else { return }") == 3
     assert "Timer" not in model and "sleep" not in model, "the count is never polled"
-    # asked as Settings shows and on its pull, as the app comes to the front, on the permission, after every write
-    you = app_file("You", "YouView.swift")
-    assert you.count("queueCount.ask()") == 2
-    tabs = app_file("Root", "MainTabs.swift")
-    assert ".onChange(of: navigation.managingWrites) { _, _ in queueCount.ask() }" in tabs
-    assert "if phase == .active { queueCount.ask() }" in tabs
-    assert ".onChange(of: Managing.asksQueueSummary(server.access.permissions), initial: true)" in tabs
     # drawn as Manage's value, read once by VoiceOver - never on a tab
     manage = app_file("You", "ManageSection.swift")
     assert "NavigationLink(value: AppRoute.needsALook)" in manage
     assert "Text(queueCount.count.value)" in manage and ".accessibilityLabel(queueCount.count.spoken)" in manage
+    tabs = app_file("Root", "MainTabs.swift")
     bar = tabs[tabs.index("struct AppTabBar"):]
     assert "queueCount" not in bar.split("\nstruct ", 1)[0], "the count is never on a tab"
-    # the next person starts with none
+    # the next person starts with none - and none of the last one's pages on screen
     assert "queueCount.reset()" in app_file("DeadwaxApp.swift")
+    assert "showing = []" in swift_like(model, "reset")
+
+
+def test_the_count_is_asked_only_while_a_page_that_uses_it_shows():
+    # (slice 6's review) asked as Settings or Needs a look comes on screen, on their pulls, back from the background
+    # with one up, and after something may have moved it - never at start-up on another tab, never twice for one event
+    model = app_file("Manage", "QueueCountModel.swift")
+    assert "private func ask()" in model, "nothing outside asks without saying why"
+    assert "guard showing.insert(page).inserted else { return }" in swift_like(model, "shows"), "once per showing"
+    assert "guard !showing.isEmpty else { return }" in swift_like(model, "changed")
+    scene = swift_like(model, "scene")
+    assert "case .background:\n            away = true" in scene
+    assert "guard away else { return }" in scene and "changed()" in scene, "back from the background, not a launch"
+    you = app_file("You", "YouView.swift")
+    assert "queueCount.shows(.settings)" in you and "queueCount.hides(.settings)" in you
+    pull = you[you.index(".refreshable {"):you.index(".task {")]
+    assert pull.index("queueCount.pulled()") < pull.index("await server.refreshMe()"), \
+        "asked before /me, so the permission it may give asks once"
+    screen = app_file("Manage", "NeedsLookScreen.swift")
+    assert "count.shows(.needsLook)" in screen and "count.hides(.needsLook)" in screen
+    tabs = app_file("Root", "MainTabs.swift")
+    assert ".onChange(of: navigation.managingWrites) { _, _ in queueCount.changed() }" in tabs
+    assert ".onChange(of: scenePhase) { _, phase in queueCount.scene(phase) }" in tabs
+    assert ".onChange(of: Managing.asksQueueSummary(server.access.permissions)) { _, asks in" in tabs
+    assert "Managing.asksQueueSummary(server.access.permissions), initial: true" not in tabs, "never at start-up on another tab"
+    # nothing anywhere else asks it
+    for path in APP.rglob("*.swift"):
+        if path.name == "QueueCountModel.swift":
+            continue
+        text = path.read_text(encoding="utf-8")
+        assert "queueCount.ask()" not in text and "count?.ask()" not in text and "count.ask()" not in text, path.name
+    # Needs a look's own pull: never out of reach, the count then the list
+    page = app_file("Manage", "NeedsLookModel.swift")
+    pulled = swift_like(page, "pulled")
+    assert "guard online, samePerson, page.allowed else { return }" in pulled
+    assert pulled.index("count?.pulled()") < pulled.index("await read()")
+    assert ".refreshable {\n            await model.pulled()\n        }" in screen
 
 
 def test_every_write_asks_the_count_again_and_tells_the_page():
@@ -217,9 +246,41 @@ def test_every_write_asks_the_count_again_and_tells_the_page():
     # a note, then the count; nothing past a sign-out
     page = app_file("Manage", "NeedsLookModel.swift")
     review = swift_like(page, "review")
-    assert "_ = try await client.markReviewed(path: path)" in review and "count?.ask()" in review
-    assert review.index("markReviewed") < review.index("count?.ask()")
+    assert "_ = try await client.markReviewed(path: path)" in review and "count?.changed()" in review
+    assert review.index("markReviewed") < review.index("count?.changed()")
     assert page.count("samePerson") >= 6
+
+
+def test_a_mark_is_judged_as_every_write_is():
+    # (slice 6's review) only a 4xx is a refusal; any other end may have been written - said so, read again, and the
+    # session and the count told what the read shows
+    mark = swift_like(app_file("Edit", "EditAlbumModel.swift"), "mark")
+    assert "guard RetagFlow.outcome(of: error) != .refused else {" in mark
+    refused = mark[mark.index("guard RetagFlow.outcome(of: error) != .refused else {"):]
+    refused = refused[:refused.index("}") + 1]
+    assert "markFailure = EditWords.said(error, failed: failed, admin: admin)" in refused and "return" in refused
+    assert "markFailure = EditWords.writeFailure(error, failed: failed, admin: admin)" in mark
+    assert "AccessibilityNotification.Announcement(EditWords.mayHaveFinished).post()" in mark
+    # the read and the telling come after the catch - an answered mark and an unanswered one alike
+    catch = mark.index("} catch {")
+    assert mark.index("await lookUp()") > catch and mark.index("told(from: from)") > mark.index("await lookUp()")
+
+
+def test_the_page_says_its_own_failures_and_shows_when_deadwax_is_out_of_reach():
+    page = app_file("Manage", "NeedsLookModel.swift")
+    assert "scan.failure(saying: scan.loaded ? NeedsLook.checkFailed : NeedsLook.readFailed)" in page
+    screen = app_file("Manage", "NeedsLookScreen.swift")
+    assert "ErrorNote(text: model.failure ?? NeedsLook.readFailed)" in screen
+    assert "Text(model.failure ?? NeedsLook.checkFailed)" in screen
+    assert "scan.failure" not in screen, "never the editor's words"
+    assert ".editOutOfReach(!reachability.online && model.scan.loaded)" in screen
+    # back in reach with the page up and no editor open on a session: read again
+    reach = swift_like(page, "reach")
+    assert "guard now, shown, session == nil else { return }" in reach and "await read()" in reach
+    # the scan keeps the error, each place saying it its own way; the editor's words stay READ_FAILED's
+    scan = app_file("Edit", "LibraryScanModel.swift")
+    assert "var failure: String? { failure(saying: EditWords.readFailed) }" in scan
+    assert "failed = (error, admin)" in scan
 
 
 def test_the_editor_steps_through_the_queue_as_the_web_does():
@@ -227,19 +288,80 @@ def test_the_editor_steps_through_the_queue_as_the_web_does():
     # one sheet, each album opened afresh in it with the page's scan
     assert ".task(id: request.queue?.steps ?? 0)" in sheet
     assert "scan: request.queue?.scan" in sheet
-    # ‹, where it is, Skip or Next album - off while a write or a mark runs, typed work asked about first
+    # ‹, where it is, Skip or Next album - each through the editor's gate, typed work asked about first
     assert "ToolbarItemGroup(placement: .bottomBar)" in sheet
     assert ".disabled(!nav.back || !model.canStep)" in sheet and ".disabled(!nav.on || !model.canStep)" in sheet
     assert "pendingStep = delta" in sheet and "askingDiscard = true" in sheet
-    # however the sheet goes, the session ends; a delete in queue mode leaves the sheet up
-    assert "request.queue?.editorClosed()" in sheet
+    assert "queue.go(by: delta, gate: model.stepGate)" in swift_like(sheet, "take")
+    # Discard's step: the gate as it is at that moment, not as it was when the step was asked
+    assert "if let model { request.queue?.go(by: delta, gate: model.stepGate) }" in sheet
+    # a delete in queue mode leaves the sheet up
     assert "if request.queue != nil {\n                path.removeAll()\n            } else {\n                dismiss()" in sheet
-    edit = app_file("Edit", "EditAlbumModel.swift")
-    assert "var canStep: Bool { online && !writing && !marking }" in edit
     page = app_file("Manage", "NeedsLookModel.swift")
     # an album gone when stepped to ends the session, the scan listing paths code unit by code unit
-    assert "NeedsLook.stepTarget(was, to: was.index + delta, present: NeedsLook.lists(scan.albums))" in page
+    assert "carry(run.step(by: delta, gate: gate, present: NeedsLook.lists(scan.albums), live: liveChips))" in page
     assert "navigation.albumEdit?.queue === self" in page
+
+
+def test_the_step_gate_waits_for_everything_done_to_the_album():
+    # (slice 6's review) no step while a write or a mark - or what follows it, the read then the page told - is under
+    # way, while the scan is read, while Release or Tags waits for a read, or while a delete waits to be found gone
+    edit = app_file("Edit", "EditAlbumModel.swift")
+    gate = edit[edit.index("var stepGate: NeedsLook.StepGate {"):]
+    gate = gate[:gate.index("\n    }\n")]
+    for part in ("online: online", "busy: writing || marking || following > 0", "reading: scan.reading",
+                 "needsRead: retag?.flow.needsRead == true || tags?.flow.needsRead == true",
+                 "deletePending: unansweredDelete != nil"):
+        assert part in gate, part
+    assert "var canStep: Bool { stepGate.open }" in edit
+    # each write and the mark hold `following` from before they send until their follow-up has told the page
+    for name in ("apply", "saveCoverOnly", "applyTags", "get", "delete", "mark"):
+        body = swift_like(edit, name)
+        assert "following += 1" in body and "defer {" in body and "following -= 1" in body, name
+    # watched, so the bar's buttons come back on when it settles
+    assert "@ObservationIgnored private var unansweredDelete" not in edit
+    assert "private var unansweredDelete: (before: ScanAlbum, all: Bool)?" in edit
+
+
+def test_the_page_only_carries_out_what_the_run_decides():
+    # (slice 6's review) Core's NeedsLook.Run decides every move of the session - begun, stepped, ended once - and the
+    # page carries out each After whole: the note sent, the editor closed, the ending read
+    page = app_file("Manage", "NeedsLookModel.swift")
+    for move in ("run.step(", "run.closed(", "run.facetChosen("):
+        for at in [m.start() for m in re.finditer(re.escape(move), page)]:
+            assert page[at - 6:at] == "carry(", f"{move} carried out"
+    assert "run.begin(NeedsLook.facetAlbums(scan.albums, shown), path: row.album.path, facet: shown," in page
+    assert "carry(run.closed(live: liveChips))" in swift_like(page, "editorClosed")
+    assert "carry(run.facetChosen(live: liveChips))" in swift_like(page, "choose")
+    carry = swift_like(page, "carry")
+    assert "let note = after.note" in carry and "let noted = Task { await self.review(note) }" in carry
+    assert "if after.close {\n            closeEditor()" in carry
+    ending = carry[carry.index("if let ticket = after.ended {"):]
+    assert ending.index("await noted.value") < ending.index("await self.read()") < ending.index("self.run.endingRead(ticket)")
+    # no state of its own about the session: the Run's
+    for word in ("private(set) var session", "heldChips", "private var endings", "private(set) var ending", "private(set) var steps"):
+        assert word not in page, word
+
+
+def test_the_session_ends_where_the_sheet_really_goes():
+    # (slice 6's review) never on the sheet's content disappearing - a full-screen cover over it does that too
+    sheet = app_file("Edit", "EditAlbumSheet.swift")
+    assert "onDisappear" not in sheet[sheet.index("struct EditAlbumSheet"):sheet.index("struct EditPageView")]
+    close = swift_like(sheet, "closeSheet")
+    assert close.index("request.queue?.editorClosed()") < close.index("dismiss()")
+    assert sheet.count("request.queue?.editorClosed()") == 1
+    assert "closeSheet()" in swift_like(sheet, "close")
+    tabs = app_file("Root", "MainTabs.swift")
+    assert ".sheet(item: $navigation.albumEdit, onDismiss: { navigation.editorDismissed() })" in tabs
+    nav = app_file("Shared", "Routes.swift")
+    dismissed = swift_like(nav, "editorDismissed")
+    assert "guard let was = presentedEdit, albumEdit?.id != was.id else { return }" in dismissed
+    assert "was.queue?.editorClosed()" in dismissed
+    assert "if let was, was.id != request.id, was.queue !== request.queue { was.queue?.editorClosed() }" \
+        in swift_like(nav, "editAlbum")
+    # a sign-out: ended after the session has moved on, so nothing is noted for the next person
+    reset = swift_like(nav, "reset")
+    assert reset.index("session += 1") < reset.index("editor?.queue?.editorClosed()")
 
 
 def swift_like(text: str, name: str) -> str:

@@ -91,19 +91,24 @@ struct YouView: View {
         }
         .navigationTitle(YouWords.title)
         .refreshable {
+            // (Phase 8, slice 6) Needs a look's count, on the pull too - asked before /me, so Look after the library
+            // given by its answer asks it once, not twice (MainTabs)
+            queueCount.pulled()
             await server.refreshMe()
-            // (Phase 8, slice 6) Needs a look's count, on the pull too
-            queueCount.ask()
         }
         .task {
             guard !asked else { return }
             asked = true
             await server.refreshMe()
         }
-        // (slice 6) Needs a look's count asked each time Settings shows (useQueueSummary.ts: as You mounts) - and once
-        // /me says Look after the library is theirs (MainTabs asks then too)
+        // (slice 6) Needs a look's count asked as Settings comes on screen (useQueueSummary.ts: as You mounts) - and,
+        // while it is, back from the background, after a managing write and once /me says Look after the library is
+        // theirs (QueueCountModel, MainTabs)
         .onAppear {
-            queueCount.ask()
+            queueCount.shows(.settings)
+        }
+        .onDisappear {
+            queueCount.hides(.settings)
         }
     }
 

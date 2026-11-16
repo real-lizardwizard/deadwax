@@ -240,6 +240,151 @@ public enum NeedsLook {
         session.current.flatMap { $0.mark == .deleted ? nil : $0.path }
     }
 
+    // MARK: the run - the page's session as the phone keeps it (review of slice 6, 16 Nov)
+
+    /// Whether the editor may step to another album of the session now (‹, Skip, Next album, and Discard's step). Shut
+    /// while anything the editor did to the album it is on hasn't settled: a step opens the next album afresh over the
+    /// same scan, so a read still out would be dropped by the next album's, and what the page is told of the album left
+    /// (its row, its mark) would be lost or stale.
+    public struct StepGate: Sendable, Equatable {
+        /// deadwax in reach: a step notes the album left, and opens the next from deadwax.
+        public var online: Bool
+        /// A write or a mark under way - or its follow-up still to come: the folder read again, then the page told.
+        public var busy: Bool
+        /// The library's scan is being read (the editor's or the page's - in queue mode they share it).
+        public var reading: Bool
+        /// Release or Tags waits for the folder to be read again (RetagFlow.needsRead), after a write or a gap.
+        public var needsRead: Bool
+        /// A delete that never answered, the read that says whether it went not yet landed.
+        public var deletePending: Bool
+
+        public init(online: Bool, busy: Bool, reading: Bool, needsRead: Bool, deletePending: Bool) {
+            self.online = online
+            self.busy = busy
+            self.reading = reading
+            self.needsRead = needsRead
+            self.deletePending = deletePending
+        }
+
+        /// A step may go now.
+        public var open: Bool { online && !busy && !reading && !needsRead && !deletePending }
+    }
+
+    /// What the page does after its run moves on (`Run`): the album to note as looked at, and whether the editor opens
+    /// the next album, the session ended (the page reads, then hands the ticket back), and the editor closes.
+    public struct After: Sendable, Equatable {
+        /// The album to note as looked at (`POST /library/queue/reviewed`), the count asked again once it is - nil: none
+        /// (nothing was left, or the album left was deleted).
+        public let note: String?
+        /// On to another album: the editor opens it afresh.
+        public let stepped: Bool
+        /// The session ended: once the note is written the page reads the library, then `endingRead(ticket)`.
+        public let ended: Int?
+        /// The editor is closed (a step to an album gone, a facet chosen) - it hasn't closed by itself.
+        public let close: Bool
+
+        public init(note: String?, stepped: Bool = false, ended: Int? = nil, close: Bool = false) {
+            self.note = note
+            self.stepped = stepped
+            self.ended = ended
+            self.close = close
+        }
+
+        /// Nothing moved.
+        public static let nothing = After(note: nil)
+    }
+
+    /// Needs a look's session from a row's tap to its rows let go (NeedsALook.tsx's `session`, `heldChips` and `ending`,
+    /// and what openRow, go and the editor's close do with them): every decision the page makes about it, the App only
+    /// carrying them out. One session at a time, never begun while an ending's rows are held; ended exactly once,
+    /// however the editor goes; a step only through the gate; and the album left always noted, unless deleted.
+    public struct Run: Sendable, Equatable {
+        /// The session, while the editor is open from a row.
+        public private(set) var session: Session?
+        /// The facets as the session began: nothing above the list moves while it lasts.
+        public private(set) var held: [Facet]?
+        /// A session just ended: its rows held until the page's read after it lands.
+        public private(set) var ending: Ending?
+        /// One more each time the session steps to another album: the editor opens it afresh.
+        public private(set) var steps = 0
+        /// One more each time a session ends: only the newest ending's read lets it go.
+        public private(set) var endings = 0
+
+        public init() {}
+
+        /// A row opened (openRow): a session over the list as shown, the row at `path` current, the facets held as
+        /// they are now - false, and nothing begun, while a session lasts, while an ending's rows are held, or when the
+        /// list doesn't hold the row.
+        public mutating func begin(_ list: [ScanAlbum], path: String, facet: String?, live: [Facet]) -> Bool {
+            guard session == nil, ending == nil,
+                  let begun = NeedsLook.startSession(list, path: path, facet: facet) else { return false }
+            session = begun
+            held = live
+            return true
+        }
+
+        /// What the editor says became of an album of the session: its row brought up to date, in place.
+        public mutating func heard(_ change: FolderChange) {
+            guard let was = session else { return }
+            session = NeedsLook.rowChanged(was, change)
+        }
+
+        /// ‹ (-1), Skip or Next album (+1), and Discard's step, taken only through `gate` as it is at that moment: on
+        /// to the row, the album left noted - or, the row stepped to gone from the scan (`present`), the session over,
+        /// the album left noted and the editor closed. Nothing past either end, or with the gate shut.
+        public mutating func step(by delta: Int, gate: StepGate, present: (String) -> Bool, live: [Facet]) -> After {
+            guard gate.open, let was = session else { return .nothing }
+            switch NeedsLook.stepTarget(was, to: was.index + delta, present: present) {
+            case .stay:
+                return .nothing
+            case .end(let leaving):
+                return end(note: leaving, live: live, close: true)
+            case .step(let next, let leaving):
+                session = next
+                steps += 1
+                return After(note: leaving, stepped: true)
+            }
+        }
+
+        /// The editor gone - its sheet dismissed (Close, a swipe, Discard), a sign-out: the session over, the album on
+        /// screen noted as looked at (stepping away too). Only the first of however many say so ends it.
+        public mutating func closed(live: [Facet]) -> After {
+            guard let was = session else { return .nothing }
+            return end(note: NeedsLook.leavingAtEnd(was), live: live, close: false)
+        }
+
+        /// A facet chosen from Show while the session lasts: the session over, the album on screen noted, the editor
+        /// closed.
+        public mutating func facetChosen(live: [Facet]) -> After {
+            guard let was = session else { return .nothing }
+            return end(note: NeedsLook.leavingAtEnd(was), live: live, close: true)
+        }
+
+        private mutating func end(note: String?, live: [Facet], close: Bool) -> After {
+            guard let was = session else { return .nothing }
+            session = nil
+            ending = NeedsLook.ending(was, held: held, live: live)
+            endings += 1
+            return After(note: note, ended: endings, close: close)
+        }
+
+        /// The page's read after ending `ticket` has answered: its rows may go - unless another session has ended since.
+        public mutating func endingRead(_ ticket: Int) {
+            guard ticket == endings, ending != nil else { return }
+            ending?.read = true
+        }
+
+        /// After any read of the scan ends (the page's or the editor's): an ending whose own read has answered, with
+        /// none still out, let go - true when it was.
+        @discardableResult
+        public mutating func settle(reading: Bool) -> Bool {
+            guard NeedsLook.released(ending, reading: reading) else { return false }
+            ending = nil
+            held = nil
+            return true
+        }
+    }
+
     // MARK: the words
 
     /// `NEEDS_LOOK_LINE`: what the page is for and what to do there.

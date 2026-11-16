@@ -1,29 +1,82 @@
 import DeadwaxCore
 import Observation
+import SwiftUI
 
 /// Needs a look's count (Phase 8, slice 6 - notes/ios-specs/phase8-managing.md 5; the web's app/useQueueSummary.ts):
 /// how many albums need a look, from deadwax's saved scan alone (`GET /library/queue/summary`), drawn as the value of
 /// Settings > Manage > Needs a look - never on a tab (James). Core's QueueCount holds every rule: one request out at a
 /// time, and one more after it when asked meanwhile, so the answer that lands last is the newest question's; a failure
 /// keeps the number in hand; nothing drawn while nobody knows it; never asked without Look after the library (the server
-/// answers 403). Asked when Settings shows and on its pull, as the app comes to the front, when Look after the library
-/// is given, and after every managing write (AppNavigation.managed) - nothing polls. Another person: let go (`reset`),
-/// an answer still out for the last one dropped.
+/// answers 403). Nothing polls.
+///
+/// Asked only while a page that uses it shows - Settings' root (its Manage row) or Needs a look (slice 6's review): as
+/// one comes on screen, on its pull, as the app comes back from the background with one up, and when something may have
+/// moved the count meanwhile - a managing write, an album noted as looked at, Look after the library given. Never at
+/// start-up on another tab, and once for each of those (a page that comes on screen asks once, however often SwiftUI
+/// says it appeared). Another person: let go (`reset`), an answer still out for the last one dropped.
 @MainActor
 @Observable
 final class QueueCountModel {
+    /// The pages that use the count.
+    enum Page: Hashable {
+        case settings
+        case needsLook
+    }
+
     /// The count as deadwax last said it, and whether a request is out.
     private(set) var count = QueueCount()
     @ObservationIgnored private let server: ServerModel
     /// One more each time the person changes: an answer for the last one lands nowhere.
     @ObservationIgnored private var generation = 0
+    /// The pages on screen that use the count.
+    @ObservationIgnored private var showing: Set<Page> = []
+    /// The app went to the background: coming back to the front asks again.
+    @ObservationIgnored private var away = false
 
     init(server: ServerModel) {
         self.server = server
     }
 
+    /// A page that uses the count came on screen: asked - once, until it goes.
+    func shows(_ page: Page) {
+        guard showing.insert(page).inserted else { return }
+        ask()
+    }
+
+    /// That page went (another tab, a page pushed over it, popped).
+    func hides(_ page: Page) {
+        showing.remove(page)
+    }
+
+    /// A pull on one of them.
+    func pulled() {
+        ask()
+    }
+
+    /// Something may have moved the count - a managing write (AppNavigation.managed), an album noted as looked at, Look
+    /// after the library given: asked while a page that uses it shows, else as one next comes on screen.
+    func changed() {
+        guard !showing.isEmpty else { return }
+        ask()
+    }
+
+    /// The scene's phase: back from the background - never merely from the switcher or a launch - with a page up that
+    /// uses the count, asked.
+    func scene(_ phase: ScenePhase) {
+        switch phase {
+        case .background:
+            away = true
+        case .active:
+            guard away else { return }
+            away = false
+            changed()
+        default:
+            break
+        }
+    }
+
     /// Ask (again) - when this person may: one request out at a time, one more once it is over when asked meanwhile.
-    func ask() {
+    private func ask() {
         guard count.ask(allowed: Managing.asksQueueSummary(server.access.permissions)) else { return }
         let ticket = generation
         Task { await run(ticket) }
@@ -50,9 +103,11 @@ final class QueueCountModel {
         }
     }
 
-    /// The person changed: nothing of the last one's count kept.
+    /// The person changed: nothing of the last one's count kept - and their pages gone with them (every stack popped,
+    /// the Library shown), so the next person's Settings asks as it comes on screen.
     func reset() {
         generation += 1
         count = QueueCount()
+        showing = []
     }
 }

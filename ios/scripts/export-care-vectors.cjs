@@ -8,7 +8,8 @@
  * Compiles lib/needsLook.ts, lib/metadataQueue.ts and lib/permissions.ts with the repo's TypeScript and runs them AS
  * THEY ARE, on inputs from the plain to the awkward: albums under folded and accented names (localeCompare's order),
  * new imports clean and not, issues marked fine and since fixed, a code the server never described, two kinds of issue
- * with as many albums (their labels decide); every facet of each (and ones emptied, unknown or ''), the counts, the
+ * with as many albums (their labels decide) - and with the same label too (the order each was first met in decides,
+ * both ways round); every facet of each (and ones emptied, unknown or ''), the counts, the
  * marks; and sessions run step by step - writes to the current row and to others, renames, a disc folder merged into
  * another row's, deletes, steps past either end, to albums gone from the scan, and the end.
  * And reads out of app/NeedsALook.tsx what the page works out itself - the facets held and shown, the rows drawn,
@@ -144,14 +145,27 @@ const ignoredWhen = compiled(['pressed', 'IGNORED_FACET', 'isIgnoredOnly', 'albu
 piece(PAGE, /\{MARKED_FINE\}\n\s*<\/span>/, "a row's Marked fine")
 const markedFineTitleOf = compiled(['album', 'library', 'MARKED_FINE', 'markedFineIssues', 'issueLabel'],
   `return ${piece(PAGE, /title=\{(`\$\{MARKED_FINE\}: \$\{markedFineIssues\(album\)\.map\(\(code\) => issueLabel\(code, library\.issueTypes\)\)\.join\(', '\)\}`)\}/, "a row's Marked fine title")[1]}`)
+//? (review, 16 Nov) their order as the page writes them, read from where each sits in the row's chips - the whole
+//? block hashed, so moving one of them stops this script; a mark, written first, stands in for all of them
+const chipsBlock = piece(PAGE, /<span class="app-queue-chips">\n([\s\S]*?)\n\s*<\/span>\n\s*<\/button>/, "a row's chips, in order")[1]
+if (!/^\s*\{mark \? \(\n\s*<span class="app-queue-mark">\{MARK_WORDS\[mark\]\}<\/span>\n\s*\) : \(/.test(chipsBlock)) {
+  throw new Error(`a row's mark no longer stands in for its chips in ui/src/${PAGE} - change this script with it`)
+}
+function chipAt(text, what) {
+  const at = chipsBlock.indexOf(text)
+  if (at < 0) throw new Error(`couldn't find ${what} among a row's chips in ui/src/${PAGE} - change this script with it`)
+  return at
+}
+const chipParts = [
+  { at: chipAt('{isNewImport(album) && ', 'New'), words: (album) => (Q.isNewImport(album) ? [newWord] : []) },
+  { at: chipAt('{outstandingIssues(album).map(', 'the issues'),
+    words: (album, pressed, issueTypes) => Q.outstandingIssues(album).map((code) => Q.issueLabel(code, issueTypes)) },
+  { at: chipAt('{pressed === IGNORED_FACET && isIgnoredOnly(album) && (', 'Marked fine'),
+    words: (album, pressed) => (ignoredWhen(pressed, N.IGNORED_FACET, N.isIgnoredOnly, album) ? [N.MARKED_FINE] : []) },
+].sort((one, other) => one.at - other.at)
 function rowChips(row, pressed, issueTypes) {
   if (row.mark) return [N.MARK_WORDS[row.mark]]
-  const album = row.album
-  return [
-    ...(Q.isNewImport(album) ? [newWord] : []),
-    ...Q.outstandingIssues(album).map((code) => Q.issueLabel(code, issueTypes)),
-    ...(ignoredWhen(pressed, N.IGNORED_FACET, N.isIgnoredOnly, album) ? [N.MARKED_FINE] : []),
-  ]
+  return chipParts.flatMap((part) => part.words(row.album, pressed, issueTypes))
 }
 //? the line at the top, and NEEDS_EDIT under it without Edit albums
 const leadOf = compiled(['canEdit', 'NEEDS_LOOK_LINE', 'NEEDS_LOOK_LINE_NO_EDIT'],
@@ -269,6 +283,12 @@ const ISSUE_TYPES = {
     unnumbered_tracks: { label: 'z', hint: '', severity: 1 },
     no_art: { label: 'No cover art', hint: '', severity: 1 },
   },
+  //? (review, 16 Nov) labels the same and counts the same: only the order each was first met in decides (the Map's)
+  same: {
+    no_release: { label: 'Same', hint: '', severity: 3 },
+    no_artist_tag: { label: 'Same', hint: '', severity: 3 },
+    mixed_tags: { label: 'Same', hint: '', severity: 3 },
+  },
 }
 const ARTISTS = ['Tame Impala', 'tame impala', 'Björk', 'Bjork', 'Émile', 'Emile', 'ABBA', 'abba', 'The Beatles',
   '10cc', '2Pac', 'Sigur Rós', '日本', 'Ølafur', 'Zola', 'zola', '', 'a', 'B', 'Björk']
@@ -367,6 +387,18 @@ listCase('ties, by label', [
   makeAlbum({ issues: ['not_in_navidrome', 'split_discs', 'artist_split'], ignored_issues: [], needs_attention: true, severity: 2 }),
   makeAlbum({ issues: ['misfiled', 'no_original_year', 'no_year', 'untitled_tracks'], ignored_issues: [], needs_attention: true, severity: 2 }),
 ], 'awkward')
+//? (review, 16 Nov) two facets of the same label and count, met in one order and then the other - drawn on a seed of
+//? their own, so every case after them is as it was
+{
+  const kept = seed
+  const plain = (artist, issues) => ({ path: `${artist}/Same [${artist}]`, artist, album: 'Same', edition: '', disc_label: '',
+    year: '', issues, ignored_issues: [], needs_attention: true, imported: false, reviewed: false, severity: 3 })
+  listCase('ties of label and count, one met first', [plain('A', ['no_release']), plain('B', ['no_artist_tag']),
+    plain('C', ['mixed_tags']), plain('D', ['mixed_tags'])], 'same')
+  listCase('ties of label and count, the other met first', [plain('A', ['no_artist_tag']), plain('B', ['no_release']),
+    plain('C', ['mixed_tags']), plain('D', ['mixed_tags'])], 'same')
+  seed = kept
+}
 listCase('an empty album name', [makeAlbum({ album: '', artist: '', edition: '', disc_label: '', issues: ['no_art'], ignored_issues: [], needs_attention: true })], 'plain')
 for (let n = 0; n < 70; n++) listCase(`seeded ${n}`, albumSet(0, 16), pick(TYPE_NAMES))
 

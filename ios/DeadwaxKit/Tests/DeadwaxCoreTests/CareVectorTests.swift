@@ -72,8 +72,13 @@ import Testing
                                  "ui/src/app/NeedsALook.tsx the ending held", "ui/src/app/NeedsALook.tsx a facet given up",
                                  "ui/src/components/MetadataEditor.tsx next album, when", "ui/src/app/You.tsx the count spoken",
                                  "ui/src/app/useQueueSummary.ts tracking", "ui/src/app/App.tsx who the page is for",
-                                 "ui/src/lib/requestsView.ts badgeText", "ui/src/lib/libraryCare.ts READ_FAILED"])
-        #expect(fixture["lists"].list.count == 77)
+                                 "ui/src/lib/requestsView.ts badgeText", "ui/src/lib/libraryCare.ts READ_FAILED",
+                                 "ui/src/app/NeedsALook.tsx a row's chips, in order"])
+        #expect(fixture["lists"].list.count == 79)
+        // two facets of the same label and count, met in each order: only the order first met decides between them
+        let ties = fixture["lists"].list.filter { $0["types"].string == "same" }
+        #expect(ties.map { Array($0["chips"].list.dropFirst(2)).compactMap { $0["id"].string } }
+                == [["no_release", "no_artist_tag"], ["no_artist_tag", "no_release"]])
         #expect(fixture["sessions"].list.count == 90)
         #expect(fixture["pages"].list.count == 60)
         #expect(fixture["permissions"].list.count == 64)
@@ -220,6 +225,78 @@ import Testing
                     let ending = NeedsLook.ending(session, held: op["held"].bool == true ? chips : nil,
                                                   live: NeedsLook.facets([], issueTypes))
                     Self.expect(ending, op["ending"], what)
+                default:
+                    Issue.record("\(what): an op the fixture doesn't know")
+                }
+            }
+        }
+    }
+
+    /// The same sessions through the phone's Run (review of slice 6): begun, told, stepped through an open gate and
+    /// ended as the page does it - every album noted the web's `leaving`, every end once.
+    @Test func eachSessionRunsThroughThePhonesRunAsTheWebs() {
+        let open = NeedsLook.StepGate(online: true, busy: false, reading: false, needsRead: false, deletePending: false)
+        for (number, run) in fixture["sessions"].list.enumerated() {
+            let albums = Self.albums(run["albums"])
+            let issueTypes = types(run["types"])
+            let chips = NeedsLook.facets(albums, issueTypes)
+            let live = NeedsLook.facets([], issueTypes)
+            let facet = run["facet"].string
+            let list = NeedsLook.facetAlbums(albums, facet)
+            var page = NeedsLook.Run()
+            var opened = page.begin(list, path: run["start"].string!, facet: facet, live: chips)
+            guard opened, let begun = page.session else {
+                #expect(run["begun"].isNull && page.session == nil, "run \(number): a session begun")
+                continue
+            }
+            Self.expect(begun, run["begun"], "run \(number) begun")
+            opened = page.begin(list, path: run["start"].string!, facet: facet, live: chips)
+            #expect(!opened && page.session == begun, "run \(number): one session at a time")
+            /// The ending as the fixture holds it: the facets as the run began, or (none held) the live ones.
+            func ending(_ held: Bool) -> NeedsLook.Ending? {
+                page.ending.map { held ? $0 : NeedsLook.Ending(rows: $0.rows, chips: live, facet: $0.facet, read: $0.read) }
+            }
+            for (at, op) in run["ops"].list.enumerated() {
+                let what = "run \(number), op \(at) (\(op["op"].string ?? ""))"
+                switch op["op"].string {
+                case "change":
+                    let change = op["change"]
+                    let album = change["album"].isNull ? nil : EditVectorTests.scanAlbum(change["album"])
+                    page.heard(NeedsLook.FolderChange(from: change["from"].string!, album: album,
+                                                      deleted: change["deleted"].bool == true))
+                    if let session = page.session { Self.expect(session, op["after"], what) }
+                case "step":
+                    guard let index = op["index"].int, let from = page.session?.index else {
+                        Issue.record("\(what): a step with no session")
+                        continue
+                    }
+                    let absent = Self.strings(op["absent"])
+                    let endings = page.endings
+                    let after = page.step(by: index - from, gate: open, present: { path in
+                        !absent.contains { Screens.same($0, path) }
+                    }, live: chips)
+                    let result = op["result"]
+                    switch result["kind"].string {
+                    case "stay":
+                        #expect(after == .nothing && page.session?.index == from, "\(what): stays")
+                    case "end":
+                        #expect(Self.same(after.note, result["leaving"].string), "\(what): the album left noted")
+                        #expect(!after.stepped && after.close && after.ended == endings + 1 && page.session == nil,
+                                "\(what): ends once, the editor closed")
+                    default:
+                        #expect(Self.same(after.note, result["leaving"].string), "\(what): the album left noted")
+                        #expect(after.stepped && after.ended == nil && !after.close, "\(what): steps")
+                        if let session = page.session { Self.expect(session, op["after"], what) }
+                    }
+                case "ending":
+                    if let held = ending(op["held"].bool == true) { Self.expect(held, op["ending"], what) }
+                    #expect(page.closed(live: live) == .nothing, "\(what): the sheet going after it ends nothing more")
+                case "end":
+                    let after = page.closed(live: live)
+                    #expect(Self.same(after.note, op["leaving"].string), "\(what): the album left noted")
+                    #expect(after.ended == 1 && !after.close && !after.stepped, "\(what): ended once")
+                    if let held = ending(op["held"].bool == true) { Self.expect(held, op["ending"], what) }
+                    #expect(page.closed(live: live) == .nothing && page.endings == 1, "\(what): only once")
                 default:
                     Issue.record("\(what): an op the fixture doesn't know")
                 }

@@ -170,6 +170,160 @@ import Testing
         #expect(!NeedsLook.released(read, reading: true) && NeedsLook.released(read, reading: false))
     }
 
+    @Test func aFailedAskStillSendsTheOneAskedMeanwhile() {
+        // the web's finally: whether the answer came or not, the one asked while it was out goes next
+        var count = QueueCount()
+        var went = count.ask(allowed: true)
+        #expect(went)
+        went = count.ask(allowed: true)
+        #expect(!went && count.again)
+        went = count.failed()
+        #expect(went, "asked meanwhile: it goes now, though the one before failed")
+        #expect(count.asking && !count.again && count.server == nil)
+        went = count.ask(allowed: true)
+        #expect(!went && count.again, "and it is out: one more after it")
+        went = count.failed()
+        #expect(went && count.asking)
+        went = count.answered(QueueSummary(total: 2))
+        #expect(!went && !count.asking && count.server == 2)
+    }
+
+    // MARK: the run - the page's session, as the phone keeps it
+
+    static let open = NeedsLook.StepGate(online: true, busy: false, reading: false, needsRead: false, deletePending: false)
+
+    /// Three albums listed (Beach House new, ABBA worst, Tame Impala), the run begun on ABBA.
+    static func begun() throws -> (NeedsLook.Run, [ScanAlbum], [NeedsLook.Facet]) {
+        let albums = [
+            album("Tame Impala/Currents", issues: ["no_art"], severity: 1),
+            album("Beach House/Bloom", imported: true, artist: "Beach House", name: "Bloom"),
+            album("ABBA/Arrival", issues: ["no_release"], severity: 3, artist: "ABBA", name: "Arrival"),
+        ]
+        let live = NeedsLook.facets(albums, [:])
+        var run = NeedsLook.Run()
+        let opened = run.begin(NeedsLook.facetAlbums(albums, nil), path: "ABBA/Arrival", facet: nil, live: live)
+        try #require(opened)
+        return (run, albums, live)
+    }
+
+    @Test func theRunIsOneSessionAtATime() throws {
+        var (run, albums, live) = try Self.begun()
+        let list = NeedsLook.facetAlbums(albums, nil)
+        #expect(run.session?.current?.path == "ABBA/Arrival" && run.held == live && run.steps == 0)
+        var again = run.begin(list, path: "Tame Impala/Currents", facet: nil, live: [])
+        #expect(!again, "a session lasts: no other begins")
+        #expect(run.session?.current?.path == "ABBA/Arrival" && run.held == live, "and it is untouched")
+
+        // ended: its rows held until the page's read after it - and no session begins while they are
+        let ended = run.closed(live: [])
+        #expect(ended.ended == 1 && run.session == nil && run.ending != nil)
+        again = run.begin(list, path: "Tame Impala/Currents", facet: nil, live: live)
+        #expect(!again, "an ending's rows are held: a row opens nothing")
+        #expect(run.session == nil)
+        // let go only once its own read has answered, and none is out
+        var released = run.settle(reading: false)
+        #expect(!released && run.ending != nil, "its read hasn't answered")
+        run.endingRead(ended.ended!)
+        released = run.settle(reading: true)
+        #expect(!released, "a read still out")
+        released = run.settle(reading: false)
+        #expect(released && run.ending == nil && run.held == nil)
+        again = run.begin(list, path: "Tame Impala/Currents", facet: nil, live: live)
+        #expect(again, "and now a row opens")
+        // a path the list doesn't hold begins nothing
+        var fresh = NeedsLook.Run()
+        again = fresh.begin(list, path: "Nowhere/Gone", facet: nil, live: live)
+        #expect(!again && fresh.session == nil && fresh.held == nil)
+    }
+
+    @Test func aStepNotesTheAlbumLeft() throws {
+        var (run, _, live) = try Self.begun()
+        // Skip: on to Tame Impala, ABBA noted as looked at
+        var after = run.step(by: 1, gate: Self.open, present: { _ in true }, live: live)
+        #expect(after == NeedsLook.After(note: "ABBA/Arrival", stepped: true))
+        #expect(run.session?.current?.path == "Tame Impala/Currents" && run.steps == 1)
+        // ‹: back, Tame Impala noted
+        after = run.step(by: -1, gate: Self.open, present: { _ in true }, live: live)
+        #expect(after == NeedsLook.After(note: "Tame Impala/Currents", stepped: true) && run.steps == 2)
+        // renamed by a write: noted by the path it has now
+        let renamed = Self.album("ABBA/Arrival (1976)", artist: "ABBA", name: "Arrival")
+        run.heard(.init(from: "ABBA/Arrival", album: renamed))
+        after = run.step(by: -1, gate: Self.open, present: { _ in true }, live: live)
+        #expect(after.note == "ABBA/Arrival (1976)" && after.stepped)
+        // past the first: nothing, and nothing noted
+        after = run.step(by: -1, gate: Self.open, present: { _ in true }, live: live)
+        #expect(after == .nothing && run.steps == 3)
+        // deleted here: stepping off it notes nothing
+        run.heard(.init(from: "Beach House/Bloom", album: nil, deleted: true))
+        after = run.step(by: 1, gate: Self.open, present: { _ in true }, live: live)
+        #expect(after == NeedsLook.After(note: nil, stepped: true))
+    }
+
+    @Test func aStepToAnAlbumGoneEndsTheRunAndClosesTheEditor() throws {
+        var (run, _, live) = try Self.begun()
+        let after = run.step(by: 1, gate: Self.open, present: { $0 != "Tame Impala/Currents" }, live: live)
+        #expect(after == NeedsLook.After(note: "ABBA/Arrival", ended: 1, close: true))
+        #expect(run.session == nil && run.ending?.rows.count == 3 && run.ending?.chips == live)
+        // the sheet's own dismissal after it ends nothing more
+        #expect(run.closed(live: live) == .nothing && run.endings == 1)
+    }
+
+    @Test func theRunEndsExactlyOnceHoweverTheEditorGoes() throws {
+        var (run, _, live) = try Self.begun()
+        // Close, a swipe, Discard, a sign-out: the album on screen noted, once
+        let first = run.closed(live: live)
+        #expect(first == NeedsLook.After(note: "ABBA/Arrival", ended: 1))
+        #expect(run.closed(live: live) == .nothing, "the sheet's onDismiss after Close")
+        #expect(run.facetChosen(live: live) == .nothing && run.endings == 1)
+        #expect(run.step(by: 1, gate: Self.open, present: { _ in true }, live: live) == .nothing, "no step past the end")
+        run.heard(.init(from: "ABBA/Arrival", album: nil, deleted: true))
+        #expect(run.ending?.rows.map(\.mark) == [nil, nil, nil], "nothing told after the end moves its rows")
+
+        // a facet chosen: ended, noted, the editor closed
+        (run, _, _) = try Self.begun()
+        #expect(run.facetChosen(live: live) == NeedsLook.After(note: "ABBA/Arrival", ended: 1, close: true))
+        #expect(run.closed(live: live) == .nothing)
+
+        // the album on screen deleted: the end notes nothing
+        (run, _, _) = try Self.begun()
+        run.heard(.init(from: "ABBA/Arrival", album: nil, deleted: true))
+        #expect(run.closed(live: live) == NeedsLook.After(note: nil, ended: 1))
+    }
+
+    @Test func onlyTheNewestEndingsReadLetsItsRowsGo() throws {
+        var (run, albums, live) = try Self.begun()
+        let first = run.closed(live: live)
+        run.endingRead(first.ended!)
+        run.settle(reading: false)
+        _ = run.begin(NeedsLook.facetAlbums(albums, nil), path: "ABBA/Arrival", facet: nil, live: live)
+        let second = run.closed(live: live)
+        #expect(second.ended == 2)
+        run.endingRead(first.ended!)
+        #expect(run.ending?.read == false, "the first ending's read is no answer for the second")
+        run.endingRead(second.ended!)
+        #expect(run.ending?.read == true)
+    }
+
+    @Test func noStepGoesThroughAShutGate() throws {
+        // each thing still to settle shuts it on its own
+        let shut: [(String, NeedsLook.StepGate)] = [
+            ("out of reach", .init(online: false, busy: false, reading: false, needsRead: false, deletePending: false)),
+            ("a write, a mark or its follow-up", .init(online: true, busy: true, reading: false, needsRead: false, deletePending: false)),
+            ("the scan being read", .init(online: true, busy: false, reading: true, needsRead: false, deletePending: false)),
+            ("Release or Tags waiting for a read", .init(online: true, busy: false, reading: false, needsRead: true, deletePending: false)),
+            ("a delete never answered", .init(online: true, busy: false, reading: false, needsRead: false, deletePending: true)),
+        ]
+        #expect(Self.open.open)
+        for (what, gate) in shut {
+            #expect(!gate.open, "\(what): shut")
+            var (run, _, live) = try Self.begun()
+            let was = run
+            #expect(run.step(by: 1, gate: gate, present: { _ in true }, live: live) == .nothing, "\(what): no step")
+            #expect(run.step(by: 1, gate: gate, present: { _ in false }, live: live) == .nothing, "\(what): no end either")
+            #expect(run == was, "\(what): nothing moved, nothing noted")
+        }
+    }
+
     // MARK: the phone's own words
 
     @Test func theShowMenuAndTheToolbarSayItPlainly() {

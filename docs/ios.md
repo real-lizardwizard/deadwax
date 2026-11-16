@@ -552,7 +552,9 @@ doesn't list. Pull down to read the library again.
 - **Needs a look**, with Edit albums, when something's wrong with the album: each issue, with what it means ("Not
   matched to MusicBrainz", "No cover art"...), as Needs a look in the web app says them. With **Look after the
   library** too, **It's fine as it is** under them takes the album out of Needs a look for those issues; after it,
-  "Marked fine: …" says which, with **Ask about it again** to put it back. Someone with Edit albums alone sees the
+  "Marked fine: …" says which, with **Ask about it again** to put it back. A mark deadwax refuses says why under them;
+  one it doesn't answer (or answers with a server error) may still have been kept, so the album is read again and shows
+  what deadwax now holds - as an apply that got no answer is. Someone with Edit albums alone sees the
   issues, but not the two buttons - marking an album fine is the library's keeper's call - and someone with Look after
   the library alone has only Delete album…, as in the web app.
 - **Edit**, with Edit albums: **Release** - the release the album is matched to, or "Not matched to a release" - opens
@@ -1919,10 +1921,12 @@ fixing, the albums Navidrome doesn't list, and the new downloads nobody has look
 Settings, and each album on it opens [Edit album](#edit-album).
 
 **Its count** - how many albums it lists - is at the right of its row in Settings > Manage ("99+" past 99; nothing
-when there are none, or before deadwax has said), never on a tab. It's asked when Settings shows and on a pull down
-there, as the app comes back to the front, and after anything Edit album or an artist's tools write - an apply, a Get,
-a delete, a mark, Save, Move - and deadwax answers it from its saved scan, without reading the disk. A count that
-can't be had leaves the last one. Someone without Look after the library has no row, so no count.
+when there are none, or before deadwax has said), never on a tab. It's asked only while Settings or Needs a look is
+on screen: as either comes up, on a pull down on either, as the app comes back from the background with one of them
+up, and after anything Edit album or an artist's tools write while one of them is up - an apply, a Get, a delete, a
+mark, an album noted as looked at, Save, Move. It isn't asked as the app starts on another tab: opening Settings asks
+it. deadwax answers it from its saved scan, without reading the disk. A count that can't be had leaves the last one.
+Someone without Look after the library has no row, so no count.
 
 **At the top**, what the page is for: "Albums whose tags, folder or cover need fixing, albums Navidrome doesn't list,
 and new downloads nobody has looked at yet. Open one to fix it, or to mark it fine as it is." Without Edit albums it
@@ -1939,7 +1943,8 @@ may not have been checked against Navidrome ("Navidrome isn't set up, so no albu
 download nobody has looked at, then each issue as Edit album names it ("No cover art", "Not matched to MusicBrainz"…).
 "Nothing needs a look." when nothing does. When deadwax has no library to read (`LIBRARY_PATH` unset or missing), it
 says so in the list's place. Pull down to read the library again; it's read again too each time the page shows anew,
-and when deadwax comes back into reach.
+and when deadwax comes back into reach. These words are the page's own: a read Edit album makes that fails says
+"Couldn't read the library." in Edit album, and "Couldn't check the library just now." here.
 
 **Show**, the menu at the top right (filled while it narrows the list), picks what the list shows, as the web app's
 chips do, each with how many: **All**, **Newly added** (when there are any), one per kind of issue (the most albums
@@ -1956,12 +1961,18 @@ album - ‹, Skip, Next album, or closing Edit album - notes it as looked at, wh
 New (its issues stay), and the count follows. Deleting an album leaves Edit album up, saying "Deleted …", with **Next
 album** to go on. If the album you step to has gone from the library since the list was read (deleted or moved
 elsewhere), the run ends and Edit album closes. Once it ends, the list stays as it was until deadwax has read the
-library again, then it's worked out afresh - albums put right leave it. The steps are dimmed while something is being
-written or marked, and while deadwax can't be reached; with something typed and not applied, a step asks "Discard
-changes?" first, as Close does.
+library again, then it's worked out afresh - albums put right leave it. The steps are dimmed until everything done to
+the album on screen has settled: while something is being written or marked and until the library has been read again
+after it, while the library is being read, while Release or Tags waits for that read (Look again, if it failed), while
+a delete that got no answer waits to be found gone or not - and while deadwax can't be reached. With something typed
+and not applied, a step asks "Discard changes?" first, as Close does, and Discard steps only if the steps are still on.
+Opening a picture full size (Compare covers, the cover or CD art, a track's picture) and closing it again leaves the
+run as it was; only Edit album closing ends it.
 
 **While deadwax can't be reached**, a page that hasn't read the library yet says "Managing needs deadwax. This opens
-once it's back." and reads it once deadwax is back; one that has keeps its list, and its rows can't be tapped. If an
+once it's back." and reads it once deadwax is back; one that has keeps its list under the amber line Edit album shows
+("deadwax is out of reach - this is how it was, and nothing here can change until it's back."), its rows can't be
+tapped and a pull asks nothing - and the library is read again once deadwax is back. If an
 admin took Look after the library away, it says "This page needs a permission an admin hasn't given you - ask one if
 you need it.", and asks nothing.
 
@@ -4627,9 +4638,10 @@ albums put in it for these checks (a test album filed from a download, or copied
 
 - **349 The count.** Settings > Manage > **Needs a look** has a number at its right: is it the web app's You badge's?
   With VoiceOver: "Needs a look, 3 albums" (the number it shows). Open an album from it, mark it fine, close Edit
-  album and go back: is the number one less, without a pull? Lock and unlock the phone after marking one fine in the
-  web app: does the number follow? With nothing to look at, nothing at the row's right - and no tab ever shows the
-  count. With Wi-Fi and WireGuard off, the number stays as it was.
+  album and go back: is the number one less, without a pull? On Settings, lock and unlock the phone after marking one
+  fine in the web app: does the number follow? Leave the app on the Library tab, mark another fine in the web app, then
+  open Settings: the number follows as it opens. With nothing to look at, nothing at the row's right - and no tab ever
+  shows the count. With Wi-Fi and WireGuard off, the number stays as it was.
 - **350 The list and Show.** Open Needs a look: "Reading the library", then the same albums in the same order as the
   web app's All, each with the same chips (New, then its issues), headed "All · N". **Show** (top right): All, Newly
   added, each kind of issue and Marked fine, with the web app's counts. Pick Newly added: only the new downloads, the
@@ -4638,8 +4650,10 @@ albums put in it for these checks (a test album filed from a download, or copied
   comes and goes.
 - **351 Working through.** Tap the first album: Edit album, with ‹ (dimmed), "1 of N" and **Skip ›** at its foot.
   Skip: "2 of N", the second album, and ‹ is on; ‹ goes back to the first. Mark one fine (or apply a release): Skip
-  becomes **Next album ›**. Close: its row says **Marked fine** (or **Fixed**) in green and stays where it was; once
-  the library has been read again, is it gone from the list - and from the web app's?
+  becomes **Next album ›**. On "2 of N", open a picture full size - Release > Compare covers, Artwork's cover, or a
+  track's picture in Tags - and close it: ‹, "2 of N" and Skip are still at the foot, and Skip goes on to the third.
+  Close: its row says **Marked fine** (or **Fixed**) in green and stays where it was; once the library has been read
+  again, is it gone from the list - and from the web app's?
 - **352 Looked at.** A test album filed from a download (New): open it from Needs a look and Skip past it (or Close).
   Once the list is read again, is it no longer New - in the web app too - and the count one less, if New was all that
   was wrong with it?
@@ -4648,14 +4662,18 @@ albums put in it for these checks (a test album filed from a download, or copied
   Delete permanently): Edit album stays up, saying "Deleted …", with Next album; its row says **Deleted**. In the web
   app, delete (or move) the album after the one open on the phone, then tap Skip on the phone: Edit album closes, and
   the list is read again.
-- **354 Edits, reach, and who.** Type in a Release field and tap Skip: "Discard changes?" - Keep editing keeps it,
-  Discard steps on. Tap Apply and look at the foot at once: ‹ and Skip dimmed until it's done. Wi-Fi and WireGuard
-  off: the steps dimmed and the rows can't be tapped; open Needs a look from Settings while off: "Managing needs
-  deadwax. This opens once it's back.", then the list once it's back. As someone with Look after the library but not
-  Edit albums: the top line ends "to see what it has, or to delete it." with "Fixing it needs Edit albums, which an
-  admin hasn't given you."; an album opens with Delete album… alone. With the largest text and VoiceOver: each row
-  read once ("The Slow Rush, Tame Impala, New, No cover art"), Show as "Show, All", the foot's "Previous album",
-  "2 of 9" and "Skip", each step said ("3 of 9: …"), every line whole. With Reduce Motion on, rows don't slide.
+- **354 Edits, reach, and who.** Type in a Release field, go back to Edit album's first page and tap Skip: "Discard
+  changes?" - Keep editing keeps it, Discard steps on. On an album that needs a release, tap Apply on its Release
+  page, then go straight back to the first page: ‹ and Skip are dimmed until the apply is done and the library has
+  been read again - Skip then says Next album. Tap "It's fine as it is": the same, until the album has been read
+  again. Wi-Fi and WireGuard off: the steps dimmed; on Needs a look the amber line at the top, the rows can't be
+  tapped, and a pull asks nothing - back on, "Checking the library…" and the list read again. Open Needs a look from
+  Settings while off: "Managing needs deadwax. This opens once it's back.", then the list once it's back. As someone
+  with Look after the library but not Edit albums: the top line ends "to see what it has, or to delete it." with
+  "Fixing it needs Edit albums, which an admin hasn't given you."; an album opens with Delete album… alone. With the
+  largest text and VoiceOver: each row read once ("The Slow Rush, Tame Impala, New, No cover art"), Show as "Show,
+  All", the foot's "Previous album", "2 of 9" and "Skip", each step said ("3 of 9: …"), every line whole. With Reduce
+  Motion on, rows don't slide.
 
 ### Add to Queue's checks (392-403)
 

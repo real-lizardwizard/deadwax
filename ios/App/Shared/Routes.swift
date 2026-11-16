@@ -270,6 +270,9 @@ final class AppNavigation {
     /// (Phase 8, slice 1) Edit album, over the tabs (EditAlbumSheet): from an album page's ••• or Choose the folder.
     /// Over the tabs, not the album page, so the page beneath can be moved to the album's new id while it is up.
     var albumEdit: AlbumEditRequest?
+    /// (slice 6's review) Edit album as last presented: whatever ends it - its sheet dismissed, another opening, a
+    /// sign-out - tells its Needs a look session, which ends once however many say so (Core's NeedsLook.Run).
+    @ObservationIgnored private var presentedEdit: AlbumEditRequest?
     /// (Phase 8, slice 1) One more each time Edit album wrote to an album's folder, by the album's id: its page asks
     /// again (now, and once Navidrome has scanned - EditAlbumModel).
     private(set) var albumWrites: [String: Int] = [:]
@@ -398,9 +401,24 @@ final class AppNavigation {
 
     // MARK: Edit album (Phase 8, slice 1)
 
-    /// Edit album opened over the tabs (a page's ••• or Choose the folder; Now Playing is never over either).
+    /// Edit album opened over the tabs (a page's ••• or Choose the folder; Now Playing is never over either). Put in
+    /// place of another opening - still up, or going with its onDismiss yet to come - that one's Needs a look session
+    /// ends: unless this is the same page's new session, which its Run began only once the last had ended.
     func editAlbum(_ request: AlbumEditRequest) {
+        let was = presentedEdit
+        presentedEdit = request
         albumEdit = request
+        if let was, was.id != request.id, was.queue !== request.queue { was.queue?.editorClosed() }
+    }
+
+    /// (slice 6's review) Edit album's sheet went (MainTabs' onDismiss) - Close, a swipe, Discard, a step to an album
+    /// gone, a sign-out: its Needs a look session told it is over, unless the sheet up now is that same opening. The
+    /// sheet's dismissal, not its content disappearing - a full-screen cover over it (Compare covers, a picture full
+    /// size) does that too, and the session lasts through it.
+    func editorDismissed() {
+        guard let was = presentedEdit, albumEdit?.id != was.id else { return }
+        presentedEdit = albumEdit
+        was.queue?.editorClosed()
     }
 
     /// Edit album wrote to the album `id`'s folder: its page asks again.
@@ -495,12 +513,17 @@ final class AppNavigation {
         eqImportSheet = false
         playlistPick = nil
         editingPlaylist = nil
+        let editor = presentedEdit
+        presentedEdit = nil
         albumEdit = nil
         albumWrites = [:]
         moves = [:]
         session += 1
         importAnswered()
         tab = .library
+        // (slice 6's review) Needs a look's session over - once the session has moved on, so nothing is noted, read or
+        // asked for the next person
+        editor?.queue?.editorClosed()
     }
 }
 

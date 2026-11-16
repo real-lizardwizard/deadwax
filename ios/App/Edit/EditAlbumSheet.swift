@@ -43,9 +43,13 @@ enum EditPage: Hashable {
 /// (Phase 8, slice 6) Opened from Needs a look it is in queue mode (phase8-managing.md 3.2, 5; MetadataEditor.tsx's
 /// queue nav): a bottom toolbar on its root holds ‹, "2 of 9" and Skip › - Next album › once a write was told of the
 /// album (the web's Apply becoming Next) - stepping through the session (NeedsLookModel.go), each album opened afresh in
-/// the same sheet with the page's scan. A step is off while a write or a mark runs, or out of reach, and asks "Discard
-/// changes?" over typed work as Close does. A delete leaves the sheet up, saying so, the queue going on from it; the
-/// sheet going, however it goes, ends the session (NeedsLookModel.editorClosed).
+/// the same sheet with the page's scan. A step goes only through the editor's gate (EditAlbumModel.stepGate - shut out
+/// of reach and until everything done to this album has settled: a write or a mark and the read after it, a read of the
+/// scan, a read Release or Tags waits for, a delete waiting to be found gone), checked again as Discard steps, and asks
+/// "Discard changes?" over typed work as Close does. A delete leaves the sheet up, saying so, the queue going on from
+/// it. The sheet going ends the session - Close here, and its every dismissal where it is presented (MainTabs'
+/// onDismiss, AppNavigation.editorDismissed) - never this content disappearing, which a full-screen cover over it
+/// (Compare covers, a picture full size) brings about too (slice 6's review).
 struct EditAlbumSheet: View {
     let request: AlbumEditRequest
 
@@ -89,9 +93,10 @@ struct EditAlbumSheet: View {
                             Button(EditWords.discard, role: .destructive) {
                                 if let delta = pendingStep {
                                     pendingStep = nil
-                                    request.queue?.go(by: delta)
+                                    // the gate as it is now: a write may have started since the step was asked
+                                    if let model { request.queue?.go(by: delta, gate: model.stepGate) }
                                 } else {
-                                    dismiss()
+                                    closeSheet()
                                 }
                             }
                             Button(EditWords.keepEditing, role: .cancel) { pendingStep = nil }
@@ -129,10 +134,6 @@ struct EditAlbumSheet: View {
                 dismiss()
             }
         }
-        // however the sheet goes - Close, a swipe, a step to an album gone, a sign-out - Needs a look's session ends
-        .onDisappear {
-            request.queue?.editorClosed()
-        }
         .onChange(of: reachability.online) { _, now in
             Task { await model?.reach(now) }
         }
@@ -148,8 +149,15 @@ struct EditAlbumSheet: View {
             pendingStep = nil
             askingDiscard = true
         } else {
-            dismiss()
+            closeSheet()
         }
+    }
+
+    /// Close (or Discard over it): Needs a look's session ended now, then the sheet dismissed - whose onDismiss says so
+    /// again, to a session already over (NeedsLook.Run ends once).
+    private func closeSheet() {
+        request.queue?.editorClosed()
+        dismiss()
     }
 
     /// (slice 6) Queue mode's bar: ‹ (Previous album), where it is ("2 of 9"), and Skip › - or Next album ›, once a
@@ -176,7 +184,7 @@ struct EditAlbumSheet: View {
         .disabled(!nav.on || !model.canStep)
     }
 
-    /// A step through the queue: typed work asks first, as Close does.
+    /// A step through the queue, through the editor's gate: typed work asks first, as Close does.
     private func take(_ delta: Int, model: EditAlbumModel) {
         guard let queue = request.queue, model.canStep else { return }
         if model.holdsWork {
@@ -184,7 +192,7 @@ struct EditAlbumSheet: View {
             askingDiscard = true
             return
         }
-        queue.go(by: delta)
+        queue.go(by: delta, gate: model.stepGate)
     }
 }
 

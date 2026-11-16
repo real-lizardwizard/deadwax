@@ -95,8 +95,11 @@ final class EditAlbumModel {
     /// The Library's lists, asked again once a folder is deleted.
     @ObservationIgnored private weak var library: LibraryModel?
     /// A delete whose answer never came (or came as a 5xx): the folder it was for, and whether it was all the album had
-    /// - settled by the next read that lands (gone from the scan: it went).
-    @ObservationIgnored private var unansweredDelete: (before: ScanAlbum, all: Bool)?
+    /// - settled by the next read that lands (gone from the scan: it went). Watched: queue mode's steps wait for it.
+    private var unansweredDelete: (before: ScanAlbum, all: Bool)?
+    /// (slice 6's review) Writes and marks under way, each until everything after it is done - the folder read again,
+    /// then Needs a look told: queue mode's steps wait for them all.
+    private(set) var following = 0
     /// AppNavigation's session when the sheet opened: once it moves on (a sign-out, another person), nothing after a
     /// write asks deadwax again or touches the pages.
     @ObservationIgnored private var session: Int?
@@ -196,10 +199,19 @@ final class EditAlbumModel {
     /// An apply or the cover alone is under way: the album held and its Release stay, whatever a read brings.
     var writing: Bool { applying || retag?.flow.savingCover == true }
 
-    /// (slice 6) Queue mode's ‹, Skip and Next album may be pressed: in reach (a step notes the album left looked at,
-    /// and opens the next from deadwax), and no write or mark under way - as Close is off while one runs. Typed work
-    /// asks first, as Close does (the sheet's).
-    var canStep: Bool { online && !writing && !marking }
+    /// (slice 6) Whether queue mode's ‹, Skip and Next album - and Discard's step - may go now (Core's StepGate): in
+    /// reach (a step notes the album left, and opens the next from deadwax), and nothing done to this album still to
+    /// settle - no write or mark under way or still following up (the folder read again, then Needs a look told), the
+    /// scan not being read, Release and Tags not waiting for a read, no delete waiting to be found gone or not. The next
+    /// album's read would drop one still out, and the page would never hear what became of this one (review, 16 Nov).
+    /// Typed work asks first, as Close does (the sheet's).
+    var stepGate: NeedsLook.StepGate {
+        NeedsLook.StepGate(online: online, busy: writing || marking || following > 0, reading: scan.reading,
+                           needsRead: retag?.flow.needsRead == true || tags?.flow.needsRead == true,
+                           deletePending: unansweredDelete != nil)
+    }
+
+    var canStep: Bool { stepGate.open }
 
     /// The read a write or a gap waits for couldn't be made - the Release's or Tags' (RetagFlow.readFailed) - in the
     /// phone's words (review, 16 Nov): what holds Delete and the Gets off, said with Look again wherever they are.
@@ -368,6 +380,8 @@ final class EditAlbumModel {
     func apply() async {
         guard !tagsApplying, !getting, !deleting, let retag, let client, let before = album,
               let body = retag.beginApply() else { return }
+        following += 1
+        defer { following -= 1 }
         let preview = retag.plan
         let hold = BackgroundHold(named: "Edit album: Apply")
         defer { hold.end() }
@@ -406,8 +420,10 @@ final class EditAlbumModel {
     /// The cover alone (RetagModel.saveCoverOnly): written - or maybe written, no answer or a 5xx, said as an apply's -
     /// the folder read again and the page beneath asked again; refused, nothing more.
     func saveCoverOnly() async {
-        guard !tagsApplying, !getting, !deleting, let retag, let before = album,
-              let outcome = await retag.saveCoverOnly(path: before.path) else { return }
+        guard !tagsApplying, !getting, !deleting, let retag, let before = album else { return }
+        following += 1
+        defer { following -= 1 }
+        guard let outcome = await retag.saveCoverOnly(path: before.path) else { return }
         guard samePerson else { return }
         if outcome == .unanswered {
             AccessibilityNotification.Announcement(EditWords.mayHaveFinished).post()
@@ -424,6 +440,8 @@ final class EditAlbumModel {
     func applyTags() async {
         guard let tags, let client, let before = album, !(retag?.flow.applying == true),
               retag?.flow.savingCover != true, !getting, !deleting, !marking, let body = tags.beginApply() else { return }
+        following += 1
+        defer { following -= 1 }
         let hold = BackgroundHold(named: "Edit album: Edit tags")
         defer { hold.end() }
         let result: Result<TagEditResponse, any Error>
@@ -461,6 +479,8 @@ final class EditAlbumModel {
     /// page beneath asked again. Signed out meanwhile, nothing more.
     func get(_ kind: GetResults.Kind) async {
         guard canGet, let client, let before = album else { return }
+        following += 1
+        defer { following -= 1 }
         let path = before.path
         var run = GetRun(kind: kind, path: path)
         runs[kind] = run
@@ -538,6 +558,8 @@ final class EditAlbumModel {
     func delete(path: String, summary: DeletionSummary) async {
         guard canDelete, let client, let before = album,
               deletion.beginDelete(path, over: summary, holding: before.path) else { return }
+        following += 1
+        defer { following -= 1 }
         // decided now, from the folders as they are - as the web's dialog is given it: once the folder is gone the
         // scan can't say what the album had
         let all = AlbumEdit.deletesAll(folders, tracks: before.trackCount, subject)
@@ -617,20 +639,33 @@ final class EditAlbumModel {
         }
     }
 
+    /// A mark sent, as every write is judged (RetagFlow.outcome - review, 16 Nov): only a 4xx is a refusal, said under
+    /// the buttons, nothing more. Any other end - answered, or no answer, or a 5xx, which may have been written: said
+    /// as maybe finished - has the folder read again, and Needs a look's session and count told what that read shows.
     private func mark(failed: String, _ send: (DeadwaxClient) async throws -> Void) async {
         guard let client, online, !marking, !deleting, let from = album?.path else { return }
         marking = true
         markFailure = nil
+        following += 1
+        defer {
+            following -= 1
+            marking = false
+        }
         do {
             try await send(client)
-            // an ignore changes no file - only the review row: the folder read again, so the list follows
-            await lookUp()
-            // (slice 6) Needs a look's row says Marked fine (or nothing, asked about again), and its count follows
-            told(from: from)
         } catch {
-            markFailure = EditWords.said(error, failed: failed, admin: admin)
+            guard RetagFlow.outcome(of: error) != .refused else {
+                markFailure = EditWords.said(error, failed: failed, admin: admin)
+                return
+            }
+            // a 5xx's own words, when it has them - else nothing to say beyond maybe finished
+            markFailure = EditWords.writeFailure(error, failed: failed, admin: admin)
+            if samePerson { AccessibilityNotification.Announcement(EditWords.mayHaveFinished).post() }
         }
-        marking = false
+        // an ignore changes no file - only the review row: the folder read again, so the list follows
+        await lookUp()
+        // (slice 6) Needs a look's row says Marked fine (or nothing, asked about again), and its count follows
+        told(from: from)
     }
 
     // MARK: after a write
