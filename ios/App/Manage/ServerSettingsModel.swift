@@ -201,42 +201,45 @@ final class ServerSettingsModel {
     private func readIfNeeded(again: Bool) {
         guard server.signInOver == nil,
               flow.readsNow(shown: visible, online: reachability.online, allowed: parts.page, again: again) else { return }
-        Task { await read() }
+        read()
     }
 
-    /// The settings read: only the newest lands. Once it does, SettingsFlow is asked again (a read begun before deadwax
+    /// The settings read: its ticket taken here, before the ask is sent - so a second ask in the same turn finds one
+    /// out and sends nothing, and a Save pressed after calls it off (SettingsFlow.save) rather than a GET going out
+    /// during the save - only the newest lands. Once it does, SettingsFlow is asked again (a read begun before deadwax
     /// was last out of reach isn't trusted), and the saved answers read afresh if the file they name changed.
-    func read() async {
+    private func read() {
         guard let client = server.client else { return }
         let ticket = flow.readBegan()
         let mine = generation
-        let checking = flow.checking != nil
-        do {
-            let found = try await client.serverSettings()
-            guard mine == generation else { return }
-            flow.readLanded(ticket, found)
-            // a save that never answered, looked at again: said how it came out
-            if checking, flow.checking == nil { announce(flow.barText) }
-        } catch {
-            guard mine == generation else { return }
-            if APIFailure.isCancellation(error) {
-                flow.readDropped(ticket)
+        Task {
+            do {
+                let found = try await client.serverSettings()
+                guard mine == generation else { return }
+                // a save that never answered, settled by this read: said how it came out
+                if flow.readLanded(ticket, found) { announce(flow.barText) }
+            } catch {
+                guard mine == generation else { return }
+                if APIFailure.isCancellation(error) {
+                    flow.readDropped(ticket)
+                    return
+                }
+                flow.readFailed(ticket, ServerSettings.readFailure(error, admin: admin, first: flow.answer == nil))
+                if Self.forbidden(error) { Task { await server.refreshMe() } }
                 return
             }
-            flow.readFailed(ticket, ServerSettings.readFailure(error, admin: admin, first: flow.answer == nil))
-            if Self.forbidden(error) { Task { await server.refreshMe() } }
-            return
-        }
-        readIfNeeded(again: false)
-        if let group = flow.group(ServerSettings.savedAnswersGroup), answers.key != SavedAnswers.key(group) {
-            answersIfNeeded()
+            readIfNeeded(again: false)
+            if let group = flow.group(ServerSettings.savedAnswersGroup), answers.key != SavedAnswers.key(group) {
+                answersIfNeeded()
+            }
         }
     }
 
-    /// Try again (the first read's, or the line over the settings shown).
+    /// Try again (the first read's, the line over the settings shown, or the bar's when a look at a save that never
+    /// answered couldn't read them).
     func retry() {
         guard !flow.reading, !flow.saving, reachability.online, server.signInOver == nil else { return }
-        Task { await read() }
+        read()
     }
 
     // MARK: drafts and the save
@@ -253,9 +256,11 @@ final class ServerSettingsModel {
         if leadUnsaved { retime.leadDrafted() }
     }
 
-    /// Discard: every draft gone.
+    /// Discard: every draft gone - and, while a save that never answered is being looked at, that look ended with no
+    /// "Saved.", the settings read again (what is shown may be from before the save).
     func discard() {
         flow.discard()
+        readIfNeeded(again: false)
     }
 
     /// Save pressed: every draft at once (held through the background). Answered, the settings are what it says and
@@ -312,21 +317,24 @@ final class ServerSettingsModel {
         guard answersShown > 0, active, parts.answers, server.signInOver == nil,
               answers.readsNow(shown: true, online: reachability.online),
               let group = flow.group(ServerSettings.savedAnswersGroup) else { return }
-        Task { await readAnswers(SavedAnswers.key(group)) }
+        readAnswers(SavedAnswers.key(group))
     }
 
-    private func readAnswers(_ key: String) async {
+    /// The file read - its ticket taken before the ask goes, as the settings' read takes its own.
+    private func readAnswers(_ key: String) {
         guard let client = server.client else { return }
         let ticket = answers.readBegan(key: key)
         let mine = generation
-        do {
-            let stats = try await client.savedAnswers()
-            guard mine == generation else { return }
-            answers.readLanded(ticket, stats)
-        } catch {
-            guard mine == generation, !APIFailure.isCancellation(error) else { return }
-            answers.readFailed(ticket, SavedAnswers.readFailure(error, admin: admin))
-            if Self.forbidden(error) { Task { await server.refreshMe() } }
+        Task {
+            do {
+                let stats = try await client.savedAnswers()
+                guard mine == generation else { return }
+                answers.readLanded(ticket, stats)
+            } catch {
+                guard mine == generation, !APIFailure.isCancellation(error) else { return }
+                answers.readFailed(ticket, SavedAnswers.readFailure(error, admin: admin))
+                if Self.forbidden(error) { Task { await server.refreshMe() } }
+            }
         }
     }
 
@@ -375,45 +383,36 @@ final class ServerSettingsModel {
         guard let client = server.client, parts.connections, reachability.online, server.signInOver == nil else { return }
         let ticket = checks.began()
         let mine = generation
+        ask(.musicbrainz, ticket, mine) { Connections.fromPing(.musicbrainz, try await client.pingMusicBrainz()) }
+        ask(.slskd, ticket, mine) { Connections.fromPing(.slskd, try await client.pingSlskd()) }
+        ask(.navidrome, ticket, mine) { Connections.fromNavidrome(try await client.navidromeStatus()) }
+    }
+
+    /// One row's ask: its answer, or the ask's failure, settles it; called off (a cancellation), the row goes back to
+    /// its last answer rather than staying on "Checking…" (ConnectionChecks.dropped).
+    private func ask(_ service: Connections.Service, _ ticket: Int, _ mine: Int,
+                     _ asking: @escaping @MainActor () async throws -> Connections.Check) {
         Task {
             let check: Connections.Check
             do {
-                check = Connections.fromPing(.musicbrainz, try await client.pingMusicBrainz())
+                check = try await asking()
             } catch {
-                guard !APIFailure.isCancellation(error) else { return }
+                guard mine == generation else { return }
+                if APIFailure.isCancellation(error) {
+                    checks.dropped(ticket, service)
+                    return
+                }
                 check = Connections.unanswered(error)
             }
             guard mine == generation else { return }
-            checks.settled(ticket, .musicbrainz, check)
-        }
-        Task {
-            let check: Connections.Check
-            do {
-                check = Connections.fromPing(.slskd, try await client.pingSlskd())
-            } catch {
-                guard !APIFailure.isCancellation(error) else { return }
-                check = Connections.unanswered(error)
-            }
-            guard mine == generation else { return }
-            checks.settled(ticket, .slskd, check)
-        }
-        Task {
-            let check: Connections.Check
-            do {
-                check = Connections.fromNavidrome(try await client.navidromeStatus())
-            } catch {
-                guard !APIFailure.isCancellation(error) else { return }
-                check = Connections.unanswered(error)
-            }
-            guard mine == generation else { return }
-            checks.settled(ticket, .navidrome, check)
+            checks.settled(ticket, service, check)
         }
     }
 
     // MARK: Re-time saved lyrics
 
-    /// Re-time pressed: the library read (the real scan - the saved one misses albums an earlier run touched), then
-    /// each album with lyrics, one at a time.
+    /// Re-time pressed: the library read (the real scan - the saved one misses albums an earlier run touched), held
+    /// through the background for the read alone, then each album with lyrics, one at a time, each with its own hold.
     func startRetime() {
         guard let client = server.client, server.signInOver == nil,
               let ticket = retime.start(allowed: parts.retime, online: reachability.online, unsaved: leadUnsaved) else {
@@ -423,17 +422,21 @@ final class ServerSettingsModel {
         let mine = generation
         Task {
             let hold = BackgroundHold(named: "Re-time saved lyrics: the library")
-            defer { hold.end() }
+            let read: Result<[ScanAlbum], any Error>
             do {
-                let albums: [ScanAlbum]
                 switch try await client.libraryScan(ifNoneMatch: nil) {
-                case .fresh(let scan, _): albums = scan.albums
-                case .unchanged: albums = []
+                case .fresh(let scan, _): read = .success(scan.albums)
+                case .unchanged: read = .success([])
                 }
-                guard mine == generation else { return }
-                retime.read(ticket, albums)
             } catch {
-                guard mine == generation else { return }
+                read = .failure(error)
+            }
+            hold.end()
+            guard mine == generation else { return }
+            switch read {
+            case .success(let albums):
+                retime.read(ticket, albums)
+            case .failure(let error):
                 retime.readFailed(ticket, RetimeRun.readFailure(error, admin: admin))
                 if Self.forbidden(error) { Task { await server.refreshMe() } }
                 ended()

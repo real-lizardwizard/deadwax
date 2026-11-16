@@ -233,6 +233,98 @@ import Testing
         #expect(!flow.saving && flow.drafts.count == 1 && flow.checking == nil && flow.saveError == nil)
     }
 
+    /// (review) "Saved." is decided by what the save SENT, never by what is left: Discard while it is looked at, or a
+    /// sent setting typed back to its saved value, left nothing to differ - and said "Saved." of a batch that never
+    /// landed.
+    @Test func discardingWhileASaveIsLookedAtNeverSaysSavedOfABatchThatDidntLand() {
+        var flow = SettingsFlow()
+        flow.readLanded(flow.readBegan(), Self.sample)
+        flow.edit("LIBRARY_PATH", "/new")
+        _ = flow.save(online: true, allowed: true)
+        flow.unanswered(nil)
+        // Discard while the read to look is out: the look ends at once, with no word on the save
+        let look = flow.readBegan()
+        flow.discard()
+        #expect(flow.checking == nil && flow.drafts.isEmpty && flow.barText.isEmpty && !flow.barShown)
+        #expect(!flow.real, "what is shown may be from before the save")
+        // the read out began after the save: it lands as a plain read, and is the one to trust
+        let settled = flow.readLanded(look, Self.sample)
+        #expect(!settled && !flow.justSaved && flow.barText.isEmpty && flow.real)
+
+        // Discard with no read out (deadwax out of reach, say): the settings are read again before Save trusts them
+        var away = SettingsFlow()
+        away.readLanded(away.readBegan(), Self.sample)
+        away.edit("LIBRARY_PATH", "/new")
+        _ = away.save(online: true, allowed: true)
+        away.unanswered(nil)
+        away.discard()
+        #expect(away.checking == nil && !away.real && away.readsNow(shown: true, online: true, allowed: true, again: false))
+        away.edit("LIBRARY_PATH", "/other")
+        #expect(!away.saveOpen(online: true, allowed: true), "Save waits for that read")
+        away.readLanded(away.readBegan(), Self.sample)
+        #expect(away.saveOpen(online: true, allowed: true) && !away.justSaved)
+
+        // a sent setting typed back to its saved value while looked at, and the save never landed: no "Saved."
+        var back = SettingsFlow()
+        back.readLanded(back.readBegan(), Self.sample)
+        back.edit("LIBRARY_PATH", "/new")
+        _ = back.save(online: true, allowed: true)
+        back.unanswered(nil)
+        back.edit("LIBRARY_PATH", "/music")
+        #expect(back.drafts.isEmpty && back.checking != nil && back.barText == EditWords.mayHaveFinished)
+        let lookSettled = back.readLanded(back.readBegan(), Self.sample)
+        #expect(lookSettled, "the look settled")
+        #expect(!back.justSaved && back.barText.isEmpty)
+        // ...but it did land: then "Saved." is true, and said
+        var landed = SettingsFlow()
+        landed.readLanded(landed.readBegan(), Self.sample)
+        landed.edit("LIBRARY_PATH", "/new")
+        _ = landed.save(online: true, allowed: true)
+        landed.unanswered(nil)
+        landed.edit("LIBRARY_PATH", "/music")
+        let now = Self.answer([("paths", [Self.setting("LIBRARY_PATH", "/new")])])
+        let settledNow = landed.readLanded(landed.readBegan(), now)
+        #expect(settledNow && landed.justSaved && landed.barText == "Saved.")
+        // a secret sent is never known to have landed (the settings never show it): it stays, and no "Saved."
+        var secret = SettingsFlow()
+        secret.readLanded(secret.readBegan(), Self.sample)
+        secret.edit("NAVIDROME_PASSWORD", "hunter2")
+        _ = secret.save(online: true, allowed: true)
+        secret.unanswered(nil)
+        secret.readLanded(secret.readBegan(), Self.sample)
+        #expect(secret.drafts.keys == ["NAVIDROME_PASSWORD"] && !secret.justSaved && secret.barText == "1 unsaved change")
+    }
+
+    /// (review) The look at a save that never answered never sticks on "looking again": its read failing says so in
+    /// the bar, with Try again there (checkStalled), and a read that lands settles it; Discard ends it as well.
+    @Test func aLookWhoseReadFailedSaysSoAndTryAgainOrDiscardEndsIt() {
+        var flow = SettingsFlow()
+        flow.readLanded(flow.readBegan(), Self.sample)
+        flow.edit("ALBUM_FOLDER_TEMPLATE", "{year}")
+        _ = flow.save(online: true, allowed: true)
+        flow.unanswered(nil)
+        let first = flow.readBegan()
+        #expect(!flow.checkStalled && flow.barText == EditWords.mayHaveFinished, "looking, while the read is out")
+        flow.readFailed(first, ServerSettings.rereadFailed)
+        #expect(flow.checkStalled && flow.barText == ServerSettings.rereadFailed)
+        #expect(!flow.saveOpen(online: true, allowed: true), "Save still waits to know")
+        // Try again: looking again while it is out, then settled
+        let again = flow.readBegan()
+        #expect(!flow.checkStalled && flow.barText == EditWords.mayHaveFinished)
+        let saved = Self.answer([("organizing", [Self.setting("ALBUM_FOLDER_TEMPLATE", "{year}")])])
+        let settledAgain = flow.readLanded(again, saved)
+        #expect(settledAgain && flow.barText == "Saved." && !flow.checkStalled)
+        // stalled again, then Discard: the look ends, nothing is said, and the settings are read again
+        flow.edit("ALBUM_FOLDER_TEMPLATE", "{album}")
+        _ = flow.save(online: true, allowed: true)
+        flow.unanswered(nil)
+        flow.readFailed(flow.readBegan(), ServerSettings.rereadFailed)
+        #expect(flow.checkStalled)
+        flow.discard()
+        #expect(!flow.checkStalled && flow.checking == nil && flow.barText.isEmpty)
+        #expect(flow.readsNow(shown: true, online: true, allowed: true, again: false))
+    }
+
     // MARK: MusicBrainz's saved answers
 
     @Test func clearReadsAfreshForAnotherFileAndSaysAnUnansweredClearMayHaveCleared() {
@@ -471,6 +563,33 @@ import Testing
         #expect(!checks.wanted)
     }
 
+    /// (review) A ping called off (a cancellation) never leaves its row on "Checking…": it goes back to that row's last
+    /// answer - or, never answered, says it couldn't check - and they are checked again the next time a page shows.
+    @Test func aPingCalledOffGoesBackToItsLastAnswer() {
+        var checks = ConnectionChecks()
+        let first = checks.began()
+        // the first check's: never answered, so "Couldn't check", with no reason to give
+        checks.dropped(first, .musicbrainz)
+        #expect(checks.check(.musicbrainz) == Connections.notChecked)
+        #expect(Connections.notChecked.text == ErrorWords.pingUnanswered && Connections.notChecked.detail == nil)
+        #expect(Connections.notChecked.state == .failed && checks.wanted)
+        checks.settled(first, .slskd, Connections.Check(state: .ok, text: Connections.connected))
+        checks.settled(first, .navidrome, Connections.Check(state: .ok, text: "Navidrome 0.64.2"))
+        // Check again: slskd's ask called off goes back to Connected, not Checking…
+        let second = checks.began()
+        checks.dropped(second, .slskd)
+        #expect(checks.check(.slskd) == Connections.Check(state: .ok, text: Connections.connected))
+        #expect(checks.check(.navidrome) == Connections.pending, "the others still asking")
+        // an older check's call-off changes nothing
+        checks.dropped(first, .navidrome)
+        #expect(checks.check(.navidrome) == Connections.pending)
+        // the last answer is the newest settled: a failure after an answer is what a later call-off goes back to
+        checks.settled(second, .navidrome, Connections.unanswered(Self.unreached))
+        let third = checks.began()
+        checks.dropped(third, .navidrome)
+        #expect(checks.check(.navidrome).text == ErrorWords.pingUnanswered && checks.check(.navidrome).detail != nil)
+    }
+
     // MARK: failures, as each part says them
 
     @Test func eachPartSaysItsOwnFailure() {
@@ -481,8 +600,14 @@ import Testing
         let silent = APIFailure.answered(.init(status: 502, method: "PUT", path: "/settings"))
         #expect(SavedAnswers.readFailure(Self.unreached, admin: false)
                 == ErrorWords.notice("", Self.unreached, failed: SavedAnswers.readFailed))
-        #expect(SavedAnswers.clearFailure(forbidden, admin: true)
-                == ErrorWords.notice("", forbidden, admin: true, failed: SavedAnswers.clearFailed))
+        // (review) a 403 in Save's words for it - a Managing page's NO_PERMISSION; any other refusal the web's
+        #expect(SavedAnswers.clearFailure(forbidden, admin: true) == EditWords.noPermission)
+        #expect(SavedAnswers.clearFailure(forbidden, admin: false) == EditWords.noPermission)
+        #expect(ServerSettings.saveFailure(forbidden, admin: true) == SavedAnswers.clearFailure(forbidden, admin: true))
+        let gone = APIFailure.answered(.init(status: 404, method: "POST", path: "/settings/musicbrainz_cache/clear",
+                                             detail: "Not Found"))
+        #expect(SavedAnswers.clearFailure(gone, admin: true)
+                == ErrorWords.notice("", gone, admin: true, failed: SavedAnswers.clearFailed))
         #expect(SavedAnswers.clearUnansweredWords(Self.unreached, admin: true) == nil, "nothing of deadwax's to say")
         #expect(SavedAnswers.clearUnansweredWords(crashed, admin: false) == "Database is locked.", "deadwax's own, as a sentence")
         #expect(RetimeRun.readFailure(Self.unreached, admin: false)

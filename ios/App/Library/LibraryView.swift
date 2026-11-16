@@ -78,11 +78,22 @@ struct LibraryView: View {
     @State private var editingOrder = false
     /// New playlist's sheet (the Playlists page's +), while it is up.
     @State private var newPlaylist: PlaylistsPage.NewSheet?
+    /// (Phase 8, slice 8) Set up Navidrome's sheet is up: held here, above the gate, so the gate giving way - deadwax
+    /// going out of reach opens it, a save mid-way included - never takes the sheet with it.
+    @State private var settingUp = false
+    @Environment(ServerSettingsModel.self) private var serverSettings
 
     init() {}
 
     var body: some View {
-        root
+        // a ZStack over the root's switch, so what is attached below stays on one view whichever list is drawn
+        ZStack { root }
+            // Server settings' Connections page over the Library; it goes when Close says so, or Navidrome answers
+            .sheet(isPresented: $settingUp) {
+                SetUpNavidromeSheet()
+            }
+            .onChange(of: navidromeAnswers) { _, _ in setUpDone() }
+            .onChange(of: serverSettings.flow.saving) { _, _ in setUpDone() }
             .onAppear {
                 look()
                 if page == nil { show(LibraryPages.first(shownOrder)) }
@@ -111,9 +122,10 @@ struct LibraryView: View {
                 if online { shown() }
             }
             .onChange(of: server.person) { _, _ in
-                // a new person opens on the first page, Find closed and empty
+                // a new person opens on the first page, Find closed and empty - and no Set up Navidrome left up
                 show(LibraryPages.first(shownOrder))
                 finding = false
+                settingUp = false
                 clearFind()
                 shown()
             }
@@ -171,7 +183,7 @@ struct LibraryView: View {
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .showsOfflineBanner()
             case .closed(let closed):
-                NavidromeGateView(closed: closed)
+                NavidromeGateView(closed: closed) { settingUp = true }
                     .showsOfflineBanner()
             }
         }
@@ -182,6 +194,21 @@ struct LibraryView: View {
     private var gate: NavidromeGate.Shown {
         guard NavidromeGate.consulted(reachability.reach), library.navidrome?.offline != true else { return .open }
         return NavidromeGate.shownOnPhone(library.navidrome, access: server.access)
+    }
+
+    /// Navidrome really answers - not the gate merely giving way: deadwax in reach, and the newest check (only the
+    /// newest lands - LibraryModel.checkNavidrome) one deadwax answered, finding Navidrome there. The sheet only ever
+    /// opens over a closed gate, whose check said otherwise, so this turns true only on a check that landed since.
+    private var navidromeAnswers: Bool {
+        guard NavidromeGate.consulted(reachability.reach), let checked = library.navidrome else { return false }
+        return !checked.offline && checked.status.ok
+    }
+
+    /// Set up Navidrome done: the sheet put away once Navidrome answers - never during a save (the sheet can't be
+    /// closed then; it goes as the save ends), and never only because deadwax went out of reach.
+    private func setUpDone() {
+        guard settingUp, navidromeAnswers, !serverSettings.flow.saving else { return }
+        settingUp = false
     }
 
     // MARK: the switch (slice 3b)
@@ -580,15 +607,16 @@ private struct EditOrderSheet: View {
 /// The Navidrome gate drawn (app/NeedsNavidrome.tsx): why the Library has no albums to show, in the words Core's
 /// NavidromeGate gives this reader, Try again (asks Navidrome again - also on a pull) and, for an admin, Set up
 /// Navidrome - since Phase 8, slice 8 the app's own Server settings, its Connections group page in a sheet over the
-/// Library (SetUpNavidromeSheet; until then the web app's, in Safari). Saved, the Library asks Navidrome again, and the
-/// gate opening takes the sheet with it. Navidrome's own words, for whoever runs deadwax, can be selected to copy.
+/// Library (SetUpNavidromeSheet; until then the web app's, in Safari) - held and drawn by LibraryView, above the gate, so
+/// the gate giving way never takes it. Saved, the Library asks Navidrome again, and the sheet goes once Navidrome
+/// answers. Navidrome's own words, for whoever runs deadwax, can be selected to copy.
 struct NavidromeGateView: View {
     let closed: NavidromeGate.Closed
+    /// Set up Navidrome pressed: LibraryView's sheet put up.
+    let setUp: () -> Void
 
     @Environment(LibraryModel.self) private var library
     @Environment(DownloadModel.self) private var downloads
-    /// Set up Navidrome's sheet is up.
-    @State private var settingUp = false
 
     var body: some View {
         ScrollView {
@@ -618,7 +646,7 @@ struct NavidromeGateView: View {
                     .accessibilityLabel(NavidromeGate.tryAgain)
                 }
                 if closed.setUp {
-                    Button(NavidromeGate.setUp) { settingUp = true }
+                    Button(NavidromeGate.setUp) { setUp() }
                         .buttonStyle(PrimaryFace())
                 }
                 if NavidromeGate.showsDownloaded(.closed(closed), anythingHere: downloads.anythingHere) {
@@ -635,10 +663,6 @@ struct NavidromeGateView: View {
         }
         .navigationTitle("Library")
         .refreshable { await library.checkNavidrome() }
-        // (Phase 8, slice 8) Server settings' Connections group page over the Library; the gate opening takes it away
-        .sheet(isPresented: $settingUp) {
-            SetUpNavidromeSheet()
-        }
     }
 }
 

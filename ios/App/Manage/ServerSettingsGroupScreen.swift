@@ -22,7 +22,9 @@ struct ServerSettingsGroupScreen: View {
 
     var body: some View {
         let parts = settings.parts
-        Group {
+        // a ZStack, not a Group: the page's frame (its shows and hides) stays on one view as the spinner gives way to
+        // the form (as ServerSettingsScreen's)
+        ZStack {
             if !parts.page {
                 ContentUnavailableView {
                     Label(title, systemImage: "lock")
@@ -107,10 +109,12 @@ private struct SettingSection: View {
                 }
             }
         } header: {
+            // the name is said once, by the control it labels (each control carries it): VoiceOver skips the header
             Text(setting.key)
                 .font(Typeface.mono(.footnote))
                 .textCase(nil)
                 .textSelection(.enabled)
+                .accessibilityHidden(true)
         } footer: {
             VStack(alignment: .leading, spacing: 4) {
                 if let marks = Self.marks(row) {
@@ -298,9 +302,9 @@ private struct SavedAnswersSection: View {
 
 /// Set up Navidrome (the Library's gate, phase8-managing.md 7): Server settings' Connections group page in a sheet over
 /// the Library - with Connections' rows, and the save bar once something is typed. Saved, the Library asks Navidrome
-/// again (ServerSettingsModel.saved), and the gate opening takes the sheet with it. Close at the leading edge; while a save
-/// is out, neither Close nor a swipe closes it. The drafts are the app's, so closing it loses nothing typed: they wait on
-/// Server settings' pages.
+/// again (ServerSettingsModel.saved), and LibraryView puts the sheet away once Navidrome answers - never because deadwax
+/// went out of reach, nor during a save. Close at the leading edge; while a save is out, neither Close nor a swipe closes
+/// it. The drafts are the app's, so closing it loses nothing typed: they wait on Server settings' pages.
 struct SetUpNavidromeSheet: View {
     @Environment(ServerSettingsModel.self) private var settings
     @Environment(\.dismiss) private var dismiss

@@ -926,9 +926,11 @@ public struct SavedAnswers: Sendable, Equatable {
         ErrorWords.notice("", error, admin: admin, failed: readFailed)
     }
 
-    /// A Clear refused (a 4xx), as the web's `sayError(reason, '', { failed: CLEAR_FAILED })`.
+    /// A Clear refused (a 4xx), as the web's `sayError(reason, '', { failed: CLEAR_FAILED })` - but a 403, the phone's
+    /// own, in the words Save's 403 says: a Managing page's NO_PERMISSION.
     public static func clearFailure(_ error: any Error, admin: Bool) -> String {
-        ErrorWords.notice("", error, admin: admin, failed: clearFailed)
+        if case .answered(let answer)? = error as? APIFailure, answer.status == 403 { return EditWords.noPermission }
+        return ErrorWords.notice("", error, admin: admin, failed: clearFailed)
     }
 
     /// The phone's own: a Clear that may have cleared (no answer, or a 5xx) - deadwax's own words when it sent some.
@@ -1399,6 +1401,9 @@ public enum Connections {
     public static func unanswered(_ error: any Error) -> Check {
         Check(state: .failed, text: ErrorWords.pingUnanswered, detail: ErrorWords.unansweredLine(error))
     }
+
+    /// The phone's own: a row whose only ask was called off - "Couldn't check", with no reason to give.
+    public static let notChecked = Check(state: .failed, text: ErrorWords.pingUnanswered)
 }
 
 /// Connections' three rows as the app keeps them (You.tsx's `checks` and `pingRequests`): none until the first check,
@@ -1411,6 +1416,8 @@ public struct ConnectionChecks: Sendable, Equatable {
     public private(set) var asks = 0
     /// Checked again the next time a page that draws them shows.
     public private(set) var wanted = false
+    /// Each row's last answer, for an ask called off (`dropped`).
+    private var last: [Connections.Service: Connections.Check] = [:]
 
     public init() {}
 
@@ -1441,6 +1448,16 @@ public struct ConnectionChecks: Sendable, Equatable {
     public mutating func settled(_ ticket: Int, _ service: Connections.Service, _ check: Connections.Check) {
         guard ticket == asks else { return }
         rows?[service] = check
+        last[service] = check
+    }
+
+    /// The phone's own: one row's ask called off (a cancellation - neither an answer nor a failure). Never left on
+    /// "Checking…": the row goes back to its last answer, or - never answered - says it couldn't check, with nothing
+    /// more to say; and they are checked again the next time a page drawing them shows.
+    public mutating func dropped(_ ticket: Int, _ service: Connections.Service) {
+        guard ticket == asks else { return }
+        rows?[service] = last[service] ?? Connections.notChecked
+        wanted = true
     }
 
     /// Checked again the next time a page drawing them shows.
@@ -1498,21 +1515,23 @@ public struct SettingsFlow: Sendable, Equatable {
     }
 
     /// Read `ticket` answered - dropped unless it is the newest. After a save that never answered, the drafts that
-    /// landed go.
-    public mutating func readLanded(_ ticket: Int, _ found: ServerSettingsAnswer) {
-        guard ticket == reads else { return }
+    /// landed go, and "Saved." is said only when everything the save SENT is now what the settings hold - never from
+    /// what is left: a draft discarded, or typed back to the value saved, while it was looked at is no sign the save
+    /// landed. True when this read settled such a save, so the App says how it came out.
+    @discardableResult
+    public mutating func readLanded(_ ticket: Int, _ found: ServerSettingsAnswer) -> Bool {
+        guard ticket == reads else { return false }
         reading = false
         answer = found
         readError = nil
         landed = ticket
-        if let sent = checking {
-            checking = nil
-            drafts = ServerSettings.stillDiffering(drafts, sent: sent, now: found)
-            if drafts.isEmpty {
-                justSaved = true
-                saveError = nil
-            }
-        }
+        guard let sent = checking else { return false }
+        checking = nil
+        drafts = ServerSettings.stillDiffering(drafts, sent: sent, now: found)
+        let landedWhole = ServerSettings.stillDiffering(sent, sent: sent, now: found).isEmpty
+        justSaved = landedWhole && drafts.isEmpty
+        if landedWhole { saveError = nil }
+        return true
     }
 
     public mutating func readFailed(_ ticket: Int, _ words: String) {
@@ -1544,12 +1563,23 @@ public struct SettingsFlow: Sendable, Equatable {
         drafts = ServerSettings.reverted(drafts, key: key)
     }
 
-    /// Discard: every draft gone, and the refusal with them.
+    /// Discard: every draft gone, and the refusal with them. While a save that never answered is being looked at, it
+    /// also ends that look, with no word on how the save came out - "Saved." is never said for it - and as what is shown
+    /// may be from before the save, the settings are read again (`real` is false until a read lands that is newer than
+    /// the one shown: a read already out began after the save, and settles it).
     public mutating func discard() {
         guard !saving else { return }
         drafts = ServerSettings.Drafts()
         saveError = nil
+        justSaved = false
+        guard checking != nil else { return }
+        checking = nil
+        gap = max(gap, landed)
     }
+
+    /// The look at a save that never answered is stuck: its read failed, and none is out. The bar says the read's
+    /// failure and offers Try again; Discard ends the look.
+    public var checkStalled: Bool { checking != nil && readError != nil && !reading }
 
     /// Save and Discard may be pressed: drafts, nothing saving - and Save, in reach with a read to trust.
     public func saveOpen(online: Bool, allowed: Bool) -> Bool {
@@ -1605,8 +1635,10 @@ public struct SettingsFlow: Sendable, Equatable {
         sent = nil
     }
 
-    /// The bar's words: deadwax may have finished this while it is looked at again; else the web's.
+    /// The bar's words: deadwax may have finished this while it is looked at again - or, the look's read having failed,
+    /// that failure (Try again beside it); else the web's.
     public var barText: String {
+        if checkStalled, let readError { return readError }
         if checking != nil { return EditWords.mayHaveFinished }
         return ServerSettings.barText(saveError: saveError, justSaved: justSaved, dirty: dirty)
     }

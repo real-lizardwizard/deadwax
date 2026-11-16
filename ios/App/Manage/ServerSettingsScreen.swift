@@ -20,7 +20,9 @@ struct ServerSettingsScreen: View {
 
     var body: some View {
         let parts = settings.parts
-        Group {
+        // a ZStack, not a Group: the page's frame (its shows and hides) is on one view that stays as the spinner gives way
+        // to the list - on a Group it would go to each branch, and the swap would hide and show the page, and read again
+        ZStack {
             if !parts.page {
                 ContentUnavailableView {
                     Label(ServerSettings.title, systemImage: "lock")
@@ -209,13 +211,14 @@ struct ServerSettingsFirstRead: View {
     }
 }
 
-/// A read again that failed over the settings shown: "Couldn't read the settings again just now.", with Try again.
+/// A read again that failed over the settings shown: "Couldn't read the settings again just now.", with Try again -
+/// unless it was the look at a save that never answered, which the save bar says, with its own Try again.
 struct ServerSettingsRereadFailure: View {
     @Environment(ServerSettingsModel.self) private var settings
     @Environment(Reachability.self) private var reachability
 
     var body: some View {
-        if let failure = settings.flow.readError {
+        if let failure = settings.flow.readError, !settings.flow.checkStalled {
             Section {
                 HStack(alignment: .firstTextBaseline, spacing: 8) {
                     Text(failure)
@@ -268,11 +271,21 @@ private struct SaveBar: View {
     private func words(_ flow: SettingsFlow) -> some View {
         Text(flow.barText)
             .font(Typeface.footnote)
-            .foregroundStyle(flow.saveError != nil && flow.checking == nil ? Palette.danger : Palette.quiet)
+            .foregroundStyle(flow.checkStalled || flow.saveError != nil && flow.checking == nil
+                             ? Palette.danger : Palette.quiet)
             .fixedSize(horizontal: false, vertical: true)
     }
 
     @ViewBuilder private func buttons(_ flow: SettingsFlow) -> some View {
+        // a save that never answered, and the read to see how it came out failed: Try again here, on every page - the
+        // way out of "looking again" (Discard ends the look too)
+        if flow.checkStalled {
+            Button(ServerSettings.tryAgain) {
+                settings.retry()
+            }
+            .buttonStyle(SecondaryPill())
+            .disabled(!reachability.online)
+        }
         if flow.dirty > 0 {
             Button(ServerSettings.discard) {
                 settings.discard()

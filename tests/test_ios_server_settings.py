@@ -273,6 +273,22 @@ def test_the_app_only_carries_out_what_core_decides():
     read = swift_like(model, "readIfNeeded")
     assert "server.signInOver == nil" in read
     assert "flow.readsNow(shown: visible, online: reachability.online, allowed: parts.page, again: again)" in read
+    # every read's ticket taken before its Task: a second ask in the same turn sends nothing, and a Save after calls it
+    # off, never a GET out during the save
+    for name, began in (("read", "let ticket = flow.readBegan()"), ("readAnswers", "let ticket = answers.readBegan(key: key)")):
+        asked = swift_like(model, name)
+        assert asked.index(began) < asked.index("Task {"), name
+    assert "Task { await read" not in model and "Task { await readAnswers" not in model
+    assert "if flow.readLanded(ticket, found) { announce(flow.barText) }" in model
+    # Discard reads again (a look at a save that never answered, ended)
+    assert "flow.discard()\n        readIfNeeded(again: false)" in swift_like(model, "discard")
+    # a ping called off settles its row (back to its last answer), never left on Checking…
+    asking = swift_like(model, "ask")
+    assert "checks.dropped(ticket, service)" in asking and "checks.settled(ticket, service, check)" in asking
+    # Re-time's library read is held for the read alone; each album has its own hold
+    start = swift_like(model, "startRetime")
+    assert "defer { hold.end() }" not in start
+    assert start.index("hold.end()") < start.index("await driveRetime(mine)")
     # the save: Core's batch, held through the background; refused (a 4xx) said in Core's words; never answered (or a
     # 5xx) may have landed - said, and the settings read again
     save = swift_like(model, "save")
@@ -348,19 +364,45 @@ def test_the_pages_draw_as_the_spec_says():
     assert ".confirmationDialog(SavedAnswers.clearQuestion, isPresented: $asking, titleVisibility: .visible)" in group
     assert "if group.id == ServerSettings.lyricsGroup {\n                RetimeSection()" in group
     assert "if group.id == ServerSettings.savedAnswersGroup && parts.answers {" in group
-    # every page: told to the model, the save bar at its foot, the amber line out of reach
+    # every page: told to the model, the save bar at its foot, the amber line out of reach - its frame on a ZStack
+    # that stays as the spinner gives way (on a Group it went to each branch: hidden and shown again, read twice)
     assert screen.count(".serverSettingsPage(") == 1 and group.count(".serverSettingsPage(") == 1
+    for page in (screen, group):
+        body = page[page.index("    var body: some View {"):]
+        assert body.index("ZStack {") < body.index("if !parts.page {") and "        Group {" not in body[:200]
     frame = screen[screen.index("private struct ServerSettingsPageFrame"):]
     assert ".safeAreaInset(edge: .bottom, spacing: 0)" in frame and "SaveBar()" in frame
     assert ".editOutOfReach(!reachability.online && settings.flow.answer != nil)" in frame
     assert ".onAppear { settings.shows(page) }" in frame and ".onDisappear { settings.hides(page) }" in frame
+    # the bar: a look at a save that never answered whose read failed offers Try again; the list doesn't say it twice
+    bar = screen[screen.index("private struct SaveBar"):]
+    assert "if flow.checkStalled {\n            Button(ServerSettings.tryAgain) {\n                settings.retry()" in bar
+    assert "!settings.flow.checkStalled" in screen[screen.index("struct ServerSettingsRereadFailure"):]
+    # VoiceOver reads a setting's name once, from its control: the section's header is hidden from it
+    section = group[group.index("private struct SettingSection"):]
+    assert ".textSelection(.enabled)\n                .accessibilityHidden(true)" in section
+    for control in ('.accessibilityLabel("\\(setting.key), \\(ServerSettings.locked)")', ".accessibilityLabel(setting.key)"):
+        assert control in section, control
     # Set up Navidrome: the Connections group page in a sheet, never closed during a save
     sheet = group[group.index("struct SetUpNavidromeSheet"):]
     assert "ServerSettingsGroupScreen(id: ServerSettings.connectionsGroup)" in sheet
     assert ".interactiveDismissDisabled(settings.flow.saving)" in sheet and ".disabled(settings.flow.saving)" in sheet
+    # held and drawn by LibraryView above the gate's switch - deadwax going out of reach opens the gate, and must not
+    # take the sheet - and put away only once Navidrome answers (a check deadwax answered, in reach), never mid-save
     library = app_file("Library", "LibraryView.swift")
     gate = library[library.index("struct NavidromeGateView"):]
-    assert "SetUpNavidromeSheet()" in gate and "openURL" not in gate[:gate.index("private extension View")]
+    assert "SetUpNavidromeSheet()" not in gate and ".sheet(" not in gate[:gate.index("private extension View")]
+    assert "openURL" not in gate[:gate.index("private extension View")]
+    assert "NavidromeGateView(closed: closed) { settingUp = true }" in library
+    view = library[library.index("struct LibraryView"):library.index("struct NavidromeGateView")]
+    body = view[view.index("    var body: some View {"):]
+    assert body.index("ZStack { root }") < body.index(".sheet(isPresented: $settingUp) {\n                SetUpNavidromeSheet()")
+    assert "return !checked.offline && checked.status.ok" in view
+    assert "guard NavidromeGate.consulted(reachability.reach), let checked = library.navidrome else { return false }" in view
+    assert "guard settingUp, navidromeAnswers, !serverSettings.flow.saving else { return }" in view
+    assert ".onChange(of: navidromeAnswers) { _, _ in setUpDone() }" in body
+    assert ".onChange(of: serverSettings.flow.saving) { _, _ in setUpDone() }" in body
+    assert "settingUp = false" in body[body.index(".onChange(of: server.person)"):]
     # the routes: the root from Manage, a group by its id
     routes = app_file("Shared", "Routes.swift")
     assert "case .serverSettings: ServerSettingsScreen()" in routes

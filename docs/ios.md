@@ -2105,9 +2105,12 @@ value in force. If deadwax refuses, nothing at all is saved: "Not saved: SLSKD_S
 3 to 60 - 8 is the default" in red, as deadwax said it, every change still there to put right. If the save gets no
 answer - the network dropped, or deadwax answered with an error of its own - the bar says "deadwax may have finished
 this - looking again" while the settings are read again; what was saved is no longer Unsaved, and only what still
-differs is left to save. Save changes is dimmed while a save is going, and from the moment deadwax goes out of reach
-until the settings have been read again after it's back. The fields can be typed in while a save goes, as in the web
-app.
+differs is left to save. "Saved." comes only when everything that save sent is what the settings now hold. If reading
+them fails, the bar says so ("Couldn't read the settings again just now.") with **Try again**. **Discard** while it
+looks ends the look - nothing is said of how the save came out, and the settings are read again to show what's
+there. Save changes is dimmed while a save is going, while one that got no answer is being looked at, and from the
+moment deadwax goes out of reach until the settings have been read again after it's back. The fields can be typed in
+while a save goes, as in the web app.
 
 Two groups do more than their settings:
 
@@ -2142,8 +2145,9 @@ When deadwax hasn't been told where Navidrome is, the Library shows "Connect Nav
 Navidrome**. It opens Server settings' **Connections** page as a sheet over the Library, Connections' three rows at its
 top: fill in `NAVIDROME_URL`, `NAVIDROME_USER` and `NAVIDROME_PASSWORD` and **Save changes**. The Library asks
 Navidrome again as the save lands; once Navidrome answers, the sheet goes and the Library fills. If it doesn't, the
-Navidrome row says why. **Close** puts the sheet away - unsaved changes stay, for the next time it opens or for
-Settings > Manage > Server settings - and it can't be closed, or swiped away, while a save goes.
+Navidrome row says why. Losing deadwax doesn't close it: the sheet stays up with the amber line, your typing kept, and
+Save changes comes back once deadwax does. **Close** puts the sheet away - unsaved changes stay, for the next time it
+opens or for Settings > Manage > Server settings - and it can't be closed, or swiped away, while a save goes.
 
 ### Debug
 
@@ -4951,10 +4955,13 @@ change how the server runs: change only what you'll put back, and note each sett
   Navidrome**. Tap it: the Connections page as a sheet, Navidrome "Not set up". Type the address back, and the
   password again (the note under it asks for it), and **Save changes**: does the sheet go and the Library fill,
   without a pull? Again, but tap **Close** after typing: the sheet goes, and Settings > Manage > Server settings has
-  the changes Unsaved, ready to save. While a save goes, Close is dimmed and the sheet can't be swiped away. Wi-Fi
-  and WireGuard off on any Server settings page: the amber line, Save changes dimmed - your typing kept; back on, the
-  settings read again and Save changes on. Signed in as someone without Settings and the log: no Server settings in
-  Manage.
+  the changes Unsaved, ready to save. While a save goes, Close is dimmed and the sheet can't be swiped away. With the
+  sheet up and something typed, turn Wi-Fi and WireGuard off: the sheet stays (it doesn't close as the Library's gate
+  gives way), with the amber line, Save changes dimmed - your typing kept; back on, the settings read again and Save
+  changes on, and saving it still closes the sheet as Navidrome answers. Tap Save changes and turn Wi-Fi and
+  WireGuard off straight away: the sheet stays; if the save got no answer, once back "deadwax may have finished this -
+  looking again", then "Saved." (or what is left to save). Signed in as someone without Settings and the log: no
+  Server settings in Manage.
 
 ### Add to Queue's checks (392-403)
 
@@ -5050,7 +5057,7 @@ These are the web app's for now:
 | Library: **"Your music isn't available right now"** (an admin sees **"Can't reach Navidrome"**) | deadwax can't reach Navidrome. Check Navidrome is running, then **Try again**. |
 | Library: **"Your music isn't available yet"** (an admin sees **"Connect Navidrome"**) | deadwax hasn't been told where Navidrome is. An admin's **Set up Navidrome** opens Server settings' Connections page over the Library: fill in Navidrome's address, user and password, **Save changes**, and the Library fills once Navidrome answers ([Set up Navidrome](#set-up-navidrome)). |
 | Server settings: **"Not saved: …"** | deadwax refused the whole save, naming each setting and what's wrong with it - nothing was saved. Every change is still there to put right; then **Save changes** again. "Type the password again to go with the new address" (or the API key) means an address changed without its secret: type it on the same page. |
-| Server settings: **"deadwax may have finished this - looking again"** | The save's answer never reached the phone (it locked, or the network dropped). The settings are read again: what was saved is no longer marked Unsaved, and only what still differs stays to save. |
+| Server settings: **"deadwax may have finished this - looking again"** | The save's answer never reached the phone (it locked, or the network dropped). The settings are read again: what was saved is no longer marked Unsaved, and only what still differs stays to save. If they can't be read, the bar says so with **Try again**; **Discard** gives up on the save's outcome and shows the settings as they are. |
 | A row of Settings > **Manage** opens Safari on deadwax's **sign-in** | Safari has its own sign-in, apart from the app's. Sign in with the same name and password you use in the app: the page the row named opens, and Safari stays signed in after that (until it goes 30 days without use). See [Manage](#manage). |
 | A row of Settings > Manage opens a page saying **"This page needs a permission an admin hasn't given you"** (People: **"Only an admin can open People - it comes with being a Navidrome admin."**) | An admin took that permission away since deadwax last told the app - or Safari is signed in as someone other than you (below). Pull down on Settings: the row goes. Ask an admin if you need it. |
 | A Manage page opens with **someone else's access** - more than you have, or less | Safari is signed in as someone else: it signs in apart from the app, and the page is Safari's person's. In Safari, open the web app's You and look at the name at its top; **Sign out**, then sign in as yourself. |

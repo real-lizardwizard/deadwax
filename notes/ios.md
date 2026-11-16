@@ -12871,8 +12871,8 @@ src/__init__.py untouched; no server change; the player engine has no diff.
   the detail in red. **RetimeSection** under Lyrics, **SavedAnswersSection** under MusicBrainz's saved answers (Clear
   asked first by a confirmationDialog). `groupGone` when deadwax's answer has no such group.
 - **SetUpNavidromeSheet**: Connections' group page in its own NavigationStack, Close (dimmed while saving), not swiped
-  away while saving. **LibraryView**'s NavidromeGateView presents it for `closed.setUp`; when the gate opens the view
-  leaves the hierarchy and the sheet with it.
+  away while saving. **LibraryView** holds it (`settingUp`) and attaches it above the gate's switch; NavidromeGateView's
+  Set up Navidrome only asks for it. It goes on Close, or once Navidrome answers (see "After review" below).
 - **ManageSection** pushes `AppRoute.serverSettings` for `.settings`; **Shared/Routes.swift** has the two routes and
   their destinations; **Palette.greenIcon** (`--dw-green-icon`) for Connected's dot.
 
@@ -12913,8 +12913,8 @@ sees the page. Moving those into lib/ too is a small no-change refactor on main 
 - **The settings are read each time a page shows with no draft** (the web reads each time its page renders), never
   over a draft.
 - **Set up Navidrome opens Connections over the Library** (the web's `showServerSettingsTab('connections')`), not the
-  web app's Server settings at its first tab in Safari; the sheet goes as the gate opens, and Close keeps the drafts in
-  the model for Settings > Manage > Server settings.
+  web app's Server settings at its first tab in Safari; the sheet goes once Navidrome answers, and Close keeps the
+  drafts in the model for Settings > Manage > Server settings.
 - **Fields stay editable offline and while a save goes** (as the web's); only Save, Clear and Re-time are writes.
 
 ### Tests
@@ -12956,5 +12956,58 @@ Not verified - only the phone can tell (docs/ios.md checks 361-369): the pages a
 settings; the save bar sitting above the mini player and the tabs, and the keyboard over it; a menu and a secure field
 as SwiftUI draws them in a Form; Connections' rows against real slskd, MusicBrainz and Navidrome failures; a save
 landing as the phone locks (the hold) and one that never answered; Revert against James's compose file; Clear's
-dialog; Re-time's run with the screen kept on, and its stop on locking; Set up Navidrome's sheet going as the gate
-opens, and Close keeping the drafts; the parts by permission; VoiceOver, the largest text, Reduce Motion.
+dialog; Re-time's run with the screen kept on, and its stop on locking; Set up Navidrome's sheet going once Navidrome
+answers (and staying through a reach blip), and Close keeping the drafts; the parts by permission; VoiceOver, the
+largest text, Reduce Motion.
+
+### After review (16 Nov) - slice 8
+
+The review of d9a1584 (code read only) found eight things; each was traced before it was changed, and all eight were
+real.
+
+- **A false "Saved." after a save that never answered.** `readLanded` said "Saved." when no draft was LEFT - so
+  Discard while the look was out (drafts empty, `checking` still set), or a sent setting typed back to its saved value
+  during it, made a read of the old settings say "Saved." of a batch that never landed. Now "Saved." is decided by
+  what was SENT: `stillDiffering(sent, sent: sent, now:)` empty, and no draft left (as `saved` says it). **Discard
+  while looking ends the look** with no word on how the save came out, and as what is shown may be from before the
+  save, `real` goes false (`gap = max(gap, landed)`) so the settings are read again - a read already out began after
+  the save, so it is the one that settles it. **The look never sticks**: its read failing is `checkStalled`, the bar
+  says that failure (not "looking again") with **Try again** on every page, and the list's re-read line stays quiet so
+  it isn't said twice; Discard ends it too. `readLanded` returns whether it settled such a save, and only then is the
+  bar announced. ServerSettingsTests: `discardingWhileASaveIsLookedAtNeverSaysSavedOfABatchThatDidntLand` (Discard
+  with a read out and without, typed back and not landed, typed back and landed, a secret sent),
+  `aLookWhoseReadFailedSaysSoAndTryAgainOrDiscardEndsIt`.
+- **Set up Navidrome's sheet went with any reach blip, even mid-save.** It was attached inside NavidromeGateView, and
+  the gate turns `.open` whenever deadwax is out of reach (or the check failed for want of it) - so the view went and
+  took the sheet, past `interactiveDismissDisabled(saving)`. Now LibraryView holds `settingUp` and attaches the sheet
+  to a ZStack over the root's switch; the gate's button only asks for it. It is put away (`setUpDone`) only when
+  Navidrome really answers - in reach, and the newest check (LibraryModel's checks are newest-only) one deadwax
+  answered with `status.ok` - and never during a save (the save ending looks again). It can't fire on a stale answer:
+  the sheet only opens over a closed gate, whose check said otherwise, so `navidromeAnswers` turns true only on a check
+  that landed since; going out of reach makes it false, and coming back leaves the old check, still not ok. A new
+  person closes it. docs/ios.md check 369 now has the sheet staying through Wi-Fi off, and a save cut off.
+- **A read could begin during a save.** `readIfNeeded` and `retry` spawned `Task { await read() }`, and `readBegan` ran
+  only as the Task started - two asks in one turn sent two GETs, and a Save pressed between let a GET out during the
+  save, whose landing after the PUT could draw the old values over "Saved.". The ticket is taken before the Task now,
+  as Library care takes its own; the saved answers' read too.
+- **An extra GET on first open.** The page's frame was on a `Group { if … }`, so the spinner giving way to the list
+  went as a hide and a show - and a show with no draft reads again. Both pages are a ZStack now.
+- **Re-time's library-read hold spanned the run** (its `defer` ran when the Task ended, after `driveRetime`). It ends as
+  the read does; each album keeps its own.
+- **A ping called off stayed on "Checking…".** `ConnectionChecks.dropped` puts the row back to its last answer - or,
+  never answered, `Connections.notChecked` ("Couldn't check", nothing more) - and wants a check the next time a page
+  shows. A cancelled Re-time album counting as failed and "may have been re-timed" matches Library care, and stays.
+  ServerSettingsTests: `aPingCalledOffGoesBackToItsLastAnswer`.
+- **Clear's 403 said the generic failure.** It says a Managing page's NO_PERMISSION now, as Save's 403 does (the
+  vectors hold no 403 for Clear: the phone's own).
+- **VoiceOver read each setting's name twice** - the section header, then the control labelled with it. The header is
+  hidden from VoiceOver; every control (the menu, the field, Locked) carries the name.
+
+tests/test_ios_server_settings.py pins each: the tickets before their Tasks, Discard reading again, the ping's
+`dropped`, the hold ended before the drive, the ZStacks, the bar's Try again, the hidden header, and the sheet in
+LibraryView above the gate with its closing rule.
+
+Verified: swift test - 1955 Core tests in 202 suites, 158 Audio in 17, 12 in 1; the unsigned device build with no new
+warning (only the AppIntents metadata one); check_project.py; pytest on its own, 4909 passed and 1 skipped; all 95
+sims. NOT verified, as before: any of it on a phone - the sheet through a real Wi-Fi drop, VoiceOver reading each
+name once, and the ZStack sending one GET on first open (read from how SwiftUI applies modifiers, not watched).
