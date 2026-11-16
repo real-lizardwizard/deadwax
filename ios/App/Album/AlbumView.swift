@@ -21,6 +21,15 @@ import SwiftUI
 /// songs, never from what the page last did, with progress followed while the page shows. An album with songs here
 /// opens at once from what the phone kept. While deadwax can't be reached, the songs not here are dimmed, Play and
 /// Shuffle take only what is here, and an album with nothing here says so in place of its songs.
+///
+/// PULL TO SHUFFLE (2026-11-15, James: "also let's add pull to shuffle to the album and playlists pages"; notes/ios.md
+/// "Pull to shuffle on an album's and a playlist's page"): the Library's pull (ShufflePull, `pullsToShuffle`,
+/// PullShuffleGraphic) on the page's List, its graphic above the hero; let go armed, it is the hero's Shuffle - the
+/// same songs, as the album, from the same call, in the lift. Offline (or the album gone from the collection) only the
+/// songs on this phone, or "Nothing on this phone to shuffle"; with no songs to draw (loading, failed, gone, not on
+/// this phone) nothing is drawn and nothing plays (ShuffleCan.page). The pull never refreshes now, as the Library's
+/// doesn't: the bar's •••'s Refresh asks again (offline, whether deadwax is back), and a failure with no album to draw
+/// has Try again.
 struct AlbumView: View {
     let route: AlbumRoute
 
@@ -38,6 +47,8 @@ struct AlbumView: View {
     @State private var askedHere = false
     /// The album Album info is open for (its sheet).
     @State private var albumInfo: Album?
+    /// The page's pull to shuffle.
+    @State private var pull = ShufflePull()
     @AccessibilityFocusState private var noteFocused: Bool
 
     init(route: AlbumRoute) {
@@ -66,9 +77,18 @@ struct AlbumView: View {
         let offline = !reachability.online
         let note = OfflineAlbum.note(online: reachability.online, haveSongs: model.album != nil, gone: model.goneButHere,
                                      anyHere: download.hasSongsHere)
+        let playable = self.playable
+        let can = pullCan(playable)
         List {
             AlbumHero(model: model, download: download, playable: !playable.isEmpty,
                       play: { play(at: 0) }, shuffle: { play(at: nil, shuffle: true) })
+                .overlay(alignment: .top) {
+                    // the pull's graphic, in the room the pull opens above the hero, as the Library's above its first
+                    // row: its foot at the hero's top
+                    PullShuffleGraphic(state: pull, can: can, of: .page)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .alignmentGuide(.top) { (drawn: ViewDimensions) -> CGFloat in drawn[.bottom] }
+                }
                 .listRowSeparator(.hidden)
                 .onAppear { setTitleInBar(false) }
                 .onDisappear { setTitleInBar(true) }
@@ -102,8 +122,16 @@ struct AlbumView: View {
                 ErrorNote(text: ErrorWords.albumGone)
                     .listRowSeparator(.hidden)
             } else if let failure = model.failure {
-                ErrorNote(failure, gone: ErrorWords.albumGone)
+                // no album to draw, and not gone: Try again (the pull shuffles now; with an album drawn, the •••'s
+                // Refresh)
+                let retry = model.album == nil && !model.gone
+                ErrorNote(failure, gone: ErrorWords.albumGone, retry: retry)
                     .listRowSeparator(.hidden)
+                if retry {
+                    // a row of its own, so the note's disclosure (whoever runs deadwax's) keeps its own tap
+                    Button(LibraryWords.tryAgain, action: refresh)
+                        .listRowSeparator(.hidden)
+                }
             } else if model.album == nil, let note {
                 // not on this phone, and deadwax out of reach: a state, not a failure - nothing was asked
                 QuietNote(text: note)
@@ -130,6 +158,8 @@ struct AlbumView: View {
             }
         }
         .listStyle(.plain)
+        // the pull shuffles the album (never refreshes), while the page is the one on top
+        .pullsToShuffle(PullShuffling(state: pull, can: can, on: shown, start: pulled))
         .navigationTitle(model.name)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
@@ -157,14 +187,6 @@ struct AlbumView: View {
                              downloads: downloads)
         }
         .task { await downloads.followProgress() }
-        .refreshable {
-            // deadwax out of reach: a pull asks whether it is back (the banner says why nothing changes)
-            guard reachability.online else {
-                reachability.tryNow()
-                return
-            }
-            await model.refresh(client: server.client, player: player, downloads: downloads)
-        }
         .onChange(of: reachability.online) { _, online in
             model.online = online
             // back: what the page drew from the phone, or couldn't draw, is asked of deadwax now
@@ -238,7 +260,36 @@ struct AlbumView: View {
         if Managing.albumEdit(server.access.permissions).shown {
             request.webEdit = Managing.albumURL(id: album.id, at: server.address)
         }
+        request.refresh = { refresh() }
         return request
+    }
+
+    /// What the pull can do (ShuffleCan.page): the album's songs, as the hero's Shuffle takes them (`playable`) - while
+    /// deadwax can't be reached, or with the album gone from the collection, only those on this phone; nothing while there
+    /// are no songs to draw.
+    private func pullCan(_ playable: [Song]) -> ShuffleCan {
+        ShuffleCan.page(songs: model.songs.count, phoneOnly: !reachability.online || model.goneButHere,
+                        onPhone: playable.count)
+    }
+
+    /// The pull let go armed: the hero's Shuffle, in the lift - nothing awaited first. Should the songs on this phone have
+    /// gone since it armed (a removal), said, as the Library's pull says it.
+    private func pulled() {
+        if playable.isEmpty, !reachability.online || model.goneButHere {
+            player.say(PullShuffleWords.nothingHere)
+            return
+        }
+        play(at: nil, shuffle: true)
+    }
+
+    /// The •••'s Refresh and a failure's Try again (the pull was this until it shuffled): the album and whose it is asked
+    /// again now - or, while deadwax can't be reached, whether it is back (the banner says why nothing changes).
+    private func refresh() {
+        guard reachability.online else {
+            reachability.tryNow()
+            return
+        }
+        Task { await model.refresh(client: server.client, player: player, downloads: downloads) }
     }
 
     /// What Play and Shuffle take: the album's songs - offline, or with the album gone from the collection, its songs on

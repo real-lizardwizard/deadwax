@@ -184,4 +184,37 @@ import Testing
         #expect(PullShuffleWords.line(.pulling(0.2), can: .nothingHere) == "Nothing on this phone to shuffle")
         #expect(PullShuffleWords.line(.pulling(0.2), can: .none) == "", "nothing to shuffle: nothing drawn")
     }
+
+    /// An album's or a playlist's page (notes/ios.md "Pull to shuffle on an album's and a playlist's page"): what its
+    /// own Shuffle can do, from every state the page is in.
+    @Test func whatAPagesShuffleCanDo() {
+        #expect(ShuffleCan.page(songs: 12, phoneOnly: false, onPhone: 0) == .ready, "online: every song")
+        #expect(ShuffleCan.page(songs: 12, phoneOnly: false, onPhone: 3) == .ready)
+        #expect(ShuffleCan.page(songs: 0, phoneOnly: false, onPhone: 0) == .none,
+                "loading, failed, gone or empty: nothing drawn")
+        #expect(ShuffleCan.page(songs: 12, phoneOnly: true, onPhone: 3) == .downloads, "offline: the songs here")
+        #expect(ShuffleCan.page(songs: 12, phoneOnly: true, onPhone: 12) == .downloads)
+        #expect(ShuffleCan.page(songs: 12, phoneOnly: true, onPhone: 0) == .nothingHere, "offline, none here: why")
+        #expect(ShuffleCan.page(songs: 0, phoneOnly: true, onPhone: 0) == .none,
+                "offline with no songs in hand: nothing drawn, not 'nothing on this phone'")
+        #expect(ShuffleCan.page(songs: 0, phoneOnly: true, onPhone: 2) == .none)
+        #expect(ShuffleCan.page(songs: 1, phoneOnly: false, onPhone: 0).starts)
+        #expect(ShuffleCan.page(songs: 1, phoneOnly: true, onPhone: 1).starts)
+        #expect(!ShuffleCan.page(songs: 1, phoneOnly: true, onPhone: 0).starts)
+        #expect(!ShuffleCan.page(songs: 0, phoneOnly: false, onPhone: 0).starts)
+    }
+
+    @Test func aPagesWords() {
+        #expect(PullShuffleWords.line(.pulling(0.4), can: .ready, of: .page) == "Pull to shuffle")
+        #expect(PullShuffleWords.line(.armed, can: .ready, of: .page) == "Release to shuffle")
+        #expect(PullShuffleWords.line(.pulling(0.4), can: .downloads, of: .page)
+                == "Pull to shuffle the songs on this phone")
+        #expect(PullShuffleWords.line(.armed, can: .downloads, of: .page) == "Release to shuffle the songs on this phone")
+        #expect(PullShuffleWords.line(.released, can: .downloads, of: .page) == "Shuffling")
+        #expect(PullShuffleWords.line(.pulling(1), can: .nothingHere, of: .page) == "Nothing on this phone to shuffle")
+        #expect(PullShuffleWords.line(.pulling(0.5), can: .none, of: .page) == "")
+        // the Library's own, unchanged by the default
+        #expect(PullShuffleWords.line(.armed, can: .downloads, of: .library) == "Release to shuffle your downloads")
+        #expect(PullShuffleWords.line(.armed, can: .downloads) == "Release to shuffle your downloads")
+    }
 }

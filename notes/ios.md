@@ -10567,3 +10567,113 @@ isDragging.
 and the full pytest suite. **Not verified** - only the phone can tell: the grip from its first points and the tap at
 lift (check 271), the placeholder and the grey square (272), ✕ at the largest text (276), and the viewer staying up as
 the song changes with Lyrics on, and a shared EQ file (278). The capped read hasn't met a real file over 30 MB.
+
+## Pull to shuffle on an album's and a playlist's page (2026-11-15)
+
+James: "also let's add pull to shuffle to the album and playlists pages". The Library's pull (Phase 4, slice 3b, above)
+on two more pages: an album's (ios/App/Album/AlbumView.swift) and a playlist's (ios/App/Playlists/PlaylistView.swift).
+Nothing new to draw or measure - Core's `PullShuffle`, the App's `ShufflePull`, `.pullsToShuffle(_:)` and
+`PullShuffleGraphic` are reused as they are, not forked. The app stays 0.13 (13); src/__init__.py untouched; no server
+change; the player engine has no diff.
+
+### What it does
+
+- **Each page keeps one `ShufflePull`** and puts the Library's modifier on its `List`, right after `.listStyle(.plain)`:
+  `PullShuffling(state: pull, can: can, on: …, start: pulled)`. It pulls while the page is the one on top - the
+  album's existing `shown`, and a new `shown` on the playlist's page (its `onAppear`/`onDisappear`); the playlist's not
+  while Edit is open (`on: shown && !editing`: Play and Shuffle wait while Edit is open, and the List is in edit mode).
+  A page that stops pulling mid-pull is reset by the modifier's own `onChange(of: on)`.
+- **The graphic is the hero's overlay**, `.overlay(alignment: .top)` with its top guide at its own bottom - so its foot
+  is the hero's top and it is drawn upward into the room the pull opens, as the Library's is drawn over a zero-height
+  anchor above its first row. A List row can't be zero high without changing every row's minimum, so the hero carries
+  it. `PullShuffleGraphic` gains `of: PullShuffleOf` (`.library` by default, so the Library's four pages are
+  unchanged; `.page` here), which only changes its line for the songs on this phone.
+- **What it can do is `ShuffleCan.page(songs:phoneOnly:onPhone:)`** (Core), from the very songs the hero's Shuffle
+  takes: the page computes `playable` once per draw and hands it to both the hero and `pullCan`. `songs` is the page's
+  songs in hand (0: still loading, failed, gone, an empty playlist - `.none`, nothing drawn, never armed);
+  `phoneOnly` is exactly the condition under which `playable` keeps only the songs on this phone (album:
+  `!online || goneButHere`; playlist: `!online`); with some there `.downloads`, with none `.nothingHere`.
+- **The release is the hero's Shuffle**: `pulled()` calls `play(at: nil, shuffle: true)` - the same call, so the same
+  queue, source and level: the album through `player.play(songs:album:at:shuffle:)` as the album, the playlist through
+  `player.play(playlist:at:shuffle:)`, each song with its own album, at the songs level. It runs in the scroll phase's
+  change that ends the touch, nothing awaited first, as the Library's does. Should the phone-only list have emptied
+  between the draw and the lift (a removal), it says "Nothing on this phone to shuffle" and plays nothing, as the
+  Library's `shuffleNow` does.
+
+### Decided here (the ask was silent; each the way the Library's pull already does it)
+
+- **The pull never refreshes these pages now.** Both Lists had `.refreshable`; UIKit's refresh control starts its
+  refresh during the drag, at a distance of its own, and holds the content down while it spins (UIKit's behaviour as
+  known, not measured here), so one pull would do both. The Library's switch made the same choice (James: the
+  Library's pull never refreshing), and both modifiers are gone.
+- **Refresh moved to the bar's •••**, as the Library's ••• has it: `QueueMenuRequest.refresh`, drawn last in the
+  menu's last section (after Album info and Edit in the web app) with the Library's own word and symbol
+  (`LibrarySwitchWords.refresh`, `arrow.clockwise`). It does what the pull did: online, the album and its store row
+  asked afresh (`AlbumModel.refresh`), the playlist asked again (`model.load`); offline, `reachability.tryNow()`.
+  The playlist was already asked each time it shows and as the app comes back to the front, but the album wasn't -
+  the ••• is how a change made in the web app's Edit is seen without leaving the page. On iOS 17, where there is no
+  pull, it is now the only way, as the Library's ••• is there.
+- **An album that failed with nothing drawn has Try again** (`LibraryWords.tryAgain`, the same `refresh()`): its
+  ••• is dimmed with no songs in hand, and the pull was its only retry. Its own List row, so the error note's
+  disclosure (for whoever runs deadwax) keeps its own tap - a second button in one List row would take the row's tap
+  too - and no raw spacing is needed. Not for an album that is gone (a 404 or `{}`). The note's words now leave
+  trying again to the button (`retry: true`). The playlist's first-load failure already had Try again.
+- **Offline, a page shuffles only its songs on the phone**, said in its own words - "Pull to shuffle the songs on this
+  phone" / "Release to shuffle the songs on this phone" (`PullShuffleWords.pullHere`, `releaseHere`) - not the
+  Library's "your downloads", which would read as every song on the phone. "The songs on this phone" is the album
+  page's own phrase for an album gone from the collection (`DownloadWords.albumGoneHere`), and that album pulls the
+  same words online.
+- **Offline with the page's songs in hand but none on the phone**: drawn, never armed, "Nothing on this phone to
+  shuffle" - the Library's `.nothingHere`. **Offline with no songs in hand** (an album never opened online, a playlist
+  not kept): nothing drawn - the page already says it isn't on this phone, and a page that can play nothing pulls
+  nothing, as the Library's draws nothing with no songs at all (`.none`).
+- **VoiceOver** doesn't read the graphic (it is hidden, as the Library's); the hero's Shuffle is the way there, as the
+  Library's ••• Shuffle is for its pull. **Reduce Motion** and **iOS 17**: as the Library's.
+
+### It works on a List (measured, not assumed)
+
+Every page that pulled before was a ScrollView; these two are Lists. iOS 18's `onScrollGeometryChange` and
+`onScrollPhaseChange` are documented for scroll views without saying which, so a scratch Catalyst probe (built with
+swiftc, `-target arm64-apple-ios18.0-macabi`, never committed - as "The letter bar beats momentum" did, the same
+SwiftUI and UIKit as iOS 27.2) ran the App's own PullShuffleView.swift and Core's PullShuffle.swift, with Palette and
+Typeface stubbed, on a NavigationStack holding a plain `List` with an inline title and a toolbar item - the album
+page's shape - its first row carrying the graphic as the pages here do:
+
+- The List is SwiftUI's `UpdateCoalescingCollectionView`, with a 95 pt adjusted top inset under the bar. The geometry
+  read the pull as 0 at rest, then 20, 60, 100, 115, 130 as the offset was set past the top.
+- UIKit's own simulated drag (`_simulateScrollWithTranslation:duration:willBeginDragging:…`, UIScrollView's private
+  method) gave the phases idle -> interacting -> decelerating -> idle, as a ScrollView's. A drag of 450 points down
+  (rubber-banded to about 200) armed with one tick and, at the lift, shuffled once (`start` called once), the machine
+  `released` until the List was back at rest, then idle; a drag of 150 (about 75) never armed and shuffled nothing; a
+  drag the other way scrolled the songs and drew nothing.
+- Snapshots of the window at 60 and 130 points: the ring and "Pull to shuffle", then the purple disc and "Release to
+  shuffle", drawn above the first row in the room the pull opened, not clipped by the row's cell.
+
+Not measured there: a real finger, the haptic, the iPhone's own bar (Catalyst's was transparent), and the order of a
+call's or Siri's interruption against the lift.
+
+### Tests
+
+- **PullShuffleTests**: 11 to 13. `whatAPagesShuffleCanDo` - every state: online with songs, none in hand, offline
+  with some, all and none here, offline with no songs in hand, and `starts` for each. `aPagesWords` - the page's
+  lines for each `ShuffleCan`, the Library's unchanged by the default `of`.
+- **tests/test_ios_pull_to_shuffle.py** (new, 8), read from the Swift as the other iOS tests are: one ShufflePull per
+  page; `.pullsToShuffle` the List's own modifier after `.listStyle(.plain)`, with when it pulls; no `.refreshable`
+  left; the playlist's `shown`; the graphic the hero's top overlay, its foot at the hero's top, `of: .page`, once per
+  page; `pullCan` from `playable` with `phoneOnly` the very condition `playable` keeps the phone's songs under; the
+  release the hero's Shuffle call with nothing awaited and the empty case said; the player's calls as they were; no
+  gesture added (DragGesture, `.gesture`, high-priority or simultaneous) on either page or the pull's view; Refresh in
+  QueueMenuRequest and drawn last, offline a probe; the album's Try again; and the Library's four pages still drawing
+  the graphic with the library's words.
+
+### Verified, and not
+
+Verified: the probe (above); `swift test`; the unsigned Debug device build with no warnings in the files touched; the
+full pytest suite.
+
+Not verified - only the phone can tell (docs/ios.md checks 282-288):
+- The pull on a real finger on both pages: the tick once per arming, the graphic in the gap above the cover and clear
+  of iOS's own bar at every text size, the music starting at the lift.
+- That nothing fights it: Back's edge swipe, the ••• menus, Album info, a song's tap and a fling's bounce at the top.
+- A pull a call, Siri or Notification Center cuts short shuffling nothing (the Library's wiring, check 95's caveat).
+- Edit on a playlist's page showing nothing when pulled; Try again on an album that couldn't load.

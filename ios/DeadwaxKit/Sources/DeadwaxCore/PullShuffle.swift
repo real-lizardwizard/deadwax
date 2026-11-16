@@ -110,6 +110,27 @@ public struct PullShuffle: Sendable, Equatable {
     }
 }
 
+/// What a pull shuffles (notes/ios.md "Pull to shuffle on an album's and a playlist's page"): the Library's - a page of
+/// its switch: the whole library, or while deadwax can't be reached every song on this phone - or one album's or
+/// playlist's - its own page: its songs, or only those of it on this phone.
+public enum PullShuffleOf: Sendable, Equatable {
+    case library
+    case page
+}
+
+extension ShuffleCan {
+    /// An album's or a playlist's page, for its pull: what the page's own Shuffle can do. `songs`: the page's songs in
+    /// hand - 0 while it has none (still loading, failed, gone, an empty playlist), when it plays nothing and the pull
+    /// shows nothing. `phoneOnly`: its Shuffle takes only the songs of it on this phone (deadwax out of reach, or an
+    /// album gone from the collection), `onPhone` how many those are - `.downloads` while there are some (those
+    /// shuffled), `.nothingHere` with none. Never getting ready or failed: the songs are in hand, or there is nothing.
+    public static func page(songs: Int, phoneOnly: Bool, onPhone: Int) -> ShuffleCan {
+        guard songs > 0 else { return .none }
+        guard phoneOnly else { return .ready }
+        return onPhone > 0 ? .downloads : .nothingHere
+    }
+}
+
 /// What the pull's graphic says under its mark (3.5) - the phone's own words, but the Shuffle's (ShuffleWords).
 public enum PullShuffleWords {
     public static let pull = "Pull to shuffle"
@@ -117,10 +138,15 @@ public enum PullShuffleWords {
     public static let shuffling = "Shuffling"
     public static let pullDownloads = "Pull to shuffle your downloads"
     public static let releaseDownloads = "Release to shuffle your downloads"
+    /// An album's or a playlist's page playing only its songs on this phone - "the songs on this phone" as the album
+    /// page's own line for an album gone from the collection says it (DownloadWords.albumGoneHere).
+    public static let pullHere = "Pull to shuffle the songs on this phone"
+    public static let releaseHere = "Release to shuffle the songs on this phone"
     public static let nothingHere = "Nothing on this phone to shuffle"
 
-    /// The line for `phase`, as the Shuffle `can` - "" when there is nothing to shuffle at all (nothing is drawn).
-    public static func line(_ phase: PullShuffle.Phase, can: ShuffleCan) -> String {
+    /// The line for `phase`, as the Shuffle `can`, on a pull that shuffles `of` - "" when there is nothing to shuffle
+    /// at all (nothing is drawn).
+    public static func line(_ phase: PullShuffle.Phase, can: ShuffleCan, of: PullShuffleOf = .library) -> String {
         if phase == .released { return shuffling }
         switch can {
         case .none: return ""
@@ -128,7 +154,11 @@ public enum PullShuffleWords {
         case .failed(let why): return why
         case .nothingHere: return nothingHere
         case .ready: return phase == .armed ? release : pull
-        case .downloads: return phase == .armed ? releaseDownloads : pullDownloads
+        case .downloads:
+            switch of {
+            case .library: return phase == .armed ? releaseDownloads : pullDownloads
+            case .page: return phase == .armed ? releaseHere : pullHere
+            }
         }
     }
 }
