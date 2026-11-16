@@ -608,6 +608,12 @@ extension KeyedDecodingContainer {
     func looseList<T: Decodable>(_ type: T.Type, _ key: Key) -> [T]? {
         looseField([LooseElement<T>].self, key)?.compactMap(\.value)
     }
+
+    /// (Phase 8, slice 5) An object's readable values by key, the rest left out; nil when the field is absent or isn't
+    /// an object.
+    func looseMap<T: Decodable>(_ type: T.Type, _ key: Key) -> [String: T]? {
+        looseField([String: LooseElement<T>].self, key)?.compactMapValues(\.value)
+    }
 }
 
 /// One element of a list, read or left out.

@@ -11853,3 +11853,166 @@ generic-iOS Debug build, BUILD SUCCEEDED; the full pytest suite, 4696 passed and
 them), then put back. Not verified - the phone's: whether a TextField over "Several values" really hands back "" on
 focus (the guard holds either way), the action sheet put away when the page is followed elsewhere, and "Reading the
 files…" after an Apply; nor any wait against a real LRCLIB or Archive at their slowest.
+
+## The artist tools on the phone (Phase 8, slice 5 - 2026-11-16)
+
+The spec's section 4 (notes/ios-specs/phase8-managing.md): an artist page's **Artist images…**, **Which artist is
+this?** and **Move albums to {name}…** on the phone, from a bar ••• the page didn't have, each a sheet. On the `ios`
+branch after the merge of main's 2.1.32 (fd86014), whose relay (`GET /library/artist/picture`, "The artist pictures'
+relay (2.1.32)" above) the pictures come through - decision 1. The app stays 0.13 (13); src/__init__.py untouched; no
+server or web change; the player engine has no diff.
+
+### Core (DeadwaxCore)
+
+- **ArtistManage.swift** (new): lib/artistManage.ts - `libraryNames` (over the `/library/owned` index the page reads
+  already: a collaboration never theirs, a folder of one artist theirs by its id, else by name or by a release
+  Navidrome lists under them; a steady order by the web's collation), `namesToMove`, `imagesFolder` (with the summary's
+  `Said` - answered or unread - for the web's Map of summaries), `bestUrls`, `toggleChoice`, `byKind`, `slotLine`,
+  `imageNotes`, `savedLine`, `matchLine`, `refileView` (two names planning one target: the later shown staying),
+  `canMove`, `moveLine`, `moveButton`, `refileAfter`, `refileOutcome`, `listed`; and ArtistPanel.tsx's own, held by
+  pattern (below) - `others`, `refileSubtitle`, `namesApplied`, `showing`. The answers, each read loosely as the rest
+  of Core decodes: `ArtistSummary` (`/library/artist`), `ArtistImagesPreview` with `ArtistImageCandidate`,
+  `ArtistImageKind` and its sources' keys, `ArtistImagesApplied`/`ArtistImagesResults`, `ArtistMatchesAnswer` (the
+  search; `MBArtistMatch` reused), `ArtistRefilePlan` with `RefileMove`, `RefileRetag`, `RefileRefused`,
+  `ArtistRefileApplied`/`ArtistRefileResults`; the bodies `ArtistImagesBody`, `ArtistSearchBody`, `ArtistRefileBody`
+  (no id is no key - the model's `None`). `searchWords` and `sameAddress` for the app (WebText is internal).
+- **ArtistManageFlow.swift** (new): `ArtistImagesFlow` - the look and the search by tickets (only the newest lands), a
+  look with no id opening the search (the web's), the choices starting at `bestUrls`, `canSave` (the web's - an id
+  settled, something chosen, nothing loading, no problem - and section 2's: a folder, in reach, read since the last
+  gap, not saving), `holdsWork`, Save by RetagFlow.outcome's rule (a 4xx said; no answer or a 5xx: maybe finished, the
+  folder looked at again before Save comes back), out of reach and back. `ArtistRefileFlow` - every name's preview as
+  one round, `changed(ask)` (the page's names, id or name now different: the previews asked again rather than applied
+  blind), `beginMove` (the names `namesApplied` gives), `moveEnded` (refileOutcome and refileAfter; a name that never
+  answered: what is known to have moved said with "maybe finished", the previews asked again). `ArtistWhoFlow` - the
+  search, newest only, a failed one searched again once deadwax is back. `ArtistWaits` (below) and
+  `ArtistManageWords` - ArtistPanel's and ArtistPage's words, and the phone's own (the menu, "More for this artist",
+  a picture as words, the relay's failure words, "In their folder now").
+- **ArtistManageClient.swift** (new): the eight calls - `libraryArtist(name:)` and `artistArt(folder:kind:)` (each a
+  404 read as none), `artistImagesPreview`, `artistImagesApply(_:commons:)`, `artistPicture(url:)` (`mostBytes` the
+  relay's own cap, Accept `image/*`), `artistSearch`, `refilePreview`, `refileApply(_:bytes:)`. **Routes.swift**: the
+  eight (86 routes) and their floors - `/library/artist` 120 s (the scan's, as `/library/albums`), `/artist/art` 30,
+  images preview 240 (the scan, one MusicBrainz lookup, three sources and Commons' widths), images apply 600, search
+  60, refile preview 240, refile apply 480 (as Release's apply: every file read, tagged and moved). **Managing.swift**:
+  `artistManaging(permissions)` (permissions.ts's, vectors over all 64 sets). **Models.swift**: `looseMap`.
+
+**The waits** (`ArtistWaits`), as EditWaits works Edit album's out: Save's is the scan (120) + one MusicBrainz lookup
+(60) + the three sources and a width for each Commons candidate (25 s each: JSON_TIMEOUT's 10 + 15) + each picture
+chosen fetched through Commons' two redirects (3 x 40 s: IMAGE_TIMEOUT's 10 + 30) + the minute's margin, rounded up
+to the minute, never under 600 s. Move's, a name at a time: 480 s + that name's albums' size (its summary's
+`total_size`) at 20 MB a second, for a retag that outgrows its room and rewrites a file. The relay has no wait of its
+own: the transport's 8 s is past its 7 s deadline. tests/test_ios_artist_manage.py reads each figure from the server's
+source; Commons' two redirects (seen by hand when the relay was built) and the disk's pace are assumptions.
+
+**Held to the web**: ios/scripts/export-artist-manage-vectors.cjs compiles lib/artistManage.ts with lib/artistPage.ts
+and lib/owned.ts and runs it as it is - libraryNames over 76 cases (folded and accented names, collaborations,
+folders with and without ids, pages with and without one, by release), namesToMove, imagesFolder over 17 (one name,
+several, the current among them or not, unread, no folder), the slot and save rules, 13 refile cases (two names, one
+target; applies that stayed, failed or emptied a name), listed - and reads out of app/ArtistPanel.tsx what the panel
+works out itself, each by a pattern evaluated as written (the subtitle, the names Move applies, a slot's other
+pictures) or a sentence checked as written (Showing…, canSave, the slot's pictures in order, a look choosing the
+best, no id opening the search), and every word the phone says that the panel and ArtistPage.tsx say. The fixture is
+142 KB; ui/test/iosartistmanage.sim.cjs runs it with `--check`. export-managing-vectors.cjs gains `artistManaging`
+over the 64 sets.
+
+### The app (ios/App/Artist/)
+
+- **ArtistView**: a bar ••• (`ellipsis.circle`, "More for this artist") only while it has something - in reach, the
+  artist not gone, and by `Managing.artistManaging`: **Artist images…** once the library files albums under a name of
+  theirs (dimmed until deadwax has said which folder: the sheet asks by it); **Which artist is this?** once the
+  artist's answer and `/library/owned` are in, while nothing says who they are (the web's `said`) or it was chosen
+  here; **Move albums to {name}…** while their name now is known and a library name isn't it. Who they are is `said ??
+  chosen` (the web's): a pick is kept by the page's artist id in ArtistsModel (`chosen`, cleared for a new person),
+  and the page says "You chose who this is, for this visit." under their name. Their name now comes from
+  MBArtistModel's `loadFacts` (the MusicBrainz artist page's own, made reachable), asked only for someone who
+  manages. The hero is the square from their folder once Artist images saved this visit, or where Navidrome has no
+  picture (the web's `square`). After a move: the page's kept answer forgotten, `/library/owned` and the summaries
+  asked again, the page loaded again now and after AlbumEdit.settleMs - never past a sign-out.
+- **ArtistToolsModel** (with `ArtistManaged`, what the page knows for the tools): the library's names (made again only
+  when `/library/owned` or who they are changes) and `/library/artist` for each, asked together, newest round only,
+  only for someone the ••• has something for. **ArtistPictureCache**: every picture the tools draw - a candidate's
+  `preview` through the relay, a folder's through `/library/artist/art` - in memory only (NSCache, 32 MB, scaled to
+  900 px), one fetch however many views wait, four at a time, a 503 (the relay busy) asked again twice 1.5 s apart, a
+  failure held a minute (CoverCache.againAfter) with deadwax's words. **RelayedArtistPicture** draws the candidate in
+  words (its label and source, then why) when it couldn't be had - never blank; **ArtistFolderPicture** the folder's.
+- **ArtistImagesSheet**: who the pictures are of ("Showing Ye (rapper)") with Not them? and the search, the notes and
+  problems, a section per slot (the preview's `kinds`): the chosen picture large (or the one on disk), `slotLine` in
+  the header, **Use another picture (N)** pushing **ArtistPictureGrid** (lazy: the slot's own kind first, then the
+  rest, a tap choosing, a second taking it back); Replace; **In their folder now**; Save and `savedLine`. Close asks
+  when `holdsWork`; Close and the swipe are off while Save runs.
+- **ArtistWhoSheet** (in ArtistMoveSheet.swift): the note, the search (asked as it opens for the page's name), the
+  matches (**ArtistMatchRow**, `matchLine`); a pick hands the page the match and closes.
+- **ArtistMoveSheet**: the subtitle ("Kanye West → Ye"), the note with the folder in bold (an AttributedString),
+  Albums that move and Albums that stay, Move N albums; then the outcome, the failures in amber, Done. Cancel and the
+  swipe are off while it moves.
+- **ArtistToolModels.swift**: `ArtistImagesModel`, `ArtistMoveModel`, `ArtistWhoModel` - the asking; Save and Move
+  each held by a BackgroundHold, a cancelled write taken as unanswered, VoiceOver told what became of it, and nothing
+  after a write (the page asked again) done past a sign-out (AppNavigation's session when the sheet opened). Back in
+  front with a read owed (`becameActive`), it is asked.
+- **ReadAgainFailed** (Edit/EditAlbumSheet.swift) takes a failure, a dimming and an action as well as Edit album's
+  model: the look's and the preview's failures, with Look again.
+
+### Decided here, and where the phone departs from the spec (or the web)
+
+- **ArtistPanel.tsx's own rules stay in the .tsx, held by pattern** - the Move albums subtitle, the names Move applies,
+  a slot's other pictures, "Showing…" and `canSave`. The brief said a rule living only in a .tsx should stop the work
+  for a no-change web refactor on main first, as slice 1 did; slices 2-4 instead read such pieces out of the source by
+  pattern (`piece`, `says`), each hashed into made_from so the sim fails when one changes, and this slice does the
+  same. Moving them into lib/artistManage.ts is a small no-change refactor on main whenever wanted; the exporter would
+  then run them as it runs the rest.
+- **One ••• in the bar**, as the spec says, where the web puts each button beside what it acts on (under In your
+  library, in About's Now known as, in the "doesn't know who" line). It's there only while deadwax is in reach - every
+  item needs it - and Artist images… is dimmed until the folder is known.
+- **The chosen picture large, the rest a pushed grid** (the spec), where the web lays every picture of a slot in a row
+  and Use another picture/Fewer adds the others inline. The grid lists the same pictures in the web's order. The phone
+  shows a picture's label and source under it (the web shows the source, the label in its tooltip); VoiceOver reads
+  the web's "label, from source", and "Chosen".
+- **In their folder now** is the phone's own section (the spec's "what's in the folder now"); the web shows a slot's
+  file on disk only when nothing was found for it.
+- **A picture the relay couldn't pass on is drawn as words** - its label, its source, and deadwax's words (the
+  relay's 502 is "deadwax couldn't get that picture just now.") - never a blank or a broken image. Four at a time from
+  the phone, under the relay's six and its 64 waiting.
+- **A choice is kept for the app's life, by the page's artist id** - the web's `kept.chosen` is the page's cache, "for
+  this visit". The phone's Which artist is this? stays in the ••• after a pick (the web's Change).
+- **The page doesn't follow a move.** The web's page of an old name every album of which moved becomes their page by
+  their MusicBrainz id; the phone's pages are Navidrome's artists, so once Navidrome has scanned, the old name's page
+  says the artist isn't here any more. Not ported: it needs a way from an MBID to Navidrome's artist id. docs/ios.md
+  says so.
+- **Move applies only the names whose albums the preview shows moving** (the web's skip), in turn, stopping at the
+  first that fails; a name that never answered keeps what is known to have moved on screen with "maybe finished".
+- **Move's previews are asked again when the page's names, id or name now change under the sheet** (`changed`), and
+  Move is off until they land - an apply sends only what its preview showed.
+- **The menu item has an ellipsis** ("Move albums to Ye…"): it opens a sheet. The web's button has none.
+- **A cancelled write is unanswered**, never a refusal: it may have written.
+
+### Tests
+
+- **ArtistManageVectorTests** (new, 7): every vector section above.
+- **ArtistManageFlowTests** (new, 14): each route's request (method, path, query, body, Accept, timeout, `mostBytes`,
+  a 404 read as none); refusals' words; the waits; Artist images' newest-only looks and searches, no folder, Save,
+  refused, unanswered, out of reach and back; Move's previews, changed, beginMove's names, moveEnded's outcome,
+  refused, unanswered and a failed preview; Which artist's search; artistManaging.
+- **ManagingVectorTests**, **ClientTests**: artistManaging's 64 sets; 86 routes and the timeouts.
+- **tests/test_ios_artist_manage.py** (new, 12): the bodies within the routes' models and passing the same-origin
+  guard; the eight routes by method, path and query and each in test_logins' ROUTES; real routes over a real folder of
+  FLACs (Kanye West's two albums and Ye's one, Ye's MusicBrainz id in their tags), MusicBrainz and fanart.tv faked -
+  the summary, its 404, the folder's picture and a kind with none; the images preview (the id from the tags, fanart.tv's
+  pictures over https) and a real save writing artist.jpg and banner.jpg, and a choice the sources didn't offer refused
+  with its words; the search; the refile preview, the current name's own nothing to move, and a real move (the folder
+  gone, the picture moved with it); a move refused while MusicBrainz is away, a 400 with nothing moved; every wait
+  against the server's figures; the permissions; the app drawing pictures only through deadwax (no AsyncImage, no
+  URLSession, no URL(string:) in ios/App/Artist), four at a time, the 503 asked again; the writes held, said as maybe
+  finished and kept from a sign-out.
+- test_ios_contract.py (86 routes); test_ios_edit.py and test_ios_edit_parts.py (ReadAgainFailed's failure line).
+
+### Verified, and not
+
+On the Mac: `swift test` (1826 Core tests in 193 suites, 158 Audio in 17, 12 more, all passing); the unsigned
+generic-iOS Debug build, BUILD SUCCEEDED; the full pytest suite, 4864 passed and 1 skipped; all 93 sims with Node 22
+(iosartistmanage running the exporter's `--check`).
+
+Not verified - only the phone can tell (docs/ios.md checks 343-348): the ••• and its items against the web's for real
+artists; the pictures through the relay from a real deadwax (fanart.tv's, TheAudioDB's and Commons' - its redirects -
+at their real sizes and speeds), the grid's scrolling and the four at a time; a save and a move against a real library
+and Navidrome's scan after it (the page asked again at 10 s); the page of an old name after a move; Save or Move with
+the phone locked; VoiceOver and the largest text. Nothing has run against a real MusicBrainz or fanart.tv: their
+answers are fakes shaped from the server's source.

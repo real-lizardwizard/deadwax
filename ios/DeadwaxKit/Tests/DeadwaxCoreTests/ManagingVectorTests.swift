@@ -35,6 +35,11 @@ import Testing
         Managing.AlbumEdit(shown: web["shown"].bool!, editors: web["editors"].bool!, delete: web["delete"].bool!)
     }
 
+    private static func artistManaging(_ web: Web) -> Managing.ArtistManaging {
+        Managing.ArtistManaging(images: web["images"].bool!, whichArtist: web["whichArtist"].bool!,
+                                move: web["move"].bool!, any: web["any"].bool!)
+    }
+
     /// The section's title, its rows' labels in the web's order, and the permissions in /me's order.
     @Test func theWordsAndTheOrderAreTheWebs() {
         let words = fixture["words"]
@@ -65,8 +70,11 @@ import Testing
             diffs.check("\(label): the album's Edit", Managing.albumEdit(permissions), Self.albumEdit(row["albumEdit"]))
             diffs.check("\(label): the album page's Edit chip", Managing.albumEdit(permissions).shown,
                         row["albumPage"].bool!)
+            // (Phase 8, slice 5) the artist page's •••
+            diffs.check("\(label): the artist page's tools", Managing.artistManaging(permissions),
+                        Self.artistManaging(row["artistManaging"]))
         }
-        #expect(diffs.checked == 64 * 6)
+        #expect(diffs.checked == 64 * 7)
         diffs.done()
     }
 

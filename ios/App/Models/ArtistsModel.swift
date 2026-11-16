@@ -179,6 +179,16 @@ final class ArtistsModel {
         keptOrder.removeAll { (kept: String) -> Bool in kept == id }
     }
 
+    // MARK: who an artist is, chosen (Phase 8, slice 5)
+
+    /// Who an artist page's artist is on MusicBrainz, chosen with Which artist is this? - by the page's artist id, for
+    /// this visit (the web's `kept.chosen`): used only while nothing else says who they are, never written anywhere.
+    private(set) var chosen: [String: MBArtistMatch] = [:]
+
+    func choose(_ id: String, _ match: MBArtistMatch) {
+        chosen[id] = match
+    }
+
     // MARK: a new person
 
     /// The person changed: nothing of theirs kept, and nothing asked before lands after.
@@ -193,5 +203,6 @@ final class ArtistsModel {
         drawnCache = [:]
         kept = [:]
         keptOrder = []
+        chosen = [:]
     }
 }

@@ -26,6 +26,16 @@ import SwiftUI
 /// hold). Your albums never wait for it and never move among themselves; its rows wait only for `/library/owned`, a
 /// moment at most. Under them: "Loading their albums…", its trouble said once with Try again, the cut at 500. With no id
 /// to be had, or offline, the page is your albums alone and says nothing of it.
+///
+/// THE ARTIST TOOLS (Phase 8, slice 5 - phase8-managing.md 4; the web's ArtistPage.tsx managing): the bar's ••• holds,
+/// by the person's permissions (Managing.artistManaging) and the web's own conditions, Artist images… (Edit albums;
+/// once the library files their albums under a name), Which artist is this? (Edit albums; while nothing says who they
+/// are on MusicBrainz, or it was chosen here) and Move albums to {name}… (Look after the library; a name the library
+/// files them under isn't their name now) - each a sheet, each needing deadwax, so the ••• is there only while it is in
+/// reach. They act on the LIBRARY'S names for the artist (ArtistManage.libraryNames over `/library/owned`), whose
+/// folders deadwax is asked about (ArtistToolsModel) - only for someone the ••• has something for. Who they are is
+/// chosen for the visit (ArtistsModel.choose), the page saying so under their name; a save draws the square from their
+/// folder; a move asks the page again, now and once Navidrome has scanned.
 struct ArtistView: View {
     let route: ArtistRoute
 
@@ -41,6 +51,11 @@ struct ArtistView: View {
     @State private var nameInBar = false
     /// The page has waited `SearchPacing.ownedWaitMs` for `/library/owned`: MusicBrainz's rows are drawn with what it has.
     @State private var ownedWaited = false
+    /// (Phase 8, slice 5) The artist tools: the library's names for them and deadwax's word on each, and the sheet open.
+    @State private var tools = ArtistToolsModel()
+    @State private var toolSheet: ArtistToolSheet?
+    /// One more each time the library's word on their names is wanted again (a save, a move, a pull).
+    @State private var summaryAsks = 0
 
     /// The picture's side, in points (CoverImage asks the nearest step for the screen's scale: 1024 on an iPhone).
     private static let pictureSide: CGFloat = 200
@@ -55,7 +70,11 @@ struct ArtistView: View {
     private var taskKey: String { "\(server.person)|\(route.id)" }
 
     /// Who they are on MusicBrainz, as the artist's answer and the library's folders now say (ArtistJoin.mbid).
-    private var mbid: String? { model.mbid(index: search.ownedIndex, version: search.ownedVersion) }
+    private var said: String? { model.mbid(index: search.ownedIndex, version: search.ownedVersion) }
+    /// ...or, with nothing saying, who was chosen with Which artist is this? for this visit (the web's `said ?? chosen`).
+    private var mbid: String? { said ?? artists.chosen[route.id]?.mbid }
+    /// Who they are was chosen here, and nothing else says (the web's `byChoice`).
+    private var byChoice: Bool { said == nil && artists.chosen[route.id] != nil }
 
     /// MusicBrainz's albums of theirs to draw: online, once `/library/owned` has answered or been waited for, the answer
     /// for the question asked now - or, while Studio only is asked again, the last one, kept on screen.
@@ -72,9 +91,11 @@ struct ArtistView: View {
         let mine = ArtistPage.rows(albums)
         let rows = model.rows(albums: albums, groups: theirGroups(online: online), index: search.ownedIndex,
                               version: search.ownedVersion)
+        let managing = self.managing()
+        let offered = self.offered(managing, online: online)
         ScrollView {
             LazyVStack(alignment: .leading, spacing: 0) {
-                hero
+                hero(managing)
                     .onAppear { nameInBar = false }
                     .onDisappear { nameInBar = true }
                 if model.answer == nil && !online && mine.isEmpty {
@@ -107,6 +128,20 @@ struct ArtistView: View {
                     .opacity(nameInBar ? 1 : 0)
                     .accessibilityHidden(!nameInBar)
             }
+            if offered.any {
+                ToolbarItem(placement: .topBarTrailing) {
+                    toolsMenu(managing, offered)
+                }
+            }
+        }
+        // (Phase 8, slice 5) the library's word on each of their names, for the artist tools - for their names as they
+        // are now, asked again after a write or a pull
+        .task(id: "\(taskKey)|\(ArtistToolsModel.key(managing.names))|\(online)|\(summaryAsks)") {
+            guard managing.may.any else { return }
+            await tools.summarize(managing.names, client: server.client, online: online, again: summaryAsks > 0)
+        }
+        .sheet(item: $toolSheet) { (open: ArtistToolSheet) in
+            toolSheetView(open, managing)
         }
         .task(id: taskKey) {
             // which of MusicBrainz's albums are yours is the library's folders' word: asked again as the page shows
@@ -116,6 +151,10 @@ struct ArtistView: View {
         .task(id: "\(taskKey)|\(mbid ?? "")") {
             // their albums on MusicBrainz, once who they are there is known - or let go when it no longer is
             model.theirAlbums(mbid: mbid, client: server.client, online: reachability.online)
+            // (Phase 8, slice 5) and their name now, for the artist tools - only for someone who manages
+            if Managing.artistManaging(server.access.permissions).any {
+                await model.theirFacts(client: server.client, online: reachability.online)
+            }
         }
         .task {
             // MusicBrainz's rows wait a moment for /library/owned, once a page's life
@@ -133,6 +172,7 @@ struct ArtistView: View {
             await model.load(key: taskKey, client: server.client, online: true, artists: artists, again: true)
             if model.asks.someMissing { model.again(client: server.client) }
             model.theirAlbums(mbid: mbid, client: server.client, online: true, retry: true)
+            summaryAsks += 1
         }
         .onChange(of: reachability.online) { _, online in
             // back: what the page couldn't ask is asked of deadwax now - the songs that didn't come with it
@@ -155,6 +195,9 @@ struct ArtistView: View {
             await model.load(key: key, client: server.client, online: reachability.online, artists: artists)
             if model.asks.someMissing { model.again(client: server.client) }
             model.theirAlbums(mbid: mbid, client: server.client, online: reachability.online, retry: true)
+            if Managing.artistManaging(server.access.permissions).any {
+                await model.theirFacts(client: server.client, online: reachability.online)
+            }
         }
     }
 
@@ -170,19 +213,151 @@ struct ArtistView: View {
 
     // MARK: the hero
 
-    private var hero: some View {
+    /// Their picture and name - (Phase 8, slice 5) the square from their folder once Artist images saved one this visit,
+    /// or where Navidrome has none (the web's `square`: Navidrome keeps its own copy of the picture it had); and, who
+    /// they are chosen here, that it was.
+    private func hero(_ managing: ArtistManaged) -> some View {
         VStack(spacing: 0) {
-            ArtistPicture(id: model.coverArt, side: Self.pictureSide, pixels: CoverSize.hero)
-                .shadow(color: .black.opacity(0.35), radius: 14, y: 6)
-                .padding(.top, 8)
+            Group {
+                if let square = managing.square(saved: tools.version, navidrome: model.coverArt) {
+                    ArtistFolderPicture(path: square, kind: "thumb", version: tools.version, square: true, round: true)
+                        .frame(width: Self.pictureSide, height: Self.pictureSide)
+                        .clipShape(Circle())
+                } else {
+                    ArtistPicture(id: model.coverArt, side: Self.pictureSide, pixels: CoverSize.hero)
+                }
+            }
+            .shadow(color: .black.opacity(0.35), radius: 14, y: 6)
+            .padding(.top, 8)
             Text(model.name)
                 .font(Typeface.title.bold())
                 .multilineTextAlignment(.center)
                 .lineLimit(3)
                 .padding(.top, 18)
                 .accessibilityAddTraits(.isHeader)
+            if byChoice {
+                Text(ArtistManageWords.chosen)
+                    .font(Typeface.footnote)
+                    .foregroundStyle(Palette.quiet)
+                    .multilineTextAlignment(.center)
+                    .padding(.top, 6)
+            }
         }
         .frame(maxWidth: .infinity)
+    }
+
+    // MARK: the artist tools (Phase 8, slice 5)
+
+    /// What the artist tools need, as the page is now: the person's permissions, the library's names for them, the folder
+    /// Artist images writes to and why none can be, the names Move albums moves and their name now.
+    private func managing() -> ArtistManaged {
+        let may = Managing.artistManaging(server.access.permissions)
+        guard may.any else { return ArtistManaged(may: may) }
+        let current = model.facts?.name
+        let who = ArtistManage.Who(mbid: mbid, name: model.answer?.name ?? current ?? route.preview?.name,
+                                   releases: (model.answer?.album ?? []).compactMap(\.musicBrainzId))
+        let names = tools.names(search.ownedIndex, version: search.ownedVersion, who: who)
+        let said = tools.said(for: names)
+        let folder = ArtistManage.imagesFolder(names, current: current, summaries: said)
+        return ArtistManaged(may: may, names: names, known: tools.known(names), folder: folder,
+                             folderSummary: tools.summary(folder.name, names: names),
+                             moveNames: ArtistManage.namesToMove(names, current: current), current: current,
+                             sizes: Dictionary(said.compactMap { (one: (name: String, said: ArtistManage.Said))
+                                 -> (String, Double)? in
+                                 if case .answered(let summary) = one.said { return (one.name, summary.totalSize) }
+                                 return nil
+                             }, uniquingKeysWith: { (first: Double, _: Double) -> Double in first }))
+    }
+
+    /// Which of the ••• items the page offers now.
+    private struct ToolsOffered {
+        let images: Bool
+        let who: Bool
+        let move: Bool
+        var any: Bool { images || who || move }
+    }
+
+    /// What the person may do here - nothing while deadwax is out of reach or the artist is gone: Artist images… once
+    /// the library files their albums under a name; Which artist is this? while nothing says who they are (once the
+    /// library has had its say), or it was chosen here; Move albums to {name}… while a name the library files them under
+    /// isn't their name now.
+    private func offered(_ managing: ArtistManaged, online: Bool) -> ToolsOffered {
+        guard online, !model.gone else { return ToolsOffered(images: false, who: false, move: false) }
+        return ToolsOffered(
+            images: managing.may.images && !managing.names.isEmpty,
+            who: managing.may.whichArtist && model.answer != nil && search.ownedIndex != nil && (mbid == nil || byChoice),
+            move: managing.may.move && managing.current != nil && !managing.moveNames.isEmpty)
+    }
+
+    /// The bar's •••: the artist tools offered, each opening its sheet.
+    private func toolsMenu(_ managing: ArtistManaged, _ offered: ToolsOffered) -> some View {
+        Menu {
+            if offered.images {
+                Button {
+                    toolSheet = ArtistToolSheet(kind: .images)
+                } label: {
+                    Label(ArtistManageWords.imagesItem, systemImage: "photo.on.rectangle")
+                }
+                // their folder known first: the sheet asks by it
+                .disabled(!managing.known)
+            }
+            if offered.who {
+                Button {
+                    toolSheet = ArtistToolSheet(kind: .who)
+                } label: {
+                    Label(ArtistManageWords.whoItem, systemImage: "person.crop.circle.badge.questionmark")
+                }
+            }
+            if offered.move, let current = managing.current {
+                Button {
+                    toolSheet = ArtistToolSheet(kind: .move)
+                } label: {
+                    Label(ArtistManageWords.moveItem(current), systemImage: "folder")
+                }
+            }
+        } label: {
+            Image(systemName: "ellipsis.circle")
+        }
+        .accessibilityLabel(ArtistManageWords.more)
+    }
+
+    /// The sheet the ••• opened, with the page as it is now - Move albums told when its names change under it.
+    @ViewBuilder private func toolSheetView(_ open: ArtistToolSheet, _ managing: ArtistManaged) -> some View {
+        switch open.kind {
+        case .images:
+            ArtistImagesSheet(request: ArtistImagesRequest(folder: managing.folder.name, reason: managing.folder.reason,
+                                                           mbid: mbid, name: model.name)) {
+                tools.saved()
+                summaryAsks += 1
+            }
+        case .who:
+            ArtistWhoSheet(name: model.name) { (match: MBArtistMatch) in
+                artists.choose(route.id, match)
+            }
+        case .move:
+            ArtistMoveSheet(ask: ArtistRefileFlow.Ask(names: managing.moveNames, mbid: mbid, current: managing.current),
+                            sizes: managing.sizes) {
+                moved()
+            }
+        }
+    }
+
+    /// Albums moved: the page asked again - what the session kept of it is of folders that have moved - now and once
+    /// Navidrome has had time to scan (AlbumEdit.settleMs), never past a sign-out.
+    private func moved() {
+        artists.forget(route.id)
+        search.refreshOwned()
+        summaryAsks += 1
+        let key = taskKey
+        let session = navigation.session
+        Task {
+            await model.load(key: key, client: server.client, online: reachability.online, artists: artists, again: true)
+            try? await Task.sleep(for: .milliseconds(AlbumEdit.settleMs))
+            guard navigation.session == session else { return }
+            search.refreshOwned()
+            summaryAsks += 1
+            await model.load(key: key, client: server.client, online: reachability.online, artists: artists, again: true)
+        }
     }
 
     // MARK: Play and Shuffle

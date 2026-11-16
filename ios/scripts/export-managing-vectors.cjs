@@ -8,7 +8,8 @@
  *
  * Compiles, as export-gate-vectors.cjs does, lib/permissions.ts, lib/appRoutes.ts, lib/ownPassword.ts and app/access.ts
  * with the repo's TypeScript (Preact stubbed: access.ts imports its hooks), and runs them AS THEY ARE:
- * - `managing` for every one of the 64 sets of permissions, logins on and off, and `albumEdit` for each;
+ * - `managing` for every one of the 64 sets of permissions, logins on and off, and `albumEdit` and (Phase 8, slice 5)
+ *   `artistManaging` for each;
  * - a run of /deadwax/me answers through `accessOf`, then You's own `managing` expression (read out of You.tsx and
  *   evaluated as written), `albumEdit`, `seesDetail` and `changeOffered`;
  * - the addresses: each Managing page as You opens it (`formatRoute` on the You tab - App's openManagingPage), the
@@ -141,6 +142,7 @@ for (let mask = 0; mask < 1 << P.PERMISSIONS.length; mask++) {
     off: partsOf(P.managing(permissions, false)),
     albumEdit: P.albumEdit(permissions),
     albumPage: albumPage(permissions),
+    artistManaging: P.artistManaging(permissions),
   })
 }
 

@@ -161,6 +161,15 @@ final class ArtistPageModel {
         Task { await discography.browse(client: client, online: true, again: failed) }
     }
 
+    /// (Phase 8, slice 5) Who they are on MusicBrainz - their name now - for the artist tools (Move albums to {name}…,
+    /// and the folder Artist images writes to): asked through the MusicBrainz page's own model, so its kept answer is
+    /// that page's, and only for someone who manages (ArtistView). Nil until known; a failure leaves it nil.
+    var facts: MBArtistFacts? { discography?.facts }
+
+    func theirFacts(client: DeadwaxClient?, online: Bool) async {
+        await discography?.loadFacts(client: client, online: online)
+    }
+
     /// Try again under the buttons: the albums that didn't come asked for again.
     func again(client: DeadwaxClient?) {
         guard let client else { return }

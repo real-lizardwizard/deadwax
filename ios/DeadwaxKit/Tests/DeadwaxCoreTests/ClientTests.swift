@@ -374,7 +374,7 @@ func sentJSON(_ request: HTTPRequest?) throws -> [String: SentValue] {
     }
 
     @Test func everyRouteIsDeadwaxsOwn() {
-        #expect(Routes.all.count == 78)
+        #expect(Routes.all.count == 86)
         #expect(Set(Routes.all).count == Routes.all.count)
         for endpoint in Routes.all {
             #expect(endpoint.path.hasPrefix("/deadwax/"))
@@ -416,6 +416,10 @@ func sentJSON(_ request: HTTPRequest?) throws -> [String: SentValue] {
         // the Archive's listing (or fanart.tv's) and each disc's picture; a CD art picture, 30 s
         // (slice 4: Delete) what deleting it takes, 60 s, the folder walked; the delete, 120 s, the folder removed and
         // the saved scan and the store written
+        // (slice 5: the artist tools) a name's summary, 120 s, the scan's; a picture in their folder, 30 s; Artist
+        // images' preview, 240 s, who they are and three sources and Commons' widths; its Save, 600 s at least; the
+        // search, 60 s, MusicBrainz's; Move albums' preview, 240 s, every file read; its apply, 480 s at least - and
+        // the relay's pictures the transport's own 8 s, over its 7 s deadline
         let longer: [Endpoint: Double] = [Routes.albumIndex: 30, Routes.autoEqSearch: 20, Routes.autoEqProfile: 20,
                                           Routes.libraryOwned: 30, Routes.fullySearch: 20, Routes.releaseGroup: 60,
                                           Routes.searchArtists: 20, Routes.searchSongs: 20, Routes.artistFacts: 60,
@@ -428,7 +432,10 @@ func sentJSON(_ request: HTTPRequest?) throws -> [String: SentValue] {
                                           Routes.libraryArt: 30, Routes.queueIgnore: 20, Routes.queueUnignore: 20,
                                           Routes.tagsPreview: 60, Routes.tagsApply: 120, Routes.trackPicture: 30,
                                           Routes.lyricsFetch: 600, Routes.discArtFetch: 360, Routes.libraryDiscArt: 30,
-                                          Routes.deletionSummary: 60, Routes.deleteAlbum: 120]
+                                          Routes.deletionSummary: 60, Routes.deleteAlbum: 120,
+                                          Routes.libraryArtist: 120, Routes.artistArt: 30,
+                                          Routes.artistImagesPreview: 240, Routes.artistImagesApply: 600,
+                                          Routes.artistSearch: 60, Routes.refilePreview: 240, Routes.refileApply: 480]
         #expect(Routes.timeouts == longer)
         for endpoint in Routes.all {
             // each path parameter filled in: a brace left in a path is no URL

@@ -250,7 +250,7 @@ def test_a_get_says_its_words_and_is_on_only_as_the_model_says():
     assert "if model.retag?.flow.readFailed == true {" in wait and "ReadAgainFailed(model: model)" in wait
     # the read that holds the Gets off, said in the phone's words with Look again (review, 16 Nov)
     failed = declared(code(SHEET), "struct", "ReadAgainFailed")
-    assert "if let failure = model.readBlocking ?? model.scan.failure {" in failed
+    assert "failure = model.readBlocking ?? model.scan.failure" in failed
     for name in ("ArtworkPage", "LyricsPage"):
         assert "GetWait(model: model)" in declared(pages, "struct", name), name
     edit = code(MODEL)

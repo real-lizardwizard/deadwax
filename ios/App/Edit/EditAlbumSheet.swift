@@ -398,19 +398,34 @@ struct EditAlbumRoot: View {
 /// The library couldn't be read again while an album is held - after a write, a gap, a mark, Look again: deadwax's
 /// failure in the phone's words (LibraryScanModel's, EditWords.said), and Look again, which reads it again. Until one
 /// lands nothing is planned or applied (RetagFlow.couldNotRead), and the page drawn is the last read's.
+///
+/// (Phase 8, slice 5) The artist tools' too: a look for pictures or a preview of the moves that failed - its words, and
+/// Look again asking it again (`init(failure:disabled:lookAgain:)`).
 struct ReadAgainFailed: View {
-    let model: EditAlbumModel
+    let failure: String?
+    let disabled: Bool
+    let lookAgain: () -> Void
+
+    init(model: EditAlbumModel) {
+        // the read a write or a gap waits for, whichever part's (EditAlbumModel.readBlocking), else the scan's
+        failure = model.readBlocking ?? model.scan.failure
+        disabled = !model.online || model.scan.reading || model.tags?.reading == true
+        // the scan read again - and with it, once it lands, Tags' files (TagsModel.albumRead)
+        lookAgain = { Task { await model.lookUp() } }
+    }
+
+    init(failure: String?, disabled: Bool, lookAgain: @escaping () -> Void) {
+        self.failure = failure
+        self.disabled = disabled
+        self.lookAgain = lookAgain
+    }
 
     var body: some View {
-        // the read a write or a gap waits for, whichever part's (EditAlbumModel.readBlocking), else the scan's
-        if let failure = model.readBlocking ?? model.scan.failure {
+        if let failure {
             ErrorNote(text: failure)
         }
-        // the scan read again - and with it, once it lands, Tags' files (TagsModel.albumRead)
-        Button(EditWords.lookAgain) {
-            Task { await model.lookUp() }
-        }
-        .disabled(!model.online || model.scan.reading || model.tags?.reading == true)
+        Button(EditWords.lookAgain) { lookAgain() }
+            .disabled(disabled)
     }
 }
 

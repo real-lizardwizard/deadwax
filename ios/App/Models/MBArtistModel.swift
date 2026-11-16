@@ -83,8 +83,9 @@ final class MBArtistModel {
     }
 
     /// Who they are: kept, else asked - a failure leaves the line out, quietly (About, where the web says so, is
-    /// Phase 7's).
-    private func loadFacts(client: DeadwaxClient?, online: Bool) async {
+    /// Phase 7's). (Phase 8, slice 5) Also an artist page's, for its artist tools: their name now, which Move albums
+    /// and Artist images' folder go by (ArtistPageModel.theirFacts).
+    func loadFacts(client: DeadwaxClient?, online: Bool) async {
         let mbid = route.mbid
         if let held = Self.keptFacts[mbid] {
             facts = held

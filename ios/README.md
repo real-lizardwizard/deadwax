@@ -28,14 +28,17 @@ People, Server settings and the event log) and Change password, each opened in t
 Phase 8, bringing them into the app one at a time, begun with Edit album: an album's folder, what's wrong with it,
 and the release it's matched to, chosen and applied on the phone, then its tags, on one track or many, then its
 artwork and lyrics, with Get cover, Get CD art and Get lyrics, then its Delete, what goes read first and asked
-once more - kept on the `ios` branch while it's being built. Nothing of Phase 2, the lyrics, the EQ, the turntable,
-play history, Phase 3, Phase 4, Search, Requests, Get, Manage or Edit album has been seen on an iPhone yet.
+once more, then the artist tools from an artist page's •••: Artist images (every picture found, through deadwax's
+relay), Which artist is this? and Move albums to their name now - kept on the `ios` branch while it's being built. Nothing of Phase 2, the lyrics, the EQ, the turntable,
+play history, Phase 3, Phase 4, Search, Requests, Get, Manage, Edit album or the artist tools has been seen on an
+iPhone yet.
 Phase 0's test screen lives on in the app's Debug.
 
 - **To install it, and every week after:** [docs/ios.md](../docs/ios.md) - the steps once on the Mac
   and the iPhone, the weekly `ios/scripts/install.sh`, the test album
   (`ios/scripts/make-test-album.py`), what the app does, and the checks, phase by phase - Phase 7's are 237-246,
-  Edit album's 320-329, its Tags' 330-334, its Artwork and Lyrics' 335-337, its Delete's 338-342.
+  Edit album's 320-329, its Tags' 330-334, its Artwork and Lyrics' 335-337, its Delete's 338-342, the artist
+  tools' 343-348.
 - **How it is built, and why:** [notes/ios.md](../notes/ios.md).
 - **Before pushing a change here, on Linux:** `ios/scripts/check-linux.sh`. GitHub's `ios.yml` compiles
   the rest on macOS.

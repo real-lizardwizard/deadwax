@@ -202,7 +202,7 @@ def test_a_failed_read_is_said_with_look_again():
     assert "ErrorNote(text: failure)" in failed and "Button(EditWords.lookAgain)" in failed
     assert "await model.lookUp()" in failed
     # whichever part's read is waited for (review, 16 Nov): the Release's or Tags', else the scan's
-    assert "if let failure = model.readBlocking ?? model.scan.failure {" in failed
+    assert "failure = model.readBlocking ?? model.scan.failure" in failed
     model = code(MODEL)
     blocking = block(model, model.index("{", model.index("var readBlocking: String?")))
     assert "if tags?.flow.readFailed == true, let said = tags?.readFailure { return said }" in blocking

@@ -1,4 +1,4 @@
-# The iPhone app (early: app 0.13, downloads, lyrics, the EQ, the turntable, play history, your library, the Library, Search, Requests, getting albums, Manage and Edit album)
+# The iPhone app (early: app 0.13, downloads, lyrics, the EQ, the turntable, play history, your library, the Library, Search, Requests, getting albums, Manage, Edit album and the artist tools)
 
 deadwax is getting a native iPhone app, built with SwiftUI and its own audio engine, for what a web
 page can't do well: seamless joins and normalization done on the phone, downloads to play offline,
@@ -55,7 +55,10 @@ it's matched to, chosen and applied on the phone, from the album's ••• or 
 album](#edit-album)). Then its **Tags**: each track's file, everything in it, and its tags edited on one track or many
 at once. Then its **Artwork** and **Lyrics**: the cover and CD art, each full screen, and Get cover, Get CD art and
 Get lyrics on the phone. Then its **Delete**: what deleting the folder takes, read as it is now, and whose libraries
-it's in, asked once more before it goes - and with it nothing in Edit album opens the web app any more.
+it's in, asked once more before it goes - and with it nothing in Edit album opens the web app any more. Then
+**the artist tools**, from an artist page's •••: **Artist images…**, every picture of them found, chosen and saved
+into their folder; **Which artist is this?**; and **Move albums to …**, their albums filed under an old name moved
+under the one they have now (see [Managing an artist](#managing-an-artist)).
 
 **Nothing of Phase 2, the lyrics, the EQ, the turntable, play history, your library downloaded,
 playlists, artists, songs, Search, Requests, Get or Manage has been seen on an iPhone yet.** It's built and tested on a Mac,
@@ -99,7 +102,7 @@ seconds rather than keeping the app waiting, and the app can draw the empty cove
 cover**, it needs deadwax's container to reach `coverartarchive.org` and `archive.org`. Nothing
 changes for the web app, which loads those covers from the Archive itself.
 
-deadwax 2.1.32 adds the route the app's **Artist images…** will draw its pictures from. The pictures
+deadwax 2.1.32 adds the route the app's [**Artist images…**](#managing-an-artist) draws its pictures from. The pictures
 it offers are on other sites (Wikimedia Commons, TheAudioDB and fanart.tv), so deadwax fetches each
 one when the app asks for it and passes it on, keeping nothing. It fetches only from those sites'
 picture addresses, over HTTPS: `commons.wikimedia.org`, plus `thumb.wikimedia.org` and
@@ -936,8 +939,8 @@ the rest). With logins off every album is ticked. **Tap an album** to open its p
   reached, the page lists only your albums and says nothing about the rest.
 - An artist deadwax no longer has says "This artist isn't here any more - their albums may have been moved
   or deleted."
-- Not on the phone yet: the description, the facts, pins, and the pictures and names managed from the
-  artist's page.
+- Not on the phone yet: the description, the facts and pins. Their pictures and the names their albums
+  are filed under are [managed from the page's •••](#managing-an-artist).
 
 **Offline**, the Artists page lists what it last listed, an artist with nothing on this phone dimmed (it
 opens nothing). With no list in hand it lists the artists of the albums on the phone, under "Only the
@@ -946,6 +949,80 @@ them, so an album they made with someone else ("Portishead & Tricky") doesn't re
 opened since the app started shows their albums as it last had them - any other, the ones on the phone -
 with the albums not on the phone dimmed, and Play and Shuffle playing only the songs here ("Only
 downloaded albums play until deadwax is back.").
+
+### Managing an artist
+
+For someone who can **Edit albums** or **Look after the library** (everyone while logins are off; with
+them on, Navidrome's admins and whoever an admin gave those), an artist's page has a **•••** at the top
+right holding what the web app's artist page offers them - only while deadwax can be reached, and only
+what that person may do:
+
+- **Artist images…** (Edit albums), once the library files albums under their name. It's dimmed for a
+  moment as the page opens, while deadwax says which folder is theirs.
+- **Which artist is this?** (Edit albums), while nothing says who they are on MusicBrainz - neither
+  Navidrome nor their albums' MusicBrainz tags - and after you've chosen, to choose again.
+- **Move albums to Ye…** (Look after the library), when the library files some of their albums under a
+  name that isn't the one MusicBrainz has for them now ("Kanye West", with MusicBrainz calling them Ye).
+
+They act on the names the library's folders go by, as the web app's do, which may not be the name the
+page shows. Each opens a sheet, and each needs deadwax: opened while it can't be reached, a sheet says
+"Managing needs deadwax. This opens once it's back." and starts by itself once it is; if deadwax goes
+away while one is open, what it shows stays under "deadwax is out of reach - this is how it was, and
+nothing here can change until it's back.", with Save or Move dimmed until it's back and has been asked
+again.
+
+**Artist images** looks for pictures ("Looking for pictures of Ye…"), then says whose they are -
+"Showing Ye (rapper)" - with **Not them?**, which searches MusicBrainz for another artist ("as Kanye
+West" beside one an old name of theirs matched); tap one for their pictures instead. When MusicBrainz
+can't say who they are, the search is open from the start, under what went wrong. Next come the
+sources it couldn't ask - with no fanart.tv or TheAudioDB key in deadwax's Server settings (under
+Connections), "Banners, logos and backgrounds come from fanart.tv and TheAudioDB, and both need a
+key…" - and then a section for each slot: **Square image**, **Banner**, **Background**, **Logo**,
+**Wide image** and **Clear art**, each with the file already in their folder ("artist.jpg on disk") or
+"none found for this" beside its name.
+
+- The best picture of each slot is chosen to start with, and shown large with its name and its source,
+  as the web app names them ("fanart.tv Thumb (3) · fanarttv", the 3 its likes on fanart.tv); a slot
+  with nothing chosen shows what's in their folder ("Banner on disk").
+- **Use another picture (7)** opens every picture found - that slot's first, then the rest, so a photo
+  can be the background - as a grid. Tap one to choose it; tap the chosen one again to leave that slot
+  alone, so it isn't written.
+- **Replace pictures that are already there** (off to start) says whether a slot with a file in it is
+  written over. **In their folder now** shows the pictures already there, with their file names.
+- **Save** writes the chosen pictures into their folder, then says what it wrote ("Saved artist.jpg,
+  banner.jpg."), or why nothing needed writing. Saving a square image makes it the page's picture.
+- Every picture is passed on by deadwax (2.1.32 or later), which fetches it from Wikimedia Commons,
+  TheAudioDB or fanart.tv: the phone never asks those sites itself. A picture deadwax couldn't get is
+  shown as its name and where it's from, with "deadwax couldn't get that picture just now." - never as
+  a blank. Pictures load as they scroll into view, a few at a time.
+- When their albums aren't in one folder the sheet says why, and nothing more: "Their albums are filed
+  under 2 names - move them under Ye first, so their pictures have one folder", or that they have no
+  folder of their own.
+
+**Which artist is this?** says what choosing does, then searches MusicBrainz for the page's name, and
+lists every artist going by it, each with what tells them apart ("as Kanye West · rapper · Person").
+Search again with other words if they aren't there. Tap one: the sheet closes and the page is theirs
+for this visit - their albums you don't have, and their pictures in Artist images - saying "You chose
+who this is, for this visit." under their name. Nothing is written; applying an album's release in
+[Edit album](#edit-album) writes who it's by into its files, for good.
+
+**Move albums to Ye** works out the moves for every name that isn't theirs now ("Working out the
+moves…"), then says what happens - "Each album moves into **Ye/** keeping its own folder name, and its
+album artist tag becomes Ye…" - and lists **Albums that move**, each with its folder, where it goes
+("→ Ye/Donda (2021)") and how many tracks and how many are retagged ("12 tracks, 12 retagged"), and
+**Albums that stay**, each with why (a collaboration, a folder of that name already there, a track
+deadwax can't read). **Move 2 albums** moves them ("Moving…"), then says what happened - "Moved 2
+albums into Ye/. Their pictures came too: artist.jpg. Kanye West/ was left empty and removed." - with
+anything that didn't move in amber, and **Done**. The page asks deadwax and Navidrome again at once, and
+again once Navidrome has had time to scan. The page of an old name every album of which moved then
+says the artist isn't here any more (the web app's page follows them to their new name; the phone's
+doesn't yet) - open them from the Artists page.
+
+While Save or Move runs, the sheet can't be closed. If the phone locks or loses deadwax before the
+answer comes, the sheet says "deadwax may have finished this - looking again", with what it knows
+moved, and looks again before offering Save or Move once more - it never sends the same thing twice
+unseen. With a picture chosen or taken back, or Replace changed, and not saved, a swipe doesn't close
+Artist images, and Close asks first.
 
 ## Songs
 
@@ -1773,8 +1850,8 @@ and the Library's Set up Navidrome.
 VoiceOver reads each Safari row as a button, with "Opens in Safari." after it; Edit an album as a row that opens a
 page. The rows grow with the text size.
 
-What isn't linked from the phone: an artist's managing (pictures, names), on the artist's page in the web app; the
-web app's **Connections**, in its You; and Needs a look's count.
+An artist's pictures and names are managed from [the artist's page](#managing-an-artist), as in the web app. What
+isn't linked from the phone: the web app's **Connections**, in its You; and Needs a look's count.
 
 ### Debug
 
@@ -4375,21 +4452,65 @@ Release, Tags, Artwork, Lyrics and Delete album… are all pages of its own.
   largest text and VoiceOver on the Delete page: every line whole, Delete permanently read as a button, and the
   question's Delete and Cancel.
 
+### The artist tools' checks (343-348)
+
+**Not done yet.** These come with the build that brings [the artist tools](#managing-an-artist) into the app - Phase
+8's fifth part (still app 0.13 (13)). Artist images' pictures need deadwax **2.1.32** or later (`:experimental`):
+an older one has no relay, and every picture shows as its name with why. As in 320-329: deadwax's plain `http://`
+address, on the home Wi-Fi and over WireGuard with Wi-Fi off; compare each with the same artist's page in the web app.
+Artist images and Move albums write into the library: use an artist whose pictures and folders you don't mind changing
+(a test album filed under an old name, or copied in).
+
+- **343 The artist's •••.** As an admin: an artist with albums has **•••** at the top right with **Artist images…**;
+  one the page can't say who is on MusicBrainz (no MusicBrainz tags in their albums, and none in Navidrome) has **Which
+  artist is this?** too; one the library files under an old name as well as their name now (a test album tagged
+  "Kanye West", with Ye's MusicBrainz id) has **Move albums to Ye…**. Does each match what the web app's artist page
+  offers? With Wi-Fi and WireGuard off, the ••• has gone; back, it's back.
+- **344 Pictures.** **Artist images…**: "Looking for pictures of …", then "Showing … (…)" and a section per slot, the
+  best picture of each large. Does each picture appear, scrolling smoothly - none left blank? **Use another picture
+  (N)**: the grid; tap one (it's ringed, with a tick), tap it again (not chosen). Choose a square image, **Save**:
+  "Saved artist.jpg." (or the names it wrote), and the page's round picture is the new one; **In their folder now**
+  lists it. Do the same pictures show in the web app's Artist images? With no fanart.tv or TheAudioDB key set: the note
+  about the keys, and only Wikimedia Commons' pictures. Lock the phone the moment you tap Save: unlocked, does it say
+  what it saved, or "deadwax may have finished this - looking again" and the folder looked at again?
+- **345 Replace.** With a square image already in their folder, choose another and **Save** with **Replace pictures
+  that are already there** off: "Nothing needed writing.", and the folder's picture is the one it was. On, Save again:
+  the new picture is in the folder and on the page. Choose something else, then Close: "Discard changes?" (Edit
+  album's question), and a swipe down doesn't close it.
+- **346 Which artist.** On an artist the page can't place, **Which artist is this?**: its note, then every artist going
+  by the name, each with what tells them apart. Search other words: only the newest list shows. Pick one: the sheet
+  closes, "You chose who this is, for this visit." under their name, their albums you don't have join the list, and
+  **Artist images…** shows that artist's pictures. Leave the page and open it again from the Artists page: still
+  chosen until the app is closed (or you sign out).
+- **347 Move albums.** On the test artist, **Move albums to Ye…**: "Working out the moves…", then the note with
+  **Ye/** in bold, **Albums that move** - each folder, "→ Ye/…" and "12 tracks, 12 retagged" - and **Albums that stay**
+  with why. Does it list what the web app's Move albums lists? **Move 1 album**: "Moving…" (Cancel dimmed, a swipe
+  doesn't close it), then "Moved 1 album into Ye/." with what came with it, and **Done**. Once Navidrome has scanned,
+  does it list the album under Ye alone, and the web app's page agree? The old name's page, if every album moved,
+  says the artist isn't here any more. Then as 344, lock the phone the moment you tap Move.
+- **348 Without the permissions.** Signed in as someone with neither Edit albums nor Look after the library: no
+  **•••** on any artist's page. With Edit albums alone: Artist images… (and Which artist is this? where 343 had it),
+  never Move albums. With Look after the library alone: only Move albums, and no ••• on an artist with nothing to
+  move. With the largest text and VoiceOver: the ••• read as "More for
+  this artist", each picture read with its name and where it's from ("…, from fanarttv") and "Chosen" on the one
+  chosen, every line whole in all three sheets.
+
 ## What it can't do yet
 
 These are the web app's for now:
 
 - **The visualizer**: it stays the web app's, on a desktop.
 
-- On an artist's page their **description** and the artist's managing (pictures, names).
+- On an artist's page their **description**, and the page following an artist whose albums
+  [Move albums](#managing-an-artist) moved to their name now.
 - In **Search**, an artist you don't have's page lists their albums, without their description or links. A search
   of what's downloaded while deadwax can't be reached isn't built: offline, Search keeps a list already drawn, and
   new words wait for deadwax.
 - **Home** and **pins** - and so Home's Arriving: outside Requests, the tab's badge is the phone's only sign of a
   download on its way.
-- **Looking after deadwax**, but for [Edit album](#edit-album), all of it on the phone now: Settings >
-  [Manage](#manage) opens each other tool in the web app, in Safari, and Change password too. Re-timing synced lyrics
-  is Server settings', in the web app. Not linked from the phone: the artist's managing (above), the web app's
+- **Looking after deadwax**, but for [Edit album](#edit-album) and [an artist's tools](#managing-an-artist), all of
+  it on the phone now: Settings > [Manage](#manage) opens each other tool in the web app, in Safari, and Change
+  password too. Re-timing synced lyrics is Server settings', in the web app. Not linked from the phone: the web app's
   **Connections** (in its You) and Needs a look's count.
 
 ## When something goes wrong

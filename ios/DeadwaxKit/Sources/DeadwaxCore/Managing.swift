@@ -65,6 +65,28 @@ public enum Managing {
         return AlbumEdit(shown: edit || library, editors: edit, delete: library)
     }
 
+    /// (Phase 8, slice 5) The artist page's tools (permissions.ts `ArtistManaging`): Artist images… and Which artist is
+    /// this? Edit albums', Move albums to … Look after the library's.
+    public struct ArtistManaging: Sendable, Equatable {
+        public let images: Bool
+        public let whichArtist: Bool
+        public let move: Bool
+        public let any: Bool
+
+        public init(images: Bool, whichArtist: Bool, move: Bool, any: Bool) {
+            self.images = images
+            self.whichArtist = whichArtist
+            self.move = move
+            self.any = any
+        }
+    }
+
+    /// permissions.ts `artistManaging(perms)`.
+    public static func artistManaging(_ permissions: Set<Access.Permission>) -> ArtistManaging {
+        let edit = permissions.contains(.edit), library = permissions.contains(.library)
+        return ArtistManaging(images: edit, whichArtist: edit, move: library, any: edit || library)
+    }
+
     /// One of Manage's rows, in the order You draws them: the phone's own Edit an album first (the web's editors live
     /// on an album's page, not in You), then the web's five in You.tsx's order.
     public enum Tool: String, Sendable, CaseIterable, Hashable {
