@@ -10207,19 +10207,19 @@ route's `read_album_details` (src/library.py: DETAIL_TAGS by name, every tag raw
 
 | line | from |
 | --- | --- |
-| Format, Bitrate, Channels | the album's songs as getAlbum answered them: `suffix` (else the content type), `bitDepth`, `samplingRate`, `bitRate`, `channelCount` |
+| Format, Bitrate, Channels | the album's songs as getAlbum answered them: `suffix` (else the content type), `bitDepth`, `samplingRate`, `bitRate`, `channelCount` - an M4A's codec from its `contentType` or the album's MP4 bitrate (After review) |
 | Songs, Discs (titles), Disc title, Length, Size | the songs (`discNumber`, `duration`, `size`) and getAlbum's `discTitles` |
 | Downloaded | DownloadModel: `album(songs)` and `here(songs)` |
-| Media | the files' MEDIA, per disc (each disc's commonest), as MusicBrainz writes a release's format: "2×CD + DVD-Video" |
+| Media | the files' MEDIA: deadwax's filing's whole-release value (" + "-joined) once, else Picard's per disc (each disc's commonest), folded as MusicBrainz writes a release's format: "2×CD + DVD-Video" |
 | Label | getAlbum's `recordLabels` (OpenSubsonic), else the files' LABEL / ORGANIZATION / TPUB |
-| Catalogue number, Barcode, Country | the files' CATALOGNUMBER, BARCODE, RELEASECOUNTRY (XW Worldwide, XE Europe, else Locale's English name) |
+| Catalogue number, Barcode, Country | the files' CATALOGNUMBER, BARCODE, RELEASECOUNTRY (MusicBrainz's own names for XW, XE and the gone countries - XC, XG, SU, YU, CS - ahead of Locale's English name; XU left out) |
 | Released | getAlbum's `releaseDate`, else the files' DATE, else the album's `year` |
 | First released | getAlbum's `originalReleaseDate`, else the files' ORIGINALDATE, else the bridge's `original_year` - only when it isn't Released |
 | Type | getAlbum's `releaseTypes` (+ Compilation from `isCompilation`), else the files' RELEASETYPE |
 | Status | the files' RELEASESTATUS - read raw: it isn't among DETAIL_TAGS |
 | Edition | the bridge's `edition` (deadwax's own words for the pressing), else getAlbum's `version` |
 | Genres | getAlbum's `genres`, else the album's `genre`, else the files' GENRE |
-| Added | the bridge's earliest `first_seen`, ", downloaded by deadwax" when any folder's `imported` |
+| Added | the bridge's earliest `first_seen`, ", downloaded by deadwax" when that earliest folder is `imported` |
 | Release, Release group (and their pages) | the bridge's `release_mbid` (else the album's `musicBrainzId`), its `release_group_mbid` (else the files' MUSICBRAINZ_RELEASEGROUPID) |
 | Folder(s) | the bridge's `present` paths (AboutCard.folderLine), for an admin (`Access.isAdmin`, as Info's) |
 
@@ -10236,16 +10236,17 @@ MP4 has no names for - an M4A's every one is raw), `WM/…` for ASF. AlbumTag ho
   copyable / link), `AlbumInfoSection`, `AlbumInfoWords`, and `AlbumInfo`'s rules: `quality`, `theAlbum`, `onPhone`,
   `release`, `musicBrainz` (a page made only for a UUID-shaped id), `server`, then `local` (Quality, The album, On this
   phone) and `fromServer` (The release, MusicBrainz, On the server), each leaving out a section with no lines;
-  `foldersToRead` (the bridge's present paths, each once, at most 8); `media`, `country`, `dateWords`.
+  `foldersToRead` (the bridge's present paths, each once, at most 8), `foldersAtOnce` (2); `media`, `country`,
+  `dateWords`.
 - **Routes.swift**: `libraryTracks` (and 30 s); **DeadwaxClient**: `albumFiles(folder:)`.
 
 ### The app
 
 - **Album/AlbumInfoAsk.swift**: what the sheet asks while open, Info's settle pattern (InfoAsk.details): getAlbum
   again (`albumAnswered` - the whole album, and AlbumExtras from the same body), the bridge, and - once the bridge names
-  them - every folder's files at once; all held for each other until in or AlbumInfoWords.settleSeconds (3 s) has gone,
-  then each landing as it comes. Only the files' failing is said, and only when every folder failed (ErrorNote, a 404
-  as "isn't where deadwax last saw it").
+  them - the folders' files, two at a time (After review); all held for each other until in or
+  AlbumInfoWords.settleSeconds (3 s) has gone, then each landing as it comes. What failed is kept for the list to say
+  (After review).
 - **Album/AlbumInfoView.swift**: `AlbumInfoList` (the list - the header's cover, title and artist, then the sections;
   Copy, links, the reading row, the offline line) and `AlbumInfoSheet` (it in a NavigationStack with Done).
 - **QueueMenu**: `QueueMenuRequest.albumInfo`, a button in the last section. **AlbumView**: sets it, and presents the
@@ -10275,8 +10276,6 @@ MP4 has no names for - an M4A's every one is raw), `WM/…` for ASF. AlbumTag ho
 - **MusicBrainz's release disambiguation and packaging**: Picard writes neither into the files by default, and
   getAlbum doesn't carry them; asking MusicBrainz from the sheet would be a second source that can disagree with the
   files. The bridge's `edition` (deadwax's own words for the pressing) stands in for the disambiguation.
-- **The codec inside an M4A** (ALAC or AAC): Navidrome's `suffix` says "m4a" either way; the format says M4A, with
-  Navidrome's depth when it gives one (an ALAC's), the bitrate otherwise.
 - **An album not matched to MusicBrainz** has no bridge folder (the bridge is keyed on the release), so no files are
   read and none of the five tag-only lines show: the docs say so.
 - **More than eight folders** of one album are not read (`foldersRead`): a set kept per disc is a handful; a dozen
@@ -10284,7 +10283,7 @@ MP4 has no names for - an M4A's every one is raw), `WM/…` for ASF. AlbumTag ho
 
 ### Tests
 
-- **AlbumInfoTests** (DeadwaxCoreTests, 24): every tag in each container from the route's own answers, media per
+- **AlbumInfoTests** (DeadwaxCoreTests, 24; 31 after review): every tag in each container from the route's own answers, media per
   disc, the named tag before raw, Quality's lines and mixes, the bitrate, channels, the album's lines, On this phone,
   the release from each source and in what order, dates and countries in words, the ids and their pages (and an id
   that isn't one), the folders, which folders are read, empty sections left out, getAlbum's other fields read
@@ -10306,3 +10305,66 @@ unchanged; the full pytest suite. **Not verified** - only the phone and a real l
 getAlbum is in the repo); what Picard-tagged and deadwax-filed albums in the real library actually carry; how long the
 tracks route takes on the NAS for a box set on a sleeping disk; the sheet's look at the largest text and with
 VoiceOver; Copy; and Safari opening musicbrainz.org beside the app.
+
+### Album info after review (2026-11-15)
+
+The coordinator's review of 38b404a, every item fixed in one commit; still app 0.13, still no server change.
+
+- **deadwax's own media, said once.** organizer.py's `write_tags` writes `media` as the job's `media_format` - the
+  WHOLE release's formats joined " + " (GetRelease.swift's and releasePayload.ts's join) - into every file of the set,
+  so per-disc folding read a 2-CD set as "2×CD + CD". `AlbumInfo.media` now takes the commonest value holding " + "
+  once, split and folded as Pressings.format folds ("CD + CD" -> "2×CD"); without one, Picard's per-disc reading as
+  before. The fixture gained two deadwax-filed cases, written by `write_tags` itself (album_files_answers.py's
+  FILED_SET, a 2-CD FLAC set, and FILED_SINGLE, an M4A), and the contract test holds the join the same in all three
+  places. The docs' claim that nothing goes into an M4A was wrong: Easy MP4 registers `releasecountry` (as
+  `----:com.apple.iTunes:MusicBrainz Release Country`), so the country does - only media and the catalogue number
+  don't (no Easy MP4 names), and the sheet reads the country raw from an M4A by that name.
+- **An M4A's codec: a lossless allowlist, not a lossy list.** A depth is drawn only for Sources.losslessFormats
+  (flac, alac, ape, wav, aiff, aif, wv) or an MP4 whose audio is ALAC. The rule for an MP4 (m4a, mp4, m4b), since
+  Navidrome's suffix ("m4a") and type ("audio/mp4") never say: ALAC when the contentType names "alac", AAC when it
+  names "aac", and otherwise ALAC only when the album's MP4 songs average over 400 kbps by length (`alacOverKbps`:
+  iTunes and Apple Music AAC is at most 320, ALAC rarely under 500 even for quiet 16-bit music). Decided for the album,
+  so one quiet song of an ALAC album isn't AAC. Said "ALAC" or "AAC", never "M4A". An ALAC quieter than 400 kbps is
+  said as AAC with its bitrate - the error that never claims a depth for a lossy file. TagLib's 16 bits for an AAC
+  never reaches the line.
+- **The Bitrate line only for an all-lossless album.** A lossy kind says its bitrate on its Format line already, so a
+  Bitrate line under it repeated it, and under a mix it averaged FLAC with MP3 into a figure nothing has. It shows now
+  only when every kind has a depth.
+- **No spinner left turning.** A cancelled asking (deadwax out of reach mid-read, the sheet going) used to leave its
+  last `reading = true` answer standing. `ask()` now numbers each asking, and when one ends, its own last answer, if
+  still reading, is marked not reading and `cut`; a later asking's answer is left alone. The offline line now shows
+  whenever deadwax is out of reach and the answer isn't `complete` (nothing cut, failed, missing or still reading) -
+  not only before any answer came.
+- **Countries that have gone.** MusicBrainz still lists XC Czechoslovakia, XG East Germany, SU Soviet Union, YU
+  Yugoslavia and CS Serbia and Montenegro, which Locale names oddly or not at all; they're named by MusicBrainz's own
+  words ahead of Locale, with XW and XE. XU (unknown) is no country: no Country line.
+- **Failures said, in a listener's words.** getAlbum failing, the bridge failing, the files failing, and getAlbum
+  answering no album, each said once under the sections through ErrorNote / ErrorWords.of (`albumFailed`,
+  `storeFailed`, `filesFailed`; a 404 as `ErrorWords.albumGone` or `filesGone`) - the first of them in that order,
+  since a later one follows from an earlier. A bridge with no folder (an album not matched to MusicBrainz) is no
+  failure, so it's said quietly (`noFolder`), not as an error. Info's playlist stub, whose own lines wait for getAlbum,
+  now says why they never came when it fails.
+- **Two folders read at a time** (`foldersAtOnce`), the next started as each lands: each read takes one of the
+  server's threads and opens every file of a folder on a disk that may have to wake; eight at once was a box set
+  holding a NAS's thread pool.
+- **Words**: release types "dj-mix" -> "DJ mix", "mixtape/street" -> "Mixtape/Street", "spokenword" -> "Spoken word";
+  ID3v2.3's "/"-joined values split (Mixtape/Street kept whole). "downloaded by deadwax" only when the earliest
+  folder - the one Added's date is - is the one deadwax filed: a copy filed later beside an older one didn't make the
+  older one deadwax's.
+- **More container names**: ASF `musicbrainz/release group id`, MP4 `----:com.apple.itunes:originaldate`, ASF
+  `wm/originalreleasetime`, and MP4's `----:com.apple.itunes:musicbrainz release country` (deadwax's own).
+- **libraryTracks' 30 s, held.** Routes.swift's comment said the contract test held it; it didn't. It does now
+  (`test_the_app_waits_for_an_albums_files_as_long_as_the_route_takes`): above the transport's own 8 s
+  (URLSessionTransport.standardTimeout) and above settleSeconds, with the route still unbounded (`asyncio.to_thread`,
+  no `wait_for`), and foldersAtOnce 2.
+- **Info's Album info stays on the album it was opened for** (decided): the row is a value link
+  (`NavigationLink(value: AlbumInfoPush)`) with `.navigationDestination(for:)` on Info's stack, so the pushed page
+  isn't tied to the List, which Info draws afresh (`.id`) for each song. Before, a pushed page belonged to a row of a
+  List that was replaced when the song changed - it could pop or change album under a reader. Following the song
+  would change a page someone is reading; Back to Info shows the song now playing instead.
+
+Tests after review: AlbumInfoTests 31 (deadwax's whole-release media, the deadwax-filed FLAC and M4A, AAC and ALAC
+by type and by bitrate, the bitrate said once, release types, Added's earliest folder, the containers' names for the
+dates and the group, the gone countries and XU); the contract test's tag expectations for both deadwax cases and the
+new timeout test. **Verified** and **not** as before: the Core and contract tests, the device build, pytest; not the
+sheet on the phone (checks 260-270, extended for AAC, the cut read, Info's push, the no-folder line).

@@ -424,6 +424,329 @@
      }
     ]
    }
+  },
+  {
+   "name": "deadwax-flac",
+   "answer": {
+    "album": "The Chemical Brothers/Exit Planet Dust",
+    "files": [
+     {
+      "filename": "01 Leave Home.flac",
+      "format": "flac",
+      "size": 1470,
+      "length": 0.0,
+      "bitrate": null,
+      "sample_rate": 44100,
+      "bits_per_sample": 16,
+      "channels": 2,
+      "codec": "FLAC",
+      "position": 1,
+      "disc": 1,
+      "tags": {
+       "title": "Leave Home",
+       "artist": "The Chemical Brothers",
+       "albumartist": "The Chemical Brothers",
+       "album": "Exit Planet Dust",
+       "tracknumber": "1",
+       "discnumber": "1",
+       "date": "2015",
+       "originaldate": "1995",
+       "catalognumber": "XDUSTCD1X",
+       "releasecountry": "GB",
+       "media": "CD + CD",
+       "musicbrainz_albumid": "6d5d6161-9c70-4f7a-bf3c-7e5e7e5e4d32",
+       "musicbrainz_releasegroupid": "5c505030-8b6f-4e69-ae2b-6d4c6d4d3c21"
+      },
+      "raw": [
+       [
+        "album",
+        "Exit Planet Dust"
+       ],
+       [
+        "albumartist",
+        "The Chemical Brothers"
+       ],
+       [
+        "artist",
+        "The Chemical Brothers"
+       ],
+       [
+        "catalognumber",
+        "XDUSTCD1X"
+       ],
+       [
+        "date",
+        "2015"
+       ],
+       [
+        "discnumber",
+        "1"
+       ],
+       [
+        "media",
+        "CD + CD"
+       ],
+       [
+        "musicbrainz_albumid",
+        "6d5d6161-9c70-4f7a-bf3c-7e5e7e5e4d32"
+       ],
+       [
+        "musicbrainz_releasegroupid",
+        "5c505030-8b6f-4e69-ae2b-6d4c6d4d3c21"
+       ],
+       [
+        "originaldate",
+        "1995"
+       ],
+       [
+        "releasecountry",
+        "GB"
+       ],
+       [
+        "title",
+        "Leave Home"
+       ],
+       [
+        "tracknumber",
+        "1"
+       ]
+      ],
+      "pictures": []
+     },
+     {
+      "filename": "02 In Dust We Trust.flac",
+      "format": "flac",
+      "size": 1476,
+      "length": 0.0,
+      "bitrate": null,
+      "sample_rate": 44100,
+      "bits_per_sample": 16,
+      "channels": 2,
+      "codec": "FLAC",
+      "position": 2,
+      "disc": 1,
+      "tags": {
+       "title": "In Dust We Trust",
+       "artist": "The Chemical Brothers",
+       "albumartist": "The Chemical Brothers",
+       "album": "Exit Planet Dust",
+       "tracknumber": "2",
+       "discnumber": "1",
+       "date": "2015",
+       "originaldate": "1995",
+       "catalognumber": "XDUSTCD1X",
+       "releasecountry": "GB",
+       "media": "CD + CD",
+       "musicbrainz_albumid": "6d5d6161-9c70-4f7a-bf3c-7e5e7e5e4d32",
+       "musicbrainz_releasegroupid": "5c505030-8b6f-4e69-ae2b-6d4c6d4d3c21"
+      },
+      "raw": [
+       [
+        "album",
+        "Exit Planet Dust"
+       ],
+       [
+        "albumartist",
+        "The Chemical Brothers"
+       ],
+       [
+        "artist",
+        "The Chemical Brothers"
+       ],
+       [
+        "catalognumber",
+        "XDUSTCD1X"
+       ],
+       [
+        "date",
+        "2015"
+       ],
+       [
+        "discnumber",
+        "1"
+       ],
+       [
+        "media",
+        "CD + CD"
+       ],
+       [
+        "musicbrainz_albumid",
+        "6d5d6161-9c70-4f7a-bf3c-7e5e7e5e4d32"
+       ],
+       [
+        "musicbrainz_releasegroupid",
+        "5c505030-8b6f-4e69-ae2b-6d4c6d4d3c21"
+       ],
+       [
+        "originaldate",
+        "1995"
+       ],
+       [
+        "releasecountry",
+        "GB"
+       ],
+       [
+        "title",
+        "In Dust We Trust"
+       ],
+       [
+        "tracknumber",
+        "2"
+       ]
+      ],
+      "pictures": []
+     },
+     {
+      "filename": "03 Chemical Beats (live).flac",
+      "format": "flac",
+      "size": 1481,
+      "length": 0.0,
+      "bitrate": null,
+      "sample_rate": 44100,
+      "bits_per_sample": 16,
+      "channels": 2,
+      "codec": "FLAC",
+      "position": 1,
+      "disc": 2,
+      "tags": {
+       "title": "Chemical Beats (live)",
+       "artist": "The Chemical Brothers",
+       "albumartist": "The Chemical Brothers",
+       "album": "Exit Planet Dust",
+       "tracknumber": "1",
+       "discnumber": "2",
+       "date": "2015",
+       "originaldate": "1995",
+       "catalognumber": "XDUSTCD1X",
+       "releasecountry": "GB",
+       "media": "CD + CD",
+       "musicbrainz_albumid": "6d5d6161-9c70-4f7a-bf3c-7e5e7e5e4d32",
+       "musicbrainz_releasegroupid": "5c505030-8b6f-4e69-ae2b-6d4c6d4d3c21"
+      },
+      "raw": [
+       [
+        "album",
+        "Exit Planet Dust"
+       ],
+       [
+        "albumartist",
+        "The Chemical Brothers"
+       ],
+       [
+        "artist",
+        "The Chemical Brothers"
+       ],
+       [
+        "catalognumber",
+        "XDUSTCD1X"
+       ],
+       [
+        "date",
+        "2015"
+       ],
+       [
+        "discnumber",
+        "2"
+       ],
+       [
+        "media",
+        "CD + CD"
+       ],
+       [
+        "musicbrainz_albumid",
+        "6d5d6161-9c70-4f7a-bf3c-7e5e7e5e4d32"
+       ],
+       [
+        "musicbrainz_releasegroupid",
+        "5c505030-8b6f-4e69-ae2b-6d4c6d4d3c21"
+       ],
+       [
+        "originaldate",
+        "1995"
+       ],
+       [
+        "releasecountry",
+        "GB"
+       ],
+       [
+        "title",
+        "Chemical Beats (live)"
+       ],
+       [
+        "tracknumber",
+        "1"
+       ]
+      ],
+      "pictures": []
+     }
+    ]
+   }
+  },
+  {
+   "name": "deadwax-m4a",
+   "answer": {
+    "album": "M83/Midnight City",
+    "files": [
+     {
+      "filename": "01 Midnight City.m4a",
+      "format": "m4a",
+      "size": 2211,
+      "length": 0.2,
+      "bitrate": 359,
+      "sample_rate": 8000,
+      "bits_per_sample": 16,
+      "channels": 1,
+      "codec": "mp4a.40.2",
+      "position": 1,
+      "disc": null,
+      "tags": {
+       "title": "Midnight City",
+       "artist": "M83",
+       "albumartist": "M83",
+       "album": "Midnight City",
+       "tracknumber": "1",
+       "date": "2011",
+       "releasecountry": "US",
+       "musicbrainz_albumid": "7e6e7272-ad81-4a8b-c04d-8f6f8f6f5e43"
+      },
+      "raw": [
+       [
+        "----:com.apple.iTunes:MusicBrainz Album Id",
+        "7e6e7272-ad81-4a8b-c04d-8f6f8f6f5e43"
+       ],
+       [
+        "----:com.apple.iTunes:MusicBrainz Release Country",
+        "US"
+       ],
+       [
+        "aART",
+        "M83"
+       ],
+       [
+        "trkn",
+        "1"
+       ],
+       [
+        "\u00a9ART",
+        "M83"
+       ],
+       [
+        "\u00a9alb",
+        "Midnight City"
+       ],
+       [
+        "\u00a9day",
+        "2011"
+       ],
+       [
+        "\u00a9nam",
+        "Midnight City"
+       ]
+      ],
+      "pictures": []
+     }
+    ]
+   }
   }
  ]
 }

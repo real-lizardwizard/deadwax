@@ -42,7 +42,7 @@ import Testing
 
     @Test func theRoutesAnswerIsRead() throws {
         let answers = try JSONDecoder().decode(Answers.self, from: Fixtures.data("albuminfo/files.json"))
-        #expect(answers.cases.map(\.name) == ["flac", "mp3", "m4a"])
+        #expect(answers.cases.map(\.name) == ["flac", "mp3", "m4a", "deadwax-flac", "deadwax-m4a"])
         let flac = try Self.files("flac")
         #expect(flac.count == 3)
         #expect(flac.map(\.disc) == [1, 1, 2])
@@ -92,6 +92,26 @@ import Testing
         #expect(AlbumInfo.values(files, .type) == ["single"])
     }
 
+    @Test func anAlbumDeadwaxFiledSaysWhatItsFilingWrote() throws {
+        // a 2-CD set: the whole release's formats in every file ("CD + CD"), said once, folded
+        let set = try Self.files("deadwax-flac")
+        #expect(set.map { $0.tags?["media"] } == ["CD + CD", "CD + CD", "CD + CD"])
+        #expect(AlbumInfo.media(set) == "2\u{00D7}CD")
+        #expect(AlbumInfo.values(set, .catalogueNumber) == ["XDUSTCD1X"])
+        #expect(AlbumInfo.values(set, .country) == ["GB"])
+        #expect(AlbumInfo.values(set, .status) == [] && AlbumInfo.values(set, .barcode) == [])
+        let rows = AlbumInfo.release(album: Album(id: "al"), extras: nil, store: nil, files: set, countryName: Self.named)
+        #expect(rows.map(\.label) == ["Media", "Catalogue number", "Country", "Released", "First released"])
+        #expect(rows.map(\.value) == ["2\u{00D7}CD", "XDUSTCD1X", "United Kingdom", "2015", "1995"])
+        // an M4A: Easy MP4 took the country (its own name for it), not the media or the catalogue number
+        let single = try Self.files("deadwax-m4a")
+        #expect(single.first?.tags?["releasecountry"] == "US")
+        #expect(AlbumInfo.media(single) == nil)
+        #expect(AlbumInfo.values(single, .catalogueNumber) == [])
+        #expect(AlbumInfo.release(album: Album(id: "al"), extras: nil, store: nil, files: single, countryName: Self.named)
+            .first { $0.label == "Country" }?.value == "United States")
+    }
+
     @Test func theReleaseSectionInWords() throws {
         let album = Album(id: "al", name: "The Dark Side of the Moon")
         let flac = AlbumInfo.release(album: album, extras: nil, store: nil, files: try Self.files("flac"), countryName: Self.named)
@@ -114,12 +134,28 @@ import Testing
         }
         #expect(AlbumInfo.media([file(1, "CD"), file(1, "CD")]) == "CD")
         #expect(AlbumInfo.media([file(1, "CD"), file(2, "cd"), file(3, "DVD-Video")]) == "2\u{00D7}CD + DVD-Video")
+        // a run is folded, as MusicBrainz writes a release's format - not every disc of a kind counted together
+        #expect(AlbumInfo.media([file(1, "CD"), file(2, "DVD-Video"), file(3, "CD")]) == "CD + DVD-Video + CD")
         // a disc's medium is the one most of its files name; a file with no disc is disc 1
         #expect(AlbumInfo.media([file(nil, "Vinyl"), file(1, "Vinyl"), file(1, "CD")]) == "Vinyl")
         #expect(AlbumInfo.media([file(1, nil), file(2, nil)]) == nil)
         #expect(AlbumInfo.media([]) == nil)
         // a disc whose files say nothing is left out, the others still said
         #expect(AlbumInfo.media([file(1, nil), file(2, "Blu-ray")]) == "Blu-ray")
+    }
+
+    @Test func deadwaxsWholeReleaseMediaIsSaidOnce() {
+        func file(_ disc: Int?, _ medium: String) -> AlbumFile { AlbumFile(disc: disc, tags: ["media": medium]) }
+        // deadwax's filing writes every medium's format, joined, into every file: never counted per disc
+        #expect(AlbumInfo.media([file(1, "CD + CD"), file(2, "CD + CD")]) == "2\u{00D7}CD")
+        #expect(AlbumInfo.media([file(1, "CD + DVD-Video"), file(2, "CD + DVD-Video")]) == "CD + DVD-Video")
+        #expect(AlbumInfo.media([file(1, "CD + CD + DVD-Video"), file(1, "CD + CD + DVD-Video"), file(3, "CD + CD + DVD-Video")])
+            == "2\u{00D7}CD + DVD-Video")
+        #expect(AlbumInfo.media([file(nil, "12\" Vinyl + 12\" Vinyl + 12\" Vinyl")]) == "3\u{00D7}12\" Vinyl")
+        // a few files retagged by hand: the commonest whole value still wins
+        #expect(AlbumInfo.media([file(1, "CD + CD"), file(1, "CD + CD"), file(2, "CD")]) == "2\u{00D7}CD")
+        // the same medium in another case is still one run
+        #expect(AlbumInfo.media([file(1, "CD + cd"), file(2, "CD + cd")]) == "2\u{00D7}CD")
     }
 
     @Test func theNamedTagWinsAndRawIsReadByAnyCase() {
@@ -170,6 +206,45 @@ import Testing
         #expect(AlbumInfo.quality(typed).first?.value == "FLAC · 16-bit / 44.1 kHz")
         // nothing said of the file: no Format line at all
         #expect(AlbumInfo.quality([Self.song("n", suffix: "", bits: nil, rate: nil, bitRate: nil, channels: nil, size: nil)]).isEmpty)
+        // a depth only for a lossless format: one nobody lists says its bitrate
+        #expect(AlbumInfo.quality([Self.song("d", suffix: "dsf", bits: 1, rate: 2_822_400, bitRate: 5645)]).first?.value
+            == "DSF · 5,645 kbps")
+    }
+
+    @Test func anM4AIsAACOrALACByWhatItCarries() {
+        // an iTunes AAC album: Navidrome says "m4a", "audio/mp4" and 16 bits - never "M4A · 16-bit / 44.1 kHz"
+        let aac = Self.songs(10) { Self.song("a\($0)", suffix: "m4a", bits: 16, bitRate: 256, contentType: "audio/mp4") }
+        let rows = AlbumInfo.quality(aac)
+        #expect(rows.first?.value == "AAC · 256 kbps · all 10 songs")
+        #expect(!rows.contains { $0.label == "Bitrate" })
+        // ALAC: its bitrate says so, decided for the album - its one quiet song still ALAC
+        let alac = Self.songs(9) { Self.song("l\($0)", suffix: "m4a", bits: 24, rate: 96000, bitRate: 2600) }
+            + [Self.song("quiet", suffix: "m4a", bits: 24, rate: 96000, bitRate: 380)]
+        let format = AlbumInfo.quality(alac).first
+        #expect(format?.value == "ALAC · 24-bit / 96 kHz · all 10 songs")
+        #expect(AlbumInfo.quality(alac).contains { $0.label == "Bitrate" })
+        // a type naming its codec decides, whatever the bitrate
+        #expect(AlbumInfo.quality([Self.song("t", suffix: "m4a", bits: 16, bitRate: 350, contentType: "audio/x-alac")])
+            .first?.value == "ALAC · 16-bit / 44.1 kHz")
+        #expect(AlbumInfo.quality([Self.song("u", suffix: "m4a", bits: 16, bitRate: 900, contentType: "audio/aac")])
+            .first?.value == "AAC · 900 kbps")
+        // at the line: over 400 kbps on average is ALAC
+        #expect(AlbumInfo.mp4Lossless([Self.song("x", suffix: "m4a", bitRate: 400)]) == false)
+        #expect(AlbumInfo.mp4Lossless([Self.song("y", suffix: "m4a", bitRate: 401)]) == true)
+        #expect(AlbumInfo.mp4Lossless([Self.song("z", suffix: "flac", bitRate: 900)]) == false)
+    }
+
+    @Test func theBitrateIsSaidOnce() {
+        // a lossy album's Format line says it: no Bitrate line too
+        let mp3 = Self.songs(3) { Self.song("m\($0)", suffix: "mp3", bits: nil, bitRate: 320) }
+        #expect(AlbumInfo.quality(mp3).map(\.label) == ["Format", "Channels"])
+        #expect(AlbumInfo.quality(mp3).first?.value == "MP3 · 320 kbps · all 3 songs")
+        // a lossless one's doesn't: the Bitrate line does
+        let flac = Self.songs(2) { Self.song("f\($0)", bitRate: 1000) }
+        #expect(AlbumInfo.quality(flac).map(\.label) == ["Format", "Bitrate", "Channels"])
+        // lossless and lossy together: each lossy line says its own, nothing averaged across them
+        let both = Self.songs(8) { Self.song("f\($0)", bitRate: 1000) } + Self.songs(2) { Self.song("m\($0)", suffix: "mp3", bits: nil, bitRate: 320) }
+        #expect(AlbumInfo.quality(both).map(\.label) == ["Format", "Channels"])
     }
 
     @Test func theBitrate() {
@@ -238,8 +313,8 @@ import Testing
                                  genres: [.init(name: "Progressive Rock"), .init(name: "Rock"), .init(name: "rock")],
                                  isCompilation: true, recordLabels: [.init(name: "Harvest"), .init(name: "Capitol")])
         let store = StoreAlbum(present: [
-            StoreRow(id: 1, path: "Pink Floyd/DSOTM [Box]", edition: "Immersion", firstSeen: "2026-10-14T23:30:00+00:00", imported: false),
-            StoreRow(id: 2, path: "Pink Floyd/DSOTM [Box] (Disc 2)", firstSeen: "2026-10-20T08:00:00+00:00", imported: true),
+            StoreRow(id: 1, path: "Pink Floyd/DSOTM [Box]", edition: "Immersion", firstSeen: "2026-10-14T23:30:00+00:00", imported: true),
+            StoreRow(id: 2, path: "Pink Floyd/DSOTM [Box] (Disc 2)", firstSeen: "2026-10-20T08:00:00+00:00", imported: false),
         ])
         let rows = AlbumInfo.release(album: album, extras: extras, store: store, files: try Self.files("flac"),
                                      countryName: Self.named, timeZone: TimeZone(identifier: "UTC")!)
@@ -251,7 +326,7 @@ import Testing
         // deadwax's edition over the files' version
         #expect(said["Edition"] == "Immersion")
         #expect(said["Genres"] == "Progressive Rock, Rock")
-        // the earliest folder's day, and that deadwax filed one of them
+        // the earliest folder's day, and that deadwax filed that one
         #expect(said["Added"] == "14 October 2026, downloaded by deadwax")
         // in the reader's own time zone, the day it was there
         let london = AlbumInfo.release(album: album, extras: extras, store: store, files: nil,
@@ -285,9 +360,51 @@ import Testing
         #expect(AlbumInfo.country("XW", name: Self.named) == "Worldwide")
         #expect(AlbumInfo.country("xe", name: Self.named) == "Europe")
         #expect(AlbumInfo.country("gb", name: Self.named) == "United Kingdom")
+        // MusicBrainz's countries that have gone, by its names, ahead of any Locale's
+        let gone = ["XC": "Czechoslovakia", "XG": "East Germany", "SU": "Soviet Union", "YU": "Yugoslavia",
+                    "CS": "Serbia and Montenegro"]
+        for (code, words) in gone {
+            #expect(AlbumInfo.country(code, name: { _ in "a Locale's name" }) == words, "\(code)")
+        }
+        // the unknown country is said by no line
+        #expect(AlbumInfo.country("XU", name: Self.named) == nil)
+        #expect(AlbumInfo.country(" ", name: Self.named) == nil)
+        let unknown = AlbumInfo.release(album: Album(id: "u"), extras: nil, store: nil,
+                                        files: [AlbumFile(tags: ["releasecountry": "XU"])], countryName: Self.named)
+        #expect(!unknown.contains { $0.label == "Country" })
         // a code nobody names, or not a code at all, as it is
         #expect(AlbumInfo.country("ZZ", name: Self.named) == "ZZ")
         #expect(AlbumInfo.country("Mars", name: Self.named) == "Mars")
+    }
+
+    @Test func releaseTypesInWords() {
+        #expect(AlbumInfo.typeWords(["dj-mix"], compilation: false) == "DJ mix")
+        #expect(AlbumInfo.typeWords(["mixtape/street"], compilation: false) == "Mixtape/Street")
+        // ID3v2.3's one frame of several, joined by "/" - the one type with a slash in its name kept whole
+        #expect(AlbumInfo.typeWords(["album/live"], compilation: false) == "Album · Live")
+        #expect(AlbumInfo.typeWords(["Album/Mixtape/Street"], compilation: false) == "Album · Mixtape/Street")
+        #expect(AlbumInfo.typeWords(["album; compilation", "ep, spokenword"], compilation: true)
+            == "Album · Compilation · EP · Spoken word")
+        #expect(AlbumInfo.typeWords([" / "], compilation: false) == nil)
+    }
+
+    @Test func addedSaysDeadwaxOnlyOfTheFolderItFiledFirst() {
+        let utc = TimeZone(identifier: "UTC")!
+        // the earliest folder was there before deadwax; a later one it filed doesn't make the album its download
+        let later = [StoreRow(id: 1, path: "a", firstSeen: "2026-10-14T10:00:00+00:00", imported: false),
+                     StoreRow(id: 2, path: "b", firstSeen: "2026-10-20T10:00:00+00:00", imported: true)]
+        #expect(AlbumInfo.addedWords(later, timeZone: utc) == "14 October 2026")
+        let first = [StoreRow(id: 1, path: "a", firstSeen: "2026-10-20T10:00:00+00:00", imported: false),
+                     StoreRow(id: 2, path: "b", firstSeen: "2026-10-14T10:00:00.250+00:00", imported: true)]
+        #expect(AlbumInfo.addedWords(first, timeZone: utc) == "14 October 2026, downloaded by deadwax")
+        #expect(AlbumInfo.addedWords([StoreRow(id: 1, path: "a", firstSeen: "soon")], timeZone: utc) == nil)
+    }
+
+    @Test func everyContainersNameForTheDatesAndTheGroup() {
+        #expect(AlbumFile(raw: [["----:com.apple.iTunes:ORIGINALDATE", "1995-03-27"]]).values(.originalDate) == ["1995-03-27"])
+        #expect(AlbumFile(raw: [["WM/OriginalReleaseTime", "1995"]]).values(.originalDate) == ["1995"])
+        #expect(AlbumFile(raw: [["MusicBrainz/Release Group Id", Self.group]]).values(.releaseGroup) == [Self.group])
+        #expect(AlbumFile(raw: [["----:com.apple.iTunes:MusicBrainz Release Country", "GB"]]).values(.country) == ["GB"])
     }
 
     // MARK: MusicBrainz and the server

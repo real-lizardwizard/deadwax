@@ -439,33 +439,48 @@ yet, so its first song is less likely to wait when you play it.
 album as a whole, grouped. A line with nothing to say is left out, never shown as "Unknown".
 
 - **Quality**: **Format** - "FLAC · 24-bit / 96 kHz · all 10 songs", or one line for each kind when the songs
-  differ ("FLAC · 16-bit / 44.1 kHz · 8 of 10 songs", "MP3 · 320 kbps · 2 of 10 songs"); an MP3 or AAC never shows a
-  bit depth. **Bitrate**: "320 kbps" when every song has the same, otherwise "1,350 kbps on average" (each song's
-  bitrate weighed by its length). **Channels**: Mono, Stereo, 5.1 surround, 7.1 surround.
+  differ ("FLAC · 16-bit / 44.1 kHz · 8 of 10 songs", "MP3 · 320 kbps · 2 of 10 songs"). Only a lossless format
+  (FLAC, ALAC, APE, WAV, AIFF, WavPack) shows a bit depth; anything else - MP3, AAC, Opus, DSF - shows its bitrate on
+  the same line instead ("MP3 · 245 kbps on average"). An M4A says which of the two is inside it: **ALAC** when the
+  file's type names ALAC, **AAC** when it names AAC, and otherwise - Navidrome calls both "audio/mp4" - ALAC only when
+  the album's M4As average over 400 kbps (iTunes' and Apple Music's AAC is at most 320; ALAC is rarely under 500), so
+  an AAC is never shown as "16-bit / 44.1 kHz". **Bitrate**, for an album that is all lossless: "1,411 kbps" when
+  every song has the same, otherwise "1,350 kbps on average" (each song's bitrate weighed by its length). An album
+  that mixes lossless and lossy files has no Bitrate line - each kind says its own. **Channels**: Mono, Stereo, 5.1
+  surround, 7.1 surround.
 - **The album**: how many **Songs**; **Discs** when there's more than one, with each disc's title and songs ("Disc
   2 · Live at Wembley · 3 songs"), or the **Disc title** of a single disc that has one; its **Length** and **Size**.
 - **On this phone**: **Downloaded** - "All 10 songs · 412 MB", "3 of 12 songs · 92 MB" or "Not downloaded", with
   what's under way ("Downloading - 4 of 12 songs", "Waiting for Wi-Fi") under it.
 - **The release**: **Media** ("CD", "2×CD + DVD-Video", 12" Vinyl, "Digital Media"), **Label**, **Catalogue
-  number**, **Barcode**, **Country** ("United Kingdom", "Worldwide"), **Released** and **First released** (when it
-  isn't the same: "26 September 2011", "1 March 1973"), **Type** ("Album · Live", "Compilation"), **Status**
-  ("Official", "Promotion"), **Edition**, **Genres**, and **Added** - when deadwax first saw the album, with
-  "downloaded by deadwax" for one it filed itself.
+  number**, **Barcode**, **Country** ("United Kingdom", "Worldwide", "Europe", and the countries MusicBrainz still
+  lists that have gone: "Soviet Union", "East Germany", "Czechoslovakia", "Yugoslavia", "Serbia and Montenegro";
+  MusicBrainz's "unknown country" is left out), **Released** and **First released** (when it isn't the same: "26
+  September 2011", "1 March 1973"), **Type** ("Album · Live", "Compilation", "DJ mix", "Mixtape/Street"),
+  **Status** ("Official", "Promotion"), **Edition**, **Genres**, and **Added** - when deadwax first saw the album,
+  with "downloaded by deadwax" when that first copy is one deadwax downloaded and filed itself.
 - **MusicBrainz**: the **Release** and **Release group** ids, each with a **Copy** button, and **This pressing on
   MusicBrainz** and **Every pressing on MusicBrainz**, which open those pages in Safari.
 - **On the server**, for an admin: the album's **Folder** (one per disc for a set kept that way), with **Copy**.
 
 The media, catalogue number, barcode, country and status come from the album's files themselves, read as the sheet
-opens - so they show only for an album whose files carry them. MusicBrainz Picard writes all five. deadwax writes the
-media, country and catalogue number when it files an album (not into an M4A, which has no place for them), and never
-the barcode or status. An album that isn't matched to MusicBrainz has no folder deadwax knows by its id, so none of the
-five show for it.
+opens - so they show only for an album whose files carry them. MusicBrainz Picard writes all five. When deadwax files
+an album it writes the country into every file, and the media and catalogue number into a FLAC or MP3 but not an M4A
+(the tag library it writes with has no M4A names for those two); it never writes the barcode or status. Its media
+is the whole release's ("CD + CD" in every file of a 2-CD set), which Album info says once, as "2×CD". An album that
+isn't matched to MusicBrainz has no folder deadwax knows by its id, so none of the five show for it - the sheet says
+"deadwax doesn't know where this album's files are, so nothing was read from them."
 
 The first three parts show at once. The rest comes from deadwax: "Reading the album's files…" shows for a moment
-in their place (a box set on a disk that's asleep can take a while), then they appear. While deadwax can't be reached,
-the sheet shows what the phone has - with the label, year and genre the album already said - and "The rest shows once
-deadwax is back."; it fills in by itself when deadwax is back. If the files can't be read, it says so where they
-would have been.
+in their place (a box set on a disk that's asleep can take a while - its folders are read two at a time), then they
+appear. While deadwax can't be reached, the sheet shows what the phone has - with the label, year and genre the album
+already said - and, while anything is still missing, "The rest shows once deadwax is back."; it fills in by itself
+when deadwax is back. If something couldn't be asked - the album itself, where its files are, or the files - the
+sheet says which, and why, in a line of its own ("The album's files couldn't be read just now. …"), so a missing line
+never looks like a tag the files don't have.
+
+Opened from Info, it stays on the album it was opened for: if the song changes to another album while you're reading
+it, the page doesn't change under you. Back returns to Info, which by then shows the song now playing.
 
 Each id, the barcode, the catalogue number and the folder are in the typewriter face; you can select them, and
 **Copy** puts the whole of one on the clipboard, its button a tick for a moment. If Safari can't open a MusicBrainz
@@ -3688,15 +3703,17 @@ change is needed: it works with the deadwax you already run.
 - **261 The format, against the files.** For the same album, compare Format and Bitrate with the web app's Debug or
   the files on the server: the depth and rate are the files' own, and the bitrate is about what Navidrome says
   for a song of it (Info's Debug). An album of MP3s says "MP3 · 320 kbps" (or "MP3 · 245 kbps on average" for a
-  VBR one), never a bit depth.
+  VBR one), never a bit depth, and no Bitrate line under it. An album bought from iTunes (AAC in .m4a files) says
+  "AAC · 256 kbps" (or "AAC · 259 kbps on average"), never "M4A" and never "16-bit / 44.1 kHz"; an ALAC album, if there is one, "ALAC · 16-bit / 44.1
+  kHz" with a Bitrate line.
 - **262 A mix.** An album whose songs differ - some 16-bit and some 24-bit, or FLAC and MP3 - says the commonest
   first ("FLAC · 16-bit / 44.1 kHz · 8 of 10 songs") with the others under it, each "N of 10 songs".
 - **263 The release, from Picard's tags.** Open an album tagged by MusicBrainz Picard and compare The release with
   its page on MusicBrainz (This pressing on MusicBrainz): Media ("CD", "2×CD", 12" Vinyl), Label, Catalogue
   number, Barcode, Country, Released, First released (only when it differs), Type, Status, Genres. Say any line that is
   missing or reads oddly - and whether anything shows as "Unknown" or empty (nothing should). Then an album deadwax
-  downloaded and filed: Media, Country and Catalogue number, and Added "…, downloaded by deadwax". And an M4A album, if
-  there is one.
+  downloaded and filed: Media (a 2-CD set "2×CD", never "2×CD + CD"), Country and Catalogue number, and Added "…,
+  downloaded by deadwax". And an M4A album deadwax filed, if there is one: Country, but no Media or Catalogue number.
 - **264 A box set.** An album of two or more discs: Discs "2", each disc's line ("Disc 2 · Live at Wembley · 3 songs"
   when it has a title), Media "2×CD" or "CD + DVD-Video". One kept as a folder per disc: as an admin, On the server
   says **Folders**, each on its own line.
@@ -3707,15 +3724,20 @@ change is needed: it works with the deadwax you already run.
 - **266 Offline.** Turn off Wi-Fi and WireGuard, open a downloaded album and its Album info: Quality, The album, and
   On this phone "All 10 songs · 412 MB" (or "3 of 12 songs · …"); The release with only what the album says itself
   (the label, the year, the genre), and "The rest shows once deadwax is back." Turn the network back on with the sheet
-  open: the rest arrives without closing it.
+  open: the rest arrives without closing it. Open it online, and turn the network off while "Reading the album's
+  files…" shows: the reading line goes, and "The rest shows once deadwax is back." takes its place - never a spinner
+  left turning.
 - **267 From Info.** Play an album, open Now Playing's ••• > Info: under the album's card, **Album info**. Tap it: the
-  same lines, pushed inside Info; its Back returns to Info, and Done still closes Info. Then play a playlist and do
-  the same for a song of it: Songs and Size are the whole album's, not the playlist's songs of it.
+  same lines, pushed inside Info; its Back returns to Info. Leave it open until the song changes to another album's
+  (or skip to one): the page stays on the album you opened it for, and Back shows Info for the song now playing. Then
+  play a playlist and do the same for a song of it: Songs and Size are the whole album's, not the playlist's songs
+  of it.
 - **268 Someone else.** With logins on, signed in as someone who isn't an admin: no On the server, everything else
   the same. With logins off (if you can try it), the release lines still come.
 - **269 A big one, asleep.** Let the server's disks spin down (leave it an hour), then open Album info for the
   biggest box set: how long "Reading the album's files…" shows before The release appears - and whether it ever says
-  "The album's files couldn't be read just now." instead.
+  "The album's files couldn't be read just now." instead. And an album you know isn't matched to MusicBrainz: "deadwax
+  doesn't know where this album's files are, so nothing was read from them.", quietly, under the rest.
 - **270 The largest text, and VoiceOver.** At the largest text sizes every line wraps, nothing cut off, the Copy
   buttons beside their ids and the arrows beside the links growing with them. With VoiceOver: each line reads as one
   ("Format, FLAC · 24-bit / 96 kHz · all 10 songs"); a Copy button reads "Copy release, button" and says "Copied";

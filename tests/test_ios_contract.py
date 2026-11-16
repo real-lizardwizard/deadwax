@@ -72,9 +72,11 @@ what was chosen, each value one the route takes) and GetSettingsAnswer's `can_sa
 
 And app 0.13's Album info (notes/ios.md "Album info"): AlbumFiles and AlbumFile to what /library/tracks sends
 (read_album_details); the answers the Swift tests decode (Fixtures/albuminfo/files.json, written by
-ios/scripts/album_files_answers.py over a FLAC set, an MP3 and an M4A tagged as Picard tags them) to what the helper makes
-now and to the real route's answer over the same folders; and AlbumTag's names - the server's among DETAIL_TAGS, each
-container's as Picard writes it - finding every tag the sheet reads in those answers.
+ios/scripts/album_files_answers.py over a FLAC set, an MP3 and an M4A tagged as Picard tags them, and a FLAC set and an
+M4A tagged by deadwax's own filing) to what the helper makes now and to the real route's answer over the same folders;
+AlbumTag's names - the server's among DETAIL_TAGS, each container's as Picard writes it - finding every tag the sheet
+reads in those answers, deadwax's whole-release media among them; and libraryTracks' timeout above the transport's own
+and the sheet's hold, the route having no bound of its own.
 """
 
 import asyncio
@@ -2054,7 +2056,8 @@ def test_the_tags_album_info_reads_are_the_servers_names_and_picards():
                     return found
         return []
 
-    group = _album_files_helper().GROUP
+    helper = _album_files_helper()
+    group = helper.GROUP
     expected = {
         "flac": {"media": ["CD"], "label": ["Harvest"], "catalogueNumber": ["SHVL 804"], "barcode": ["5099902894225"],
                  "country": ["GB"], "status": ["official"], "type": ["album", "live"], "date": ["2011-09-26"],
@@ -2064,6 +2067,12 @@ def test_the_tags_album_info_reads_are_the_servers_names_and_picards():
                 "releaseGroup": [group]},
         "m4a": {"media": ["Digital Media"], "label": ["Warp"], "catalogueNumber": ["WAP105CD"],
                 "barcode": ["801061010524"], "country": ["XW"], "status": ["Promotion"], "type": ["single"]},
+        # what deadwax's own filing writes (organizer.write_tags): the media is the WHOLE release, " + "-joined, on every
+        # disc's files (AlbumInfo.media takes it once); no barcode, status or label; into an M4A only the country
+        "deadwax-flac": {"media": ["CD + CD"], "catalogueNumber": ["XDUSTCD1X"], "country": ["GB"], "date": ["2015"],
+                         "originalDate": ["1995"], "releaseGroup": [helper.FILED_GROUP], "barcode": [], "status": [],
+                         "label": []},
+        "deadwax-m4a": {"country": ["US"], "media": [], "catalogueNumber": [], "barcode": [], "status": []},
     }
     answers = _album_files_cases()
     for name, tags in expected.items():
@@ -2072,3 +2081,33 @@ def test_the_tags_album_info_reads_are_the_servers_names_and_picards():
             assert values(first, tag) == value, (name, tag)
     # the M4A's are every one raw: Easy MP4 has no names for Picard's freeform atoms
     assert set(answers["m4a"]["files"][0]["tags"]) == {"title", "album"}
+    # deadwax's set carries the one whole-release value on both discs' files - never a disc's own medium
+    filed = answers["deadwax-flac"]["files"]
+    assert {file["disc"] for file in filed} == {1, 2}
+    assert {values(file, "media")[0] for file in filed} == {"CD + CD"}
+    # the join AlbumInfo splits on is the one both writers of a job's media_format join with
+    assert 'static let releaseJoin = " + "\n' in (CORE / "AlbumInfo.swift").read_text(encoding="utf-8")
+    assert 'formats.joined(separator: " + ")' in (CORE / "GetRelease.swift").read_text(encoding="utf-8")
+    assert ".join(' + ')" in (Path(__file__).resolve().parent.parent / "ui" / "src" / "lib"
+                              / "releasePayload.ts").read_text(encoding="utf-8")
+
+
+def test_the_app_waits_for_an_albums_files_as_long_as_the_route_takes():
+    # /library/tracks reads every file of the folder off the disk with no bound of its own (a box set on a disk that
+    # has to spin up): the phone gives it longer than the transport's own 8 s, and longer than Album info holds the
+    # sheet, so a slow read lands late rather than failing as "That took too long."
+    source = inspect.getsource(library_route.tracks)
+    assert "asyncio.to_thread(read_album_details" in source
+    assert "wait_for" not in source and "timeout" not in source
+    text = (CORE / "Routes.swift").read_text(encoding="utf-8")
+    literal = re.search(r"public static let timeouts: \[Endpoint: Double\] = \[([^\]]*)\]", text)
+    timeouts = {name: float(seconds) for name, seconds in re.findall(r"(\w+): ([\d.]+)", literal.group(1))}
+    transport = (Path(__file__).resolve().parent.parent / "ios" / "App" / "URLSessionTransport.swift").read_text(
+        encoding="utf-8")
+    standard = float(re.search(r"static let standardTimeout: Double = ([\d.]+)\n", transport).group(1))
+    album_info = (CORE / "AlbumInfo.swift").read_text(encoding="utf-8")
+    settle = float(re.search(r"public static let settleSeconds = ([\d.]+)\n", album_info).group(1))
+    assert timeouts["libraryTracks"] > standard
+    assert timeouts["libraryTracks"] > settle
+    # and only two folders are read at once (a box set's ten folders never all spin a disk together)
+    assert re.search(r"public static let foldersAtOnce = 2\n", album_info)

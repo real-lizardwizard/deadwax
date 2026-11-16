@@ -7,7 +7,14 @@ src/routes/library.py tracks() - over real files tagged as Picard tags them, one
     RELEASESTATUS, RELEASETYPE twice, DATE, ORIGINALDATE, GENRE, MUSICBRAINZ_RELEASEGROUPID);
   - an MP3 (ID3: TMED, TPUB, TXXX:CATALOGNUMBER, TXXX:BARCODE, TXXX:MusicBrainz Album Release Country,
     TXXX:MusicBrainz Album Status, TXXX:MusicBrainz Album Type, TXXX:MusicBrainz Release Group Id);
-  - an M4A (iTunes freeform atoms ----:com.apple.iTunes:MEDIA and the rest, which Easy MP4 has no names for).
+  - an M4A (iTunes freeform atoms ----:com.apple.iTunes:MEDIA and the rest, which Easy MP4 has no names for);
+
+and two as deadwax's own filing tags them - src/organizer.py write_tags, the very writer, over a release as a Get
+sends it (GetRelease.swift payload, releasePayload.ts):
+
+  - a FLAC set of two CDs, whose MEDIA is the whole release's formats in every file ("CD + CD", `media_format`);
+  - an M4A, which Easy MP4 takes only some of (the country, as "MusicBrainz Release Country"; no media or catalogue
+    number).
 
 Written to
 
@@ -32,6 +39,7 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 
 from src.library import read_album_details  # noqa: E402
+from src.organizer import write_tags  # noqa: E402
 
 FIXTURE = ROOT / "ios" / "DeadwaxKit" / "Tests" / "DeadwaxCoreTests" / "Fixtures" / "albuminfo" / "files.json"
 
@@ -61,6 +69,28 @@ TINY_M4A = base64.b64decode(
 )
 
 GROUP = "4b4f4f2f-7a5e-3d58-9d1a-5c3b5c3c2b10"
+#? deadwax's filed set's release group
+FILED_GROUP = "5c505030-8b6f-4e69-ae2b-6d4c6d4d3c21"
+
+#? a 2-CD set as a Get sends it: every medium's format joined by " + " (GetRelease.payload's mediaFormat)
+FILED_SET = {
+    "album": "Exit Planet Dust", "artist": "The Chemical Brothers", "year": "2015", "original_year": "1995",
+    "release_mbid": "6d5d6161-9c70-4f7a-bf3c-7e5e7e5e4d32", "release_group_mbid": FILED_GROUP,
+    "country": "GB", "media_format": "CD + CD", "catalog_number": "XDUSTCD1X",
+    "tracks": [
+        {"position": 1, "disc": 1, "disc_position": 1, "title": "Leave Home"},
+        {"position": 2, "disc": 1, "disc_position": 2, "title": "In Dust We Trust"},
+        {"position": 3, "disc": 2, "disc_position": 1, "title": "Chemical Beats (live)"},
+    ],
+}
+
+#? a single as a Get sends it, filed as an M4A
+FILED_SINGLE = {
+    "album": "Midnight City", "artist": "M83", "year": "2011", "original_year": "2011",
+    "release_mbid": "7e6e7272-ad81-4a8b-c04d-8f6f8f6f5e43", "release_group_mbid": FILED_GROUP,
+    "country": "US", "media_format": "Digital Media", "catalog_number": "MUTE 9534",
+    "tracks": [{"position": 1, "title": "Midnight City"}],
+}
 
 #? one disc of the set: its number, its medium, and its tracks' titles
 FLAC_DISCS = [(1, "CD", ["Speak to Me", "Breathe"]), (2, "DVD-Video", ["Speak to Me (live)"])]
@@ -126,7 +156,19 @@ def make(root: Path) -> list[tuple[str, str]]:
     m4a = root / "Aphex Twin" / "Windowlicker"
     m4a.mkdir(parents=True)
     _m4a(m4a / "01 Windowlicker.m4a")
-    return [("flac", str(flac.relative_to(root))), ("mp3", str(mp3.relative_to(root))), ("m4a", str(m4a.relative_to(root)))]
+    filed = root / "The Chemical Brothers" / "Exit Planet Dust"
+    filed.mkdir(parents=True)
+    for track in FILED_SET["tracks"]:
+        path = filed / f"{track['position']:02d} {track['title']}.flac"
+        path.write_bytes(FLAC_STREAMINFO)
+        write_tags(path, FILED_SET, track)
+    single = root / "M83" / "Midnight City"
+    single.mkdir(parents=True)
+    path = single / "01 Midnight City.m4a"
+    path.write_bytes(TINY_M4A)
+    write_tags(path, FILED_SINGLE, FILED_SINGLE["tracks"][0])
+    return [("flac", str(flac.relative_to(root))), ("mp3", str(mp3.relative_to(root))), ("m4a", str(m4a.relative_to(root))),
+            ("deadwax-flac", str(filed.relative_to(root))), ("deadwax-m4a", str(single.relative_to(root)))]
 
 
 def tidy(answer: dict) -> dict:

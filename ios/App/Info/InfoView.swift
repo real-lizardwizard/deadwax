@@ -25,7 +25,8 @@ import SwiftUI
 /// sound now.
 ///
 /// Album info (notes/ios.md "Album info"): The album gains an "Album info" row under its card while the queue knows the
-/// album's id - everything known of the album, pushed here (AlbumInfoList), Info's own Done still a tap away.
+/// album's id - everything known of the album, pushed here (AlbumInfoList, by value: AlbumInfoPush), its Back to Info
+/// and Info's own Done. It stays on the album it was opened for when the song changes; Back is Info for the song playing.
 struct InfoView: View {
     @Environment(PlayerModel.self) private var player
     @Environment(EQModel.self) private var eq
@@ -74,6 +75,11 @@ struct InfoView: View {
             }
             .navigationTitle(InfoWords.title)
             .navigationBarTitleDisplayMode(.inline)
+            //? by value, on the stack's root rather than the List (drawn afresh for each song): the page stays on the
+            //? album it was opened for when the song changes under it
+            .navigationDestination(for: AlbumInfoPush.self) { push in
+                AlbumInfoList(album: push.album)
+            }
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
                     Button(InfoWords.done) { dismiss() }
@@ -146,10 +152,9 @@ struct InfoView: View {
                 }
                 if let id = card.id, !id.isEmpty {
                     //? the album as it was played from - or, for a playlist's songs, a stub Album info asks the whole of
-                    NavigationLink {
-                        AlbumInfoList(album: player.playedAlbum(id: id)
-                            ?? Album(id: id, name: card.title, artist: track.artist, coverArt: card.coverArt, partial: true))
-                    } label: {
+                    let album = player.playedAlbum(id: id)
+                        ?? Album(id: id, name: card.title, artist: track.artist, coverArt: card.coverArt, partial: true)
+                    NavigationLink(value: AlbumInfoPush(album: album)) {
                         Label(AlbumInfoWords.title, systemImage: AlbumInfoWords.symbol)
                     }
                 }

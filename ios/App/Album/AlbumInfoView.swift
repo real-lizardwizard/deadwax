@@ -21,6 +21,16 @@ struct AlbumInfoSheet: View {
     }
 }
 
+/// Album info pushed inside Info's stack (`navigationDestination(for:)`): a value, so the page stays on the album it
+/// was opened for when the song playing changes under it - Info's List is drawn afresh for each song, and a pushed
+/// page tied to its row would go with it (or change album under a reader). Back goes to Info, for the song playing.
+struct AlbumInfoPush: Hashable {
+    let album: Album
+
+    static func == (a: AlbumInfoPush, b: AlbumInfoPush) -> Bool { a.album == b.album }
+    func hash(into hasher: inout Hasher) { hasher.combine(album.id) }
+}
+
 /// Album info (James, 2026-11-15: "I'd like somewhere I can see all the album metadata like quality, media type,
 /// etc."): the album as a whole, in a listener's words, grouped - pushed inside Info's stack from its album card, or in
 /// AlbumInfoSheet from the album page's •••. Every line is Core's (AlbumInfo); this draws and asks.
@@ -28,10 +38,12 @@ struct AlbumInfoSheet: View {
 /// At once, from the album in hand and this phone: the cover, title and artist, then Quality, The album and On this
 /// phone. Then what deadwax adds (AlbumInfoAsk: the album again, the id bridge, the folders' files) - The release,
 /// MusicBrainz and, for an admin, On the server - drawn once every answer is in or AlbumInfoWords.settleSeconds has
-/// gone, a "Reading the album's files…" row in their place until then. Info's album may be a playlist's stub of it
-/// (`partial`): its own lines wait for the album's answer too, since a stub's songs are only the playlist's. While
-/// deadwax can't be reached nothing is asked: the release's lines are drawn from the album alone, with a line saying the
-/// rest comes when deadwax is back.
+/// gone, a "Reading the album's files…" row in their place until then (and under them while the rest comes). Info's
+/// album may be a playlist's stub of it (`partial`): its own lines wait for the album's answer too, since a stub's songs
+/// are only the playlist's. What couldn't be asked is said (ErrorNote): the album, where its files are, the files -
+/// never left looking like tags that say nothing. While deadwax can't be reached nothing is asked: the release's lines
+/// are drawn from what is in hand, and while that is short of everything, a line says the rest comes when deadwax is
+/// back.
 ///
 /// An id, a path or a number read in columns is in the monospaced face, selectable, with a Copy button beside it
 /// ("Copied" said to VoiceOver, the button's sign a tick for a moment); a MusicBrainz page opens in Safari, beside the
@@ -44,7 +56,10 @@ struct AlbumInfoList: View {
     @Environment(DownloadModel.self) private var downloads
     @Environment(Reachability.self) private var reachability
     @Environment(\.openURL) private var openURL
-    @State private var said: (albumID: String, said: AlbumInfoAsk.Said)?
+    /// What deadwax said, for which album, by which asking (`runs`).
+    @State private var said: (run: Int, albumID: String, said: AlbumInfoAsk.Said)?
+    /// Each asking's number: the one that ends marks only its own answer as cut short.
+    @State private var runs = 0
     /// The row whose Copy was tapped last, while its tick shows.
     @State private var copied: String?
     /// A link row iOS wouldn't open.
@@ -59,7 +74,7 @@ struct AlbumInfoList: View {
         let answer = said.flatMap { $0.albumID == album.id ? $0.said : nil }
         //? the album's own answer once it has come; a playlist's stub of it is never counted from
         let whole = answer?.album ?? (album.partial ? nil : album)
-        let asking = reachability.online && server.client != nil
+        let online = reachability.online && server.client != nil
         List {
             Section {
                 header(whole ?? album)
@@ -71,29 +86,22 @@ struct AlbumInfoList: View {
                 }
             }
 
-            if let answer {
-                ForEach(AlbumInfo.fromServer(album: whole ?? album, extras: answer.extras, store: answer.store,
-                                             files: answer.files, folders: server.access.isAdmin,
+            // deadwax's answers once they've come (or the wait is over); offline, what is in hand
+            if answer != nil || !online {
+                ForEach(AlbumInfo.fromServer(album: whole ?? album, extras: answer?.extras, store: answer?.store,
+                                             files: answer?.files, folders: server.access.isAdmin,
                                              countryName: Self.countryName)) { section in
                     infoSection(section)
                 }
-                if let failure = answer.filesFailure {
-                    Section {
-                        ErrorNote(failure, gone: AlbumInfoWords.filesGone, failed: AlbumInfoWords.filesFailed)
-                    }
-                } else if answer.reading {
-                    Section { reading }
-                }
-            } else if asking {
+            }
+
+            if online, let answer, let note = missing(answer) {
+                Section { missingNote(note) }
+            }
+
+            if online && (answer?.reading ?? true) {
                 Section { reading }
-            } else {
-                // nothing asked: what the album says alone, and that the rest waits for deadwax
-                if let whole {
-                    ForEach(AlbumInfo.fromServer(album: whole, extras: nil, store: nil, files: nil, folders: false,
-                                                 countryName: Self.countryName)) { section in
-                        infoSection(section)
-                    }
-                }
+            } else if !online && !(answer?.complete ?? false) {
                 Section {
                     Text(AlbumInfoWords.offline)
                         .font(Typeface.footnote)
@@ -207,6 +215,43 @@ struct AlbumInfoList: View {
         .padding(.vertical, 2)
     }
 
+    /// What couldn't be had - the first of: the album, where its files are, the files - else that deadwax knows no
+    /// folder of it (so nothing could be read from its files). Nil when nothing is missing.
+    private enum Missing {
+        case failed(any Error, gone: String?, failed: String)
+        case gone
+        case noFolder
+    }
+
+    private func missing(_ answer: AlbumInfoAsk.Said) -> Missing? {
+        if let failure = answer.albumFailure {
+            return .failed(failure, gone: ErrorWords.albumGone, failed: AlbumInfoWords.albumFailed)
+        }
+        if answer.albumMissing { return .gone }
+        if let failure = answer.storeFailure { return .failed(failure, gone: nil, failed: AlbumInfoWords.storeFailed) }
+        if let failure = answer.filesFailure {
+            return .failed(failure, gone: AlbumInfoWords.filesGone, failed: AlbumInfoWords.filesFailed)
+        }
+        if let store = answer.store, AlbumInfo.foldersToRead(store).isEmpty { return .noFolder }
+        return nil
+    }
+
+    /// What is missing, in a listener's words (ErrorWords); that no folder is known, quietly - it is no failure.
+    @ViewBuilder
+    private func missingNote(_ missing: Missing) -> some View {
+        switch missing {
+        case .failed(let error, let gone, let failed):
+            ErrorNote(error, gone: gone, failed: failed)
+        case .gone:
+            ErrorNote(text: ErrorWords.albumGone)
+        case .noFolder:
+            Text(AlbumInfoWords.noFolder)
+                .font(Typeface.footnote)
+                .foregroundStyle(Palette.quiet)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+
     private var reading: some View {
         HStack(spacing: 10) {
             ProgressView()
@@ -263,9 +308,18 @@ struct AlbumInfoList: View {
 
     private func ask() async {
         guard reachability.online, let client = server.client else { return }
+        runs += 1
+        let run = runs
         let id = album.id
         await AlbumInfoAsk.ask(albumID: id, client: client) { now in
-            said = (id, now)
+            said = (run, id, now)
+        }
+        //? done or cancelled (deadwax out of reach, the sheet going): this asking reads nothing more, so what it last
+        //? put is no longer reading - and was cut short if it still was. A later asking's answer is left alone.
+        if var last = said, last.run == run, last.said.reading {
+            last.said.reading = false
+            last.said.cut = true
+            said = last
         }
     }
 

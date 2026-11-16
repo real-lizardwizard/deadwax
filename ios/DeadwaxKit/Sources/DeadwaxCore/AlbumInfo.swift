@@ -17,9 +17,10 @@ import Foundation
 //  - the id bridge (`GET /deadwax/store/album?navidrome_id=`, a user's route): the release group, the store's folders
 //    of the album (an admin's "On the server"), its edition, and when deadwax first saw it;
 //  - the files' own tags, read now (`GET /deadwax/library/tracks?album=<folder>`, the track viewer's route, a user's):
-//    what only the tags hold - Picard's MEDIA, CATALOGNUMBER, BARCODE, RELEASECOUNTRY, RELEASESTATUS - by the
-//    server's names for them (`tags`) where it reads them, else by each container's own name (`raw`), as Picard's tag
-//    map writes them (picard-docs appendices/tag_mapping).
+//    what only the tags hold - Picard's MEDIA, CATALOGNUMBER, BARCODE, RELEASECOUNTRY, RELEASESTATUS, and those of
+//    them deadwax's own filing writes (organizer.write_tags) - by the server's names for them (`tags`) where it reads
+//    them, else by each container's own name (`raw`), as Picard's tag map writes them (picard-docs
+//    appendices/tag_mapping). Read two folders at a time (`foldersAtOnce`).
 //
 // A line with nothing to say is left out, never "Unknown"; a section with no lines is left out.
 
@@ -185,8 +186,10 @@ public enum AlbumTag: CaseIterable, Sendable {
             return ["catalognumber", "txxx:catalognumber", "----:com.apple.itunes:catalognumber", "wm/catalogno"]
         case .barcode: return ["barcode", "txxx:barcode", "----:com.apple.itunes:barcode", "wm/barcode"]
         case .country:
+            // Easy MP4's own name for it (what deadwax's filing writes into an M4A) beside Picard's
             return ["releasecountry", "txxx:musicbrainz album release country",
-                    "----:com.apple.itunes:musicbrainz album release country", "musicbrainz/album release country"]
+                    "----:com.apple.itunes:musicbrainz album release country",
+                    "----:com.apple.itunes:musicbrainz release country", "musicbrainz/album release country"]
         case .status:
             return ["releasestatus", "musicbrainz_albumstatus", "txxx:musicbrainz album status",
                     "----:com.apple.itunes:musicbrainz album status", "musicbrainz/album status"]
@@ -195,11 +198,12 @@ public enum AlbumTag: CaseIterable, Sendable {
                     "----:com.apple.itunes:musicbrainz album type", "musicbrainz/album type"]
         case .label: return ["label", "organization", "publisher", "tpub", "----:com.apple.itunes:label", "wm/publisher"]
         case .date: return []
-        case .originalDate: return ["originaldate", "tdor", "tory"]
+        case .originalDate:
+            return ["originaldate", "tdor", "tory", "----:com.apple.itunes:originaldate", "wm/originalreleasetime"]
         case .genre: return []
         case .releaseGroup:
             return ["musicbrainz_releasegroupid", "txxx:musicbrainz release group id",
-                    "----:com.apple.itunes:musicbrainz release group id"]
+                    "----:com.apple.itunes:musicbrainz release group id", "musicbrainz/release group id"]
         }
     }
 }
@@ -274,6 +278,13 @@ public enum AlbumInfoWords {
     public static let filesFailed = "The album's files couldn't be read just now."
     /// The files' folder answered 404 (ErrorWords' `gone`).
     public static let filesGone = "The album's folder isn't where deadwax last saw it - it may have been moved."
+    /// getAlbum couldn't be asked (ErrorWords' `failed`): the album's own lines are what the phone had, if any.
+    public static let albumFailed = "The album couldn't be asked for just now, so some of what's known of it is missing."
+    /// The id bridge couldn't be asked (ErrorWords' `failed`): no folder, so nothing read from the files.
+    public static let storeFailed = "deadwax couldn't say where the album's files are just now, so nothing was read from them."
+    /// The bridge answered, with no folder of the album: an untagged album, or no library - nothing to read, which is
+    /// not the same as files that say nothing.
+    public static let noFolder = "deadwax doesn't know where this album's files are, so nothing was read from them."
 
     public static let copy = "Copy"
     public static let copied = "Copied"
@@ -298,8 +309,16 @@ public enum AlbumInfo {
 
     // MARK: Quality
 
-    /// Formats nothing has a bit depth in, whatever a tag reader says: their depth is never drawn.
-    static let lossy: Set<String> = ["mp3", "aac", "ogg", "oga", "opus", "wma", "mpc", "mp2"]
+    /// The formats a bit depth is drawn for - lossless ones (Sources' list) - and an MP4's audio when it is ALAC
+    /// (`mp4Lossless`). Anything else says its bitrate instead, whatever depth a tag reader gives it (TagLib and
+    /// mutagen say 16 for an AAC).
+    static let lossless = Sources.losslessFormats
+    /// An MP4's suffixes: AAC or ALAC inside, which Navidrome's suffix ("m4a") and type ("audio/mp4") never say.
+    static let mp4: Set<String> = ["m4a", "mp4", "m4b"]
+    /// Over this an MP4's audio is ALAC: AAC is at most 320 kbps from iTunes and Apple's own (256 for its masters),
+    /// while ALAC is rarely under 500 even for quiet 16-bit music. An ALAC that quiet is said as AAC with its bitrate -
+    /// a depth left out, never one claimed for a lossy file.
+    static let alacOverKbps = 400
 
     /// One kind of file the album is in: its format, and for a lossless one its depth and rate.
     struct Kind: Hashable {
@@ -308,19 +327,43 @@ public enum AlbumInfo {
         let rate: Int
     }
 
-    static func kind(_ song: Song) -> Kind {
-        let suffix = WebText.trim(song.suffix ?? "").lowercased()
-        let format = suffix.isEmpty ? LevelWords.kindOf(FileFacts(suffix: nil, contentType: song.contentType)) : suffix.uppercased()
+    /// Whether the album's MP4 songs are ALAC (else AAC) when their type names neither (Navidrome's is "audio/mp4"):
+    /// the MP4 songs' bitrate, weighed by length, over `alacOverKbps`. Decided for the album, so one quiet song of an
+    /// ALAC album isn't said as AAC.
+    static func mp4Lossless(_ songs: [Song]) -> Bool {
+        let inMP4 = songs.filter { mp4.contains(formatName(of: $0).lowercased()) }
+        let rate = Double(averageKbps(inMP4) ?? 0)
+        return rate > Double(alacOverKbps)
+    }
+
+    /// A song's format as its suffix says it, else its type.
+    static func formatName(of song: Song) -> String {
+        let suffix = WebText.trim(song.suffix ?? "")
+        return suffix.isEmpty ? LevelWords.kindOf(FileFacts(suffix: nil, contentType: song.contentType)) : suffix.uppercased()
+    }
+
+    /// A song's kind: its format (an MP4's audio named ALAC or AAC: its type when that names one, else `mp4Lossless`),
+    /// and a depth and rate only for a lossless one.
+    static func kind(_ song: Song, mp4Lossless: Bool) -> Kind {
+        var format = formatName(of: song)
+        var isLossless = lossless.contains(format.lowercased())
+        if mp4.contains(format.lowercased()) {
+            let type = (song.contentType ?? "").lowercased()
+            isLossless = type.contains("alac") || (!type.contains("aac") && mp4Lossless)
+            format = isLossless ? "ALAC" : "AAC"
+        }
         let bits = song.bitDepth ?? 0
-        guard bits > 0, !lossy.contains(suffix) else { return Kind(format: format, bits: 0, rate: 0) }
+        guard isLossless, bits > 0 else { return Kind(format: format, bits: 0, rate: 0) }
         return Kind(format: format, bits: bits, rate: max(song.samplingRate ?? 0, 0))
     }
 
     /// Quality: "FLAC · 24-bit / 96 kHz · all 10 songs" (each kind of file a line when they differ, the commonest
-    /// first, "8 of 10 songs"), the bitrate and the channels.
+    /// first, "8 of 10 songs" - a lossy kind with its bitrate, "MP3 · 320 kbps"), the bitrate when no line has said
+    /// one (every kind lossless: never a lossy and a lossless file averaged into one figure), and the channels.
     public static func quality(_ songs: [Song]) -> [AlbumInfoRow] {
         var rows: [AlbumInfoRow] = []
-        let kinds = groups(songs, by: kind).filter { !$0.key.format.isEmpty }
+        let alac = mp4Lossless(songs)
+        let kinds = groups(songs, by: { kind($0, mp4Lossless: alac) }).filter { !$0.key.format.isEmpty }
         if !kinds.isEmpty {
             let lines = kinds.map { group in
                 [kindWords(group.key, songs: group.songs), countWords(group.songs.count, of: songs.count)]
@@ -328,7 +371,7 @@ public enum AlbumInfo {
             }
             rows.append(AlbumInfoRow(label: "Format", value: lines[0], lines: Array(lines.dropFirst())))
         }
-        if let bitrate = bitrateWords(songs) {
+        if kinds.allSatisfy({ $0.key.bits > 0 }), let bitrate = bitrateWords(songs) {
             rows.append(AlbumInfoRow(label: "Bitrate", value: bitrate))
         }
         let channels = groups(songs.filter { ($0.channelCount ?? 0) > 0 }, by: { $0.channelCount ?? 0 })
@@ -365,14 +408,20 @@ public enum AlbumInfo {
         if rates.count == songs.count, let first = rates.first, rates.allSatisfy({ $0 == first }) {
             return "\(grouped(first)) kbps"
         }
+        return averageKbps(songs).map { "\(grouped($0)) kbps on average" }
+    }
+
+    /// The songs' bitrate weighed by length (each song's alike without lengths); nil when none says one.
+    static func averageKbps(_ songs: [Song]) -> Int? {
+        let rates = songs.compactMap(\.bitRate).filter { $0 > 0 }
         let weighed = songs.filter { ($0.bitRate ?? 0) > 0 && ($0.duration ?? 0) > 0 }
         guard !weighed.isEmpty else {
             guard !rates.isEmpty else { return nil }
-            return "\(grouped(Int((Double(rates.reduce(0, +)) / Double(rates.count)).rounded()))) kbps on average"
+            return Int((Double(rates.reduce(0, +)) / Double(rates.count)).rounded())
         }
         let seconds = weighed.reduce(0.0) { $0 + ($1.duration ?? 0) }
         let sum = weighed.reduce(0.0) { $0 + Double($1.bitRate ?? 0) * ($1.duration ?? 0) }
-        return "\(grouped(Int((sum / seconds).rounded()))) kbps on average"
+        return Int((sum / seconds).rounded())
     }
 
     /// 1 "Mono", 2 "Stereo", 6 "5.1 surround", 8 "7.1 surround", else "4 channels".
@@ -495,7 +544,7 @@ public enum AlbumInfo {
             rows.append(AlbumInfoRow(label: "Barcode", value: barcode.joined(separator: " / "), style: .copyable,
                                      copy: barcode.joined(separator: " / ")))
         }
-        let countries = values(files, .country).map { country($0, name: countryName) }
+        let countries = uniqueFolded(values(files, .country).compactMap { country($0, name: countryName) })
         if !countries.isEmpty { rows.append(AlbumInfoRow(label: "Country", value: countries.joined(separator: " / "))) }
 
         let released = extras?.releaseDate.flatMap(dateWords)
@@ -534,42 +583,61 @@ public enum AlbumInfo {
         uniqueFolded(files.flatMap { $0.values(tag) })
     }
 
-    /// What the album is on, from each disc's MEDIA tag, as MusicBrainz writes it: "CD", "2×CD", "CD + DVD-Video",
-    /// `12" Vinyl` - each disc's the medium most of its files name (a file with no disc is disc 1); nil when none says.
+    /// What the album is on, as MusicBrainz writes a release's format: "CD", "2×CD", "CD + DVD-Video", `12" Vinyl`
+    /// (Pressings.format's folding: a run of the same medium is "2×CD"); nil when no file says.
+    ///
+    /// Two shapes of MEDIA tag: Picard's, one disc's medium in each of its files - each disc's the medium most of its
+    /// files name (a file with no disc is disc 1), the discs in order; and deadwax's filing's, the whole release's
+    /// formats joined by " + " in every file (GetRelease's `mediaFormat`, releasePayload.ts's - "CD + CD" on each track
+    /// of a 2-CD set), taken once, the commonest such value, and folded the same way.
     public static func media(_ files: [AlbumFile]) -> String? {
+        let mediums = files.compactMap { $0.values(.media).first }
+        if let release = commonest(mediums.filter { $0.contains(releaseJoin) }) {
+            return fold(release.components(separatedBy: releaseJoin))
+        }
         var byDisc: [Int: [String]] = [:]
         for file in files {
             guard let medium = file.values(.media).first else { continue }
             byDisc[max(file.disc ?? 1, 1), default: []].append(medium)
         }
-        var order: [String] = []
-        var counts: [String: (words: String, count: Int)] = [:]
-        for disc in byDisc.keys.sorted() {
-            guard let medium = commonest(byDisc[disc] ?? []) else { continue }
-            let folded = medium.lowercased()
-            if counts[folded] == nil {
-                order.append(folded)
-                counts[folded] = (medium, 0)
-            }
-            counts[folded]?.count += 1
-        }
-        guard !order.isEmpty else { return nil }
-        return order.compactMap { counts[$0] }
-            .map { $0.count > 1 ? "\($0.count)\u{00D7}\($0.words)" : $0.words }
-            .joined(separator: " + ")
+        return fold(byDisc.keys.sorted().compactMap { commonest(byDisc[$0] ?? []) })
     }
 
-    /// A country as MusicBrainz codes it, in words: its two special areas, else `name`'s for a two-letter code, else the
-    /// code as it is.
-    public static func country(_ code: String, name: (String) -> String?) -> String {
-        let upper = code.uppercased()
-        if upper == "XW" { return "Worldwide" }
-        if upper == "XE" { return "Europe" }
+    /// How deadwax's filing joins a release's formats (GetRelease.payload, releasePayload.ts).
+    static let releaseJoin = " + "
+
+    /// Mediums in order, a run of the same one (whatever its case) as "2×CD" - nil for none.
+    static func fold(_ mediums: [String]) -> String? {
+        var runs: [(words: String, count: Int)] = []
+        for medium in mediums.map(WebText.trim) where !medium.isEmpty {
+            if let last = runs.last, last.words.lowercased() == medium.lowercased() {
+                runs[runs.count - 1].count += 1
+            } else {
+                runs.append((medium, 1))
+            }
+        }
+        guard !runs.isEmpty else { return nil }
+        return runs.map { $0.count > 1 ? "\($0.count)\u{00D7}\($0.words)" : $0.words }.joined(separator: releaseJoin)
+    }
+
+    /// MusicBrainz's areas that are no country of today - its two special ones and the countries that have gone - by
+    /// MusicBrainz's own names, ahead of any Locale's (which may not know them, or name them otherwise).
+    static let areas = ["XW": "Worldwide", "XE": "Europe", "XC": "Czechoslovakia", "XG": "East Germany",
+                        "SU": "Soviet Union", "YU": "Yugoslavia", "CS": "Serbia and Montenegro"]
+    /// MusicBrainz's "[Unknown Country]": said by no line.
+    static let unknownArea = "XU"
+
+    /// A country as MusicBrainz codes it, in words: its areas (`areas`), else `name`'s for a two-letter code, else the
+    /// code as it is - nil for the unknown one.
+    public static func country(_ code: String, name: (String) -> String?) -> String? {
+        let upper = WebText.trim(code).uppercased()
+        if upper.isEmpty || upper == unknownArea { return nil }
+        if let area = areas[upper] { return area }
         if upper.count == 2, upper.unicodeScalars.allSatisfy({ ("A"..."Z").contains($0) }),
            let named = name(upper).flatMap(nonEmpty) {
             return named
         }
-        return code
+        return WebText.trim(code)
     }
 
     static let months = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October",
@@ -596,28 +664,39 @@ public enum AlbumInfo {
         return dateWords(year: year, month: month, day: day)
     }
 
-    /// MusicBrainz's types in words: "Album · Live", "EP", with "Compilation" when Navidrome says it is one.
+    /// MusicBrainz's types in words: "Album · Live", "EP", "DJ mix", with "Compilation" when Navidrome says it is one.
+    /// Several in one value are split wherever they are joined - ", ", "; " or ID3v2.3's "/" - but "mixtape/street",
+    /// one type with a slash in its name, is kept whole.
     static func typeWords(_ types: [String], compilation: Bool) -> String? {
-        var words = uniqueFolded(types.flatMap { $0.split(whereSeparator: { $0 == "," || $0 == ";" }).map(String.init) }
-            .map(WebText.trim).filter { !$0.isEmpty })
-            .map { $0.lowercased() == "ep" ? "EP" : capitalised($0) }
+        let parts = types.flatMap { type -> [String] in
+            type.lowercased()
+                .replacingOccurrences(of: mixtape, with: mixtapeHeld)
+                .split(whereSeparator: { $0 == "," || $0 == ";" || $0 == "/" })
+                .map { WebText.trim(String($0)).replacingOccurrences(of: mixtapeHeld, with: mixtape) }
+        }
+        var words = uniqueFolded(parts.filter { !$0.isEmpty }).map { typeNames[$0] ?? capitalised($0) }
         if compilation && !words.contains(where: { $0.lowercased() == "compilation" }) { words.append("Compilation") }
         return words.isEmpty ? nil : words.joined(separator: dot)
     }
 
-    /// When the collection got the album - the earliest of its folders - and, when deadwax filed any of them, so:
+    /// MusicBrainz's types that capitalising alone would misspell.
+    static let typeNames = ["ep": "EP", "dj-mix": "DJ mix", "mixtape/street": "Mixtape/Street", "spokenword": "Spoken word"]
+    static let mixtape = "mixtape/street"
+    static let mixtapeHeld = "mixtape_street"
+
+    /// When the collection got the album - the earliest of its folders - and, when deadwax filed that one, so:
     /// "14 October 2026, downloaded by deadwax". Nil when no folder says.
     static func addedWords(_ present: [StoreRow], timeZone: TimeZone) -> String? {
-        let seen = present.compactMap(\.firstSeen).compactMap { text -> (String, Date)? in
-            guard let when = parseISO(text) else { return nil }
-            return (text, when)
+        let seen = present.compactMap { row -> (row: StoreRow, when: Date)? in
+            guard let text = row.firstSeen, let when = parseISO(text) else { return nil }
+            return (row, when)
         }
-        guard let earliest = seen.min(by: { $0.1 < $1.1 }) else { return nil }
+        guard let earliest = seen.min(by: { $0.when < $1.when }) else { return nil }
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = timeZone
-        let parts = calendar.dateComponents([.year, .month, .day], from: earliest.1)
+        let parts = calendar.dateComponents([.year, .month, .day], from: earliest.when)
         guard let date = dateWords(year: parts.year, month: parts.month, day: parts.day) else { return nil }
-        return present.contains { $0.imported == true } ? "\(date), downloaded by deadwax" : date
+        return earliest.row.imported == true ? "\(date), downloaded by deadwax" : date
     }
 
     static func parseISO(_ text: String) -> Date? {
@@ -701,6 +780,9 @@ public enum AlbumInfo {
     }
 
     public static let foldersRead = 8
+    /// How many folders are read at once: each read takes one of the server's threads and opens every file in the
+    /// folder, on a disk that may have to wake.
+    public static let foldersAtOnce = 2
 
     // MARK: words
 

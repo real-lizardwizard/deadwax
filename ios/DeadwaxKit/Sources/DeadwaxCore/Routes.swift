@@ -206,7 +206,8 @@ public enum Routes {
     /// info's read of a folder's files opens every file there as it is asked (read_album_details: each file twice, and
     /// its pictures' sizes), which a box set on a disk that has to spin up can take a while over - nothing waits on it
     /// past AlbumInfoWords.settleSeconds, so it is given time to land late rather than fail -
-    /// tests/test_ios_contract.py holds each above the server's.
+    /// tests/test_ios_contract.py holds each above the server's: Album info's above the transport's own 8 s and the
+    /// sheet's hold, and the route still with no bound of its own (nothing there to wait longer than).
     public static let timeouts: [Endpoint: Double] = [albumIndex: 30, autoEqSearch: 20, autoEqProfile: 20, libraryOwned: 30, fullySearch: 20, releaseGroup: 60, searchArtists: 20, searchSongs: 20, artistFacts: 60, discography: 60, jobs: 20, cancelJob: 30, retryJob: 60, retryJobSame: 30, clearJobs: 30, storeState: 20, findCandidates: 300, enqueue: 300, joinJob: 60, libraryAdd: 60, libraryTracks: 30]
 }
 
