@@ -93,6 +93,35 @@ extension DeadwaxClient {
         try await call(Routes.queueUnignore, sending: QueueMarkBody(albumPath: path, issues: nil))
     }
 
+    // MARK: Tags (slice 2)
+
+    /// What editing these tracks' tags would change (`POST /library/tags/preview`) - writes nothing. Each file's
+    /// changes in the form's order (`TagEditFile`).
+    public func tagsPreview(_ body: TagEditBody) async throws -> TagEditPlan {
+        try await call(Routes.tagsPreview, sending: body)
+    }
+
+    /// Writes the edited tags and nothing else - no file renamed, no folder moved (`POST /library/tags/apply`): the
+    /// same body as the preview, the plan worked out again on the server; the whole batch refused (a 400 with its
+    /// problems) when any of it is wrong.
+    public func tagsApply(_ body: TagEditBody) async throws -> TagEditResponse {
+        try await call(Routes.tagsApply, sending: body)
+    }
+
+    /// One picture inside one track (`/library/tracks/picture?album=&file=&index=`) - a 404 when the file or the
+    /// picture isn't there.
+    public func trackPictureRequest(path: String, file: String, index: Int) -> HTTPRequest {
+        var built = request(Routes.trackPicture, query: [("album", path), ("file", file), ("index", String(index))])
+        built.headers["Accept"] = "image/*"
+        return built
+    }
+
+    /// That picture's bytes - nil when it isn't there (a 404); anything else deadwax answers is thrown.
+    public func trackPicture(path: String, file: String, index: Int) async throws -> Data? {
+        let response = try await answer(trackPictureRequest(path: path, file: file, index: index), accept: [200, 404])
+        return response.status == 200 ? response.body : nil
+    }
+
     static func json<Body: Encodable>(_ body: Body) throws -> Data {
         do {
             return try JSONEncoder().encode(body)

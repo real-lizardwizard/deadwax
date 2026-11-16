@@ -52,7 +52,8 @@ page of its own, and every choice on them one row with a menu rather than a list
 [Settings](#settings)). The web app's tab is still called You. Still 0.13, **Phase 8** begins bringing those tools into
 the app itself, one build at a time: first **Edit album** - an album's folder, what's wrong with it, and the release
 it's matched to, chosen and applied on the phone, from the album's ••• or Settings > Manage > Edit an album (see [Edit
-album](#edit-album)). Its tags, artwork, lyrics and Delete still open the web app until their builds.
+album](#edit-album)). Then its **Tags**: each track's file, everything in it, and its tags edited on one track or many
+at once. Its artwork, lyrics and Delete still open the web app until their builds.
 
 **Nothing of Phase 2, the lyrics, the EQ, the turntable, play history, your library downloaded,
 playlists, artists, songs, Search, Requests, Get or Manage has been seen on an iPhone yet.** It's built and tested on a Mac,
@@ -537,8 +538,9 @@ doesn't list. Pull down to read the library again.
   issues, but not the two buttons - marking an album fine is the library's keeper's call - and someone with Look after
   the library alone has only Delete album…, as in the web app.
 - **Edit**, with Edit albums: **Release** - the release the album is matched to, or "Not matched to a release" - opens
-  the Release page (below). **Tags** ("12 tracks"), **Artwork** ("Cover, CD art", "No cover") and **Lyrics** ("8 of
-  12") still open the album in the web app, in Safari, until the app has them; the line under the section says so.
+  the Release page (below), and **Tags** ("12 tracks") the album's files (below). **Artwork** ("Cover, CD art", "No
+  cover") and **Lyrics** ("8 of 12") still open the album in the web app, in Safari, until the app has them; the line
+  under the section says so.
 - **Delete album…**, with Look after the library, still opens the web app too.
 
 **Release** is the release, the fields, the cover and what Apply will do, top to bottom:
@@ -580,6 +582,34 @@ folder has none) saves the release's cover into the folder and changes nothing e
 cover.png." It's off until the release's cover has shown, so you never save one you haven't seen - and while an Apply
 runs, or the folder is still being read again after one. If its answer never comes, it's said as an Apply's is (below).
 
+**Tags** is the album's files as deadwax reads them from the disk when it opens ("Reading the files…"), in running
+order - a section for each disc on a set ("Disc 1", "Disc 2"). Each row is the track's number (its disc first on a
+set: "2-04") and its title, with its artist under it when it isn't the album's. Tap a track for its page. **Select**
+(top right) lets you tick tracks, with **Select every track** at the bottom; **Edit 3 tracks…** at the bottom (or
+**Edit all tracks…** with none ticked) opens Edit tags for them, and **Done** ends Select. Choosing other tracks while
+Edit tags holds changes you haven't applied asks "Discard changes?" first.
+
+**A track's page** is everything in its file, as the web app's track view shows it: its title (or its file's name, with
+"No title tag - this is the file's name."), where it sits ("Track 3, disc 2 of 2 · 4:07 · FLAC"), **Edit this
+track…**, then what the file holds under **Tags**, **Audio**, **MusicBrainz** and **File** - only the fields it has,
+a default dimmed with why under it ("No disc number on the file - it reads as disc 1"). **Pictures in this file** is
+each picture inside it - its kind ("Front cover"), its size once it has loaded ("500 × 500 · 61 KB · JPEG"); tap one
+to see it full screen - or "None - a player shows the album's cover for this song, or its CD art if the song has a disc
+number." Last, **All tags in this file (24)**: every tag under its own name, and the file's name; you can select them.
+
+**Edit tags** is the web app's tag editor: **Title**, **Artist** and **Track**; **Album**, **Album artist**, **Disc**
+and **Disc title**; **Year** and **Original year**; **Genre** and **Composer** - each showing what the tracks say, or
+"Several values" where they disagree ("Differs between tracks - left alone, each keeps its own"). Type over a field
+and only that field is written, to every track chosen; **Undo** under it puts back what the files say, and emptying a
+field removes the tag ("Will be removed"). A track or disc number has to be a number ("3" or "3/12"), a year a year
+or a date ("2022" or "2022-07-29"): anything else is said under the field in amber, and nothing is asked until it's
+put right. **What would change** is worked out by deadwax a moment after you stop typing: each file that would change,
+each tag with what it says now and what it would say ("removed" for a tag taken away) - or "Nothing to change - every
+track already says that." **Apply** writes them, as the web app's does: "Saved 12 files." No file is renamed and the
+folder stays where it is - Release moves an album's folder to where its tags say it belongs. Then the files are read
+again, and the album page under the sheet shows the album as it is now. An Apply whose answer never comes is said as
+Release's is (below), and the files read again before Apply comes back on.
+
 **Typed work isn't lost by a swipe.** With something typed or chosen and not applied, the sheet can't be swiped away,
 and Close asks "Discard changes?" - **Discard**, or **Keep editing**.
 
@@ -590,7 +620,9 @@ long, WireGuard dropped) - or comes as a server error, from deadwax or from a re
 the wait - the sheet says "deadwax may have finished this - looking again", reads the folder again and works What Apply
 does out afresh: never the same Apply again on the old answer. Only a refusal (deadwax saying no before it wrote
 anything) keeps What Apply does as it was. If the library can't be read then, the sheet says "Couldn't read the
-library." with **Look again**, and nothing can be applied until it has been read.
+library." with **Look again**, and nothing can be applied until it has been read. Only one write runs at a time: while
+Release applies or saves a cover, Edit tags' Apply is dimmed, and the other way round - and after either, the other's
+preview is worked out again once the folder has been read.
 
 **When Navidrome gives the album a new id** - an applied release can - the album page under the sheet becomes the
 album's page as Navidrome has it now, on every tab it was open in, and VoiceOver says "The album page now shows the
@@ -4149,8 +4181,8 @@ same album's Edit in the web app.
 
 - **320 Edit album is the app's.** An album's top ••• ends with Album info, **Edit album**, Refresh - nothing opens
   Safari. It opens a sheet titled Edit album: the cover, name, artist, the folder's path, then Release, Tags, Artwork,
-  Lyrics and Delete album…. Tags, Artwork, Lyrics and Delete album… still open the album in the web app (the line under
-  them says so); Release opens a page in the sheet.
+  Lyrics and Delete album…. Artwork, Lyrics and Delete album… still open the album in the web app (the line under
+  them says so); Release opens a page in the sheet, and so does Tags since the build after it (330).
 - **321 The folder.** An album kept as one folder per disc shows a **Folder** menu with each disc's folder; choosing
   another opens the editor on it. Settings > Manage > **Edit an album** opens Choose the folder: type part of a name,
   the list narrows (the line over it says how many), pick one - Edit album opens for that folder.
@@ -4181,6 +4213,38 @@ same album's Edit in the web app.
   every word whole, wrapped rather than cut off; each folder and pressing read as one line (a pressing with Current
   and its track count), the header as a heading, the Folder menu its choice, and the Discard question's two buttons.
 
+### Edit album's Tags checks (330-334)
+
+**Not done yet.** These come with the build that brings Edit album's [Tags](#edit-album) into the app - Phase 8's
+second part (still app 0.13 (13)). No server change is needed: any deadwax the first part works with. As in 320-329:
+deadwax's plain `http://` address, on the home Wi-Fi and over WireGuard with Wi-Fi off, as an admin; compare each with
+the same album's Tags in the web app.
+
+- **330 Tags.** Edit album > **Tags**: "Reading the files…", then every track in running order - on a set a section
+  for each disc and numbers like "2-04"; a guest artist's track shows them under its title. **Select**, tick three:
+  "3 of 12 selected", and **Edit 3 tracks…** at the bottom opens Edit tags with the fields they share filled in and
+  those that differ saying "Several values" ("Differs between tracks - left alone, each keeps its own"). **Select every
+  track**, then **Deselect every track**; **Done** clears the ticks, and with none ticked the button is **Edit all
+  tracks…**.
+- **331 A genre for all.** Edit all tracks…, type a genre: within a second What would change lists each file's change,
+  its genre now struck through and the new one under it; a field left at "Several values" changes no file's own.
+  **Apply**: "Saved 12 files.", and Navidrome - and the web app's Tags - shows the new genre. Again, locking the phone
+  the moment you tap Apply: unlocked, does it say what it did, or "deadwax may have finished this - looking again" -
+  and never offer the same Apply on the old preview?
+- **332 Remove and undo.** Empty a field the track has (Composer, say): "Will be removed" under it, and the preview says
+  "removed". **Undo** puts back what the files say, and the preview goes. Turn Wi-Fi and WireGuard off with a field
+  typed over: the amber line, Apply dimmed, what you typed kept; back on, the files are read and worked out again
+  before Apply comes back.
+- **333 Refused as typed.** Type "July 2022" into **Year**: the field says why in amber, "Fix the marked field first.",
+  nothing is worked out and Apply is dimmed; "2022-07" puts it right. ("2024-13" is taken, by deadwax too: neither
+  checks the month.)
+- **334 A track's page.** Tap a track: where it sits ("Track 3, disc 2 of 2 · 4:07 · FLAC"), its tags, its audio, its
+  MusicBrainz ids, its file and **All tags in this file** - the same as the web app's track view - and a track with a
+  picture inside it lists it ("Front cover", its size once it has loaded), a tap showing it full screen. **Edit this
+  track…** opens Edit tags for that track alone. With the largest text and VoiceOver: each track row read as one
+  ("Track 3, Title, Artist"), each picture row as "Front cover - see it full size", Undo with its hint, every word
+  whole.
+
 ## What it can't do yet
 
 These are the web app's for now:
@@ -4194,7 +4258,7 @@ These are the web app's for now:
 - **Home** and **pins** - and so Home's Arriving: outside Requests, the tab's badge is the phone's only sign of a
   download on its way.
 - **Looking after deadwax**, but for [Edit album](#edit-album)'s folder, Needs a look marks and Release: Settings >
-  [Manage](#manage) opens each other tool in the web app, in Safari, and Change password too; so do Edit album's Tags,
+  [Manage](#manage) opens each other tool in the web app, in Safari, and Change password too; so do Edit album's
   Artwork, Lyrics and Delete album…. Not linked from the phone: the artist's managing (above), the web app's
   **Connections** (in its You) and Needs a look's count.
 
@@ -4220,6 +4284,8 @@ These are the web app's for now:
 | Edit album: **"deadwax can't find this album's folder: …"** | No folder in deadwax's library is matched to the album, or none has its name. **Choose the folder** and pick it yourself - or, if it was only just filed, **Look again** in a moment. See [Edit album](#edit-album). |
 | Edit album: **"deadwax may have finished this - looking again"** | The Apply's answer didn't reach the phone (locked too long, or the connection dropped); deadwax carried on regardless. The sheet reads the folder again: check What Apply does - often "Nothing to change." - before applying again. |
 | Edit album's **Apply** stays dimmed | What Apply does is still being worked out (or a release's tracklist is loading), there's nothing to change, or deadwax can't be reached. |
+| Edit tags' **Apply** stays dimmed | A field says in amber what's wrong with it, What would change says "Nothing to change", it's still being worked out - or Release is applying or saving a cover, and Edit tags waits for it. |
+| Edit album's Tags: **"Couldn't read the files."**, with **Look again** | deadwax couldn't read the folder's files just then - the disk asleep, or the folder moved. **Look again**; if the album was just applied with a new release, its files were renamed, so go back to Tags and choose them again. |
 | Library: **"Couldn't update this list - showing it as it was."** | deadwax didn't answer just then. ••• > Refresh to try again (pull down, on a list opened from the •••). |
 | An album's page: **"This album isn't here any more - it may have been moved or deleted."** | Go back, and ••• > Refresh in the Library to bring it up to date. |
 | An artist's page: **"This artist isn't here any more - their albums may have been moved or deleted."** | The same: go back, and ••• > Refresh. |

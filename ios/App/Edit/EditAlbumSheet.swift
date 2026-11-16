@@ -13,6 +13,12 @@ enum EditPage: Hashable {
     case changes
     /// Choose the folder: any folder of the library (the album's own can't be found).
     case chooseFolder
+    /// Tags: the folder's files, a section per disc, Select.
+    case tags
+    /// A track's page: everything its file says, by the file's name.
+    case track(String)
+    /// Edit tags: the fields of the tracks chosen, what would change, Apply.
+    case editTags
 }
 
 /// Edit album (notes/ios-specs/phase8-managing.md 3.2; the web's EditPanel, its title): a sheet over the tabs, its own
@@ -119,6 +125,12 @@ struct EditPageView: View {
                     model.choose(path, fromScan: true)
                     self.path.removeAll()
                 }
+            case .tags:
+                if let tags = model.tags { TagsListView(model: model, tags: tags, path: $path) }
+            case .track(let filename):
+                if let tags = model.tags { TrackPageView(model: model, tags: tags, filename: filename, path: $path) }
+            case .editTags:
+                if let tags = model.tags { EditTagsView(model: model, tags: tags) }
             }
         }
         .editOutOfReach(!model.online)
@@ -126,7 +138,7 @@ struct EditPageView: View {
 }
 
 /// Edit album's root: the album's header, then its sections - the Folder menu with several folders, Needs a look, Edit
-/// (Release, and the editors still in the web app), Delete album… - each by the person's permissions (Core's
+/// (Release, Tags, and the editors still in the web app), Delete album… - each by the person's permissions (Core's
 /// Managing.albumEdit and AlbumEdit.marksFine). Without an album, what AlbumEdit.status says, with Look again and
 /// Choose the folder; several folders by name alone, the Folder menu alone, "Which folder is this album?" over it.
 struct EditAlbumRoot: View {
@@ -225,9 +237,12 @@ struct EditAlbumRoot: View {
                             .multilineTextAlignment(.trailing)
                     }
                 }
+                NavigationLink(value: EditPage.tags) {
+                    LabeledContent(AlbumEdit.Part.tags.label) {
+                        Text(EditWords.tracks(album.trackCount))
+                    }
+                }
                 if let url = webURL {
-                    WebAppRow(label: AlbumEdit.Part.tags.label, line: EditWords.tracks(album.trackCount), url: url,
-                              live: model.online)
                     WebAppRow(label: AlbumEdit.Part.artwork.label, line: EditWords.artworkValue(album), url: url,
                               live: model.online)
                     WebAppRow(label: AlbumEdit.Part.lyrics.label, line: EditWords.lyricsValue(album), url: url,

@@ -182,7 +182,7 @@ struct ReleasePage: View {
                 }
                 .frame(maxWidth: .infinity)
             }
-            .disabled(!retag.canApply)
+            .disabled(!retag.canApply || model.tagsApplying)
         }
     }
 
@@ -442,7 +442,7 @@ struct CompareCoversView: View {
                     }
                     // only once the pressing's cover has come (what it saves is what was looked at), no write under
                     // way, and the folder read since the last gap or write (RetagFlow.canSaveCover)
-                    .disabled(incoming == nil || !retag.flow.canSaveCover)
+                    .disabled(incoming == nil || !retag.flow.canSaveCover || model.tagsApplying)
                     if let result = retag.coverResult {
                         Text(result)
                             .font(Typeface.footnote)
@@ -495,11 +495,12 @@ struct CompareCoversView: View {
 }
 
 /// A cover opened full screen from Compare covers: the folder's as it is, or the pressing's from the relay at its
-/// largest.
+/// largest - and (slice 2) a picture inside a track, from a track's page.
 struct FullCover: Identifiable {
     enum Source {
         case folder(String, Double)
         case release(String)
+        case picture(path: String, file: String, index: Int)
     }
 
     let id = UUID()
@@ -513,6 +514,8 @@ struct FullCoverView: View {
     @Environment(ServerModel.self) private var server
     @Environment(\.dismiss) private var dismiss
     @State private var image: UIImage?
+    /// A picture fetched for itself (not a cover) that couldn't be.
+    @State private var failed = false
 
     var body: some View {
         ZStack {
@@ -522,6 +525,10 @@ struct FullCoverView: View {
                     .resizable()
                     .scaledToFit()
                     .accessibilityLabel(EditWords.coverFullScreen)
+            } else if failed {
+                Text(EditWords.pictureFailed)
+                    .foregroundStyle(.primary)
+                    .padding()
             } else {
                 ProgressView()
             }
@@ -541,6 +548,10 @@ struct FullCoverView: View {
             case .release(let mbid):
                 image = await CoverCache.shared.loadArchive(client: client, cover: ArchiveCoverID(.release, mbid),
                                                             size: ArchiveCoverSize.hero)
+            case .picture(let path, let file, let index):
+                let data = try? await client.trackPicture(path: path, file: file, index: index)
+                image = data.flatMap { UIImage(data: $0) }
+                failed = image == nil
             }
         }
     }

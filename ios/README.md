@@ -26,15 +26,15 @@ collection added to your library, and When I tap Get, Quality floor and Format c
 Phase 7's Manage: the list of the managing tools you may use (editing an album, Needs a look, Library care,
 People, Server settings and the event log) and Change password, each opened in the web app in Safari - and
 Phase 8, bringing them into the app one at a time, begun with Edit album: an album's folder, what's wrong with it,
-and the release it's matched to, chosen and applied on the phone (its tags, artwork, lyrics and Delete still in the
-web app) - kept on the `ios` branch while it's being built. Nothing of Phase 2, the lyrics, the EQ, the turntable,
+and the release it's matched to, chosen and applied on the phone, then its tags, on one track or many (its artwork,
+lyrics and Delete still in the web app) - kept on the `ios` branch while it's being built. Nothing of Phase 2, the lyrics, the EQ, the turntable,
 play history, Phase 3, Phase 4, Search, Requests, Get, Manage or Edit album has been seen on an iPhone yet.
 Phase 0's test screen lives on in the app's Debug.
 
 - **To install it, and every week after:** [docs/ios.md](../docs/ios.md) - the steps once on the Mac
   and the iPhone, the weekly `ios/scripts/install.sh`, the test album
   (`ios/scripts/make-test-album.py`), what the app does, and the checks, phase by phase - Phase 7's are 237-246,
-  Edit album's 320-329.
+  Edit album's 320-329, its Tags' 330-334.
 - **How it is built, and why:** [notes/ios.md](../notes/ios.md).
 - **Before pushing a change here, on Linux:** `ios/scripts/check-linux.sh`. GitHub's `ios.yml` compiles
   the rest on macOS.

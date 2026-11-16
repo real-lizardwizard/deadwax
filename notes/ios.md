@@ -11254,3 +11254,129 @@ phone locked (how long beginBackgroundTask gives, and that the re-read after it 
 covers pair at 500 and full screen; VoiceOver and the largest text across the sheet. Nothing has run against a real
 deadwax: the routes' answers are the contract test's real routes over a two-file folder, MusicBrainz is the vectors'
 recorded pressings.
+
+## Edit album's Tags on the phone (Phase 8, slice 2 - 2026-11-16)
+
+The spec's 3.4 (notes/ios-specs/phase8-managing.md): Edit album's **Tags** - the folder's files, a track's page, and
+Edit tags with its preview and Apply - on the phone, the WebAppRow for Tags gone. On the `ios` branch after slice 1's
+review (92ccccd); the app stays 0.13 (13); src/__init__.py untouched; no server or web change; the player engine has
+no diff.
+
+### Core (DeadwaxCore)
+
+- **AlbumInfo.swift**: `AlbumFile` reads every field `/library/tracks` sends (read_album_details) - `filename`,
+  `format`, `size`, `length`, `bitrate`, `sample_rate`, `bits_per_sample`, `channels`, `codec`, `position`, `pictures`
+  - each loosely, so a file with one odd field is kept; `title` (the non-empty title tag). `EmbeddedPicture`
+  (describe_pictures: index, type, label, mime, size, description).
+- **TagEdit.swift**: lib/tagEdit.ts - `TagEdit.fields` (TAG_FIELDS: the eleven, labels and short/numeric flags, the
+  web's order, which is track_tags.EDITABLE_TAGS'), `sections` (the phone's four groups of them), `shared`
+  (sharedValue: the value every file holds, or `mixed`), `edits` (only the fields typed over, trimmed, "" to remove,
+  one draft to every file), `problem` (fieldProblem: UTF-16 length over 1000, a control unit, a number or a date by
+  JavaScript's ASCII `\d`), `removes`, `placeholder`, `note` (fieldNote), `trackLabel` (albumEdit.ts's). `TagEditWords`
+  (TrackTagEditor.tsx's and EditPanel TagsList's sentences, `saved`, `problems`, `canApply` - the web button's
+  `disabled` turned round). The wire: `TagEditBody` (TagEditRequest), `TagEditPlan`, `TagEditFile` (each file's
+  changes in the form's order), `TagEditResults`, `TagEditResponse`. `EditWords.pictureFailed` (the phone's own).
+- **TrackInspector.swift**: lib/trackInspector.ts and trackFields.ts as a track's page reads them with its file read:
+  `groups` (Tags, Audio, MusicBrainz, File - every TRACK_FIELDS row the inspector shows, its value, the data face, the
+  default's reason), `place` (trackPlace), `trackTime`, the picture's facts and bytes, the page's words.
+- **RetagFlow.swift**: `canApply(_ plan: TagEditPlan?, problems:)` and `beginApply(_:problems:)` - the tag editor is
+  the Release page's flow again (a preview and an apply of one body: tickets, `due`, `needsRead`, `readFailed`,
+  `mayHaveFinished`, `outcome(of:)`), so its review lessons hold for Tags as they are. `EditWords.inWebAppLine` names
+  Artwork, Lyrics and Delete album… only.
+- **EditClient.swift / Routes.swift**: `tagsPreview`, `tagsApply` (POST `/library/tags/preview|apply`) and
+  `trackPicture` (GET `/library/tracks/picture?album&file&index`, a 404 as nil) - 73 routes now. Timeouts: the
+  preview 60 s (at least the listing's 30: it reads each file sent), the apply 120 (it reads them again, writes each
+  and reads the folder into the scan's cache and the store index - nothing on the network, no pause, no lock), a
+  picture 30.
+
+**Held to the web**: ios/scripts/export-edit-parts-vectors.cjs (seed 8330) compiles lib/tagEdit.ts,
+trackInspector.ts, trackFields.ts, format.ts, libraryTree.ts, albumEdit.ts and errorWords.ts and runs them as they
+are, and reads TrackTagEditor.tsx's, EditPanel.tsx's, useTrackDetails.ts's and TrackInspector.tsx's sentences by
+pattern (each piece hashed into made_from), over made files and drafts: Fixtures/edit/edit-parts-vectors.json, 300 KB
+- the fields and words, 47 shared values, 47 edits, 399 problems, 112 notes, 160 labels, the plans' sentences, 33 track
+pages. ui/test/iosedit.sim.cjs runs both exporters with `--check`. Slices 3 and 4 add their sections to it.
+
+### The app (ios/App/Edit/)
+
+- **TagsModel** (one per folder EditAlbumModel holds): the files as `/library/tracks` reads them (the first time Tags
+  opens, then whenever the scan reads the folder again - `albumRead`; newest read only, a cancellation changing
+  nothing, a failure said with Look again and `flow.couldNotRead()`), the selection, the editor's files and draft, the
+  400 ms debounced preview (none asked with nothing typed over or a field wrong: answered with no plan, as
+  TrackTagEditor's effect does), `beginApply`/`applyEnded`.
+- **TagsPages**: `TagsListView` - a List, a section per disc on a set ("Disc 2", by the file's own disc number), rows
+  "3 · Title" with the artist under it when it isn't the album's; **Select** / Done in the bar, the List's own
+  selection (EditMode), and the bottom bar's **Select every track** / **Deselect every track** and **Edit 3 tracks…**
+  (or **Edit all tracks…**); the footer "3 of 12 selected" or the web's note. `TrackPageView` - the head (title, "No
+  title tag…", place), **Edit this track…**, an `InspectorSection` per group, **Pictures in this file** (a
+  `PictureRow` each: the picture at 56 pt, `Corners.artShape`, its facts once loaded; a tap is FullCover's new
+  `.picture` source), **All tags in this file (N)**. `EditTagsView` - a Form: what is edited (one track's title, or a
+  disclosure of the tracks), the four sections of fields (each a TextField over what the files share, its note in
+  amber for a problem, Undo), the web's hint under the last, **What would change** (`TagFileChanges` each: the label,
+  from struck through, to), Apply.
+- **EditAlbumModel.applyTags()**: as `apply()` - BackgroundHold ("Edit album: Edit tags"), RetagFlow's outcome, the
+  maybe-finished announcement, `samePerson` before anything after the write, the folder read again only when it wrote
+  or a gap asked, `wrote(before:)` so the album page asks again. `holdsWork` takes typed tags; `applying` takes the tag
+  apply (Close off); `becameActive` reads again for Tags' `needsRead` too; reach and a failed read reach TagsModel.
+- **One write at a time**: Release's Apply and the cover alone are off (and guarded in the model) while Tags applies;
+  Tags' Apply is off while Release applies, saves a cover, or a mark runs. **And each waits for the other's write**: a
+  tag edit that wrote (or may have) tells Release's flow the folder changed (`RetagFlow.folderChanged`: `needsRead`,
+  no preview landing, no "may have finished" of its own), a release applied tells Tags' - so neither page offers an
+  Apply on a preview of the files as they were. A Tags never opened has nothing to wait for (a read lets it go).
+
+### Decided here, and where the phone departs from the spec
+
+- **"" removes a tag**, as the web sends it (TagEditBody's tags are strings); the spec's 3.4 said null. The server takes
+  both alike (TagEdit's model: `str | None`, "" or None removes).
+- **A file's changes are listed in the form's order** (Title first), a tag the form doesn't offer after them by name -
+  the web lists them in the order of the server's dict (the order typed), which JSONDecoder doesn't keep.
+- **The track's page shows only the fields the file has** (the web draws a dash for each empty one), its place without
+  the disc's title (that's Tags' Disc title row), and has no Previous/Next - Back and another row are the phone's way.
+- **Edit this track…**, the web's words, not the spec's "Edit tags…".
+- **After a clean apply the fields go back to what the files now say** (the draft cleared); the web leaves what was
+  typed in them. On the phone the next edit then starts from the files, and the sheet holds no "unsaved" work that is
+  saved.
+- **The hint names the Release page**, not the web's Release tab.
+- **Track, Disc, Year and Original year have the numbers-and-punctuation keyboard** (a "/" or "-" is part of them);
+  Done above the keyboard, as on Release.
+- **Another set of tracks over typed work asks "Discard changes?"** (the web's editor simply starts again on the new
+  selection); the same set keeps what was typed.
+- **Select is the bar's Select / Done**, Select every track in the bottom bar, the selection cleared on Done; the web's
+  Shift-click runs aren't the phone's.
+- **"Couldn't load this picture."** - the phone's own words when a picture full screen doesn't load (the web's viewer
+  leaves the image broken).
+- **The fields carry the web's labels** (Track, Disc, Disc title, Year, Original year), not the spec's.
+- **The web's rule is stricter than the server's in three places** (tests/test_ios_edit_parts_contract.py holds it):
+  a digit of another script (Python's `\d` takes it), a NEL after a number (Python's strip removes it), and a length
+  over 1000 UTF-16 units but not characters. Each refuses something the server would have written - never the other
+  way - so the phone never offers an Apply the server refuses for a field. Reported, unchanged.
+
+### Tests
+
+- **EditPartsVectorTests** (11): the fixture's counts; the fields, the words, every shared value, edit, problem (333's
+  "July 2022" and "2024-13" among them), note and label; the plans' sentences, saved and headings; every track page.
+- **TagEditFlowTests** (7): a write beside it waits for the read; Apply only for a current preview that changes something with no problem on either side;
+  nothing typed is an answer of its own; an apply with no answer said and read again before anything is offered, a
+  failed read said; a refusal writes nothing, a 5xx maybe finished; the routes asked as the server takes them (only
+  `album_path` and `edits`, the preview's very body for Apply, the picture's query and its 404); AlbumFile read in
+  full and leniently.
+- **tests/test_ios_edit_parts_contract.py** (new, 9): TagEditBody and its Edit within TagEditRequest and TagEdit; the
+  form's fields the server's EDITABLE_TAGS; a value the web takes never one validate_tag refuses; every draft the
+  vectors hold taken by the real preview over a real folder; the real preview, apply (and its 400 refusal, nothing
+  written) and track listing with an embedded picture answering every field the phone reads; the picture and its
+  404s; the timeouts; the permissions.
+- **tests/test_ios_edit_parts.py** (new, 6): Tags a page of the phone's own; Select the List's own; the track's page
+  and its pictures; Apply as the flow says and never beside another write; the background task, the re-read and the
+  sign-out; cancellations and the newest read.
+- test_ios_edit.py (three WebAppRows now; the cover alone off during a tag apply), test_ios_contract.py (73 routes,
+  AlbumFile's and EmbeddedPicture's fields), ClientTests (73 routes and the timeouts).
+
+### Verified, and not
+
+On the Mac: `swift test` (1776 Core tests in 188 suites, 158 Audio in 17, 12 more, all passing); the unsigned
+generic-iOS Debug build, BUILD SUCCEEDED; the full pytest suite, 4667 passed and 1 skipped; all 92 sims with Node 22
+(iosedit running both exporters' `--check`).
+
+Not verified - only the phone can tell (docs/ios.md checks 330-334): the List's selection with EditMode as iOS 27
+draws it, the bottom bar beside the sheet's, the keyboard (numbers and punctuation, a field scrolled above it), the
+pictures' thumbnails and full screen, a long apply locked, VoiceOver and the largest text. Nothing has run against a
+real deadwax: the routes' answers are the contract test's real routes over a two-file folder.

@@ -118,27 +118,82 @@ public struct AlbumFiles: Decodable, Sendable, Equatable {
     }
 }
 
-/// One file as the track viewer's route reads it: its disc, its tags by the server's names for them (mutagen's easy
-/// names, every value of a tag joined by "; "), and every tag under its container's own name (`raw`, `[name, text]`
-/// pairs - a FLAC's lower-cased, an MP3's ID3 frame ids, an M4A's atoms).
+/// One file as the track viewer's route reads it (src/library.py `read_track_details`): its disc, its tags by the
+/// server's names for them (mutagen's easy names, every value of a tag joined by "; "), and every tag under its
+/// container's own name (`raw`, `[name, text]` pairs - a FLAC's lower-cased, an MP3's ID3 frame ids, an M4A's atoms);
+/// and (Phase 8, slice 2 - Edit album's Tags) the rest of what the route sends: its name, format, size and audio, its
+/// number, and the pictures inside it without their bytes (`/library/tracks/picture` serves those).
 public struct AlbumFile: Decodable, Sendable, Equatable {
     public let disc: Int?
     public let tags: [String: String]?
     public let raw: [[String]]?
+    /// The file's name in its folder - "" when the answer had none.
+    public let filename: String
+    /// Its extension, lower-case ("flac").
+    public let format: String
+    /// Bytes.
+    public let size: Double
+    /// Seconds, to a tenth.
+    public let length: Double
+    /// Bits a second (for lossless the size over the length, as every player shows it).
+    public let bitrate: Double?
+    public let sampleRate: Double?
+    /// None for a lossy file - never a made-up 16.
+    public let bitsPerSample: Double?
+    public let channels: Double?
+    public let codec: String
+    /// The track number the file is tagged with.
+    public let position: Int?
+    public let pictures: [EmbeddedPicture]
 
-    public init(disc: Int? = nil, tags: [String: String]? = nil, raw: [[String]]? = nil) {
+    public init(disc: Int? = nil, tags: [String: String]? = nil, raw: [[String]]? = nil, filename: String = "",
+                format: String = "", size: Double = 0, length: Double = 0, bitrate: Double? = nil,
+                sampleRate: Double? = nil, bitsPerSample: Double? = nil, channels: Double? = nil, codec: String = "",
+                position: Int? = nil, pictures: [EmbeddedPicture] = []) {
         self.disc = disc
         self.tags = tags
         self.raw = raw
+        self.filename = filename
+        self.format = format
+        self.size = size
+        self.length = length
+        self.bitrate = bitrate
+        self.sampleRate = sampleRate
+        self.bitsPerSample = bitsPerSample
+        self.channels = channels
+        self.codec = codec
+        self.position = position
+        self.pictures = pictures
     }
 
-    enum CodingKeys: String, CodingKey { case disc, tags, raw }
+    enum CodingKeys: String, CodingKey {
+        case disc, tags, raw, filename, format, size, length, bitrate, channels, codec, position, pictures
+        case sampleRate = "sample_rate"
+        case bitsPerSample = "bits_per_sample"
+    }
 
     public init(from decoder: any Decoder) throws {
         let fields = try decoder.container(keyedBy: CodingKeys.self)
         disc = fields.looseField(Int.self, .disc)
         tags = fields.looseField([String: String].self, .tags)
         raw = fields.looseList([String].self, .raw)
+        filename = fields.looseField(String.self, .filename) ?? ""
+        format = fields.looseField(String.self, .format) ?? ""
+        size = fields.looseField(Double.self, .size) ?? 0
+        length = fields.looseField(Double.self, .length) ?? 0
+        bitrate = fields.looseField(Double.self, .bitrate)
+        sampleRate = fields.looseField(Double.self, .sampleRate)
+        bitsPerSample = fields.looseField(Double.self, .bitsPerSample)
+        channels = fields.looseField(Double.self, .channels)
+        codec = fields.looseField(String.self, .codec) ?? ""
+        position = fields.looseField(Int.self, .position)
+        pictures = fields.looseList(EmbeddedPicture.self, .pictures) ?? []
+    }
+
+    /// The file's own title tag - nil when it has none (the list then names it by its file, as the web's does).
+    public var title: String? {
+        guard let title = tags?["title"], !title.isEmpty else { return nil }
+        return title
     }
 
     /// Every value the file holds for `tag`: the server's named tag first, else any of the container names Picard
@@ -154,6 +209,40 @@ public struct AlbumFile: Decodable, Sendable, Equatable {
             if !found.isEmpty { return found }
         }
         return []
+    }
+}
+
+/// A picture inside a file, as the track viewer's route lists it (src/library.py `describe_pictures`): its place among
+/// the file's pictures (`/library/tracks/picture`'s `index`), its declared type and the server's name for it ("Front
+/// cover"; "Cover" for an M4A's, which has no types), its MIME type, its bytes and its description.
+public struct EmbeddedPicture: Decodable, Sendable, Equatable, Hashable {
+    public let index: Int
+    public let type: Int?
+    public let label: String
+    public let mime: String
+    public let size: Double
+    public let description: String
+
+    public init(index: Int, type: Int? = nil, label: String, mime: String = "image/jpeg", size: Double = 0,
+                description: String = "") {
+        self.index = index
+        self.type = type
+        self.label = label
+        self.mime = mime
+        self.size = size
+        self.description = description
+    }
+
+    enum CodingKeys: String, CodingKey { case index, type, label, mime, size, description }
+
+    public init(from decoder: any Decoder) throws {
+        let fields = try decoder.container(keyedBy: CodingKeys.self)
+        index = fields.looseField(Int.self, .index) ?? 0
+        type = fields.looseField(Int.self, .type)
+        label = fields.looseField(String.self, .label) ?? ""
+        mime = fields.looseField(String.self, .mime) ?? "image/jpeg"
+        size = fields.looseField(Double.self, .size) ?? 0
+        description = fields.looseField(String.self, .description) ?? ""
     }
 }
 

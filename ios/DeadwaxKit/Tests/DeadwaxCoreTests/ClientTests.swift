@@ -374,7 +374,7 @@ func sentJSON(_ request: HTTPRequest?) throws -> [String: SentValue] {
     }
 
     @Test func everyRouteIsDeadwaxsOwn() {
-        #expect(Routes.all.count == 70)
+        #expect(Routes.all.count == 73)
         #expect(Set(Routes.all).count == Routes.all.count)
         for endpoint in Routes.all {
             #expect(endpoint.path.hasPrefix("/deadwax/"))
@@ -410,6 +410,8 @@ func sentJSON(_ request: HTTPRequest?) throws -> [String: SentValue] {
         // release's pressings and a pressing, 60 s, MusicBrainz's browse and its retries; Changes, 60 s, every file
         // read; Apply, 480 s, two cover fetches, Navidrome asked twice and 300 s before the rename; a cover, 120 s,
         // the Cover Art Archive's and the files'; the cover drawn, 30 s; the queue's marks, 20 s
+        // (slice 2: Tags) a tag edit's preview, 60 s, every file named read; its apply, 120 s, read and written again;
+        // a picture inside a track, 30 s
         let longer: [Endpoint: Double] = [Routes.albumIndex: 30, Routes.autoEqSearch: 20, Routes.autoEqProfile: 20,
                                           Routes.libraryOwned: 30, Routes.fullySearch: 20, Routes.releaseGroup: 60,
                                           Routes.searchArtists: 20, Routes.searchSongs: 20, Routes.artistFacts: 60,
@@ -419,7 +421,8 @@ func sentJSON(_ request: HTTPRequest?) throws -> [String: SentValue] {
                                           Routes.joinJob: 60, Routes.libraryAdd: 60, Routes.libraryTracks: 30,
                                           Routes.libraryAlbums: 120, Routes.releases: 60, Routes.release: 60,
                                           Routes.retagPreview: 60, Routes.retagApply: 480, Routes.artFetch: 120,
-                                          Routes.libraryArt: 30, Routes.queueIgnore: 20, Routes.queueUnignore: 20]
+                                          Routes.libraryArt: 30, Routes.queueIgnore: 20, Routes.queueUnignore: 20,
+                                          Routes.tagsPreview: 60, Routes.tagsApply: 120, Routes.trackPicture: 30]
         #expect(Routes.timeouts == longer)
         for endpoint in Routes.all {
             // each path parameter filled in: a brace left in a path is no URL

@@ -301,6 +301,13 @@ final class RetagModel {
         schedulePreview()
     }
 
+    /// Another part of Edit album wrote to the folder (RetagFlow.folderChanged): no preview in flight lands, and Apply
+    /// waits for the folder to be read again.
+    func folderChanged() {
+        previewTask?.cancel()
+        flow.folderChanged()
+    }
+
     func wentAway() {
         flow.wentAway()
         previewTask?.cancel()

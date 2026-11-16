@@ -121,7 +121,7 @@ from src.store import JobStore  # noqa: E402
 
 CORE = Path(__file__).resolve().parent.parent / "ios" / "DeadwaxKit" / "Sources" / "DeadwaxCore"
 ENDPOINT = re.compile(r'Endpoint\(method: "(\w+)", path: "([^"]+)", query: \[([^\]]*)\]\)')
-ROUTE_COUNT = 70
+ROUTE_COUNT = 73
 RAW_OPENING = re.compile(r'#+"')
 HASHES = re.compile(r"#*")
 
@@ -2006,7 +2006,12 @@ def test_album_info_reads_what_the_tracks_route_sends():
     assert '{"album": album, "files": await asyncio.to_thread(read_album_details, directory)}' in \
         inspect.getsource(library_route.tracks)
     assert fields("AlbumFiles") == {"files": False}
-    assert fields("AlbumFile") == {"disc": True, "tags": True, "raw": True}
+    # (Phase 8, slice 2) and Edit album's Tags reads the rest of what the route sends: the file, its audio, its pictures
+    assert fields("AlbumFile") == {"disc": True, "tags": True, "raw": True, "filename": False, "format": False, "size": False,
+                                   "length": False, "bitrate": True, "sample_rate": True, "bits_per_sample": True,
+                                   "channels": True, "codec": False, "position": True, "pictures": False}
+    assert fields("EmbeddedPicture") == {"index": False, "type": True, "label": False, "mime": False, "size": False,
+                                         "description": False}
     for name, answer in _album_files_cases().items():
         assert answer["files"], name
         for file in answer["files"]:

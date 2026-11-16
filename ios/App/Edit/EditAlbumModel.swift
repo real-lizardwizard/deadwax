@@ -46,6 +46,8 @@ final class EditAlbumModel {
     private(set) var album: ScanAlbum?
     /// Its Release.
     private(set) var retag: RetagModel?
+    /// Its Tags (slice 2): the files, the selection, the tag editor.
+    private(set) var tags: TagsModel?
     /// deadwax in reach (Reachability).
     private(set) var online: Bool
     /// It's fine as it is / Ask about it again on its way, and what went wrong.
@@ -120,10 +122,13 @@ final class EditAlbumModel {
     }
 
     /// Typed work, or a write under way: the sheet isn't swiped away, and Close asks first.
-    var holdsWork: Bool { retag?.unsaved == true || writing || marking }
+    var holdsWork: Bool { retag?.unsaved == true || tags?.unsaved == true || writing || marking }
 
-    /// An apply is under way.
-    var applying: Bool { retag?.flow.applying == true }
+    /// An apply is under way - a release's or (slice 2) a tag edit's: Close is off.
+    var applying: Bool { retag?.flow.applying == true || tagsApplying }
+
+    /// A tag edit's Apply is under way: no other write starts.
+    var tagsApplying: Bool { tags?.flow.applying == true }
 
     /// An apply or the cover alone is under way: the album held and its Release stay, whatever a read brings.
     var writing: Bool { applying || retag?.flow.savingCover == true }
@@ -159,6 +164,7 @@ final class EditAlbumModel {
         case .failed:
             // the read a write or a gap waits for: the wait ends, said with Look again (the sheet draws scan.failure)
             retag?.couldNotRead()
+            tags?.couldNotRead()
         case .dropped:
             break
         }
@@ -206,6 +212,7 @@ final class EditAlbumModel {
             // the folder is gone from the scan: let go, found again below from what the scan says
             album = nil
             retag = nil
+            tags = nil
         }
         guard let folders, let first = folders.paths.first, !AlbumEdit.needsChoice(folders),
               let found = answer.album(at: first) else { return }
@@ -217,6 +224,7 @@ final class EditAlbumModel {
         album = fresh
         if fresh.path != oldPath, chosen == oldPath { chosen = fresh.path }
         retag?.albumRead(fresh)
+        tags?.albumRead(fresh)
     }
 
     private func hold(_ found: ScanAlbum) {
@@ -224,6 +232,8 @@ final class EditAlbumModel {
         let release = RetagModel(album: found, online: online, admin: admin, client: client)
         retag = release
         release.start()
+        // its files are read the first time Tags opens
+        tags = TagsModel(album: found, online: online, admin: admin, client: client)
     }
 
     /// A folder picked - from the Folder menu (another of the album's folders) or from Choose the folder (any of the
@@ -242,9 +252,11 @@ final class EditAlbumModel {
         online = now
         guard now else {
             retag?.wentAway()
+            tags?.wentAway()
             return
         }
         retag?.cameBack()
+        tags?.cameBack()
         // everything asked again before a write comes back on - or, never asked, asked now
         opened = true
         await lookUp()
@@ -252,7 +264,7 @@ final class EditAlbumModel {
 
     /// The app back in front with the folder still to be read (an apply ended while the phone was locked).
     func becameActive() async {
-        guard online, retag?.flow.needsRead == true, !scan.reading else { return }
+        guard online, retag?.flow.needsRead == true || tags?.flow.needsRead == true, !scan.reading else { return }
         await lookUp()
     }
 
@@ -263,7 +275,7 @@ final class EditAlbumModel {
     /// followed - and, the release changed, its new id looked for. Signed out meanwhile, nothing more: the next person's
     /// pages are none of this apply's business.
     func apply() async {
-        guard let retag, let client, let before = album, let body = retag.beginApply() else { return }
+        guard !tagsApplying, let retag, let client, let before = album, let body = retag.beginApply() else { return }
         let preview = retag.plan
         let hold = BackgroundHold(named: "Edit album: Apply")
         defer { hold.end() }
@@ -274,6 +286,8 @@ final class EditAlbumModel {
             result = .failure(error)
         }
         let outcome = retag.applyEnded(result)
+        // Tags' preview describes the files as they were: it waits for the read too
+        if outcome != .refused { tags?.folderChanged() }
         guard samePerson else { return }
         switch (outcome, result) {
         case (.refused, _):
@@ -300,12 +314,48 @@ final class EditAlbumModel {
     /// The cover alone (RetagModel.saveCoverOnly): written - or maybe written, no answer or a 5xx, said as an apply's -
     /// the folder read again and the page beneath asked again; refused, nothing more.
     func saveCoverOnly() async {
-        guard let retag, let before = album, let outcome = await retag.saveCoverOnly(path: before.path) else { return }
+        guard !tagsApplying, let retag, let before = album,
+              let outcome = await retag.saveCoverOnly(path: before.path) else { return }
         guard samePerson else { return }
         if outcome == .unanswered {
             AccessibilityNotification.Announcement(EditWords.mayHaveFinished).post()
         }
         guard retag.flow.needsRead else { return }
+        await lookUp()
+        if outcome != .refused { wrote(before: before) }
+    }
+
+    /// Tags' Apply (TrackTagEditor's `apply`): the preview's very body sent, the plan worked out again on the server;
+    /// held with a background task while iOS allows; then the folder read again (its files with it) and the album page
+    /// beneath asked again. One that never answered, or answered a 5xx, is said as maybe finished and read again - never
+    /// the same Apply on the old preview. Never while the Release is writing; signed out meanwhile, nothing more.
+    func applyTags() async {
+        guard let tags, let client, let before = album, !(retag?.flow.applying == true),
+              retag?.flow.savingCover != true, !marking, let body = tags.beginApply() else { return }
+        let hold = BackgroundHold(named: "Edit album: Edit tags")
+        defer { hold.end() }
+        let result: Result<TagEditResponse, any Error>
+        do {
+            result = .success(try await client.tagsApply(body))
+        } catch {
+            result = .failure(error)
+        }
+        let outcome = tags.applyEnded(result)
+        // the Release's preview describes the files as they were: it waits for the read too
+        if outcome != .refused { retag?.folderChanged() }
+        guard samePerson else { return }
+        switch outcome {
+        case .unanswered:
+            AccessibilityNotification.Announcement(EditWords.mayHaveFinished).post()
+        case .applied:
+            if let said = tags.applied ?? tags.applyError {
+                AccessibilityNotification.Announcement(said).post()
+            }
+        case .refused:
+            break
+        }
+        // a refusal wrote nothing: read only when a gap meanwhile asked for it
+        guard tags.flow.needsRead else { return }
         await lookUp()
         if outcome != .refused { wrote(before: before) }
     }

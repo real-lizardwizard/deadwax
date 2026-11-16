@@ -179,6 +179,23 @@ public struct RetagFlow: Sendable, Equatable {
         return true
     }
 
+    /// (Phase 8, slice 2) Tags' Apply - a tag edit's preview and apply are the same plan/execute pair, so the same
+    /// flow: TrackTagEditor's `disabled={!plan || plan.empty || plan.problems.length > 0 || planning || applying ||
+    /// problemCount > 0}` (TagEditWords.canApply), with section 2's rules - the preview the newest edit's, in reach, and
+    /// the files read since the last gap or write. A plan's problems refuse the whole batch here, as the server does.
+    public func canApply(_ plan: TagEditPlan?, problems: Int) -> Bool {
+        TagEditWords.canApply(plan: plan, planning: planning, applying: applying, problems: problems)
+            && current && !savingCover && online && !needsRead
+    }
+
+    /// Tags' Apply pressed: false when it isn't on.
+    public mutating func beginApply(_ plan: TagEditPlan?, problems: Int) -> Bool {
+        guard canApply(plan, problems: problems) else { return false }
+        applying = true
+        mayHaveFinished = false
+        return true
+    }
+
     /// The apply is over. Whatever came of it, the preview in hand no longer describes the folder: an answered one
     /// changed it (or some of it), and an unanswered one may have. Only a refusal - nothing written - keeps it.
     public mutating func applyEnded(_ outcome: Outcome) {
@@ -226,6 +243,16 @@ public struct RetagFlow: Sendable, Equatable {
             needsRead = true
             mayHaveFinished = true
         }
+        readFailed = false
+        planFor = nil
+        changed()
+    }
+
+    /// Another part of Edit album wrote to the folder, or may have (Release's apply or its cover beside Tags, a tag
+    /// edit beside Release): the preview in hand describes the files as they were, so nothing is offered until the
+    /// folder has been read again - without this page's "may have finished", which is the writer's to say.
+    public mutating func folderChanged() {
+        needsRead = true
         readFailed = false
         planFor = nil
         changed()
@@ -508,7 +535,7 @@ public enum EditWords {
     /// The editors slice 1 hasn't brought to the phone (Tags, Artwork, Lyrics, Delete album…): each a row that opens
     /// the album in the web app, saying so, until its own slice lands.
     public static let inWebApp = "In the web app"
-    public static let inWebAppLine = "Tags, Artwork, Lyrics and Delete album… open the album in the web app, in "
+    public static let inWebAppLine = "Artwork, Lyrics and Delete album… open the album in the web app, in "
         + "Safari, until the app has them."
     public static let deleteAlbum = "Delete album…"
 

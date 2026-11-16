@@ -169,6 +169,12 @@ public enum Routes {
     public static let libraryArt = Endpoint(method: "GET", path: "/deadwax/library/art", query: ["album"])
     public static let queueIgnore = Endpoint(method: "POST", path: "/deadwax/library/queue/ignore", query: [])
     public static let queueUnignore = Endpoint(method: "POST", path: "/deadwax/library/queue/unignore", query: [])
+    // Edit album's Tags (Phase 8, slice 2 - notes/ios.md "Edit album on the phone"): a tag edit's preview and apply
+    // (Edit albums'; the plan worked out again by apply, never sent), and one picture inside one track (the track's
+    // page, by the album's folder, the file's name and the picture's place in it)
+    public static let tagsPreview = Endpoint(method: "POST", path: "/deadwax/library/tags/preview", query: [])
+    public static let tagsApply = Endpoint(method: "POST", path: "/deadwax/library/tags/apply", query: [])
+    public static let trackPicture = Endpoint(method: "GET", path: "/deadwax/library/tracks/picture", query: ["album", "file", "index"])
 
     /// The levels spec's name for `levelAlbum`: the album's levels warmed before its first play.
     public static var warmLevels: Endpoint { levelAlbum }
@@ -201,6 +207,7 @@ public enum Routes {
         joinJob, savePreferences,
         libraryTracks,
         libraryAlbums, releases, release, retagPreview, retagApply, artFetch, libraryArt, queueIgnore, queueUnignore,
+        tagsPreview, tagsApply, trackPicture,
     ]
 
     /// The routes given longer than the transport's own 8 seconds to answer, in seconds: the album index reads every
@@ -236,8 +243,12 @@ public enum Routes {
     /// one last poll, is shorter) - with the plan, the writes and the move on top, so it is given 480; the cover alone
     /// that fetch twice and a write, so 120; the
     /// folder's cover a read of a file, or of the audio's pictures; the marks a row of SQLite -
-    /// tests/test_ios_edit_contract.py holds each.
-    public static let timeouts: [Endpoint: Double] = [albumIndex: 30, autoEqSearch: 20, autoEqProfile: 20, libraryOwned: 30, fullySearch: 20, releaseGroup: 60, searchArtists: 20, searchSongs: 20, artistFacts: 60, discography: 60, jobs: 20, cancelJob: 30, retryJob: 60, retryJobSame: 30, clearJobs: 30, storeState: 20, findCandidates: 300, enqueue: 300, joinJob: 60, libraryAdd: 60, libraryTracks: 30, libraryAlbums: 120, releases: 60, release: 60, retagPreview: 60, retagApply: 480, artFetch: 120, libraryArt: 30, queueIgnore: 20, queueUnignore: 20]
+    /// tests/test_ios_edit_contract.py holds each. Tags' (slice 2): a tag edit's preview reads every file named (up to
+    /// MAX_EDITS), as a retag's preview does, so it is given a retag preview's 60; its apply reads them again and
+    /// writes each changed one, then the scan's cache and the store index's row - no network, no wait, no bound of its
+    /// own - so it is given twice that; a track's picture a read of one file - tests/test_ios_edit_parts_contract.py
+    /// holds each.
+    public static let timeouts: [Endpoint: Double] = [albumIndex: 30, autoEqSearch: 20, autoEqProfile: 20, libraryOwned: 30, fullySearch: 20, releaseGroup: 60, searchArtists: 20, searchSongs: 20, artistFacts: 60, discography: 60, jobs: 20, cancelJob: 30, retryJob: 60, retryJobSame: 30, clearJobs: 30, storeState: 20, findCandidates: 300, enqueue: 300, joinJob: 60, libraryAdd: 60, libraryTracks: 30, libraryAlbums: 120, releases: 60, release: 60, retagPreview: 60, retagApply: 480, artFetch: 120, libraryArt: 30, queueIgnore: 20, queueUnignore: 20, tagsPreview: 60, tagsApply: 120, trackPicture: 30]
 }
 
 /// The Cover Art Archive's thumbnail sizes the app asks deadwax's relay for (`Routes.archiveCover`'s `size`, which takes
