@@ -305,35 +305,10 @@ enum GetVectors {
     static func json(_ value: some Encodable) throws -> JSONValue {
         try JSONDecoder().decode(JSONValue.self, from: JSONEncoder().encode(value))
     }
-
-    /// (16 Nov) THE DEPARTURE, on purpose: the phone's tab is Settings (James: "instead of "you", let's just use
-    /// settings") and the web app's is still You, so where the web's line names the tab - NOTHING_LOSSLESS_NOTE's
-    /// "You can change it in You, under Getting albums." - the phone's says Settings. Only that: the web's words are
-    /// made the phone's by this one replacement and are otherwise held word for word, and `theTabsNameIsTheOneWord`
-    /// fails if the web's line stops naming You there - so a change of the web's is still seen.
-    static let webSays = "in \(YouWords.webTitle), under Getting albums"
-    static let phoneSays = "in \(YouWords.title), under Getting albums"
-    static func phones(_ web: String) -> String {
-        web.replacingOccurrences(of: webSays, with: phoneSays)
-    }
 }
 
 @Suite struct GetVectorTests {
     let v = GetVectors.vectors
-
-    /// The departure (GetVectors.phones): the web's note names its You tab once, the phone's names Settings instead, and
-    /// nothing else of it differs.
-    @Test func theTabsNameIsTheOneWord() {
-        let web = v.words.nothingLosslessNote
-        #expect(web.components(separatedBy: GetVectors.webSays).count == 2, "the web's note names You, under Getting albums, once")
-        #expect(Sources.nothingLosslessNote != web)
-        #expect(Sources.nothingLosslessNote.components(separatedBy: GetVectors.phoneSays).count == 2)
-        #expect(!Sources.nothingLosslessNote.contains("in You"))
-        #expect(GetVectors.phones(web) == Sources.nothingLosslessNote)
-        // every announcement that carries it departs in that word alone
-        let carrying = v.lists.filter { $0.announcement.contains(GetVectors.webSays) }
-        #expect(!carrying.isEmpty)
-    }
 
     @Test func theNumbersAreTheWebs() {
         #expect(Sources.speedBarFull == v.numbers.speedBarFull)
@@ -387,8 +362,8 @@ enum GetVectors {
         for note in words.store.sharedNotes {
             #expect(StoreLine.sharedNote(CancelPlace(rawValue: note.place)!) == note.said)
         }
-        // the web's but for the tab's name (GetVectors.phones)
-        #expect(Sources.nothingLosslessNote == GetVectors.phones(words.nothingLosslessNote))
+        // the web's word for word - the tab named Settings on both since the web's 2.1.35
+        #expect(Sources.nothingLosslessNote == words.nothingLosslessNote)
         #expect(CandidateSort.allCases.map(\.rawValue) == words.sorts.map(\.sort))
         #expect(CandidateSort.allCases.map(\.label) == words.sorts.map(\.label))
         #expect(QualityFloor.allCases.map(\.rawValue) == words.floors.map(\.floor))
@@ -579,8 +554,7 @@ enum GetVectors {
             #expect(Sources.searchedLine(answer, shown: passing.count) == list.searched, "list \(at)")
             let said = Sources.announcement(pending: false, release: nil, error: nil, status: list.status?.storeStatus,
                                             answer: answer, shown: passing.count, notPicked: list.notPicked, format: format)
-            // the web's, but for the tab's name in the nothing-lossless note (GetVectors.phones)
-            #expect(said == GetVectors.phones(list.announcement), "list \(at)")
+            #expect(said == list.announcement, "list \(at)")
         }
     }
 

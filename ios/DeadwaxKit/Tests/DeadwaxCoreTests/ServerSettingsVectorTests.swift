@@ -125,14 +125,11 @@ import Testing
         diffs.done()
     }
 
-    /// The page's line is the web's, but for where your own choices are: the phone's Settings - the web's You (the
-    /// phone's too until 16 Nov), as GetVectors.webSays has it.
-    @Test func thePagesLineIsTheWebsButForWhereYourChoicesAre() throws {
+    /// The page's line is the web's - your own choices in Settings on both since the web's 2.1.35 (the phone said
+    /// Settings from 16 Nov while the web said You).
+    @Test func thePagesLineIsTheWebs() throws {
         let web = try #require(fixture["words"]["pageLine"].string)
-        let webSays = "are in \(YouWords.webTitle), under Getting albums."
-        #expect(web.hasSuffix(webSays))
-        let phone = String(web.dropLast(webSays.count)) + "are in \(YouWords.title), under Getting albums."
-        #expect(Self.same(ServerSettings.pageLine, phone))
+        #expect(Self.same(ServerSettings.pageLine, web))
     }
 
     // MARK: the answer, and its choices' order

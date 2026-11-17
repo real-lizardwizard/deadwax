@@ -190,8 +190,9 @@ public enum People {
     public static let forgetFailed = "Couldn't forget them."
     public static let saveFailed = "Couldn't save the permissions."
 
-    /// The server's words name the web app's path to Change password (src/people.py YOUR_PASSWORD); on the phone it is
-    /// under Settings - said as the phone has it, wherever People shows them.
+    /// The server's words name the web app's path to Change password (src/people.py YOUR_PASSWORD): Settings since the
+    /// web's 2.1.35, the phone's place too, so they pass through as they are. A server before 2.1.35 names the web's
+    /// tab You - said as the phone has it, Settings, wherever People shows them.
     public static let webPasswordPlace = "You → Account → Change password"
     public static let phonePasswordPlace = "Settings → Account → Change password"
 

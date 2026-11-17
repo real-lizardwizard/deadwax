@@ -10,8 +10,8 @@ phone and About - each page an AppRoute of its own; every choice that
 was a list of ticks is one menu Picker row, the chosen choice's own line moved into its footer; Getting albums' three
 are asked by their page (as it shows, on a pull, as deadwax comes back), /me by the root (its first show, a pull); the
 tab tapped again goes back to the root, then to the top, as every tab does; and no word the app shows calls the tab You.
-Core's words (YouWords.title, the departure from the web's You, ServerAddress.host, the lines that name the tab) are
-held by ScreenYouTests, GetVectorTests, AddressAndCookieTests and DownloadWordsTests.
+Core's words (YouWords.title, the web's own tab name too since its 2.1.35, ServerAddress.host, the lines that name the
+tab) are held by ScreenYouTests, GetVectorTests, AddressAndCookieTests and DownloadWordsTests.
 """
 
 import re
@@ -99,7 +99,8 @@ def test_the_tab_is_settings_with_a_gear():
     assert '"person.crop.circle"' not in routes
     you_lines = (CORE / "YouLines.swift").read_text(encoding="utf-8")
     assert 'public static let title = "Settings"' in you_lines
-    assert 'public static let webTitle = "You"' in you_lines
+    # the web's tab is Settings too since its 2.1.35: no second name kept for it
+    assert "webTitle" not in you_lines
     # the root's title is the tab's name
     assert ".navigationTitle(YouWords.title)" in code(ROOT)
 

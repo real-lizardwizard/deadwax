@@ -762,8 +762,8 @@ public enum Sources {
         "Nothing lossless found for \(queriesText(answer))."
     }
 
-    /// ...and under it, why - and where the setting is (`NOTHING_LOSSLESS_NOTE`): the web's word for word but the tab's
-    /// name, the phone's Settings where the web's says You (16 Nov - GetVectorTests holds the one word that departs).
+    /// ...and under it, why - and where the setting is (`NOTHING_LOSSLESS_NOTE`): the web's word for word. (The phone said
+    /// Settings here from 16 Nov while the web said You; the web's 2.1.35 renamed its tab Settings, so no word departs.)
     public static let nothingLosslessNote =
         "Some were found, but none with lossless files - your Format is Lossless only, which leaves the rest out. You can change it in Settings, under Getting albums."
 

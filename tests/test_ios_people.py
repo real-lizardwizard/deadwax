@@ -258,8 +258,12 @@ def test_a_refusal_is_read_with_its_kind_and_fix_and_peoples_403_has_none(nd):
 
 
 def test_the_server_words_naming_the_web_apps_place_are_said_as_the_phones():
-    assert people_words("webPasswordPlace") in rules.YOUR_PASSWORD
+    # since the web's 2.1.35 the server names Settings, the phone's place too; a server before it named the web's
+    # You, which the phone still says as its own
     assert people_words("phonePasswordPlace") == "Settings → Account → Change password"
+    assert people_words("phonePasswordPlace") in rules.YOUR_PASSWORD
+    assert people_words("webPasswordPlace") == "You → Account → Change password"
+    assert people_words("webPasswordPlace") not in rules.YOUR_PASSWORD
     # wherever the phone says the server's words: a refusal, its fix, a row's reasons, the locked reason
     outcome = swift_function("PeopleFlow.swift", "outcome")
     assert outcome.count("onPhone(") == 4

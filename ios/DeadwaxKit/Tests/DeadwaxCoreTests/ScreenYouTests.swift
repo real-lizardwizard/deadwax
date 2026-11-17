@@ -32,19 +32,12 @@ import Testing
         #expect(Screens.same(YouWords.normalizationNote, words["normalizationNote"].string))
     }
 
-    /// (16 Nov) The one departure on purpose, as the fixture records it: the phone's tab is Settings, the web app's is
-    /// You (lib/appRoutes.ts TAB_LABELS, read by the exporter) - and only that one departs. Should the web rename its
-    /// tab, `webTitle` stops being the web's here, and should the two meet, the departure has ended: both fail.
-    @Test func theTabIsSettingsWhereTheWebSaysYou() throws {
-        let departures = fixture["departures"].list
-        #expect(departures.count == 1)
-        let tab = try #require(departures.first)
-        #expect(tab["word"].string == "the tab's name")
-        #expect(Screens.same(YouWords.webTitle, fixture["words"]["tab"].string))
-        #expect(Screens.same(YouWords.webTitle, tab["web"].string))
-        #expect(Screens.same(YouWords.title, tab["phone"].string))
+    /// The tab's name is the web's (lib/appRoutes.ts TAB_LABELS, read by the exporter): Settings. The phone named it so
+    /// on 16 Nov (James: "instead of "you", let's just use settings") while the web said You - a departure the fixture
+    /// recorded until the web's 2.1.35 renamed its own tab and the two met.
+    @Test func theTabIsSettingsAsTheWebsIs() {
+        #expect(Screens.same(YouWords.title, fixture["words"]["tab"].string))
         #expect(YouWords.title == "Settings")
-        #expect(YouWords.title != YouWords.webTitle)
     }
 
     /// The phone's footer says the web's of Normalization - it changes from the next thing played - and leaves out

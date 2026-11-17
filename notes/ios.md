@@ -10881,8 +10881,9 @@ Each of these follows the web unless it says otherwise.
 James: "also instead of "you", let's just use settings", and "with maybe some better organization, and maybe some
 dropdowns instead of big lists". Asked how to organize it, he chose **"Pages, like iOS Settings"**: a short list of
 groups at the top, each opening its own page, and on a page each choice one row with a menu, not a list of ticks. The
-app stays 0.13 (13); src/__init__.py untouched; no server change; the player engine has no diff. The web app keeps
-its You - the phone departs on purpose, and says so where the web's words are held. The managing tools stay the web
+app stays 0.13 (13); src/__init__.py untouched; no server change; the player engine has no diff. The web app keeps its
+You - the phone departs on purpose, and says so where the web's words are held. (Until the web's own 2.1.35 renamed
+its tab Settings: see "Main's 2.1.35 brought into ios: the tab is Settings on both".) The managing tools stay the web
 app's in this change (other slices make them native); Needs a look's count isn't on the root yet.
 
 ### What changed
@@ -10926,17 +10927,19 @@ app's in this change (other slices make them native); Needs a look's count isn't
 
 ### Held to the web, and where the phone departs
 
-- **The tab's name**: export-you-vectors.cjs now reads the web's name for the tab out of lib/appRoutes.ts's
-  TAB_LABELS (`you: 'You'`, a new `made_from` piece) into you.json's `words.tab`, and writes a `departures` list
-  beside it, by hand: the tab's name, You on the web, Settings on the phone, since 2026-11-16 and why. ScreenYouTests'
+- **The tab's name**: export-you-vectors.cjs now reads the web's name for the tab out of lib/appRoutes.ts's TAB_LABELS
+  (`you: 'You'`, a new `made_from` piece) into you.json's `words.tab`, and writes a `departures` list beside it, by
+  hand: the tab's name, You on the web, Settings on the phone, since 2026-11-16 and why. ScreenYouTests'
   `theTabIsSettingsWhereTheWebSaysYou` holds `YouWords.webTitle` to the web's word and `YouWords.title` to the
-  departure's, and fails if the two ever meet again. iosyou.sim.cjs still checks the fixture byte for byte (136 cases).
+  departure's, and fails if the two ever meet again. iosyou.sim.cjs still checks the fixture byte for byte (136
+  cases). (They met on 17 Nov, in the web's 2.1.35: the departure, `webTitle` and this test are gone - see "Main's
+  2.1.35 brought into ios: the tab is Settings on both".)
 - **The nothing-lossless note** (NOTHING_LOSSLESS_NOTE, held by get-vectors.json): GetVectorTests makes the web's
   words the phone's by one named replacement, `GetVectors.phones` ("in You, under Getting albums" -> "in Settings,
   under Getting albums", built from YouWords' two titles), used for the note and for every list's VoiceOver
   announcement; `theTabsNameIsTheOneWord` asserts the web's note names You there exactly once, the phone's names
   Settings, and that the replacement is the whole difference. The get fixture and its exporter are untouched (the web
-  didn't change).
+  didn't change). (The web's 2.1.35 says Settings there itself: `GetVectors.phones` and that test went with it.)
 - The Download and Debug lines that said "You > Downloads" are the phone's own (no web counterpart): their tests now
   say Settings.
 
@@ -12900,7 +12903,8 @@ sees the page. Moving those into lib/ too is a small no-change refactor on main 
 - **A menu keeps a value that isn't one of its choices** (unset, or one this deadwax doesn't know) as its first entry
   ("Not set" when empty), where the web's dropdown would show its first choice - which reads as a value that isn't
   there.
-- **The page line names Settings, not You**: the phone's own choices are in its Settings, under Getting albums.
+- **The page line names Settings, not You**: the phone's own choices are in its Settings, under Getting albums. (The
+  web's line says Settings too since its 2.1.35, so the phone's is the web's word for word.)
 - **Connections on the Connections group's page too**, so Set up Navidrome's sheet shows whether Navidrome answers
   after a save; and checked again (the phone's own) after a save carrying a Connections setting, back in reach, and
   after signing in again.
@@ -13477,9 +13481,9 @@ bodies, the unlock and its idle timeout are the server's as they are; the player
 - **People.swift** (new). `People` is lib/people.ts and lib/permissions.ts' People part, and app/People.tsx's own
   words: the titles, UNLOCKED_LINE, HTTP_NOTE (`httpNote(at:)` from the phone's address), the name, display-name and
   password rules (`cleanName`, `nameProblem`, `displayProblem`, `passwordProblem`, `formProblem`, `formReady`,
-  `resetProblem`, `resetReady` - lengths in UTF-16 units, the pattern's every edge, the name folded as JavaScript folds
-  it), a row's `chips`, `signInWords` (with `ago`), `libraryWords` and `librariesWarning`; `actions(person)` (Reset
-  password, Make admin or No longer admin, Remove - each offered or not from the server's `can`) and
+  `resetProblem`, `resetReady` - lengths in UTF-16 units, the pattern's every edge, the name folded as JavaScript
+  folds it), a row's `chips`, `signInWords` (with `ago`), `libraryWords` and `librariesWarning`; `actions(person)`
+  (Reset password, Make admin or No longer admin, Remove - each offered or not from the server's `can`) and
   `refusals(person)` (why one isn't); `removeReady` (the typed name, exactly), `makeAdminWords`/`unmakeAdminWords`
   (the flip's question and what it loses), `removeLines`, `knownWords`, `madeWords` (what to tell the new person, with
   deadwax's address), `resetWords` (who was signed out), `savedWords`, `versionNote` (Navidrome older than People
@@ -13487,11 +13491,12 @@ bodies, the unlock and its idle timeout are the server's as they are; the player
   `checkboxes` (five, by category, locked for an admin and for a refused account), `lockedReason`, `changed`,
   `offered`/`allowed` (who is shown the row and who the page). `onPhone` turns the server's and the web's "You →
   Account → Change password" into the phone's place, "Settings → Account → Change password", wherever deadwax's words
-  are said. `clipped` keeps whole characters (never half a pair) up to a rule's most plus 8, so a field can't grow
-  without end and its problem still shows. The models - PeopleState, PeoplePerson, PeopleKnownOnly, PeopleCan,
-  PeopleTicks - read the GET's answer loosely (an unknown field ignored, a missing one its default), dedupe rows by id
-  and drop a row with no id; the bodies - PeopleUnlockBody, PeopleCreateBody, PeopleResetBody, PeopleAdminBody,
-  PeopleRemoveBody, PeopleForgetBody, PeoplePermissionsBody, PeopleLockBody - are each route's strict model key for key
+  are said (a server before 2.1.35's: since it the server names Settings itself, which passes through unchanged).
+  `clipped` keeps whole characters (never half a pair) up to a rule's most plus 8, so a field can't grow without end
+  and its problem still shows. The models - PeopleState, PeoplePerson, PeopleKnownOnly, PeopleCan, PeopleTicks - read
+  the GET's answer loosely (an unknown field ignored, a missing one its default), dedupe rows by id and drop a row
+  with no id; the bodies - PeopleUnlockBody, PeopleCreateBody, PeopleResetBody, PeopleAdminBody, PeopleRemoveBody,
+  PeopleForgetBody, PeoplePermissionsBody, PeopleLockBody - are each route's strict model key for key
   (PeoplePermissionsBody always sends all five). The three that carry a password, and PeopleAddForm and
   PeoplePasswords, redact themselves (`description`, `debugDescription`, an empty `customMirror`).
 - **PeopleFlow.swift** (new). `PeopleFlow` is the page's state, as app/usePeople.ts holds it: the last answer (and
@@ -14171,3 +14176,52 @@ again on the commit; all 98 sims with Node 22; and `install-mac.sh --dry-run --n
 --allow-profile`) from a scratch copy with a Local.xcconfig - each step said, nothing built, quit, copied or opened.
 Not verified, for the Mac (404, 407, 412, 414): the Open panel's file read under the new entitlement, `tmutil
 isexcluded` on the folder, the Terminal prompt's words, and `--quit` against a real deadwax.
+
+## Main's 2.1.35 brought into ios: the tab is Settings on both (2026-11-17)
+
+Main's 2.1.35 (the desktop sidebar with icons, one Library with a Yours | All switch, folding Playlists and Manage)
+renamed the web app's You tab **Settings** wherever the web says it - lib/appRoutes.ts's TAB_LABELS, the
+nothing-lossless note, Server settings' page line, src/people.py's YOUR_PASSWORD, the guides. The phone had called the
+tab Settings since 16 Nov ("Settings, pages like iOS Settings") and kept a departure from the web's You in four
+places; with the two names met, each is plain equality now, and nothing departs. Main merged into `ios` (the only
+conflict notes/sims.md's list of sims, both sides kept); src/__init__.py is main's 2.1.35, the app stays 0.13 (13);
+the player engine has no diff.
+
+- **The tab's name** (iosyou): export-you-vectors.cjs drops its hand-written `departures` (you.json's `words.tab` is
+  "Settings", read from TAB_LABELS as before); `YouWords.webTitle` is gone; ScreenYouTests'
+  `theTabIsSettingsWhereTheWebSaysYou` is `theTabIsSettingsAsTheWebsIs`, YouWords.title held to the web's word.
+- **The nothing-lossless note** (iosget): get-vectors.json regenerated (the note and five announcements say "in
+  Settings, under Getting albums"); `GetVectors.webSays`, `phoneSays` and `phones` and `theTabsNameIsTheOneWord` are
+  gone; Sources.nothingLosslessNote and every announcement are the web's word for word.
+- **Server settings' page line** (iosserver): server-vectors.json regenerated;
+  `thePagesLineIsTheWebsButForWhereYourChoicesAre` is `thePagesLineIsTheWebs`, ServerSettings.pageLine the web's line
+  as it is.
+- **People's "That's you" reason** (iospeople): export-people-vectors.cjs's REASONS carries the server's new sentence
+  ("... in Settings → Account → Change password."), people-vectors.json regenerated. `People.onPhone` and its two
+  places stay, for a server before 2.1.35, whose words still say You; PeopleFlowTests has both sentences - the new one
+  through unchanged, the old one said as Settings - in `eachFailureIsWhatItMeans` and `thePhonesPlaceForChangePassword`,
+  and the fixture's own person carries the new one. test_ios_people.py holds the phone's place in YOUR_PASSWORD and
+  the web's old one out of it.
+- **test_ios_settings.py**: `webTitle` must not be in YouLines.swift any more (it asserted it was).
+- **Comments**: Routes.swift, MainTabs.swift, People.swift, Sources.swift, ServerSettings.swift and YouLines.swift
+  say the web's tab is Settings too since its 2.1.35.
+- **docs/ios.md**: the vocabulary sim's guide rule (main's 2.1.35) flagged the old name in it 68 times. The current
+  text says the web app's tab is Settings (the release list, the tabs, Settings, Change password, Getting an album,
+  Manage). The checks, written while both tabs were You, now name the phone's pages as Settings has them (Settings >
+  Getting albums, Playback, Downloads, Account, About; Debug and the address under Settings > This phone), and the web
+  app's managing pages as its desktop sidebar has them (Manage → Needs a look, Library care, Server settings, Event
+  log); the intro to the checks says so in place of "read You as Settings". Managing's checks (237-246), whose Safari
+  is gone from the app, keep what the web app said then ("Opens the web app's You: ...", its Back to "the web app's
+  You (its Settings now)") without its old path; 121's tab strip reads "Library | Search | You (Settings now)". The
+  paragraphs edited were rewrapped.
+- **notes**: sims.md's iosyou and iosmanaging lines; the 16 Nov departure notes above (the tab, the note, the page
+  line, onPhone) each say where it ended.
+- **The Mac** (slice 1): nothing in its code, tests or docs named the web's tab; its plan's sidebar
+  (~/Desktop/Code/deadwax-plans/mac-app.md 1.2) gains a line - it follows the web's 2.1.35 layout.
+
+Verified on the tip, on James's Mac (Xcode 27.2): all 99 sims with Node 22, each in a TMPDIR of its own (iosyou,
+iosget, iosserver and vocabulary among them, the four that failed on the bare merge); pytest, 5026 passed and 1
+skipped; pyflakes over src and tests; `swift test` (2244: 2074 in Core - one fewer, `theTabsNameIsTheOneWord` - then
+12 and 158), all passed; the iPhone's unsigned generic-iOS Debug build and the Mac's unsigned Release build (Mac
+Catalyst, arm64, 0.13), each BUILD SUCCEEDED with only the AppIntents warning; check_project.py. Nothing the app
+itself shows changed (it said Settings already), so nothing here was run on a phone or the Mac.

@@ -1,78 +1,73 @@
 # The iPhone app (early: app 0.13, downloads, lyrics, the EQ, the turntable, play history, your library, the Library, Search, Requests, getting albums, Manage, Edit album and the artist tools)
 
-deadwax is getting a native iPhone app, built with SwiftUI and its own audio engine, for what a web
-page can't do well: seamless joins and normalization done on the phone, downloads to play offline,
-and a song's start never lost on AirPods. It's built in phases. Phase 0, "Hello, iPhone", was a
-single test screen that proved the tools, the connection and the audio engine. Phase 1, the player
-(app 0.2), was the first version meant for playing your music day to day: your library, album pages,
-Up Next, Now Playing, normalization, the lock screen, plays counted, and picking up where you left
-off. Phase 2, downloads (app 0.3), followed: an album, or a song, downloaded to the phone plays from
-there, bit for bit as deadwax has it - and goes on playing when deadwax can't be reached (see
-[Downloads](#downloads) and [Offline](#offline)). App 0.4 added lyrics on Now Playing, as the web app
-shows them (see [Lyrics](#lyrics)). App 0.5 added the EQ: ten sliders and nine presets, kept for each
-output on its own - your headphones, the speaker, the car - and switching by itself when the output
-changes, a correction for your headphones from AutoEq's measurements, and - under Advanced - filters
-and a preamp of your own and Equalizer APO files in and out (see [EQ](#eq)). App 0.6 added the
-turntable: Now Playing's second look, as the web app has it - a record you can turn by hand and hear
-as you turn it, with the album's CD art on its face (see [The turntable](#the-turntable)). App 0.7
-added the turntable's speed fader: the song faster or slower, its pitch moving with it, as a record
-deck's does - and at 1x the song exactly as it is (see [The speed](#the-speed)). App 0.8 added play
-history: scroll up in Up Next, past the song playing, and it goes on back through every song you've
-played - on the phone and in the web app, one list, as the web app's Up Next has it - and the phone's
-own plays go into the web app's too (see [Up Next](#up-next) and [What you've
-played](#what-youve-played)). App 0.9 added your library downloaded by itself, as much as fits your
-storage limit, kept in step with what you star and unstar anywhere - only while the phone is charging if
-you choose, and with the app in the background when iOS allows (see [Your library on this
-phone](#your-library-on-this-phone)). App 0.10 added Phase 4's Library: **playlists** - yours and
-those shared with you, played as the web app plays them, and made, added to, edited and deleted on the
-phone as in the web app, and downloaded to play with no connection, kept in step as they change (see
-[Playlists](#playlists)); the Library's switch - Albums | Playlists | Artists, and Songs with logins off
-(with them on, every song is under All music > All songs), swiped between, in the order you choose - and
-a pull down that shuffles your whole library (see [The
-Library](#the-library)); **artists** - your artists, and an artist's page with their albums, Play and
-Shuffle (see [Artists](#artists)); and **songs** - every song, a page at a time, each opening its album
-(see [Songs](#songs)). **This is app 0.11, Phase 5's Search**: your library and MusicBrainz searched as the
-web app's Search searches them, in one list - Top results, then artists, albums and songs, yours first - a song
-playing from its tap; the albums, artists and songs you don't have yet, each opening its page (an album's
-pressings and tracklists, an artist's albums); what deadwax has saved of MusicBrainz's answers, drawn with your
-library at once; and **More** from MusicBrainz, a page at a time (see [Search](#search)). Phase 6 begins with
-**Requests**, still app 0.11: every download you asked for - in the web app, or on another phone - under the web
-app's four headings, with its progress, cancelled, tried again from another source and cleared on the phone, and
-a finished album opened or played from its row (see [Requests](#requests)). Then **Get**, still app 0.11: an
-album you don't have got from the phone - what deadwax already has of the pressing said under Get the album, the
-sources Soulseek has for it in a sheet, each with why it scored what it did, and the one you pick on its way in
-Requests from your tap (see [Getting an album](#getting-an-album)). **App 0.12** finishes getting albums on the
-phone: a download somebody else asked for **joined**, a pressing in the collection **added to your library**,
-**Pick the best source for me**, and **When I tap Get**, **Quality floor** and **Format** chosen on the phone
-(see [Settings](#settings)). **App 0.13** is Phase 7, the last of the plan: **Manage** lists the tools for looking
-after deadwax that you may use - editing an album, Needs a look, Library care, People, Server settings and the event
-log - each of which at first opened in the web app, in Safari, as **Change password** did (see
-[Manage](#manage)). Still 0.13, the tab that was **You** is **Settings** now: a short list of groups, each opening a
-page of its own, and every choice on them one row with a menu rather than a list of ticks (see
-[Settings](#settings)). The web app's tab is still called You. Still 0.13, **Phase 8** begins bringing those tools into
-the app itself, one build at a time: first **Edit album** - an album's folder, what's wrong with it, and the release
-it's matched to, chosen and applied on the phone, from the album's ••• or Settings > Manage > Edit an album (see [Edit
-album](#edit-album)). Then its **Tags**: each track's file, everything in it, and its tags edited on one track or many
-at once. Then its **Artwork** and **Lyrics**: the cover and CD art, each full screen, and Get cover, Get CD art and
-Get lyrics on the phone. Then its **Delete**: what deleting the folder takes, read as it is now, and whose libraries
-it's in, asked once more before it goes - and with it nothing in Edit album opens the web app any more. Then
-**the artist tools**, from an artist page's •••: **Artist images…**, every picture of them found, chosen and saved
-into their folder; **Which artist is this?**; and **Move albums to …**, their albums filed under an old name moved
-under the one they have now (see [Managing an artist](#managing-an-artist)). Then **Needs a look**: the albums that
-need fixing and the new downloads nobody has looked at, how many beside it in Settings > Manage, each worked through
-in Edit album with **Skip** and **Next album** (see [Needs a look](#needs-a-look)). Then **Library care**: Rescan,
-and covers, CD art and lyrics fetched for every album without, one album at a time - with In nobody's library for an
-admin (see [Library care](#library-care)). Then **Server settings**: whether deadwax reaches MusicBrainz, slskd and
-Navidrome, and every setting of the server's, each group a page of its own, saved together - with Re-time saved
-lyrics and MusicBrainz's saved answers - and the Library's **Set up Navidrome** opening it over the Library (see
-[Server settings](#server-settings)). Then the **Event log**: what deadwax has said since it started, newest first,
-each new line as it's logged, with Copy on a long press and Clear for the phone's view (see [Event log](#event-log)).
-Then **Change password**: your Navidrome password changed on the phone, which stays signed in while every other
-sign-in of yours is signed out (see [Change password](#change-password)). Then **People**, for an admin: unlocked with
-your own Navidrome password, every Navidrome account with its permissions, a password reset, the admin role and
-Remove, Add a person, and the names deadwax keeps things for with no account (see [People](#people)). And last,
-nothing in the app takes you to the web app any more: what was left of the way out to it is gone, and the app's only
-links out are to MusicBrainz, AutoEq on GitHub and the Sharing deadwax guide (see [Manage](#manage)).
+deadwax is getting a native iPhone app, built with SwiftUI and its own audio engine, for what a web page can't do
+well: seamless joins and normalization done on the phone, downloads to play offline, and a song's start never lost on
+AirPods. It's built in phases. Phase 0, "Hello, iPhone", was a single test screen that proved the tools, the
+connection and the audio engine. Phase 1, the player (app 0.2), was the first version meant for playing your music day
+to day: your library, album pages, Up Next, Now Playing, normalization, the lock screen, plays counted, and picking up
+where you left off. Phase 2, downloads (app 0.3), followed: an album, or a song, downloaded to the phone plays from
+there, bit for bit as deadwax has it - and goes on playing when deadwax can't be reached (see [Downloads](#downloads)
+and [Offline](#offline)). App 0.4 added lyrics on Now Playing, as the web app shows them (see [Lyrics](#lyrics)). App
+0.5 added the EQ: ten sliders and nine presets, kept for each output on its own - your headphones, the speaker, the
+car - and switching by itself when the output changes, a correction for your headphones from AutoEq's measurements,
+and - under Advanced - filters and a preamp of your own and Equalizer APO files in and out (see [EQ](#eq)). App 0.6
+added the turntable: Now Playing's second look, as the web app has it - a record you can turn by hand and hear as you
+turn it, with the album's CD art on its face (see [The turntable](#the-turntable)). App 0.7 added the turntable's
+speed fader: the song faster or slower, its pitch moving with it, as a record deck's does - and at 1x the song exactly
+as it is (see [The speed](#the-speed)). App 0.8 added play history: scroll up in Up Next, past the song playing, and
+it goes on back through every song you've played - on the phone and in the web app, one list, as the web app's Up Next
+has it - and the phone's own plays go into the web app's too (see [Up Next](#up-next) and [What you've
+played](#what-youve-played)). App 0.9 added your library downloaded by itself, as much as fits your storage limit,
+kept in step with what you star and unstar anywhere - only while the phone is charging if you choose, and with the app
+in the background when iOS allows (see [Your library on this phone](#your-library-on-this-phone)). App 0.10 added
+Phase 4's Library: **playlists** - yours and those shared with you, played as the web app plays them, and made, added
+to, edited and deleted on the phone as in the web app, and downloaded to play with no connection, kept in step as they
+change (see [Playlists](#playlists)); the Library's switch - Albums | Playlists | Artists, and Songs with logins off
+(with them on, every song is under All music > All songs), swiped between, in the order you choose - and a pull down
+that shuffles your whole library (see [The Library](#the-library)); **artists** - your artists, and an artist's page
+with their albums, Play and Shuffle (see [Artists](#artists)); and **songs** - every song, a page at a time, each
+opening its album (see [Songs](#songs)). **This is app 0.11, Phase 5's Search**: your library and MusicBrainz searched
+as the web app's Search searches them, in one list - Top results, then artists, albums and songs, yours first - a song
+playing from its tap; the albums, artists and songs you don't have yet, each opening its page (an album's pressings
+and tracklists, an artist's albums); what deadwax has saved of MusicBrainz's answers, drawn with your library at once;
+and **More** from MusicBrainz, a page at a time (see [Search](#search)). Phase 6 begins with **Requests**, still app
+0.11: every download you asked for - in the web app, or on another phone - under the web app's four headings, with its
+progress, cancelled, tried again from another source and cleared on the phone, and a finished album opened or played
+from its row (see [Requests](#requests)). Then **Get**, still app 0.11: an album you don't have got from the phone -
+what deadwax already has of the pressing said under Get the album, the sources Soulseek has for it in a sheet, each
+with why it scored what it did, and the one you pick on its way in Requests from your tap (see [Getting an
+album](#getting-an-album)). **App 0.12** finishes getting albums on the phone: a download somebody else asked for
+**joined**, a pressing in the collection **added to your library**, **Pick the best source for me**, and **When I tap
+Get**, **Quality floor** and **Format** chosen on the phone (see [Settings](#settings)). **App 0.13** is Phase 7, the
+last of the plan: **Manage** lists the tools for looking after deadwax that you may use - editing an album, Needs a
+look, Library care, People, Server settings and the event log - each of which at first opened in the web app, in
+Safari, as **Change password** did (see [Manage](#manage)). Still 0.13, the tab that was called You is **Settings**
+now: a short list of groups, each opening a page of its own, and every choice on them one row with a menu rather than
+a list of ticks (see [Settings](#settings)). The web app's tab is called Settings too, since deadwax 2.1.35. Still
+0.13, **Phase 8** begins bringing those tools into the app itself, one build at a time: first **Edit album** - an
+album's folder, what's wrong with it, and the release it's matched to, chosen and applied on the phone, from the
+album's ••• or Settings > Manage > Edit an album (see [Edit album](#edit-album)). Then its **Tags**: each track's
+file, everything in it, and its tags edited on one track or many at once. Then its **Artwork** and **Lyrics**: the
+cover and CD art, each full screen, and Get cover, Get CD art and Get lyrics on the phone. Then its **Delete**: what
+deleting the folder takes, read as it is now, and whose libraries it's in, asked once more before it goes - and with
+it nothing in Edit album opens the web app any more. Then **the artist tools**, from an artist page's •••: **Artist
+images…**, every picture of them found, chosen and saved into their folder; **Which artist is this?**; and **Move
+albums to …**, their albums filed under an old name moved under the one they have now (see [Managing an
+artist](#managing-an-artist)). Then **Needs a look**: the albums that need fixing and the new downloads nobody has
+looked at, how many beside it in Settings > Manage, each worked through in Edit album with **Skip** and **Next album**
+(see [Needs a look](#needs-a-look)). Then **Library care**: Rescan, and covers, CD art and lyrics fetched for every
+album without, one album at a time - with In nobody's library for an admin (see [Library care](#library-care)). Then
+**Server settings**: whether deadwax reaches MusicBrainz, slskd and Navidrome, and every setting of the server's, each
+group a page of its own, saved together - with Re-time saved lyrics and MusicBrainz's saved answers - and the
+Library's **Set up Navidrome** opening it over the Library (see [Server settings](#server-settings)). Then the **Event
+log**: what deadwax has said since it started, newest first, each new line as it's logged, with Copy on a long press
+and Clear for the phone's view (see [Event log](#event-log)). Then **Change password**: your Navidrome password
+changed on the phone, which stays signed in while every other sign-in of yours is signed out (see [Change
+password](#change-password)). Then **People**, for an admin: unlocked with your own Navidrome password, every
+Navidrome account with its permissions, a password reset, the admin role and Remove, Add a person, and the names
+deadwax keeps things for with no account (see [People](#people)). And last, nothing in the app takes you to the web
+app any more: what was left of the way out to it is gone, and the app's only links out are to MusicBrainz, AutoEq on
+GitHub and the Sharing deadwax guide (see [Manage](#manage)).
 
 **Nothing of Phase 2, the lyrics, the EQ, the turntable, play history, your library downloaded,
 playlists, artists, songs, Search, Requests, Get or Manage has been seen on an iPhone yet.** It's built and tested on a Mac,
@@ -372,16 +367,15 @@ app with deadwax's reason, Now Playing closes, and the music plays on underneath
 the same person carries on where you were. Signing in as someone else starts afresh: nothing of the
 first person's queue stays.
 
-The app has four tabs, **Library**, **Search**, **Requests** and **Settings** (a gear - the web app's **You**), along
-a bar at the foot of the screen: square, the full width, flush with the bottom edge, with a thin line along its top -
-as the web app's tab bar is.
-The tab you're on is purple. Requests carries a small purple count of the downloads on their way, as on the web
-app, and none when there are none. Tapping the tab you're on goes back to its first screen, or to the top of it.
-Once something is playing, the mini player is the top of the tab bar: one solid block with the tabs, a thin line
-between them (see [Playing](#playing)). Every screen scrolls far enough for its last row to come up above the whole
-block. While the keyboard is up, the tab bar and the mini player both stay under it. VoiceOver reads the bar as a
-tab bar, the tab you're on as selected, and Requests with its count ("Requests, 2 arriving"); at the largest text
-sizes its words stop growing, and holding a finger on a tab shows it large.
+The app has four tabs, **Library**, **Search**, **Requests** and **Settings** (a gear - the web app's tab of that
+name), along a bar at the foot of the screen: square, the full width, flush with the bottom edge, with a thin line
+along its top - as the web app's tab bar is. The tab you're on is purple. Requests carries a small purple count of the
+downloads on their way, as on the web app, and none when there are none. Tapping the tab you're on goes back to its
+first screen, or to the top of it. Once something is playing, the mini player is the top of the tab bar: one solid
+block with the tabs, a thin line between them (see [Playing](#playing)). Every screen scrolls far enough for its last
+row to come up above the whole block. While the keyboard is up, the tab bar and the mini player both stay under it.
+VoiceOver reads the bar as a tab bar, the tab you're on as selected, and Requests with its count ("Requests, 2
+arriving"); at the largest text sizes its words stop growing, and holding a finger on a tab shows it large.
 
 Everything is squarer since the build after app 0.11's Search (still 0.11): album covers have the smallest of
 corners, everywhere they're drawn - the album page, Now Playing, the tiles and the rows - and the notices, cards,
@@ -1416,10 +1410,10 @@ sheet (see [Downloading](downloading.md#choosing-a-source)):
   the score's six parts, each with its percentage and what it measures - **Track names**, **Track count**, **Track
   lengths**, **Edition**, **Format** and **Availability**. Tap the score again to fold it away.
 - **The chips** - **Lossless**, **24-bit**, **Starts now** and **Complete albums only** (and **320 kbps** with that
-  quality floor) - narrow the list, and **the sort** orders it: **Best match**, **Highest quality**, **Largest
-  first** or **Smallest first**. The chips start as your **quality floor**, the sort at Best match, and the search is
-  scored by your **Format**, both chosen in [Settings](#settings) > Getting albums (or the web app's You) and kept for you on
-  deadwax.
+  quality floor) - narrow the list, and **the sort** orders it: **Best match**, **Highest quality**, **Largest first**
+  or **Smallest first**. The chips start as your **quality floor**, the sort at Best match, and the search is scored
+  by your **Format**, both chosen in [Settings](#settings) > Getting albums (or the web app's Settings) and kept for
+  you on deadwax.
 - **Search again** - at the right of "Choose a source" at the top, and under the cards - opens the words searched in
   a field: the top one's above the chips, the other's just under it. Change them and tap **Search**. Changed words
   are searched exactly as typed; unchanged, it searches as Get did. At larger text sizes the top one is a magnifying
@@ -1901,10 +1895,11 @@ album.
 
 ## Settings
 
-**Settings** is the tab the web app calls **You** (the phone called it You too, until the build after app 0.13's
-Manage - still 0.13 (13)). Its first screen is a short list, as the iPhone's own Settings is: each row opens a page of
-its own, and **Back**, or a swipe in from the left edge, comes back. Tap **Settings** in the tab bar on one of its
-pages and it goes back to the first screen; tap it again there, and it goes to the top.
+**Settings** is the web app's **Settings** too (the phone called the tab You until the build after app 0.13's Manage -
+still 0.13 (13) - and the web app until deadwax 2.1.35). Its first screen is a short list, as the iPhone's own
+Settings is: each row opens a page of its own, and **Back**, or a swipe in from the left edge, comes back. Tap
+**Settings** in the tab bar on one of its pages and it goes back to the first screen; tap it again there, and it goes
+to the top.
 
 - **At the top**: who you're signed in as, or "No sign-in needed" with logins off - and, in amber, "Some things an
   admin let you do are off for now - sign out and in again to get them back." when deadwax says so.
@@ -2028,7 +2023,7 @@ VoiceOver reads each row as one that opens a page, Needs a look with its count (
 grow with the text size.
 
 An artist's pictures and names are managed from [the artist's page](#managing-an-artist), as in the web app. The web
-app's **Connections**, in its You, is at the top of [Server settings](#server-settings) on the phone.
+app's **Connections**, in its Settings, is at the top of [Server settings](#server-settings) on the phone.
 
 **Nothing in the app takes you to the web app.** Every managing tool - Manage's rows, an album's **Edit album**, an
 artist's **Artist images…**, **Which artist is this?** and **Move albums to …**, Account's **Change password** and the
@@ -2415,7 +2410,7 @@ everything wraps.
 
 **Change password** (Settings > Account > Change password, with logins on - for anyone who signed in with their own
 Navidrome account; not the emergency `deadwax` sign-in, which has no Navidrome password) changes your Navidrome
-password from the phone, as the web app's You > Account does. It's a page pushed on Account:
+password from the phone, as the web app's Settings > Account does. It's a page pushed on Account:
 
 - **At the top**: "Your Navidrome password, *you* - the one you sign in to deadwax, Navidrome and Amperfy with. deadwax
   changes it in Navidrome as you, and doesn't keep it."
@@ -3216,22 +3211,22 @@ answering, **Try again**. It goes by itself once deadwax answers.
 
 ## The checks
 
-**You is Settings now.** The checks were written while the tab was called You, and are left as written: read "You >
-Getting albums", "You > Playback", "You > Downloads" and "You > About" as the Settings page of that name, "You >
-Debug" as Settings > This phone > Debug, and a list of ticks as a row with a menu ([Settings](#settings)). Checks
-310-319 are the new layout's own.
+**Written while the tab was called You.** Where the checks below send you to it, they name the tab and its pages as
+Settings has them now - Settings > Getting albums, Playback, Downloads, Account and About, and Debug under Settings >
+This phone - and the web app's managing pages as its desktop sidebar has them, under Manage. Read a list of ticks as a
+row with a menu ([Settings](#settings)). Checks 310-319 are the new layout's own.
 
 Phase 1 exists to answer these on the phone. Note what you see for each.
 
 1. **Sign in and count.** Sign in with your Navidrome account. The Library shows your albums: does
    the count above them match the web app's Library? And All albums against the web app's All music?
-   If you're an admin, You > Debug > Library says how many each list had and how long it took to
+   If you're an admin, Settings > This phone > Debug > Library says how many each list had and how long it took to
    come: note the times.
 2. **The joins.** Find the test album under All music > All albums ("start test" in Find), tap song 9
    and let it run into song 10: one unbroken tone, with no gap, click or blip. Then a live or
    continuous album you know well: is every join seamless? Then previous: in a song's first 3 seconds
    it goes to the song before, and after that it starts the song again.
-3. **Normalization, Automatic.** With Normalization on Automatic (You > Playback), play an album. Info
+3. **Normalization, Automatic.** With Normalization on Automatic (Settings > Playback), play an album. Info
    > About > Sound > Normalization says "Album volume matching, ..." with the same change for every
    song of it. While it plays, add a song from another album with **•••** > Add to Queue (Play Next until
    16 Nov): when it plays, Info says "Song volume matching, ...". (The app had no Search yet, so a song added
@@ -3279,18 +3274,18 @@ The tests can't reach these either. Note what happens.
 - **Sign out, then sign in as someone else.** Their Library, and nothing of the first person's queue.
 - **Download your library on a phone with little space left.** It keeps 2 GB free by the phone's own
   measure of free space, the one iOS uses for what it would make room for. Does the iPhone's Settings > General >
-  iPhone Storage agree with what You > Downloads says, and does anything else on the phone complain?
+  iPhone Storage agree with what Settings > Downloads says, and does anything else on the phone complain?
   When the phone dips under 2 GB, Debug says "under the reserve · confirming", then after a few minutes
   "giving way" - does only the bottom album go, and only as much as was needed?
 
 ### Phase 2's checks: downloads
 
 1. **An album, on Wi-Fi.** Tap an album's download arrow: the ring fills, the line under the title
-   counts the songs, and You > Downloads shows it under Downloading with a bar. Once it's here: the
-   filled arrow, "Downloaded · ... MB" in its menu, and You > Downloads lists it with **Checked** (or
+   counts the songs, and Settings > Downloads shows it under Downloading with a bar. Once it's here: the
+   filled arrow, "Downloaded · ... MB" in its menu, and Settings > Downloads lists it with **Checked** (or
    Checking… for a moment). Does a 24-bit 192 kHz album check in reasonable time (Debug > Downloads)?
 2. **Locked.** Ask for a big album, lock the phone and leave it for ten minutes: is it all here?
-3. **Wi-Fi only.** On mobile data, ask for an album: "Waiting for Wi-Fi", and You > Downloads' line
+3. **Wi-Fi only.** On mobile data, ask for an album: "Waiting for Wi-Fi", and Settings > Downloads' line
    in amber. Back on Wi-Fi, does it start by itself? Then Wi-Fi and cellular: does it download on
    mobile data?
 4. **Airplane Mode.** Turn it on with an album downloaded: the amber strip, and the Library on
@@ -3305,7 +3300,7 @@ The tests can't reach these either. Note what happens.
 8. **WireGuard off, away from home.** The strip says "Can't reach deadwax"; **Try again** while it's
    off, and the strip goes by itself once it's on.
 9. **Force quit mid-download.** Ask for an album, close the app from the app switcher, open it again:
-   You > Downloads says downloads stopped, and they carry on.
+   Settings > Downloads says downloads stopped, and they carry on.
 10. **The storage limit.** Set it to 5 GB with more than that here: the amber line, and nothing
     removed. A new album waits for room.
 11. **Sign out and in.** Your downloads stay through a sign-out; signed in as someone else, they're
@@ -3315,11 +3310,11 @@ The tests can't reach these either. Note what happens.
 13. **A downloaded album opens at once**, online too: no spinner before its songs.
 14. **deadwax up, Navidrome down** (Navidrome's container stopped): the Library's "isn't available"
     screen has On this phone > Downloaded under it, and a downloaded album plays.
-15. **The strip under every bar**: on the Library (with Find), an album's page and You > Downloads,
+15. **The strip under every bar**: on the Library (with Find), an album's page and Settings > Downloads,
     offline, the strip sits under the bar and the list scrolls under it without showing through.
 16. **VoiceOver and the largest text size**: the download button ("Download, Downloading, 40
     percent"), a song's actions, the strip as it comes and "Back online" as it goes; at the largest
-    text size, You > Downloads and an album's page with nothing cut off.
+    text size, Settings > Downloads and an album's page with nothing cut off.
 17. **The queue, kept.** Play a downloaded album, pause halfway through a song, and close the app from
     the app switcher. Turn on Airplane Mode and open it: the mini player shows that song, paused at
     the second you left it, with no notice, and Up Next is as you left it. Press play: it plays.
@@ -3388,7 +3383,7 @@ hand: several of these ask how it compares.
 ### The EQ's first checks
 
 These came with the build that put the EQ's audio unit in, before it had anything to set but Debug's
-test (You > Debug > EQ); they still hold. Install the usual way, not with `--debug`: a Debug build's
+test (Settings > This phone > Debug > EQ); they still hold. Install the usual way, not with `--debug`: a Debug build's
 EQ runs far slower than the one that ships. AirPods:
 
 - **E0a Muffle.** Play test sound 1. Debug's EQ says "Unit: In the graph: passing every sample
@@ -3407,7 +3402,7 @@ EQ runs far slower than the one that ships. AirPods:
 
 The EQ's own page, with AirPods unless it says. Install the usual way, not with `--debug`.
 
-- **E1 You's row.** You > Playback: after Normalization, **EQ**, with "iPhone speaker" under it and
+- **E1 Playback's row.** Settings > Playback: after Normalization, **EQ**, with "iPhone speaker" under it and
   "Off" at the right; its note below.
 - **E2 The speaker, off.** Open it with the speaker playing: "iPhone speaker", "Connected now", the EQ
   switch off, a flat curve in grey, "Off: nothing changes the sound."
@@ -3425,7 +3420,7 @@ The EQ's own page, with AirPods unless it says. Install the usual way, not with 
 - **E7 On and off.** Flip the EQ switch on and off while a song plays, a dozen times: a clean A/B, no
   click.
 - **E8 Out and back in.** Take the AirPods out mid-song: it pauses, as before. Play: the speaker plays
-  Off - flat. Put them back in and play: Bass Boost again from the first sound. Then You > Debug > EQ:
+  Off - flat. Put them back in and play: Bass Boost again from the first sound. Then Settings > This phone > Debug > EQ:
   what does **Start took** say?
 - **E9 Tune the presets.** Try each of the nine on two albums you know. Tell me any that sound wrong,
   and which way (too much, too little, the wrong place) - the numbers move to what you settle.
@@ -3479,7 +3474,7 @@ deadwax.
 
 - **E22 Advanced on.** At the bottom of the EQ page, turn **Advanced** on: the curve grows, with a
   handle for each filter; Correction lists the filters, lowest first; **Preamp** after Tone says
-  "Automatic". Then You > Debug's EQ section, **Render**: tell me both numbers.
+  "Automatic". Then Settings > This phone > Debug's EQ section, **Render**: tell me both numbers.
 - **E23 The handles.** Drag a handle sideways, then up and down, then pinch it: the sound follows,
   its numbers show above the curve, its row changes too, and the Correction row says "- changed".
   Tell me whether a drag on the curve away from the handles still scrolls the page, and whether the
@@ -3519,7 +3514,7 @@ deadwax.
 ### The turntable's first checks
 
 These come with the build that adds the turntable's sound engine, before it has a screen. They use
-You > Debug > Test sounds > **The record's engine beside the song**. Install the usual way, not with
+Settings > This phone > Debug > Test sounds > **The record's engine beside the song**. Install the usual way, not with
 `--debug`.
 
 - **0a Both at once.** Play test sound 1, then tap **Start** on the record's engine. You hear both
@@ -3535,7 +3530,7 @@ You > Debug > Test sounds > **The record's engine beside the song**. Install the
 These come with the build that puts [the turntable](#the-turntable) on Now Playing. Earbuds or the
 speaker unless a check says. The numbers are the turntable plan's, so answers can say "check 8".
 
-- **1 The settings.** You > Playback: Gapless, then **Now Playing opens as** (Cover ticked), then
+- **1 The settings.** Settings > Playback: Gapless, then **Now Playing opens as** (Cover ticked), then
   **Pause winds the record down** (on), then Normalization - each with its note under it. Choose
   **Turntable**.
 - **2 Opens as.** Play an album and open Now Playing: it opens on the turntable. The top-right button
@@ -3671,7 +3666,7 @@ the Mac, signed in as you.
   and Up Next goes on after it as it was. With VoiceOver: the row says "…, play again", a double tap
   says "Playing …", and the focus stays on the row.
 - **43 Not new songs.** Up Next draws a song started again straight after itself as one row, so this
-  one is counted in Debug. Turn on Airplane Mode and play a downloaded album, with You > Debug >
+  one is counted in Debug. Turn on Airplane Mode and play a downloaded album, with Settings > This phone > Debug >
   Downloads' **Starts waiting to be sent** a look away: it goes up by one as each song starts. While
   one plays: pause and play, drag the arm on the turntable, take hold of the record and let go, move
   the speed fader off 1x and back, and lock the phone for a minute - the count doesn't move. Next: up
@@ -3681,7 +3676,7 @@ the Mac, signed in as you.
   sent**, press play, look again: the same - the song carries on its play rather than starting a new
   one. Next: up by one. Airplane Mode off afterwards.
 - **45 Offline.** Turn on Airplane Mode and play three downloaded songs: each shows in Up Next as it
-  starts, and You > Debug > Downloads counts them under **Starts waiting to be sent**. Close the app
+  starts, and Settings > This phone > Debug > Downloads counts them under **Starts waiting to be sent**. Close the app
   (swipe it away), open it again still offline: Up Next still has them, and what you played before
   (the newest 100). Turn Airplane Mode off: the count goes to 0, and the web app's Up Next has the
   three, in order, before the plays they made counted in Navidrome.
@@ -3700,8 +3695,8 @@ the Mac, signed in as you.
 ### Your library's first checks (L0a-L0g)
 
 These came with the build that added [Debug's Your library](#debug), the first part of downloading
-your library by itself, when nothing downloaded yet. You > Debug > **Your library**, with **Follow
-your library** on - in the build after it, that switch is You > Downloads' **Download your library**,
+your library by itself, when nothing downloaded yet. Settings > This phone > Debug > **Your library**, with **Follow
+your library** on - in the build after it, that switch is Settings > Downloads' **Download your library**,
 which downloads too (see [the next checks](#your-librarys-checks-50-63)). The web app is
 deadwax's own page (`/player/`) in Safari or on the Mac, signed in as you.
 
@@ -3724,33 +3719,33 @@ deadwax's own page (`/player/`) in Safari or on the Mac, signed in as you.
   played each album.)
 - **L0e Removed here.** **Remove from my library** on an album's page in the app, then back to Debug:
   Albums is already one fewer - no ten minutes.
-- **L0f Would fit.** Note the "… fit in 20 GB" line; set You > Downloads' **Storage limit** to 5 GB:
+- **L0f Would fit.** Note the "… fit in 20 GB" line; set Settings > Downloads' **Storage limit** to 5 GB:
   the line says fewer fit in 5 GB. Back to 20 GB: as before.
-- **L0g Nothing else moved.** You > Downloads is as it was, nothing is downloading that you didn't ask
+- **L0g Nothing else moved.** Settings > Downloads is as it was, nothing is downloading that you didn't ask
   for, and Debug's Downloads counts haven't moved.
 
 ### Your library's checks (50-63)
 
-These come with the builds that download your library by itself (54 and 61-63 with app 0.9). Debug's own switch is gone: **You >
-Downloads > Download your library** does what it did, and downloads too, so L0a-L0f above now run
-with it (L0g no longer holds: things download). Note what you see for each; the Downloads events in
-You > Debug have a "library" line for everything it asks for and lets go, and why.
+These come with the builds that download your library by itself (54 and 61-63 with app 0.9). Debug's own switch is
+gone: **Settings > Downloads > Download your library** does what it did, and downloads too, so L0a-L0f above now run
+with it (L0g no longer holds: things download). Note what you see for each; the Downloads events in Settings > This
+phone > Debug have a "library" line for everything it asks for and lets go, and why.
 
-- **50 Overnight.** At home on Wi-Fi, turn on Download your library with the phone on charge, open
-  the app, then lock the phone: in the morning your library is downloaded - or as much as fits, said in
-  numbers in You > Downloads. Note the time it took, and the size, and what You > Debug > Your library >
-  In the background lists. (If little came, try once more with the app open and Auto-Lock off: that
-  tells iOS's background apart from the app's.)
+- **50 Overnight.** At home on Wi-Fi, turn on Download your library with the phone on charge, open the app, then lock
+  the phone: in the morning your library is downloaded - or as much as fits, said in numbers in Settings > Downloads.
+  Note the time it took, and the size, and what Settings > This phone > Debug > Your library > In the background
+  lists. (If little came, try once more with the app open and Auto-Lock off: that tells iOS's background apart from
+  the app's.)
 - **51 A star elsewhere.** Add an album in the web app (or star one in Amperfy): within 15 minutes of
   the app being open, or straight away when you come back to it, it starts downloading.
 - **52 An unstar.** Remove an album from your library in the web app: it stays on the phone at the
-  first check that misses it, and goes at the next check ten minutes or more later (pull down on You >
+  first check that misses it, and goes at the next check ten minutes or more later (pull down on Settings >
   Downloads to check now). Try it once more with an album you'd also downloaded a song of yourself:
   that song stays.
 - **53 Add and Remove here.** **Add to my library** on an album's page: it starts downloading within
   seconds (if it fits). **Remove from my library** on one it downloaded: the line under the button says
   "Its download goes from this phone too.", and it goes within seconds.
-- **54 Only while charging.** Turn it on (You > Downloads, under the line of what fits) and unplug the
+- **54 Only while charging.** Turn it on (Settings > Downloads, under the line of what fits) and unplug the
   phone while your library is downloading: what was downloading stops, and your library's albums say
   "Waiting for the phone to charge" - Downloading's row, and an album's download menu. Download an
   album yourself meanwhile: it doesn't wait. Plug the phone in: your library carries on, from where it
@@ -3766,23 +3761,23 @@ You > Debug have a "library" line for everything it asks for and lets go, and wh
 - **58 The first ask.** On a phone that has never been asked (or after deleting and reinstalling the
   app): the card at the top of the Library. Not Now puts it away for good; next time, try Turn On.
 - **59 Remove All** with it on: the question says Download your library is turned off too; afterwards
-  nothing downloads again, and You > Downloads shows it off.
+  nothing downloads again, and Settings > Downloads shows it off.
 - **60 An empty list.** Only if it can be arranged safely - unstar everything on a test account, or
-  stop Navidrome's music folder from mounting: nothing goes from the phone, and You > Downloads asks.
+  stop Navidrome's music folder from mounting: nothing goes from the phone, and Settings > Downloads asks.
   Keep Them keeps them, and the question goes. If you try Remove: still nothing goes at once, and the
   albums go only if a check ten minutes or more later says the same.
 
 - **61 In the background.** Add an album in the web app on the Mac, and leave the phone locked and not
   playing for an hour (the app not swiped away): note whether it came down without opening the app.
-  iOS decides when, and may not at all - You > Debug > Your library > In the background says whether
+  iOS decides when, and may not at all - Settings > This phone > Debug > Your library > In the background says whether
   iOS ran the app, when, and what came of it. Please send me those lines either way.
 - **62 Unplugged overnight.** With Only while charging on, start a big library downloading on the
-  charger, note how many albums are on the phone (You > Downloads > Downloaded), then unplug the phone
+  charger, note how many albums are on the phone (Settings > Downloads > Downloaded), then unplug the phone
   and lock it. In the morning: at most one album more than when you unplugged, and the rest say
   "Waiting for the phone to charge". Then plug it in overnight with the app closed: note in the morning
   whether it carried on by itself (In the background has a **Charger** line if iOS ran it).
 - **63 VoiceOver and the largest text.** With VoiceOver on, and again at the largest text size
-  (the iPhone's Settings > Accessibility > Display & Text Size > Larger Text): You > Downloads' Your library section
+  (the iPhone's Settings > Accessibility > Display & Text Size > Larger Text): Settings > Downloads' Your library section
   - each switch read as one, with its note as the hint, the line of what fits as one - the Library's
   card, and Downloading's row for your library. Nothing cut off or overlapping.
 
@@ -3856,7 +3851,7 @@ These come with the build that downloads a playlist (still app 0.9). Use a test 
 songs from a few albums, on Wi-Fi, with the web app open beside the phone.
 
 - **77 Download one and play it offline** (the phase's). On its page, tap the arrow beside the •••: it
-  becomes a ring, the page says "Downloading - 4 of 12 songs" as they come, and You > Downloads has its
+  becomes a ring, the page says "Downloading - 4 of 12 songs" as they come, and Settings > Downloads has its
   row ("3 of 12 songs to go") with a bar. Once all are here: "This playlist is downloaded - it plays with
   no connection." Then Airplane Mode, force-quit the app and open it again: in the Library (it may open
   on Downloaded), Downloaded has **Downloaded playlists** with its count; the playlist opens, every song
@@ -3864,7 +3859,7 @@ songs from a few albums, on Wi-Fi, with the web app open beside the phone.
   > Playlists, still in Airplane Mode: it's listed, bright.
 - **78 Kept in step.** Add a song to it in the web app, then open it on the phone: the song comes (the
   ring, then here). Take a song out in the web app and open it again at once: the song has left the
-  page, but it's still on the phone - the song count under Storage in You > Downloads hasn't dropped;
+  page, but it's still on the phone - the song count under Storage in Settings > Downloads hasn't dropped;
   ten minutes or more later (open it again, or leave the app open) it's gone from the phone. Take a song
   out with **Edit** on the phone, Done: it's gone from the phone at once.
 - **79 What stays.** Download a song of the playlist by hand first (its •••), and an album one of its
@@ -3872,7 +3867,7 @@ songs from a few albums, on Wi-Fi, with the web app open beside the phone.
   with …" and has no Remove Download. **Remove Download** on the playlist (the mark, or its •••): the song
   you downloaded yourself and the album's songs stay; the rest go. With Download your library on and an
   album of your library in the playlist, turn the switch off: the playlist's songs stay.
-- **80 Where it is.** Library > Downloaded > **Downloaded playlists**: the playlist, by name. You >
+- **80 Where it is.** Library > Downloaded > **Downloaded playlists**: the playlist, by name. Settings >
   Downloads > Downloaded: the playlist first, "12 songs · 412 MB", its songs not under an album row of
   their own; tap it for its page; swipe it to Remove. **Remove All Downloads**: does the question say the
   downloaded playlists go too and stay in your playlists? Afterwards, Downloaded playlists is empty and
@@ -3936,7 +3931,7 @@ button (still app 0.9). Earlier checks' "Library > Playlists" is now the switch'
 - **92 The switch.** The Library opens on Albums, with nothing above the albums but their count, and
   Albums | Playlists at the top. Swipe left: Playlists - the switch, the buttons and Find follow as the page
   settles; swipe halfway and let go: it springs back, and nothing else changes. Tap Albums: back. Go to
-  You and back: the same page. Scroll a long way down and tap the Library tab: the page goes to its top.
+  Settings and back: the same page. Scroll a long way down and tap the Library tab: the page goes to its top.
   Force-quit and open: Albums. Scrolling up and down never swipes to the other page.
 - **93 Edit order.** ••• > Edit order: drag Playlists above Albums, Done. The switch reads Playlists |
   Albums at once; force-quit and open: the Library opens on Playlists. (Put it back as you like it.)
@@ -4029,7 +4024,7 @@ order and Grid or list are in the Library's •••, and All music is a submen
 the end of Phase 4. Check 113 on wants a few hundred songs or more; 117 wants logins off, or the
 break-glass `deadwax` sign-in.
 
-- **112 The version.** install.sh says "Installed deadwax 0.10 (10), runs until …", and You > About reads
+- **112 The version.** install.sh says "Installed deadwax 0.10 (10), runs until …", and Settings > About reads
   0.10 (10). The Library opens as before: the order you'd arranged, the page you were on.
 - **113 All songs.** With logins on, the switch is still Albums | Playlists | Artists, and Edit order lists
   those three. ••• > All music: All albums, All artists, All songs. All songs: every song, each with its
@@ -4072,7 +4067,7 @@ break-glass `deadwax` sign-in.
 0.10). Check 126 wants logins on and a library of your own; the rest work either way. The web app's Search
 is the one to compare with: it should give the same lists.
 
-- **121 The tab.** The tabs read Library | Search | You. Search shows the field and "Search your
+- **121 The tab.** The tabs read Library | Search | You (Settings now). Search shows the field and "Search your
   library." (with logins on and a library of your own, "Search your library and the collection."). Open an
   album from a list, then tap Search: back to the list; tap it again at the list: its top.
 - **122 A song you have.** Type "roads" (or a song of yours): Top results and Songs list it, with ▶ after
@@ -4208,7 +4203,7 @@ artist you don't have's page (still app 0.10). Compare with the web app's Search
 **Not done yet.** These come with the build that adds what's saved, the kept answers and More from MusicBrainz -
 **app 0.11 (11)**, the end of Phase 5. Compare with the web app's Search, as for 121-155.
 
-- **156 The version.** install.sh says "Installed deadwax 0.11 (11), runs until …", and You > About reads
+- **156 The version.** install.sh says "Installed deadwax 0.11 (11), runs until …", and Settings > About reads
   0.11 (11). Search opens as before: the field, and the hint under it.
 - **157 What's saved, at once.** In the web app search an album you don't have ("roseland nyc live"), so deadwax
   has MusicBrainz's answer saved. On the phone type the same words: the album is in the list with your library's
@@ -4251,7 +4246,7 @@ Compare with the web app's Requests on the Mac: the phone should show the same r
 same words. Check 175 wants logins on; the rest work either way. Check 167 gets its album in the web app; getting
 one on the phone is checked from 180.
 
-- **166 The tab.** The tabs read Library | Search | Requests | You, Requests' icon an arrow into a tray. Tap it:
+- **166 The tab.** The tabs read Library | Search | Requests | Settings, Requests' icon an arrow into a tray. Tap it:
   the heading Requests, and Clear done at the top right, dimmed with nothing to clear. With nothing ever asked
   for, "Nothing requested yet" and "Albums you get show here while they download, and once they've arrived - find
   one in Search and tap Get." A spinner shows only until deadwax first answers. With a long list and something
@@ -4274,7 +4269,7 @@ one on the phone is checked from 180.
   Playing opened meanwhile. A row that can't open says why under it.
 - **172 Cancel, asked first.** Tap ✕ on a waiting download: the question in the card, **Keep it** and **Cancel
   download**; tap ✕ again: it closes. Tap ✕ on another card while one asks: only the new one asks. Tap **Cancel
-  download**: the card dims, "cancelling…", then goes to Needs attention as Cancelled. In You > Getting albums turn
+  download**: the card dims, "cancelling…", then goes to Needs attention as Cancelled. In Settings > Getting albums turn
   **Confirm before cancelling** off: ✕ cancels at once. Turn it back on.
 - **173 Another source and Same source again.** A download under Needs attention with sources left: **Another
   source · 2 left**; tap it: both buttons wait, "Trying another source…", then the row moves to Waiting, a try on.
@@ -4340,9 +4335,9 @@ same words. Check 187 wants logins on; the rest work either way. Use an album yo
   with "It's already downloading." (if it was filed meanwhile, "It's already in your library." - "…in the
   collection." with logins on). Clear done takes it away.
 - **187 Get albums, and someone else's download.** As an admin, take **Get albums** from a user in the web app's
-  People. On their phone, open You (it asks deadwax again), then an album they don't have: no Get the album, and
+  People. On their phone, open Settings (it asks deadwax again), then an album they don't have: no Get the album, and
   "Getting albums is off for you - ask an admin." in its place, the line under it still saying what's here. Give it
-  back, open You again: Get the album is back. As that user, open an album another user is downloading: "Already
+  back, open Settings again: Get the album is back. As that user, open an album another user is downloading: "Already
   downloading for someone else", the copy and how far it's got - the web app's words, without its Join.
 - **188 Offline.** On an album you don't have's page, turn Airplane Mode on: Get the album goes, and "Getting albums
   works once deadwax is back." stands in the line's place. Turn it off: the button is back, and the line is asked
@@ -4369,17 +4364,19 @@ same words. Check 187 wants logins on; the rest work either way. Use an album yo
 ### Getting albums' checks, slice 3 (193-199, 229-236)
 
 **Not done yet.** These come with **app 0.12 (12)**, the end of Phase 6: Join, Add to my library, Pick the best
-source for me and You's Getting albums. They take 193-199, then go on at 229 - the look's builds took 200-228
+source for me and Settings' Getting albums. They take 193-199, then go on at 229 - the look's builds took 200-228
 meanwhile. Compare with the web app on the Mac, the same album open in both. 196-199 want logins on and
 two accounts (one can be an admin); the rest work either way.
 
-- **193 The version, and You's three.** install.sh says "Installed deadwax 0.12 (12), runs until …", and You >
-  About reads 0.12 (12). You > Getting albums: **When I tap Get** (Show me the sources, Pick the best source for
-  me), **Quality floor** (Any, 320 kbps, Lossless, 24-bit) and **Format** (Any, Prefer lossless, Lossless only),
-  each with a tick on what the web app's You shows, the web app's note under them, then Confirm before cancelling.
-- **194 Chosen on the phone, kept on deadwax.** On the phone choose **Lossless** and **Lossless only**: the ticks
-  move at once. In the web app's You (reload it), the same two are chosen. Choose **Any** there, then open You on
-  the phone (or pull down): Any is ticked. Get an album: the sheet's chips start at the floor you chose.
+- **193 The version, and Getting albums' three.** install.sh says "Installed deadwax 0.12 (12), runs until …", and
+  Settings > About reads 0.12 (12). Settings > Getting albums: **When I tap Get** (Show me the sources, Pick the best
+  source for me), **Quality floor** (Any, 320 kbps, Lossless, 24-bit) and **Format** (Any, Prefer lossless, Lossless
+  only), each with a tick on what the web app's Settings shows, the web app's note under them, then Confirm before
+  cancelling.
+- **194 Chosen on the phone, kept on deadwax.** On the phone choose **Lossless** and **Lossless only**: the ticks move
+  at once. In the web app's Settings (reload it), the same two are chosen. Choose **Any** there, then open Settings >
+  Getting albums on the phone (or pull down): Any is ticked. Get an album: the sheet's chips start at the floor you
+  chose.
 - **195 Pick the best source for me.** Choose it, then Get an album that's well shared ("Dummy" on CD): the sheet
   says it's looking, then closes onto Requests, the download under Waiting or Downloading, its source the one the
   web app would mark as the best match. Then Get an obscure album, or one whose sources are all MP3 with the floor
@@ -4390,7 +4387,7 @@ two accounts (one can be an admin); the rest work either way.
   other, on the phone, open the same album and pressing: "Already downloading for someone else", "Join it to have
   it in your Requests too - …" and **Join this download**. Tap it: "Joining…", then "Joined - it's in your
   Requests.", and the line becomes "Already downloading". Requests lists the download, as "Someone else asked for it
-  too". Without Get albums (an admin takes it in the web app's People, then open You), the line has no Join and
+  too". Without Get albums (an admin takes it in the web app's People, then open Settings), the line has no Join and
   says nothing of joining.
 - **197 Add to my library.** Logins on: as one person, have an album filed. As the other, open it on the phone:
   "In the collection, not in your library", "It's already here - add it to your library to keep it with your
@@ -4405,18 +4402,18 @@ two accounts (one can be an admin); the rest work either way.
   cancel the download and Clear done. Tap Join on the phone: under the button, which stays, why it can't be
   joined now ("That download has been cleared from the list since - get it again.", or that it has been
   cancelled). Go back and open the album again: the line says nothing's on its way.
-- **229 Offline.** With You showing, Airplane Mode on: "Getting albums works once deadwax is back." under the
-  three, which can't be chosen. Back, they can, and a choice made in the web app meanwhile shows.
+- **229 Offline.** With Settings > Getting albums showing, Airplane Mode on: "Getting albums works once deadwax is
+  back." under the three, which can't be chosen. Back, they can, and a choice made in the web app meanwhile shows.
 - **230 Not saved.** (Only if you can make deadwax's database read-only for a minute, or you see it anyway.) A
   choice goes back to what it was, with "Not saved." and why under the three; VoiceOver says it. "deadwax can't
   keep these: its database isn't writable." under them while it lasts - and "Tell whoever runs deadwax." for
   someone who isn't an admin.
-- **231 The largest text.** You's three rows and their note read whole, the ticks at the right. Join this download
-  and Add to my library, and the words that replace them, wrap rather than clip, in the page's line and in the
-  sheet.
-- **232 VoiceOver.** You's rows read their names, the chosen one "Selected", and dimmed until deadwax has answered.
-  Join and Add read as buttons; "Joining…" stays where it is with the focus on it, then "Joined - it's in your
-  Requests." is heard (and "Added to your library."). A refusal is heard as it's said.
+- **231 The largest text.** Getting albums' three rows and their note read whole, the ticks at the right. Join this
+  download and Add to my library, and the words that replace them, wrap rather than clip, in the page's line and in
+  the sheet.
+- **232 VoiceOver.** Getting albums' rows read their names, the chosen one "Selected", and dimmed until deadwax has
+  answered. Join and Add read as buttons; "Joining…" stays where it is with the focus on it, then "Joined - it's in
+  your Requests." is heard (and "Added to your library."). A refusal is heard as it's said.
 
 After review, four more, for what the review changed:
 
@@ -4445,16 +4442,16 @@ not 166: Phase 6's checks are being written at the same time and take the number
 - **200 The tab bar.** Square, the full width, flush with the bottom edge, a thin line along its top - no
   floating capsule. The tab you're on is purple. Tap each tab; tap the one you're on: back to its first screen,
   then to its top. Open an album and swipe back: the bar never moves or flickers, and iOS's own never shows.
-- **201 Above the bar.** With something playing, the mini player is the top of the bar (since the build after
-  Noto Sans: checks 218-228); add a song to the queue: the line above the mini player. Scroll to the end of an album, Your
-  albums (grid and list), Playlists, Artists and You: the last row clears the mini player and the bar, and the letter
-  index's last letter is above them. Nothing playing: the last row clears the bar, with no gap under it. Now
+- **201 Above the bar.** With something playing, the mini player is the top of the bar (since the build after Noto
+  Sans: checks 218-228); add a song to the queue: the line above the mini player. Scroll to the end of an album, Your
+  albums (grid and list), Playlists, Artists and Settings: the last row clears the mini player and the bar, and the
+  letter index's last letter is above them. Nothing playing: the last row clears the bar, with no gap under it. Now
   Playing opens over everything, the bar included.
 - **202 The keyboard.** In Search, tap the field: the keyboard comes up over the tab bar - the bar doesn't ride
   up on it - and over the mini player with it (until the build after Noto Sans the mini player sat on the
   keyboard). Scroll the results to the end: the last row clears the keyboard, with no gap the bar's height above
   it. Put the keyboard away: the bar and the mini player are back where they were. The same with the Library's
-  Find and You > Server address.
+  Find and Settings > This phone > Change address.
 - **203 The Library's top.** On Albums: the round magnifying glass, the switch, the round •••, evenly spaced -
   the switch filling the room - and no Find field. Swipe to Playlists and Artists: the same top, no **+**.
   The switch's purple slides as you swipe and as you tap. Does the top look complete?
@@ -4467,7 +4464,7 @@ not 166: Phase 6's checks are being written at the same time and take the number
 - **206 Square corners.** The album page's cover, Now Playing's, the tiles and rows, Up Next's and Info's covers,
   Search's rows: the smallest of corners. The line over the mini player, the first ask on Downloaded, the
   sign-in's fields, the "In your library" badge, Up Next's Shuffle and Repeat, the EQ's held value, the Try again
-  buttons: small square corners, no round ends. Still round: artists' pictures, your initial on You, the download
+  buttons: small square corners, no round ends. Still round: artists' pictures, your initial on Settings, the download
   rings, the EQ's knobs, the two buttons at the Library's top. The turntable as it was.
 - **207 VoiceOver.** The bar reads as a tab bar, each tab its name, the one you're on selected. The switch reads
   "Library pages", each page a button, the one shown selected; the magnifying glass "Find in albums" (the page's
@@ -4484,9 +4481,9 @@ not 166: Phase 6's checks are being written at the same time and take the number
 **Not done yet.** These come with the build that sets the app in Noto Sans (still app 0.11 (11)), and follow
 the squared look's.
 
-- **210 The face.** Go through the Library, an album, Now Playing, Up Next, Search and You with the web app open
+- **210 The face.** Go through the Library, an album, Now Playing, Up Next, Search and Settings with the web app open
   beside them: the same face as the web's. Check the navigation bars' titles too, large and then small once you
-  scroll (Search, You, All music's pages, an artist), and the back button's word.
+  scroll (Search, Settings, All music's pages, an artist), and the back button's word.
 - **211 Its weights.** An album's title and Now Playing's song are bold; the switch's names, the tab bar's words
   and the track titles keep the weights they had. Nothing looks smeared or faked-bold.
 - **212 Other alphabets.** Find a name with Polish or Czech letters (Łódź, Dvořák), Turkish (ş, ğ, ı), Vietnamese,
@@ -4498,7 +4495,7 @@ the squared look's.
   The navigation bars' titles take the size the app opened at: change the size with the app open, and they catch up
   the next time it opens. A page's small title, the bars' buttons, the search fields and the segmented controls
   stop growing at the largest of the standard sizes, as the tab bar does; the big titles keep growing.
-- **215 What iOS draws for the app.** These are in Noto Sans: You's and Info's section headings and the small notes
+- **215 What iOS draws for the app.** These are in Noto Sans: Settings' and Info's section headings and the small notes
   under sections, the segmented controls (Search's filter, Info's, the EQ's ear), what you type in a search field,
   and the bars' buttons (**Done**, **Edit**). The menus, alerts, swipe buttons and Paste stay in iOS's face.
 - **216 Bold Text** on: what's in iOS's face gets heavier, Noto Sans doesn't. Say whether that reads badly.
@@ -4539,7 +4536,7 @@ follow Noto Sans's.
 - **225 VoiceOver.** The mini player reads "Now playing: Roads, Portishead - open"; double-tap opens Now Playing.
   Swipe up or down on it: **Next song** and **Previous song**, each only when there's a song that way. Then
   Play/Pause, then the line: "Position in the song", "0:12 of 5:00", and swiping up or down moves it 10 seconds.
-- **226 The last row.** Scroll to the end of an album, Your albums (grid and list), Playlists, Artists, You and
+- **226 The last row.** Scroll to the end of an album, Your albums (grid and list), Playlists, Artists, Settings and
   Search's results: the last row clears the mini player and the tabs, with no gap. Add a song to the queue: the line above
   the mini player, and the last row clears that too. In Search, tap the field: the keyboard covers the mini player
   and the tabs, and the last result clears the keyboard alone.
@@ -4547,7 +4544,7 @@ follow Noto Sans's.
   far as the tab bar's do, the cover with it; hold a finger on Play/Pause: it shows large. With Reduce Motion on, a
   swipe's titles fade instead of sliding. Look at the navigation bars too: a page's small title, **Done**, the
   back button, Search's field and the segmented controls (Search's filter, Info's) stop growing at the largest
-  standard size, so nothing is cut off in them. The big titles (Search, You, All music's pages) still grow: are
+  standard size, so nothing is cut off in them. The big titles (Search, Settings, All music's pages) still grow: are
   any cut off at the top or bottom?
 - **228 Scrolling near the mini player.** On a long list (an album, Your albums, Search's results), start a scroll
   with your thumb just above the mini player, so close it nearly touches, going up and going down, slowly and
@@ -4557,7 +4554,7 @@ follow Noto Sans's.
 
 ### Managing's checks (237-246)
 
-**Not done yet.** These come with **app 0.13 (13)**, Phase 7: You's [Manage](#manage), each row opening the web app
+**Not done yet.** These come with **app 0.13 (13)**, Phase 7: Settings' [Manage](#manage), each row opening the web app
 in Safari. Use deadwax's plain `http://` address, as the app has it - once on the home Wi-Fi, once over WireGuard
 with Wi-Fi off. 237-243 want logins on, and 241 two accounts (one an admin); 244-246 work either way. Since the build
 with [Edit album](#edit-album), Edit an album opens Choose the folder in the app (no line under it, no arrow) and an
@@ -4573,16 +4570,16 @@ longer apply - 379-387 check People's page. 241's rows following the permissions
 the Mac's People (or the phone's), and look at the app alone. Since the build that takes the web app's way out away,
 nothing of 237-246's Safari is left in the app at all: 388-391 check that.
 
-- **237 The version, and Manage.** install.sh says "Installed deadwax 0.13 (13), runs until …", and You > About
-  reads 0.13 (13). As an admin, You has **Manage** between Downloads and Account: **Edit an album** (with "Opens the
+- **237 The version, and Manage.** install.sh says "Installed deadwax 0.13 (13), runs until …", and Settings > About
+  reads 0.13 (13). As an admin, Settings has **Manage** between Downloads and Account: **Edit an album** (with "Opens the
   web app's Library: open an album there, then Edit. An album's ••• here has Edit in the web app too." under it),
   **Needs a look**, **Library care**, **People**, **Server settings** and **Event log**, each with an arrow at its
   right, and under them "These open in the web app, in Safari." and the line about Safari's own sign-in.
-- **238 Each row opens its page.** Tap each row in turn, coming back to the app between them: Edit an album opens
-  the web app's Library; Needs a look, Library care, People, Server settings and Event log each open that very page
-  in Safari, its title at the top, not the web app's Home. Its Back goes to the web app's You. Does Safari open a new
-  tab each time, or go back to the one it has?
-- **239 Safari's first sign-in.** Sign out of deadwax in Safari first (the web app's You > Sign out), then tap
+- **238 Each row opens its page.** Tap each row in turn, coming back to the app between them: Edit an album opens the
+  web app's Library; Needs a look, Library care, People, Server settings and Event log each open that very page in
+  Safari, its title at the top, not the web app's Home. Its Back goes to the web app's You (its Settings now). Does
+  Safari open a new tab each time, or go back to the one it has?
+- **239 Safari's first sign-in.** Sign out of deadwax in Safari first (the web app's Sign out), then tap
   Needs a look in the app: Safari shows the web app's sign-in. Sign in with the name and password you use in the
   app: Needs a look opens, not Home. Back in the app, tap Event log: it opens at once, with no sign-in. The app is
   still signed in throughout.
@@ -4590,28 +4587,28 @@ nothing of 237-246's Safari is left in the app at all: 388-391 check that.
   the address bar and no other warning - unless Safari is set to warn about pages that aren't secure (Settings >
   Apps > Safari), in which case say what it shows. Safari doesn't ask about the local network, and the address isn't
   turned into `https://`.
-- **241 The rows follow the permissions.** Do the admin's part on **another device** - the web app on the Mac,
-  signed in as the admin - never in Safari on this phone: that would sign Safari in as the admin, and every page
-  would then open with the admin's access. On the phone, sign Safari in as the person under test (the web app's You
-  > Sign out in Safari, then sign in as them), and the app too. As them, with no permissions: no Manage in You, and
-  the album's ••• has no Edit in the web app. On the Mac, give them **Edit albums** in People; on the phone pull down
-  on You: Edit an album and Library care appear, and nothing else. Give them **Settings and the log**: Server
-  settings and Event log join them. Take Edit albums away on the Mac and tap Library care on the phone before
-  pulling down: Safari, signed in as them, says "This page needs a permission an admin hasn't given you - ask one if
-  you need it." Pull down: the row goes.
+- **241 The rows follow the permissions.** Do the admin's part on **another device** - the web app on the Mac, signed
+  in as the admin - never in Safari on this phone: that would sign Safari in as the admin, and every page would then
+  open with the admin's access. On the phone, sign Safari in as the person under test (Sign out in the web app, in
+  Safari, then sign in as them), and the app too. As them, with no permissions: no Manage in Settings, and the album's
+  ••• has no Edit in the web app. On the Mac, give them **Edit albums** in People; on the phone pull down on Settings:
+  Edit an album and Library care appear, and nothing else. Give them **Settings and the log**: Server settings and
+  Event log join them. Take Edit albums away on the Mac and tap Library care on the phone before pulling down: Safari,
+  signed in as them, says "This page needs a permission an admin hasn't given you - ask one if you need it." Pull
+  down: the row goes.
 - **242 An album's Edit in the web app.** As an admin, open an album and tap the top •••: after the download items,
   **Edit in the web app**, with Safari's compass. Tap it: the same album's page in the web app, with **Edit** at
   its top. Try an album whose name has an accent or a slash in it. A song's ••• has no such item.
-- **243 Change password.** You > Account has **Change password** above Sign out, with "Opens the web app's You:
+- **243 Change password.** Settings > Account has **Change password** above Sign out, with "Opens the web app's You:
   Change password is under Account there. It changes the password of whoever is signed in in Safari." under it. Tap
-  it: the web app's You, with Safari's signed-in name at its top and Change password under Account. (Don't change
-  it unless you mean to.) Signed in as `deadwax` (the emergency admin), Account has Sign out alone.
+  it: the web app's You (its Settings now), with Safari's signed-in name at its top and Change password under Account.
+  (Don't change it unless you mean to.) Signed in as `deadwax` (the emergency admin), Account has Sign out alone.
 - **244 Set up Navidrome.** Only if you can take Navidrome's address away for a moment (in the web app's Server
   settings > Connections, on a test setup): the Library shows "Connect Navidrome" with **Set up Navidrome**. Tap it:
   Safari opens the web app's Server settings, at its first tab; Connections is the third. Put the address back.
 - **245 Offline, and Safari turned off.** Turn off Wi-Fi and WireGuard: Manage's rows dim and do nothing when
   tapped, the footer says "These open once deadwax is back.", Change password dims, and the album's ••• has no Edit
-  in the web app. Turn the network back on: all of it works again without leaving You. Then, only if you're happy
+  in the web app. Turn the network back on: all of it works again without leaving Settings. Then, only if you're happy
   to change Screen Time for a minute: turn Safari off (the iPhone's Settings > Screen Time > Content & Privacy Restrictions >
   Allowed Apps) and tap Needs a look: nothing opens, and "Couldn't open the web app - Safari may be turned off in
   Screen Time." shows over the tabs for a few seconds. Turn Safari back on.
@@ -4692,7 +4689,7 @@ and the Library's icon sharp (still app 0.13 (13)).
 - **251 Square corners.** Look for any rounding left on what was squared: covers (an album's page, Now Playing, the
   Library's tiles, the rows, the play bar's), the album page's Play and Shuffle, the chips and pills, the badges (In
   your library, New, Requests' count), the Library's switch and its chosen segment, Find's field, the notice, the
-  first ask, the sign-in's fields, the EQ's buttons and Paste, You > Downloads' bars, and on Now Playing the look
+  first ask, the sign-in's fields, the EQ's buttons and Paste, Settings > Downloads' bars, and on Now Playing the look
   button at the top right (and its square glyph, on the turntable) and the speed chip on the cover off 1x. Every
   corner is a point. Say if any reads badly square - the switch's chosen segment inside its well, Play's light line
   along its top, a badge over the Requests icon. Still round, as they should be: the dots, your avatar, artists'
@@ -4703,7 +4700,7 @@ and the Library's icon sharp (still app 0.13 (13)).
   the same size as before: the play bar's Play/Pause, Now Playing's three, the album and playlist pages' Play,
   Requests' ▶, Search's ▶ beside a song, and Debug's. Tap Play/Pause on each: it turns between the two with a short
   fade. The Library tab's icon is a square stack with sharp corners, the same size and weight as Search's, Requests'
-  and You's beside it, in the accent when the Library is shown and grey when not. At the largest text size, all of
+  and Settings' beside it, in the accent when the Library is shown and grey when not. At the largest text size, all of
   them grow as the words do; hold a finger on Play/Pause in the play bar and on the Library tab: the large view
   shows the sharp glyph. With VoiceOver, each still reads its name ("Pause", "Next", "Library").
 
@@ -4894,7 +4891,7 @@ Library (still app 0.13 (13)). Compare each with the same artist's page in the w
 ### Settings' checks (310-319)
 
 **Not done yet.** These come with the build that makes You into Settings, a list of pages with a menu for each
-choice (still app 0.13 (13)). No server change is needed. Compare the choices with the web app's You.
+choice (still app 0.13 (13)). No server change is needed. Compare the choices with the web app's Settings.
 
 - **310 The tab.** The fourth tab says **Settings**, with a gear, and its first screen is titled Settings. VoiceOver
   reads it as "Settings"; holding a finger on it shows the gear and "Settings" large. Nothing calls the tab You any
@@ -4909,9 +4906,9 @@ choice (still app 0.13 (13)). No server change is needed. Compare the choices wi
   Pull the first screen down: it asks deadwax again (no spinner left behind).
 - **312 Getting albums' menus.** Open Getting albums: **When I tap Get**, **Quality floor** and **Format**, each one
   row with its choice at the right. Tap Quality floor: a menu of Any, 320 kbps, Lossless and 24-bit, the chosen one
-  ticked; choose Lossless and the row says Lossless at once. The web app's You says Lossless too. Change Format in the
-  web app, then open Getting albums again: the web app's choice shows. Change it once more in the web app and pull
-  the page down: it shows. **Confirm before cancelling** is still a switch, and the ✕ in Requests follows it.
+  ticked; choose Lossless and the row says Lossless at once. The web app's Settings says Lossless too. Change Format
+  in the web app, then open Getting albums again: the web app's choice shows. Change it once more in the web app and
+  pull the page down: it shows. **Confirm before cancelling** is still a switch, and the ✕ in Requests follows it.
 - **313 Before deadwax answers, and offline.** Turn on Airplane Mode and open Getting albums: the three rows are
   dimmed and don't open, what was chosen still shows, and "Getting albums works once deadwax is back." is under them.
   Turn Airplane Mode off with the page open: the rows come back, and a choice changed in the web app meanwhile shows.
@@ -5131,15 +5128,15 @@ Artist images and Move albums write into the library: use an artist whose pictur
 **Not done yet.** These come with the build that brings [Needs a look](#needs-a-look) into the app - Phase 8's sixth
 part (still app 0.13 (13)). No server change is needed: any deadwax the first part works with. As in 320-329:
 deadwax's plain `http://` address, on the home Wi-Fi and over WireGuard with Wi-Fi off, as an admin unless said;
-compare each with the web app's Needs a look (You > Needs a look). Fixing and deleting write into the library: use
-albums put in it for these checks (a test album filed from a download, or copied in).
+compare each with the web app's Needs a look (the desktop sidebar's Manage → Needs a look). Fixing and deleting write
+into the library: use albums put in it for these checks (a test album filed from a download, or copied in).
 
-- **349 The count.** Settings > Manage > **Needs a look** has a number at its right: is it the web app's You badge's?
-  With VoiceOver: "Needs a look, 3 albums" (the number it shows). Open an album from it, mark it fine, close Edit
-  album and go back: is the number one less, without a pull? On Settings, lock and unlock the phone after marking one
-  fine in the web app: does the number follow? Leave the app on the Library tab, mark another fine in the web app, then
-  open Settings: the number follows as it opens. With nothing to look at, nothing at the row's right - and no tab ever
-  shows the count. With Wi-Fi and WireGuard off, the number stays as it was.
+- **349 The count.** Settings > Manage > **Needs a look** has a number at its right: is it the web app's count beside
+  Needs a look? With VoiceOver: "Needs a look, 3 albums" (the number it shows). Open an album from it, mark it fine,
+  close Edit album and go back: is the number one less, without a pull? On Settings, lock and unlock the phone after
+  marking one fine in the web app: does the number follow? Leave the app on the Library tab, mark another fine in the
+  web app, then open Settings: the number follows as it opens. With nothing to look at, nothing at the row's right -
+  and no tab ever shows the count. With Wi-Fi and WireGuard off, the number stays as it was.
 - **350 The list and Show.** Open Needs a look: "Reading the library", then the same albums in the same order as the
   web app's All, each with the same chips (New, then its issues), headed "All · N". **Show** (top right): All, Newly
   added, each kind of issue and Marked fine, with the web app's counts. Pick Newly added: only the new downloads, the
@@ -5181,8 +5178,9 @@ albums put in it for these checks (a test album filed from a download, or copied
 **Not done yet.** These come with the build that brings [Library care](#library-care) into the app - Phase 8's seventh
 part (still app 0.13 (13)). No server change is needed: deadwax 2.1.28 or later rescans without the tracks, which an
 older one sends whole - slower, the same. As in 349-354: deadwax's plain `http://` address, on the home Wi-Fi and over
-WireGuard with Wi-Fi off, as an admin unless said; compare each with the web app's Library care (You > Library care).
-The runs write covers, CD art and lyrics into album folders: narrow them to albums put in the library for these checks.
+WireGuard with Wi-Fi off, as an admin unless said; compare each with the web app's Library care (the desktop sidebar's
+Manage → Library care). The runs write covers, CD art and lyrics into album folders: narrow them to albums put in the
+library for these checks.
 
 - **355 Rescan.** Settings > Manage > **Library care**: the line at the top, then Rescan with the web app's totals
   ("7 albums · 87 tracks · 425 MB") and "Scanned … ago in …s". Tap **Rescan**: "Rescanning…" on the button and
@@ -5234,16 +5232,17 @@ The runs write covers, CD art and lyrics into album folders: narrow them to albu
 **Not done yet.** These come with the build that brings [Server settings](#server-settings) into the app - Phase 8's
 eighth part (still app 0.13 (13)). No server change is needed: any deadwax the first part works with. As in 355-360:
 deadwax's plain `http://` address, on the home Wi-Fi and over WireGuard with Wi-Fi off, as an admin unless said;
-compare each with the web app's Server settings (You > Server settings) and Connections (the web app's You). These
+compare each with the web app's Server settings (the desktop sidebar's Manage → Server settings) and Connections (a
+section of the web app's Settings). These
 change how the server runs: change only what you'll put back, and note each setting's value before you start.
 
 - **361 The root.** Settings > Manage > **Server settings**: the line about the compose file, then **Connections** -
-  MusicBrainz, slskd and Navidrome, "Checking…", then each as the web app's You says it (Connected, Navidrome with its
-  version). Then the organizing verdict, the web app's, and **Library**, **Downloads** and **Connections**, each
-  group the web app shows under that tab, in its order. Is any group marked **Needs attention** where the web app's
-  tab has its dot? Tap **Check again**: "Checking…", then the same. Stop slskd for a moment (only if you can): Check
-  again says "Can't reach it" or "Not on Soulseek" under slskd, with the web app's sentence - press and hold it to
-  select it. Start it, Check again: Connected. With VoiceOver: each row read once ("slskd, Connected").
+  MusicBrainz, slskd and Navidrome, "Checking…", then each as the web app's Settings says it (Connected, Navidrome
+  with its version). Then the organizing verdict, the web app's, and **Library**, **Downloads** and **Connections**,
+  each group the web app shows under that tab, in its order. Is any group marked **Needs attention** where the web
+  app's tab has its dot? Tap **Check again**: "Checking…", then the same. Stop slskd for a moment (only if you can):
+  Check again says "Can't reach it" or "Not on Soulseek" under slskd, with the web app's sentence - press and hold it
+  to select it. Start it, Check again: Connected. With VoiceOver: each row read once ("slskd, Connected").
 - **362 A menu.** Open **Cover art** (or When a download fails): a setting with choices is a menu, its value the web
   app's. Pick another: the group's row and the setting say **Unsaved**, and the bar at the foot "1 unsaved change".
   **Save changes**: "Saving…" on the button, then "Saved." (VoiceOver reads it), and "Set here" under it. Does the
@@ -5297,7 +5296,7 @@ change how the server runs: change only what you'll put back, and note each sett
 **Not done yet.** These come with the build that brings the [Event log](#event-log) into the app - Phase 8's ninth
 part (still app 0.13 (13)). No server change is needed: any deadwax the first part works with. As in 361-369:
 deadwax's plain `http://` address, on the home Wi-Fi and over WireGuard with Wi-Fi off, as an admin unless said;
-compare each with the web app's event log (You > Event log) open on the Mac beside it.
+compare each with the web app's event log (the desktop sidebar's Manage → Event log) open on the Mac beside it.
 
 - **370 Live.** Settings > Manage > **Event log**: "Connecting…" under the bar, then "Live" with a green dot, the
   line about the page, and the lines newest first - the same lines as the web app's, in its order. Search for an

@@ -13,8 +13,8 @@
  * that no longer matches stops this script, naming what moved. Writes
  * ios/DeadwaxKit/Tests/DeadwaxCoreTests/Fixtures/you/you.json.
  *
- * `departures` (16 Nov) is where the phone says something else on purpose, written here by hand beside the web's word
- * it departs from: the tab's name, Settings on the phone and You on the web.
+ * The tab's name is Settings on both: the phone named it so on 16 Nov while the web said You, a departure kept here
+ * by hand until the web's 2.1.35 renamed its own tab and the two met.
  *
  * The web keeps the session's /me apart from You's own (`sessionMe()`); the phone has one answer, so `session` is
  * null in every case here.
@@ -74,20 +74,9 @@ const NO_SIGN_IN = expression(piece(YOU, /export const NO_SIGN_IN = ('[^'\n]*')/
 const NOT_KNOWN = expression(piece(YOU, /export const NOT_KNOWN = ('[^'\n]*')/, 'NOT_KNOWN')[1])()
 const UNVERIFIED = expression(piece('lib/permissions.ts', /export const UNVERIFIED = ("[^"\n]*")/, 'UNVERIFIED')[1])()
 
-/* (16 Nov) The tab's own name, the web's read out of lib/appRoutes.ts's TAB_LABELS - and where the phone departs from
- * it ON PURPOSE, written here by hand so the departure is in the fixture rather than a check left loose: the phone's
- * tab is Settings (James: "instead of "you", let's just use settings"), the web app's stays You. ScreenYouTests holds
- * YouWords.webTitle to the web's and YouWords.title to the phone's, and fails if the two ever meet again. */
+/* The tab's own name, the web's read out of lib/appRoutes.ts's TAB_LABELS: Settings since the web's 2.1.35, the
+ * phone's since 16 Nov (James: "instead of "you", let's just use settings"). ScreenYouTests holds YouWords.title to it. */
 const TAB = expression(piece('lib/appRoutes.ts', /\n\s*you: ('[^'\n]*'),\n\}/, "TAB_LABELS' you")[1])()
-const DEPARTURES = [
-  {
-    word: "the tab's name",
-    web: TAB,
-    phone: 'Settings',
-    since: '2026-11-16',
-    why: 'James: "instead of \'you\', let\'s just use settings" - the phone\'s tab is Settings, a root of groups each opening its page; the web app keeps You for now.',
-  },
-]
 
 const titled = (id) => jsxText(piece(YOU, new RegExp(`<h2 id="app-${id}-title" class="app-section-title">([^<]*)</h2>`), `the ${id} title`)[1])
 const normalizationTitle = jsxText(piece('app/NormalizationChoice.tsx',
@@ -172,7 +161,7 @@ function ascii(text) {
 }
 const flat = (value) => ascii(JSON.stringify(value))
 const fixture = {
-  about: "You (app/You.tsx): the expressions the phone's You draws by, read out of the source and evaluated as written over every kind of /me answer, failed or not, for an admin or not, with an unverified session or not (the session's own /me always null: the phone keeps one answer); and the words it shares with the web - and where it departs from them on purpose (the phone calls the tab Settings since 2026-11-16).",
+  about: "You (app/You.tsx): the expressions the phone's You draws by, read out of the source and evaluated as written over every kind of /me answer, failed or not, for an admin or not, with an unverified session or not (the session's own /me always null: the phone keeps one answer); and the words it shares with the web, the tab's name (Settings) among them.",
   made_by: MADE_BY,
   made_from: Object.fromEntries(Object.keys(madeFrom).sort().map((key) => [key, madeFrom[key]])),
   words: {
@@ -185,12 +174,11 @@ const fixture = {
     normalizationNote: jsxText(notes[1]),
     webFooter: jsxText(notes[2]),
   },
-  departures: DEPARTURES,
   cases,
 }
 const body = [
   '{',
-  ['about', 'made_by', 'made_from', 'words', 'departures'].map((key) => `  ${flat(key)}: ${flat(fixture[key])},`).join('\n'),
+  ['about', 'made_by', 'made_from', 'words'].map((key) => `  ${flat(key)}: ${flat(fixture[key])},`).join('\n'),
   '  "cases": [',
   fixture.cases.map((row) => `    ${flat(row)}`).join(',\n'),
   '  ]',

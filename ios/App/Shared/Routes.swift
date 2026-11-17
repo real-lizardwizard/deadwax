@@ -2,16 +2,16 @@ import DeadwaxCore
 import Observation
 import SwiftUI
 
-/// The app's tabs (D1): Library, Search (Phase 5 - phase5-search.md 3.1, question 1: the web's order, You at the end),
-/// Requests (Phase 6 - phase6-get-requests.md 3.1, question 1: the web's order less Home) and Settings - the web's You,
-/// and the phone's too until 16 Nov (the case keeps its name, `you`). The one list of them: the tab bar draws `allCases`
+/// The app's tabs (D1): Library, Search (Phase 5 - phase5-search.md 3.1, question 1: the web's order, Settings at the
+/// end), Requests (Phase 6 - phase6-get-requests.md 3.1, question 1: the web's order less Home) and Settings - You on
+/// the phone until 16 Nov and on the web until its 2.1.35 (the case keeps its name, `you`). The one list of them: the tab bar draws `allCases`
 /// in this order and MainTabs builds a stack for each, so a tab is one case here, with its words and symbol below and
 /// its stack in MainTabs.
 enum AppTab: Hashable, CaseIterable {
     case library
     case search
     case requests
-    /// Settings (YouWords.title), the web's You.
+    /// Settings (YouWords.title), the web's name for its tab too since its 2.1.35.
     case you
 
     /// Its words in the tab bar, and to VoiceOver.

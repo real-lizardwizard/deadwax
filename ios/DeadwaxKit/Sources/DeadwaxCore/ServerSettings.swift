@@ -725,7 +725,7 @@ public enum ServerSettings {
     // MARK: the words (ServerSettings.tsx, SettingsView.tsx)
 
     public static let title = "Server settings"
-    /// The page's line - the web's, but for where your own choices are: the phone's Settings, not You.
+    /// The page's line - the web's: your own choices are in Settings (the web's tab too since its 2.1.35).
     public static let pageLine = "How deadwax runs, as your compose file or .env sets it. A change saved here takes "
         + "effect at once, with no restart, and is used instead of what the file says until you revert it. Your own "
         + "choices - what Get does, the quality floor, Format and whether cancelling asks first - are in Settings, under "

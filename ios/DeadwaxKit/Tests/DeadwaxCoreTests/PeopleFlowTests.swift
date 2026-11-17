@@ -20,7 +20,7 @@ import Testing
     }
 
     static let you = PeoplePerson(id: "nd-james", user: "james", name: "James", admin: true, you: true,
-                                  can: PeopleCan(reset: "That's you - change your own password in You → Account → Change password.",
+                                  can: PeopleCan(reset: "That's you - change your own password in Settings → Account → Change password.",
                                                  remove: "deadwax doesn't remove the account you're signed in with.",
                                                  admin: "You can't take away your own admin role.",
                                                  permissions: "That's you - an admin has every permission."))
@@ -431,6 +431,11 @@ import Testing
              .refused(words: People.peopleOnly, kind: nil, fix: nil, askMe: true)),
             (Self.answered(403, "Navidrome says you aren't its admin.", kind: "not_admin", fix: "Ask an admin."),
              .refused(words: "Navidrome says you aren't its admin.", kind: "not_admin", fix: "Ask an admin.", askMe: true)),
+            // the server's words since the web's 2.1.35 name Settings, the phone's place too: said as they are
+            (Self.answered(400, "That's you - change your own password in Settings → Account → Change password.", kind: "yourself"),
+             .refused(words: "That's you - change your own password in Settings → Account → Change password.",
+                      kind: "yourself", fix: nil, askMe: false)),
+            // an older server's name the web's You: said as the phone has it
             (Self.answered(400, "That's you - change your own password in You → Account → Change password.", kind: "yourself"),
              .refused(words: "That's you - change your own password in Settings → Account → Change password.",
                       kind: "yourself", fix: nil, askMe: false)),
@@ -461,11 +466,18 @@ import Testing
     }
 
     @Test func thePhonesPlaceForChangePassword() {
+        // a server before the web's 2.1.35 named the web's tab You: said as the phone has it
         #expect(People.onPhone("change it in You → Account → Change password.") == "change it in Settings → Account → Change password.")
+        // since 2.1.35 the server names Settings, the phone's place too: through unchanged
+        #expect(People.onPhone("change it in Settings → Account → Change password.") == "change it in Settings → Account → Change password.")
         #expect(People.onPhone("nothing to change") == "nothing to change")
         #expect(People.onPhone(nil as String?) == nil)
         let you = Self.you
         #expect(People.refusals(you).map(People.onPhone).first == "That's you - change your own password in Settings → Account → Change password.")
+        #expect(People.refusals(you).first == People.refusals(you).map(People.onPhone).first)
+        let older = PeoplePerson(id: "nd-james", user: "james", name: "James", admin: true, you: true,
+                                 can: PeopleCan(reset: "That's you - change your own password in You → Account → Change password."))
+        #expect(People.refusals(older).map(People.onPhone).first == "That's you - change your own password in Settings → Account → Change password.")
     }
 
     // MARK: what is sent

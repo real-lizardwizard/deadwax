@@ -370,7 +370,7 @@ for (let n = 0; n < 100; n++) {
 const NOW = 1763300000
 const LAST_ADMIN = 'maya is Navidrome\'s last admin - make someone else one first.'
 const REASONS = [null, null, null, null, '', 'That\'s deadwax\'s own account (NAVIDROME_USER) - deadwax would lose its way into Navidrome.',
-  'That\'s you - change your own password in You \u2192 Account \u2192 Change password.', 'deadwax doesn\'t remove the account you\'re signed in with.',
+  'That\'s you - change your own password in Settings \u2192 Account \u2192 Change password.', 'deadwax doesn\'t remove the account you\'re signed in with.',
   'You can\'t take away your own admin role.', 'That\'s you - an admin has every permission.', LAST_ADMIN,
   'Admins have every permission - that changes with Make admin.', 'deadwax keeps that name for itself - nobody signs in to deadwax as it.']
 const AGES = [0, 1, 30, 59, 60, 61, 119, 120, 3599, 3600, 3601, 7199, 86399, 86400, 172799, 86400 * 59, 86400 * 60 - 1, 86400 * 60,
