@@ -90,7 +90,7 @@ struct YouView: View {
             }
         }
         .navigationTitle(YouWords.title)
-        .refreshable {
+        .pullToRefresh {
             // (Phase 8, slice 6) Needs a look's count, on the pull too - asked before /me, so Look after the library
             // given by its answer asks it once, not twice (MainTabs)
             queueCount.pulled()
@@ -163,7 +163,7 @@ struct AboutPage: View {
             }
         }
         .navigationTitle(YouWords.about)
-        .refreshable {
+        .pullToRefresh {
             await server.refreshMe()
         }
     }

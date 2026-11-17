@@ -1,8 +1,10 @@
 #if canImport(AVFAudio)
-// AVFAudio for UnsafeMutableAudioBufferListPointer: AudioToolbox alone brings it on macOS, not on iOS (the device build)
+// AVFAudio for UnsafeMutableAudioBufferListPointer: AudioToolbox alone brings it on macOS, not on iOS (the device build);
+// and CoreAudio, which brings it on Mac Catalyst, where neither of the other two does (the Mac app, slice 1)
 import AVFAudio
 import AudioToolbox
 import CAudioRing
+import CoreAudio
 import DeadwaxCore
 
 // The deck engine's render (notes/ios-specs/turntable.md 4.3): its state, reached through one pointer made before the
@@ -10,7 +12,7 @@ import DeadwaxCore
 // Objective-C message or counts a Swift reference: the state is plain numbers and pointers (`_isPOD`, tested), the
 // voice is DeckRender's concrete entries over PlatformMaths, and the rings are CAudioRing's. The review rule: this
 // file imports CAudioRing, DeadwaxCore and AudioToolbox (for AudioBufferList and AudioTimeStamp, the block's own
-// arguments) - nothing else.
+// arguments) - and AVFAudio and CoreAudio only for UnsafeMutableAudioBufferListPointer's declaration - nothing else.
 
 /// What the render writes after each block, read by `DeckEngine.status()` (relaxed words; Doubles as their bits).
 enum DeckCounter: UInt32, CaseIterable {

@@ -190,6 +190,8 @@ struct DeadwaxApp: App {
             // the events and the plan after them within one budget (slice 3's review)
             await BackgroundWork.shared.eventsHandled(began: began)
         }
+        // (the Mac app, slice 1) on the Mac, its window: phone-sized, no New Window, no Help - nothing on the iPhone
+        .macWindow()
     }
 }
 
@@ -200,6 +202,8 @@ final class AppDelegate: NSObject, UIApplicationDelegate {
                      didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil) -> Bool {
         BackgroundWork.shared.register()
         Typeface.configureUIKit()
+        // (the Mac app, slice 1) the Mac's window shaped as it opens; nothing on the iPhone
+        Platform.launching()
         return true
     }
 }

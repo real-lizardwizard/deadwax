@@ -47,6 +47,15 @@ public enum Resume {
     /// What this phone is called in deadwax's record, and so in the notice on another device: what the web's
     /// deviceLabel says for Safari on an iPhone ("Picked up from your iPhone"). Inside play_queue.py's LABEL_PATTERN.
     public static let label = "iPhone"
+    /// (The Mac app, slice 1) What `device` is called there: the iPhone's `label`, and on a Mac "Mac" - what the web's
+    /// deviceLabel says for Safari on a Mac (resume.ts), so the phone's notice says "Picked up from your Mac". Inside
+    /// play_queue.py's LABEL_PATTERN too.
+    public static func label(for device: Device) -> String {
+        switch device {
+        case .iPhone: return label
+        case .mac: return "Mac"
+        }
+    }
     /// play_queue.py POSITION_MAX: the furthest position a save may name, in seconds.
     public static let positionMax = 86_400.0
     /// OWED_ORDER (useResume.ts): the triggers held while a request was out, asked again in this order.

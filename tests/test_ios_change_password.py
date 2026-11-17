@@ -247,12 +247,12 @@ def test_the_new_session_is_kept_before_it_is_used_and_a_401_is_held_while_out()
     order = [change.index(step) for step in ("changingPassword = true", "let sent = changeContext",
                                              "await client.changeOwnPassword(body",
                                              "guard PasswordRekey.answerStands(sent: sent, now: changeContext) else {",
-                                             "SessionKeychain.save(cookie, for: address.key)", "session = cookie",
+                                             "SessionStore.save(cookie, for: address.key)", "session = cookie",
                                              "self.client = makeClient(address, session: cookie)",
                                              "let then = rekey.ended(outcome)", "changingPassword = false")]
     assert order == sorted(order)
     # the cookie kept, in hand and in the client in one turn: nothing awaited between, so nothing asks under the old one
-    kept = change[change.index("SessionKeychain.save(cookie"):change.index("self.client = makeClient(address")]
+    kept = change[change.index("SessionStore.save(cookie"):change.index("self.client = makeClient(address")]
     assert "await" not in kept
     # an answer whose person, address or session has moved on is dropped, and the hold with it
     assert "dropChange()\n            return .cancelled" in change

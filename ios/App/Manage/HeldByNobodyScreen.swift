@@ -134,7 +134,7 @@ struct HeldByNobodyScreen: View {
             if reduceMotion { transaction.animation = nil }
         }
         .editOutOfReach(!online && model.answer != nil)
-        .refreshable {
+        .pullToRefresh {
             guard online else { return }
             await model.read()
         }

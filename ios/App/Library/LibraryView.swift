@@ -662,7 +662,7 @@ struct NavidromeGateView: View {
             .padding(16)
         }
         .navigationTitle("Library")
-        .refreshable { await library.checkNavidrome() }
+        .pullToRefresh { await library.checkNavidrome() }
     }
 }
 

@@ -106,7 +106,7 @@ struct AlbumsScreen: View {
                             LibraryLayoutSwitch()
                         }
                     }
-                    .refreshable { await pulled() }
+                    .pullToRefresh { await pulled() }
             }
         }
         .task(id: LoadKey(person: server.person, generation: scope.map { library.generations[$0] ?? 0 } ?? 0)) {

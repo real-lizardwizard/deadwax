@@ -3,9 +3,10 @@ import Foundation
 import Observation
 
 /// Who this phone is to which deadwax: the address, the client every screen asks through, the session kept in the
-/// Keychain, /me and what it lets this person see (Core's `Access`), and the launch's gates (screens.md 1, D10) - the
-/// address, then can't-reach, then the sign-in, then the app - with the sign-in brought OVER the app when a session
-/// ends mid-use (SignInRules.endsSession: the music plays on under it).
+/// Keychain (in a file on the Mac - SessionStore; "the Keychain" below means whichever this device keeps it in), /me
+/// and what it lets this person see (Core's `Access`), and the launch's gates (screens.md 1, D10) - the address, then
+/// can't-reach, then the sign-in, then the app - with the sign-in brought OVER the app when a session ends mid-use
+/// (SignInRules.endsSession: the music plays on under it).
 ///
 /// Every rule is Core's (SignInRules, SignOutRow, Access, ErrorWords, CheckReport); this only keeps the state and
 /// makes the requests.
@@ -114,7 +115,7 @@ final class ServerModel {
         addressText = saved
         if !saved.isEmpty, case .success(let parsed) = ServerAddress.parse(saved) {
             address = parsed
-            session = SessionKeychain.read(parsed.key)
+            session = SessionStore.read(parsed.key)
             launch = .checking
             client = makeClient(parsed, session: session)
             // the last /me this phone had from this server, with a session to go with it (or logins off): the app at once
@@ -247,7 +248,7 @@ final class ServerModel {
         guard let address else { return SignInProblem(error: APIFailure.other("There's no deadwax address to sign in to.")) }
         do {
             let (answer, cookie) = try await makeClient(address, session: nil).signIn(username: name, password: password)
-            SessionKeychain.save(cookie, for: address.key)
+            SessionStore.save(cookie, for: address.key)
             session = cookie
             client = makeClient(address, session: cookie)
             asks += 1
@@ -276,7 +277,7 @@ final class ServerModel {
         }
         guard signOutRow.answered(failure) == .startAgain else { return }
         dropChange()
-        SessionKeychain.delete(address.key)
+        SessionStore.delete(address.key)
         Self.keep(nil, for: address)
         session = nil
         self.client = makeClient(address, session: nil)
@@ -378,7 +379,7 @@ final class ServerModel {
         if case .changed(_, _, let cookie) = outcome {
             // the new sign-in kept, then in hand, then in the client - nothing awaited between, so nothing asks under
             // the old one meanwhile
-            SessionKeychain.save(cookie, for: address.key)
+            SessionStore.save(cookie, for: address.key)
             session = cookie
             self.client = makeClient(address, session: cookie)
             // a /me still out under the old session is that session's answer, not this one's
@@ -479,7 +480,7 @@ final class ServerModel {
         dropChange()
         if me != nil { personChanged() }
         address = new
-        session = SessionKeychain.read(new.key)
+        session = SessionStore.read(new.key)
         client = makeClient(new, session: session)
         asks += 1
         me = nil

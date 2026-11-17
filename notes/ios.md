@@ -13901,3 +13901,211 @@ Verified after review, on the Mac: `swift test` (2232: 2062, 158 and 12, all pas
 build, BUILD SUCCEEDED with only the AppIntents warning; check_project.py; pyflakes over src and tests;
 tests/test_ios_*.py, test_source_bytes.py and test_logins.py (609 passed, 1 skipped - the new reading test the one
 more); all 98 sims with Node 22; and the thirteen mutations above, against the real files. Nothing in the app changed.
+
+## The Mac app, slice 1: it runs and plays (2026-11-17)
+
+The Mac app's plan (~/Desktop/Code/deadwax-plans/mac-app.md), slice 1 - sections 0, 1.1, 1.4, 3, 4, 5 and 11, with
+James's answers of 17 Nov: the Mac idiom (TARGETED_DEVICE_FAMILY 6); no provisioning profile, the sign-in kept in a
+file in the sandbox container, made 0600, never the Keychain; closing the window may quit the app for now (the music
+playing on with it closed is slice 2's, and nothing here makes it harder); downloads as on the phone; macOS 14. The
+iPhone app built for the Mac through Mac Catalyst from the same files - one target, one scheme, one MARKETING_VERSION
+(0.13 (13)). Built on `mac1`, from the `ios` branch at 4bee7e9. src/__init__.py untouched; **no server change**;
+**ios/Deadwax.xcodeproj untouched** - every setting is in the xcconfigs, as the trial found; PlaybackEngine has no
+diff, and DeadwaxAudio's one change is DeckVoiceHost's import.
+
+### The trial's three fixes
+
+- `SUPPORTS_MACCATALYST = YES` (Base.xcconfig; it was NO in the device-only block).
+- `import CoreAudio` in DeadwaxAudio's DeckVoiceHost.swift: on Catalyst, `UnsafeMutableAudioBufferListPointer` comes
+  from CoreAudio, which AVFAudio doesn't re-export there as it does on the iPhone.
+- `INFOPLIST_FILE[sdk=macosx*] = Config/Info-Mac.plist`: macOS refuses `LSSupportsOpeningDocumentsInPlace = NO`
+  ("not supported on macOS. Either remove the entry or set it to YES"), which the phone's plist needs.
+
+### Core (DeadwaxCore)
+
+- **Device.swift** (new): `Device` - `.iPhone`, `.mac`. Core never asks the platform; what differs takes the device
+  as a value (section 3.3), handed in by the App's `Platform.device`.
+- **Resume.swift**: `Resume.label(for:)` - "iPhone" (the old `label`, kept) or "Mac", the web's `deviceLabel` for
+  Safari on a Mac (resume.ts), so the other device's notice says "Picked up from your Mac". Inside play_queue.py's
+  LABEL_PATTERN.
+- **SessionFile.swift** (new): the Mac's sign-in, the same three calls SessionKeychain has.
+  - **Where**: `<Application Support>/deadwax/sessions/<name>` - in the container,
+    `~/Library/Containers/net.lizardlounge.deadwax/Data/Library/Application Support/deadwax/sessions/`. One file a
+    server, its account in the Keychain's terms.
+  - **The name** is the server's, escaped as KeptAlbumIndex.safeName escapes the kept /me's folder (`%` and two hex
+    digits for every byte but an ASCII letter or digit; never a `/` or `.`). Past 200 bytes it is a 183-character
+    prefix, `-`, and FNV-1a 64 of the whole server in 16 hex digits, so two long servers stay apart, every name fits
+    APFS's 255 with the temporary file's `.` and `.new`, and a capped name (the one with a bare `-`) can't be an
+    uncapped one.
+  - **Kept for this user alone**: the folder made 0700 (and tightened if it was looser), the file 0600 - made so
+    before a byte is written: `.<name>.new` created empty with `posixPermissions` 0600, its mode checked, the value
+    written and synchronized, then moved over the old file. A replaced file is a new one, so a 0644 left by anything
+    else becomes 0600 at the next save.
+  - **A failed save keeps nothing**: the temporary file is removed and the server's old file deleted too, as the
+    Keychain's delete-then-add leaves nothing when the add fails - a stale session never outlives a failed save. The
+    App ignores the Bool, as it ignores the Keychain's.
+  - **Read** takes a regular file only, decoded as UTF-8; a `.new` left by a stop mid-save is never read as the
+    session. **Delete** (sign-out) removes the file and any `.new` beside it.
+  - Nothing is logged, and nothing but the cookie's value is in the file.
+
+### The app
+
+- **Shared/Platform.swift** (new) - **the one switch**: `#if targetEnvironment(macCatalyst)`, said once, in this file
+  alone (tests/test_ios_mac.py holds it). `Platform.mac`, `Platform.device`; on the Mac `Platform.launching()`,
+  `Scene.macWindow()` and a no-op `View.pullToRefresh`; on the iPhone `launching()` does nothing, `macWindow()` is
+  `self` and `pullToRefresh` is SwiftUI's `refreshable(action:)`.
+- **The window** (1.1): `macWindow()` - `.defaultSize(430 x 860)` and `.commands` replacing `.newItem` (no New
+  Window) and `.help` (no help book) with nothing. `launching()`, from the app delegate's didFinishLaunching, observes
+  `UIScene.willConnectNotification` and `didActivateNotification` and sets each window scene's
+  `sizeRestrictions` (390 x 640 at least, 600 wide at most) and `titlebar` (no title, the unified toolbar) - again at
+  each activation, in case the first came too soon for macOS to take them.
+- **SessionStore.swift** (new): read, save, delete - `SessionFile` on the Mac, `SessionKeychain` on the iPhone,
+  exactly as before. ServerModel's five calls (two reads, two saves, the one delete in `signOut()`, the only sign-out
+  path that cleared the Keychain) go through it.
+- **NowPlayingController**: on the Mac, `MPNowPlayingInfoCenter.playbackState` beside `nowPlayingInfo` (1.4) -
+  playing or paused in `show`, paused in `republishPaused`, stopped in `clear`. iOS works it out from the audio
+  session, so the phone doesn't set it.
+- **PlayerModel**: the ResumeController's label is `Resume.label(for: Platform.device)`.
+- **Pull to refresh** (section 11): the 17 `.refreshable` in 15 files are `.pullToRefresh` - one helper, not 17
+  `#if`s. The helper's closure is `@MainActor @Sendable`: SwiftUI's own takes `@_inheritActorContext`, which a
+  wrapper can't, and without the `@MainActor` every call site warned that main-actor work ran outside the actor.
+
+### The build, the icon and the scripts
+
+- **Base.xcconfig**: the Mac block - `SUPPORTS_MACCATALYST = YES`, `DERIVE_MACCATALYST_PRODUCT_BUNDLE_IDENTIFIER =
+  NO` (already the default; said, so the Mac's id can't become `maccatalyst.…`), and `[sdk=macosx*]` for the rest:
+  TARGETED_DEVICE_FAMILY 6, INFOPLIST_FILE Config/Info-Mac.plist, ENABLE_APP_SANDBOX YES,
+  ENABLE_OUTGOING_NETWORK_CONNECTIONS YES. No MACOSX_DEPLOYMENT_TARGET: it follows IPHONEOS_DEPLOYMENT_TARGET 17.0 to
+  macOS 14.0 (the built plist's LSMinimumSystemVersion; the binary's LC_BUILD_VERSION is platform 6, minos 17.0). The
+  entitlements come from the two ENABLE_ settings - no .entitlements file, so nothing that needs a profile.
+  **The block must come after every setting it qualifies**: the first Mac build read Info.plist and failed, because
+  `INFOPLIST_FILE[sdk=macosx*]` stood above `INFOPLIST_FILE = Config/Info.plist`, and a later plain assignment hides
+  an earlier conditional one. check_project.py refuses that order now.
+- **Config/Info-Mac.plist** (new): Info.plist less LSSupportsOpeningDocumentsInPlace, plus CFBundleName `deadwax`
+  (the menu bar's About, Hide and Quit deadwax - the phone's stays $(PRODUCT_NAME), which its home screen never
+  shows), CFBundleIconFile `AppIcon`, LSApplicationCategoryType `public.app-category.music`, and
+  NSSupportsAutomaticTermination and NSSupportsSuddenTermination both NO (a music player must not be quit by macOS
+  while it plays with no window in front). UIApplicationSupportsMultipleScenes stays NO: slice 2's.
+- **The icon**: make-icon.py draws the Mac's too - the record on macOS's rounded square (824 px of 1024, 100 px in
+  from each edge, corner radius 185), RGBA with the corners transparent, supersampled - and writes
+  `App/Icon/AppIcon.icns` (icp4, ic11, icp5, ic12, ic07, ic13, ic08, ic14, ic09, ic10: 16 to 1024 px, 243,476 bytes).
+  The phone's PNGs come out byte for byte as before. No asset catalog, as before (actool needs a Simulator runtime).
+  The iPhone's .app carries the icns too, unused there - the one byte-level difference in its bundle.
+- **check_project.py**: the xcconfig reader keeps a conditional `KEY[cond]` as a key of its own, so the iPhone's
+  `KEY` reads as it did. New rules: each Mac setting as MAC_SETTINGS has it; any other conditional setting refused
+  (nothing changes the iPhone build by the back door); the phone's TARGETED_DEVICE_FAMILY still 1; no
+  MACOSX_DEPLOYMENT_TARGET in any xcconfig; no plain `KEY =` after a `KEY[...]` in Base.xcconfig, nor any in
+  Debug/Release.xcconfig; **Info-Mac.plist is Info.plist** less the one key and plus the five, value for value - a key
+  added to either alone, or a value changed, is "the two have drifted"; the icns's types and sizes, its 1024 present,
+  opaque at its centre and transparent at its corners (an unfiltered 8-bit RGBA PNG, as make-icon.py writes).
+- **install_helper.py**: `plist <file> <key>` (a top-level value as text) and `entitlements <file>` - "ok" when the
+  signed entitlements hold app-sandbox and network.client and no keychain-access-groups or application-groups.
+- **ios/scripts/install-mac.sh** (new; bash 3.2, `set -euo pipefail`, install.sh's say/step/stop/confirm):
+  1. Xcode (DEVELOPER_DIR defaulting to /Applications/Xcode.app; 16 or later) and Xcode's python3 for the helper.
+  2. The free space said (`df -h`), and a stop below 4 GB (`df -k`).
+  3. The team from ios/Config/Local.xcconfig (`helper setting`); none, or the example's XXXXXXXXXX, stops, naming
+     install.sh and the example.
+  4. install.sh's project guard (Xcode's edits to the .xcodeproj stop the pull), then `git pull --ff-only` unless
+     `--no-pull`.
+  5. GitHub asked whether ios.yml passed on the commit (`helper ci`); a failure or a run still going is asked about
+     (yes with `--yes`); out of reach builds anyway.
+  6. `xcodebuild … -configuration Release -destination 'generic/platform=macOS,variant=Mac Catalyst' ARCHS=arm64
+     -derivedDataPath ~/Library/Caches/deadwax-build-mac -allowProvisioningUpdates build` (Debug with `--debug`), its
+     log in last-build.log there; a failure shows its errors and last lines and names the Apple Development
+     certificate. The build time is said.
+  7. What it made: `codesign --verify --strict`; `codesign -d --entitlements - --xml` through `helper entitlements`;
+     the bundle id through `helper plist`; and, should Xcode have embedded a profile after all, its expiry said
+     (`security cms -D`, `helper expiry`).
+  8. deadwax open (`osascript -e 'application id "net.lizardlounge.deadwax" is running'`, which neither opens nor
+     asks it anything): "deadwax is open - quit it to install the new one? (If it's playing, the music stops.)" - asked
+     only after the build, so the music stops only once the new build is ready. No stops with nothing changed; yes
+     sends `tell application id … to quit` and waits up to 20 s; an Automation refusal or a deadwax that won't go
+     stops, saying so - never kill.
+  9. `--dry-run` stops here, having said each "would" (the pull, the build line, the checks, the quit, the copy and
+     the open) and done none of it.
+  10. Into place: `mkdir -p ~/Applications`; a `.deadwax.app.old` left by a stopped run put back first; `ditto` to
+      `.deadwax.app.new`; the old app moved aside, the new one moved in (the old one back if that fails), the old
+      removed. Never /Applications, never sudo.
+  11. `open ~/Applications/deadwax.app`, then the version and build (Base.xcconfig), the time, and the space before
+      and after.
+- **ios.yml**, the macOS job: "The Mac app, an unsigned Catalyst build" (Release, arm64, `build-mac`, signing off)
+  after the iPhone's, and "What the Mac build made", one test a line: arm64 alone, the icns, the bundle id, 0.13,
+  CFBundleName deadwax, CFBundleIconFile, UIDeviceFamily 6, LSMinimumSystemVersion 14.0, the category, both
+  termination keys false, UIBackgroundModes' audio, and no LSSupportsOpeningDocumentsInPlace. The project job's
+  `bash -n` over ios/scripts/*.sh takes install-mac.sh by itself.
+
+### Decided here, and where it departs from the plan
+
+- **The session file fails closed**: a save that can't complete deletes the server's file rather than leave an older
+  session in it; the Keychain's own save (delete, then add) behaves the same.
+- **No Keychain probe on Debug** (section 11 suggested one, to say for certain what the Keychain answers without a
+  profile). Nothing in slice 1 reads the Keychain on the Mac, so it would answer a question nothing asks; TN3137 says
+  the data-protection keychain needs the entitlement a profile gives. Left for a slice that needs it.
+- **The window is shaped from the scene notifications**, not a scene delegate: the app is SwiftUI's
+  `WindowGroup` with an app delegate and no scene delegate of its own, and a notification observer needs no change
+  to the project.
+- **install-mac.sh `--dry-run`**, beyond the plan: it says each step's command and does nothing, so the script can
+  be read against the Mac before it touches anything.
+- **Hardened runtime**: Xcode 27 turns ENABLE_HARDENED_RUNTIME on for a macOS build by itself; nothing here needs an
+  exception from it (no JIT, no unsigned libraries), so it stays as Xcode has it.
+
+### Tests
+
+- **SessionFileTests** (new, 9) and **DeviceTests** (1), in DeadwaxCoreTests - on Linux as on the Mac: the name
+  (escaped, never a path, the kept /me's), a long server capped at 200 and kept apart, FNV-1a's own vectors, the
+  container's folder; saved and read back - the file 0600, the folder 0700, the bytes exactly the cookie's, no
+  temporary file left; a save over a 0644 file and a 0755 folder tightening both, a shorter value leaving nothing of
+  the longer; two servers, sign-out removing only its own; a leftover `.new` never read, and taken at sign-out; a
+  folder that can't be made keeping nothing; a directory of the name never read. Each device's label, inside the
+  server's LABEL_PATTERN and told apart.
+- **tests/test_ios_mac.py** (new, 10), reading Swift as the compiler lexes it (test_ios_no_web_app's `views()`): the
+  one switch said once in Platform.swift and no other `#if` in the App; `os(macOS)` nowhere but DeadwaxAudio's
+  StreamFetch and EQUnit, once each - they pick for the package's own macOS tests, and both app builds take the iOS
+  side; Core takes the device as a value; Platform's iPhone branch exactly SwiftUI's own;
+  the App wired to it (DeadwaxApp, PlayerModel, DeckVoiceHost's imports); every pull through the one helper, page by
+  page; the session where the device keeps it - two reads, two saves, the one delete inside signOut, and no
+  SessionKeychain call left outside SessionStore; nothing about it logged; the file made for this user alone; the
+  Mac's playbackState lines; "Mac" the web's word and the server's pattern.
+- **tests/test_ios_install_mac.py** (new, 28 tests, 49 with their cases): install-mac.sh under bash with
+  stand-ins for xcodebuild, xcrun, codesign, osascript, ditto, open, security, curl, df and sleep, in a temporary HOME
+  and a git repo of its own - help and an unknown flag; the dry run (every "would", nothing done, deadwax left
+  open); Debug; the team's three cases and a team said; too little space; the project guard; six answers from
+  GitHub, and GitHub out of reach; an install (the build line exactly, the two codesign calls, ditto, open, nothing
+  left beside it, the log, the words); over an old app (replaced whole); a failed copy keeping the old; a run stopped
+  midway getting its old app back; a failed build, an unsigned one and the `maccatalyst.` id each installing
+  nothing; three entitlement failures; a profile's date said; deadwax open - no, yes, `--yes`, one that won't quit
+  (20 waits, never forced) and an Automation refusal; and the script's own text - no sudo, kill, killall or pkill,
+  /Applications only as Xcode's. install_helper's `entitlements` and `plist`. check_project's Mac rules: passing on
+  the tree; eleven ways Info-Mac.plist can drift; each Mac setting changed or missing, a conditional it doesn't name,
+  a MACOSX_DEPLOYMENT_TARGET, a plain INFOPLIST_FILE or TARGETED_DEVICE_FAMILY after the Mac's; Debug.xcconfig hiding
+  one; the icns missing, cut short, without its 1024, and with a phone's opaque PNG in its place.
+- **Changed**: test_ios_settings, test_ios_needs_look, test_ios_edit and test_ios_pull_to_shuffle read
+  `.pullToRefresh`; test_ios_change_password reads `SessionStore.save(cookie`.
+
+### Verified, and not
+
+On the Mac (Xcode 27.2, macOS 27.2): `swift test` (2242 tests: 2072 in Core - ten of them new - 158 in the audio engine and 12 in the turntable, all passed); the iPhone's unsigned generic-iOS Debug build, BUILD
+SUCCEEDED with only the AppIntents metadata warning every build has, and its resolved build settings (Debug and
+Release, `-showBuildSettings`) diffed against 4bee7e9's: **one difference, SUPPORTS_MACCATALYST NO to YES** - the
+iPhone's Info.plist, family, identifier and every other setting as they were; the Mac's unsigned Catalyst builds,
+Debug (arm64 and x86_64) and Release (arm64), BUILD SUCCEEDED with only that same warning - the built plist read key
+by key (bundle id net.lizardlounge.deadwax, CFBundleName deadwax, UIDeviceFamily [6], LSMinimumSystemVersion 14.0,
+the category, both termination keys false, no LSSupportsOpeningDocumentsInPlace, AppIcon.icns in Resources) and the
+binary arm64 alone; the Release build signed ad hoc once (never installed) to read what it's entitled to:
+app-sandbox, network.client and get-task-allow, no keychain groups - `helper entitlements` said "ok"; check_project.py
+(Xcode's python3 and the system's); pyflakes over src and tests; tests/test_ios_*.py, test_source_bytes.py,
+test_logins.py and test_compose_example.py (683 passed, 1 skipped); all 98 sims with Node 22. install-mac.sh was run only
+under the tests' stand-ins: never for real, and no app was opened, quit or installed.
+
+Not verified - only the Mac can tell (docs/ios.md checks 404-415): whether Xcode signs a Personal Team's Catalyst
+app with no profile, as expected, or makes one (404 - install-mac.sh says if it did); whether Gatekeeper asks
+anything at the first open (404); the icon in the Dock - the icns drawn on the rounded square, and CFBundleIconFile
+taking it over the CFBundleIcons the plist still carries (405); whether `.defaultSize` and the size restrictions take,
+and whether the Help menu goes or keeps its search field (405); the Local Network question by IP and by name (406);
+the session file in the container, kept across a quit and gone at sign-out (407); the engine, gapless joins and
+headphones through Catalyst's audio session (408); the media keys and AirPods (409); playbackState in the menu bar's
+Now Playing (410); "Picked up from your Mac" both ways (411); the EQ per output and what it calls the Mac's speakers
+(412); every page in the Mac idiom - a control UIKit refuses there would crash where it's reached, as the refresh
+control would have (413); the Automation question at the first quit, and the swap (414); nothing running out (415).
+Nor whether closing the window quits the app (a one-scene Catalyst app is expected to), or whether LaunchServices
+also registers the copy in derived data.

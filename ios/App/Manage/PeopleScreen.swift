@@ -45,7 +45,7 @@ struct PeopleScreen: View {
         .transaction { (transaction: inout Transaction) -> Void in
             if reduceMotion { transaction.animation = nil }
         }
-        .refreshable {
+        .pullToRefresh {
             await people.refresh()
         }
         .toolbar {
@@ -215,7 +215,7 @@ struct PersonScreen: View {
         .transaction { (transaction: inout Transaction) -> Void in
             if reduceMotion { transaction.animation = nil }
         }
-        .refreshable {
+        .pullToRefresh {
             await people.refresh()
         }
         .sheet(item: personSheet) { (sheet: PeopleSheet) in

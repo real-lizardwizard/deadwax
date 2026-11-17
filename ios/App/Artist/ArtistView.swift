@@ -163,7 +163,7 @@ struct ArtistView: View {
             if !Task.isCancelled { ownedWaited = true }
         }
         .task { await downloads.followProgress() }
-        .refreshable {
+        .pullToRefresh {
             // deadwax out of reach: a pull asks whether it is back (the banner says why nothing changes)
             guard reachability.online else {
                 reachability.tryNow()

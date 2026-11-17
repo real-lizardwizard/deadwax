@@ -331,7 +331,7 @@ struct ChooseReleaseView: View {
         .onSubmit(of: .search) {
             Task { await retag.search() }
         }
-        .refreshable {
+        .pullToRefresh {
             await retag.search()
         }
     }

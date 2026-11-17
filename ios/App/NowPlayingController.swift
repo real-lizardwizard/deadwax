@@ -5,7 +5,9 @@ import UIKit
 
 /// The lock screen and Control Center (MPNowPlayingInfoCenter), and the controls that reach the
 /// app from there and from AirPods (MPRemoteCommandCenter: a squeeze or a double tap arrives as
-/// one of these commands).
+/// one of these commands). On the Mac the same is the menu bar's Now Playing and Control Center, and
+/// the keyboard's media keys - with the playing state said as well (`playbackState`): macOS reads it
+/// from there, where iOS works it out from the audio session (the Mac app, slice 1).
 @MainActor
 final class NowPlayingController {
     struct Actions {
@@ -64,10 +66,12 @@ final class NowPlayingController {
             info[MPMediaItemPropertyArtwork] = MPMediaItemArtwork(boundsSize: artwork.size) { _ in artwork }
         }
         MPNowPlayingInfoCenter.default().nowPlayingInfo = info
+        if Platform.mac { MPNowPlayingInfoCenter.default().playbackState = playing ? .playing : .paused }
     }
 
     func clear() {
         MPNowPlayingInfoCenter.default().nowPlayingInfo = nil
+        if Platform.mac { MPNowPlayingInfoCenter.default().playbackState = .stopped }
     }
 
     /// The paused state published again (turntable.md 4.6): rate 0 at `elapsed`, the rest as it stands - for the
@@ -79,6 +83,7 @@ final class NowPlayingController {
         info[MPNowPlayingInfoPropertyPlaybackRate] = 0.0
         info[MPNowPlayingInfoPropertyElapsedPlaybackTime] = elapsed
         center.nowPlayingInfo = info
+        if Platform.mac { center.playbackState = .paused }
     }
 }
 

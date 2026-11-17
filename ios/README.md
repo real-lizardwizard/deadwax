@@ -50,12 +50,22 @@ tools, Needs a look, Library care, Server settings, the event log, Change passwo
 has been seen on an iPhone yet.
 Phase 0's test screen lives on in the app's Debug.
 
+**On a Mac too.** The same app, built for the Mac through Mac Catalyst from the same files: the iPhone's layout in a
+phone-shaped window for now, in the Mac's sizes and controls, with the Mac's Now Playing and media keys. It is signed
+with your team and no provisioning profile, so it never runs out, and keeps its sign-in in a file in its sandbox
+container rather than the Keychain. Nothing of it has been seen on a Mac yet.
+
 - **To install it, and every week after:** [docs/ios.md](../docs/ios.md) - the steps once on the Mac
   and the iPhone, the weekly `ios/scripts/install.sh`, the test album
   (`ios/scripts/make-test-album.py`), what the app does, and the checks, phase by phase - Phase 7's are 237-246,
   Edit album's 320-329, its Tags' 330-334, its Artwork and Lyrics' 335-337, its Delete's 338-342, the artist
   tools' 343-348, Needs a look's 349-354, Library care's 355-360, Server settings' 361-369, the event log's 370-373,
   Change password's 374-378, People's 379-387, no way out to the web app's 388-391, Add to Queue's 392-403.
+- **To install it on a Mac:** `ios/scripts/install-mac.sh` (`--dry-run` says what it would do first) - after
+  install.sh has been run once for the team it writes, `ios/Config/Local.xcconfig`. It builds the Mac app (Release,
+  Apple silicon) in `~/Library/Caches/deadwax-build-mac`, checks it's signed, sandboxed and allowed out to the
+  network, asks before quitting deadwax if it's open (never by force), and puts it in `~/Applications/deadwax.app`.
+  How, and the Mac's checks, 404-415: [The Mac app](../docs/ios.md#the-mac-app) in docs/ios.md.
 - **How it is built, and why:** [notes/ios.md](../notes/ios.md).
 - **Before pushing a change here, on Linux:** `ios/scripts/check-linux.sh`. GitHub's `ios.yml` compiles
   the rest on macOS.

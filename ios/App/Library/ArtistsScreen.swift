@@ -97,7 +97,7 @@ struct ArtistsScreen: View {
                             ArtistOrderMenu()
                         }
                     }
-                    .refreshable { await pulled() }
+                    .pullToRefresh { await pulled() }
             }
         }
         .task(id: AskKey(person: server.person, online: reachability.online, current: current,

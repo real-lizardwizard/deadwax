@@ -16,7 +16,7 @@ struct AccountPage: View {
             }
         }
         .navigationTitle(YouWords.account)
-        .refreshable {
+        .pullToRefresh {
             await server.refreshMe()
         }
     }

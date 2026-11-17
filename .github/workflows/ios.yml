@@ -184,3 +184,37 @@ jobs:
           test "$(plutil -extract BGTaskSchedulerPermittedIdentifiers.1 raw "$app/Info.plist")" = net.lizardlounge.deadwax.charging
           test "$(plutil -extract NSAppTransportSecurity.NSAllowsArbitraryLoads raw "$app/Info.plist")" = true
           python3 ios/scripts/check_project.py
+
+      # The Mac app (notes/ios.md "The Mac app, slice 1"): the same target through Mac Catalyst, unsigned, as
+      # install-mac.sh builds it - Release, arm64 - so the Mac's own compile (the code behind Platform.swift's one
+      # switch, and what macOS refuses in an Info.plist) is seen before James's Mac sees it. Signing, the sandbox's
+      # entitlements and the window are his Mac's to check (docs/ios.md, checks 404-415).
+      - name: The Mac app, an unsigned Catalyst build
+        id: build-mac
+        if: ${{ !cancelled() }}
+        run: |
+          xcodebuild -project ios/Deadwax.xcodeproj -scheme Deadwax -configuration Release \
+            -destination 'generic/platform=macOS,variant=Mac Catalyst' ARCHS=arm64 -derivedDataPath build-mac \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO build
+
+      - name: What the Mac build made
+        if: ${{ !cancelled() && steps.build-mac.outcome == 'success' }}
+        run: |
+          app=build-mac/Build/Products/Release-maccatalyst/Deadwax.app
+          plist="$app/Contents/Info.plist"
+          ls -la "$app/Contents" "$app/Contents/Resources"
+          plutil -p "$plist"
+          # one test a line, as above
+          test "$(lipo -archs "$app/Contents/MacOS/Deadwax")" = arm64
+          test -f "$app/Contents/Resources/AppIcon.icns"
+          test "$(plutil -extract CFBundleIdentifier raw "$plist")" = net.lizardlounge.deadwax
+          test "$(plutil -extract CFBundleShortVersionString raw "$plist")" = 0.13
+          test "$(plutil -extract CFBundleName raw "$plist")" = deadwax
+          test "$(plutil -extract CFBundleIconFile raw "$plist")" = AppIcon
+          test "$(plutil -extract UIDeviceFamily.0 raw "$plist")" = 6
+          test "$(plutil -extract LSMinimumSystemVersion raw "$plist")" = 14.0
+          test "$(plutil -extract LSApplicationCategoryType raw "$plist")" = public.app-category.music
+          test "$(plutil -extract NSSupportsAutomaticTermination raw "$plist")" = false
+          test "$(plutil -extract NSSupportsSuddenTermination raw "$plist")" = false
+          test "$(plutil -extract UIBackgroundModes.0 raw "$plist")" = audio
+          test -z "$(plutil -extract LSSupportsOpeningDocumentsInPlace raw "$plist" 2>/dev/null || true)"

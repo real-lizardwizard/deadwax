@@ -14,7 +14,6 @@ CURRENT_PROJECT_VERSION = 13
 // A device build only: James's Mac has no Simulator runtime, and none is needed.
 SDKROOT = iphoneos
 SUPPORTED_PLATFORMS = iphoneos
-SUPPORTS_MACCATALYST = NO
 SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO
 SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD = NO
 TARGETED_DEVICE_FAMILY = 1
@@ -27,6 +26,25 @@ GENERATE_INFOPLIST_FILE = NO
 ASSETCATALOG_COMPILER_APPICON_NAME =
 ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME =
 ENABLE_PREVIEWS = NO
+
+// The Mac app (notes/ios.md "The Mac app, slice 1"): the same target built for the Mac through Mac Catalyst
+// (-destination 'generic/platform=macOS,variant=Mac Catalyst'; ios/scripts/install-mac.sh). Beside the two below,
+// which only let the Mac be a destination and keep its id, every Mac setting is [sdk=macosx*], so the iPhone build's
+// are as they were; check_project.py holds each. No MACOSX_DEPLOYMENT_TARGET:
+// it follows the iPhone's 17.0 to macOS 14. No profile: the sandbox and the outgoing network are build settings, which
+// need none (and the sign-in is kept in a file on the Mac, not the Keychain - SessionStore).
+// After every setting it qualifies: a KEY = later in the file (or in Debug/Release.xcconfig) hides KEY[sdk=...] -
+// the Mac build read Info.plist while this block stood above INFOPLIST_FILE.
+SUPPORTS_MACCATALYST = YES
+// already the default; said, so the Mac's bundle id can't drift from the phone's to a "maccatalyst." one
+DERIVE_MACCATALYST_PRODUCT_BUNDLE_IDENTIFIER = NO
+// the Mac idiom: Mac sizes and controls (James, 17 Nov)
+TARGETED_DEVICE_FAMILY[sdk=macosx*] = 6
+// Info.plist less LSSupportsOpeningDocumentsInPlace (macOS refuses NO), plus the Mac's own keys
+INFOPLIST_FILE[sdk=macosx*] = Config/Info-Mac.plist
+// the App Sandbox: every path the app uses is its container's, as on the phone; and its requests may go out
+ENABLE_APP_SANDBOX[sdk=macosx*] = YES
+ENABLE_OUTGOING_NETWORK_CONNECTIONS[sdk=macosx*] = YES
 
 // Swift 5 language mode, as the package's audio target: nothing of the app compiles on Linux, so a
 // strict-concurrency error would only show on the Mac.

@@ -263,7 +263,7 @@ struct DownloadedPlaylistsScreen: View {
         .listStyle(.plain)
         .navigationTitle(PlaylistDownloadWords.place)
         .navigationBarTitleDisplayMode(.large)
-        .refreshable {
+        .pullToRefresh {
             guard reachability.online else {
                 reachability.tryNow()
                 return

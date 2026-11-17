@@ -77,8 +77,9 @@ def test_each_page_pulls_on_its_list_and_never_refreshes():
     for path, _, on in PAGES:
         source = code(path)
         assert source.count("@State private var pull = ShufflePull()") == 1, path.name
-        # the pull is the shuffle's now, as the Library's is: no refresh on the List to fight it
-        assert ".refreshable" not in source, path.name
+        # the pull is the shuffle's now, as the Library's is: no refresh on the List to fight it (nor the iPhone's
+        # pull to refresh through Platform.swift's helper, since the Mac app's slice 1)
+        assert ".refreshable" not in source and ".pullToRefresh" not in source, path.name
         assert source.count(".pullsToShuffle(") == 1, path.name
         _, after = the_list(source)
         # the List's own first two modifiers (a comment's line blanked)

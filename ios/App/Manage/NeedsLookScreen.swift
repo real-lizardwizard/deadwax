@@ -164,7 +164,7 @@ struct NeedsLookScreen: View {
         }
         // out of reach, the list stays as last read under the amber line, and a pull asks nothing (review, 16 Nov)
         .editOutOfReach(!reachability.online && model.scan.loaded)
-        .refreshable {
+        .pullToRefresh {
             await model.pulled()
         }
     }

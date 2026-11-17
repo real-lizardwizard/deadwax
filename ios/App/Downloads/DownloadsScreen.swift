@@ -91,7 +91,7 @@ struct DownloadsScreen: View {
         .listStyle(.insetGrouped)
         .navigationTitle(DownloadWords.downloads)
         .animation(.default, value: shelf.isEmpty)
-        .refreshable {
+        .pullToRefresh {
             // a pull checks your library now (`byHand`), held until the check has answered - and looks at the downloaded
             // playlists (slice 3)
             downloads.playlists.look(.byHand)

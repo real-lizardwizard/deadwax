@@ -80,6 +80,10 @@ and what only a phone can tell is what [the checks](#the-checks) are for. Until 
 everything about downloads, lyrics, the EQ, the turntable, play history, your library, playlists, artists,
 songs, Search, Requests, Get and Manage below as what the app is built to do.
 
+**On a Mac too.** Still app 0.13, the same app runs on a Mac with Apple silicon - in a phone-shaped window for now -
+installed with `ios/scripts/install-mac.sh` and never running out. It hasn't been seen on a Mac yet either: see [The
+Mac app](#the-mac-app).
+
 The app talks only to deadwax, never to Navidrome, through deadwax's own routes, so the phone never
 needs the Navidrome account deadwax itself uses. With logins on, you sign in with your own Navidrome
 user name and password: the password goes to deadwax, and isn't kept on the phone.
@@ -216,6 +220,109 @@ took and the Mac's free space before and after. Xcode doesn't need to be open.
 It remembers which iPhone it installed on, in `ios/Config/device` (also ignored by git). The build
 happens in `~/Library/Caches/deadwax-build`, and the last build's whole log is `last-build.log` there.
 
+## The Mac app
+
+The same app runs on a Mac too, built from the same code through Apple's Mac Catalyst - not the web app in a window,
+and not a second app. It's the same version as the phone's (app 0.13 (13) now), it talks only to deadwax as the phone
+does, and it plays through the same audio engine: seamless joins, normalization, the EQ, downloads. **This is its
+first build** (the Mac app's slice 1, "it runs and plays"), and **nothing of it has been seen on a Mac yet** - what
+only a Mac can tell is what [its checks](#the-mac-apps-checks-404-415) are for.
+
+**What it is today.** The phone's app in a window shaped like a phone: the four tabs along the foot, every page as on
+the iPhone, in macOS's sizes and controls (the Mac idiom). The window is at least 390 x 640 points, no wider than 600,
+and opens at 430 x 860; macOS remembers its size and place after that. The menu bar says **deadwax** (About deadwax,
+Hide deadwax, Quit deadwax ⌘Q), with no File > New Window - there is only ever one window - and no deadwax Help, as
+there's no Mac help book. What the phone does, the Mac does, with these differences:
+
+- **Pull to refresh** isn't on the Mac: macOS refuses it in the Mac's layout. The Library's **•••** > **Refresh**
+  does the same for the Library, and a later build brings Refresh (⌘R) to every page.
+- **Your sign-in** is kept in a file rather than the Keychain - see [Where the Mac keeps your sign-in](#where-the-mac-keeps-your-sign-in).
+- **The Mac's Now Playing** - in Control Center and the menu bar - shows the song, its artist and cover, and whether
+  it's playing or paused; its buttons, the keyboard's media keys (F7, F8, F9) and AirPods' presses play, pause and
+  skip, as the lock screen's do on the phone.
+- **Picking up where you left off** calls the Mac "Mac", as the web app does for Safari on a Mac: play on the Mac,
+  and the phone's notice says "Picked up from your Mac".
+- **Settings > This phone > Debug** says "No install date to show: this build wasn't signed for a phone." The Mac
+  app doesn't run out - see below.
+- **Closing the window may quit deadwax**, and stop the music: in this build, keep the window open (or minimised,
+  ⌘M) while you listen. A later build lets the music play on with the window closed, as Music's does.
+
+Still to come, each in a build of its own: the Mac's menus and keyboard shortcuts (Play/Pause on the space bar,
+Refresh ⌘R, Settings… ⌘,, right-click menus), a layout for a big window (a sidebar, the player bar along the foot,
+Up Next and Lyrics beside the page) - without the turntable, which stays the phone's - and the Mac's own words ("This
+Mac" where it says "This phone"). Until then, the words say "phone" and "iPhone" in places.
+
+### What the Mac needs
+
+- **A Mac with Apple silicon** (M1 or later), on **macOS 14 or later**.
+- **Xcode 16 or later**, opened once, with your Apple ID added (Xcode > Settings > Accounts) - steps 2 and 3 of
+  [Once](#once). No iPhone is needed, nor any Simulator.
+- **Your team in `ios/Config/Local.xcconfig`** - step 4 of [Once](#once): `ios/scripts/install.sh` writes it the
+  first time you run it, or copy `Local.xcconfig.example` and put your team id in it. If you already install on the
+  phone, it's there. install-mac.sh signs with that team.
+- **About 4 GB free**: the build's own files are about 1 GB, and Xcode needs room on the way there.
+
+### Installing it, and again for a new build
+
+```
+~/Developer/deadwax/ios/scripts/install-mac.sh
+```
+
+It pulls the latest code, asks GitHub whether the app's checks passed on it (they build the Mac app too) and asks
+you before building one that failed or is still running, then builds the Mac app (Release, for Apple silicon) and
+checks what it made: signed, in the App Sandbox, allowed out to the network, and with the app's id. If deadwax is
+open, it asks "deadwax is open - quit it to install the new one? (If it's playing, the music stops.)": on yes it asks
+deadwax to quit, as ⌘Q would - never by force; on no it stops and installs nothing. Then it copies the new app to
+**`~/Applications/deadwax.app`** - your own Applications folder, never the Mac's - keeping the old one until the
+new one is in place, and opens it. It ends with the version, how long it took and the free space before and after:
+`Installed deadwax 0.13 (13) in ~/Applications - it doesn't run out`.
+
+| option | what it does |
+| --- | --- |
+| `--no-pull` | builds what's checked out, without `git pull` |
+| `--yes` | doesn't ask: builds even if the checks failed, and quits deadwax if it's open (which stops the music) |
+| `--debug` | builds Debug instead of Release |
+| `--dry-run` | says what it would do - the build, the quit, the copy, the open - and does none of it |
+
+The build happens in `~/Library/Caches/deadwax-build-mac`, and the last build's whole log is `last-build.log` there.
+Deleting that folder only means the next build starts afresh.
+
+**It doesn't run out.** The Mac app is signed with your team and no provisioning profile, so - unlike the phone's
+free install - it opens for as long as you like, and takes none of a free account's three devices. Run
+install-mac.sh again only for a new build. Everything the app keeps - your sign-in, settings, downloads and EQ - is
+in its own folder, `~/Library/Containers/net.lizardlounge.deadwax`, so a new install keeps it all. Deleting the app
+leaves that folder; deleting the folder too (with deadwax quit) starts it afresh.
+
+**The first time it opens**, macOS may ask a few things:
+
+- **"deadwax would like to find devices on your local network"**: **Allow**, as on the phone - deadwax at a
+  `192.168.…` address or a name on your network can't be reached without it.
+- If macOS says it **can't check deadwax for malicious software**, or that it **can't be opened**: an app you built
+  yourself shouldn't be stopped, but if it is, open **System Settings > Privacy & Security**, and under the message
+  about deadwax choose **Open Anyway**.
+- The first time install-mac.sh quits deadwax for you, macOS may ask whether **Terminal may control deadwax**: OK lets
+  it ask deadwax to quit. If you said no, install-mac.sh says so - quit deadwax yourself (deadwax > Quit deadwax) and
+  run it again, or allow it in System Settings > Privacy & Security > Automation.
+
+Then deadwax's address and the sign-in, as in [The first time you open it](#the-first-time-you-open-it).
+
+### Where the Mac keeps your sign-in
+
+On the phone, the session deadwax gives you at sign-in is kept in the Keychain. On a Mac the Keychain would need a
+provisioning profile, and a free account's runs out after seven days - so the Mac keeps it in a file in the app's
+own folder:
+
+```
+~/Library/Containers/net.lizardlounge.deadwax/Data/Library/Application Support/deadwax/sessions/
+```
+
+one file for each deadwax address you've signed in at, named after the address, that only your account on the Mac
+can read or change (`-rw-------`, in a folder only you can open). It holds the session and nothing else: **your
+password is never kept**, on the Mac as on the phone. **Sign out** (Settings > Account) deletes that address's file
+once deadwax has answered it, as the phone's Sign out clears the Keychain. When your sign-in ends some other way - it
+ran out, or an admin reset your password - the session ends on deadwax, so the file left behind opens nothing, and
+signing in again replaces it. Deleting the file yourself, with deadwax quit, signs the Mac out.
+
 ## The first time you open it
 
 1. **deadwax's address**: the address you open deadwax at, by IP (`192.168.1.20:8090`) or by name.
@@ -228,7 +335,8 @@ happens in `~/Library/Caches/deadwax-build`, and the last build's whole log is `
    type the `https://` address (or the other name) instead.
 2. **Sign in**, when logins are on: your Navidrome user name and password, as on the web app (a
    password manager can fill them in). The password isn't kept on the phone. Only the session
-   deadwax gives back is kept, in the Keychain, for that address. With logins off there's no sign-in,
+   deadwax gives back is kept, in the Keychain, for that address (on a Mac, in a file of the app's own - see [Where
+   the Mac keeps your sign-in](#where-the-mac-keeps-your-sign-in)). With logins off there's no sign-in,
    and the app opens on the Library.
 
 From then on the app opens straight into your music. It keeps who deadwax last said you are, so it
@@ -5372,6 +5480,54 @@ No server change is needed. Use an album of a dozen songs, headphones on; the we
   no other song stands open in its place: a row only ever stands open on the song it was opened on, and its button
   adds that song. Then open one, scroll down until the next page loads, and come back: nothing stands open.
 
+### The Mac app's checks (404-415)
+
+**Not done yet.** These come with [the Mac app](#the-mac-app)'s first build - it runs and plays (still app 0.13
+(13)). No server change is needed, and nothing changes on the phone. Use deadwax's plain `http://` address, on the
+home Wi-Fi, signed in as an admin with logins on. Install with `ios/scripts/install-mac.sh` from the repo. Say
+"pass", or what you saw.
+
+- **404 Install.** First `ios/scripts/install-mac.sh --dry-run`: it says what it would do and does none of it. Then
+  `ios/scripts/install-mac.sh`. It says Xcode's version and the free space, "Signing with team …, with no
+  provisioning profile", builds (a few minutes the first time - note how long it says), then "Signed, sandboxed,
+  allowed out to the network; net.lizardlounge.deadwax." and opens deadwax from ~/Applications. Does it say anything
+  about a provisioning profile ("Note: Xcode signed this one with a provisioning profile…")? Does macOS ask anything
+  before deadwax opens - and if so, what exactly?
+- **405 The app.** The Dock shows the record icon, on the Mac's own rounded square (not a square inside another).
+  The menu bar says **deadwax**: About deadwax (0.13 (13)), Hide deadwax, Quit deadwax - lowercase. The File menu has
+  no New Window, and there's no deadwax Help: is the Help menu gone, or still there with only its search field? The
+  window is phone-shaped, opens at about 430 x 860, won't go narrower than a phone (390) or shorter than 640, nor
+  wider than 600, and shows no title in its title bar. Quit and open: the same size and place.
+- **406 Local Network.** macOS asks whether deadwax may find devices on your local network: **Allow**. deadwax connects
+  at its `http://` address - try the IP and the name. Does macOS ask for both, or for neither?
+- **407 Signed in, kept.** Sign in. Quit (⌘Q) and open it again: still signed in, straight into the Library. In
+  Terminal, `ls -l ~/Library/Containers/net.lizardlounge.deadwax/Data/Library/Application\ Support/deadwax/sessions/`
+  shows one file, `-rw-------`, named after deadwax's address. Sign out (Settings > Account), quit, open: the sign-in -
+  and the same `ls` shows no file.
+- **408 It plays.** Play an album: the first song starts within a couple of seconds; the join between two songs that run
+  into each other is gapless (the test album's songs 9 and 10); dragging the scrubber lands where you let go.
+  Headphones in: the sound moves to them.
+- **409 The media keys.** With another app in front: F8 pauses and plays, F9 next, F7 previous. AirPods: a press pauses.
+- **410 The menu bar's Now Playing.** Control Center (or the menu bar's Now Playing) shows the song, the artist and the
+  cover; its buttons work; dragging its time moves the song; paused, it shows paused - not playing. Play another app's
+  music and come back: does deadwax take Now Playing back when it plays again?
+- **411 Picked up.** Play on the Mac, pause. Open the app on the iPhone: its notice says "Picked up from your Mac" (not
+  iPhone). And the other way: play on the iPhone, pause, open the Mac app: "Picked up from your iPhone".
+- **412 The EQ.** Settings > Playback > EQ on: the sound changes on the speakers; headphones in, they have their own
+  (Off until set). What does the EQ call the Mac's speakers?
+- **413 Every tab, once.** Library (its pages, an album, an artist), Search (yours and MusicBrainz's), Requests (Get an
+  album), Lyrics on Now Playing, Up Next, Settings' pages, and Manage's six. Anything that doesn't open, closes the
+  app, or looks broken? There's no pull to refresh anywhere on the Mac - the Library's ••• > Refresh brings the
+  Library up to date: does it? Does the pull down that shuffles your library work with the trackpad? Which controls
+  look like the Mac's rather than the phone's, and is any text too small or too big? Does Now Playing's AirPlay button
+  list the house's speakers?
+- **414 Install over it.** With deadwax open and playing, run install-mac.sh again: once it has built, it asks to quit
+  deadwax; yes - the music stops, the new build opens, still signed in, settings and downloads kept. The first time,
+  does macOS ask whether Terminal may control deadwax? Then once more with **n**: it stops, saying the new build is
+  ready, and deadwax plays on.
+- **415 A week on.** Eight days after an install, deadwax still opens. Settings > This phone > Debug says "No install
+  date to show: this build wasn't signed for a phone."
+
 ## What it can't do yet
 
 These are the web app's for now - open deadwax's address in a browser for them, since nothing in the app takes you
@@ -5462,3 +5618,14 @@ there. Looking after deadwax isn't among them any more: every managing tool is t
 | install.sh: **the build failed** with a signing or profile error | The first install has to come from Xcode with the cable (step 5 of "Once"). After that, the script renews the signing by itself. |
 | install.sh: **Xcode knows no Apple ID** | Add it in Xcode > Settings > Accounts, then run the script again. |
 | A free account says it can't install more apps | A free account can have only 3 of its own apps on the phone at once. Delete one you don't need. |
+| The Mac app: **"Couldn't reach deadwax at ..."** on the address screen | If you said no to "find devices on your local network", turn deadwax on in the Mac's System Settings > Privacy & Security > Local Network, then quit deadwax and open it again. Otherwise the same as on the phone: the address, and that the Mac is on your home network or WireGuard. |
+| The Mac app: macOS says deadwax **can't be opened**, or that it **can't check it for malicious software** | Open System Settings > Privacy & Security, and under the message about deadwax choose **Open Anyway**. An app built and signed on your own Mac isn't expected to be stopped - say so if it is. |
+| The Mac app asks you to sign in **every time it opens** | Its sign-in can't be kept in its folder (see [Where the Mac keeps your sign-in](#where-the-mac-keeps-your-sign-in)). Check the Mac's disk isn't full; then, with deadwax quit, delete `~/Library/Containers/net.lizardlounge.deadwax/Data/Library/Application Support/deadwax/sessions` and sign in again - it's made afresh. |
+| The Mac app: closing its window **stopped the music** | In this build, closing deadwax's window quits it. Keep the window open, or minimised (⌘M), while you listen. |
+| install-mac.sh: **"There's no ios/Config/Local.xcconfig"** or **"has no team id in it"** | Run `ios/scripts/install.sh` once - it offers to write the file from the teams Xcode knows - or copy `Local.xcconfig.example` beside it and put your team id in it (step 4 of [Once](#once)). |
+| install-mac.sh: **"Only … free. A build of the Mac app needs about 4 GB free"** | Free some space - emptying the Trash, or deleting `~/Library/Caches/deadwax-build-mac`, which only makes the next build start afresh - and run it again. |
+| install-mac.sh: **the build failed** with a signing or certificate error | Xcode has no Apple Development certificate for your team yet: Xcode > Settings > Accounts, select your Apple ID, **Manage Certificates…**, **+** > **Apple Development**. Then run it again. The whole log is `~/Library/Caches/deadwax-build-mac/last-build.log`. |
+| install-mac.sh: **"The new app wasn't signed as the Mac app must be"** or **"The new app's bundle id is …"** | Something changed the Mac's build settings in `ios/Config/Base.xcconfig`; `xcrun python3 ios/scripts/check_project.py` says what. Nothing was installed: the deadwax.app in ~/Applications is as it was. |
+| install-mac.sh: **"deadwax couldn't be asked to quit"** | macOS didn't let Terminal control deadwax. Quit deadwax yourself (deadwax > Quit deadwax) and run `install-mac.sh --no-pull`, or allow Terminal to control deadwax in System Settings > Privacy & Security > Automation. |
+| install-mac.sh: **"deadwax didn't quit within 20 seconds"** | deadwax may be asking something in its window. Look, quit it yourself, and run `install-mac.sh --no-pull`. It's never quit by force. |
+| install-mac.sh: **"Note: Xcode signed this one with a provisioning profile, which runs out on …"** | The Mac app isn't meant to need one. It will stop opening on that date until install-mac.sh runs again - say if you see this. |

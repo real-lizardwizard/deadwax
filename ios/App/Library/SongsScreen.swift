@@ -83,7 +83,7 @@ struct SongsScreen: View {
                                 prompt: Text(SongWords.findPlaceholder))
                     .autocorrectionDisabled()
                     .textInputAutocapitalization(.never)
-                    .refreshable { await pulled() }
+                    .pullToRefresh { await pulled() }
             }
         }
         .task(id: AskKey(person: server.person, online: reachability.online, current: current, query: query)) {

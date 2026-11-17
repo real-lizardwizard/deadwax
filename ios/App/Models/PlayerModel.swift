@@ -1379,7 +1379,8 @@ final class PlayerModel {
             )
         }()
         let made = ResumeController(
-            device: Self.deviceID(), label: Resume.label, player: player, server: routes, clock: resumeClock,
+            device: Self.deviceID(), label: Resume.label(for: Platform.device), player: player, server: routes,
+            clock: resumeClock,
             session: { [weak self] in MainActor.assumeIsolated { self?.sessionGeneration() ?? 0 } },
             normalization: { [weak self] in MainActor.assumeIsolated { self?.normalization ?? .default } },
             say: { [weak self] words in MainActor.assumeIsolated { self?.say(words) } },

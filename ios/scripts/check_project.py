@@ -20,7 +20,13 @@ Checks the iPhone app's project files without Xcode - what can be checked on Lin
     returns false and its task never runs;
   - no asset catalog, storyboard, xib or entitlements file anywhere under ios/ (the plan's risk R2: actool
     and ibtool need a Simulator runtime James's Mac doesn't have; and a free account has no use for
-    entitlements).
+    entitlements);
+  - (the Mac app, slice 1 - notes/ios.md) the Mac's build: SUPPORTS_MACCATALYST YES, its bundle id never derived, and
+    every Mac setting [sdk=macosx*] - the Mac idiom, Info-Mac.plist, the App Sandbox and the outgoing network as build
+    settings (no entitlements file, no profile), each after the plain setting it qualifies (a plain one after it hides
+    it) - and no MACOSX_DEPLOYMENT_TARGET; Info-Mac.plist is Info.plist with
+    exactly the Mac's differences (MAC_PLIST), so the two can't drift; and the Mac's icon, AppIcon.icns, holds its
+    images (a 1024-pixel one opaque at its centre, transparent at its corners).
 
     python3 ios/scripts/check_project.py      # exit 0 and "ok", or every problem and exit 1
 """
@@ -29,6 +35,7 @@ import plistlib
 import re
 import struct
 import sys
+import zlib
 from pathlib import Path
 
 IOS = Path(__file__).resolve().parent.parent
@@ -39,6 +46,31 @@ BUILD = "13"
 DEPLOYMENT_TARGET = "17.0"
 BACKGROUND_MODES = ["audio", "fetch", "processing"]
 IGNORED_BESIDE_LOCAL = ("NSAllowsLocalNetworking", "NSAllowsArbitraryLoadsForMedia", "NSAllowsArbitraryLoadsInWebContent")
+
+# The Mac app (slice 1): its settings in Base.xcconfig, and how its Info-Mac.plist differs from Info.plist - nothing else
+MAC_SETTINGS = {
+    "SUPPORTS_MACCATALYST": "YES",
+    "DERIVE_MACCATALYST_PRODUCT_BUNDLE_IDENTIFIER": "NO",
+    "TARGETED_DEVICE_FAMILY[sdk=macosx*]": "6",
+    "INFOPLIST_FILE[sdk=macosx*]": "Config/Info-Mac.plist",
+    "ENABLE_APP_SANDBOX[sdk=macosx*]": "YES",
+    "ENABLE_OUTGOING_NETWORK_CONNECTIONS[sdk=macosx*]": "YES",
+}
+MAC_PLIST = {
+    # macOS refuses LSSupportsOpeningDocumentsInPlace NO (and opens a file in place: EQImport reads it under its scope)
+    "remove": ("LSSupportsOpeningDocumentsInPlace",),
+    "set": {
+        "CFBundleName": "deadwax",                                  # the menu bar: About, Hide and Quit deadwax
+        "CFBundleIconFile": "AppIcon",                              # App/Icon/AppIcon.icns
+        "LSApplicationCategoryType": "public.app-category.music",
+        "NSSupportsAutomaticTermination": False,                    # a music player is never quit by macOS while it
+        "NSSupportsSuddenTermination": False,                       # plays with no window in front
+    },
+}
+MAC_ICNS = "AppIcon.icns"
+# the icns's image types and their sizes (make-icon.py's MAC_TYPES among them)
+ICNS_SIZES = {"icp4": 16, "icp5": 32, "icp6": 64, "ic07": 128, "ic08": 256, "ic09": 512, "ic10": 1024,
+              "ic11": 32, "ic12": 64, "ic13": 256, "ic14": 512}
 
 
 # ----------------------------------------------------------------------------- the OpenStep plist
@@ -219,14 +251,24 @@ def check_scheme(problems: list, target_id: str) -> None:
         problems.append("the scheme's product isn't Deadwax.app")
 
 
-def xcconfig(name: str) -> dict:
-    settings = {}
+XCCONFIG_LINE = re.compile(r"([A-Za-z0-9_]+(?:\[[^\]]*\])*)\s*=\s*(.*)")
+
+
+def xcconfig_lines(name: str) -> list:
+    """An xcconfig's settings in the order it sets them, as (key, value). A conditional one (`KEY[sdk=macosx*]`) is a
+    key of its own, so the iPhone's `KEY` is read as it was."""
+    settings = []
     for line in (IOS / "Config" / name).read_text(encoding="utf-8").splitlines():
         line = line.split("//", 1)[0].strip()
-        if "=" in line and not line.startswith("#"):
-            key, _, value = line.partition("=")
-            settings[key.strip()] = value.strip()
+        match = XCCONFIG_LINE.fullmatch(line)
+        if match and not line.startswith("#"):
+            settings.append((match.group(1), match.group(2).strip()))
     return settings
+
+
+def xcconfig(name: str) -> dict:
+    """An xcconfig's settings, the last of each key winning."""
+    return dict(xcconfig_lines(name))
 
 
 def check_xcconfigs(problems: list) -> dict:
@@ -247,11 +289,44 @@ def check_xcconfigs(problems: list) -> dict:
     for name in ("Debug.xcconfig", "Release.xcconfig"):
         if '#include "Base.xcconfig"' not in (IOS / "Config" / name).read_text(encoding="utf-8"):
             problems.append(f"{name} doesn't include Base.xcconfig")
+    check_mac_settings(base, problems)
     return base
 
 
-def png_size(path: Path):
-    data = path.read_bytes()
+def check_mac_settings(base: dict, problems: list) -> None:
+    """(The Mac app, slice 1) Each Mac setting as MAC_SETTINGS has it; every other conditional setting is the Mac's
+    too and named there, so nothing changes the iPhone's build by the back door; the phone's own TARGETED_DEVICE_FAMILY
+    as it was; and no MACOSX_DEPLOYMENT_TARGET in any file (the Mac's macOS 14 follows the phone's iOS 17)."""
+    for key, value in MAC_SETTINGS.items():
+        if base.get(key) != value:
+            problems.append(f"Base.xcconfig: {key} is {base.get(key)!r}, not {value!r} (the Mac app)")
+    for key in base:
+        if "[" in key and key not in MAC_SETTINGS:
+            problems.append(f"Base.xcconfig: {key} is a conditional setting the Mac app's rules don't name "
+                            "(each is [sdk=macosx*] and in check_project.py's MAC_SETTINGS)")
+    if base.get("TARGETED_DEVICE_FAMILY") != "1":
+        problems.append(f"Base.xcconfig: TARGETED_DEVICE_FAMILY is {base.get('TARGETED_DEVICE_FAMILY')!r}, not '1' "
+                        "(the iPhone)")
+    for name in ("Base.xcconfig", "Debug.xcconfig", "Release.xcconfig"):
+        if any(key.split("[", 1)[0] == "MACOSX_DEPLOYMENT_TARGET" for key in xcconfig(name)):
+            problems.append(f"{name} sets MACOSX_DEPLOYMENT_TARGET: the Mac's follows IPHONEOS_DEPLOYMENT_TARGET")
+    # a KEY = after KEY[sdk=...] hides it: the Mac build read Info.plist while INFOPLIST_FILE[sdk=macosx*] stood above
+    # INFOPLIST_FILE (Debug and Release.xcconfig include Base.xcconfig first, so a KEY = there is after it too)
+    conditional = {key.split("[", 1)[0] for key in base if "[" in key}
+    lines = [key for key, _ in xcconfig_lines("Base.xcconfig")]
+    for key in sorted(conditional):
+        if key in lines and max(i for i, k in enumerate(lines) if k == key) > \
+                min(i for i, k in enumerate(lines) if k.split("[", 1)[0] == key and "[" in k):
+            problems.append(f"Base.xcconfig sets {key} after {key}[...]: the later one hides the Mac's (move the Mac's "
+                            "settings below it)")
+        for name in ("Debug.xcconfig", "Release.xcconfig"):
+            if key in xcconfig(name):
+                problems.append(f"{name} sets {key}, which hides Base.xcconfig's {key}[...] (the Mac app)")
+
+
+def png_size(path):
+    """A PNG's (width, height, colour type) - from its file, or its bytes - or None when it isn't one."""
+    data = path.read_bytes() if isinstance(path, Path) else path
     if data[:8] != bytes([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]) or data[12:16] != b"IHDR":
         return None
     width, height, _bits, colour = struct.unpack(">IIBB", data[16:26])
@@ -333,6 +408,102 @@ def check_info_plist(problems: list) -> None:
     check_fonts(info, problems)
 
 
+def check_mac_plist(problems: list) -> None:
+    """(The Mac app, slice 1) Info-Mac.plist is Info.plist with MAC_PLIST's differences and no others: every key the
+    phone's has, with the same value, but the ones removed or set - so a key added to one and not the other fails here."""
+    try:
+        phone = plistlib.loads((IOS / "Config" / "Info.plist").read_bytes())
+        mac = plistlib.loads((IOS / "Config" / "Info-Mac.plist").read_bytes())
+    except Exception as error:  # noqa: BLE001 - any failure is the finding
+        problems.append(f"Info-Mac.plist (or Info.plist) doesn't parse: {error}")
+        return
+    wanted = {key: value for key, value in phone.items() if key not in MAC_PLIST["remove"]}
+    wanted.update(MAC_PLIST["set"])
+    for key in sorted(set(wanted) | set(mac)):
+        if key not in mac:
+            problems.append(f"Info-Mac.plist: no {key} - Info.plist has it (or the Mac's own keys do): the two have drifted")
+        elif key not in wanted:
+            problems.append(f"Info-Mac.plist: {key} isn't in Info.plist, nor one of the Mac's own keys: the two have drifted")
+        elif mac[key] != wanted[key]:
+            said = "the Mac's own keys have it" if key in MAC_PLIST["set"] else "Info.plist has it"
+            problems.append(f"Info-Mac.plist: {key} is {mac[key]!r}, not {wanted[key]!r} as {said}: the two have drifted")
+
+
+def icns_images(data: bytes) -> dict:
+    """An icns's images, by type - or a ValueError saying why it isn't one."""
+    if data[:4] != b"icns" or len(data) < 8 or struct.unpack(">I", data[4:8])[0] != len(data):
+        raise ValueError("it isn't an icns, or its length isn't the file's")
+    images, at = {}, 8
+    while at < len(data):
+        if at + 8 > len(data):
+            raise ValueError(f"an image's header runs past the end at {at}")
+        kind = data[at:at + 4].decode("latin-1")
+        length = struct.unpack(">I", data[at + 4:at + 8])[0]
+        if length < 8 or at + length > len(data):
+            raise ValueError(f"the image {kind} runs past the end")
+        images[kind] = data[at + 8:at + length]
+        at += length
+    return images
+
+
+def png_pixel(data: bytes, x: int, y: int):
+    """The RGBA of (x, y) in an 8-bit RGBA PNG whose rows are all unfiltered - as make-icon.py writes them. None for
+    any other PNG (the icns isn't the script's then)."""
+    size = png_size(data)
+    if size is None or size[2] != 6 or data[24] != 8:
+        return None
+    width = size[0]
+    chunks, at = [], 8
+    while at + 8 <= len(data):
+        length = struct.unpack(">I", data[at:at + 4])[0]
+        if data[at + 4:at + 8] == b"IDAT":
+            chunks.append(data[at + 8:at + 8 + length])
+        at += 12 + length
+    try:
+        raw = zlib.decompress(b"".join(chunks))
+    except zlib.error:
+        return None
+    stride = 1 + width * 4
+    row = raw[y * stride:(y + 1) * stride]
+    if len(row) != stride or row[0] != 0:
+        return None
+    return tuple(row[1 + x * 4:1 + x * 4 + 4])
+
+
+def check_mac_icon(problems: list) -> None:
+    """(The Mac app, slice 1) App/Icon/AppIcon.icns, named by Info-Mac.plist: an icns of PNGs, each its type's size, one
+    of 1024 pixels - the record on macOS's rounded square: opaque at its centre, transparent at its corners."""
+    path = IOS / "App" / "Icon" / MAC_ICNS
+    if not path.is_file():
+        problems.append(f"App/Icon/{MAC_ICNS} is missing - the Mac's icon (make-icon.py writes it)")
+        return
+    try:
+        images = icns_images(path.read_bytes())
+    except ValueError as error:
+        problems.append(f"App/Icon/{MAC_ICNS}: {error}")
+        return
+    for kind, data in images.items():
+        size = png_size(data)
+        wanted = ICNS_SIZES.get(kind)
+        if wanted is None:
+            problems.append(f"App/Icon/{MAC_ICNS}: an image of type {kind!r}, which make-icon.py doesn't write")
+        elif size is None or size[:2] != (wanted, wanted):
+            problems.append(f"App/Icon/{MAC_ICNS}: its {kind} isn't a {wanted}x{wanted} PNG")
+    big = images.get("ic10")
+    if big is None:
+        problems.append(f"App/Icon/{MAC_ICNS} has no 1024-pixel image (ic10)")
+        return
+    centre, corner = png_pixel(big, 512, 512), png_pixel(big, 0, 0)
+    if centre is None or corner is None:
+        problems.append(f"App/Icon/{MAC_ICNS}: its 1024-pixel image isn't an unfiltered 8-bit RGBA PNG as make-icon.py "
+                        "writes them")
+    elif centre[3] != 255:
+        problems.append(f"App/Icon/{MAC_ICNS}: its 1024-pixel image isn't opaque at its centre")
+    elif corner[3] != 0:
+        problems.append(f"App/Icon/{MAC_ICNS}: its 1024-pixel image isn't transparent at its corners (macOS's rounded "
+                        "square)")
+
+
 def check_fonts(info: dict, problems: list) -> None:
     """(Noto Sans, 15 Nov) UIAppFonts names exactly the fonts in App/Fonts - the synchronized folder copies each to
     the bundle's root, which is where UIAppFonts looks - each a TrueType font, with the licence beside them. A font
@@ -393,12 +564,14 @@ def main() -> int:
         check_scheme(problems, found["target_id"])
     check_xcconfigs(problems)
     check_info_plist(problems)
+    check_mac_plist(problems)
+    check_mac_icon(problems)
     check_no_catalogs(problems)
     for problem in problems:
         print("PROBLEM:", problem)
     if problems:
         return 1
-    print("ok: the project, the scheme, the xcconfigs, Info.plist, the icons and the fonts check out")
+    print("ok: the project, the scheme, the xcconfigs, Info.plist and Info-Mac.plist, the icons and the fonts check out")
     return 0
 
 

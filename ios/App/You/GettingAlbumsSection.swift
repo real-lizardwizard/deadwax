@@ -16,7 +16,7 @@ struct GettingAlbumsPage: View {
             GettingAlbumsSection()
         }
         .navigationTitle(RequestWords.gettingAlbums)
-        .refreshable {
+        .pullToRefresh {
             await getting.ask().value
         }
         .onAppear { getting.ask() }

@@ -110,7 +110,7 @@ struct ChooseFolderScreen: View {
                 ChooseFolderView(scan: scan, online: reachability.online) { (path: String) in
                     navigation.editAlbum(AlbumEditRequest(target: .folder(path)))
                 }
-                .refreshable {
+                .pullToRefresh {
                     await scan.read(client: server.client, admin: server.access.seesDetail)
                 }
             }

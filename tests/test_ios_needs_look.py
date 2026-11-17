@@ -207,7 +207,7 @@ def test_the_count_is_asked_only_while_a_page_that_uses_it_shows():
     assert "guard away else { return }" in scene and "changed()" in scene, "back from the background, not a launch"
     you = app_file("You", "YouView.swift")
     assert "queueCount.shows(.settings)" in you and "queueCount.hides(.settings)" in you
-    pull = you[you.index(".refreshable {"):you.index(".task {")]
+    pull = you[you.index(".pullToRefresh {"):you.index(".task {")]
     assert pull.index("queueCount.pulled()") < pull.index("await server.refreshMe()"), \
         "asked before /me, so the permission it may give asks once"
     screen = app_file("Manage", "NeedsLookScreen.swift")
@@ -233,7 +233,7 @@ def test_the_count_is_asked_only_while_a_page_that_uses_it_shows():
     pulled = swift_like(page, "pulled")
     assert "guard online, samePerson, page.allowed else { return }" in pulled
     assert pulled.index("count?.pulled()") < pulled.index("await read()")
-    assert ".refreshable {\n            await model.pulled()\n        }" in screen
+    assert ".pullToRefresh {\n            await model.pulled()\n        }" in screen
     # (slice 7's review) nothing read or noted under the sign-in over the app: every read of the page's goes through
     # read() (reach, shows, the pull, Try again, a session's ending) and every note through review() - the editor's
     # sheet stays up over the sign-in, so its steps reach them - and once it goes, the page reads again

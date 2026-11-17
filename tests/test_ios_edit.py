@@ -98,7 +98,7 @@ def test_manage_pushes_choose_the_folder_which_opens_the_sheet():
     assert "navigation.editAlbum(AlbumEditRequest(target: .folder(path)))" in screen
     # asked as it opens and on a pull, and not while deadwax can't be reached
     assert ".task(id: reachability.online)" in screen and "guard reachability.online else { return }" in screen
-    assert ".refreshable {" in screen
+    assert ".pullToRefresh {" in screen
 
 
 def test_the_sheet_keeps_typed_work_and_a_running_apply():

@@ -239,21 +239,21 @@ def test_who_asks_what_and_when():
     assert "@State private var asked = false" in view
     task = block(view, view.index("{", view.index(".task {")))
     assert "guard !asked else { return }" in task and "asked = true" in task and "await server.refreshMe()" in task
-    pull = block(view, view.index("{", view.index(".refreshable {")))
+    pull = block(view, view.index("{", view.index(".pullToRefresh {")))
     # (Phase 8, slice 6) and Needs a look's count - before it (slice 6's review: Look after the library given by /me's
     # answer then asks it once, not twice)
     assert [line.strip() for line in pull.strip().splitlines() if line.strip() and not line.strip().startswith("//")]         == ["queueCount.pulled()", "await server.refreshMe()"]
     assert "GetSettingsModel" not in view and "getSettings" not in view and "Reachability" not in view
     # Getting albums: as the page shows, on its pull, and as deadwax comes back into reach
     page = struct(code(GETTING), "GettingAlbumsPage")
-    assert block(page, page.index("{", page.index(".refreshable {"))).strip() == "await getting.ask().value"
+    assert block(page, page.index("{", page.index(".pullToRefresh {"))).strip() == "await getting.ask().value"
     assert ".onAppear { getting.ask() }" in page
     back = block(page, page.index("{", page.index(".onChange(of: reachability.online)")))
     assert "if back { getting.ask() }" in back
     # About and Account ask /me again on a pull: what they draw is /me's
     for path, name in ((ROOT, "AboutPage"), (ACCOUNT, "AccountPage")):
         page = struct(code(path), name)
-        assert block(page, page.index("{", page.index(".refreshable {"))).strip() == "await server.refreshMe()", name
+        assert block(page, page.index("{", page.index(".pullToRefresh {"))).strip() == "await server.refreshMe()", name
 
 
 def test_every_choice_is_one_menu_row():

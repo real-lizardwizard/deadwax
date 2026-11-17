@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """
-install.sh's reading of what Apple's and GitHub's tools answer - JSON and plists, which a shell
-script can't read well and macOS has no jq for. Run with Xcode's own python3 (`xcrun python3`), so
-James installs nothing. Standard library only; tested on Linux by tests/test_ios_install.py.
+install.sh's (and install-mac.sh's) reading of what Apple's and GitHub's tools answer - JSON and plists, which a
+shell script can't read well and macOS has no jq for. Run with Xcode's own python3 (`xcrun python3`), so
+James installs nothing. Standard library only; tested on Linux by tests/test_ios_install.py and
+tests/test_ios_install_mac.py.
 
     install_helper.py ci <runs.json>                  GitHub's ios.yml runs for one commit -> one line:
                                                        "success", "failure <url>", "running <url>" or "none"
@@ -11,6 +12,10 @@ James installs nothing. Standard library only; tested on Linux by tests/test_ios
                                                        lines, the one named first when there is one
     install_helper.py expiry <profile.plist>           a provisioning profile -> "Thu 30 Oct, 14:02"
     install_helper.py setting <file.xcconfig> <KEY>    a setting's value in an xcconfig
+    install_helper.py plist <file.plist> <key>         a plist's top-level value, as text ("" when it has none)
+    install_helper.py entitlements <entitlements.plist>
+                                                       the Mac app's signed entitlements (`codesign -d --entitlements -
+                                                       --xml`) -> "ok", or what's wrong with them
 """
 
 from __future__ import annotations
@@ -120,6 +125,38 @@ def setting(path: str, key: str) -> str:
     return ""
 
 
+def plist(path: str, key: str) -> str:
+    try:
+        value = plistlib.loads(Path(path).read_bytes()).get(key)
+    except Exception:  # noqa: BLE001 - nothing readable has no value
+        return ""
+    if value is None:
+        return ""
+    if isinstance(value, bool):
+        return "true" if value else "false"
+    return str(value)
+
+
+# What the Mac app must be signed with (the Mac app, slice 1 - notes/ios.md): the App Sandbox and the outgoing network,
+# both made from build settings (ENABLE_APP_SANDBOX, ENABLE_OUTGOING_NETWORK_CONNECTIONS in Base.xcconfig), which need
+# no provisioning profile - and no keychain access groups, which would.
+MAC_ENTITLEMENTS = {"com.apple.security.app-sandbox": "App Sandbox",
+                    "com.apple.security.network.client": "outgoing network connections"}
+
+
+def entitlements(path: str) -> str:
+    try:
+        signed = plistlib.loads(Path(path).read_bytes())
+    except Exception:  # noqa: BLE001 - nothing readable is the finding
+        return "its entitlements couldn't be read (codesign -d --entitlements - --xml said nothing a plist could be read from)"
+    if not isinstance(signed, dict):
+        return "its entitlements aren't a dictionary"
+    problems = [f"no {what} ({key})" for key, what in MAC_ENTITLEMENTS.items() if signed.get(key) is not True]
+    if "keychain-access-groups" in signed or "com.apple.security.application-groups" in signed:
+        problems.append("it asks for keychain access or app groups, which need a provisioning profile")
+    return "; ".join(problems) or "ok"
+
+
 def main(argv: list[str]) -> int:
     if len(argv) < 3:
         print(__doc__, file=sys.stderr)
@@ -135,6 +172,10 @@ def main(argv: list[str]) -> int:
         print(expiry(path))
     elif command == "setting" and rest:
         print(setting(path, rest[0]))
+    elif command == "plist" and rest:
+        print(plist(path, rest[0]))
+    elif command == "entitlements":
+        print(entitlements(path))
     else:
         print(__doc__, file=sys.stderr)
         return 2
