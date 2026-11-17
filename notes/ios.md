@@ -13728,56 +13728,95 @@ src/__init__.py untouched; **no server change**; the player engine has no diff; 
 
 ### The test: tests/test_ios_no_web_app.py
 
-It reads every Swift source of the app - ios/App and DeadwaxKit's Sources, 343 files - as two views of the same
-length and lines: comments blanked (nested block comments too), and then string literals' words blanked as well
-(raw, multi-line and escaped quotes; an interpolation's code kept, its own strings blanked in turn). A use is looked
-for only in the second, so a word in a comment or a string is never one; every file's brackets balance in it. Then:
+It reads every Swift source of the app - ios/App and DeadwaxKit's Sources, 343 files - as the compiler lexes it, in
+views of the same length and lines: comments blanked (nested block comments too); then string literals' contents and
+`#/.../#` regex literals' blanked as well (raw, multi-line and escaped quotes; an interpolation's code kept, its own
+strings blanked in turn; a regex on one line, or from a `#/` ending its line to its `/#`); and the string literals'
+words alone. A use is looked for only in the second, so a word in a comment, a string or a regex is never one; every
+file's brackets balance in it. A source with a string, comment or regex literal that never closes - where the reading
+lost its place - is refused whole. Then:
 
-- **Every `openURL(...)` and `Link(...)`** is found with what it opens - its first argument or its `destination:` -
-  and, when that is a bare name, what the name was last bound to before it (`guard let link = row.link else`, `if let
-  address = URL(string: ...) {`, `if !state.on, let guide = ...`). Each must be on the allowlist, keyed by **file and
-  what it opens**, never a line number:
+- **Every `openURL(...)`, `Link(...)` and `ShareLink(...)`** - `Link` spelt `SwiftUI.Link`, `Link<Label>` or
+  `Link.init` too - is found with what it opens or shares - openURL's first argument, Link's `destination:`,
+  ShareLink's `item:` - and, when that is a bare name, what the name was last bound to before it (`guard let link =
+  row.link else`, `if let address = URL(string: ...) {`, `if !state.on, let guide = ...`). Any other mention of `Link`
+  or `ShareLink` (a typealias, `Link.init` handed on) is refused, so a spelling the test doesn't read fails rather
+  than passing unread; NavigationLink, EQLink and creditLink are other names. Each call must be on its list, keyed by
+  **file and what it opens or shares**, never a line number:
 
   | file (ios/App) | what it opens | the link |
   | --- | --- | --- |
   | Album/AlbumInfoView.swift | `row.link` | Album info's This pressing / Every pressing on MusicBrainz |
   | EQ/EQProfileScreen.swift | `URL(string: EQWords.Profile.gitHubAddress)` | AutoEq on GitHub, at a correction's foot |
-  | Manage/PeopleScreen.swift | `URL(string: People.sharingDoc)` | Sharing deadwax, under People's logins-off refusal |
+  | Manage/PeopleScreen.swift | `URL(string: People.sharingDoc)` | Sharing deadwax, when logins are turned off on deadwax with the app open |
 
-  And each entry must still be found: an allowed link taken out fails until its entry goes too.
-- **Where those three go** is checked in Core: `gitHubAddress` and `sharingDoc` are each one literal, the whole
+  | file (ios/App) | what it shares | the share |
+  | --- | --- | --- |
+  | EQ/EQExport.swift | `EQExportFile(... whole: true ...)` | Export... > The Whole Curve, a file |
+  | EQ/EQExport.swift | `EQExportFile(... whole: false ...)` | Export... > The Correction Alone, a file |
+  | You/DebugView.swift | `url` | the turntable recording's file |
+  | You/DebugView.swift | `shown.text` | the engine log, as text |
+
+  And each entry must still be found: an allowed link or share taken out fails until its entry goes too.
+- **Where those three links go** is checked in Core: `gitHubAddress` and `sharingDoc` are each one literal, the whole
   address (AutoEq's project, and docs/sharing.md in deadwax's repository, both on GitHub); a row's `link` is made only
   by `AlbumInfo.page`, which answers `https://musicbrainz.org/<kind>/<id>` for a MusicBrainz id and nil for anything
-  else; `self.link = link` in AlbumInfoRow's init is Core's only assignment, and the app makes none.
-- **deadwax's own address**: anything opened or shared - `openURL`, `Link`, and `ShareLink`'s `item:` - whose
-  destination names the phone's address (`ServerAddress`, `address`, `base`, `origin`, `absoluteString`, `/player`,
-  `server.`) is refused, on the allowlist or not. No Swift string literal is `"/player/"` or starts `"/player/#"`.
-- **openURL itself**: the environment's `\.openURL`, or a `var`/`let openURL`, only in a file with an allowed call;
-  `openURL` used any other way than called (Phase 7's `openURL.webApp(...)`, handed on as a value) and someone else's
-  `.openURL(` (UIApplication's old one) are refused.
-- **Never at all**: `OpenURLAction` (an extension, or a handler on the environment), `UIApplication`/`shared`/
-  `application` `.open(`, `SFSafariViewController` and `import SafariServices`, `WKWebView`, SwiftUI's `WebView`,
-  `import WebKit`, `ASWebAuthenticationSession`, `AttributedString(markdown:`; and a markdown link
-  (`[words](https:...)`, `mailto:`, `deadwax:`) in any string literal, which SwiftUI's Text would draw as a link.
+  else; `self.link = link` in AlbumInfoRow's init is Core's only assignment, and an argument labelled `link:` anywhere
+  but Core's AlbumInfo.swift is refused (an `AlbumInfoRow(..., link:)` or `.init(..., link:)` the app made).
+- **deadwax's own address**: anything opened or shared whose destination names the phone's address (`ServerAddress`,
+  `address`, `base`, `origin`, `absoluteString`, `/player`, `server.`) is refused, on a list or not. No Swift string
+  literal is `"/player/"` or starts `"/player/#"`.
+- **openURL itself**: the environment's `@Environment(\.openURL) var openURL` read once, under that name, only in a
+  file whose own openURL call is allowed (Album info); a second read, one under another name, one in any other file, a
+  `var`/`let openURL` of its own, `openURL` used any other way than called (Phase 7's `openURL.webApp(...)`, handed on
+  as a value) and someone else's `.openURL(` (UIApplication's old one) are refused.
+- **UIKit**: `UIApplication.shared` held under a name - but DownloadModel's `let application` - and `open`/`openURL`
+  on `UIApplication`, `shared`, `application`, that name or a parameter typed `UIApplication` (the app delegate's);
+  and any `open(..., options:)`, a scene's open or UIApplication's.
+- **Never at all**: `OpenURLAction` (an extension, or a handler), the environment's openURL set
+  (`.environment(\.openURL, ...)`), `SFSafariViewController` and `import SafariServices`, `WKWebView`, SwiftUI's
+  `WebView`, `import WebKit`, `ASWebAuthenticationSession`, `UIActivityViewController`, markdown parsed at run time
+  (an argument labelled `markdown:`), a `LocalizedStringKey(...)` or `Text(.init(...))` made at run time (its markdown
+  links tap), and a link attribute (`LinkAttribute`, an `AttributeContainer`'s `.link`, `NSAttributedString.Key.link`,
+  `dataDetectorTypes`; `.link(...)` called on something, `.link =` set, `.link:` as a key but in a `case`). A case's
+  own `.link(...)` - after `case`, `return`, `(` or an operator - is no call on anything, and passes.
+- **In a string literal's words** (each literal on its own, an interpolation's opening `\(` kept): a markdown link to
+  an address (`](` then any scheme, `<scheme:` or an interpolation), a link's address given apart (`[1]: https:...`),
+  an autolink (`<https:...>`, `<name@...>`, `<\(...)>`) - each of which SwiftUI's Text would draw as a link - and, in
+  ios/App's literals, any address at all (`scheme://`, `www.`), since a Text may make a bare one tappable too and Core
+  holds the app's addresses. The one kept is ServerAddressView's placeholder, `http://192.168.1.20:8090`.
+- **The reading's own two facts**: ios/App is built in Swift 5 mode (SWIFT_VERSION 5.0 in ios/Config, nothing turning
+  bare-slash regexes on), where `/.../` is no regex literal - so `#/.../#`, which it reads, is the only kind the app
+  can have; and DeadwaxKit's Sources import no UI framework (SwiftUI, UIKit, SafariServices, WebKit,
+  AuthenticationServices, AppKit), so Core - Swift 6 mode, where `/.../` is a regex this doesn't read - has no way out
+  to write.
 - **The gone stay gone**: none of Managing's removed names in Core, none of `WebAppRow`, `webApp(`, `webEdit` or
   `Managing.url(`/`albumURL(`/`youURL(`/`notice(` anywhere, no `addresses` or `albums` in the fixture and nothing made
   from appRoutes.ts or openManagingPage, and no appRoutes, formatRoute or parseHash in the exporter.
 
-**The matcher is held to made-up sources first** (`test_the_matcher_refuses_a_planted_way_out`): 16 planted ways out,
+**The matcher is held to made-up sources first** (`test_the_matcher_refuses_a_planted_way_out`): 51 planted ways out,
 each asserted refused *for its reason* - a bare openURL, a Link with and without a label, the web app's address built
 from the server's base, `Managing.url` as Phase 7 called it, Phase 7's own WebAppRow and extension (cut down from
 e879995's ManageSection.swift), `openURL.webApp` alone, UIApplication's two opens, openURL handed on, Safari's view,
-WKWebView and SwiftUI's WebView, a markdown link, a ShareLink of deadwax's base, an openURL handler; an allowed
-destination in the wrong file, and in its own file built from deadwax's address. And to what isn't one
-(`test_the_matcher_passes_what_isnt_a_way_out`): the words in line, block (nested), raw, multi-line and interpolated
-strings, NavigationLink, EQLink, creditLink, updateLink, a ShareLink of a file, `.onOpenURL` (a file shared *to* the
-app), `navigation.open(...)` - and the three allowed, each in its own file.
+WKWebView and SwiftUI's WebView, a markdown link, a ShareLink of deadwax's base, an openURL handler; and since the
+review each bypass it found (below) - and nine more asserts: Phase 7's row read as ManageSection.swift (no link out
+of its own there), an allowed destination or share in the wrong file, one
+in its own file built from deadwax's address, a second or renamed environment read and an openURL of its own in
+Album info's file, an Album info row's link made there, and DownloadModel's binding anywhere else. And to what isn't
+one (`test_the_matcher_passes_what_isnt_a_way_out`): the words in line, block (nested), raw, multi-line and
+interpolated strings, NavigationLink, EQLink, creditLink, updateLink, `.onOpenURL` (a file shared *to* the app),
+`navigation.open(...)`, a case's `.link(...)` and `.link:`, UIKit as the app uses it (`UIApplication.shared.` this and
+that, its notifications, the app delegate's `application(_:didFinishLaunchingWithOptions:)`), three regex literals -
+and the three links, the four shares, DownloadModel's `application`, the placeholder and Core's row links, each in its
+own file.
 
-**And against the real files**: seven mutations planted into the sources themselves, the test run against each, the
+**And against the real files**: thirteen mutations planted into the sources themselves, the test run against each, the
 file put back - a Link to the server's base in the Library, an OpenURLAction in Settings, Album info opening another
 property, the EQ's Link pointed at another constant, People's Link taken away (the allowlist gone stale), the AutoEq
-address changed to deadwax's `/player/`, and a markdown link in a Text in Account: each failed the test, one test
-each.
+address changed to deadwax's `/player/`, a markdown link in a Text in Account; and after review a
+`SwiftUI.Link<Text>.init` in the Library, a ShareLink of its own in Account, `UIApplication.shared` held as `ui` in
+KeyWindow, a `#/a//b/#` hiding an openURL in Album info, a second environment read there, and a
+`Text(LocalizedStringKey(words))` in Account: each failed the test, one test each.
 
 ### Decided here, and where the phone departs from the spec
 
@@ -13787,9 +13826,10 @@ each.
   nothing, while what it opens changing - or the same expression in another file - fails.
 - **`Tool.native` and `othersOpen` went too**, though the spec's list doesn't name them: the footer was their only
   reader, and both only said which rows opened Safari.
-- **ShareLink isn't on the allowlist** - it hands a file or text to the share sheet, it doesn't open a page - but its
-  item may not be deadwax's address. There are four: the EQ's two exports (a file), Debug's turntable recording (a
-  file) and Debug's engine log (text).
+- **ShareLink has a list of its own** (since the review; at first it wasn't listed, only kept from deadwax's address):
+  it hands a file or text to the share sheet rather than opening a page, but a new one could share deadwax's address
+  under a name the address check can't see, so each is keyed as Link is. There are four: the EQ's two exports (a
+  file), Debug's turntable recording (a file) and Debug's engine log (text).
 - **No other link out was found.** `.onOpenURL` in RootView is the other way in (a file shared to deadwax). The test
   reads DeadwaxKit's Sources too, where there's no SwiftUI today, so one added there is refused all the same.
 - **The docs**: docs/ios.md says in Manage that nothing in the app takes you to the web app and lists the three links
@@ -13799,9 +13839,10 @@ each.
 
 ### Tests
 
-- **tests/test_ios_no_web_app.py** (new, 5): the matcher refuses 16 planted ways out, each for its reason, and passes
-  what isn't one; nothing in the 343 sources opens the web app, the three allowed are all there are and each is there;
-  each goes to a site that isn't deadwax's; the web app's way out is gone from Core, the App and the vectors.
+- **tests/test_ios_no_web_app.py** (new, 6): the matcher refuses 51 planted ways out, each for its reason, and passes
+  what isn't one; nothing in the 343 sources opens the web app, the three links and four shares listed are all there
+  are and each is there; the app is read as Swift reads it (Swift 5 mode, no UI framework in DeadwaxKit); each link
+  goes to a site that isn't deadwax's; the web app's way out is gone from Core, the App and the vectors.
 - **Swift**: ManagingTests (2 left: each reader's rows, Change password's offer), ManagingVectorTests (3: the
   fixture without addresses and not made from appRoutes.ts, the words and order, every set and /me answer),
   ScreenYouTests, PeopleFlowTests.
@@ -13814,10 +13855,49 @@ footer tests that went); the unsigned generic-iOS Debug build, BUILD SUCCEEDED, 
 warning every build has; check_project.py; pyflakes over src and tests; tests/test_ios_*.py, test_source_bytes.py and
 test_logins.py (608 passed, 1 skipped); all 98 sims with Node 22 (iosmanaging running the trimmed exporter's
 `--check`). The exporter, run again, wrote the fixture without the addresses and nothing else changed in it. The
-seven mutations above, each run against the real files.
+seven mutations above, each run against the real files. (After review: see below.)
 
 Not verified - only the phone can tell (docs/ios.md checks 388-391): that no tap anywhere opens Safari to deadwax;
-that the three links out open their pages in Safari with the music playing on; each managing page offline and back;
-the largest text and VoiceOver across them. The test reads source, so a way out made some way it doesn't know - a
-URL handed to UIKit through a helper in another module, say - would get past it; the planted cases are what it
-covers.
+that the two links out a check can reach open their pages in your browser with the music playing on; each managing
+page offline and back; the largest text and VoiceOver across them. Nor whether a Text makes a bare address in a
+literal tappable - the test refuses one in ios/App whichever it does. The test reads source, so a way out made some
+way it doesn't know - a URL handed to UIKit through a helper in another module, say - would get past it; the planted
+cases are what it covers.
+
+### After review (17 Nov) - slice 12
+
+The review found no way out in the code, and two must-fixes and five gaps in the test, each fixed here and each
+bypass it used planted in the matcher's made-up sources, refused for its own reason.
+
+- **Check 389 sent James through a step he can't reach** (a must-fix). With logins off, Manage has no People row
+  (`Managing.parts`: `people` needs `loginsOn`), and the checks are done signed in as an admin with logins on - so
+  People's logins-off line, with **Sharing deadwax** under it, shows only if logins are turned off on deadwax while
+  the app is open. 389 checks the two links a tap can reach and says why the third isn't a step; Manage's table says
+  when Sharing deadwax shows, and that the test keeps it to the guide on GitHub. "Each opens in Safari" there and in
+  389 is "your browser (Safari unless you've changed it)" now; Album info's own "Opens in Safari." stays.
+- **Link spelt another way passed unread** (a must-fix): `SwiftUI.Link(...)`, `Link<Text>(...)` and `Link.init(...)`
+  weren't calls to the matcher. Now they are, and any other mention of `Link` or `ShareLink` is refused.
+- **UIKit's opens**: `let ui = UIApplication.shared; ui.open(url)` and `scene.open(url, options: nil)` passed. Now
+  UIApplication.shared is held only as DownloadModel's `application`, open is refused on anything that holds it (the
+  app delegate's parameter too), and so is any `open(..., options:)`.
+- **Tappable text with no `](https:`**: an attribute container's link, a LocalizedStringKey made at run time, an
+  autolink, and a markdown link to an interpolated address passed. Now each is refused, with the link attribute's
+  other ways in (`.link =`, `NSAttributedString.Key.link`, `.link:`, `dataDetectorTypes`), a link's address given
+  apart, any scheme after `](`, and in ios/App's literals any address at all - the one kept a TextField's placeholder.
+  `.link(...)` is refused as a call on something rather than everywhere: Artists' credits use a `.link(id:)` case.
+- **ShareLink** was kept from deadwax's address but not listed, so a new one sharing it under another name passed.
+  Now it has its list of four, as Link has, and `UIActivityViewController` is refused. The docstring claims only what
+  the test does.
+- **Inside an allowed file**, any number of environment reads under any name passed, and so did the environment's
+  openURL set and an Album info row given a `link:` by the app. Now Album info's one read, as `openURL`, is all; the
+  environment's openURL set is refused anywhere; and a `link:` argument outside Core's AlbumInfo.swift is refused.
+- **A regex literal hid the rest of its line**: `#/a//b/#` read as a comment from its `//`. Now `#/.../#` (any number
+  of `#`, on one line or over lines) is read as the literal it is, the first `/#` closing it (an escaped one closing
+  it early only shows more as code). And the reading refuses a source it lost its place in - a string, comment or
+  regex that never closes - rather than trusting what follows. The bare `/.../` regex isn't read; the test holds the
+  app to Swift 5 mode, where it isn't one, and DeadwaxKit - Core is Swift 6 - to importing no UI framework.
+
+Verified after review, on the Mac: `swift test` (2232: 2062, 158 and 12, all passed); the unsigned generic-iOS Debug
+build, BUILD SUCCEEDED with only the AppIntents warning; check_project.py; pyflakes over src and tests;
+tests/test_ios_*.py, test_source_bytes.py and test_logins.py (609 passed, 1 skipped - the new reading test the one
+more); all 98 sims with Node 22; and the thirteen mutations above, against the real files. Nothing in the app changed.

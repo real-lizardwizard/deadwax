@@ -1916,9 +1916,9 @@ now refuse a new one.) The app has three links out, and none of them is to deadw
 | --- | --- | --- |
 | **This pressing on MusicBrainz**, **Every pressing on MusicBrainz** | [Album info](#album-info) | the release's and the release group's pages on musicbrainz.org |
 | **AutoEq on GitHub** | the foot of a correction's page in the [EQ](#autoeq-a-correction-for-your-headphones) | AutoEq's project on GitHub |
-| **Sharing deadwax** | [People](#people), when deadwax says People can't work because logins are off | the [Sharing deadwax](sharing.md) guide, on GitHub |
+| **Sharing deadwax** | [People](#people), only if logins are turned off on deadwax while the app is open (People isn't in Manage with them off) | the [Sharing deadwax](sharing.md) guide, on GitHub - deadwax's tests keep it to that page |
 
-Each opens in Safari, beside the app; the music keeps playing.
+Each opens in your browser (Safari unless you've changed it), beside the app; the music keeps playing.
 
 ### Needs a look
 
@@ -5294,11 +5294,11 @@ so - if Safari comes up anywhere else, say where.
   Navidrome's address away for a moment on a test setup, the Library's **Set up Navidrome** opens Server settings'
   Connections over the Library. Safari opens for none of them.
 - **389 What still opens outside.** Album info's **This pressing on MusicBrainz** and **Every pressing on
-  MusicBrainz** open musicbrainz.org's pages in Safari; the foot of an EQ correction's page, **AutoEq on GitHub**,
-  AutoEq's page there. With logins off, People's page says "People needs logins on - with them off, anyone who can
-  reach deadwax is its admin." with **Sharing deadwax** under it, which opens the Sharing deadwax guide on GitHub. Each
-  time the music keeps playing, and coming back to the app finds the page you left. Those three are all: is there
-  anywhere else something opens outside the app?
+  MusicBrainz** open musicbrainz.org's pages in your browser (Safari unless you've changed it); the foot of an EQ
+  correction's page, **AutoEq on GitHub**, AutoEq's page there. Each time the music keeps playing, and coming back to
+  the app finds the page you left. Is there anywhere else something opens outside the app? (The third link out,
+  People's **Sharing deadwax**, shows only if logins are turned off on deadwax while the app is open, so it isn't a
+  step here; deadwax's tests keep it to the guide on GitHub.)
 - **390 Offline.** Quit the app from the app switcher and open it again, so nothing managing has been read yet; turn
   off Wi-Fi and WireGuard, then open each of Manage's rows: no row is dimmed, none opens Safari, and each page says
   "Managing needs deadwax. This opens once it's back." and asks nothing (Account's Change password shows the amber line
