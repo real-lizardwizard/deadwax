@@ -220,6 +220,11 @@ public enum Routes {
     public static let clearSavedAnswers = Endpoint(method: "POST", path: "/deadwax/settings/musicbrainz_cache/clear", query: [])
     public static let pingMusicBrainz = Endpoint(method: "GET", path: "/deadwax/search_musicbrainz/ping", query: [])
     public static let pingSlskd = Endpoint(method: "GET", path: "/deadwax/monitor_slskd/ping", query: [])
+    // The event log (Phase 8, slice 9 - notes/ios.md "The event log on the phone"): the lines deadwax kept since it
+    // started, and the stream of them as they're logged - Settings and the log's both. The stream is read as it comes
+    // (`DeadwaxClient.logStream`, through HTTPLineTransport), never as one answer
+    public static let recentLog = Endpoint(method: "GET", path: "/deadwax/interface_logs/recent", query: [])
+    public static let logStream = Endpoint(method: "GET", path: "/deadwax/interface_logs/interface_logs", query: ["after", "boot"])
 
     /// The levels spec's name for `levelAlbum`: the album's levels warmed before its first play.
     public static var warmLevels: Endpoint { levelAlbum }
@@ -260,6 +265,7 @@ public enum Routes {
         queueSummary, queueReviewed,
         rescan, held, heldAdd, heldDismiss,
         serverSettings, saveServerSettings, savedAnswers, clearSavedAnswers, pingMusicBrainz, pingSlskd,
+        recentLog, logStream,
     ]
 
     /// The routes given longer than the transport's own 8 seconds to answer, in seconds: the album index reads every
@@ -344,8 +350,10 @@ public enum Routes {
     /// one thread, 30, and Clear a DELETE and a VACUUM of the file there, 120 - no bound on the server for either, so both
     /// pinned; MusicBrainz's ping one request with MusicBrainz's ten attempts, 120, past its 111.5 (ArtistWaits); slskd's
     /// ping a call through slskd's own client with no timeout of its own, 30, pinned - tests/test_ios_server_settings.py
-    /// holds each.
-    public static let timeouts: [Endpoint: Double] = [albumIndex: 30, autoEqSearch: 20, autoEqProfile: 20, libraryOwned: 30, fullySearch: 20, releaseGroup: 60, searchArtists: 20, searchSongs: 20, artistFacts: 120, discography: 60, jobs: 20, cancelJob: 30, retryJob: 60, retryJobSame: 30, clearJobs: 30, storeState: 20, findCandidates: 300, enqueue: 300, joinJob: 60, libraryAdd: 60, libraryTracks: 30, libraryAlbums: 120, releases: 60, release: 60, retagPreview: 60, retagApply: 480, artFetch: 120, libraryArt: 30, queueIgnore: 20, queueUnignore: 20, tagsPreview: 60, tagsApply: 120, trackPicture: 30, lyricsFetch: 600, discArtFetch: 360, libraryDiscArt: 30, deletionSummary: 60, deleteAlbum: 120, libraryArtist: 120, artistArt: 30, artistImagesPreview: 660, artistImagesApply: 600, artistSearch: 120, refilePreview: 480, refileApply: 600, queueSummary: 30, queueReviewed: 20, rescan: 300, held: 30, heldAdd: 60, heldDismiss: 30, serverSettings: 30, saveServerSettings: 60, savedAnswers: 30, clearSavedAnswers: 120, pingMusicBrainz: 120, pingSlskd: 30]
+    /// holds each. The event log's (slice 9): the history is what deadwax holds in memory, answered at once - the
+    /// transport's own 8; the stream is meant never to end, so its 45 is the most it may say nothing between two bytes
+    /// (EventStream.silence), three of its 15 s keepalives - tests/test_ios_event_log.py holds both.
+    public static let timeouts: [Endpoint: Double] = [albumIndex: 30, autoEqSearch: 20, autoEqProfile: 20, libraryOwned: 30, fullySearch: 20, releaseGroup: 60, searchArtists: 20, searchSongs: 20, artistFacts: 120, discography: 60, jobs: 20, cancelJob: 30, retryJob: 60, retryJobSame: 30, clearJobs: 30, storeState: 20, findCandidates: 300, enqueue: 300, joinJob: 60, libraryAdd: 60, libraryTracks: 30, libraryAlbums: 120, releases: 60, release: 60, retagPreview: 60, retagApply: 480, artFetch: 120, libraryArt: 30, queueIgnore: 20, queueUnignore: 20, tagsPreview: 60, tagsApply: 120, trackPicture: 30, lyricsFetch: 600, discArtFetch: 360, libraryDiscArt: 30, deletionSummary: 60, deleteAlbum: 120, libraryArtist: 120, artistArt: 30, artistImagesPreview: 660, artistImagesApply: 600, artistSearch: 120, refilePreview: 480, refileApply: 600, queueSummary: 30, queueReviewed: 20, rescan: 300, held: 30, heldAdd: 60, heldDismiss: 30, serverSettings: 30, saveServerSettings: 60, savedAnswers: 30, clearSavedAnswers: 120, pingMusicBrainz: 120, pingSlskd: 30, logStream: 45]
 }
 
 /// The Cover Art Archive's thumbnail sizes the app asks deadwax's relay for (`Routes.archiveCover`'s `size`, which takes

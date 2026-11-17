@@ -110,7 +110,7 @@ def test_the_routes_are_the_servers_by_method_path_and_permission():
     assert "loginsOn && parts.held" in swift_function("LibraryCare.swift", "heldShown")
     # the page is the app's own now: no Safari for Library care
     managing = _code((CORE / "Managing.swift").read_text(encoding="utf-8"))
-    assert "case .edit, .queue, .care, .settings: return true" in managing[managing.index("public var native: Bool {"):]
+    assert "case .edit, .queue, .care, .settings, .log: return true" in managing[managing.index("public var native: Bool {"):]
 
 
 def test_a_rescan_sends_tracks_false_and_no_body_and_the_writes_none():

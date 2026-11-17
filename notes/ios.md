@@ -13011,3 +13011,167 @@ Verified: swift test - 1955 Core tests in 202 suites, 158 Audio in 17, 12 in 1; 
 warning (only the AppIntents metadata one); check_project.py; pytest on its own, 4909 passed and 1 skipped; all 95
 sims. NOT verified, as before: any of it on a phone - the sheet through a real Wi-Fi drop, VoiceOver reading each
 name once, and the ZStack sending one GET on first open (read from how SwiftUI applies modifiers, not watched).
+
+## The event log on the phone (Phase 8, slice 9 - 2026-11-16)
+
+The spec's section 8 (notes/ios-specs/phase8-managing.md), with 13-14's rules: Settings > Manage > **Event log** is the
+app's own page now - what deadwax has said since it started, the last 500 lines, newest first, and each new line as
+it's logged - rather than the web app's in Safari. The web's rules run as they are in the vectors; the stream is the
+phone's first answer read as it comes. Built on the `ios` branch at b946439 (main 2.1.33 merged). The app stays 0.13
+(13); src/__init__.py untouched; **no server change** - /interface_logs/recent and the stream are 2.0.0-player.33's,
+as they are; the player engine has no diff.
+
+### Core (DeadwaxCore)
+
+- **EventLog.swift** (new). `LogLine` and `RecentLog` read loosely (a field of another type left out, never the line;
+  a fractional `seq` read as none - deadwax's are whole, and the vectors leave that case out, where the web would key
+  by it). `EventLog` is lib/eventLog.ts and the page's
+  words: `kept` (LOG_KEPT, 500), `State` - `joining(_:)` (joinLine), `joining(history:)` (joinHistory, with fillGap's
+  gap), `emptied()` (clearLog), `streamFrom` (EventLog.tsx's `logStreamUrl(boot ? last : null, boot)`: both or
+  neither) - `streamQuery`, `level` (levelOf), `time` (lineTime: HH:MM:SS on the device's clock, TimeClip's whole
+  milliseconds and "Invalid " past a Date's end, as `toTimeString().slice(0, 8)` gives), the title, the page's line,
+  the list's label, EMPTY_WORDS, the history's failure (`historyFailure`: sayError's notice with "failed" and retry),
+  STREAM_WORDS, `allowed` (App.tsx's `perms.has('server')`). Each held line is a `Line` with an `ID` of its run, its
+  number and the phone's own count of lines taken - fixed as the line is taken, so a line coming above leaves every row
+  below as it was; never its place.
+- **EventStream.swift** (new). The stream, pure: `Lines` (bytes to lines - LF, CR and CRLF, a CR and its LF split
+  across reads, a BOM dropped only at the very start, a line over 1 MB dropped whole and the next read, UTF-8 decoded
+  with replacement) and `Frames` (the WHATWG EventSource parse: comments, `data` joined by newlines, `event`, `id`
+  without NUL, `retry` digits only; a blank line dispatches only with data). `End` classes how an ask ended -
+  cancelled, signed out (401), forbidden (403), refused (another 4xx), lost (everything else: no answer, a timeout, a
+  5xx, an answer that isn't the stream, the stream ending). `isStream` is EventSource's content-type check, and
+  `NotTheStream` what an answer failing it throws. `keepalive` 15, `silence` 45 (three keepalives: the stream's wait
+  between bytes, so a WireGuard drop with no word is noticed), `retry` 5 (STREAM_RETRY_MS). **Feed** is every decision
+  the page makes, each ask numbered as it's decided and an answer to any but the newest dropped: `update(wanted:online:)`
+  (wanted and idle: the history; not wanted and something out: stop - the line "Lost…" out of reach, "Connecting…"
+  for the next showing), `historyLanded` (joined, then the stream from where it ends), `historyFailed` (said, with Try
+  again, and the stream opened all the same - a 401 halts for the sign-in, a 403 asks /me), `opened` (Live), `frame`
+  (a message's line joined; anything that isn't a line left out, as JSON.parse failing leaves it), `streamEnded`
+  (lost: "Lost the live feed - reconnecting…" and a wait; refused: "Not live" and its words, halted until Try again
+  or the page shown again; cancelled by the system: asked again, never said), `retryDue` (the stream from the last
+  line held - the history first when it's owed or the lines have a gap), `tryAgain`, `clear`, `reading` (the first
+  read's spinner, which gives way to its failure), `tryAgainShown`, and `announcement` (what VoiceOver hears: lost,
+  refused, and live again after either - never each "Connecting…"). The client: `recentLog()`, and
+  `logStream(after:boot:)` - the session's cookie by hand as every request's, `Accept: text/event-stream`, the route's
+  wait between bytes; a status other than 200 through `failure()` (so a 401 tells the app, as anywhere), the content
+  type checked, then the frames as an AsyncThrowingStream whose end calls the request off.
+- **HTTP.swift**: `HTTPLines` and `HTTPLineTransport` (`lines(for:)`), beside `HTTPTransport.send`, which stays a
+  whole answer for every other route.
+- **Routes.swift**: `recentLog` (GET /interface_logs/recent) and `logStream` (GET /interface_logs/interface_logs,
+  `after` and `boot`) - 100 routes; `logStream`'s wait is 45 s (`silence`), /recent keeps the transport's own.
+- **Managing.swift**: `Tool.native` takes in `.log`, so the footer names five - and says nothing at all unless People
+  is drawn (an admin with logins on).
+
+### The app (ios/App/Manage/)
+
+- **URLSessionTransport** answers `lines(for:)` on `URLSession.bytes(for:)`, from a URLSession of the streams' own
+  (made once, cookies off and no cache as the other's, its wait between bytes `silence` and none over all - a stream
+  holds its connection while it's open, so it never takes one of the other requests'). The answer's status and headers
+  as they arrive; a non-200's body read up to 64 KB to say why; the body as `EventStream.Lines` until it ends, fails, or
+  the reader stops - which cancels both the reading Task and the bytes' own task. A connection failing tells
+  Reachability, as any request's does.
+- **EventLogModel** (new), held by the app as ServerSettingsModel is: DeadwaxApp makes it, puts it in the environment
+  and resets it when the person changes; Reachability's `whenChanged` re-checks it; RootView tells it the scene phase
+  and the sign-in over the app going. `wanted` is the page showing (a counter), the app in front, deadwax in reach,
+  Settings and the log, no sign-in over the app, a client. It carries out Feed's actions - `read` (/recent), `open`
+  (the stream, each frame handed on), `wait` (Task.sleep, then `retryDue`), `stop` (cancel what's out), `askMe`
+  (`server.refreshMe()`) - in one `asking` Task at a time, each ask's number taken by Feed before the Task is made, and
+  a generation dropping anything of the last person's. Nothing else: no rule of its own, **no BackgroundHold, no
+  ScreenAwake** - the background stops it. The lines outlive the page, as the web keeps them in its module.
+- **EventLogScreen** (new), its frame on a ZStack: NO_PERMISSION without Settings and the log; "Managing needs deadwax"
+  when opened out of reach before anything was heard; else the list - the page's line, a problem (the history's
+  failure, or a refused stream's words, in the danger red with Try again), then the lines (`ForEach` over the held
+  lines, keyed by `Line.ID`), "Reading what deadwax kept…" or the empty words. The stream's line (`StreamLine`: a dot -
+  grey, green-icon live, amber-icon lost - and the words, amber while lost) is a top `safeAreaInset`, under the bar.
+  Clear in the bar, dimmed with no lines; `.editOutOfReach` once something was heard. `LogRow`: the time in the mono
+  face, the level (semibold; red or amber), the part (one line), over the words (red or amber with the level),
+  stacked at accessibility sizes; one VoiceOver element (`EventLog.spoken`, words first) with Copy as an action; a
+  context menu's Copy (`EventLog.copyText`, the line as drawn) to UIPasteboard. Reduce Motion takes the animation out
+  of the list's transactions.
+- **ManageSection** pushes `AppRoute.eventLog` for `.log`; **Shared/Routes.swift** has the route.
+
+### What the web's .tsx files hold, read by pattern
+
+As in slices 2-8, ios/scripts/export-log-vectors.cjs runs lib/eventLog.ts, api/logs.ts, lib/errorWords.ts and
+lib/permissions.ts compiled, and reads out of **app/EventLog.tsx** by pattern (each piece hashed into made_from, so
+ioslog fails when one moves) a line's key, the empty words, the history's failure, the stream's address from what is
+held, the page's line, the title, the list's label, and the two retries (a stream the browser gave up on - CLOSED -
+asked again by hand, the history first); from **app/App.tsx** who opens the page, **app/access.ts** seesDetail and
+**lib/appRoutes.ts** the not-allowed words. 37 runs of 1100 steps (13 worked, 24 seeded - EventSource's own reconnect
+from the number it first asked from among them) replayed through `State` with the state compared after every step;
+198 times in four zones (St John's and Kathmandu's half hours, London's changes, far values in UTC); 24 history
+failures; 10 addresses; 65 permission sets.
+
+**The real route's first frames** are ios/scripts/log_stream_answers.py's (Fixtures/log/stream.json): /recent and four
+streams (from where the history ends, from a line held below the last, another run's number, from now) run through
+the real src/routes/interface_logs.py over ASGI with a fixed run and fixed lines - status, the headers the phone
+reads, the body as sent. tests/test_ios_event_log.py makes it again and compares, and EventStreamTests reads each
+through Lines, Frames and Feed.
+
+### Decided here, and where the phone departs from the spec (or the web)
+
+- **A dropped connection asks again from the last line held**; EventSource asks again from the number it was first
+  opened with, and joinLine drops what it had. The phone's ask is the smaller; the vectors replay EventSource's way
+  too, so either joins the same.
+- **An answer that isn't the stream** (a 5xx, a proxy's page, the wrong content type) is where EventSource gives up
+  for good and EventLog.tsx asks again by hand after 5 s, the history first: the phone does the same. A connection that
+  drops reopens the stream alone (EventSource's own reconnect), unless the history is owed or the lines have a gap.
+- **A 4xx stops it** ("Not live", the phone's own state, with deadwax's words or "Couldn't open the live feed." and Try
+  again): EventSource would also give up, and the web says only "Lost…" for ever. A 401 says nothing - the sign-in
+  comes over the app - and a 403 says NO_PERMISSION and asks /me again, so the page turns into NO_PERMISSION.
+- **The stream's state is a strip under the bar** (the spec's "under the bar"); the page's line is the list's first
+  row. Neither is a line of the log.
+- **Copy** is the phone's own (the spec's), on a long press and as a VoiceOver action; it copies the line as drawn.
+- **"Reading what deadwax kept…"** while the first read is out with nothing held, rather than "Nothing logged yet." -
+  which it isn't known to be. A failed first read shows its failure and Try again, never an endless spinner.
+- **Out of reach** the stream is stopped, the line says "Lost the live feed - reconnecting…" and the amber line comes
+  over the lines; back in reach, the history is read again and the stream rejoined.
+- **The lines are the app's while it runs**, as the web's module keeps them: coming back to the page shows them at
+  once and fills in the rest. A new person empties them.
+- **VoiceOver reads a line once, its words first**, then its level, time and part; it hears the stream lost, refused
+  and back, not every "Connecting…" (the web's line is a live region, read every time).
+- **Each line's identity is the phone's own** (run, number, and its count taken): the web keys by `boot:seq` or by
+  place, which two lines can share (a number of the wrong type) and which moves as lines come above.
+- **/recent keeps the transport's own wait** (8 s): its handler reads 500 lines from memory under a lock, with nothing
+  to wait on.
+
+### Tests
+
+- **EventLogVectorTests** (new, 8): the fixture and its sources, the words, levels, times in four zones and untimed
+  lines, every run replayed step by step (the lines and keys at the end, every identity once), the history's
+  failures, the addresses, who opens the page.
+- **EventStreamTests** (new, 22): lines across every ending and a split CRLF, an over-long line dropped, frames as
+  EventSource reads them, each End, the waits; Feed - the history then the stream, a stale answer dropped, a history
+  not read (the gap, filled), a drop asked again from the last line held, a refusal and a 401, a 403, a cancellation
+  never said, out of reach and back, Clear and nothing cleared back, the first read's spinner and Try again, what
+  VoiceOver hears; the client's stream (the cookie, Accept, the query, the 45 s wait), a refusal's words and the 401
+  hook, no answer and a timeout mid-stream, the reader stopping calling the request off, /recent, and the real
+  route's frames.
+- **ClientTests** (100 routes, `logStream`'s 45 s), **ManagingTests** (five native rows, the footer).
+- **tests/test_ios_event_log.py** (new, 8): the routes by method, path and permission (test_logins' ROUTES); the
+  line's and history's fields against src/logger.py; the real route's answers the helper's; the transport (bytes,
+  the streams' session, the cookie by hand, cookies off); the waits (the keepalive the route's `wait_for`, silence
+  three keepalives, the retry the web's, 500 kept); the app only carrying out Core; nothing keeping the app awake or
+  running (no BackgroundHold, no ScreenAwake, the scene and sign-in wiring); the page drawn as the spec says.
+  tests/test_ios_palette.py holds the new screen to the palette and fonts.
+- test_ios_contract.py (100 routes); test_ios_settings.py (five NavigationLinks), test_ios_library_care.py and
+  test_ios_server_settings.py (`.log` native).
+- **ui/test/ioslog.sim.cjs** (new): the exporter's `--check`.
+
+### Verified, and not
+
+On the Mac: `swift test` (1985 Core tests in 204 suites, 158 Audio in 17, 12 more, all passing); the unsigned
+generic-iOS Debug build, BUILD SUCCEEDED, with only the AppIntents metadata warning every build has; check_project.py;
+the full pytest suite run alone on the rebased tip (on 5dc3d47), 4919 passed and 1 skipped; pyflakes over src
+and tests, clean; all 96 sims with Node 22 (ioslog
+running the exporter's `--check`). tests/test_ios_event_log.py runs the real /recent and the real stream route over
+ASGI, and EventStreamTests reads what they sent through the phone's reader. Assumed: that URLSession's
+`timeoutIntervalForRequest` on a `bytes(for:)` task is a wait between bytes, as it is documented to be for a data
+task, so 45 s of silence ends a dropped stream; that `bytes(for:)` hands each frame on as it arrives rather than
+buffering; and that cancelling the reading Task and the bytes' task closes the connection at once.
+
+Not verified - only the phone can tell (docs/ios.md checks 370-373): the stream over WireGuard (the keepalives through
+the tunnel, how soon a drop is noticed, "Lost the live feed - reconnecting…" then Live with no line missing); lines
+arriving as a search runs, as promptly as the web's; the stream stopping as the app goes to the background and the
+phone sleeping with the page open; Copy's context menu and the pasted text; the list under Reduce Motion (no slide-in)
+and VoiceOver (each line once, the stream lost and back said); the largest text sizes; 500 rows scrolling.

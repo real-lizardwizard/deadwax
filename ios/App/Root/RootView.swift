@@ -11,6 +11,7 @@ struct RootView: View {
     @Environment(AppNavigation.self) private var navigation
     @Environment(CareRunModel.self) private var care
     @Environment(ServerSettingsModel.self) private var serverSettings
+    @Environment(EventLogModel.self) private var eventLog
     @Environment(\.scenePhase) private var scenePhase
 
     var body: some View {
@@ -30,6 +31,8 @@ struct RootView: View {
             // (slice 8) a Re-time run the same
             care.scene(phase)
             serverSettings.scene(phase)
+            // (slice 9) the event log's stream called off as the app goes, rejoined from the last line on return
+            eventLog.scene(phase)
             switch phase {
             case .active:
                 CoverCache.shared.forgetFailures()
@@ -49,6 +52,8 @@ struct RootView: View {
             // (Phase 8, slice 8) gone: a Server settings page showing asks again what failed under it - told once
             // here, as the root, a group page and Set up Navidrome's sheet may all be up at once
             if over == nil { serverSettings.sessionBack() }
+            // (slice 9) come: the event log's stream called off (it would only be refused); gone: asked again
+            eventLog.recheck()
         }
         .onOpenURL { (url: URL) -> Void in shared(url) }
     }

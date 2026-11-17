@@ -109,6 +109,9 @@ enum AppRoute: Hashable {
     case serverSettings
     /// (Phase 8, slice 8) A group of Server settings, its own page (ServerSettingsGroupScreen), by the group's id.
     case serverSettingsGroup(String)
+    /// (Phase 8, slice 9) Settings > Manage > Event log (EventLogScreen): what deadwax has said since it started, newest
+    /// first, live - the lines held by the app (EventLogModel), so they outlive the page.
+    case eventLog
 }
 
 /// The album you don't have's address: its release group's id as MusicBrainz gave it (lowercase - deadwax's routes take
@@ -574,6 +577,7 @@ extension View {
                 case .heldByNobody: HeldByNobodyScreen()
                 case .serverSettings: ServerSettingsScreen()
                 case .serverSettingsGroup(let id): ServerSettingsGroupScreen(id: id)
+                case .eventLog: EventLogScreen()
                 }
             }
             .clearsPlayer()

@@ -65,7 +65,8 @@ and covers, CD art and lyrics fetched for every album without, one album at a ti
 admin (see [Library care](#library-care)). Then **Server settings**: whether deadwax reaches MusicBrainz, slskd and
 Navidrome, and every setting of the server's, each group a page of its own, saved together - with Re-time saved
 lyrics and MusicBrainz's saved answers - and the Library's **Set up Navidrome** opening it over the Library (see
-[Server settings](#server-settings)).
+[Server settings](#server-settings)). Then the **Event log**: what deadwax has said since it started, newest first,
+each new line as it's logged, with Copy on a long press and Clear for the phone's view (see [Event log](#event-log)).
 
 **Nothing of Phase 2, the lyrics, the EQ, the turntable, play history, your library downloaded,
 playlists, artists, songs, Search, Requests, Get or Manage has been seen on an iPhone yet.** It's built and tested on a Mac,
@@ -1869,9 +1870,10 @@ Account and About ask deadwax again when you pull them down, as the first screen
 ### Manage
 
 Settings > **Manage** is deadwax's tools for looking after it, as many of them as you may use. They're coming into the
-app one build at a time (Phase 8): **Edit an album**, **Needs a look**, **Library care** and **Server settings** are the app's own now, and the rest still
-**open in the web app, in Safari** - the web app has every one of them laid out for a phone ([Looking after deadwax from a
-phone](player.md#looking-after-deadwax-from-a-phone)). Top to bottom, each only for someone who may use it:
+app one build at a time (Phase 8): **Edit an album**, **Needs a look**, **Library care**, **Server settings** and
+**Event log** are the app's own now, and **People** still **opens in the web app, in Safari** - the web app has it laid
+out for a phone ([Looking after deadwax from a phone](player.md#looking-after-deadwax-from-a-phone)). Top to bottom,
+each only for someone who may use it:
 
 | row | who has it | opens |
 | --- | --- | --- |
@@ -1880,7 +1882,7 @@ phone](player.md#looking-after-deadwax-from-a-phone)). Top to bottom, each only 
 | **Library care** | Look after the library or Edit albums | [**Library care**](#library-care), in the app: Rescan (Look after the library's), and covers, CD art and lyrics fetched for every album without (Edit albums') - and, with logins on, In nobody's library. |
 | **People** | an admin, with logins on | People - unlock it with your own Navidrome password, as in the web app |
 | **Server settings** | Settings and the log | [**Server settings**](#server-settings), in the app: whether deadwax reaches MusicBrainz, slskd and Navidrome, and every setting of the server's, a group to a page, saved together. |
-| **Event log** | Settings and the log | the event log |
+| **Event log** | Settings and the log | [**Event log**](#event-log), in the app: what deadwax has said since it started - the last 500 lines - newest first, each new line as deadwax logs it. |
 
 An admin has every row. With logins off everyone does, but People: there's nobody to manage. Someone with none of
 these permissions has no Manage at all ([Sharing deadwax](sharing.md#admins-permissions-and-everyone-else) has what each
@@ -1889,13 +1891,12 @@ down. If an admin took a permission away since, the page it opens says "This pag
 given you - ask one if you need it." - and People, its own words: "Only an admin can open People - it comes with
 being a Navidrome admin."
 
-Under the rows: "Edit an album, Needs a look, Library care and Server settings are the app's own; the others open in
-the web app, in Safari." - naming only the rows of the app's own you have (with Edit albums alone, "Edit an album and
-Library care are the app's own; the others open in the web app, in Safari."; with Settings and the log alone, "Server
-settings is the app's own; the others open in the web app, in Safari."; with none of them, "These open in the web app,
-in Safari."; and nothing at all when every row there is the app's own) - and with logins on, "Safari has its own
-sign-in, apart from the app's: the first time, sign in there with the same name and password you use here. The pages
-open as whoever is signed in there, who may not be who's signed in here." Nothing hands the app's sign-in to Safari (it
+Under the rows, while a row there opens Safari - People, so for an admin with logins on: "Edit an album, Needs a look,
+Library care, Server settings and Event log are the app's own; the others open in the web app, in Safari." (naming only
+the rows of the app's own drawn there), then "Safari has its own sign-in, apart from the app's: the first time, sign in
+there with the same name and password you use here. The pages open as whoever is signed in there, who may not be who's
+signed in here." When every row there is the app's own - everyone else's Manage, and everyone's with logins off -
+nothing is said under them. Nothing hands the app's sign-in to Safari (it
 could only go in the address, where it would sit in Safari's history), so the first time a row opens, the web app's
 sign-in comes first. Sign in, and the page the row named opens. Safari stays signed in after that, as any browser
 does, until its sign-in goes 30 days without use. Signing out of the app doesn't sign Safari out, nor the other way
@@ -1911,13 +1912,13 @@ The rows open deadwax's address as the app has it, plain `http://` included: Saf
 typed (its address bar says Not Secure), over your Wi-Fi or WireGuard. If the phone's default browser isn't Safari,
 they open in that one instead. While deadwax can't be reached the rows that open Safari are dimmed and can't be
 tapped, and "These open once deadwax is back." says why; so is Change password. Edit an album, Needs a look, Library
-care and Server settings still open: each says it needs deadwax, and reads what it shows once it's back. If iOS won't
+care, Server settings and Event log still open: each says it needs deadwax, and reads what it shows once it's back. If iOS won't
 open the address at all - Safari turned off in Screen Time, with no other browser - the app says "Couldn't open the web
 app - Safari may be turned off in Screen Time." over the tabs, and VoiceOver reads it.
 
 VoiceOver reads each Safari row as a button, with "Opens in Safari." after it; Edit an album, Needs a look, Library
-care and Server settings as rows that open a page, Needs a look with its count ("Needs a look, 3 albums"). The rows
-grow with the text size.
+care, Server settings and Event log as rows that open a page, Needs a look with its count ("Needs a look, 3 albums").
+The rows grow with the text size.
 
 An artist's pictures and names are managed from [the artist's page](#managing-an-artist), as in the web app. The web
 app's **Connections**, in its You, is at the top of [Server settings](#server-settings) on the phone.
@@ -2148,6 +2149,53 @@ Navidrome again as the save lands; once Navidrome answers, the sheet goes and th
 Navidrome row says why. Losing deadwax doesn't close it: the sheet stays up with the amber line, your typing kept, and
 Save changes comes back once deadwax does. **Close** puts the sheet away - unsaved changes stay, for the next time it
 opens or for Settings > Manage > Server settings - and it can't be closed, or swiped away, while a save goes.
+
+### Event log
+
+**Event log** (Settings > Manage > Event log, for someone with **Settings and the log** - an admin, or everyone while
+logins are off) is the web app's event log on the phone: what deadwax has said since it started - the last 500 lines it
+keeps - newest first, and each new line as deadwax logs it. It's a page pushed on Settings:
+
+- **Under the bar**, where the live feed stands, in one line: "Connecting…" with a grey dot, "Live" with a green one
+  once deadwax is sending, and "Lost the live feed - reconnecting…" in amber while it's gone. It's never a line of the
+  log itself, so a feed that drops and comes back fills nothing with failures.
+- **What it's for**: "What deadwax has said since it started - the last 500 lines - newest first. Clear empties this
+  view only."
+- **The lines**, newest at the top: each its time on the phone's clock (14:03:27), its level - ERROR (and CRITICAL) in
+  red and WARNING in amber, their words the same colour; the rest plain - and which part of deadwax said it, over what
+  it said, which wraps. "Reading what deadwax kept…" until the first read answers; "Nothing logged yet." when there's
+  nothing.
+
+**Copy**: a long press on a line offers **Copy**, which puts it on the clipboard as drawn - its time, level, part and
+words on one line - to paste into a message or an issue. VoiceOver has Copy among a line's actions. (The web app has
+no Copy: select the text there.)
+
+**Clear**, in the bar, empties the page on this phone: "Cleared. New lines show here as deadwax logs them." Nothing is
+cleared on deadwax - the web app's log still has every line - and what was cleared doesn't come back when you leave and
+return: only what deadwax logs after it does. It's dimmed with nothing to clear.
+
+**The feed is live only while the page shows with the app in front.** Go back to Settings, to another tab, or out of
+the app, and it stops: nothing keeps the phone awake or runs in the background for it. Come back and the lines deadwax
+kept are read again, then the feed picks up from the last line the page has - what was logged meanwhile fills in,
+nothing twice. If the connection drops - WireGuard off, the Wi-Fi gone, deadwax restarting - the line says "Lost the
+live feed - reconnecting…" and the feed is asked for again 5 seconds later, and every 5 seconds until it's back, from
+the last line held, so nothing logged meanwhile is missed (as long as deadwax still keeps it: its last 500). deadwax
+sends a keepalive every 15 seconds while it has nothing to say, so a connection that goes quiet without a word is
+taken as lost within 45 seconds. When deadwax has restarted, its new lines come in above the last run's.
+
+**While deadwax can't be reached**, a page that has heard nothing yet says "Managing needs deadwax. This opens once
+it's back."; one that has keeps its lines under the amber line Edit album shows, with "Lost the live feed -
+reconnecting…" under the bar, and picks up once deadwax is back. If the kept lines can't be read, it says so in red -
+"Couldn't load the lines deadwax kept - what happens from now still shows.", or why ("Can't connect to deadwax. Check
+your connection.") - with **Try again**, and the feed opens all the same: new lines still come in, and the next read
+fills in the rest. If deadwax refuses the feed, the line says "Not live", why is said in red ("Couldn't open the live
+feed." when deadwax gave no words of its own) with Try again, and it isn't asked for again until you tap it or come
+back to the page. Without Settings and the log - an admin took it away - it says "This page needs a permission an admin
+hasn't given you - ask one if you need it." and asks nothing. When your session ends, nothing is asked under the
+sign-in; sign in again and the page picks up. Signing out, or someone else signing in, empties it. VoiceOver reads each
+line once - its words, then its level, time and part - and says when the feed is lost, refused, and live again; with
+Reduce Motion on, new lines don't slide in; at the largest text sizes a line's time, level and part stack over its
+words.
 
 ### Debug
 
@@ -4242,7 +4290,8 @@ with [Edit album](#edit-album), Edit an album opens Choose the folder in the app
 album's ••• has **Edit album** where Edit in the web app was: those parts of 237, 238, 241 and 242 are 320 and 321's
 now, and the footer says "Edit an album is the app's own; the others open in the web app, in Safari." Since the
 build with [Server settings](#server-settings), Server settings opens in the app, and the Library's Set up Navidrome
-opens its Connections page over the Library: 244 is 369's now.
+opens its Connections page over the Library: 244 is 369's now. Since the build with the [Event log](#event-log), it
+opens in the app too: in 239, tap People (as an admin) where it says Event log, and the page itself is 370-373's.
 
 - **237 The version, and Manage.** install.sh says "Installed deadwax 0.13 (13), runs until …", and You > About
   reads 0.13 (13). As an admin, You has **Manage** between Downloads and Account: **Edit an album** (with "Opens the
@@ -4963,6 +5012,33 @@ change how the server runs: change only what you'll put back, and note each sett
   looking again", then "Saved." (or what is left to save). Signed in as someone without Settings and the log: no
   Server settings in Manage.
 
+### Event log's checks (370-373)
+
+**Not done yet.** These come with the build that brings the [Event log](#event-log) into the app - Phase 8's ninth
+part (still app 0.13 (13)). No server change is needed: any deadwax the first part works with. As in 361-369:
+deadwax's plain `http://` address, on the home Wi-Fi and over WireGuard with Wi-Fi off, as an admin unless said;
+compare each with the web app's event log (You > Event log) open on the Mac beside it.
+
+- **370 Live.** Settings > Manage > **Event log**: "Connecting…" under the bar, then "Live" with a green dot, the
+  line about the page, and the lines newest first - the same lines as the web app's, in its order. Search for an
+  album in the app (or tap Find on a request): do its lines arrive at the top as the search runs, at the same moment
+  as on the Mac, without a pull? Leave the page open and quiet for two minutes: does it stay "Live"? With VoiceOver,
+  each line is read once, its words first.
+- **371 Levels and Copy.** Find an ERROR line and a WARNING line (a search slskd refuses, or a download that fails,
+  makes one): the error's level and words red, the warning's amber, an INFO line plain. Each line's time is the
+  phone's clock, as the Mac's page has it. Press and hold a line: **Copy**. Paste it into Notes: its time, level,
+  part and words, as drawn. At the largest text size (Settings > Accessibility > Display & Text Size > Larger Text),
+  a line's time, level and part stack over its words, nothing cut off.
+- **372 Clear.** Tap **Clear** in the bar: "Cleared. New lines show here as deadwax logs them.", and Clear dimmed. Is
+  the web app's log still full (reload it)? Go back to Settings, search for something, come back to Event log: only
+  the lines since - none of what was cleared. Put the app in the background for a minute, search on the Mac, come
+  back: the lines logged meanwhile are there, each once.
+- **373 Dropped.** With the page live over WireGuard, turn WireGuard off: within 45 seconds, "Lost the live feed -
+  reconnecting…" in amber (and the amber line, if the app notices deadwax is out of reach), the lines kept. Search on
+  the Mac meanwhile. Turn WireGuard on: "Live" again, and the Mac's search's lines are there - none missing, none
+  twice. With VoiceOver, it says when the feed is lost and when it's back. Signed in as someone without Settings and
+  the log: no Event log in Manage.
+
 ### Add to Queue's checks (392-403)
 
 **Not done yet.** These come with the build that makes [Add to Queue](#adding-to-the-queue) the phone's one way to add
@@ -5038,9 +5114,9 @@ These are the web app's for now:
 - **Home** and **pins** - and so Home's Arriving: outside Requests, the tab's badge is the phone's only sign of a
   download on its way.
 - **Looking after deadwax**, but for [Edit album](#edit-album), [an artist's tools](#managing-an-artist),
-  [Needs a look](#needs-a-look), [Library care](#library-care) and [Server settings](#server-settings) (with the web
-  app's Connections, and re-timing synced lyrics), all of it on the phone now: Settings > [Manage](#manage) opens each
-  other tool - People and the event log - in the web app, in Safari, and Change password too.
+  [Needs a look](#needs-a-look), [Library care](#library-care), [Server settings](#server-settings) (with the web
+  app's Connections, and re-timing synced lyrics) and the [Event log](#event-log), all of it on the phone now:
+  Settings > [Manage](#manage) opens the other tool - People - in the web app, in Safari, and Change password too.
 
 ## When something goes wrong
 

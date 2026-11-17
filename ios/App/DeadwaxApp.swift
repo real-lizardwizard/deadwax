@@ -38,6 +38,7 @@ struct DeadwaxApp: App {
     @State private var queueCount: QueueCountModel
     @State private var care: CareRunModel
     @State private var serverSettings: ServerSettingsModel
+    @State private var eventLog: EventLogModel
 
     /// The one background session, made before anything else can ask it.
     private static let downloadSession = DownloadSession()
@@ -80,6 +81,10 @@ struct DeadwaxApp: App {
         // outlive a page and a run its page; a save of Navidrome's settings asks the Library's gate again
         let serverSettings = ServerSettingsModel(server: server, reachability: reachability, library: library)
         reachability.whenChanged { [weak serverSettings] in serverSettings?.reachChanged() }
+        // Phase 8, slice 9: the event log's lines and its stream - the app's, so the lines outlive the page (the stream
+        // only while the page shows); out of reach the stream is called off, back it rejoins from the last line held
+        let eventLog = EventLogModel(server: server, reachability: reachability)
+        reachability.whenChanged { [weak eventLog] in eventLog?.recheck() }
         let downloads = DownloadModel(server: server, reachability: reachability, files: files, session: Self.downloadSession)
         player.connect(downloads: downloads, reachability: reachability)
         // Phase 4, slice 3: a write here to a downloaded playlist keeps it in step at once
@@ -115,6 +120,7 @@ struct DeadwaxApp: App {
             queueCount.reset()
             care.reset()
             serverSettings.reset()
+            eventLog.reset()
         }
         _server = State(initialValue: server)
         _player = State(initialValue: player)
@@ -137,6 +143,7 @@ struct DeadwaxApp: App {
         _queueCount = State(initialValue: queueCount)
         _care = State(initialValue: care)
         _serverSettings = State(initialValue: serverSettings)
+        _eventLog = State(initialValue: eventLog)
     }
 
     var body: some Scene {
@@ -163,6 +170,7 @@ struct DeadwaxApp: App {
                 .environment(queueCount)
                 .environment(care)
                 .environment(serverSettings)
+                .environment(eventLog)
                 .preferredColorScheme(.dark)
                 .tint(Palette.accent)
                 // (Noto Sans, 15 Nov) the words of every Text and control that sets no font of its own

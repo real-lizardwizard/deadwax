@@ -62,6 +62,27 @@ public protocol HTTPTransport: Sendable {
     func send(_ request: HTTPRequest) async throws -> HTTPResponse
 }
 
+/// An answer read as it comes (Phase 8, slice 9 - the event log's stream): its status and headers at once, then its
+/// body's lines (EventStream.Lines: LF, CR or CRLF, blank lines kept) as they arrive, until it ends, fails, or the task
+/// reading them is cancelled - which calls the request off. An answer other than 200 has its body whole in `response`
+/// (to say why) and no lines.
+public struct HTTPLines: Sendable {
+    public let response: HTTPResponse
+    public let lines: AsyncThrowingStream<String, any Error>
+
+    public init(response: HTTPResponse, lines: AsyncThrowingStream<String, any Error>) {
+        self.response = response
+        self.lines = lines
+    }
+}
+
+/// A transport that can read an answer as it comes. The app's is URLSession's `bytes(for:)`, its cookie sent by hand as
+/// every request's is; the request's `timeout` is the most the answer may say nothing - between any two bytes - never a
+/// limit over all.
+public protocol HTTPLineTransport: HTTPTransport {
+    func lines(for request: HTTPRequest) async throws -> HTTPLines
+}
+
 /// FastAPI's error body is `{"detail": "..."}`, or for a refused form a list of `{msg}`. deadwax's own
 /// words are shown as they are; anything else falls back to the status. Phase 0's words (APIFailure.words reads
 /// the same); a listener's are ErrorWords'.

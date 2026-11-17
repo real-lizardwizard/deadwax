@@ -1,0 +1,56 @@
+{
+ "made_from": "src/routes/interface_logs.py and src/logger.py (ios/scripts/log_stream_answers.py)",
+ "boot": "d00dfeed0001",
+ "recent": "{\"lines\":[{\"event_type\":\"INFO\",\"event_content\":\"Searching Soulseek for \\\"Dummy\\\" by Portishead\",\"src\":\"SLSKD\",\"seq\":1,\"time\":1763300000.25,\"boot\":\"d00dfeed0001\"},{\"event_type\":\"WARNING\",\"event_content\":\"no cover on the Archive for this pressing\",\"seq\":2,\"time\":1763300001.5,\"boot\":\"d00dfeed0001\"},{\"event_type\":\"ERROR\",\"event_content\":\"slskd answered 409: it isn't logged in to Soulseek\",\"src\":\"SLSKD\",\"seq\":3,\"time\":1763300002.125,\"boot\":\"d00dfeed0001\"},{\"event_type\":\"INFO\",\"event_content\":\"Filed 11 tracks into Portishead/Dummy (1994) - Sigur R\u00f3s next \u266a\",\"src\":\"organizer\",\"seq\":4,\"time\":1763300003.0,\"boot\":\"d00dfeed0001\"}],\"last\":4,\"boot\":\"d00dfeed0001\"}",
+ "cases": [
+  {
+   "name": "from where the history ends",
+   "query": "after=4&boot=d00dfeed0001",
+   "status": 200,
+   "headers": {
+    "content-type": "text/event-stream; charset=utf-8",
+    "cache-control": "no-cache",
+    "x-accel-buffering": "no",
+    "content-encoding": null
+   },
+   "body": ":\n\ndata: {\"event_type\": \"INFO\", \"event_content\": \"download 41 finished\", \"src\": \"poller\", \"seq\": 5, \"time\": 1763300010.75, \"boot\": \"d00dfeed0001\"}\n\n"
+  },
+  {
+   "name": "from a line held below the last",
+   "query": "after=2&boot=d00dfeed0001",
+   "status": 200,
+   "headers": {
+    "content-type": "text/event-stream; charset=utf-8",
+    "cache-control": "no-cache",
+    "x-accel-buffering": "no",
+    "content-encoding": null
+   },
+   "body": ":\n\ndata: {\"event_type\": \"ERROR\", \"event_content\": \"slskd answered 409: it isn't logged in to Soulseek\", \"src\": \"SLSKD\", \"seq\": 3, \"time\": 1763300002.125, \"boot\": \"d00dfeed0001\"}\n\ndata: {\"event_type\": \"INFO\", \"event_content\": \"Filed 11 tracks into Portishead/Dummy (1994) - Sigur R\\u00f3s next \\u266a\", \"src\": \"organizer\", \"seq\": 4, \"time\": 1763300003.0, \"boot\": \"d00dfeed0001\"}\n\ndata: {\"event_type\": \"INFO\", \"event_content\": \"download 41 finished\", \"src\": \"poller\", \"seq\": 5, \"time\": 1763300010.75, \"boot\": \"d00dfeed0001\"}\n\ndata: {\"event_type\": \"CRITICAL\", \"event_content\": \"the database can't be written\", \"seq\": 6, \"time\": 1763300011.0, \"boot\": \"d00dfeed0001\"}\n\n"
+  },
+  {
+   "name": "another run's number",
+   "query": "after=3&boot=0123456789ab",
+   "status": 200,
+   "headers": {
+    "content-type": "text/event-stream; charset=utf-8",
+    "cache-control": "no-cache",
+    "x-accel-buffering": "no",
+    "content-encoding": null
+   },
+   "body": ":\n\ndata: {\"event_type\": \"INFO\", \"event_content\": \"Searching Soulseek for \\\"Dummy\\\" by Portishead\", \"src\": \"SLSKD\", \"seq\": 1, \"time\": 1763300000.25, \"boot\": \"d00dfeed0001\"}\n\ndata: {\"event_type\": \"WARNING\", \"event_content\": \"no cover on the Archive for this pressing\", \"seq\": 2, \"time\": 1763300001.5, \"boot\": \"d00dfeed0001\"}\n\ndata: {\"event_type\": \"ERROR\", \"event_content\": \"slskd answered 409: it isn't logged in to Soulseek\", \"src\": \"SLSKD\", \"seq\": 3, \"time\": 1763300002.125, \"boot\": \"d00dfeed0001\"}\n\ndata: {\"event_type\": \"INFO\", \"event_content\": \"Filed 11 tracks into Portishead/Dummy (1994) - Sigur R\\u00f3s next \\u266a\", \"src\": \"organizer\", \"seq\": 4, \"time\": 1763300003.0, \"boot\": \"d00dfeed0001\"}\n\ndata: {\"event_type\": \"INFO\", \"event_content\": \"download 41 finished\", \"src\": \"poller\", \"seq\": 5, \"time\": 1763300010.75, \"boot\": \"d00dfeed0001\"}\n\ndata: {\"event_type\": \"CRITICAL\", \"event_content\": \"the database can't be written\", \"seq\": 6, \"time\": 1763300011.0, \"boot\": \"d00dfeed0001\"}\n\n"
+  },
+  {
+   "name": "from now",
+   "query": "",
+   "status": 200,
+   "headers": {
+    "content-type": "text/event-stream; charset=utf-8",
+    "cache-control": "no-cache",
+    "x-accel-buffering": "no",
+    "content-encoding": null
+   },
+   "body": ":\n\ndata: {\"event_type\": \"WARNING\", \"event_content\": \"a candidate left out: its folder holds no audio\", \"src\": \"matching\", \"seq\": 7, \"time\": 1763300012.5, \"boot\": \"d00dfeed0001\"}\n\n"
+  }
+ ],
+ "recentAfter": "{\"lines\":[{\"event_type\":\"INFO\",\"event_content\":\"Searching Soulseek for \\\"Dummy\\\" by Portishead\",\"src\":\"SLSKD\",\"seq\":1,\"time\":1763300000.25,\"boot\":\"d00dfeed0001\"},{\"event_type\":\"WARNING\",\"event_content\":\"no cover on the Archive for this pressing\",\"seq\":2,\"time\":1763300001.5,\"boot\":\"d00dfeed0001\"},{\"event_type\":\"ERROR\",\"event_content\":\"slskd answered 409: it isn't logged in to Soulseek\",\"src\":\"SLSKD\",\"seq\":3,\"time\":1763300002.125,\"boot\":\"d00dfeed0001\"},{\"event_type\":\"INFO\",\"event_content\":\"Filed 11 tracks into Portishead/Dummy (1994) - Sigur R\\u00f3s next \\u266a\",\"src\":\"organizer\",\"seq\":4,\"time\":1763300003.0,\"boot\":\"d00dfeed0001\"},{\"event_type\":\"INFO\",\"event_content\":\"download 41 finished\",\"src\":\"poller\",\"seq\":5,\"time\":1763300010.75,\"boot\":\"d00dfeed0001\"},{\"event_type\":\"CRITICAL\",\"event_content\":\"the database can't be written\",\"seq\":6,\"time\":1763300011.0,\"boot\":\"d00dfeed0001\"},{\"event_type\":\"WARNING\",\"event_content\":\"a candidate left out: its folder holds no audio\",\"src\":\"matching\",\"seq\":7,\"time\":1763300012.5,\"boot\":\"d00dfeed0001\"}],\"last\":7,\"boot\":\"d00dfeed0001\"}"
+}

@@ -73,12 +73,99 @@ final class URLSessionTransport: HTTPTransport, @unchecked Sendable {
         guard let http = response as? HTTPURLResponse else {
             throw APIFailure.other("The answer wasn't http.")
         }
+        return HTTPResponse(status: http.statusCode, headers: Self.headers(http), body: data)
+    }
+
+    private static func headers(_ http: HTTPURLResponse) -> [String: String] {
         var headers: [String: String] = [:]
         for (name, value) in http.allHeaderFields {
             if let name = name as? String, let value = value as? String { headers[name] = value }
         }
         if let cookie = http.value(forHTTPHeaderField: "Set-Cookie") { headers["Set-Cookie"] = cookie }
-        return HTTPResponse(status: http.statusCode, headers: headers, body: data)
+        return headers
+    }
+
+    // MARK: an answer read as it comes (the event log's stream)
+
+    /// The most of a refusal's body read, to say why: deadwax's are a line of JSON.
+    private static let refusalMost = 64 * 1024
+
+    /// Streams' own URLSession - a stream holds its connection for as long as it's open, so it never takes one of the
+    /// other requests' - made once, cookies off and no cache as theirs are. Its wait is the most a stream may say
+    /// nothing between two bytes (EventStream.silence, the request's own); no wait over all.
+    private var streams: URLSession?
+
+    private func streamSession() -> URLSession {
+        lock.lock()
+        defer { lock.unlock() }
+        if let streams { return streams }
+        let configuration = Self.configuration(waiting: EventStream.silence)
+        // no wait over all: the stream is meant never to end (URLSession's own default is a week)
+        configuration.timeoutIntervalForResource = .infinity
+        let session = URLSession(configuration: configuration)
+        streams = session
+        return session
+    }
+}
+
+extension URLSessionTransport: HTTPLineTransport {
+    /// The answer read as it comes (`URLSession.bytes(for:)`): its status and headers once they arrive, then its body as
+    /// lines (EventStream.Lines) until it ends, fails, or whoever reads it stops - which calls the request off. The
+    /// session's cookie goes as every request's does, set by DeadwaxClient as `Cookie:` (HTTPCookieStorage is off). A
+    /// stream that says nothing for the request's wait fails as a timeout. An answer other than 200 is read, up to 64 KB,
+    /// to say why, with no lines.
+    func lines(for request: HTTPRequest) async throws -> HTTPLines {
+        var sent = URLRequest(request)
+        sent.timeoutInterval = request.timeout ?? EventStream.silence
+        let bytes: URLSession.AsyncBytes
+        let response: URLResponse
+        do {
+            (bytes, response) = try await streamSession().bytes(for: sent)
+        } catch let error as URLError where error.code != .cancelled {
+            heard(false)
+            throw error
+        }
+        heard(true)
+        let task = bytes.task
+        guard let http = response as? HTTPURLResponse else {
+            task.cancel()
+            throw APIFailure.other("The answer wasn't http.")
+        }
+        let headers = Self.headers(http)
+        guard http.statusCode == 200 else {
+            var body = Data()
+            do {
+                for try await byte in bytes {
+                    body.append(byte)
+                    if body.count >= Self.refusalMost { break }
+                }
+            } catch {
+                // what came of it says enough, or nothing - the status is the answer
+            }
+            task.cancel()
+            let none = AsyncThrowingStream<String, any Error> { $0.finish() }
+            return HTTPLines(response: HTTPResponse(status: http.statusCode, headers: headers, body: body), lines: none)
+        }
+        let lines = AsyncThrowingStream<String, any Error> { continuation in
+            let reading = Task { [weak self] in
+                var splitter = EventStream.Lines()
+                do {
+                    for try await byte in bytes {
+                        if let line = splitter.feed(byte) { continuation.yield(line) }
+                    }
+                    continuation.finish()
+                } catch {
+                    // the connection gone (not called off): deadwax out of reach, as any request failing says
+                    if let failure = error as? URLError, failure.code != .cancelled { self?.heard(false) }
+                    continuation.finish(throwing: error)
+                }
+            }
+            continuation.onTermination = { _ in
+                reading.cancel()
+                task.cancel()
+            }
+        }
+        return HTTPLines(response: HTTPResponse(status: http.statusCode, headers: headers), lines: lines)
     }
 }
 

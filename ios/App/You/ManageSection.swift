@@ -14,8 +14,9 @@ import SwiftUI
 /// queue (NeedsLookScreen), its count at the row's right (QueueCountModel - asked by YouView and MainTabs, never here).
 /// Since slice 7 Library care is too: it pushes LibraryCareScreen (Rescan, Get covers, CD art and lyrics, In nobody's
 /// library). Since slice 8 Server settings is too: it pushes ServerSettingsScreen (Connections, the organizing verdict,
-/// each group of the server's settings a page of its own, one save). The others still open the web app in Safari
-/// (WebAppRow) until their slices land.
+/// each group of the server's settings a page of its own, one save). Since slice 9 the event log is too: it pushes
+/// EventLogScreen (the lines, live, Copy and Clear). People still opens the web app in Safari (WebAppRow) until its
+/// slice lands.
 ///
 /// The footer says those open in Safari (the app's own said apart, ManagingWords.othersOpen) and - with logins on -
 /// that Safari signs in apart from the app, the first time, with the same name and password, and that each page opens
@@ -59,6 +60,11 @@ struct ManageSection: View {
                     } else if tool == .settings {
                         // (Phase 8, slice 8) the app's own: Connections, the verdict and the server's settings
                         NavigationLink(value: AppRoute.serverSettings) {
+                            Text(ManagingWords.label(tool))
+                        }
+                    } else if tool == .log {
+                        // (Phase 8, slice 9) the app's own: the event log, live
+                        NavigationLink(value: AppRoute.eventLog) {
                             Text(ManagingWords.label(tool))
                         }
                     } else if let url = Managing.url(tool, at: server.address) {
