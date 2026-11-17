@@ -15,9 +15,10 @@ import SwiftUI
 /// One change at a time (Core's OwnPasswordFlow takes its ticket synchronously in the tap), never sent again by itself.
 /// While it is out the page can't be left by Back or a swipe, nor by its tab tapped again (AppNavigation): its answer is
 /// said here. ServerModel.changeOwnPassword sends it and, when deadwax answers with this phone's new sign-in, keeps it
-/// in the Keychain and hands it to the client at once. Every field is emptied once it changed, as the page goes, and
-/// when the sign-in comes over the app; a refusal keeps them to correct, the current one emptied and focused when it
-/// was wrong. No password is ever logged, kept or put in an address: the fields live in this page's state alone.
+/// in the Keychain and hands it to the client at once. Every field is emptied once it changed, as the page goes, when
+/// Now Playing comes over it, and when the sign-in comes over the app; a refusal keeps them to correct, the current one
+/// emptied and focused when it was wrong. No password is ever logged, kept or put in an address: the fields live in
+/// this page's state alone.
 struct ChangePasswordScreen: View {
     @Environment(ServerModel.self) private var server
     @Environment(Reachability.self) private var reachability
@@ -68,6 +69,10 @@ struct ChangePasswordScreen: View {
         }
         .onChange(of: server.signInOver != nil) { _, over in
             if over { forget() }
+        }
+        .onChange(of: navigation.nowPlayingShown) { _, shown in
+            // (review) Now Playing over the page: it went from view, so the fields go as they do when it goes
+            if shown { forget() }
         }
         .onDisappear {
             forget()
@@ -122,7 +127,7 @@ struct ChangePasswordScreen: View {
     }
 
     private func changeSection(_ user: String) -> some View {
-        let on = flow.canChange(user: user, online: reachability.online) && server.signInOver == nil
+        let on = flow.canChange(user: user, online: reachability.online, signInOver: server.signInOver != nil)
         return Section {
             Button {
                 change(user)
@@ -184,13 +189,15 @@ struct ChangePasswordScreen: View {
     /// Change pressed (or Done on the last field): the body and its ticket taken here, in the tap, before the Task - a
     /// second press finds one out. What came of it is announced once.
     private func change(_ user: String) {
-        guard server.signInOver == nil, let (ticket, body) = flow.begin(user: user, online: reachability.online) else {
+        guard let (ticket, body) = flow.begin(user: user, online: reachability.online,
+                                              signInOver: server.signInOver != nil) else {
             return
         }
         focused = nil
         Task {
             let outcome = await server.changeOwnPassword(body)
-            let words = flow.ended(ticket, outcome)
+            // (review) nothing announced when the sign-in came over the app as it answered: the sign-in says it
+            let words = flow.ended(ticket, outcome, signInOver: server.signInOver != nil)
             // told here too, not only by onChange: the answer may come while the page is off screen (another tab)
             navigation.passwordChanging(flow.changing)
             if let words {

@@ -55,6 +55,11 @@ struct RootView: View {
             // (slice 9) come: the event log's stream called off (it would only be refused); gone: asked again
             eventLog.recheck()
         }
+        .onChange(of: server.client?.session) { _, _ in
+            // (slice 10's review) the session moved - Change password's re-key: the event log's stream asked again under
+            // the new one, a halt for the old one's 401 let go
+            eventLog.sessionMoved()
+        }
         .onOpenURL { (url: URL) -> Void in shared(url) }
     }
 

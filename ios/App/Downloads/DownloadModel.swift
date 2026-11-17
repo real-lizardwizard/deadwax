@@ -185,6 +185,11 @@ final class DownloadModel {
     /// minute - /me is asked, and its 401 brings the sign-in - or until the client changes.
     @ObservationIgnored private var refusedSession: String??
     @ObservationIgnored private var refusedAt: Double = 0
+    /// (Phase 8, slice 10's review) A 401 heard under the session in hand while a Change password was out
+    /// (DownloadRules.heard401's `deferred`): the session it came under (nil inside: none), decided once the change
+    /// answers (`afterChange`) - and the songs it came to, not asked for again until then.
+    @ObservationIgnored private var deferredRefusal: String??
+    @ObservationIgnored private var heldForChange: Set<String> = []
     /// (slice 3) What to do with each background task's request (BackgroundWork's), and the last asked.
     @ObservationIgnored var askBackground: ([String: LibraryBackground.Ask]) -> Void = { _ in }
     @ObservationIgnored private var backgroundAsked: [String: LibraryBackground.Ask]?
@@ -845,6 +850,7 @@ final class DownloadModel {
             _ = server.me
             _ = server.signInOver
             _ = server.client
+            _ = server.changingPassword
         } onChange: { [weak self] in
             DispatchQueue.main.async {
                 MainActor.assumeIsolated {
@@ -859,6 +865,18 @@ final class DownloadModel {
     /// carry that person's cookie). Then a plan: signed out mid-use is a sign-in wait for every task.
     private func serverChanged() {
         if let refused = refusedSession, refused != server.client?.session { refusedSession = nil }
+        // (slice 10's review) a Change password answered: what a 401 held back meanwhile was, decided now - the session in
+        // hand's refusal after all (no re-key), or nothing (the re-key replaced the session it came under); either way the
+        // songs it came to are planned again, under the session in hand
+        if !server.changingPassword {
+            heldForChange = []
+            if let deferred = deferredRefusal {
+                deferredRefusal = nil
+                if DownloadRules.afterChange(deferred: deferred, current: server.client?.session) {
+                    refuseSession(server.client?.session)
+                }
+            }
+        }
         let key: (server: String, person: String)? = {
             guard let address = server.address, let me = server.me else { return nil }
             return (address.key, DownloadStore.person(me))
@@ -1522,6 +1540,8 @@ final class DownloadModel {
         // checked against nothing)
         let toMake = ordered(records.values.filter {
             $0.state == .wanted && decisions[$0.id]?.task == true && !sizeComing($0)
+                // (slice 10's review) one a 401 came to while Change password is out: asked again once it answers
+                && !(server.changingPassword && heldForChange.contains($0.id))
         })
         var made: [String: String] = [:]
         var copied: [DownloadRecord] = []
@@ -1626,7 +1646,7 @@ final class DownloadModel {
             if !DownloadRules.isTheSong(status: status) {
                 if status == 401 {
                     record = DownloadRules.apply(.signedOut, to: record)
-                    if current { signedOutHeard(sentUnder: sentUnder) }
+                    if current { signedOutHeard(sentUnder: sentUnder, song: record.id) }
                 } else {
                     record = DownloadRules.apply(.refused(status: status, detail: nil), to: record)
                 }
@@ -1674,12 +1694,27 @@ final class DownloadModel {
     /// under the old one is answered 401 - which says nothing of the new one. Its song is asked again under the new
     /// session by the plan that follows, and nothing is held: held, every task out would be called off for a minute.
     /// A task whose request can't be read (`sentUnder` nil) is taken as the session in hand's, as before.
-    private func signedOutHeard(sentUnder: String??) {
+    ///
+    /// (slice 10's review) And while a change is out, a 401 under the session in hand may be the move's own, answering
+    /// before the change does: only its song is held back (`heldForChange`, not asked again) and the rest go on; the
+    /// change's end decides (serverChanged). The rule is Core's, DownloadRules.heard401.
+    private func signedOutHeard(sentUnder: String??, song: String) {
         let session = server.client?.session
-        if let sentUnder, sentUnder != session {
+        switch DownloadRules.heard401(sentUnder: sentUnder, current: session, changing: server.changingPassword) {
+        case .replaced:
             note("a 401 to a task sent under a session since replaced - nothing held")
-            return
+        case .deferred:
+            heldForChange.insert(song)
+            // deferred only under the session in hand, so that is the one the change's end decides on
+            if deferredRefusal == nil { deferredRefusal = .some(session) }
+            note("a 401 while Change password is out - \(song) held until it answers")
+        case .refused:
+            refuseSession(session)
         }
+    }
+
+    /// The session in hand refused: nothing more fetched under it for a minute, /me asked.
+    private func refuseSession(_ session: String?) {
         guard !refused(session) else { return }
         refusedSession = .some(session)
         refusedAt = Monotonic.seconds()

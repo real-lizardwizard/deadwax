@@ -150,27 +150,33 @@ import Testing
 
     @Test func oneChangeAtATimeAndOnlyWhenReady() throws {
         var flow = OwnPasswordFlow()
-        let none = flow.begin(user: "ethan", online: true)
+        let none = flow.begin(user: "ethan", online: true, signInOver: false)
         #expect(none == nil, "nothing typed")
         flow.form = Self.ready
-        let away = flow.begin(user: "ethan", online: false)
+        let away = flow.begin(user: "ethan", online: false, signInOver: false)
         #expect(away == nil, "out of reach")
-        #expect(!flow.canChange(user: "ethan", online: false))
-        let begun = flow.begin(user: "ethan", online: true)
+        #expect(!flow.canChange(user: "ethan", online: false, signInOver: false))
+        // (review) the sign-in over the app: anything asked under it is a 401 for certain
+        #expect(!flow.canChange(user: "ethan", online: true, signInOver: true))
+        let under = flow.begin(user: "ethan", online: true, signInOver: true)
+        #expect(under == nil && !flow.changing)
+        #expect(flow.canChange(user: "ethan", online: true, signInOver: false))
+        let begun = flow.begin(user: "ethan", online: true, signInOver: false)
         let (ticket, body) = try #require(begun)
         #expect(body == Self.body && flow.changing)
         // the ticket was taken before the Task: a second tap in the same turn finds one out
-        let second = flow.begin(user: "ethan", online: true)
+        let second = flow.begin(user: "ethan", online: true, signInOver: false)
         #expect(second == nil)
+        #expect(!flow.canChange(user: "ethan", online: true, signInOver: false), "one out")
         // an older ticket's answer is dropped
-        let older = flow.ended(ticket - 1, .changed(signedOut: 1, warning: nil, session: "s.x"))
+        let older = flow.ended(ticket - 1, .changed(signedOut: 1, warning: nil, session: "s.x"), signInOver: false)
         #expect(older == nil && flow.changing)
-        let told = flow.ended(ticket, .changed(signedOut: 1, warning: nil, session: "s.x"))
+        let told = flow.ended(ticket, .changed(signedOut: 1, warning: nil, session: "s.x"), signInOver: false)
         #expect(told == OwnPassword.doneWords(1))
         #expect(!flow.changing && flow.form.isEmpty)
         #expect(flow.said == .done(words: OwnPassword.doneWords(1), warning: nil))
         // and once over, the same ticket is nothing
-        let late = flow.ended(ticket, .unknown(words: "late"))
+        let late = flow.ended(ticket, .unknown(words: "late"), signInOver: false)
         #expect(late == nil)
     }
 
@@ -178,9 +184,9 @@ import Testing
         func after(_ outcome: OwnPassword.Outcome) throws -> (OwnPasswordFlow, String?) {
             var flow = OwnPasswordFlow()
             flow.form = Self.ready
-            let begun = flow.begin(user: "ethan", online: true)
+            let begun = flow.begin(user: "ethan", online: true, signInOver: false)
             let (ticket, _) = try #require(begun)
-            let said = flow.ended(ticket, outcome)
+            let said = flow.ended(ticket, outcome, signInOver: false)
             return (flow, said)
         }
         // changed, with its warning: emptied, both said in one announcement
@@ -212,14 +218,14 @@ import Testing
     @Test func hiddenEmptiesTheFieldsButAChangeOutStaysOut() throws {
         var flow = OwnPasswordFlow()
         flow.form = Self.ready
-        let begun = flow.begin(user: "ethan", online: true)
+        let begun = flow.begin(user: "ethan", online: true, signInOver: false)
         let (ticket, _) = try #require(begun)
         flow.hidden()
         #expect(flow.form.isEmpty && flow.changing)
         flow.form = Self.ready
-        let second = flow.begin(user: "ethan", online: true)
+        let second = flow.begin(user: "ethan", online: true, signInOver: false)
         #expect(second == nil, "no second change while one is out")
-        let told = flow.ended(ticket, .changed(signedOut: 0, warning: nil, session: "s.z"))
+        let told = flow.ended(ticket, .changed(signedOut: 0, warning: nil, session: "s.z"), signInOver: false)
         #expect(told != nil)
         flow.hidden()
         #expect(flow.said == nil && flow.form.isEmpty)
@@ -228,62 +234,134 @@ import Testing
     @Test func typingAgainClearsWhatWasSaid() throws {
         var flow = OwnPasswordFlow()
         flow.form = Self.ready
-        let begun = flow.begin(user: "ethan", online: true)
+        let begun = flow.begin(user: "ethan", online: true, signInOver: false)
         let (ticket, _) = try #require(begun)
         flow.typed()
-        _ = flow.ended(ticket, .refused(words: "No.", kind: "form", fix: nil))
+        _ = flow.ended(ticket, .refused(words: "No.", kind: "form", fix: nil), signInOver: false)
         #expect(flow.said != nil)
         flow.typed()
         #expect(flow.said == nil)
+    }
+
+    /// (review) The sign-in come over the app as the change answered: the fields go as the outcome leaves them, and
+    /// nothing is announced here - the sign-in says what happened, and two announcements would cut each other off.
+    @Test func nothingIsAnnouncedUnderTheSignIn() throws {
+        for outcome: OwnPassword.Outcome in [.changed(signedOut: 0, warning: nil, session: "s.n"),
+                                             .refused(words: "No.", kind: "form", fix: nil),
+                                             .unknown(words: OwnPassword.unknownLine)] {
+            var flow = OwnPasswordFlow(), plain = OwnPasswordFlow()
+            flow.form = Self.ready
+            plain.form = Self.ready
+            let begun = flow.begin(user: "ethan", online: true, signInOver: false)
+            let begunPlain = plain.begin(user: "ethan", online: true, signInOver: false)
+            let (ticket, _) = try #require(begun)
+            let (ticketPlain, _) = try #require(begunPlain)
+            let under = flow.ended(ticket, outcome, signInOver: true)
+            let told = plain.ended(ticketPlain, outcome, signInOver: false)
+            #expect(under == nil && told != nil, "\(outcome)")
+            #expect(flow == plain, "the same fields and words either way: \(outcome)")
+        }
     }
 
     // MARK: the hold on the sign-in
 
     @Test func aRekeyDropsWhatWasHeldAndAnythingElseSaysIt() {
         var rekey = PasswordRekey()
-        let idle = rekey.holds(reason: "x")
+        let idle = rekey.holds(reason: "x", session: "s.old")
         #expect(!idle, "nothing out: a 401 is acted on")
-        let first = rekey.began(), again = rekey.began()
+        let first = rekey.began(under: "s.old"), again = rekey.began(under: "s.old")
         #expect(first && !again, "one at a time")
-        let heldFirst = rekey.holds(reason: "first"), heldSecond = rekey.holds(reason: "second")
+        #expect(rekey.under == .some("s.old"))
+        let heldFirst = rekey.holds(reason: "first", session: "s.old")
+        let heldSecond = rekey.holds(reason: "second", session: "s.old")
         #expect(heldFirst && heldSecond)
-        let then = rekey.ended(.changed(signedOut: 0, warning: nil, session: "s.n"), rekeyed: true)
+        let then = rekey.ended(.changed(signedOut: 0, warning: nil, session: "s.n"))
         #expect(then == .nothing)
-        let after = rekey.holds(reason: "after")
-        #expect(!rekey.out && !after)
+        let after = rekey.holds(reason: "after", session: "s.n")
+        #expect(!rekey.out && !after && rekey.under == nil)
 
         // the person or the address changed while it was out: let go, nothing held, the next one may go
-        let again2 = rekey.began()
-        let held2 = rekey.holds(reason: "someone else's")
+        let again2 = rekey.began(under: "s.n")
+        let held2 = rekey.holds(reason: "someone else's", session: "s.n")
         rekey.forgot()
-        let afterForgot = rekey.holds(reason: "now")
-        #expect(again2 && held2 && !rekey.out && !afterForgot)
+        let afterForgot = rekey.holds(reason: "now", session: "s.n")
+        #expect(again2 && held2 && !rekey.out && !afterForgot && rekey.under == nil)
 
-        // the table: the outcome, a 401 held or not, what then
+        // the table: the outcome, a 401 held or not, what then - a change is re-keyed exactly when it changed, which
+        // drops what was held; a held 401 after anything else but a refusal is said in the phone's words (the change
+        // may have gone through: deadwax's would name another device); and an answer that leaves the session in doubt
+        // asks /me, a cancelled request among them
+        let ended = OwnPassword.endedWhileChanging
         let cases: [(OwnPassword.Outcome, String??, PasswordRekey.After)] = [
-            (.changed(signedOut: 0, warning: nil, session: "s"), nil, .askMe),     // changed, not kept: another person now
+            (.changed(signedOut: 0, warning: nil, session: "s"), nil, .nothing),
+            (.changed(signedOut: 0, warning: nil, session: "s"), .some("the move's"), .nothing),
             (.notRenewed(signedOut: 0, warning: nil), nil, .askMe),
-            (.notRenewed(signedOut: 0, warning: nil), .some("held"), .signIn(reason: "held")),
+            (.notRenewed(signedOut: 0, warning: nil), .some("held"), .signIn(reason: ended)),
             (.refused(words: "No.", kind: "form", fix: nil), nil, .nothing),
             (.refused(words: "No.", kind: "form", fix: nil), .some("held"), .signIn(reason: "held")),
             (.refused(words: "No.", kind: "form", fix: nil), .some(nil), .signIn(reason: nil)),
             (.signedOut(reason: "its own"), nil, .signIn(reason: "its own")),
             (.signedOut(reason: "its own"), .some("held"), .signIn(reason: "its own")),
             (.failed(words: "Timed out.", fix: nil), nil, .askMe),
-            (.failed(words: "Timed out.", fix: nil), .some("held"), .signIn(reason: "held")),
+            (.failed(words: "Timed out.", fix: nil), .some("held"), .signIn(reason: ended)),
             (.unknown(words: "?"), nil, .askMe),
-            (.unknown(words: "?"), .some("went through"), .signIn(reason: "went through")),
-            (.cancelled, nil, .nothing),
-            (.cancelled, .some("held"), .signIn(reason: "held")),
+            (.unknown(words: "?"), .some("from another device"), .signIn(reason: ended)),
+            (.cancelled, nil, .askMe),
+            (.cancelled, .some("held"), .signIn(reason: ended)),
         ]
         for (outcome, held, then) in cases {
             var hold = PasswordRekey()
-            _ = hold.began()
-            if let held { _ = hold.holds(reason: held) }
-            let after = hold.ended(outcome, rekeyed: false)
+            _ = hold.began(under: "s.old")
+            if let held { _ = hold.holds(reason: held, session: "s.old") }
+            let after = hold.ended(outcome)
             #expect(after == then, "\(outcome), held \(String(describing: held))")
-            #expect(!hold.out)
+            #expect(!hold.out && hold.under == nil)
         }
+    }
+
+    /// (review) The hold is the session's it began under: a 401 that would end any other session - one signed in since,
+    /// or none - is that session's own, and acted on.
+    @Test func aHoldIsOnlyTheSessionsItBeganUnder() {
+        let cases: [(began: String?, heard: String?, held: Bool)] = [
+            ("s.old", "s.old", true),
+            ("s.old", "s.new", false),
+            ("s.old", nil, false),
+            (nil, nil, true),
+            (nil, "s.new", false),
+        ]
+        for (began, heard, held) in cases {
+            var rekey = PasswordRekey()
+            _ = rekey.began(under: began)
+            let holds = rekey.holds(reason: "r", session: heard)
+            #expect(holds == held, "began under \(String(describing: began)), heard under \(String(describing: heard))")
+            // and one not held is not kept: the end says nothing of it
+            let then = rekey.ended(.failed(words: "x", fix: nil))
+            #expect(then == (held ? .signIn(reason: OwnPassword.endedWhileChanging) : .askMe))
+        }
+    }
+
+    /// (review) ServerModel's guard after the await: the answer is used only while the person, the address, the session
+    /// and the open app all stand as the change was sent.
+    @Test func anAnswerStandsOnlyWhileAllItWasSentUnderDoes() {
+        let sent = PasswordRekey.Context(person: 3, address: "http://deadwax.test:8080", session: "s.old", ready: true)
+        func now(person: Int = 3, address: String? = "http://deadwax.test:8080", session: String? = "s.old",
+                 ready: Bool = true) -> PasswordRekey.Context {
+            PasswordRekey.Context(person: person, address: address, session: session, ready: ready)
+        }
+        let cases: [(PasswordRekey.Context, Bool, String)] = [
+            (now(), true, "all as sent"),
+            (now(person: 4), false, "another person"),
+            (now(address: "http://other.test:8080"), false, "another address"),
+            (now(address: nil), false, "no address"),
+            (now(session: "s.new"), false, "another session"),
+            (now(session: nil), false, "signed out"),
+            (now(ready: false), false, "the app not open"),
+        ]
+        for (at, stands, what) in cases {
+            #expect(PasswordRekey.answerStands(sent: sent, now: at) == stands, "\(what)")
+        }
+        let unready = PasswordRekey.Context(person: 3, address: nil, session: nil, ready: false)
+        #expect(!PasswordRekey.answerStands(sent: unready, now: unready), "never while the app isn't open")
     }
 
     @Test func aChangeOutKeepsTheSettingsPageThroughATabRetap() {

@@ -295,6 +295,8 @@ public final class ResumeController {
 
     private func send(_ kind: SaveKind, _ sending: UpNextQueue, _ position: Double, _ now: Int64) {
         lastSent = (sending, position, kind)
+        //? the sign-in it goes under: a 401 holds saving only while that is still the one in hand (Resume.heldAfter401)
+        let under = session()
         //? kept before it goes, unsent: the app may be closed, or the network gone, before deadwax answers
         let made: Saving? = keeper == nil ? nil : toSave(sending, position: position)
         if let made { keep(sending, position: position, saving: made, unsent: true, seen: kept?.seen ?? taken) }
@@ -309,7 +311,7 @@ public final class ResumeController {
                 guard let self else { return }
                 switch result {
                 case .success(let answer): self.answered(baseline, answer, sentAt: now, full: false, write: write)
-                case .failure(let failure): self.refused(failure, position: true)
+                case .failure(let failure): self.refused(failure, position: true, under: under)
                 }
                 self.settled()
             }
@@ -320,7 +322,7 @@ public final class ResumeController {
                                  label: label, snapshot: saving.snapshot)
         let baseline = SaveBaseline(tracks: sending.tracks, upNext: sending.upNext, index: sending.index,
                                     position: position, start: saving.start, count: saving.ids.count)
-        saveFull(body, baseline, sentAt: now, write: write)
+        saveFull(body, baseline, sentAt: now, write: write, under: under)
     }
 
     /// A full save sent - and (review of the roll-back's port) when deadwax refuses it with a 422 while it carries a v2
@@ -329,7 +331,8 @@ public final class ResumeController {
     /// was kept. Without its snapshot it is the songs, the one playing and the second, which any server keeps: put back
     /// as a plain list there, as every reader before 2.1.18 puts a v2 back. The phone's own kept row still holds it
     /// whole. A second refusal is the failure it always was.
-    private func saveFull(_ body: QueueSaveBody, _ baseline: SaveBaseline, sentAt now: Int64, write: Int, again: Bool = false) {
+    private func saveFull(_ body: QueueSaveBody, _ baseline: SaveBaseline, sentAt now: Int64, write: Int, under: Int,
+                          again: Bool = false) {
         flying += 1
         server.save(body) { [weak self] result in
             guard let self else { return }
@@ -338,8 +341,8 @@ public final class ResumeController {
             case .failure(.status(422)) where !again && body.snapshot?.hasPrefix(#"{"v":2,"#) == true:
                 let plain = QueueSaveBody(ids: body.ids, index: body.index, position: body.position, device: body.device,
                                           label: body.label, snapshot: nil)
-                self.saveFull(plain, baseline, sentAt: now, write: write, again: true)
-            case .failure(let failure): self.refused(failure, position: false)
+                self.saveFull(plain, baseline, sentAt: now, write: write, under: under, again: true)
+            case .failure(let failure): self.refused(failure, position: false, under: under)
             }
             self.settled()
         }
@@ -368,9 +371,16 @@ public final class ResumeController {
         }
     }
 
-    private func refused(_ failure: ResumeFailure, position: Bool) {
+    /// - Parameter under: the sign-in generation the save was sent under.
+    private func refused(_ failure: ResumeFailure, position: Bool, under: Int) {
         if failure == .status(401) {
-            signedOutUnder = session()
+            if let held = Resume.heldAfter401(sentUnder: under, now: session()) {
+                signedOutUnder = held
+                return
+            }
+            //? sent under a session since replaced (Change password): a failure like any other, tried again under the
+            //? new one at the next trigger
+            saves.failedAt = clock.now
             return
         }
         //? (a position save) the ids changed elsewhere, or aren't the ones kept: saved in full, now

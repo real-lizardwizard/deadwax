@@ -43,7 +43,8 @@ final class URLSessionTransport: HTTPTransport, @unchecked Sendable {
         lock.lock()
         defer { lock.unlock() }
         if let session = sessions[timeout] { return session }
-        let session = URLSession(configuration: Self.configuration(waiting: timeout))
+        let session = URLSession(configuration: Self.configuration(waiting: timeout), delegate: SameOriginRedirects.shared,
+                                 delegateQueue: nil)
         sessions[timeout] = session
         return session
     }
@@ -102,7 +103,7 @@ final class URLSessionTransport: HTTPTransport, @unchecked Sendable {
         defer { lock.unlock() }
         if let streams { return streams }
         let configuration = Self.configuration(waiting: EventStream.silence)
-        let session = URLSession(configuration: configuration)
+        let session = URLSession(configuration: configuration, delegate: SameOriginRedirects.shared, delegateQueue: nil)
         streams = session
         return session
     }
@@ -179,6 +180,21 @@ extension URLRequest {
     }
 }
 
+/// (Phase 8, slice 10's review) The app's sessions follow a redirect only within the address they asked - the same scheme,
+/// host and port (Core's Redirects.follows): every request carries deadwax's session by hand as `Cookie:`, and a sign-in
+/// or Change password a password in its body, which URLSession would send on to wherever a 307 or 308 named. One
+/// elsewhere is refused, and its 3xx is the answer. URLSessionTransport's sessions (every route, and the event log's
+/// stream) and the reachability probe take this; a capped read and the player's StreamFetch are their own delegates and
+/// ask the same rule; the downloads' background session can't be asked (DownloadSession).
+final class SameOriginRedirects: NSObject, URLSessionTaskDelegate, Sendable {
+    static let shared = SameOriginRedirects()
+
+    func urlSession(_ session: URLSession, task: URLSessionTask, willPerformHTTPRedirection response: HTTPURLResponse,
+                    newRequest request: URLRequest, completionHandler: @escaping (URLRequest?) -> Void) {
+        completionHandler(Redirects.follows(from: task.originalRequest?.url, to: request.url) ? request : nil)
+    }
+}
+
 /// A body read as it comes and called off past `most` bytes - at once when the answer's Content-Length says it will
 /// be - so a file too big to hold is never held whole: the cover viewer's full size, past CoverZoom.fullMostBytes
 /// (notes/ios.md "The cover, full screen"). Its own URLSession, for the delegate, let go as the read ends; a task
@@ -229,6 +245,12 @@ private final class CappedRead: NSObject, URLSessionDataDelegate, @unchecked Sen
             if past { over = true }
         }
         completionHandler(past ? .cancel : .allow)
+    }
+
+    /// Only within the address asked, as every session's (SameOriginRedirects).
+    func urlSession(_ session: URLSession, task: URLSessionTask, willPerformHTTPRedirection response: HTTPURLResponse,
+                    newRequest request: URLRequest, completionHandler: @escaping (URLRequest?) -> Void) {
+        completionHandler(Redirects.follows(from: task.originalRequest?.url, to: request.url) ? request : nil)
     }
 
     func urlSession(_ session: URLSession, dataTask: URLSessionDataTask, didReceive data: Data) {

@@ -217,7 +217,11 @@ happens in `~/Library/Caches/deadwax-build`, and the last build's whole log is `
 1. **deadwax's address**: the address you open deadwax at, by IP (`192.168.1.20:8090`) or by name.
    `http://` is assumed when you don't type it, and a pasted web-app link (`.../player/`) works too.
    **Check** asks deadwax whether it's there, and the address is kept only once it answers. The first
-   time, iOS asks to let deadwax **find devices on your local network**: say yes.
+   time, iOS asks to let deadwax **find devices on your local network**: say yes. Give the address deadwax
+   answers at itself: the app follows a redirect only within that address - the same `http://` or `https://`, name
+   and port - since every request carries your sign-in (and a sign-in or Change password your password). A proxy
+   that sends `http://` on to `https://`, or one name on to another, is refused, so Check fails at that address;
+   type the `https://` address (or the other name) instead.
 2. **Sign in**, when logins are on: your Navidrome user name and password, as on the web app (a
    password manager can fill them in). The password isn't kept on the phone. Only the session
    deadwax gives back is kept, in the Keychain, for that address. With logins off there's no sign-in,
@@ -2244,18 +2248,24 @@ mistyped current password counts against your sign-ins too, as a wrong one at th
 page can't tell whether the change went through. It says "deadwax may have changed your password - its answer never
 came. If deadwax asks you to sign in again, it did: sign in with the new password. If it doesn't, try again." and asks
 deadwax at once who you are: had it gone through, this phone's old sign-in is over, and the sign-in screen comes up
-with why. Nothing is ever sent again by itself. The fields are kept.
+with why. Nothing is ever sent again by itself. The fields are kept. If deadwax said this phone's sign-in was over
+while the change was out and no new one came back, the sign-in screen says "This phone's sign-in ended while your
+password was being changed - sign in again, with the new password if the change went through." (and nothing more is
+said on the page under it).
 
 **Your password never stays on the phone**: it isn't saved, logged or put in an address; only deadwax's new sign-in is
-kept. The fields are emptied once it's changed, when you leave the page (going back, another tab, Now Playing over it),
-and when the sign-in screen comes over the app. While deadwax can't be reached, the amber line Edit album shows is at
-the top and Change is dimmed. VoiceOver reads each field once, and says what came of a change once; at the largest text
-sizes the words wrap.
+kept. The fields are emptied once it's changed, when you leave the page (going back, another tab), when Now Playing
+comes up over it, and when the sign-in screen comes over the app (Change is dimmed under it). While deadwax can't be
+reached, the amber line Edit album shows is at the top and Change is dimmed. VoiceOver reads each field once, and says
+what came of a change once; at the largest text sizes the words wrap.
 
 **Downloads going at that moment** were asked for under the old sign-in. One deadwax was already sending finishes as
 it was; one it hadn't started answering is refused, as the old sign-in is over. The app sees that it went out under the
 old one, not the one it has now, and asks for that song again under the new one - the other downloads aren't held up,
-and nothing asks you to sign in (check 377).
+and nothing asks you to sign in (check 377). One refused in the moment before the change's own answer reaches the
+phone waits for that answer - only that song; the rest carry on - and is asked for again under the new sign-in once
+it comes. Had the change not gone through, it is taken as the sign-in being over, as any download's refusal is.
+Saving where you are in the queue, and the event log's live feed, carry on under the new sign-in the same way.
 
 ### Debug
 

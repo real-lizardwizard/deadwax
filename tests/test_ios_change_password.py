@@ -12,12 +12,14 @@ Downloads/, Shared/Routes.swift) and held to the server's.
 - who may - a user's route (tests/test_logins.py ROUTES), offered by the rule the web's is;
 - what the app does with it - the cookie kept in the Keychain before the new client is made, a 401 held while the
   change is out, a background download's 401 told by the session it went out under, never a password logged or kept,
-  the fields emptied, the page's words in the palette's faces.
+  the fields emptied, the page's words in the palette's faces;
+- (after review) where it goes: a redirect followed only within the address asked, by every session the app makes.
 """
 
 import inspect
 import re
 import sys
+import unicodedata
 from pathlib import Path
 
 from fastapi.testclient import TestClient
@@ -32,7 +34,7 @@ from src.store import JobStore  # noqa: E402
 from tests import test_own_password, test_people  # noqa: E402
 from tests.test_ios_contract import (CORE, _block, _code, coding_keys, fields, sent_fields, swift_function,  # noqa: E402
                                      swift_struct)
-from tests.test_ios_needs_look import app_file, swift_like, timeouts  # noqa: E402
+from tests.test_ios_needs_look import APP, app_file, swift_like, timeouts  # noqa: E402
 from tests.test_logins import ROUTES  # noqa: E402
 from tests.test_people import ME, password, signed_in  # noqa: E402
 
@@ -68,10 +70,62 @@ def phone_body(current: str, new: str, again: str) -> dict:
     return {keys[name]: values[name] for name in keys}
 
 
-def session_of(header: str) -> str | None:
-    """SessionCookie.value(fromSetCookie:)'s rule: after the name and `=`, up to `;` or `,`."""
-    found = re.search(r"(?:^|[,;]\s*)" + re.escape(auth.COOKIE) + r"=([^;,]*)", header or "")
-    return found.group(1).strip() or None if found else None
+def _swift_trimmed(text: str) -> str:
+    """`String.trimmingCharacters(in: .whitespaces)`: Unicode's space separators (Zs) and the tab, off both ends."""
+    def blank(character: str) -> bool:
+        return character == "\t" or unicodedata.category(character) == "Zs"
+    start, end = 0, len(text)
+    while start < end and blank(text[start]):
+        start += 1
+    while end > start and blank(text[end - 1]):
+        end -= 1
+    return text[start:end]
+
+
+def session_of(header: str | None) -> str | None:
+    """SessionCookie.value(fromSetCookie:), step for step: each `<name>=` in turn, taken where it starts the header
+    (only spaces before it) or follows a `,`, a space or a `;`; its value up to the next `;` or `,`, trimmed, one pair of
+    surrounding quotes taken off; nil when empty (a sign-out's clearing) or when there is none."""
+    if header is None:
+        return None
+    needle = auth.COOKIE + "="
+    rest = header
+    while (at := rest.find(needle)) >= 0:
+        before, after = rest[:at], rest[at + len(needle):]
+        if all(c == " " for c in before) or before[-1] in (",", " ", ";"):
+            value = _swift_trimmed(re.split(r"[;,]", after, maxsplit=1)[0])
+            if len(value) >= 2 and value.startswith('"') and value.endswith('"'):
+                value = value[1:-1]
+            return value or None
+        rest = after
+    return None
+
+
+def test_the_cookie_is_read_as_session_cookie_reads_it():
+    code = _code((CORE / "SessionCookie.swift").read_text(encoding="utf-8"))
+    found = list(re.finditer(r"\bfunc value\(fromSetCookie[^{]*\{", code))
+    assert len(found) == 1
+    rule = _block(code, found[0].end() - 1)
+    # the Swift this follows, step by step
+    for part in ('rest.range(of: name + "=")', 'before.allSatisfy({ $0 == " " }) || before.last == ","',
+                 'after.prefix(while: { $0 != ";" && $0 != "," })', ".trimmingCharacters(in: .whitespaces)",
+                 'value.hasPrefix("\\""), value.hasSuffix("\\""), value.count >= 2', "return value.isEmpty ? nil : value"):
+        assert part in rule, part
+    name = auth.COOKIE
+    cases = [
+        (f"{name}=s.a; HttpOnly; Path=/", "s.a"),
+        (f'{name}="s.q"; Path=/', "s.q"),
+        (f"other=1; Path=/, {name}=s.b; HttpOnly", "s.b"),
+        (f"x{name}=no; {name}=s.c", "s.c"),
+        (f"  {name}= s.d ;", "s.d"),
+        (f"{name}=; Max-Age=0", None),
+        (f'{name}=""; Max-Age=0', None),
+        (f'{name}="', '"'),
+        ("other=1", None),
+        (None, None),
+    ]
+    for header, value in cases:
+        assert session_of(header) == value, header
 
 
 # ---------------------------------------------------------------------------- the route, and who may
@@ -189,20 +243,47 @@ def test_the_wait_is_the_servers_worst_case_with_room():
 def test_the_new_session_is_kept_before_it_is_used_and_a_401_is_held_while_out():
     server = _code(app_file("Models", "ServerModel.swift"))
     change = swift_like(server, "changeOwnPassword")
-    assert "rekey.began()" in change and "BackgroundHold(named:" in change
-    order = [change.index(step) for step in ("SessionKeychain.save(cookie, for: address.key)", "session = cookie",
+    assert "rekey.began(under: session)" in change and "BackgroundHold(named:" in change
+    order = [change.index(step) for step in ("changingPassword = true", "let sent = changeContext",
+                                             "await client.changeOwnPassword(body",
+                                             "guard PasswordRekey.answerStands(sent: sent, now: changeContext) else {",
+                                             "SessionKeychain.save(cookie, for: address.key)", "session = cookie",
                                              "self.client = makeClient(address, session: cookie)",
-                                             "rekey.ended(outcome, rekeyed: rekeyed)")]
+                                             "let then = rekey.ended(outcome)", "changingPassword = false")]
     assert order == sorted(order)
+    # the cookie kept, in hand and in the client in one turn: nothing awaited between, so nothing asks under the old one
+    kept = change[change.index("SessionKeychain.save(cookie"):change.index("self.client = makeClient(address")]
+    assert "await" not in kept
+    # an answer whose person, address or session has moved on is dropped, and the hold with it
+    assert "dropChange()\n            return .cancelled" in change
+    assert ("PasswordRekey.Context(person: person, address: address?.key, session: session, ready: launch == .ready)"
+            in server)
     # nothing asked again by itself: one call to the client
     assert change.count("client.changeOwnPassword(") == 1
-    # every 401 that would end the session goes through the hold
+    # every 401 that would end the session goes through the hold - held only under the session it began under
     ended = swift_like(server, "sessionEnded")
-    assert "if rekey.holds(reason: reason) { return }" in ended
+    assert "if rekey.holds(reason: reason, session: session) { return }" in ended
     assert server.count("sessionEnded(reason:") == 4
+    # and the sign-in is brought from two places only: a 401 not held, and the change's end
+    assert len(re.findall(r"(?<!func )\bbringSignIn\(", server)) == 2
+    assert "bringSignIn(reason: reason)" in ended and "bringSignIn(reason: reason)" in change
+    # a sign-out, another address, another person: the hold let go with them
+    assert len(re.findall(r"(?<!func )\bdropChange\(\)", server)) == 4
+    assert "dropChange()" in swift_like(server, "personChanged")
+    drop = swift_like(server, "dropChange")
+    assert "rekey.forgot()" in drop and "changingPassword = false" in drop
     # Core's hold: what each outcome leaves
-    after = own_function("ended(_ outcome: OwnPassword.Outcome, rekeyed: Bool)")
-    assert "if rekeyed { return .nothing }" in after
+    after = own_function("ended(_ outcome: OwnPassword.Outcome)")
+    assert "defer { forgot() }" in after
+    assert re.search(r"case \.changed:\s*return \.nothing", after)
+    assert ("case .notRenewed, .failed, .unknown, .cancelled:\n"
+            "            return heard ? .signIn(reason: OwnPassword.endedWhileChanging) : .askMe") in after
+    holds = own_function("holds(reason said: String?, session: String?)")
+    assert "guard out, under == .some(session) else { return false }" in holds
+    assert "now.ready && sent == now" in own_function("answerStands(sent: Context, now: Context)")
+    # the words the sign-in says when a held 401 is brought: the phone's, never PASSWORD_CHANGED's "another device"
+    assert "another device" not in swift_words("endedWhileChanging")
+    assert "another device" in auth.PASSWORD_CHANGED
 
 
 def test_a_downloads_401_is_told_by_the_session_it_went_out_under():
@@ -210,10 +291,25 @@ def test_a_downloads_401_is_told_by_the_session_it_went_out_under():
     assert "sentUnder: String??" in session
     assert 'SessionCookie.value(fromCookie: $0.value(forHTTPHeaderField: "Cookie"))' in session
     model = _code(app_file("Downloads", "DownloadModel.swift"))
-    assert "if current { signedOutHeard(sentUnder: sentUnder) }" in model
+    assert "if current { signedOutHeard(sentUnder: sentUnder, song: record.id) }" in model
     heard = swift_like(model, "signedOutHeard")
-    early = heard.index("if let sentUnder, sentUnder != session {")
-    assert early < heard.index("refusedSession = .some(session)")
+    assert ("switch DownloadRules.heard401(sentUnder: sentUnder, current: session, changing: server.changingPassword)"
+            in heard)
+    assert "heldForChange.insert(song)" in heard and "refuseSession(session)" in heard
+    assert "refusedSession = .some(session)" in swift_like(model, "refuseSession")
+    # a 401 while a change is out holds its own song back, not every download; the change's end decides it
+    assert "&& !(server.changingPassword && heldForChange.contains($0.id))" in model
+    changed = swift_like(model, "serverChanged")
+    assert "DownloadRules.afterChange(deferred: deferred, current: server.client?.session)" in changed
+    assert "_ = server.changingPassword" in swift_like(model, "watchServer")
+    # Core's rule
+    rule = swift_function("DownloadRules.swift", "heard401")
+    assert "if under != .some(current) { return .replaced }" in rule
+    assert "return changing ? .deferred : .refused" in rule
+    # and Resume's: a save's 401 stops saving only under the session it was sent under
+    resume = _code((CORE / "ResumeController.swift").read_text(encoding="utf-8"))
+    assert "if let held = Resume.heldAfter401(sentUnder: under, now: session()) {" in resume
+    assert "sentUnder == now ? now : nil" in swift_function("Resume.swift", "heldAfter401")
     # the request carries the cookie the way SessionCookie reads it back
     cookie = swift_function("SessionCookie.swift", "header")
     assert '"\\(name)=\\(value)"' in cookie
@@ -222,9 +318,17 @@ def test_a_downloads_401_is_told_by_the_session_it_went_out_under():
 def test_no_password_is_logged_kept_or_put_in_an_address():
     screen = _code(app_file("You", "ChangePasswordScreen.swift"))
     server = _code(swift_like(app_file("Models", "ServerModel.swift"), "changeOwnPassword"))
-    for code in (screen, server):
-        for leak in ("print(", "Logger", "os_log", "NSLog", "note(", "UserDefaults", "AppStorage", "URLQueryItem"):
+    # the page, the change, Core's rules for it, the client that sends it and the transport under that
+    wider = [_code((CORE / name).read_text(encoding="utf-8")) for name in ("OwnPassword.swift", "DeadwaxClient.swift")]
+    transport = _code(app_file("URLSessionTransport.swift"))
+    for code in (screen, server, *wider, transport):
+        for leak in ("print(", "Logger", "os_log", "NSLog", "note(", "UserDefaults", "AppStorage", "dump("):
             assert leak not in code, leak
+    # nothing in an address: the page and OwnPassword make none, and the client's are the route's query alone - which
+    # for this route is none
+    for code in (screen, server, wider[0]):
+        assert "URLQueryItem" not in code
+    assert "parts.queryItems = sent.map { URLQueryItem(name: $0.0, value: $0.1) }" in wider[1]
     # the form and the body say nothing of what they hold, however they are printed
     for struct in ("OwnPasswordForm", "OwnPasswordBody"):
         body = swift_struct(struct)
@@ -236,6 +340,8 @@ def test_no_password_is_logged_kept_or_put_in_an_address():
     assert "flow.hidden()" in forget
     assert ".onDisappear {\n            forget()" in screen
     assert "if over { forget() }" in screen
+    # and as Now Playing comes over the page
+    assert ".onChange(of: navigation.nowPlayingShown) { _, shown in\n" in screen and "if shown { forget() }" in screen
 
 
 def test_the_page_draws_as_the_spec_says():
@@ -249,12 +355,18 @@ def test_the_page_draws_as_the_spec_says():
     assert ".navigationBarBackButtonHidden(flow.changing)" in screen
     assert ".editOutOfReach(!reachability.online)" in screen
     assert "navigation.passwordChanging(changing)" in screen
-    assert "flow.canChange(user: user, online: reachability.online) && server.signInOver == nil" in screen
+    # on only by Core's rule, the sign-in over the app among it
+    assert "flow.canChange(user: user, online: reachability.online, signInOver: server.signInOver != nil)" in screen
+    assert "!changing && online && !signInOver && OwnPassword.formReady(form, user: user)" in own_function(
+        "canChange(user: String, online: Bool, signInOver: Bool)")
     assert "OwnPassword.httpNote(at: server.address)" in screen and "Text(OwnPassword.appsLine)" in screen
     # the ticket taken in the tap, before the Task
     change = swift_like(screen, "change")
-    assert change.index("flow.begin(user: user, online: reachability.online)") < change.index("Task {")
+    assert change.index("flow.begin(user: user, online: reachability.online,") < change.index("Task {")
     assert "Notice.announce(words)" in change
+    # nothing announced under the sign-in: it says what happened
+    assert "let words = flow.ended(ticket, outcome, signInOver: server.signInOver != nil)" in change
+    assert "return signInOver ? nil : said?.announcement" in own_function("ended(_ ticket: Int")
     # Account's row pushes it, offered by the web's rule
     account = _code(app_file("You", "AccountSection.swift"))
     assert "if OwnPassword.changeOffered(server.me) {" in account
@@ -262,3 +374,45 @@ def test_the_page_draws_as_the_spec_says():
     navigation = _code(app_file("Shared", "Routes.swift"))
     assert "case .changePassword: ChangePasswordScreen()" in navigation
     assert "OwnPassword.pagesKept(password, changing: changingPassword)" in navigation
+
+
+# ---------------------------------------------------------------------------- where it goes (after review)
+
+FOLLOWS = "Redirects.follows(from: task.originalRequest?.url, to: request.url) ? request : nil"
+
+
+def test_every_session_the_app_makes_follows_a_redirect_only_within_the_address_asked():
+    """A request carries deadwax's session as `Cookie:`, a sign-in or Change password a password: a 307 or 308 to
+    another scheme, host or port would take them there. Every URLSession the app makes is found, and each says so."""
+    sources = CORE.parent
+    made = {}
+    for path in sorted([*APP.rglob("*.swift"), *sources.rglob("*.swift")]):
+        code = _code(path.read_text(encoding="utf-8"))
+        assert "URLSession.shared" not in code, path.name
+        calls = re.findall(r"URLSession\(configuration:[^\n]*", code)
+        if calls:
+            made[path.name] = (code, calls)
+    assert set(made) == {"URLSessionTransport.swift", "Reachability.swift", "DownloadSession.swift", "StreamFetch.swift"}
+    for name, (code, calls) in made.items():
+        for call in calls:
+            assert "delegate:" in call, (name, call)
+            if "delegate: SameOriginRedirects.shared" in call:
+                continue
+            if name == "DownloadSession.swift":
+                # a background session follows redirects itself, never asking: an answer from elsewhere isn't the song
+                assert "URLSessionConfiguration.background(" in code
+                assert "!Redirects.follows(from: downloadTask.originalRequest?.url, to: answeredAt) {" in code
+                assert "status = 0" in code
+                continue
+            # its own delegate (a capped read, the player's StreamFetch) asks the same rule
+            assert "willPerformHTTPRedirection" in code and FOLLOWS in code, (name, call)
+    transport = made["URLSessionTransport.swift"][0]
+    # every route's sessions and the event log's stream, the rule's own class; and the capped read's delegate
+    assert transport.count("delegate: SameOriginRedirects.shared") == 2
+    assert "final class SameOriginRedirects: NSObject, URLSessionTaskDelegate" in transport
+    assert transport.count(FOLLOWS) == 2
+    assert "delegate: SameOriginRedirects.shared" in made["Reachability.swift"][0]
+    # Core's rule: the same scheme, host and port, each URL's own port where it names none
+    rule = _code((CORE / "Redirects.swift").read_text(encoding="utf-8"))
+    assert "return from == to" in rule
+    assert 'case "http": return 80' in rule and 'case "https": return 443' in rule

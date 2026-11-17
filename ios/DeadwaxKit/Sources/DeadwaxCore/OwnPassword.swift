@@ -60,6 +60,11 @@ public enum OwnPassword {
         + "If it doesn't, try again."
     /// What a refusal with no words of deadwax's says it couldn't do (ErrorWords' `failed`).
     public static let failed = "Couldn't change your password."
+    /// (review) The sign-in's reason when this phone's session ended while its own change was out and the change may
+    /// have gone through (anything but a refusal): deadwax's words for that 401 - PASSWORD_CHANGED's "Your password was
+    /// changed from another device" - would name the wrong device.
+    public static let endedWhileChanging = "This phone's sign-in ended while your password was being changed - sign in "
+        + "again, with the new password if the change went through."
     /// src/routes/own_password.py NOT_YOUR_PASSWORD's kind: Current is emptied and focused, as the web does.
     public static let notYourPassword = "not_your_password"
 
@@ -344,9 +349,10 @@ public struct OwnPasswordFlow: Sendable, Equatable {
 
     public func problem(user: String) -> String? { OwnPassword.formProblem(form, user: user) }
 
-    /// Change may be pressed: no change out, deadwax in reach, the form ready.
-    public func canChange(user: String, online: Bool) -> Bool {
-        !changing && online && OwnPassword.formReady(form, user: user)
+    /// Change may be pressed: no change out, deadwax in reach, the sign-in not over the app (anything asked under it is
+    /// a 401 for certain), the form ready.
+    public func canChange(user: String, online: Bool, signInOver: Bool) -> Bool {
+        !changing && online && !signInOver && OwnPassword.formReady(form, user: user)
     }
 
     /// Typing again clears what the last answer said - it was of the fields as they were.
@@ -355,8 +361,8 @@ public struct OwnPasswordFlow: Sendable, Equatable {
     }
 
     /// Change pressed: the body to send and the ticket its answer comes back with - nil when it isn't on.
-    public mutating func begin(user: String, online: Bool) -> (ticket: Int, body: OwnPasswordBody)? {
-        guard canChange(user: user, online: online) else { return nil }
+    public mutating func begin(user: String, online: Bool, signInOver: Bool) -> (ticket: Int, body: OwnPasswordBody)? {
+        guard canChange(user: user, online: online, signInOver: signInOver) else { return nil }
         changing = true
         said = nil
         tickets += 1
@@ -365,8 +371,9 @@ public struct OwnPasswordFlow: Sendable, Equatable {
 
     /// The change answered, for `ticket` - the fields as the outcome leaves them: emptied once it changed (or the
     /// session ended), kept to correct after a refusal, Current emptied and focused when it was wrong. Returns what
-    /// VoiceOver is told, once - nil for an older ticket, or nothing said.
-    public mutating func ended(_ ticket: Int, _ outcome: OwnPassword.Outcome) -> String? {
+    /// VoiceOver is told, once - nil for an older ticket, or nothing said, or (`signInOver`) the sign-in come over the
+    /// app as it answered: the sign-in says what happened, and two announcements would cut each other off.
+    public mutating func ended(_ ticket: Int, _ outcome: OwnPassword.Outcome, signInOver: Bool) -> String? {
         guard ticket == tickets, changing else { return nil }
         changing = false
         switch outcome {
@@ -392,7 +399,7 @@ public struct OwnPasswordFlow: Sendable, Equatable {
         case .cancelled:
             said = nil
         }
-        return said?.announcement
+        return signInOver ? nil : said?.announcement
     }
 
     /// The page went (another tab, Now Playing over it), or the sign-in came over the app: every field emptied and
@@ -409,6 +416,10 @@ public struct OwnPasswordFlow: Sendable, Equatable {
 /// 401 - which says nothing about the session the answer brings. So a 401 that would end the session in hand, heard
 /// while a change is out, is held rather than acted on; at the end, the re-key drops it, and anything else brings the
 /// sign-in with it.
+///
+/// (review) Tied to the session it began under: a 401 is held only while that session is still the one in hand - after a
+/// sign-out, another address or another person (each of which lets the hold go, `forgot`), a 401 is that session's own.
+/// And the change's answer is used only while everything it was sent under still stands (`answerStands`).
 public struct PasswordRekey: Sendable, Equatable {
     public enum After: Sendable, Equatable {
         case nothing
@@ -418,24 +429,44 @@ public struct PasswordRekey: Sendable, Equatable {
         case askMe
     }
 
+    /// What a change was sent under - and, as it answers, what stands now: the person (ServerModel's count), the
+    /// address, the session, and whether the app is open (signed in, not at the address or sign-in screen).
+    public struct Context: Sendable, Equatable {
+        public let person: Int
+        public let address: String?
+        public let session: String?
+        public let ready: Bool
+
+        public init(person: Int, address: String?, session: String?, ready: Bool) {
+            self.person = person
+            self.address = address
+            self.session = session
+            self.ready = ready
+        }
+    }
+
     public private(set) var out = false
+    /// The session the change went out under (inside: none) - nil while none is out.
+    public private(set) var under: String??
     private var heard = false
     private var reason: String?
 
     public init() {}
 
-    /// A change goes out: false when one is out already (one at a time).
-    public mutating func began() -> Bool {
+    /// A change goes out under `session`: false when one is out already (one at a time).
+    public mutating func began(under session: String?) -> Bool {
         guard !out else { return false }
         out = true
+        under = .some(session)
         heard = false
         reason = nil
         return true
     }
 
-    /// A 401 that would end the session in hand: true when it's held (a change is out) - the first one's reason kept.
-    public mutating func holds(reason said: String?) -> Bool {
-        guard out else { return false }
+    /// A 401 that would end `session`, the one in hand: true when it's held - a change is out, sent under that very
+    /// session - with the first one's reason kept.
+    public mutating func holds(reason said: String?, session: String?) -> Bool {
+        guard out, under == .some(session) else { return false }
         if !heard {
             heard = true
             reason = said
@@ -443,29 +474,38 @@ public struct PasswordRekey: Sendable, Equatable {
         return true
     }
 
-    /// The person, the address or the session changed while the change was out: whatever was held was theirs, and is
-    /// let go with them.
+    /// The person, the address or the session changed while the change was out (a sign-out, another address, another
+    /// person - or its answer came to find them changed): whatever was held was theirs, and is let go with them.
     public mutating func forgot() {
         out = false
+        under = nil
         heard = false
         reason = nil
     }
 
-    /// The change is over: what then. `rekeyed` - its new session kept and in hand - drops whatever was held: the
-    /// old session's 401s were the move's. Its own 401 brings the sign-in with its reason; a 401 held, with the held
-    /// reason; an answer that leaves it unsure whether the session in hand stands asks /me.
-    public mutating func ended(_ outcome: OwnPassword.Outcome, rekeyed: Bool) -> After {
-        defer {
-            out = false
-            heard = false
-            reason = nil
-        }
-        if rekeyed { return .nothing }
-        if case .signedOut(let said) = outcome { return .signIn(reason: said) }
-        if heard { return .signIn(reason: reason) }
+    /// The change's answer may be used - its cookie kept, what was held decided: everything it was sent under still
+    /// stands, the app open. Otherwise it is dropped (`forgot`), and nothing of it kept.
+    public static func answerStands(sent: Context, now: Context) -> Bool {
+        now.ready && sent == now
+    }
+
+    /// The change is over: what then. A change is re-keyed exactly when it `changed` - ServerModel keeps the new session
+    /// before this is asked - which drops whatever was held: the old session's 401s were the move's. Its own 401 brings
+    /// the sign-in with its reason. A 401 held otherwise brings it too - with deadwax's words after a refusal (nothing
+    /// changed here, so the session ended for a reason of its own), and the phone's own after anything else (the change
+    /// may have gone through: deadwax's PASSWORD_CHANGED would name another device). An answer that leaves it unsure
+    /// whether the session in hand stands asks /me - a cancelled request among them, which may still have reached deadwax.
+    public mutating func ended(_ outcome: OwnPassword.Outcome) -> After {
+        defer { forgot() }
         switch outcome {
-        case .notRenewed, .failed, .unknown, .changed: return .askMe
-        case .refused, .signedOut, .cancelled: return .nothing
+        case .changed:
+            return .nothing
+        case .signedOut(let said):
+            return .signIn(reason: said)
+        case .refused:
+            return heard ? .signIn(reason: reason) : .nothing
+        case .notRenewed, .failed, .unknown, .cancelled:
+            return heard ? .signIn(reason: OwnPassword.endedWhileChanging) : .askMe
         }
     }
 }

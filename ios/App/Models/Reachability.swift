@@ -44,7 +44,8 @@ final class Reachability {
         configuration.timeoutIntervalForRequest = OfflineRule.probeTimeout
         configuration.timeoutIntervalForResource = OfflineRule.probeTimeout
         configuration.waitsForConnectivity = false
-        return URLSession(configuration: configuration)
+        // a redirect followed only within the address asked, as every session's (SameOriginRedirects)
+        return URLSession(configuration: configuration, delegate: SameOriginRedirects.shared, delegateQueue: nil)
     }()
 
     init(server: ServerModel) {

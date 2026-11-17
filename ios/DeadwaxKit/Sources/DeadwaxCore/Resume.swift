@@ -52,6 +52,14 @@ public enum Resume {
     /// OWED_ORDER (useResume.ts): the triggers held while a request was out, asked again in this order.
     public static let owedOrder: [SaveTrigger] = [.pause, .wait, .position]
 
+    /// (Phase 8, slice 10's review) A save's 401: the sign-in generation that stops saving - the one it was SENT under,
+    /// and only while that is still the one in hand (`now`). Nil when the session has moved since: Change password moves
+    /// this phone's session under a new id, so a save still out under the old cookie is answered 401 after the new one is
+    /// in hand - which says nothing of it. Recorded as the new generation, it stopped saving until the next launch.
+    public static func heldAfter401(sentUnder: Int, now: Int) -> Int? {
+        sentUnder == now ? now : nil
+    }
+
     /// A position as a save sends it: inside the server's 0...86,400, and 0 for one that isn't a number. The web
     /// can't make another; a 422 on a position save would be read as "save in full", which would 422 again.
     public static func sent(_ position: Double) -> Double {

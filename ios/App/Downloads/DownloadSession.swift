@@ -157,7 +157,14 @@ final class DownloadSession: NSObject, URLSessionDownloadDelegate, @unchecked Se
     func urlSession(_ session: URLSession, downloadTask: URLSessionDownloadTask, didFinishDownloadingTo location: URL) {
         guard let name = downloadTask.taskDescription.flatMap(DownloadTaskName.init(description:)) else { return }
         let id = downloadTask.taskIdentifier
-        let status = (downloadTask.response as? HTTPURLResponse)?.statusCode ?? 0
+        var status = (downloadTask.response as? HTTPURLResponse)?.statusCode ?? 0
+        // (Phase 8, slice 10's review) a background session follows redirects itself - its delegate is never asked, as
+        // every other session's is (SameOriginRedirects) - so an answer that came from another scheme, host or port than
+        // the one asked is no answer of deadwax's, and never taken as the song: said as no status at all
+        if let answeredAt = downloadTask.response?.url,
+           !Redirects.follows(from: downloadTask.originalRequest?.url, to: answeredAt) {
+            status = 0
+        }
         var part: URL?
         var unsaved: String?
         var full = false

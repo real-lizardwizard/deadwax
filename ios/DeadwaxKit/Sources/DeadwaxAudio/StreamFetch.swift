@@ -1,4 +1,5 @@
 #if canImport(AVFAudio)
+import DeadwaxCore
 import Foundation
 
 /// Bytes that arrive over time - a song being streamed into a cache file. A StreamSource reads
@@ -177,6 +178,14 @@ public final class StreamFetch: NSObject, ByteSource, URLSessionDataDelegate {
         }
         if response.expectedContentLength > 0 { expectedLength = response.expectedContentLength }
         completionHandler(.allow)
+    }
+
+    /// (Phase 8, slice 10's review) A redirect followed only within the address asked - the request carries deadwax's
+    /// session as `Cookie:` (Core's Redirects). One elsewhere is refused; its 3xx then fails the song as any status
+    /// but 200 does.
+    public func urlSession(_ session: URLSession, task: URLSessionTask, willPerformHTTPRedirection response: HTTPURLResponse,
+                           newRequest request: URLRequest, completionHandler: @escaping (URLRequest?) -> Void) {
+        completionHandler(Redirects.follows(from: task.originalRequest?.url, to: request.url) ? request : nil)
     }
 
     public func urlSession(_ session: URLSession, dataTask: URLSessionDataTask, didReceive data: Data) {

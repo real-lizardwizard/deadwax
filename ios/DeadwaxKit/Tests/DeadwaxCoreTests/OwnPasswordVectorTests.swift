@@ -69,13 +69,13 @@ import Testing
         #expect(Routes.ownPassword.method == "POST" && Routes.ownPassword.query.isEmpty)
         var flow = OwnPasswordFlow()
         flow.form = OwnPasswordForm(current: "wrong-one-here", password: "a-fresh-own-password", again: "a-fresh-own-password")
-        let begun = flow.begin(user: "ethan", online: true)
+        let begun = flow.begin(user: "ethan", online: true, signInOver: false)
         guard let (ticket, _) = begun else {
             Issue.record("a ready form begins")
             return
         }
         _ = flow.ended(ticket, .refused(words: "That isn't your current password.", kind: page["wrongCurrentKind"].string,
-                                        fix: nil))
+                                        fix: nil), signInOver: false)
         #expect(flow.form.current.isEmpty && flow.form.password == "a-fresh-own-password" && flow.focusCurrent == 1)
     }
 

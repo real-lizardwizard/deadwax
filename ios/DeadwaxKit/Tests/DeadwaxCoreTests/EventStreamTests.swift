@@ -314,6 +314,57 @@ final class FakeLineTransport: HTTPLineTransport, @unchecked Sendable {
         #expect(feed.streamProblem == EditWords.noPermission)
     }
 
+    /// (Phase 8, slice 10's review) The session moved - Change password re-keyed it: a halt for the old one's 401 is let
+    /// go, and whatever is out under it asked again under the new one, the history first - nothing twice; a refusal or
+    /// a 403 stays halted until Try again.
+    @Test func theSessionMovingAsksAgainUnderTheNewOne() {
+        var feed = EventStream.Feed()
+        #expect(feed.sessionMoved(wanted: false, online: true) == .none, "nothing out and not wanted: nothing")
+        #expect(feed.sessionMoved(wanted: true, online: true) == .read(1), "nothing out: begun, as update begins")
+        #expect(feed.historyLanded(1, RecentLog(lines: [Self.line(1)], last: 1, boot: "b1")) == .open(2, after: 1, boot: "b1"))
+        feed.opened(2)
+        // the stream open under the old session: asked again under the new one, and the old one's 401 dropped
+        #expect(feed.sessionMoved(wanted: true, online: true) == .read(3))
+        #expect(feed.streamEnded(2, Self.answered(401), admin: false) == .none)
+        #expect(feed.step == .reading)
+        let recent = RecentLog(lines: [Self.line(1), Self.line(2)], last: 2, boot: "b1")
+        #expect(feed.historyLanded(3, recent) == .open(4, after: 2, boot: "b1"))
+        #expect(feed.log.lines.map(\.seq) == [2, 1], "nothing twice")
+        feed.opened(4)
+        // halted by a 401 that came first: not asked again by itself - until the session moves
+        #expect(feed.streamEnded(4, Self.answered(401), admin: false) == .none)
+        #expect(feed.step == .halted)
+        #expect(feed.update(wanted: true, online: true) == .none)
+        #expect(feed.sessionMoved(wanted: true, online: true) == .read(5))
+        // halted again, and the session moving while it isn't wanted: let go, asked once it is
+        #expect(feed.historyFailed(5, Self.answered(401, "/interface_logs/recent"), admin: false) == .none)
+        #expect(feed.sessionMoved(wanted: false, online: true) == .none)
+        #expect(feed.step == .idle)
+        #expect(feed.update(wanted: true, online: true) == .read(6))
+        // waiting out a loss: asked at once instead
+        _ = feed.historyLanded(6, RecentLog(lines: [], last: 0, boot: "b1"))
+        feed.opened(7)
+        #expect(feed.streamEnded(7, Self.offline, admin: false) == .wait(7, seconds: EventStream.retry))
+        #expect(feed.sessionMoved(wanted: true, online: true) == .read(8))
+        #expect(feed.retryDue(7) == .none)
+        // a refusal stays: it isn't the session's
+        _ = feed.historyLanded(8, RecentLog(lines: [], last: 0, boot: "b1"))
+        #expect(feed.streamEnded(9, Self.answered(404, detail: "Not Found"), admin: true) == .none)
+        #expect(feed.sessionMoved(wanted: true, online: true) == .none)
+        #expect(feed.step == .halted && feed.streamProblem != nil)
+        // nor a 403
+        #expect(feed.tryAgain(wanted: true) == .read(10))
+        #expect(feed.historyFailed(10, Self.answered(403, "/interface_logs/recent"), admin: false) == .askMe)
+        #expect(feed.sessionMoved(wanted: true, online: true) == .none)
+        #expect(feed.step == .halted)
+
+        // something out and no longer wanted as the session moves: called off
+        var gone = EventStream.Feed()
+        _ = gone.update(wanted: true, online: true)
+        #expect(gone.sessionMoved(wanted: false, online: false) == .stop)
+        #expect(gone.step == .idle && gone.stream == .lost)
+    }
+
     @Test func aCancellationIsNeverSaidAsAFailure() {
         var feed = EventStream.Feed()
         _ = feed.update(wanted: true, online: true)

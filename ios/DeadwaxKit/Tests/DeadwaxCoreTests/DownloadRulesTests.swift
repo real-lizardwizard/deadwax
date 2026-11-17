@@ -70,6 +70,37 @@ private func record(_ id: String = "s1", album: String = "al-1", size: Int64? = 
         #expect(r.state == .wanted && r.wait == .signIn && r.resume == nil && r.tries == 2)
     }
 
+    /// (Phase 8, slice 10's review) What else a 401 does: sent under a session since replaced, nothing; under the one in
+    /// hand while Change password is out, only its own song held until the change answers (deadwax answers the old cookie
+    /// 401 from the moment it moves the session, before the change's answer brings the new one); else the session refused.
+    @Test func a401RefusesTheSessionOnlyWhenItsTheOneInHandAndNoChangeIsOut() {
+        let cases: [(sent: String??, current: String?, changing: Bool, then: DownloadRules.Heard401)] = [
+            (.some("s.a"), "s.a", false, .refused),
+            (.some("s.a"), "s.a", true, .deferred),
+            (.some("s.old"), "s.new", false, .replaced),
+            (.some("s.old"), "s.new", true, .replaced),
+            (nil, "s.a", false, .refused),          // a request that can't be read: the session in hand's
+            (nil, "s.a", true, .deferred),
+            (.some(nil), nil, false, .refused),     // none carried, none in hand
+            (.some(nil), "s.a", true, .replaced),   // sent with none, one signed in since
+            (.some("s.a"), nil, false, .replaced),  // signed out since
+            (nil, nil, true, .deferred),
+        ]
+        for (sent, current, changing, then) in cases {
+            #expect(DownloadRules.heard401(sentUnder: sent, current: current, changing: changing) == then,
+                    "sent \(String(describing: sent)), in hand \(String(describing: current)), changing \(changing)")
+        }
+    }
+
+    /// The change answered with a 401 deferred: the session in hand's refusal after all only when it's still the one the
+    /// 401 came under (no re-key); a re-key replaced it, and the 401 was the move's.
+    @Test func aDeferred401IsDecidedByWhetherTheChangeReKeyed() {
+        #expect(DownloadRules.afterChange(deferred: "s.a", current: "s.a"), "no re-key: refused after all")
+        #expect(!DownloadRules.afterChange(deferred: "s.old", current: "s.new"), "re-keyed: the move's")
+        #expect(!DownloadRules.afterChange(deferred: "s.a", current: nil), "signed out since: nothing to refuse")
+        #expect(DownloadRules.afterChange(deferred: nil, current: nil))
+    }
+
     @Test func aForceQuitsCancelKeepsItsResumeDataAndIsNoTry() {
         var r = DownloadRules.apply(.taskMade("t"), to: record())
         r = DownloadRules.apply(.cancelled(resume: Data([7])), to: r)

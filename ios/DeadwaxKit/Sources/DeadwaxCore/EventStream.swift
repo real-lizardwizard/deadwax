@@ -277,6 +277,8 @@ public enum EventStream {
         public private(set) var ask = 0
         /// The history is owed: its last read failed (or was called off) - the next ask after a loss reads it first.
         private var owed = false
+        /// (Phase 8, slice 10's review) Halted by a 401: the session's, so the session moving lets it go (`sessionMoved`).
+        private var haltedSignedOut = false
         /// What VoiceOver was last left knowing (`announcement`): the stream's state and the history's failure as they
         /// stood, and whether it was told the stream was lost or refused - so live again is said only after that.
         private var toldStream: EventLog.StreamState = .connecting
@@ -321,10 +323,35 @@ public enum EventStream {
         private mutating func begin() -> Action {
             ask += 1
             step = .reading
+            haltedSignedOut = false
             //? lost stays lost until the stream opens again ("reconnecting…" is what happens); a page shown afresh connects
             if stream != .lost { stream = .connecting }
             streamProblem = nil
             return .read(ask)
+        }
+
+        /// (Phase 8, slice 10's review) The session in hand moved - Change password re-keyed it, or the same person signed
+        /// in again: whatever is out went under the old one (deadwax answers its cookie 401 from the move on), and a halt
+        /// for a 401 was the old one's. So it is all asked again under the new one, the history first - nothing twice,
+        /// nothing cleared back. A refusal or a 403 stays halted until Try again; nothing out and nothing halted is
+        /// `update`'s.
+        public mutating func sessionMoved(wanted: Bool, online: Bool) -> Action {
+            switch step {
+            case .idle:
+                return update(wanted: wanted, online: online)
+            case .halted:
+                guard haltedSignedOut else { return .none }
+            case .reading, .streaming, .waiting:
+                break
+            }
+            let wasOut = step != .halted
+            step = .idle
+            haltedSignedOut = false
+            if wanted { return begin() }
+            guard wasOut else { return .none }
+            ask += 1
+            stream = online ? .connecting : .lost
+            return .stop
         }
 
         /// The history landed: joined (only what the page hasn't had), then the stream from where it ends.
@@ -344,6 +371,7 @@ public enum EventStream {
             switch End(error) {
             case .signedOut:
                 step = .halted
+                haltedSignedOut = true
                 return .none
             case .forbidden:
                 return forbidden()
@@ -403,6 +431,7 @@ public enum EventStream {
                 return .wait(ask, seconds: EventStream.retry)
             case .signedOut:
                 step = .halted
+                haltedSignedOut = true
                 return .none
             case .forbidden:
                 return forbidden()

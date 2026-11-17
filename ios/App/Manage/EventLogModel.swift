@@ -97,6 +97,13 @@ final class EventLogModel {
         announce()
     }
 
+    /// (Phase 8, slice 10's review) The session in hand moved (Change password's re-key, a sign-in again): what is out
+    /// went under the old one, and a halt for its 401 was the old one's - asked again under the new one (Feed).
+    func sessionMoved() {
+        carry(feed.sessionMoved(wanted: wanted, online: reachability.online))
+        announce()
+    }
+
     /// Try again (beside the history's failure, or a refused stream's).
     func tryAgain() {
         carry(feed.tryAgain(wanted: wanted))

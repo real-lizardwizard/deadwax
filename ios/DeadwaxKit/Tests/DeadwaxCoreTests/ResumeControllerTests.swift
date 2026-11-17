@@ -260,6 +260,37 @@ import Testing
         #expect(p.server.asks.count == 2, "nothing saved or asked again, back at the front included")
     }
 
+    /// (Phase 8, slice 10's review) Change password moves the session while a save is out under the old one: its 401
+    /// lands after the new session is in hand, and says nothing of it - saving carries on under the new one (as any
+    /// failure is tried again), never stopped until the next launch.
+    @Test func a401ToASaveSentUnderASessionSinceReplacedStopsNothing() {
+        let p = ResumePage()
+        p.server.asks.removeAll()
+        p.set(startUpNext(queueOf(["1", "2"]), start: 0), playing: true)
+        p.play(2_250)
+        #expect(p.asked(.full).count == 1)
+        // the re-key: the session moves while the save is out, then its 401 arrives
+        p.session = 2
+        p.ask(.full, 0).refuse(.status(401))
+        p.play(31_000)
+        #expect(p.asked(.full).count == 2, "tried again under the new session, after the failure's 30 s")
+        // and a 401 to that one, sent under the session in hand, stops saving as before
+        p.ask(.full, 1).refuse(.status(401))
+        p.play(60_000)
+        #expect(p.asked(.full).count == 2, "held under the session it was sent under, the one in hand")
+        p.session = 3
+        p.play(500)
+        #expect(p.asked(.full).count == 3, "until it moves")
+    }
+
+    @Test func a401HoldsSavingOnlyUnderTheSessionItWasSentUnder() {
+        // (sent under, in hand now, held under)
+        let cases: [(Int, Int, Int?)] = [(1, 1, 1), (1, 2, nil), (2, 1, nil), (7, 7, 7)]
+        for (sent, now, held) in cases {
+            #expect(Resume.heldAfter401(sentUnder: sent, now: now) == held, "sent \(sent), now \(now)")
+        }
+    }
+
     @Test func aFailureIsTriedAgainAtTheNextTriggerAfterThirtySeconds() {
         let p = ResumePage()
         p.server.asks.removeAll()

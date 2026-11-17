@@ -88,6 +88,10 @@ final class ServerModel {
     /// One more each time the person changes - signed out, signed in as someone else, another server: everything
     /// kept for the person before is dropped (`whenPersonChanges`).
     private(set) var person = 0
+    /// (Phase 8, slice 10's review) A Change password is out: the downloads hold back a 401 heard meanwhile under the
+    /// session in hand rather than calling every download off for it (DownloadRules.heard401) - deadwax answers the old
+    /// cookie 401 from the moment it moves the session, before the change's answer brings the new one.
+    private(set) var changingPassword = false
 
     // MARK: kept
 
@@ -271,6 +275,7 @@ final class ServerModel {
             failure = error
         }
         guard signOutRow.answered(failure) == .startAgain else { return }
+        dropChange()
         SessionKeychain.delete(address.key)
         Self.keep(nil, for: address)
         session = nil
@@ -356,27 +361,33 @@ final class ServerModel {
     /// came back leaves it unsure whether the session in hand still stands. What came of it is the page's to say -
     /// `.cancelled` when the person, the address or the session changed while it was out (nothing kept then).
     func changeOwnPassword(_ body: OwnPasswordBody) async -> OwnPassword.Outcome {
-        guard launch == .ready, signInOver == nil, let client, let address, rekey.began() else { return .cancelled }
-        let sentUnder = session
-        let who = person
+        guard launch == .ready, signInOver == nil, let client, let address, rekey.began(under: session) else {
+            return .cancelled
+        }
+        changingPassword = true
+        let sent = changeContext
         let hold = BackgroundHold(named: "Change password")
         defer { hold.end() }
         let outcome = await client.changeOwnPassword(body, admin: access.seesDetail)
-        guard who == person, address == self.address, sentUnder == session, launch == .ready else {
-            rekey.forgot()
+        // (review) Core's guard: the person, the address, the session and the launch all as they were sent - else the
+        // answer is someone else's now, and nothing of it is kept (a sign-out, another address or person let the hold go)
+        guard PasswordRekey.answerStands(sent: sent, now: changeContext) else {
+            dropChange()
             return .cancelled
         }
-        var rekeyed = false
         if case .changed(_, _, let cookie) = outcome {
+            // the new sign-in kept, then in hand, then in the client - nothing awaited between, so nothing asks under
+            // the old one meanwhile
             SessionKeychain.save(cookie, for: address.key)
             session = cookie
             self.client = makeClient(address, session: cookie)
             // a /me still out under the old session is that session's answer, not this one's
             asks += 1
             askingMe = false
-            rekeyed = true
         }
-        switch rekey.ended(outcome, rekeyed: rekeyed) {
+        let then = rekey.ended(outcome)
+        changingPassword = false
+        switch then {
         case .nothing:
             break
         case .signIn(let reason):
@@ -385,6 +396,17 @@ final class ServerModel {
             Task { await refreshMe() }
         }
         return outcome
+    }
+
+    /// What a change is sent under, and what stands as it answers (PasswordRekey.answerStands).
+    private var changeContext: PasswordRekey.Context {
+        PasswordRekey.Context(person: person, address: address?.key, session: session, ready: launch == .ready)
+    }
+
+    /// The hold let go: a sign-out, another address or person - whatever it held was theirs.
+    private func dropChange() {
+        rekey.forgot()
+        if changingPassword { changingPassword = false }
     }
 
     /// `action` is run, on the main actor, each time the person changes - the player stops and forgets its queue, the
@@ -419,7 +441,8 @@ final class ServerModel {
     /// when it is held until the change has answered (PasswordRekey): deadwax answers the old cookie 401 from the moment
     /// it moves this phone's session, before its answer with the new one arrives.
     private func sessionEnded(reason: String?) {
-        if rekey.holds(reason: reason) { return }
+        // (review) held only while the session the change went out under is still the one in hand
+        if rekey.holds(reason: reason, session: session) { return }
         bringSignIn(reason: reason)
     }
 
@@ -453,6 +476,7 @@ final class ServerModel {
     private func use(_ new: ServerAddress) {
         UserDefaults.standard.set(new.base.absoluteString, forKey: Self.addressKey)
         guard new != address else { return }
+        dropChange()
         if me != nil { personChanged() }
         address = new
         session = SessionKeychain.read(new.key)
@@ -491,6 +515,7 @@ final class ServerModel {
     }
 
     private func personChanged() {
+        dropChange()
         person += 1
         for handler in personHandlers { handler() }
     }

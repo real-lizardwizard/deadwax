@@ -191,6 +191,36 @@ public enum DownloadRules {
     /// whatever its body - a background download "succeeds" with an error page (8.3).
     public static func isTheSong(status: Int) -> Bool { status == 200 || status == 206 }
 
+    // MARK: a 401 (Phase 8, slice 10)
+
+    /// What a download's 401 does to the session (DownloadModel.signedOutHeard). Its record goes back to wanted either way
+    /// (`apply(.signedOut)`); this is what else.
+    public enum Heard401: Sendable, Equatable {
+        /// Sent under a session since replaced (Change password moved it): it says nothing of the one in hand - nothing
+        /// held; the plan asks for the song again under the new one.
+        case replaced
+        /// Sent under the session in hand while a Change password is out: deadwax answers the old cookie 401 from the
+        /// moment it moves the session, before the change's own answer brings the new one. Only this song is held back -
+        /// not asked again, and nothing else called off - until the change answers (`afterChange`).
+        case deferred
+        /// The session in hand was refused: nothing more is fetched under it for a minute, /me asked.
+        case refused
+    }
+
+    /// The rule: `sentUnder` is the session the task's request carried (nil inside: none; nil: unknown - taken as the
+    /// session in hand's), `current` the one in hand, `changing` whether a Change password is out.
+    public static func heard401(sentUnder: String??, current: String?, changing: Bool) -> Heard401 {
+        let under = sentUnder ?? .some(current)
+        if under != .some(current) { return .replaced }
+        return changing ? .deferred : .refused
+    }
+
+    /// The change is over, with a 401 deferred under `deferred`: true when it is the session in hand's refusal after
+    /// all (no re-key - the session it came under is still the one in hand), false when the re-key replaced it.
+    public static func afterChange(deferred: String?, current: String?) -> Bool {
+        deferred == current
+    }
+
     /// Whether a finished file's `length` is the song's: Navidrome's size for the file as it is, any length but 0 for a
     /// transcode (8.4, LocalFiles.lengthMatches).
     public static func lengthMatches(_ length: Int64, record: DownloadRecord) -> Bool {

@@ -13389,3 +13389,76 @@ after a change, the other devices signed out; downloads across a change (a task 
 refused and asked again under the new session, nothing held for a minute); the new session surviving a kill and
 reopen (the Keychain's save); VoiceOver's one announcement and Current's focus; the page under the largest text
 sizes; Back and the swipe off while a change is out.
+
+### After review (16 Nov) - slice 10
+
+The review found nothing serious; each finding was traced before it was fixed, and each was real.
+
+- **Resume could stop saving after a change.** ResumeController recorded `signedOutUnder = session()` when a save's 401
+  ARRIVED: a save still out under the old cookie, answered 401 after the re-key, was recorded as the NEW generation,
+  and saving stopped until the next launch. Now `send` captures `session()` as each save goes, passes it to `refused`,
+  and Core's `Resume.heldAfter401(sentUnder:now:)` records it only while it is still the one in hand; otherwise the 401
+  is a failure like any other (`saves.failedAt`), tried again under the new session at the next trigger. Tested by a
+  table and by a ResumeController run (a 401 sent under generation 1 landing under 2 stops nothing).
+- **A download's 401 landing before the change's 200 called off every download.** deadwax answers the old cookie 401
+  from the moment it moves the session, before the change's answer brings the new one, and that 401 was under the
+  session still in hand - so `refusedSession` was set and every running task cancelled (no resume data) for a minute.
+  Now ServerModel exposes `changingPassword` (true from just before the POST to just after `rekey.ended`, and let go by
+  `dropChange`), DownloadModel watches it, and Core's `DownloadRules.heard401(sentUnder:current:changing:)` decides:
+  `replaced` (sent under a session since replaced: nothing, as before), `deferred` (under the session in hand while a
+  change is out: only that song is held back - `heldForChange`, left out of the plan's tasks to make - and the session
+  it came under kept in `deferredRefusal`), `refused` (the old body, now `refuseSession`). When the change ends
+  (`serverChanged`, with `changingPassword` false) the held songs are planned again, and `afterChange(deferred:current:)`
+  says whether the 401 was the session in hand's after all (no re-key: refused then) or the move's (re-keyed: nothing).
+- **The hold wasn't tied to the session it began under.** `PasswordRekey.began(under:)` records the session;
+  `holds(reason:session:)` holds only while the session in hand is still that one; `personChanged`, `use` and `signOut`
+  let it go (`dropChange` - `rekey.forgot()` and `changingPassword` false). The guard after the await is Core's
+  `PasswordRekey.answerStands(sent:now:)` over a `Context` of person, address, session and launch-ready.
+- **Fields under Now Playing**: the page's `.onChange(of: navigation.nowPlayingShown)` empties them, as the user guide
+  already said it did.
+- **Two announcements**: `OwnPasswordFlow.ended(_:_:signInOver:)` returns nothing to announce when the sign-in came
+  over the app as the change answered (the sign-in says what happened); the fields are left exactly as without it.
+- **The event log's halt**: a halt for a 401 was let go only by the sign-in coming and going. Now `Feed.sessionMoved
+  (wanted:online:)` - called from RootView's `.onChange(of: server.client?.session)` through `EventLogModel
+  .sessionMoved()` - lets a 401's halt go and asks again under the new session whatever was out under the old one (the
+  history first: nothing twice); a refusal or a 403 stays halted until Try again.
+- **The held reason**: a 401 held through a change that then didn't re-key (notRenewed, failed, unknown, cancelled)
+  brings the sign-in with the phone's own words, `OwnPassword.endedWhileChanging` ("This phone's sign-in ended while
+  your password was being changed - sign in again, with the new password if the change went through."), never
+  deadwax's PASSWORD_CHANGED, which names "another device". A refusal's held 401 keeps deadwax's reason (nothing
+  changed, so the session ended for a reason of its own).
+- **A cancelled POST** with nothing held asks /me (`.askMe`), as an unknown outcome does: a request called off on the
+  phone may still have reached deadwax. The table's unreachable `(.changed, nil, .askMe)` row is gone - a change is
+  re-keyed exactly when it is `changed` (ServerModel keeps the cookie before `ended` is asked), so `ended` takes the
+  outcome alone and `.changed` is always `.nothing`.
+- **Redirects**: Core's `Redirects.follows(from:to:)` - the same scheme, host and port (lowercased; a URL's own
+  scheme's port when it names none) - is asked by every session that can be asked: URLSessionTransport's per-timeout
+  sessions and its stream session take `SameOriginRedirects.shared` as their delegate, as does Reachability's probe;
+  CappedRead (the cover viewer's full size) and the player's StreamFetch are their own delegates and implement
+  `willPerformHTTPRedirection` with the same rule. A refused redirect's 3xx is the answer (a route's error; a song that
+  fails). The downloads' background session can't be asked - iOS follows a background task's redirects itself and
+  never calls the delegate - so DownloadSession takes an answer whose URL isn't the asked one's origin as status 0,
+  never the song. Whether iOS carries the hand-set `Cookie:` on such a background redirect is iOS's, and not verified.
+  This is a small diff in DeadwaxAudio (StreamFetch's import of DeadwaxCore and one delegate method), said here
+  because the engine is otherwise left alone. The user guide's first-open step says to give the address deadwax
+  answers at, since a proxy's http-to-https redirect is now refused.
+- **App rules into Core**: the post-await guard (`answerStands`), the downloads' sent-under rule (`heard401`,
+  `afterChange`) and the page's enabled rule (`OwnPasswordFlow.canChange(user:online:signInOver:)`, which `begin`
+  shares) are pure and table-tested; the page asks `canChange` and `begin` with the sign-in's state.
+- **Tests**: the order test also finds no `await` between the Keychain save and the new client; `bringSignIn(` is
+  called from exactly two places (a 401 not held, the change's end); the no-password-logged search covers
+  OwnPassword.swift, DeadwaxClient.swift and URLSessionTransport.swift too (DeadwaxClient's one URLQueryItem is the
+  route's own query, which for this route is none); the Python `session_of` is now SessionCookie.value(fromSetCookie:)
+  step for step - quote stripping and `.whitespaces` trimming included - with its own cases; a new test finds every
+  URLSession the app and DeadwaxKit's sources make and holds each to the redirect rule.
+
+Left as they are:
+
+- **The engine's client box is updated a turn late**: the player's engine is handed the new client a turn after the
+  re-key, so a gapless open in that window goes out under the old cookie, is refused, and heals itself after 1.5 s.
+- **The orphaned server session**: when the guard after the await discards a changed outcome (the person, address or
+  session moved while it was out), the new session deadwax made for this phone is never used and lives on the server
+  until it times out. Nothing on the phone holds it.
+- **The second-page case**: a second Change password page while a change is out (its own flow idle, so its Change is
+  on) is refused by ServerModel's one-at-a-time `rekey.began` as `.cancelled`, which says nothing and keeps its
+  fields.
