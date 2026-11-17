@@ -11,7 +11,7 @@ import SwiftUI
 /// - Getting albums, Playback and Downloads, each pushing its page (GettingAlbumsPage, PlaybackPage, DownloadsScreen):
 ///   Downloads with what's on this phone at its right and, under the three, its footer while something is happening
 ///   (DownloadsRow, DownloadsFooter);
-/// - Manage (Phase 7): the managing tools this person may use, each opened in the web app in Safari, as before
+/// - Manage (Phase 7; Phase 8 made each row the app's own page): the managing tools this person may use
 ///   (ManageSection) - drawn only with a row to draw;
 /// - Account (logins on), This phone - the server's name or IP at its right - and About - the app's own version at its
 ///   right - each pushing its page (AccountPage, ThisPhonePage, AboutPage).

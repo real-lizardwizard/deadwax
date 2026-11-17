@@ -121,16 +121,11 @@ def test_the_page_is_offered_by_the_webs_rule_and_opens_in_the_app():
     offered = swift_function("People.swift", "offered")
     assert "Managing.parts(access.permissions, loginsOn: access.on).people" in offered
     assert "access.permissions.contains(.people)" in swift_function("People.swift", "allowed")
-    managing = _code((CORE / "Managing.swift").read_text(encoding="utf-8"))
-    assert "case .edit, .queue, .care, .people, .settings, .log: return true" in managing
     section = app_code("You", "ManageSection.swift")
-    rows = section[:section.index("extension OpenURLAction")]
-    assert "} else if tool == .people {" in rows and "NavigationLink(value: AppRoute.people)" in rows
-    # no row opens Safari any more: WebAppRow is kept for slice 12 to take out, drawn by nobody - and the footer that
-    # said which rows open there says nothing
-    assert "WebAppRow(" not in rows
-    footer = swift_function("Managing.swift", "footer")
-    assert "guard !web.isEmpty else { return [] }" in footer
+    assert "} else if tool == .people {" in section and "NavigationLink(value: AppRoute.people)" in section
+    # no row opens Safari any more: since slice 12 WebAppRow, the openURL extension that opened it and the footer that
+    # said which rows opened there are gone (tests/test_ios_no_web_app.py)
+    assert "WebAppRow" not in section and "openURL" not in section and "footer:" not in section
 
 
 # ---------------------------------------------------------------------------- what it sends

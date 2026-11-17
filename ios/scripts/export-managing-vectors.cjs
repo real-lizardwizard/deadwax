@@ -1,24 +1,20 @@
 #!/usr/bin/env node
 /**
  * The iPhone app's Manage section (app 0.13, Phase 7 - notes/ios-specs/phase7-managing.md): which of deadwax's
- * managing tools the web app offers for which permissions, and the address each one is opened at - written as a
- * fixture the Swift port (ios/DeadwaxKit/Sources/DeadwaxCore/Managing.swift) replays in
- * Tests/DeadwaxCoreTests/ManagingVectorTests.swift, so the phone's You lists exactly the web's rows and opens each in
- * the web app at the page the web app itself opens.
+ * managing tools the web app offers for which permissions - written as a fixture the Swift port
+ * (ios/DeadwaxKit/Sources/DeadwaxCore/Managing.swift) replays in Tests/DeadwaxCoreTests/ManagingVectorTests.swift, so
+ * the phone's Settings > Manage lists exactly the web's rows. (Until Phase 8's slice 12 it also made the address each
+ * opened at in the web app; every row is the app's own page now, and nothing in the app opens the web app.)
  *
- * Compiles, as export-gate-vectors.cjs does, lib/permissions.ts, lib/appRoutes.ts, lib/ownPassword.ts and app/access.ts
- * with the repo's TypeScript (Preact stubbed: access.ts imports its hooks), and runs them AS THEY ARE:
+ * Compiles, as export-gate-vectors.cjs does, lib/permissions.ts, lib/ownPassword.ts and app/access.ts with the repo's
+ * TypeScript (Preact stubbed: access.ts imports its hooks), and runs them AS THEY ARE:
  * - `managing` for every one of the 64 sets of permissions, logins on and off, and `albumEdit` and (Phase 8, slice 5)
  *   `artistManaging` for each;
  * - a run of /deadwax/me answers through `accessOf`, then You's own `managing` expression (read out of You.tsx and
- *   evaluated as written), `albumEdit`, `seesDetail` and `changeOffered`;
- * - the addresses: each Managing page as You opens it (`formatRoute` on the You tab - App's openManagingPage), the
- *   Library's and You's roots, and an album's page for ids from the plain to the awkward - each with what `parseHash`
- *   makes of it, so the vectors also say each opens as itself, not rewritten.
+ *   evaluated as written), `albumEdit`, `seesDetail` and `changeOffered`.
  * And reads You.tsx's Manage section out of its source: its title, and its rows in order, each with the part of
- * `managing` that draws it and its label. And App.tsx's two the phone follows (after review): the album page's Edit
- * chip - its `onEdit` rule and App's `perms`, evaluated as written for every set and answer - and the tab
- * `openManagingPage` opens a Managing page on, which the addresses are made with. A pattern that no longer matches
+ * `managing` that draws it and its label. And App.tsx's album page Edit chip, which the phone follows (after review):
+ * its `onEdit` rule and App's `perms`, evaluated as written for every set and answer. A pattern that no longer matches
  * stops this script, naming what moved.
  * Writes ios/DeadwaxKit/Tests/DeadwaxCoreTests/Fixtures/managing/managing-vectors.json.
  *
@@ -44,7 +40,7 @@ const UI = path.join(REPO, 'ui')
 const FIXTURE = path.join(REPO, 'ios', 'DeadwaxKit', 'Tests', 'DeadwaxCoreTests', 'Fixtures', 'managing', 'managing-vectors.json')
 const CHECK = process.argv.includes('--check')
 const MADE_BY = 'ios/scripts/export-managing-vectors.cjs'
-const SOURCES = ['lib/permissions.ts', 'lib/appRoutes.ts', 'lib/ownPassword.ts', 'app/access.ts']
+const SOURCES = ['lib/permissions.ts', 'lib/ownPassword.ts', 'app/access.ts']
 const YOU = 'app/You.tsx'
 const APP = 'app/App.tsx'
 
@@ -80,7 +76,6 @@ exports.useEffect = () => {}
 `)
 
 const P = require(path.join(OUT, 'lib/permissions.js'))
-const R = require(path.join(OUT, 'lib/appRoutes.js'))
 const O = require(path.join(OUT, 'lib/ownPassword.js'))
 const A = require(path.join(OUT, 'app/access.js'))
 
@@ -105,7 +100,7 @@ for (const row of rows) {
 /* ===== App's own, read out of its source ===== */
 
 //? the album page's Edit chip: App hands AlbumPage `onEdit` by this rule over its `perms` - the phone's Edit an album
-//? row and the album's Edit in the web app follow it. Exactly one such onEdit, or the script can't say which is drawn.
+//? row and the album's Edit album follow it. Exactly one such onEdit, or the script can't say which is drawn.
 const chipRule = /onEdit=\{(albumEdit\(perms\)\.\w+) \? toggleEdit : undefined\}/
 if ([...source(APP).matchAll(new RegExp(chipRule.source, 'g'))].length !== 1) {
   throw new Error("App.tsx doesn't hand AlbumPage its Edit by one albumEdit rule any more - the web app's code moved")
@@ -115,17 +110,6 @@ const permsCall = piece(APP, /\n\s*const perms = (.+)\n/, "App's perms")[1]
 const chip = new Function('albumEdit', 'perms', `return (${chipCall})`)
 const permsOf = new Function('access', `return (${permsCall})`)
 const albumPage = (permissions) => chip(P.albumEdit, permissions) === true
-//? the tab a Managing page opens on (openManagingPage: the stack it reads, the tab it shows, the scroll it forgets)
-const opener = piece(APP, /const openManagingPage = \(page: Page\) => \{\n\s*const stack = router\.nav\.stacks\.(\w+)\n[\s\S]*?if \(router\.nav\.tab !== '(\w+)'\) router\.tab\('(\w+)'\)\n[\s\S]*?scrollKey\(\{ tab: '(\w+)', page \}\)/,
-  'openManagingPage')
-const MANAGING_TAB = opener[1]
-if (opener.slice(2, 5).some((tab) => tab !== MANAGING_TAB) || !R.TABS.includes(MANAGING_TAB)) {
-  throw new Error(`openManagingPage opens on ${opener.slice(1, 5).join(', ')} - not one of appRoutes.ts's tabs; the port's addresses moved`)
-}
-//? the phone's own choice, not App's: the editors' row and an album's Edit in the web app open on the Library tab (an
-//? album opens on whichever tab shows, openAlbum) - held to appRoutes.ts's tabs, which the fixture's hash covers
-const LIBRARY_TAB = 'library'
-if (!R.TABS.includes(LIBRARY_TAB)) throw new Error(`appRoutes.ts has no ${LIBRARY_TAB} tab any more - the port's addresses moved`)
 
 /* ===== the cases ===== */
 
@@ -182,27 +166,6 @@ const me = ME.map((answer) => {
   }
 })
 
-/** An address, and what the web app makes of it opened cold: the page it names, and whether it is kept as it is. */
-function address(route) {
-  const hash = R.formatRoute(route)
-  const parsed = R.parseHash(hash)
-  return { hash, opens: parsed.route, kept: parsed.canonical === hash }
-}
-const pages = { queue: R.QUEUE_PAGE, care: R.CARE_PAGE, people: R.PEOPLE_PAGE, settings: R.SETTINGS_PAGE, log: R.LOG_PAGE }
-for (const part of PARTS) {
-  if (pages[part]?.kind !== part) throw new Error(`appRoutes.ts's page for ${part} isn't of that kind - the port's mapping moved`)
-}
-const E_ACUTE = String.fromCharCode(0xe9)
-const NOTE = String.fromCodePoint(0x1f3b5)
-const ALBUM_IDS = ['3f2a1c0e9b8d7a6f5e4d3c2b1a0f9e8d', '1b2Kq7xYz', 'a/b', 'a b', '50%', 'x#y', 'x?y=1', 'a&b',
-  "o'neil!*()~", 'caf' + E_ACUTE, NOTE, 'a+b', 'mb:abc', '-_.']
-const addresses = {
-  tabs: { managing: MANAGING_TAB, library: LIBRARY_TAB },
-  pages: Object.fromEntries(PARTS.map((part) => [part, { label: pages[part].label, ...address({ tab: MANAGING_TAB, page: pages[part] }) }])),
-  library: address({ tab: LIBRARY_TAB, page: null }),
-  you: address({ tab: MANAGING_TAB, page: null }),
-}
-const albums = ALBUM_IDS.map((id) => ({ id, ...address({ tab: LIBRARY_TAB, page: { kind: 'album', id } }) }))
 fs.rmSync(OUT, { recursive: true, force: true })
 
 /* ===== output: plain ASCII ===== */
@@ -219,16 +182,14 @@ function ascii(json) {
 const flat = (value) => ascii(JSON.stringify(value))
 
 const fixture = {
-  about: "Manage (app/You.tsx, app/App.tsx, lib/permissions.ts, lib/appRoutes.ts, lib/ownPassword.ts, app/access.ts): which managing tools the web app offers for which permissions, and the address each opens at - run as they are; You's Manage section, App's album page Edit rule and its Managing pages' tab read out of their source.",
+  about: "Manage (app/You.tsx, app/App.tsx, lib/permissions.ts, lib/ownPassword.ts, app/access.ts): which managing tools the web app offers for which permissions - run as they are; You's Manage section and App's album page Edit rule read out of their source.",
   made_by: MADE_BY,
   made_from: Object.fromEntries(Object.keys(madeFrom).sort().map((key) => [key, madeFrom[key]])),
   words: { title, rows, CHANGE_TITLE: O.CHANGE_TITLE, LABELS: P.LABELS, PERMISSIONS: P.PERMISSIONS },
-  addresses,
-  albums,
   me,
   sets,
 }
-const listed = new Set(['albums', 'me', 'sets'])
+const listed = new Set(['me', 'sets'])
 const body = [
   '{',
   Object.entries(fixture).map(([key, value]) => listed.has(key)

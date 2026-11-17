@@ -7,8 +7,8 @@ import Foundation
 /// A listener (not `Access.seesDetail`) reads that their music isn't available, in their words, and what they can do -
 /// try again, or tell whoever runs deadwax - never Navidrome's address, its error or a setting's name. Whoever runs
 /// deadwax reads Navidrome's own words (the status's `problem`) and why the library needs it; an admin also gets Set up
-/// Navidrome. The phone has no Server settings of its own, so that button opens the web app's in Safari (D8; Server
-/// settings' own page since Phase 7, where the web app's Home was until then), and its line keeps the web's words.
+/// Navidrome - since Phase 8's slice 8 the app's own Server settings at Connections, in a sheet over the Library
+/// (D8 opened the web app's in Safari until then), and its line keeps the web's words.
 ///
 /// Held to the web by Tests/DeadwaxCoreTests/Fixtures/gate/navidrome.json (ios/scripts/export-gate-vectors.cjs, which
 /// runs NeedsNavidrome.tsx as it is; ui/test/iosgate.sim.cjs checks it is current).

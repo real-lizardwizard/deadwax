@@ -79,11 +79,10 @@ def test_the_routes_are_the_servers_by_method_path_and_permission():
     assert 'return [("after", String(last)), ("boot", boot)]' in query
     # who opens the page: Settings and the log, as App.tsx's `perms.has('server')`
     assert "public static func allowed(_ access: Access) -> Bool { access.can(.server) }" in LOG
-    # the page is the app's own now: no Safari for the event log
+    # the page is the app's own now: no Safari for the event log - nor, since slice 12, any address of the web app's in
+    # Core at all (tests/test_ios_no_web_app.py refuses a way out to it)
     managing = _code((CORE / "Managing.swift").read_text(encoding="utf-8"))
-    native = managing[managing.index("public var native: Bool {"):]
-    # (slice 11) and People: every row is the app's own
-    assert "case .edit, .queue, .care, .people, .settings, .log: return true" in native
+    assert "appPath" not in managing and "func url(" not in managing
 
 
 def test_a_line_and_the_history_are_read_as_the_server_sends_them(monkeypatch):

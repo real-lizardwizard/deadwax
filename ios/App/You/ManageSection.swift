@@ -18,19 +18,17 @@ import SwiftUI
 /// EventLogScreen (the lines, live, Copy and Clear). Since slice 11 People is too: it pushes PeopleScreen (Unlock
 /// People, then Navidrome's accounts - each person's page, Add a person) - so no row opens Safari any more.
 ///
-/// The footer said which rows open in Safari, and how Safari signs in apart from the app; with every row the app's own
-/// it says nothing (ManagingWords.footer answers no lines), and is drawn empty until slice 12 takes it out with
-/// WebAppRow. Nothing is asked of deadwax here - the page each opens asks it itself, and refuses for itself without its
-/// permission.
+/// The footer that said which rows opened in Safari, and how Safari signs in apart from the app, went in Phase 8's
+/// slice 12 with WebAppRow and the openURL extension that opened them: nothing in the app takes you to the web app
+/// (tests/test_ios_no_web_app.py). Nothing is asked of deadwax here - the page each opens asks it itself, says for
+/// itself that it needs deadwax, and refuses for itself without its permission.
 struct ManageSection: View {
     @Environment(ServerModel.self) private var server
-    @Environment(Reachability.self) private var reachability
     @Environment(QueueCountModel.self) private var queueCount
 
     var body: some View {
         let tools = Managing.tools(server.access)
         if !tools.isEmpty {
-            let online = reachability.online
             Section {
                 ForEach(tools, id: \.self) { (tool: Managing.Tool) in
                     if tool == .edit {
@@ -75,78 +73,7 @@ struct ManageSection: View {
             } header: {
                 Text(ManagingWords.title)
                     .font(Typeface.footnote)
-            } footer: {
-                VStack(alignment: .leading, spacing: 6) {
-                    ForEach(ManagingWords.footer(loginsOn: server.access.on, online: online, tools: tools), id: \.self) {
-                        (line: String) in
-                        Text(line)
-                    }
-                }
-                .font(Typeface.footnote)
-                .fixedSize(horizontal: false, vertical: true)
             }
         }
-    }
-}
-
-extension OpenURLAction {
-    /// Opens a web-app address - Manage's rows, until slice 11 took People, the last of them, into the app (slice 12
-    /// takes this out) - in the default browser (never a web view in the app), and when iOS refuses it (Safari turned off in Screen Time, no
-    /// other browser to take it) says so over the tabs, announced: Core's Managing.notice(opened:). A tap that opens
-    /// nothing never says nothing.
-    @MainActor
-    func webApp(_ url: URL, player: PlayerModel) {
-        self(url) { (accepted: Bool) in
-            guard let words = Managing.notice(opened: accepted) else { return }
-            Task { @MainActor in player.say(words) }
-        }
-    }
-}
-
-/// A row that opens the web app in Safari (Manage's rows - none since slice 11; slice 12 takes it out): its words - and, for a row that
-/// can't open its tool's own page, a line under them saying where it is once open - with `arrow.up.forward` at the
-/// trailing edge, where a pushed page's row has its chevron. The tap hands the address to the default browser
-/// (`OpenURLAction.webApp`, which says so if iOS refuses it). Off (dimmed, `.disabled`) while deadwax can't be reached.
-/// VoiceOver reads it as one button, its words and line, with the hint "Opens in Safari."; the words wrap at every
-/// text size, the sign growing with them.
-struct WebAppRow: View {
-    let label: String
-    var line: String?
-    let url: URL
-    let live: Bool
-
-    @Environment(\.openURL) private var openURL
-    @Environment(PlayerModel.self) private var player
-
-    var body: some View {
-        Button {
-            guard live else { return }
-            openURL.webApp(url, player: player)
-        } label: {
-            HStack(alignment: .firstTextBaseline, spacing: 12) {
-                VStack(alignment: .leading, spacing: 3) {
-                    Text(label)
-                        .foregroundStyle(.primary)
-                    if let line {
-                        Text(line)
-                            .font(Typeface.footnote)
-                            .foregroundStyle(Palette.quiet)
-                    }
-                }
-                .fixedSize(horizontal: false, vertical: true)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                Image(systemName: ManagingWords.outSymbol)
-                    .font(Typeface.symbol(.body))
-                    .foregroundStyle(Palette.quiet)
-                    .accessibilityHidden(true)
-            }
-            .opacity(live ? 1 : Palette.off)
-            .contentShape(Rectangle())
-        }
-        .disabled(!live)
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel(line.map { "\(label), \($0)" } ?? label)
-        .accessibilityAddTraits(.isButton)
-        .accessibilityHint(ManagingWords.opensInSafari)
     }
 }

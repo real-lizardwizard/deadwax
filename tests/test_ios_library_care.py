@@ -108,9 +108,10 @@ def test_the_routes_are_the_servers_by_method_path_and_permission():
     assert "let library = permissions.contains(.library), edit = permissions.contains(.edit)" in parts
     assert "CareParts(shown: library || edit, rescan: library, held: library, bulk: edit)" in parts
     assert "loginsOn && parts.held" in swift_function("LibraryCare.swift", "heldShown")
-    # the page is the app's own now: no Safari for Library care
+    # the page is the app's own now: no Safari for Library care (since slice 12 Core has no address of the web app's at
+    # all, and tests/test_ios_no_web_app.py refuses a way out to it)
     managing = _code((CORE / "Managing.swift").read_text(encoding="utf-8"))
-    assert "case .edit, .queue, .care, .people, .settings, .log: return true" in managing[managing.index("public var native: Bool {"):]
+    assert "appPath" not in managing and "func url(" not in managing
 
 
 def test_a_rescan_sends_tracks_false_and_no_body_and_the_writes_none():

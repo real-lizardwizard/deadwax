@@ -45,8 +45,6 @@ import Testing
         #expect(Screens.same(YouWords.title, tab["phone"].string))
         #expect(YouWords.title == "Settings")
         #expect(YouWords.title != YouWords.webTitle)
-        // a line pointing at the web app's own tab keeps the web's name for it
-        #expect(ManagingWords.changePasswordLine.hasPrefix("Opens the web app's \(YouWords.webTitle):"))
     }
 
     /// The phone's footer says the web's of Normalization - it changes from the next thing played - and leaves out

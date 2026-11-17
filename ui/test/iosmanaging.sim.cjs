@@ -1,10 +1,9 @@
 /**
  * The iPhone app's Manage section offers what this app's You offers (notes/ios.md, "Phase 7: Managing"): which
- * managing tools show for which permissions - lib/permissions.ts managing and albumEdit, over every set of
- * permissions and a run of /deadwax/me answers through app/access.ts - and the address each opens at in the web app
- * (lib/appRoutes.ts formatRoute and parseHash: each Managing page as You opens it, the Library's and You's roots, an
- * album's page), with You's Manage section read out of its source (its title, its rows in order) and Change
- * password's offer (lib/ownPassword.ts).
+ * managing tools show for which permissions - lib/permissions.ts managing, albumEdit and artistManaging, over every
+ * set of permissions and a run of /deadwax/me answers through app/access.ts - with You's Manage section read out of
+ * its source (its title, its rows in order), App.tsx's album page Edit rule and Change password's offer
+ * (lib/ownPassword.ts). (The web app's addresses went in Phase 8's slice 12: nothing in the app opens the web app.)
  *
  * The phone's Swift port (ios/DeadwaxKit/Sources/DeadwaxCore/Managing.swift) is held by its tests to
  * ios/DeadwaxKit/Tests/DeadwaxCoreTests/Fixtures/managing/managing-vectors.json, which

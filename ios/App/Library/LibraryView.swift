@@ -607,8 +607,8 @@ private struct EditOrderSheet: View {
 /// The Navidrome gate drawn (app/NeedsNavidrome.tsx): why the Library has no albums to show, in the words Core's
 /// NavidromeGate gives this reader, Try again (asks Navidrome again - also on a pull) and, for an admin, Set up
 /// Navidrome - since Phase 8, slice 8 the app's own Server settings, its Connections group page in a sheet over the
-/// Library (SetUpNavidromeSheet; until then the web app's, in Safari) - held and drawn by LibraryView, above the gate, so
-/// the gate giving way never takes it. Saved, the Library asks Navidrome again, and the sheet goes once Navidrome
+/// Library (SetUpNavidromeSheet) - held and drawn by LibraryView, above the gate, so the gate giving way never takes
+/// it. Saved, the Library asks Navidrome again, and the sheet goes once Navidrome
 /// answers. Navidrome's own words, for whoever runs deadwax, can be selected to copy.
 struct NavidromeGateView: View {
     let closed: NavidromeGate.Closed

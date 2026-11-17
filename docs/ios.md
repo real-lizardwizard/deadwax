@@ -46,7 +46,7 @@ phone: a download somebody else asked for **joined**, a pressing in the collecti
 **Pick the best source for me**, and **When I tap Get**, **Quality floor** and **Format** chosen on the phone
 (see [Settings](#settings)). **App 0.13** is Phase 7, the last of the plan: **Manage** lists the tools for looking
 after deadwax that you may use - editing an album, Needs a look, Library care, People, Server settings and the event
-log - and each opens in the web app, in Safari, where it's already built for a phone; so does **Change password** (see
+log - each of which at first opened in the web app, in Safari, as **Change password** did (see
 [Manage](#manage)). Still 0.13, the tab that was **You** is **Settings** now: a short list of groups, each opening a
 page of its own, and every choice on them one row with a menu rather than a list of ticks (see
 [Settings](#settings)). The web app's tab is still called You. Still 0.13, **Phase 8** begins bringing those tools into
@@ -70,8 +70,9 @@ each new line as it's logged, with Copy on a long press and Clear for the phone'
 Then **Change password**: your Navidrome password changed on the phone, which stays signed in while every other
 sign-in of yours is signed out (see [Change password](#change-password)). Then **People**, for an admin: unlocked with
 your own Navidrome password, every Navidrome account with its permissions, a password reset, the admin role and
-Remove, Add a person, and the names deadwax keeps things for with no account - and with it no row of Manage opens
-Safari any more (see [People](#people)).
+Remove, Add a person, and the names deadwax keeps things for with no account (see [People](#people)). And last,
+nothing in the app takes you to the web app any more: what was left of the way out to it is gone, and the app's only
+links out are to MusicBrainz, AutoEq on GitHub and the Sharing deadwax guide (see [Manage](#manage)).
 
 **Nothing of Phase 2, the lyrics, the EQ, the turntable, play history, your library downloaded,
 playlists, artists, songs, Search, Requests, Get or Manage has been seen on an iPhone yet.** It's built and tested on a Mac,
@@ -1877,8 +1878,8 @@ Account and About ask deadwax again when you pull them down, as the first screen
 ### Manage
 
 Settings > **Manage** is deadwax's tools for looking after it, as many of them as you may use. They came into the app
-one build at a time (Phase 8), and since the build with [People](#people) every one is a page of the app's own -
-none opens Safari. Top to bottom, each only for someone who may use it:
+one build at a time (Phase 8), and every one is a page of the app's own - none opens Safari. Top to bottom, each only
+for someone who may use it:
 
 | row | who has it | opens |
 | --- | --- | --- |
@@ -1896,16 +1897,28 @@ down. If an admin took a permission away since, the page it opens says "This pag
 given you - ask one if you need it." - and People, its own words: "Only an admin can open People - it comes with
 being a Navidrome admin."
 
-Nothing is said under the rows. (Until the build with People, an admin's Manage said there that People opened in the
-web app, in Safari, which signs in apart from the app; nothing opens Safari now, so there's nothing to say.) Every row
-opens while deadwax can't be reached: each page says it needs deadwax, and reads what it shows once it's back. All of
-them open as whoever is signed in to the app.
+Nothing is said under the rows. Every row opens while deadwax can't be reached: each page says it needs deadwax, and
+reads what it shows once it's back. All of them open as whoever is signed in to the app.
 
 VoiceOver reads each row as one that opens a page, Needs a look with its count ("Needs a look, 3 albums"). The rows
 grow with the text size.
 
 An artist's pictures and names are managed from [the artist's page](#managing-an-artist), as in the web app. The web
 app's **Connections**, in its You, is at the top of [Server settings](#server-settings) on the phone.
+
+**Nothing in the app takes you to the web app.** Every managing tool - Manage's rows, an album's **Edit album**, an
+artist's **Artist images…**, **Which artist is this?** and **Move albums to …**, Account's **Change password** and the
+Library's **Set up Navidrome** - is a page or a sheet of the app's own. (Until the build after People, the app still
+had the pieces of its old way out to the web app in Safari, unused; that build took them out, and deadwax's own tests
+now refuse a new one.) The app has three links out, and none of them is to deadwax:
+
+| link | where | opens |
+| --- | --- | --- |
+| **This pressing on MusicBrainz**, **Every pressing on MusicBrainz** | [Album info](#album-info) | the release's and the release group's pages on musicbrainz.org |
+| **AutoEq on GitHub** | the foot of a correction's page in the [EQ](#autoeq-a-correction-for-your-headphones) | AutoEq's project on GitHub |
+| **Sharing deadwax** | [People](#people), when deadwax says People can't work because logins are off | the [Sharing deadwax](sharing.md) guide, on GitHub |
+
+Each opens in Safari, beside the app; the music keeps playing.
 
 ### Needs a look
 
@@ -4433,7 +4446,8 @@ Since the build with [Change password](#change-password), Account's Change passw
 line under it and no arrow: 243 is 374-378's now. Since the build with [People](#people), People opens in the app too,
 and no row of Manage opens Safari: nothing is said under the rows, and the Safari parts of 237-241, 245 and 246 no
 longer apply - 379-387 check People's page. 241's rows following the permissions still hold: give and take them in
-the Mac's People (or the phone's), and look at the app alone.
+the Mac's People (or the phone's), and look at the app alone. Since the build that takes the web app's way out away,
+nothing of 237-246's Safari is left in the app at all: 388-391 check that.
 
 - **237 The version, and Manage.** install.sh says "Installed deadwax 0.13 (13), runs until …", and You > About
   reads 0.13 (13). As an admin, You has **Manage** between Downloads and Account: **Edit an album** (with "Opens the
@@ -5264,6 +5278,39 @@ the Mac beside it. You'll make a throwaway account and remove it again: pick a n
   library"), each switch with its line and whether it's on, and what each change said read once - nothing read while
   the sign-in is over the app.
 
+### No way out to the web app's checks (388-391)
+
+**Not done yet.** These come with the build that takes the last of the app's way out to the web app away - Phase 8's
+last part (still app 0.13 (13)). No server change is needed. Sign in as an admin, with logins on, on deadwax's plain
+`http://` address; 390 wants Wi-Fi and WireGuard off for a while. Nothing in these should open Safari unless it says
+so - if Safari comes up anywhere else, say where.
+
+- **388 Nothing opens Safari to deadwax.** Settings > Manage: tap **Edit an album**, **Needs a look**, **Library
+  care**, **People**, **Server settings** and **Event log** in turn - each pushes a page of the app's own, with Back,
+  and no row has an arrow out at its right or a line under it about the web app; nothing is said under the rows. An
+  album's top **•••**: **Edit album** opens its sheet over the tabs, **Album info** its own. An artist's top **•••**:
+  **Artist images…**, **Which artist is this?** and **Move albums to …** (where they show) each open in the app.
+  Settings > Account: **Change password** pushes its page, with no line under it. And, only if you can take
+  Navidrome's address away for a moment on a test setup, the Library's **Set up Navidrome** opens Server settings'
+  Connections over the Library. Safari opens for none of them.
+- **389 What still opens outside.** Album info's **This pressing on MusicBrainz** and **Every pressing on
+  MusicBrainz** open musicbrainz.org's pages in Safari; the foot of an EQ correction's page, **AutoEq on GitHub**,
+  AutoEq's page there. With logins off, People's page says "People needs logins on - with them off, anyone who can
+  reach deadwax is its admin." with **Sharing deadwax** under it, which opens the Sharing deadwax guide on GitHub. Each
+  time the music keeps playing, and coming back to the app finds the page you left. Those three are all: is there
+  anywhere else something opens outside the app?
+- **390 Offline.** Quit the app from the app switcher and open it again, so nothing managing has been read yet; turn
+  off Wi-Fi and WireGuard, then open each of Manage's rows: no row is dimmed, none opens Safari, and each page says
+  "Managing needs deadwax. This opens once it's back." and asks nothing (Account's Change password shows the amber line
+  at its top and **Change** dimmed). Open Server settings while still offline, then turn the network back on: it fills
+  in by itself, without going back. Open Needs a look with the network on, then turn it off: what it shows stays, under
+  "deadwax is out of reach - this is how it was, and nothing here can change until it's back."; turn it on again and
+  the line goes by itself.
+- **391 The largest text, and VoiceOver.** At the largest text size, go through Manage's six pages, Edit album's,
+  the artist's sheets, Change password and People: every row and line wraps, nothing cut off. With VoiceOver, Manage's
+  rows read as rows that open a page ("Needs a look, 3 albums"), never "Opens in Safari."; Album info's MusicBrainz
+  links are the only ones that say "Opens in Safari.".
+
 ### Add to Queue's checks (392-403)
 
 **Not done yet.** These come with the build that makes [Add to Queue](#adding-to-the-queue) the phone's one way to add
@@ -5327,10 +5374,10 @@ No server change is needed. Use an album of a dozen songs, headphones on; the we
 
 ## What it can't do yet
 
-These are the web app's for now:
+These are the web app's for now - open deadwax's address in a browser for them, since nothing in the app takes you
+there. Looking after deadwax isn't among them any more: every managing tool is the app's own (see [Manage](#manage)).
 
 - **The visualizer**: it stays the web app's, on a desktop.
-
 - On an artist's page their **description**, and the page following an artist whose albums
   [Move albums](#managing-an-artist) moved to their name now.
 - In **Search**, an artist you don't have's page lists their albums, without their description or links. A search
@@ -5385,11 +5432,11 @@ These are the web app's for now:
 | Edit: **"The songs were saved, but Navidrome didn't take the name, description or sharing."** | Edit stays open: **Done** again saves the rest. |
 | Edit: **"Saved - but Navidrome didn't answer when deadwax asked for the playlist again."** | It's saved. **Done** again, or **Cancel**, and the page asks for it again. |
 | The app's notice: **"Couldn't add to Late night."** and why | An add you'd closed Add to a playlist on was refused, or its answer didn't come back. Try again: if the songs did get in, it asks before adding them twice. |
-| **Lyrics** is dimmed | The song has none - none on LRCLIB, or none fetched yet (**Get lyrics** in the album's Edit, on the web app). Offline, "Lyrics - not on this phone": none were kept for it, which happens to a song downloaded with app 0.3 until the app has been opened with deadwax in reach. |
+| **Lyrics** is dimmed | The song has none - none on LRCLIB, or none fetched yet (**Get lyrics** in the album's [Edit album](#edit-album) > Lyrics, or Library care's lyrics, for someone who can edit albums). Offline, "Lyrics - not on this phone": none were kept for it, which happens to a song downloaded with app 0.3 until the app has been opened with deadwax in reach. |
 | The EQ's correction picker: **"Something went wrong."**, with **Try again** | deadwax answered with an error. If it's every search, deadwax may be older than 2.1.7, which has no AutoEq for the app (an admin sees why, folded under it). |
 | Search: **"Searching for more isn't working right now - try again in a few minutes."** (or **"Too many searches just now - try again in a moment."**), or an album you don't have says **"This album's details can't be loaded right now - try again in a few minutes."** | MusicBrainz is away, or turning searches away, for a while - it does, for minutes at a time. Your library's rows are still there; **Try again** in a minute. **"That took too long."** is the same, MusicBrainz slow enough that the phone stopped waiting. [The troubleshooting page](troubleshooting.md#the-apps-search-says-it-cant-search-for-more-or-keeps-searching) has the rest. |
 | Search: an album you don't have shows an **empty square** for its cover | Its cover comes from the Cover Art Archive through deadwax, which needs deadwax 2.1.24 or later - see [the troubleshooting page](troubleshooting.md#the-iphone-app-shows-no-cover-for-an-album-you-dont-have). |
-| Choose a source: **"slskd is not connected to the Soulseek network, so it cannot search"** (or **"Downloads aren't working right now."**), with **Try again** | slskd isn't logged in to Soulseek, or deadwax can't reach slskd. Whoever runs deadwax checks You > Connections in the web app - [troubleshooting](troubleshooting.md#a-search-fails-with-not-logged-in-or-slskd-refused-it) has the rest - then **Try again**. |
+| Choose a source: **"slskd is not connected to the Soulseek network, so it cannot search"** (or **"Downloads aren't working right now."**), with **Try again** | slskd isn't logged in to Soulseek, or deadwax can't reach slskd. Whoever runs deadwax checks Connections, at the top of Settings > Manage > [Server settings](#server-settings) - [troubleshooting](troubleshooting.md#a-search-fails-with-not-logged-in-or-slskd-refused-it) has the rest - then **Try again**. |
 | Choose a source: **'Nothing lossless found for “…”.'** | Your Format is Lossless only, which leaves out every copy that isn't. Change it in Settings > Getting albums, or **Search again** with other words. |
 | Choose a source, with **Pick the best source for me** on: **"No close match that passes your filters - choose a source yourself."** (or **"You already have part of it - …"**, **"Part of it is already downloading - …"**) | Nothing through the chips scored 75% or more, or the pressing is partly here or on its way, so nothing was picked: choose one yourself. Clearing a chip, or a lower quality floor in Settings > Getting albums, lets more through. [The troubleshooting page](troubleshooting.md#get-shows-downloads-arent-working-right-now-or-nothing-to-choose-from) has the rest. |
 | **Join this download** says **"That download has been cleared from the list since - get it again."** (or that it has finished, failed or been cancelled) | The download moved on after the line was drawn. Get the album again: the line then says what's true now. [The troubleshooting page](troubleshooting.md#join-this-download-says-the-download-has-finished-failed-or-been-cancelled) has the rest. |

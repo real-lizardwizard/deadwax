@@ -24,10 +24,9 @@ struct AccountPage: View {
 
 /// Account (screens.md 3 and 8, the web's app/SignOutRow.tsx), drawn only with logins on: Change password first, as the
 /// web's Account has it - for a Navidrome sign-in, never break-glass (Core's OwnPassword.changeOffered, the web's
-/// changeOffered) - (Phase 8, slice 10) its own page here (ChangePasswordScreen), where until then it opened the web
-/// app's You in Safari. Then Sign out,
-/// the user name beside it, "Signing out…" while it asks, and the footnote - who is signed in and how, break-glass's
-/// 12 hours. (16 Nov) No header: the page's title says Account.
+/// changeOffered) - (Phase 8, slice 10) its own page here (ChangePasswordScreen). Then Sign out, the user name beside
+/// it, "Signing out…" while it asks, and the footnote - who is signed in and how, break-glass's 12 hours. (16 Nov) No
+/// header: the page's title says Account.
 ///
 /// Signing out is leaving: ServerModel.signOut asks POST /auth/logout, and any answer from deadwax ends the session -
 /// the music stops (the player is reset with the person), the Keychain's session goes, every page pops and the sign-in

@@ -383,9 +383,11 @@ public enum AlbumInfoWords {
     public static func copyName(_ label: String) -> String { "Copy \(label.lowercased())" }
     /// iOS refused to open a link out (Safari turned off in Screen Time, no browser to take it).
     public static let notOpened = "Couldn't open it - Safari may be turned off in Screen Time."
-    /// VoiceOver's hint on a link row.
-    public static let opensInSafari = ManagingWords.opensInSafari
-    public static let outSymbol = ManagingWords.outSymbol
+    /// VoiceOver's hint on a link row. (Manage's web-app rows had the same, until Phase 8's slice 12 took them out:
+    /// a MusicBrainz page is one of the three links out the app keeps - tests/test_ios_no_web_app.py.)
+    public static let opensInSafari = "Opens in Safari."
+    /// The trailing sign on a link row, where a pushed page's row has its chevron.
+    public static let outSymbol = "arrow.up.forward"
 
     /// How long the server's sections wait for every answer before drawing what has come (the files are read as they
     /// are asked for - a box set on a sleeping disk takes a while); later answers then land as they come.

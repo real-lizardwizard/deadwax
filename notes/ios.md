@@ -13680,3 +13680,144 @@ One must-fix and four smaller findings, each traced in the code before it was fi
 - **Two sentences here didn't match the code**, now corrected above: `hidden()` doesn't run as the app goes to the
   background (the fields are kept, so a password manager's fill survives the trip - the code is left so), and a write's
   answer is dropped only for another person (`generation`), not for a session that moved.
+
+## No way out to the web app (Phase 8, slice 12 - 2026-11-17)
+
+The spec's section 11 (notes/ios-specs/phase8-managing.md), with checks 388-391: James, 2026-11-16, "nothing in the
+app should take you to the web app". Slices 1-11 each switched its own entry to the app's own page as it landed (the
+album's ••• and Manage's Edit an album in 1, Needs a look in 6, Library care in 7, Server settings and Set up Navidrome
+in 8, the event log in 9, Account's Change password in 10, People in 11), so by slice 11 nothing drew a way out to the
+web app - but the pieces of Phase 7's were still there, unused. Slice 12 takes them out and adds a test that keeps any
+new one out, by CI rather than by memory. Built on the `ios` branch at e879995. The app stays 0.13 (13);
+src/__init__.py untouched; **no server change**; the player engine has no diff; the xcodeproj is unchanged.
+
+### What went
+
+- **Core, Managing.swift**: the web app's addresses - `appPath`, `fragment(_:)`, `albumFragment(id:)`, `youFragment`,
+  `url(_:at:)`, `albumURL(id:at:)`, `youURL(at:)`, the internal `url(fragment:at:)` - and `notice(opened:)`, what a
+  refused open said. `Tool.native`, true for every row since slice 11 and read only by the footer. **ManagingWords**:
+  `changePasswordLine`, `opensInSafari`, `opens`, `othersOpen` (slice 1's constant and slice 6's function, with its
+  `rest`), `signIn`, `offline`, `notOpened`, `footer(loginsOn:online:tools:)`, `outSymbol` and `safariSymbol`. What
+  stays is every rule (`parts`, `albumEdit`, `artistManaging`, `asksQueueSummary`, `needsLook`, `tools`,
+  `changeOffered`) and the words the fixture holds to the web's (`title`, `label`, `editAnAlbum`, `changePassword` -
+  CHANGE_TITLE, read by ManagingVectorTests and OwnPasswordVectorTests).
+- **AlbumInfoWords**' `opensInSafari` and `outSymbol` were aliases of Managing's two: they are Album info's own
+  literals now, the same words ("Opens in Safari.", `arrow.up.forward`) - its MusicBrainz rows are one of the links
+  out the app keeps.
+- **The app**: `WebAppRow`, `extension OpenURLAction { webApp(_:player:) }`, and ManageSection's footer (drawn empty
+  since slice 11), with the Reachability it read only for that. Comments that still said a thing opened in Safari
+  (YouView, AccountSection, LibraryView's gate, NavidromeGate.swift) say what it opens now.
+- **The vectors**: ios/scripts/export-managing-vectors.cjs no longer compiles lib/appRoutes.ts nor reads App.tsx's
+  `openManagingPage`; the fixture's `addresses` and `albums` (14 album ids' web addresses) are gone, 36 KB to 33 KB,
+  its `words`, `me` and `sets` byte for byte as they were. ui/test/iosmanaging.sim.cjs still runs it with `--check`.
+- **Tests that held the gone**: ManagingTests' four (every tool at the web app's address on six kinds of base, none
+  without one, the footer's words, a refused open's notice), ManagingVectorTests' address replay, ScreenYouTests'
+  `changePasswordLine` line, PeopleFlowTests' `native` and `footer` lines; and in Python the five places that pinned
+  `native`, `footer`, `WebAppRow` or `changePasswordLine` (test_ios_settings, test_ios_people,
+  test_ios_server_settings, test_ios_library_care, test_ios_event_log) now pin that they're gone.
+
+### What the spec named that was gone already, or never there
+
+- `QueueMenuRequest.webEdit` - slice 1, when the album's ••• got Edit album.
+- `ManagingWords.editLine` and `editInWebApp` (and `line(_:)`) - slice 1 (see "Edit album on the phone").
+- ScreenGateTests' `setUpURL` tests - slice 8, with `NavidromeGate.setUpURL`, when Set up Navidrome became the app's
+  own sheet.
+- **"its pause of the player"**: the `webApp` extension never paused anything. Its `player` argument was for
+  `player.say(...)` - a refused open (Safari turned off in Screen Time) said over the tabs - from Phase 7's
+  after-review commit eae6c54 on. It went with the extension.
+
+### The test: tests/test_ios_no_web_app.py
+
+It reads every Swift source of the app - ios/App and DeadwaxKit's Sources, 343 files - as two views of the same
+length and lines: comments blanked (nested block comments too), and then string literals' words blanked as well
+(raw, multi-line and escaped quotes; an interpolation's code kept, its own strings blanked in turn). A use is looked
+for only in the second, so a word in a comment or a string is never one; every file's brackets balance in it. Then:
+
+- **Every `openURL(...)` and `Link(...)`** is found with what it opens - its first argument or its `destination:` -
+  and, when that is a bare name, what the name was last bound to before it (`guard let link = row.link else`, `if let
+  address = URL(string: ...) {`, `if !state.on, let guide = ...`). Each must be on the allowlist, keyed by **file and
+  what it opens**, never a line number:
+
+  | file (ios/App) | what it opens | the link |
+  | --- | --- | --- |
+  | Album/AlbumInfoView.swift | `row.link` | Album info's This pressing / Every pressing on MusicBrainz |
+  | EQ/EQProfileScreen.swift | `URL(string: EQWords.Profile.gitHubAddress)` | AutoEq on GitHub, at a correction's foot |
+  | Manage/PeopleScreen.swift | `URL(string: People.sharingDoc)` | Sharing deadwax, under People's logins-off refusal |
+
+  And each entry must still be found: an allowed link taken out fails until its entry goes too.
+- **Where those three go** is checked in Core: `gitHubAddress` and `sharingDoc` are each one literal, the whole
+  address (AutoEq's project, and docs/sharing.md in deadwax's repository, both on GitHub); a row's `link` is made only
+  by `AlbumInfo.page`, which answers `https://musicbrainz.org/<kind>/<id>` for a MusicBrainz id and nil for anything
+  else; `self.link = link` in AlbumInfoRow's init is Core's only assignment, and the app makes none.
+- **deadwax's own address**: anything opened or shared - `openURL`, `Link`, and `ShareLink`'s `item:` - whose
+  destination names the phone's address (`ServerAddress`, `address`, `base`, `origin`, `absoluteString`, `/player`,
+  `server.`) is refused, on the allowlist or not. No Swift string literal is `"/player/"` or starts `"/player/#"`.
+- **openURL itself**: the environment's `\.openURL`, or a `var`/`let openURL`, only in a file with an allowed call;
+  `openURL` used any other way than called (Phase 7's `openURL.webApp(...)`, handed on as a value) and someone else's
+  `.openURL(` (UIApplication's old one) are refused.
+- **Never at all**: `OpenURLAction` (an extension, or a handler on the environment), `UIApplication`/`shared`/
+  `application` `.open(`, `SFSafariViewController` and `import SafariServices`, `WKWebView`, SwiftUI's `WebView`,
+  `import WebKit`, `ASWebAuthenticationSession`, `AttributedString(markdown:`; and a markdown link
+  (`[words](https:...)`, `mailto:`, `deadwax:`) in any string literal, which SwiftUI's Text would draw as a link.
+- **The gone stay gone**: none of Managing's removed names in Core, none of `WebAppRow`, `webApp(`, `webEdit` or
+  `Managing.url(`/`albumURL(`/`youURL(`/`notice(` anywhere, no `addresses` or `albums` in the fixture and nothing made
+  from appRoutes.ts or openManagingPage, and no appRoutes, formatRoute or parseHash in the exporter.
+
+**The matcher is held to made-up sources first** (`test_the_matcher_refuses_a_planted_way_out`): 16 planted ways out,
+each asserted refused *for its reason* - a bare openURL, a Link with and without a label, the web app's address built
+from the server's base, `Managing.url` as Phase 7 called it, Phase 7's own WebAppRow and extension (cut down from
+e879995's ManageSection.swift), `openURL.webApp` alone, UIApplication's two opens, openURL handed on, Safari's view,
+WKWebView and SwiftUI's WebView, a markdown link, a ShareLink of deadwax's base, an openURL handler; an allowed
+destination in the wrong file, and in its own file built from deadwax's address. And to what isn't one
+(`test_the_matcher_passes_what_isnt_a_way_out`): the words in line, block (nested), raw, multi-line and interpolated
+strings, NavigationLink, EQLink, creditLink, updateLink, a ShareLink of a file, `.onOpenURL` (a file shared *to* the
+app), `navigation.open(...)` - and the three allowed, each in its own file.
+
+**And against the real files**: seven mutations planted into the sources themselves, the test run against each, the
+file put back - a Link to the server's base in the Library, an OpenURLAction in Settings, Album info opening another
+property, the EQ's Link pointed at another constant, People's Link taken away (the allowlist gone stale), the AutoEq
+address changed to deadwax's `/player/`, and a markdown link in a Text in Account: each failed the test, one test
+each.
+
+### Decided here, and where the phone departs from the spec
+
+- **Python, not Swift**: the Swift suite can't read the App's sources; pytest runs on every push and tag through
+  tests.yml and docker-publish's call, beside the other test_ios_* readers of the App.
+- **Keyed by file and destination after one binding**, so a line moving, a label renamed or a modifier added changes
+  nothing, while what it opens changing - or the same expression in another file - fails.
+- **`Tool.native` and `othersOpen` went too**, though the spec's list doesn't name them: the footer was their only
+  reader, and both only said which rows opened Safari.
+- **ShareLink isn't on the allowlist** - it hands a file or text to the share sheet, it doesn't open a page - but its
+  item may not be deadwax's address. There are four: the EQ's two exports (a file), Debug's turntable recording (a
+  file) and Debug's engine log (text).
+- **No other link out was found.** `.onOpenURL` in RootView is the other way in (a file shared to deadwax). The test
+  reads DeadwaxKit's Sources too, where there's no SwiftUI today, so one added there is refused all the same.
+- **The docs**: docs/ios.md says in Manage that nothing in the app takes you to the web app and lists the three links
+  out; the intro, "What it can't do yet" and two troubleshooting rows (Get lyrics, and Connections for slskd's refusal)
+  no longer point at the web app for managing. The old checks (237-246) keep their words, with a line pointing at
+  388-391.
+
+### Tests
+
+- **tests/test_ios_no_web_app.py** (new, 5): the matcher refuses 16 planted ways out, each for its reason, and passes
+  what isn't one; nothing in the 343 sources opens the web app, the three allowed are all there are and each is there;
+  each goes to a site that isn't deadwax's; the web app's way out is gone from Core, the App and the vectors.
+- **Swift**: ManagingTests (2 left: each reader's rows, Change password's offer), ManagingVectorTests (3: the
+  fixture without addresses and not made from appRoutes.ts, the words and order, every set and /me answer),
+  ScreenYouTests, PeopleFlowTests.
+- **ui/test/iosmanaging.sim.cjs**: the exporter's `--check`, without the addresses (notes/sims.md).
+
+### Verified, and not
+
+On the Mac: `swift test` (2232 tests: 2062, 158 and 12, all passed - five fewer in Core than before, the address and
+footer tests that went); the unsigned generic-iOS Debug build, BUILD SUCCEEDED, with only the AppIntents metadata
+warning every build has; check_project.py; pyflakes over src and tests; tests/test_ios_*.py, test_source_bytes.py and
+test_logins.py (608 passed, 1 skipped); all 98 sims with Node 22 (iosmanaging running the trimmed exporter's
+`--check`). The exporter, run again, wrote the fixture without the addresses and nothing else changed in it. The
+seven mutations above, each run against the real files.
+
+Not verified - only the phone can tell (docs/ios.md checks 388-391): that no tap anywhere opens Safari to deadwax;
+that the three links out open their pages in Safari with the music playing on; each managing page offline and back;
+the largest text and VoiceOver across them. The test reads source, so a way out made some way it doesn't know - a
+URL handed to UIKit through a helper in another module, say - would get past it; the planted cases are what it
+covers.

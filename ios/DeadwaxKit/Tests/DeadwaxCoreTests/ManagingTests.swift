@@ -2,50 +2,13 @@ import Foundation
 import Testing
 @testable import DeadwaxCore
 
-/// Managing by hand (notes/ios-specs/phase7-managing.md): what the vectors can't reach - the addresses on every kind
-/// of base the phone may have, none without one, the rows for the readers the phone has, and the footer's words.
+/// Managing by hand (notes/ios-specs/phase7-managing.md): what the vectors can't reach - the rows for the readers the
+/// phone has, and Change password's offer. (The web app's addresses, the footer's Safari words and what a refused open
+/// said went in Phase 8's slice 12: nothing in the app opens the web app - tests/test_ios_no_web_app.py.)
 @Suite struct ManagingTests {
     private static func access(_ user: String, admin: Bool = false, auth: String = "on", _ permissions: [String]? = nil)
         -> Access {
         Access(me: Me(user: user, admin: admin, auth: auth, permissions: permissions))
-    }
-
-    /// Each tool at the web app's own address for it, on whatever base the phone was given: an IP, a name, https, a
-    /// port or none, IPv6 with a zone - deadwax's routes and its web app are both at the server's root.
-    @Test func everyToolOpensTheWebAppAtThePhonesServer() throws {
-        let bases: [(typed: String, base: String)] = [
-            ("192.168.3.20:8090", "http://192.168.3.20:8090"),
-            ("bearded-dragon:8090", "http://bearded-dragon:8090"),
-            ("http://deadwax.lan:8090/player/", "http://deadwax.lan:8090"),
-            ("https://deadwax.example.org", "https://deadwax.example.org"),
-            ("http://[fe80::1%25en0]:8090/player/", "http://[fe80::1%25en0]:8090"),
-            ("[2001:db8::20]", "http://[2001:db8::20]"),
-        ]
-        let pages: [Managing.Tool: String] = [
-            .edit: "#/library", .queue: "#/you/queue/all", .care: "#/you/care/library", .people: "#/you/people/all",
-            .settings: "#/you/settings/server", .log: "#/you/log/all",
-        ]
-        for (typed, base) in bases {
-            let server = try ServerAddress.parse(typed).get()
-            for tool in Managing.Tool.allCases {
-                let url = try #require(Managing.url(tool, at: server), "\(typed) \(tool)")
-                #expect(url.absoluteString == base + "/player/" + pages[tool]!, "\(typed) \(tool)")
-                let parts = URLComponents(url: url, resolvingAgainstBaseURL: false)
-                #expect(parts?.percentEncodedPath == "/player/", "\(typed) \(tool): the page is the web app's")
-                #expect(url.fragment.map { "#" + $0 } == pages[tool], "\(typed) \(tool): the route after the #")
-                #expect(url.query == nil, "\(typed) \(tool): nothing after a ? - a query is nobody's instruction there")
-            }
-            #expect(Managing.youURL(at: server)?.absoluteString == base + "/player/#/you")
-            #expect(Managing.albumURL(id: "a/b c", at: server)?.absoluteString == base + "/player/#/library/album/a%2Fb%20c")
-        }
-    }
-
-    @Test func withNoAddressThereIsNothingToOpen() throws {
-        for tool in Managing.Tool.allCases { #expect(Managing.url(tool, at: nil) == nil) }
-        #expect(Managing.albumURL(id: "x", at: nil) == nil && Managing.youURL(at: nil) == nil)
-        // nor an album with no id: the web app would open its Library's root, not the album
-        let server = try ServerAddress.parse("192.168.3.20:8090").get()
-        #expect(Managing.albumURL(id: "", at: server) == nil)
     }
 
     /// The readers the phone has: with logins off everyone is the admin, but there is nobody to manage; a Navidrome
@@ -75,35 +38,5 @@ import Testing
         #expect(!Managing.changeOffered(Me(user: "local", admin: true, auth: "off")), "logins off: no password of yours")
         #expect(!Managing.changeOffered(Me(user: "", admin: false, auth: "on")))
         #expect(!Managing.changeOffered(nil))
-    }
-
-    /// (Phase 8, slice 11) People is the app's own page too: every row of Manage is, so the footer says nothing about
-    /// Safari, whoever is drawn, in reach or out of it (each page says for itself that it needs deadwax). Its words stay
-    /// until slice 12 takes the web app's way out away.
-    @Test func theFooterSaysNothingNowEveryRowIsTheApps() {
-        #expect(Managing.Tool.allCases.filter(\.native) == Managing.Tool.allCases)
-        for loginsOn in [true, false] {
-            for online in [true, false] {
-                #expect(ManagingWords.footer(loginsOn: loginsOn, online: online).isEmpty)
-                #expect(ManagingWords.footer(loginsOn: loginsOn, online: online, tools: [.people]).isEmpty)
-                #expect(ManagingWords.footer(loginsOn: loginsOn, online: online, tools: [.edit, .queue, .people]).isEmpty)
-            }
-        }
-        #expect(ManagingWords.othersOpen.hasPrefix(ManagingWords.editAnAlbum))
-        #expect(ManagingWords.othersOpen([.edit]) == ManagingWords.othersOpen)
-        // the page is Safari's person's, not the app's: said wherever a row still opened one
-        #expect(ManagingWords.signIn.contains("whoever is signed in there"))
-        #expect(ManagingWords.changePasswordLine.contains("whoever is signed in in Safari"))
-    }
-
-    /// A tap iOS refused (Safari turned off in Screen Time, no browser to open it) says so - in a listener's words,
-    /// no address in them - and one the browser took says nothing.
-    @Test func anOpenIOSRefusedSaysSoInAListenersWords() throws {
-        #expect(Managing.notice(opened: true) == nil)
-        let words = try #require(Managing.notice(opened: false))
-        #expect(words == ManagingWords.notOpened)
-        #expect(!ErrorWords.plumbing(words), "a listener's line: no address, setting or error in it")
-        #expect(!words.contains("http") && !words.contains("/player/"))
-        #expect(words.contains("Safari") && words.contains("Screen Time"))
     }
 }

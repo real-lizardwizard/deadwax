@@ -120,9 +120,9 @@ def test_no_word_the_app_shows_calls_the_tab_you():
     assert code(CORE / "DownloadWords.swift").count("- in Settings > Downloads.\"") == 3
     assert "in Settings, under Getting albums.\"" in code(CORE / "Sources.swift")
     assert code(CORE / "LibraryFollowWords.swift").count("in Settings > Downloads") == 2
-    # the one line about the web app's own tab keeps the web's name for it
-    managing = (CORE / "Managing.swift").read_text(encoding="utf-8")
-    assert "Opens the web app's You: Change password is under Account there." in managing
+    # (slice 12) the one line that pointed at the web app's own tab - Account's Change password, in Safari - is gone
+    # with every other way out to the web app
+    assert "Opens the web app's" not in (CORE / "Managing.swift").read_text(encoding="utf-8")
 
 
 def test_the_root_is_the_headline_then_rows_that_open_pages():
@@ -185,11 +185,10 @@ def test_manage_keeps_its_rules_and_every_row_is_the_apps_own():
     # Safari any more
     assert "NavigationLink(value: AppRoute.people)" in section[people:]
     assert section.count("NavigationLink") == 6
-    assert "WebAppRow" not in section
-    # the footer is said of the rows drawn - with none opening Safari it says nothing (slice 12 takes it out, and
-    # WebAppRow with it)
-    assert "ManagingWords.footer(loginsOn: server.access.on, online: online, tools: tools)" in section
-    assert "openURL.webApp(url, player: player)" in body(struct(manage, "WebAppRow"))
+    # (slice 12) the footer that said which rows opened Safari is gone, with WebAppRow and the openURL extension that
+    # opened them: nothing in the app takes you to the web app (tests/test_ios_no_web_app.py)
+    for gone in ("WebAppRow", "OpenURLAction", "openURL", "ManagingWords.footer", "} footer: {"):
+        assert gone not in manage, gone
 
 
 def test_each_page_is_a_route_of_its_own():

@@ -92,9 +92,10 @@ def test_the_routes_are_the_servers_by_method_path_and_permission():
     assert "let page = access.can(.server)" in parts
     assert ("Parts(page: page, connections: page && access.seesDetail, retime: page && access.can(.edit), "
             "answers: page)") in parts
-    # the page is the app's own now: no Safari for Server settings
+    # the page is the app's own now: no Safari for Server settings (since slice 12 Core has no address of the web app's
+    # at all, and tests/test_ios_no_web_app.py refuses a way out to it)
     managing = _code((CORE / "Managing.swift").read_text(encoding="utf-8"))
-    assert "case .edit, .queue, .care, .people, .settings, .log: return true" in managing[managing.index("public var native: Bool {"):]
+    assert "appPath" not in managing and "func url(" not in managing
     # and the Library's Set up Navidrome is the app's own page too: no address of the web app's left for it
     assert "setUpURL" not in (CORE / "NavidromeGate.swift").read_text(encoding="utf-8")
 

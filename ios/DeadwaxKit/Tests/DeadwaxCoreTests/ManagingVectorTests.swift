@@ -2,24 +2,26 @@ import Foundation
 import Testing
 @testable import DeadwaxCore
 
-/// Fixtures/managing/managing-vectors.json: the web's lib/permissions.ts (`managing`, `albumEdit`), app/access.ts
-/// (`accessOf`, `seesDetail`), lib/ownPassword.ts (`changeOffered`) and lib/appRoutes.ts (`formatRoute`, `parseHash`)
-/// run as they are, You.tsx's Manage section read out of its source, and App.tsx's album page Edit rule (evaluated as
-/// written) and the tab its Managing pages open on - replayed here through Managing and Access, case for case
-/// (notes/ios-specs/phase7-managing.md 6).
+/// Fixtures/managing/managing-vectors.json: the web's lib/permissions.ts (`managing`, `albumEdit`, `artistManaging`),
+/// app/access.ts (`accessOf`, `seesDetail`) and lib/ownPassword.ts (`changeOffered`) run as they are, You.tsx's Manage
+/// section read out of its source, and App.tsx's album page Edit rule (evaluated as written) - replayed here through
+/// Managing and Access, case for case (notes/ios-specs/phase7-managing.md 6). The web app's addresses went from the
+/// fixture in Phase 8's slice 12, with Managing's: nothing in the app opens the web app.
 @Suite struct ManagingVectorTests {
     let fixture = try! JSONDecoder().decode(Web.self, from: Fixtures.data("managing/managing-vectors.json"))
 
     @Test func theFixtureIsThere() {
         #expect(fixture["made_by"].string == "ios/scripts/export-managing-vectors.cjs")
-        expectMadeFrom(fixture, ["ui/src/lib/permissions.ts", "ui/src/lib/appRoutes.ts", "ui/src/lib/ownPassword.ts",
-                                 "ui/src/app/access.ts", "ui/src/app/You.tsx the Manage section",
-                                 "ui/src/app/You.tsx the Manage title", "ui/src/app/You.tsx You's managing",
-                                 "ui/src/app/App.tsx the album page's Edit", "ui/src/app/App.tsx App's perms",
-                                 "ui/src/app/App.tsx openManagingPage"])
+        expectMadeFrom(fixture, ["ui/src/lib/permissions.ts", "ui/src/lib/ownPassword.ts", "ui/src/app/access.ts",
+                                 "ui/src/app/You.tsx the Manage section", "ui/src/app/You.tsx the Manage title",
+                                 "ui/src/app/You.tsx You's managing", "ui/src/app/App.tsx the album page's Edit",
+                                 "ui/src/app/App.tsx App's perms"])
         #expect(fixture["sets"].list.count == 64)
         #expect(fixture["me"].list.count == 20)
-        #expect(fixture["albums"].list.count == 14)
+        // (slice 12) no address of the web app's is kept any more, nor made from its routes
+        #expect(fixture["addresses"].isNull && fixture["albums"].isNull)
+        #expect(fixture["made_from"]["ui/src/lib/appRoutes.ts"].isNull)
+        #expect(fixture["made_from"]["ui/src/app/App.tsx openManagingPage"].isNull)
     }
 
     private static func permissions(_ list: Web) -> Set<Access.Permission> {
@@ -111,38 +113,5 @@ import Testing
         }
         #expect(diffs.checked == 20 * 10)
         diffs.done()
-    }
-
-    /// Every Managing page's address as You opens it, the Library's and You's roots, an album's for every kind of id -
-    /// and each one, opened cold in the web app, is that very page, its address kept.
-    @Test func everyAddressIsTheWebsAndOpensAsItself() throws {
-        let server = try ServerAddress.parse("http://192.168.3.20:8090").get()
-        let addresses = fixture["addresses"]
-        let base = "http://192.168.3.20:8090/player/"
-        // the tabs they open on: App's openManagingPage's for the Managing pages and You, the phone's Library for the rest
-        let managingTab = try #require(addresses["tabs"]["managing"].string)
-        let libraryTab = try #require(addresses["tabs"]["library"].string)
-        #expect(Managing.youFragment == "/" + managingTab)
-        #expect(Managing.fragment(.edit) == "/" + libraryTab)
-        #expect(Managing.albumFragment(id: "x").hasPrefix("/" + libraryTab + "/"))
-        for tool in Managing.Tool.allCases where tool != .edit {
-            #expect(Managing.fragment(tool).hasPrefix("/" + managingTab + "/"), "\(tool) opens on App's tab")
-            let page = addresses["pages"][tool.rawValue]
-            #expect("#" + Managing.fragment(tool) == page["hash"].string, "\(tool)")
-            #expect(Managing.url(tool, at: server)?.absoluteString == base + (page["hash"].string ?? "?"), "\(tool)")
-            #expect(page["kept"].bool == true && page["opens"]["page"]["kind"].string == tool.rawValue, "\(tool)")
-            #expect(Screens.same(ManagingWords.label(tool), page["label"].string), "\(tool)'s page is named as its row")
-        }
-        #expect("#" + Managing.fragment(.edit) == addresses["library"]["hash"].string)
-        #expect(addresses["library"]["kept"].bool == true && addresses["library"]["opens"]["page"].isNull)
-        #expect("#" + Managing.youFragment == addresses["you"]["hash"].string)
-        #expect(addresses["you"]["kept"].bool == true && addresses["you"]["opens"]["tab"].string == "you")
-        #expect(Managing.youURL(at: server)?.absoluteString == base + "#/you")
-        for album in fixture["albums"].list {
-            let id = album["id"].string!
-            #expect("#" + Managing.albumFragment(id: id) == album["hash"].string, "\(id)")
-            #expect(Managing.albumURL(id: id, at: server)?.absoluteString == base + (album["hash"].string ?? "?"), "\(id)")
-            #expect(album["kept"].bool == true && album["opens"]["page"]["id"].string == id, "\(id) opens as itself")
-        }
     }
 }

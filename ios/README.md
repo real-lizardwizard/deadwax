@@ -24,7 +24,7 @@ the button, Soulseek's sources in a sheet with each one's reasoning, the one pic
 picked for you with Pick the best source for me; a download somebody else asked for joined, a pressing in the
 collection added to your library, and When I tap Get, Quality floor and Format chosen on the phone - and
 Phase 7's Manage: the list of the managing tools you may use (editing an album, Needs a look, Library care,
-People, Server settings and the event log) and Change password, each opened in the web app in Safari - and
+People, Server settings and the event log) and Change password, each first opened in the web app in Safari - and
 Phase 8, bringing them into the app one at a time, begun with Edit album: an album's folder, what's wrong with it,
 and the release it's matched to, chosen and applied on the phone, then its tags, on one track or many, then its
 artwork and lyrics, with Get cover, Get CD art and Get lyrics, then its Delete, what goes read first and asked
@@ -40,7 +40,8 @@ deadwax gives it while every other sign-in of yours ends, then People: Navidrome
 phone, unlocked with your own Navidrome password - a person added, their password reset, made admin or not, removed
 with their name typed, each person's permissions ticked and saved, and Forget for what deadwax still keeps for
 someone gone from Navidrome -
-after which nothing in Manage opens Safari -
+and last, no way out to the web app left at all: the app's only links out are to MusicBrainz, AutoEq on GitHub and
+the Sharing deadwax guide, and a test keeps it so -
 and Add to Queue, the phone's one way to add
 songs: a swipe right on a song, or the one item on every •••, each song after the ones already added (the web app's
 Play Last; the web keeps Play Next too) - kept on the `ios` branch while it's being built. Nothing of Phase 2, the
@@ -54,7 +55,7 @@ Phase 0's test screen lives on in the app's Debug.
   (`ios/scripts/make-test-album.py`), what the app does, and the checks, phase by phase - Phase 7's are 237-246,
   Edit album's 320-329, its Tags' 330-334, its Artwork and Lyrics' 335-337, its Delete's 338-342, the artist
   tools' 343-348, Needs a look's 349-354, Library care's 355-360, Server settings' 361-369, the event log's 370-373,
-  Change password's 374-378, People's 379-387, Add to Queue's 392-403.
+  Change password's 374-378, People's 379-387, no way out to the web app's 388-391, Add to Queue's 392-403.
 - **How it is built, and why:** [notes/ios.md](../notes/ios.md).
 - **Before pushing a change here, on Linux:** `ios/scripts/check-linux.sh`. GitHub's `ios.yml` compiles
   the rest on macOS.

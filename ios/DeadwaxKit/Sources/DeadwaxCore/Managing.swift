@@ -1,10 +1,11 @@
 import Foundation
 
-/// You > Manage (Phase 7, notes/ios-specs/phase7-managing.md): deadwax's managing tools - the editors, Needs a look,
-/// Library care, People, Server settings and the event log - each opened in the web app, in Safari, never rebuilt on
-/// the phone. Which show is the web's rule (lib/permissions.ts `managing` and `albumEdit`, by the permissions /me
-/// gives - Access); where each opens is the web app's own address for it (lib/appRoutes.ts `formatRoute`: the app at
-/// `/player/`, its page after the `#`, opened cold as itself). Held to the TypeScript by
+/// Settings > Manage (Phase 7, notes/ios-specs/phase7-managing.md; Phase 8, phase8-managing.md): deadwax's managing
+/// tools - the editors, Needs a look, Library care, People, Server settings and the event log. Phase 7 opened each
+/// in the web app, in Safari; Phase 8 rebuilt them on the phone one slice at a time, and since slice 12 nothing here
+/// addresses the web app at all (James: "nothing in the app should take you to the web app" -
+/// tests/test_ios_no_web_app.py keeps it so). Which show is the web's rule (lib/permissions.ts `managing` and
+/// `albumEdit`, by the permissions /me gives - Access). Held to the TypeScript by
 /// Tests/DeadwaxCoreTests/Fixtures/managing/managing-vectors.json (ios/scripts/export-managing-vectors.cjs, which runs
 /// it as it is; ui/test/iosmanaging.sim.cjs checks it is current).
 ///
@@ -110,19 +111,12 @@ public enum Managing {
         NeedsLookPage(allowed: permissions.contains(.library), canEdit: permissions.contains(.edit))
     }
 
-    /// One of Manage's rows, in the order You draws them: the phone's own Edit an album first (the web's editors live
-    /// on an album's page, not in You), then the web's five in You.tsx's order.
+    /// One of Manage's rows, in the order Settings draws them: the phone's own Edit an album first (the web's editors
+    /// live on an album's page, not in You), then the web's five in You.tsx's order - each the app's own page (Edit an
+    /// album since Phase 8's slice 1, Needs a look since slice 6, Library care since 7, Server settings since 8, the
+    /// event log since 9, People since 11).
     public enum Tool: String, Sendable, CaseIterable, Hashable {
         case edit, queue, care, people, settings, log
-
-        /// The app's own page (Phase 8 - one slice at a time): Edit an album since slice 1, Needs a look since slice 6,
-        /// Library care since slice 7, Server settings since slice 8, the event log since slice 9, People since slice 11 -
-        /// every row now, so nothing in Manage opens Safari (slice 12 takes the web app's way out away).
-        public var native: Bool {
-            switch self {
-            case .edit, .queue, .care, .people, .settings, .log: return true
-            }
-        }
     }
 
     /// The rows for this person (You.tsx: `managing(access.permissions, access.on)`; the first by `albumEdit`).
@@ -145,67 +139,10 @@ public enum Managing {
     public static func changeOffered(_ me: Me?) -> Bool {
         OwnPassword.changeOffered(me)
     }
-
-    // MARK: the addresses
-
-    /// Where the web app is: `/` answers a 307 to it, so the phone goes there itself.
-    public static let appPath = "/player/"
-
-    /// The page's address after the `#` (formatRoute's, without its `#`): each Managing page on the You tab, as You
-    /// opens it - one page each, whatever id an address gives it, so the id is the web's own - and for the editors,
-    /// which no address opens (the Edit panel opens only from a tap on an album's page), the Library's root.
-    public static func fragment(_ tool: Tool) -> String {
-        switch tool {
-        case .edit: return "/library"
-        case .queue: return "/you/queue/all"
-        case .care: return "/you/care/library"
-        case .people: return "/you/people/all"
-        case .settings: return "/you/settings/server"
-        case .log: return "/you/log/all"
-        }
-    }
-
-    /// An album's page in the web app, by Navidrome's album id (formatRoute: the id `encodeURIComponent`'d).
-    public static func albumFragment(id: String) -> String {
-        "/library/album/" + TurntableGeometry.encodeURIComponent(id)
-    }
-
-    /// You's root in the web app: Account's Change password is in it, and has no address of its own. (Phase 8, slice 10:
-    /// Account's row is the app's own page now - nothing opens this; slice 12 removes it with the rest.)
-    public static let youFragment = "/you"
-
-    /// A tool's page in the web app at this phone's deadwax; nil with no address.
-    public static func url(_ tool: Tool, at server: ServerAddress?) -> URL? {
-        url(fragment: fragment(tool), at: server)
-    }
-
-    /// An album's page in the web app (Edit album's rows still there - Tags, Artwork, Lyrics, Delete); nil with no
-    /// address or no id.
-    public static func albumURL(id: String, at server: ServerAddress?) -> URL? {
-        id.isEmpty ? nil : url(fragment: albumFragment(id: id), at: server)
-    }
-
-    /// The web app's You (Account's Change password until Phase 8's slice 10; slice 12 removes it).
-    public static func youURL(at server: ServerAddress?) -> URL? {
-        url(fragment: youFragment, at: server)
-    }
-
-    static func url(fragment: String, at server: ServerAddress?) -> URL? {
-        guard let server else { return nil }
-        return URL(string: server.base.absoluteString + appPath + "#" + fragment)
-    }
-
-    /// What a tap says once iOS has answered the open (SwiftUI's openURL completion): nothing when the browser took the
-    /// address; when iOS refused it - Safari turned off in Screen Time, no other browser to open it - a notice in a
-    /// listener's words, so a tap that opened nothing never says nothing. The address is no help to anyone here (iOS
-    /// refused the kind of link, not this one), so it isn't said, even to whoever runs deadwax.
-    public static func notice(opened: Bool) -> String? {
-        opened ? nil : ManagingWords.notOpened
-    }
 }
 
 /// Manage's words: the web's where the web says them (You.tsx's title and rows, ownPassword.ts's CHANGE_TITLE - held by
-/// the fixture), the phone's own for what only the phone does - open them in Safari.
+/// the fixture), the phone's own for its own row, Edit an album.
 public enum ManagingWords {
     /// The section's title (You.tsx `app-managing-title`).
     public static let title = "Manage"
@@ -225,54 +162,7 @@ public enum ManagingWords {
     /// The phone's own row for the editors (Phase 8, slice 1: the app's own - Choose the folder, then Edit album).
     public static let editAnAlbum = "Edit an album"
 
-    /// Account's row (ownPassword.ts CHANGE_TITLE), and the line under it: where it is once open, and whose password
-    /// it changes there - Safari's person's, who may not be the app's (Safari signs in apart). (Phase 8, slice 10: the
-    /// row opens the app's own page - OwnPassword.title - and the line is drawn nowhere; slice 12 removes it.)
+    /// Account's row (ownPassword.ts CHANGE_TITLE): since Phase 8's slice 10 it opens the app's own page
+    /// (OwnPassword.title), and is held to the web's here for Manage's fixture.
     public static let changePassword = "Change password"
-    public static let changePasswordLine = "Opens the web app's You: Change password is under Account there. It changes "
-        + "the password of whoever is signed in in Safari."
-
-    /// VoiceOver's hint on every row that opens Safari.
-    public static let opensInSafari = "Opens in Safari."
-
-    public static let opens = "These open in the web app, in Safari."
-    /// (Phase 8, slice 1) With Edit an album, the app's own now, above the rows that still open Safari.
-    public static let othersOpen = "Edit an album is the app's own; the others open in the web app, in Safari."
-
-    /// (slice 6) The same, of every row drawn that is the app's own (Tool.native), in Manage's order: "Edit an album and
-    /// Needs a look are the app's own; the others open in the web app, in Safari."
-    public static func othersOpen(_ native: [Managing.Tool]) -> String {
-        let names = native.map(label)
-        guard names.count > 1 else { return names.first.map { "\($0) is the app's own; \(rest)" } ?? opens }
-        return "\(names.dropLast().joined(separator: ", ")) and \(names.last ?? "") are the app's own; \(rest)"
-    }
-
-    private static let rest = "the others open in the web app, in Safari."
-    /// With logins on: Safari signs in apart from the app - and each page is Safari's person's, not the app's: nothing
-    /// compares the two.
-    public static let signIn = "Safari has its own sign-in, apart from the app's: the first time, sign in there with the "
-        + "same name and password you use here. The pages open as whoever is signed in there, who may not be who's "
-        + "signed in here."
-    /// deadwax out of reach: the rows are off.
-    public static let offline = "These open once deadwax is back."
-
-    /// iOS refused to open the address (Managing.notice(opened:)): said over the tabs, announced.
-    public static let notOpened = "Couldn't open the web app - Safari may be turned off in Screen Time."
-
-    /// The section's footer, a sentence a line: where the rows that open Safari open (or, out of reach, when), then
-    /// Safari's sign-in with logins on - nothing at all when every row drawn is the app's own (Edit an album since
-    /// Phase 8's slice 1, Needs a look since slice 6, Library care since slice 7, Server settings since slice 8, the event
-    /// log since slice 9, People since slice 11 - so since slice 11, never), whose pages say for themselves that they
-    /// need deadwax.
-    public static func footer(loginsOn: Bool, online: Bool, tools: [Managing.Tool] = Managing.Tool.allCases) -> [String] {
-        let web = tools.filter { !$0.native }
-        guard !web.isEmpty else { return [] }
-        let native = tools.filter(\.native)
-        let lead = !online ? offline : native.isEmpty ? opens : othersOpen(native)
-        return [lead] + (loginsOn ? [signIn] : [])
-    }
-
-    /// The trailing sign on a row that opens elsewhere (where a pushed page's row has a chevron), and the menu item's.
-    public static let outSymbol = "arrow.up.forward"
-    public static let safariSymbol = "safari"
 }

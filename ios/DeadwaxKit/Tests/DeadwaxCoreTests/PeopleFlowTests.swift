@@ -58,10 +58,6 @@ import Testing
             #expect(People.allowed(access) == allowed, "\(access.user), on \(access.on): allowed")
             #expect(Managing.tools(access).contains(.people) == offered, "\(access.user): Manage's row")
         }
-        let native = Managing.Tool.allCases.filter(\.native)
-        #expect(native == Managing.Tool.allCases, "nothing in Manage opens Safari")
-        #expect(ManagingWords.footer(loginsOn: true, online: true).isEmpty)
-        #expect(ManagingWords.footer(loginsOn: true, online: false).isEmpty)
     }
 
     // MARK: the idle unlock
