@@ -376,25 +376,37 @@ def player(on, monkeypatch, tmp_path):
 
 class Slow:
     """The fake Navidrome a real network's round trip away - each answer `delay` seconds after it is asked -
-    counting how many calls are out at once."""
+    counting how many calls are out at once.
 
-    def __init__(self, fake, delay: float = 0.05):
+    With `together`, every call after the first `alone` is held until `together` are out at once (or `patience`
+    runs out), so how many went together never hangs on how fast a busy CI runner starts them - a burst of 0.05 s
+    calls once had some answered before the last were asked (most 7, not 9). A burst that goes one at a time still
+    never has more than one out: each waits out its patience alone."""
+
+    def __init__(self, fake, delay: float = 0.05, together: int = 0, alone: int = 0, patience: float = 2.0):
         self.fake, self.delay = fake, delay
-        self.flying = self.most = 0
+        self.together, self.alone, self.patience = together, alone, patience
+        self.flying = self.most = self.asked = 0
 
     async def __call__(self, request: httpx.Request) -> httpx.Response:
         self.flying += 1
+        self.asked += 1
         self.most = max(self.most, self.flying)
         try:
+            if self.together and self.asked > self.alone:
+                loop = asyncio.get_running_loop()
+                until = loop.time() + self.patience
+                while self.flying < self.together and loop.time() < until:
+                    await asyncio.sleep(0.005)
             await asyncio.sleep(self.delay)
             return self.fake.handle(request)
         finally:
             self.flying -= 1
 
 
-def slow(env, delay: float = 0.05) -> Slow:
+def slow(env, delay: float = 0.05, together: int = 0, alone: int = 0) -> Slow:
     """The shared client's connections (a UserClient's too) through Slow."""
-    answering = Slow(env.fake, delay)
+    answering = Slow(env.fake, delay, together, alone)
     navidrome.client = httpx.AsyncClient(transport=httpx.MockTransport(answering), base_url=f"{NAVIDROME}/rest")
     return answering
 
@@ -995,7 +1007,7 @@ def test_a_burst_after_a_password_change_is_one_refused_login(player):
 
 def test_calls_as_a_login_navidrome_has_just_taken_go_together(player):
     client, key = ethans_client(player)
-    answering = slow(player)
+    answering = slow(player, together=10)
     navidrome_endpoint._confirmed[key] = time.monotonic()
 
     async def ten():
@@ -1007,7 +1019,7 @@ def test_calls_as_a_login_navidrome_has_just_taken_go_together(player):
 
 def test_after_a_pause_one_call_goes_first_and_the_rest_together(player):
     client, key = ethans_client(player)
-    answering = slow(player)
+    answering = slow(player, together=9, alone=1)
     navidrome_endpoint.forget_confirmed()
 
     async def ten():
@@ -1015,6 +1027,7 @@ def test_after_a_pause_one_call_goes_first_and_the_rest_together(player):
 
     run(ten())
     assert answering.most == 9
+    answering.together = 0
     #? ...and refused, it is the only one that asked - five seconds on (the gate kept: a lock is made afresh for
     #? another event loop, here the next run's, as the tests' loops come and go)
     navidrome_endpoint._confirmed[key] = time.monotonic() - navidrome_endpoint.CONFIRMED_SECONDS - 1
@@ -1032,7 +1045,7 @@ def test_after_a_pause_one_call_goes_first_and_the_rest_together(player):
 def test_navidrome_not_there_holds_up_nothing_waiting_on_the_first_call(player):
     """Down is no failed login: the calls waiting on the first don't then go one by one to find that out."""
     client, key = ethans_client(player)
-    answering = slow(player)
+    answering = slow(player, together=4, alone=1)
     navidrome_endpoint.forget_confirmed()
     player.fake.down = True
 

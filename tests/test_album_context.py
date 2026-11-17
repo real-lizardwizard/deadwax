@@ -12,6 +12,7 @@ without numpy, soxr and soundfile (never in CI - see test_resample.py).
 
 import asyncio
 import logging
+import math
 import sys
 from collections import Counter, defaultdict
 from pathlib import Path
@@ -132,9 +133,23 @@ def plan_of(cache: player_cache.Mp4Cache, song: str, max_rate: int = 48000):
 
 
 def later(cache: player_cache.Mp4Cache, seconds: float = player_cache.VERSION_SECONDS + 1) -> None:
-    """Move the cache's clock on - past what Navidrome said being believed, by default."""
-    now = cache.clock() + seconds
-    cache.clock = lambda: now
+    """Move the cache's clock on - past what Navidrome said being believed, by default.
+
+    The first move holds the clock at a whole second (never behind the real one), so every step after
+    it is exact: on the monotonic clock's own value, (x + 6) + 30 less (x + 6) can come out a hair under
+    30 where the sum crosses a power of two, and a test stepping exactly VERSION_SECONDS then saw a new
+    play read as carrying on (test_safaris_rest_straight_after_its_probe_is_still_the_probes_file,
+    failing now and then in CI)."""
+    now = cache.clock()
+    if not getattr(cache.clock, "held", False):
+        now = float(math.ceil(now))
+    now += seconds
+
+    def held() -> float:
+        return now
+
+    held.held = True
+    cache.clock = held
 
 
 # ---------------------------------------------------------------- the grid
