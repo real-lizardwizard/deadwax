@@ -63,8 +63,10 @@ container rather than the Keychain. Nothing of it has been seen on a Mac yet.
   Change password's 374-378, People's 379-387, no way out to the web app's 388-391, Add to Queue's 392-403.
 - **To install it on a Mac:** `ios/scripts/install-mac.sh` (`--dry-run` says what it would do first) - after
   install.sh has been run once for the team it writes, `ios/Config/Local.xcconfig`. It builds the Mac app (Release,
-  Apple silicon) in `~/Library/Caches/deadwax-build-mac`, checks it's signed, sandboxed and allowed out to the
-  network, asks before quitting deadwax if it's open (never by force), and puts it in `~/Applications/deadwax.app`.
+  Apple silicon) in `~/Library/Caches/deadwax-build-mac`, checks it's signed, sandboxed, allowed out to the network
+  and to read a file you choose, and has no provisioning profile (it stops there, installing nothing, if Xcode added
+  one - `--allow-profile` to install it anyway), asks before quitting deadwax if it's open (`--quit` doesn't ask;
+  never by force), and puts it in `~/Applications/deadwax.app`.
   How, and the Mac's checks, 404-415: [The Mac app](../docs/ios.md#the-mac-app) in docs/ios.md.
 - **How it is built, and why:** [notes/ios.md](../notes/ios.md).
 - **Before pushing a change here, on Linux:** `ios/scripts/check-linux.sh`. GitHub's `ios.yml` compiles

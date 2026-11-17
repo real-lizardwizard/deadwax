@@ -4,9 +4,10 @@ plays"), checked on Linux as on a Mac:
 
   - ios/scripts/install-mac.sh, run under bash with stand-ins on PATH for Apple's tools (xcodebuild, xcrun, codesign,
     osascript, ditto, open, security), curl, df and sleep, in a temporary HOME: its flags and --dry-run, the team's
-    three cases, too little space, what GitHub's checks said, the build and the checks on what it made, deadwax open
-    (asked before it is quit, never forced), the swap into ~/Applications (an old app kept when the copy fails), and
-    that it never names /Applications as a place to install, sudo or kill;
+    three cases, too little space, what GitHub's checks said (--yes), the build and the checks on what it made, a
+    provisioning profile refused unless --allow-profile, deadwax open (asked before it is quit unless --quit - never
+    --yes - and never forced), the swap into ~/Applications (an old app kept when the copy fails), and that it never
+    names /Applications as a place to install, sudo or kill;
   - install_helper.py's two readers it adds: a plist's value, and the entitlements the Mac app is signed with;
   - check_project.py's Mac rules: it passes on the tree, and fails on an Info-Mac.plist that drifts from Info.plist, a
     Mac setting changed or missing, a conditional setting it doesn't name, a MACOSX_DEPLOYMENT_TARGET, and an icon
@@ -40,6 +41,7 @@ helper = load("install_helper")
 project = load("check_project")
 
 GOOD_ENTITLEMENTS = {"com.apple.security.app-sandbox": True, "com.apple.security.network.client": True,
+                     "com.apple.security.files.user-selected.read-only": True,
                      "com.apple.security.get-task-allow": True}
 
 
@@ -128,7 +130,8 @@ else echo "/dev/disk3s5 228Gi 190Gi 19Gi 90% /"; fi
 out=""
 while [ $# -gt 0 ]; do [ "$1" = -o ] && out="$2"; shift; done
 {sys.executable} -c 'import plistlib, sys, datetime
-sys.stdout.buffer.write(plistlib.dumps({{"ExpirationDate": datetime.datetime(2026, 11, 24, 12, 0)}}))' > "$out"
+sys.stdout.buffer.write(plistlib.dumps({{"ExpirationDate": datetime.datetime(2026, 11, 24, 12, 0),
+                                         "UUID": "0F1E2D3C-4B5A-6978-8796-A5B4C3D2E1F0"}}))' > "$out"
 """,
         }
         for name, body in stubs.items():
@@ -171,8 +174,9 @@ def test_its_help_and_an_unknown_flag(tmp_path):
     mac = FakeMac(tmp_path)
     ran = mac.run("--help")
     assert ran.returncode == 0
-    for flag in ("--no-pull", "--yes", "--debug", "--dry-run"):
-        assert flag in ran.stdout
+    for flag in ("--no-pull", "--yes", "--quit", "--debug", "--dry-run", "--allow-profile"):
+        assert f"  {flag} " in ran.stdout and f"[{flag}]" in ran.stdout, flag
+    assert "/bin/bash on macOS is 3.2" in ran.stdout, "the whole header"
     assert "~/Applications/deadwax.app" in ran.stdout and "#" not in ran.stdout.splitlines()[0]
     ran = mac.run("--install-everywhere")
     assert ran.returncode == 2 and "Unknown option" in ran.stderr
@@ -195,11 +199,18 @@ def test_a_dry_run_says_what_it_would_do_and_does_none_of_it(tmp_path):
     assert "would move the deadwax.app there now aside first" in out
     assert f"would open {mac.installed}" in out
     assert "Dry run: nothing was built, quit, copied or opened." in out
+    assert "no provisioning profile in it" in out and "--allow-profile installs it anyway" in out
     # it looked (the version, the space, the team, whether deadwax is open) and did nothing
     assert mac.builds() == [] and mac.called("ditto") == [] and mac.called("open") == [] and mac.called("curl") == []
     assert not [line for line in mac.called("osascript") if "quit" in line]
     assert (mac.installed / "Contents" / "MacOS" / "Deadwax").read_text() == "the old build\n"
     assert not (mac.home / "Library").exists()
+    # --quit and --allow-profile, said as they'd be done
+    ran = mac.run("--dry-run", "--no-pull", "--quit", "--allow-profile")
+    assert ran.returncode == 0, said(ran)
+    assert "would tell it to quit without asking (--quit) - never by force" in ran.stdout
+    assert "installed anyway: --allow-profile" in ran.stdout
+    assert not [line for line in mac.called("osascript") if "quit" in line]
 
 
 def test_debug_builds_debug(tmp_path):
@@ -298,7 +309,7 @@ def test_an_install_builds_checks_copies_and_opens(tmp_path):
     assert sorted(p.name for p in (home / "Applications").iterdir()) == ["deadwax.app"], "nothing left beside it"
     assert (home / "Library" / "Caches" / "deadwax-build-mac" / "last-build.log").is_file()
     out = ran.stdout
-    assert "Signed, sandboxed, allowed out to the network; net.lizardlounge.deadwax." in out
+    assert "Signed, sandboxed, allowed out to the network and to read a file you choose; net.lizardlounge.deadwax." in out
     assert "Installed deadwax 0.13 (13) in ~/Applications - it doesn't run out" in out
     assert re.search(r"Built in \d+ min \d+ s\.", out) and re.search(r"Took \d+ min \d+ s\. Space: .* before, .* now\.", out)
     # nothing asked of deadwax but whether it's open
@@ -354,6 +365,10 @@ def test_a_build_that_isnt_right_isnt_installed(tmp_path, fake, words):
 @pytest.mark.parametrize("entitlements, words", [
     ({"com.apple.security.network.client": True}, "no App Sandbox"),
     ({"com.apple.security.app-sandbox": True}, "no outgoing network connections"),
+    ({key: value for key, value in GOOD_ENTITLEMENTS.items() if "user-selected" not in key},
+     "no reading a file chosen in the Open panel"),
+    (dict({key: value for key, value in GOOD_ENTITLEMENTS.items() if "user-selected" not in key},
+          **{"com.apple.security.files.user-selected.read-write": True}), "no reading a file chosen in the Open panel"),
     (dict(GOOD_ENTITLEMENTS, **{"keychain-access-groups": ["X.net.lizardlounge.deadwax"]}), "need a provisioning profile"),
 ])
 def test_the_entitlements_it_was_signed_with_are_checked(tmp_path, entitlements, words):
@@ -364,12 +379,33 @@ def test_the_entitlements_it_was_signed_with_are_checked(tmp_path, entitlements,
     assert mac.called("ditto") == []
 
 
-def test_a_profile_xcode_added_is_said_with_its_date(tmp_path):
+def test_a_profile_xcode_embedded_after_all_isnt_installed(tmp_path):
+    """The 7-day app James decided against (17 Nov): stopped before deadwax is quit or anything copied, saying when it
+    would run out and how to be rid of it - and --yes, which answers GitHub's checks, isn't enough."""
     mac = FakeMac(tmp_path)
-    ran = mac.run("--yes", "--no-pull", profile=1)
+    mac.open_deadwax()
+    old = mac.old_app()
+    for args in (("--no-pull",), ("--no-pull", "--yes"), ("--no-pull", "--yes", "--quit")):
+        ran = mac.run(*args, answers="y\n", profile=1)
+        assert ran.returncode == 1, args
+        words = ran.stderr
+        assert "Not installed: Xcode signed this build with a provisioning profile, which runs out on" in words
+        assert "24 Nov" in words and "the Mac app is meant to need none" in words
+        assert "xcrun python3\nios/scripts/check_project.py" in words
+        assert "(0F1E2D3C-4B5A-6978-8796-A5B4C3D2E1F0.provisionprofile)" in words
+        assert "~/Library/Developer/Xcode/UserData/Provisioning Profiles" in words
+        assert "--allow-profile to install this build anyway (--yes isn't enough)" in words
+    assert [line for line in mac.called("osascript") if "quit" in line] == [], "deadwax left playing"
+    assert mac.called("ditto") == [] and mac.called("open") == [] and old.read_text() == "the old build\n"
+
+
+def test_a_profile_is_installed_only_with_allow_profile(tmp_path):
+    mac = FakeMac(tmp_path)
+    ran = mac.run("--no-pull", "--allow-profile", profile=1)
     assert ran.returncode == 0, said(ran)
-    assert "Xcode signed this one with a provisioning profile, which runs out on" in ran.stdout
-    assert "24 Nov" in ran.stdout
+    assert "Note: Xcode signed this one with a provisioning profile, which runs out on" in ran.stdout
+    assert "24 Nov" in ran.stdout and "installing\n      it anyway (--allow-profile)" in ran.stdout
+    assert (mac.installed / "Contents" / "MacOS" / "Deadwax").read_text() == "the new build\n"
 
 
 # ----------------------------------------------------------------------------- deadwax open
@@ -388,27 +424,44 @@ def test_deadwax_open_is_asked_about_and_left_open_on_no(tmp_path):
     assert old.read_text() == "the old build\n"
 
 
-def test_deadwax_open_is_asked_to_quit_on_yes(tmp_path):
+def quits(mac) -> list[str]:
+    return [line for line in mac.called("osascript") if "quit" in line]
+
+
+@pytest.mark.parametrize("answer", ["y\n", "\n"])
+def test_deadwax_open_is_asked_to_quit_and_enter_is_yes(tmp_path, answer):
     mac = FakeMac(tmp_path)
     mac.open_deadwax()
     mac.old_app()
-    ran = mac.run("--no-pull", answers="y\n")
+    ran = mac.run("--no-pull", answers=answer)
     assert ran.returncode == 0, said(ran)
-    assert [line for line in mac.called("osascript") if "quit" in line] == [
-        f'osascript -e tell application id "{BUNDLE_ID}" to quit']
+    assert quits(mac) == [f'osascript -e tell application id "{BUNDLE_ID}" to quit']
     assert "deadwax quit." in ran.stdout
     assert (mac.installed / "Contents" / "MacOS" / "Deadwax").read_text() == "the new build\n"
-    # --yes says yes for you
+
+
+def test_yes_never_stops_the_music_quit_does(tmp_path):
+    """--yes answers GitHub's checks alone: with deadwax open it still asks, and with no answer (not a terminal) it
+    leaves deadwax playing. --quit quits it without asking."""
+    mac = FakeMac(tmp_path)
     mac.open_deadwax()
+    old = mac.old_app()
     ran = mac.run("--no-pull", "--yes")
+    assert ran.returncode == 1 and "Not installed: deadwax is still open" in ran.stderr
+    assert "with --quit to quit it without asking" in ran.stderr
+    assert quits(mac) == [] and old.read_text() == "the old build\n"
+    ran = mac.run("--no-pull", "--quit")
     assert ran.returncode == 0, said(ran)
+    assert "Quitting deadwax (--quit)." in ran.stdout and "deadwax quit." in ran.stdout
+    assert quits(mac) == [f'osascript -e tell application id "{BUNDLE_ID}" to quit']
+    assert old.read_text() == "the new build\n"
 
 
 def test_deadwax_that_wont_quit_is_left_open_never_forced(tmp_path):
     mac = FakeMac(tmp_path)
     mac.open_deadwax()
     old = mac.old_app()
-    ran = mac.run("--no-pull", "--yes", wont_quit=1)
+    ran = mac.run("--no-pull", "--quit", wont_quit=1)
     assert ran.returncode == 1
     assert "deadwax didn't quit within 20 seconds" in ran.stderr and "never quit by force" in ran.stderr
     assert len(mac.called("sleep")) == 20
@@ -418,7 +471,7 @@ def test_deadwax_that_wont_quit_is_left_open_never_forced(tmp_path):
 def test_a_quit_macos_wont_send_says_where_to_allow_it(tmp_path):
     mac = FakeMac(tmp_path)
     mac.open_deadwax()
-    ran = mac.run("--no-pull", "--yes", quit_refused=1)
+    ran = mac.run("--no-pull", "--quit", quit_refused=1)
     assert ran.returncode == 1
     assert "Not authorized to send Apple events" in ran.stderr and "Privacy & Security > Automation" in ran.stderr
     assert mac.called("ditto") == []
@@ -450,7 +503,9 @@ def test_the_helper_reads_the_entitlements(tmp_path):
     assert helper.entitlements(str(path)) == "ok"
     path.write_bytes(plistlib.dumps({}))
     assert helper.entitlements(str(path)) == ("no App Sandbox (com.apple.security.app-sandbox); no outgoing network "
-                                              "connections (com.apple.security.network.client)")
+                                              "connections (com.apple.security.network.client); no reading a file "
+                                              "chosen in the Open panel (com.apple.security.files.user-selected."
+                                              "read-only)")
     path.write_bytes(plistlib.dumps(dict(GOOD_ENTITLEMENTS, **{"com.apple.security.application-groups": ["g"]})))
     assert "provisioning profile" in helper.entitlements(str(path))
     path.write_bytes(plistlib.dumps(dict(GOOD_ENTITLEMENTS, **{"com.apple.security.app-sandbox": False})))
@@ -548,6 +603,8 @@ def test_the_mac_plist_cant_drift_from_the_phones(config):
      "ENABLE_OUTGOING_NETWORK_CONNECTIONS[sdk=macosx*] is None"),
     ("INFOPLIST_FILE[sdk=macosx*] = Config/Info-Mac.plist", "INFOPLIST_FILE[sdk=macosx*] = Config/Info.plist",
      "INFOPLIST_FILE[sdk=macosx*] is 'Config/Info.plist'"),
+    ("ENABLE_USER_SELECTED_FILES[sdk=macosx*] = readonly", "ENABLE_USER_SELECTED_FILES[sdk=macosx*] = readwrite",
+     "ENABLE_USER_SELECTED_FILES[sdk=macosx*] is 'readwrite', not 'readonly'"),
     ("SUPPORTS_MACCATALYST = YES\n", "SUPPORTS_MACCATALYST = YES\nCODE_SIGN_ENTITLEMENTS[sdk=iphoneos*] = x.plist\n",
      "a conditional setting the Mac app's rules don't name"),
     ("SUPPORTS_MACCATALYST = YES\n", "SUPPORTS_MACCATALYST = YES\nMACOSX_DEPLOYMENT_TARGET[sdk=macosx*] = 15.0\n",

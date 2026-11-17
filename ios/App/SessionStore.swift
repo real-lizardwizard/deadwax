@@ -13,7 +13,9 @@ enum SessionStore {
 
     static func save(_ value: String, for server: String) {
         if Platform.mac {
-            macFile?.save(value, for: server)
+            guard let macFile else { return }
+            macFile.save(value, for: server)
+            keptOutOfBackups(macFile.folder)
         } else {
             SessionKeychain.save(value, for: server)
         }
@@ -26,6 +28,17 @@ enum SessionStore {
         } else {
             SessionKeychain.delete(server)
         }
+    }
+
+    /// The sessions folder kept out of Time Machine (and any backup that honours the flag), set after every save so a
+    /// folder made again is kept out again. The phone's Keychain item is ThisDeviceOnly, so no backup carries the
+    /// sign-in to another device; ~/Library/Containers is backed up, so on the Mac the folder says so itself. The folder
+    /// holds sessions alone, so nothing else is left out.
+    private static func keptOutOfBackups(_ folder: URL) {
+        var folder = folder
+        var values = URLResourceValues()
+        values.isExcludedFromBackup = true
+        try? folder.setResourceValues(values)
     }
 
     /// The Mac's folder, `<Application Support>/deadwax/sessions`.

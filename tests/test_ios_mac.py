@@ -175,13 +175,22 @@ def test_the_session_is_kept_where_the_device_keeps_it():
     store = bare(app["SessionStore.swift"])
     # each of the three: the Mac's file, else the Keychain as before
     for call, mac, phone in (("read", "macFile?.read(server)", "SessionKeychain.read(server)"),
-                             ("save", "macFile?.save(value, for: server)", "SessionKeychain.save(value, for: server)"),
+                             ("save", "macFile.save(value, for: server)", "SessionKeychain.save(value, for: server)"),
                              ("delete", "macFile?.delete(server)", "SessionKeychain.delete(server)")):
         body = store[store.index(f"static func {call}("):]
         body = body[:body.index("\n    }\n")]
         assert "Platform.mac" in body and mac in body and phone in body, call
         assert body.index(mac) < body.index(phone), f"{call}: the Mac's branch first, then the iPhone's, unchanged"
     assert "SessionFile(applicationSupport: support)" in store
+    # (review) the sessions folder out of Time Machine, after every save - the phone's Keychain item is ThisDeviceOnly
+    save = store[store.index("static func save("):]
+    save = save[:save.index("\n    }\n")]
+    assert save.index("macFile.save(value, for: server)") < save.index("keptOutOfBackups(macFile.folder)")
+    kept = store[store.index("private static func keptOutOfBackups("):]
+    kept = kept[:kept.index("\n    }\n")]
+    assert "values.isExcludedFromBackup = true" in kept and "folder.setResourceValues(values)" in kept
+    keychain = bare(app["SessionKeychain.swift"])
+    assert "kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly" in keychain, "what the Mac's folder matches"
     assert ".applicationSupportDirectory, in: .userDomainMask" in store
     # the Keychain is reached only through the store; the model only through the store
     for name, text in app.items():
@@ -216,11 +225,26 @@ def test_the_session_file_is_made_for_this_user_alone():
     code = bare(source)
     assert "public static let permissions = 0o600" in code and "public static let folderPermissions = 0o700" in code
     save = code[code.index("public func save("):code.index("public func delete(")]
-    # made 0600 while still empty, held to it, then written - and only then moved into place
+    # an empty server first: its file would be the folder itself
+    assert save.index("guard !server.isEmpty else { return false }") < save.index("let manager")
+    # made 0600 while still empty, held to it, then written - and only then put in place
     order = [save.index(step) for step in ("contents: nil", "attributes: [.posixPermissions: Self.permissions]",
                                            "Self.ensure(Self.permissions, at: temporary.path)",
-                                           "handle.write(contentsOf:", "manager.moveItem(at: temporary, to: final)")]
+                                           "handle.write(contentsOf:", "Self.place(temporary, at: final)")]
     assert order == sorted(order)
+    # (review) put in place in one step over an old file, with the new file's own metadata (its 0600); a link or a
+    # folder of the name taken away, never written through; and what's in place checked regular and 0600
+    place = code[code.index("static func place("):code.index("static func ensure(")]
+    assert ("manager.replaceItemAt(final, withItemAt: temporary, backupItemName: nil,\n"
+            "                                              options: .usingNewMetadataOnly)") in place
+    assert place.index("if let existing, isRegular(existing) {") < place.index("replaceItemAt(")
+    assert place.index("try manager.removeItem(at: final)") > place.index("} else {")
+    assert "ensure(permissions, at: final.path)" in place
+    assert "removeItem(at: final)" not in save, "never removed and then moved: there'd be a moment with no file"
+    # read and delete refuse an empty server too
+    for call in ("public func read(", "public func delete("):
+        body = code[code.index(call):]
+        assert body.index("guard !server.isEmpty else { return") < body.index("let manager"), call
     assert "import Foundation" in source and not re.search(r"^import (?!Foundation)", source, re.M)
 
 

@@ -125,6 +125,60 @@ private let away = "https://deadwax.example.org"
         }
     }
 
+    @Test func anOldFileIsReplacedInPlaceWithTheNewOnesPermissions() throws {
+        try withFolder { root in
+            let file = SessionFile(folder: root)
+            #expect(file.save("old", for: home))
+            try FileManager.default.setAttributes([.posixPermissions: 0o644], ofItemAtPath: file.url(home).path)
+            // the step itself: a written 0600 file put over the old 0644 one keeps its own mode, not the old file's
+            let temporary = root.appendingPathComponent(".written")
+            #expect(FileManager.default.createFile(atPath: temporary.path, contents: Data("new".utf8),
+                                                   attributes: [.posixPermissions: 0o600]))
+            #expect(SessionFile.place(temporary, at: file.url(home)))
+            #expect(file.read(home) == "new")
+            #expect(SessionFile.mode(at: file.url(home).path) == 0o600)
+            #expect(!FileManager.default.fileExists(atPath: temporary.path), "the written file is the kept one now")
+            #expect(names(root) == [SessionFile.name(home)])
+        }
+    }
+
+    @Test func aLinkOrAFolderOfTheNameIsReplacedNeverWrittenThrough() throws {
+        try withFolder { root in
+            let file = SessionFile(folder: root.appendingPathComponent("sessions"))
+            #expect(file.save("first", for: away))
+            let elsewhere = root.appendingPathComponent("someone else's")
+            #expect(FileManager.default.createFile(atPath: elsewhere.path, contents: Data("theirs".utf8)))
+            try FileManager.default.createSymbolicLink(at: file.url(home), withDestinationURL: elsewhere)
+            #expect(file.read(home) == nil, "a link is no cookie")
+            #expect(file.save("mine", for: home))
+            #expect(file.read(home) == "mine")
+            #expect(FileManager.default.contents(atPath: elsewhere.path) == Data("theirs".utf8), "never written through")
+            let placed = try FileManager.default.attributesOfItem(atPath: file.url(home).path)
+            #expect(SessionFile.isRegular(placed) && SessionFile.mode(at: file.url(home).path) == 0o600)
+            // a folder of the name, the same
+            try FileManager.default.removeItem(at: file.url(home))
+            try FileManager.default.createDirectory(at: file.url(home), withIntermediateDirectories: false)
+            #expect(file.save("again", for: home))
+            #expect(file.read(home) == "again")
+            #expect(file.read(away) == "first", "another server's untouched")
+        }
+    }
+
+    @Test func anEmptyServerIsNoServerAndNeverTheFolder() {
+        withFolder { root in
+            let file = SessionFile(folder: root)
+            #expect(file.save("at home", for: home))
+            #expect(file.save("away", for: away))
+            // its file would be the folder itself - every server's session
+            #expect(file.url("").path == file.folder.path)
+            #expect(!file.save("nobody", for: ""))
+            #expect(file.read("") == nil)
+            file.delete("")
+            #expect(file.read(home) == "at home" && file.read(away) == "away", "nothing taken")
+            #expect(names(root) == [SessionFile.name(home), SessionFile.name(away)].sorted())
+        }
+    }
+
     @Test func onlyARegularFileIsRead() throws {
         try withFolder { root in
             let file = SessionFile(folder: root)

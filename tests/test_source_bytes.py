@@ -44,7 +44,11 @@ BINARY_SUFFIXES = {".png", ".woff2", ".flac"}
 # decision, as a new suffix is.
 # .ttf: the iPhone app's Noto Sans, one TrueType font per weight made from the web's own woff2 by ios/scripts/make-fonts.py
 # (notes/ios.md "Noto Sans (15 Nov)") and held to the web's by tests/test_ios_palette.py.
-BINARY_IN = {".f32": "ios/DeadwaxKit/Tests/DeadwaxCoreTests/Fixtures/deck/voice/", ".ttf": "ios/App/Fonts/"}
+# .icns: the Mac app's icon, AppIcon.icns, made by ios/scripts/make-icon.py beside the phone's PNGs and checked by
+# ios/scripts/check_project.py - its images, their sizes, the 1024 one's centre and corners (notes/ios.md "The Mac app,
+# slice 1: it runs and plays").
+BINARY_IN = {".f32": "ios/DeadwaxKit/Tests/DeadwaxCoreTests/Fixtures/deck/voice/", ".ttf": "ios/App/Fonts/",
+             ".icns": "ios/App/Icon/"}
 
 
 def _binary(rel):
@@ -109,3 +113,5 @@ def test_a_binary_allowed_in_one_folder_is_checked_everywhere_else():
     assert not _binary("ios/DeadwaxKit/Tests/DeadwaxCoreTests/Fixtures/deck/swap.f32")
     assert not _binary("ui/src/swap.f32")
     assert _binary("interface/player/icon.png")
+    assert _binary("ios/App/Icon/AppIcon.icns")
+    assert not _binary("ios/App/AppIcon.icns")

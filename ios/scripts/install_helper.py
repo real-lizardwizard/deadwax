@@ -137,11 +137,13 @@ def plist(path: str, key: str) -> str:
     return str(value)
 
 
-# What the Mac app must be signed with (the Mac app, slice 1 - notes/ios.md): the App Sandbox and the outgoing network,
-# both made from build settings (ENABLE_APP_SANDBOX, ENABLE_OUTGOING_NETWORK_CONNECTIONS in Base.xcconfig), which need
-# no provisioning profile - and no keychain access groups, which would.
+# What the Mac app must be signed with (the Mac app, slice 1 - notes/ios.md): the App Sandbox, the outgoing network and
+# a file the person chooses read (the EQ's Import from Files…), all made from build settings (ENABLE_APP_SANDBOX,
+# ENABLE_OUTGOING_NETWORK_CONNECTIONS, ENABLE_USER_SELECTED_FILES in Base.xcconfig), which need no provisioning profile
+# - and no keychain access groups, which would.
 MAC_ENTITLEMENTS = {"com.apple.security.app-sandbox": "App Sandbox",
-                    "com.apple.security.network.client": "outgoing network connections"}
+                    "com.apple.security.network.client": "outgoing network connections",
+                    "com.apple.security.files.user-selected.read-only": "reading a file chosen in the Open panel"}
 
 
 def entitlements(path: str) -> str:

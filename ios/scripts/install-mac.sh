@@ -3,20 +3,24 @@
 # command, as install.sh is for the phone. docs/ios.md "The Mac app" has what comes first: install.sh run once (it
 # writes ios/Config/Local.xcconfig, the team this signs with).
 #
-#     ~/Developer/deadwax/ios/scripts/install-mac.sh [--no-pull] [--yes] [--debug] [--dry-run]
+#     ~/Developer/deadwax/ios/scripts/install-mac.sh [--no-pull] [--yes] [--quit] [--debug] [--dry-run]
+#                                                    [--allow-profile]
 #
-#   --no-pull   build what is checked out, without `git pull`
-#   --yes       don't ask: build even if CI failed, and quit deadwax if it's open (which stops the music)
-#   --debug     build Debug instead of Release (Release is what to use day to day)
-#   --dry-run   say what it would do - build, quit, copy, open - and do none of it
+#   --no-pull        build what is checked out, without `git pull`
+#   --yes            don't ask about GitHub's checks: build even if they failed or are still running
+#   --quit           quit deadwax if it's open without asking (which stops the music); without it, you're asked
+#   --debug          build Debug instead of Release (Release is what to use day to day)
+#   --dry-run        say what it would do - build, quit, copy, open - and do none of it
+#   --allow-profile  install a build Xcode signed with a provisioning profile after all (it then stops opening
+#                    when the profile runs out); without it, such a build stops here, installing nothing
 #
 # What it does: pulls; asks GitHub whether ios.yml passed on that commit; builds Release for this Mac (arm64) with
 # xcodebuild, signed with your team and no provisioning profile, so the install never runs out; checks what it made
-# (signed, sandboxed, allowed out to the network, the right bundle id); quits deadwax if it's open - asking first, and
-# never by force; copies the new app to ~/Applications/deadwax.app (never /Applications), keeping the old one until
-# the new one is in place; and opens it. Its sign-in, settings, downloads and EQ are in its container
-# (~/Library/Containers/net.lizardlounge.deadwax), so every install keeps them. Xcode itself never needs to be open.
-# No Simulator, nothing installed system-wide, no sudo.
+# (signed, sandboxed, allowed out to the network and to read a file you choose, the right bundle id, no profile);
+# quits deadwax if it's open - asking first (unless --quit), never by force; copies the new app to ~/Applications/deadwax.app
+# (never /Applications), keeping the old one until the new one is in place; and opens it. Its sign-in, settings,
+# downloads and EQ are in its container (~/Library/Containers/net.lizardlounge.deadwax), so every install keeps them.
+# Xcode itself never needs to be open. No Simulator, nothing installed system-wide, no sudo.
 #
 # /bin/bash on macOS is 3.2: nothing here needs a newer one.
 set -euo pipefail
@@ -37,15 +41,19 @@ installed="$applications/deadwax.app"
 
 pull=1
 ask=1
+quit=0
+profile_ok=0
 dry=0
 configuration=Release
 for argument in "$@"; do
     case "$argument" in
         --no-pull) pull=0 ;;
         --yes) ask=0 ;;
+        --quit) quit=1 ;;
+        --allow-profile) profile_ok=1 ;;
         --debug) configuration=Debug ;;
         --dry-run) dry=1 ;;
-        -h|--help) sed -n '2,21p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+        -h|--help) sed -n '2,25p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
         *) echo "Unknown option: $argument (try --help)" >&2; exit 2 ;;
     esac
 done
@@ -54,13 +62,14 @@ say() { printf '%s\n' "$*"; }
 step() { printf '\n== %s\n' "$*"; }
 stop() { printf '\nStopped: %s\n' "$*" >&2; exit 1; }
 would() { say "   (dry run) would $*"; }
-confirm() {
-    # confirm "question" -> yes unless answered n (or --yes, which says yes)
-    if [ "$ask" = 0 ]; then return 0; fi
+asks() {
+    # asks "question" -> yes unless answered n: Enter is yes, as install.sh's; no answer at all (not a terminal) is no
     local answer
     read -r -p "$1 [Y/n] " answer || answer=n
     case "$answer" in [nN]*) return 1 ;; *) return 0 ;; esac
 }
+# GitHub's checks: --yes answers for you. Only these - quitting deadwax is --quit's, so --yes never stops the music.
+confirm() { [ "$ask" = 0 ] || asks "$1"; }
 free_space() { df -h "$HOME" | awk 'NR==2 {print $4 " free of " $2}'; }
 free_kb() { df -k "$HOME" | awk 'NR==2 {print $4}'; }
 # whether deadwax is open now: asking AppleScript whether it is running neither opens nor asks it anything
@@ -163,8 +172,13 @@ if [ "$dry" = 1 ]; then
     would "     -destination 'generic/platform=macOS,variant=Mac Catalyst' ARCHS=arm64"
     would "     -derivedDataPath $derived -allowProvisioningUpdates build"
     would "     (its log to $log)"
-    would "check $app: signed (codesign --verify --strict), sandboxed and allowed out to the network, no keychain"
-    would "      groups, bundle id $BUNDLE_ID"
+    would "check $app: signed (codesign --verify --strict), sandboxed, allowed out to the network and to read a"
+    would "      file you choose, no keychain groups, bundle id $BUNDLE_ID - and no provisioning profile in it"
+    if [ "$profile_ok" = 1 ]; then
+        would "      (one Xcode embedded after all installed anyway: --allow-profile)"
+    else
+        would "      (one Xcode embedded after all stops it, installing nothing; --allow-profile installs it anyway)"
+    fi
 else
     mkdir -p "$derived"
     built_at=$(date +%s)
@@ -192,14 +206,28 @@ $(cat "$scratch/verify")"
     made="$(helper plist "$app/Contents/Info.plist" CFBundleIdentifier)"
     [ "$made" = "$BUNDLE_ID" ] || stop "The new app's bundle id is '$made', not $BUNDLE_ID - it would be another,
 empty app. Base.xcconfig's PRODUCT_BUNDLE_IDENTIFIER and DERIVE_MACCATALYST_PRODUCT_BUNDLE_IDENTIFIER say why."
-    say "Signed, sandboxed, allowed out to the network; $made."
+    say "Signed, sandboxed, allowed out to the network and to read a file you choose; $made."
     if [ -e "$app/Contents/embedded.provisionprofile" ]; then
+        # The Mac app is signed with no profile so that it never runs out (James, 17 Nov): one Xcode made after all
+        # would be the 7-day app that was decided against, so it isn't installed unless asked for by name.
         until=""
+        uuid=""
         if security cms -D -i "$app/Contents/embedded.provisionprofile" -o "$scratch/profile.plist" 2>/dev/null; then
             until="$(helper expiry "$scratch/profile.plist")"
+            uuid="$(helper plist "$scratch/profile.plist" UUID)"
         fi
-        say "Note: Xcode signed this one with a provisioning profile${until:+, which runs out on $until}. The Mac app"
-        say "      isn't meant to need one; after that date it won't open until this runs again (docs/ios.md)."
+        if [ "$profile_ok" = 1 ]; then
+            say "Note: Xcode signed this one with a provisioning profile${until:+, which runs out on $until}; installing"
+            say "      it anyway (--allow-profile). After that date it won't open until this runs again."
+        else
+            stop "Not installed: Xcode signed this build with a provisioning profile${until:+, which runs out on $until},
+and the Mac app is meant to need none - with one, it stops opening when the profile runs out, as the phone's
+free install does. Usually a setting that needs one has crept into ios/Config (xcrun python3
+ios/scripts/check_project.py names any the Mac app's rules don't), or Xcode chose to make one for this Mac.
+To be rid of it: put the setting right if one is named; delete the profile Xcode made${uuid:+ ($uuid.provisionprofile)}
+from ~/Library/Developer/Xcode/UserData/Provisioning Profiles, and ~/Library/Caches/deadwax-build-mac; then run
+this again. Or run again with --allow-profile to install this build anyway (--yes isn't enough)."
+        fi
     fi
 fi
 
@@ -208,11 +236,20 @@ fi
 if running; then
     step "deadwax is open"
     if [ "$dry" = 1 ]; then
-        would "ask \"deadwax is open - quit it to install the new one?\" and, on yes, tell it to quit (never by force)"
+        if [ "$quit" = 1 ]; then
+            would "tell it to quit without asking (--quit) - never by force"
+        else
+            would "ask \"deadwax is open - quit it to install the new one?\" and, on yes, tell it to quit (never by force)"
+        fi
     else
-        confirm "deadwax is open - quit it to install the new one? (If it's playing, the music stops.)" \
-            || stop "Not installed: deadwax is still open. The new build is in $app; quit deadwax and run this
-again with --no-pull when you're ready."
+        # --quit, and only --quit, answers this one: --yes is for GitHub's checks, and never stops the music
+        if [ "$quit" = 1 ]; then
+            say "Quitting deadwax (--quit)."
+        else
+            asks "deadwax is open - quit it to install the new one? (If it's playing, the music stops.)" \
+                || stop "Not installed: deadwax is still open. The new build is in $app; quit deadwax and run this
+again with --no-pull when you're ready (or with --quit to quit it without asking)."
+        fi
         osascript -e "tell application id \"$BUNDLE_ID\" to quit" >/dev/null 2>"$scratch/quit" \
             || stop "deadwax couldn't be asked to quit: $(cat "$scratch/quit")
 macOS may not have let this Terminal control deadwax (System Settings > Privacy & Security > Automation).

@@ -46,13 +46,15 @@ public struct SessionFile: Sendable, Equatable {
         return String(safe.prefix(longestName - 17)) + "-" + fnv1a(server)
     }
 
-    /// The file `server`'s cookie is kept in.
+    /// The file `server`'s cookie is kept in. Never asked for an empty server: its name is empty, so this is the folder
+    /// itself - which is why read, save and delete each refuse one first (a delete of it would take every session).
     public func url(_ server: String) -> URL {
         folder.appendingPathComponent(Self.name(server), isDirectory: false)
     }
 
     /// The cookie kept for `server`, or nil when there is none.
     public func read(_ server: String) -> String? {
+        guard !server.isEmpty else { return nil }
         let manager = FileManager.default
         let path = url(server).path
         guard let attributes = try? manager.attributesOfItem(atPath: path), Self.isRegular(attributes),
@@ -60,11 +62,13 @@ public struct SessionFile: Sendable, Equatable {
         return String(data: data, encoding: .utf8)
     }
 
-    /// Keeps `value` for `server`: written to a temporary file made 0600 while still empty, then moved over the old one,
-    /// so the cookie is never in a file anyone else could read. True when it was kept; on any failure, nothing is kept
-    /// for `server` (the old file goes too).
+    /// Keeps `value` for `server`: written to a temporary file made 0600 while still empty, then put in the old one's
+    /// place in one step (`place`), so the cookie is never in a file anyone else could read and there is no moment with
+    /// no file. True when it was kept; on any failure, nothing is kept for `server` (the old file goes too). An empty
+    /// server keeps nothing and touches nothing.
     @discardableResult
     public func save(_ value: String, for server: String) -> Bool {
+        guard !server.isEmpty else { return false }
         let manager = FileManager.default
         let final = url(server)
         let temporary = folder.appendingPathComponent("." + Self.name(server) + ".new", isDirectory: false)
@@ -92,10 +96,7 @@ public struct SessionFile: Sendable, Equatable {
             delete(server)
             return false
         }
-        try? manager.removeItem(at: final)
-        do {
-            try manager.moveItem(at: temporary, to: final)
-        } catch {
+        guard Self.place(temporary, at: final) else {
             try? manager.removeItem(at: temporary)
             delete(server)
             return false
@@ -103,8 +104,10 @@ public struct SessionFile: Sendable, Equatable {
         return true
     }
 
-    /// Forgets `server`'s cookie (signing out): its file, and a save's temporary one left by a stop midway.
+    /// Forgets `server`'s cookie (signing out): its file, and a save's temporary one left by a stop midway. An empty
+    /// server forgets nothing - its file would be the folder, and every server's session with it.
     public func delete(_ server: String) {
+        guard !server.isEmpty else { return }
         let manager = FileManager.default
         try? manager.removeItem(at: url(server))
         try? manager.removeItem(at: folder.appendingPathComponent("." + Self.name(server) + ".new", isDirectory: false))
@@ -121,6 +124,29 @@ public struct SessionFile: Sendable, Equatable {
         var isFolder: ObjCBool = false
         guard manager.fileExists(atPath: folder.path, isDirectory: &isFolder), isFolder.boolValue else { return false }
         return Self.ensure(Self.folderPermissions, at: folder.path)
+    }
+
+    /// The written file into `final`'s place. Over an old regular file, in one step (`replaceItemAt`, with the new
+    /// file's own metadata - so its 0600, not the old file's mode): the old cookie is there until the new one is. Where
+    /// there's none, moved in. Anything else of the name - a link, a folder - is taken away first and never written
+    /// through (`attributesOfItem` reads the link, not what it points at). Then what is in place must be a regular
+    /// file, 0600 - false otherwise.
+    static func place(_ temporary: URL, at final: URL) -> Bool {
+        let manager = FileManager.default
+        let existing = try? manager.attributesOfItem(atPath: final.path)
+        do {
+            if let existing, isRegular(existing) {
+                _ = try manager.replaceItemAt(final, withItemAt: temporary, backupItemName: nil,
+                                              options: .usingNewMetadataOnly)
+            } else {
+                if existing != nil { try manager.removeItem(at: final) }
+                try manager.moveItem(at: temporary, to: final)
+            }
+        } catch {
+            return false
+        }
+        guard let placed = try? manager.attributesOfItem(atPath: final.path), isRegular(placed) else { return false }
+        return ensure(permissions, at: final.path)
     }
 
     /// `path`'s permissions are `wanted`, set if they weren't - false when they can't be.

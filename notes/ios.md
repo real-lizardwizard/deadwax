@@ -13939,8 +13939,8 @@ diff, and DeadwaxAudio's one change is DeckVoiceHost's import.
     uncapped one.
   - **Kept for this user alone**: the folder made 0700 (and tightened if it was looser), the file 0600 - made so
     before a byte is written: `.<name>.new` created empty with `posixPermissions` 0600, its mode checked, the value
-    written and synchronized, then moved over the old file. A replaced file is a new one, so a 0644 left by anything
-    else becomes 0600 at the next save.
+    written and synchronized, then put in place - over an old file in one step since the review (`place`, below). A
+    replaced file takes the new one's mode, so a 0644 left by anything else becomes 0600 at the next save.
   - **A failed save keeps nothing**: the temporary file is removed and the server's old file deleted too, as the
     Keychain's delete-then-add leaves nothing when the add fails - a stale session never outlives a failed save. The
     App ignores the Bool, as it ignores the Keychain's.
@@ -13975,9 +13975,10 @@ diff, and DeadwaxAudio's one change is DeckVoiceHost's import.
 - **Base.xcconfig**: the Mac block - `SUPPORTS_MACCATALYST = YES`, `DERIVE_MACCATALYST_PRODUCT_BUNDLE_IDENTIFIER =
   NO` (already the default; said, so the Mac's id can't become `maccatalyst.…`), and `[sdk=macosx*]` for the rest:
   TARGETED_DEVICE_FAMILY 6, INFOPLIST_FILE Config/Info-Mac.plist, ENABLE_APP_SANDBOX YES,
-  ENABLE_OUTGOING_NETWORK_CONNECTIONS YES. No MACOSX_DEPLOYMENT_TARGET: it follows IPHONEOS_DEPLOYMENT_TARGET 17.0 to
+  ENABLE_OUTGOING_NETWORK_CONNECTIONS YES, and since the review ENABLE_USER_SELECTED_FILES readonly (the EQ's Import
+  from Files…). No MACOSX_DEPLOYMENT_TARGET: it follows IPHONEOS_DEPLOYMENT_TARGET 17.0 to
   macOS 14.0 (the built plist's LSMinimumSystemVersion; the binary's LC_BUILD_VERSION is platform 6, minos 17.0). The
-  entitlements come from the two ENABLE_ settings - no .entitlements file, so nothing that needs a profile.
+  entitlements come from the three ENABLE_ settings - no .entitlements file, so nothing that needs a profile.
   **The block must come after every setting it qualifies**: the first Mac build read Info.plist and failed, because
   `INFOPLIST_FILE[sdk=macosx*]` stood above `INFOPLIST_FILE = Config/Info.plist`, and a later plain assignment hides
   an earlier conditional one. check_project.py refuses that order now.
@@ -13999,7 +14000,8 @@ diff, and DeadwaxAudio's one change is DeckVoiceHost's import.
   added to either alone, or a value changed, is "the two have drifted"; the icns's types and sizes, its 1024 present,
   opaque at its centre and transparent at its corners (an unfiltered 8-bit RGBA PNG, as make-icon.py writes).
 - **install_helper.py**: `plist <file> <key>` (a top-level value as text) and `entitlements <file>` - "ok" when the
-  signed entitlements hold app-sandbox and network.client and no keychain-access-groups or application-groups.
+  signed entitlements hold app-sandbox, network.client and (since the review) files.user-selected.read-only, and no
+  keychain-access-groups or application-groups.
 - **ios/scripts/install-mac.sh** (new; bash 3.2, `set -euo pipefail`, install.sh's say/step/stop/confirm):
   1. Xcode (DEVELOPER_DIR defaulting to /Applications/Xcode.app; 16 or later) and Xcode's python3 for the helper.
   2. The free space said (`df -h`), and a stop below 4 GB (`df -k`).
@@ -14008,19 +14010,20 @@ diff, and DeadwaxAudio's one change is DeckVoiceHost's import.
   4. install.sh's project guard (Xcode's edits to the .xcodeproj stop the pull), then `git pull --ff-only` unless
      `--no-pull`.
   5. GitHub asked whether ios.yml passed on the commit (`helper ci`); a failure or a run still going is asked about
-     (yes with `--yes`); out of reach builds anyway.
+     (`--yes` answers it - since the review, this question and no other); out of reach builds anyway.
   6. `xcodebuild … -configuration Release -destination 'generic/platform=macOS,variant=Mac Catalyst' ARCHS=arm64
      -derivedDataPath ~/Library/Caches/deadwax-build-mac -allowProvisioningUpdates build` (Debug with `--debug`), its
      log in last-build.log there; a failure shows its errors and last lines and names the Apple Development
      certificate. The build time is said.
   7. What it made: `codesign --verify --strict`; `codesign -d --entitlements - --xml` through `helper entitlements`;
      the bundle id through `helper plist`; and, should Xcode have embedded a profile after all, its expiry said
-     (`security cms -D`, `helper expiry`).
+     (`security cms -D`, `helper expiry`) - since the review, as a stop installing nothing (its UUID and how to be rid
+     of it), unless `--allow-profile`.
   8. deadwax open (`osascript -e 'application id "net.lizardlounge.deadwax" is running'`, which neither opens nor
      asks it anything): "deadwax is open - quit it to install the new one? (If it's playing, the music stops.)" - asked
      only after the build, so the music stops only once the new build is ready. No stops with nothing changed; yes
-     sends `tell application id … to quit` and waits up to 20 s; an Automation refusal or a deadwax that won't go
-     stops, saying so - never kill.
+     (or Enter) sends `tell application id … to quit` and waits up to 20 s; an Automation refusal or a deadwax that
+     won't go stops, saying so - never kill. `--quit` (since the review) sends it without asking; `--yes` never does.
   9. `--dry-run` stops here, having said each "would" (the pull, the build line, the checks, the quit, the copy and
      the open) and done none of it.
   10. Into place: `mkdir -p ~/Applications`; a `.deadwax.app.old` left by a stopped run put back first; `ditto` to
@@ -14109,3 +14112,62 @@ Now Playing (410); "Picked up from your Mac" both ways (411); the EQ per output 
 control would have (413); the Automation question at the first quit, and the swap (414); nothing running out (415).
 Nor whether closing the window quits the app (a one-scene Catalyst app is expected to), or whether LaunchServices
 also registers the copy in derived data.
+
+### After review (17 Nov) - Mac slice 1
+
+The review of ff9fb2b found one must-fix and six gaps, each fixed here.
+
+- **AppIcon.icns failed tests/test_source_bytes.py** (the must-fix): the slice's own run passed only because the icns
+  was still untracked then, and the test reads git's files. `.icns` is in BINARY_IN now, allowed in `ios/App/Icon/`
+  alone, with the .ttf's kind of comment, and the test of the rule says it's checked anywhere else. Run again on the
+  commit itself.
+- **Import from Files… on the Mac**: the EQ's `.fileImporter` opens the Mac's Open panel, and under the App Sandbox a
+  file chosen there is readable only with `com.apple.security.files.user-selected.read-only`.
+  `ENABLE_USER_SELECTED_FILES[sdk=macosx*] = readonly` gives it from a build setting, as the other two - no
+  .entitlements file, no profile. It's one of check_project's MAC_SETTINGS and one of install_helper's
+  MAC_ENTITLEMENTS (read-write is refused: it isn't read-only). Export… is a ShareLink and needs nothing. ios.yml's
+  Mac build is unsigned, so it reads no entitlements and has nothing to add.
+- **The session file and Time Machine**: the phone's Keychain item is `AfterFirstUnlockThisDeviceOnly`, so no backup
+  carries the sign-in elsewhere; ~/Library/Containers is backed up. SessionStore marks the sessions folder
+  `isExcludedFromBackup` after every save - so a folder made again is marked again - App-side, as the flag is a
+  Foundation resource value Core needn't know of. The folder holds sessions alone. test_ios_mac pins the order
+  (save, then the flag) and the Keychain's ThisDeviceOnly it matches.
+- **SessionFile.save over an old file** now puts the new one in place in one step: `place(_:at:)` -
+  `replaceItemAt(final, withItemAt: temporary, backupItemName: nil, options: .usingNewMetadataOnly)` when what's
+  there is a regular file (the new file's metadata, so its 0600, rather than the old one's merged in), else whatever
+  has the name (a symlink, a folder) removed - never followed or written through - and the temporary moved in. What's
+  in place is then checked regular (lstat) and held to 0600 (`ensure`), or the save fails closed as before.
+- **An empty server** would have been `url("")` - the sessions folder itself - and a failed save's `delete("")`
+  every session. read, save and delete each refuse an empty server first.
+- **A profile Xcode embedded after all** is the 7-day app James decided against, so install-mac.sh stops there,
+  before deadwax is asked to quit and before anything is copied: when it runs out, the profile's UUID file name in
+  ~/Library/Developer/Xcode/UserData/Provisioning Profiles, check_project.py to name a setting that needs one, and
+  the build folder to delete. `--allow-profile` installs it anyway, with the old note; `--yes` isn't enough. The dry
+  run says which.
+- **`--yes` stopped the music**: it answered every question, the quit included. It answers GitHub's checks alone now;
+  `--quit` quits a running deadwax without asking. Without `--quit`, the question is asked as before - Enter is
+  yes, and no answer at all (not a terminal) is no, so `--yes` from a script leaves deadwax playing and installs
+  nothing. The help, the docs' table and checks 404, 407, 412 and 414 say so.
+- **The docs**: check 407's `ls -l` and the "sign in every time" row reach into another app's container, so macOS
+  may ask whether "Terminal" would like to access data from other apps - Allow is right, said in both and in "Where
+  the Mac keeps your sign-in" (with Time Machine). The differences list gains Import from Files… (the Open panel)
+  and Export… (the Mac's Share menu); its other lines held as they were. Rows for the profile stop and for an
+  import that can't be read.
+
+Tests: SessionFileTests three more (the in-place replace over a 0644 file; a symlink and a folder of the name
+replaced, never written through; the empty server); test_ios_mac's session tests pinning the guards, `place` and
+the backup flag; test_ios_install_mac - `--yes` asks about the quit and, unanswered, stops; `--quit`; Enter is yes;
+the profile stop with and without `--yes`, `--allow-profile` installing; the dry run with both new flags; the new
+entitlement missing or read-write; ENABLE_USER_SELECTED_FILES changed; the help's flags (55 cases now).
+
+Verified after review, on the Mac (Xcode 27.2): `swift test` (2245: 2075 in Core - the three new among them - 158
+and 12, all passed); the Mac's unsigned Release build (arm64), BUILD SUCCEEDED with only the AppIntents warning, and
+signed ad hoc once (never installed) to read it: app-sandbox, network.client, files.user-selected.read-only and
+get-task-allow, no profile - `helper entitlements` said "ok"; `-showBuildSettings` resolving ENABLE_USER_SELECTED_FILES
+to readonly for the Mac and leaving it unset for the iPhone; the iPhone's unsigned generic-iOS Debug build, BUILD
+SUCCEEDED with only that warning; check_project.py; pyflakes over src and tests; tests/test_ios_*.py,
+test_source_bytes.py, test_logins.py and test_compose_example.py (689 passed, 1 skipped), and test_source_bytes.py
+again on the commit; all 98 sims with Node 22; and `install-mac.sh --dry-run --no-pull` (and with `--quit
+--allow-profile`) from a scratch copy with a Local.xcconfig - each step said, nothing built, quit, copied or opened.
+Not verified, for the Mac (404, 407, 412, 414): the Open panel's file read under the new entitlement, `tmutil
+isexcluded` on the folder, the Terminal prompt's words, and `--quit` against a real deadwax.
