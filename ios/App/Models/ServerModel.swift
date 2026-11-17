@@ -14,6 +14,11 @@ import Observation
 /// into the app from it, /me asked behind - so with no network the app opens on what is on the phone, not on a spinner
 /// and the can't-reach screen. A 401 then brings the sign-in over the app, as mid-use; no answer leaves the app as it is. Read `client` afresh at every call: a sign-in makes a new one with the new session, and a
 /// request still out under the old one says nothing about the new session when it answers 401.
+///
+/// (Phase 8, slice 10) Change password re-keys this phone: deadwax moves the session under a new id and sets its cookie
+/// on the answer, which is kept in the Keychain and handed to a new client at once (`changeOwnPassword`) - and while the
+/// change is out, a 401 that would end the session in hand is held (Core's PasswordRekey), since deadwax answers the
+/// old cookie 401 the moment it moves it.
 @MainActor
 @Observable
 final class ServerModel {
@@ -96,6 +101,8 @@ final class ServerModel {
     @ObservationIgnored private var personHandlers: [@MainActor () -> Void] = []
     /// The launch opened from the kept /me: it is asked behind the app, not in front of it.
     @ObservationIgnored private var openedFromKept = false
+    /// (Phase 8, slice 10) Change password's hold on the sign-in while its answer is out - one change at a time.
+    @ObservationIgnored private var rekey = PasswordRekey()
 
     init(transport: URLSessionTransport = URLSessionTransport()) {
         self.transport = transport
@@ -149,7 +156,7 @@ final class ServerModel {
             if APIFailure.isCancellation(error) { return }
             let failure = error as? APIFailure ?? .other(String(describing: error))
             if failure.isSignedOut {
-                bringSignIn(reason: SignInRules.launchReason(failure).reason)
+                sessionEnded(reason: SignInRules.launchReason(failure).reason)
             } else {
                 meFailure = failure
             }
@@ -305,7 +312,7 @@ final class ServerModel {
             let failure = error as? APIFailure ?? .other(String(describing: error))
             if failure.isSignedOut {
                 if SignInRules.endsSession(failure, sentUnder: client.session, current: session) {
-                    bringSignIn(reason: failure.detail)
+                    sessionEnded(reason: failure.detail)
                 }
             } else {
                 meFailure = failure
@@ -339,6 +346,47 @@ final class ServerModel {
         launch = .ready
     }
 
+    // MARK: Change password (Phase 8, slice 10)
+
+    /// Change password: the change asked - one at a time, never under the sign-in, never asked again by itself - and, the
+    /// moment it answers with this phone's new sign-in, that sign-in kept: in the Keychain, then in hand, then in a new
+    /// client, synchronously on the main actor, before anything else can ask under the old one (deadwax signed the old one
+    /// out as it moved it). Held through the app going to the background. Meanwhile a 401 that would end the session in
+    /// hand is held (PasswordRekey): the re-key drops it; anything else brings the sign-in with it, or asks /me when what
+    /// came back leaves it unsure whether the session in hand still stands. What came of it is the page's to say -
+    /// `.cancelled` when the person, the address or the session changed while it was out (nothing kept then).
+    func changeOwnPassword(_ body: OwnPasswordBody) async -> OwnPassword.Outcome {
+        guard launch == .ready, signInOver == nil, let client, let address, rekey.began() else { return .cancelled }
+        let sentUnder = session
+        let who = person
+        let hold = BackgroundHold(named: "Change password")
+        defer { hold.end() }
+        let outcome = await client.changeOwnPassword(body, admin: access.seesDetail)
+        guard who == person, address == self.address, sentUnder == session, launch == .ready else {
+            rekey.forgot()
+            return .cancelled
+        }
+        var rekeyed = false
+        if case .changed(_, _, let cookie) = outcome {
+            SessionKeychain.save(cookie, for: address.key)
+            session = cookie
+            self.client = makeClient(address, session: cookie)
+            // a /me still out under the old session is that session's answer, not this one's
+            asks += 1
+            askingMe = false
+            rekeyed = true
+        }
+        switch rekey.ended(outcome, rekeyed: rekeyed) {
+        case .nothing:
+            break
+        case .signIn(let reason):
+            bringSignIn(reason: reason)
+        case .askMe:
+            Task { await refreshMe() }
+        }
+        return outcome
+    }
+
     /// `action` is run, on the main actor, each time the person changes - the player stops and forgets its queue, the
     /// pages pop to their roots, every list kept for the person before is dropped. Registered once, at the app's start.
     func whenPersonChanges(_ action: @escaping @MainActor () -> Void) {
@@ -364,7 +412,15 @@ final class ServerModel {
             return
         }
         guard SignInRules.endsSession(failure, sentUnder: sentUnder, current: session) else { return }
-        bringSignIn(reason: failure.detail)
+        sessionEnded(reason: failure.detail)
+    }
+
+    /// The session in hand has ended (a 401 sent under it): the sign-in over the app - unless a Change password is out,
+    /// when it is held until the change has answered (PasswordRekey): deadwax answers the old cookie 401 from the moment
+    /// it moves this phone's session, before its answer with the new one arrives.
+    private func sessionEnded(reason: String?) {
+        if rekey.holds(reason: reason) { return }
+        bringSignIn(reason: reason)
     }
 
     private func loginsMayHaveComeOn() {

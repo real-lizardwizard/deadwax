@@ -67,6 +67,8 @@ Navidrome, and every setting of the server's, each group a page of its own, save
 lyrics and MusicBrainz's saved answers - and the Library's **Set up Navidrome** opening it over the Library (see
 [Server settings](#server-settings)). Then the **Event log**: what deadwax has said since it started, newest first,
 each new line as it's logged, with Copy on a long press and Clear for the phone's view (see [Event log](#event-log)).
+Then **Change password**: your Navidrome password changed on the phone, which stays signed in while every other
+sign-in of yours is signed out (see [Change password](#change-password)).
 
 **Nothing of Phase 2, the lyrics, the EQ, the turntable, play history, your library downloaded,
 playlists, artists, songs, Search, Requests, Get or Manage has been seen on an iPhone yet.** It's built and tested on a Mac,
@@ -1853,10 +1855,9 @@ as it is each browser's in the web app.
 ### Downloads, Account, This phone and About
 
 - **Downloads** is [Settings > Downloads](#settings--downloads).
-- **Account**, with logins on: **Change password**, then **Sign out**. Change password opens the web app's You in
-  Safari - "Opens the web app's You: Change password is under Account there. It changes the password of whoever is
-  signed in in Safari." under it: Safari signs in apart from the app ([Manage](#manage)), so check the name there
-  first. It isn't there for the emergency `deadwax` sign-in, which has no Navidrome password to change. **Sign out** ends this phone's session and
+- **Account**, with logins on: **Change password**, then **Sign out**. Change password opens a page of its own
+  ([Change password](#change-password)) - your Navidrome password changed from the phone. It isn't there for the
+  emergency `deadwax` sign-in, which has no Navidrome password to change. **Sign out** ends this phone's session and
   stops what's playing. With anything downloaded, it adds that your downloads stay on this phone for when you sign in
   again. If deadwax can't be reached, it says "Couldn't reach deadwax, so you're still signed in - try again."
 - **This phone**: deadwax's address, **Change address**, and **Debug**, for an admin (with logins
@@ -1904,14 +1905,14 @@ round.
 
 **The page opens as whoever is signed in in Safari, which may not be who's signed in to the app.** The app shows the
 rows its own sign-in may use; nothing checks Safari's against it. Sign in to the app as one person and Safari as
-another, and the page is the other person's: what they may do, and their password changed by Change password. To be
+another, and the page is the other person's: what they may do. To be
 sure, open the web app's You in Safari and look at the name at its top. If you use the web app from your Home
 Screen, it keeps a sign-in of its own, and the rows open in Safari, not in it.
 
 The rows open deadwax's address as the app has it, plain `http://` included: Safari opens it as it would the address
 typed (its address bar says Not Secure), over your Wi-Fi or WireGuard. If the phone's default browser isn't Safari,
 they open in that one instead. While deadwax can't be reached the rows that open Safari are dimmed and can't be
-tapped, and "These open once deadwax is back." says why; so is Change password. Edit an album, Needs a look, Library
+tapped, and "These open once deadwax is back." says why. Edit an album, Needs a look, Library
 care, Server settings and Event log still open: each says it needs deadwax, and reads what it shows once it's back. If iOS won't
 open the address at all - Safari turned off in Screen Time, with no other browser - the app says "Couldn't open the web
 app - Safari may be turned off in Screen Time." over the tabs, and VoiceOver reads it.
@@ -2201,6 +2202,60 @@ the same breath: "Not live. Couldn't open the live feed."), and when it's live a
 lines couldn't be read; when deadwax goes out of reach, the app's own banner line and its "Back online" say it instead.
 With Reduce Motion on, new lines don't slide in; at the largest text sizes a line's time, level and part stack over
 its words, the part wrapping rather than cut short.
+
+### Change password
+
+**Change password** (Settings > Account > Change password, with logins on - for anyone who signed in with their own
+Navidrome account; not the emergency `deadwax` sign-in, which has no Navidrome password) changes your Navidrome
+password from the phone, as the web app's You > Account does. It's a page pushed on Account:
+
+- **At the top**: "Your Navidrome password, *you* - the one you sign in to deadwax, Navidrome and Amperfy with. deadwax
+  changes it in Navidrome as you, and doesn't keep it."
+- **Current password**, **New password** and **New password again** - each hides what you type, and the phone's
+  password manager knows the first for your current password and the other two for a new one. No capitals or
+  corrections are made as you type. (The web app's third field is called Again, and it has a Show box; the phone has
+  neither.)
+- **Under them, what's wrong as you type**, once both new fields have something in them - the web app's rules, in its
+  words: "A password is at least 8 characters.", "A password is at most 128 characters.", "A password can't have
+  control characters in it.", "A password can't be the user name.", "The two passwords aren't the same.", and "That's
+  the password you have now - type a new one."
+- **Under the fields**: on a plain `http://` address, "This page isn't over HTTPS: a password typed here crosses your
+  network readable, as everyone's sign-in does. That's fine on your own network or over a VPN; anywhere else, put HTTPS
+  in front of deadwax first." Then, always: "Amperfy and any other app you use with Navidrome need the new password
+  too." - before you change it, not only after.
+- **Change** (the web app's Save) - only once every rule is met and deadwax is in reach. While it asks it says
+  "Changing…", and the page can't be left by Back or a swipe, nor by tapping Settings again: what came of it is said
+  here.
+
+**Changed**: "Password changed. You're still signed in here." - or, when your other phones, browsers and devices were
+signed in, "Password changed. Signed out of your other device - it signs in again with the new one. You're still signed
+in here." (or "your other 2 devices - they sign"), in green, with any warning deadwax gave in amber under it. Every field
+is emptied. deadwax signs every other sign-in of yours out and gives this phone a new one at the same moment: the app
+keeps it (in the Keychain, as at sign-in) and goes on with it at once, so the music plays on and nothing asks you to
+sign in. Amperfy and other apps signed in to Navidrome with the old password need the new one.
+
+**Refused**: deadwax's own words, in red, as the web app says them - the fields kept so you can correct them - with
+what to change, when deadwax names it, under it. "That isn't your current password - …": the current one is emptied,
+and the cursor put back in it. Navidrome set not to let people change their own details, Navidrome not answering, or
+"That's a lot of tries in a minute - wait … seconds and try again." (five tries a minute) are said the same way. A
+mistyped current password counts against your sign-ins too, as a wrong one at the sign-in screen does.
+
+**No answer**: if deadwax's answer never comes - WireGuard drops, the Wi-Fi goes, it takes over four minutes - the
+page can't tell whether the change went through. It says "deadwax may have changed your password - its answer never
+came. If deadwax asks you to sign in again, it did: sign in with the new password. If it doesn't, try again." and asks
+deadwax at once who you are: had it gone through, this phone's old sign-in is over, and the sign-in screen comes up
+with why. Nothing is ever sent again by itself. The fields are kept.
+
+**Your password never stays on the phone**: it isn't saved, logged or put in an address; only deadwax's new sign-in is
+kept. The fields are emptied once it's changed, when you leave the page (going back, another tab, Now Playing over it),
+and when the sign-in screen comes over the app. While deadwax can't be reached, the amber line Edit album shows is at
+the top and Change is dimmed. VoiceOver reads each field once, and says what came of a change once; at the largest text
+sizes the words wrap.
+
+**Downloads going at that moment** were asked for under the old sign-in. One deadwax was already sending finishes as
+it was; one it hadn't started answering is refused, as the old sign-in is over. The app sees that it went out under the
+old one, not the one it has now, and asks for that song again under the new one - the other downloads aren't held up,
+and nothing asks you to sign in (check 377).
 
 ### Debug
 
@@ -4297,6 +4352,8 @@ now, and the footer says "Edit an album is the app's own; the others open in the
 build with [Server settings](#server-settings), Server settings opens in the app, and the Library's Set up Navidrome
 opens its Connections page over the Library: 244 is 369's now. Since the build with the [Event log](#event-log), it
 opens in the app too: in 239, tap People (as an admin) where it says Event log, and the page itself is 370-373's.
+Since the build with [Change password](#change-password), Account's Change password opens a page in the app, with no
+line under it and no arrow: 243 is 374-378's now.
 
 - **237 The version, and Manage.** install.sh says "Installed deadwax 0.13 (13), runs until …", and You > About
   reads 0.13 (13). As an admin, You has **Manage** between Downloads and Account: **Edit an album** (with "Opens the
@@ -5046,6 +5103,39 @@ compare each with the web app's event log (You > Event log) open on the Mac besi
   is said at that moment instead (then "Back online", and not "Live", as it returns) - never two said over each
   other. Signed in as someone without Settings and the log: no Event log in Manage.
 
+### Change password's checks (374-378)
+
+**Not done yet.** These come with the build that brings [Change password](#change-password) into the app - Phase 8's
+tenth part (still app 0.13 (13)). No server change is needed: any deadwax the first part works with. Use deadwax's
+plain `http://` address, on the home Wi-Fi, signed in as yourself (not the emergency `deadwax` sign-in), with the web
+app open on the Mac as you too. You'll change your Navidrome password twice - to a new one, and back - so have both to
+hand, and Amperfy's settings open to put it in there after.
+
+- **374 The form.** Settings > Account > **Change password**: the line with your name at the top, **Current
+  password**, **New password** and **New password again**, then the plain-http note in amber and "Amperfy and any
+  other app you use with Navidrome need the new password too." under them, and **Change**, dimmed. Type a new password
+  of 4 characters in both new fields: "A password is at least 8 characters." under them. Make the two differ: "The two
+  passwords aren't the same." Type your current password as the new one: "That's the password you have now - type a
+  new one." Change is dimmed throughout. Does the password manager offer to fill Current password, and to suggest a
+  new one? With VoiceOver: each field read once by its name. Turn on Airplane Mode: the amber line at the top, Change
+  dimmed.
+- **375 Wrong current.** Type a wrong current password and a good new one twice: **Change** - "Changing…", then
+  deadwax's words in red, "That isn't your current password - …", the current field emptied with the cursor in it,
+  the new ones kept. (With VoiceOver on, the cursor stays put and the words are read once.) Is your password unchanged
+  - does the web app on the Mac still work, and Amperfy?
+- **376 Changed.** Play an album. With the web app open on the Mac (and Amperfy signed in), type the right current
+  password and a new one twice: **Change**. The page says "Password changed. Signed out of your other device - it signs
+  in again with the new one. You're still signed in here." (or how many), every field emptied. Does the music play
+  on, and does the app go on working - pull down the Library, open an album - without asking you to sign in? On the
+  Mac, reload the web app: the sign-in, saying your password changed. Sign in there with the new one. Amperfy needs
+  the new one too.
+- **377 Downloads across it.** Start downloading an album of ten or more songs (Settings > Downloads shows them going).
+  Mid-way, change the password (back to the old one, say). Does every song still download - the ones going at that
+  moment carried on, none left waiting, no sign-in asked? Settings > Downloads afterwards: nothing waiting or failed.
+- **378 Kill and reopen.** After a change, swipe the app away in the app switcher and open it again: still signed in,
+  straight to the Library, no sign-in. Put the password back to the one you started with (Change password again), and
+  in Amperfy.
+
 ### Add to Queue's checks (392-403)
 
 **Not done yet.** These come with the build that makes [Add to Queue](#adding-to-the-queue) the phone's one way to add
@@ -5123,7 +5213,8 @@ These are the web app's for now:
 - **Looking after deadwax**, but for [Edit album](#edit-album), [an artist's tools](#managing-an-artist),
   [Needs a look](#needs-a-look), [Library care](#library-care), [Server settings](#server-settings) (with the web
   app's Connections, and re-timing synced lyrics) and the [Event log](#event-log), all of it on the phone now:
-  Settings > [Manage](#manage) opens the other tool - People - in the web app, in Safari, and Change password too.
+  Settings > [Manage](#manage) opens the other tool - People - in the web app, in Safari. ([Change
+  password](#change-password) is the app's own too, under Settings > Account.)
 
 ## When something goes wrong
 

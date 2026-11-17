@@ -141,12 +141,10 @@ public enum Managing {
         }
     }
 
-    /// Whether Account offers Change password (lib/ownPassword.ts `changeOffered`): logins on and a Navidrome sign-in -
-    /// never with logins off (no password of yours in deadwax), never break-glass (no Navidrome account behind it).
-    /// The name compared as JavaScript compares it, unit for unit.
+    /// Whether Account offers Change password (lib/ownPassword.ts `changeOffered`) - OwnPassword's rule (Phase 8, slice
+    /// 10: the page is the app's own now), kept under this name for Manage's fixture.
     public static func changeOffered(_ me: Me?) -> Bool {
-        guard let me, me.auth == "on", !me.user.isEmpty else { return false }
-        return !me.user.utf16.elementsEqual(Access.breakGlassUser.utf16)
+        OwnPassword.changeOffered(me)
     }
 
     // MARK: the addresses
@@ -173,7 +171,8 @@ public enum Managing {
         "/library/album/" + TurntableGeometry.encodeURIComponent(id)
     }
 
-    /// You's root in the web app: Account's Change password is in it, and has no address of its own.
+    /// You's root in the web app: Account's Change password is in it, and has no address of its own. (Phase 8, slice 10:
+    /// Account's row is the app's own page now - nothing opens this; slice 12 removes it with the rest.)
     public static let youFragment = "/you"
 
     /// A tool's page in the web app at this phone's deadwax; nil with no address.
@@ -187,7 +186,7 @@ public enum Managing {
         id.isEmpty ? nil : url(fragment: albumFragment(id: id), at: server)
     }
 
-    /// The web app's You (Account's Change password).
+    /// The web app's You (Account's Change password until Phase 8's slice 10; slice 12 removes it).
     public static func youURL(at server: ServerAddress?) -> URL? {
         url(fragment: youFragment, at: server)
     }
@@ -228,7 +227,8 @@ public enum ManagingWords {
     public static let editAnAlbum = "Edit an album"
 
     /// Account's row (ownPassword.ts CHANGE_TITLE), and the line under it: where it is once open, and whose password
-    /// it changes there - Safari's person's, who may not be the app's (Safari signs in apart).
+    /// it changes there - Safari's person's, who may not be the app's (Safari signs in apart). (Phase 8, slice 10: the
+    /// row opens the app's own page - OwnPassword.title - and the line is drawn nowhere; slice 12 removes it.)
     public static let changePassword = "Change password"
     public static let changePasswordLine = "Opens the web app's You: Change password is under Account there. It changes "
         + "the password of whoever is signed in in Safari."

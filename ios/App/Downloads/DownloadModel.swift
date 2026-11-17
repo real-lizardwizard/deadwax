@@ -1598,7 +1598,7 @@ final class DownloadModel {
 
     private func handle(_ event: DownloadSession.Event) {
         switch event {
-        case .finished(let task, let name, let status, let part, let unsaved, let full):
+        case .finished(let task, let name, let status, let part, let unsaved, let full, let sentUnder):
             guard let found = storeFor(name) else {
                 if let part { try? FileManager.default.removeItem(at: part) }
                 return
@@ -1626,7 +1626,7 @@ final class DownloadModel {
             if !DownloadRules.isTheSong(status: status) {
                 if status == 401 {
                     record = DownloadRules.apply(.signedOut, to: record)
-                    if current { signedOutHeard() }
+                    if current { signedOutHeard(sentUnder: sentUnder) }
                 } else {
                     record = DownloadRules.apply(.refused(status: status, detail: nil), to: record)
                 }
@@ -1668,8 +1668,18 @@ final class DownloadModel {
 
     /// A download answered 401: nothing more is fetched under this session, and /me is asked - its 401 brings the sign-in
     /// over the app (the downloads' session never goes through DeadwaxClient, which would have).
-    private func signedOutHeard() {
+    ///
+    /// (Phase 8, slice 10) Only when it was sent under the session in hand, as the client's own rule is
+    /// (SignInRules.endsSession): Change password moves this phone's session under a new id, and a task that went out
+    /// under the old one is answered 401 - which says nothing of the new one. Its song is asked again under the new
+    /// session by the plan that follows, and nothing is held: held, every task out would be called off for a minute.
+    /// A task whose request can't be read (`sentUnder` nil) is taken as the session in hand's, as before.
+    private func signedOutHeard(sentUnder: String??) {
         let session = server.client?.session
+        if let sentUnder, sentUnder != session {
+            note("a 401 to a task sent under a session since replaced - nothing held")
+            return
+        }
         guard !refused(session) else { return }
         refusedSession = .some(session)
         refusedAt = Monotonic.seconds()

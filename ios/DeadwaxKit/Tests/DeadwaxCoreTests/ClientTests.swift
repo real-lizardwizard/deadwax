@@ -374,7 +374,7 @@ func sentJSON(_ request: HTTPRequest?) throws -> [String: SentValue] {
     }
 
     @Test func everyRouteIsDeadwaxsOwn() {
-        #expect(Routes.all.count == 100)
+        #expect(Routes.all.count == 101)
         #expect(Set(Routes.all).count == Routes.all.count)
         for endpoint in Routes.all {
             #expect(endpoint.path.hasPrefix("/deadwax/"))
@@ -435,6 +435,7 @@ func sentJSON(_ request: HTTPRequest?) throws -> [String: SentValue] {
         // MusicBrainz ping, 120 s, one request with its ten attempts (111.5 s at worst); slskd's, 30 s
         // (slice 9: the event log) the history, the transport's own 8 s, held in memory; the stream, 45 s - the most
         // it may say nothing between two bytes (three of its 15 s keepalives), never a wait over all
+        // (slice 10: Change password) 240 s: four calls to Navidrome, the store's and the throttle's lock (180 at worst)
         let longer: [Endpoint: Double] = [Routes.albumIndex: 30, Routes.autoEqSearch: 20, Routes.autoEqProfile: 20,
                                           Routes.libraryOwned: 30, Routes.fullySearch: 20, Routes.releaseGroup: 60,
                                           Routes.searchArtists: 20, Routes.searchSongs: 20, Routes.artistFacts: 120,
@@ -455,7 +456,8 @@ func sentJSON(_ request: HTTPRequest?) throws -> [String: SentValue] {
                                           Routes.held: 30, Routes.heldAdd: 60, Routes.heldDismiss: 30,
                                           Routes.serverSettings: 30, Routes.saveServerSettings: 60,
                                           Routes.savedAnswers: 30, Routes.clearSavedAnswers: 120,
-                                          Routes.pingMusicBrainz: 120, Routes.pingSlskd: 30, Routes.logStream: 45]
+                                          Routes.pingMusicBrainz: 120, Routes.pingSlskd: 30, Routes.logStream: 45,
+                                          Routes.ownPassword: 240]
         #expect(Routes.timeouts == longer)
         for endpoint in Routes.all {
             // each path parameter filled in: a brace left in a path is no URL

@@ -35,4 +35,18 @@ public enum SessionCookie {
 
     /// The `Cookie:` header that carries a session.
     public static func header(_ value: String) -> String { "\(name)=\(value)" }
+
+    /// The session a request carried, from its `Cookie:` header (the app's own, `header(_:)`'s - and any other cookies
+    /// beside it, `; `-separated): nil when it carried none. (Phase 8, slice 10) A background download's 401 is told by
+    /// the session it went out under, so one sent under a session Change password has since replaced holds nothing.
+    public static func value(fromCookie header: String?) -> String? {
+        guard let header else { return nil }
+        for part in header.split(separator: ";") {
+            let pair = part.trimmingCharacters(in: .whitespaces)
+            guard pair.hasPrefix(name + "=") else { continue }
+            let value = String(pair.dropFirst(name.count + 1))
+            return value.isEmpty ? nil : value
+        }
+        return nil
+    }
 }

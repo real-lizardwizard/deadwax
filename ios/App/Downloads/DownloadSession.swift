@@ -17,8 +17,10 @@ final class DownloadSession: NSObject, URLSessionDownloadDelegate, @unchecked Se
     /// What a task did.
     enum Event {
         /// It finished: `status` is deadwax's (0 when there was none); `part` the file moved into place when it was the
-        /// song; `unsaved` the system's words when the move failed (`full` when for want of room).
-        case finished(task: Int, name: DownloadTaskName, status: Int, part: URL?, unsaved: String?, full: Bool)
+        /// song; `unsaved` the system's words when the move failed (`full` when for want of room). (Phase 8, slice 10)
+        /// `sentUnder`: the session its request carried (nil inside: none) - nil when the task has no request to read.
+        case finished(task: Int, name: DownloadTaskName, status: Int, part: URL?, unsaved: String?, full: Bool,
+                      sentUnder: String??)
         /// It ended without a file: the system's error, its resume data when it can carry on, and whether iOS ended it
         /// because the app was force quit. `ours` when the app cancelled it itself.
         case failed(task: Int, name: DownloadTaskName, error: NSError, resume: Data?, forceQuit: Bool, ours: Bool)
@@ -177,7 +179,11 @@ final class DownloadSession: NSObject, URLSessionDownloadDelegate, @unchecked Se
             }
         }
         lock.withLock { _ = told.insert(id) }
-        tell(.finished(task: id, name: name, status: status, part: part, unsaved: unsaved, full: full))
+        // the session it went out under, from its own request's Cookie (the app's header - SessionCookie)
+        let sentUnder: String?? = downloadTask.originalRequest.map {
+            SessionCookie.value(fromCookie: $0.value(forHTTPHeaderField: "Cookie"))
+        }
+        tell(.finished(task: id, name: name, status: status, part: part, unsaved: unsaved, full: full, sentUnder: sentUnder))
     }
 
     func urlSession(_ session: URLSession, task: URLSessionTask, didCompleteWithError error: Error?) {

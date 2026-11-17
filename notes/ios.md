@@ -13235,3 +13235,157 @@ check_project.py; pyflakes over src and tests, clean; pytest on its own, 4919 pa
 before: any of it on a phone - VoiceOver's announcements as they're actually spoken (one cutting another off is iOS's
 behaviour, read, not heard), the List under Reduce Motion, Now Playing calling the stream off and the page rejoining as
 it goes.
+
+## Change password on the phone (Phase 8, slice 10 - 2026-11-16)
+
+The spec's section 9 (notes/ios-specs/phase8-managing.md), with 13-14's rules: Settings > Account > **Change password**
+is the app's own page now - your Navidrome password changed by deadwax as you (`POST /deadwax/me/password`,
+src/routes/own_password.py, 2.0.2) - rather than the web app's You in Safari. Built on the `ios` branch at db6a4ff. The
+app stays 0.13 (13); src/__init__.py untouched; **no server change** - the route, its strict body and its cookie are
+2.0.2's (and review 3's re-key) as they are; the player engine has no diff.
+
+### Core (DeadwaxCore)
+
+- **OwnPassword.swift** (new). `OwnPassword` is lib/ownPassword.ts and people.ts' password rules: the title,
+  SAME_PASSWORD, APPS_LINE, HTTP_NOTE (`httpNote(protocol:)`, and `httpNote(at:)` from the phone's address - nil only
+  for https), PASSWORD_MIN/MAX, `passwordProblem` (lengths in UTF-16 units, people.ts' CONTROL class unit for unit, the
+  name compared lowercased as JavaScript lowercases, `!==` as unit equality - Swift's `==` would call a composed and a
+  decomposed é the same), `formProblem`, `formReady`, `doneWords`, `changeLine`, `changeOffered` (logins on, a name,
+  never break-glass - Managing.changeOffered now hands on to it). The labels: Current password and New password the
+  web's; **New password again** and **Change**/"Changing…" the phone's. `Outcome` is what a change came to:
+  `changed(signedOut:warning:session:)` - a 200 WITH a new `deadwax_session` cookie, which is the proof; `notRenewed` - a
+  200 with `changed: true` and no cookie (NOT_RENEWED: the session stands under its old id); `refused(words:kind:fix:)`
+  - any 4xx but 401, deadwax's `detail` as it came (with its `why` for whoever runs deadwax); `signedOut(reason:)` - a
+  401; `failed(words:fix:)` - a 5xx with deadwax's own words (TIMED_OUT, NOT_KEPT, DIDNT_TAKE, UNREACHABLE…);
+  `unknown(words:)` - no answer, a timeout, a bare 5xx, a 200 that isn't deadwax's: "deadwax may have changed your
+  password - its answer never came. If deadwax asks you to sign in again, it did: sign in with the new password. If it
+  doesn't, try again." (the transport's words in brackets for whoever runs deadwax); `cancelled`. `Said` is what the
+  page shows after, and its one announcement. `pagesKept` keeps the page through a tab tapped again while a change is
+  out.
+- **OwnPasswordForm** and **OwnPasswordBody** redact themselves: `description`, `debugDescription` and an empty
+  `customMirror`, so `print`, `dump`, string interpolation and a debugger's summary never show a password. The body's
+  keys are `current`, `password`, `password_again` - exactly the server's strict model (an extra key is its 422).
+  `OwnPasswordAnswer` reads `changed`, `signed_out` and `warning` loosely.
+- **OwnPasswordFlow**: the page's state. `begin` gives the body and a ticket synchronously (one change at a time; an
+  answer to an older ticket is dropped); `ended` leaves the fields as the web does - emptied once changed (or the
+  session ended), kept after a refusal, Current emptied and `focusCurrent` bumped for `not_your_password`, kept for an
+  unknown outcome - and returns the one announcement; `typed` clears what was said; `hidden` empties everything said
+  and typed but leaves a change out.
+- **PasswordRekey**: ServerModel's hold on the sign-in while a change is out. deadwax moves this phone's session under
+  a new id BEFORE it answers, so anything asked meanwhile under the old cookie is answered 401 PASSWORD_CHANGED - which
+  says nothing about the session the answer brings. `holds(reason:)` keeps the first such 401 instead of bringing the
+  sign-in; `ended(_:rekeyed:)` drops it when the new session was kept, brings the sign-in with the change's own 401's
+  reason or the held one's otherwise, and asks /me when the outcome leaves it unsure whether the session in hand still
+  stands (notRenewed, failed, unknown); `forgot` lets it go when the person, address or session changed meanwhile.
+- **APIFailure**: `Answer.fix` and `APIFailure.fix` - People's and Change password's refusals are `{detail, kind,
+  fix}`; ErrorBody reads `fix` as a string, as `kind`.
+- **SessionCookie.value(fromCookie:)**: the session a request carried, from its own `Cookie:` header.
+- **DeadwaxClient.changeOwnPassword(_:admin:)**: the POST through `answer()` (so a 401 tells the signed-out hook, as
+  every route's does), never retried. **Routes**: `ownPassword` (101 routes), waited on for 240 s.
+
+### The app
+
+- **ChangePasswordScreen** (ios/App/You/, new): a pushed Form - `changeLine` at the top; the three SecureFields
+  (`.password`, then `.newPassword` twice; no capitals, no autocorrection; Next, Next, Done) with the problem as typed
+  under them in the footnote face; the footer's plain-http note (amber) and APPS_LINE; Change (a spinner and
+  "Changing…" while out), on only when `flow.canChange` and the sign-in isn't over the app; then what was said - done
+  in the held green with deadwax's warning in amber, a problem in the danger red with `fix` under it - as one VoiceOver
+  element. Back is hidden (and so the swipe) while a change is out, and AppNavigation keeps the page through its tab
+  tapped again (`passwordChanging`, `OwnPassword.pagesKept`). `.editOutOfReach` while deadwax can't be reached. The
+  fields reach the form through bindings whose setter also calls `typed()`, so an answer emptying them doesn't clear
+  what it said. Current takes the focus after a wrong current password, unless VoiceOver is running (it would cut off
+  the announcement). The fields are emptied as the page disappears and as the sign-in comes over the app.
+- **AccountSection**: Change password is a `NavigationLink(value: AppRoute.changePassword)`, under
+  `OwnPassword.changeOffered`; no WebAppRow is left in Account.
+- **ServerModel.changeOwnPassword**: refused (`.cancelled`) unless the launch is ready, no sign-in is over the app,
+  there is a client and an address, and no change is out (`rekey.began()`); held through the background
+  (`BackgroundHold`); after the await, `.cancelled` (nothing kept) if the person, address, session or launch changed.
+  On `.changed`: **the Keychain first** (`SessionKeychain.save`), then `session`, then a **new client** with the new
+  cookie - synchronously on the main actor, so nothing can ask under the old one between - and `asks += 1` so a /me
+  still out under the old session is dropped. Then `rekey.ended` - nothing, the sign-in, or /me asked. Every path that
+  used to bring the sign-in on a 401 (`askBehind`, `refreshMe`, `noteSignedOut`) goes through `sessionEnded`, which the
+  hold can keep.
+- **Downloads**: `DownloadSession.Event.finished` carries `sentUnder` - the session the task's own request carried,
+  read from its `Cookie:` header - and `DownloadModel.signedOutHeard(sentUnder:)` holds nothing for a 401 to a task
+  sent under a session since replaced. Without it, a download task queued under the old cookie and answered 401 after
+  the re-key would have marked the NEW session refused: `refused(session)` true, the plan's `signedIn` false, every
+  task out called off and nothing asked for 60 s. Now the record goes back to wanted (DownloadRules' `.signedOut`, as
+  before) and the plan that follows asks for it under the new session. A task whose request can't be read is taken as
+  the session in hand's, as before.
+
+### What the web's .tsx files hold, read by pattern
+
+ios/scripts/export-password-vectors.cjs runs lib/ownPassword.ts, lib/people.ts and lib/signIn.ts compiled, and reads
+out of **app/ChangePassword.tsx** by pattern (each piece hashed into made_from, so iospassword fails when one moves):
+the three labels, the button's words (Save, Saving…), the body sent (compiled and run as a function of the form), a
+wrong current password's kind emptied and focused, one change at a time and only when ready, a done change's fields
+emptied before what is said, a failure keeping the fields, the problem as typed, the plain-http note and the Amperfy
+line; from **api/me.ts** the route and that a new session follows it. 293 passwords (lengths at and around 8 and 128 in
+UTF-16 units, astral characters, every control range and its neighbours, the name in other cases and normalizations -
+the Kelvin and Angstrom signs, a composed and a decomposed é - and 160 seeded), 140 forms (with what each sends), 10
+counts for doneWords, 6 lines, 6 notes, 11 people offered or not.
+
+### Decided here, and where the phone departs from the spec (or the web)
+
+- **A 200 with no new cookie is not a re-key** (notRenewed): nothing goes to the Keychain, the session in hand stays,
+  the fields are emptied and it says "Password changed, but deadwax sent this phone no new sign-in." with deadwax's
+  warning (or "Sign out and sign in again here with the new password."), and /me is asked.
+- **A 5xx with deadwax's own words is said as it came** (failed), as EditWords.writeFailure does; only a bare 5xx, a
+  timeout or no answer is "may have changed". The spec said 5xx and no answer alike; deadwax's 5xx words already say
+  whether anything changed (NOT_KEPT, TIMED_OUT…), so they are the better sentence.
+- **A 403 is said as it came** (EDITING_OFF names what to do), not as NO_PERMISSION: the route is every user's, so a
+  403 here is never a permission.
+- **`fix` is shown** under a refusal; the web reads only `detail`.
+- **APPS_LINE is under the form from the start** (check 374), where the web says it only once a change is done.
+- **The labels**: "New password again" for the web's Again (read alone, as a Form row or by VoiceOver, Again says
+  nothing); Change for Save. No Show toggle (iOS's SecureField has none to switch, and the password manager fills).
+  No hidden user-name field (the web's is for a browser's password manager to save the right entry; iOS's AutoFill
+  without associated domains doesn't use one).
+- **The re-key hold closes a race the web has**: the web's api/http.ts drops a 401 sent under an older session, but
+  one asked under the old cookie that answers BEFORE the change's 200 signs it out. The phone holds it until the
+  change answers.
+- **Downloads' 401 by the session sent under** - the spec assumed DownloadModel's wait "until the client changes" was
+  enough; it wasn't, as above.
+- **Never retried**: one POST per tap, and a tap can't go while one is out; an unknown outcome asks /me, never the
+  route again.
+- Assumed: `SessionKeychain.save` succeeds (it's delete-then-add with its status unread, as at sign-in) - if it
+  didn't, the next launch would start from the old session, which deadwax has ended, and show the sign-in.
+
+### Tests
+
+- **OwnPasswordVectorTests** (new, 9): the fixture and its sources; the words; the labels, the two departures pinned
+  against the web's own; what the page does (the wrong-current kind, the route); every password's problem; every
+  form's problem, readiness and body, key for key; doneWords, changeLine and httpNote; who is offered it (OwnPassword's
+  and Managing's names); the note following the phone's address.
+- **OwnPasswordTests** (new, 18): a new cookie is the change (200 seeded outcomes), no cookie isn't; refusals with kind
+  and fix (400, 403 EDITING_OFF, 409, 422, 429, a bare 413), the why for whoever runs deadwax, a 401, what may have
+  changed (offline, a timeout, a bare 5xx; a 5xx with words failed), fix read from any refusal; the flow - one at a
+  time, older tickets dropped, each outcome's fields, hidden, typing; the re-key table and `forgot`; pagesKept;
+  `value(fromCookie:)`; redaction (String(describing:), reflecting, dump, Mirror); the body's three keys; the client's
+  POST (the old cookie, JSON, 240 s, sent once) and a refusal, no answer and a 401 each their own.
+- **ClientTests** (101 routes; ownPassword's 240 s).
+- **tests/test_ios_change_password.py** (new, 12): the route by method, path and permission (test_logins' ROUTES:
+  `user`) and in Routes.all; the body equal to the strict model's fields and `extra="forbid"`; the phone's body posted
+  to the real route (People's fake Navidrome, `own` bound by assignment) - 200, OwnPasswordAnswer's fields there, the
+  cookie read by SessionCookie's rule IS the session after and the old one is 401 PASSWORD_CHANGED; an extra key the
+  route's 422, nothing echoed; a refusal's `{detail, kind, fix}` and the wrong-current kind; SAME_PASSWORD the
+  server's; no cookie read as not renewed; the wait worked out from navidrome_admin's, LoginClient's and SQLite's
+  timeouts (180 s at worst, 240 given); the Keychain before the client, every 401 through the hold; the downloads'
+  `sentUnder`; no password logged, kept or put in an address, the fields emptied; the page drawn as the spec says.
+  tests/test_ios_settings.py: Account's NavigationLink before Sign out; tests/test_ios_palette.py holds the new page
+  to the palette and fonts. test_ios_contract.py: 101 routes.
+- **ui/test/iospassword.sim.cjs** (new): the exporter's `--check`.
+
+### Verified, and not
+
+On the Mac: `swift test`; the unsigned generic-iOS Debug build, BUILD SUCCEEDED, with only the AppIntents metadata
+warning every build has; check_project.py; the full pytest suite run alone; pyflakes over src and tests; every sim with
+Node 22 (iospassword running the exporter's `--check`). The counts are in the slice's commit. tests/
+test_ios_change_password.py posts the phone's body to the real route and reads its cookie as the phone does.
+
+Not verified - only the phone can tell (docs/ios.md checks 374-378): the password manager's fill and suggestion on the
+three fields; the re-key against a real deadwax and Navidrome - the music playing on and nothing asking to sign in
+after a change, the other devices signed out; downloads across a change (a task in flight finishing, one queued
+refused and asked again under the new session, nothing held for a minute); the new session surviving a kill and
+reopen (the Keychain's save); VoiceOver's one announcement and Current's focus; the page under the largest text
+sizes; Back and the swipe off while a change is out.

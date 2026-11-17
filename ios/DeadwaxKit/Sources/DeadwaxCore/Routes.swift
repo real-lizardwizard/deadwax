@@ -225,6 +225,9 @@ public enum Routes {
     // (`DeadwaxClient.logStream`, through HTTPLineTransport), never as one answer
     public static let recentLog = Endpoint(method: "GET", path: "/deadwax/interface_logs/recent", query: [])
     public static let logStream = Endpoint(method: "GET", path: "/deadwax/interface_logs/interface_logs", query: ["after", "boot"])
+    // Change password (Phase 8, slice 10 - notes/ios.md "Change password on the phone"): a user's route, for anyone
+    // signed in through their own Navidrome account. Its answer's cookie is this phone's new sign-in
+    public static let ownPassword = Endpoint(method: "POST", path: "/deadwax/me/password", query: [])
 
     /// The levels spec's name for `levelAlbum`: the album's levels warmed before its first play.
     public static var warmLevels: Endpoint { levelAlbum }
@@ -266,6 +269,7 @@ public enum Routes {
         rescan, held, heldAdd, heldDismiss,
         serverSettings, saveServerSettings, savedAnswers, clearSavedAnswers, pingMusicBrainz, pingSlskd,
         recentLog, logStream,
+        ownPassword,
     ]
 
     /// The routes given longer than the transport's own 8 seconds to answer, in seconds: the album index reads every
@@ -352,8 +356,12 @@ public enum Routes {
     /// ping a call through slskd's own client with no timeout of its own, 30, pinned - tests/test_ios_server_settings.py
     /// holds each. The event log's (slice 9): the history is what deadwax holds in memory, answered at once - the
     /// transport's own 8; the stream is meant never to end, so its 45 is the most it may say nothing between two bytes
-    /// (EventStream.silence), three of its 15 s keepalives - tests/test_ios_event_log.py holds both.
-    public static let timeouts: [Endpoint: Double] = [albumIndex: 30, autoEqSearch: 20, autoEqProfile: 20, libraryOwned: 30, fullySearch: 20, releaseGroup: 60, searchArtists: 20, searchSongs: 20, artistFacts: 120, discography: 60, jobs: 20, cancelJob: 30, retryJob: 60, retryJobSame: 30, clearJobs: 30, storeState: 20, findCandidates: 300, enqueue: 300, joinJob: 60, libraryAdd: 60, libraryTracks: 30, libraryAlbums: 120, releases: 60, release: 60, retagPreview: 60, retagApply: 480, artFetch: 120, libraryArt: 30, queueIgnore: 20, queueUnignore: 20, tagsPreview: 60, tagsApply: 120, trackPicture: 30, lyricsFetch: 600, discArtFetch: 360, libraryDiscArt: 30, deletionSummary: 60, deleteAlbum: 120, libraryArtist: 120, artistArt: 30, artistImagesPreview: 660, artistImagesApply: 600, artistSearch: 120, refilePreview: 480, refileApply: 600, queueSummary: 30, queueReviewed: 20, rescan: 300, held: 30, heldAdd: 60, heldDismiss: 30, serverSettings: 30, saveServerSettings: 60, savedAnswers: 30, clearSavedAnswers: 120, pingMusicBrainz: 120, pingSlskd: 30, logStream: 45]
+    /// (EventStream.silence), three of its 15 s keepalives - tests/test_ios_event_log.py holds both. Change password's
+    /// (slice 10): the handler waits on its sign-in throttle's lock for the name (a sign-in holding it asks Navidrome
+    /// once), the session read before it and three store calls in it (each may wait out SQLite's busy timeout, 10 s),
+    /// and four calls to Navidrome, each its connection and its read (the native API's 10 s, its PUT's 30, the proof's
+    /// getUser 10) - 180 s at worst, so it is given 240 - tests/test_ios_change_password.py holds it there.
+    public static let timeouts: [Endpoint: Double] = [albumIndex: 30, autoEqSearch: 20, autoEqProfile: 20, libraryOwned: 30, fullySearch: 20, releaseGroup: 60, searchArtists: 20, searchSongs: 20, artistFacts: 120, discography: 60, jobs: 20, cancelJob: 30, retryJob: 60, retryJobSame: 30, clearJobs: 30, storeState: 20, findCandidates: 300, enqueue: 300, joinJob: 60, libraryAdd: 60, libraryTracks: 30, libraryAlbums: 120, releases: 60, release: 60, retagPreview: 60, retagApply: 480, artFetch: 120, libraryArt: 30, queueIgnore: 20, queueUnignore: 20, tagsPreview: 60, tagsApply: 120, trackPicture: 30, lyricsFetch: 600, discArtFetch: 360, libraryDiscArt: 30, deletionSummary: 60, deleteAlbum: 120, libraryArtist: 120, artistArt: 30, artistImagesPreview: 660, artistImagesApply: 600, artistSearch: 120, refilePreview: 480, refileApply: 600, queueSummary: 30, queueReviewed: 20, rescan: 300, held: 30, heldAdd: 60, heldDismiss: 30, serverSettings: 30, saveServerSettings: 60, savedAnswers: 30, clearSavedAnswers: 120, pingMusicBrainz: 120, pingSlskd: 30, logStream: 45, ownPassword: 240]
 }
 
 /// The Cover Art Archive's thumbnail sizes the app asks deadwax's relay for (`Routes.archiveCover`'s `size`, which takes

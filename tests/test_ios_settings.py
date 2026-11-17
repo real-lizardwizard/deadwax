@@ -215,7 +215,8 @@ def test_each_page_holds_its_section():
                      "ErrorNote(failure)"])
     # Account: Change password, then Sign out; This phone: the address, Change address, Debug for an admin alone
     section = body(struct(code(ACCOUNT), "AccountSection"))
-    in_order(section, ["WebAppRow(label: ManagingWords.changePassword", "await server.signOut()"])
+    in_order(section, ["if OwnPassword.changeOffered(server.me) {", "NavigationLink(value: AppRoute.changePassword)",
+                       "await server.signOut()"])
     phone = body(struct(code(THIS_PHONE), "ThisPhoneSection"))
     in_order(phone, ["LabeledContent(YouWords.server)", "NavigationLink(value: AppRoute.serverAddress)",
                      "if debug {", "NavigationLink(value: AppRoute.debug)"])

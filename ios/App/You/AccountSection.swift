@@ -22,10 +22,10 @@ struct AccountPage: View {
     }
 }
 
-/// Account (screens.md 3 and 8, the web's app/SignOutRow.tsx), drawn only with logins on: (Phase 7) Change
-/// password first, as the web's Account has it - for a Navidrome sign-in, never break-glass (Core's
-/// Managing.changeOffered, the web's changeOffered) - opening the web app's You in Safari, where it is under Account
-/// (it has no address of its own), the line under the row saying so; off while deadwax can't be reached. Then Sign out,
+/// Account (screens.md 3 and 8, the web's app/SignOutRow.tsx), drawn only with logins on: Change password first, as the
+/// web's Account has it - for a Navidrome sign-in, never break-glass (Core's OwnPassword.changeOffered, the web's
+/// changeOffered) - (Phase 8, slice 10) its own page here (ChangePasswordScreen), where until then it opened the web
+/// app's You in Safari. Then Sign out,
 /// the user name beside it, "Signing out…" while it asks, and the footnote - who is signed in and how, break-glass's
 /// 12 hours. (16 Nov) No header: the page's title says Account.
 ///
@@ -37,14 +37,14 @@ struct AccountSection: View {
 
     @Environment(ServerModel.self) private var server
     @Environment(DownloadModel.self) private var downloads
-    @Environment(Reachability.self) private var reachability
 
     var body: some View {
         let row = server.signOutRow
         Section {
-            if Managing.changeOffered(server.me), let url = Managing.youURL(at: server.address) {
-                WebAppRow(label: ManagingWords.changePassword, line: ManagingWords.changePasswordLine, url: url,
-                          live: reachability.online)
+            if OwnPassword.changeOffered(server.me) {
+                NavigationLink(value: AppRoute.changePassword) {
+                    Text(OwnPassword.title)
+                }
             }
             Button(role: .destructive) {
                 Task { await server.signOut() }

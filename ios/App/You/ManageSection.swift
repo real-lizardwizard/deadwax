@@ -89,10 +89,10 @@ struct ManageSection: View {
 }
 
 extension OpenURLAction {
-    /// Opens a web-app address - Manage's rows, Change password, Edit album's rows still in the web app, Set up
-    /// Navidrome - in the default browser (never a web view in the app), and when iOS refuses it (Safari turned off in
-    /// Screen Time, no other browser to take it) says so over the tabs, announced: Core's Managing.notice(opened:). A
-    /// tap that opens nothing never says nothing.
+    /// Opens a web-app address - Manage's rows (People, since Phase 8's slice 10 took Change password into the app) - in
+    /// the default browser (never a web view in the app), and when iOS refuses it (Safari turned off in Screen Time, no
+    /// other browser to take it) says so over the tabs, announced: Core's Managing.notice(opened:). A tap that opens
+    /// nothing never says nothing.
     @MainActor
     func webApp(_ url: URL, player: PlayerModel) {
         self(url) { (accepted: Bool) in
@@ -102,7 +102,7 @@ extension OpenURLAction {
     }
 }
 
-/// A row that opens the web app in Safari (Manage's rows, Account's Change password): its words - and, for a row that
+/// A row that opens the web app in Safari (Manage's rows - People alone since slice 10): its words - and, for a row that
 /// can't open its tool's own page, a line under them saying where it is once open - with `arrow.up.forward` at the
 /// trailing edge, where a pushed page's row has its chevron. The tap hands the address to the default browser
 /// (`OpenURLAction.webApp`, which says so if iOS refuses it). Off (dimmed, `.disabled`) while deadwax can't be reached.

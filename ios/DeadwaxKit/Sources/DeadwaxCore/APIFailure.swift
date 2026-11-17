@@ -10,7 +10,7 @@ public typealias DeadwaxError = APIFailure
 ///
 /// Phase 0's DeadwaxError kept only words: a refusal's status and `detail`, with words invented when deadwax sent
 /// none, and dropped deadwax's `why` (src/auth.py Explained: `detail` for anyone, `why` for whoever runs it), a
-/// refusal's `kind` (People's, Change password's), `busy` and the route. All of it is here, as it came.
+/// refusal's `kind` and `fix` (People's, Change password's), `busy` and the route. All of it is here, as it came.
 public enum APIFailure: Error, Sendable, Equatable {
     /// deadwax - or whatever is at the address - answered, with a status the route doesn't succeed with.
     case answered(Answer)
@@ -35,19 +35,23 @@ public enum APIFailure: Error, Sendable, Equatable {
         public let why: String?
         /// What kind of refusal a route named it (src/routes/people.py Refused, own_password's).
         public let kind: String?
+        /// (Phase 8, slice 10) What to change to put it right, when the route named it (People's and Change password's
+        /// `fix` - src/routes/people.py Refused, navidrome_admin.FIXES: "Server settings → Connections").
+        public let fix: String?
         /// The body said `busy: true` (MusicBrainz shedding searches).
         public let busy: Bool
         /// FastAPI's list of `msg` for a form it refused (a 422) - Phase 0's words join them; ErrorWords never reads them.
         public let problems: [String]
 
         public init(status: Int, method: String, path: String, detail: String? = nil, why: String? = nil,
-                    kind: String? = nil, busy: Bool = false, problems: [String] = []) {
+                    kind: String? = nil, fix: String? = nil, busy: Bool = false, problems: [String] = []) {
             self.status = status
             self.method = method
             self.path = path
             self.detail = detail
             self.why = why
             self.kind = kind
+            self.fix = fix
             self.busy = busy
             self.problems = problems
         }
@@ -87,6 +91,7 @@ extension APIFailure {
     public var detail: String? { answer?.detail }
     public var why: String? { answer?.why }
     public var kind: String? { answer?.kind }
+    public var fix: String? { answer?.fix }
     public var busy: Bool { answer?.busy ?? false }
 
     /// The route under /deadwax, answered or not; nil for `.other`.
@@ -137,11 +142,11 @@ extension APIFailure: LocalizedError {
 
 extension APIFailure {
     /// `response`, a status its route doesn't succeed with, read as api/http.ts reads one: `detail` when a string,
-    /// `why` and `kind` when strings, `busy` only when exactly `true`; a body that isn't JSON says nothing.
+    /// `why`, `kind` and `fix` when strings, `busy` only when exactly `true`; a body that isn't JSON says nothing.
     public static func answered(_ response: HTTPResponse, to request: HTTPRequest) -> APIFailure {
         let body = (try? JSONDecoder().decode(ErrorBody.self, from: response.body)) ?? ErrorBody()
         return .answered(Answer(status: response.status, method: request.method, path: route(of: request.url),
-                                detail: body.detail, why: body.why, kind: body.kind, busy: body.busy,
+                                detail: body.detail, why: body.why, kind: body.kind, fix: body.fix, busy: body.busy,
                                 problems: body.problems))
     }
 
@@ -200,11 +205,12 @@ private struct ErrorBody: Decodable {
     var problems: [String] = []
     var why: String?
     var kind: String?
+    var fix: String?
     var busy = false
 
     init() {}
 
-    private enum Keys: String, CodingKey { case detail, why, kind, busy }
+    private enum Keys: String, CodingKey { case detail, why, kind, fix, busy }
     private struct Problem: Decodable { let msg: String? }
 
     init(from decoder: any Decoder) throws {
@@ -216,6 +222,7 @@ private struct ErrorBody: Decodable {
         }
         why = (try? body.decodeIfPresent(String.self, forKey: .why)) ?? nil
         kind = (try? body.decodeIfPresent(String.self, forKey: .kind)) ?? nil
+        fix = (try? body.decodeIfPresent(String.self, forKey: .fix)) ?? nil
         busy = ((try? body.decodeIfPresent(Bool.self, forKey: .busy)) ?? nil) == true
     }
 }

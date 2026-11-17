@@ -51,7 +51,8 @@ enum Fixtures {
                      "search/search-songs-vectors.json", "requests/requests-vectors.json", "get/get-vectors.json",
                      "managing/managing-vectors.json", "albuminfo/files.json", "edit/edit-vectors.json",
                      "edit/edit-parts-vectors.json", "artists/artist-manage-vectors.json",
-                     "care/care-vectors.json", "care/library-care-vectors.json", "server/server-vectors.json"] {
+                     "care/care-vectors.json", "care/library-care-vectors.json", "server/server-vectors.json",
+                     "password/password-vectors.json"] {
             #expect(try Fixtures.url(path) == Fixtures.checkout.appendingPathComponent(path), "\(path)")
         }
     }

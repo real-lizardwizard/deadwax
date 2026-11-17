@@ -112,6 +112,9 @@ enum AppRoute: Hashable {
     /// (Phase 8, slice 9) Settings > Manage > Event log (EventLogScreen): what deadwax has said since it started, newest
     /// first, live - the lines held by the app (EventLogModel), so they outlive the page.
     case eventLog
+    /// (Phase 8, slice 10) Settings > Account > Change password (ChangePasswordScreen): your Navidrome password, changed
+    /// in Navidrome as you - its answer re-keys this phone (ServerModel.changeOwnPassword).
+    case changePassword
 }
 
 /// The album you don't have's address: its release group's id as MusicBrainz gave it (lowercase - deadwax's routes take
@@ -303,6 +306,9 @@ final class AppNavigation {
     /// The playlist whose Edit is open on a tab's page: the tab tapped again goes back no further than that page, so
     /// Edit's changes are never thrown away without Cancel's question (PlaylistEdit.pagesKept).
     private(set) var editingPlaylist: String?
+    /// (Phase 8, slice 10) A Change password is out: the tab tapped again goes back no further than its page, where its
+    /// answer is said (OwnPassword.pagesKept).
+    private(set) var changingPassword = false
 
     /// A file shared to deadwax (`.onOpenURL`): shown by the preview that is up, in place - else by the EQ sheet,
     /// opened over Now Playing (by Now Playing) or over the tabs (here).
@@ -353,14 +359,22 @@ final class AppNavigation {
         backToRoot(&requests)
     }
 
-    /// Every page popped - but none of a playlist being edited, nor the pages under it.
+    /// Every page popped - but none of a playlist being edited, nor the pages under it; nor Change password's while its
+    /// change is out.
     private func backToRoot(_ stack: inout [AppRoute]) {
         let ids = stack.map { (route: AppRoute) -> String? in
             if case .playlist(let shown) = route { return shown.id }
             return nil
         }
-        let kept = PlaylistEdit.pagesKept(ids, editing: editingPlaylist)
+        let password = stack.map { (route: AppRoute) -> Bool in route == .changePassword }
+        let kept = max(PlaylistEdit.pagesKept(ids, editing: editingPlaylist),
+                       OwnPassword.pagesKept(password, changing: changingPassword))
         stack.removeLast(stack.count - kept)
+    }
+
+    /// (Phase 8, slice 10) Change password's change went out, or answered.
+    func passwordChanging(_ out: Bool) {
+        changingPassword = out
     }
 
     /// A playlist's page opened or closed its Edit.
@@ -528,6 +542,7 @@ final class AppNavigation {
         eqImportSheet = false
         playlistPick = nil
         editingPlaylist = nil
+        changingPassword = false
         let editor = presentedEdit
         presentedEdit = nil
         albumEdit = nil
@@ -578,6 +593,7 @@ extension View {
                 case .serverSettings: ServerSettingsScreen()
                 case .serverSettingsGroup(let id): ServerSettingsGroupScreen(id: id)
                 case .eventLog: EventLogScreen()
+                case .changePassword: ChangePasswordScreen()
                 }
             }
             .clearsPlayer()
