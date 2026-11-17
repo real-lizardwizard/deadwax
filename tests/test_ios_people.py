@@ -330,9 +330,18 @@ def test_the_idle_unlock_is_the_servers():
     # always after the server's has run out, so the read it brings never keeps it alive
     assert "public static let idleCheckSeconds: Double = unlockIdleSeconds + 2" in PEOPLE_SWIFT
     assert "return now - answeredAt >= idleCheckSeconds" in swift_function("People.swift", "idleDue")
+    # (review) once per answer: a read sent while the check is due is that answer's check, and no other is armed for
+    # it - so a read that fails (People's 403, a proxy's 502) never loops, and never keeps the unlock alive by asking
+    wait = flow_function("idleWait")
+    assert "guard view == .list, let answeredAt, answeredAt != idleAskedFor else { return nil }" in wait
+    assert "return max(0, People.idleCheckSeconds - (now - answeredAt))" in wait
+    assert "answeredAt != idleAskedFor" in flow_function("idleDue")
+    assert "if let now, idleDue(now: now) { idleAskedFor = answeredAt }" in flow_function("readBegan")
     model = app_code("Manage", "PeopleModel.swift")
     arm = swift_like(model, "armIdle")
-    assert "People.idleCheckSeconds - (now - answered)" in arm and "flow.idleDue(now: now)" in arm
+    assert "guard mayAsk, let wait = flow.idleWait(now: now) else { return }" in arm
+    assert "flow.idleDue(now: now)" in arm
+    assert "flow.readBegan(now: now)" in swift_like(model, "read")
     # on a clock that counts while the phone sleeps
     assert "ContinuousClock.now" in model
     # the server refreshes an unlock only by using it: a list read is a use
@@ -381,7 +390,7 @@ def test_no_password_is_logged_kept_or_put_in_an_address():
 def test_the_ticket_is_taken_in_the_tap_and_nothing_is_asked_under_the_sign_in():
     model = app_code("Manage", "PeopleModel.swift")
     read = swift_like(model, "read")
-    assert read.index("flow.readBegan()") < read.index("Task {")
+    assert read.index("flow.readBegan(now: now)") < read.index("Task {")
     assert "guard mine == generation else { return }" in read
     assert "pagesShown > 0 && active && online && !signInOver && allowed && server.client != nil" in model
     for write, call in (("unlock", "flow.beginUnlock("), ("lock", "flow.beginLock("), ("create", "flow.beginCreate("),
@@ -399,9 +408,20 @@ def test_the_ticket_is_taken_in_the_tap_and_nothing_is_asked_under_the_sign_in()
                  "navigation.peopleWriting(flow.writing != nil)", "Notice.announce(words)",
                  "navigation.leavePerson(id)", "await server.refreshMe()", "if after.read { read() }"):
         assert step in send, step
+    # (review) a read landing after the sign-in came, or after the page went, asks nothing more of deadwax: not /me,
+    # not Navidrome's version, not the idle check - and a write's /me waits for the sign-in to go
+    assert "if askMe == true, mayAsk { Task { await server.refreshMe() } }" in read
+    landed = swift_like(model, "landed")
+    assert landed.index("guard mayAsk else { return }") < landed.index("askVersion()") < landed.index("armIdle()")
+    assert "guard mayAsk, !versionAsked" in swift_like(model, "askVersion")
+    assert "if after.askMe, !signInOver { Task { await server.refreshMe() } }" in send
+    # (review) the read after Unlock waits for the list it brings: the last list's count, kept through a lock
+    assert "let accounts = flow.accountsListed" in read
     # nothing announced under the sign-in, and the admin flip always asks /me again
     ended = flow_function("ended(_ ticket: Int")
     assert "after.announce = signInOver ? nil : said?.announcement" in ended
+    # (review) and a write answered under the sign-in puts away the sheet it kept
+    assert "if signInOver, outcome != .signedOut { signInCame() }" in ended
     assert "if case .admin = write, outcome != .signedOut { after.askMe = true }" in ended
     assert 'if let kind, People.same(kind, PeopleOutcome.lockedKind) { lockedAgain() }' in ended
 

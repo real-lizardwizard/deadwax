@@ -13504,9 +13504,10 @@ bodies, the unlock and its idle timeout are the server's as they are; the player
   came of it, and after a 403), to leave a person's page (after Remove), to arm the idle check. A refusal of kind
   `locked` (409) brings Unlock back at once: the answer and every password typed are dropped; Add's user and display
   names, the name typed into Remove and each person's unsaved ticks are kept (none secret), and a sheet still up says
-  People.lockedNote. `hidden()` empties every password and the typed name
-  (the page going, Now Playing over it, the app in the background); `signInCame()` does that and puts a sheet away,
-  unless a write is out; `left()` forgets the answer once no page is left. `PeopleOutcome` and `PeopleRead` are what a
+  People.lockedNote. `hidden()` empties every password (the page going, Now Playing over it) - not the app going to
+  the background, which leaves the fields as they are, so a password manager's fill or a paste from another app
+  survives the trip; `signInCame()` does that, empties the typed name and puts a sheet away, unless a write is out -
+  and `ended` does it once that write answers under the sign-in; `left()` forgets the answer once no page is left. `PeopleOutcome` and `PeopleRead` are what a
   write and a read came to: `refused(words:kind:fix:askMe:)` only for a 4xx (said as it came, with its `fix`; the 403 of
   require("people") has no kind), `failed` for a 5xx with deadwax's words, `unknown` ("deadwax may have finished - its
   answer never came", EditWords.mayHaveFinished, the transport's words in brackets for an admin) for a bare 5xx, a
@@ -13518,7 +13519,10 @@ bodies, the unlock and its idle timeout are the server's as they are; the player
   `People.idleCheckSeconds` (902) after the last answer, on a ContinuousClock (it counts through sleep), the model reads
   once - which, by then, the server answers locked, so Unlock shows without waiting for a tap to be refused. The read
   is a GET, and a GET refreshes the unlock only while it still stands - so the check never keeps it alive. It is the
-  page's only timer; it runs while a People page shows and the app is active.
+  page's only timer; it runs while a People page shows and the app is active. **Once per answer**: a read sent while
+  the check is due records the answer it was for (`idleAskedFor`, set by `readBegan(now:)`), and `idleWait` arms no
+  other for that answer - so a check that fails (a 403, a proxy's 502, no answer) is said under the list and nothing
+  more is asked by itself until a read or a write answers again.
 - **PeopleWaits**: each route's wait worked out from the handlers' own worst cases - the store's busy timeout (10 s),
   a native call (20), a native write (60), Subsonic's getUser (20) - rounded up to the minute: the read 50 s plus 30 s
   an account (120 at least), Unlock 120, Make account, Reset, the flip and Remove 300, Forget and the permissions 240,
@@ -13533,10 +13537,13 @@ bodies, the unlock and its idle timeout are the server's as they are; the player
   reset in `whenPersonChanges`. It asks only while a People page shows, the app is active, deadwax can be reached, the
   sign-in isn't over the app, the person is allowed and there's a client (`mayAsk`); reads again on the page showing
   (after a second away, with nothing read, or with the idle check due), the app coming back, reach returning, the
-  sign-in going, Now Playing closing and the session moving; and arms the idle check after each answer. A write takes
-  its ticket in the tap, tells AppNavigation (`peopleWriting`), holds through the background (`BackgroundHold`), drops
-  its answer if the person or session changed meanwhile (the session counter), and then announces, leaves the person's
-  page, asks /me, reads again and arms the check - as `PeopleAfter` says. Every binding to a field clips it and clears
+  sign-in going, Now Playing closing and the session moving; and, after each answer, asks Navidrome's version and arms
+  the idle check (`landed`) - only while `mayAsk` holds, so a read landing after the sign-in came or the page went is
+  drawn and asks nothing more. A write takes its ticket in the tap, tells AppNavigation (`peopleWriting`), holds through
+  the background (`BackgroundHold`), drops its answer if the person changed meanwhile (`generation`, bumped by `reset`
+  from `whenPersonChanges`), and then announces, leaves the person's page, asks /me (not under the sign-in), reads again
+  and arms the check - as `PeopleAfter` says. A session that moves while a write is out (Change password's re-key) lets
+  the answer land: it is about the same person's accounts, and `sessionMoved()` only reads People again. Every binding to a field clips it and clears
   what was said (`typed(at:)`).
 - **PeopleScreen** (new): one List. Not allowed: the permission's words. Then the status sections: deadwax's refusal
   with its fix (and Sharing's link where it names logins), **Unlock People** (`PeopleUnlockSection`: the SecureField,
@@ -13635,3 +13642,41 @@ suggestion on Add and Reset; the unlock running out after 15 minutes idle and Un
 Navidrome's answers to each write (its admin flag, its removal, a reset signing the person out); VoiceOver reading each
 row once and each change's one announcement; the largest text sizes; Back, the swipe and the sheets' swipe off while a
 write is out; the sign-in over an open sheet; Now Playing emptying the fields.
+
+### After review (17 Nov) - slice 11
+
+One must-fix and four smaller findings, each traced in the code before it was fixed.
+
+- **The idle check looped on a failed read** (the must-fix). `readEnded` returns non-nil for a failure, so the model
+  ran `landed()` and `armIdle()` with `answeredAt` unmoved: once 902 s old the wait was 0, `idleDue` still true, and
+  `read()` went again at once - and again on each failure. An admin demoted while away got People's 403 (`askMe`), so
+  every turn also asked /me, each dropping the last /me still out; a proxy answering 502 while deadwax restarted kept
+  Reachability online and looped until deadwax came back. Now Core decides: `readBegan(now:)` records the answer a read
+  sent while the check is due was for (`idleAskedFor`), `idleDue` is false for that answer, and `idleWait(now:)` - the
+  model's only way to arm it - is nil for it. Only a new answer (a read's list, a write's answer) arms another. Tested
+  over a 403, a 502, a 5xx with words, no answer, a 401 and a cancellation, each sent while due: none arms a 0 s read,
+  a read asked again by hand and failing arms none, an answer arms a full 902 s, and a read sent before the check is
+  due leaves it armed as it was.
+- **A sheet stayed over the sign-in after a write answered under it.** `signInCame()` keeps the sheet while a write is
+  out (to say what came of it); when that write then answered (Add done, Reset or Remove refused or failed), `ended`
+  only muted the announcement, and the sheet - with a refused Reset's passwords - stayed over the sign-in. Now `ended`,
+  with `signInOver` and anything but `.signedOut`, does what `signInCame()` does once the outcome is recorded: the
+  sheet goes, with every password and the typed name; what it said there goes with it (the list read once the sign-in
+  goes says what came of it). Tested for Add, a refused Reset and a failed Remove, and that the same refusal with no
+  sign-in keeps the sheet and its passwords.
+- **Asks after a read landing under the sign-in or after the page left.** `landed()` asked Navidrome's version, armed
+  the idle check, and the read's 403 spawned `refreshMe()` whatever the state - and `refreshMe()` clears `signInOver`
+  when it succeeds. Now the read's /me, `landed()`'s version and idle check, and `askVersion` itself are each behind
+  `mayAsk` (a page showing, the app active, in reach, no sign-in, allowed, a client), as ServerSettingsModel's
+  `readIfNeeded` checks again; a write's /me isn't asked under the sign-in (signing in answers with /me's own answer, so the role is fresh once it
+  goes).
+  `shows()`, when it doesn't read, runs `landed()`, so a read that landed in the moment between two of People's pages
+  still gets its version and its check.
+- **The read after Unlock waited only the floor.** Its `accounts` came from the list in hand, which a lock empties, so
+  the read that brings the list back - the one that matters - had the 120 s floor rather than 50 s plus 30 s an
+  account. Now `accountsListed` keeps the last list's count through Lock, a `locked` refusal and People left (it
+  changes only when a list is read); the model passes it. Tested: seven accounts kept through each (300 s), a shorter
+  list read after taking its own count.
+- **Two sentences here didn't match the code**, now corrected above: `hidden()` doesn't run as the app goes to the
+  background (the fields are kept, so a password manager's fill survives the trip - the code is left so), and a write's
+  answer is dropped only for another person (`generation`), not for a session that moved.

@@ -2258,17 +2258,21 @@ itself. After every change People is read again, and VoiceOver says what came of
 
 **Locked again.** deadwax forgets an unlock 15 minutes after it was last used, and when you Lock, sign out or your
 session ends. The phone notices on its own: a little after 15 minutes left alone (time in the background counts),
-the page reads People again - or as soon as you come back to it - and Unlock People comes back. A change refused because People locked meanwhile brings Unlock People
-back at once; a sheet still up says "People locked again - close this and unlock it with your Navidrome password. The
-passwords typed here are gone." What you typed in Add a person's names is kept for when it opens again; a person's
-unsaved switches are kept too.
+the page reads People again - or as soon as you come back to it - and Unlock People comes back. If that read fails
+(deadwax restarting, say), it's said in red under the list, and nothing more is asked by itself until you pull down,
+come back to the app or People, or deadwax answers a change. A change refused because People locked meanwhile brings
+Unlock People back at once; a sheet still up says "People locked again - close this and unlock it with your Navidrome
+password. The passwords typed here are gone." What you typed in Add a person's names is kept for when it opens again;
+a person's unsaved switches are kept too.
 
-**Your password and theirs never stay on the phone**: none is saved, logged or put in an address. Each field is emptied
-once it's sent or done with, when you leave People, when a sheet closes, when Now Playing comes up over it, and when
-the sign-in screen comes over the app (a sheet goes with it). While deadwax can't be reached, a page that has read
-nothing yet says "Managing needs deadwax. This opens once it's back."; one that has keeps what it showed under the
-amber line, with every change dimmed until deadwax is back and People has been read again. Pull down to read it again
-at any time. With Reduce Motion on, nothing slides; at the largest text sizes everything wraps.
+**Your password and theirs never stay on the phone**: none is saved, logged or put in an address. Each field is
+emptied once it's sent or done with, when you leave People, when a sheet closes, when Now Playing comes up over it,
+and when the sign-in screen comes over the app (a sheet goes with it - once a change it sent has answered, if one was
+out). Going to the background leaves them, so a password pasted from another app is still there. While deadwax can't
+be reached, a page that has read nothing yet says "Managing needs deadwax. This opens once it's back."; one that has
+keeps what it showed under the amber line, with every change dimmed until deadwax is back and People has been read
+again. Pull down to read it again at any time. With Reduce Motion on, nothing slides; at the largest text sizes
+everything wraps.
 
 ### Change password
 

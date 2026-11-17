@@ -19,7 +19,9 @@ import Foundation
 /// THE IDLE UNLOCK. The server holds an unlock UNLOCK_IDLE_SECONDS since it last used it, and the web learns it ran out
 /// at its next ask. The phone notes when it last heard a People answer (`answeredAt`, on a clock that counts while the
 /// phone sleeps) and, `People.idleCheckSeconds` after it, reads the list again (`People.idleDue`) - always after the
-/// server's unlock has run out, so that read finds it gone and never keeps it alive.
+/// server's unlock has run out, so that read finds it gone and never keeps it alive. Once per answer (`idleAskedFor`):
+/// a read sent while the check is due that fails - a 403, a proxy's 502, no answer - arms no other until a read or a
+/// write answers again, so a failure never loops.
 ///
 /// Nothing here keeps a password longer than it must: the unlock's is sent and emptied as Unlock is pressed; a new
 /// person's and a reset's go when the account is made or the password reset, as a sheet closes, when People locks
@@ -38,6 +40,11 @@ public struct PeopleFlow: Sendable, Equatable, CustomStringConvertible, CustomDe
     public private(set) var reading = false
     /// When the phone last heard a People answer while the list showed, on the App's clock (seconds).
     public private(set) var answeredAt: Double?
+    /// The `answeredAt` a read was sent for while the idle check was due: none other is armed for that answer.
+    public private(set) var idleAskedFor: Double?
+    /// How many accounts the last list had - kept through a lock (and People left), so the read after Unlock is waited
+    /// for by the list it will bring (PeopleWaits.read), not the floor.
+    public private(set) var accountsListed = 0
 
     // MARK: the writes
 
@@ -155,7 +162,10 @@ public struct PeopleFlow: Sendable, Equatable, CustomStringConvertible, CustomDe
 
     // MARK: reads
 
-    public mutating func readBegan() -> Int {
+    /// A read decided - `now` on the App's clock: one sent while the idle check is due is that check's, for this
+    /// answer alone.
+    public mutating func readBegan(now: Double? = nil) -> Int {
+        if let now, idleDue(now: now) { idleAskedFor = answeredAt }
         reads += 1
         reading = true
         return reads
@@ -173,7 +183,10 @@ public struct PeopleFlow: Sendable, Equatable, CustomStringConvertible, CustomDe
             readProblem = nil
             landed = max(landed, ticket)
             let shown = view
-            if shown == .list { answeredAt = now }
+            if shown == .list {
+                answeredAt = now
+                accountsListed = answer.people.count
+            }
             if was == .list, shown != .list { forgetSheetPasswords() }
             if was == .locked, shown != .locked { unlockPassword = "" }
             keepDrafts()
@@ -191,9 +204,17 @@ public struct PeopleFlow: Sendable, Equatable, CustomStringConvertible, CustomDe
         gap = reads
     }
 
-    /// The idle unlock: the list shows and has been left alone long enough to have run out on the server.
+    /// The idle unlock: the list shows and has been left alone long enough to have run out on the server - and no read
+    /// has been sent for that yet since this answer.
     public func idleDue(now: Double) -> Bool {
-        view == .list && People.idleDue(answeredAt: answeredAt, now: now)
+        view == .list && answeredAt != idleAskedFor && People.idleDue(answeredAt: answeredAt, now: now)
+    }
+
+    /// How long until the idle check, at `now`: nil when there is none to arm - nothing listed, or a read already sent
+    /// for it since this answer (it failed, or is out: only a new answer arms another, so a failure never loops).
+    public func idleWait(now: Double) -> Double? {
+        guard view == .list, let answeredAt, answeredAt != idleAskedFor else { return nil }
+        return max(0, People.idleCheckSeconds - (now - answeredAt))
     }
 
     /// A fresh list puts a person's ticks back to what was saved when that changed (People.tsx's effect on
@@ -264,8 +285,8 @@ public struct PeopleFlow: Sendable, Equatable, CustomStringConvertible, CustomDe
         removeTyped = ""
     }
 
-    /// People left (no page of it on the tab): nothing of it kept - the next opening reads afresh. The tickets go on,
-    /// so an answer still out is dropped.
+    /// People left (no page of it on the tab): nothing of it kept - the next opening reads afresh - but how many
+    /// accounts the last list had, for that read's wait. The tickets go on, so an answer still out is dropped.
     public mutating func left() {
         guard writing == nil else { return }
         reads += 1
@@ -274,6 +295,7 @@ public struct PeopleFlow: Sendable, Equatable, CustomStringConvertible, CustomDe
         state = nil
         readProblem = nil
         answeredAt = nil
+        idleAskedFor = nil
         said = nil
         sheet = nil
         drafts = [:]
@@ -360,8 +382,9 @@ public struct PeopleFlow: Sendable, Equatable, CustomStringConvertible, CustomDe
 
     /// The write answered, failed or never answered, for `ticket` - at `now` on the App's clock; `origin` is deadwax's
     /// address for Made's words. What then: what VoiceOver is told (once - nothing while the sign-in is over the app,
-    /// which says what happened itself), whether /me is asked again, the person's page to leave, and whether the list is
-    /// read again (always, but after a 401). Nil for an older ticket.
+    /// which says what happened itself, and the sheet the write kept put away as `signInCame` puts one), whether /me is
+    /// asked again, the person's page to leave, and whether the list is read again (always, but after a 401). Nil for an
+    /// older ticket.
     public mutating func ended(_ ticket: Int, _ outcome: PeopleOutcome, now: Double, signInOver: Bool,
                                origin: String) -> PeopleAfter? {
         guard ticket == writes, let write = writing else { return nil }
@@ -411,6 +434,9 @@ public struct PeopleFlow: Sendable, Equatable, CustomStringConvertible, CustomDe
         // (the task) the admin role changed, or may have: /me asked again, whatever came of it
         if case .admin = write, outcome != .signedOut { after.askMe = true }
         after.announce = signInOver ? nil : said?.announcement
+        // (review) it ended under the sign-in: the sheet it kept goes now, with any password still typed in it - what was
+        // said in it goes too (the list read once the sign-in goes says what came of it)
+        if signInOver, outcome != .signedOut { signInCame() }
         return after
     }
 

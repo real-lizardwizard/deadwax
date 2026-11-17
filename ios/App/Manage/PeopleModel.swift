@@ -17,8 +17,10 @@ import SwiftUI
 /// Playing goes from over it, when the session moves (Change password's re-key - the unlock was the old session's), on
 /// a pull, after every write - and once the unlock has been left alone long enough to have run out on the server
 /// (People.idleCheckSeconds after the last answer, on a clock that counts while the phone sleeps): that read finds it
-/// gone and Unlock People comes back, as the web's next ask finds it. Nothing is asked under the sign-in, out of reach,
-/// in the background, or without People's permission.
+/// gone and Unlock People comes back, as the web's next ask finds it - once per answer, so a read that fails arms no
+/// other (the flow's `idleWait`). Nothing is asked under the sign-in, out of reach, in the background, with no page of
+/// People showing, or without People's permission - nor anything a landing read would ask next (/me, Navidrome's
+/// version, the idle check): a read landing after the sign-in came or the page went asks nothing more.
 ///
 /// WRITES. One at a time, never sent again by itself, each held through the app going to the background
 /// (BackgroundHold). While one is out the page can't be left by Back or a swipe, nor its tab tapped back past it
@@ -108,7 +110,12 @@ final class PeopleModel {
     func shows() {
         let away = pagesShown == 0 && hiddenAt.map { now - $0 >= 1 } != false
         pagesShown += 1
-        if flow.state == nil || !flow.real || away || flow.idleDue(now: now) { read() }
+        if flow.state == nil || !flow.real || away || flow.idleDue(now: now) {
+            read()
+        } else {
+            // what a read landing between two of People's pages left unasked: the version, the idle check
+            landed()
+        }
     }
 
     /// One of People's pages went from view. None left on any tab: People left - nothing of it kept.
@@ -181,8 +188,9 @@ final class PeopleModel {
     /// `GET /deadwax/people`, waited for by how many the last answer listed. The ticket is the flow's, taken here.
     private func read() {
         guard mayAsk, let client = server.client else { return }
-        let ticket = flow.readBegan()
-        let accounts = flow.state?.people.count ?? 0
+        let ticket = flow.readBegan(now: now)
+        // the last list's, kept through a lock: the read after Unlock brings it back
+        let accounts = flow.accountsListed
         let admin = self.admin
         let mine = generation
         reading?.cancel()
@@ -196,25 +204,25 @@ final class PeopleModel {
             guard mine == generation else { return }
             let askMe = flow.readEnded(ticket, result, now: now)
             guard askMe != nil else { return }
-            if askMe == true { Task { await server.refreshMe() } }
+            // drawn whenever it lands; asked after it only while People may ask (not under the sign-in, nor once gone)
+            if askMe == true, mayAsk { Task { await server.refreshMe() } }
             landed()
         }
     }
 
-    /// A read or a write landed: Navidrome's version asked once the list shows, the idle check set from the answer.
+    /// A read or a write landed (or a page of People came back): Navidrome's version asked once the list shows, the idle
+    /// check set from the answer - only while People may ask.
     private func landed() {
-        if flow.view == .list {
-            askVersion()
-        } else {
-            versionAsked = false
-        }
+        if flow.view != .list { versionAsked = false }
+        guard mayAsk else { return }
+        if flow.view == .list { askVersion() }
         armIdle()
     }
 
     /// Navidrome's status, for the note when it isn't the version People was checked with - asked once each time the
     /// list comes; a failure says nothing.
     private func askVersion() {
-        guard !versionAsked, let client = server.client else { return }
+        guard mayAsk, !versionAsked, let client = server.client else { return }
         versionAsked = true
         let mine = generation
         Task {
@@ -225,11 +233,12 @@ final class PeopleModel {
     }
 
     /// The idle check: once the unlock has been left alone long enough to have run out on the server, People is read
-    /// again - only while it shows, so the read finds it gone.
+    /// again - only while it shows, so the read finds it gone; once per answer (the flow's `idleWait` arms none after a
+    /// read sent for it, so one that fails - a 403, a proxy's 502 - never loops).
     private func armIdle() {
         idle?.cancel()
-        guard let answered = flow.answeredAt else { return }
-        let wait = max(0, People.idleCheckSeconds - (now - answered))
+        idle = nil
+        guard mayAsk, let wait = flow.idleWait(now: now) else { return }
         let mine = generation
         idle = Task {
             try? await Task.sleep(for: .seconds(wait))
@@ -324,7 +333,7 @@ final class PeopleModel {
             guard let after else { return }
             if let words = after.announce, !words.isEmpty { Notice.announce(words) }
             if let id = after.leave { navigation.leavePerson(id) }
-            if after.askMe { Task { await server.refreshMe() } }
+            if after.askMe, !signInOver { Task { await server.refreshMe() } }
             if after.read { read() }
             armIdle()
             leaveIfGone()

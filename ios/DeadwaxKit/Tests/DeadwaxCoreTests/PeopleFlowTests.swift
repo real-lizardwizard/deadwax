@@ -85,6 +85,59 @@ import Testing
         #expect(locked.answeredAt == nil && !locked.idleDue(now: 100_000))
     }
 
+    /// (review) One idle read per answer: a read sent while the check is due that fails - People's 403 (demoted while
+    /// away), a proxy's 502 while deadwax restarts, a 5xx, no answer, a 401, called off - arms no other until an answer
+    /// lands, so it never loops (and never keeps the unlock alive by asking).
+    @Test func aFailedIdleReadNeverArmsAnother() {
+        let due = 100 + People.idleCheckSeconds + 60
+        let offline = APIFailure.offline(.init(server: Self.server, method: "GET", path: "/people",
+                                               reason: "The request timed out."))
+        let failures: [PeopleRead] = [
+            People.readOutcome(of: Self.answered(403, "Not yours.", path: "/people"), admin: false),
+            People.readOutcome(of: Self.answered(502, nil, path: "/people"), admin: true),
+            People.readOutcome(of: Self.answered(500, "Navidrome didn't answer.", path: "/people"), admin: false),
+            People.readOutcome(of: offline, admin: false),
+            .signedOut,
+            .cancelled,
+        ]
+        #expect(failures[0] == .failed(words: People.peopleOnly, askMe: true))
+        for failure in failures {
+            var flow = Self.listed(now: 100)
+            #expect(flow.idleWait(now: 100) == People.idleCheckSeconds)
+            #expect(flow.idleWait(now: due) == 0 && flow.idleDue(now: due))
+            let ticket = flow.readBegan(now: due)
+            #expect(flow.idleAskedFor == 100 && !flow.idleDue(now: due), "the read sent is the check")
+            #expect(flow.readEnded(ticket, failure, now: due + 1) != nil)
+            #expect(flow.idleWait(now: due + 1) == nil, "\(failure): nothing armed at 0 s")
+            #expect(!flow.idleDue(now: due + 1) && !flow.idleDue(now: due + 100_000), "\(failure)")
+            // asked again by hand (a pull, the app back) and failing again: still nothing armed
+            let again = flow.readBegan(now: due + 2)
+            _ = flow.readEnded(again, failure, now: due + 3)
+            #expect(flow.idleWait(now: due + 3) == nil && flow.idleAskedFor == 100, "\(failure)")
+            // an answer arms it afresh, a full wait away
+            let fresh = flow.readBegan(now: due + 4)
+            _ = flow.readEnded(fresh, .answered(Self.list()), now: due + 5)
+            #expect(flow.idleWait(now: due + 5) == People.idleCheckSeconds && !flow.idleDue(now: due + 5))
+            #expect(flow.idleDue(now: due + 5 + People.idleCheckSeconds), "\(failure)")
+        }
+        // a read sent before the check is due is no check: one that fails leaves it armed as it was
+        var early = Self.listed(now: 100)
+        let pull = early.readBegan(now: 200)
+        _ = early.readEnded(pull, .failed(words: People.readFailed, askMe: false), now: 201)
+        #expect(early.idleAskedFor == nil && early.idleWait(now: 201) == People.idleCheckSeconds - 101)
+        // a write's answer is an answer too: the check armed again from it
+        var wrote = Self.listed(now: 100)
+        let sent = wrote.readBegan(now: due)
+        _ = wrote.readEnded(sent, .failed(words: People.readFailed, askMe: false), now: due)
+        #expect(wrote.idleWait(now: due) == nil)
+        let (forget, _) = wrote.beginForget(PeopleKnownOnly(user: "gone"), online: true, signInOver: false)!
+        _ = wrote.ended(forget, .done(.forgot), now: due + 10, signInOver: false, origin: "")
+        #expect(wrote.idleWait(now: due + 10) == People.idleCheckSeconds)
+        // People left: the next opening starts afresh
+        wrote.left()
+        #expect(wrote.idleAskedFor == nil && wrote.idleWait(now: due + 20) == nil)
+    }
+
     // MARK: reads
 
     @Test func onlyTheNewestReadLandsAndNothingWritesBeforeOne() {
@@ -329,6 +382,47 @@ import Testing
         #expect(writing.add.password.isEmpty && writing.add.again.isEmpty)
     }
 
+    /// (review) A write the sign-in came over while it was out keeps its sheet - then, answered under the sign-in, the
+    /// sheet goes as `signInCame` puts one away, with anything still typed in it; nothing said.
+    @Test func aWriteAnsweredUnderTheSignInPutsItsSheetAway() {
+        var made = Self.listed()
+        made.open(.add)
+        made.add = PeopleAddForm(user: "maya", name: "Maya", password: "maya-pass-1", again: "maya-pass-1")
+        let (create, _) = made.beginCreate(online: true, signInOver: false)!
+        made.signInCame()
+        #expect(made.sheet == .add)
+        let after = made.ended(create, .done(.made(user: "maya", warning: nil)), now: 2, signInOver: true,
+                               origin: "http://x")
+        #expect(after?.announce == nil && after?.read == true && made.sheet == nil && made.said(at: .add) == nil)
+        #expect(made.add.isEmpty)
+        // a Reset refused as the sign-in came (its onChange not yet run): the sheet and its passwords go
+        let ethan = Self.ethan()
+        var reset = Self.listed()
+        reset.open(.reset(ethan.id))
+        reset.resetPasswords = PeoplePasswords(password: "ethan-new-pw", again: "ethan-new-pw")
+        let (ticket, _) = reset.beginReset(ethan, online: true, signInOver: false)!
+        let refused = reset.ended(ticket, .refused(words: "That's a lot of changes in a minute.", kind: "too_many",
+                                                   fix: nil, askMe: false),
+                                  now: 2, signInOver: true, origin: "")
+        #expect(refused?.announce == nil && reset.sheet == nil && reset.resetPasswords.isEmpty)
+        // Remove's sheet, failed under it: gone with the name typed; the person's page stays
+        var remove = Self.listed()
+        remove.open(.remove(ethan.id))
+        remove.removeTyped = "ethan"
+        let (gone, _) = remove.beginRemove(ethan, online: true, signInOver: false)!
+        let failed = remove.ended(gone, .failed(words: "Navidrome didn't answer.", fix: nil), now: 2, signInOver: true,
+                                  origin: "")
+        #expect(failed?.leave == nil && remove.sheet == nil && remove.removeTyped.isEmpty)
+        // the same refusal with no sign-in keeps the sheet up, and the passwords to try again
+        var open = Self.listed()
+        open.open(.reset(ethan.id))
+        open.resetPasswords = PeoplePasswords(password: "ethan-new-pw", again: "ethan-new-pw")
+        let (kept, _) = open.beginReset(ethan, online: true, signInOver: false)!
+        _ = open.ended(kept, .refused(words: "No.", kind: "too_many", fix: nil, askMe: false), now: 2,
+                       signInOver: false, origin: "")
+        #expect(open.sheet == .reset(ethan.id) && !open.resetPasswords.isEmpty)
+    }
+
     // MARK: what a failure means
 
     @Test func eachFailureIsWhatItMeans() throws {
@@ -467,6 +561,35 @@ import Testing
         #expect(Routes.timeouts[Routes.lockPeople] == nil)
         #expect(PeopleWaits.read(accounts: 0) == 120 && PeopleWaits.read(accounts: 2) == 120)
         #expect(PeopleWaits.read(accounts: 4) == 180 && PeopleWaits.read(accounts: 20) == 660)
+    }
+
+    /// (review) The read after Unlock is waited for by the list it brings back: the last list's count is kept through a
+    /// lock - Lock, or a `locked` refusal - and People left, never the floor's 0.
+    @Test func theReadAfterUnlockWaitsForTheListItBrings() {
+        let many = (1...6).map { PeoplePerson(id: "nd-\($0)", user: "p\($0)", libraries: 1,
+                                             permissions: PeopleTicks(request: true)) }
+        var flow = Self.listed(Self.list([Self.you] + many))
+        #expect(flow.accountsListed == 7 && PeopleWaits.read(accounts: flow.accountsListed) == 300)
+        let lock = flow.beginLock(online: true, signInOver: false)!
+        _ = flow.ended(lock, .done(.locked), now: 2, signInOver: false, origin: "")
+        #expect(flow.view == .locked && flow.state?.people.isEmpty == true && flow.accountsListed == 7)
+        let read = flow.readBegan(now: 3)
+        _ = flow.readEnded(read, .answered(Self.locked), now: 4)
+        #expect(flow.accountsListed == 7, "a locked answer lists nobody, and says nothing of how many there are")
+        // a write refused `locked`
+        var refused = Self.listed(Self.list([Self.you] + many))
+        let (forget, _) = refused.beginForget(PeopleKnownOnly(user: "gone"), online: true, signInOver: false)!
+        _ = refused.ended(forget, .refused(words: "Unlock People.", kind: "locked", fix: nil, askMe: false), now: 2,
+                          signInOver: false, origin: "")
+        #expect(refused.view == .locked && refused.accountsListed == 7)
+        // People left and opened again
+        refused.left()
+        #expect(refused.state == nil && refused.accountsListed == 7)
+        // a shorter list read after: its count
+        let shorter = refused.readBegan(now: 5)
+        _ = refused.readEnded(shorter, .answered(Self.list()), now: 6)
+        #expect(refused.accountsListed == 2 && PeopleWaits.read(accounts: refused.accountsListed) == 120)
+        #expect(PeopleFlow().accountsListed == 0)
     }
 
     @Test func theTabKeepsPeoplesPagesOnlyWhileAWriteIsOut() {
