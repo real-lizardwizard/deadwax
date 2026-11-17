@@ -4,7 +4,7 @@ There are three kinds of setting:
 
 - **Server settings** belong to the container: where slskd is, where your library is, how albums are
   filed. They're edited in the app's **Server settings** - the desktop sidebar's **Server settings**, under
-  **Manage**, or **You → Manage → Server settings** on a phone - which has three pages: **Library**,
+  **Manage**, or **Settings → Manage → Server settings** on a phone - which has three pages: **Library**,
   **Downloads** and **Connections**. "Settings → Library" in this guide means that page.
 - **Your Getting albums settings** - what **Get** does, the quality floor and Format - are
   [kept for you on deadwax](#your-settings-in-the-app-per-user-on-deadwax), so they follow you from
@@ -65,7 +65,7 @@ run ends. Pressing it again is safe - it moves what is still at the old lead and
 **Clear MusicBrainz's saved answers** is there too, under **Connections** beside its two settings
 ([below](#musicbrainzs-saved-answers-settings--connections)). The line at the top of the page says
 where your own choices are: what Get does, the quality floor, Format and whether cancelling asks
-first are in **You**, under **Getting albums**. On a first run with Navidrome not set up, the app's
+first are in **Settings**, under **Getting albums**. On a first run with Navidrome not set up, the app's
 **Set up Navidrome** (on Home, the Library and Search) opens this page at **Connections**; once the
 three Navidrome settings are saved, the app asks Navidrome again by itself.
 
@@ -89,7 +89,7 @@ All three, for the library (deadwax needs Navidrome for it): the app - [its guid
 out for a desktop - shows and plays your library from Navidrome, so its Home shelves, Library,
 albums and artists you have, and Search's look in your library say **Connect Navidrome** until every
 one is set (**Your music isn't available yet** to anyone who doesn't run deadwax); Server settings marks whichever is missing. Searching MusicBrainz, getting albums,
-**Requests** and **You** work without them. With them set, and an address that passes the check
+**Requests** and **Settings** work without them. With them set, and an address that passes the check
 below, deadwax also checks every album folder against the albums Navidrome lists, raising one it
 doesn't as [Not in Navidrome](library.md#not-in-navidrome), and applying a release asks Navidrome
 when it has scanned before renaming a folder (see `RETAG_RENAME_WAIT` below). Point Navidrome at the
@@ -144,7 +144,7 @@ is, and empties it - on disk and in memory, and what Search finds in it. Only sp
 `MUSICBRAINZ_CACHE_PATH` has an unsaved change (it clears the file that is saved) and when nothing is
 saved.
 
-The connection check (the MusicBrainz pill, and You's **Connections** in the app) never answers from
+The connection check (the MusicBrainz pill, and Settings' **Connections** in the app) never answers from
 the saved answers: one saved last week can't say whether MusicBrainz can be reached now. (It keeps its
 answer in memory for an hour, as it always did.)
 
@@ -265,7 +265,7 @@ search, find and get albums, play, pin to Home and choose their own Getting albu
 the library (applying a release, tags, covers, lyrics, CD art, an artist's pictures), deleting and
 re-filing, rescans, Needs a look, the event log and the server settings are an admin's - unless
 an admin gives that person the permission for them, by category, in **People** (the desktop
-sidebar's, or **You → Manage → People** on a phone) - and Get albums can be taken away. **Permissions are kept in deadwax's database, per person,
+sidebar's, or **Settings → Manage → People** on a phone) - and Get albums can be taken away. **Permissions are kept in deadwax's database, per person,
 and set in People** - no setting of their own. The app doesn't show anyone what they can't use, and
 deadwax refuses it (a 403 that says what it needs) - [the full table](sharing.md#admins-permissions-and-everyone-else). **Downloads are each person's own**: you see the downloads you asked for, and join one somebody else already has
 on its way rather than fetching it twice; your cancel leaves a download others still want, and your
@@ -282,7 +282,7 @@ start-up logs it; while logins are on, Server settings refuses a save that would
 used deadwax there, through restarts. Every few minutes deadwax asks Navidrome whether the login you
 signed in with still stands, so changing your Navidrome password in Navidrome or Amperfy, or your account
 being deleted, signs you out within about six minutes; Navidrome merely being down signs nobody out.
-(Changed in deadwax with **You → Account → Change password**, the device you changed it on stays signed in and your
+(Changed in deadwax with **Settings → Account → Change password**, the device you changed it on stays signed in and your
 others are signed out at once - [Sharing deadwax](sharing.md#when-something-changes).) Your deadwax user is
 your Navidrome user name, lowercased: renamed in Navidrome, you sign in again under the new name.
 Three wrong passwords for one name within a minute and deadwax stops asking Navidrome about that name
@@ -402,40 +402,42 @@ sends deadwax's log straight to `docker logs`.
 
 ## The phone player's settings (per device)
 
-[The app](player.md) keeps fourteen settings of its own, on the device, in the app's own storage: a
+[The app](player.md) keeps sixteen settings of its own, on the device, in the app's own storage: a
 home-screen app keeps its storage apart from Safari's, so set them in the app itself.
 
 | setting | default | where it is | what it does |
 | --- | --- | --- | --- |
-| Maximum quality | Up to 48 kHz | **You** → Playback | whether hi-res FLAC songs are resampled to 48 kHz (or 44.1 kHz) or sent as they are - see [Maximum quality](player.md#maximum-quality-hi-res-at-48-khz). |
-| Normalization | Automatic | **You** → Playback | whether deadwax levels FLAC songs to one loudness - **Automatic** (an album you play at one level for the whole album, anything else song by song), **By song**, **By album**, or **Off** (no levelling: every song played exactly as the file is, bit for bit, unless Maximum quality converts it) - see [Normalization](player.md#normalization). Kept as `deadwax-player-normalization`, `song`, `album` or `off`: anything else stored there - nothing, a mistyped value, storage that can't be read - is Automatic. Used from the next thing you play. |
-| Gapless | off | **You** → Playback | joins songs into one stream, or gets the next song ready on a second player - see [Gapless playback](player.md#gapless-playback). A checkbox. |
-| Now Playing opens as | Cover | **You** → Playback | whether the now-playing screen opens as the cover or as [the turntable](player.md#the-turntable). The button at the screen's top right switches between them for as long as it's open, without changing this. The phone layout's only: [on a desktop](player.md#on-a-desktop) there's no now-playing screen, so You leaves it out there - an iPad on its side still shows it, since turned upright it's a phone. |
-| Pause winds the record down | on | **You** → Playback | whether pausing from [the turntable](player.md#the-turntable) slows the song's sound to a stop with the record over about a second (on), or stops it at once. The turntable's only: the cover's pause, the lock screen's and a song ending are always instant - and a desktop, which has no turntable, leaves it out of You (an iPad on its side still shows it). A checkbox. |
+| Maximum quality | Up to 48 kHz | **Settings** → Playback | whether hi-res FLAC songs are resampled to 48 kHz (or 44.1 kHz) or sent as they are - see [Maximum quality](player.md#maximum-quality-hi-res-at-48-khz). |
+| Normalization | Automatic | **Settings** → Playback | whether deadwax levels FLAC songs to one loudness - **Automatic** (an album you play at one level for the whole album, anything else song by song), **By song**, **By album**, or **Off** (no levelling: every song played exactly as the file is, bit for bit, unless Maximum quality converts it) - see [Normalization](player.md#normalization). Kept as `deadwax-player-normalization`, `song`, `album` or `off`: anything else stored there - nothing, a mistyped value, storage that can't be read - is Automatic. Used from the next thing you play. |
+| Gapless | off | **Settings** → Playback | joins songs into one stream, or gets the next song ready on a second player - see [Gapless playback](player.md#gapless-playback). A checkbox. |
+| Now Playing opens as | Cover | **Settings** → Playback | whether the now-playing screen opens as the cover or as [the turntable](player.md#the-turntable). The button at the screen's top right switches between them for as long as it's open, without changing this. The phone layout's only: [on a desktop](player.md#on-a-desktop) there's no now-playing screen, so Settings leaves it out there - an iPad on its side still shows it, since turned upright it's a phone. |
+| Pause winds the record down | on | **Settings** → Playback | whether pausing from [the turntable](player.md#the-turntable) slows the song's sound to a stop with the record over about a second (on), or stops it at once. The turntable's only: the cover's pause, the lock screen's and a song ending are always instant - and a desktop, which has no turntable, leaves it out of Settings (an iPad on its side still shows it). A checkbox. |
 | Speed | 1x | the turntable's **speed fader**, beside the platter (and the chip that shows a speed that isn't 1x, on the cover and the desktop's player bar, which puts it back to 1x) | how fast the song plays, from 0.25x to 2x, its pitch moving with it - a record deck's speed, not a time-stretch - see [the speed fader](player.md#the-speed-fader). Kept as `deadwax-player-speed`, a number from 0.25 to 2 in hundredths: anything else stored there - nothing, a word, a number out of range - plays at 1x. It holds for every song after, until you change it. |
 | Repeat | off | **Up Next**'s Repeat chip (on a desktop, the player bar's Repeat too) | off, **Repeat all** (the album or list again from the top, a new order with Shuffle on) or **Repeat one** (the song again until you skip it) - see [Up Next, shuffle and repeat](player.md#up-next-shuffle-and-repeat). Kept as `deadwax-player-repeat`, `all` or `one`: anything else stored there - nothing, a mistyped value, storage that can't be read - is off. Shuffle isn't kept: it belongs to what's playing. |
-| Library view | Albums | [on a desktop](player.md#on-a-desktop), the sidebar's Library and All music views | which view a desktop's Library opens on: Albums, Artists or Songs - with logins on Your albums or Your artists, or All music's All albums, All artists or All songs. Songs is left out where Navidrome won't list songs, and the albums show instead. A desktop's **Recently added** isn't kept: the view kept is the last of the others. Kept as `deadwax-player-library-view`. A phone doesn't use it: its Library opens on [the list](player.md#the-library), each row a page of its own. |
+| Library view | Albums | [on a desktop](player.md#on-a-desktop), the sidebar's Library views | which view a desktop's Library opens on: Albums, Artists or Songs - with logins on Your albums or Your artists (the sidebar's **Yours**), or All albums, All artists or All songs (its **All**). Songs is left out where Navidrome won't list songs, and the albums show instead. A desktop's **Recently added** isn't kept: the view kept is the last of the others. Kept as `deadwax-player-library-view`. A phone doesn't use it: its Library opens on [the list](player.md#the-library), each row a page of its own. |
+| Library side | Yours | [on a desktop](player.md#on-a-desktop) with logins on, the **Yours \| All** switch beside the sidebar's Library heading | which side's rows the sidebar's Library lists while no Library view is showing - off the Library, or on an album, an artist or a playlist opened from a view: the side last shown - turned to on the switch, or the side of the last Library view opened. On a Library view the switch shows that view's side. Kept as `deadwax-sidebar-side`: `all` is All, and anything else is Yours. |
+| Folded groups | both open | on a desktop, the sidebar's **Playlists** and **Manage** headings | which of the two groups are folded away. Kept as `deadwax-sidebar-folded`, the folded ones' names (`playlists`, `manage`) with a comma between; anything else there is ignored. |
 | Library order | Artist | a Library page's sort, on its title's row (Albums, All albums) | **Artist**, **Title**, **Recently added**, **Year, newest first**, **Year, oldest first**, **Recently played** or **Most played** - see [the Library](player.md#the-library) - one order for your albums and the collection's (Recently added over your albums goes by when you added each, over the collection's by when the collection got it). Kept as `deadwax-player-order`: the four that came before (Recently added, Recently played, Artist and Title) keep the values they were saved as, so a device that chose one keeps it; anything else stored there - nothing, a mistyped value - is Artist. Recently added has its own place: the Library list's grid and its **See all**. |
 | Artists order | Name | a Library page's sort, on Artists (and All artists) | **Name** (under letters, with the index) or **Most albums**. Kept as `deadwax-player-artist-order`: `albums` is Most albums, and anything else stored there is Name. |
 | Visualizer effect | Ambient | the [visualizer](player.md#the-visualizer)'s effects, at its top right | Bars, Scope, Halo or Ambient - what it opens on next time; **V** steps through them too. The visualizer is a desktop's, so on a phone this changes nothing. |
 | Visualizer colour | From the cover | the visualizer's **Colour** | From the cover (the playing album's) or Purple (deadwax's own). |
 | Ambient style | Mandala | the visualizer's **Style** list, shown with Ambient | Mandala, Waves, Liquid, Burst, Ribbons, Smoke, Rings or Embers - or **Rotate all**, through all eight in that order. |
-| Confirm before cancelling | on | **You** → Getting albums, under the three kept on deadwax | whether the Requests tab's **✕** asks first. Kept as `deadwax-player-confirm-cancel`. A checkbox; the first time a device reads it, it carries over the old page's setting of that name in that browser, once ([below](#your-settings-in-the-app-per-user-on-deadwax)). |
+| Confirm before cancelling | on | **Settings** → Getting albums, under the three kept on deadwax | whether the Requests tab's **✕** asks first. Kept as `deadwax-player-confirm-cancel`. A checkbox; the first time a device reads it, it carries over the old page's setting of that name in that browser, once ([below](#your-settings-in-the-app-per-user-on-deadwax)). |
 
 The Requests tab's **✕** asks before cancelling, by **Confirm before cancelling** - in the card
 itself (**Keep it** or **Cancel download**), never as a pop-up, which would hold up the music.
 
 ## Your settings in the app (per user, on deadwax)
 
-Three settings in the app's **You → Getting albums** decide what **Get** does
+Three settings in the app's **Settings → Getting albums** decide what **Get** does
 ([choosing a source](downloading.md#choosing-a-source)). They are kept
 **on deadwax, per user** - not on the device - so they follow you from the phone to a browser and
 back. With logins off (the default) everyone using deadwax shares one set, on every device; with
 logins on each person has their own, and the first Navidrome admin to sign in takes over the ones chosen before
-([sharing deadwax](sharing.md#what-happens-to-what-you-had)). Each is a list to tap in You: the choice shows at once and
+([sharing deadwax](sharing.md#what-happens-to-what-you-had)). Each is a list to tap in Settings: the choice shows at once and
 is saved behind it, and if deadwax can't keep it (its database isn't writable) it goes back to what
-deadwax has and You says so. Choices made quickly are saved one after another, in the order you made
-them, so the last one is what stays. The app asks deadwax for them each time You is opened, on
+deadwax has and Settings says so. Choices made quickly are saved one after another, in the order you made
+them, so the last one is what stays. The app asks deadwax for them each time Settings is opened, on
 **Check again** under Connections, and before every search the sources start - a Get, another Get or
 pressing while a desktop's Sources panel stays open, **Try again**, **Search** under Search again - so a change made
 on another device shows without closing the app. Until deadwax has first answered, nothing shows as

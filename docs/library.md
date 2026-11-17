@@ -15,7 +15,7 @@ All of it is in the app, on a phone and on a desktop:
 - An artist's page has [their pictures, and moving their albums under their current name](#artist-pages).
 
 On a desktop (a window 1024 pixels wide or more) Needs a look and Library care are the sidebar's,
-under **Manage**; on a phone they're in **You → Manage**. They're there for an admin,
+under **Manage**; on a phone they're in **Settings → Manage**. They're there for an admin,
 which with logins off is everyone - and for anyone an admin gives their permission to
 ([Sharing deadwax](sharing.md#admins-permissions-and-everyone-else)).
 
@@ -285,7 +285,7 @@ With logins on the confirmation also says **whose libraries it is in** - "In
 ethan and sam's libraries: deleting it takes it out, and they'll see it was removed by an admin", or,
 when it is in yours too, "In your library and ethan's: deleting it takes it out, and ethan will see it
 was removed by an admin" - or that nobody has it. When deadwax can't read who has it (its database
-unavailable) it says that instead, never "nobody". Each of the others then finds it in **You → Your
+unavailable) it says that instead, never "nobody". Each of the others then finds it in **Settings → Your
 library** as **Removed by an admin.**, with **Get it again** (when they may Get albums) and **Dismiss**
 ([the app guide](player.md#your-library-with-logins-on)); it simply leaves yours, since you chose to
 delete it.
@@ -343,7 +343,7 @@ back (the browser's Back, a mouse's back button, a phone's back gesture), which 
 ## Needs a look
 
 **Needs a look** - the desktop sidebar's first item under **Manage**, with how many albums need one
-beside it, or **You → Manage → Needs a look** on a phone, with the same count - is the library's
+beside it, or **Settings → Manage → Needs a look** on a phone, with the same count - is the library's
 review queue. The line at its top says what it's for: *Albums whose tags, folder or cover need fixing,
 albums Navidrome doesn't list, and new downloads nobody has looked at yet. Open one to fix it, or to
 mark it fine as it is.* Without Edit albums it ends *Open one to see what it has, or to delete it.*, with a line
@@ -401,7 +401,7 @@ An album page showing the same album elsewhere in the app isn't asked again afte
 
 ## Library care
 
-**Library care** - after **Needs a look** in the desktop sidebar's **Manage**, and in **You →
+**Library care** - after **Needs a look** in the desktop sidebar's **Manage**, and in **Settings →
 Manage** on a phone, where the page is laid out for it - says at its top what it's for (*Rescan the
 library after changing tags in another program, and fill in missing covers, CD art and lyrics across
 many albums at once - one album at a time, and Stop ends a run after the album it's on.*) and holds:

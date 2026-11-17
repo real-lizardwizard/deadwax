@@ -109,7 +109,7 @@ every finished download is moved into the library), and says so in its log while
 ## The first run
 
 1. **Start it** and open `http://your-server:8080` - that opens the app, at `/player/`.
-2. **Fill in Server settings → Connections** - the desktop sidebar's **Server settings**, or **You → Manage →
+2. **Fill in Server settings → Connections** - the desktop sidebar's **Server settings**, or **Settings → Manage →
    Server settings** on a phone - and **Save changes**; it applies at once:
    - **`SLSKD_URL`**, slskd's address **as seen from inside this container**, which is often not the
      one you type into a browser: for another container on the same Docker network, its service name
@@ -120,10 +120,10 @@ every finished download is moved into the library), and says so in its log while
      is only ever sent to the address from `.env`, so a new address saved in the app takes the key again.
    - **`MUSICBRAINZ_EMAIL`**, your contact address for MusicBrainz.
 
-   Then **check You → Connections**: MusicBrainz, slskd and Navidrome. **Connected** means connected;
+   Then **check Settings → Connections**: MusicBrainz, slskd and Navidrome. **Connected** means connected;
    otherwise it says what's wrong in a word, with a sentence under it saying where to put it right -
    **Not on Soulseek** when slskd is running but not signed in to Soulseek, **Can't reach it** when it
-   can't be reached at all ([troubleshooting](troubleshooting.md#yous-connections-says-slskd-isnt-connected)).
+   can't be reached at all ([troubleshooting](troubleshooting.md#settings-connections-says-slskd-isnt-connected)).
    Connections is for whoever runs deadwax: with logins on, only admins and anyone given **Settings and
    the log** see it.
 3. **Open Settings → Library**. Every configured path is shown as the container sees it,
@@ -133,7 +133,7 @@ every finished download is moved into the library), and says so in its log while
 4. **Download something small.** Search for an album, open it, pick a pressing, press **Get the
    album**, then **Get** on a good source. [Finding music](finding-music.md) and
    [Downloading](downloading.md) walk through it.
-5. **Watch the log** (the sidebar's **Event log**, or **You → Manage → Event log** on a phone). When
+5. **Watch the log** (the sidebar's **Event log**, or **Settings → Manage → Event log** on a phone). When
    the download finishes it's **moved** into your library, tagged and filed - there is no dry run,
    and no setting to switch it on - and the log names the folder it went into. slskd's emptied
    folder is cleaned up after it.
@@ -155,7 +155,7 @@ Navidrome**, with the reason and **Try again**) and how to set it up, in place o
 and, to anyone who doesn't run deadwax, **Your music isn't available yet** (or **right now**) and to
 tell whoever does, never Navidrome's address or a setting. The
 rest works without it: Search's MusicBrainz rows, an album you don't have and its **Get**,
-**Requests**, Home's arriving downloads and **You**. An album folder Navidrome doesn't list - not
+**Requests**, Home's arriving downloads and **Settings**. An album folder Navidrome doesn't list - not
 scanned yet, unreadable, or outside Navidrome's music folder - is never out of reach: **Needs a
 look** raises it as **Not in Navidrome** (see [the library](library.md#not-in-navidrome)).
 
@@ -202,7 +202,7 @@ own network; plain http is fine there and over WireGuard.
 
 **[Sharing deadwax](sharing.md) is the full story**: what each person gets and what stays shared,
 each setting, what happens to what you had (the first Navidrome admin to sign in takes it over), adding
-and removing people (People, in You), what admins can do that others can't and the permissions they can
+and removing people (People, in Settings), what admins can do that others can't and the permissions they can
 give, and turning logins off again. Every setting's
 row: [Configuration → Logins](configuration.md#logins-environment-only). If you're locked out, see
 [Troubleshooting](troubleshooting.md#signing-in).

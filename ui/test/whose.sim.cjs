@@ -419,11 +419,20 @@ console.log('\nthe wiring: every page takes `personal` from hasLibrary() and han
       /\{albumCountLine\(artist\.albumCount, inStore \? IN_THE_STORE : ''\) && \(\s*<span class="app-result-line">\{albumCountLine\(artist\.albumCount, inStore \? IN_THE_STORE : ''\)\}<\/span>/.test(read('app/LibraryViews.tsx'))],
     [true, true, true])
   const sidebar = read('app/Sidebar.tsx')
-  check('a desktop\'s sidebar: a Browse group whenever App gives it Browse\'s views, and App gives them - and the Library\'s - by hasLibrary()',
-    [/\{browse\.length > 0 && \(\s*<section class="app-side-group" aria-labelledby="app-side-browse">\s*<h2 id="app-side-browse" class="app-side-label">\s*\{ALL_MUSIC\}\s*<\/h2>\s*<ul class="app-side-list">\{browse\.map\(item\)\}<\/ul>/.test(sidebar),
-      /library=\{libraryItems\(hasSongs, hasLibrary\(\)\)\}\s*browse=\{browseItems\(hasSongs, hasLibrary\(\)\)\}\s*personal=\{hasLibrary\(\)\}/.test(app),
+  //? (2.1.35) one Library group: Yours | All in its heading with a library of your own - All music's group went
+  check('a desktop\'s sidebar: one Library group, its switch only with a library of your own, its rows the side shown\'s - App hands it hasSongs and hasLibrary()',
+    [/\{personal && \(\s*<div class="app-side-switch" role="radiogroup" aria-labelledby="app-side-library"/.test(sidebar)
+      && /<ul class="app-side-list">\{sidebarRows\(side, hasSongs, personal\)\.map\(item\)\}<\/ul>/.test(sidebar) && !/app-side-browse|ALL_MUSIC|browse\.map/.test(sidebar),
+      /hasSongs=\{hasSongs\}\s*personal=\{hasLibrary\(\)\}/.test(app) && !/<Sidebar\b[^>]*\b(?:library|browse)=\{/.test(app),
       /sidebarMove\(item, libraryPick\(\), librarySongs\(\), hasLibrary\(\), router\.nav\.stacks\.library\[0\] \?\? null\)\s*if \(move\.how === 'tab'\) \{\s*(?:\/\/[^\n]*\n\s*)?if \(move\.pick\) chooseLibrary\(move\.pick\)\s*chooseTab\(move\.tab\)/.test(app), /aria-label=\{searchWords\(personal\)\.label\}/.test(sidebar)],
     [true, true, true, true])
+  //? (2.1.35, review) a page pushed above a view: App says so from the tab's own stack, and Sidebar reads the side and
+  //? the turn through it - All albums -> Homogenic -> Yours had popped the album
+  check('...App tells it when a page is pushed above the Library\'s view, and the switch\'s side, its keeping and its turn all go by that',
+    [/personal=\{hasLibrary\(\)\}\s*overView=\{overLibraryView\(nav\.tab, nav\.stacks\[nav\.tab\]\)\}/.test(app),
+      /const side = sideShown\(current, remembered, overView\)/.test(sidebar), /const shown = sideShown\(current, remembered, overView\)/.test(sidebar),
+      /\}, \[current, personal, overView\]\)/.test(sidebar), /const opens = sideFlip\(current, to, overView\)/.test(sidebar)],
+    [true, true, true, true, true])
   const search = read('app/Search.tsx')
   const list = read('lib/searchList.ts')
   check('Search: its words, its artists\' counts, More\'s note and its MusicBrainz rows\' places, each by `personal`',

@@ -458,15 +458,22 @@ console.log('\nthe whole app: "the collection", never "the store"')
   check(`no file of ${files.length} says "the store" to anyone`, broken, [])
 }
 
-console.log('\nthe guide (2.0.8): the way to a managing page goes through You → Manage, its rows by their names now')
+console.log('\nthe guide (2.0.8): the way to a managing page goes through Settings → Manage (You → Manage until 2.1.35), its rows by their names now')
 {
   //? (review) You's managing rows sit under Manage, Change password under Account, and the sidebar says Server settings
   //? and Event log: a path written the old way sends a phone's reader looking for a row that isn't where it says
   const OLD_PATHS = [
-    ['a managing row straight under You', /You →(?: \*\*)? ?(?:Server settings|Library care|Event log|Log\b|Needs a look|People|In nobody's library)/],
-    ['Change password straight under You', /You →(?: \*\*)? ?Change password/],
-    ["the sidebar's old Settings or Log", /sidebar's (?:\*\*)?(?:Settings|Log)\b/],
+    ['a managing row straight under Settings', /(?:You|Settings) →(?: \*\*)? ?(?:Server settings|Library care|Event log|Log\b|Needs a look|People|In nobody's library)/],
+    ['Change password straight under Settings', /(?:You|Settings) →(?: \*\*)? ?Change password/],
+    //? (2.1.35, review) the Log half alone now: the sidebar's foot is Settings (the page You was), so "the sidebar's
+    //? Settings" is right for it - and no words tell it from the old name for Server settings reliably, since both pages
+    //? have a Connections (the server's a tab, Settings' a section)
+    ["the sidebar's old Log", /sidebar's (?:\*\*)?Log\b/],
     ['"Settings" for the Server settings page in a step', /Fill in Settings →/],
+    //? (2.1.35) the tab is Settings now: its old name, as a path, a possessive (straight or curly), a bold or tagged
+    //? name, "in You" ending a phrase or "the You tab", sends the reader looking for a tab that isn't there. A pronoun
+    //? mid-sentence is lowercase, and an album's "Wish You Were Here" is no tab
+    ['the Settings tab by its old name, You', /\bYou (?:→|>) |\bYou['’]s\b|\*\*You\*\*|<(?:strong|em)>You<\/(?:strong|em)>|\bin You[,.;:)]|\bthe You tab\b/],
   ]
   const docs = path.join(SRC, '..', '..', 'docs')
   const guides = [...fs.readdirSync(docs).filter((name) => name.endsWith('.md')).map((name) => path.join(docs, name)), path.join(docs, '..', 'README.md')]
@@ -479,10 +486,19 @@ console.log('\nthe guide (2.0.8): the way to a managing page goes through You �
       if (at) broken.push(`${path.basename(file)} ${name}: ${at.join(' | ')}`)
     }
   }
-  const samples = ['or **You → Library care**)', 'with **You → Change password**', "the desktop sidebar's Settings, or", '**Fill in Settings → Connections**']
+  const samples = ['or **Settings → Library care**)', 'with **You → Change password**', "the desktop sidebar's Log, or", '**Fill in Settings → Connections**', "You's **Connections**"]
   check('the guide scan knows each old way, and passes the new', [OLD_PATHS.map(([, rule], at) => rule.test(samples[at])),
-    OLD_PATHS.some(([, rule]) => rule.test("**You → Manage → Library care**, **You → Account → Change password**, the sidebar's Server settings"))],
-    [[true, true, true, true], false])
+    OLD_PATHS.some(([, rule]) => rule.test("**Settings → Manage → Library care**, **Settings → Account → Change password**, the sidebar's Server settings, Wish You Were Here, You can"))],
+    [[true, true, true, true, true], false])
+  const oldName = OLD_PATHS.at(-1)[1]
+  check('...the tab\'s old name in each way it was written: a path, a possessive straight or curly, bold, tagged, "in You" ending a phrase, "the You tab"',
+    ['You → Getting albums', 'You > Playback', "You's **Format**", 'You’s **Format**', '**You**', '<strong>You</strong>', '<em>You</em>', 'ticked in You, FLAC songs',
+      'are in You.', 'the Gapless checkbox in You)', 'open the You tab'].map((text) => oldName.test(text)),
+    Array(11).fill(true))
+  check('...and not a pronoun, a song or album title, People\'s "You" on your own row, nor the sidebar\'s Settings at its foot',
+    ['You can change it in Settings', 'If You', 'Wish You Were Here', 'Shine On You Crazy Diamond', 'your own row says "You"', 'tagged “You”',
+      "the sidebar's **Settings**, at its foot", 'in Your library', 'in You Were Here'].map((text) => OLD_PATHS.some(([, rule]) => rule.test(text))),
+    Array(9).fill(false))
   check(`${guides.length} guides: none writes a managing page's way the old way`, broken, [])
 }
 

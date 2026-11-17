@@ -147,3 +147,17 @@ Moved verbatim from CLAUDE.md (2026-10-07), where it was loaded into every sessi
   string or regex and the code runs the same. Write such escapes with a byte-level replace.
   `tests/test_source_bytes.py` now fails on any raw control byte in a tracked source file, so
   catching this no longer depends on noticing `Bin` in `git diff --stat`.
+- **A test clock moved by float steps can land a hair short of a boundary (2.1.34).** `later()` in
+  `tests/test_album_context.py` once froze the player cache's clock at the real `time.monotonic()` plus
+  the step, so `(x + 6) + 30 - (x + 6)` came out just under 30 whenever the sum crossed a power of two -
+  and `test_safaris_rest_straight_after_its_probe_is_still_the_probes_file`, which steps exactly
+  `VERSION_SECONDS`, saw its new play read as carrying on, now and then in CI (12 Nov, Python 3.12; the
+  runner's uptime decides it, not the Python). Reproduced by starting the clock at 1048531.3 (just under
+  2^20). `later()` now holds the clock at a whole second the first time, so every step after is exact.
+  A test clock that steps onto a boundary starts from a whole number, as `test_people.py`'s 10 000 does.
+- **A burst counted with real delays depends on the runner's speed (2.1.34).** `test_player_as_you.py`'s
+  `Slow` answered each call 0.05 s after it was asked, and `most == 9` once came out 7 on a busy 3.14
+  runner: the first of the nine were answered before the last were asked. `Slow(together=, alone=)` now
+  holds each call after the first `alone` until `together` are out at once (2 s patience at most), so
+  the count is exact; forced one at a time (every call unconfirmed), the three burst tests still fail
+  with `most == 1`.

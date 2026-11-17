@@ -77,7 +77,7 @@ export function onServerSettingsSaved(listener: (keys: string[]) => void): () =>
  * Save is the screen's one solid purple button.
  *
  * NOT here, on purpose: each person's own choices - what Get does, the quality floor, Format and whether
- * cancelling asks first. They are in You, under Getting albums, and one line says so (2.0.0-player.66: it
+ * cancelling asks first. They are in Settings (You until 2.1.35), under Getting albums, and one line says so (2.0.0-player.66: it
  * pointed at the main page's browser preferences until that page retired). RE-TIME SAVED LYRICS is here
  * since 2.0.0-player.42, beside LYRICS_LEAD_MS (components/RetimeLyrics.tsx): refused while the lead has a
  * draft - it re-times to the SAVED lead - reading a real scan, its run kept in its module so it goes on
@@ -263,7 +263,7 @@ export function ServerSettings({
         <p class="app-settings-line">
           How deadwax runs, as your compose file or <code>.env</code> sets it. A change saved here takes effect at once, with
           no restart, and is used instead of what the file says until you revert it. Your own choices - what Get does, the quality
-          floor, Format and whether cancelling asks first - are in You, under Getting albums.
+          floor, Format and whether cancelling asks first - are in Settings, under Getting albums.
         </p>
 
         {!server && error ? (

@@ -168,10 +168,12 @@ export const RequestsIcon = thin(
 /** An arrow down onto a line - "Get the album", as Request.dc.html draws it. */
 export const GetIcon = line(<path d="M12 4v11m0 0-4.5-4.5M12 15l4.5-4.5M5 19.5h14" />)
 
-export const YouIcon = thin(
+/** (2.1.35) Settings - the fifth tab, You until then, as the iPhone app names it: a gear of eight teeth round its hub,
+ *  in the tab bar's finer line as its four neighbours are. (YouIcon, the head and shoulders it replaced, went.) */
+export const SettingsIcon = thin(
   <>
-    <circle cx="12" cy="8.5" r="3.8" />
-    <path d="M4.5 20.5c1.2-3.8 4-5.8 7.5-5.8s6.3 2 7.5 5.8" />
+    <path d="M10.43 5.18L10.69 2.69A9.4 9.4 0 0 1 13.31 2.69L13.57 5.18A7 7 0 0 1 15.71 6.06L17.66 4.49A9.4 9.4 0 0 1 19.51 6.34L17.94 8.29A7 7 0 0 1 18.82 10.43L21.31 10.69A9.4 9.4 0 0 1 21.31 13.31L18.82 13.57A7 7 0 0 1 17.94 15.71L19.51 17.66A9.4 9.4 0 0 1 17.66 19.51L15.71 17.94A7 7 0 0 1 13.57 18.82L13.31 21.31A9.4 9.4 0 0 1 10.69 21.31L10.43 18.82A7 7 0 0 1 8.29 17.94L6.34 19.51A9.4 9.4 0 0 1 4.49 17.66L6.06 15.71A7 7 0 0 1 5.18 13.57L2.69 13.31A9.4 9.4 0 0 1 2.69 10.69L5.18 10.43A7 7 0 0 1 6.06 8.29L4.49 6.34A9.4 9.4 0 0 1 6.34 4.49L8.29 6.06A7 7 0 0 1 10.43 5.18z" />
+    <circle cx="12" cy="12" r="3" />
   </>,
 )
 
@@ -255,6 +257,53 @@ export const SongIcon = line(
 
 /** ...and adding to one: the list with a plus */
 export const PlaylistAddIcon = line(<path d="M4 6.5h11M4 11.5h11M4 16.5h7M17.5 13.5v7M14 17h7" />)
+
+/* (2.1.35) the desktop sidebar's other rows, in the same line set - app/Sidebar.tsx draws every row's glyph at one
+   weight (app-desktop.css's --app-desk-side-stroke), so these and the tab bar's finer two sit together */
+
+/** Recently added: a clock, its hands at a little past four */
+export const ClockIcon = line(
+  <>
+    <circle cx="12" cy="12" r="8.5" />
+    <path d="M12 7.5V12l3.2 1.9" />
+  </>,
+)
+
+/** Needs a look: a flag on its pole - something marked to come back to */
+export const FlagIcon = line(<path d="M6 20.5V4M6 4.5h10.5l-2.6 4.25 2.6 4.25H6" />)
+
+/** Library care: a first-aid kit - its case, its handle and the cross on it */
+export const CareIcon = line(
+  <>
+    <rect x="3.5" y="7" width="17" height="12.5" rx="2" />
+    <path d="M9 7V5.5A1.5 1.5 0 0 1 10.5 4h3A1.5 1.5 0 0 1 15 5.5V7M12 10.5v5.5M9.25 13.25h5.5" />
+  </>,
+)
+
+/** People: one head and shoulders, and another behind it - ArtistIcon's, two of them */
+export const PeopleIcon = line(
+  <>
+    <circle cx="9" cy="8.6" r="3.3" />
+    <path d="M3 19.5c.8-3.5 3.1-5.4 6-5.4s5.2 1.9 6 5.4M15.4 5.5a3.2 3.2 0 0 1 0 6.2M17.4 14.4c1.9.6 3.1 2.3 3.6 5.1" />
+  </>,
+)
+
+/** Server settings: a server - two units in a rack, a light on each */
+export const ServerIcon = line(
+  <>
+    <rect x="3.5" y="4" width="17" height="7" rx="1.5" />
+    <rect x="3.5" y="13" width="17" height="7" rx="1.5" />
+    <path d="M7.25 7.5h.01M7.25 16.5h.01" />
+  </>,
+)
+
+/** Event log: a page with its corner turned and lines written on it */
+export const LogIcon = line(
+  <>
+    <path d="M14.5 3.5H7.5a1 1 0 0 0-1 1v15a1 1 0 0 0 1 1h9a1 1 0 0 0 1-1v-13zM14.5 3.5v3h3" />
+    <path d="M9.5 11h5M9.5 14h5M9.5 17h3" />
+  </>,
+)
 
 /** Three lines - what a row in Home's Edit is dragged by. */
 export const GripIcon = thin(<path d="M5 8h14M5 12h14M5 16h14" />)

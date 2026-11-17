@@ -56,7 +56,7 @@ deadwax too, in **People**. Then, for each person:
   but only its owner can change it. A private one is never shown to anyone else in deadwax - though
   Navidrome's own admins can still see it in Amperfy, which is Navidrome's doing.
   ([Playlists](player.md#playlists).)
-- **Their own pins and Getting albums settings.** What's pinned to Home, and You → Getting albums
+- **Their own pins and Getting albums settings.** What's pinned to Home, and Settings → Getting albums
   (what Get does, the quality floor, the format), are kept on deadwax for each person, so they follow
   them from the phone to a computer. The player's other settings - Gapless, Maximum quality, the
   turntable's - are kept on each device, as they always were, whoever signs in there.
@@ -233,7 +233,7 @@ You were deadwax's one user until now (deadwax calls that user `local`). When lo
 
 From deadwax, as a Navidrome admin:
 
-1. **You → Manage → People** (on a desktop, **People** in the sidebar's Manage group). Anyone who isn't
+1. **Settings → Manage → People** (on a desktop, **People** in the sidebar's Manage group). Anyone who isn't
    a Navidrome admin is told "Only an admin can open People - it comes with being a Navidrome admin."
 2. **Unlock People** with your own Navidrome password. People changes Navidrome's accounts *as you*,
    and Navidrome needs your password for that; deadwax checks it against the login you signed in with
@@ -260,13 +260,13 @@ does - fine on your own network or over a VPN; anywhere else, put HTTPS in front
 says so under each password field.
 
 **The first time**, they see the app without any managing: no **Manage** or **Connections**
-in You, no **Edit** on an album; when something fails they're told what happened and what to do -
+in Settings, no **Edit** on an album; when something fails they're told what happened and what to do -
 try again, or tell whoever runs deadwax - never an error's own words. Their Library - and Home's Recently added - says **Nothing in your library yet.**, with **See All music** in
 the Library, where the whole collection is. Home has no pins yet; their Getting albums settings are the defaults, or what the old page at `/` had
 left in that browser, carried over once ([configuration](configuration.md#your-settings-in-the-app-per-user-on-deadwax)). From
 there they search, **Get** what they want, or add what the collection already has. They stay signed in on
-that device for 30 days from the last time they used it; **You → Account → Sign out** signs them out.
-You's headline is their name, and **About** shows them only the version (whether logins are on is an
+that device for 30 days from the last time they used it; **Settings → Account → Sign out** signs them out.
+The Settings page's headline is their name, and **About** shows them only the version (whether logins are on is an
 admin's to see).
 
 To make someone an admin, use **Make admin** on their row in People, or tick **Admin** for them in
@@ -286,7 +286,7 @@ admin's job, give it under their **Permissions** instead ([below](#admins-permis
   and what deadwax kept for them shows in People under **Known only to deadwax**, with **Forget** -
   until it's forgotten, deadwax won't make a new account of that name in People, so a new person never
   inherits someone else's library, pins, play queue, played songs or permissions.
-- **Changing your own password**: **You → Account → Change password**, for anyone signed in with their own
+- **Changing your own password**: **Settings → Account → Change password**, for anyone signed in with their own
   Navidrome account - your current password, then the new one twice (8 to 128 characters, not your user
   name, not the one you have), **Show** to see what you typed. deadwax checks the current one against the
   login you signed in with before it asks Navidrome anything, so a typo costs nothing; then it changes the
@@ -304,9 +304,9 @@ admin's job, give it under their **Permissions** instead ([below](#admins-permis
 - **A forgotten password**: in People, **Reset password…** on their row - the new one typed twice. They
   are signed out of deadwax on every device at once, and sign in with the new password; their other
   music apps need it too. Their library stays. (You can't reset your own there - change it in
-  **You → Account → Change password**, which needs the one you have; a forgotten admin password needs another admin's
+  **Settings → Account → Change password**, which needs the one you have; a forgotten admin password needs another admin's
   People, or Navidrome itself.) A password changed in Navidrome itself signs them out within about six
-  minutes, and **You → Your library** says in red that new albums can't be added to their library until they
+  minutes, and **Settings → Your library** says in red that new albums can't be added to their library until they
   sign in again; nothing waiting is lost.
 - **Making someone an admin, or no longer one**: **Make admin** / **No longer admin** in People, which
   says first what it gives (or that they keep every library Navidrome gave them as an admin), and is in
@@ -340,7 +340,7 @@ else can do what the left column says, and an admin can give any of them more, b
 | **Edit albums**: apply a release, tags, cover, CD art, lyrics (one album, or Library care's runs), an artist's pictures, **Which artist is this?** | no | **Edit albums** | yes |
 | **Look after the library**: delete an album, move an artist's albums under their current name, **Needs a look** (and, with Edit albums too, Edit album's **It's fine as it is** and **Ask about it again**), **Rescan**, **In nobody's library** | no | **Look after the library** | yes |
 | **Everyone's downloads**: see who asked ("Asked by ethan"), cancel or retry anyone's, clear everyone's finished | no | **Everyone's downloads** | yes |
-| **Settings and the log**: the server settings and the event log - and You's **Connections**, and the words behind what went wrong (Navidrome's or slskd's own, a setting's name) under each error | no | **Settings and the log** | yes |
+| **Settings and the log**: the server settings and the event log - and Settings' **Connections**, and the words behind what went wrong (Navidrome's or slskd's own, a setting's name) under each error | no | **Settings and the log** | yes |
 | **People**: make, reset and remove Navidrome accounts, make admins, give permissions | no | never - it comes with being a Navidrome admin | yes |
 | **Info → Debug** on the now-playing screen: how each song is sent, the last song changes and seek, the turntable's readouts and recording, the test bench link, the fields Navidrome sent | no - **Info** is **About** alone, with a **Sound** group (the file's format, Gapless, Normalization, in a listener's words) - and never the album's folder, which is an admin's | never - it comes with being an admin | yes |
 
@@ -359,7 +359,7 @@ else can do what the left column says, and an admin can give any of them more, b
 - **Bound to the account**: a permission is given to that Navidrome account, not just the name - an
   account removed and made again under the same name doesn't inherit it. deadwax checks the account
   as they sign in (one Navidrome sign-in as them, only for someone given something); if it can't, what
-  was given is off until their next sign-in (a Get albums taken away still applies), and You says so.
+  was given is off until their next sign-in (a Get albums taken away still applies), and Settings says so.
 - Making someone an admin keeps what they were given, for if they're ever made ordinary again.
 - **Debug is an admin's**: it was built for testing deadwax on a phone, and everyone
   else's Info has no tabs - About alone, with a short **Sound** group of the three things a listener can
@@ -371,7 +371,7 @@ else can do what the left column says, and an admin can give any of them more, b
 Retrying someone else's download needs both Everyone's downloads (to reach it) and Get albums (it
 starts a download). Library care shows with Edit albums or Look after the library - each part by its own.
 
-The app doesn't show anyone what they can't use - Manage in You and the sidebar shows a row per
+The app doesn't show anyone what they can't use - Manage in Settings and the sidebar shows a row per
 permission, an album's **Edit** its editors or its Delete, an artist's page its managing - and deadwax
 refuses it if asked anyway ("That needs Edit albums, which an admin hasn't given you."). Everyone can
 still look at everything in the collection: albums, their tracks, covers, lyrics and artists. A download
@@ -403,7 +403,7 @@ something else that asks for a password.
 
 - **No sign-up page**: accounts are made by an admin, in People or in Navidrome.
 - **No resetting a password you've forgotten** yourself: changing your own needs the one you have
-  (**You → Account → Change password**); forgotten, an admin resets it in People.
+  (**Settings → Account → Change password**); forgotten, an admin resets it in People.
 - **No choosing a person's Navidrome libraries**: People warns when a new account got none ("Choose one
   for them in Navidrome's Users page.") - choose them there.
 - **No per-person storage or quotas**: there's one collection, and one copy of each album in it.

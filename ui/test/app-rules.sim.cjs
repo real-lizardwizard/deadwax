@@ -2021,7 +2021,8 @@ console.log('\nNeeds a look: the review queue in the app, on a desktop (2.0.0-pl
     [true, true])
   check('the sidebar\'s item: Managing\'s first, an admin\'s, with the count',
     //? (2.0.0-player.61: each item by its permission, the group by any of them)
-    [/\{managing\.any && \(\s*<section class="app-side-group" aria-labelledby="app-side-managing">[\s\S]*?<ul class="app-side-list">\s*\{managing\.queue && item\(SIDEBAR_QUEUE\)\}/.test(side),
+        //? (2.1.35: the list folds away under its heading - its id the heading's aria-controls)
+    [/\{managing\.any && \(\s*<section class="app-side-group" aria-labelledby="app-side-managing">[\s\S]*?<ul id="app-side-managing-list" class="app-side-list" hidden=\{folds\.manage\}>\s*\{managing\.queue && item\(SIDEBAR_QUEUE\)\}/.test(side),
       /<Sidebar\b[\s\S]*?needsLook=\{needsLook\}/.test(app), /sidebarCurrent\(nav\.tab, libraryView, hasSongs, topNow, hasLibrary\(\), nav\.stacks\.library\[0\] \?\? null\)/.test(app)],
     [true, true, true])
   //? (2.0.0-player.47: on both frames - You is told no frame at all now)

@@ -376,7 +376,7 @@ console.log('\nwhat the Sources sheet says to VoiceOver, one line for each outco
   const answered = (n, responses) => ({ ...result(n), response_count: responses });
   check('Lossless only, answers in, nothing left: nothing lossless, and the Format named - never "found nothing"',
     said({ result: answered(0, 3), format: 'lossless_only' }),
-    'Nothing lossless found for “Portishead Third”. Some were found, but none with lossless files - your Format is Lossless only, which leaves the rest out. You can change it in You, under Getting albums.');
+    'Nothing lossless found for “Portishead Third”. Some were found, but none with lossless files - your Format is Lossless only, which leaves the rest out. You can change it in Settings, under Getting albums.');
   check('...but no peer answering, another Format, or no Format known: found nothing, as ever',
     [said({ result: answered(0, 0), format: 'lossless_only' }), said({ result: answered(0, 3), format: 'prefer_lossless' }), said({ result: answered(0, 3), format: 'any' }), said({ result: answered(0, 3) })],
     Array(4).fill('Nothing found for “Portishead Third”.'));

@@ -434,7 +434,7 @@ def test_the_list_joins_what_deadwax_knows_and_sends_nothing_private(nd):
     assert rows["admin"]["can"] == {"reset": rules.YOUR_PASSWORD, "remove": rules.YOUR_ACCOUNT, "admin": rules.YOUR_ROLE,
                                     "permissions": rules.YOUR_PERMISSIONS}
     #? (2.0.8) Change password is in You's Account section now, and the refusal sends you there by that path
-    assert rules.YOUR_PASSWORD.endswith("You → Account → Change password.")
+    assert rules.YOUR_PASSWORD.endswith("Settings → Account → Change password.")
     assert set(rows["demo"]["can"].values()) == {rules.SHARED_ACCOUNT}
     assert rows["ethan"]["can"] == {"reset": None, "remove": None, "admin": None, "permissions": None}
     text = json.dumps(state)

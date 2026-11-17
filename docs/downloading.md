@@ -188,12 +188,12 @@ passes), **24-bit**, **Starts now** (a free upload slot, so it starts at once), 
 a card's **Tracks** counts them - so a CD+DVD's whole CD, "14 of 14", passes, and a folder with no
 tracklist to count against, the album as a whole, isn't left out) and the sort (**Best match**,
 **Highest quality**, **Largest first**, **Smallest first**). They start as your **quality floor**
-(You → Getting albums, below): Lossless or 24-bit pressed, or a **320 kbps** chip, which shows only
+(Settings → Getting albums, below): Lossless or 24-bit pressed, or a **320 kbps** chip, which shows only
 while that's your floor; Complete albums only always starts off. A floor is judged by the folder's
 *worst* file, and a folder whose files don't report a value doesn't pass a floor for it, with one
 exception: a lossless folder passes 320 kbps, because lossless beats any lossy bitrate.
 
-The search is scored by your **Format** (You → Getting albums; Prefer lossless unless you choose
+The search is scored by your **Format** (Settings → Getting albums; Prefer lossless unless you choose
 otherwise): **Any** - format doesn't count; **Prefer lossless** - a folder with no lossless file
 scores lower on Format; **Lossless only** - such folders are left out of the answer altogether. It's
 separate from the quality floor, which only filters what was found and never changes a score.
@@ -221,7 +221,7 @@ separate from the quality floor, which only filters what was found and never cha
 - **"Nothing lossless found for "Portishead Third"."**, when your **Format** is **Lossless
   only** and Soulseek did answer: every folder it found had no lossless file, so all of them were
   left out. It says so ("Some were found, but none with lossless files - your Format is Lossless
-  only, which leaves the rest out."), and that the setting is in You → Getting albums; choose **Prefer lossless**
+  only, which leaves the rest out."), and that the setting is in Settings → Getting albums; choose **Prefer lossless**
   or **Any** there and **Get** again to see them. The query to edit is still under it - a lossless
   copy may be shared under other words.
 - **slskd unable to search** - not logged in to Soulseek, waiting for its VPN, unreachable - in
@@ -233,7 +233,7 @@ With VoiceOver, each outcome is read out as it comes - "4 sources.", "Nothing fo
 
 ### When I tap Get
 
-**When I tap Get** (You → Getting albums) can be **Pick the best source for me** instead of the
+**When I tap Get** (Settings → Getting albums) can be **Pick the best source for me** instead of the
 default, **Show me the sources**. Then a Get takes the top card itself - in best-match order,
 through the chips (your quality floor, unless you change them while it searches), and only when it
 scores 75 or more - queues it, and switches to Requests. When nothing qualifies it shows the cards,
@@ -358,7 +358,7 @@ neither loses its words.
 **✕** on a downloading or waiting download cancels it. It asks first, in the card itself - "Cancel
 this download? You'll lose your place in their queue.", with **Keep it** and **Cancel
 download** (tap the ✕ again to close the question) - unless **Confirm before cancelling** is off on
-that device (You → Getting albums; see
+that device (Settings → Getting albums; see
 [configuration](configuration.md#the-phone-players-settings-per-device)). It never puts up a pop-up dialog,
 which would hold up the music playing in the same app. Once you cancel, the row reads "cancelling…"
 at once, its cover and title faded, and the transfers are removed from slskd's own list too. If
@@ -390,7 +390,7 @@ rather than joined.
   deadwax wasn't told more) and how far it has got - and **Join this download**. Joining puts it in
   your Requests too: one download, everyone who asked waiting for it. In the sheet it then switches
   to Requests, as a Get does; on the album's page the line says it's yours. If the copy is below your
-  quality floor (You → Getting albums), or its folder doesn't say whether it meets it, the box says
+  quality floor (Settings → Getting albums), or its folder doesn't say whether it meets it, the box says
   so ("Its quality isn't known, so it may be below your quality floor …") - getting a copy of your
   own instead isn't offered yet. A Get that reaches deadwax just as
   somebody else's download of the same pressing has started joins it too, rather than being
@@ -459,7 +459,7 @@ rather than joined.
 
 ## The event log
 
-**Event log** - the desktop sidebar's, under **Manage**, or **You → Manage → Event log** on a phone - shows what's
+**Event log** - the desktop sidebar's, under **Manage**, or **Settings → Manage → Event log** on a phone - shows what's
 happening behind the scenes: searches, how many answers came back, queueing, filing, and anything that
 went wrong, with slskd's or MusicBrainz's own words where there are any. It shows the last 500 lines
 since deadwax started, newest first, then follows new ones live while the page shows: each with its

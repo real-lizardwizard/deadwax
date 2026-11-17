@@ -5,7 +5,7 @@ import { useDownloadJobs } from '../hooks/useDownloadJobs'
 import type { Playlist } from '../api/playlists'
 import type { ReleaseGroup } from '../api/types'
 import { me } from '../api/me'
-import { browseItems, closesOnCrossing, libraryItems, libraryTitle, liesOver, makesRoom, shownPick, sideOf, sidebarCurrent, sidebarMove, type LibraryPick, type ManagingKind, type SidebarId } from '../lib/appFrame'
+import { closesOnCrossing, libraryTitle, liesOver, makesRoom, overLibraryView, shownPick, sideOf, sidebarCurrent, sidebarMove, type LibraryPick, type ManagingKind, type SidebarId } from '../lib/appFrame'
 import { createRouter, type Router, type StorageLike } from '../lib/appHistory'
 import { CARE_PAGE, LOG_PAGE, PEOPLE_PAGE, PLAYLISTS_PAGE, QUEUE_ID, QUEUE_PAGE, SETTINGS_PAGE, TAB_LABELS, TABS, backLabel, currentRoute, playlistsMove, samePage, scrollKey, type Nav, type Page, type PageKind, type Tab } from '../lib/appRoutes'
 import { handleDownloadRequests } from '../lib/downloadRequests'
@@ -1706,9 +1706,9 @@ export function App() {
             {desktop && (
               <Sidebar
                 current={sidebarCurrent(nav.tab, libraryView, hasSongs, topNow, hasLibrary(), nav.stacks.library[0] ?? null)}
-                library={libraryItems(hasSongs, hasLibrary())}
-                browse={browseItems(hasSongs, hasLibrary())}
+                hasSongs={hasSongs}
                 personal={hasLibrary()}
+                overView={overLibraryView(nav.tab, nav.stacks[nav.tab])}
                 arriving={view.arriving.length}
                 managing={managingOf(perms, access.on)}
                 needsLook={needsLook}

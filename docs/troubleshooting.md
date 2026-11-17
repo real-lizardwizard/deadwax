@@ -141,7 +141,7 @@ Wherever something fails the app says what happened and what you can do, never t
 - **"Can't reach the music server right now."**: deadwax answered, but Navidrome didn't (or isn't set
   up) - see [the player says "Connect Navidrome"](#the-player-says-connect-navidrome-or-cant-reach-navidrome).
 - **"Downloads aren't working right now."**: slskd didn't answer, or refused - see
-  [You's Connections says slskd isn't connected](#yous-connections-says-slskd-isnt-connected).
+  [Settings' Connections says slskd isn't connected](#settings-connections-says-slskd-isnt-connected).
 - **"That took too long. Try again."** / **"Something went wrong. Try again."**: a request timed out,
   or failed in a way deadwax had no words for.
 - **"deadwax can't do that right now."**, or deadwax's own words (its database can't be written, say).
@@ -236,17 +236,17 @@ The sources ask slskd to search Soulseek, so these stop it:
   **Settings and the log**, sees slskd's own words under it ("slskd isn't logged in to Soulseek, so it
   can't search"); everyone else is told to try again, and to tell whoever runs deadwax if it keeps
   happening. See [A search fails with "not logged in"](#a-search-fails-with-not-logged-in-or-slskd-refused-it)
-  and [You's Connections says slskd isn't connected](#yous-connections-says-slskd-isnt-connected).
+  and [Settings' Connections says slskd isn't connected](#settings-connections-says-slskd-isnt-connected).
 - **"Nothing found for …"**: as [A search finds nothing](#a-search-finds-nothing) - edit the
   query under it (to the album title alone, say) and **Search**.
-- **"Nothing lossless found for …"**: your **Format** (You → Getting
+- **"Nothing lossless found for …"**: your **Format** (Settings → Getting
   albums) is **Lossless only**, and every folder Soulseek found had no lossless file, so all of them
   were left out - searching again is scored the same way and finds the same. Choose **Prefer lossless**
   or **Any** there and **Get** again to see them, or edit the query in case a lossless copy is shared
   under other words. Format can be Lossless only without your choosing it in the app: the first time
   the app asks, it carries over the Format the old page at `/` had left in that browser.
 - **"N sources found - none match your filters."**: the chips above the list are hiding them -
-  **Lossless** and **24-bit** start pressed when your quality floor (You → Getting albums) says so.
+  **Lossless** and **24-bit** start pressed when your quality floor (Settings → Getting albums) says so.
   **Clear filters**, or tap the chip, to see them all. **Complete albums only** leaves out every folder
   missing one of the pressing's tracks. On a computer a **Match details** minimum and the sample-rate floor
   leave folders out too - and no folder passes the floor when its user's client reported no sample
@@ -263,10 +263,10 @@ The sources ask slskd to search Soulseek, so these stop it:
   asks MusicBrainz for the album's pressings - typing, opening a row, Now Playing or another tab - so
   the sheet never opens over where you went. Tap it again.
 
-## You's Connections says slskd isn't connected
+## Settings' Connections says slskd isn't connected
 
-**You → Connections** is shown to admins and to anyone given **Settings and the log** - the people who
-can do something about it; nobody else's You has it, and nothing is asked for them. Each row shows a
+**Settings → Connections** is shown to admins and to anyone given **Settings and the log** - the people who
+can do something about it; it isn't in anyone else's Settings, and nothing is asked for them. Each row shows a
 short word - **Connected**, or what's wrong - with a sentence under it saying where to put it right:
 
 - **Can't reach it** - "deadwax can't reach slskd at its address": slskd can't be reached at
@@ -300,7 +300,7 @@ it** as "...its address (SLSKD_URL) only an admin can change, in Server settings
 up** as "...only an admin can set it, in Server settings (Connections).": what's wrong is theirs to
 see, the fix an admin's.
 
-## You's Connections says MusicBrainz isn't connected
+## Settings' Connections says MusicBrainz isn't connected
 
 - **Not set up** - "No contact is set for MusicBrainz": set `MUSICBRAINZ_EMAIL` (Settings → Connections).
 - **Can't reach it** / **No answer** / **Unexpected problem**: MusicBrainz couldn't be reached, or
@@ -330,7 +330,7 @@ own page, another app) still can.
 - An artist with more than one name is searched under each of them (the credit, the name they go by
   now, and names MusicBrainz marks as ended); an edited query searches exactly what you typed.
 - **Format** set to **Lossless only** leaves out every folder with no lossless file, and the sources
-  say "Nothing lossless found for …". Prefer lossless or Any (You → Getting albums) shows them.
+  say "Nothing lossless found for …". Prefer lossless or Any (Settings → Getting albums) shows them.
 
 ## A download sits at "queued"
 
@@ -352,8 +352,8 @@ download, and the progress as slskd reports it.
   download - the person sharing it may have gone offline, or downloads stopped working for a while".
   **Another source** and **Same source again** can't get anywhere until slskd is back, and the row says
   why, in red. A download slskd still lists but can't move - slskd signed out of Soulseek, or
-  waiting for its VPN - just stops where it is until slskd is back. You's **Connections** says
-  whether slskd answers, and [You's Connections says slskd isn't connected](#yous-connections-says-slskd-isnt-connected)
+  waiting for its VPN - just stops where it is until slskd is back. Settings' **Connections** says
+  whether slskd answers, and [Settings' Connections says slskd isn't connected](#settings-connections-says-slskd-isnt-connected)
   goes through the reasons. **slskd up but not answering** (it takes the connection and then says nothing) is
   slower to show: deadwax waits on it, so the tab keeps its spinner, or the last answer, until the
   phone gives up on the request, and then says it can't update your requests.
@@ -411,7 +411,7 @@ rather than retrying.
 
 That's deadwax's [saved answers](configuration.md#musicbrainzs-saved-answers-settings--connections): anything asked before - a search, an artist, an album's pressings - is
 answered from the file deadwax keeps, however old the answer, while MusicBrainz is away. Something
-never asked before still needs MusicBrainz, and fails as above. You's **Connections** still says
+never asked before still needs MusicBrainz, and fails as above. Settings' **Connections** still says
 whether MusicBrainz itself can be reached: it never answers from
 the saved answers. Nothing needs doing; when MusicBrainz is back, old answers are refreshed behind
 themselves as they're used.
@@ -429,7 +429,7 @@ fetched behind it for the next time.
   tried again the next time the answer is read from the file - after the hour it is kept in memory, or
   after deadwax restarts.
 - **Or clear them now**: **Clear MusicBrainz's saved answers**, under Settings → Connections (or, on a
-  phone, the app's You → Manage → Server settings → Connections), empties the file and the memory, and the next answers
+  phone, the app's Settings → Manage → Server settings → Connections), empties the file and the memory, and the next answers
   are asked of MusicBrainz again. Only speed is lost.
 - To stop saving answers altogether, set `MUSICBRAINZ_CACHE_MB` to `0`.
 - If the line beside Clear says **Nothing is being saved**, or the `MUSICBRAINZ_CACHE_PATH` row is
@@ -456,7 +456,7 @@ refreshed behind itself once it's old (a search after 7 days, the rest after 30)
   the same artist, album or song as a saved row isn't shown twice - the saved row stands for it, as it was
   saved, until the words are searched again after the saved answers behind it are refreshed (above).
 - **Or clear them now**: **Clear MusicBrainz's saved answers** (Server settings → Connections - the desktop
-  sidebar's Server settings, or You → Manage → Server settings on a phone) empties what's saved and what Search finds in it; the next searches ask
+  sidebar's Server settings, or Settings → Manage → Server settings on a phone) empties what's saved and what Search finds in it; the next searches ask
   MusicBrainz again.
 - **Nothing saved ever shows**: saving is off (`MUSICBRAINZ_CACHE_MB` is `0`), nothing has been saved yet,
   or the line beside Clear says why nothing is being saved ([above](#a-musicbrainz-answer-looks-out-of-date)).
@@ -485,8 +485,8 @@ ask MusicBrainz through deadwax, so the same slow minutes reach them.
   while longer). That's not
   the same as **No other albums for "…"** or **No results for "…".**, which are answers.
   Tap **Try again** in a minute; the album page never shows part of a pressing list as if it were
-  all of it. You's **Connections** says whether deadwax can reach MusicBrainz at all, and [You's
-  Connections says MusicBrainz isn't connected](#yous-connections-says-musicbrainz-isnt-connected) goes
+  all of it. Settings' **Connections** says whether deadwax can reach MusicBrainz at all, and [Settings'
+  Connections says MusicBrainz isn't connected](#settings-connections-says-musicbrainz-isnt-connected) goes
   through why it might not.
 - **"Showing earlier results - searching for more isn't working right now."** (or **"Showing earlier
   results."** in a section's place): the same, under rows [deadwax had saved](finding-music.md#what-deadwax-has-saved) -
@@ -559,7 +559,7 @@ ask MusicBrainz through deadwax, so the same slow minutes reach them.
   the container. Settings → Library shows whether the path exists.
 - **A change made by another program doesn't show up**: tags edited elsewhere don't change a
   folder's date, which is what the library watches. Press **Rescan** in **Library care** (the
-  desktop sidebar's **Manage → Library care**, or **You → Manage → Library care**).
+  desktop sidebar's **Manage → Library care**, or **Settings → Manage → Library care**).
 - **The Library tab** is Navidrome's: an album shows there once Navidrome has scanned it (see
   [the app's Library looks empty](#the-apps-library-looks-empty)).
 
@@ -795,7 +795,7 @@ ask them.
 
 ### "Your password was changed from another device - sign in with the new one."
 
-You (or someone signed in as you) changed your password in deadwax's **You → Account → Change password** on another
+You (or someone signed in as you) changed your password in deadwax's **Settings → Account → Change password** on another
 device. That device stays signed in, under a new sign-in of its own; every other one is signed out at once -
 and so is any copy of that device's old sign-in - and this message is why. Sign in with the new password -
 Amperfy and any other app you use with Navidrome need it too.
@@ -857,7 +857,7 @@ more.
 
 ### Signed out after changing your Navidrome password
 
-(Changed in deadwax, under **You → Account → Change password**, the device you changed it on stays signed in and the
+(Changed in deadwax, under **Settings → Account → Change password**, the device you changed it on stays signed in and the
 others are signed out at once, saying so - [above](#your-password-was-changed-from-another-device---sign-in-with-the-new-one).
 What follows is a password changed in Navidrome itself, or in Amperfy.) Every few minutes deadwax asks
 Navidrome whether the login you signed in with still stands. After you
@@ -884,10 +884,10 @@ since you signed in - sign in again."; the log names the key).
 
 With logins on, deadwax stars what goes into your library **as you** in Navidrome, with the login you last
 signed in with. After you change your Navidrome password in Navidrome or Amperfy that login stops working
-(changed in deadwax's **You → Account → Change password**, deadwax keeps the new one and this doesn't happen), and
-**You → Your library** says so in red: "New albums can't be added to your library until you sign in again.
+(changed in deadwax's **Settings → Account → Change password**, deadwax keeps the new one and this doesn't happen), and
+**Settings → Your library** says so in red: "New albums can't be added to your library until you sign in again.
 Sign out, then sign in - with your new password if you changed it. Nothing is lost meanwhile." Nothing is
-lost - what you get meanwhile is kept, waiting. Sign out (**You → Account → Sign out**) and sign in with your
+lost - what you get meanwhile is kept, waiting. Sign out (**Settings → Account → Sign out**) and sign in with your
 new password: deadwax keeps the new login and stars everything waiting within a few seconds. Changing
 `DEADWAX_SECRET_KEY` does the same (the sign-in says "deadwax's sign-ins have been reset since you signed in
 - sign in again."). Signing out by itself doesn't stop deadwax starring for you.
@@ -955,12 +955,12 @@ if you were signed out, or "That needs Settings and the log…" if it was taken 
 An admin unticked **Get albums** for you in People: you can still play, look through and add what the
 collection has to your library, but not search Soulseek or download. Only an admin can give it back.
 
-### You says "Some things an admin let you do are off for now"
+### Settings says "Some things an admin let you do are off for now"
 
 ("…sign out and in again to get them back.") An admin gave you a permission, and deadwax checks it's still the same Navidrome account it was given to
 as you sign in - one Navidrome sign-in as you. That check couldn't be made this time (Navidrome was busy
 or not answering, or deadwax had just made several sign-ins), so the extra permissions are off on this
-device until you sign in again: **You → Account → Sign out**, then sign in. A Get albums taken away still
+device until you sign in again: **Settings → Account → Sign out**, then sign in. A Get albums taken away still
 applies. An admin opening People also puts it right, from your next tap.
 
 ### People asks for my password
@@ -1029,7 +1029,7 @@ every http sign-in's cookie is thrown away while the old one lasts. Either:
 - **Use one address**: keep to the HTTPS one (recommended away from home), or the http one - not both
   for the same host name. Two names work fine (`https://music.example.com` outside, `http://nas.lan:8080`
   at home).
-- **Or clear the cookie**: sign out at the HTTPS address (**You → Account → Sign out**), or delete the
+- **Or clear the cookie**: sign out at the HTTPS address (**Settings → Account → Sign out**), or delete the
   site's cookies for that host in the browser's settings (on an iPhone, Settings → Safari → Advanced →
   Website Data). Then sign in over http again.
 
@@ -1188,7 +1188,7 @@ the Library's **All music** group - on a desktop, the sidebar's **All music** gr
 holds, and open one to **Add to my library**. A few more things that make your library look short:
 
 - **An album waiting to be added** isn't there yet: your Library lists what Navidrome has starred for
-  you, and a download is starred once Navidrome has scanned it. **You → Your library** says what's
+  you, and a download is starred once Navidrome has scanned it. **Settings → Your library** says what's
   waiting to be added, and why.
 - **An album with no MusicBrainz release id** can't be added from its page (deadwax keeps your library
   by release, and the page says so: "This album can't be added from here - make it a favourite in another
@@ -1248,7 +1248,7 @@ count.
 
 ## An album in my library isn't starred in Amperfy, or is "waiting to be added"
 
-With logins on your library is your starred albums in Navidrome, and **You →
+With logins on your library is your starred albums in Navidrome, and **Settings →
 Your library** says how many are waiting to be added ("12 albums · 2 waiting to be added") - albums deadwax
 hasn't starred for you yet, some of which only an admin can move along - and why:
 
@@ -1418,7 +1418,7 @@ after **Play** and **Shuffle**.
 
 ## The "Needs a look" count changes when you open it, or has none
 
-The count beside **Needs a look** (in the desktop sidebar's **Manage**, and in You's) is worked out
+The count beside **Needs a look** (in the desktop sidebar's **Manage**, and in **Settings → Manage** on a phone) is worked out
 from the library's **saved scan**, never by reading the disk, so it costs
 nothing to keep asking. While the page is open it shows the page's own count instead, from a fresh
 scan - so if the music changed since the library was last read (an album copied in, retagged or
@@ -1513,7 +1513,7 @@ can be written as `PUID`/`PGID`, then restart deadwax (or recreate the container
 
 ## The Event log is missing lines, says "Lost the live feed", or starts empty
 
-The **Event log** (the desktop sidebar's **Manage → Event log**, or **You → Manage → Event log** on a phone) shows
+The **Event log** (the desktop sidebar's **Manage → Event log**, or **Settings → Manage → Event log** on a phone) shows
 deadwax's event log, newest first. As it opens it reads what deadwax kept: **the last 500
 lines since deadwax started** - nothing from before a restart (a Komodo redeploy starts it empty), and
 nothing older than those 500. Then it follows deadwax live, joining the two so no line is missing or
@@ -1554,7 +1554,7 @@ albums, and in Search in place of what's in your library, with the reason under 
 deadwax needs Navidrome for the app's library, that it does: **Connect Navidrome**
 says "deadwax needs Navidrome for your library" and to set it up in Server settings
 (Connections), and **Can't reach Navidrome** that your library shows once deadwax can reach it. The other tabs
-(and Search's MusicBrainz rows, and an album you don't have) work without Navidrome, and You's
+(and Search's MusicBrainz rows, and an album you don't have) work without Navidrome, and Settings'
 **Connections** shows Navidrome as **Not set up** or **Can't reach it**, with the same reason under it.
 
 - **Connect Navidrome**: the three Navidrome settings aren't all set. Fill in `NAVIDROME_URL`,
@@ -1776,7 +1776,7 @@ admin reads it - and where they read it matters:
 - **Rows about the device** - the rest: **Sent as**, **Resampled**, **Why sent this way**, **Speed**, **Last song
   change**, **Last seek**, **Turntable sound** and the rows under it, **Turntable timing** and the rows under it, and
   **Recording** - describe the device and browser Info is open on. On an admin's own phone they're that
-  phone's, not yours. For these, an admin reads Debug on your device: **You → Account → Sign out**, let them
+  phone's, not yours. For these, an admin reads Debug on your device: **Settings → Account → Sign out**, let them
   sign in there and do what went wrong again (the same song, the same turn of the record), read the row,
   then sign out and sign back in as you.
 
@@ -1833,7 +1833,7 @@ shows when it can't find one. In the order to check:
 - **The album isn't tagged with a release.** deadwax finds the album's folder by the MusicBrainz
   release id in its files, which Navidrome reads. An untagged rip has none: match a release in
   **Edit → Release**, then Get CD art.
-- **Navidrome hasn't read the new tags yet, or can't be reached.** You's **Connections** says
+- **Navidrome hasn't read the new tags yet, or can't be reached.** Settings' **Connections** says
   whether Navidrome answers. After a retag, Navidrome notices the files by itself a few seconds
   later.
 - **deadwax hasn't seen the folder.** It knows the library's folders from its scans and from what
@@ -2101,7 +2101,7 @@ the window instead, and works the same.
 
 ## With Gapless on, there's still a pause between songs, or the player reloads by itself
 
-[Gapless](player.md#gapless-playback) (in **You**, under **Playback**) depends on the
+[Gapless](player.md#gapless-playback) (in **Settings**, under **Playback**) depends on the
 device and the connection, and **Info → Debug** (**•••** on the now-playing screen, then **Info**, then **Debug** - an
 admin's, and read on the device it's about: see [Info has no Debug tab](#info-has-no-debug-tab-or-it-went)) says how each song change went, in its **Last song change** row. Compare it with Gapless off on the same phone
 and connection: the difference is what Gapless saves.
@@ -2190,7 +2190,7 @@ Both come from [Maximum quality](player.md#maximum-quality-hi-res-at-48-khz)'s d
 That's [Normalization](player.md#normalization), on **Automatic** by default: deadwax
 brings every FLAC song to one loudness (-18 LUFS, as ReplayGain 2.0 does), and most music is mastered
 louder than that, so it comes out 6 to 12 dB quieter. Turn the volume up - nothing else about the sound
-changes, and nothing clips. To hear every song exactly as it is, choose **Off** in You → Playback (it takes effect
+changes, and nothing clips. To hear every song exactly as it is, choose **Off** in Settings → Playback (it takes effect
 from the next thing you play): every song is then sent bit for bit as it was.
 
 ## The first song of an album takes a while to start
@@ -2229,7 +2229,7 @@ the album again and every song is at the album's level.
 If the browser can't play deadwax's levelled copy of a song - a 24-bit FLAC in an MP4, which is how every FLAC
 song comes with [Normalization](player.md#normalization) on (the default) - the player passes it over for the
 next song, as it does any song that won't play, when Gapless is off. (In the gapless stream it plays the song as
-the file is instead.) It shows as every FLAC song of an album being skipped while MP3s play. Choose **Off** in You
+the file is instead.) It shows as every FLAC song of an album being skipped while MP3s play. Choose **Off** in Settings
 → Playback, then reload the page: every song is then sent as it always was. And please report it, with the
 phone's model and iOS version - it's the one thing about Normalization that couldn't be checked before it
 shipped.

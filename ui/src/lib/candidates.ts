@@ -441,7 +441,7 @@ export function nothingLosslessLine(result: Pick<FindCandidatesResponse, 'query'
 /** ...and under it, why - and where the setting is. Never how many lossy copies there were: `response_count` counts
  *  answers, one holding no music among them. */
 export const NOTHING_LOSSLESS_NOTE =
-  'Some were found, but none with lossless files - your Format is Lossless only, which leaves the rest out. You can change it in You, under Getting albums.'
+  'Some were found, but none with lossless files - your Format is Lossless only, which leaves the rest out. You can change it in Settings, under Getting albums.'
 
 /** "41 sources", "1 source" - (2.0.6, UX batch 3) a source is what the sheet lists: one sharer's copy of the album
  *  (it said "folders on Soulseek"). */
