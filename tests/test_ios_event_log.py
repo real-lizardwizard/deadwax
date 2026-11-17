@@ -82,8 +82,8 @@ def test_the_routes_are_the_servers_by_method_path_and_permission():
     # the page is the app's own now: no Safari for the event log
     managing = _code((CORE / "Managing.swift").read_text(encoding="utf-8"))
     native = managing[managing.index("public var native: Bool {"):]
-    assert "case .edit, .queue, .care, .settings, .log: return true" in native
-    assert "case .people: return false" in native
+    # (slice 11) and People: every row is the app's own
+    assert "case .edit, .queue, .care, .people, .settings, .log: return true" in native
 
 
 def test_a_line_and_the_history_are_read_as_the_server_sends_them(monkeypatch):

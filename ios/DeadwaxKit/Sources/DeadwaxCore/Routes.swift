@@ -228,6 +228,18 @@ public enum Routes {
     // Change password (Phase 8, slice 10 - notes/ios.md "Change password on the phone"): a user's route, for anyone
     // signed in through their own Navidrome account. Its answer's cookie is this phone's new sign-in
     public static let ownPassword = Endpoint(method: "POST", path: "/deadwax/me/password", query: [])
+    // People (Phase 8, slice 11 - notes/ios.md "People on the phone"): People's state and Navidrome's accounts, its
+    // unlock and lock, and its six writes - all People's (only Navidrome's admins hold it). A write is answered after
+    // Navidrome has been asked, as the unlocked admin; a refusal of kind "locked" means the unlock ran out
+    public static let people = Endpoint(method: "GET", path: "/deadwax/people", query: [])
+    public static let unlockPeople = Endpoint(method: "POST", path: "/deadwax/people/unlock", query: [])
+    public static let lockPeople = Endpoint(method: "POST", path: "/deadwax/people/lock", query: [])
+    public static let createPerson = Endpoint(method: "POST", path: "/deadwax/people/create", query: [])
+    public static let resetPassword = Endpoint(method: "POST", path: "/deadwax/people/{person_id}/password", query: [])
+    public static let setAdmin = Endpoint(method: "POST", path: "/deadwax/people/{person_id}/admin", query: [])
+    public static let removePerson = Endpoint(method: "POST", path: "/deadwax/people/{person_id}/remove", query: [])
+    public static let forgetPerson = Endpoint(method: "POST", path: "/deadwax/people/forget", query: [])
+    public static let savePermissions = Endpoint(method: "POST", path: "/deadwax/people/{person_id}/permissions", query: [])
 
     /// The levels spec's name for `levelAlbum`: the album's levels warmed before its first play.
     public static var warmLevels: Endpoint { levelAlbum }
@@ -270,6 +282,8 @@ public enum Routes {
         serverSettings, saveServerSettings, savedAnswers, clearSavedAnswers, pingMusicBrainz, pingSlskd,
         recentLog, logStream,
         ownPassword,
+        people, unlockPeople, lockPeople, createPerson, resetPassword, setAdmin, removePerson, forgetPerson,
+        savePermissions,
     ]
 
     /// The routes given longer than the transport's own 8 seconds to answer, in seconds: the album index reads every
@@ -360,8 +374,15 @@ public enum Routes {
     /// (slice 10): the handler waits on its sign-in throttle's lock for the name (a sign-in holding it asks Navidrome
     /// once), the session read before it and three store calls in it (each may wait out SQLite's busy timeout, 10 s),
     /// and four calls to Navidrome, each its connection and its read (the native API's 10 s, its PUT's 30, the proof's
-    /// getUser 10) - 180 s at worst, so it is given 240 - tests/test_ios_change_password.py holds it there.
-    public static let timeouts: [Endpoint: Double] = [albumIndex: 30, autoEqSearch: 20, autoEqProfile: 20, libraryOwned: 30, fullySearch: 20, releaseGroup: 60, searchArtists: 20, searchSongs: 20, artistFacts: 120, discography: 60, jobs: 20, cancelJob: 30, retryJob: 60, retryJobSame: 30, clearJobs: 30, storeState: 20, findCandidates: 300, enqueue: 300, joinJob: 60, libraryAdd: 60, libraryTracks: 30, libraryAlbums: 120, releases: 60, release: 60, retagPreview: 60, retagApply: 480, artFetch: 120, libraryArt: 30, queueIgnore: 20, queueUnignore: 20, tagsPreview: 60, tagsApply: 120, trackPicture: 30, lyricsFetch: 600, discArtFetch: 360, libraryDiscArt: 30, deletionSummary: 60, deleteAlbum: 120, libraryArtist: 120, artistArt: 30, artistImagesPreview: 660, artistImagesApply: 600, artistSearch: 120, refilePreview: 480, refileApply: 600, queueSummary: 30, queueReviewed: 20, rescan: 300, held: 30, heldAdd: 60, heldDismiss: 30, serverSettings: 30, saveServerSettings: 60, savedAnswers: 30, clearSavedAnswers: 120, pingMusicBrainz: 120, pingSlskd: 30, logStream: 45, ownPassword: 240]
+    /// getUser 10) - 180 s at worst, so it is given 240 - tests/test_ios_change_password.py holds it there. People's (slice
+    /// 11): each route reads the session first, and every call it makes is a store call that may wait out SQLite's busy
+    /// timeout (10 s) or a call to Navidrome, each its connection and its read (the native API's 10 s, its writes' 30,
+    /// the Subsonic proof's 10) - the read is given 120 at least and 30 s more for each account listed last time; Unlock
+    /// waits on the name's sign-in throttle (another unlock holding it: its login and a store call), so 120; each write
+    /// waits on the one write lock for another write's worst (a reset's 130) before its own, so Make account, Reset,
+    /// the admin flip and Remove 300 and Forget and the permissions 240 (PeopleWaits); Lock forgets the unlock in memory,
+    /// the transport's own 8 - tests/test_ios_people.py holds each to the handlers.
+    public static let timeouts: [Endpoint: Double] = [albumIndex: 30, autoEqSearch: 20, autoEqProfile: 20, libraryOwned: 30, fullySearch: 20, releaseGroup: 60, searchArtists: 20, searchSongs: 20, artistFacts: 120, discography: 60, jobs: 20, cancelJob: 30, retryJob: 60, retryJobSame: 30, clearJobs: 30, storeState: 20, findCandidates: 300, enqueue: 300, joinJob: 60, libraryAdd: 60, libraryTracks: 30, libraryAlbums: 120, releases: 60, release: 60, retagPreview: 60, retagApply: 480, artFetch: 120, libraryArt: 30, queueIgnore: 20, queueUnignore: 20, tagsPreview: 60, tagsApply: 120, trackPicture: 30, lyricsFetch: 600, discArtFetch: 360, libraryDiscArt: 30, deletionSummary: 60, deleteAlbum: 120, libraryArtist: 120, artistArt: 30, artistImagesPreview: 660, artistImagesApply: 600, artistSearch: 120, refilePreview: 480, refileApply: 600, queueSummary: 30, queueReviewed: 20, rescan: 300, held: 30, heldAdd: 60, heldDismiss: 30, serverSettings: 30, saveServerSettings: 60, savedAnswers: 30, clearSavedAnswers: 120, pingMusicBrainz: 120, pingSlskd: 30, logStream: 45, ownPassword: 240, people: 120, unlockPeople: 120, createPerson: 300, resetPassword: 300, setAdmin: 300, removePerson: 300, forgetPerson: 240, savePermissions: 240]
 }
 
 /// The Cover Art Archive's thumbnail sizes the app asks deadwax's relay for (`Routes.archiveCover`'s `size`, which takes

@@ -77,44 +77,21 @@ import Testing
         #expect(!Managing.changeOffered(nil))
     }
 
-    @Test func theFooterSaysWhereTheyOpenAndHowSafariSignsIn() {
-        let web: [Managing.Tool] = [.people]
-        #expect(ManagingWords.footer(loginsOn: true, online: true, tools: web) == [ManagingWords.opens, ManagingWords.signIn])
-        #expect(ManagingWords.footer(loginsOn: false, online: true, tools: web) == [ManagingWords.opens])
-        #expect(ManagingWords.footer(loginsOn: true, online: false, tools: web) == [ManagingWords.offline, ManagingWords.signIn])
-        #expect(ManagingWords.footer(loginsOn: false, online: false, tools: web) == [ManagingWords.offline])
-        // (Phase 8, slice 1) Edit an album is the app's own: said apart from the rest - and alone, nothing about Safari
-        #expect(ManagingWords.footer(loginsOn: false, online: true, tools: [.edit, .people]) == [ManagingWords.othersOpen])
-        #expect(ManagingWords.footer(loginsOn: true, online: false, tools: [.edit, .people])
-                == [ManagingWords.offline, ManagingWords.signIn])
-        #expect(ManagingWords.footer(loginsOn: true, online: true, tools: [.edit]).isEmpty)
+    /// (Phase 8, slice 11) People is the app's own page too: every row of Manage is, so the footer says nothing about
+    /// Safari, whoever is drawn, in reach or out of it (each page says for itself that it needs deadwax). Its words stay
+    /// until slice 12 takes the web app's way out away.
+    @Test func theFooterSaysNothingNowEveryRowIsTheApps() {
+        #expect(Managing.Tool.allCases.filter(\.native) == Managing.Tool.allCases)
+        for loginsOn in [true, false] {
+            for online in [true, false] {
+                #expect(ManagingWords.footer(loginsOn: loginsOn, online: online).isEmpty)
+                #expect(ManagingWords.footer(loginsOn: loginsOn, online: online, tools: [.people]).isEmpty)
+                #expect(ManagingWords.footer(loginsOn: loginsOn, online: online, tools: [.edit, .queue, .people]).isEmpty)
+            }
+        }
         #expect(ManagingWords.othersOpen.hasPrefix(ManagingWords.editAnAlbum))
         #expect(ManagingWords.othersOpen([.edit]) == ManagingWords.othersOpen)
-        // (slice 6) Needs a look is the app's own too, (slice 7) Library care, (slice 8) Server settings and (slice 9)
-        // the event log: each named, in Manage's order - and with nothing else, nothing
-        let five = "Edit an album, Needs a look, Library care, Server settings and Event log are the app's own; the "
-            + "others open in the web app, in Safari."
-        #expect(ManagingWords.footer(loginsOn: true, online: true) == [five, ManagingWords.signIn])
-        #expect(ManagingWords.footer(loginsOn: false, online: true, tools: [.queue, .people])
-                == ["Needs a look is the app's own; the others open in the web app, in Safari."])
-        #expect(ManagingWords.footer(loginsOn: false, online: true, tools: [.edit, .queue, .settings, .people])
-                == ["Edit an album, Needs a look and Server settings are the app's own; the others open in the web app, "
-                    + "in Safari."])
-        #expect(ManagingWords.footer(loginsOn: true, online: true, tools: [.edit, .queue]).isEmpty)
-        #expect(ManagingWords.footer(loginsOn: true, online: true, tools: [.queue]).isEmpty)
-        #expect(ManagingWords.footer(loginsOn: true, online: true, tools: [.edit, .care]).isEmpty)
-        #expect(ManagingWords.footer(loginsOn: true, online: true, tools: [.care]).isEmpty)
-        #expect(ManagingWords.footer(loginsOn: true, online: true, tools: [.settings]).isEmpty)
-        #expect(ManagingWords.footer(loginsOn: false, online: true, tools: [.settings, .people])
-                == ["Server settings is the app's own; the others open in the web app, in Safari."])
-        // (slice 9) the event log alone, or with Server settings - an admin with logins off has no People - is all the
-        // app's own: nothing said about Safari
-        #expect(ManagingWords.footer(loginsOn: true, online: true, tools: [.log]).isEmpty)
-        #expect(ManagingWords.footer(loginsOn: false, online: false, tools: [.edit, .queue, .care, .settings, .log]).isEmpty)
-        #expect(ManagingWords.footer(loginsOn: true, online: true, tools: [.log, .people])
-                == ["Event log is the app's own; the others open in the web app, in Safari.", ManagingWords.signIn])
-        #expect(Managing.Tool.allCases.filter(\.native) == [.edit, .queue, .care, .settings, .log])
-        // the page is Safari's person's, not the app's: said wherever a row opens one
+        // the page is Safari's person's, not the app's: said wherever a row still opened one
         #expect(ManagingWords.signIn.contains("whoever is signed in there"))
         #expect(ManagingWords.changePasswordLine.contains("whoever is signed in in Safari"))
     }

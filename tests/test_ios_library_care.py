@@ -110,7 +110,7 @@ def test_the_routes_are_the_servers_by_method_path_and_permission():
     assert "loginsOn && parts.held" in swift_function("LibraryCare.swift", "heldShown")
     # the page is the app's own now: no Safari for Library care
     managing = _code((CORE / "Managing.swift").read_text(encoding="utf-8"))
-    assert "case .edit, .queue, .care, .settings, .log: return true" in managing[managing.index("public var native: Bool {"):]
+    assert "case .edit, .queue, .care, .people, .settings, .log: return true" in managing[managing.index("public var native: Bool {"):]
 
 
 def test_a_rescan_sends_tracks_false_and_no_body_and_the_writes_none():
@@ -286,7 +286,7 @@ def test_the_page_draws_by_permission_and_out_of_reach_as_edit_album_does():
     assert ".disabled(!care.startOpen(kind, online: online))" in screen
     assert ".disabled(!care.rescanOpen(online: online))" in screen
     manage = app_file("You", "ManageSection.swift")
-    care = manage[manage.index("} else if tool == .care {"):manage.index("} else if let url")]
+    care = manage[manage.index("} else if tool == .care {"):manage.index("} else if tool == .settings {")]
     assert "NavigationLink(value: AppRoute.libraryCare)" in care
     routes = app_file("Shared", "Routes.swift")
     assert "case .libraryCare: LibraryCareScreen()" in routes and "case .heldByNobody: HeldByNobodyScreen()" in routes

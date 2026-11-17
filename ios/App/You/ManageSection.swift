@@ -15,14 +15,12 @@ import SwiftUI
 /// Since slice 7 Library care is too: it pushes LibraryCareScreen (Rescan, Get covers, CD art and lyrics, In nobody's
 /// library). Since slice 8 Server settings is too: it pushes ServerSettingsScreen (Connections, the organizing verdict,
 /// each group of the server's settings a page of its own, one save). Since slice 9 the event log is too: it pushes
-/// EventLogScreen (the lines, live, Copy and Clear). People still opens the web app in Safari (WebAppRow) until its
-/// slice lands.
+/// EventLogScreen (the lines, live, Copy and Clear). Since slice 11 People is too: it pushes PeopleScreen (Unlock
+/// People, then Navidrome's accounts - each person's page, Add a person) - so no row opens Safari any more.
 ///
-/// The footer says those open in Safari (the app's own said apart, ManagingWords.othersOpen) and - with logins on -
-/// that Safari signs in apart from the app, the first time, with the same name and password, and that each page opens
-/// as Safari's person, who may not be the app's: nothing compares the two. While deadwax can't be reached the Safari
-/// rows are dimmed and off, the footer saying they open once it's back: Safari would only fail at the same address.
-/// Nothing is asked of deadwax here - the page each opens asks it itself, and refuses for itself without its
+/// The footer said which rows open in Safari, and how Safari signs in apart from the app; with every row the app's own
+/// it says nothing (ManagingWords.footer answers no lines), and is drawn empty until slice 12 takes it out with
+/// WebAppRow. Nothing is asked of deadwax here - the page each opens asks it itself, and refuses for itself without its
 /// permission.
 struct ManageSection: View {
     @Environment(ServerModel.self) private var server
@@ -67,8 +65,11 @@ struct ManageSection: View {
                         NavigationLink(value: AppRoute.eventLog) {
                             Text(ManagingWords.label(tool))
                         }
-                    } else if let url = Managing.url(tool, at: server.address) {
-                        WebAppRow(label: ManagingWords.label(tool), url: url, live: online)
+                    } else if tool == .people {
+                        // (Phase 8, slice 11) the app's own: People, unlocked with your Navidrome password
+                        NavigationLink(value: AppRoute.people) {
+                            Text(ManagingWords.label(tool))
+                        }
                     }
                 }
             } header: {
@@ -89,8 +90,8 @@ struct ManageSection: View {
 }
 
 extension OpenURLAction {
-    /// Opens a web-app address - Manage's rows (People, since Phase 8's slice 10 took Change password into the app) - in
-    /// the default browser (never a web view in the app), and when iOS refuses it (Safari turned off in Screen Time, no
+    /// Opens a web-app address - Manage's rows, until slice 11 took People, the last of them, into the app (slice 12
+    /// takes this out) - in the default browser (never a web view in the app), and when iOS refuses it (Safari turned off in Screen Time, no
     /// other browser to take it) says so over the tabs, announced: Core's Managing.notice(opened:). A tap that opens
     /// nothing never says nothing.
     @MainActor
@@ -102,7 +103,7 @@ extension OpenURLAction {
     }
 }
 
-/// A row that opens the web app in Safari (Manage's rows - People alone since slice 10): its words - and, for a row that
+/// A row that opens the web app in Safari (Manage's rows - none since slice 11; slice 12 takes it out): its words - and, for a row that
 /// can't open its tool's own page, a line under them saying where it is once open - with `arrow.up.forward` at the
 /// trailing edge, where a pushed page's row has its chevron. The tap hands the address to the default browser
 /// (`OpenURLAction.webApp`, which says so if iOS refuses it). Off (dimmed, `.disabled`) while deadwax can't be reached.

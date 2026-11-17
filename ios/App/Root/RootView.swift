@@ -12,6 +12,7 @@ struct RootView: View {
     @Environment(CareRunModel.self) private var care
     @Environment(ServerSettingsModel.self) private var serverSettings
     @Environment(EventLogModel.self) private var eventLog
+    @Environment(PeopleModel.self) private var people
     @Environment(\.scenePhase) private var scenePhase
 
     var body: some View {
@@ -33,6 +34,8 @@ struct RootView: View {
             serverSettings.scene(phase)
             // (slice 9) the event log's stream called off as the app goes, rejoined from the last line on return
             eventLog.scene(phase)
+            // (slice 11) People read again as the app comes back with it up - the unlock may have run out meanwhile
+            people.scene(phase)
             switch phase {
             case .active:
                 CoverCache.shared.forgetFailures()
@@ -54,11 +57,21 @@ struct RootView: View {
             if over == nil { serverSettings.sessionBack() }
             // (slice 9) come: the event log's stream called off (it would only be refused); gone: asked again
             eventLog.recheck()
+            // (slice 11) come: People's passwords emptied and its sheet put away (it would stand over the sign-in);
+            // gone: People read again
+            people.signInChanged()
         }
         .onChange(of: server.client?.session) { _, _ in
             // (slice 10's review) the session moved - Change password's re-key: the event log's stream asked again under
             // the new one, a halt for the old one's 401 let go
             eventLog.sessionMoved()
+            // (slice 11) People's unlock was the old session's: read again under the new one
+            people.sessionMoved()
+        }
+        .onChange(of: navigation.nowPlayingShown) { _, shown in
+            // (slice 11) Now Playing over People (a full-screen cover, its pages left shown under it): every password
+            // typed there emptied; gone again, People read again
+            people.nowPlaying(shown)
         }
         .onOpenURL { (url: URL) -> Void in shared(url) }
     }

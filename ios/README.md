@@ -36,13 +36,17 @@ then Server settings: Connections, the server's settings a group to a page and s
 and MusicBrainz's saved answers, and the Library's Set up Navidrome opening its Connections page, then the event
 log: the lines deadwax kept and each new one live, newest first, Copy on a long press and Clear for the phone's view,
 then Change password: your Navidrome password changed on the phone, this phone kept signed in under the new sign-in
-deadwax gives it while every other sign-in of yours ends -
+deadwax gives it while every other sign-in of yours ends, then People: Navidrome's accounts looked after on the
+phone, unlocked with your own Navidrome password - a person added, their password reset, made admin or not, removed
+with their name typed, each person's permissions ticked and saved, and Forget for what deadwax still keeps for
+someone gone from Navidrome -
+after which nothing in Manage opens Safari -
 and Add to Queue, the phone's one way to add
 songs: a swipe right on a song, or the one item on every •••, each song after the ones already added (the web app's
 Play Last; the web keeps Play Next too) - kept on the `ios` branch while it's being built. Nothing of Phase 2, the
 lyrics, the EQ, the turntable, play history, Phase 3, Phase 4, Search, Requests, Get, Manage, Edit album, the artist
-tools, Needs a look, Library care, Server settings, the event log, Change password or Add to Queue's swipe has been
-seen on an iPhone yet.
+tools, Needs a look, Library care, Server settings, the event log, Change password, People or Add to Queue's swipe
+has been seen on an iPhone yet.
 Phase 0's test screen lives on in the app's Debug.
 
 - **To install it, and every week after:** [docs/ios.md](../docs/ios.md) - the steps once on the Mac
@@ -50,7 +54,7 @@ Phase 0's test screen lives on in the app's Debug.
   (`ios/scripts/make-test-album.py`), what the app does, and the checks, phase by phase - Phase 7's are 237-246,
   Edit album's 320-329, its Tags' 330-334, its Artwork and Lyrics' 335-337, its Delete's 338-342, the artist
   tools' 343-348, Needs a look's 349-354, Library care's 355-360, Server settings' 361-369, the event log's 370-373,
-  Change password's 374-378, Add to Queue's 392-403.
+  Change password's 374-378, People's 379-387, Add to Queue's 392-403.
 - **How it is built, and why:** [notes/ios.md](../notes/ios.md).
 - **Before pushing a change here, on Linux:** `ios/scripts/check-linux.sh`. GitHub's `ios.yml` compiles
   the rest on macOS.

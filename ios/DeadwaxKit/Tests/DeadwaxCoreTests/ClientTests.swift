@@ -374,7 +374,7 @@ func sentJSON(_ request: HTTPRequest?) throws -> [String: SentValue] {
     }
 
     @Test func everyRouteIsDeadwaxsOwn() {
-        #expect(Routes.all.count == 101)
+        #expect(Routes.all.count == 110)
         #expect(Set(Routes.all).count == Routes.all.count)
         for endpoint in Routes.all {
             #expect(endpoint.path.hasPrefix("/deadwax/"))
@@ -436,6 +436,10 @@ func sentJSON(_ request: HTTPRequest?) throws -> [String: SentValue] {
         // (slice 9: the event log) the history, the transport's own 8 s, held in memory; the stream, 45 s - the most
         // it may say nothing between two bytes (three of its 15 s keepalives), never a wait over all
         // (slice 10: Change password) 240 s: four calls to Navidrome, the store's and the throttle's lock (180 at worst)
+        // (slice 11: People) the list, 120 s at least (more for each account the last list named); Unlock, 120 s, the
+        // name's sign-in throttle and Navidrome's login; Make account, Reset, the admin flip and Remove, 300 s, and
+        // Forget and the permissions, 240 s - each after the one write lock, which another write may hold for a reset's
+        // 130 s (PeopleWaits); Lock the transport's own 8 s, the unlock forgotten in memory
         let longer: [Endpoint: Double] = [Routes.albumIndex: 30, Routes.autoEqSearch: 20, Routes.autoEqProfile: 20,
                                           Routes.libraryOwned: 30, Routes.fullySearch: 20, Routes.releaseGroup: 60,
                                           Routes.searchArtists: 20, Routes.searchSongs: 20, Routes.artistFacts: 120,
@@ -457,7 +461,9 @@ func sentJSON(_ request: HTTPRequest?) throws -> [String: SentValue] {
                                           Routes.serverSettings: 30, Routes.saveServerSettings: 60,
                                           Routes.savedAnswers: 30, Routes.clearSavedAnswers: 120,
                                           Routes.pingMusicBrainz: 120, Routes.pingSlskd: 30, Routes.logStream: 45,
-                                          Routes.ownPassword: 240]
+                                          Routes.ownPassword: 240, Routes.people: 120, Routes.unlockPeople: 120,
+                                          Routes.createPerson: 300, Routes.resetPassword: 300, Routes.setAdmin: 300,
+                                          Routes.removePerson: 300, Routes.forgetPerson: 240, Routes.savePermissions: 240]
         #expect(Routes.timeouts == longer)
         for endpoint in Routes.all {
             // each path parameter filled in: a brace left in a path is no URL

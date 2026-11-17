@@ -13462,3 +13462,176 @@ Left as they are:
 - **The second-page case**: a second Change password page while a change is out (its own flow idle, so its Change is
   on) is refused by ServerModel's one-at-a-time `rekey.began` as `.cancelled`, which says nothing and keeps its
   fields.
+
+## People on the phone (Phase 8, slice 11 - 2026-11-17)
+
+The spec's section 10 (notes/ios-specs/phase8-managing.md), with 13-14's rules: Settings > Manage > **People** is the
+app's own page now - Navidrome's accounts looked after by deadwax as the signed-in admin (src/routes/people.py, the
+nine routes of 2.0.0-player.61 and after) - rather than the web app's People in Safari. With it nothing in Manage opens
+Safari any more (WebAppRow and `OpenURLAction.webApp` are left, unused, for slice 12 to remove). Built on the `ios`
+branch at 16ef56d. The app stays 0.13 (13); src/__init__.py untouched; **no server change** - the routes, their strict
+bodies, the unlock and its idle timeout are the server's as they are; the player engine has no diff.
+
+### Core (DeadwaxCore)
+
+- **People.swift** (new). `People` is lib/people.ts and lib/permissions.ts' People part, and app/People.tsx's own
+  words: the titles, UNLOCKED_LINE, HTTP_NOTE (`httpNote(at:)` from the phone's address), the name, display-name and
+  password rules (`cleanName`, `nameProblem`, `displayProblem`, `passwordProblem`, `formProblem`, `formReady`,
+  `resetProblem`, `resetReady` - lengths in UTF-16 units, the pattern's every edge, the name folded as JavaScript folds
+  it), a row's `chips`, `signInWords` (with `ago`), `libraryWords` and `librariesWarning`; `actions(person)` (Reset
+  password, Make admin or No longer admin, Remove - each offered or not from the server's `can`) and
+  `refusals(person)` (why one isn't); `removeReady` (the typed name, exactly), `makeAdminWords`/`unmakeAdminWords`
+  (the flip's question and what it loses), `removeLines`, `knownWords`, `madeWords` (what to tell the new person, with
+  deadwax's address), `resetWords` (who was signed out), `savedWords`, `versionNote` (Navidrome older than People
+  needs), `view` (which of the four faces the page draws: not allowed, locked, the list, not an admin in Navidrome),
+  `checkboxes` (five, by category, locked for an admin and for a refused account), `lockedReason`, `changed`,
+  `offered`/`allowed` (who is shown the row and who the page). `onPhone` turns the server's and the web's "You →
+  Account → Change password" into the phone's place, "Settings → Account → Change password", wherever deadwax's words
+  are said. `clipped` keeps whole characters (never half a pair) up to a rule's most plus 8, so a field can't grow
+  without end and its problem still shows. The models - PeopleState, PeoplePerson, PeopleKnownOnly, PeopleCan,
+  PeopleTicks - read the GET's answer loosely (an unknown field ignored, a missing one its default), dedupe rows by id
+  and drop a row with no id; the bodies - PeopleUnlockBody, PeopleCreateBody, PeopleResetBody, PeopleAdminBody,
+  PeopleRemoveBody, PeopleForgetBody, PeoplePermissionsBody, PeopleLockBody - are each route's strict model key for key
+  (PeoplePermissionsBody always sends all five). The three that carry a password, and PeopleAddForm and
+  PeoplePasswords, redact themselves (`description`, `debugDescription`, an empty `customMirror`).
+- **PeopleFlow.swift** (new). `PeopleFlow` is the page's state, as app/usePeople.ts holds it: the last answer (and
+  when it was answered), the read's ticket (`readBegan`, `readEnded` - only the newest lands; a failed first read is
+  said with Try again; a 403 asks /me again), the forms typed (Unlock's password, Add's four fields, Reset's two,
+  Remove's typed name, each person's ticks), the sheet open, the one write out (`writing`) and what was said (`said`,
+  placed: the list, Add, a person's Reset or their page). Each write is `beginX` - synchronously, in the tap: the
+  ticket and the body, refused while another is out - and `ended(ticket, outcome, now:, signInOver:, origin:)`, which
+  returns a `PeopleAfter`: the one announcement, whether to read the list again, to ask /me (after the flip, whatever
+  came of it, and after a 403), to leave a person's page (after Remove), to arm the idle check. A refusal of kind
+  `locked` (409) brings Unlock back at once: the answer and every password typed are dropped; Add's user and display
+  names, the name typed into Remove and each person's unsaved ticks are kept (none secret), and a sheet still up says
+  People.lockedNote. `hidden()` empties every password and the typed name
+  (the page going, Now Playing over it, the app in the background); `signInCame()` does that and puts a sheet away,
+  unless a write is out; `left()` forgets the answer once no page is left. `PeopleOutcome` and `PeopleRead` are what a
+  write and a read came to: `refused(words:kind:fix:askMe:)` only for a 4xx (said as it came, with its `fix`; the 403 of
+  require("people") has no kind), `failed` for a 5xx with deadwax's words, `unknown` ("deadwax may have finished - its
+  answer never came", EditWords.mayHaveFinished, the transport's words in brackets for an admin) for a bare 5xx, a
+  timeout or no answer, then a read again; `signedOut` for a 401 (through `sessionEnded`, never said here);
+  `cancelled`, neither.
+- **The unlock's timeout.** The server forgets an unlock after UNLOCK_IDLE_SECONDS (900) without a People request
+  (`_unlock_for` keys it by the session's hash and refreshes it on each one). The web learns of it only from the next
+  answer, a `locked` 409 or a read showing `unlocked: false`. The phone does the same, plus one read of its own:
+  `People.idleCheckSeconds` (902) after the last answer, on a ContinuousClock (it counts through sleep), the model reads
+  once - which, by then, the server answers locked, so Unlock shows without waiting for a tap to be refused. The read
+  is a GET, and a GET refreshes the unlock only while it still stands - so the check never keeps it alive. It is the
+  page's only timer; it runs while a People page shows and the app is active.
+- **PeopleWaits**: each route's wait worked out from the handlers' own worst cases - the store's busy timeout (10 s),
+  a native call (20), a native write (60), Subsonic's getUser (20) - rounded up to the minute: the read 50 s plus 30 s
+  an account (120 at least), Unlock 120, Make account, Reset, the flip and Remove 300, Forget and the permissions 240,
+  Lock the transport's own (it forgets the unlock in memory). **DeadwaxClient**'s nine methods (`people(accounts:)` with
+  the last answer's count, and one per write through `answer()`, never retried). **Routes**: nine endpoints (110
+  routes).
+- **Managing.swift**: People's row is native.
+
+### The app
+
+- **PeopleModel** (ios/App/Manage/, new): the app-held `@Observable` model, made in DeadwaxApp beside the event log's,
+  reset in `whenPersonChanges`. It asks only while a People page shows, the app is active, deadwax can be reached, the
+  sign-in isn't over the app, the person is allowed and there's a client (`mayAsk`); reads again on the page showing
+  (after a second away, with nothing read, or with the idle check due), the app coming back, reach returning, the
+  sign-in going, Now Playing closing and the session moving; and arms the idle check after each answer. A write takes
+  its ticket in the tap, tells AppNavigation (`peopleWriting`), holds through the background (`BackgroundHold`), drops
+  its answer if the person or session changed meanwhile (the session counter), and then announces, leaves the person's
+  page, asks /me, reads again and arms the check - as `PeopleAfter` says. Every binding to a field clips it and clears
+  what was said (`typed(at:)`).
+- **PeopleScreen** (new): one List. Not allowed: the permission's words. Then the status sections: deadwax's refusal
+  with its fix (and Sharing's link where it names logins), **Unlock People** (`PeopleUnlockSection`: the SecureField,
+  `.password` content, the focus unless VoiceOver runs, Unlock, the plain-http note under it), a failed read with Try
+  again, deadwax out of reach with nothing read, or a spinner (`People.loading`). Unlocked: UNLOCKED_LINE, the version
+  note, what was said, **Everyone in Navidrome** (you first; each row's name, user name, chips as one line, sign-in and
+  library words, one VoiceOver element, a NavigationLink to the person's page by id) and **Known only to deadwax**
+  (knownWords, and Forget… behind a confirmationDialog). The bar: **Lock**, and **+** (Add a person) - both only on the
+  list. Back is hidden while a write is out.
+- **PersonScreen** (new, pushed by `AppRoute.person(id)`): the person's facts and what was said; **Permissions** - the
+  five Toggles (off for an admin, a refused account or while a write is out), lockedReason in the footer, **Save
+  permissions** sending all five, on only when changed; then the actions `People.actions(person)` offers - Reset
+  password… and Remove… open sheets, Make admin / No longer admin asks in a confirmationDialog (and flips only if the
+  person is still what was asked about) - with `refusals(person)` in the footer.
+- **PeopleSheets** (new): **AddPersonSheet** (user name, display name, Password and Password again as `.newPassword`,
+  the problem as typed, the plain-http note, Make account; done, it says madeWords and the answer's warning, and Close
+  becomes Done), **ResetPasswordSheet** (New password and New password again, the problem, the note, Reset password,
+  then resetWords), **RemovePersonSheet** (removeLines - what goes, what stays, that there's no undo - the user name
+  typed in mono, Remove in the danger red, on only by `removeReady`). Each is `.interactiveDismissDisabled` while a write
+  is out, and keeps a snapshot of the person it opened for, so it still says who it was about when People locks again.
+- **AppNavigation**: `.people` and `.person(id)`; `writingPeople`, so a tab tapped again keeps People's pages while a
+  write is out (`People.pagesKept`); `leavePerson(id)` pops a removed person's page. **ManageSection**: People is a
+  NavigationLink. **RootView**: scene, sign-in, session and Now Playing changes reach the model.
+
+### What the web's .tsx files hold, read by pattern
+
+ios/scripts/export-people-vectors.cjs runs lib/people.ts and lib/permissions.ts compiled, and reads out of
+**app/People.tsx**, **app/UnlockPeople.tsx**, **app/AddPerson.tsx**, **app/ResetPassword.tsx**,
+**app/RemovePerson.tsx**, **app/usePeople.ts** and **api/people.ts** by pattern (77 pieces hashed into made_from, so
+iospeople fails when one moves): the labels and buttons, each body sent (compiled and run as a function of the form),
+which actions are drawn, the flip's and Forget's words, what a `locked` refusal does, each route. 170 user names, 168
+display names, 187 forms, 114 resets, 124 rows, 29 ages, 52 known-only rows, 12 typed names for Remove, 25 permission
+changes, 20 things said after, 27 version strings and 6 views.
+
+### Decided here, and where the phone departs from the spec (or the web)
+
+- **The idle check** above: the web has no timer; the phone reads once 902 s after the last answer, on a clock that
+  counts through sleep, and reads again on every return (scene, reach, the sign-in, Now Playing, the session).
+- **Sheets, not inline forms**: Add, Reset and Remove are sheets; a person's page is pushed rather than opened in the
+  list. A sheet stays up when People locks again, saying lockedNote ("People locked again - close this and unlock it
+  with your Navidrome password. The passwords typed here are gone."); the sign-in coming over the app puts a sheet away
+  unless a write is out.
+- **What's kept through a lock**: Add's user and display names (also through Close), the name typed into Remove and
+  each person's unsaved ticks - none secret, all annoying to type again; never a password.
+- **The labels**: "Password again" / "New password again" for the web's Again; no Show passwords toggle (SecureField
+  has none, and the password manager fills); Make account/Making…, Reset password/Resetting….
+- **The phone's place** for Change password in every sentence deadwax or the web says (`People.onPhone`).
+- **Each write's own fallback words** ("Couldn't make the account." and the rest) where the web has one for all; and
+  "may have finished" with a read again for an unknown outcome, never a retry.
+- **madeWords** names the user name sent when the answer names none.
+- **Lock** shows Unlock People as soon as it answers, without waiting for the list read again.
+- **What was said is placed** on the page it's about: Reset's in its sheet, the flip's and Save's on the person's page,
+  the rest on the list.
+- **Fields clipped** to the rule's most plus 8 whole characters (the unlock's password isn't: it's checked against
+  Navidrome, not a rule).
+- **`fix` is shown** under a refusal; the web reads only `detail`.
+- **Chips as a joined line**, not capsules (the palette has none).
+- **Rows** deduped by id and an empty id dropped (the list is keyed by identity); the name falls back to the user name.
+- Assumed: no change of the admin's own password holds the sign-in throttle at the moment of an unlock (PeopleWaits'
+  unlock wait counts one other unlock, not both).
+
+### Tests
+
+- **PeopleVectorTests** (new, 17): the fixture and its sources; the words, the page's words and the routes the web's;
+  every name, display name, form, reset, row, age, known-only row, typed name, permission change, thing said after,
+  version note and view; the origin from the phone's address.
+- **PeopleFlowTests** (new, 23): who is offered People; the idle check after the server's unlock runs out; only the
+  newest read lands, nothing written before one; a failed read and a 403; Unlock sends the password and keeps none;
+  Lock at once; locked again keeping what's safe; Make account, Reset, the flip (asks /me whatever came of it), Remove
+  (leaves their page), Forget and Save; a write ending under the sign-in says nothing, a 401 reads nothing; the
+  sign-in putting the sheet away but not under a write; each failure what it means; the phone's place; each body;
+  no password ever said; passwords gone when the page goes; the list keyed by id and failing closed; each wait;
+  pagesKept; whole characters kept.
+- **ClientTests** (110 routes, People's waits); **ManagingTests** (People native).
+- **tests/test_ios_people.py** (new, 12): every route by method, path and permission (test_logins' ROUTES: `people`);
+  the page offered by the web's rule and opened in the app; each body the strict model's key for key; the phone's
+  bodies posted one after another to the real routes (test_people's fake Navidrome, `nd` bound by assignment) - locked,
+  a locked 409, unlock, the list, create, reset, admin on and off, permissions, remove, forget, lock; an extra field or
+  a permission left out is People's 422 with nothing echoed; a refusal's kind and fix, and require("people")'s 403 with
+  none; the server's words naming the web's place said as the phone's; the waits the handlers' worst cases; the idle
+  check the server's 900 s; no password logged, kept or put in an address (five SecureFields, all through the model's
+  bindings); the ticket taken in the tap and nothing asked under the sign-in; the pages drawn as the spec says.
+  test_ios_contract.py: 110 routes; test_ios_settings.py, test_ios_library_care.py, test_ios_server_settings.py and
+  test_ios_event_log.py: People native and Manage's rows all the app's own.
+- **ui/test/iospeople.sim.cjs** (new): the exporter's `--check`.
+
+### Verified, and not
+
+On the Mac: `swift test`; the unsigned generic-iOS Debug build, BUILD SUCCEEDED, with only the AppIntents metadata
+warning every build has; check_project.py; the full pytest suite run alone; pyflakes over src and tests; every sim with
+Node 22 (iospeople running the exporter's `--check`). The counts are in the slice's commit. tests/test_ios_people.py
+posts the phone's bodies to the real routes.
+
+Not verified - only the phone can tell (docs/ios.md checks 379-387): the password manager's fill on Unlock and its
+suggestion on Add and Reset; the unlock running out after 15 minutes idle and Unlock showing by itself; a real
+Navidrome's answers to each write (its admin flag, its removal, a reset signing the person out); VoiceOver reading each
+row once and each change's one announcement; the largest text sizes; Back, the swipe and the sheets' swipe off while a
+write is out; the sign-in over an open sheet; Now Playing emptying the fields.

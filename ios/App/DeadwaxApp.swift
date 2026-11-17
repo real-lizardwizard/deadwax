@@ -39,6 +39,7 @@ struct DeadwaxApp: App {
     @State private var care: CareRunModel
     @State private var serverSettings: ServerSettingsModel
     @State private var eventLog: EventLogModel
+    @State private var people: PeopleModel
 
     /// The one background session, made before anything else can ask it.
     private static let downloadSession = DownloadSession()
@@ -85,6 +86,10 @@ struct DeadwaxApp: App {
         // only while the page shows); out of reach the stream is called off, back it rejoins from the last line held
         let eventLog = EventLogModel(server: server, reachability: reachability, navigation: navigation)
         reachability.whenChanged { [weak eventLog] in eventLog?.recheck() }
+        // Phase 8, slice 11: People - the answer, the write out and what's typed, shared by the list and each person's
+        // page; out of reach nothing writes until a read lands again, back it reads again
+        let people = PeopleModel(server: server, reachability: reachability, navigation: navigation)
+        reachability.whenChanged { [weak people] in people?.reachChanged() }
         let downloads = DownloadModel(server: server, reachability: reachability, files: files, session: Self.downloadSession)
         player.connect(downloads: downloads, reachability: reachability)
         // Phase 4, slice 3: a write here to a downloaded playlist keeps it in step at once
@@ -121,6 +126,7 @@ struct DeadwaxApp: App {
             care.reset()
             serverSettings.reset()
             eventLog.reset()
+            people.reset()
         }
         _server = State(initialValue: server)
         _player = State(initialValue: player)
@@ -144,6 +150,7 @@ struct DeadwaxApp: App {
         _care = State(initialValue: care)
         _serverSettings = State(initialValue: serverSettings)
         _eventLog = State(initialValue: eventLog)
+        _people = State(initialValue: people)
     }
 
     var body: some Scene {
@@ -171,6 +178,7 @@ struct DeadwaxApp: App {
                 .environment(care)
                 .environment(serverSettings)
                 .environment(eventLog)
+                .environment(people)
                 .preferredColorScheme(.dark)
                 .tint(Palette.accent)
                 // (Noto Sans, 15 Nov) the words of every Text and control that sets no font of its own

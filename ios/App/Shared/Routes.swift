@@ -115,6 +115,20 @@ enum AppRoute: Hashable {
     /// (Phase 8, slice 10) Settings > Account > Change password (ChangePasswordScreen): your Navidrome password, changed
     /// in Navidrome as you - its answer re-keys this phone (ServerModel.changeOwnPassword).
     case changePassword
+    /// (Phase 8, slice 11) Settings > Manage > People (PeopleScreen): Navidrome's accounts, unlocked with your own
+    /// password - the state held by the app (PeopleModel), so a person's page and the list under it are one.
+    case people
+    /// (Phase 8, slice 11) One of People's accounts, by Navidrome's id (PersonScreen): its permissions, Reset
+    /// password…, Make admin or No longer admin, Remove….
+    case person(String)
+
+    /// One of People's pages.
+    var isPeople: Bool {
+        switch self {
+        case .people, .person: return true
+        default: return false
+        }
+    }
 }
 
 /// The album you don't have's address: its release group's id as MusicBrainz gave it (lowercase - deadwax's routes take
@@ -309,6 +323,9 @@ final class AppNavigation {
     /// (Phase 8, slice 10) A Change password is out: the tab tapped again goes back no further than its page, where its
     /// answer is said (OwnPassword.pagesKept).
     private(set) var changingPassword = false
+    /// (Phase 8, slice 11) A People write is out: the tab tapped again goes back no further than People's last page,
+    /// where its answer is said (People.pagesKept).
+    private(set) var writingPeople = false
 
     /// A file shared to deadwax (`.onOpenURL`): shown by the preview that is up, in place - else by the EQ sheet,
     /// opened over Now Playing (by Now Playing) or over the tabs (here).
@@ -360,21 +377,45 @@ final class AppNavigation {
     }
 
     /// Every page popped - but none of a playlist being edited, nor the pages under it; nor Change password's while its
-    /// change is out.
+    /// change is out; nor People's while one of its writes is.
     private func backToRoot(_ stack: inout [AppRoute]) {
         let ids = stack.map { (route: AppRoute) -> String? in
             if case .playlist(let shown) = route { return shown.id }
             return nil
         }
         let password = stack.map { (route: AppRoute) -> Bool in route == .changePassword }
+        let people = stack.map(\.isPeople)
         let kept = max(PlaylistEdit.pagesKept(ids, editing: editingPlaylist),
-                       OwnPassword.pagesKept(password, changing: changingPassword))
+                       OwnPassword.pagesKept(password, changing: changingPassword),
+                       People.pagesKept(people, writing: writingPeople))
         stack.removeLast(stack.count - kept)
     }
 
     /// (Phase 8, slice 10) Change password's change went out, or answered.
     func passwordChanging(_ out: Bool) {
         changingPassword = out
+    }
+
+    /// (Phase 8, slice 11) A People write went out, or answered.
+    func peopleWriting(_ out: Bool) {
+        writingPeople = out
+    }
+
+    /// (slice 11) A page of People is on a tab - PeopleModel keeps People's state while one is.
+    var holdsPeople: Bool {
+        (library + search + requests + you).contains(where: \.isPeople)
+    }
+
+    /// (slice 11) A person removed: their page gone from the top of any tab it is on top of - only while it is what
+    /// shows there, so a removal answering after another page was opened over it pops nothing.
+    func leavePerson(_ id: String) {
+        func left(_ stack: inout [AppRoute]) {
+            if case .person(let shown)? = stack.last, shown == id { stack.removeLast() }
+        }
+        left(&library)
+        left(&search)
+        left(&requests)
+        left(&you)
     }
 
     /// A playlist's page opened or closed its Edit.
@@ -543,6 +584,7 @@ final class AppNavigation {
         playlistPick = nil
         editingPlaylist = nil
         changingPassword = false
+        writingPeople = false
         let editor = presentedEdit
         presentedEdit = nil
         albumEdit = nil
@@ -594,6 +636,8 @@ extension View {
                 case .serverSettingsGroup(let id): ServerSettingsGroupScreen(id: id)
                 case .eventLog: EventLogScreen()
                 case .changePassword: ChangePasswordScreen()
+                case .people: PeopleScreen()
+                case .person(let id): PersonScreen(id: id)
                 }
             }
             .clearsPlayer()

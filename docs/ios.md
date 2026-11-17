@@ -68,7 +68,10 @@ lyrics and MusicBrainz's saved answers - and the Library's **Set up Navidrome** 
 [Server settings](#server-settings)). Then the **Event log**: what deadwax has said since it started, newest first,
 each new line as it's logged, with Copy on a long press and Clear for the phone's view (see [Event log](#event-log)).
 Then **Change password**: your Navidrome password changed on the phone, which stays signed in while every other
-sign-in of yours is signed out (see [Change password](#change-password)).
+sign-in of yours is signed out (see [Change password](#change-password)). Then **People**, for an admin: unlocked with
+your own Navidrome password, every Navidrome account with its permissions, a password reset, the admin role and
+Remove, Add a person, and the names deadwax keeps things for with no account - and with it no row of Manage opens
+Safari any more (see [People](#people)).
 
 **Nothing of Phase 2, the lyrics, the EQ, the turntable, play history, your library downloaded,
 playlists, artists, songs, Search, Requests, Get or Manage has been seen on an iPhone yet.** It's built and tested on a Mac,
@@ -1784,8 +1787,7 @@ pages and it goes back to the first screen; tap it again there, and it goes to t
   right ("2.1 GB"). Under the three, only while something is happening: "Downloading - 6 songs to go", what it's
   waiting for, or, in amber, "2 songs didn't download".
 - **Manage**, for someone who may look after deadwax - an admin, everyone with logins off, or someone an admin gave
-  a permission to: the tools you may use - Edit an album the app's own, the others opening in the web app, in Safari,
-  as before (see [Manage](#manage)).
+  a permission to: the tools you may use, each a page of the app's own (see [Manage](#manage)).
 - **Account**, with logins on.
 - **This phone**, with the name or IP deadwax is at on its right ("192.168.1.20", "bearded-dragon").
 - **About**, with the app's own version on its right, **0.13 (13)**.
@@ -1874,18 +1876,16 @@ Account and About ask deadwax again when you pull them down, as the first screen
 
 ### Manage
 
-Settings > **Manage** is deadwax's tools for looking after it, as many of them as you may use. They're coming into the
-app one build at a time (Phase 8): **Edit an album**, **Needs a look**, **Library care**, **Server settings** and
-**Event log** are the app's own now, and **People** still **opens in the web app, in Safari** - the web app has it laid
-out for a phone ([Looking after deadwax from a phone](player.md#looking-after-deadwax-from-a-phone)). Top to bottom,
-each only for someone who may use it:
+Settings > **Manage** is deadwax's tools for looking after it, as many of them as you may use. They came into the app
+one build at a time (Phase 8), and since the build with [People](#people) every one is a page of the app's own -
+none opens Safari. Top to bottom, each only for someone who may use it:
 
 | row | who has it | opens |
 | --- | --- | --- |
 | **Edit an album** | Edit albums or Look after the library | **Choose the folder**, in the app: every album folder deadwax's library has, with a search at the top - tap one and [Edit album](#edit-album) opens for it. It's the way to a folder Navidrome doesn't list. An album's top **•••** has **Edit album** too ([An album's page](#an-albums-page)). |
 | **Needs a look** | Look after the library | [**Needs a look**](#needs-a-look), in the app: the albums that need fixing and the new downloads nobody has looked at, worked through one after another in Edit album. How many albums it lists is at the row's right. |
 | **Library care** | Look after the library or Edit albums | [**Library care**](#library-care), in the app: Rescan (Look after the library's), and covers, CD art and lyrics fetched for every album without (Edit albums') - and, with logins on, In nobody's library. |
-| **People** | an admin, with logins on | People - unlock it with your own Navidrome password, as in the web app |
+| **People** | an admin, with logins on | [**People**](#people), in the app: unlocked with your own Navidrome password, every Navidrome account - each with its permissions, Reset password…, Make admin and Remove… - Add a person, and the names deadwax keeps things for with no account. |
 | **Server settings** | Settings and the log | [**Server settings**](#server-settings), in the app: whether deadwax reaches MusicBrainz, slskd and Navidrome, and every setting of the server's, a group to a page, saved together. |
 | **Event log** | Settings and the log | [**Event log**](#event-log), in the app: what deadwax has said since it started - the last 500 lines - newest first, each new line as deadwax logs it. |
 
@@ -1896,34 +1896,13 @@ down. If an admin took a permission away since, the page it opens says "This pag
 given you - ask one if you need it." - and People, its own words: "Only an admin can open People - it comes with
 being a Navidrome admin."
 
-Under the rows, while a row there opens Safari - People, so for an admin with logins on: "Edit an album, Needs a look,
-Library care, Server settings and Event log are the app's own; the others open in the web app, in Safari." (naming only
-the rows of the app's own drawn there), then "Safari has its own sign-in, apart from the app's: the first time, sign in
-there with the same name and password you use here. The pages open as whoever is signed in there, who may not be who's
-signed in here." When every row there is the app's own - everyone else's Manage, and everyone's with logins off -
-nothing is said under them. Nothing hands the app's sign-in to Safari (it
-could only go in the address, where it would sit in Safari's history), so the first time a row opens, the web app's
-sign-in comes first. Sign in, and the page the row named opens. Safari stays signed in after that, as any browser
-does, until its sign-in goes 30 days without use. Signing out of the app doesn't sign Safari out, nor the other way
-round.
+Nothing is said under the rows. (Until the build with People, an admin's Manage said there that People opened in the
+web app, in Safari, which signs in apart from the app; nothing opens Safari now, so there's nothing to say.) Every row
+opens while deadwax can't be reached: each page says it needs deadwax, and reads what it shows once it's back. All of
+them open as whoever is signed in to the app.
 
-**The page opens as whoever is signed in in Safari, which may not be who's signed in to the app.** The app shows the
-rows its own sign-in may use; nothing checks Safari's against it. Sign in to the app as one person and Safari as
-another, and the page is the other person's: what they may do. To be
-sure, open the web app's You in Safari and look at the name at its top. If you use the web app from your Home
-Screen, it keeps a sign-in of its own, and the rows open in Safari, not in it.
-
-The rows open deadwax's address as the app has it, plain `http://` included: Safari opens it as it would the address
-typed (its address bar says Not Secure), over your Wi-Fi or WireGuard. If the phone's default browser isn't Safari,
-they open in that one instead. While deadwax can't be reached the rows that open Safari are dimmed and can't be
-tapped, and "These open once deadwax is back." says why. Edit an album, Needs a look, Library
-care, Server settings and Event log still open: each says it needs deadwax, and reads what it shows once it's back. If iOS won't
-open the address at all - Safari turned off in Screen Time, with no other browser - the app says "Couldn't open the web
-app - Safari may be turned off in Screen Time." over the tabs, and VoiceOver reads it.
-
-VoiceOver reads each Safari row as a button, with "Opens in Safari." after it; Edit an album, Needs a look, Library
-care, Server settings and Event log as rows that open a page, Needs a look with its count ("Needs a look, 3 albums").
-The rows grow with the text size.
+VoiceOver reads each row as one that opens a page, Needs a look with its count ("Needs a look, 3 albums"). The rows
+grow with the text size.
 
 An artist's pictures and names are managed from [the artist's page](#managing-an-artist), as in the web app. The web
 app's **Connections**, in its You, is at the top of [Server settings](#server-settings) on the phone.
@@ -2206,6 +2185,90 @@ the same breath: "Not live. Couldn't open the live feed."), and when it's live a
 lines couldn't be read; when deadwax goes out of reach, the app's own banner line and its "Back online" say it instead.
 With Reduce Motion on, new lines don't slide in; at the largest text sizes a line's time, level and part stack over
 its words, the part wrapping rather than cut short.
+
+### People
+
+**People** (Settings > Manage > People, for a Navidrome admin with logins on) is the web app's People on the phone:
+Navidrome's accounts, changed by deadwax in Navidrome as you. It's a page pushed on Settings, and each person a page
+pushed on it. Someone who isn't one of Navidrome's admins sees "Only an admin can open People - it comes with being a
+Navidrome admin." and nothing is asked. With logins off, or signed in as the emergency `deadwax`, deadwax's own words
+say why People can't work here ("People needs logins on - with them off, anyone who can reach deadwax is its admin.")
+- with logins off, with a link to the [Sharing deadwax](sharing.md) guide.
+
+**Unlock People.** It opens locked: "People changes Navidrome's accounts as you, *you*. Navidrome needs your password
+for that; deadwax uses it once and doesn't keep it." Type your Navidrome password in **Your Navidrome password** (the
+phone's password manager knows it) and tap **Unlock** - "Unlocking…" while it asks. On a plain `http://` address the
+note under it says the password crosses your network readable, as Change password's does. A wrong one is said in red
+as deadwax says it - "That isn't the password you signed in to deadwax with - if you've changed it since, sign out and
+in again." - the field emptied, and the cursor put back in it (not with VoiceOver on, where it would cut off what was
+just read). It counts against your sign-ins, as a wrong password at the sign-in screen does.
+
+**Unlocked**: "Unlocked on this device until it's left alone for 15 minutes. Lock ends it now." with **Lock** and
+**+** (Add a person) in the bar. If Navidrome isn't the version People was checked with, an amber line says so and to
+use Navidrome's own Users page if something doesn't work. Then:
+
+- **Everyone in Navidrome**, you first: each person's name, their user name, what they are ("You", "Admin", "deadwax's
+  own account", "Can't sign in to deadwax"), their deadwax sign-ins ("Signed in on 2 devices", "Last signed in 3 days
+  ago", "Never signed in to deadwax"), how many albums are in their library - and, in amber, "Navidrome gives them no
+  library - they'll see nothing. Choose one for them in Navidrome's Users page." for someone Navidrome gives none.
+  VoiceOver reads each row once. Tap one for their page.
+- **Known only to deadwax**, when there are any: names deadwax still keeps things for that have no Navidrome account -
+  deleted in Navidrome's own Users page, or a removal deadwax couldn't finish - each with what's kept ("deadwax keeps 1
+  sign-in, a kept login, 3 pins.") and **Forget…**, which asks first: "Forget what deadwax keeps for *them*? Their
+  library list, pins, settings and permissions go - the albums stay in the collection." **Forget** or **Keep it**.
+
+**A person's page**: who they are, as their row has it, then **Permissions** - Get albums, Edit albums, Look after the
+library, Everyone's downloads and Settings and the log, each a switch with what it opens under it, and its warning in
+amber ("This includes deleting albums from disk, which can't be undone." with Look after the library on, "They can still
+play, look through and add what the collection has." with Get albums off). An admin's are all on and can't be changed
+("Admins can do everything."), and yours, deadwax's own account's and a reserved name's are locked with deadwax's reason
+under them. **Save permissions** sends all five - on only once one differs from what's saved - and "Saved - *they*
+have them from their next tap." Under them, the changes deadwax offers for this person:
+
+- **Reset password…** opens a sheet: **New password** and **New password again** (the password manager's new-password
+  fields), what's wrong as you type (the same rules as Change password's), the plain-http note, and **Reset password**.
+  Done, the sheet goes and their page says "Done. *They're* signed out of deadwax on 2 devices and sign in with the new
+  password - their other music apps need it too."
+- **Make admin** (or **No longer admin**) asks first, saying what it gives - "In deadwax they'll edit and delete
+  albums, … In Navidrome they become an admin too …" - or what they keep. **Make admin** / **No longer admin**, or
+  **Keep as it is**. After it the app asks deadwax who you are again, so your own Manage follows.
+- **Remove…** opens a sheet saying what goes - in Navidrome, for good, and in deadwax - what stays, and "There's no
+  undo. If they might come back, reset their password instead." in red. Type their user name exactly in **Type their
+  user name to remove them** (Return only puts the keyboard away): **Remove *them*** is on only once it matches. Done,
+  their page goes and People says "Removed *them* from Navidrome and deadwax."
+
+What deadwax won't do for someone is said under their changes, in its words: you can't reset your own password here
+("That's you - change your own password in Settings → Account → Change password."), remove yourself or take your own
+admin role away, nor change deadwax's own account or Navidrome's last admin.
+
+**Add a person** (the **+**) opens a sheet: "Makes a Navidrome account for an ordinary listener. You can make them an
+admin afterwards." **User name**, **Display name (optional)**, **Password** and **Password again**, what's wrong as you
+type (lowercase letters, digits, dots, underscores and hyphens; at most 32; not `local` or `deadwax`; the password
+rules), the plain-http note, and **Make account**. Made: "Made *them*. Tell them their user name, the password you
+chose and deadwax's address (http://…/player/) - their other music apps sign in with the same user name and password."
+with deadwax's warning in amber when it gives one, the form emptied, and **Done** to close it. (The web app's Add a
+person sits on the page and has a Show passwords box; the phone's is a sheet, and has none.)
+
+**One change at a time.** While one is out its button says so ("Making…", "Resetting…", "Changing…", "Removing…",
+"Saving…", "Forgetting…"), the others are dimmed, and the page can't be left by Back or a swipe, nor by tapping Settings
+again; a sheet can't be closed. A refusal is said in red, in deadwax's words, with what to do under it when deadwax
+names it - "That's a lot of changes in a minute - wait … seconds and try again." after ten. If deadwax's answer never
+comes, "deadwax may have finished this - looking again": People is read again to see, and nothing is sent again by
+itself. After every change People is read again, and VoiceOver says what came of it once.
+
+**Locked again.** deadwax forgets an unlock 15 minutes after it was last used, and when you Lock, sign out or your
+session ends. The phone notices on its own: a little after 15 minutes left alone (time in the background counts),
+the page reads People again - or as soon as you come back to it - and Unlock People comes back. A change refused because People locked meanwhile brings Unlock People
+back at once; a sheet still up says "People locked again - close this and unlock it with your Navidrome password. The
+passwords typed here are gone." What you typed in Add a person's names is kept for when it opens again; a person's
+unsaved switches are kept too.
+
+**Your password and theirs never stay on the phone**: none is saved, logged or put in an address. Each field is emptied
+once it's sent or done with, when you leave People, when a sheet closes, when Now Playing comes up over it, and when
+the sign-in screen comes over the app (a sheet goes with it). While deadwax can't be reached, a page that has read
+nothing yet says "Managing needs deadwax. This opens once it's back."; one that has keeps what it showed under the
+amber line, with every change dimmed until deadwax is back and People has been read again. Pull down to read it again
+at any time. With Reduce Motion on, nothing slides; at the largest text sizes everything wraps.
 
 ### Change password
 
@@ -4363,7 +4426,10 @@ build with [Server settings](#server-settings), Server settings opens in the app
 opens its Connections page over the Library: 244 is 369's now. Since the build with the [Event log](#event-log), it
 opens in the app too: in 239, tap People (as an admin) where it says Event log, and the page itself is 370-373's.
 Since the build with [Change password](#change-password), Account's Change password opens a page in the app, with no
-line under it and no arrow: 243 is 374-378's now.
+line under it and no arrow: 243 is 374-378's now. Since the build with [People](#people), People opens in the app too,
+and no row of Manage opens Safari: nothing is said under the rows, and the Safari parts of 237-241, 245 and 246 no
+longer apply - 379-387 check People's page. 241's rows following the permissions still hold: give and take them in
+the Mac's People (or the phone's), and look at the app alone.
 
 - **237 The version, and Manage.** install.sh says "Installed deadwax 0.13 (13), runs until …", and You > About
   reads 0.13 (13). As an admin, You has **Manage** between Downloads and Account: **Edit an album** (with "Opens the
@@ -4697,8 +4763,8 @@ choice (still app 0.13 (13)). No server change is needed. Compare the choices wi
   albums**, **Playback** and **Downloads** (its size at the right); Manage's rows, if you may look after deadwax;
   then **Account** (with logins on only), **This phone** - at its right the name or IP of deadwax's address: is it
   the address's? - and **About**, "0.13 (13)" at its right. Each opens its page, with **Back** and the
-  edge swipe home again; Manage's rows still have their arrow and open Safari, as before. Pull the first screen down:
-  it asks deadwax again (no spinner left behind).
+  edge swipe home again; Manage's rows have their arrow, each opening the app's own page (Safari, before Phase 8).
+  Pull the first screen down: it asks deadwax again (no spinner left behind).
 - **312 Getting albums' menus.** Open Getting albums: **When I tap Get**, **Quality floor** and **Format**, each one
   row with its choice at the right. Tap Quality floor: a menu of Any, 320 kbps, Lossless and 24-bit, the chosen one
   ticked; choose Lossless and the row says Lossless at once. The web app's You says Lossless too. Change Format in the
@@ -5146,6 +5212,54 @@ hand, and Amperfy's settings open to put it in there after.
   straight to the Library, no sign-in. Put the password back to the one you started with (Change password again), and
   in Amperfy.
 
+### People's checks (379-387)
+
+**Not done yet.** These come with the build that brings [People](#people) into the app - Phase 8's eleventh part
+(still app 0.13 (13)). No server change is needed: any deadwax the first part works with. Use deadwax's plain
+`http://` address, on the home Wi-Fi, with logins on, signed in as a Navidrome admin, with the web app's People open on
+the Mac beside it. You'll make a throwaway account and remove it again: pick a name nobody uses ("phonetest").
+
+- **379 Unlock.** Settings > Manage > **People**: the page, not Safari. "People changes Navidrome's accounts as you, …",
+  **Your Navidrome password**, **Unlock** dimmed until something is typed, and the plain-http note. Does the password
+  manager offer your password? Type a wrong one: **Unlock** - "Unlocking…", then "That isn't the password you signed in
+  to deadwax with - …" in red, the field emptied with the cursor in it. Type the right one: the unlocked line, **Lock**
+  and **+** in the bar, Everyone in Navidrome - the same people as the Mac's, you first - and Known only to deadwax if
+  the Mac shows it. With VoiceOver, each row is read once.
+- **380 A person.** Tap someone who isn't an admin: their page - their name and facts, then the five switches with
+  their lines, and Reset password…, Make admin and Remove…. Tap your own row: the switches all on and dimmed, "Admins can
+  do everything." and "That's you - change your own password in Settings → Account → Change password." under the
+  changes, with no Reset password… or Remove….
+- **381 Add a person.** **+**: the sheet. Type "Phone Test" as the user name: "A user name is lowercase letters, …"
+  under the fields, **Make account** dimmed. Type "phonetest", a display name, and a password of 4 characters twice:
+  "A password is at least 8 characters." Fix it: **Make account** - "Making…", then "Made phonetest. Tell them their
+  user name, …" with deadwax's address, the form emptied and **Done**. Close it: phonetest is in the list, and in the
+  Mac's People when it's read again.
+- **382 Permissions.** Open phonetest: turn **Edit albums** on - **Save permissions** comes on - and **Save
+  permissions**: "Saved - phonetest has them from their next tap." Reload the Mac's People: Edit albums ticked there.
+  Turn **Look after the library** on: its amber line about deleting albums. Go back without saving and open phonetest
+  again: the switch is as you left it, still unsaved.
+- **383 Reset and the admin role.** On phonetest's page, **Reset password…**: two new-password fields, the plain-http
+  note; a good password twice, **Reset password**: the sheet goes and "Done. phonetest is signed out of deadwax on 0
+  devices …" on their page. **Make admin**: the question, saying what it gives - **Make admin**: "phonetest is an admin
+  now.", the switches all on and dimmed. **No longer admin**: the question says they keep every library and what they
+  had ticked - **No longer admin**, and the switches are back as they were.
+- **384 Remove.** **Remove…**: what goes, what stays, "There's no undo. …" in red. Type "Phonetest": **Remove
+  phonetest** stays dimmed; press Return: only the keyboard goes. Type "phonetest": **Remove phonetest** - "Removing…",
+  then the sheet and the page go, and "Removed phonetest from Navidrome and deadwax." over the list, without them. The
+  Mac's People agrees when read again.
+- **385 Locked again.** Unlock, then leave People open and the phone alone (or locked) for 16 minutes: back on the
+  page, Unlock People is there, not the list. Unlock again, and tap **Lock** in the web app on the Mac: that ends the
+  Mac's unlock, not the phone's - the phone's list stays. Tap **Lock** on the phone: Unlock People at once.
+- **386 Busy, and out of reach.** Unlock, open **+** and type a user name and two passwords, then turn on Airplane
+  Mode: the amber line at the top, **Make account** dimmed. Turn it off, close the sheet, pull down on People, open **+**
+  again: the names are still there, the passwords not. Type them and make the account: while "Making…" shows, Close is
+  dimmed and a swipe down doesn't close the sheet. Remove it again (384). Then **Lock**, type your password into Unlock
+  People without tapping Unlock, open Now Playing from the mini player and put it away: the field is empty.
+- **387 The largest text, and VoiceOver.** At the largest text size, every row, switch line and sheet wraps, nothing
+  cut off. With VoiceOver: each person's row read once ("Ethan, ethan, Signed in on 2 devices, 3 albums in their
+  library"), each switch with its line and whether it's on, and what each change said read once - nothing read while
+  the sign-in is over the app.
+
 ### Add to Queue's checks (392-403)
 
 **Not done yet.** These come with the build that makes [Add to Queue](#adding-to-the-queue) the phone's one way to add
@@ -5220,11 +5334,6 @@ These are the web app's for now:
   new words wait for deadwax.
 - **Home** and **pins** - and so Home's Arriving: outside Requests, the tab's badge is the phone's only sign of a
   download on its way.
-- **Looking after deadwax**, but for [Edit album](#edit-album), [an artist's tools](#managing-an-artist),
-  [Needs a look](#needs-a-look), [Library care](#library-care), [Server settings](#server-settings) (with the web
-  app's Connections, and re-timing synced lyrics) and the [Event log](#event-log), all of it on the phone now:
-  Settings > [Manage](#manage) opens the other tool - People - in the web app, in Safari. ([Change
-  password](#change-password) is the app's own too, under Settings > Account.)
 
 ## When something goes wrong
 
@@ -5242,11 +5351,12 @@ These are the web app's for now:
 | Library: **"Your music isn't available yet"** (an admin sees **"Connect Navidrome"**) | deadwax hasn't been told where Navidrome is. An admin's **Set up Navidrome** opens Server settings' Connections page over the Library: fill in Navidrome's address, user and password, **Save changes**, and the Library fills once Navidrome answers ([Set up Navidrome](#set-up-navidrome)). |
 | Server settings: **"Not saved: …"** | deadwax refused the whole save, naming each setting and what's wrong with it - nothing was saved. Every change is still there to put right; then **Save changes** again. "Type the password again to go with the new address" (or the API key) means an address changed without its secret: type it on the same page. |
 | Server settings: **"deadwax may have finished this - looking again"** | The save's answer never reached the phone (it locked, or the network dropped). The settings are read again: what was saved is no longer marked Unsaved, and only what still differs stays to save. If they can't be read, the bar says so with **Try again**; **Discard** gives up on the save's outcome and shows the settings as they are. |
-| A row of Settings > **Manage** opens Safari on deadwax's **sign-in** | Safari has its own sign-in, apart from the app's. Sign in with the same name and password you use in the app: the page the row named opens, and Safari stays signed in after that (until it goes 30 days without use). See [Manage](#manage). |
-| A row of Settings > Manage opens a page saying **"This page needs a permission an admin hasn't given you"** (People: **"Only an admin can open People - it comes with being a Navidrome admin."**) | An admin took that permission away since deadwax last told the app - or Safari is signed in as someone other than you (below). Pull down on Settings: the row goes. Ask an admin if you need it. |
-| A Manage page opens with **someone else's access** - more than you have, or less | Safari is signed in as someone else: it signs in apart from the app, and the page is Safari's person's. In Safari, open the web app's You and look at the name at its top; **Sign out**, then sign in as yourself. |
-| **"Couldn't open the web app - Safari may be turned off in Screen Time."** | iOS wouldn't open the address. Turn Safari back on in the iPhone's Settings > Screen Time > Content & Privacy Restrictions > Allowed Apps (or ask whoever set Screen Time up), then tap the row again. |
-| Settings > Manage's rows are **dimmed** | deadwax can't be reached ("These open once deadwax is back."). They work again as soon as it can. |
+| A row of Settings > Manage opens a page saying **"This page needs a permission an admin hasn't given you"** (People: **"Only an admin can open People - it comes with being a Navidrome admin."**) | An admin took that permission away since deadwax last told the app (or, for People, Navidrome no longer has you as one of its admins). Pull down on Settings: the row goes. Ask an admin if you need it. |
+| People: **Unlock People** again, after it was unlocked | deadwax forgets an unlock 15 minutes after it was last used, and when you tap Lock - this is that. Type your Navidrome password and **Unlock** again. See [People](#people). |
+| People: **"That isn't the password you signed in to deadwax with - if you've changed it since, sign out and in again."** | Unlock wants the Navidrome password this phone signed in with. If you changed it elsewhere since, sign out of the app and in again with the new one, then unlock. |
+| People: **"That's a lot of changes in a minute - wait … seconds and try again."** | deadwax takes ten changes a minute from each admin, so a slip can't run away with Navidrome's accounts. Wait as long as it says. |
+| People: **"deadwax may have finished this - looking again"** | The change's answer never reached the phone. People is read again: the list says whether it went through - check before trying again. Nothing is sent again by itself. |
+| People: **Make account**, **Reset password** or **Remove** stays dimmed | What's typed breaks a rule (said under the fields), Remove's name isn't typed exactly, another change is out, People is being read again after one, or deadwax can't be reached. |
 | Edit album: **"deadwax can't find this album's folder: …"** | No folder in deadwax's library is matched to the album, or none has its name. **Choose the folder** and pick it yourself - or, if it was only just filed, **Look again** in a moment. See [Edit album](#edit-album). |
 | Edit album: **"deadwax may have finished this - looking again"** | The Apply's answer didn't reach the phone (locked too long, or the connection dropped); deadwax carried on regardless. The sheet reads the folder again: check What Apply does - often "Nothing to change." - before applying again. |
 | Edit album's **Apply** stays dimmed | What Apply does is still being worked out (or a release's tracklist is loading), there's nothing to change, or deadwax can't be reached. |
@@ -5284,7 +5394,7 @@ These are the web app's for now:
 | Settings > Getting albums: **"deadwax can't keep these: its database isn't writable."**, or a choice going back with **"Not saved. …"** | deadwax keeps the three in its database. Whoever runs deadwax checks `DB_PATH`, and that its folder can be written as `PUID`/`PGID`, then restarts the deadwax container - the choices in hand still apply to a Get meanwhile. |
 | A Get's row under Needs attention says **"didn't start"** and **"It's already downloading."** (or **"…already in your library."**) | It was got - by you elsewhere, or by someone else - after the sheet searched. It's already in Requests, or already yours; **Clear done** takes the refused row away. |
 | A Get's row under Needs attention says **"no answer"** and **"deadwax didn't answer in time, so this may have started anyway."** | The person sharing it took more than ten minutes to be reached, or deadwax was stuck. Look under Waiting and Downloading - it may be there - and if it isn't, get it again. **Clear done** takes the row away. |
-| An album you don't have says **"Getting albums is off for you - ask an admin."** where Get the album goes | With logins on, an admin gives **Get albums** in the web app's People. Open Settings afterwards, so the phone asks deadwax again. |
+| An album you don't have says **"Getting albums is off for you - ask an admin."** where Get the album goes | With logins on, an admin gives **Get albums** in [People](#people) (on their phone, or the web app's). Open Settings afterwards, so the phone asks deadwax again. |
 | An album stays on **"Waiting for Wi-Fi"** | Download over is Wi-Fi only (Settings > Downloads): join a Wi-Fi network that isn't a phone's hotspot, with Low Data Mode off - or choose Wi-Fi and cellular. |
 | **"Waiting for room - the storage limit is reached"** | Raise the Storage limit in Settings > Downloads, or remove something there (largest first). |
 | Your library's albums stay on **"Waiting for the phone to charge"** | Only while charging is on (Settings > Downloads, under Download your library): plug the phone in, or turn it off. Albums you download yourself don't wait for it. |

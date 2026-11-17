@@ -94,7 +94,7 @@ def test_the_routes_are_the_servers_by_method_path_and_permission():
             "answers: page)") in parts
     # the page is the app's own now: no Safari for Server settings
     managing = _code((CORE / "Managing.swift").read_text(encoding="utf-8"))
-    assert "case .edit, .queue, .care, .settings, .log: return true" in managing[managing.index("public var native: Bool {"):]
+    assert "case .edit, .queue, .care, .people, .settings, .log: return true" in managing[managing.index("public var native: Bool {"):]
     # and the Library's Set up Navidrome is the app's own page too: no address of the web app's left for it
     assert "setUpURL" not in (CORE / "NavidromeGate.swift").read_text(encoding="utf-8")
 

@@ -161,11 +161,11 @@ def test_the_root_is_the_headline_then_rows_that_open_pages():
     assert "DownloadWords.youFooter(" in footer and "DownloadWords.storeUnreadable" in footer
 
 
-def test_manage_keeps_its_rules_and_opens_the_web_app():
+def test_manage_keeps_its_rules_and_every_row_is_the_apps_own():
     manage = code(MANAGE)
     section = body(struct(manage, "ManageSection"))
     assert "let tools = Managing.tools(server.access)" in section and "if !tools.isEmpty" in section
-    # (Phase 8, slice 1) Edit an album is the app's own - Choose the folder, pushed; the others open the web app
+    # (Phase 8, slice 1) Edit an album is the app's own - Choose the folder, pushed
     edit = section.index("if tool == .edit {")
     queue = section.index("} else if tool == .queue {")
     assert "NavigationLink(value: AppRoute.chooseFolder)" in section[edit:queue]
@@ -179,10 +179,15 @@ def test_manage_keeps_its_rules_and_opens_the_web_app():
     log = section.index("} else if tool == .log {")
     assert "NavigationLink(value: AppRoute.serverSettings)" in section[settings:log]
     # (Phase 8, slice 9) the event log is the app's own too - the lines, live, pushed
-    assert "NavigationLink(value: AppRoute.eventLog)" in section[log:section.index("} else if let url")]
-    assert section.count("NavigationLink") == 5
-    assert "WebAppRow(label: ManagingWords.label(tool), url: url, live: online)" in section
-    # the footer is said of the rows drawn: Edit an album opens no Safari
+    people = section.index("} else if tool == .people {")
+    assert "NavigationLink(value: AppRoute.eventLog)" in section[log:people]
+    # (Phase 8, slice 11) People is the app's own too - Unlock People and Navidrome's accounts, pushed: no row opens
+    # Safari any more
+    assert "NavigationLink(value: AppRoute.people)" in section[people:]
+    assert section.count("NavigationLink") == 6
+    assert "WebAppRow" not in section
+    # the footer is said of the rows drawn - with none opening Safari it says nothing (slice 12 takes it out, and
+    # WebAppRow with it)
     assert "ManagingWords.footer(loginsOn: server.access.on, online: online, tools: tools)" in section
     assert "openURL.webApp(url, player: player)" in body(struct(manage, "WebAppRow"))
 
