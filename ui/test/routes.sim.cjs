@@ -72,6 +72,11 @@
  *    by path, the first 50 drawn and the rest counted, and what it says over them.
  *  - People (2.0.0-player.61): `#/you/people/all`, one page as Library care is, a sibling made from and into
  *    the others; its sidebar item, after Library care; and what a page says without its permission.
+ *  - The sidebar's one Library and its folds (2.1.35, lib/appFrame.ts): sidebarRows (one side's rows, or the
+ *    library's four without a library of your own), sideOfItem, sideShown (the view's side, else the one
+ *    remembered), sideFlip (the same view on the other side, Recently added and Songs to Albums), and after
+ *    review overLibraryView (a page pushed above a view: the side remembered shown, a turn opening nothing);
+ *    foldOf, foldCurrent and manageHeadLabel; and the tab the address still calls `you` named Settings.
  *
  * A script for the same reason as the other sims: there is no JS test runner here.
  *
@@ -105,9 +110,9 @@ function check(label, actual, expected) {
 const album = (id, label) => (label ? { kind: 'album', id, label } : { kind: 'album', id })
 const stackIds = (nav, tab) => nav.stacks[tab].map((page) => page.id)
 
-console.log('\nthe five tabs, You at the right end')
+console.log('\nthe five tabs, Settings (`you`) at the right end - You until 2.1.35')
 check('in the tab bar\'s order', R.TABS, ['home', 'library', 'search', 'requests', 'you'])
-check('their names', R.TABS.map((tab) => R.TAB_LABELS[tab]), ['Home', 'Library', 'Search', 'Requests', 'You'])
+check('their names - (2.1.35) the fifth Settings, as the iPhone app names it', R.TABS.map((tab) => R.TAB_LABELS[tab]), ['Home', 'Library', 'Search', 'Requests', 'Settings'])
 
 console.log('\nreading and writing the address')
 for (const tab of R.TABS) {
@@ -908,6 +913,81 @@ console.log('\nthe desktop frame picks panels over sheets (2.0.0-player.19)')
   check('each view\'s title on a desktop, the sidebar\'s own words',
     ['recent', 'albums', 'artists', 'songs'].map((pick) => F.LIBRARY_TITLES[pick]), ['Recently added', 'Albums', 'Artists', 'Songs'])
 
+  //? (2.1.35) one Library group with a Yours | All switch in its heading - app/Sidebar.tsx draws it (sidebar.sim)
+  const rows = (side, hasSongs, personal) => F.sidebarRows(side, hasSongs, personal).map((item) => [item.id, item.label])
+  check('the switch\'s two sides, in order, and their words', [F.LIBRARY_SIDES, F.LIBRARY_SIDES.map((side) => F.SIDE_LABELS[side])], [['yours', 'all'], ['Yours', 'All']])
+  check('Yours\' rows: your three views, plainly named - the switch says whose', rows('yours', true, true), [['recent', 'Recently added'], ['albums', 'Albums'], ['artists', 'Artists']])
+  check('All\'s rows: the collection\'s three, plainly named - Songs left out when Navidrome lists none, kept while that isn\'t known',
+    [rows('all', true, true), rows('all', null, true).length, rows('all', false, true)],
+    [[['store', 'Albums'], ['storeArtists', 'Artists'], ['songs', 'Songs']], 3, [['store', 'Albums'], ['storeArtists', 'Artists']]])
+  check('logins off: either side the library\'s rows as they always were (libraryItems), Songs by the same rule',
+    [rows('yours', true, false), rows('all', true, false), rows('all', false, false).map(([id]) => id)],
+    [[['recent', 'Recently added'], ['albums', 'Albums'], ['artists', 'Artists'], ['songs', 'Songs']],
+      [['recent', 'Recently added'], ['albums', 'Albums'], ['artists', 'Artists'], ['songs', 'Songs']], ['recent', 'albums', 'artists']])
+  check('...no row says whose: the pages\' titles still do ("Albums" never stands alone for two lists)',
+    [[...F.SIDEBAR_YOURS_ROWS, ...F.SIDEBAR_ALL_ROWS].some((item) => /^(Your|All) /.test(item.label)), ['albums', 'store', 'artists', 'storeArtists', 'songs'].map((pick) => F.libraryTitle(pick, true))],
+    [false, ['Your albums', 'All albums', 'Your artists', 'All artists', 'All songs']])
+  check('...and the phone root\'s lists keep their own words (libraryItems, browseItems unchanged)',
+    [F.libraryItems(true, true).map((item) => item.label), F.browseItems(true, true).map((item) => item.label)],
+    [['Recently added', 'Your albums', 'Your artists'], ['All albums', 'All artists', 'All songs']])
+  check('which side an item is on: the collection\'s three All\'s, yours Yours\', the rest neither',
+    ['store', 'storeArtists', 'songs', 'recent', 'albums', 'artists', 'home', 'requests', 'playlists', 'queue', 'care', 'people', 'settings', 'log', 'you', null].map(F.sideOfItem),
+    ['all', 'all', 'all', 'yours', 'yours', 'yours', null, null, null, null, null, null, null, null, null, null])
+  check('the side shown: where you are on a Library page - whatever was last shown',
+    [F.sideShown('store', 'yours'), F.sideShown('storeArtists', 'yours'), F.sideShown('songs', 'yours'), F.sideShown('recent', 'all'), F.sideShown('albums', 'all'), F.sideShown('artists', 'all')],
+    ['all', 'all', 'all', 'yours', 'yours', 'yours'])
+  check('...anywhere else the side last shown, either way',
+    ['home', 'requests', 'you', 'playlists', 'queue', 'settings', null].flatMap((at) => [F.sideShown(at, 'yours'), F.sideShown(at, 'all')]),
+    Array(7).fill(['yours', 'all']).flat())
+  check('...read from sidebarCurrent: Songs with none listed All (the collection\'s albums), Search the last side',
+    [F.sideShown(F.sidebarCurrent('library', 'songs', false, null, true), 'yours'), F.sideShown(F.sidebarCurrent('search', 'store', true, null, true), 'yours')],
+    ['all', 'yours'])
+  //? (2.1.35, review) a page pushed above a view: sidebarCurrent still names the view under it (its row lit), but the
+  //? switch doesn't follow it - All albums -> Homogenic -> Yours had popped the album to open your Albums
+  const album = { kind: 'album', id: 'x' }, artist = { kind: 'artist', id: 'a' }, section = { kind: 'section', id: 'store' }
+  check('a page above the Library\'s view: over its root, or over a section page at the stack\'s foot - an album, an artist, a playlist',
+    [F.overLibraryView('library', [album]), F.overLibraryView('library', [album, artist]), F.overLibraryView('library', [section, album]),
+      F.overLibraryView('library', [{ kind: 'playlists', id: 'all' }]), F.overLibraryView('library', [section, { kind: 'playlist', id: 'p1' }])],
+    [true, true, true, true, true])
+  check('...not the view itself: the root, or a section page alone - nor any other tab, whatever is pushed there',
+    [F.overLibraryView('library', []), F.overLibraryView('library', [section]), F.overLibraryView('home', [album]), F.overLibraryView('search', [album, artist]),
+      F.overLibraryView('you', [{ kind: 'settings', id: 'server' }])],
+    [false, false, false, false, false])
+  check('...there the switch shows the side last shown, the view under it whichever side: an album over All albums with Yours kept, Yours',
+    [F.sideShown(F.sidebarCurrent('library', 'store', true, album, true), 'yours', F.overLibraryView('library', [album])),
+      F.sideShown('store', 'all', true), F.sideShown('albums', 'all', true), F.sideShown('recent', 'yours', true)],
+    ['yours', 'all', 'all', 'yours'])
+  check('...and a turn there opens nothing - only the rows change - every view under it and either way',
+    ['recent', 'albums', 'artists', 'store', 'storeArtists', 'songs'].flatMap((at) => [F.sideFlip(at, 'all', true), F.sideFlip(at, 'yours', true)]),
+    Array(12).fill(null))
+  check('...while with the view itself showing it does, as before (over false is the default)',
+    [F.sideFlip('store', 'yours', false), F.sideFlip('store', 'yours'), F.sideShown('store', 'yours', false)], ['albums', 'albums', 'all'])
+  check('a turn on a Library page opens the same kind of page across: Albums for Albums, Artists for Artists',
+    [F.sideFlip('albums', 'all'), F.sideFlip('artists', 'all'), F.sideFlip('store', 'yours'), F.sideFlip('storeArtists', 'yours')], ['store', 'storeArtists', 'albums', 'artists'])
+  check('...Recently added (yours alone) to the collection\'s Albums, Songs (the collection\'s alone) back to your Albums',
+    [F.sideFlip('recent', 'all'), F.sideFlip('songs', 'yours')], ['store', 'albums'])
+  check('...and nothing on a page of the side turned to, nor off the Library - there only the rows change',
+    [F.sideFlip('albums', 'yours'), F.sideFlip('store', 'all'), F.sideFlip('songs', 'all'), ...['home', 'requests', 'you', 'playlists', 'queue', 'log', null].map((at) => F.sideFlip(at, 'all'))],
+    Array(10).fill(null))
+  check('...what it opens is a move sidebarMove makes as the row\'s own: that view at the Library\'s root',
+    [F.sidebarMove(F.sideFlip('artists', 'all'), 'artists', true, true), F.sidebarMove(F.sideFlip('songs', 'yours'), 'songs', true, true)],
+    [{ how: 'view', tab: 'library', pick: 'storeArtists' }, { how: 'view', tab: 'library', pick: 'albums' }])
+
+  //? (2.1.35) Playlists and Manage fold away; Library, Home and Requests never do
+  check('both groups open by default', F.OPEN_FOLDS, { playlists: false, manage: false })
+  check('the group each item folds with: All playlists (and each playlist) Playlists\', the managing pages Manage\'s, the rest none',
+    ['playlists', 'queue', 'care', 'people', 'settings', 'log', 'home', 'requests', 'recent', 'albums', 'store', 'songs', 'you', null].map(F.foldOf),
+    ['playlists', 'manage', 'manage', 'manage', 'manage', 'manage', null, null, null, null, null, null, null, null])
+  const folded = (playlists, manage) => ({ playlists, manage })
+  check('a folded group with its page showing marks its heading current - open, its row does; another group\'s page, neither',
+    [F.foldCurrent('playlists', folded(true, false), 'playlists'), F.foldCurrent('playlists', folded(false, false), 'playlists'),
+      F.foldCurrent('manage', folded(false, true), 'settings'), F.foldCurrent('manage', folded(false, true), 'queue'), F.foldCurrent('manage', folded(true, true), 'playlists'),
+      F.foldCurrent('playlists', folded(true, true), 'queue'), F.foldCurrent('manage', folded(true, true), 'home'), F.foldCurrent('playlists', folded(true, true), null)],
+    [true, false, true, true, false, false, false, false])
+  check('Manage\'s heading: its name - and folded with albums that need a look, their count too',
+    [F.manageHeadLabel(false, 3), F.manageHeadLabel(true, 3), F.manageHeadLabel(true, 1), F.manageHeadLabel(true, 0), F.manageHeadLabel(true, null), F.manageHeadLabel(false, null)],
+    ['Manage', 'Manage, 3 albums need a look', 'Manage, 1 album needs a look', 'Manage', 'Manage', 'Manage'])
+
   //? the Library's store, which the Library's chips and the desktop sidebar both choose from
   const PICK = fs.mkdtempSync(path.join(os.tmpdir(), 'deadwax-routes-pick-'))
   execFileSync(path.join(UI, 'node_modules/.bin/tsc'), [
@@ -1100,7 +1180,7 @@ console.log('\nThe server\'s settings and the log: one page each, as the queue\'
     [R.scrollKey({ tab: 'you', page: R.SETTINGS_PAGE }), R.scrollKey({ tab: 'you', page: R.LOG_PAGE }), R.samePage(R.SETTINGS_PAGE, R.LOG_PAGE), R.samePage(R.LOG_PAGE, R.QUEUE_PAGE)],
     ['#/you/settings/server', '#/you/log/all', false, false])
   const nav = R.openPage(R.startNav({ tab: 'you', page: null }), R.SETTINGS_PAGE)
-  check('back from either says "You"', [R.backLabel(nav), R.backLabel(R.openPage(R.startNav({ tab: 'you', page: null }), R.LOG_PAGE))], ['You', 'You'])
+  check('back from either says "Settings"', [R.backLabel(nav), R.backLabel(R.openPage(R.startNav({ tab: 'you', page: null }), R.LOG_PAGE))], ['Settings', 'Settings'])
   check('...and from a page pushed over them, their own names', R.backLabel(R.openPage(nav, R.LOG_PAGE)), 'Server settings')
   check('...opened twice is one page', R.openPage(nav, R.SETTINGS_PAGE), nav)
 
@@ -1120,8 +1200,8 @@ console.log('\nThe server\'s settings and the log: one page each, as the queue\'
   d.load()
   d.router.open(R.SETTINGS_PAGE)
   d.router.become(R.SETTINGS_PAGE, R.LOG_PAGE)
-  check('one Managing page made another: its entry replaced, back still saying "You"', [d.hashes(), d.router.nav.stacks.you, R.backLabel(d.router.nav)],
-    [['#/you', '#/you/log/all'], [R.LOG_PAGE], 'You'])
+  check('one Managing page made another: its entry replaced, back still saying "Settings"', [d.hashes(), d.router.nav.stacks.you, R.backLabel(d.router.nav)],
+    [['#/you', '#/you/log/all'], [R.LOG_PAGE], 'Settings'])
   d.router.become(R.LOG_PAGE, R.QUEUE_PAGE)
   d.router.back()
   d.settle()
@@ -1147,7 +1227,7 @@ console.log('\nLibrary care: one page, a sibling of the other Managing pages (2.
     [R.scrollKey({ tab: 'you', page: R.CARE_PAGE }), R.samePage(R.CARE_PAGE, R.QUEUE_PAGE), R.samePage(R.CARE_PAGE, R.SETTINGS_PAGE), R.samePage(R.CARE_PAGE, R.LOG_PAGE)],
     ['#/you/care/library', false, false, false])
   const nav = R.openPage(R.startNav({ tab: 'you', page: null }), R.CARE_PAGE)
-  check('back from it says "You"; from a page over it, "Library care"', [R.backLabel(nav), R.backLabel(R.openPage(nav, R.LOG_PAGE))], ['You', 'Library care'])
+  check('back from it says "Settings"; from a page over it, "Library care"', [R.backLabel(nav), R.backLabel(R.openPage(nav, R.LOG_PAGE))], ['Settings', 'Library care'])
   const c = makeBrowser('#/you/care/library')
   c.load()
   check('a reload (or a link) opens it', c.router.nav.stacks.you, [{ kind: 'care', id: 'library' }])
@@ -1155,8 +1235,8 @@ console.log('\nLibrary care: one page, a sibling of the other Managing pages (2.
   d.load()
   d.router.open(R.QUEUE_PAGE)
   d.router.become(R.QUEUE_PAGE, R.CARE_PAGE)
-  check('made from Needs a look by `become`: the entry replaced, back still "You"', [d.hashes(), d.router.nav.stacks.you, R.backLabel(d.router.nav)],
-    [['#/you', '#/you/care/library'], [R.CARE_PAGE], 'You'])
+  check('made from Needs a look by `become`: the entry replaced, back still "Settings"', [d.hashes(), d.router.nav.stacks.you, R.backLabel(d.router.nav)],
+    [['#/you', '#/you/care/library'], [R.CARE_PAGE], 'Settings'])
   d.router.become(R.CARE_PAGE, R.SETTINGS_PAGE)
   d.router.back()
   d.settle()
@@ -1179,7 +1259,7 @@ console.log('\nPeople: one page, a sibling of the other Managing pages (2.0.0-pl
     [R.samePage(R.PEOPLE_PAGE, R.CARE_PAGE), R.samePage(R.PEOPLE_PAGE, R.QUEUE_PAGE), R.samePage(R.PEOPLE_PAGE, R.SETTINGS_PAGE), R.samePage(R.PEOPLE_PAGE, R.LOG_PAGE)],
     [false, false, false, false])
   const nav = R.openPage(R.startNav({ tab: 'you', page: null }), R.PEOPLE_PAGE)
-  check('back from it says "You"', R.backLabel(nav), 'You')
+  check('back from it says "Settings"', R.backLabel(nav), 'Settings')
   const c = makeBrowser('#/you/people/all')
   c.load()
   check('a reload (or a link) opens it', c.router.nav.stacks.you, [{ kind: 'people', id: 'all' }])
@@ -1187,8 +1267,8 @@ console.log('\nPeople: one page, a sibling of the other Managing pages (2.0.0-pl
   d.load()
   d.router.open(R.CARE_PAGE)
   d.router.become(R.CARE_PAGE, R.PEOPLE_PAGE)
-  check('made from Library care by `become`: the entry replaced, back still "You"', [d.hashes(), d.router.nav.stacks.you, R.backLabel(d.router.nav)],
-    [['#/you', '#/you/people/all'], [R.PEOPLE_PAGE], 'You'])
+  check('made from Library care by `become`: the entry replaced, back still "Settings"', [d.hashes(), d.router.nav.stacks.you, R.backLabel(d.router.nav)],
+    [['#/you', '#/you/people/all'], [R.PEOPLE_PAGE], 'Settings'])
   check('the sidebar: People is Managing\'s item', F.SIDEBAR_PEOPLE, { id: 'people', label: 'People' })
   check('...current while its page is on top, whatever its tab', [F.sidebarCurrent('you', 'albums', true, R.PEOPLE_PAGE), F.sidebarCurrent('home', 'albums', true, R.PEOPLE_PAGE)],
     ['people', 'people'])

@@ -2,18 +2,20 @@ import type { FunctionComponent } from 'preact'
 
 import { TAB_LABELS, TABS, type Tab } from '../lib/appRoutes'
 import { badgeLabel, badgeText } from '../lib/requestsView'
-import { HomeIcon, LibraryIcon, RequestsIcon, SearchIcon, YouIcon } from '../player/icons'
+import { HomeIcon, LibraryIcon, RequestsIcon, SearchIcon, SettingsIcon } from '../player/icons'
 
 const ICONS: Record<Tab, FunctionComponent<{ class?: string }>> = {
   home: HomeIcon,
   library: LibraryIcon,
   search: SearchIcon,
   requests: RequestsIcon,
-  you: YouIcon,
+  //? (2.1.35) Settings, a gear - You and its head and shoulders until then, as the iPhone app names it
+  you: SettingsIcon,
 }
 
 /**
- * The five tabs along the bottom: Home, Library, Search, Requests and You, You at the right end.
+ * The five tabs along the bottom: Home, Library, Search, Requests and Settings (You until 2.1.35; its id is still
+ * `you`), Settings at the right end.
  * Flat, as STYLE.md draws it - no pill, no blur - the chosen tab in the accent.
  *
  * A tap is App's to interpret (lib/appRoutes.ts's selectTab): another tab shows it as it was

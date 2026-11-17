@@ -56,9 +56,14 @@
         --app-desk-field-gap: 8px;
         --app-desk-badge: 20px;
         --app-desk-badge-pad: 4px;
-        --app-desk-you: 44px;
-        --app-desk-avatar: 26px;
-        --app-desk-avatar-icon: 16px;
+        --app-desk-you: 44px;             /* Settings, at the foot */
+        /* (2.1.35) a glyph on every row, the headings that fold, and Library's switch */
+        --app-desk-side-icon: 18px;       /* a row's glyph */
+        --app-desk-side-stroke: 1.8;      /* ...every glyph's line at one weight: the tab bar's, Home's and Requests' own */
+        --app-desk-side-head: 24px;       /* a group's heading - a fold's button, the switch beside Library */
+        --app-desk-side-fold-icon: 12px;  /* the chevron that says whether a group is open */
+        --app-desk-side-fold-turn: -90deg; /* ...pointing at the words while it is folded */
+        --app-desk-side-switch-pad: 8px;  /* Yours, All: either side of the word */
 
         /* the player bar */
         --app-desk-bar-pad: 20px;
@@ -300,7 +305,23 @@
         outline-offset: var(--app-ring-inset);
     }
 
-    .app-desk .app-side-item-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    /* the words take the row between the glyph and the count */
+    .app-desk .app-side-item-label { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+    /* (2.1.35) a row's glyph, before its words: the phone Library rows' accent, every glyph's line at one weight (the
+       tab bar's finer two and the line set's others side by side), the selection's own colour on the row you're on */
+    .app-desk .app-side-icon {
+        flex: none;
+        width: var(--app-desk-side-icon);
+        height: var(--app-desk-side-icon);
+        color: var(--dw-accent);
+        stroke-width: var(--app-desk-side-stroke);
+    }
+
+    .app-desk .app-side-item.is-current .app-side-icon { color: var(--dw-selected-text); }
+
+    /* a playlist has no glyph of its own: its name set under All playlists' words, as All playlists' own */
+    .app-desk .app-side-playlist { padding-left: calc(2 * var(--app-desk-item-pad) + var(--app-desk-side-icon)); }
 
     /* Requests' count, STYLE.md's purple badge */
     .app-desk .app-side-badge {
@@ -319,31 +340,123 @@
         font-weight: var(--dw-weight-semibold);
     }
 
-    /* You, at the foot, under a rule */
-    .app-desk .app-side-you {
+    /* (2.1.35) Library's heading: its words, and with a library of your own the Yours | All switch at the right, where
+       a row's count sits - every heading one height, with a switch or without */
+    .app-desk .app-side-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: var(--app-desk-item-pad);
+        min-height: var(--app-desk-side-head);
+        margin-bottom: var(--app-desk-label-pad);
+        padding-right: var(--app-desk-item-pad);
+    }
+
+    .app-desk .app-side-head > .app-side-label { padding-bottom: 0; }
+
+    /* the switch: STYLE.md's segmented control, as Settings draws its own - a well, the chosen side in the toggled tint */
+    .app-desk .app-side-switch {
+        display: grid;
         flex: none;
+        grid-auto-columns: minmax(0, 1fr);
+        grid-auto-flow: column;
+        gap: var(--app-segment-gap);
+        height: var(--app-desk-side-head);
+        padding: var(--dw-hairline);
+        border-radius: var(--dw-radius-control);
+        background: var(--dw-well);
+        box-shadow: var(--dw-well-inset);
+    }
+
+    .app-desk .app-side-side {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 0 var(--app-desk-side-switch-pad);
+        border: var(--dw-hairline) solid transparent;
+        border-radius: var(--dw-radius-tag);
+        color: var(--dw-text-2);
+        font-size: var(--dw-text-label);
+        font-weight: var(--dw-weight-semibold);
+    }
+
+    .app-desk .app-side-side:hover { color: var(--dw-text); }
+
+    .app-desk .app-side-side[aria-checked='true'] {
+        border-color: var(--dw-toggled-border);
+        background: var(--dw-toggled-bg);
+        color: var(--dw-accent-text);
+    }
+
+    .app-desk .app-side-side:focus-visible {
+        outline: var(--app-ring) solid var(--dw-accent);
+        outline-offset: var(--app-ring-inset);
+    }
+
+    /* (2.1.35) Playlists' and Manage's headings fold their groups away: the heading a button the label's width and
+       words, a chevron at the right that turns to point at them while the group is folded */
+    .app-desk .app-side-fold-head { padding: 0 0 var(--app-desk-label-pad); }
+
+    .app-desk .app-side-fold {
+        display: flex;
+        align-items: center;
+        gap: var(--app-desk-item-pad);
+        width: 100%;
+        min-height: var(--app-desk-side-head);
+        padding: 0 var(--app-desk-item-pad);
+        border: var(--dw-hairline) solid transparent;
+        border-radius: var(--dw-radius-control);
+        text-align: left;
+    }
+
+    .app-desk .app-side-fold:hover { background: var(--app-desk-hover); color: var(--dw-text); }
+
+    .app-desk .app-side-fold:focus-visible {
+        outline: var(--app-ring) solid var(--dw-accent);
+        outline-offset: var(--app-ring-inset);
+    }
+
+    .app-desk .app-side-fold-label { flex: 1 1 auto; min-width: 0; }
+
+    .app-desk .app-side-fold-icon {
+        flex: none;
+        width: var(--app-desk-side-fold-icon);
+        height: var(--app-desk-side-fold-icon);
+        transition: transform var(--dw-duration) var(--dw-ease);
+    }
+
+    .app-desk .app-side-fold[aria-expanded='false'] .app-side-fold-icon { transform: rotate(var(--app-desk-side-fold-turn)); }
+
+    /* folded, with its page the one showing: the heading is where you are, in Explorer's selection */
+    .app-desk .app-side-fold.is-current {
+        border-color: var(--dw-selection-border);
+        background: var(--dw-selection-bg);
+        color: var(--dw-selected-text);
+    }
+
+    /* Settings, at the foot, under a rule - and (2.1.35) kept in view while the groups above it scroll: twenty
+       playlists and Manage's rows put it below a laptop's fold. The foot is an opaque strip the rows pass under, reaching
+       over the sidebar's own padding below it so none shows through there either (a sticky box keeps clear of its
+       scroller's padding, hence the bottom past it); keyboard focus scrolls clear of it */
+    .app-desk .app-side { scroll-padding-bottom: calc(var(--app-desk-you) + var(--app-desk-side-pad-y)); }
+
+    .app-desk .app-side-foot {
+        position: sticky;
+        bottom: calc(-1 * var(--app-desk-side-pad-y));
+        flex: none;
+        margin: auto 0 calc(-1 * var(--app-desk-side-pad-y));
+        padding-bottom: var(--app-desk-side-pad-y);
+        background: var(--dw-sidebar);
+    }
+
+    .app-desk .app-side-you {
         justify-content: flex-start;
         height: var(--app-desk-you);
-        margin-top: auto;
         border-top-color: var(--dw-frame-border);
         border-radius: 0;
     }
 
     .app-desk .app-side-you.is-current { border-radius: var(--dw-radius-control); }
-
-    .app-desk .app-side-avatar {
-        display: flex;
-        flex: none;
-        align-items: center;
-        justify-content: center;
-        width: var(--app-desk-avatar);
-        height: var(--app-desk-avatar);
-        border-radius: var(--dw-radius-round);
-        background: var(--dw-avatar);
-        color: var(--dw-text);
-    }
-
-    .app-desk .app-side-avatar-icon { width: var(--app-desk-avatar-icon); height: var(--app-desk-avatar-icon); }
 
     /* ===== the player bar ===== */
 
@@ -2005,6 +2118,7 @@
            43px. The transport between them still has its 5 x 44 + 4 x 22 at 1024. From 1280 the column's 320px. */
         --app-desk-bar-side: 304px;
         --app-desk-item: var(--pl-hit);
+        --app-desk-side-head: var(--pl-hit);   /* (2.1.35) a fold's heading, and Library's switch */
         --app-desk-row: var(--pl-hit);
         --app-desk-control: var(--pl-hit);
         --app-desk-close: var(--pl-hit);

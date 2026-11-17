@@ -6,13 +6,13 @@ its guide. It plays your library from **[Navidrome](https://www.navidrome.org)**
 which keeps Navidrome's login and passes on the player's requests, so the phone never holds
 Navidrome's password and only ever needs to reach deadwax.
 
-It has five tabs along the bottom (**Home**, **Library**, **Search**, **Requests** and **You**), with
+It has five tabs along the bottom (**Home**, **Library**, **Search**, **Requests** and **Settings**), with
 the player inside them. **Search** finds artists, albums and songs - yours first in each, then
 MusicBrainz's, in one list as Apple Music shows it - and shows an album you don't have with each of
 its pressings' tracklists, and **Get** fetches it: the sources found on Soulseek, to choose from
 ([finding music](finding-music.md), [downloading](downloading.md)). **Requests** shows your downloads
 as they arrive. **Home** has the albums and artists you [pin](#home-and-pins) to it, and what you
-haven't played in a while. **You** has your settings and, for an admin, everything for looking after
+haven't played in a while. **Settings** has your settings and, for an admin, everything for looking after
 deadwax ([the library](library.md), [configuration](configuration.md)). On a computer's screen - a
 window 1024 pixels wide or more - the same app has [a desktop's layout](#on-a-desktop): a sidebar
 instead of the tabs, a player bar along the bottom, and the sources beside an album rather than over
@@ -72,8 +72,8 @@ what, in place of the albums: **Connect Navidrome** when the settings aren't all
 needs Navidrome for your library, set up in Server settings (Connections) - or **Can't reach
 Navidrome** with the reason and a **Try again** button. Anyone who doesn't run deadwax reads **Your
 music isn't available yet** or **…right now** instead, with what they can do - try again, or tell
-whoever runs deadwax - never Navidrome's address or a setting. The tab bar and You work without
-Navidrome, so You's **Connections** can say what deadwax can and can't reach. [Troubleshooting](troubleshooting.md#the-player-says-connect-navidrome-or-cant-reach-navidrome)
+whoever runs deadwax - never Navidrome's address or a setting. The tab bar and Settings work without
+Navidrome, so Settings' **Connections** can say what deadwax can and can't reach. [Troubleshooting](troubleshooting.md#the-player-says-connect-navidrome-or-cant-reach-navidrome)
 goes through each one.
 
 Setting Navidrome up also changes how an album is re-filed: applying a release in the Edit
@@ -93,7 +93,7 @@ address (`http://your-server:8080/`) opens the app too: that address sends the b
 
 ## What it does
 
-- **Five tabs** along the bottom: **Home**, **Library**, **Search**, **Requests** and **You**.
+- **Five tabs** along the bottom: **Home**, **Library**, **Search**, **Requests** and **Settings**.
   Each keeps its own pages, as an iPhone app's tabs do: an album opened from Home stays under
   Home while you look at the Library, and is there when you come back - the browser's back
   button, or a swipe back, onto another tab brings that tab back as you left it too. Tapping the
@@ -170,7 +170,7 @@ address (`http://your-server:8080/`) opens the app too: that address sends the b
 - **A mini player** along the bottom, just above the tabs, while something is playing, with
   play/pause and next. Tap it to open the now-playing screen, from any tab. VoiceOver reads it as what it
   shows, then what a tap does: "Now playing: Roads, Portishead - open".
-- **You**: **Getting albums** - **When I tap Get** (**Show me the sources**, or **Pick the best
+- **Settings**: **Getting albums** - **When I tap Get** (**Show me the sources**, or **Pick the best
   source for me**), the **Quality floor** (Any, 320 kbps, Lossless, 24-bit) and **Format** (Any, Prefer lossless, Lossless only - what a Get's sources are scored
   by), kept for you on deadwax rather than on the device (see [configuration](configuration.md#your-settings-in-the-app-per-user-on-deadwax)),
   then **Confirm before cancelling**, which is this device's;
@@ -180,7 +180,7 @@ address (`http://your-server:8080/`) opens the app too: that address sends the b
   **Connections** (for an admin, and anyone given **Settings and the log**), whether deadwax can reach
   MusicBrainz, slskd and Navidrome - a word for each (**Connected**, **Not on Soulseek**, **Can't reach
   it**…) and a sentence under it saying where to put it right - checked the first
-  time you open You and again with **Check again** (which asks for the version again too). At the top,
+  time you open Settings and again with **Check again** (which asks for the version again too). At the top,
   with logins on, the name you're signed in as is the headline (with them off, **deadwax**, and *No
   sign-in needed* under it). With logins on, **Account** has **Change password**
   (signed in with your own Navidrome account: your current password and the new one twice; this device
@@ -192,12 +192,12 @@ address (`http://your-server:8080/`) opens the app too: that address sends the b
   hours"). **About** has the version - and, for an admin, whether logins are on. For an admin,
   **Manage**: **Needs a look**, with how many, then **Library care**, **People** (with logins on),
   **Server settings** and **Event log** ([below](#looking-after-deadwax-from-a-phone)) - on a phone; on
-  a desktop they are the sidebar's **Manage** ([below](#on-a-desktop)), always in view, so You leaves them out. Someone an admin gave some of these to sees only theirs: Needs a look
+  a desktop they are the sidebar's **Manage** ([below](#on-a-desktop)), always in view, so Settings leaves them out. Someone an admin gave some of these to sees only theirs: Needs a look
   with Look after the library, Library care with it or Edit albums, Server settings and Event log with
   Settings and the log - People is a Navidrome admin's alone ([Sharing deadwax](sharing.md#admins-permissions-and-everyone-else)).
 - **Requests**: your downloads, under **Downloading** (a bar, "6 of 10 files · 1.8 MB/s", who it's
   from, and **✕** to cancel, which asks in the card first - **Keep it** or **Cancel download** -
-  unless You's **Confirm before cancelling** is off),
+  unless Settings' **Confirm before cancelling** is off),
   **Waiting** (its place in the user's queue - "4th in their queue" - or "starting"), **Needs attention**
   (why it stopped, in red, with **Another source · N left** and **Same source again**) and **Done** (how it ended and how long
   ago: "In your library · 12 minutes ago"), each heading only when it has something under it, and
@@ -271,9 +271,9 @@ address (`http://your-server:8080/`) opens the app too: that address sends the b
   the score's six parts as chips (**Track names**, **Track count**, **Track lengths**, **Edition**,
   **Format**, **Availability**), each with what it measures beside it, and the edition words in the
   folder's name. **Lossless**, **24-bit**, **Starts now**, **Complete albums only** and the sort narrow the list,
-  and **Search again** under it opens the query to edit. The search is scored by You's **Format**.
+  and **Search again** under it opens the query to edit. The search is scored by Settings' **Format**.
   A card's **Get** queues it and switches to Requests, where it already shows. With **Pick the best
-  source for me** in You, Get queues the best match itself when one scores 75 or more under your
+  source for me** in Settings, Get queues the best match itself when one scores 75 or more under your
   quality floor (never for the album as a whole, with no tracklist to judge by).
   [Downloading](downloading.md#choosing-a-source) has every state of the sheet.
 - **Now playing**: a large cover (a grey square for an album without one), the song's title, and
@@ -289,7 +289,7 @@ address (`http://your-server:8080/`) opens the app too: that address sends the b
   Drag it down by its top half, or tap the arrow at its top, to close it (Escape closes it too). While
   it's open nothing behind it can be reached by the keyboard or VoiceOver; opening it moves to its
   close arrow, and closing it goes back to where you were. How the song was sent and how the last
-  song changes and seek went are in [Info → Debug](#info--debug), and the Gapless checkbox in **You**.
+  song changes and seek went are in [Info → Debug](#info--debug), and the Gapless checkbox in **Settings**.
 - **Lyrics** on the now-playing screen shows the song's lyrics in the cover's place as it plays: the line being
   sung bright and the rest dimmer, kept about a third of the way down as the song moves on, and three dots filling in
   through a long break between verses (or a long intro). Scroll them yourself - a finger, a wheel or a trackpad -
@@ -888,7 +888,7 @@ other Subsonic app signed in as you) shows the same ones, and a playlist made or
 same playlist in the other. deadwax keeps none of its own.
 
 **Where they are.** On a phone, **Playlists** is the first row of the Library's list. On a
-desktop it's the sidebar's **Playlists** group, under the Library's (and All music's): **All playlists**, then
+desktop it's the sidebar's **Playlists** group, under **Library**: **All playlists**, then
 up to 20 of them by name - yours, then the ones shared with you.
 
 **Whose.** The Playlists page lists three groups, each by name:
@@ -971,7 +971,7 @@ everyone:
   or an iPad), so a stray one can't throw away an edit you've half made; inside the tag editor, a track or the delete confirmation, their own **Cancel**,
   **Tracks** or **Close** goes back one step. Turn an iPad (or widen the window) past 1024 pixels with
   the sheet open and it becomes the desktop's panel beside the page - and a sheet again the other way.
-- **You → Manage**: **Needs a look** (with how many) opens **Needs a look** - the albums whose tags,
+- **Settings → Manage**: **Needs a look** (with how many) opens **Needs a look** - the albums whose tags,
   folder or cover need fixing, the ones Navidrome doesn't list and the new downloads nobody has looked
   at, with a chip per kind of issue. Tap one and the Edit sheet opens on it, saying where it is in the
   list (*1 of 17*), with **◁**, **Skip ▷** and, after **Apply**, **Next album ▷** to work through them
@@ -1002,27 +1002,42 @@ side - and the same app is laid out for a desktop. It's the same app, not
 a second one: the same pages, the same addresses (a link or a bookmark opens the same thing at
 either size), the same settings. Make the window narrower than 1024 and it's the phone's layout
 again - and the other way round - without the music stopping: only what's around the pages
-changes. (You's **Now Playing opens as** and **Pause winds the record down** are the phone layout's
-own: there's no now-playing screen on a desktop, so You leaves them out there - an iPad on its side
+changes. (Settings' **Now Playing opens as** and **Pause winds the record down** are the phone layout's
+own: there's no now-playing screen on a desktop, so Settings leaves them out there - an iPad on its side
 still shows them, since turned upright it's a phone.)
 
-- **A sidebar** down the left instead of the tab bar: **deadwax**, the **search field**, **Home**
-  and **Requests** (with the count of what's arriving, as the tab has), the Library's views -
-  **Recently added**, **Albums**, **Artists** and **Songs** (Songs left out when Navidrome won't list
-  songs, as on a phone; with logins on, the Library's three are yours - **Recently added**, **Your albums**,
-  **Your artists** - and an **All music** group under them has the collection's **All albums**, **All artists**
-  and **All songs** - [the player as you](#the-player-as-you-with-logins-on))
+- **A sidebar** down the left instead of the tab bar, each row with an icon before its name:
+  **deadwax**, the **search field**, **Home** and **Requests** (with the count of what's arriving, as
+  the tab has), then **Library** - **Recently added**, **Albums**, **Artists** and **Songs** (Songs left
+  out when Navidrome won't list songs, as on a phone).
+  - **With logins on**, Library's heading has a **Yours | All** switch beside it
+    ([the player as you](#the-player-as-you-with-logins-on)). **Yours** lists your library's
+    **Recently added**, **Albums** and **Artists**; **All** lists everything deadwax holds - **Albums**,
+    **Artists** and **Songs**. The pages keep their full names (**Your albums**, **All albums** and so on).
+    The switch shows the side of the Library view you're on; anywhere else - an album, an artist or a
+    playlist opened from a view included - the side you chose last in that browser. Turned while a view
+    shows, it opens the same view on the other side - Albums for Albums, Artists for Artists, and Albums
+    from Recently added or Songs, which the other side doesn't have; anywhere else, over an album or an
+    artist too, it only changes the rows, and the page you're on stays. It's a pair of radio buttons to the keyboard: the
+    arrow keys move between them.
   - then **Playlists**: **All playlists**, and up to 20 playlists by name, yours
-  then those shared with you, each opening its page ([Playlists](#playlists)) - then **Manage**: **Needs a look**, with how many albums need one, the
+    then those shared with you, each opening its page ([Playlists](#playlists)). A playlist's own row
+    has no icon - its name sits under All playlists'.
+  - then **Manage**: **Needs a look**, with how many albums need one, the
   library's review queue in the app, an album folder Navidrome doesn't list among them (**Not in
   Navidrome**; [the library guide](library.md#needs-a-look) has it),
   **Library care** - **Rescan** and the runs that fetch covers, CD art and lyrics for the albums
   missing them ([the library guide](library.md#library-care)) - **Server settings**, the server's settings, its
   three pages and its one save ([Configuration](configuration.md#in-the-app) has it) - and **Event log**,
   deadwax's event log: the last 500 lines since it started, then new ones as they come, while the page
-  shows ([troubleshooting](troubleshooting.md#the-event-log-is-missing-lines-says-lost-the-live-feed-or-starts-empty))
-  - and **You** at the foot. An album is edited from its own page (below), and an artist's pictures and
-  **Move albums to …** are on the artist's page ([above](#managing-an-artist)). Where you are is highlighted. Home, Requests and You work as the phone's tabs
+  shows ([troubleshooting](troubleshooting.md#the-event-log-is-missing-lines-says-lost-the-live-feed-or-starts-empty)).
+  - **Playlists** and **Manage** fold: click the heading (or its arrow) to put the group's rows away,
+    and again to bring them back. Both start open, and that browser remembers which you folded.
+    Folded, the heading is highlighted while one of its pages shows, and Manage's heading carries
+    **Needs a look**'s count. Home, Requests and Library don't fold.
+  - and **Settings** (your settings, the phone's fifth tab) at the foot, under a rule, kept in view while the rows
+  above it scroll. An album is edited from its own page (below), and an artist's pictures and
+  **Move albums to …** are on the artist's page ([above](#managing-an-artist)). Where you are is highlighted. Home, Requests and Settings work as the phone's tabs
   do: a click shows it as you left it, and a click on the one showing goes back to its first page
   (and, there, to the top). So does the Library view showing. Another Library view shows that view -
   where you left it when you were already on the Library's first page, and at its top from anywhere
@@ -1043,7 +1058,7 @@ still shows them, since turned upright it's a phone.)
 - **The Library's albums and Home's Recently added** are a grid, six covers across - fewer while a
   panel is a column beside them (from 1280 pixels wide), so a cover stays a cover's size. Home's
   **Arriving** cards sit side by side.
-- **You** is laid out as a desktop's settings page. From 1280 pixels wide it runs across the page to
+- **Settings** is laid out for a desktop. From 1280 pixels wide it runs across the page to
   the same edges as Home and the Library, in two columns: Your library and Getting albums, then
   Connections, Account and About, down the left, and Playback down the right, each section's title
   above its settings. Narrower than that, each section's title is in a column at the left with its
@@ -1234,9 +1249,9 @@ calmly, and nothing jumps with the beat.
 The now-playing screen has a second look, made for the phone: the song on a record turning on a
 turntable. **The button at its top right** switches between the two, for as long as the screen
 stays open - a round record on the cover, a square (the cover) on the turntable. Which one it
-opens as is **Now Playing opens as**, in **You** under **Playback**: **Cover**, the default, or
+opens as is **Now Playing opens as**, in **Settings** under **Playback**: **Cover**, the default, or
 **Turntable**. Like the others there, it's kept on that device. The button never changes the
-setting: close the screen and open it again, and it's back to what You says.
+setting: close the screen and open it again, and it's back to what Settings says.
 
 The record has **momentum** and **its own sound**: flick it and it keeps
 turning; the sound follows your hand, faster and slower and backwards; and pausing from the turntable
@@ -1402,7 +1417,7 @@ below.
     and which of the two plays it.
     It never touches the song's own playback: what you hear when the record is at its own speed is
     the song, exactly as it always was.
-- **Pause winds the record down**, a checkbox in **You** under **Playback**, beside **Now Playing
+- **Pause winds the record down**, a checkbox in **Settings** under **Playback**, beside **Now Playing
   opens as**: on (the default), pausing from the turntable - a tap on the record, or the pause button
   while the turntable shows - slows the song's sound to a stop with the record over about a second
   at 1x (from 2x about 1.25 s, from 0.25x about 0.55 s - it winds down from the song's own speed),
@@ -1458,7 +1473,7 @@ the turntable.
   0.01, Page Up and Page Down by 0.1, **Home** to 0.25x and **End** to 2x; VoiceOver reads it as
   "1.25 times", or "normal speed". The arrows step past the 1x snap, so 1.01x is one press from 1x.
 - **It stays where you left it**, as a deck's pitch fader does: for every song after, kept on the device
-  like the settings in You, through Gapless's stream and its second player, a song asked for again
+  like the settings in Settings, through Gapless's stream and its second player, a song asked for again
   after it dropped, AirPlay, and a reload of the app. The lock screen's scrubber moves at the speed.
 - **Off 1x, a chip says so on the now-playing screen's cover and on a desktop** - `1.25x` - at the
   left end of the row of buttons under the cover's transport, and in the [desktop's player
@@ -1666,7 +1681,7 @@ of the page shows Info > Debug's two turntable rows.
 ## Gapless playback
 
 Between two songs there's normally a short pause, about a second on an iPhone over a VPN: when
-one song ends, the phone has to ask deadwax for the next one and start it from nothing. **Gapless**, a checkbox in **You** under **Playback**, closes that gap. It's **off** by default.
+one song ends, the phone has to ask deadwax for the next one and start it from nothing. **Gapless**, a checkbox in **Settings** under **Playback**, closes that gap. It's **off** by default.
 It's kept on the device, and a home-screen app keeps its settings apart from Safari's, so turn it
 on in the app itself.
 
@@ -1781,7 +1796,7 @@ where it's read matters. The rows about the song - **Fields from Navidrome**'s *
 other songs** and **Album fields** - say the same on any device, so an admin can read them on theirs, playing the same song. The
 rest describe the device and browser Info is open on (how the song is sent to it, its gaps and seeks, its
 speed, the turntable's sound and timing, a recording): on an admin's own phone they're that phone's, not
-yours. For those an admin reads Debug on your device - **You → Account → Sign out**, they sign in there and
+yours. For those an admin reads Debug on your device - **Settings → Account → Sign out**, they sign in there and
 do what went wrong again, then sign out and you sign back in. Nothing on the server is kept from anyone by
 this: Debug is drawn from what the page already has.
 
@@ -1913,7 +1928,7 @@ the lock screen followed each song, and seeks, Next and Previous landed where th
 second player's song changes took about 98 ms there against about 145 ms with Gapless off, and
 94 and 96 ms on an iPhone. To try the stream on the phone:
 
-1. Tick **Gapless** in You and play an album of CD-quality FLAC from a tap, with the screen on.
+1. Tick **Gapless** in Settings and play an album of CD-quality FLAC from a tap, with the screen on.
    Info → Debug's Last song change row should say `0 ms, in one stream`, and you shouldn't hear the joins.
 2. **Lock the phone** and let at least ten songs change by themselves. The lock screen should show
    each song's title and its own position as it comes. Unlock and open Info → Debug: the Last song change row
@@ -1938,7 +1953,7 @@ second player's song changes took about 98 ms there against about 145 ms with Ga
 
 ## Maximum quality: hi-res at 48 kHz
 
-**Maximum quality** is in **You**, under **Playback**, with two choices. Like Gapless above it, it's
+**Maximum quality** is in **Settings**, under **Playback**, with two choices. Like Gapless above it, it's
 kept on the device.
 
 - **Up to 48 kHz** (the default): FLAC songs at 88.2, 96, 176.4, 192, 352.8 or 384 kHz, 16 or 24
@@ -2001,7 +2016,7 @@ playing carries on as it began.
 
 ## Normalization
 
-**Normalization** is in **You**, under **Playback**, after Maximum quality. It
+**Normalization** is in **Settings**, under **Playback**, after Maximum quality. It
 brings your music to one loudness, so a quiet album and a loud one play at the same level and you don't
 reach for the volume between them. Like the other Playback settings it's kept on the device, so a phone
 on AirPods and a desktop on speakers can each have their own. Four choices:
@@ -2265,11 +2280,11 @@ With logins on ([sharing deadwax](sharing.md) says how to turn them on), the app
 screen: your **Navidrome** user name and password. Nothing else of the app is drawn until you've signed
 in, and then you stay signed in on that device - the home-screen app included - for 30 days from when
 you last used it. Admins - Navidrome's admins - see everything described here;
-anyone else sees no **Manage** in You or the sidebar, no **Edit** on an album and no managing on
+anyone else sees no **Manage** in Settings or the sidebar, no **Edit** on an album and no managing on
 an artist's page, and can do everything else - search, **Get**, play, pin - unless an admin gave them
 some of the managing (they see that part) or took Get albums away (Get then says "Getting albums is off
 for you - ask an admin."). A change an admin makes to what you may do is in force from your next tap; if
-deadwax couldn't check your account as you signed in, You says the extra permissions are off until you
+deadwax couldn't check your account as you signed in, Settings says the extra permissions are off until you
 sign in again ([Sharing deadwax](sharing.md#admins-permissions-and-everyone-else)).
 
 When a sign-in can't go through, the screen says why in words for anyone - "That user name and password
@@ -2279,7 +2294,7 @@ whoever runs deadwax."). What they need - the setting's name, Navidrome's own an
 it, behind **For whoever runs deadwax** ([troubleshooting](troubleshooting.md#signing-in)).
 
 If your session ends while you're using the app - you changed your Navidrome password in Navidrome, say
-(or with **You → Account → Change password** on another device), or your account was removed, which deadwax notices within about six minutes - the sign-in screen comes back
+(or with **Settings → Account → Change password** on another device), or your account was removed, which deadwax notices within about six minutes - the sign-in screen comes back
 **over** whatever was showing, saying why: as soon as the app next asks deadwax for something, as it
 comes back to the front, or as a song fails to load. Sign in again as the same person and it goes, leaving the app as it
 was underneath. **The music doesn't wait for you, though**: until you've signed in again the player
@@ -2329,7 +2344,7 @@ favourites, the same ones Amperfy (or any Subsonic app) shows as starred - and d
   waits for deadwax to have scanned the library once (it does so by itself as it starts, the first
   time): until then every read counts as the first, so a star you make before that isn't marked new
   either.
-- **You → Your library** says how many albums your library holds and how many are waiting to be added
+- **Settings → Your library** says how many albums your library holds and how many are waiting to be added
   ("12 albums · 2 waiting to be added"), and why - a few albums named for each reason, then how many more:
   "The music server hasn't picked it up yet - it's added as soon as it has.", "An admin needs to match it
   to a release on MusicBrainz before it can be added." (it has no MusicBrainz release id; an admin applies
@@ -2342,7 +2357,7 @@ favourites, the same ones Amperfy (or any Subsonic app) shows as starred - and d
   change your Navidrome password** in Navidrome or Amperfy, the login deadwax kept for you stops working: it
   says so in red - "New albums can't be added to your library until you sign in again. Sign out, then sign in
   - with your new password if you changed it. Nothing is lost meanwhile." - and what you get meanwhile
-  waits, then is starred once you've signed in with the new password. (Changed in deadwax, with **You →
+  waits, then is starred once you've signed in with the new password. (Changed in deadwax, with **Settings →
   Account → Change password**, deadwax keeps the new login at once: no red line, and what was waiting is starred
   within a few seconds.) An album an admin deleted is listed there as
   **Removed by an admin.**, with **Get it again** (its album page, where **Get** is - shown only to someone
@@ -2392,9 +2407,9 @@ lists at all (**Not in Navidrome**). With logins off nothing here changes: one a
   theirs: "2 albums in the collection") and **All songs**, as the Library always listed them. On a phone the
   Library's list has both: its first group is yours (Playlists, **Your albums**, **Your artists**), and a group
   headed **All music** under it the collection's (**All albums**, **All artists**, **All songs**); on a desktop
-  the sidebar lists both, **Library** (Recently added, Your albums, Your artists) and **All music** (All
-  albums, All artists, All songs) - each page titled as its row is. All songs is All music's: Navidrome lists
-  songs from the whole collection.
+  the sidebar's **Library** has both behind its **Yours | All** switch - **Yours** (Recently added, Albums,
+  Artists) and **All** (Albums, Artists, Songs) - each page titled in full: Your albums, All albums and so on
+  ([on a desktop](#on-a-desktop)). All songs is All music's: Navidrome lists songs from the whole collection.
 - **An empty library says so** - Ethan's, at first: "Nothing in your library yet." and "Look through All
   music and add the albums you like, or find new ones in Search and Get them.", with **See All music** - in
   whichever order the albums are in (**Recently played** too: it says "You haven't played anything from your
@@ -2430,7 +2445,7 @@ lists at all (**Not in Navidrome**). With logins off nothing here changes: one a
   nothing was deleted." It asks no "are you sure?": nothing is lost, and **Add to my library** puts it
   straight back - or, for an album Add can't put back (no release id, or a folder deadwax hasn't found),
   the line after it says how: "To add it back, make it a favourite in another music app." It isn't listed
-  as "Removed by an admin." in You either - you removed it. If deadwax can't write the Remove down (its
+  as "Removed by an admin." in Settings either - you removed it. If deadwax can't write the Remove down (its
   database refusing a write), it says so - "It's out of your library, but deadwax couldn't save that, so it
   may come back - try Remove again in a moment." (Navidrome has unstarred it, and Remove again finishes it);
   if Navidrome keeps the star, "It's still in your library - try Remove again in a moment."
@@ -2465,7 +2480,7 @@ lists at all (**Not in Navidrome**). With logins off nothing here changes: one a
   there to get you in when your own login won't, and the shared account is the one deadwax was set up
   with.
 - **If your Navidrome password changes** while you're signed in - in Navidrome or Amperfy; changed in
-  deadwax with **You → Account → Change password**, the device you changed it on stays signed in and your others are
+  deadwax with **Settings → Account → Change password**, the device you changed it on stays signed in and your others are
   signed out at once, saying **Your password was changed from another device - sign in with the new one**
   ([Sharing deadwax](sharing.md#when-something-changes)) - the player's next request is refused:
   your session ends there and then (as the six-minute check would end it), the sign-in screen comes up
@@ -2495,7 +2510,7 @@ fixes that.
 ## Known gaps
 
 - **Gapless playback**: there's a short gap between songs, unless you tick the
-  [Gapless](#gapless-playback) in You.
+  [Gapless](#gapless-playback) in Settings.
 - **Hi-res through a USB DAC**: whether Safari ever runs a DAC at a song's own rate is unknown.
 - **Play from the lock screen after a long pause** may do nothing until the app is opened: iOS
   puts a web page that isn't playing to sleep. See
@@ -2622,7 +2637,7 @@ question the whole player existed to answer. Still to find out:
   crackle on its drum hits, slowed, sped up or at its own speed; Debug's **Limiter** row should
   count the peaks it held (`… peaks held under full scale since it showed …`), and a recording made then should have no
   moment over half a decibel under full scale;
-- **Requests** on the phone: the ✕ asking in the card (unless You's **Confirm before cancelling** is
+- **Requests** on the phone: the ✕ asking in the card (unless Settings' **Confirm before cancelling** is
   off on the phone - it's kept per device, so a home-screen app has its own), the count on the tab, Home's Arriving coming
   and going, a download started on another device showing up when you come back to the app, what
   VoiceOver reads out as downloads change, and the covers fetched from the Cover Art Archive over
@@ -2653,7 +2668,7 @@ question the whole player existed to answer. Still to find out:
   picker (iOS's own wheel), the cards' words for real folders and users, a download showing in
   Requests from the tap, and **Pick the best source for me**;
 - **Info and the ••• menu** under a real finger: that Info's list scrolls and nothing behind it
-  does, that a tap above it closes it, and that the Gapless checkbox in You turns gapless on from
+  does, that a tap above it closes it, and that the Gapless checkbox in Settings turns gapless on from
   its tap as the switch did;
 - how Safari handles a **transcoded** song, and which Ogg files it says it can play;
 - whether a song that won't load is **asked for again with the phone locked**: the second try

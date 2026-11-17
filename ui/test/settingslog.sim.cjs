@@ -9,7 +9,7 @@
  * What it pins:
  *
  *  - SERVER SETTINGS: the server's groups only - no browser preference of the main page's (one line
- *    says your own choices are in You, under Getting albums - since 2.0.0-player.66, when the main page
+ *    says your own choices are in Settings (You until 2.1.35), under Getting albums - since 2.0.0-player.66, when the main page
  *    it pointed at retired) - and, since 2.0.0-player.42, Re-time saved
  *    lyrics under the Lyrics group alone, refused while the lead is a draft; every rule of a row (a
  *    secret masked, choices a dropdown, a locked one saying why, revert, the retype note); since
@@ -524,8 +524,8 @@ async function settingsPage() {
     [classed('retime-stub').length, classed('retime-stub', lyricsGroup).length, classed('retime-stub')[0]?.props['data-unsaved']], [1, 1, false])
   const line = classed('app-settings-line')[0]
   const lineLink = find((node) => node.type === 'a', line)[0]
-  check('...one line says your own choices are in You, under Getting albums - no link to the retired main page (2.0.0-player.66), re-timing no longer',
-    [words(line).includes('Your own choices - what Get does, the quality floor, Format and whether cancelling asks first - are in You, under Getting albums.'),
+  check('...one line says your own choices are in Settings (You until 2.1.35), under Getting albums - no link to the retired main page (2.0.0-player.66), re-timing no longer',
+    [words(line).includes('Your own choices - what Get does, the quality floor, Format and whether cancelling asks first - are in Settings, under Getting albums.'),
       /re-tim/i.test(words(line)), lineLink, /main page/i.test(words(line))], [true, false, undefined, false])
   check('a row: where its value came from, its status, what it does',
     [words(row('LIBRARY_PATH')).includes('Set here'), words(row('SLSKD_DOWNLOAD_PATH')).includes('Needs attention'), words(row('SLSKD_DOWNLOAD_PATH')).includes('Not set: nothing can be filed.'), words(row('LIBRARY_PATH')).includes('what LIBRARY_PATH does')],

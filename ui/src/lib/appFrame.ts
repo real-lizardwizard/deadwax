@@ -245,10 +245,128 @@ export function libraryItems(hasSongs: boolean | null, personal = false): Sideba
 }
 
 /** Browse's views the sidebar lists (2.0.0-player.52): none with logins off; with a library of your own the
- *  store's albums, artists and songs - Songs left out as above. */
+ *  store's albums, artists and songs - Songs left out as above. (Since 2.1.35 the phone's Library root's: the desktop
+ *  sidebar lists one Library group with a switch - sidebarRows.) */
 export function browseItems(hasSongs: boolean | null, personal = false): SidebarItem[] {
   if (!personal) return []
   return SIDEBAR_BROWSE.filter((item) => item.id !== 'songs' || hasSongs !== false)
+}
+
+/* ===== the sidebar's one Library group, and the groups that fold (2.1.35) ===== */
+
+/**
+ * WHOSE LIBRARY THE SIDEBAR LISTS (2.1.35). James: "the left menu bar on desktop isn't super easy to navigate". The
+ * Library and All music were two groups of near-identical rows ("Your albums", "All albums"...); now they are ONE
+ * Library group with a switch in its heading - Yours or All - and rows labelled plainly (Albums, Artists, Songs), since
+ * the switch says whose. Only with a library of your own (`personal`); with logins off there is no switch and the rows
+ * are the library's as they always were. The pages' titles still say whose (PERSONAL_TITLES: "Your albums", "All
+ * albums"), so "Albums" never names two lists in one frame where a title stands alone.
+ */
+export type LibrarySide = 'yours' | 'all'
+
+export const LIBRARY_SIDES: readonly LibrarySide[] = ['yours', 'all']
+
+/** The switch's two words. */
+export const SIDE_LABELS: Readonly<Record<LibrarySide, string>> = { yours: 'Yours', all: 'All' }
+
+/** Yours' rows: your views, plainly named. */
+export const SIDEBAR_YOURS_ROWS: readonly SidebarItem[] = [
+  { id: 'recent', label: 'Recently added' },
+  { id: 'albums', label: 'Albums' },
+  { id: 'artists', label: 'Artists' },
+]
+
+/** All's rows: the collection's views, plainly named - Songs only here (Navidrome lists songs collection-wide). */
+export const SIDEBAR_ALL_ROWS: readonly SidebarItem[] = [
+  { id: 'store', label: 'Albums' },
+  { id: 'storeArtists', label: 'Artists' },
+  { id: 'songs', label: 'Songs' },
+]
+
+/** The Library group's rows for a side: Yours' or All's with a library of your own - All's Songs left out when
+ *  Navidrome lists none (null: not known yet, so it stays) - and with logins off the library's, the side aside. */
+export function sidebarRows(side: LibrarySide, hasSongs: boolean | null, personal: boolean): SidebarItem[] {
+  if (!personal) return libraryItems(hasSongs, false)
+  if (side === 'yours') return [...SIDEBAR_YOURS_ROWS]
+  return SIDEBAR_ALL_ROWS.filter((item) => item.id !== 'songs' || hasSongs !== false)
+}
+
+/** Which side a sidebar item is on: All for the collection's three, Yours for your three, null for the rest. */
+export function sideOfItem(item: SidebarId | null): LibrarySide | null {
+  if (item === 'store' || item === 'storeArtists' || item === 'songs') return 'all'
+  if (item === 'recent' || item === 'albums' || item === 'artists') return 'yours'
+  return null
+}
+
+/** (2.1.35, review) Whether a page is pushed above the Library's view on the tab showing - an album, an artist, a
+ *  playlist, over the Library's root or over a section page at its stack's foot (2.0.0-player.59, the view itself
+ *  then). sidebarCurrent goes on naming the view under such a page, so the row you came from stays lit; the switch
+ *  doesn't follow it there: a flip would open the view across and throw the page away (All albums -> Homogenic ->
+ *  Yours popped the album). Off the Library tab nothing is above its view. */
+export function overLibraryView(tab: Tab, stack: readonly Page[]): boolean {
+  if (tab !== 'library') return false
+  return stack.length > (stack[0]?.kind === 'section' ? 1 : 0)
+}
+
+/** The side the switch shows: where you are while a Library view itself shows - one of the collection's All, one of
+ *  yours Yours (`current`, sidebarCurrent's answer) - and anywhere else the side last shown (`remembered`): off the
+ *  Library, and on a page pushed above a view (`over`, overLibraryView), the view under it included. Sidebar
+ *  remembers what this says, so leaving a Library view for Home keeps its side's rows in view rather than swapping
+ *  them. */
+export function sideShown(current: SidebarId | null, remembered: LibrarySide, over = false): LibrarySide {
+  if (over) return remembered
+  return sideOfItem(current) ?? remembered
+}
+
+/** The same kind of page on the other side: Albums for Albums, Artists for Artists - Recently added, yours alone,
+ *  to the collection's Albums, and Songs, the collection's alone, back to your Albums. */
+const ACROSS: Readonly<Record<LibraryPick, LibraryPick>> = {
+  recent: 'store',
+  albums: 'store',
+  artists: 'storeArtists',
+  store: 'albums',
+  storeArtists: 'artists',
+  songs: 'albums',
+}
+
+/** What turning the switch to `to` opens: with a Library view of the other side showing (`current`), the same kind of
+ *  view on this one; anywhere else - a view of this side already, off the Library, or a page pushed above a view
+ *  (`over`, overLibraryView: an album, an artist, a playlist, which a view opened across would pop) - nothing, only
+ *  the rows change. */
+export function sideFlip(current: SidebarId | null, to: LibrarySide, over = false): LibraryPick | null {
+  if (over) return null
+  const from = sideOfItem(current)
+  if (from === null || from === to) return null
+  return ACROSS[current as LibraryPick]
+}
+
+/** The sidebar's groups that fold away (2.1.35): Playlists and Manage. Library, Home and Requests never fold. */
+export type SidebarFold = 'playlists' | 'manage'
+
+/** Which are folded - neither, by default: both open. */
+export type SidebarFolds = Readonly<Record<SidebarFold, boolean>>
+
+export const OPEN_FOLDS: SidebarFolds = { playlists: false, manage: false }
+
+/** The group a sidebar item is listed in, of the two that fold: All playlists (and each playlist, which is
+ *  `playlists` too) Playlists'; Needs a look, Library care, People, Server settings and Event log Manage's. */
+export function foldOf(item: SidebarId | null): SidebarFold | null {
+  if (item === 'playlists') return 'playlists'
+  if (item === 'queue' || item === 'care' || item === 'people' || item === 'settings' || item === 'log') return 'manage'
+  return null
+}
+
+/** Whether a group's heading is drawn current: folded, with the page showing one of its own - so where you are is
+ *  still marked while the row that would say so is put away. Open, the row says it. */
+export function foldCurrent(fold: SidebarFold, folds: SidebarFolds, current: SidebarId | null): boolean {
+  return folds[fold] && foldOf(current) === fold
+}
+
+/** What a reader hears for Manage's heading folded with albums that need a look - its count, drawn on it as the row
+ *  draws it ("Manage, 3 albums need a look"); its name alone open, or with none (null: not known yet). */
+export function manageHeadLabel(folded: boolean, needsLook: number | null): string {
+  if (!folded || !needsLook || needsLook <= 0) return 'Manage'
+  return `Manage, ${needsLook} album${needsLook === 1 ? ' needs' : 's need'} a look`
 }
 
 /** The view the Library is showing for a pick: Songs falls back to the albums when Navidrome lists

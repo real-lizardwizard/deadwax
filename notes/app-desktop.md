@@ -1953,3 +1953,141 @@ imports only types from api/settings.ts and `SAVED_ANSWERS_GROUP` from lib/music
   calls them through the lib now, and checks the four are the lib's alone - SettingsView defines none of them nor the
   table, and each file imports what it draws from the lib. tests/test_compose_example.py's check of the draft rule
   (a value equal to the saved one dropped) reads lib/serverSettings.ts now.
+
+### The sidebar with icons, one Library (2.1.35)
+
+James: "the left menu bar on desktop isn't super easy to navigate, I would like maybe some icons and to make the
+layout a bit more intuitive." Two Library groups (Your library, then All music) of near-identical rows, five Manage
+rows and up to twenty playlists, all in plain words, made one long column with nothing to catch the eye. He chose
+this layout:
+
+```
+deadwax
+[ Search            ]
+⌂  Home
+↓  Requests          2
+Library   [Yours | All]
+◷  Recently added / ◫ Albums / ☺ Artists / ♪ Songs
+Playlists            ⌄
+☰  All playlists /   Road trip /   Sunday
+Manage               ⌄
+⚑ Needs a look 3 / ✚ Library care / 👥 People / ⚙ Server settings / ≡ Event log
+────────────────────
+⚙  Settings
+```
+
+**An icon on every row** (app/Sidebar.tsx's `ICONS`, by SidebarId), aria-hidden, before the words. The tab bar's
+own glyphs where a row is a tab's (HomeIcon, RequestsIcon), the phone Library rows' where it is a Library view
+(AlbumIcon, ArtistIcon, SongIcon, PlaylistIcon), and seven new ones in player/icons.tsx: `ClockIcon` (Recently added),
+`FlagIcon` (Needs a look), `CareIcon` (Library care, a kit with a cross), `PeopleIcon` (two heads), `ServerIcon` (two
+rack units), `LogIcon` (a page of lines) on the line set's 24-unit grid, and `SettingsIcon` (an eight-tooth gear) as a
+`thin()` glyph like the tab bar's others. The tab bar's are finer than the line set's, so in the sidebar every glyph is
+drawn at one size and one weight - `--app-desk-side-icon` (18px) and `--app-desk-side-stroke` (1.8) - in the accent the
+phone's Library rows use, and in the selection's own colour on the row you're on. **A listed playlist has none**: twenty
+of one glyph down a column would say "playlist" twenty times over; the names are indented to sit under All playlists'
+words, as its own.
+
+**One Library, with a Yours | All switch** (logins on). With a library of your own (`hasLibrary()`: logins on, not the
+break-glass admin) Library's heading has a two-option switch, and the rows are one side's: Yours - Recently added,
+Albums, Artists; All - Albums, Artists, Songs (Songs left out when Navidrome lists none). The rows say Albums and
+Artists plainly - the switch says whose - while the pages' titles keep "Your albums", "All albums" and the rest. With
+logins off (or break-glass) there is no switch, and the rows are the library's four, as they were. The phone's Library
+list keeps its two groups (LibraryHome.tsx still reads `libraryItems`, `browseItems` and `ALL_MUSIC`). The rules are
+lib/appFrame.ts's, pure:
+
+- `sidebarRows(side, hasSongs, personal)` - the rows: without a library of your own `libraryItems(hasSongs, false)`,
+  else `SIDEBAR_YOURS_ROWS` or `SIDEBAR_ALL_ROWS` (Songs dropped only when `hasSongs` is false - unknown keeps it).
+- `sideOfItem(item)` - recent, albums and artists are Yours; store, storeArtists and songs All; anything else null.
+- `overLibraryView(tab, stack)` (after review, below) - whether a page is pushed above the Library's view: on the
+  Library tab, anything over its root, or over a section page at the stack's foot (which is the view itself).
+- `sideShown(current, remembered, over)` - **the switch follows where you are while a view itself shows**: a view
+  of one side shows that side; anywhere else, a page pushed above a view included, the side remembered.
+- `sideFlip(current, to, over)` - a turn with a view showing opens the same kind of view on the other side: Albums
+  for Albums, Artists for Artists, and since the other side has no Recently added or Songs, Recently added goes to
+  All's Albums and Songs to your Albums. Null - only the rows change - anywhere else, over a pushed page, or when
+  the side is already shown.
+
+**After review: a flip over an album threw the album away.** All albums -> Homogenic -> Yours: sidebarCurrent goes on
+naming the view under a pushed page (so its row stays lit), the switch read that as "on All albums", and
+`sideFlip('store', 'yours')` gave `albums` - chooseFromSidebar's view branch then popped the album to the root and
+cleared the root's saved scroll. The same album opened from Home only changed the rows. Decided (the coordinator's
+call): the switch follows the page only while the Library's view itself shows, nothing pushed above it; over an
+album, an artist or a playlist it shows the side last shown and a turn changes only the rows, as it does off the
+Library. App passes `overView={overLibraryView(nav.tab, nav.stacks[nav.tab])}`; the effect below is keyed on it too,
+so coming back down to the view writes that view's side. An album opened cold over your Albums, with All kept, shows
+All's rows with none of them marked (the view under it is yours) - the price of the page staying put.
+
+**What is remembered is the side last shown**, not only the side last clicked: open All albums from a link, go Home,
+and the rows stay All's rather than swapping back under you. Sidebar's effect writes it as `current` changes (keyed
+on `[current, personal, overView]`, not on the side, so a turn still opening its view never reads as the old side
+shown), to
+persisted.ts's `deadwax-sidebar-side` (`all`, or anything else is Yours) through readRaw/writeRaw's try/catch, and to a
+module-level `keptSide` so the frame's swap across 1024px, which remounts the sidebar, keeps it without storage.
+
+The switch is a **radio group** (`role="radiogroup"`, labelled by the heading; each side `role="radio"`,
+`aria-checked`, `data-side`): a click picks; to the keyboard the arrows move the choice and the focus with it, and only
+the chosen side is a tab stop - the Settings page's segmented controls' way (QualityChoice.tsx). It is drawn as one:
+a well, the chosen side in the toggled tint, `--app-desk-side-head` (24px) tall like every heading, so Library's
+heading is no taller than the folding ones.
+
+**Playlists and Manage fold** (Library, Home and Requests never do). Each heading is a button the label's width
+(`aria-expanded`, `aria-controls` its list's id) with a chevron that turns `--app-desk-side-fold-turn` to point at the
+words while folded; the list takes `hidden` (player.css's `[hidden] { display: none !important }` - measured
+`display: none` and 0 tall, not trusted from the attribute). Both start open (`OPEN_FOLDS`); what is folded is kept in
+`deadwax-sidebar-folded` (the folded names, comma-separated; anything else ignored) and in a module-level `keptFolds`,
+and a toggle reads `keptFolds` first so two clicks before a re-render don't fold from a stale state. Folded:
+
+- `foldOf(item)` / `foldCurrent(fold, folds, current)` - the group whose page is showing marks its heading current
+  (`is-current`, Explorer's selection, and `aria-current="true"`), so where you are is never folded out of sight.
+- `manageHeadLabel(folded, needsLook)` - a folded Manage carries Needs a look's count as its badge, and its name says
+  it: "Manage, 3 albums need a look" ("1 album needs"); open, or with nothing to look at, plain "Manage".
+
+**You is Settings now**, everywhere the web says it - the sidebar's foot (a gear where the avatar was), the phone's
+fifth tab (the same gear for the head-and-shoulders; `YouIcon` is gone), the back links of pages pushed on that tab and
+NeedsNavidrome's title there (all `TAB_LABELS.you`), the words that send you there, and docs/ and the README. The ids,
+routes and addresses stay `you` (`#/you/...`), so a bookmark or a kept stack still opens. The iPhone app already says
+Settings. People's tag "You" (this row is you) stays: it names a person, not the page. Strings changed:
+
+- the tab and the foot: "You" -> "Settings" (TAB_LABELS.you); back links "‹ You" -> "‹ Settings";
+- the sidebar's Library rows with logins on: "Recently added", "Your albums", "Your artists" under Library and
+  "All albums", "All artists", "All songs" under All music -> "Recently added", "Albums", "Artists" (Yours) and
+  "Albums", "Artists", "Songs" (All) under one "Library" with the radios "Yours" and "All"; the "All music" heading
+  gone from the sidebar (the phone keeps it);
+- new: the folded Manage heading's name "Manage, N album(s) need(s) a look";
+- app/ServerSettings.tsx: "…are in You, under Getting albums." -> "…are in Settings, under Getting albums.";
+- lib/candidates.ts NOTHING_LOSSLESS_NOTE: "You can change it in You, under Getting albums." -> "…in Settings, under
+  Getting albums.";
+- src/people.py YOUR_PASSWORD (the server's refusal of your own row in People): "…in You → Account → Change
+  password." -> "…in Settings → Account → Change password.".
+
+**Settings stays in view.** Its foot used to sit in the scroll at the column's end; with three playlists at 1280×800
+it was already below the fold, and with twenty a long scroll away. It is now on `.app-side-foot`, an opaque strip
+(`--dw-sidebar`) that is `position: sticky` at the sidebar's bottom, the rows passing under it - the button can't be
+that strip itself, as its hover and selection fills are translucent. Chromium keeps a sticky box clear of its
+scroller's padding: with `bottom: 0` it stuck 20px up with Event log showing beneath it (measured), so the strip
+reaches over the sidebar's bottom padding (`bottom` and `margin-bottom` the padding's negative, `padding-bottom` the
+padding) and measured flush at both ends of the scroll. `.app-side`'s `scroll-padding-bottom` keeps a row the keyboard
+focuses from scrolling under it.
+
+- **Held by** ui/test/sidebar.sim.cjs (new; Sidebar, persisted.ts and icons.tsx compiled and drawn with a fake
+  Preact - after review also the row marked current on each side, a turn still opening its view checked by what it
+  draws once the view opens, and a page pushed above a view: the side kept, click and arrow opening nothing, the
+  switch following the view again back down, a cold link), routes.sim.cjs (the pure rules above, overLibraryView's
+  cases among them, TAB_LABELS and the back labels saying Settings), whose.sim.cjs (the switch only with a library of
+  your own, `sidebarRows` drawing the rows, App passing `personal={hasLibrary()}` and `overView`, and Sidebar reading
+  the side, its keeping and its turn through it), app-rules.sim.cjs (Manage's list by its id), vocabulary.sim.cjs
+  (the guides never send anyone to "You →", "You's" or "You’s", **You**, a tagged You, "in You" ending a phrase or
+  "the You tab" - an album's "Wish You Were Here", a pronoun and People's "You" pass - and managing rows sit under
+  Settings → Manage; after review its "sidebar's Settings or Log" rule is the Log half alone, since the foot is
+  Settings now and no words tell it from the old name for Server settings - both pages have a Connections),
+  people.sim, candidates.sim, sources.sim and settingslog.sim (the moved words), tests/test_people.py.
+- **Verified**: the build; every sim; pytest; and the page itself, in headless Brave against a stand-in Navidrome
+  (twelve albums, three playlists, an admin and a listener) at 1280×800 and 1024×768 - logins on with a library of
+  your own on both sides of the switch, a flip each way (All's Artists to your Artists, your Albums to All albums, each
+  titled right), Manage folded on Server settings (current, the count on it) and on Home (not current), both folded, a
+  listener (no Manage), and logins off (no switch, four rows). Measured: every glyph 18×18 at 1.8 stroke, accent and
+  selected-text only; folded lists `display: none`, 0 tall; the radios 51×22 in a 24px well, tab stops 0 and -1; no
+  horizontal overflow; no console errors.
+- **Not verified**: a real Navidrome; Safari and Firefox; a desktop with a coarse pointer (its block sets the heading
+  height to `--pl-hit`, not looked at); what a screen reader says of the radio group and the folded heading; the iPhone
+  app's exporters on `ios`, which read some of these strings by pattern.

@@ -965,7 +965,7 @@ async function main() {
   console.log('\nLossless only, and Soulseek answered with nothing lossless: said so, and why (review)')
   {
     const status = () => text(find((node) => node.props?.role === 'status')[0])
-    const NOTE = 'Some were found, but none with lossless files - your Format is Lossless only, which leaves the rest out. You can change it in You, under Getting albums.'
+    const NOTE = 'Some were found, but none with lossless files - your Format is Lossless only, which leaves the rest out. You can change it in Settings, under Getting albums.'
     const phone = sheet()
     globalThis.__sources.settings = { get_mode: 'sources', quality_floor: 'any', format_preference: 'lossless_only' }
     phone.draw({ open: true, request: { release: RELEASE, subtitle: 'Third', key: 440 } })

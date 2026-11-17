@@ -60,15 +60,18 @@ import { NO_PERMISSION } from './permissions'
 
 export type Tab = 'home' | 'library' | 'search' | 'requests' | 'you'
 
-/** The tab bar's order: You at the right end. */
+/** The tab bar's order: Settings (`you`) at the right end. */
 export const TABS: readonly Tab[] = ['home', 'library', 'search', 'requests', 'you']
 
+/** What each tab is called - the tab bar's words, the sidebar's, and a page's back link at the foot of its tab.
+ *  (2.1.35) The fifth is Settings, as the iPhone app calls it: it was "You". Its id, and its addresses (`#/you`,
+ *  `#/you/settings/server` and the rest), stay `you`. */
 export const TAB_LABELS: Readonly<Record<Tab, string>> = {
   home: 'Home',
   library: 'Library',
   search: 'Search',
   requests: 'Requests',
-  you: 'You',
+  you: 'Settings',
 }
 
 /** What a page can be: an album in the library (Navidrome's id), a MusicBrainz release group -

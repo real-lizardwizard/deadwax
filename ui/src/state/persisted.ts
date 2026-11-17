@@ -1,4 +1,5 @@
 import type { FormatPreference } from '../api/types'
+import type { LibrarySide, SidebarFolds } from '../lib/appFrame'
 import { DEFAULT_NORMALIZATION, type Normalization } from '../lib/loudness'
 import { isSpeed, roundSpeed, SPEED_NORMAL } from '../lib/playSpeed'
 import type { MaxRate } from '../lib/streamWrap'
@@ -70,6 +71,12 @@ export const STORAGE_KEYS = {
   /** (2.0.0-player.64) This device's own name for its saves of the play queue (app/useResume.ts): 16 characters of
    *  A-Z a-z 0-9 _ -, made once. What tells "picked up from your Mac" from this device's own queue coming back. */
   playerDevice: 'deadwax-player-device',
+  /** (2.1.35) The desktop sidebar's Library switch, the side last shown: 'all', anything else - nothing stored, a
+   *  mistyped value, storage that can't be read - Yours. Per device, like the Library's view. */
+  sidebarSide: 'deadwax-sidebar-side',
+  /** (2.1.35) The desktop sidebar's groups folded away: their names, comma-separated - 'playlists', 'manage' or both;
+   *  any other word is no group, so nothing stored (or storage that can't be read) is both open, the default. */
+  sidebarFolded: 'deadwax-sidebar-folded',
 } as const
 
 /*
@@ -375,6 +382,25 @@ export function readVizStyle(): AmbientChoice {
 
 export function writeVizStyle(choice: AmbientChoice): void {
   writeRaw(STORAGE_KEYS.playerVizStyle, choice)
+}
+
+/* ===== deadwax-sidebar-side, deadwax-sidebar-folded (2.1.35) ===== */
+
+export function readSidebarSide(): LibrarySide {
+  return readRaw(STORAGE_KEYS.sidebarSide) === 'all' ? 'all' : 'yours'
+}
+
+export function writeSidebarSide(side: LibrarySide): void {
+  writeRaw(STORAGE_KEYS.sidebarSide, side)
+}
+
+export function readSidebarFolds(): SidebarFolds {
+  const named = (readRaw(STORAGE_KEYS.sidebarFolded) ?? '').split(',').map((word) => word.trim())
+  return { playlists: named.includes('playlists'), manage: named.includes('manage') }
+}
+
+export function writeSidebarFolds(folds: SidebarFolds): void {
+  writeRaw(STORAGE_KEYS.sidebarFolded, (['playlists', 'manage'] as const).filter((fold) => folds[fold]).join(','))
 }
 
 /* ===== deadwax-preferences ===== */
