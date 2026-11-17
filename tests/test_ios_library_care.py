@@ -36,8 +36,13 @@ from src.store import JobStore  # noqa: E402
 from tests.test_ios_contract import CORE, _block, _code, fields, swift_function  # noqa: E402
 from tests.test_ios_needs_look import app_file, swift_like, timeouts  # noqa: E402
 from tests.test_logins import ROUTES  # noqa: E402
-from tests.test_personal_libraries import HELD, THIRD, grant, held, on, run, signed_in  # noqa: E402, F401
+from tests import test_personal_libraries  # noqa: E402
+from tests.test_personal_libraries import HELD, THIRD, grant, held, run, signed_in  # noqa: E402
 from tests.test_retag import seed  # noqa: E402
+
+# The logins-on fixture, used by name: bound by assignment (as test_player_as_you.py does), since pyflakes
+# reads an imported fixture as an unused import.
+on = test_personal_libraries.on
 
 ALBUM = "Tame Impala/The Slow Rush (2020)"
 CARE = (CORE / "LibraryCare.swift").read_text(encoding="utf-8")

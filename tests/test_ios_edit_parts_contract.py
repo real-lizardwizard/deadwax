@@ -37,14 +37,13 @@ from src import track_tags  # noqa: E402
 from src.config import Config  # noqa: E402
 from src.routes import library as library_route  # noqa: E402
 from tests.test_ios_contract import CORE, coding_keys, swift_function, swift_struct  # noqa: E402
-from tests.test_ios_edit_contract import (  # noqa: E402,F401 - the fixtures, used by name
-    ALBUM,
-    client,
-    nothing_left_over,
-    reads,
-    sends,
-    timeouts,
-)
+from tests import test_ios_edit_contract  # noqa: E402
+from tests.test_ios_edit_contract import ALBUM, reads, sends, timeouts  # noqa: E402
+
+# The contract test's fixtures, used here by name: bound by assignment, as test_player_as_you.py binds
+# its own, because pyflakes reads an imported fixture as an unused import that each test redefines.
+client = test_ios_edit_contract.client
+nothing_left_over = test_ios_edit_contract.nothing_left_over
 
 PARTS = CORE.parent.parent / "Tests" / "DeadwaxCoreTests" / "Fixtures" / "edit" / "edit-parts-vectors.json"
 FILES = ("01 - One More Year.flac", "02 - Instant Destiny.flac")
