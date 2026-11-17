@@ -52,7 +52,8 @@ import Testing
         diffs.text("title", EventLog.title, words["title"])
         diffs.text("manage's row", ManagingWords.label(.log), words["title"])
         diffs.text("the page's line", EventLog.pageLine, words["pageLine"])
-        diffs.text("the list's label", EventLog.listLabel, words["listLabel"])
+        // the web's list label (`aria-label`, words["listLabel"]) isn't drawn: a label on a SwiftUI List that isn't an
+        // element of its own can go to every row in it, over each line's own - the title and the page's line say it
         diffs.text("Clear", EventLog.clear, words["clear"])
         diffs.text("the history's failure", EventLog.historyFailed, words["historyFailed"])
         diffs.text("never", EventLog.emptyNever, words["emptyNever"])
@@ -113,8 +114,10 @@ import Testing
         for run in fixture["runs"].list {
             let name = run["name"].string!
             var state = EventLog.State()
+            var moved: [String] = []
             for (index, step) in run["steps"].list.enumerated() {
                 let label = "\(name) step \(index)"
+                let before = state.lines.map(\.id)
                 if !step["line"].isNull {
                     state = state.joining(Self.line(step["line"]))
                 } else if !step["history"].isNull {
@@ -122,6 +125,7 @@ import Testing
                 } else {
                     state = state.emptied()
                 }
+                if let why = Self.identityMoved(from: before, to: state.lines.map(\.id)) { moved.append("\(label): \(why)") }
                 let after = step["after"]
                 diffs.text("\(label) boot", state.boot, after["boot"])
                 diffs.number("\(label) last", Double(state.last), after["last"])
@@ -146,11 +150,40 @@ import Testing
                     unkeyed += 1
                 }
             }
-            // the phone's identities are its own: never two the same, however the web's keys fall
-            diffs.check("\(name) every identity once", Set(state.lines.map(\.id)).count, state.lines.count)
+            // the list is keyed by these: a line held keeps its identity, and its row, through every op
+            diffs.check("\(name) identities kept", moved.first, nil)
         }
         #expect(unkeyed == 1, "the one line of the wrong type's number, and only it")
         diffs.done()
+    }
+
+    /// What, if anything, broke the list's identities in one op, from the lines' identities before it to after: every
+    /// line still held keeps its identity and its order among the others; those that went are the oldest (past `kept`)
+    /// or all of them (Clear), never one from the middle; and each line new to the list has an identity none held before
+    /// had - taken after them. A port that took a held line again (filling a gap by rebuilding the list, say) gives it a
+    /// new identity, and its row would be drawn again as another.
+    static func identityMoved(from before: [EventLog.Line.ID], to after: [EventLog.Line.ID]) -> String? {
+        let had = Set(before)
+        let held = Set(after)
+        let stayed = before.filter(held.contains)
+        guard after.filter(had.contains) == stayed else { return "a line held changed its place among the others" }
+        guard stayed == Array(before.prefix(stayed.count)) else { return "a line went from the middle, or changed" }
+        let newest = before.map(\.taken).max() ?? 0
+        guard after.allSatisfy({ had.contains($0) || $0.taken > newest }) else { return "a line came with an old one's" }
+        return nil
+    }
+
+    /// The check above, shown to fail on what it is there to catch.
+    @Test func theIdentityCheckCatchesALineTakenAgain() {
+        func id(_ seq: Int, _ taken: Int) -> EventLog.Line.ID { EventLog.Line.ID(boot: "b", seq: seq, taken: taken) }
+        let held = [id(3, 3), id(2, 2), id(1, 1)]
+        #expect(Self.identityMoved(from: held, to: [id(4, 4)] + held) == nil)
+        #expect(Self.identityMoved(from: held, to: [id(4, 4), id(3, 3), id(2, 2)]) == nil, "the oldest past kept")
+        #expect(Self.identityMoved(from: held, to: []) == nil, "Clear")
+        #expect(Self.identityMoved(from: held, to: [id(3, 3), id(2, 5), id(1, 1)]) != nil, "a held line taken again")
+        #expect(Self.identityMoved(from: held, to: [id(3, 3), id(1, 1)]) != nil, "one gone from the middle")
+        #expect(Self.identityMoved(from: held, to: [id(2, 2), id(3, 3), id(1, 1)]) != nil, "two swapped")
+        #expect(Self.identityMoved(from: [id(3, 3)], to: [id(4, 2), id(3, 3)]) != nil, "an old identity for a new line")
     }
 
     // MARK: the history's failure, the stream's address

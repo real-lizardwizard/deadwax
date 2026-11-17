@@ -151,8 +151,11 @@ def test_the_stream_is_read_as_it_comes_with_the_cookie_by_hand():
     assert "reading.cancel()" in lines and "task.cancel()" in lines
     session = swift_like(transport, "streamSession")
     assert "let configuration = Self.configuration(waiting: EventStream.silence)" in session
-    assert "configuration.timeoutIntervalForResource = .infinity" in session
+    # (after review) the wait over all left at URLSession's default, a week - never an infinite one, a value CFNetwork may
+    # not take as meant - in the streams' session and the configuration it starts from
+    assert "timeoutIntervalForResource" not in _code(session)
     configuration = swift_like(transport, "configuration")
+    assert "timeoutIntervalForResource" not in _code(configuration)
     assert "configuration.httpShouldSetCookies = false" in configuration
     assert "configuration.httpCookieAcceptPolicy = .never" in configuration
     assert "configuration.urlCache = nil" in configuration
@@ -210,12 +213,20 @@ def test_the_app_only_carries_out_what_core_decides():
     for asked in ("read", "open"):
         body = _code(swift_like(model, asked))
         assert "let mine = generation" in body and "guard mine == generation, !Task.isCancelled else { return }" in body
-    # wanted only while the page shows with the app in front, in reach, allowed, and no sign-in over the app
+    # wanted only while the page shows with the app in front, in reach, allowed, and neither the sign-in nor (after
+    # review) Now Playing over the app - the web's managingLive, whose !sheetOpen is Now Playing
     wanted = code[code.index("private var wanted: Bool {"):]
     wanted = wanted[:wanted.index("}")]
     for part in ("pagesShown > 0", "active", "reachability.online", "allowed", "server.signInOver == nil",
-                 "server.client != nil"):
+                 "server.client != nil", "!navigation.nowPlayingShown"):
         assert part in wanted, part
+    web = (REPO / "ui" / "src" / "app" / "App.tsx").read_text(encoding="utf-8")
+    assert "const managingLive = (tab: Tab) => pageShown && nav.tab === tab && !visualizerShown && !sheetOpen" in web
+    assert "<EventLog allowed={perms.has('server')} live={managingLive(tab)}" in web
+    # VoiceOver told what Core decides, in one announcement at a time - nothing posted but what it says
+    announce = _code(swift_like(model, "announce"))
+    assert "guard let words = feed.announcement(inReach: reachability.online), !words.isEmpty else { return }" in announce
+    assert code.count(".post()") == 1 and code.count("AccessibilityNotification.Announcement(") == 1
     # a stop calls off what is out; a 403 asks /me again
     carry = _code(swift_like(model, "carry"))
     assert "case .stop:\n            asking?.cancel()" in carry
@@ -241,7 +252,7 @@ def test_a_stream_that_never_ends_never_keeps_the_app_awake_or_running():
     sign_in = root[root.index(".onChange(of: server.signInOver)"):]
     assert "eventLog.recheck()" in sign_in[:sign_in.index(".onOpenURL")]
     app = _code(app_file("DeadwaxApp.swift"))
-    assert "let eventLog = EventLogModel(server: server, reachability: reachability)" in app
+    assert "let eventLog = EventLogModel(server: server, reachability: reachability, navigation: navigation)" in app
     assert "reachability.whenChanged { [weak eventLog] in eventLog?.recheck() }" in app
     assert "eventLog.reset()" in app[app.index("server.whenPersonChanges {"):]
     assert ".environment(eventLog)" in app
@@ -257,6 +268,8 @@ def test_the_page_draws_as_the_spec_says():
     for modifier in (".onAppear { log.shows() }", ".onDisappear { log.hides() }", ".editOutOfReach(",
                      ".onChange(of: log.allowed)", ".navigationTitle(EventLog.title)"):
         assert modifier in frame, modifier
+    # (after review) Now Playing over the page - a full-screen cover, which leaves it shown under it - asks again
+    assert ".onChange(of: navigation.nowPlayingShown) { _, _ in\n            log.recheck()" in frame
     # without the permission it says so and asks nothing; out of reach before anything was heard, it needs deadwax
     assert "if !log.allowed {" in body and "Text(EditWords.noPermission)" in body
     assert "Text(EditWords.needsDeadwax)" in body
@@ -272,17 +285,22 @@ def test_the_page_draws_as_the_spec_says():
     # a first read that hasn't answered: said, never "Nothing logged yet." while it isn't known
     assert "if feed.reading {" in lines and "Text(EventLog.reading)" in lines
     assert "Text(EventLog.empty(feed.log))" in lines
-    assert ".accessibilityLabel(EventLog.listLabel)" in lines
-    # under Reduce Motion, nothing slides in
-    assert "if reduceMotion { transaction.animation = nil }" in lines
+    # (after review) no label on the List: on a container that isn't an element of its own it can go to every row
+    assert "accessibilityLabel" not in lines and "listLabel" not in code
+    # under Reduce Motion, nothing slides in: no animation, and none an `.animation` above could add
+    assert "if reduceMotion {\n                transaction.disablesAnimations = true\n" in lines
+    assert "transaction.animation = nil" in lines
     row = code[code.index("private struct LogRow"):]
     # read once, words first; Copy by a long press and by VoiceOver's action
     assert ".accessibilityElement(children: .ignore)" in row and ".accessibilityLabel(EventLog.spoken(line))" in row
     assert ".contextMenu {" in row and "UIPasteboard.general.string = EventLog.copyText(line)" in row
     assert ".accessibilityAction(named: Text(EventLog.copy))" in row
-    # the largest text: time, level and part stacked; the words wrap
+    # the largest text: time, level and part stacked; the words wrap - and (after review) the part too, nothing cut off
     assert "if typeSize.isAccessibilitySize {" in row
     assert ".fixedSize(horizontal: false, vertical: true)" in row
+    part = row[row.index("private var part: some View {"):row.index("private func copy()")]
+    assert ".lineLimit(typeSize.isAccessibilitySize ? nil : 1)" in part
+    assert ".fixedSize(horizontal: false, vertical: typeSize.isAccessibilitySize)" in part
     # levels as the web colours them: errors the danger text, warnings amber
     assert "case .error: return Palette.danger" in row and "case .warning: return Palette.amber" in row
     # the time in the data face

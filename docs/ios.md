@@ -2166,22 +2166,24 @@ keeps - newest first, and each new line as deadwax logs it. It's a page pushed o
   it said, which wraps. "Reading what deadwax kept…" until the first read answers; "Nothing logged yet." when there's
   nothing.
 
-**Copy**: a long press on a line offers **Copy**, which puts it on the clipboard as drawn - its time, level, part and
-words on one line - to paste into a message or an issue. VoiceOver has Copy among a line's actions. (The web app has
-no Copy: select the text there.)
+**Copy**: a long press on a line offers **Copy**, which puts it on the clipboard as drawn - its time, level and part,
+then its words, all on one line unless the words run over several - to paste into a message or an issue. VoiceOver has
+Copy among a line's actions. (The web app has no Copy: select the text there.)
 
 **Clear**, in the bar, empties the page on this phone: "Cleared. New lines show here as deadwax logs them." Nothing is
 cleared on deadwax - the web app's log still has every line - and what was cleared doesn't come back when you leave and
 return: only what deadwax logs after it does. It's dimmed with nothing to clear.
 
 **The feed is live only while the page shows with the app in front.** Go back to Settings, to another tab, or out of
-the app, and it stops: nothing keeps the phone awake or runs in the background for it. Come back and the lines deadwax
-kept are read again, then the feed picks up from the last line the page has - what was logged meanwhile fills in,
-nothing twice. If the connection drops - WireGuard off, the Wi-Fi gone, deadwax restarting - the line says "Lost the
-live feed - reconnecting…" and the feed is asked for again 5 seconds later, and every 5 seconds until it's back, from
-the last line held, so nothing logged meanwhile is missed (as long as deadwax still keeps it: its last 500). deadwax
-sends a keepalive every 15 seconds while it has nothing to say, so a connection that goes quiet without a word is
-taken as lost within 45 seconds. When deadwax has restarted, its new lines come in above the last run's.
+the app, or open Now Playing over it, and it stops: nothing keeps the phone awake or runs in the background for it.
+Come back and the lines deadwax kept are read again, then the feed picks up from the last line the page has - what was
+logged meanwhile fills in, nothing twice. If the feed drops, the line says "Lost the live feed - reconnecting…" and it's
+asked for again 5 seconds later from the last line held, so nothing logged meanwhile is missed (as long as deadwax
+still keeps it: its last 500). While deadwax answers with an error - restarting behind a proxy, say - it's asked again
+every 5 seconds until it's back. If nothing answers at all - WireGuard off, the Wi-Fi gone - the app soon finds
+deadwax out of reach (the amber line below), stops asking, and picks up once deadwax is back in reach. deadwax sends a
+keepalive every 15 seconds while it has nothing to say, so a connection that goes quiet without a word is taken as
+lost within 45 seconds. When deadwax has restarted, its new lines come in above the last run's.
 
 **While deadwax can't be reached**, a page that has heard nothing yet says "Managing needs deadwax. This opens once
 it's back."; one that has keeps its lines under the amber line Edit album shows, with "Lost the live feed -
@@ -2189,13 +2191,16 @@ reconnecting…" under the bar, and picks up once deadwax is back. If the kept l
 "Couldn't load the lines deadwax kept - what happens from now still shows.", or why ("Can't connect to deadwax. Check
 your connection.") - with **Try again**, and the feed opens all the same: new lines still come in, and the next read
 fills in the rest. If deadwax refuses the feed, the line says "Not live", why is said in red ("Couldn't open the live
-feed." when deadwax gave no words of its own) with Try again, and it isn't asked for again until you tap it or come
-back to the page. Without Settings and the log - an admin took it away - it says "This page needs a permission an admin
+feed." when deadwax gave no words of its own) with Try again, and it isn't asked for again until you tap it - or until
+the page is shown again, the app comes back from the background, deadwax comes back in reach, or Now Playing is put
+away. Without Settings and the log - an admin took it away - it says "This page needs a permission an admin
 hasn't given you - ask one if you need it." and asks nothing. When your session ends, nothing is asked under the
 sign-in; sign in again and the page picks up. Signing out, or someone else signing in, empties it. VoiceOver reads each
-line once - its words, then its level, time and part - and says when the feed is lost, refused, and live again; with
-Reduce Motion on, new lines don't slide in; at the largest text sizes a line's time, level and part stack over its
-words.
+line once - its words, then its level, time and part - and says when the feed is lost, when it's refused (with why, in
+the same breath: "Not live. Couldn't open the live feed."), and when it's live again after either, and when the kept
+lines couldn't be read; when deadwax goes out of reach, the app's own banner line and its "Back online" say it instead.
+With Reduce Motion on, new lines don't slide in; at the largest text sizes a line's time, level and part stack over
+its words, the part wrapping rather than cut short.
 
 ### Debug
 
@@ -5032,12 +5037,14 @@ compare each with the web app's event log (You > Event log) open on the Mac besi
 - **372 Clear.** Tap **Clear** in the bar: "Cleared. New lines show here as deadwax logs them.", and Clear dimmed. Is
   the web app's log still full (reload it)? Go back to Settings, search for something, come back to Event log: only
   the lines since - none of what was cleared. Put the app in the background for a minute, search on the Mac, come
-  back: the lines logged meanwhile are there, each once.
+  back: the lines logged meanwhile are there, each once. The same with Now Playing opened over the page instead
+  (the mini player), and put away.
 - **373 Dropped.** With the page live over WireGuard, turn WireGuard off: within 45 seconds, "Lost the live feed -
   reconnecting…" in amber (and the amber line, if the app notices deadwax is out of reach), the lines kept. Search on
   the Mac meanwhile. Turn WireGuard on: "Live" again, and the Mac's search's lines are there - none missing, none
-  twice. With VoiceOver, it says when the feed is lost and when it's back. Signed in as someone without Settings and
-  the log: no Event log in Manage.
+  twice. With VoiceOver: "Lost the live feed - reconnecting…" as it drops, unless the app's own out-of-reach line
+  is said at that moment instead (then "Back online", and not "Live", as it returns) - never two said over each
+  other. Signed in as someone without Settings and the log: no Event log in Manage.
 
 ### Add to Queue's checks (392-403)
 

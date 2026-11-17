@@ -223,11 +223,15 @@ public enum EventStream {
     /// - The stream lost - no answer, a timeout, a 5xx, an answer that isn't it, or it ended: "Lost the live feed -
     ///   reconnecting…", and asked again after `retry`, from the last line held (the history first when it is owed: its
     ///   last read failed, or the lines have a gap it fills).
-    /// - Refused (a 4xx): not asked again until Try again or the page shown again; a 401 leaves it to the sign-in, a 403
-    ///   asks /me again.
-    /// - Not wanted any more - the page gone, the app to the background, deadwax out of reach, the sign-in over the app -
-    ///   what is out is called off (never said as a failure). Wanted again, the history is read again and the stream
-    ///   rejoined by number: nothing twice, nothing cleared back.
+    /// - Refused (a 4xx): not asked again until Try again, or until it's wanted again after it wasn't (the page shown
+    ///   again, the app back in front, deadwax back in reach, Now Playing put away); a 401 leaves it to the sign-in, a
+    ///   403 asks /me again.
+    /// - Not wanted any more - the page gone, the app to the background, deadwax out of reach, the sign-in or Now Playing
+    ///   over the app - what is out is called off (never said as a failure). Wanted again, the history is read again and
+    ///   the stream rejoined by number: nothing twice, nothing cleared back.
+    /// - Nothing answering at all: the app's Reachability probes deadwax and, finding it out of reach, makes the stream
+    ///   no longer wanted - usually before `retry` is up - and it's asked again once deadwax is back. An answer that
+    ///   isn't the stream (a 5xx, another page), with deadwax in reach, is asked again every `retry` while it lasts.
     public struct Feed: Sendable, Equatable {
         public enum Step: Sendable, Equatable {
             /// Nothing out.
@@ -238,7 +242,7 @@ public enum EventStream {
             case streaming
             /// The stream was lost: asked again after `retry`.
             case waiting
-            /// Refused: nothing asked until Try again, or the page shown again.
+            /// Refused: nothing asked until Try again, or until it's wanted again after it wasn't.
             case halted
         }
 
@@ -273,6 +277,11 @@ public enum EventStream {
         public private(set) var ask = 0
         /// The history is owed: its last read failed (or was called off) - the next ask after a loss reads it first.
         private var owed = false
+        /// What VoiceOver was last left knowing (`announcement`): the stream's state and the history's failure as they
+        /// stood, and whether it was told the stream was lost or refused - so live again is said only after that.
+        private var toldStream: EventLog.StreamState = .connecting
+        private var toldProblem: String?
+        private var toldTrouble = false
 
         public init() {}
 
@@ -429,14 +438,45 @@ public enum EventStream {
             log = log.emptied()
         }
 
-        /// What VoiceOver hears as the stream's state changes (the phone's own; the web's line is a live region): lost,
-        /// back, or refused - never the first Live, nor every Connecting….
-        public static func announcement(from old: EventLog.StreamState, to new: EventLog.StreamState) -> String? {
-            guard old != new else { return nil }
-            switch new {
-            case .lost, .stopped: return EventLog.words(new)
-            case .live: return old == .lost || old == .stopped ? EventLog.words(new) : nil
-            case .connecting: return nil
+        /// What VoiceOver hears now, if anything (the phone's own; the web's line is a live region, read at every change),
+        /// asked after each change is carried out - ONE announcement for what changed since it was last asked, as a new
+        /// one cuts off the one before:
+        /// - the history's failure, when it's new (what it says - "what happens from now still shows" - covers the stream
+        ///   that opens after it, so live isn't said on top of it);
+        /// - the stream lost; refused, with why in the same breath ("Not live. Couldn't open the live feed."), never the
+        ///   words then "Not live" over them; and live again after either was said - never the first Live, nor every
+        ///   Connecting….
+        ///
+        /// Out of reach (`inReach` false) nothing: the app's banner says deadwax has gone at that very moment
+        /// (Reachability), and its "Back online" says it's back - so the stream's lost isn't said over it, nor its live
+        /// again after.
+        public mutating func announcement(inReach: Bool) -> String? {
+            let (oldStream, oldProblem) = (toldStream, toldProblem)
+            toldStream = stream
+            toldProblem = historyProblem
+            guard inReach else {
+                toldTrouble = false
+                return nil
+            }
+            if let problem = historyProblem, problem != oldProblem {
+                toldTrouble = false
+                return problem
+            }
+            guard stream != oldStream else { return nil }
+            switch stream {
+            case .lost:
+                toldTrouble = true
+                return EventLog.words(.lost)
+            case .stopped:
+                toldTrouble = true
+                guard let why = streamProblem, !why.isEmpty else { return EventLog.words(.stopped) }
+                return EventLog.words(.stopped) + ". " + why
+            case .live:
+                guard toldTrouble else { return nil }
+                toldTrouble = false
+                return EventLog.words(.live)
+            case .connecting:
+                return nil
             }
         }
     }

@@ -92,7 +92,9 @@ final class URLSessionTransport: HTTPTransport, @unchecked Sendable {
 
     /// Streams' own URLSession - a stream holds its connection for as long as it's open, so it never takes one of the
     /// other requests' - made once, cookies off and no cache as theirs are. Its wait is the most a stream may say
-    /// nothing between two bytes (EventStream.silence, the request's own); no wait over all.
+    /// nothing between two bytes (EventStream.silence, the request's own). Its wait over all is URLSession's own default,
+    /// a week, left as it is: the stream is held only while the page shows with the app in front, so it never comes near
+    /// it (and an infinite one is a value CFNetwork may not take as meant).
     private var streams: URLSession?
 
     private func streamSession() -> URLSession {
@@ -100,8 +102,6 @@ final class URLSessionTransport: HTTPTransport, @unchecked Sendable {
         defer { lock.unlock() }
         if let streams { return streams }
         let configuration = Self.configuration(waiting: EventStream.silence)
-        // no wait over all: the stream is meant never to end (URLSession's own default is a week)
-        configuration.timeoutIntervalForResource = .infinity
         let session = URLSession(configuration: configuration)
         streams = session
         return session

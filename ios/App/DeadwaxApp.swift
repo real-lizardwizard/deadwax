@@ -83,7 +83,7 @@ struct DeadwaxApp: App {
         reachability.whenChanged { [weak serverSettings] in serverSettings?.reachChanged() }
         // Phase 8, slice 9: the event log's lines and its stream - the app's, so the lines outlive the page (the stream
         // only while the page shows); out of reach the stream is called off, back it rejoins from the last line held
-        let eventLog = EventLogModel(server: server, reachability: reachability)
+        let eventLog = EventLogModel(server: server, reachability: reachability, navigation: navigation)
         reachability.whenChanged { [weak eventLog] in eventLog?.recheck() }
         let downloads = DownloadModel(server: server, reachability: reachability, files: files, session: Self.downloadSession)
         player.connect(downloads: downloads, reachability: reachability)

@@ -19,6 +19,7 @@ import UIKit
 struct EventLogScreen: View {
     @Environment(EventLogModel.self) private var log
     @Environment(Reachability.self) private var reachability
+    @Environment(AppNavigation.self) private var navigation
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
@@ -66,6 +67,11 @@ struct EventLogScreen: View {
         .onChange(of: log.allowed) { _, _ in
             log.recheck()
         }
+        // Now Playing over the page (a full-screen cover: the page stays shown under it) calls the stream off, as the
+        // web's managingLive does; put away, it's rejoined from the last line held
+        .onChange(of: navigation.nowPlayingShown) { _, _ in
+            log.recheck()
+        }
     }
 
     @ViewBuilder private func lines(_ feed: EventStream.Feed) -> some View {
@@ -103,9 +109,16 @@ struct EventLogScreen: View {
                 }
             }
         }
-        .accessibilityLabel(EventLog.listLabel)
+        // no label on the List itself (the web's aria-label): on a container that isn't an element of its own a label
+        // can go to every row in it, over each line's own - the title and the page's line, the list's first row, say it
+        // Reduce Motion: a line coming in is drawn in place. A List animates a change its transaction carries an
+        // animation for, and an `.animation` above can add one - disablesAnimations stops that, as Up Next's
+        // instant scroll does, and the animation goes
         .transaction { (transaction: inout Transaction) -> Void in
-            if reduceMotion { transaction.animation = nil }
+            if reduceMotion {
+                transaction.disablesAnimations = true
+                transaction.animation = nil
+            }
         }
     }
 }
@@ -223,12 +236,15 @@ private struct LogRow: View {
             .foregroundStyle(tone ?? Palette.quiet)
     }
 
+    /// Which part said it: one line beside the time and level, cut short at its end - and at the largest text sizes,
+    /// stacked on its own line, all of it, wrapping (nothing cut off).
     private var part: some View {
         Text(line.src ?? "")
             .font(Typeface.caption)
             .foregroundStyle(Palette.quiet)
-            .lineLimit(1)
+            .lineLimit(typeSize.isAccessibilitySize ? nil : 1)
             .truncationMode(.tail)
+            .fixedSize(horizontal: false, vertical: typeSize.isAccessibilitySize)
     }
 
     private func copy() {

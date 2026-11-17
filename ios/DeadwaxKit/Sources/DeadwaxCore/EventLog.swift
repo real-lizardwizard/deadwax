@@ -282,8 +282,6 @@ public enum EventLog {
         + "this view only."
     /// Clear, in the bar: the view emptied, nothing on the server.
     public static let clear = "Clear"
-    /// The list, read by VoiceOver (EventLog.tsx's `aria-label`).
-    public static let listLabel = "Event log, newest first"
     /// EMPTY_WORDS: nothing yet, or emptied by Clear (lines were logged; deadwax still has them).
     public static let emptyNever = "Nothing logged yet."
     public static let emptyCleared = "Cleared. New lines show here as deadwax logs them."

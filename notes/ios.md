@@ -13048,10 +13048,10 @@ as they are; the player engine has no diff.
   again, and the stream opened all the same - a 401 halts for the sign-in, a 403 asks /me), `opened` (Live), `frame`
   (a message's line joined; anything that isn't a line left out, as JSON.parse failing leaves it), `streamEnded`
   (lost: "Lost the live feed - reconnecting…" and a wait; refused: "Not live" and its words, halted until Try again
-  or the page shown again; cancelled by the system: asked again, never said), `retryDue` (the stream from the last
+  or until it's wanted again after it wasn't; cancelled by the system: asked again, never said), `retryDue` (the stream from the last
   line held - the history first when it's owed or the lines have a gap), `tryAgain`, `clear`, `reading` (the first
-  read's spinner, which gives way to its failure), `tryAgainShown`, and `announcement` (what VoiceOver hears: lost,
-  refused, and live again after either - never each "Connecting…"). The client: `recentLog()`, and
+  read's spinner, which gives way to its failure), `tryAgainShown`, and `announcement(inReach:)` (what VoiceOver hears,
+  one announcement at a time - see "After review" below). The client: `recentLog()`, and
   `logStream(after:boot:)` - the session's cookie by hand as every request's, `Accept: text/event-stream`, the route's
   wait between bytes; a status other than 200 through `failure()` (so a 401 tells the app, as anywhere), the content
   type checked, then the frames as an AsyncThrowingStream whose end calls the request off.
@@ -13065,7 +13065,7 @@ as they are; the player engine has no diff.
 ### The app (ios/App/Manage/)
 
 - **URLSessionTransport** answers `lines(for:)` on `URLSession.bytes(for:)`, from a URLSession of the streams' own
-  (made once, cookies off and no cache as the other's, its wait between bytes `silence` and none over all - a stream
+  (made once, cookies off and no cache as the other's, its wait between bytes `silence`, its wait over all URLSession's default - a stream
   holds its connection while it's open, so it never takes one of the other requests'). The answer's status and headers
   as they arrive; a non-200's body read up to 64 KB to say why; the body as `EventStream.Lines` until it ends, fails, or
   the reader stops - which cancels both the reading Task and the bytes' own task. A connection failing tells
@@ -13073,7 +13073,7 @@ as they are; the player engine has no diff.
 - **EventLogModel** (new), held by the app as ServerSettingsModel is: DeadwaxApp makes it, puts it in the environment
   and resets it when the person changes; Reachability's `whenChanged` re-checks it; RootView tells it the scene phase
   and the sign-in over the app going. `wanted` is the page showing (a counter), the app in front, deadwax in reach,
-  Settings and the log, no sign-in over the app, a client. It carries out Feed's actions - `read` (/recent), `open`
+  Settings and the log, neither the sign-in nor (after review) Now Playing over the app, a client. It carries out Feed's actions - `read` (/recent), `open`
   (the stream, each frame handed on), `wait` (Task.sleep, then `retryDue`), `stop` (cancel what's out), `askMe`
   (`server.refreshMe()`) - in one `asking` Task at a time, each ask's number taken by Feed before the Task is made, and
   a generation dropping anything of the last person's. Nothing else: no rule of its own, **no BackgroundHold, no
@@ -13084,10 +13084,10 @@ as they are; the player engine has no diff.
   lines, keyed by `Line.ID`), "Reading what deadwax kept…" or the empty words. The stream's line (`StreamLine`: a dot -
   grey, green-icon live, amber-icon lost - and the words, amber while lost) is a top `safeAreaInset`, under the bar.
   Clear in the bar, dimmed with no lines; `.editOutOfReach` once something was heard. `LogRow`: the time in the mono
-  face, the level (semibold; red or amber), the part (one line), over the words (red or amber with the level),
+  face, the level (semibold; red or amber), the part (one line, wrapping at accessibility sizes), over the words (red or amber with the level),
   stacked at accessibility sizes; one VoiceOver element (`EventLog.spoken`, words first) with Copy as an action; a
-  context menu's Copy (`EventLog.copyText`, the line as drawn) to UIPasteboard. Reduce Motion takes the animation out
-  of the list's transactions.
+  context menu's Copy (`EventLog.copyText`, the line as drawn) to UIPasteboard. Reduce Motion: the list's transactions
+  carry no animation and disable any an `.animation` would add.
 - **ManageSection** pushes `AppRoute.eventLog` for `.log`; **Shared/Routes.swift** has the route.
 
 ### What the web's .tsx files hold, read by pattern
@@ -13129,7 +13129,8 @@ through Lines, Frames and Feed.
 - **The lines are the app's while it runs**, as the web's module keeps them: coming back to the page shows them at
   once and fills in the rest. A new person empties them.
 - **VoiceOver reads a line once, its words first**, then its level, time and part; it hears the stream lost, refused
-  and back, not every "Connecting…" (the web's line is a live region, read every time).
+  (with why, in one announcement) and back, not every "Connecting…", and nothing over the app's own out-of-reach
+  banner (the web's line is a live region, read every time).
 - **Each line's identity is the phone's own** (run, number, and its count taken): the web keys by `boot:seq` or by
   place, which two lines can share (a number of the wrong type) and which moves as lines come above.
 - **/recent keeps the transport's own wait** (8 s): its handler reads 500 lines from memory under a lock, with nothing
@@ -13137,10 +13138,10 @@ through Lines, Frames and Feed.
 
 ### Tests
 
-- **EventLogVectorTests** (new, 8): the fixture and its sources, the words, levels, times in four zones and untimed
-  lines, every run replayed step by step (the lines and keys at the end, every identity once), the history's
+- **EventLogVectorTests** (new, 9): the fixture and its sources, the words, levels, times in four zones and untimed
+  lines, every run replayed step by step (the lines and keys at the end, and - after review - every held line keeping its identity and place), the history's
   failures, the addresses, who opens the page.
-- **EventStreamTests** (new, 22): lines across every ending and a split CRLF, an over-long line dropped, frames as
+- **EventStreamTests** (new, 23): lines across every ending and a split CRLF, an over-long line dropped, frames as
   EventSource reads them, each End, the waits; Feed - the history then the stream, a stale answer dropped, a history
   not read (the gap, filled), a drop asked again from the last line held, a refusal and a 401, a 403, a cancellation
   never said, out of reach and back, Clear and nothing cleared back, the first read's spinner and Try again, what
@@ -13175,3 +13176,62 @@ the tunnel, how soon a drop is noticed, "Lost the live feed - reconnecting…" t
 arriving as a search runs, as promptly as the web's; the stream stopping as the app goes to the background and the
 phone sleeping with the page open; Copy's context menu and the pasted text; the list under Reduce Motion (no slide-in)
 and VoiceOver (each line once, the stream lost and back said); the largest text sizes; 500 rows scrolling.
+
+### After review (16 Nov) - slice 9
+
+The review of c485edd (code read only) found four plausible things and some minors. Each was traced before it was
+changed, and all of them were real:
+
+- **The List's VoiceOver label.** `.accessibilityLabel(EventLog.listLabel)` sat on the whole List, which isn't an
+  accessibility element of its own - and on such a container SwiftUI can hand the label to every element inside it,
+  over each line's own `EventLog.spoken`. Dropped, with `EventLog.listLabel` (the web's `aria-label`, no longer drawn;
+  the fixture keeps the web's words): the title and the page's line - the list's first row, "…newest first" - say what
+  it is. `.accessibilityElement(children: .contain)` before it was the other way, but a container element wrapped round
+  a List is one more thing VoiceOver's list navigation would have to get through, for words the page says already.
+- **`timeoutIntervalForResource = .infinity`** on the streams' session: a value CFNetwork may not take as meant. Gone -
+  `configuration(waiting:)` sets only the wait between bytes, so the wait over all is URLSession's default, a week,
+  which no stream held only while the page is in front comes near. tests/test_ios_event_log.py pins its absence from
+  both the streams' session and the configuration it starts from.
+- **The stream stayed open under Now Playing.** Now Playing is a full-screen cover, which leaves the page under it
+  shown (no onDisappear), and the web's `managingLive` is `pageShown && nav.tab === tab && !visualizerShown &&
+  !sheetOpen` - Now Playing being `sheetOpen`. EventLogModel takes AppNavigation now, `wanted` has
+  `!navigation.nowPlayingShown`, and the screen re-checks on `.onChange(of: navigation.nowPlayingShown)`, so the stream
+  is called off as Now Playing opens and rejoined from the last line held as it's put away (a refused stream asked
+  again then too, as after any time it wasn't wanted). pytest holds the web's rule beside the phone's.
+- **VoiceOver announcements collided.** A refused stream posted its words, then "Not live" at once - which cut them
+  off - and going out of reach posted "Lost the live feed - reconnecting…" in the same turn as Reachability's banner
+  line. What VoiceOver hears is Core's now: `Feed.announcement(inReach:)`, asked after each change is carried out,
+  keeps what it last told and gives ONE announcement for what changed since: the history's failure when it's new (and
+  live isn't said on top of it - "what happens from now still shows" covers it); lost; refused with why in the same
+  breath ("Not live. Couldn't open the live feed."); live again only after lost or refused was said; and nothing at all
+  out of reach, where the banner speaks at that moment and its "Back online" says the return (Reachability sets
+  `reach` before telling its handlers, so `inReach` is already false when the banner is said). The model's two
+  `announce` functions are one, posting only what Core says. EventStreamTests:
+  `voiceOverHearsTheStreamLostAndBackNeverEveryConnecting` (lost, back, a refusal and a 403 each in one
+  announcement) and `voiceOverHearsTheHistorysFailureOnceAndNothingOverTheBanner`.
+
+Minors:
+
+- **Reduce Motion** set `transaction.animation = nil`, which was nil already - nothing wraps the feed's changes in an
+  animation - so it did nothing. Under Reduce Motion the List's transactions now also set `disablesAnimations` (as Up
+  Next's instant scroll does), so no `.animation` above can add one. Whether a List animates a row in with no
+  animation in its transaction at all is iOS's to say; not watched (check 371's region).
+- **The part's `.lineLimit(1)`** cut a long `src` short at accessibility sizes, where it stands on a line of its own:
+  there it wraps now (`lineLimit(nil)`, fixed vertically), so check 371's "nothing cut off" holds.
+- **docs/ios.md** said a lost feed was asked again "every 5 seconds": only while deadwax answers with an error. When
+  nothing answers, the transport's silence makes Reachability probe and find deadwax out of reach - usually before the
+  5 s are up - which stops the asking until it's back in reach. A refused stream is asked again on return from the
+  background, deadwax back in reach and Now Playing put away, not only on Try again and the page shown again. And Copy
+  gives more than one line when the words hold newlines. All three said now; Feed's own doc too.
+- **EventLogVectorTests' "every identity once"** couldn't fail: every identity carries a count taken, unique by
+  construction. In its place, `identityMoved(from:to:)` after every step of every run: each held line keeps its
+  identity and its order among the others, those that went are the oldest or all of them (Clear), never one from the
+  middle, and each new line's identity was taken after every one held - which a port that took a held line again
+  (rebuilding the list as it fills a gap, say) would break. `theIdentityCheckCatchesALineTakenAgain` shows it failing
+  on each of those.
+
+Verified: swift test - 1987 Core tests in 204 suites, 158 Audio in 17, 12 in 1; the unsigned device build with no new warning (only the AppIntents metadata one);
+check_project.py; pyflakes over src and tests, clean; pytest on its own, 4919 passed and 1 skipped; all 96 sims. NOT verified, as
+before: any of it on a phone - VoiceOver's announcements as they're actually spoken (one cutting another off is iOS's
+behaviour, read, not heard), the List under Reduce Motion, Now Playing calling the stream off and the page rejoining as
+it goes.

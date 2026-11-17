@@ -380,14 +380,90 @@ final class FakeLineTransport: HTTPLineTransport, @unchecked Sendable {
     }
 
     @Test func voiceOverHearsTheStreamLostAndBackNeverEveryConnecting() {
-        typealias F = EventStream.Feed
-        #expect(F.announcement(from: .connecting, to: .live) == nil)
-        #expect(F.announcement(from: .live, to: .lost) == EventLog.words(.lost))
-        #expect(F.announcement(from: .lost, to: .live) == EventLog.words(.live))
-        #expect(F.announcement(from: .stopped, to: .live) == EventLog.words(.live))
-        #expect(F.announcement(from: .live, to: .stopped) == EventLog.words(.stopped))
-        #expect(F.announcement(from: .live, to: .connecting) == nil)
-        #expect(F.announcement(from: .lost, to: .lost) == nil)
+        var feed = EventStream.Feed()
+        _ = feed.update(wanted: true, online: true)
+        #expect(feed.announcement(inReach: true) == nil, "connecting")
+        _ = feed.historyLanded(1, RecentLog(lines: [Self.line(1)], last: 1, boot: "b1"))
+        feed.opened(2)
+        #expect(feed.announcement(inReach: true) == nil, "the first Live")
+        #expect(feed.announcement(inReach: true) == nil, "said once, whoever asks again")
+        // lost, said; asked again (connecting, never said) and back: Live said
+        _ = feed.streamEnded(2, nil, admin: false)
+        #expect(feed.announcement(inReach: true) == EventLog.words(.lost))
+        #expect(feed.announcement(inReach: true) == nil)
+        _ = feed.retryDue(2)
+        feed.opened(3)
+        #expect(feed.announcement(inReach: true) == EventLog.words(.live))
+        // refused: "Not live" and why, in ONE announcement - never the words cut off by the state after them
+        let refused = Self.answered(404, detail: "Not Found")
+        _ = feed.streamEnded(3, refused, admin: true)
+        #expect(feed.announcement(inReach: true) == "Not live. " + EventStream.refusal(refused, admin: true))
+        #expect(feed.announcement(inReach: true) == nil)
+        // Try again, and live: said, after the refusal
+        _ = feed.tryAgain(wanted: true)
+        #expect(feed.announcement(inReach: true) == nil)
+        _ = feed.historyLanded(4, RecentLog(lines: [Self.line(1)], last: 1, boot: "b1"))
+        feed.opened(5)
+        #expect(feed.announcement(inReach: true) == EventLog.words(.live))
+        // a 403's refusal says NO_PERMISSION with it
+        _ = feed.streamEnded(5, Self.answered(403), admin: false)
+        #expect(feed.announcement(inReach: true) == "Not live. " + EditWords.noPermission)
+    }
+
+    @Test func voiceOverHearsTheHistorysFailureOnceAndNothingOverTheBanner() {
+        var feed = EventStream.Feed()
+        _ = feed.update(wanted: true, online: true)
+        // the history's failure, said once; the stream opening after it isn't said over it
+        _ = feed.historyFailed(1, Self.answered(500, "/interface_logs/recent"), admin: false)
+        let problem = feed.historyProblem
+        let said = feed.announcement(inReach: true)
+        #expect(problem != nil && said == problem)
+        #expect(feed.announcement(inReach: true) == nil)
+        feed.opened(2)
+        #expect(feed.announcement(inReach: true) == nil)
+        // lost, said; asked again, the history first (owed) - failing again with the same words: nothing more; then
+        // the stream back is what that failure already said ("what happens from now still shows")
+        _ = feed.streamEnded(2, nil, admin: false)
+        #expect(feed.announcement(inReach: true) == EventLog.words(.lost))
+        _ = feed.retryDue(2)
+        _ = feed.historyFailed(3, Self.answered(502, "/interface_logs/recent"), admin: false)
+        #expect(feed.announcement(inReach: true) == nil, "the same failure, said already")
+        feed.opened(4)
+        #expect(feed.announcement(inReach: true) == EventLog.words(.live), "lost was said, and nothing since")
+        // read again and landed, then failing anew: said anew
+        _ = feed.update(wanted: false, online: true)
+        _ = feed.update(wanted: true, online: true)
+        _ = feed.historyLanded(6, RecentLog(lines: [], last: 0, boot: "b1"))
+        #expect(feed.announcement(inReach: true) == nil)
+        _ = feed.update(wanted: false, online: true)
+        _ = feed.update(wanted: true, online: true)
+        _ = feed.historyFailed(9, Self.offline, admin: false)
+        let anew = feed.announcement(inReach: true)
+        #expect(anew != nil && anew == feed.historyProblem && anew != problem)
+
+        // out of reach: the app's banner says so at that moment - the stream's lost isn't said over it, nor its live
+        // again after (the banner's "Back online" says that)
+        var live = EventStream.Feed()
+        _ = live.update(wanted: true, online: true)
+        _ = live.historyLanded(1, RecentLog(lines: [Self.line(1)], last: 1, boot: "b1"))
+        live.opened(2)
+        #expect(live.announcement(inReach: true) == nil)
+        #expect(live.update(wanted: false, online: false) == .stop)
+        #expect(live.stream == .lost)
+        #expect(live.announcement(inReach: false) == nil)
+        _ = live.update(wanted: true, online: true)
+        _ = live.historyLanded(4, RecentLog(lines: [Self.line(1)], last: 1, boot: "b1"))
+        live.opened(5)
+        #expect(live.announcement(inReach: true) == nil, "back online said it")
+        // lost while in reach, said - then out of reach: the banner takes it from there, and live again isn't said
+        _ = live.streamEnded(5, nil, admin: false)
+        #expect(live.announcement(inReach: true) == EventLog.words(.lost))
+        _ = live.update(wanted: false, online: false)
+        #expect(live.announcement(inReach: false) == nil)
+        _ = live.update(wanted: true, online: true)
+        _ = live.historyLanded(7, RecentLog(lines: [Self.line(1)], last: 1, boot: "b1"))
+        live.opened(8)
+        #expect(live.announcement(inReach: true) == nil)
     }
 
     // MARK: the client's stream

@@ -13,10 +13,12 @@ import SwiftUI
 /// ask but the newest (one a stop, a page gone or a Try again made stale) is dropped.
 ///
 /// The stream is held only while it is wanted (`wanted`): the page shows, the app is in front, deadwax is in reach, this
-/// person has Settings and the log, and no sign-in is over the app. Anything else calls it off - the page gone, the app
-/// to the background (so a stream that never ends never keeps the app running there: no BackgroundHold, no idle timer),
-/// deadwax out of reach, a session ended (the 401 that brings the sign-in). Wanted again, the history is read again and
-/// the stream rejoined from the last line held, nothing twice and nothing cleared back.
+/// person has Settings and the log, and neither the sign-in nor Now Playing is over the app (the web's `managingLive`,
+/// whose `!sheetOpen` is Now Playing). Anything else calls it off - the page gone, the app to the background (so a stream
+/// that never ends never keeps the app running there: no BackgroundHold, no idle timer), deadwax out of reach, a session
+/// ended (the 401 that brings the sign-in), Now Playing opened over the page (a full-screen cover, which leaves the page
+/// shown under it). Wanted again, the history is read again and the stream rejoined from the last line held, nothing twice
+/// and nothing cleared back.
 ///
 /// Another person (`reset`): everything of the last one's let go - a stream opened for them never draws for anyone else.
 @MainActor
@@ -27,6 +29,8 @@ final class EventLogModel {
 
     @ObservationIgnored private let server: ServerModel
     @ObservationIgnored private let reachability: Reachability
+    /// Whether Now Playing is over the app.
+    @ObservationIgnored private let navigation: AppNavigation
     /// One more each time the person changes: an answer for the last one is dropped.
     @ObservationIgnored private var generation = 0
     /// How many copies of the page show now.
@@ -36,9 +40,10 @@ final class EventLogModel {
     /// What is out: the history read, the stream, or the wait after a loss - called off by a stop.
     @ObservationIgnored private var asking: Task<Void, Never>?
 
-    init(server: ServerModel, reachability: Reachability) {
+    init(server: ServerModel, reachability: Reachability, navigation: AppNavigation) {
         self.server = server
         self.reachability = reachability
+        self.navigation = navigation
     }
 
     // MARK: what the page draws
@@ -52,6 +57,7 @@ final class EventLogModel {
     /// The stream is wanted now.
     private var wanted: Bool {
         pagesShown > 0 && active && reachability.online && allowed && server.signInOver == nil && server.client != nil
+            && !navigation.nowPlayingShown
     }
 
     // MARK: told
@@ -84,19 +90,17 @@ final class EventLogModel {
         }
     }
 
-    /// Anything the stream's being wanted turns on changed - deadwax in reach or out of it, the sign-in over the app come
-    /// or gone, /me answered again - or an answer landed: Feed asked again, and what it says carried out.
+    /// Anything the stream's being wanted turns on changed - deadwax in reach or out of it, the sign-in or Now Playing
+    /// over the app come or gone, /me answered again - or an answer landed: Feed asked again, and what it says carried out.
     func recheck() {
-        let before = feed.stream
         carry(feed.update(wanted: wanted, online: reachability.online))
-        announce(from: before)
+        announce()
     }
 
     /// Try again (beside the history's failure, or a refused stream's).
     func tryAgain() {
-        let before = feed.stream
         carry(feed.tryAgain(wanted: wanted))
-        announce(from: before)
+        announce()
     }
 
     /// Clear: this view emptied, nothing on the server.
@@ -138,16 +142,13 @@ final class EventLogModel {
                 result = .failure(error)
             }
             guard mine == generation, !Task.isCancelled else { return }
-            let before = feed.stream
             switch result {
             case .success(let recent):
                 carry(feed.historyLanded(ask, recent))
             case .failure(let error):
-                let had = feed.historyProblem
                 carry(feed.historyFailed(ask, error, admin: admin))
-                if had == nil, let problem = feed.historyProblem { announce(problem) }
             }
-            announce(from: before)
+            announce()
             recheck()
         }
     }
@@ -163,9 +164,8 @@ final class EventLogModel {
             do {
                 let frames = try await client.logStream(after: after, boot: boot)
                 guard mine == generation, !Task.isCancelled else { return }
-                let before = feed.stream
                 feed.opened(ask)
-                announce(from: before)
+                announce()
                 for try await frame in frames {
                     guard mine == generation, !Task.isCancelled else { return }
                     feed.frame(ask, frame)
@@ -175,10 +175,8 @@ final class EventLogModel {
             }
             // called off: the page's own stop, which Feed already knows of
             guard mine == generation, !Task.isCancelled else { return }
-            let before = feed.stream
             carry(feed.streamEnded(ask, ended, admin: admin))
-            if case .stopped = feed.stream, let problem = feed.streamProblem { announce(problem) }
-            announce(from: before)
+            announce()
             recheck()
         }
     }
@@ -196,15 +194,11 @@ final class EventLogModel {
 
     // MARK: VoiceOver
 
-    /// The stream's line said as it changes the way that matters (Feed.announcement: lost, back, refused) - the web's
-    /// line is a live region.
-    private func announce(from before: EventLog.StreamState) {
-        guard let words = EventStream.Feed.announcement(from: before, to: feed.stream) else { return }
-        announce(words)
-    }
-
-    private func announce(_ words: String) {
-        guard !words.isEmpty else { return }
+    /// What changed said, once it's carried out - Feed.announcement decides what, if anything: one announcement for it
+    /// (a refusal and its words together, never one cutting the other off), and nothing out of reach, where the app's
+    /// banner speaks at that very moment (Reachability's own announcement).
+    private func announce() {
+        guard let words = feed.announcement(inReach: reachability.online), !words.isEmpty else { return }
         AccessibilityNotification.Announcement(words).post()
     }
 
