@@ -1,0 +1,206 @@
+import Foundation
+import Testing
+@testable import DeadwaxCore
+
+/// The Mac's frame and sidebar, the parts that are the Mac's own (notes/ios.md "The Mac app, slice 3: the desktop
+/// frame"): the frame at every size, one panel of three at a time, the window's sizes; the rows from the person's page
+/// order and permissions; where the app is on its stacks (the web's sidebarCurrent) and what a row does (its
+/// sidebarMove). The web's own rules are MacFrameVectorTests'.
+@Suite struct MacFrameTests {
+    @Test func theMacIsAlwaysTheDesktop() {
+        #expect(MacFrame.drawsDesktop(.mac) && !MacFrame.drawsDesktop(.iPhone))
+        #expect(!MacFrame.opensNowPlaying(.mac) && MacFrame.opensNowPlaying(.iPhone))
+        // never a sheet, however narrow: a drawer up to COLUMN_MIN, a column from it
+        for width in [0.0, 400, 880, 1023, 1024, 1279] {
+            #expect(MacFrame.panelStyle(width: width) == .drawer, "\(width)")
+            #expect(!MacFrame.panelIsModal(MacFrame.panelStyle(width: width)))
+        }
+        for width in [1280.0, 1440, 3000] {
+            #expect(MacFrame.panelStyle(width: width) == .column, "\(width)")
+        }
+    }
+
+    @Test func onePanelAtATime() {
+        for shown in MacFrame.Panel.allCases {
+            for asked in MacFrame.Panel.allCases where asked != .none {
+                let now = MacFrame.toggled(shown, asked)
+                #expect(now == (shown == asked ? .none : asked), "\(asked) over \(shown)")
+            }
+        }
+        // the queue gone: Up Next and Info go with it, Lyrics stays to say Nothing playing
+        #expect(MacFrame.afterQueueEnds(.upNext) == .none && MacFrame.afterQueueEnds(.info) == .none)
+        #expect(MacFrame.afterQueueEnds(.lyrics) == .lyrics && MacFrame.afterQueueEnds(.none) == .none)
+    }
+
+    @Test func theWindowHoldsTheSidebarAPageAndTheBar() {
+        // the bar's two sides, its gaps and ends, and the controls between them fit the smallest window
+        let bar = 2 * MacFrame.barSideNarrow + 2 * MacFrame.barGap + 2 * MacFrame.barPad + MacFrame.barMiddleMin
+        #expect(bar <= MacFrame.smallestWidth)
+        // beside the sidebar, a page wider than a phone's (430, the biggest iPhone's)
+        #expect(MacFrame.smallestWidth - MacFrame.sidebarWidth >= 430)
+        #expect(MacFrame.smallestHeight - MacFrame.barHeight >= 480)
+        // it opens wide enough for a panel beside the page, and never smaller than its smallest
+        #expect(MacFrame.panelStyle(width: MacFrame.openingWidth) == .column)
+        #expect(MacFrame.openingWidth >= MacFrame.smallestWidth && MacFrame.openingHeight >= MacFrame.smallestHeight)
+        // a drawer always leaves some of the page in view, the sidebar shown, at the smallest
+        #expect(MacFrame.smallestWidth - MacFrame.sidebarWidth - MacFrame.panelWidth > 0)
+        // the grid's cover fits twice beside a panel's column at the column's width
+        #expect(MacFrame.columnMin - MacFrame.sidebarWidth - MacFrame.panelWidth >= 2 * MacFrame.tileMin)
+    }
+}
+
+@Suite struct MacSidebarTests {
+    private typealias Row = MacSidebar.Row
+
+    // MARK: the rows
+
+    @Test func theLibrarysRowsAreThePersonsOwnPages() {
+        // logins off: the Library's pages in the person's order, Playlists in its own group, then Downloaded
+        let order: [LibraryPage] = [.artists, .playlists, .songs, .albums]
+        #expect(MacSidebar.rows(.yours, order: order, personal: false)
+                == [.view(.artists), .view(.songs), .view(.albums), .downloaded])
+        // the switch's side means nothing without a library of your own
+        #expect(MacSidebar.rows(.all, order: order, personal: false) == MacSidebar.rows(.yours, order: order, personal: false))
+        // a library of your own: yours, Songs the collection's (LibraryPages.shown); All's three
+        #expect(MacSidebar.rows(.yours, order: order, personal: true) == [.view(.artists), .view(.albums), .downloaded])
+        #expect(MacSidebar.rows(.all, order: order, personal: true) == [.allAlbums, .allArtists, .allSongs, .downloaded])
+        // Edit order's own order, as saved
+        let saved = LibraryPages.read("songs,albums")
+        #expect(MacSidebar.rows(.yours, order: saved, personal: false) == [.view(.songs), .view(.albums), .view(.artists),
+                                                                             .downloaded])
+    }
+
+    @Test func manageIsSettingsManageByPermission() {
+        // Settings > Manage's rows, in its order: a Navidrome admin's six (check 424), with Needs a look's count
+        let admin = Access(me: Me(user: "james", admin: true, auth: "on", permissions: nil))
+        #expect(MacSidebar.manageRows(admin) == [.manage(.edit), .manage(.queue), .manage(.care), .manage(.people),
+                                                 .manage(.settings), .manage(.log)])
+        // logins off: no People (nobody to manage); a listener: none, and no Manage group
+        let off = Access(me: Me(user: "local", admin: true, auth: "off", permissions: nil))
+        #expect(MacSidebar.manageRows(off) == Managing.tools(off).map(Row.manage))
+        #expect(!MacSidebar.manageRows(off).contains(.manage(.people)))
+        let listener = Access(me: Me(user: "ethan", admin: false, auth: "on", permissions: ["request"]))
+        #expect(MacSidebar.manageRows(listener).isEmpty)
+    }
+
+    @Test func everyRowHasItsWordsAndAGlyphButAPlaylist() {
+        let rows: [Row] = [.requests, .view(.albums), .view(.artists), .view(.songs), .allAlbums, .allArtists, .allSongs,
+                           .downloaded, .playlists, .settings] + Managing.Tool.allCases.map(Row.manage)
+        for row in rows {
+            #expect(!MacSidebar.label(row).isEmpty, "\(row)")
+            #expect(MacSidebar.symbol(row) != nil, "\(row)")
+        }
+        #expect(MacSidebar.symbol(.playlist("p1")) == nil, "a playlist's name sits under All playlists' words")
+        #expect(MacSidebar.label(.view(.albums)) == "Albums" && MacSidebar.label(.allAlbums) == "Albums")
+        #expect(MacSidebar.label(.downloaded) == DownloadWords.downloadedTitle)
+        #expect(MacSidebar.label(.manage(.edit)) == ManagingWords.editAnAlbum)
+        #expect(MacSidebar.label(.settings) == YouWords.title && MacSidebar.label(.requests) == RequestWords.tab)
+        // the tab bar's own glyphs for the tabs the sidebar stands for
+        #expect(MacSidebar.symbol(.requests) == "square.and.arrow.down" && MacSidebar.symbol(.settings) == "gearshape")
+        // a folding heading's state, as VoiceOver says the web's aria-expanded
+        #expect(MacSidebar.Words.collapsed == "Collapsed" && MacSidebar.Words.expanded == "Expanded")
+    }
+
+    // MARK: where the app is
+
+    @Test func theRowForWhereTheAppIs() {
+        typealias W = MacSidebar.Where
+        // the Library at its root: the page its switch shows; Playlists' page is All playlists
+        #expect(MacSidebar.current(W(tab: .library, page: .artists), listed: []) == .view(.artists))
+        #expect(MacSidebar.current(W(tab: .library, page: .playlists), listed: []) == .playlists)
+        // an album over it: still the view under it
+        #expect(MacSidebar.current(W(tab: .library, page: .albums, library: [.other]), listed: []) == .view(.albums))
+        // a section at the foot names its own row, whatever is over it
+        #expect(MacSidebar.current(W(tab: .library, page: .albums, library: [.allArtists, .other]), listed: []) == .allArtists)
+        #expect(MacSidebar.current(W(tab: .library, library: [.downloaded]), listed: []) == .downloaded)
+        // a playlist's page on top: its row while it is listed, All playlists while it isn't
+        #expect(MacSidebar.current(W(tab: .library, library: [.playlist("p1")]), listed: ["p1"]) == .playlist("p1"))
+        #expect(MacSidebar.current(W(tab: .library, library: [.playlist("p9")]), listed: ["p1"]) == .playlists)
+        // ...before a section under it
+        #expect(MacSidebar.current(W(tab: .library, library: [.allAlbums, .playlist("p1")]), listed: ["p1"]) == .playlist("p1"))
+        // a Manage page on top - or one under it - is its row; under an album it is the tab's again
+        #expect(MacSidebar.current(W(tab: .settings, settings: [.manage(.log)]), listed: []) == .manage(.log))
+        #expect(MacSidebar.current(W(tab: .settings, settings: [.manage(.people), .under(.people)]), listed: [])
+                == .manage(.people))
+        #expect(MacSidebar.current(W(tab: .settings, settings: [.manage(.queue), .other]), listed: []) == .settings)
+        // Search has none - its place is the field; Requests and Settings are theirs
+        #expect(MacSidebar.current(W(tab: .search, library: [.allAlbums]), listed: []) == nil)
+        #expect(MacSidebar.current(W(tab: .requests), listed: []) == .requests)
+        #expect(MacSidebar.current(W(tab: .settings), listed: []) == .settings)
+        // the Library's section isn't the row while another tab shows
+        #expect(MacSidebar.current(W(tab: .requests, library: [.allAlbums]), listed: []) == .requests)
+    }
+
+    @Test func overTheLibrarysView() {
+        typealias W = MacSidebar.Where
+        #expect(!MacSidebar.overLibraryView(W(tab: .library)))
+        #expect(!MacSidebar.overLibraryView(W(tab: .library, library: [.allAlbums])))
+        #expect(MacSidebar.overLibraryView(W(tab: .library, library: [.other])))
+        #expect(MacSidebar.overLibraryView(W(tab: .library, library: [.allAlbums, .other])))
+        #expect(!MacSidebar.overLibraryView(W(tab: .requests, library: [.other])), "off the Library nothing is")
+    }
+
+    // MARK: what a row does
+
+    @Test func whatEachRowDoes() {
+        typealias W = MacSidebar.Where
+        let root = W(tab: .library, page: .albums)
+        // Requests and Settings: their tabs' buttons
+        #expect(MacSidebar.move(.requests, root) == .tab(.requests))
+        #expect(MacSidebar.move(.settings, root) == .tab(.settings))
+        // the Library's page showing: the tab's button (back to its root, then its top); another page at the root
+        #expect(MacSidebar.move(.view(.albums), root) == .tab(.library))
+        #expect(MacSidebar.move(.view(.albums), W(tab: .requests, page: .albums, library: [.other])) == .tab(.library),
+                "the Library as it was left")
+        #expect(MacSidebar.move(.view(.artists), root) == .view(.artists))
+        #expect(MacSidebar.move(.playlists, root) == .view(.playlists))
+        #expect(MacSidebar.move(.playlists, W(tab: .library, page: .playlists)) == .tab(.library))
+        // over a section, the page under it is no longer showing: every Library page is that page at the root
+        let section = W(tab: .library, page: .albums, library: [.allAlbums])
+        #expect(MacSidebar.move(.view(.albums), section) == .view(.albums))
+        #expect(MacSidebar.move(.playlists, W(tab: .library, page: .playlists, library: [.allAlbums])) == .view(.playlists))
+        // a section: the Library with it at the foot - the tab's button when it is there already
+        #expect(MacSidebar.move(.allAlbums, section) == .tab(.library))
+        #expect(MacSidebar.move(.allArtists, section) == .section(.allArtists))
+        #expect(MacSidebar.move(.allSongs, root) == .section(.allSongs))
+        #expect(MacSidebar.move(.downloaded, root) == .section(.downloaded))
+        // a playlist: on the Library, siblings never piled up
+        #expect(MacSidebar.move(.playlist("p1"), root) == .playlist("p1", .open))
+        #expect(MacSidebar.move(.playlist("p1"), W(tab: .library, library: [.playlist("p1")])) == .playlist("p1", .stay))
+        #expect(MacSidebar.move(.playlist("p2"), W(tab: .library, library: [.playlist("p1")])) == .playlist("p2", .become))
+        #expect(MacSidebar.move(.playlist("p1"), W(tab: .library, library: [.playlist("p1"), .playlist("p2")]))
+                == .playlist("p1", .back))
+        // a Manage page: on Settings, in the place of another Manage page on top, else pushed
+        #expect(MacSidebar.move(.manage(.queue), root) == .manage(.queue, .open))
+        #expect(MacSidebar.move(.manage(.queue), W(tab: .settings, settings: [.manage(.queue)])) == .manage(.queue, .stay))
+        #expect(MacSidebar.move(.manage(.log), W(tab: .settings, settings: [.manage(.queue)])) == .manage(.log, .become))
+        #expect(MacSidebar.move(.manage(.log), W(tab: .settings, settings: [.manage(.people), .under(.people)]))
+                == .manage(.log, .open))
+        #expect(MacSidebar.managingMove([], .care) == .open)
+    }
+
+    @Test func theSwitchAndTheFoldsKeptAsTheWebKeepsThem() {
+        #expect(MacSidebar.side(saved: nil) == .yours && MacSidebar.side(saved: "all") == .all)
+        #expect(MacSidebar.folds(saved: nil) == MacSidebar.Folds())
+        #expect(MacSidebar.saved(MacSidebar.Folds(playlists: true, manage: true)) == "playlists,manage")
+        var folds = MacSidebar.Folds()
+        folds = folds.toggled(.manage)
+        #expect(folds.manage && !folds.playlists && folds[.manage])
+        folds = folds.toggled(.manage).toggled(.playlists)
+        #expect(folds == MacSidebar.Folds(playlists: true, manage: false))
+        // the flip from the Mac's own rows: Songs with logins off goes to All's Albums as the web's Recently added does
+        #expect(MacSidebar.sideFlip(.view(.songs), to: .all, over: false) == .allAlbums)
+        #expect(MacSidebar.sideFlip(.downloaded, to: .all, over: false) == nil, "Downloaded is on neither side")
+        #expect(MacSidebar.side(of: .downloaded) == nil && MacSidebar.fold(of: .downloaded) == nil)
+        #expect(MacSidebar.fold(of: .manage(.edit)) == .manage && MacSidebar.fold(of: .playlist("p")) == .playlists)
+    }
+
+    @Test func thePlaylistsListedAtMostTwenty() {
+        let yours = (0..<25).map { Playlist(id: "y\($0)", name: "Mix \($0)", mine: true, editable: true) }
+        let shared = Playlist(id: "s", name: "Shared", mine: false, editable: false)
+        let file = Playlist(id: "f", name: "File", mine: true, editable: false)
+        #expect(MacSidebar.playlists(nil).isEmpty && MacSidebar.playlists([]).isEmpty)
+        #expect(MacSidebar.playlists([shared, file, yours[0]]).map(\.id) == ["y0", "s"])
+        #expect(MacSidebar.playlists(yours + [shared]).count == MacSidebar.playlistsMax)
+    }
+}

@@ -105,7 +105,10 @@ import Testing
         #expect(said == [.settings: "\u{2318},", .find: "\u{2318}F", .refresh: "\u{2318}R", .playPause: "Space",
                          .next: "\u{2318}\u{2192}", .previous: "\u{2318}\u{2190}",
                          .forward: "\u{2325}\u{2318}\u{2192}", .back: "\u{2325}\u{2318}\u{2190}",
-                         .goToCurrentSong: "\u{2318}L"])
+                         .goToCurrentSong: "\u{2318}L",
+                         // (slice 3) the View menu's frame
+                         .sidebar: "\u{2303}\u{2318}S", .upNext: "\u{2325}\u{2318}U", .lyrics: "\u{2325}\u{2318}L",
+                         .info: "\u{2318}I"])
         // no two items share a key
         let keys = MacMenu.Command.allCases.compactMap(MacMenu.key)
         for (i, key) in keys.enumerated() {
@@ -210,5 +213,71 @@ import Testing
         #expect(!MacMenu.item(.find, state).enabled && !MacMenu.item(.settings, state).enabled)
         #expect(!MacMenu.item(.refresh, state).enabled && !MacMenu.item(.goToCurrentSong, state).enabled)
         #expect(MacMenu.item(.next, state).enabled)
+    }
+
+    // MARK: (slice 3) the View menu's frame
+
+    @Test func theSidebarItemSaysWhatItWillDo() {
+        var state = Self.playing
+        #expect(MacMenu.item(.sidebar, state).words == "Hide Sidebar", "shown: Hide")
+        state.sidebarShown = false
+        #expect(MacMenu.item(.sidebar, state).words == "Show Sidebar")
+        #expect(MacMenu.item(.sidebar, state).enabled && !MacMenu.item(.sidebar, state).ticked)
+        // nothing queued doesn't matter to it; the sign-in over the app and a sheet up do
+        #expect(MacMenu.item(.sidebar, MacMenu.State()).enabled)
+        #expect(!MacMenu.item(.sidebar, MacMenu.State(tabs: false)).enabled)
+        #expect(!MacMenu.item(.sidebar, MacMenu.State(sheet: true)).enabled)
+        // Find shows the sidebar to put the cursor in its field: it is never dimmed for a sidebar hidden
+        #expect(MacMenu.item(.find, state).enabled)
+    }
+
+    @Test func thePanelsOneAtATimeEachTickedWhileItShows() {
+        let words = MacMenu.Command.panels.map { MacMenu.item($0, Self.playing).words }
+        #expect(words == [UpNextWords.title, LyricsWords.lyrics, InfoWords.title])
+        #expect(words == ["Up Next", "Lyrics", "Info"])
+        #expect(MacMenu.Command.panels.compactMap(\.panel) == [.upNext, .lyrics, .info])
+        #expect(MacMenu.Command.allCases.filter { $0.panel != nil } == MacMenu.Command.panels)
+        for panel in MacFrame.Panel.allCases {
+            var state = Self.playing
+            state.panel = panel
+            let ticked = MacMenu.Command.panels.filter { MacMenu.item($0, state).ticked }
+            #expect(ticked.compactMap(\.panel) == (panel == .none ? [] : [panel]), "\(panel): its own item ticked alone")
+            #expect(MacMenu.Command.panels.allSatisfy { MacMenu.item($0, state).enabled }, "\(panel)")
+        }
+        let sections = MacMenu.view(Self.playing).map { $0.map(\.command) }
+        #expect(sections == [[.sidebar], [.upNext, .lyrics, .info]])
+    }
+
+    @Test func aPanelOpensWithSomethingQueuedAndAlwaysCloses() {
+        // nothing queued: none opens - but one left open (Lyrics saying Nothing playing) can be put away
+        let none = MacMenu.State()
+        for command in MacMenu.Command.panels {
+            #expect(!MacMenu.item(command, none).enabled, "\(command) with nothing queued")
+            var open = none
+            open.panel = command.panel ?? .none
+            #expect(MacMenu.item(command, open).enabled && MacMenu.item(command, open).ticked, "\(command) open")
+        }
+        // Lyrics dimmed while it is known the song has none (or none kept here offline), as the bar's button is
+        for have in LyricsHave.allCases {
+            var state = Self.playing
+            state.lyrics = have
+            #expect(MacMenu.item(.lyrics, state).enabled == !Lyrics.dimmed(have, on: false), "\(have)")
+            state.panel = .lyrics
+            #expect(MacMenu.item(.lyrics, state).enabled, "\(have): open, it can be put away")
+        }
+        // a sheet up or the sign-in over the app: no panel is opened or closed under it
+        for command in MacMenu.Command.panels + [.sidebar] {
+            var state = Self.playing
+            state.panel = command.panel ?? .none
+            state.sheet = true
+            #expect(!MacMenu.item(command, state).enabled, "\(command) under a sheet")
+            state.sheet = false
+            state.tabs = false
+            #expect(!MacMenu.item(command, state).enabled, "\(command) under the sign-in")
+        }
+        // a text field with the cursor keeps none of these keys from the field: ⌥⌘, ⌃⌘ and ⌘I type nothing
+        for command in MacMenu.Command.panels + [.sidebar] {
+            #expect(!MacMenu.yieldsToTyping(command), "\(command)")
+        }
     }
 }

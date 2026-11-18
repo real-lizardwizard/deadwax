@@ -13,6 +13,9 @@ reading: comments and string literals blanked, so a word in either is never code
     SessionStore - read, saved and removed where the Keychain's was, and nothing about it logged.
   - The Mac's Now Playing says paused when it is (playbackState), the Mac is "Mac" to another device as the web calls
     it, and the window and menus are the Mac's alone.
+  - (Slice 3, notes/ios.md "The Mac app, slice 3: the desktop frame") The Mac's window is always the desktop frame - the
+    sidebar, the page, the side panels and the player bar - and never opens Now Playing; only the app's own window
+    scene is shaped; the iPhone's tabs exactly as they were.
 """
 
 import importlib.util
@@ -119,11 +122,18 @@ def test_platform_is_the_iphones_exactly_as_before_on_the_iphone():
     for helper in (r"refreshCommand\(_ action: @escaping @MainActor @Sendable \(\) async -> Void\)",
                    r"macContextMenu<Items: View>\(@ViewBuilder _ items: \(\) -> Items\)",
                    r"albumRightClick\(_ route: AlbumRoute\)", r"playlistRightClick\(_ route: PlaylistRoute\)",
-                   r"escapeCloses\(_ on: @autoclosure \(\) -> Bool = true\)", r"returnCancels\(\)", r"findField\(\)",
-                   r"oneWindow\(\)", r"macSheet\(\)", r"keepsWindowOpen\(_ on: @autoclosure \(\) -> Bool\)"):
+                   r"escapeCloses\(_ on: @autoclosure \(\) -> Bool = true\)", r"returnCancels\(\)",
+                   r"findField\(_ focused: FocusState<Bool>\.Binding\)",
+                   r"oneWindow\(\)", r"macSheet\(\)", r"keepsWindowOpen\(_ on: @autoclosure \(\) -> Bool\)",
+                   r"readableOnMac\(\)", r"shapesWindow\(\)"):
         assert re.search(r"func " + helper + r" -> some View \{\s*self\s*\}", phone), helper
         assert re.search(r"func " + helper + r" -> some View \{", mac), helper
     assert re.search(r"static func dialogCancel\(\) -> some View \{\s*EmptyView\(\)\s*\}", phone)
+    # (slice 3) Search's field: the navigation bar's, always drawn, exactly as SearchScreen had it - none on the Mac
+    assert re.search(r"func searchField\(text: Binding<String>, prompt: String\) -> some View \{\s*"
+                     r"searchable\(text: text, placement: \.navigationBarDrawer\(displayMode: \.always\), "
+                     r"prompt: Text\(prompt\)\)\s*\}", phone)
+    assert re.search(r"func searchField\(text: Binding<String>, prompt: String\) -> some View \{\s*self\s*\}", mac)
     assert "keyboardShortcut" not in phone and "contextMenu" not in phone and "commands" not in phone
     # the Mac's: no refresh control at all - (slice 2) the same action on ⌘R - the window phone-shaped, New Window and
     # Help gone, and deadwax's menus
@@ -146,8 +156,13 @@ def test_platform_is_the_iphones_exactly_as_before_on_the_iphone():
     assert "MacRefresh" not in launching
     assert "refreshable" not in mac
     assert "CommandGroup(replacing: .newItem) {}" in mac and "CommandGroup(replacing: .help) {}" in mac
-    for size in ("CGSize(width: 390, height: 640)", "widest: CGFloat = 600", "CGSize(width: 430, height: 860)"):
-        assert size in mac
+    # (slice 3) the desktop frame's window: as large as you like above the least that holds the sidebar, a page and
+    # the bar - it was phone-shaped (390 x 640 to 600 wide, opening 430 x 860) until slice 3
+    for size in ("static let smallest = CGSize(width: MacFrame.smallestWidth, height: MacFrame.smallestHeight)",
+                 "static let widest = CGFloat.greatestFiniteMagnitude",
+                 "static let opening = CGSize(width: MacFrame.openingWidth, height: MacFrame.openingHeight)"):
+        assert size in mac, size
+    assert "390" not in mac and "600" not in mac and "860" not in mac
     assert "sizeRestrictions?.minimumSize" in mac and "sizeRestrictions?.maximumSize" in mac
     assert "titlebar?.titleVisibility = .hidden" in mac
     # a presented page: its presenter's models handed on, the Mac's alone (Presenting.swift)
@@ -158,8 +173,8 @@ def test_platform_is_the_iphones_exactly_as_before_on_the_iphone():
 def test_the_app_is_wired_to_platform():
     app = app_sources()
     root = bare(app["DeadwaxApp.swift"])
-    assert root.count(".macWindow(MacCommands(player: player, navigation: navigation, server: server))") == 1, \
-        "the scene's Mac window and (slice 2) its menus"
+    assert root.count(".macWindow(MacCommands(player: player, navigation: navigation, server: server, lyrics: lyrics))") == 1, \
+        "the scene's Mac window and (slice 2) its menus - (slice 3) the lyrics' state for View > Lyrics"
     assert root.count(".oneWindow()") == 1
     assert root.count("Platform.launching()") == 1
     delegate = root[root.index("final class AppDelegate"):]
@@ -274,15 +289,20 @@ def test_the_menus_are_mac_menus_and_nothing_else():
     for group in ("CommandGroup(replacing: .appSettings) {\n            item(.settings, state)",
                   "CommandGroup(replacing: .textEditing) {\n            item(.find, state)",
                   "CommandGroup(replacing: .textFormatting) {}",
-                  "CommandGroup(after: .toolbar) {\n            item(.refresh, state)"):
+                  "CommandGroup(after: .toolbar) {\n            item(.refresh, state)",
+                  "CommandGroup(replacing: .sidebar) {\n            let sections = MacMenu.view(state)"):
         assert group in commands, group
+    # (slice 3) View's frame: Show/Hide Sidebar a button, each panel a tick
+    frame = commands[commands.index("private func frameItems("):commands.index("private func item(")]
+    assert "if each.command.panel != nil {\n                tick(each)\n            } else {\n                button(each)" in frame
     # the state each time it's drawn, from the player and the window
     state = commands[commands.index("private var state: MacMenu.State {"):commands.index("var body: some Commands {")]
     for read in ("queued: player.hasQueue", "playing: player.isPlaying", "shuffle: player.shuffle",
                  "paged: player.paged?.scope", "repeatMode: player.repeatMode", "length: player.duration",
                  "PlayedAlbum.route($0, player: player)", "typing: TextEditing.shared.typing",
                  "tabs: server.launch == .ready && server.signInOver == nil", "refresh: MacRefresh.shared.state",
-                 "nowPlaying: navigation.nowPlayingShown", "sheet: MacRefresh.shared.sheetUp"):
+                 "nowPlaying: navigation.nowPlayingShown", "sheet: MacRefresh.shared.sheetUp",
+                 "sidebarShown: navigation.macSidebarShown", "panel: navigation.macPanel", "lyrics: lyrics.have"):
         assert read in state, read
     # each click as the player's button makes it, read again as it lands
     perform = commands[commands.index("private func perform("):commands.index("static func shortcut(")]
@@ -290,7 +310,8 @@ def test_the_menus_are_mac_menus_and_nothing_else():
     for call in ("navigation.showSettings()", "navigation.find()", "MacRefresh.shared.run()", "player.toggle()",
                  "player.next()", "player.previous()",
                  "MacMenu.skip(command, from: player.shownPosition, length: player.duration) { player.seek(to: to) }",
-                 "player.toggleShuffle()", "player.setRepeat(mode)", "navigation.openAlbum(route)"):
+                 "player.toggleShuffle()", "player.setRepeat(mode)", "navigation.openAlbum(route)",
+                 "navigation.macSidebarShown.toggle()", "if let panel = command.panel { navigation.togglePanel(panel) }"):
         assert call in perform, call
     # no volume of deadwax's own (audio fidelity first), and nothing of the engine's
     assert not re.search(r"(?i)volume|gain", code)
@@ -299,7 +320,7 @@ def test_the_menus_are_mac_menus_and_nothing_else():
     cases = re.findall(r"^\s*case ([a-z][\w, ]*)$", bare(core[core.index("public enum Command"):core.index("public static let repeats")]), re.M)
     every = [name.strip() for line in cases for name in line.split(",")]
     assert every == ["settings", "find", "refresh", "playPause", "next", "previous", "forward", "back", "shuffle",
-                     "repeatOff", "repeatAll", "repeatOne", "goToCurrentSong"]
+                     "repeatOff", "repeatAll", "repeatOne", "goToCurrentSong", "sidebar", "upNext", "lyrics", "info"]
     for name in every:
         assert f"case .{name}" in perform or f".{name}," in perform or f", .{name}" in perform, name
 
@@ -317,17 +338,32 @@ def test_a_text_field_keeps_its_keys():
     assert "TextEditing.shared.changed(nil, began: false)" in editing
 
 
-def test_find_puts_the_cursor_in_searchs_field():
+def test_find_puts_the_cursor_in_the_sidebars_field():
+    """(Slice 3) Search's field on the Mac is the desktop frame's sidebar's: Find shows the sidebar and puts the cursor
+    there, the page left as it is. Search's page draws its navigation-bar field on the iPhone alone (Platform's
+    searchField), and the iPhone's Find path is the slice-2 one, never reached there."""
     app = app_sources()
     search = bare(app["Search/SearchScreen.swift"])
-    assert search.count(".findField()") == 1
-    assert search.index(".searchable(") < search.index(".findField()") < search.index(".onSubmit(of: .search)")
-    assert sum(bare(text).count(".findField()") for name, text in app.items() if name != PLATFORM) == 1
+    assert ".findField(" not in search and ".searchable(" not in search
+    assert search.index(".searchField(text: Binding(get: { search.text }, set: { (typed: String) -> Void in search.type(typed) }),") \
+        < search.index(".onSubmit(of: .search) { search.submitted() }")
+    sidebar = bare(app["Root/MacSidebarView.swift"])
+    assert sidebar.count(".findField($focused)") == 1
+    field = sidebar[sidebar.index("private struct SidebarSearchField"):]
+    assert field.index("TextField(MacSidebar.Words.searchPlaceholder") < field.index(".findField($focused)")
+    assert "@FocusState private var focused: Bool" in field and ".escapeCloses(focused)" in field
+    assert "search.type(typed)" in field and "navigation.showSearch()" in field and "search.submitted()" in field
+    assert sum(bare(text).count(".findField(") for name, text in app.items() if name != PLATFORM) == 1
     routes = bare(app["Shared/Routes.swift"])
     find = routes[routes.index("func find() {"):]
     find = find[:find.index("\n    }\n")]
+    assert "if MacFrame.drawsDesktop(Platform.device) {\n            macSidebarShown = true\n        } else {" in find
     assert "nowPlayingShown = false" in find and "tab = .search" in find and "backToRoot(&search)" in find
+    assert find.index("macSidebarShown = true") < find.index("tab = .search")
     assert "findWanted = true" in find
+    show = routes[routes.index("func showSearch() {"):]
+    show = show[:show.index("\n    }\n")]
+    assert "tab = .search" in show and "if !search.isEmpty { backToRoot(&search) }" in show
     settings = routes[routes.index("func showSettings() {"):]
     settings = settings[:settings.index("\n    }\n")]
     assert "tab = .you" in settings and "nowPlayingShown = false" in settings
@@ -336,7 +372,8 @@ def test_find_puts_the_cursor_in_searchs_field():
     assert "findWanted = false" in reset and "macLibraryPage = nil" in reset
     focus = bare(app["Shared/MacCommands.swift"])
     focus = focus[focus.index("struct FindFocus: ViewModifier"):]
-    assert "content.searchFocused($focused)" in focus and "if #available(iOS 18.0, *) {" in focus
+    assert "content\n            .focused(focused)" in focus and "searchFocused" not in focus and "#available" not in focus
+    assert "focused.wrappedValue = true" in focus
     assert "navigation.findTaken()" in focus
 
 
@@ -344,7 +381,10 @@ def test_the_window_comes_back_on_the_page_it_showed():
     library = bare(app_sources()["Library/LibraryView.swift"])
     assert "if page == nil { show(navigation.macLibraryPage ?? LibraryPages.first(shownOrder)) }" in library
     assert "if Platform.mac { navigation.macLibraryPage = now }" in library
-    assert library.count("macLibraryPage") == 2, "written only on the Mac: nil on the iPhone, the first page as before"
+    # (slice 3) a sidebar row's page shown - written only on the Mac, so never on the iPhone
+    assert ".onChange(of: navigation.macLibraryPage) { (_: LibraryPage?, asked: LibraryPage?) -> Void in" in library
+    assert "if let asked, asked != page { show(LibraryPages.showing(asked, in: shownOrder)) }" in library
+    assert library.count("macLibraryPage") == 3, "written only on the Mac: nil on the iPhone, the first page as before"
 
 
 # ----------------------------------------------------------------------------- right-click (slice 2)
@@ -430,6 +470,7 @@ ESCAPES = {
     "EQ/EQImport.swift": 2, "EQ/EQRoute.swift": 1, "Edit/EditAlbumSheet.swift": 1, "Edit/ReleasePage.swift": 1,
     "Get/SourcesSheet.swift": 1, "Info/InfoView.swift": 1, "Library/LibraryView.swift": 1,
     "Manage/PeopleSheets.swift": 3, "Manage/ServerSettingsGroupScreen.swift": 1, "Player/CoverViewer.swift": 1,
+    "Player/MacPanels.swift": 1, "Root/MacSidebarView.swift": 1,
     "Player/NowPlayingView.swift": 1, "Playlists/PlaylistPicker.swift": 2, "Playlists/PlaylistView.swift": 1,
     "Search/PressingPickerSheet.swift": 1, "UpNext/UpNextScreen.swift": 1,
 }
@@ -443,6 +484,12 @@ GUARDED_ESCAPES = {
     "Artist/ArtistImagesSheet.swift": ["model.map { (model: ArtistImagesModel) -> Bool in"],
     "Get/SourcesSheet.swift": ["!model.edited)"],
     "Playlists/PlaylistPicker.swift": ["!(model.making && nameTyped))", "escapes && blank)"],
+    #? (slice 3) the side panels' Done: Escape is a field's while one has the cursor - the sidebar's search, the page's
+    "UpNext/UpNextScreen.swift": ["!TextEditing.shared.typing)"],
+    "Info/InfoView.swift": ["!TextEditing.shared.typing)"],
+    "Player/MacPanels.swift": ["!TextEditing.shared.typing)"],
+    #? the sidebar's clear button: Escape empties the field only while it has the cursor
+    "Root/MacSidebarView.swift": ["focused)"],
 }
 
 
@@ -601,6 +648,8 @@ SHEET_ROOTS = {
     "Library/LibraryView.swift": 2, "Manage/PeopleScreen.swift": 3, "Player/CoverViewer.swift": 1,
     "Player/NowPlayingView.swift": 4, "Playlists/PlaylistsScreen.swift": 1, "Root/MainTabs.swift": 3,
     "Search/GroupView.swift": 2, "Shared/MacRightClick.swift": 1,
+    #? (slice 3) the desktop frame's: MainTabs' three over the frame, and the bar's EQ
+    "Root/DesktopFrame.swift": 3, "Player/PlayerBar.swift": 1,
 }
 
 
@@ -722,3 +771,177 @@ def test_the_carried_models_are_every_model_the_root_shares():
         assert ("AppCarried(models: models, tabBarRoom: tabBarRoom, playerClearance: playerClearance,\n"
                 "                                 sheetLevel: sheetLevel)") in presenter, kind
 
+
+
+# ----------------------------------------------------------------------------- the desktop frame (slice 3)
+
+def test_the_mac_is_always_the_desktop_frame_and_the_iphone_its_tabs():
+    """The Mac app's plan decision 3: the Mac's window is the desktop frame whatever its width; the iPhone's tabs exactly
+    as before. Core decides (MacFrame.drawsDesktop, held to the device)."""
+    root = bare(app_sources()["Root/RootView.swift"])
+    app = root[root.index("@ViewBuilder private var app: some View {"):]
+    app = app[:app.index("\n    }\n")]
+    assert re.search(r"if MacFrame\.drawsDesktop\(Platform\.device\) \{\s*DesktopFrame\(\)\s*\} else \{\s*MainTabs\(\)\s*\}", app)
+    assert root.count("MainTabs()") == 1 and root.count("DesktopFrame()") == 1
+    gate = root[root.index("case .ready:"):]
+    assert gate.index("app\n") < gate.index(".accessibilityHidden(server.signInOver != nil)")
+    # no system split view and no inspector: the frame is the app's own drawing, as the web's (an inspector or a split
+    # view's column would be a presentation or a column whose environment no smoke run has seen)
+    for name, text in app_sources().items():
+        code = bare(text)
+        assert "NavigationSplitView" not in code and not re.search(r"\binspector\s*\(", code), name
+
+
+def test_only_the_apps_own_window_is_shaped():
+    """On the Mac every sheet and cover is a window scene of its own: shaping every scene held a sheet to the window's
+    least size. Only the scene RootView is drawn in is shaped - RootView is never inside a presentation."""
+    app = app_sources()
+    mac = bare(app[PLATFORM]).split("\n#else\n")[0]
+    launching = mac[mac.index("static func launching()"):]
+    launching = launching[:launching.index("\n    }\n")]
+    assert "willConnectNotification" not in launching, "a scene isn't shaped as it connects - it isn't known yet"
+    assert "forName: UIScene.didActivateNotification" in launching
+    assert "if mainScenes.contains(scene) { shape(scene) }" in launching
+    assert "@MainActor private static let mainScenes = NSHashTable<UIWindowScene>.weakObjects()" in mac
+    main = mac[mac.index("static func mainScene(_ scene: UIWindowScene) {"):]
+    main = main[:main.index("\n    }\n")]
+    assert main.index("mainScenes.add(scene)") < main.index("shape(scene)")
+    assert mac.count("shape(scene)") == 2, "as RootView is put in it, and as it comes to the front"
+    marker = mac[mac.index("private struct MainWindowMarker: UIViewRepresentable {"):]
+    assert "override func didMoveToWindow() {" in marker
+    assert "if let scene = window?.windowScene { Platform.mainScene(scene) }" in marker
+    assert re.search(r"func shapesWindow\(\) -> some View \{\s*background\(MainWindowMarker\(\)\.accessibilityHidden\(true\)\)\s*\}", mac)
+    uses = {name: bare(text).count(".shapesWindow()") for name, text in app.items() if name != PLATFORM}
+    assert {name: n for name, n in uses.items() if n} == {"Root/RootView.swift": 1}, "RootView alone: never a sheet's page"
+    # the window scene's limits are set only in shape()
+    for name, text in app.items():
+        if name != PLATFORM:
+            assert "sizeRestrictions" not in bare(text), name
+
+
+def test_the_frame_never_opens_now_playing():
+    """Decision 5: no Now Playing on the Mac (and no turntable). The frame draws no Now Playing, no mini player and no
+    cover for them; should anything set Now Playing shown, it is put back."""
+    frame = bare(app_sources()["Root/DesktopFrame.swift"])
+    for absent in ("NowPlayingView", "MiniPlayerView", "AppTabBar", "TabView", "appCover(", "nowPlayingShown = true"):
+        assert absent not in frame, absent
+    assert "if shown && !MacFrame.opensNowPlaying(Platform.device) { navigation.nowPlayingShown = false }" in frame
+    bar = bare(app_sources()["Player/PlayerBar.swift"])
+    assert "nowPlayingShown" not in bar and "NowPlayingView" not in bar
+    # a click on the bar's cover opens it full size - the cover viewer, as Now Playing's cover does
+    assert ".opensCoverFullScreen(track, into: $viewing)" in bar and ".coverViewer($viewing, onDismiss: {})" in bar
+    for name, text in app_sources().items():
+        if "nowPlayingShown = true" in bare(text):
+            assert name == "Player/MiniPlayerView.swift", f"{name}: only the iPhone's play bar opens Now Playing"
+
+
+def test_the_frame_holds_the_sidebar_the_page_a_panel_and_the_bar():
+    frame = bare(app_sources()["Root/DesktopFrame.swift"])
+    body = frame[frame.index("var body: some View {"):frame.index("@ViewBuilder private var page: some View {")]
+    order = [body.index(part) for part in ("if navigation.macSidebarShown {", "MacSidebarView()", "page\n",
+                                           "if MacFrame.liesOver(style, panel) {",
+                                           "if MacFrame.makesRoom(style, panel) {", "PlayerBar()")]
+    assert order == sorted(order)
+    assert ".frame(width: CGFloat(MacFrame.sidebarWidth))" in body
+    assert "private var style: MacFrame.PanelStyle { MacFrame.panelStyle(width: width) }" in frame
+    assert ("navigation.macPanelStyle = now" in frame
+            and ".onChange(of: style, initial: true) { (_: MacFrame.PanelStyle, now: MacFrame.PanelStyle) -> Void in" in frame)
+    # the page: the tab the sidebar leads to, as its stack stands - only the one showing drawn
+    page = frame[frame.index("@ViewBuilder private var page: some View {"):frame.index("private var watching: Watching {")]
+    for tab in ("TabStack(path: paths.library, ownTop: true) { LibraryView() }", "TabStack(path: paths.search) { SearchScreen() }",
+                "TabStack(path: paths.requests) { RequestsScreen() }", "TabStack(path: paths.you) { YouView() }"):
+        assert tab in page, tab
+    assert "switch navigation.tab {" in page
+    # what MainTabs watches, this watches
+    for line in (".onChange(of: watching, initial: true)", ".onAppear { requests.watch(watching) }",
+                 ".onDisappear { requests.watch(.hidden) }", "queueCount.changed()", "queueCount.scene(phase)",
+                 "if !queued { navigation.queueEnded() }", "if tab != .search { search.standDown() }",
+                 "sheetOpen: false)"):
+        assert line in frame, line
+    # MainTabs' sheets, over the frame
+    for sheet in (".appSheet(isPresented: $navigation.eqImportSheet) {", ".appSheet(item: $navigation.playlistPick) {",
+                  ".appSheet(item: $navigation.albumEdit, onDismiss: { navigation.editorDismissed() }) {"):
+        assert sheet in frame, sheet
+
+
+def test_the_panels_are_one_at_a_time_and_never_modal():
+    app = app_sources()
+    panels = bare(app["Player/MacPanels.swift"])
+    panel = panels[panels.index("struct MacPanel: View {"):panels.index("extension EnvironmentValues")]
+    for page in ("case .upNext:\n                UpNextScreen()", "case .lyrics:\n                LyricsPanel()",
+                 "case .info:\n                InfoView()"):
+        assert page in panel, page
+    assert ".environment(\\.inSidePanel, true)" in panel and ".frame(width: CGFloat(MacFrame.panelWidth))" in panel
+    assert "@Entry var inSidePanel = false" in panels
+    assert "isModal" not in panels and "appSheet" not in panels
+    lyrics = panels[panels.index("struct LyricsPanel: View {"):]
+    assert ".onAppear {\n            lyrics.showing = true" in lyrics and ".onDisappear { lyrics.showing = false }" in lyrics
+    assert "LyricsView(lyrics: shown, covered: false)" in lyrics and "LyricsWords.nothingPlaying" in lyrics
+    # Up Next's and Info's Done put the panel away there, and dismiss their sheet as before on the iPhone
+    for name in ("UpNext/UpNextScreen.swift", "Info/InfoView.swift"):
+        code = bare(app[name])
+        assert "@Environment(\\.inSidePanel) private var inSidePanel" in code, name
+        assert "if inSidePanel { navigation.closePanel() } else { dismiss() }" in code, name
+    routes = bare(app["Shared/Routes.swift"])
+    assert "private(set) var macPanel: MacFrame.Panel = .none" in routes
+    assert "macPanel = MacFrame.toggled(macPanel, panel)" in routes and "macPanel = MacFrame.afterQueueEnds(macPanel)" in routes
+    album = routes[routes.index("func openAlbum(_ album: AlbumRoute) {"):]
+    assert "if MacFrame.liesOver(macPanelStyle, macPanel) { macPanel = .none }" in album[:album.index("\n    }\n")]
+    reset = routes[routes.index("func reset() {"):]
+    assert "macPanel = .none" in reset[:reset.index("\n    }\n")]
+
+
+def test_the_bars_actions_are_the_players_own():
+    """The bar carries out a click through the very calls Now Playing's buttons make: no engine change, no volume."""
+    bar = bare(app_sources()["Player/PlayerBar.swift"])
+    for call in ("player.toggle()", "player.previous()", "player.next()", "player.toggleShuffle()",
+                 "player.setRepeat(nextRepeat(mode))", "player.seek(to:", "navigation.openAlbum(route)",
+                 "navigation.togglePanel(.lyrics)", "navigation.togglePanel(.upNext)", "navigation.togglePanel(.info)",
+                 "AirPlayButton()", "NowPlayingMenu(hasAlbum: route != nil",
+                 "navigation.playlistPick = PlaylistPickRequest(PlaylistPick(playing: track))", "BarScrubber()",
+                 "Text(LyricsWords.nothingPlaying)", "Lyrics.dimmed(lyrics.have, on: lyricsOn)"):
+        assert call in bar, call
+    assert not re.search(r"(?i)volume|gain", bar), "no volume of deadwax's own"
+    assert "engine" not in bar and "deck" not in bar, "nothing of the engine's, and no turntable"
+    assert ".frame(height: CGFloat(MacFrame.barHeight))" in bar
+    assert "let side = CGFloat(MacFrame.barSide(width: width))" in bar
+
+
+def test_the_sidebar_is_mac_sidebars_rows():
+    sidebar = bare(app_sources()["Root/MacSidebarView.swift"])
+    for rule in ("MacSidebar.current(at, listed: listed.map(\\.id))", "MacSidebar.overLibraryView(at)",
+                 "MacSidebar.sideShown(current, remembered: MacSidebar.side(saved: savedSide), over: over)",
+                 "MacSidebar.folds(saved: savedFolds)", "MacSidebar.manageRows(server.access)",
+                 "MacSidebar.rows(side, order: order, personal: personal)", "MacSidebar.sideFlip(current, to: to, over: over)",
+                 "navigation.macMove(MacSidebar.move(each, at))", "MacSidebar.foldCurrent(fold, folds, current)",
+                 "MacSidebar.manageHeadLabel(folded: folds.manage", "MacSidebar.saved(folds.toggled(fold))",
+                 "@AppStorage(MacSidebar.sideKey)", "@AppStorage(MacSidebar.foldedKey)", "@AppStorage(LibraryPages.storageKey)",
+                 "RequestWords.badgeText(requests.badgeCount)", "queueCount.count.value",
+                 ".onAppear { queueCount.shows(.sidebar) }", ".onDisappear { queueCount.hides(.sidebar) }",
+                 ".task { await playlists.ask(fresh: false) }", "row(.settings, current: current, at: at)"):
+        assert rule in sidebar, rule
+    assert "case sidebar" in bare(app_sources()["Manage/QueueCountModel.swift"])
+    routes = bare(app_sources()["Shared/Routes.swift"])
+    move = routes[routes.index("func macMove(_ move: MacSidebar.Move) {"):]
+    move = move[:move.index("\n    }\n")]
+    for case in ("case .tab(let tab):", "case .view(let page):", "case .section(let page):",
+                 "case .playlist(let id, let how):", "case .manage(let tool, let how):"):
+        assert case in move, case
+
+
+def test_the_grids_and_the_readable_pages():
+    app = app_sources()
+    albums = bare(app["Library/AlbumsScreen.swift"])
+    columns = albums[albums.index("private static var columns: [GridItem] {"):]
+    columns = columns[:columns.index("\n    }\n")]
+    assert ("if Platform.mac {\n            return [GridItem(.adaptive(minimum: CGFloat(MacFrame.tileMin)), spacing: gap, "
+            "alignment: .top)]") in columns
+    assert ("return [GridItem(.flexible(), spacing: gap, alignment: .top), GridItem(.flexible(), spacing: gap, alignment: .top)]"
+            in columns), "the iPhone's two columns as before"
+    routes = bare(app["Shared/Routes.swift"])
+    destinations = routes[routes.index("func appRoutes() -> some View {"):]
+    readable = re.findall(r"case \.(\w+)\(let \w+\): [^\n]*\.readableOnMac\(\)", destinations)
+    assert readable == ["album", "artist", "group", "mbArtist"]
+    mac = bare(app[PLATFORM]).split("\n#else\n")[0]
+    assert re.search(r"func readableOnMac\(\) -> some View \{\s*frame\(maxWidth: CGFloat\(MacFrame\.readableWidth\)\)\s*"
+                     r"\.frame\(maxWidth: \.infinity\)\s*\}", mac)

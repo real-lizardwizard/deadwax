@@ -34,6 +34,8 @@ struct InfoView: View {
     @Environment(DownloadModel.self) private var downloads
     @Environment(AppNavigation.self) private var navigation
     @Environment(\.dismiss) private var dismiss
+    /// (The Mac app, slice 3) Drawn in the desktop frame's side panel: Done puts the panel away (MacPanel).
+    @Environment(\.inSidePanel) private var inSidePanel
     @State private var picked: InfoTab = .about
     @State private var said: InfoAsk.Said?
     @State private var raw: (albumID: String, answer: RawJSON?)?
@@ -82,8 +84,11 @@ struct InfoView: View {
             }
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
-                    Button(InfoWords.done) { dismiss() }
-                        .escapeCloses()
+                    Button(InfoWords.done) {
+                        if inSidePanel { navigation.closePanel() } else { dismiss() }
+                    }
+                    // (the Mac app, slice 3) a panel's Done leaves Escape to a field with the cursor (the sidebar's)
+                    .escapeCloses(!TextEditing.shared.typing)
                 }
             }
         }

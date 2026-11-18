@@ -220,16 +220,62 @@ happens in `~/Library/Caches/deadwax-build`, and the last build's whole log is `
 The same app runs on a Mac too, built from the same code through Apple's Mac Catalyst - not the web app in a window,
 and not a second app. It's the same version as the phone's (app 0.13 (13) now), it talks only to deadwax as the phone
 does, and it plays through the same audio engine: seamless joins, normalization, the EQ, downloads. **This is its
-second build** - the first ran and played (the Mac app's slice 1); this one adds the Mac's menus, keyboard shortcuts
-and right-click menus, and a window you can close while the music plays (slice 2). **Little of it has been seen on a
-Mac yet** - the first build installed, opened and was allowed onto the local network (17 Nov), and no more: what only
-a Mac can tell is what its checks are for ([404-415](#the-mac-apps-checks-404-415) and
-[416-423](#the-mac-apps-menus-keys-and-window-checks-416-423)).
+third build** - the first ran and played (the Mac app's slice 1), the second added the Mac's menus, keyboard shortcuts
+and right-click menus, and a window you can close while the music plays (slice 2); this one lays the window out as the
+web app's desktop is laid out - a sidebar, the page, side panels and a player bar (slice 3). **Little of it has been
+seen on a Mac yet** - the first build installed, opened and was allowed onto the local network (17 Nov), and no more:
+what only a Mac can tell is what its checks are for ([404-415](#the-mac-apps-checks-404-415),
+[416-423](#the-mac-apps-menus-keys-and-window-checks-416-423) and [424-433](#the-mac-apps-desktop-frame-checks-424-433)).
 
-**What it is today.** The phone's app in a window shaped like a phone: the four tabs along the foot, every page as on
-the iPhone, in macOS's sizes and controls (the Mac idiom). The window is at least 390 x 640 points, no wider than 600,
-and opens at 430 x 860; macOS remembers its size and place after that. What the phone does, the Mac does, with the
-Mac's menus and keys, and these differences.
+**What it is today.** The window is laid out as the web app's desktop is, whatever its size: the **sidebar** at the
+left, the **page** you're on beside it, **Up Next, Lyrics or Info** in a panel at the right when you open one, and the
+**player bar** along the foot. Every page is the phone's own page, in macOS's sizes and controls (the Mac idiom). The
+window is at least 880 x 600 points - room for the sidebar, a page and the bar - as large as you like above that, and
+opens at 1280 x 820; macOS remembers its size and place after that. What the phone does, the Mac does, with the Mac's
+menus and keys, and these differences.
+
+- **The sidebar** (232 points wide; **View > Hide Sidebar** ⌃⌘S puts it away and brings it back), from the top:
+  - **The search field.** Type in it and Search's results fill the page - the same results as the phone's Search,
+    which has no field of its own on the Mac. Return searches at once (MusicBrainz too), as the phone keyboard's
+    Search does. Escape empties it while the cursor's in it. **Edit > Find** ⌘F shows the sidebar and puts the cursor
+    here, leaving the page as it is.
+  - **Requests**, with the count of downloads on their way, as the phone's tab has it.
+  - **Library.** With a library of your own, a switch beside the heading - **Yours** and **All**: Yours lists the
+    Library's pages in the order you keep for its switch (Albums, Artists, ... - Playlists is its own group below),
+    All lists all of deadwax's Albums, Artists and Songs. **Downloaded** follows on either. The switch follows where you
+    are, and stays as you left it otherwise (kept on this Mac); turned with a page of the other side showing, it opens
+    the same kind of page on this side - your Albums for All's Albums, All's Artists for your Artists. With logins off,
+    the Library's pages and Downloaded, no switch.
+  - **Playlists**: All playlists, then yours and those shared with you, by name - twenty at most.
+  - **Manage** (only what you're allowed): Edit an album, Needs a look with its count, Library care, Server settings,
+    Event log, People - the rows of Settings > Manage.
+  - **Settings**, at the foot, in view however far the rest scrolls.
+
+  Playlists' and Manage's headings fold their groups away; what's folded is kept on this Mac, and folded Manage shows
+  Needs a look's count on its heading. The row for where you are is lit - a folded heading too, when the page showing
+  is one of its rows. Clicking the row you're on goes back to its own page from whatever you opened over it - and
+  on Requests, Settings or a Library page of Yours, clicking it there goes to the top of its list, as tapping the tab
+  you're on does on the phone. A playlist's row or a Manage row opens its page over what's there, in place of another
+  playlist's or Manage page rather than piling them up. Every row has its glyph.
+- **The page.** The Library's switch and its **•••** stay at the top of the Library, as on the phone. The Library's
+  album grid has as many covers in a row as fit, none under 150 points across. An album's page, an artist's and the
+  album you don't have sit in the middle of the page at a readable width (760 points). Pages you've opened stay as you
+  left them as you move between the sidebar's rows - but each list starts at its top again when you come back to it.
+- **The player bar**, always there along the foot: the song's cover - click it for the cover full size - its title,
+  and **Artist — Album**, which goes to the album's page; **Shuffle**, **Previous**, **Play/Pause**, **Next** and
+  **Repeat** over the song's progress, with the time played and the time left at its ends (click or drag on it to
+  move in the song); then **Lyrics**, **Up Next**, **AirPlay** and **•••** - Now Playing's: Info, Add to a playlist…, Go to
+  album, the song's download items, the EQ. With nothing queued it says **Nothing playing**.
+- **The panels**: Up Next, Lyrics and Info open beside the page - the bar's Lyrics and Up Next buttons, the •••'s
+  Info, or **View > Up Next** ⌥⌘U, **Lyrics** ⌥⌘L and **Info** ⌘I, each ticked while its panel shows. One at a time:
+  opening one closes the other; its button (or menu item) again, its **Done** or Escape closes it. With the window
+  1280 points wide or more the panel is a column of its own (470 points) and the page narrows beside it; narrower, it
+  lies over the page's right edge. Either way the page, the sidebar and the bar still answer. Up Next and Info are
+  the phone's, Lyrics the lines Now Playing shows on the phone, lit as they're sung. When the queue ends Up Next and
+  Info close; Lyrics stays, saying Nothing playing. Going to an album from the bar, Info or ⌘L closes a panel lying
+  over the page, so it doesn't cover the album.
+- **No Now Playing.** The Mac has no Now Playing screen, and so no turntable: everything Now Playing has is in the bar
+  and the panels.
 
 **The menu bar** keeps the Mac's own menus - Undo to Select All, Close Window ⌘W, Enter Full Screen, the Window menu -
 and adds deadwax's:
@@ -238,8 +284,8 @@ and adds deadwax's:
 | --- | --- |
 | **deadwax** | About deadwax, **Settings…** ⌘, (the Settings tab), Hide deadwax ⌘H, Quit deadwax ⌘Q |
 | **File** | Close Window ⌘W - and no New Window: there is only ever one window |
-| **Edit** | **Find** ⌘F: Search, with the cursor in its field (macOS 15 and later - on macOS 14, Find opens Search and you click in the field) |
-| **View** | **Refresh** ⌘R: the page you're on, asked again (see below) |
+| **Edit** | **Find** ⌘F: the cursor in the sidebar's search field, the sidebar shown if it was hidden |
+| **View** | **Show Sidebar** or **Hide Sidebar** ⌃⌘S; **Up Next** ⌥⌘U, **Lyrics** ⌥⌘L, **Info** ⌘I - each opens its panel, or closes it, ticked while it shows; **Refresh** ⌘R: the page you're on, asked again (see below) |
 | **Controls** | **Play** or **Pause** (Space), **Next** ⌘→, **Previous** ⌘←, **Forward 10 Seconds** ⌥⌘→, **Back 10 Seconds** ⌥⌘←, **Shuffle**, **Repeat** (Repeat off, Repeat all, Repeat one - the one that's on is ticked), **Go to Current Song** ⌘L (the album of the song playing) |
 
 Format has nothing of deadwax's in it (there's nothing to format), and there's no deadwax Help (no Mac help book:
@@ -247,8 +293,10 @@ this guide is the help). Every Controls item is dimmed while nothing is queued. 
 Shuffle button is: during the Library's Shuffle it reads **Shuffle - shuffling your whole library** (**Shuffle -
 shuffling all music** for all of deadwax's), ticked and dimmed, as Now Playing's is - that order is the shuffle. The
 Repeat submenu's three items are the words Up Next says to VoiceOver as Repeat changes: Repeat off, Repeat all, Repeat
-one. **While a sheet is up** (Edit album, Up Next, Add to a playlist, a cover full size - any of them) Settings…,
-Find, Refresh and Go to Current Song are dimmed: they'd act on the page under the sheet. **While a text field has the
+one. Up Next and Info are dimmed with nothing queued (unless open: then they close it), and Lyrics too, and for a song
+known to have none. **While a sheet is up** (Edit album, Add to a playlist, the EQ, a cover full size - any of them)
+Settings…, Find, Refresh, Go to Current Song, the sidebar and the panels are dimmed: they'd act on the window under the
+sheet. **While a text field has the
 cursor** - Search, Find in the Library, a name - Space types a space and ⌘→ and ⌘← move along the line: they don't
 play, pause or skip then (their menu items still do). Forward and Back stay within the song. There's no volume of deadwax's own: the Mac's
 volume keys and menu bar volume work, as for any app.
@@ -258,8 +306,8 @@ The rest of the differences:
 - **Pull to refresh** isn't on the Mac: macOS refuses it in the Mac's layout. **View > Refresh** (⌘R) does what the
   page's pull does on the phone, on every page that has one - and on the Library, an album and a playlist, whose pull
   shuffles on the phone, what their **•••** > **Refresh** does. Refresh is dimmed on a page that has none, while one is
-  on its way, while Now Playing is open, and while a sheet is up - unless the page in front inside the sheet has a
-  refresh of its own (Edit album's release page).
+  on its way, and while a sheet is up - unless the page in front inside the sheet has a refresh of its own (Edit
+  album's release page).
 - **Right-click** a song, an album or a playlist for the menu its **•••** has: a song's row (on an album, a playlist,
   All songs or Search) its own •••'s; an album's tile or row (the Library's albums, Search's, an artist's) the album
   page's •••; a playlist's row its page's •••. Only the page's own Refresh is left out - that's ⌘R on the page.
@@ -274,15 +322,16 @@ The rest of the differences:
   typed (Edit album, Artist images, a playlist's Edit), Escape asks too. Where Close doesn't ask, Escape does nothing
   while you've typed something Close would throw away - Add a person's passwords, Reset password's, Which artist is
   this?'s and Artist images' searches, Choose a source's search words, a new playlist's name: click Close or Cancel
-  then. It closes Now Playing, and a cover shown full size. **Return never confirms a delete or a write** in a question
+  then. It closes a cover shown full size, and a panel - Up Next, Lyrics or Info - unless a text field has the cursor
+  (the sidebar's search field's Escape empties it first). **Return never confirms a delete or a write** in a question
   deadwax asks: Return is the question's Cancel (Keep editing, Keep it, Keep as it is, Cancel). A text field's own
   Return is as on the phone - New playlist's name field creates the playlist.
 - **Closing the window** (⌘W, or its red button) leaves the music playing, as Music's does. Click deadwax in the Dock
   and the window comes back on the tab and page you left, the Library on the page it showed. **⌘Q** quits deadwax,
   and the music stops. While Edit album has changes, or a playlist's Edit has, the window can't be closed - Close
   Window is dimmed and the red button off - until you've finished or thrown them away.
-- **No turntable**: Now Playing is always the cover on the Mac, with no button to switch, and Settings > Playback
-  hasn't Now Playing opens as or Pause winds the record down. The turntable stays the phone's.
+- **No turntable**: there's no Now Playing on the Mac to show it, and Settings > Playback hasn't Now Playing opens as
+  or Pause winds the record down. The turntable stays the phone's.
 - **Your sign-in** is kept in a file rather than the Keychain - see [Where the Mac keeps your sign-in](#where-the-mac-keeps-your-sign-in).
 - **The EQ's Import from Files…** opens the Mac's Open panel: deadwax may read the file you choose there, and nothing
   else outside its own folder. **Export…** shares the file through the Mac's Share menu rather than the phone's sheet.
@@ -294,9 +343,8 @@ The rest of the differences:
 - **Settings > This phone > Debug** says "No install date to show: this build wasn't signed for a phone." The Mac
   app doesn't run out - see below.
 
-Still to come, each in a build of its own: a layout for a big window (a sidebar, the player bar along the foot, Up
-Next and Lyrics beside the page, View's Show Sidebar, Up Next, Lyrics and Info), the Mac's own words ("This Mac" where
-it says "This phone"), and File > Import EQ File… ⌘O. Until then, the words say "phone" and "iPhone" in places.
+Still to come, each in a build of its own: the Mac's own words ("This Mac" where it says "This phone"), and File >
+Import EQ File… ⌘O. Until then, the words say "phone" and "iPhone" in places.
 
 ### What the Mac needs
 
@@ -5661,6 +5709,54 @@ Say "pass", or what you saw.
   nothing - empty the field, and Escape closes. A playlist page in Edit, then Now Playing opened over it: Escape
   closes Now Playing alone - is the playlist still in Edit, with no discard question raised behind?
 - **423 VoiceOver** (⌘F5) reads the menus, a song row, a right-click menu's items and the player's buttons by name.
+
+### The Mac app's desktop frame checks (424-433)
+
+**Not done yet.** These come with [the Mac app](#the-mac-app)'s third build - the desktop frame (still app 0.13 (13)).
+No server change is needed, and nothing changes on the phone. As for 404-423: deadwax's plain `http://` address, the
+home Wi-Fi, signed in as an admin with logins on, installed with `ios/scripts/install-mac.sh`. Say "pass", or what you
+saw.
+
+- **424 The sidebar.** At the top the search field, then Requests (with its count while something's arriving),
+  Library with **Yours | All**, Playlists, Manage, and Settings at the foot - each row with its glyph. Yours lists your
+  Library pages in the order you keep for the Library's switch, then Downloaded; All lists Albums, Artists, Songs, then
+  Downloaded. Click each row: its page fills the window beside it, and the row is lit. On All's Albums, turn the switch
+  to Yours: your Albums open. Open an album from All's Albums, then turn the switch: the album stays, only the rows
+  change. Fold Playlists and Manage: quit and reopen - still folded? Folded, does Manage's heading show Needs a look's
+  count? Manage has only what your permissions allow. Twenty playlists and Manage's rows: does Settings stay in view at
+  the foot as the rest scrolls? ⌃⌘S hides the sidebar and shows it again; View's item says Hide Sidebar or Show Sidebar.
+- **425 Search from the sidebar.** Type in its field from the Library: Search's results fill the page as you type -
+  and Return asks MusicBrainz at once. Open an album from the results, then type again: back to the results. Escape
+  with the cursor in the field empties it. ⌘F from any page (and with the sidebar hidden): the sidebar shows, the
+  cursor in its field, the page unchanged. Does Space type a space there, not pause?
+- **426 The player bar.** Along the foot, with something playing: the cover, the title, Artist — Album, Shuffle,
+  Previous, Play/Pause, Next, Repeat, the progress with the time played and the time left, Lyrics, Up Next, AirPlay and
+  •••. Each button does what Now Playing's did on the phone; Shuffle and Repeat light while on; Artist — Album opens the
+  album's page; click the progress and drag along it: the song moves where you let go. Click the cover: the cover full
+  size, Escape closes it. The •••: Info opens the Info panel, Add to a playlist… the picker, the EQ its sheet, Go to
+  album the album. Nothing queued (a fresh sign-in, say): **Nothing playing**, and the bar keeps its height.
+- **427 The panels.** With the window 1280 wide or more, Up Next opens at the right, the page narrower beside it; drag
+  the window narrower: it lies over the page's right edge instead, with a shadow. Lyrics in its place, then Info - one
+  at a time; each button (and ⌥⌘U, ⌥⌘L, ⌘I) opens and closes its own, the menu item ticked while it shows. With one
+  open, the page still scrolls, its songs play and the sidebar's rows work. Done and Escape close it - but Escape with
+  the cursor in a text field doesn't. Lyrics follow the song as it's sung; a song with none says No lyrics for this
+  song, and Lyrics is dimmed in the bar until it's open. Info's album card opens the album: with the panel over the
+  page's edge it closes; as a column it stays. Let the queue run out (or clear it): Up Next and Info close, Lyrics says
+  Nothing playing.
+- **428 Albums wide.** The Library's albums as a grid: as many covers in a row as fit, none smaller than a phone's.
+  Widen the window and the rows take more; narrow it and fewer - the list keeps your place. An album's page, an
+  artist's and an album you don't have sit in the middle at a readable width, the window's sides left plain.
+- **429 Resizing while playing.** Drag the window from its smallest to full screen and back while a song plays: the
+  music doesn't stop or skip, and the page you're on stays where it was.
+- **430 The smallest window.** Narrow and shorten the window as far as it goes: the sidebar, a page and the bar still
+  fit and read, nothing cut off; with a panel open over the page, the page's left part still shows.
+- **431 Sign-in and can't-reach.** Sign out (Settings > Account) - the sign-in fills the window and reads well; sign
+  in. With deadwax unreachable (the network off), the can't-reach screen too. With a sheet open (Edit album, say), is
+  the sheet its own size - not 880 points wide?
+- **432 No turntable.** Nothing on the Mac opens Now Playing or the record: the bar's cover opens the cover full size,
+  its title does nothing, and Settings > Playback has no turntable rows.
+- **433 The phones.** Both iPhones on the same build: the tabs, the play bar on the tab bar, Now Playing (and its
+  turntable), Search's field and the Library's albums grid exactly as before.
 
 ## What it can't do yet
 

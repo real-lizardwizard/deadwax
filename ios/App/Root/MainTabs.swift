@@ -365,7 +365,7 @@ private struct TabBadge: View {
 /// on the stack and on each page (the app draws its own, MainTabs), so the stack's safe area at its foot is the home
 /// indicator's (or the keyboard's): the notice sits `tabBarRoom` above it, and the pages' room counts the bar too.
 /// Since the play bar joined the tab bar (15 Nov) `tabBarRoom` is the whole block, the play bar's height in it.
-private struct TabStack<Root: View>: View {
+struct TabStack<Root: View>: View {
     @Binding var path: [AppRoute]
     /// The root draws its own top, with the offline banner under it (the Library's switch): not drawn here.
     var ownTop = false

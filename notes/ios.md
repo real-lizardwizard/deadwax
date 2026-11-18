@@ -14657,3 +14657,279 @@ docs/ios.md:
 - that SwiftUI lets a view's `@State` object go when its window closes (the weak pages, as WindowWork's holds already
   assume);
 - whether a sheet's scene has `windowingBehaviors` at all, and what ⌘W does with a sheet in front (421).
+
+## The Mac app, slice 3: the desktop frame (2026-11-17)
+
+The Mac app's plan (~/Desktop/Code/deadwax-plans/mac-app.md), slice 3. It covers:
+- section 1.2, the desktop frame;
+- item 3 of section 6, Core's MacSidebar and MacFrame, with vectors held to lib/appFrame.ts;
+- checks 424-433 of section 7;
+- decisions 3 (always the desktop frame) and 5 (no Now Playing and no turntable).
+
+Built on `mac-s3`, from mac-s2's 6cf4ead (slice 2 merged with the ios branch's 72079a8). What it leaves alone:
+- src/__init__.py is untouched and the app is still 0.13 (13). There is **no server change**.
+- **ios/Deadwax.xcodeproj is untouched**: the App folder is synchronized, so the four new App files needed nothing.
+- The engine files and DeadwaxAudio have no diff.
+
+**Nothing an iPhone user sees or does changes.** The frame is drawn only where `MacFrame.drawsDesktop(Platform.device)`
+says so, which is never on an iPhone. Every new view helper is Platform.swift's, and on the iPhone it is the view
+itself, or the iPhone's own code as it was (Search's `.searchable`, moved there whole).
+
+### Core (DeadwaxCore)
+
+- **MacFrame.swift** (new): the web's desktop frame (lib/appFrame.ts) as the Mac draws it.
+  - **The web's own rules**, held by the vectors:
+    - `frame(width:)`, the web's frameFor: the phone frame under 1024, a drawer under 1280, a column from 1280.
+    - `panelIsModal`: only the phone's sheet is modal.
+    - `panel(_:info:upNext:lyrics:)`, the web's sideOf: which panel shows of those open, Info first.
+    - `makesRoom` and `liesOver`: the page gives way to a column, a drawer lies over the page's right edge.
+    - `closesOnCrossing`: what crossing into the desktop closes.
+  - **The Mac's own**, tested in MacFrameTests:
+    - `drawsDesktop(Device)`: true on the Mac at every width (decision 3), false on the iPhone.
+    - `opensNowPlaying(Device)`: false on the Mac (decision 5).
+    - `panelStyle(width:)`: a drawer under 1280 and a column from 1280, **never the sheet**. The web's frame below
+      1024 is the phone's; the Mac's window can be 880 wide and is still the desktop.
+    - `toggled(shown, asked)`: one panel of three at a time; asking for the one shown closes it.
+    - `afterQueueEnds`: Up Next and Info go with the queue, and Lyrics stays to say Nothing playing.
+  - **The sizes**, app-desktop.css's, held by the vectors:
+    - the sidebar 232 and the panel 470;
+    - the bar 72 tall, its cover 48, its sides 240 (320 from a 1280 window), its pad 20 and gap 24;
+    - the grid's least cover 150;
+    - the readable width 760.
+  - **The window's sizes**, the Mac's own: the least is 880 x 600, the least that holds the sidebar, a page and the
+    bar, with the bar's middle 300 at least. It opens at 1280 x 820, where a panel is a column.
+- **MacSidebar.swift** (new): the web's app/Sidebar.tsx as its 2.1.35 lays it out.
+  - **The web's own rules**, held by the vectors:
+    - `rows(side, order:, personal:)`, the web's sidebarRows for each side, with a library of your own and without;
+    - which side a row is on (sideOfItem), the side shown (sideShown), and what a turn of the switch opens (sideFlip);
+    - what folds (foldOf), whether a folded heading is lit (foldCurrent), and Manage's folded heading with Needs a
+      look's count (manageHeadLabel);
+    - whether a page is pushed above a Library view (overLibraryView);
+    - the playlists listed, at most twenty (sidebarPlaylists), and how a playlist's page is opened (playlistsMove);
+    - the two choices kept on the device, under the web's keys and values (`deadwax-sidebar-side`,
+      `deadwax-sidebar-folded`);
+    - the words: the group headings, the field's placeholder and the sidebar's name.
+  - **The Mac's own**, tested in MacSidebarTests:
+    - `current(_ at: Where, listed:)`: the web's sidebarCurrent on the app's four stacks. It gives the row where you
+      are, a section of All's at a Library stack's foot, a Manage page however deep, and a playlist only while listed.
+    - `move(_ row:, _ at:)`: the web's sidebarMove. A row's click is one of a tab's button, a Library page at the root,
+      a section, a playlist on the Library's stack, or a Manage page on Settings' stack, the last two with playlistsMove's
+      stay/back/become/open.
+    - `manageRows(Access)`: Settings > Manage's rows by permission (Managing.tools), Edit an album as the phone's own
+      Choose the folder.
+    - every row's words and glyph (`label`, `symbol`). A playlist has no glyph, as on the web, and its name is set in
+      under All playlists' words (the web's .app-side-playlist).
+  - **Departures**, each because the app has no such page:
+    - no Home;
+    - no Recently added (the app's Albums sort by it instead);
+    - Downloaded closes the Library group on either side (the phone's own: what's on this Mac);
+    - Songs stays with logins off whatever Navidrome lists, as the app's Library always has its Songs page.
+- **MacMenu.swift**, the View menu's frame:
+  - Show Sidebar or Hide Sidebar (⌃⌘S), then Up Next (⌥⌘U), Lyrics (⌥⌘L) and Info (⌘I), each ticked while it shows.
+  - `State` gains `sidebarShown`, `panel` and `lyrics`. `view(_:)` gives the two sections, and `Command.panel` the panel
+    an item shows.
+  - Enabled with the tabs drawn and no sheet over them. A panel that's open can always be put away, and one that's
+    closed opens with something queued. Lyrics isn't offered while it's known the song has none, as the bar's button
+    is dimmed (Lyrics.dimmed).
+  - No new key is the system's or another item's.
+- **The vectors**: ios/scripts/export-frame-vectors.cjs writes Fixtures/frame/frame-vectors.json, 367 cases.
+  - It compiles lib/appFrame.ts, lib/appRoutes.ts, lib/playlists.ts and state/persisted.ts with the repo's tsc and runs
+    them as they are.
+  - It reads Sidebar.tsx's words and app-desktop.css's sizes out of the sources.
+  - Each source's sha256 goes into the fixture, so ui/test/iosframe.sim.cjs (the script with `--check`) fails when the
+    web changes, until the fixture is written again and the Swift follows.
+  - MacFrameVectorTests (12) replays every case through MacFrame and MacSidebar.
+
+### The app
+
+- **Root/DesktopFrame.swift** (new): the Mac's window, always. RootView's `.ready` draws it in place of MainTabs on
+  the Mac.
+  - The layout: the sidebar (232) and a hairline rule, then the page, then a panel's column (from 1280) or a drawer lying
+    over the page's right edge with a shadow (below it), then the player bar along the foot under all of them.
+  - **The page is the tab the sidebar leads to, as its stack stands.** AppNavigation's four stacks are the iPhone's own,
+    each a `TabStack` (MainTabs', no longer private), and the Library keeps its own top: its switch and its ••• stay at
+    the top of its page, as the plan says. **Only the one showing is drawn**, so each page appears and goes as it did
+    under the tab bar - ⌘R's page (MacRefresh), Needs a look's count, the event log's stream and the downloads' poll all
+    go by appearing.
+  - **What MainTabs watches, this watches**: RequestsModel's watch (with no sheet: Now Playing is never over the page),
+    the queue count's three triggers, and the sheets MainTabs presents over the tabs (a shared file's EQ, Add to a
+    playlist, Edit album), each through `appSheet` with its `.macSheet()` root.
+  - Search's asks stand down when another page shows. SearchScreen's own standDown isn't drawn to hear the tab change.
+  - **Now Playing**: nothing in the frame opens it. Should anything set `nowPlayingShown`, an `onChange(initial: true)`
+    puts it back at once, decided by `MacFrame.opensNowPlaying(Platform.device)`. Find, Settings… and Go to Current
+    Song already closed it (slice 2); the iPhone's play bar, the only thing that opens it, isn't drawn here.
+- **Root/MacSidebarView.swift** (new): MacSidebar's rows, top to bottom.
+  - **The search field.** Its words are SearchModel's: typing shows Search's page and Return asks at once
+    (`submitted()`). Escape with the cursor in it empties it. ⌘F shows the sidebar and puts the cursor here
+    (`.findField($focused)`).
+  - **Requests**, with RequestsModel's badge.
+  - **LIBRARY**, with the Yours | All switch when you have a library of your own. Yours' rows are the Library switch's
+    pages in the order you keep, read from LibraryPages' own key, and All's are All music's three. Both end with
+    Downloaded.
+  - **PLAYLISTS** and **MANAGE**, which fold. The folds are kept, and a folded heading is lit when its page shows.
+    Manage's heading says Needs a look's count while folded (QueueCountModel, a new `.sidebar` page).
+  - **Settings** at the foot, under a rule, outside the scroll.
+  - The row where you are is drawn in the selection's colours. VoiceOver hears a fold's heading as Collapsed or
+    Expanded (MacSidebar.Words).
+- **Player/PlayerBar.swift** (new): the web's .app-playbar, in three columns.
+  - **The song**: the cover, the title, and Artist — Album as a button to the album (PlayedAlbum.route). A player
+    failure takes the byline's place. A click on the cover opens it full size: the cover viewer, exactly as Now
+    Playing's cover opens it.
+  - **The transport**: Shuffle, Previous, Play/Pause, Next and Repeat, each PlayerModel's own call from the click.
+    Shuffle is on and dimmed during a library's shuffle, as on Now Playing.
+  - **The scrubber**, BarScrubber: a clock at each end and every rule of Scrub. ScrubberView is untouched, since the
+    palette tests pin its code.
+  - **The tools**: Lyrics (dimmed as Lyrics.dimmed says), Up Next, AirPlay, and Now Playing's ••• (NowPlayingMenu).
+    The •••'s Info opens the Info panel, its EQ the EQ sheet, Add to a playlist… the frame's picker, and Go to album the
+    album.
+  - **Nothing queued**: "Nothing playing" in the bar's place. The bar keeps its height and never comes and goes.
+  - No volume and nothing of the engine's.
+- **Player/MacPanels.swift** (new): `MacPanel` holds Up Next, Lyrics or Info, 470 wide on --dw-side-panel.
+  - Up Next and Info are the very pages their sheets over Now Playing are on the iPhone. With `\.inSidePanel` (a new
+    environment value, false everywhere else), their Done (and Escape, unless a field has the cursor) closes the panel
+    instead of dismissing.
+  - LyricsPanel is the lyrics Now Playing's face shows (LyricsView, `lyrics.showing` while open), with its waiting,
+    error, none and Nothing playing states.
+  - None of it is a presentation, so its environment is the frame's own (see below).
+- **AppNavigation** (Routes.swift):
+  - New state: `macSidebarShown`, `macPanel` (private(set)) and `macPanelStyle`.
+  - New calls: `togglePanel`, `closePanel`, `queueEnded`, `macMove` (MacSidebar.Move onto the four stacks),
+    `macWhere(page:)` and `sidebarPage(_:)`, a route's page for the sidebar.
+  - `find()` on the Mac shows the sidebar and leaves the page alone. On the iPhone it is as before: Now Playing closed,
+    Search at its root.
+  - `showSearch()` comes from the sidebar's field: Search's tab, popped to its results.
+  - `openAlbum` puts a drawer away, since it lies over the album opening, and leaves a column. `reset()` closes the
+    panel.
+  - A section's row clicked again pops back to the section rather than to the Library's root (`backToSection`). The
+    Mac's Library root is Yours' pager, which can't show All's views.
+  - The album, artist, group and MusicBrainz artist routes are centred at the readable width on the Mac
+    (`.readableOnMac()`).
+- **Library/AlbumsScreen.swift**: on the Mac the grid is `GridItem(.adaptive(minimum: 150))`, as many columns as fit.
+  The iPhone keeps its two flexible columns. **Library/LibraryView.swift** follows `macLibraryPage` when the sidebar
+  asks for a page. **Search/SearchScreen.swift**'s `.searchable` is Platform's `searchField`: the iPhone's exactly,
+  and nothing on the Mac, where the sidebar's field is the field.
+- **Shared/MacCommands.swift** draws `CommandGroup(replacing: .sidebar)` from `MacMenu.view`, with ticks for the panels.
+  It reads LyricsModel (a new init argument from DeadwaxApp; it's already one of AppModels, so no new shared model).
+  FindFocus takes the field's own FocusState rather than Search's `searchFocused`.
+- **Shared/Platform.swift**: the window and its scene.
+  - **The window**: at least 880 x 600, no greatest width, opening at 1280 x 820 (`defaultSize` in `macWindow`).
+    Slice 1's 390 x 640 to 600 phone column has gone.
+  - **The helpers**, each a no-op on the iPhone: `findField($focused)`, `searchField(text:prompt:)`, `readableOnMac()`
+    and `shapesWindow()`.
+
+### `.inspector`, NavigationSplitView, and which scene is shaped
+
+- **No `.inspector`.**
+  - On iOS an inspector in a compact width is presented as a sheet. On the Mac a presentation is a scene of its own
+    with an empty environment (72079a8), so a narrow window's inspector would be a page with no models, the crash
+    72079a8 fixed for the sheets.
+  - Proving whether Catalyst's inspector is ever a presentation needs a Mac to click. Not using it needs no proof.
+  - The web's drawer lies over the page's edge with the page still answering. That is neither an inspector's column nor
+    its sheet.
+  - So the panel is a plain view in the frame's HStack, or in an `overlay`, inside the main window's own hierarchy. It
+    presents nothing and carries nothing, and its environment is RootView's.
+- **No NavigationSplitView.**
+  - Its sidebar column brings its own toolbar toggle and its own collapsing below a width, which would be a second
+    Hide Sidebar beside View's ⌃⌘S.
+  - Its detail column would have to take over the four stacks the iPhone and the Mac share.
+  - A sidebar that is a plain view keeps `AppNavigation` the one account of where the app is.
+  - A test forbids both in the App (`test_the_mac_is_always_the_desktop_frame_and_the_iphone_its_tabs`).
+- **Which scene is shaped.**
+  - Slice 1 shaped every `UIWindowScene` as it connected and as it came to the front. On the Mac a sheet is a scene of
+    its own, so slice 3's 880-wide least size would have been put on every sheet.
+  - Now only the scene RootView is drawn in is shaped. `MainWindowMarker`, a hidden, non-interactive UIView in
+    RootView's background, calls `Platform.mainScene(window.windowScene)` from `didMoveToWindow`. That records the scene
+    in a weak table and shapes it. `UIScene.didActivateNotification` shapes it again only if it's in that table.
+  - **Why this tells them apart**: RootView is the WindowGroup's content and is never inside a presentation. A sheet's
+    page is the sheet's own view, wrapped by Presenting.swift's CarriesApp, never RootView. So a window RootView's view
+    has moved into is the app's own.
+  - A new window after the last one closed draws a new RootView, so it is recorded and shaped too. Closed ones drop out
+    of the weak table.
+  - The values are set nowhere else, and a test holds that.
+
+### Decided here (beyond the plan's words)
+
+- **Requests is at the top, then the Library group**, as the web's 2.1.35 sidebar has them (Home and Requests, then the
+  groups). The brief listed Library first; the plan says to follow the web's layout.
+- **The panel's style follows the window's width only.** A drawer becoming a column (or back) as the window crosses
+  1280 draws the panel again, so (assumed, not seen) Up Next's scroll goes back to the top then.
+- **The bar's Lyrics and Up Next light while theirs shows.** The •••'s Info opens Info and leaves it open if it is
+  already showing; View's ⌘I toggles it.
+- **The bar's title does nothing**, as the web's. Artist — Album goes to the album; the cover opens the cover.
+- **Escape in a panel** closes it unless a text field has the cursor (`!TextEditing.shared.typing`, as the sheets' Done
+  in slice 2). In the sidebar's field Escape empties the field while it has the cursor.
+
+### Tests
+
+- **Core**: MacFrameVectorTests (12, the 367 cases), MacFrameTests (3), MacSidebarTests (8), and MacMenuTests up from
+  10 to 14. The new four cover the View menu's items, keys and words, ticks one at a time, Lyrics dimmed, and Hide
+  Sidebar's words.
+- **test_ios_mac.py** (30):
+  - the Mac is always the desktop frame and the iPhone its tabs, with no `.inspector` and no NavigationSplitView in the
+    App;
+  - only the app's own window is shaped (above);
+  - the frame never opens Now Playing, and only the iPhone's play bar sets it shown;
+  - the frame's order and parts, only the showing tab drawn, MainTabs' watches and sheets;
+  - the panels one at a time and never modal, Up Next's and Info's Done by `inSidePanel`;
+  - the bar's actions are the player's own;
+  - the sidebar is MacSidebar's rows;
+  - the grid and the readable pages;
+  - Find to the sidebar's field;
+  - Platform's helpers exactly the iPhone's on the iPhone;
+  - the View menu drawn from MacMenu;
+  - the Escape, guarded Escape and sheet-root counts with the new files.
+- **ui/test/iosframe.sim.cjs**: the vectors against the web, with every source hashed.
+- Each new check was seen failing on its fault, one at a time, and put back:
+  - every scene shaped again, or a sheet's page marked as the main window;
+  - Now Playing let open on the Mac;
+  - the panel as an `.inspector`;
+  - a drawer left open over an album;
+  - Up Next's Done dismissing inside the panel;
+  - the albums grid two columns on the Mac too;
+  - Find sent to Search's field again.
+
+### Verified, and not
+
+Verified on the tip (2026-11-17), on James's Mac, nothing installed:
+
+- `swift test` through build-locked.sh, the whole package: 2281 tests passed, none failed. That is 2111 in Core's (the
+  frame's 23 new and MacMenuTests' 14 among them), 158 in the audio engine's and 12 in the turntable's.
+- An unsigned iPhone Debug build and an unsigned Mac Catalyst Release build (arm64) both succeed, each with only the
+  AppIntents metadata note. A closure stored in an `@Entry` warned in the first Mac build; it became the Bool
+  `inSidePanel`.
+- check_project.py: ok.
+- pytest of tests/test_ios_*.py, test_source_bytes.py and test_logins.py: 694 passed, 1 skipped. pyflakes over src and tests:
+  clean.
+- All 100 sims on Node 22, each in a TMPDIR of its own: 100 passed (iosframe the new one).
+- ios/Deadwax.xcodeproj unchanged.
+
+Not verified - only the Mac can tell (docs/ios.md checks 424-433), beyond what the smoke runs below saw:
+
+- how the sidebar, the bar and the panels look and read at each width - the fonts, the selection's colours, the rules,
+  a drawer's shadow, the bar's three columns at 880 (424, 426, 427, 430);
+- that a click on each row lands where MacSidebar says, the switch's turn included, and that the folds and the side
+  come back after a relaunch (424);
+- the sidebar's field: typing shows Search's page, Return asks at once, Escape empties it, ⌘F puts the cursor there
+  from any page and with the sidebar hidden, and Space types a space there (425);
+- the bar's scrubber under a mouse (a click and a drag), the clocks, the cover full size and Escape on it, the •••'s
+  items (426);
+- the panels under a pointer - the page, the sidebar and the bar still taking clicks with a drawer over the page -
+  and Escape against a field (427);
+- the albums grid's columns as the window is dragged, and the readable pages centred (428);
+- playback carrying on through a resize from the smallest window to full screen (429);
+- the sign-in and can't-reach screens filling the window, and a sheet keeping its own size (431);
+- VoiceOver over the sidebar (Collapsed and Expanded, the counts) and the bar;
+- the iPhones: nothing there changed in the code the iPhone runs - every change is behind Platform's Mac side or
+  `MacFrame.drawsDesktop` - but both phones on the build is James's check (433).
+
+Known, and left:
+
+- **A section's scroll is lost on switching**: only the page showing is drawn, so its stack is kept and its scroll
+  isn't. The four stacks keep where you went.
+- **ArtistView's and MBArtistView's standDowns** aren't heard when a section switch takes their page away, as only
+  SearchModel's is called on a tab change. An ask one of them had out isn't called off when its page goes; its answer
+  has no page to draw in.
+- **Lyrics' "not on this phone"** (LyricsWords.notKept, offline with a downloaded song and no lyrics kept) says phone
+  on the Mac. It's a Core word the phone shares.
+- **No hover**: the rows, the bar's buttons and the panel's rows draw no hover state.
+- **The bar's scrubber** moves twice a second at most, as the ticker does, not frame by frame.

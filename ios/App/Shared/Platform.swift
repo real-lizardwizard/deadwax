@@ -27,22 +27,31 @@ extension Platform {
     /// The Mac's build.
     static let mac = true
 
-    /// The window, phone-shaped until the desktop frame (the Mac app's plan 1.1): the phone's layout in a window,
-    /// honest about what it is - no narrower or shorter than a phone, no wider than a phone's layout reads, opening at
-    /// a big phone's size. Its size and place after that are macOS's to remember.
+    /// The window (slice 3, the desktop frame - the Mac app's plan 1.2): as wide and as tall as you like above the
+    /// least that holds the sidebar, a page and the player bar (MacFrame's smallest, 880 x 600), opening at 1280 x 820,
+    /// where the side panels are a third column. It was phone-shaped until slice 3 (390 x 640 to 600 wide). Its size
+    /// and place after that are macOS's to remember.
     enum Window {
-        static let smallest = CGSize(width: 390, height: 640)
-        static let widest: CGFloat = 600
-        static let opening = CGSize(width: 430, height: 860)
+        static let smallest = CGSize(width: MacFrame.smallestWidth, height: MacFrame.smallestHeight)
+        static let widest = CGFloat.greatestFiniteMagnitude
+        static let opening = CGSize(width: MacFrame.openingWidth, height: MacFrame.openingHeight)
     }
 
-    /// At launch (the app delegate): each window scene shaped as it connects, and again each time it comes to the front
-    /// (the same values - in case the first was too soon for macOS to take them).
+    /// (Slice 3) The app's own window scenes - the one RootView is drawn in (MainWindowMarker). Only these are shaped:
+    /// on the Mac every sheet and cover is a window scene of its own (Presenting.swift), and a sheet held to the main
+    /// window's least size would be 880 wide. RootView is drawn in the WindowGroup's scene alone - never inside a
+    /// presentation, whose page is the sheet's own view - so a scene RootView's view has moved into is the main one.
+    @MainActor private static let mainScenes = NSHashTable<UIWindowScene>.weakObjects()
+
+    /// At launch (the app delegate): the app's window shaped as RootView is drawn in it (`mainScene`), and again each
+    /// time it comes to the front (the same values - in case the first was too soon for macOS to take them). A scene
+    /// that isn't the app's window - a sheet's, a cover's - is never shaped.
     static func launching() {
-        for name in [UIScene.willConnectNotification, UIScene.didActivateNotification] {
-            _ = NotificationCenter.default.addObserver(forName: name, object: nil, queue: .main) { (note: Notification) in
-                guard let scene = note.object as? UIWindowScene else { return }
-                MainActor.assumeIsolated { shape(scene) }
+        _ = NotificationCenter.default.addObserver(forName: UIScene.didActivateNotification, object: nil,
+                                                   queue: .main) { (note: Notification) in
+            guard let scene = note.object as? UIWindowScene else { return }
+            MainActor.assumeIsolated {
+                if mainScenes.contains(scene) { shape(scene) }
             }
         }
         // (slice 2) whether a text field has the cursor: Space, ⌘→ and ⌘← are its own meanwhile (MacMenu); the window's
@@ -60,6 +69,13 @@ extension Platform {
             .returnCancels()
     }
 
+    /// (Slice 3) RootView's view is in this scene's window: the app's own, shaped now and each time it comes to the front.
+    @MainActor static func mainScene(_ scene: UIWindowScene) {
+        guard !mainScenes.contains(scene) else { return }
+        mainScenes.add(scene)
+        shape(scene)
+    }
+
     /// The window's limits, and its title bar: one with the toolbar, no title shown (each page has its own).
     @MainActor private static func shape(_ scene: UIWindowScene) {
         scene.sizeRestrictions?.minimumSize = Window.smallest
@@ -70,9 +86,9 @@ extension Platform {
 }
 
 extension Scene {
-    /// The Mac's window: opening phone-sized, and the menus without File > New Window (one window: never a second copy
-    /// of the app's pages) or Help (there is no Mac help book) - and (slice 2) deadwax's own: Settings…, Find,
-    /// Refresh and Controls (MacCommands).
+    /// The Mac's window: opening at the desktop frame's size (slice 3), and the menus without File > New Window (one
+    /// window: never a second copy of the app's pages) or Help (there is no Mac help book) - and (slice 2) deadwax's
+    /// own: Settings…, Find, Refresh and Controls (MacCommands).
     func macWindow(_ menus: MacCommands) -> some Scene {
         defaultSize(width: Platform.Window.opening.width, height: Platform.Window.opening.height)
             .commands {
@@ -139,9 +155,27 @@ extension View {
         keyboardShortcut(.defaultAction)
     }
 
-    /// (Slice 2) Search's field takes the cursor at Edit > Find (⌘F, AppNavigation.find).
-    func findField() -> some View {
-        modifier(FindFocus())
+    /// (Slice 2) Search's field takes the cursor at Edit > Find (⌘F, AppNavigation.find) - (slice 3) the sidebar's, its
+    /// focus the field's own (`focused`), so the field knows when it has the cursor.
+    func findField(_ focused: FocusState<Bool>.Binding) -> some View {
+        modifier(FindFocus(focused: focused))
+    }
+
+    /// (Slice 3) Search's field: the sidebar's on the Mac (MacSidebarView), so Search's page draws none of its own.
+    func searchField(text: Binding<String>, prompt: String) -> some View {
+        self
+    }
+
+    /// (Slice 3) An album's page, an artist's and the album you don't have: centred at a readable width in the
+    /// desktop frame (MacFrame.readableWidth, the web's --app-desk-content-max), the page's room either side of it.
+    func readableOnMac() -> some View {
+        frame(maxWidth: CGFloat(MacFrame.readableWidth))
+            .frame(maxWidth: .infinity)
+    }
+
+    /// (Slice 3) RootView: the window it is drawn in is the app's own, the one scene shaped (MainWindowMarker).
+    func shapesWindow() -> some View {
+        background(MainWindowMarker().accessibilityHidden(true))
     }
 
     /// (Slice 2) The one window: a file opened, or a link, comes to the window that's open rather than a second one.
@@ -153,6 +187,24 @@ extension View {
     /// it with an empty environment here, and its first `@Environment(PlayerModel.self)` would be a crash).
     func carryingApp(_ carried: AppCarried) -> some View {
         modifier(CarriesApp(carried: carried))
+    }
+}
+
+/// (Slice 3) A view of no size behind RootView: as it is put in a window, that window's scene is the app's own
+/// (Platform.mainScene) - the one shaped. UIKit says when a view moves into a window; SwiftUI has no such moment.
+private struct MainWindowMarker: UIViewRepresentable {
+    func makeUIView(context: Context) -> Marker {
+        Marker()
+    }
+
+    func updateUIView(_ marker: Marker, context: Context) {}
+
+    final class Marker: UIView {
+        override func didMoveToWindow() {
+            super.didMoveToWindow()
+            isUserInteractionEnabled = false
+            if let scene = window?.windowScene { Platform.mainScene(scene) }
+        }
     }
 }
 
@@ -225,7 +277,22 @@ extension View {
     }
 
     /// The Mac's alone: Search's field as before.
-    func findField() -> some View {
+    func findField(_ focused: FocusState<Bool>.Binding) -> some View {
+        self
+    }
+
+    /// Search's field in the navigation bar, always drawn - exactly as before.
+    func searchField(text: Binding<String>, prompt: String) -> some View {
+        searchable(text: text, placement: .navigationBarDrawer(displayMode: .always), prompt: Text(prompt))
+    }
+
+    /// The Mac's alone: the iPhone's page is the screen's width.
+    func readableOnMac() -> some View {
+        self
+    }
+
+    /// The Mac's alone: the iPhone's window is the screen.
+    func shapesWindow() -> some View {
         self
     }
 

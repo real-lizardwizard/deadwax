@@ -51,6 +51,9 @@ struct UpNextScreen: View {
     @Environment(HistoryModel.self) private var history
     @Environment(Reachability.self) private var reachability
     @Environment(\.dismiss) private var dismiss
+    /// (The Mac app, slice 3) Drawn in the desktop frame's side panel: Done puts the panel away (MacPanel).
+    @Environment(\.inSidePanel) private var inSidePanel
+    @Environment(AppNavigation.self) private var navigation
     @Environment(\.scenePhase) private var scenePhase
     @State private var editing = false
     /// The entry a roll-back moved to (a tap above the card): its change of song keeps the scroll where it is - nothing
@@ -270,21 +273,27 @@ struct UpNextScreen: View {
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button(UpNextWords.done) {
-                        if editing { editing = false } else { dismiss() }
+                        if editing { editing = false } else { close() }
                     }
                     .accessibilityFocused($focus, equals: .done)
-                    .escapeCloses()
+                    // (the Mac app, slice 3) a panel's Done leaves Escape to a field with the cursor (the sidebar's)
+                    .escapeCloses(!TextEditing.shared.typing)
                 }
             }
         }
         // the marks' progress, once for the sheet (it asks the session only while something is fetching)
         .task { await downloads.followProgress() }
         .onChange(of: player.hasQueue) { _, queued in
-            if !queued { dismiss() }
+            if !queued { close() }
         }
         .onChange(of: editable) { _, can in
             if !can { editing = false }
         }
+    }
+
+    /// Put away: the sheet over Now Playing, or (the Mac app, slice 3) the desktop frame's side panel.
+    private func close() {
+        if inSidePanel { navigation.closePanel() } else { dismiss() }
     }
 
     /// The entry playing, by its key (a plain queue's, its place): what changes when the song playing does - a song's

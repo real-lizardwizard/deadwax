@@ -70,6 +70,15 @@ struct AlbumsScreen: View {
     private static let gap: CGFloat = 14
     private static let edge: CGFloat = 16
 
+    /// The grid's columns: two on the iPhone; (the Mac app, slice 3) in the desktop frame as many as fit, none
+    /// narrower than MacFrame.tileMin (150, the web's --app-desk-tile-min).
+    private static var columns: [GridItem] {
+        if Platform.mac {
+            return [GridItem(.adaptive(minimum: CGFloat(MacFrame.tileMin)), spacing: gap, alignment: .top)]
+        }
+        return [GridItem(.flexible(), spacing: gap, alignment: .top), GridItem(.flexible(), spacing: gap, alignment: .top)]
+    }
+
     /// What the screen's ask is keyed on: a new person or a new generation is a new look.
     private struct LoadKey: Equatable {
         let person: Int
@@ -299,9 +308,7 @@ struct AlbumsScreen: View {
         let lines = list == .downloaded
         switch library.layout {
         case .grid:
-            LazyVGrid(columns: [GridItem(.flexible(), spacing: Self.gap, alignment: .top),
-                                GridItem(.flexible(), spacing: Self.gap, alignment: .top)],
-                      alignment: .leading, spacing: 18) {
+            LazyVGrid(columns: Self.columns, alignment: .leading, spacing: 18) {
                 ForEach(drawn.groups) { group in
                     Section {
                         ForEach(group.albums) { album in

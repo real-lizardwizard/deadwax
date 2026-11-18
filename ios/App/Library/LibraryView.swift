@@ -127,6 +127,11 @@ struct LibraryView: View {
                 // (the Mac app, slice 2) kept beside the tab for the window closed and opened again - the Mac's alone
                 if Platform.mac { navigation.macLibraryPage = now }
             }
+            .onChange(of: navigation.macLibraryPage) { (_: LibraryPage?, asked: LibraryPage?) -> Void in
+                // (the Mac app, slice 3) a sidebar row's page of the Library, shown - the page the switch has already
+                // is let be (it wrote it). Never on the iPhone, where nothing writes it
+                if let asked, asked != page { show(LibraryPages.showing(asked, in: shownOrder)) }
+            }
             .onChange(of: server.person) { _, _ in
                 // a new person opens on the first page, Find closed and empty - and no Set up Navidrome left up
                 show(LibraryPages.first(shownOrder))

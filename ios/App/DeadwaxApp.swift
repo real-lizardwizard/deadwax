@@ -222,7 +222,7 @@ struct DeadwaxApp: App {
         }
         // (the Mac app, slice 1) on the Mac, its window: phone-sized, no New Window, no Help - and (slice 2) deadwax's
         // menus and keys, drawn from the player and the window (MacCommands). Nothing on the iPhone
-        .macWindow(MacCommands(player: player, navigation: navigation, server: server))
+        .macWindow(MacCommands(player: player, navigation: navigation, server: server, lyrics: lyrics))
     }
 }
 
@@ -305,6 +305,20 @@ enum Palette {
     static let tabBar = Color(red: 0x12 / 255, green: 0x11 / 255, blue: 0x17 / 255)
     /// --dw-border #2c2a36: the hairline along the tab bar's top and the Library's top's foot, the switch's edge.
     static let border = Color(red: 0x2C / 255, green: 0x2A / 255, blue: 0x36 / 255)
+    /// (The Mac app, slice 3) The desktop frame's own, theme.css's: --dw-sidebar #111018 down the left, --dw-side-panel
+    /// #131219 a panel beside the page, --dw-player-bar #16151c the bar along the foot, and --dw-frame-border #22202b the
+    /// rules between them.
+    static let sidebar = Color(red: 0x11 / 255, green: 0x10 / 255, blue: 0x18 / 255)
+    static let sidePanel = Color(red: 0x13 / 255, green: 0x12 / 255, blue: 0x19 / 255)
+    static let playerBar = Color(red: 0x16 / 255, green: 0x15 / 255, blue: 0x1C / 255)
+    static let frameBorder = Color(red: 0x22 / 255, green: 0x20 / 255, blue: 0x2B / 255)
+    /// --dw-selection-bg, --dw-selection-border, --dw-selected-text: the sidebar's row for where the app is - a faint
+    /// gradient of rgba(168, 85, 247) from 0.2 to 0.1, in an edge of rgba(192, 132, 252, 0.5), its words #e9d5ff.
+    static let selectionFill = LinearGradient(colors: [Color(red: 168 / 255, green: 85 / 255, blue: 247 / 255).opacity(0.2),
+                                                       Color(red: 168 / 255, green: 85 / 255, blue: 247 / 255).opacity(0.1)],
+                                              startPoint: .top, endPoint: .bottom)
+    static let selectionEdge = Color(red: 192 / 255, green: 132 / 255, blue: 252 / 255).opacity(0.5)
+    static let selectedText = Color(red: 0xE9 / 255, green: 0xD5 / 255, blue: 0xFE / 255)
     /// --dw-tab-inactive #8a8a9c: a tab not shown (the one shown is `accent`).
     static let tabInactive = Color(red: 0x8A / 255, green: 0x8A / 255, blue: 0x9C / 255)
     /// --dw-well rgba(0, 0, 0, 0.2): the switch's well.

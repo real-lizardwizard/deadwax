@@ -23,6 +23,8 @@ final class QueueCountModel {
     enum Page: Hashable {
         case settings
         case needsLook
+        /// (The Mac app, slice 3) The desktop frame's sidebar, its Needs a look row's count - while it shows.
+        case sidebar
     }
 
     /// The count as deadwax last said it, and whether a request is out.

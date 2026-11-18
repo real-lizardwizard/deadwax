@@ -26,6 +26,8 @@ struct RootView: View {
             }
         }
         .animation(.default, value: server.signInOver)
+        // (the Mac app, slice 3) the window this is drawn in is the app's own: the one scene Platform shapes
+        .shapesWindow()
         .task { await server.start() }
         .onChange(of: scenePhase) { _, phase in
             // (Phase 8, slice 7) a Library care run stops after the album out as the app goes, its screen let sleep - and
@@ -100,9 +102,19 @@ struct RootView: View {
         case .signedOut(let reason, let why):
             SignInView(reason: reason, reasonWhy: why)
         case .ready:
-            MainTabs()
+            app
                 .accessibilityHidden(server.signInOver != nil)
                 .allowsHitTesting(server.signInOver == nil)
+        }
+    }
+
+    /// The app: the tabs on the iPhone; (the Mac app, slice 3) on the Mac always the desktop frame - the sidebar, the
+    /// page, the side panels and the player bar (MacFrame.drawsDesktop, the Mac app's plan decision 3).
+    @ViewBuilder private var app: some View {
+        if MacFrame.drawsDesktop(Platform.device) {
+            DesktopFrame()
+        } else {
+            MainTabs()
         }
     }
 }

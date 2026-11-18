@@ -331,8 +331,17 @@ final class AppNavigation {
     private(set) var findWanted = false
     /// (The Mac app, slice 2) The Library switch's page as the Mac's window last showed it: a window closed and opened
     /// again from the Dock comes back on it, as the tab and its pages do (they are all the app's, not the window's).
-    /// Only the Mac's window writes it (LibraryView).
+    /// Only the Mac's window writes it (LibraryView) - and (slice 3) the sidebar's rows, which the Library's page follows.
     var macLibraryPage: LibraryPage?
+    /// (The Mac app, slice 3) The desktop frame's sidebar is shown: View > Hide Sidebar (⌃⌘S) puts it away, Find brings
+    /// it back. Never read on the iPhone.
+    var macSidebarShown = true
+    /// (The Mac app, slice 3) The side panel showing - Up Next, Lyrics or Info, one at a time (MacFrame.toggled). Always
+    /// none on the iPhone, where they are Now Playing's sheets and its face.
+    private(set) var macPanel: MacFrame.Panel = .none
+    /// (The Mac app, slice 3) How the panel is drawn at the window's width (MacFrame.panelStyle): a drawer over the page's
+    /// edge closes as an album is opened from the player (`openAlbum`). DesktopFrame keeps it.
+    var macPanelStyle: MacFrame.PanelStyle = .column
 
     /// A file shared to deadwax (`.onOpenURL`): shown by the preview that is up, in place - else by the EQ sheet,
     /// opened over Now Playing (by Now Playing) or over the tabs (here).
@@ -375,12 +384,151 @@ final class AppNavigation {
     }
 
     /// (The Mac app, slice 2) Edit > Find (⌘F): Search at its root - its pages popped as the tab tapped again pops them -
-    /// Now Playing closed, and its field to take the cursor as it shows.
+    /// Now Playing closed, and its field to take the cursor as it shows. (Slice 3) In the desktop frame the field is the
+    /// sidebar's: the sidebar shown, and its field given the cursor where the page is - typing there shows Search's
+    /// results (`showSearch`), as the web's sidebar field does.
     func find() {
-        nowPlayingShown = false
-        tab = .search
-        backToRoot(&search)
+        if MacFrame.drawsDesktop(Platform.device) {
+            macSidebarShown = true
+        } else {
+            nowPlayingShown = false
+            tab = .search
+            backToRoot(&search)
+        }
         findWanted = true
+    }
+
+    /// (The Mac app, slice 3) Something typed in the sidebar's search field, or Return there: Search's results at its
+    /// root (the web's `onSearch`) - an album opened from them popped, as the web's field pops it.
+    func showSearch() {
+        tab = .search
+        if !search.isEmpty { backToRoot(&search) }
+    }
+
+    /// (The Mac app, slice 3) A panel's button in the bar, or its View menu item: it, or none when it was showing - one
+    /// at a time.
+    func togglePanel(_ panel: MacFrame.Panel) {
+        macPanel = MacFrame.toggled(macPanel, panel)
+    }
+
+    /// (The Mac app, slice 3) A panel's Done (or Escape): put away.
+    func closePanel() {
+        macPanel = .none
+    }
+
+    /// (The Mac app, slice 3) Nothing queued any more: Up Next and Info go with the queue (their sheets did); Lyrics stays.
+    func queueEnded() {
+        macPanel = MacFrame.afterQueueEnds(macPanel)
+    }
+
+    /// (The Mac app, slice 3) A sidebar row's move (MacSidebar.move): the tab's own button, a page of the Library at its
+    /// root, a section at its foot, a playlist's page or a Manage page put on its stack. A stack whose pages hold work
+    /// (a playlist's Edit, a password or a People write out - as the tab tapped again keeps them) is never cleared under
+    /// it: the move then goes no further than that page.
+    func macMove(_ move: MacSidebar.Move) {
+        nowPlayingShown = false
+        switch move {
+        case .tab(.library) where tab == .library && library.first.map(Self.sidebarPage)?.section != nil:
+            // a section at the Library's foot is the view the Library shows (the web's root drawn with the section's
+            // pick): its row again goes back to it - never past it to the root, which shows Yours' pages alone here
+            backToSection()
+        case .tab(let tab):
+            select(Self.appTab(tab))
+        case .view(let page):
+            tab = .library
+            if !library.isEmpty { backToRoot(&library) }
+            macLibraryPage = page
+        case .section(let page):
+            tab = .library
+            if !library.isEmpty { backToRoot(&library) }
+            if library.isEmpty, let route = Self.route(page) { library = [route] }
+        case .playlist(let id, let how):
+            tab = .library
+            Self.put(.playlist(PlaylistRoute(id: id)), how, on: &library)
+        case .manage(let tool, let how):
+            tab = .you
+            if let route = Self.route(.manage(tool)) { Self.put(route, how, on: &you) }
+        }
+    }
+
+    /// Where the app is, as the sidebar reads it: the tab, the Library's page, and its stacks.
+    func macWhere(page: LibraryPage) -> MacSidebar.Where {
+        let tab: MacSidebar.Tab
+        switch self.tab {
+        case .library: tab = .library
+        case .search: tab = .search
+        case .requests: tab = .requests
+        case .you: tab = .settings
+        }
+        return MacSidebar.Where(tab: tab, page: page, library: library.map(Self.sidebarPage),
+                                settings: you.map(Self.sidebarPage), shown: shownStack.map(Self.sidebarPage))
+    }
+
+    private static func appTab(_ tab: MacSidebar.Tab) -> AppTab {
+        switch tab {
+        case .library: return .library
+        case .search: return .search
+        case .requests: return .requests
+        case .settings: return .you
+        }
+    }
+
+    /// A page as the sidebar reads it.
+    static func sidebarPage(_ route: AppRoute) -> MacSidebar.Page {
+        switch route {
+        case .albums(.store): return .allAlbums
+        case .artists(.store): return .allArtists
+        case .allSongs: return .allSongs
+        case .downloaded: return .downloaded
+        case .playlist(let shown): return .playlist(shown.id)
+        case .chooseFolder: return .manage(.edit)
+        case .needsALook: return .manage(.queue)
+        case .libraryCare: return .manage(.care)
+        case .heldByNobody: return .under(.care)
+        case .people: return .manage(.people)
+        case .person: return .under(.people)
+        case .serverSettings: return .manage(.settings)
+        case .serverSettingsGroup: return .under(.settings)
+        case .eventLog: return .manage(.log)
+        default: return .other
+        }
+    }
+
+    /// A sidebar row's own page.
+    private static func route(_ page: MacSidebar.Page) -> AppRoute? {
+        switch page {
+        case .allAlbums: return .albums(.store)
+        case .allArtists: return .artists(.store)
+        case .allSongs: return .allSongs
+        case .downloaded: return .downloaded
+        case .playlist(let id): return .playlist(PlaylistRoute(id: id))
+        case .manage(.edit): return .chooseFolder
+        case .manage(.queue): return .needsALook
+        case .manage(.care): return .libraryCare
+        case .manage(.people): return .people
+        case .manage(.settings): return .serverSettings
+        case .manage(.log): return .eventLog
+        case .under, .other: return nil
+        }
+    }
+
+    /// The Library back to the section at its foot: the pages over it popped as the tab's button pops a stack, those
+    /// that hold work kept.
+    private func backToSection() {
+        guard let base = library.first, library.count > 1 else { return }
+        var above = Array(library.dropFirst())
+        backToRoot(&above)
+        library = [base] + above
+    }
+
+    /// A page put on a stack as a sidebar row puts it (MacSidebar.StackMove).
+    private static func put(_ route: AppRoute, _ how: MacSidebar.StackMove, on stack: inout [AppRoute]) {
+        switch how {
+        case .stay: break
+        case .back: stack.removeLast()
+        case .become: stack[stack.count - 1] = route
+        case .open: stack.append(route)
+        }
     }
 
     /// (The Mac app, slice 2) Search's field has the cursor Find asked for.
@@ -491,6 +639,9 @@ final class AppNavigation {
     /// goToAlbum: "opens the album page on the current tab"). An album already on top of it isn't pushed twice.
     func openAlbum(_ album: AlbumRoute) {
         nowPlayingShown = false
+        // (the Mac app, slice 3) a panel lying over the page's edge would lie over the album asked for: put away. A third
+        // column stays beside it. Never on the iPhone, whose panel is always none.
+        if MacFrame.liesOver(macPanelStyle, macPanel) { macPanel = .none }
         guard case .album(let album) = followed(.album(album)) else { return }
         let top = shownStack.last
         if case .album(let shown)? = top, shown.id == album.id { return }
@@ -629,6 +780,7 @@ final class AppNavigation {
         tab = .library
         findWanted = false
         macLibraryPage = nil
+        macPanel = .none
         // (slice 6's review) Needs a look's session over - once the session has moved on, so nothing is noted, read or
         // asked for the next person
         editor?.queue?.editorClosed()
@@ -644,8 +796,10 @@ extension View {
         navigationDestination(for: AppRoute.self) { route in
             Group {
                 switch route {
-                // by its id: a page moved to an album's new id (AppNavigation.albumMoved) is that album's page afresh
-                case .album(let album): AlbumView(route: album).id(album.id)
+                // by its id: a page moved to an album's new id (AppNavigation.albumMoved) is that album's page afresh.
+                // (The Mac app, slice 3) The album's page, an artist's and the album you don't have centred at a
+                // readable width in the desktop frame (Platform's readableOnMac - the iPhone's page as before)
+                case .album(let album): AlbumView(route: album).id(album.id).readableOnMac()
                 case .albums(let scope): AlbumsScreen(scope: scope)
                 case .downloaded: AlbumsScreen(list: .downloaded)
                 case .downloads: DownloadsScreen()
@@ -659,11 +813,11 @@ extension View {
                 case .about: AboutPage()
                 case .playlist(let playlist): PlaylistView(route: playlist)
                 case .downloadedPlaylists: DownloadedPlaylistsScreen()
-                case .artist(let artist): ArtistView(route: artist)
+                case .artist(let artist): ArtistView(route: artist).readableOnMac()
                 case .artists(let scope): ArtistsScreen(scope: scope)
                 case .allSongs: SongsScreen()
-                case .group(let group): GroupView(route: group)
-                case .mbArtist(let artist): MBArtistView(route: artist)
+                case .group(let group): GroupView(route: group).readableOnMac()
+                case .mbArtist(let artist): MBArtistView(route: artist).readableOnMac()
                 case .chooseFolder: ChooseFolderScreen()
                 case .needsALook: NeedsLookScreen()
                 case .libraryCare: LibraryCareScreen()

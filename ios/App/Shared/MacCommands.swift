@@ -5,7 +5,8 @@ import UIKit
 /// The Mac's menus and keys (the Mac app's plan 1.3; notes/ios.md "The Mac app, slice 2: menus, keys, right-click and
 /// the window"): deadwax > Settings… (⌘,), Edit > Find (⌘F), View > Refresh (⌘R) and the Controls menu - Play/Pause
 /// (Space), Next (⌘→), Previous (⌘←), Forward and Back 10 Seconds (⌥⌘→, ⌥⌘←), Shuffle, Repeat's three and Go to Current
-/// Song (⌘L). Drawn from Core's MacMenu and nothing else: each item's words, key, dimming and tick are MacMenu's, read
+/// Song (⌘L) - and (slice 3, the desktop frame) View's Show/Hide Sidebar (⌃⌘S), Up Next (⌥⌘U), Lyrics (⌥⌘L) and Info
+/// (⌘I), the three side panels ticked while theirs shows. Drawn from Core's MacMenu and nothing else: each item's words, key, dimming and tick are MacMenu's, read
 /// from the player and the window each time the menus are drawn; this only carries the click out, through the very
 /// calls the player's own buttons make. The system's menus stay - About, Hide, Quit (⌘Q), Undo to Select All, Close
 /// Window (⌘W), Enter Full Screen, the Window menu; File > New Window and Help go (Platform's `macWindow`), and Format
@@ -17,6 +18,8 @@ struct MacCommands: Commands {
     let player: PlayerModel
     let navigation: AppNavigation
     let server: ServerModel
+    /// (Slice 3) Whether the song has lyrics: View > Lyrics is dimmed for one known to have none, as the bar's button.
+    let lyrics: LyricsModel
 
     /// The menus' state now: the player's, the window's (a text field with the cursor, the sign-in, Now Playing, a
     /// sheet, the page shown's Refresh).
@@ -28,7 +31,8 @@ struct MacCommands: Commands {
                              typing: TextEditing.shared.typing,
                              tabs: server.launch == .ready && server.signInOver == nil,
                              refresh: MacRefresh.shared.state, nowPlaying: navigation.nowPlayingShown,
-                             sheet: MacRefresh.shared.sheetUp)
+                             sheet: MacRefresh.shared.sheetUp, sidebarShown: navigation.macSidebarShown,
+                             panel: navigation.macPanel, lyrics: lyrics.have)
     }
 
     var body: some Commands {
@@ -43,6 +47,14 @@ struct MacCommands: Commands {
         CommandGroup(replacing: .textFormatting) {}
         CommandGroup(after: .toolbar) {
             item(.refresh, state)
+        }
+        // (slice 3) the frame's: the sidebar, then the three panels - in the View menu's sidebar place
+        CommandGroup(replacing: .sidebar) {
+            let sections = MacMenu.view(state)
+            ForEach(Array(sections.enumerated()), id: \.offset) { (index: Int, section: [MacMenu.Item]) in
+                if index > 0 { Divider() }
+                frameItems(section)
+            }
         }
         CommandMenu(MacMenu.Words.controls) {
             let sections = MacMenu.controls(state)
@@ -68,6 +80,17 @@ struct MacCommands: Commands {
                 ForEach(repeats, id: \.command) { (each: MacMenu.Item) in tick(each) }
             }
             .disabled(repeats.allSatisfy { !$0.enabled })
+        }
+    }
+
+    /// (Slice 3) One section of View's frame: Show/Hide Sidebar a button, each panel a tick.
+    @ViewBuilder private func frameItems(_ section: [MacMenu.Item]) -> some View {
+        ForEach(section, id: \.command) { (each: MacMenu.Item) in
+            if each.command.panel != nil {
+                tick(each)
+            } else {
+                button(each)
+            }
         }
     }
 
@@ -114,6 +137,10 @@ struct MacCommands: Commands {
             if let track = player.current?.track, let route = PlayedAlbum.route(track, player: player) {
                 navigation.openAlbum(route)
             }
+        case .sidebar:
+            navigation.macSidebarShown.toggle()
+        case .upNext, .lyrics, .info:
+            if let panel = command.panel { navigation.togglePanel(panel) }
         }
     }
 
@@ -388,28 +415,25 @@ struct WindowKeptOpen: ViewModifier {
     }
 }
 
-/// Search's field takes the cursor at Edit > Find (AppNavigation.find): once Search shows, after the tab's switch is
-/// drawn. macOS 15 and later (SwiftUI's searchFocused); on 14, Find opens Search and the field waits for a click.
+/// The search field takes the cursor at Edit > Find (AppNavigation.find): once it shows - (slice 3) the desktop frame's
+/// sidebar's field, a plain text field, its sidebar brought back first if it was put away. It was Search's own
+/// navigation-bar field until slice 3, focused through SwiftUI's searchFocused (macOS 15 and later); a text field's
+/// focus works on every macOS the app runs on.
 struct FindFocus: ViewModifier {
+    /// The field's focus - its own, so it knows when it has the cursor (the sidebar's clear button's Escape).
+    let focused: FocusState<Bool>.Binding
+
     @Environment(AppNavigation.self) private var navigation
-    @FocusState private var focused: Bool
 
     func body(content: Content) -> some View {
-        focusing(content)
+        content
+            .focused(focused)
             .task(id: navigation.findWanted) {
                 guard navigation.findWanted else { return }
                 try? await Task.sleep(for: .milliseconds(150))
                 guard !Task.isCancelled else { return }
-                focused = true
+                focused.wrappedValue = true
                 navigation.findTaken()
             }
-    }
-
-    @ViewBuilder private func focusing(_ content: Content) -> some View {
-        if #available(iOS 18.0, *) {
-            content.searchFocused($focused)
-        } else {
-            content
-        }
     }
 }

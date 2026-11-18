@@ -10,6 +10,10 @@ import Foundation
 // three items what Up Next says to VoiceOver as Repeat changes (UpNextWords.repeatSaid: "Repeat off", "Repeat all",
 // "Repeat one"); Refresh the Library's •••'s; Settings the tab's. Forward 10 Seconds, Back 10 Seconds and Go to Current
 // Song are the Mac's own, as Music names them.
+//
+// (Slice 3, notes/ios.md "The Mac app, slice 3: the desktop frame") And the View menu's frame: Show Sidebar or Hide
+// Sidebar (⌃⌘S, the Mac's own words for it), and the three side panels - Up Next (⌥⌘U), Lyrics (⌥⌘L) and Info (⌘I),
+// each ticked while it shows, one at a time (MacFrame.toggled) - named as the panels are.
 
 public enum MacMenu {
     /// What the menus are drawn from - read by the App each time it draws them.
@@ -41,10 +45,18 @@ public enum MacMenu {
         /// A sheet is up (Edit album, Up Next, Add to a playlist…, any of them): the page under it is out of reach - it
         /// isn't refreshed unseen, and Settings…, Find and Go to Current Song don't change the tab under the sheet.
         public var sheet: Bool
+        /// (Slice 3) The sidebar is shown: the View menu's item says Hide Sidebar.
+        public var sidebarShown: Bool
+        /// (Slice 3) The side panel showing.
+        public var panel: MacFrame.Panel
+        /// (Slice 3) What is known of the song playing's lyrics: Lyrics is dimmed while it is known there are none to
+        /// open, as the bar's button is (Lyrics.dimmed).
+        public var lyrics: LyricsHave
 
         public init(queued: Bool = false, playing: Bool = false, shuffle: Bool = false, paged: PagedScope? = nil,
                     repeatMode: Repeat = .off, length: Double = 0, hasAlbum: Bool = false, typing: Bool = false,
-                    tabs: Bool = true, refresh: Refresh = .none, nowPlaying: Bool = false, sheet: Bool = false) {
+                    tabs: Bool = true, refresh: Refresh = .none, nowPlaying: Bool = false, sheet: Bool = false,
+                    sidebarShown: Bool = true, panel: MacFrame.Panel = .none, lyrics: LyricsHave = .unknown) {
             self.queued = queued
             self.playing = playing
             self.shuffle = shuffle
@@ -57,6 +69,9 @@ public enum MacMenu {
             self.refresh = refresh
             self.nowPlaying = nowPlaying
             self.sheet = sheet
+            self.sidebarShown = sidebarShown
+            self.panel = panel
+            self.lyrics = lyrics
         }
     }
 
@@ -71,6 +86,20 @@ public enum MacMenu {
         case playPause, next, previous, forward, back
         case shuffle, repeatOff, repeatAll, repeatOne
         case goToCurrentSong
+        case sidebar, upNext, lyrics, info
+
+        /// (Slice 3) The View menu's three panels, in the bar's order (Lyrics, Up Next, then Info from its •••).
+        public static let panels: [Command] = [.upNext, .lyrics, .info]
+
+        /// The panel this item shows - nil for every other.
+        public var panel: MacFrame.Panel? {
+            switch self {
+            case .upNext: return .upNext
+            case .lyrics: return .lyrics
+            case .info: return .info
+            default: return nil
+            }
+        }
 
         /// Repeat's three, in Up Next's order (off, all, one).
         public static let repeats: [Command] = [.repeatOff, .repeatAll, .repeatOne]
@@ -162,6 +191,9 @@ public enum MacMenu {
         public static let settings = "\(YouWords.title)\u{2026}"
         /// The submenu Repeat's three are in: Repeat's own word when it's off.
         public static let repeatMenu = repeatLabel(.off)
+        /// (Slice 3) The View menu's sidebar item, as every Mac app words it.
+        public static let showSidebar = "Show Sidebar"
+        public static let hideSidebar = "Hide Sidebar"
     }
 
     /// How far Forward and Back move, in seconds.
@@ -179,6 +211,10 @@ public enum MacMenu {
         case .forward: return Shortcut(.rightArrow, [.option, .command])
         case .back: return Shortcut(.leftArrow, [.option, .command])
         case .goToCurrentSong: return Shortcut(.character("l"), .command)
+        case .sidebar: return Shortcut(.character("s"), [.control, .command])
+        case .upNext: return Shortcut(.character("u"), [.option, .command])
+        case .lyrics: return Shortcut(.character("l"), [.option, .command])
+        case .info: return Shortcut(.character("i"), .command)
         case .shuffle, .repeatOff, .repeatAll, .repeatOne: return nil
         }
     }
@@ -201,6 +237,11 @@ public enum MacMenu {
     public static func controls(_ state: State) -> [[Item]] {
         [[.playPause, .next, .previous], [.forward, .back], [.shuffle] + Command.repeats, [.goToCurrentSong]]
             .map { $0.map { item($0, state) } }
+    }
+
+    /// (Slice 3) The View menu's frame, its sections in order: the sidebar; the three panels.
+    public static func view(_ state: State) -> [[Item]] {
+        [[.sidebar], Command.panels].map { $0.map { item($0, state) } }
     }
 
     /// Where Forward or Back goes from `from` in a song `length` long: kept within the song - nil for any other
@@ -227,6 +268,10 @@ public enum MacMenu {
         case .shuffle: return shuffleLabel(state.paged)
         case .repeatOff, .repeatAll, .repeatOne: return UpNextWords.repeatSaid(command.repeatMode ?? .off)
         case .goToCurrentSong: return Words.goToCurrentSong
+        case .sidebar: return state.sidebarShown ? Words.hideSidebar : Words.showSidebar
+        case .upNext: return UpNextWords.title
+        case .lyrics: return LyricsWords.lyrics
+        case .info: return InfoWords.title
         }
     }
 
@@ -240,6 +285,13 @@ public enum MacMenu {
         case .shuffle: return state.queued && state.paged == nil
         case .repeatOff, .repeatAll, .repeatOne: return state.queued
         case .goToCurrentSong: return state.tabs && !state.sheet && state.queued && state.hasAlbum
+        //? (slice 3) the frame's: with the tabs drawn and no sheet over them - a panel open can always be put away, and
+        //? one closed opens with something queued (Lyrics not while it is known the song has none)
+        case .sidebar: return state.tabs && !state.sheet
+        case .upNext, .info: return state.tabs && !state.sheet && (state.queued || state.panel == command.panel)
+        case .lyrics:
+            return state.tabs && !state.sheet
+                && (state.panel == .lyrics || (state.queued && !Lyrics.dimmed(state.lyrics, on: false)))
         }
     }
 
@@ -247,6 +299,7 @@ public enum MacMenu {
         switch command {
         case .shuffle: return state.queued && state.shuffle
         case .repeatOff, .repeatAll, .repeatOne: return state.queued && command.repeatMode == state.repeatMode
+        case .upNext, .lyrics, .info: return state.panel == command.panel
         default: return false
         }
     }

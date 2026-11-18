@@ -56,12 +56,12 @@ struct SearchScreen: View {
             .onChange(of: state.drawn?.text) { _, _ in jump(proxy) }
         }
         .navigationTitle(SearchWords.title)
-        .searchable(text: Binding(get: { search.text }, set: { (typed: String) -> Void in search.type(typed) }),
-                    placement: .navigationBarDrawer(displayMode: .always), prompt: Text(SearchWords.prompt))
+        // the navigation bar's field, always drawn - (the Mac app, slice 3) on the Mac the sidebar's instead, these very
+        // words (MacSidebarView), and Edit > Find (⌘F) puts the cursor there
+        .searchField(text: Binding(get: { search.text }, set: { (typed: String) -> Void in search.type(typed) }),
+                     prompt: SearchWords.prompt)
         .autocorrectionDisabled()
         .textInputAutocapitalization(.never)
-        // (the Mac app, slice 2) Edit > Find (⌘F) puts the cursor here; nothing on the iPhone
-        .findField()
         .onSubmit(of: .search) { search.submitted() }
         .onAppear { search.shown() }
         .onChange(of: navigation.tab) { _, tab in
