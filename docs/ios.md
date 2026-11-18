@@ -355,13 +355,20 @@ The rest of the differences:
   Mac when you sign out."), an album's and a playlist's download lines, Album info's **On this Mac**, the offline
   banner ("Offline - showing what's on this Mac", then "Join a network to play what isn't on this Mac." - a Mac has no
   Airplane Mode), Pull to shuffle's "songs on this Mac", Lyrics' "not on this Mac", Change password's and
-  Normalization's lines. Where the phone says to close deadwax from the app switcher, the Mac says to quit it. The
-  EQ calls the Mac's own speakers **Mac speakers**, with a laptop for its picture - their EQ the same one the Mac
-  kept before, under another name - and its Import from Files… is **Import…**. The address screen says macOS asks
-  about the local network, and when deadwax can't be reached the words point to the Mac's **System Settings > Privacy
-  & Security > Local Network**. **Settings > This Mac > Debug** says "This install doesn't expire: a Mac keeps opening
-  deadwax without installing it again." - see below. A few of the audio engine's rarest errors still say "phone" or
-  "iOS": the engine is the phone's, unchanged.
+  Normalization's lines. Where the phone says to close deadwax from the app switcher and open it again (downloads it
+  can't read, the EQ), the Mac says to quit it. The EQ calls the Mac's own speakers **Mac speakers**, with a speaker
+  for their picture - their EQ the same one the Mac kept before, under another name - and its Import from Files… is
+  **Import…**. The address screen says macOS 15 or later asks about the local network, and when deadwax can't be
+  reached the words point to the Mac's **System Settings > Privacy & Security > Local Network** - on macOS 15 or
+  later: macOS 14 has no such switch, and never asks. **Settings > This Mac > Debug** says "This install doesn't
+  expire: a Mac keeps opening deadwax without installing it again." - see below - or, for a build installed with a
+  provisioning profile (`install-mac.sh --allow-profile`), the date it runs out.
+- **Still the phone's words**, until a later build (the Mac app's slice 5, with sleep, power and downloads):
+  Settings > Downloads' **Download over** - "Wi-Fi and cellular", "mobile data", and "On Wi-Fi now." on a Mac on a
+  cable - and its note that downloads stopped when deadwax was "closed from the app switcher"; **Only while charging**,
+  which on a Mac with no battery waits for a charge that never comes (see
+  [When something goes wrong](#when-something-goes-wrong)); and, in Debug (an admin's), "ended by iOS" and some of
+  the audio engine's rarer errors, which say "phone" or "iOS". A few lines say "tap" where the Mac clicks.
 
 Still to come, in a build of its own: File > Import EQ File… ⌘O.
 
@@ -413,8 +420,8 @@ leaves that folder; deleting the folder too (with deadwax quit) starts it afresh
 
 **The first time it opens**, macOS may ask a few things:
 
-- **"deadwax would like to find devices on your local network"**: **Allow**, as on the phone - deadwax at a
-  `192.168.…` address or a name on your network can't be reached without it.
+- **"deadwax would like to find devices on your local network"** (macOS 15 or later - macOS 14 doesn't ask):
+  **Allow**, as on the phone - deadwax at a `192.168.…` address or a name on your network can't be reached without it.
 - If macOS says it **can't check deadwax for malicious software**, or that it **can't be opened**: an app you built
   yourself shouldn't be stopped, but if it is, open **System Settings > Privacy & Security**, and under the message
   about deadwax choose **Open Anyway**.
@@ -5794,25 +5801,27 @@ you saw - and anywhere on the Mac that still says "phone" or "iPhone", which pag
 
 - **434 This Mac.** Settings: the row is **This Mac**, with the server's address at its right; About below it. Open
   This Mac: its title is This Mac. Its Debug (an admin's): the foot says "deadwax for Mac 0.13 (13)", and the install
-  line "This install doesn't expire: a Mac keeps opening deadwax without installing it again." Settings > Playback,
+  line "This install doesn't expire: a Mac keeps opening deadwax without installing it again." (On a build installed
+  with `--allow-profile`, the line says the date it runs out instead - say so if you have one.) Settings > Playback,
   under Normalization: "This is kept on this Mac."
 - **435 Downloads.** Settings > Downloads: the foot says "Downloads stay on this Mac when you sign out.", and the line
   for what's downloaded says this Mac. Download your library's note, an album's download line and Album info's **On
   this Mac** say this Mac; so does the card at the top of the Library's Downloaded, while it asks ("Keep your library
-  on this Mac?"). Turn the Mac's Wi-Fi off: the banner says "Offline -
-  showing what's on this Mac", and under it "Join a network to play what isn't on this Mac." Offline, a song with no
+  on this Mac?"). Turn the Mac's Wi-Fi off: the banner says "Offline - showing what's on this Mac", and under it
+  "Join a network to play what isn't on this Mac." Offline, a song with no
   lyrics kept on this Mac has Lyrics dimmed, and the Lyrics panel says "Lyrics - not on this Mac" - if you come across
-  one. Never phone.
-- **436 Outputs.** The EQ page: the Mac's own speakers are **Mac speakers**, with a laptop for their picture - with the
-  EQ you gave them in an earlier build, if you did. Headphones in the jack, then AirPods: each its own output, AirPods
+  one. Never phone - but Download over's choices and notes, and the note after a force quit, which are still the
+  phone's (see [The Mac app](#the-mac-app)).
+- **436 Outputs.** The EQ page: the Mac's own speakers are **Mac speakers**, with a speaker for their picture - with
+  the EQ you gave them in an earlier build, if you did. Headphones in the jack, then AirPods: each its own output, AirPods
   by their name. Settings > Playback, under the EQ: the foot names "the Mac's speakers, a USB DAC" and says it's kept
-  on this Mac. The EQ page's **Import…** (not Import from Files…) opens the Open panel. On a Mac without a built-in
-  screen (a Mac mini), is a laptop the wrong picture for its speakers?
-- **437 Local Network refused.** In System Settings > Privacy & Security > Local Network, turn deadwax off; quit
-  deadwax and open it: the words under "Couldn't reach deadwax at …" say "Is the Mac on your home network, or on
-  WireGuard? If you said no when asked about the local network, turn deadwax on in System Settings > Privacy &
-  Security > Local Network." - as does the address screen's Check. Turn it on there, quit and open deadwax: it
-  connects.
+  on this Mac. The EQ page's **Import…** (not Import from Files…) opens the Open panel. Are the Mac's own speakers
+  "Mac speakers" at all, or listed under another name (what macOS calls them, "MacBook Air Speakers" say)?
+- **437 Local Network refused** (macOS 15 or later; on macOS 14 there's no such switch - say which macOS the Mac
+  has). In System Settings > Privacy & Security > Local Network, turn deadwax off; quit deadwax and open it: the
+  words under "Couldn't reach deadwax at …" say "Is the Mac on your home network, or on WireGuard? On macOS 15 or
+  later, if you said no when asked about the local network, turn deadwax on in System Settings > Privacy & Security >
+  Local Network." - as does the address screen's Check. Turn it on there, quit and open deadwax: it connects.
 - **438 The phones' words.** Both iPhones on the same build: Settings' **This phone**, Settings > Downloads' foot
   ("Closing deadwax from the app switcher stops downloads…"), the EQ's **iPhone speaker** and **Import from Files…**,
   Debug's install line ("This install runs until …") and "deadwax for iPhone" - every word as before.
@@ -5893,7 +5902,7 @@ there. Looking after deadwax isn't among them any more: every managing tool is t
 | An album you don't have says **"Getting albums is off for you - ask an admin."** where Get the album goes | With logins on, an admin gives **Get albums** in [People](#people) (on their phone, or the web app's). Open Settings afterwards, so the phone asks deadwax again. |
 | An album stays on **"Waiting for Wi-Fi"** | Download over is Wi-Fi only (Settings > Downloads): join a Wi-Fi network that isn't a phone's hotspot, with Low Data Mode off - or choose Wi-Fi and cellular. |
 | **"Waiting for room - the storage limit is reached"** | Raise the Storage limit in Settings > Downloads, or remove something there (largest first). |
-| Your library's albums stay on **"Waiting for the phone to charge"** | Only while charging is on (Settings > Downloads, under Download your library): plug the phone in, or turn it off. Albums you download yourself don't wait for it. |
+| Your library's albums stay on **"Waiting for the phone to charge"** (on the Mac, **"…the Mac to charge"**) | Only while charging is on (Settings > Downloads, under Download your library): plug the phone in, or turn it off. Albums you download yourself don't wait for it. On a Mac with no battery (a Mac mini, an iMac, a Studio) it can wait for ever: turn **Only while charging** off there, until a later build knows a Mac with no battery is always plugged in. |
 | Your library didn't download with the app closed | iOS decides when the app runs in the background, and may not for hours; Background App Refresh off (the iPhone's Settings > General) or Low Power Mode stops it, and so does swiping deadwax away in the app switcher. Opening the app checks and downloads at once. Settings > This phone > Debug > Your library > In the background (an admin's) says whether iOS ran it. |
 | **"Waiting for space on this phone"** (on the Mac, **"…on this Mac"**) | The phone itself is full: make room in the iPhone's Settings > General > iPhone Storage. On the Mac, its disk is: make room (System Settings > General > Storage). |
 | **"2 songs didn't download"**, with why ("The copy kept arriving the wrong size.", "The copy's sound didn't match the original.", "This song isn't on deadwax any more.") | **Try again** in Settings > Downloads. If it keeps failing, the file on the server may be damaged: play it on the web app. |
@@ -5907,7 +5916,7 @@ there. Looking after deadwax isn't among them any more: every managing tool is t
 | install.sh: **the build failed** with a signing or profile error | The first install has to come from Xcode with the cable (step 5 of "Once"). After that, the script renews the signing by itself. |
 | install.sh: **Xcode knows no Apple ID** | Add it in Xcode > Settings > Accounts, then run the script again. |
 | A free account says it can't install more apps | A free account can have only 3 of its own apps on the phone at once. Delete one you don't need. |
-| The Mac app: **"Couldn't reach deadwax at ..."** on the address screen | If you said no to "find devices on your local network", turn deadwax on in the Mac's System Settings > Privacy & Security > Local Network, then quit deadwax and open it again. Otherwise the same as on the phone: the address, and that the Mac is on your home network or WireGuard. |
+| The Mac app: **"Couldn't reach deadwax at ..."** on the address screen | On macOS 15 or later, if you said no to "find devices on your local network", turn deadwax on in the Mac's System Settings > Privacy & Security > Local Network, then quit deadwax and open it again (macOS 14 has no such switch). Otherwise the same as on the phone: the address, and that the Mac is on your home network or WireGuard. |
 | The Mac app: macOS says deadwax **can't be opened**, or that it **can't check it for malicious software** | Open System Settings > Privacy & Security, and under the message about deadwax choose **Open Anyway**. An app built and signed on your own Mac isn't expected to be stopped - say so if it is. |
 | The Mac app asks you to sign in **every time it opens** | Its sign-in can't be kept in its folder (see [Where the Mac keeps your sign-in](#where-the-mac-keeps-your-sign-in)). Check the Mac's disk isn't full; then, with deadwax quit, delete `~/Library/Containers/net.lizardlounge.deadwax/Data/Library/Application Support/deadwax/sessions` and sign in again - it's made afresh. If macOS asks whether "Terminal" would like to access data from other apps, **Allow** is right: it's deadwax's own folder. |
 | The Mac app: the EQ's **Import…** says **"deadwax couldn't read this file."** for a `.txt` you can open in TextEdit | The Mac app is meant to be allowed to read the file you choose in the Open panel - say so, with any words under it. Meanwhile **Paste** brings it in: open the file in TextEdit, Select All, Copy, and Paste on the EQ page. |

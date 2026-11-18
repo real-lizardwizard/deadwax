@@ -182,11 +182,13 @@ import Testing
     @Test func noLineHoldsAWordAListenerNeverReads() {
         // the vocabulary sim's rule (ui/test/vocabulary.sim.cjs), ported for these words
         let banned = ["Navidrome", "the store", "cache", "sync", "MD5", "offline mode", "everything", "checksum", "Browse"]
-        let lines = DownloadWords.everyLine(.iPhone)
-        #expect(lines.count > 80)
-        for line in lines {
-            for word in banned { #expect(!line.localizedCaseInsensitiveContains(word), "\"\(line)\" says \(word)") }
-            #expect(!line.isEmpty)
+        for device in Device.allCases {      // slice 4's review: the Mac's lines too
+            let lines = DownloadWords.everyLine(device)
+            #expect(lines.count > 80)
+            for line in lines {
+                for word in banned { #expect(!line.localizedCaseInsensitiveContains(word), "\(device): \"\(line)\" says \(word)") }
+                #expect(!line.isEmpty)
+            }
         }
     }
 }

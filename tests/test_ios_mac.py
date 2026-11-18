@@ -1023,6 +1023,12 @@ PHONE_LITERALS = {"Player/Turntable/DeckController.swift": ['"deadwax-turntable-
 PHONE_WORD = re.compile(r'"[^"\n]*\bi?[Pp]hones?\b[^"\n]*"')
 
 
+#? (slice 4's review) a device named in the App, any way: `Device.iPhone` or `Device.mac`, `Device(rawValue:`, or
+#? `.iPhone` / `.mac` written as a value anywhere - an argument, labelled or not, a ternary's choice, a return
+#? (`Platform.mac`, `x?.mac` and the like are members, not values). Platform.swift alone says which this build is.
+NAMES_A_DEVICE = re.compile(r"\bDevice\s*(?:\.\s*(?:iPhone|mac)\b|\(\s*rawValue)|(?<![\w)\]?!])\.(?:iPhone|mac)\b")
+
+
 def test_the_app_hands_core_the_device_for_its_words():
     app = app_sources()
     for path, calls in DEVICE_WORDS.items():
@@ -1032,7 +1038,8 @@ def test_the_app_hands_core_the_device_for_its_words():
         if path == PLATFORM:
             continue
         # never a device named in the App: Core is handed this build's, so the iPhone's words are the iPhone's there
-        assert not re.search(r"\bdevice:\s*\.(?:iPhone|mac)\b|\(\s*\.(?:iPhone|mac)\s*\)", bare(text)), path
+        named = NAMES_A_DEVICE.search(bare(text))
+        assert not named, (path, named and named.group(0))
 
 
 def test_no_word_the_app_writes_itself_says_phone():
@@ -1058,3 +1065,20 @@ def test_nothing_stored_sent_or_keyed_changes_with_the_words():
         assert not [s for s in strings if re.search(r"\bi?[Pp]hones?\b|\biOS\b", s)], name
     assert not list(APP.rglob("*.intentdefinition")) and not list(APP.rglob("*.appintents"))
     assert not any(re.search(r"\bimport AppIntents\b|\bAppIntent\b", bare(text)) for text in app_sources().values())
+
+
+def test_debug_reads_the_macs_profile_where_install_mac_finds_it():
+    """(Slice 4's review) Debug's install line reads the build's own provisioning profile: the phone's
+    embedded.mobileprovision as before, and on the Mac Contents/embedded.provisionprofile - the file install-mac.sh
+    refuses but for --allow-profile - so a Mac build that carries one says its date, not that it never runs out."""
+    model = bare(app_sources()["Models/DebugModel.swift"])
+    code = reader.views(app_sources()["Models/DebugModel.swift"])[0]
+    assert "guard let url = profileURL, let data = try? Data(contentsOf: url) else { return nil }" in model
+    url = code[code.index("static var profileURL: URL? {"):]
+    url = url[:url.index("\n    }\n")]
+    assert ('Platform.mac\n            ? Bundle.main.bundleURL.appendingPathComponent("Contents/embedded.provisionprofile")\n'
+            '            : Bundle.main.url(forResource: "embedded", withExtension: "mobileprovision")') in url
+    script = (IOS / "scripts" / "install-mac.sh").read_text(encoding="utf-8")
+    assert '"$app/Contents/embedded.provisionprofile"' in script
+    core = (CORE / "InstallExpiry.swift").read_text(encoding="utf-8")
+    assert 'return device == .mac ? mac : "No install date to show: this build wasn\'t signed for a phone."' in core

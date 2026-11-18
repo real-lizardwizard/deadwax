@@ -543,11 +543,13 @@ private func listed(_ id: String, changed: String = "c1") -> Playlist {
         #expect(PlaylistDownloadWords.removeAllToo(playlists: 1, device: .iPhone)?.hasPrefix("Your downloaded playlist goes") == true)
         #expect(PlaylistDownloadWords.removeAllToo(playlists: 3, device: .iPhone)?.hasPrefix("Your 3 downloaded playlists go") == true)
         let banned = ["Navidrome", "the store", "cache", "sync", "MD5", "offline mode", "everything", "checksum", "Browse"]
-        let lines = PlaylistDownloadWords.everyLine(.iPhone)
-        #expect(lines.count > 10)
-        for line in lines {
-            #expect(!line.isEmpty)
-            for word in banned { #expect(!line.localizedCaseInsensitiveContains(word), "\"\(line)\" says \(word)") }
+        for device in Device.allCases {      // slice 4's review: the Mac's lines too
+            let lines = PlaylistDownloadWords.everyLine(device)
+            #expect(lines.count > 10)
+            for line in lines {
+                #expect(!line.isEmpty)
+                for word in banned { #expect(!line.localizedCaseInsensitiveContains(word), "\(device): \"\(line)\" says \(word)") }
+            }
         }
     }
 

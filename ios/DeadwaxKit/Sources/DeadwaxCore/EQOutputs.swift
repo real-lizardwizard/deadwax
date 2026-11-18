@@ -51,13 +51,14 @@ public enum EQOutputs {
     public static let speakerKey = "speaker"
 
     /// The speaker: always there, met or not - the iPhone's ("iPhone speaker", its phone's mark) or the Mac's ("Mac
-    /// speakers", a Mac's).
+    /// speakers", a speaker's mark: true of a MacBook's, an iMac's or a Mac mini's alike - slice 4's review, which took
+    /// out `laptopcomputer`; `speaker.wave.2` is an unknown output's already).
     public static func speaker(_ device: Device) -> EQOutput {
         EQOutput(key: speakerKey, port: .builtInSpeaker, portType: "Speaker", uid: "", name: EQWords.Outputs.speaker(device),
                  symbol: speakerSymbol(device))
     }
 
-    static func speakerSymbol(_ device: Device) -> String { device == .mac ? "laptopcomputer" : "iphone" }
+    static func speakerSymbol(_ device: Device) -> String { device == .mac ? "hifispeaker" : "iphone" }
 
     /// The output a route is (3.12's table): several AirPlay outputs at once (multi-room) are one, keyed by their
     /// UIDs sorted; anything else with several ports is its first. Nil for a route with none.

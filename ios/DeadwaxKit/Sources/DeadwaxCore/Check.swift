@@ -76,9 +76,10 @@ public struct CheckReport: Sendable, Equatable {
 
 /// The address screen's own words that name the device (App/Root/ServerAddressView.swift).
 public enum AddressWords {
-    /// Under the address: the first time, the system asks for the local network - iOS on the iPhone, macOS on the Mac.
+    /// Under the address: the first time, the system asks for the local network - iOS on the iPhone, macOS 15 or later
+    /// on the Mac (macOS 14 never asks: Local Network began with 15, Apple's TN3179).
     public static func footer(_ device: Device) -> String {
-        "The address you open deadwax at, by IP or by name. The first time, \(device == .mac ? "macOS" : "iOS") asks to "
-            + "let deadwax find devices on your local network: say yes."
+        "The address you open deadwax at, by IP or by name. The first time, \(device == .mac ? "macOS 15 or later" : "iOS") "
+            + "asks to let deadwax find devices on your local network: say yes."
     }
 }

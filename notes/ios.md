@@ -15212,7 +15212,9 @@ DeviceWordsTests and Fixtures/words/iphone.json before any word moved. iphone.js
 c97a824's own code (`DEADWAX_WORDS_WRITE=iphone`): every word this slice touches, in each state it can be in
 (downloads waiting, failed, offline; the EQ's outputs and import refusals; the install line's four cases; and so on).
 The App's literals that moved into Core are in it under `App.<file>.<name>`, written from the App's text at
-c97a824. After the change, the iPhone's words are compared with it key by key.
+c97a824. After the change, the iPhone's words are compared with it key by key. (0abb493's message says ~550 words and
+"550 keys": the count before Debug's two footers joined the snapshot, when that commit was amended at the same
+c97a824 code. The fixture it committed holds 552 - corrected here, not by rewriting history.)
 
 ### How a word knows the device
 
@@ -15267,8 +15269,8 @@ c97a824. After the change, the iPhone's words are compared with it key by key.
 - **Pull to shuffle** (12): "Pull to shuffle the songs on this Mac", "Nothing on this Mac to shuffle", and its other
   lines.
 - **The EQ**:
-  - **iPhone speaker → Mac speakers**, its mark `iphone` → `laptopcomputer` (an assumption: a Mac mini's speaker
-    would show a laptop - check 436 asks);
+  - **iPhone speaker → Mac speakers**, its mark `iphone` → `hifispeaker` (`laptopcomputer` at 0b97faf; the review
+    took it out as untrue of a Mac mini, an iMac or a Studio - see "The Mac app, slice 4 after review");
   - **Import from Files… → Import…**;
   - Settings' EQ foot → "Each output keeps its own EQ - your headphones, the Mac's speakers, a USB DAC - and the EQ
     switches by itself when the output changes. This is kept on this Mac.";
@@ -15290,9 +15292,11 @@ c97a824. After the change, the iPhone's words are compared with it key by key.
   now gone.
 - **Connect Navidrome**: "…so the phone never needs Navidrome's password." → "…so the Mac never needs…".
 - **Debug**:
-  - the install line → "This install doesn't expire: a Mac keeps opening deadwax without installing it again.", for
-    every case: no profile, days left, soon, ran out. A Mac's install has no profile; one in it would be install-mac.sh's
-    to refuse.
+  - the install line → "This install doesn't expire: a Mac keeps opening deadwax without installing it again." At
+    0b97faf it said so for every case, profile or none - wrong: install-mac.sh refuses a profile only without
+    `--allow-profile`, which installs exactly such a 7-day build. Since the review it says so with no profile read,
+    and a build with one (`Contents/embedded.provisionprofile`) says its date, with "Run install-mac.sh" where the
+    phone's says "Run install.sh on the Mac" - see "The Mac app, slice 4 after review".
   - the foot "deadwax for iPhone 0.13 (13)" → "deadwax for Mac 0.13 (13)";
   - "on the phone" → "on the Mac";
   - the test sounds' "downloaded to this phone" → "…this Mac";
@@ -15310,7 +15314,18 @@ Left saying phone or iOS on the Mac, on purpose:
 - **The turntable recording's file name and user agent**, which are data.
 - **People's `phonePasswordPlace`**, and anything stored, sent or keyed: download states such as `phone_full`, the
   speaker's key, play_queue's labels, and the plists.
-- **`forceQuit` and `over()`** (Downloads): slice 5's to reword, with sleep and power.
+- **Slice 5's, with sleep, power and downloads** (DeviceWordsTests' `slice5Leftovers` lists the snapshot's):
+  - `over()`: "Wi-Fi and cellular", "never mobile data…", "Downloads use mobile data too…";
+  - `overNow`: "On Wi-Fi now." on a Mac on a cable (Ethernet counts as Wi-Fi), and its mobile-data lines (added by
+    the review);
+  - `forceQuit`: "…closed from the app switcher…";
+  - LibraryFollowWords' background-run line "ended by iOS", in Debug - an admin's (added by the review; it's outside
+    the snapshot);
+  - "Waiting for the Mac to charge" on a Mac with no battery: the words are right, the behaviour is slice 5's
+    ("unknown means plugged in"); docs/ios.md's troubleshooting says to turn Only while charging off meanwhile.
+- **"tap"** in a dozen listener words (Requests' "tap to try again", Edit album's "Tap a track's name", People's
+  "from their next tap", a playlist's empty Downloaded, Debug's test sounds) - a touch word rather than a phone
+  word, and not plan 1.5's; left for a later slice, named in docs/ios.md.
 
 ### Departures from the web
 
@@ -15332,11 +15347,14 @@ The web's words are the phone's in three places, so the Mac departs from them:
 - **Core: DeviceWordsTests** (7).
   - The iPhone's 552 words equal iphone.json.
   - The Mac's equal mac.json (`DEADWAX_WORDS_WRITE=mac` writes it), under the same names.
-  - No Mac word says phone or iPhone (`\bi?phones?\b`, any case).
+  - No Mac word OF THE SNAPSHOT says phone or iPhone (`\bi?phones?\b`, any case) - the snapshot's words only, not
+    every word the app has. Since the review: `noWordOfTheSnapshotSaysThePhonesOnTheMac`, which also bans iOS, the
+    app switcher, cellular, mobile data and Airplane Mode but for its named slice-5 leftovers.
   - The Mac's differ wherever the phone's say phone. The exceptions are the phone's own words for its own things,
     listed by name.
   - The Local Network words point to each device's settings, through `NoAnswer` too.
-  - The Mac's install line never expires.
+  - The Mac's install line never expires (since the review, `theMacsInstallLineReadsItsProfile`: only with no
+    profile read).
   - The speaker keeps its key, and a speaker kept under "iPhone speaker" and met on the Mac is named "Mac speakers",
     its EQ kept.
 - **About 45 Core test files** now pass `.iPhone` (or `device: .iPhone`) where a word became a function. Their
@@ -15377,7 +15395,7 @@ says not to run one then. Nothing on the Mac has shown these words yet.
 
 Not verified - only the Mac can tell (docs/ios.md checks 434-438):
 - that each page shows the Mac's words: Settings, Downloads, the banner, Album info and the EQ (434, 435, 436);
-- whether `laptopcomputer` suits the speakers, and what macOS names its outputs (436). The Mac's own speakers are
+- what macOS names its outputs (436). The Mac's own speakers are
   assumed to come through Catalyst's AVAudioSession as `.builtInSpeaker`, and so be "Mac speakers". If they came as
   another port, they'd be named and keyed by what macOS calls them ("MacBook Air Speakers"), as check 412 already
   asks. Headphones and AirPods are named as on the phone.
@@ -15385,3 +15403,111 @@ Not verified - only the Mac can tell (docs/ios.md checks 434-438):
   screen, and connecting once it's on (437);
 - the phones: both on the build, every word as before (438). The snapshot holds it in Core, and every App call hands
   `Platform.device`, which is `.iPhone` there.
+
+## The Mac app, slice 4 after review (2026-11-18)
+
+An independent review of c97a824..0b97faf found nothing severe. It confirmed four things:
+- iphone.json is c97a824's words (DeviceWordsTests re-run at 0abb493);
+- the coverage is complete;
+- no App code names a device;
+- nothing stored, sent or keyed moved.
+
+It asked for six fixes. Each was checked against the code first, and each held.
+
+### What each fix did
+
+1. **Debug's install line on a Mac build with a profile.**
+   - At 0b97faf, InstallExpiry returned "doesn't expire" on the Mac whatever was read, and DebugModel looked only for
+     `embedded.mobileprovision`. A Mac app's profile is `Contents/embedded.provisionprofile`, beside its Info.plist.
+     `install-mac.sh --allow-profile` installs exactly such a 7-day build, which Debug would have said never runs
+     out.
+   - Now DebugModel's `profileURL` decides the path: the phone's as before, the Mac's `Bundle.main.bundleURL` +
+     `Contents/embedded.provisionprofile`, chosen by `Platform.mac` (no compile condition). It is the same file
+     install-mac.sh checks (`"$app/Contents/embedded.provisionprofile"`).
+   - Core's `InstallExpiry.line` says "doesn't expire" only with no profile read. A dated Mac build says its date as
+     the phone does, with "Run install-mac.sh" in place of "Run install.sh on the Mac".
+   - Assumed: a Mac profile is the same CMS envelope with an XML plist inside, so `ProvisioningProfile.parse` reads
+     it. install-mac.sh reads it with `security cms -D`, so the envelope is the same kind; no Mac profile has been
+     parsed here.
+2. **What still says the phone's words on the Mac**, named rather than claimed away.
+   - docs/ios.md's Mac section said only "a few of the audio engine's rarest errors" were left, and that the Mac
+     says to quit wherever the phone says app switcher. Neither was true while Download over and the force-quit
+     note stay the phone's.
+   - It now has a **Still the phone's words** bullet, as slice 5's: Download over ("Wi-Fi and cellular", "mobile
+     data", "On Wi-Fi now." on a cable), the force-quit note, Only while charging with no battery, Debug's "ended by
+     iOS" and the engine's errors, and "tap".
+   - The slice-5 list in "The Mac app, slice 4" above gained `overNow` and "ended by iOS".
+3. **"Waiting for the Mac to charge" on a Mac with no battery.** The behaviour stays slice 5's. docs/ios.md's
+   troubleshooting row now gives the Mac's words and says to turn Only while charging off there until then.
+4. **The Local Network words on macOS 14.** The app runs from macOS 14.0.
+   - The SDK's annotations don't settle it: Network's `nw_path_unsatisfied_reason_local_network_denied` and
+     NSNetServices' `MissingRequiredConfiguration` error are marked macOS 11, which is when the API appeared, not
+     when macOS began asking.
+   - Apple's TN3179, "Understanding local network privacy", does settle it. Its platform table gives macOS as
+     **introduced in macOS 15** (iOS 14, visionOS 1). It says macOS 15.1 fixed a number of its bugs, and it doesn't
+     mention Mac Catalyst.
+   - So on macOS 14 nothing asks and there is no Local Network switch, and the Mac's words now say so, with no
+     version check in Core:
+     - AddressWords.footer: "The first time, macOS 15 or later asks to let deadwax find devices on your local
+       network: say yes."
+     - unreachableWords: "Is the Mac on your home network, or on WireGuard? On macOS 15 or later, if you said no when
+       asked about the local network, turn deadwax on in System Settings > Privacy & Security > Local Network."
+   - docs/ios.md's first-open list, check 437 and the troubleshooting row say "macOS 15 or later" too.
+5. **Tests that held less than they claimed:**
+   - DownloadWords', AutoDownloadWords' and PlaylistDownloadWords' banned-words checks now run each device's lines.
+   - `noWordOnTheMacSaysPhone` became `noWordOfTheSnapshotSaysThePhonesOnTheMac`. Its name and comment say it reads
+     the snapshot's words, not every word. It now also bans iOS, the app switcher, cellular, mobile data and Airplane
+     Mode, but for `slice5Leftovers`: forceQuit, over()'s three, overNow's two mobile-data lines, and an admin's raw
+     "iOS couldn't open or decode the file". Each leftover must still be said, so a stale list is noticed.
+     Wi-Fi, a hotspot and Low Data Mode are left unbanned: a Mac has all three.
+   - test_ios_mac.py's "never names a device" check is now `NAMES_A_DEVICE`. It catches `Device.iPhone` and
+     `Device.mac`, `Device(rawValue:`, and `.iPhone` or `.mac` written as any value: an argument, labelled or not, a
+     ternary's choice, a return. Members such as `Platform.mac` and `x?.mac` are not values.
+   - The everyLine exemption in `theMacsWordsDifferWhereThePhonesSayPhone` is now held, not assumed. A differing
+     `DownloadWords.everyLine[i]` must repeat a named word on both devices, or one ` | ` part of one (the offline
+     banner's lines repeat parts of `banner(...)`).
+   - 0abb493's count is corrected in "The Mac app, slice 4" above, not by rewriting history.
+   - `InstallExpiry.line(days)` left the own-words list: the Mac's dated line is the phone's now.
+   - New: `theMacsInstallLineReadsItsProfile`, and test_ios_mac.py's
+     `test_debug_reads_the_macs_profile_where_install_mac_finds_it`.
+6. **The speakers' symbol is `hifispeaker`**, a speaker cabinet, true of every Mac.
+   - `laptopcomputer` was untrue of a Mac mini, an iMac or a Studio.
+   - `speaker.wave.2` is already the mark of an unknown output (`.other`), so it would have made the two alike.
+   - CoreGlyphs' name_availability.plist on James's Mac gives `hifispeaker` as 2019, which its year table maps to
+     iOS 13.0 and macOS 10.15, so it is there for iOS 17 and Catalyst.
+   - Whether the speakers come through as `.builtInSpeaker` at all stays check 436's.
+
+mac.json was written again (`DEADWAX_WORDS_WRITE=mac`), and only the intended Mac words moved:
+- the install line's dated cases;
+- the speakers' mark;
+- the address footer, and the unreachable words (with APIFailure's offline and timeout).
+iphone.json is untouched.
+
+### Verified, and not
+
+Each new or changed check was seen failing on its fault, then put back:
+- **The banned-words checks**: the Mac's noun as "Mac cache". All three failed on the Mac's lines alone.
+- **The snapshot test**: a Mac word saying "app switcher", and the admin's raw words reworded. It failed on the word,
+  and on the stale leftover.
+- **The everyLine rule**: a new everyLine line said by no named word. `repeatsANamedWord` failed.
+- **The install line**: the Mac's line forced again. All three dated cases failed.
+- **The Local Network words**: "On macOS 15 or later, " dropped. The Local Network test failed.
+- **The speakers' symbol**: `laptopcomputer` put back. `theSpeakerKeepsItsKey` failed.
+- **NAMES_A_DEVICE**: `Device.iPhone` in AlbumHero failed it, and `Platform.mac ? .mac : .iPhone` in DebugModel failed
+  it on its own.
+- **The profile check**: the Mac's path without `Contents/`.
+
+Verified on the review's tip, on James's Mac, nothing installed:
+- `swift test`, the whole package: 2292 passed (2122 Core, 158 audio, 12 turntable);
+- the unsigned iPhone Debug build and the unsigned Mac Catalyst Release build (arm64): both succeed, no warnings;
+- check_project.py: ok;
+- pytest of test_ios_*.py, test_source_bytes.py and test_logins.py: 698 passed, 1 skipped. pyflakes: clean;
+- all 100 sims on Node 22: 100 passed;
+- ios/Deadwax.xcodeproj unchanged.
+
+No smoke run: James's deadwax was open again (`pgrep`).
+
+Not verified - only the Mac can tell:
+- a Mac build carrying a profile, read and dated by Debug (434);
+- macOS 14 against 15: what each says and asks (437);
+- how `hifispeaker` looks beside the other outputs (436).

@@ -100,11 +100,13 @@ private func plan(_ sizes: [Int64], limit: StorageLimit, free: Int64 = 10_000 * 
 
     @Test func noLineSaysAWordAListenerNeverReads() {
         let banned = ["Navidrome", "the store", "cache", "sync", "MD5", "offline mode", "everything", "checksum", "Browse"]
-        let lines = AutoDownloadWords.everyLine(.iPhone)
-        #expect(lines.count > 40)
-        for line in lines {
-            #expect(!line.isEmpty)
-            for word in banned { #expect(!line.localizedCaseInsensitiveContains(word), "\"\(line)\" says \(word)") }
+        for device in Device.allCases {      // slice 4's review: the Mac's lines too
+            let lines = AutoDownloadWords.everyLine(device)
+            #expect(lines.count > 40)
+            for line in lines {
+                #expect(!line.isEmpty)
+                for word in banned { #expect(!line.localizedCaseInsensitiveContains(word), "\(device): \"\(line)\" says \(word)") }
+            }
         }
     }
 }

@@ -380,13 +380,32 @@ enum DeviceWords {
         }
     }
 
-    /// No word the Mac says calls it a phone or an iPhone (headphones are headphones).
-    @Test func noWordOnTheMacSaysPhone() {
-        for (name, word) in DeviceWords.all(.mac) {
-            let said = word.lowercased()
-            let phone = said.range(of: #"\b(i)?phones?\b"#, options: .regularExpression)
+    /// Slice 5's, left saying the phone's words on the Mac for now (notes/ios.md "The Mac app, slice 4 after review"):
+    /// Download over's choices and notes and what's used now, the force-quit footer - and an admin's raw "iOS
+    /// couldn't…" (DeadwaxAudio's own words, which have no diff). Listed so a phone word outside them is noticed.
+    static let slice5Leftovers: [String] = [
+        DownloadWords.forceQuit, DownloadWords.over(.wifi).note, DownloadWords.over(.any).name,
+        DownloadWords.over(.any).note,
+        DownloadWords.overNow(NetworkPath(satisfied: true, cellular: true, expensive: true), setting: .wifi),
+        DownloadWords.overNow(NetworkPath(satisfied: true, cellular: true, expensive: true), setting: .any),
+        "iOS couldn't open or decode the file",
+    ]
+
+    /// No word OF THIS SNAPSHOT (DeviceWords.all - the words that named the device at c97a824, and the downloads' lists
+    /// of every line) calls the Mac a phone or an iPhone (headphones are headphones), nor says iOS, the app switcher,
+    /// cellular, mobile data or Airplane Mode - but slice 5's leftovers, named above. A word outside the snapshot isn't
+    /// read here (Debug's "ended by iOS" is one, notes/ios.md has the rest).
+    @Test func noWordOfTheSnapshotSaysThePhonesOnTheMac() {
+        let words = DeviceWords.all(.mac)
+        for (name, word) in words {
+            var said = word
+            for left in Self.slice5Leftovers { said = said.replacingOccurrences(of: left, with: "") }
+            let phone = said.range(of: #"(?i)\b(i?phones?|ios|app switcher|cellular|mobile data|airplane mode)\b"#,
+                                   options: .regularExpression)
             #expect(phone == nil, "\(name): \(word)")
         }
+        // each leftover is still said: a stale list is noticed
+        for left in Self.slice5Leftovers { #expect(words.contains { $0.1.contains(left) }, "\(left)") }
     }
 
     /// What differs between the two, and how: every word the phone says with "phone" in it says "Mac" on the Mac - and
@@ -401,20 +420,34 @@ enum DeviceWords {
             "EQWords.Import.fromFiles", "EQWords.Import.channels(C, 12-20)", "EQWords.Import.channels(RL RR, 4)",
             "APOReader.read(channel)", "unreachableWords", "unreachableWords(no reason)", "APIFailure.offline.words",
             "APIFailure.timeout.words", "App.ServerAddressView.footer", "App.DebugView.footer",
-            "App.DebugView.engineLogFooter", "InstallExpiry.line(nil)", "InstallExpiry.line(days)",
+            "App.DebugView.engineLogFooter", "InstallExpiry.line(nil)",
             "InstallExpiry.line(soon)", "InstallExpiry.line(ran out)", "Resume.label",
         ]
+        // a line of the downloads' everyLine (the banned-words checks' list) is no word of its own: one that differs
+        // repeats a named word - or one part of one, a banner's line - on both devices, and is held where that is
+        let named = phone.keys.filter { !$0.contains(".everyLine[") }
+        func parts(_ word: String) -> [String] { [word] + word.components(separatedBy: " | ") }
+        func repeatsANamedWord(_ name: String) -> Bool {
+            named.contains { other in
+                let (p, m) = (parts(phone[other]!), parts(mac[other]!))
+                return p.count == m.count && zip(p, m).contains { $0 == phone[name] && $1 == mac[name] }
+            }
+        }
         var differ: Set<String> = []
         for (name, word) in phone where mac[name] != word {
             differ.insert(name)
-            if ownWords.contains(where: { name == $0 || name.hasPrefix("DownloadWords.everyLine") }) { continue }
+            if ownWords.contains(name) { continue }
+            if name.hasPrefix("DownloadWords.everyLine[") {
+                #expect(repeatsANamedWord(name), "\(name) differs and repeats no named word: \(word)")
+                continue
+            }
             // the rest: "phone" said "Mac", "This phone" "This Mac", the speaker named for the Mac, and nothing else
             let swapped = word.replacingOccurrences(of: "This phone", with: "This Mac")
                 .replacingOccurrences(of: "this phone", with: "this Mac")
                 .replacingOccurrences(of: "the phone", with: "the Mac")
                 .replacingOccurrences(of: "a phone", with: "a Mac")
                 .replacingOccurrences(of: "iPhone speaker", with: "Mac speakers")
-                .replacingOccurrences(of: "| iphone |", with: "| laptopcomputer |")
+                .replacingOccurrences(of: "| iphone |", with: "| hifispeaker |")
             #expect(mac[name] == swapped, "\(name): \(word) -> \(mac[name] ?? "<none>")")
         }
         // every word that says phone on the phone is different on the Mac
@@ -431,6 +464,10 @@ enum DeviceWords {
         let mac = unreachableWords(server, reason: nil, device: .mac)
         #expect(mac.hasSuffix(" turn deadwax on in System Settings > Privacy & Security > Local Network."))
         #expect(mac.contains("Is the Mac on your home network, or on WireGuard?"))
+        // slice 4's review: the Mac's asking began with macOS 15 (Apple's TN3179), and the app opens from macOS 14
+        #expect(mac.contains("On macOS 15 or later, if you said no when asked about the local network"))
+        #expect(AddressWords.footer(.mac).contains("The first time, macOS 15 or later asks to let deadwax find devices"))
+        #expect(AddressWords.footer(.iPhone).contains("The first time, iOS asks"))
         #expect(unreachableWords(server, reason: nil, device: .iPhone)
             .hasSuffix(" turn deadwax on in the iPhone's Settings > Privacy & Security > Local Network."))
         // the device rides on the failure itself, so every place that says one says it right
@@ -440,15 +477,21 @@ enum DeviceWords {
             .words.contains("System Settings > Privacy & Security > Local Network"))
     }
 
-    /// Check 434: Debug's install line says the Mac's install doesn't run out, whatever date is read.
-    @Test func theMacsInstallDoesntExpire() {
+    /// Check 434: Debug's install line on the Mac. No profile read - install-mac.sh's build - and it doesn't run out;
+    /// a build that carries one (--allow-profile) says its date, and install-mac.sh where the phone's says install.sh.
+    @Test func theMacsInstallLineReadsItsProfile() {
         let end = Date(timeIntervalSince1970: 1_793_455_320)
-        for expiration in [nil, end] {
-            for now in [end.addingTimeInterval(-5 * 86_400), end.addingTimeInterval(60)] {
-                #expect(InstallExpiry.line(expiration: expiration, now: now, device: .mac) == InstallExpiry.mac)
-            }
+        let utc = TimeZone(identifier: "UTC")!
+        for now in [end.addingTimeInterval(-5 * 86_400), end.addingTimeInterval(60)] {
+            #expect(InstallExpiry.line(expiration: nil, now: now, device: .mac) == InstallExpiry.mac)
         }
         #expect(InstallExpiry.mac.contains("doesn't expire"))
+        #expect(InstallExpiry.line(expiration: end, now: end.addingTimeInterval(-5 * 86_400), timeZone: utc, device: .mac)
+                == "This install runs until Sat 31 Oct, 14:02")
+        #expect(InstallExpiry.line(expiration: end, now: end.addingTimeInterval(-86_400), timeZone: utc, device: .mac)
+                == "This install runs until Sat 31 Oct, 14:02. Run install-mac.sh before then.")
+        #expect(InstallExpiry.line(expiration: end, now: end.addingTimeInterval(60), timeZone: utc, device: .mac)
+                == "This install ran out on Sat 31 Oct, 14:02. Run install-mac.sh to put it back.")
     }
 
     /// Check 436: the speaker keeps its key on both - only its name and mark are the Mac's - so nothing stored moves.
@@ -458,7 +501,7 @@ enum DeviceWords {
         #expect(EQOutputs.speaker(.mac).name == "Mac speakers")
         let port = EQRoutePort(port: .builtInSpeaker, portType: "Speaker", name: "MacBook Air Speakers", uid: "BuiltInSpeakerDevice")
         let o = EQOutputs.output(port, device: .mac)
-        #expect(o.key == "speaker" && o.name == "Mac speakers" && o.symbol == "laptopcomputer")
+        #expect(o.key == "speaker" && o.name == "Mac speakers" && o.symbol == "hifispeaker")
         // a speaker kept under the phone's old name, met on the Mac: named the Mac's from then on, its EQ kept
         var settings = EQSettings()
         settings.outputs = [EQSettings.newOutput(EQOutputs.speaker(.iPhone), seen: "")]

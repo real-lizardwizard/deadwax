@@ -45,9 +45,17 @@ final class DebugModel {
 
     /// The app's own provisioning profile: how long this install runs.
     static func profile() -> ProvisioningProfile? {
-        guard let url = Bundle.main.url(forResource: "embedded", withExtension: "mobileprovision"),
-              let data = try? Data(contentsOf: url) else { return nil }
+        guard let url = profileURL, let data = try? Data(contentsOf: url) else { return nil }
         return ProvisioningProfile.parse(data)
+    }
+
+    /// Where a profile is, if the build has one: the phone's in the app's own folder; a Mac build's beside the app's
+    /// Info.plist (`Contents/embedded.provisionprofile` - only when Xcode put one in, which install-mac.sh refuses but
+    /// for --allow-profile). Slice 4's review: the Mac read none, so a build with one said it never ran out.
+    static var profileURL: URL? {
+        Platform.mac
+            ? Bundle.main.bundleURL.appendingPathComponent("Contents/embedded.provisionprofile")
+            : Bundle.main.url(forResource: "embedded", withExtension: "mobileprovision")
     }
 
     // MARK: Check
