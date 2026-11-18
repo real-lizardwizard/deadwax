@@ -276,8 +276,9 @@ struct UpNextScreen: View {
                         if editing { editing = false } else { close() }
                     }
                     .accessibilityFocused($focus, equals: .done)
-                    // (the Mac app, slice 3) a panel's Done leaves Escape to a field with the cursor (the sidebar's)
-                    .escapeCloses(!TextEditing.shared.typing)
+                    // (the Mac app, slice 3) a panel's Done: Escape's after a field with the cursor, before the page's
+                    // Edit (MacFrame.escape - one owner)
+                    .escapeCloses(MacFrame.escape(typing: TextEditing.shared.typing, panel: navigation.macPanel) == .panel)
                 }
             }
         }

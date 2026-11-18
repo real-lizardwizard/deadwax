@@ -256,11 +256,17 @@ menus and keys, and these differences.
   is one of its rows. Clicking the row you're on goes back to its own page from whatever you opened over it - and
   on Requests, Settings or a Library page of Yours, clicking it there goes to the top of its list, as tapping the tab
   you're on does on the phone. A playlist's row or a Manage row opens its page over what's there, in place of another
-  playlist's or Manage page rather than piling them up. Every row has its glyph.
+  playlist's or Manage page rather than piling them up - except a playlist you're editing, or a Change password or
+  People change still under way: the new page opens over that one, which waits under it (Back) as you left it. Every
+  row has its glyph.
 - **The page.** The Library's switch and its **•••** stay at the top of the Library, as on the phone. The Library's
   album grid has as many covers in a row as fit, none under 150 points across. An album's page, an artist's and the
-  album you don't have sit in the middle of the page at a readable width (760 points). Pages you've opened stay as you
-  left them as you move between the sidebar's rows - but each list starts at its top again when you come back to it.
+  album you don't have sit in the middle of the page at a readable width (760 points); they scroll with the pointer
+  anywhere across the page, their scroll bar at its right edge. Pages you've opened stay as you left them as you move
+  between the sidebar's rows - Library, Search, Requests and Settings each keep their pages, where you'd scrolled to and
+  what you'd typed or begun, a playlist's Edit included, as the phone's tabs keep them. One thing starts again: All's
+  Albums, Artists, Songs and Downloaded each open in place of the last one, so going back to one after another starts
+  it at its top.
 - **The player bar**, always there along the foot: the song's cover - click it for the cover full size - its title,
   and **Artist — Album**, which goes to the album's page; **Shuffle**, **Previous**, **Play/Pause**, **Next** and
   **Repeat** over the song's progress, with the time played and the time left at its ends (click or drag on it to
@@ -322,8 +328,9 @@ The rest of the differences:
   typed (Edit album, Artist images, a playlist's Edit), Escape asks too. Where Close doesn't ask, Escape does nothing
   while you've typed something Close would throw away - Add a person's passwords, Reset password's, Which artist is
   this?'s and Artist images' searches, Choose a source's search words, a new playlist's name: click Close or Cancel
-  then. It closes a cover shown full size, and a panel - Up Next, Lyrics or Info - unless a text field has the cursor
-  (the sidebar's search field's Escape empties it first). **Return never confirms a delete or a write** in a question
+  then. It closes a cover shown full size. In the window itself Escape goes to one thing at a time, in this order: a
+  text field with the cursor (the sidebar's search field's Escape empties it), then the panel that's open - Up Next,
+  Lyrics or Info - then a playlist's Edit, as its Cancel. **Return never confirms a delete or a write** in a question
   deadwax asks: Return is the question's Cancel (Keep editing, Keep it, Keep as it is, Cancel). A text field's own
   Return is as on the phone - New playlist's name field creates the playlist.
 - **Closing the window** (⌘W, or its red button) leaves the music playing, as Music's does. Click deadwax in the Dock
@@ -5724,7 +5731,10 @@ saw.
   to Yours: your Albums open. Open an album from All's Albums, then turn the switch: the album stays, only the rows
   change. Fold Playlists and Manage: quit and reopen - still folded? Folded, does Manage's heading show Needs a look's
   count? Manage has only what your permissions allow. Twenty playlists and Manage's rows: does Settings stay in view at
-  the foot as the rest scrolls? ⌃⌘S hides the sidebar and shows it again; View's item says Hide Sidebar or Show Sidebar.
+  the foot as the rest scrolls? ⌃⌘S hides the sidebar and shows it again; View's item says Hide Sidebar or Show Sidebar,
+  and View still has Enter Full Screen. Scroll Requests down a way, click Library, then Requests: still where you
+  were? Start a playlist's Edit, click Requests and back: still in Edit, your changes kept. In Edit, click another
+  playlist's row: it opens over the one you're editing, and Back returns to your Edit.
 - **425 Search from the sidebar.** Type in its field from the Library: Search's results fill the page as you type -
   and Return asks MusicBrainz at once. Open an album from the results, then type again: back to the results. Escape
   with the cursor in the field empties it. ⌘F from any page (and with the sidebar hidden): the sidebar shows, the
@@ -5739,20 +5749,23 @@ saw.
   the window narrower: it lies over the page's right edge instead, with a shadow. Lyrics in its place, then Info - one
   at a time; each button (and ⌥⌘U, ⌥⌘L, ⌘I) opens and closes its own, the menu item ticked while it shows. With one
   open, the page still scrolls, its songs play and the sidebar's rows work. Done and Escape close it - but Escape with
-  the cursor in a text field doesn't. Lyrics follow the song as it's sung; a song with none says No lyrics for this
+  the cursor in a text field doesn't. With a playlist's Edit open too, Escape closes the panel first, then cancels Edit.
+  Widen or narrow the window across 1280 with Up Next in Edit, or Lyrics following a song: the panel stays as it was. Lyrics follow the song as it's sung; a song with none says No lyrics for this
   song, and Lyrics is dimmed in the bar until it's open. Info's album card opens the album: with the panel over the
   page's edge it closes; as a column it stays. Let the queue run out (or clear it): Up Next and Info close, Lyrics says
   Nothing playing.
 - **428 Albums wide.** The Library's albums as a grid: as many covers in a row as fit, none smaller than a phone's.
   Widen the window and the rows take more; narrow it and fewer - the list keeps your place. An album's page, an
-  artist's and an album you don't have sit in the middle at a readable width, the window's sides left plain.
-- **429 Resizing while playing.** Drag the window from its smallest to full screen and back while a song plays: the
-  music doesn't stop or skip, and the page you're on stays where it was.
+  artist's and an album you don't have sit in the middle at a readable width, the window's sides left plain - and
+  they scroll with the pointer over those sides too, the scroll bar at the page's right edge.
+- **429 Resizing while playing.** Drag the window from its smallest to full screen (View > Enter Full Screen, or the
+  green button) and back while a song plays: the music doesn't stop or skip, and the page you're on stays where it was.
 - **430 The smallest window.** Narrow and shorten the window as far as it goes: the sidebar, a page and the bar still
   fit and read, nothing cut off; with a panel open over the page, the page's left part still shows.
 - **431 Sign-in and can't-reach.** Sign out (Settings > Account) - the sign-in fills the window and reads well; sign
   in. With deadwax unreachable (the network off), the can't-reach screen too. With a sheet open (Edit album, say), is
-  the sheet its own size - not 880 points wide?
+  the sheet its own size - not 880 points wide? Sign in as someone else: the sidebar's playlists are theirs, and Needs
+  a look's count shows if they may look after the library.
 - **432 No turntable.** Nothing on the Mac opens Now Playing or the record: the bar's cover opens the cover full size,
   its title does nothing, and Settings > Playback has no turntable rows.
 - **433 The phones.** Both iPhones on the same build: the tabs, the play bar on the tab bar, Now Playing (and its

@@ -316,6 +316,34 @@ public enum MacSidebar {
         return top == tool ? .stay : .become
     }
 
+    /// (Slice 3's review) A row's move on a stack whose first `kept` pages hold work - a playlist's Edit open, a password
+    /// or a People write out, as the tab's own button keeps them (PlaylistEdit.pagesKept, OwnPassword.pagesKept,
+    /// People.pagesKept): a move that would take its top away (back) or put the row's page in its place (become) when the
+    /// top is one of those pages pushes the row's page over it instead, so the work stays, a Back away. The rest as asked.
+    public static func keepingWork(_ how: StackMove, count: Int, kept: Int) -> StackMove {
+        switch how {
+        case .back, .become:
+            return count > 0 && kept >= count ? .open : how
+        case .stay, .open:
+            return how
+        }
+    }
+
+    /// `page` put on `stack` as a row's move puts it (AppNavigation.macMove), its first `kept` pages never taken away or
+    /// replaced (`keepingWork`).
+    public static func put<Element>(_ page: Element, _ how: StackMove, on stack: inout [Element], kept: Int) {
+        switch keepingWork(how, count: stack.count, kept: kept) {
+        case .stay:
+            break
+        case .back:
+            if !stack.isEmpty { stack.removeLast() }
+        case .become:
+            if stack.isEmpty { stack.append(page) } else { stack[stack.count - 1] = page }
+        case .open:
+            stack.append(page)
+        }
+    }
+
     private static func sectionPage(_ row: Row) -> Page {
         switch row {
         case .allAlbums: return .allAlbums

@@ -47,6 +47,32 @@ import Testing
         // the grid's cover fits twice beside a panel's column at the column's width
         #expect(MacFrame.columnMin - MacFrame.sidebarWidth - MacFrame.panelWidth >= 2 * MacFrame.tileMin)
     }
+
+    @Test func escapeHasOneOwnerTypingThenThePanelThenThePage() {
+        // (slice 3's review) a text field with the cursor keeps it, whatever else is up
+        for panel in MacFrame.Panel.allCases {
+            #expect(MacFrame.escape(typing: true, panel: panel) == .field, "\(panel)")
+        }
+        // then the panel showing (its Done) - before a playlist's Edit on the page under it
+        for panel in MacFrame.Panel.allCases where panel != .none {
+            #expect(MacFrame.escape(typing: false, panel: panel) == .panel, "\(panel)")
+        }
+        // and only with neither, the page's Edit Cancel
+        #expect(MacFrame.escape(typing: false, panel: .none) == .page)
+    }
+
+    @Test func aReadablePageKeepsItsScrollViewAcrossThePage() {
+        // the margins either side of the readable column - none on a page narrower than it
+        #expect(MacFrame.readableMargin(width: 0) == 0)
+        #expect(MacFrame.readableMargin(width: MacFrame.readableWidth - 1) == 0)
+        #expect(MacFrame.readableMargin(width: MacFrame.readableWidth) == 0)
+        #expect(MacFrame.readableMargin(width: 1260) == 250)
+        // the smallest window's page, the sidebar shown: the whole page
+        #expect(MacFrame.readableMargin(width: MacFrame.smallestWidth - MacFrame.sidebarWidth) == 0)
+        // what's left of the page between the margins is the readable width
+        let page = 1687.0
+        #expect(page - 2 * MacFrame.readableMargin(width: page) == MacFrame.readableWidth)
+    }
 }
 
 @Suite struct MacSidebarTests {
@@ -177,6 +203,58 @@ import Testing
         #expect(MacSidebar.move(.manage(.log), W(tab: .settings, settings: [.manage(.people), .under(.people)]))
                 == .manage(.log, .open))
         #expect(MacSidebar.managingMove([], .care) == .open)
+    }
+
+    @Test func aRowNeverTakesAwayAPageHoldingWork() {
+        // (slice 3's review) a move that takes the top away or replaces it, with the top holding work: pushed over it
+        for how in [MacSidebar.StackMove.back, .become] {
+            #expect(MacSidebar.keepingWork(how, count: 2, kept: 2) == .open, "\(how)")
+            #expect(MacSidebar.keepingWork(how, count: 2, kept: 3) == .open, "\(how)")
+            #expect(MacSidebar.keepingWork(how, count: 2, kept: 1) == how, "\(how): the top holds none")
+            #expect(MacSidebar.keepingWork(how, count: 2, kept: 0) == how, "\(how)")
+        }
+        for how in [MacSidebar.StackMove.stay, .open] {
+            #expect(MacSidebar.keepingWork(how, count: 2, kept: 2) == how, "\(how)")
+        }
+        #expect(MacSidebar.keepingWork(.become, count: 0, kept: 0) == .become)
+    }
+
+    @Test func aRowsMoveAsTheAppMakesIt() {
+        // the stacks as AppNavigation keeps them, and the tab's own rule for what they keep
+        func kept(_ stack: [String], editing: String?) -> Int {
+            PlaylistEdit.pagesKept(stack.map { $0.hasPrefix("playlist:") ? String($0.dropFirst(9)) : nil }, editing: editing)
+        }
+        func page(_ name: String) -> MacSidebar.Page {
+            name.hasPrefix("playlist:") ? .playlist(String(name.dropFirst(9))) : .other
+        }
+        func click(_ id: String, on stack: [String], editing: String?) -> [String] {
+            var stack = stack
+            let how = MacSidebar.playlistsMove(stack.map(page), .playlist(id))
+            MacSidebar.put("playlist:\(id)", how, on: &stack, kept: kept(stack, editing: editing))
+            return stack
+        }
+        // playlist A in Edit, B clicked: A stays under B, its Edit with it - never replaced
+        #expect(click("B", on: ["playlist:A"], editing: "A") == ["playlist:A", "playlist:B"])
+        #expect(click("B", on: ["playlist:A"], editing: nil) == ["playlist:B"], "no Edit: siblings, never piled")
+        // B under A, A in Edit, B clicked: A isn't popped - B opens over it
+        #expect(click("B", on: ["playlist:B", "playlist:A"], editing: "A") == ["playlist:B", "playlist:A", "playlist:B"])
+        #expect(click("B", on: ["playlist:B", "playlist:A"], editing: nil) == ["playlist:B"])
+        // an Edit lower down holds only the pages up to it: a playlist over an album over it is replaced as before
+        #expect(click("C", on: ["playlist:A", "album", "playlist:B"], editing: "A") == ["playlist:A", "album", "playlist:C"])
+        // the one on top clicked again: nothing
+        #expect(click("A", on: ["playlist:A"], editing: "A") == ["playlist:A"])
+
+        // People with a write out on top of Settings, Event log clicked: pushed over People, never in its place
+        func manage(_ tool: Managing.Tool, on stack: [Managing.Tool], writing: Bool) -> [Managing.Tool] {
+            var stack = stack
+            let how = MacSidebar.managingMove(stack.map(MacSidebar.Page.manage), tool)
+            MacSidebar.put(tool, how, on: &stack, kept: People.pagesKept(stack.map { $0 == .people }, writing: writing))
+            return stack
+        }
+        #expect(manage(.log, on: [.people], writing: true) == [.people, .log])
+        #expect(manage(.log, on: [.people], writing: false) == [.log])
+        #expect(manage(.people, on: [.log], writing: false) == [.people])
+        #expect(manage(.people, on: [.people], writing: true) == [.people])
     }
 
     @Test func theSwitchAndTheFoldsKeptAsTheWebKeepsThem() {

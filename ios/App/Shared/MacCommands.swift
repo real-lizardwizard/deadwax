@@ -48,7 +48,9 @@ struct MacCommands: Commands {
         CommandGroup(after: .toolbar) {
             item(.refresh, state)
         }
-        // (slice 3) the frame's: the sidebar, then the three panels - in the View menu's sidebar place
+        // (slice 3) the frame's: the sidebar, then the three panels - in the View menu's sidebar place. Replacing it,
+        // never beside it (slice 3's review, smoke-run): kept, the system's own Show Sidebar has ⌃⌘S too, and UIKit
+        // throws at launch over the two. Enter Full Screen is a place of its own and stays (fn-F, and ⌃⌘F).
         CommandGroup(replacing: .sidebar) {
             let sections = MacMenu.view(state)
             ForEach(Array(sections.enumerated()), id: \.offset) { (index: Int, section: [MacMenu.Item]) in

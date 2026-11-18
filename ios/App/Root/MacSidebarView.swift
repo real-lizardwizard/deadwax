@@ -85,9 +85,12 @@ struct MacSidebarView: View {
         .background(Palette.sidebar)
         .accessibilityElement(children: .contain)
         .accessibilityLabel(MacSidebar.Words.sections)
-        .task { await playlists.ask(fresh: false) }
+        // (slice 3's review) asked again for each person: the sidebar stays on screen while someone else signs in over
+        // the app, and their reset lets go of the last one's playlists and of every page counted as showing
+        .task(id: server.person) { await playlists.ask(fresh: false) }
         .onAppear { queueCount.shows(.sidebar) }
         .onDisappear { queueCount.hides(.sidebar) }
+        .onChange(of: server.person) { (_: Int, _: Int) -> Void in queueCount.shows(.sidebar) }
         .onChange(of: side) { (_: MacSidebar.Side, now: MacSidebar.Side) -> Void in
             // the side shown, remembered (the web's Sidebar keeps what sideShown says)
             if MacSidebar.side(saved: savedSide) != now { savedSide = now.rawValue }

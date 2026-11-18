@@ -15,7 +15,8 @@ import SwiftUI
 ///   the shuffle). Under it the scrubber, a clock at each end (BarScrubber).
 /// - The tools: Lyrics, Up Next, AirPlay and the •••. Lyrics and Up Next open their side panel, or close it (one panel at
 ///   a time, AppNavigation.togglePanel), lit while theirs shows; the •••'s Info opens Info's. Its EQ opens the EQ as a
-///   sheet; Add to a playlist… the picker (AppNavigation.playlistPick, the frame's sheet); Go to album the album's page.
+///   sheet - the frame's own, a shared file's too (AppNavigation.eqImportSheet); Add to a playlist… the picker
+///   (AppNavigation.playlistPick, the frame's sheet); Go to album the album's page.
 ///
 /// Nothing queued: "Nothing playing" across the bar, in the place the song would be - the bar never comes and goes.
 /// No volume (the system's is the Mac's), and nothing of the engine's: every action is a call the player's buttons
@@ -31,8 +32,6 @@ struct PlayerBar: View {
     @State private var width: Double = MacFrame.openingWidth
     /// The cover full size, from a click on the bar's cover.
     @State private var viewing: ViewedCover?
-    /// The EQ, from the •••.
-    @State private var showsEQ = false
 
     var body: some View {
         let side = CGFloat(MacFrame.barSide(width: width))
@@ -68,10 +67,6 @@ struct PlayerBar: View {
             width = now
         }
         .coverViewer($viewing, onDismiss: {})
-        .appSheet(isPresented: $showsEQ) {
-            EQSheet()
-                .macSheet()
-        }
         .accessibilityElement(children: .contain)
     }
 
@@ -213,7 +208,9 @@ struct PlayerBar: View {
                 .frame(width: 32, height: 32)
             NowPlayingMenu(hasAlbum: route != nil, saysSpeed: player.speed != PlaySpeed.normal,
                            onInfo: { if navigation.macPanel != .info { navigation.togglePanel(.info) } },
-                           onEQ: { showsEQ = true },
+                           // (slice 3's review) the frame's one EQ sheet, a shared file's too (DesktopFrame) - never a
+                           // second over it, and an EQ page on Settings' stack knows it's covered (EQScreen.onTop)
+                           onEQ: { navigation.eqImportSheet = true },
                            onPlaylist: reachability.online ? {
                                navigation.playlistPick = PlaylistPickRequest(PlaylistPick(playing: track))
                            } : nil) {

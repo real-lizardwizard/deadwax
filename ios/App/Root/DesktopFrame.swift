@@ -6,26 +6,26 @@ import SwiftUI
 ///
 /// - The sidebar at the left (MacSidebarView), MacFrame.sidebarWidth wide, put away and back by View > Hide Sidebar
 ///   (⌃⌘S); a rule at its right.
-/// - The page: the tab the sidebar's rows lead to, as its stack stands (AppNavigation's four stacks, the iPhone's) -
-///   only the one showing is drawn, so each page appears and goes as it did under the tab bar (⌘R's page, the counts,
-///   the event log's stream all go by it). The Library's own top - its switch and its ••• - stays at the top of its page.
+/// - The page: the tab the sidebar's rows lead to, as its stack stands (AppNavigation's four stacks, the iPhone's), in
+///   the iPhone's TabView with its bar hidden - every tab's pages kept as the tabs keep them, only the one showing on
+///   screen, so each page appears and goes as it does under the tab bar (⌘R's page, the counts, the event log's stream
+///   all go by it). The Library's own top - its switch and its ••• - stays at the top of its page.
 /// - The side panel - Up Next, Lyrics or Info, one at a time (MacPanel) - a third column 470 wide in a window 1280 wide
-///   or more, a drawer over the page's right edge below that (MacFrame.panelStyle). Never modal: a drawer lies over the
-///   page's edge, the rest of the page and the sidebar still answer. Opening an album from the player puts a drawer away
-///   (AppNavigation.openAlbum).
+///   or more, a drawer over the page's right edge below that (MacFrame.panelStyle); drawn in one place either way, so
+///   crossing 1280 keeps it as it is. Never modal: a drawer lies over the page's edge, the rest of the page and the
+///   sidebar still answer. Opening an album from the player puts a drawer away (AppNavigation.openAlbum).
 /// - The player bar along the foot (PlayerBar), always: "Nothing playing" while nothing is queued.
 ///
 /// Now Playing never opens here (MacFrame.opensNowPlaying, decision 5): nothing in the frame opens it, and should
 /// anything ask, it is put back at once. The sheets MainTabs presents over the tabs are presented over the frame:
-/// a shared file's EQ, Add to a playlist and Edit album. What MainTabs watches, this watches: the downloads RequestsModel
-/// paces its poll by, Needs a look's count after a managing write. Search's asks stand down when another page shows.
+/// the EQ (a shared file's, and the bar's ••• - one sheet), Add to a playlist and Edit album. What MainTabs watches,
+/// this watches: the downloads RequestsModel paces its poll by, Needs a look's count after a managing write.
 struct DesktopFrame: View {
     @Environment(PlayerModel.self) private var player
     @Environment(AppNavigation.self) private var navigation
     @Environment(RequestsModel.self) private var requests
     @Environment(ServerModel.self) private var server
     @Environment(QueueCountModel.self) private var queueCount
-    @Environment(SearchModel.self) private var search
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.displayScale) private var displayScale
 
@@ -44,21 +44,22 @@ struct DesktopFrame: View {
                         .frame(width: CGFloat(MacFrame.sidebarWidth))
                     rule
                 }
+                // (slice 3's review) the panel in one place whichever way it's drawn - over the page's edge or in a
+                // column the page makes room for - so a window crossing 1280 keeps it as it was (Up Next's Edit, the
+                // lyrics followed), never draws it afresh
                 page
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .padding(.trailing, MacFrame.makesRoom(style, panel) ? CGFloat(MacFrame.panelWidth) + hairline : 0)
                     .overlay(alignment: .trailing) {
-                        if MacFrame.liesOver(style, panel) {
+                        if panel != .none {
                             HStack(spacing: 0) {
                                 rule
                                 MacPanel(panel: panel)
                             }
-                            .shadow(color: Palette.well, radius: 16)
+                            .shadow(color: MacFrame.liesOver(style, panel) ? Palette.well : Color.clear,
+                                    radius: MacFrame.liesOver(style, panel) ? 16 : 0)
                         }
                     }
-                if MacFrame.makesRoom(style, panel) {
-                    rule
-                    MacPanel(panel: panel)
-                }
             }
             .frame(maxHeight: .infinity)
             PlayerBar()
@@ -71,7 +72,8 @@ struct DesktopFrame: View {
         .onChange(of: style, initial: true) { (_: MacFrame.PanelStyle, now: MacFrame.PanelStyle) -> Void in
             navigation.macPanelStyle = now
         }
-        // a shared file's EQ, Add to a playlist and Edit album, over the frame as they are over the tabs (MainTabs)
+        // a shared file's EQ, Add to a playlist and Edit album, over the frame as they are over the tabs (MainTabs) -
+        // and (slice 3's review) the bar's EQ the same sheet, so a shared file shows over the one that's up, never a second
         .appSheet(isPresented: $navigation.eqImportSheet) {
             EQSheet()
                 .macSheet()
@@ -92,11 +94,6 @@ struct DesktopFrame: View {
             // nothing queued: Up Next and Info go with the queue, Lyrics stays (MacFrame.afterQueueEnds)
             if !queued { navigation.queueEnded() }
         }
-        .onChange(of: navigation.tab) { (_: AppTab, tab: AppTab) -> Void in
-            // another page than Search's: a held album's row asking the id bridge lets go (SearchScreen's own, which
-            // isn't drawn now to hear it)
-            if tab != .search { search.standDown() }
-        }
         .onChange(of: watching, initial: true) { (_: Watching, now: Watching) -> Void in requests.watch(now) }
         .onAppear { requests.watch(watching) }
         .onDisappear { requests.watch(.hidden) }
@@ -110,18 +107,21 @@ struct DesktopFrame: View {
         }
     }
 
-    /// The page showing: the tab the sidebar leads to, its stack as it stands - the Library's with its own top.
-    @ViewBuilder private var page: some View {
+    /// The page showing: the tab the sidebar leads to, its stack as it stands - the Library's with its own top. (Slice
+    /// 3's review) The iPhone's TabView, its bar hidden (TabStack hides it on every stack, as on the iPhone, where the
+    /// app draws its own): each tab's pages are kept as the tabs keep them - a playlist's Edit, Find's words, a list's
+    /// place - while only the tab showing is on screen, so its pages appear and go as they do under the tab bar.
+    private var page: some View {
         let paths = Bindable(navigation)
-        switch navigation.tab {
-        case .library:
+        return TabView(selection: Binding(get: { navigation.tab }, set: { (tab: AppTab) -> Void in navigation.select(tab) })) {
             TabStack(path: paths.library, ownTop: true) { LibraryView() }
-        case .search:
+                .tag(AppTab.library)
             TabStack(path: paths.search) { SearchScreen() }
-        case .requests:
+                .tag(AppTab.search)
             TabStack(path: paths.requests) { RequestsScreen() }
-        case .you:
+                .tag(AppTab.requests)
             TabStack(path: paths.you) { YouView() }
+                .tag(AppTab.you)
         }
     }
 
@@ -142,7 +142,12 @@ struct DesktopFrame: View {
     /// --dw-frame-border, a hairline down the sidebar's edge and the panel's.
     private var rule: some View {
         Palette.frameBorder
-            .frame(width: 1 / max(displayScale, 1))
+            .frame(width: hairline)
             .accessibilityHidden(true)
+    }
+
+    /// One pixel, in points.
+    private var hairline: CGFloat {
+        1 / max(displayScale, 1)
     }
 }

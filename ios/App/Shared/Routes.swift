@@ -292,7 +292,8 @@ final class AppNavigation {
     /// The EQ page whose own preview shows it (its import from Files or Paste) - nil: the EQ sheet's, for a shared
     /// file.
     private(set) var eqImportPage: UUID?
-    /// The EQ sheet over the tabs, opened for a shared file - over Now Playing, Now Playing opens its own.
+    /// The EQ sheet over the tabs, opened for a shared file - over Now Playing, Now Playing opens its own. (The Mac app,
+    /// slice 3's review) On the Mac, the player bar's EQ too: one EQ sheet, so a file shared while it is up shows in it.
     var eqImportSheet = false
     /// A preview is drawn (EQImportSheetContent says so).
     var eqPreviewUp = false
@@ -424,7 +425,8 @@ final class AppNavigation {
     /// (The Mac app, slice 3) A sidebar row's move (MacSidebar.move): the tab's own button, a page of the Library at its
     /// root, a section at its foot, a playlist's page or a Manage page put on its stack. A stack whose pages hold work
     /// (a playlist's Edit, a password or a People write out - as the tab tapped again keeps them) is never cleared under
-    /// it: the move then goes no further than that page.
+    /// it: the move then goes no further than that page - and a page put on it never takes such a page's place, nor
+    /// pops it, but opens over it (MacSidebar.put, slice 3's review).
     func macMove(_ move: MacSidebar.Move) {
         nowPlayingShown = false
         switch move {
@@ -444,10 +446,10 @@ final class AppNavigation {
             if library.isEmpty, let route = Self.route(page) { library = [route] }
         case .playlist(let id, let how):
             tab = .library
-            Self.put(.playlist(PlaylistRoute(id: id)), how, on: &library)
+            MacSidebar.put(AppRoute.playlist(PlaylistRoute(id: id)), how, on: &library, kept: kept(library))
         case .manage(let tool, let how):
             tab = .you
-            if let route = Self.route(.manage(tool)) { Self.put(route, how, on: &you) }
+            if let route = Self.route(.manage(tool)) { MacSidebar.put(route, how, on: &you, kept: kept(you)) }
         }
     }
 
@@ -521,16 +523,6 @@ final class AppNavigation {
         library = [base] + above
     }
 
-    /// A page put on a stack as a sidebar row puts it (MacSidebar.StackMove).
-    private static func put(_ route: AppRoute, _ how: MacSidebar.StackMove, on stack: inout [AppRoute]) {
-        switch how {
-        case .stay: break
-        case .back: stack.removeLast()
-        case .become: stack[stack.count - 1] = route
-        case .open: stack.append(route)
-        }
-    }
-
     /// (The Mac app, slice 2) Search's field has the cursor Find asked for.
     func findTaken() {
         findWanted = false
@@ -555,16 +547,22 @@ final class AppNavigation {
     /// Every page popped - but none of a playlist being edited, nor the pages under it; nor Change password's while its
     /// change is out; nor People's while one of its writes is.
     private func backToRoot(_ stack: inout [AppRoute]) {
+        stack.removeLast(stack.count - kept(stack))
+    }
+
+    /// How many of a stack's pages, from its foot, hold work - a playlist's Edit, Change password's or a People write
+    /// out, and the pages under each: the tab tapped again pops none of them, nor does a sidebar row (slice 3's review:
+    /// MacSidebar.put, which once replaced or popped a playlist being edited).
+    private func kept(_ stack: [AppRoute]) -> Int {
         let ids = stack.map { (route: AppRoute) -> String? in
             if case .playlist(let shown) = route { return shown.id }
             return nil
         }
         let password = stack.map { (route: AppRoute) -> Bool in route == .changePassword }
         let people = stack.map(\.isPeople)
-        let kept = max(PlaylistEdit.pagesKept(ids, editing: editingPlaylist),
-                       OwnPassword.pagesKept(password, changing: changingPassword),
-                       People.pagesKept(people, writing: writingPeople))
-        stack.removeLast(stack.count - kept)
+        return max(PlaylistEdit.pagesKept(ids, editing: editingPlaylist),
+                   OwnPassword.pagesKept(password, changing: changingPassword),
+                   People.pagesKept(people, writing: writingPeople))
     }
 
     /// (Phase 8, slice 10) Change password's change went out, or answered.

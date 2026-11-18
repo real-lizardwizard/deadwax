@@ -169,10 +169,11 @@ extension View {
     }
 
     /// (Slice 3) An album's page, an artist's and the album you don't have: centred at a readable width in the
-    /// desktop frame (MacFrame.readableWidth, the web's --app-desk-content-max), the page's room either side of it.
+    /// desktop frame (MacFrame.readableWidth, the web's --app-desk-content-max), the page's room either side of it -
+    /// (slice 3's review) as its scroll views' margins, so the page still scrolls under the pointer anywhere across
+    /// it and its scroll bar is at the page's edge, rather than the scroll view narrowed to the readable width.
     func readableOnMac() -> some View {
-        frame(maxWidth: CGFloat(MacFrame.readableWidth))
-            .frame(maxWidth: .infinity)
+        modifier(ReadableOnMac())
     }
 
     /// (Slice 3) RootView: the window it is drawn in is the app's own, the one scene shaped (MainWindowMarker).
@@ -189,6 +190,22 @@ extension View {
     /// it with an empty environment here, and its first `@Environment(PlayerModel.self)` would be a crash).
     func carryingApp(_ carried: AppCarried) -> some View {
         modifier(CarriesApp(carried: carried))
+    }
+}
+
+/// readableOnMac's: the page's width read, and the room beyond the readable width given to its scroll views as their
+/// content's horizontal margins (MacFrame.readableMargin) - none, the scroll view's own, on a page narrower than that.
+private struct ReadableOnMac: ViewModifier {
+    @State private var margin: Double = 0
+
+    func body(content: Content) -> some View {
+        content
+            .contentMargins(.horizontal, margin > 0 ? CGFloat(margin) : nil, for: .scrollContent)
+            .onGeometryChange(for: Double.self) { (page: GeometryProxy) -> Double in
+                MacFrame.readableMargin(width: Double(page.size.width))
+            } action: { (now: Double) -> Void in
+                margin = now
+            }
     }
 }
 

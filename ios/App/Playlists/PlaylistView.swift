@@ -244,8 +244,9 @@ struct PlaylistView: View {
                     if model.changed { asksDiscard = true } else { leaveEdit() }
                 }
                 .disabled(model.busy)
-                // (the Mac app, slice 2) Escape is Cancel: it leaves Edit, or asks first with something changed
-                .escapeCloses()
+                // (the Mac app, slice 2) Escape is Cancel: it leaves Edit, or asks first with something changed - (slice
+                // 3's review) only when it is the page's: a field with the cursor, then a side panel's Done, come first
+                .escapeCloses(MacFrame.escape(typing: TextEditing.shared.typing, panel: navigation.macPanel) == .page)
                 .confirmationDialog(PlaylistWords.discardQuestion, isPresented: $asksDiscard, titleVisibility: .visible) {
                     Button(PlaylistWords.discard, role: .destructive) { leaveEdit() }
                     Button(PlaylistWords.keepEditing, role: .cancel) { refocus(.toggle) }

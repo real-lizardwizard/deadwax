@@ -141,15 +141,19 @@ import Testing
         for row in fixture["sidebar"]["rows"].list {
             let side = MacSidebar.Side(rawValue: row["side"].string!)!
             let personal = row["personal"].bool!
-            // the web's rows the Mac has (Recently added aside), in the app's standard order - then the Mac's Downloaded
-            let web = row["rows"].list.compactMap { (item: Web) -> String? in
+            // the web's rows the Mac has (Recently added aside), in the app's standard order - then the Mac's Downloaded.
+            // (Slice 3's review) Each row by what it is as well as its words: with logins off the web's "songs" is the
+            // library's own Songs (the switch's page here), with a library of your own All's (the collection's).
+            let web = row["rows"].list.compactMap { (item: Web) -> (row: MacSidebar.Row, words: String?)? in
+                if item["id"].string == "songs" && !personal { return (.view(.songs), item["label"].string) }
                 guard case .some(.some(let mapped)) = Self.row(item["id"]) else { return nil }
-                _ = mapped
-                return item["label"].string
+                return (mapped, item["label"].string)
             }
             let mac = MacSidebar.rows(side, order: LibraryPages.standard, personal: personal)
             #expect(mac.last == .downloaded, "\(side), personal \(personal): Downloaded closes the group")
-            diffs.check("\(side), personal \(personal): the rows' words", mac.dropLast().map(MacSidebar.label), web)
+            diffs.check("\(side), personal \(personal): the rows", Array(mac.dropLast()), web.map(\.row))
+            diffs.check("\(side), personal \(personal): the rows' words", mac.dropLast().map(MacSidebar.label),
+                        web.map { $0.words ?? "" })
         }
         diffs.done()
     }

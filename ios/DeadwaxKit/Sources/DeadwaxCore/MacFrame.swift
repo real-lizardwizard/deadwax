@@ -132,6 +132,30 @@ public enum MacFrame {
         shown == .lyrics ? .lyrics : .none
     }
 
+    /// Who Escape is for in the Mac's window - one at a time (slice 3's review: a panel's Done and a playlist's Edit
+    /// Cancel both had it, and Escape went to either).
+    public enum Escape: String, Sendable, CaseIterable {
+        /// A text field with the cursor: the sidebar's search field empties itself; any other keeps Escape for itself.
+        case field
+        /// The side panel showing: its Done.
+        case panel
+        /// The page: a playlist's Edit, its Cancel.
+        case page
+    }
+
+    /// Escape's one owner, in this order: typing first, then the side panel, then the page.
+    public static func escape(typing: Bool, panel: Panel) -> Escape {
+        if typing { return .field }
+        return panel == .none ? .page : .panel
+    }
+
+    /// (Slice 3's review) A page drawn at the readable width (an album's, an artist's, the album you don't have): the
+    /// room left either side of its content in a page `width` wide - the scroll view spans the page, so its margins
+    /// still scroll and its scroll bar is at the page's edge; none on a page narrower than readableWidth.
+    public static func readableMargin(width: Double) -> Double {
+        max(0, (width - readableWidth) / 2)
+    }
+
     // MARK: sizes, in points - the web's CSS px (app-desktop.css, held by the fixture)
 
     /// --app-desk-side: the sidebar.

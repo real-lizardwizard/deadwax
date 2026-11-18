@@ -14750,11 +14750,13 @@ itself, or the iPhone's own code as it was (Search's `.searchable`, moved there 
     each a `TabStack` (MainTabs', no longer private), and the Library keeps its own top: its switch and its ••• stay at
     the top of its page, as the plan says. **Only the one showing is drawn**, so each page appears and goes as it did
     under the tab bar - ⌘R's page (MacRefresh), Needs a look's count, the event log's stream and the downloads' poll all
-    go by appearing.
+    go by appearing. (The review below: drawn that way, a tab not showing lost its pages' state. The page is now the
+    iPhone's TabView, its bar hidden.)
   - **What MainTabs watches, this watches**: RequestsModel's watch (with no sheet: Now Playing is never over the page),
     the queue count's three triggers, and the sheets MainTabs presents over the tabs (a shared file's EQ, Add to a
     playlist, Edit album), each through `appSheet` with its `.macSheet()` root.
   - Search's asks stand down when another page shows. SearchScreen's own standDown isn't drawn to hear the tab change.
+    (Gone in the review: with the TabView, SearchScreen is kept and hears it, as on the iPhone.)
   - **Now Playing**: nothing in the frame opens it. Should anything set `nowPlayingShown`, an `onChange(initial: true)`
     puts it back at once, decided by `MacFrame.opensNowPlaying(Platform.device)`. Find, Settings… and Go to Current
     Song already closed it (slice 2); the iPhone's play bar, the only thing that opens it, isn't drawn here.
@@ -14860,7 +14862,8 @@ itself, or the iPhone's own code as it was (Search's `.searchable`, moved there 
   already showing; View's ⌘I toggles it.
 - **The bar's title does nothing**, as the web's. Artist — Album goes to the album; the cover opens the cover.
 - **Escape in a panel** closes it unless a text field has the cursor (`!TextEditing.shared.typing`, as the sheets' Done
-  in slice 2). In the sidebar's field Escape empties the field while it has the cursor.
+  in slice 2). In the sidebar's field Escape empties the field while it has the cursor. (The review below: one owner,
+  `MacFrame.escape`, a playlist's Edit Cancel after the panel.)
 
 ### Tests
 
@@ -14926,13 +14929,11 @@ Not verified - only the Mac can tell (docs/ios.md checks 424-433), beyond what t
 - the iPhones: nothing there changed in the code the iPhone runs - every change is behind Platform's Mac side or
   `MacFrame.drawsDesktop` - but both phones on the build is James's check (433).
 
-Known, and left:
+Known, and left (as the review below left them):
 
-- **A section's scroll is lost on switching**: only the page showing is drawn, so its stack is kept and its scroll
-  isn't. The four stacks keep where you went.
-- **ArtistView's and MBArtistView's standDowns** aren't heard when a section switch takes their page away, as only
-  SearchModel's is called on a tab change. An ask one of them had out isn't called off when its page goes; its answer
-  has no page to draw in.
+- **All's sections start at their top** when opened again after another of the Library's rows: Albums, Artists, Songs
+  and Downloaded are each the page at the Library's foot, put in place of the last (`macMove`'s `.section`), not kept
+  beside it. Everything else is kept - the four tabs' pages, their state and their scroll (the review's TabView).
 - **Lyrics' "not on this phone"** (LyricsWords.notKept, offline with a downloaded song and no lyrics kept) says phone
   on the Mac. It's a Core word the phone shares.
 - **No hover**: the rows, the bar's buttons and the panel's rows draw no hover state.
@@ -14999,3 +15000,193 @@ report (six Deadwax-*.ips before each run and six after, every one older than th
 
 **What they don't show**: anything a pointer or a key does (the clicks were the rows' own calls, the keys never
 pressed), and how any of it looks - which is what checks 424-433 are for.
+
+## The Mac app, slice 3 after review (2026-11-17)
+
+A review of 5eb9c27 sent eight findings. Each was checked against the code before anything was changed. Seven were
+right and were fixed. One, the seventh, was wrong: a smoke run showed it, so it was put back and is now tested.
+
+Still on `mac-s3`. What it leaves alone:
+- `__version__` and the app's 0.13 (13).
+- ios/Deadwax.xcodeproj.
+- The engine files.
+- Everything the iPhone runs: every change is on Platform's Mac side, in the desktop frame, or in Core rules the
+  iPhone doesn't call.
+
+### What each fix did
+
+1. **Every tab's pages are kept (medium).** DesktopFrame drew `switch navigation.tab`, so a tab not showing wasn't
+   drawn at all.
+   - AppNavigation's stacks were kept, but the pages on them were drawn afresh, so their state was lost: a
+     playlist's Edit and its changes, what was typed, each list's place.
+   - **Now** the page is the iPhone's TabView over the four TabStacks: MainTabs' selection binding, a `.tag` each, no
+     `.tabItem`. TabStack already hides the system's bar on every stack (`.toolbar(.hidden, for: .tabBar)`).
+   - UITabBarController keeps each tab's hosting controller and takes the views of the tabs not shown out of the
+     window. So pages appear and go exactly as under the iPhone's tabs, and `queueCount.shows`/`hides`,
+     `lyrics.showing` and MacRefresh's pages still see only the tab showing.
+   - The frame's own `search.standDown()` on a tab change is gone. SearchScreen is kept now and hears the change
+     itself (its `onChange(of: navigation.tab)`), as on the iPhone. ArtistView and MBArtistView do too, so slice 3's
+     known item about their standDowns is gone.
+   - Rejected: all four mounted with three hidden. Their pages would never disappear, so ⌘R, the counts and the event
+     log's stream would see every tab.
+2. **A row never takes away a page holding work (medium).** `macMove`'s `.become` replaced the top page and `.back`
+   popped it, whatever it held. A playlist in Edit was lost to another playlist's row, and People mid-write to another
+   Manage row.
+   - **Core**: `MacSidebar.keepingWork(how, count:, kept:)` turns a back or become into an open when the top page is
+     one of the `kept`, and `MacSidebar.put(page, how, on: &stack, kept:)` applies it.
+   - `kept` is what the tab tapped again keeps: AppNavigation's new `kept(_:)`, the largest of PlaylistEdit's,
+     OwnPassword's and People's `pagesKept`. backToRoot and macMove now share it, and the private `put` went.
+   - **Tests**, in MacSidebarTests:
+     - `aRowNeverTakesAwayAPageHoldingWork`: the rule over every StackMove.
+     - `aRowsMoveAsTheAppMakesIt`: route stacks run through playlistsMove/managingMove and the real
+       PlaylistEdit/People.pagesKept, as macMove makes them:
+       - [A] with A in Edit, B's row → [A, B];
+       - [B, A] with A in Edit, B's row → [B, A, B];
+       - People writing, Event log's row → [people, log].
+3. **Someone else signing in (low-medium).** `whenPersonChanges` resets PlaylistsModel (list nil) and QueueCountModel
+   (no pages counted as showing). The sidebar stays on screen under a sign-in over the app, so its `.task` and
+   `.onAppear` didn't run again: no playlists and no Needs a look count until it was drawn afresh.
+   - **Now** `.task(id: server.person)` asks for the playlists again, and `.onChange(of: server.person)` registers
+     `.sidebar` again.
+   - The count is asked once the sign-in goes, by DesktopFrame's `onChange(of: signInOver == nil)`.
+   - Not smoke-run: it needs a second account signing in.
+4. **Escape has one owner (low).** In the main window three things could take Escape:
+   - the sidebar field's clear, while focused;
+   - a panel's Done, while nothing was being typed;
+   - a playlist's Edit Cancel, always.
+
+   With a panel open over a playlist in Edit, Done and Cancel both had `.cancelAction`.
+   - **Core**: `MacFrame.escape(typing:panel:)` gives `.field`, `.panel` or `.page`, in that order.
+   - The three panels' Done take Escape when it is `.panel`, and PlaylistView's Cancel when it is `.page`. The
+     sidebar's clear keeps `focused` (its own field, which is what makes `typing` true there). Every other Escape is
+     inside a sheet.
+   - One change of behaviour: with the cursor in a playlist's name field, Escape is now the field's, where it used to
+     be Cancel's.
+   - Tested in `escapeHasOneOwnerTypingThenThePanelThenThePage`, and test_ios_mac.py holds each owner to the rule.
+5. **Crossing 1280 keeps the panel (low).** The panel was drawn in two places: an overlay as a drawer, and an
+   HStack's third child as a column. Crossing tore one down and drew the other, losing Up Next's Edit and setting
+   lyrics.showing false, then true.
+   - **Now** it is one overlay at the page's trailing edge. The page is padded by `panelWidth` plus a hairline when it
+     makes room, and the shadow follows the style.
+6. **One EQ sheet (low).** PlayerBar had a `showsEQ` sheet of its own.
+   - A file shared while it was up opened the frame's `eqImportSheet` over it: two EQ sheets.
+   - EQScreen's `onTop` (`navigation.eqImportSheet`) didn't know the bar's sheet covered an EQ page on Settings' stack.
+   - **Now** the •••'s EQ sets `navigation.eqImportSheet`. There is one sheet, a shared file shows in it (EQSheet
+     presents a shared import over itself), and `onTop` sees it. PlayerBar presents no sheets (SHEET_ROOTS).
+7. **`CommandGroup(replacing: .sidebar)` is right; the finding was wrong (low, unverified).** The fix (`after:`) was
+   tried and smoke-run:
+   - **`after: .sidebar` crashes at launch.** UIKit threw `NSInvalidArgumentException`, "Replacement elements contain
+     duplicates", over the system's own Show Sidebar (`toggleSidebar:`, ⌃⌘S) beside the frame's Hide Sidebar, also
+     ⌃⌘S.
+   - **With `replacing: .sidebar`, View's Enter Full Screen is still there.** The `menu` run dumped NSApp's View menu
+     in order:
+     - Show Toolbar, Customize Toolbar…, Refresh ⌘R;
+     - Hide Sidebar ⌃⌘S;
+     - Up Next ⌥⌘U, Lyrics ⌥⌘L, Info ⌘I;
+     - Enter Full Screen fn-F, with its alternate ⌃⌘F hidden.
+
+     Full screen is a place of its own on Catalyst.
+   - So it stays `replacing:`, with the reason in MacCommands.swift. test_ios_mac.py now refuses `after:` or
+     `before: .sidebar`.
+8. **The readable pages keep their scroll view (low).** `readableOnMac()` framed the whole page to 760, its ScrollView
+   or List included. So the page's sides didn't scroll and its scroll bar sat inside the page.
+   - **Now** a ViewModifier reads the page's width and gives `MacFrame.readableMargin(width:)` (`(width − 760) / 2`,
+     at least 0) to its scroll views as `.contentMargins(.horizontal, …, for: .scrollContent)` (nil, the scroll view's
+     own, at 0).
+   - None of the four pages has a horizontal scroll view inside, which would take the margins too.
+   - Tested in `aReadablePageKeepsItsScrollViewAcrossThePage`.
+
+**Tests and docs**:
+- **Vectors**: theLibraryGroupsRowsForEachSide in MacFrameVectorTests compares each row's id with the web's (All's
+  Songs as `.view(.songs)` with logins off), not only its words.
+- **docs/ios.md**:
+  - "Pages you've opened stay as you left them" is true now, and says what starts again: All's sections, one in place
+    of the last.
+  - It says where a row's page opens over work, and gives Escape's order.
+  - The readable pages scroll across the page.
+  - Checks 424, 427, 428, 429 and 431 gained what to look for.
+- **Known, and left**, above, matches: the section scroll and the standDowns items are gone, and All's sections
+  starting at the top is said instead.
+
+### Verified, and not
+
+Verified on the tip, on James's Mac, nothing installed:
+
+- `swift test` through build-locked.sh, the whole package: 2285 passed, none failed. That is 2115 in Core's (4 new),
+  158 in the audio engine's and 12 in the turntable's.
+- An unsigned Mac Catalyst Release build (arm64) and an unsigned iPhone Debug build both succeed, each with only the
+  AppIntents metadata note. The Mac one was rebuilt after fix 7 was put back.
+- check_project.py: ok.
+- pytest of tests/test_ios_*.py, test_source_bytes.py and test_logins.py: 694 passed, 1 skipped (run before fix 7 was
+  put back; test_ios_mac.py, the only file that changed after, passed again on the tip).
+- pyflakes over src and tests: clean.
+- All 100 sims on Node 22, each with a TMPDIR of its own: 100 passed.
+- ios/Deadwax.xcodeproj unchanged.
+- Each new source-shape check was seen failing on its fault, one at a time, and put back:
+  - the page a `switch` again;
+  - the panel drawn twice;
+  - a row's put with nothing kept;
+  - the sidebar's ask once only;
+  - Edit's Cancel taking Escape always;
+  - the bar's own EQ sheet;
+  - the sidebar place added after;
+  - the readable page framed.
+
+Not verified:
+- fix 3, which needs another person signing in;
+- fix 6 with a file shared while the bar's EQ is up, which needs a file opened from Finder;
+- fix 8 on the three ScrollView pages (the artist's, the group's, the MusicBrainz artist's); the smoke run saw the
+  album's List;
+- anything under a real pointer or key: Escape's order from the keyboard, a click on a row.
+
+These stay with checks 424-433 on James's Mac.
+
+### The smoke runs (17 Nov, on the review's tip)
+
+James's own deadwax wasn't open (`pgrep` found nothing before each run).
+- **The build**: a scratch git worktree at 5eb9c27 with these changes copied in, and Local.xcconfig for the team.
+- **The hook**: a temporary Diag.swift (`DEADWAX_DIAG=<mode>`, acting 6 s after launch, `NSLog("DIAG: …")`), plus
+  appear/disappear logs on each tab's root, on a playlist's page, on Up Next's list and on the panel. Two notices made
+  a playlist's page begin Edit (and type a name change, never saved) and say its state, and two did the same for Up
+  Next.
+- Built Debug for Mac Catalyst (arm64, signed) into ~/Library/Caches/deadwax-s3-diag. Each run went through
+  `open -n --env DEADWAX_DIAG=<mode> --stdout … --stderr …` and was then `kill`ed.
+- **Afterwards**: the worktree and the DerivedData were deleted. Nothing was committed from it.
+- Signed in as on James's Mac, a queue put back paused. Nothing was played and nothing was written.
+
+The runs:
+
+- **work** (fixes 1 and 2), at 1920 x 1205:
+  - **No tab bar anywhere.** No UITabBar or other tab-bar view was in the window. The UIKitTabBarController's
+    tabBar wasn't in the window, `isTabBarHidden` was true, and there was no title-bar toolbar.
+  - **The Library's albums list kept its scroll.** Scrolled to 600, then Requests: the Library's root logged
+    disappear, Requests appear, and MacRefresh's pages went from 1 to 0. Back to the Library: the same list object at
+    600.
+  - **Edit kept across tabs.** The one playlist (editable) opened by its row's move (`.open`) and began Edit, its name
+    changed. Then:
+    - to Requests: the playlist logged disappear, still editing, its change in hand;
+    - to Settings: counted `settings+sidebar`, and only `sidebar` elsewhere;
+    - back to the Library: the playlist appeared again, editing, its change kept, `editingPlaylist` held all along.
+  - **A row over a page in Edit.** The row of a second playlist id (a stand-in id: there is only one playlist; its
+    page read it and said it isn't there) asked `.become`, and the stack became [A, B], A still in Edit beneath.
+  - A's row again asked `.back`: [A], still in Edit.
+  - B again, then Event log's and Library care's rows put on Settings' stack, then the Library: [A, B], A still in
+    Edit.
+  - The Search tab never appeared: it isn't drawn until it's chosen.
+- **panelcross** (fix 5): Up Next opened at 1400 x 860 (column) and was put in Edit.
+  - Crossing to 1000 x 720 (drawer) and back to 1400: still in Edit, with no appear or disappear of the panel or of Up
+    Next's list.
+  - Lyrics then: `lyrics.showing` stayed true through both crossings. Closed, it went false.
+  - The window was put back to 1920 x 1205.
+- **readable** (fix 8): the album of the song in the queue, opened from the player.
+  - Its List spanned the page (232.5 to 1920, 1687.5 wide) with its rows 760 wide, from 696.5: centred.
+  - At 1000 x 720: the List 767.5 wide, the rows 760 wide from 236.5.
+- **menu** (fix 7): as under 7 above. The first try of this mode also read each item's `action` through KVC, which
+  can't box a selector. The app crashed (EXC_BAD_ACCESS, later, in a timer), and the run was made again without it.
+
+**Two crash reports came from these runs**, both the scratch build's, and neither is the app's own fault:
+- Deadwax-2026-11-17-234532.ips: the `after: .sidebar` launch.
+- Deadwax-2026-11-17-234814.ips: the KVC read.
+
+No other run logged an exception, `Fatal error`, `multiple times per frame` or `Publishing changes from within view
+updates`.

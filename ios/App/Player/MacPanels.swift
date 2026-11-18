@@ -56,7 +56,9 @@ struct LyricsPanel: View {
                 .toolbar {
                     ToolbarItem(placement: .confirmationAction) {
                         Button(InfoWords.done) { navigation.closePanel() }
-                            .escapeCloses(!TextEditing.shared.typing)
+                            // Escape's after a field with the cursor, before the page's Edit (MacFrame.escape)
+                            .escapeCloses(MacFrame.escape(typing: TextEditing.shared.typing,
+                                                          panel: navigation.macPanel) == .panel)
                     }
                 }
         }
