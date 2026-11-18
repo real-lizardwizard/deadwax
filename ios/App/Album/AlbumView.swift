@@ -199,7 +199,7 @@ struct AlbumView: View {
                                  downloads: downloads)
             }
         }
-        .sheet(item: $albumInfo) { album in
+        .appSheet(item: $albumInfo) { album in
             AlbumInfoSheet(album: album)
         }
         .onChange(of: download) { _, now in ended(now) }

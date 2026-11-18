@@ -5522,8 +5522,9 @@ home Wi-Fi, signed in as an admin with logins on. Install with `ios/scripts/inst
   data from other apps: **Allow** - see [Where the Mac keeps your sign-in](#where-the-mac-keeps-your-sign-in)), and
   `tmutil isexcluded` with the same path says `[Excluded]`: kept out of Time Machine. Sign out (Settings > Account),
   quit, open: the sign-in - and the same `ls` shows no file.
-- **408 It plays.** Play an album: the first song starts within a couple of seconds; the join between two songs that run
-  into each other is gapless (the test album's songs 9 and 10); dragging the scrubber lands where you let go.
+- **408 It plays.** Play an album: the first song starts within a couple of seconds. Click the play bar: Now Playing
+  opens over the window, and its Up Next, Info and EQ each open over it and close again; the join between two songs
+  that run into each other is gapless (the test album's songs 9 and 10); dragging the scrubber lands where you let go.
   Headphones in: the sound moves to them.
 - **409 The media keys.** With another app in front: F8 pauses and plays, F9 next, F7 previous. AirPods: a press pauses.
 - **410 The menu bar's Now Playing.** Control Center (or the menu bar's Now Playing) shows the song, the artist and the

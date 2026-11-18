@@ -75,23 +75,23 @@ struct MainTabs: View {
             (_: Notification) -> Void in
             keyboardUp = false
         }
-        .fullScreenCover(isPresented: $navigation.nowPlayingShown) {
+        .appCover(isPresented: $navigation.nowPlayingShown) {
             NowPlayingView()
         }
         // a file shared to deadwax over the tabs (eq.md 3.9): the EQ as a sheet, the import's preview over it - over
         // Now Playing, Now Playing opens its own
-        .sheet(isPresented: $navigation.eqImportSheet) {
+        .appSheet(isPresented: $navigation.eqImportSheet) {
             EQSheet()
         }
         // Add to a playlist from a page's ••• (Phase 4, slice 2) - Now Playing's opens over Now Playing
-        .sheet(item: $navigation.playlistPick) { (request: PlaylistPickRequest) in
+        .appSheet(item: $navigation.playlistPick) { (request: PlaylistPickRequest) in
             PlaylistPicker(request: request)
         }
         // (Phase 8, slice 1) Edit album, from an album page's ••• or Choose the folder - over the tabs, so the album
         // page beneath can follow the album to a new id while it is up. (slice 6's review) Its dismissal, however it
         // comes - Close, a swipe, Discard, a step to an album gone, a sign-out - ends Needs a look's session: here, where
         // the sheet really goes, never on its content disappearing (a full-screen cover over it does that too)
-        .sheet(item: $navigation.albumEdit, onDismiss: { navigation.editorDismissed() }) { (request: AlbumEditRequest) in
+        .appSheet(item: $navigation.albumEdit, onDismiss: { navigation.editorDismissed() }) { (request: AlbumEditRequest) in
             EditAlbumSheet(request: request)
         }
         .onChange(of: player.hasQueue) { _, queued in

@@ -79,7 +79,7 @@ struct PlaylistsPage: View {
                 withAnimation { proxy.scrollTo(ShelfAnchor.top, anchor: .top) }
             }
         }
-        .sheet(item: $newSheet, onDismiss: openMade) { (sheet: NewSheet) in
+        .appSheet(item: $newSheet, onDismiss: openMade) { (sheet: NewSheet) in
             NavigationStack {
                 List {
                     NewPlaylistFields { name in

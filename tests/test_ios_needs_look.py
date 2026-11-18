@@ -372,7 +372,7 @@ def test_the_session_ends_where_the_sheet_really_goes():
     assert sheet.count("request.queue?.editorClosed()") == 1
     assert "closeSheet()" in swift_like(sheet, "close")
     tabs = app_file("Root", "MainTabs.swift")
-    assert ".sheet(item: $navigation.albumEdit, onDismiss: { navigation.editorDismissed() })" in tabs
+    assert ".appSheet(item: $navigation.albumEdit, onDismiss: { navigation.editorDismissed() })" in tabs
     nav = app_file("Shared", "Routes.swift")
     dismissed = swift_like(nav, "editorDismissed")
     assert "guard let was = presentedEdit, albumEdit?.id != was.id else { return }" in dismissed

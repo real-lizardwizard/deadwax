@@ -65,7 +65,7 @@ struct PeopleScreen: View {
                 }
             }
         }
-        .sheet(item: addSheet) { (_: PeopleSheet) in
+        .appSheet(item: addSheet) { (_: PeopleSheet) in
             AddPersonSheet()
         }
         .confirmationDialog(People.forgetQuestion(forgetting?.user ?? ""),
@@ -218,7 +218,7 @@ struct PersonScreen: View {
         .pullToRefresh {
             await people.refresh()
         }
-        .sheet(item: personSheet) { (sheet: PeopleSheet) in
+        .appSheet(item: personSheet) { (sheet: PeopleSheet) in
             // each sheet keeps whom it was opened for: People locked again under it lists nobody
             switch sheet {
             case .reset(let shown):

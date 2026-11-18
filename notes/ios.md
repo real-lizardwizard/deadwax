@@ -14225,3 +14225,60 @@ skipped; pyflakes over src and tests; `swift test` (2244: 2074 in Core - one few
 12 and 158), all passed; the iPhone's unsigned generic-iOS Debug build and the Mac's unsigned Release build (Mac
 Catalyst, arm64, 0.13), each BUILD SUCCEEDED with only the AppIntents warning; check_project.py. Nothing the app
 itself shows changed (it said Settings already), so nothing here was run on a phone or the Mac.
+
+## On James's Mac: every sheet carries the app's models (2026-11-17)
+
+**What James saw** (Mac app 0.13 at 64e3e9c, slice 1): "the Mac app opened fine, Local Network allowed" (404 in part:
+nothing asked before it opened, so no Gatekeeper or Open Anyway for a build made on this Mac; 406: the Local Network
+prompt came, he chose Allow - whether it asked again for the IP versus the name, not said). Then: "I tried to open the
+play screen and the mac app has become completely non-functional".
+
+**What the Mac said.** Three runs. The first crashed as the click presented Now Playing - its crash report and its log:
+`SwiftUICore/Environment+Objects.swift:34: Fatal error: No Observable object of type PlayerModel found`, raised in
+`PresentationHostingController.init` under `SheetBridge.present`, with none of the app's own frames between: the page
+presented had NO environment at all, not one model missing. The next two hung on the same click (12 s and 24 s, two
+`.hang` reports in /Library/Logs/DiagnosticReports - the main thread in layout under a UINavigationController's
+transition, with `<OnScrollGeometryChange Modifier> tried to update multiple times per frame` logged as it began) until
+he quit. Each click's log shows the Mac making a scene of its own for the presentation ("Creating foregrounded scene
+(persistentID: UINSSceneHostingViewController-…)").
+
+**Reproduced here, without a click.** A scratch build (never committed) with a hook - an environment variable opening
+Now Playing, or the EQ import sheet, 6 s after launch - run through `open --env … --stdout …` (run straight from the
+shell, the app waits for ever in `AVAudioSession sharedInstance`'s XPC: macOS's audio service won't answer a process
+LaunchServices didn't start). Both crashed the same way: Now Playing on `PlayerModel`, the plain `.sheet` on
+`AppNavigation`, its first. So every sheet and cover on the Mac, not Now Playing's alone - slice 1 shipped with none of
+them ever opened (nothing here can click, and its checks hadn't been run).
+
+**Why.** On the iPhone a presented page inherits its presenter's environment, so the 23 models DeadwaxApp puts on its
+root reach every sheet. On the Mac (macOS 27.2's Catalyst, the Mac idiom) the presentation is hosted in that scene of
+its own and its page starts from an empty environment. Putting the models on the WindowGroup scene instead
+(`Scene.environment`) was tried in the scratch build: the same two crashes - the presentation's scene isn't the
+WindowGroup's.
+
+**What changed.**
+- **Shared/Presenting.swift (new)**: `appSheet` and `appCover`, the `isPresented` and the `item` forms of SwiftUI's
+  `.sheet` and `.fullScreenCover`, each a modifier that reads, on the presenter's side, `\.appModels` (AppModels, one
+  field for each of DeadwaxApp's 23 models) and the two layout values a page's sheets inherit on the iPhone
+  (`\.tabBarRoom`, `\.playerClearance`), and puts them on the page it presents through `carryingApp`. `CarriesApp` puts
+  each model back, `\.appModels` itself (so a sheet over a sheet carries them on), the two values, and the root's tint
+  and font.
+- **Platform.swift**: `carryingApp` is `modifier(CarriesApp(carried:))` on the Mac and `self` on the iPhone - so on the
+  iPhone every presentation is SwiftUI's own exactly as before, inheriting as it always has.
+- **DeadwaxApp.swift**: `.environment(\.appModels, AppModels(…))` beside the 23 `.environment(model)`.
+- **All 23 presentations** (13 files, CoverViewer's `coverViewer` among them) call `appSheet` / `appCover`.
+- **tests/test_ios_mac.py**: no `sheet(`, `fullScreenCover(`, `popover(` or `inspector(` in the App outside
+  Presenting.swift (whose four are each followed by `.carryingApp(carried)`); AppModels' fields, the `AppModels(…)`
+  DeadwaxApp makes and CarriesApp's `.environment(m.…)` are DeadwaxApp's `.environment(…)` models, in its order; Platform
+  says `carryingApp` as above on each side. Both new tests were seen failing: on a bare `.sheet(` put back in AlbumView,
+  and on `people` left out of CarriesApp.
+
+**Not carried, on purpose**: values set beside a presentation rather than above it - EQSheet's `\.eqDone` and
+`EQSheetStack`, `\.editMode` - which its sheets don't inherit on the iPhone either (each is put on inside the modifier
+that presents).
+
+**Verified here**: the scratch build with this change and the hook - Now Playing opened and stayed up, and the EQ
+import sheet too, each still running 20 s later at 0% CPU, no crash report, no "multiple times per frame" fault;
+test_ios_mac.py and test_ios_install_mac.py; the builds and checks listed in the commit. **Not verified**: whether the
+hang James saw was this same fault seen another way (it never came back in the scratch runs, but no click was made in
+them) - check 408's Now Playing step and 413's every-page pass say; `Menu` and `.contextMenu` contents, which aren't
+presentations here, were never opened on the Mac either.

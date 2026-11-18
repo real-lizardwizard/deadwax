@@ -123,6 +123,9 @@ def test_platform_is_the_iphones_exactly_as_before_on_the_iphone():
         assert size in mac
     assert "sizeRestrictions?.minimumSize" in mac and "sizeRestrictions?.maximumSize" in mac
     assert "titlebar?.titleVisibility = .hidden" in mac
+    # a presented page: its presenter's models handed on, the Mac's alone (Presenting.swift)
+    assert re.search(r"func carryingApp\(_ carried: AppCarried\) -> some View \{\s*self\s*\}", phone)
+    assert re.search(r"func carryingApp\(_ carried: AppCarried\) -> some View \{\s*modifier\(CarriesApp\(carried: carried\)\)\s*\}", mac)
 
 
 def test_the_app_is_wired_to_platform():
@@ -267,3 +270,47 @@ def test_the_mac_is_called_what_the_web_calls_it():
     assert 'case .mac: return "Mac"' in core and "case .iPhone: return label" in core
     from src.play_queue import LABEL
     assert LABEL.match("Mac") and LABEL.match("iPhone")
+
+
+# ----------------------------------------------------------------------------- every presentation carries the app's models
+
+PRESENTING = "Shared/Presenting.swift"
+PRESENTS = re.compile(r"\b(sheet|fullScreenCover|popover|inspector)\s*\(")
+
+
+def test_every_sheet_and_cover_goes_through_the_carrying_wrappers():
+    """On the Mac a presented page starts with an empty environment, and its first @Environment(PlayerModel.self) is a
+    crash (17 Nov: opening Now Playing on James's Mac). appSheet and appCover hand the presenter's models on; SwiftUI's
+    own are called only inside them, so a sheet added later can't miss it."""
+    used = 0
+    for name, text in app_sources().items():
+        code = bare(text)
+        if name == PRESENTING:
+            assert [m.group(1) for m in PRESENTS.finditer(code)] == ["sheet", "fullScreenCover", "sheet", "fullScreenCover"]
+            assert code.count(".carryingApp(carried)") == 4
+            continue
+        found = [m.group(0) for m in PRESENTS.finditer(code)]
+        assert not found, f"{name}: {found} - present through appSheet / appCover (Shared/Presenting.swift)"
+        used += len(re.findall(r"\bapp(?:Sheet|Cover)\((?:isPresented|item):", code))
+    assert used >= 23, used
+
+
+def test_the_carried_models_are_every_model_the_root_shares():
+    """A model DeadwaxApp shares but AppModels leaves out would be missing from every sheet on the Mac alone."""
+    app = app_sources()
+    root = bare(app["DeadwaxApp.swift"])
+    group = root[root.index("WindowGroup {"):root.index(".backgroundTask(")]
+    shared = re.findall(r"\.environment\((\w+)\)", group)
+    assert len(shared) == 23 and len(set(shared)) == 23, shared
+    presenting = bare(app[PRESENTING])
+    models = presenting[presenting.index("struct AppModels {"):presenting.index("extension EnvironmentValues")]
+    fields = re.findall(r"^\s*let (\w+): \w+$", models, re.M)
+    assert fields == shared, "AppModels' fields are DeadwaxApp's .environment(...) models, in its order"
+    made = group[group.index("AppModels("):]
+    assert re.findall(r"(\w+): (\w+)", made[:made.index("))")]) == [(name, name) for name in shared]
+    carries = presenting[presenting.index("struct CarriesApp"):presenting.index("private enum PresentationKind")]
+    assert re.findall(r"\.environment\(m\.(\w+)\)", carries) == shared
+    for value in (".environment(\\.appModels, m)", ".environment(\\.tabBarRoom, carried.tabBarRoom)",
+                  ".environment(\\.playerClearance, carried.playerClearance)", ".tint(Palette.accent)", ".font(Typeface.body)"):
+        assert value in carries, value
+

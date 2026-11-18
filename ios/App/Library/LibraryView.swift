@@ -89,7 +89,7 @@ struct LibraryView: View {
         // a ZStack over the root's switch, so what is attached below stays on one view whichever list is drawn
         ZStack { root }
             // Server settings' Connections page over the Library; it goes when Close says so, or Navidrome answers
-            .sheet(isPresented: $settingUp) {
+            .appSheet(isPresented: $settingUp) {
                 SetUpNavidromeSheet()
             }
             .onChange(of: navidromeAnswers) { _, _ in setUpDone() }
@@ -291,7 +291,7 @@ struct LibraryView: View {
         // the title the pages pushed over it go back to; the bar itself is the Library's own top
         .navigationTitle("Library")
         .toolbar(.hidden, for: .navigationBar)
-        .sheet(isPresented: $editingOrder) {
+        .appSheet(isPresented: $editingOrder) {
             EditOrderSheet(saved: $savedOrder, personal: server.access.hasLibrary)
         }
     }

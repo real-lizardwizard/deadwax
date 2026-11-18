@@ -69,6 +69,12 @@ extension View {
     func pullToRefresh(_ action: @escaping @MainActor @Sendable () async -> Void) -> some View {
         self
     }
+
+    /// A presented page on the Mac: given its presenter's models (Presenting.swift - a presentation's own scene starts
+    /// it with an empty environment here, and its first `@Environment(PlayerModel.self)` would be a crash).
+    func carryingApp(_ carried: AppCarried) -> some View {
+        modifier(CarriesApp(carried: carried))
+    }
 }
 
 #else
@@ -92,6 +98,11 @@ extension View {
     /// Pull to refresh: SwiftUI's own, exactly as before.
     func pullToRefresh(_ action: @escaping @MainActor @Sendable () async -> Void) -> some View {
         refreshable(action: action)
+    }
+
+    /// A presented page on the iPhone inherits its presenter's environment, as it always has: nothing to hand on.
+    func carryingApp(_ carried: AppCarried) -> some View {
+        self
     }
 }
 

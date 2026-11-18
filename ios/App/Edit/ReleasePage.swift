@@ -467,7 +467,7 @@ struct CompareCoversView: View {
             incoming = got
             looked = true
         }
-        .fullScreenCover(item: $full) { (cover: FullCover) in
+        .appCover(item: $full) { (cover: FullCover) in
             FullCoverView(cover: cover)
         }
     }

@@ -179,6 +179,32 @@ struct DeadwaxApp: App {
                 .environment(serverSettings)
                 .environment(eventLog)
                 .environment(people)
+                // (the Mac app) the same models as one value, which a sheet's presenter hands on to the page in it on the
+                // Mac - where a presentation starts with an empty environment (Shared/Presenting.swift)
+                .environment(\.appModels, AppModels(
+                    server: server,
+                    player: player,
+                    navigation: navigation,
+                    library: library,
+                    debug: debug,
+                    reachability: reachability,
+                    downloads: downloads,
+                    lyrics: lyrics,
+                    eq: eq,
+                    deck: deck,
+                    history: history,
+                    playlists: playlists,
+                    shuffles: shuffles,
+                    artists: artists,
+                    songs: songs,
+                    search: search,
+                    requests: requests,
+                    getSettings: getSettings,
+                    queueCount: queueCount,
+                    care: care,
+                    serverSettings: serverSettings,
+                    eventLog: eventLog,
+                    people: people))
                 .preferredColorScheme(.dark)
                 .tint(Palette.accent)
                 // (Noto Sans, 15 Nov) the words of every Text and control that sets no font of its own

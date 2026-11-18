@@ -131,9 +131,9 @@ def test_the_viewer_is_presented_from_now_playings_root():
     body = body_of(source)
     root = body[body.index(".offset(y: dragY)"):]
     assert ".coverViewer($viewing, onDismiss: eqAfterSheet)" in root
-    assert root.index(".sheet(isPresented: $showsUpNext") < root.index(".coverViewer($viewing")
+    assert root.index(".appSheet(isPresented: $showsUpNext") < root.index(".coverViewer($viewing")
     # once, and nowhere inside the content the cover lives in
-    assert source.count(".coverViewer(") == 1 and ".fullScreenCover(" not in source
+    assert source.count(".coverViewer(") == 1 and ".appCover(" not in source and "fullScreenCover(" not in source
     assert ".coverViewer(" not in func(source, "content")
     viewer = code(VIEWER)
     opening = viewer[viewer.index("private struct CoverOpens"):viewer.index("struct CoverViewer: View")]
@@ -141,8 +141,8 @@ def test_the_viewer_is_presented_from_now_playings_root():
     assert "@State" not in opening and "fullScreenCover" not in opening
     assert "@Binding var viewing: ViewedCover?" in opening
     presents = func(viewer, "coverViewer")
-    assert "fullScreenCover(item: viewing, onDismiss: onDismiss)" in presents
-    assert viewer.count("fullScreenCover(") == 1
+    assert "appCover(item: viewing, onDismiss: onDismiss)" in presents
+    assert viewer.count("appCover(") == 1
 
 
 def test_a_shared_eq_file_waits_for_the_viewer_too():

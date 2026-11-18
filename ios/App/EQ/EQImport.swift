@@ -294,7 +294,7 @@ private struct EQPageImport: ViewModifier {
     @Environment(AppNavigation.self) private var navigation
 
     func body(content: Content) -> some View {
-        content.sheet(isPresented: Binding<Bool>(get: {
+        content.appSheet(isPresented: Binding<Bool>(get: {
             navigation.eqImport != nil && navigation.eqImportPage == page
         }, set: { (up: Bool) -> Void in
             if !up { navigation.importAnswered() }

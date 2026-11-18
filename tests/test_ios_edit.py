@@ -5,7 +5,7 @@ dropdowns instead of big lists".
 
 Read from the Swift source, as the other ios tests read theirs: an album page's ••• has Edit album (with the album's
 Edit, deadwax in reach, the album not gone), between Album info and Refresh, and opens the sheet over the tabs
-(AppNavigation.albumEdit, MainTabs' one `.sheet(item:)`); Settings > Manage > Edit an album pushes Choose the folder,
+(AppNavigation.albumEdit, MainTabs' one `.appSheet(item:)`); Settings > Manage > Edit an album pushes Choose the folder,
 whose folder opens the same sheet; the sheet is its own NavigationStack, can't be swiped away with work in it, asks
 before discarding, and Close is off while an apply runs; the apply holds a background task; the album page asks again
 after a write and follows a new id; the choices are menu Pickers; nothing in Edit album opens a URL (the last row
@@ -77,7 +77,7 @@ def test_an_albums_menu_has_edit_album_with_the_albums_edit():
 
 def test_the_sheet_is_opened_over_the_tabs_once():
     tabs = code(TABS)
-    assert tabs.count(".sheet(item: $navigation.albumEdit, onDismiss: { navigation.editorDismissed() })") == 1
+    assert tabs.count(".appSheet(item: $navigation.albumEdit, onDismiss: { navigation.editorDismissed() })") == 1
     assert "EditAlbumSheet(request: request)" in tabs
     routes = code(ROUTES)
     navigation = declared(routes, "class", "AppNavigation")
