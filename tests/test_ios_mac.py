@@ -793,8 +793,9 @@ def test_the_mac_is_always_the_desktop_frame_and_the_iphone_its_tabs():
 
 
 def test_only_the_apps_own_window_is_shaped():
-    """On the Mac every sheet and cover is a window scene of its own: shaping every scene held a sheet to the window's
-    least size. Only the scene RootView is drawn in is shaped - RootView is never inside a presentation."""
+    """Shaping every scene that connects or comes to the front would shape whatever a presentation brings to the front
+    with the window's least size (on the Mac a sheet is drawn in a window of its own). Only the scene RootView is drawn
+    in is shaped - RootView is never inside a presentation."""
     app = app_sources()
     mac = bare(app[PLATFORM]).split("\n#else\n")[0]
     launching = mac[mac.index("static func launching()"):]

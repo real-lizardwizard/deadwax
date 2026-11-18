@@ -37,10 +37,12 @@ extension Platform {
         static let opening = CGSize(width: MacFrame.openingWidth, height: MacFrame.openingHeight)
     }
 
-    /// (Slice 3) The app's own window scenes - the one RootView is drawn in (MainWindowMarker). Only these are shaped:
-    /// on the Mac every sheet and cover is a window scene of its own (Presenting.swift), and a sheet held to the main
-    /// window's least size would be 880 wide. RootView is drawn in the WindowGroup's scene alone - never inside a
-    /// presentation, whose page is the sheet's own view - so a scene RootView's view has moved into is the main one.
+    /// (Slice 3) The app's own window scenes - the one RootView is drawn in (MainWindowMarker). Only these are shaped,
+    /// never whatever else comes to the front: a sheet held to the main window's least size would be 880 wide. On the
+    /// Mac a sheet is drawn in a window of its own (macOS logs a scene for it) - though slice 3's smoke runs saw no
+    /// second UIWindowScene join the app's while one was up, and a cover drawn in the main window - so nothing here
+    /// counts on either. RootView is drawn in the WindowGroup's scene alone - never inside a presentation, whose page is
+    /// the sheet's own view - so a scene RootView's view has moved into is the main one.
     @MainActor private static let mainScenes = NSHashTable<UIWindowScene>.weakObjects()
 
     /// At launch (the app delegate): the app's window shaped as RootView is drawn in it (`mainScene`), and again each

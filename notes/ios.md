@@ -14820,9 +14820,9 @@ itself, or the iPhone's own code as it was (Search's `.searchable`, moved there 
 ### `.inspector`, NavigationSplitView, and which scene is shaped
 
 - **No `.inspector`.**
-  - On iOS an inspector in a compact width is presented as a sheet. On the Mac a presentation is a scene of its own
-    with an empty environment (72079a8), so a narrow window's inspector would be a page with no models, the crash
-    72079a8 fixed for the sheets.
+  - On iOS an inspector in a compact width is presented as a sheet. On the Mac a presentation's page starts with an
+    empty environment (72079a8), so a narrow window's inspector would be a page with no models, the crash 72079a8
+    fixed for the sheets.
   - Proving whether Catalyst's inspector is ever a presentation needs a Mac to click. Not using it needs no proof.
   - The web's drawer lies over the page's edge with the page still answering. That is neither an inspector's column nor
     its sheet.
@@ -14835,8 +14835,11 @@ itself, or the iPhone's own code as it was (Search's `.searchable`, moved there 
   - A sidebar that is a plain view keeps `AppNavigation` the one account of where the app is.
   - A test forbids both in the App (`test_the_mac_is_always_the_desktop_frame_and_the_iphone_its_tabs`).
 - **Which scene is shaped.**
-  - Slice 1 shaped every `UIWindowScene` as it connected and as it came to the front. On the Mac a sheet is a scene of
-    its own, so slice 3's 880-wide least size would have been put on every sheet.
+  - Slice 1 shaped every `UIWindowScene` as it connected and as it came to the front. 72079a8's write-up took a sheet
+    to be a scene of its own (macOS logs one for it), so slice 3's 880-wide least size could have been put on every
+    sheet. The smoke runs below saw a sheet drawn in a window of its own, 470 x 400, with no second `UIWindowScene` in
+    the app's connected scenes, and a cover drawn in the main window. Shaping only RootView's scene holds either way,
+    and counts on neither.
   - Now only the scene RootView is drawn in is shaped. `MainWindowMarker`, a hidden, non-interactive UIView in
     RootView's background, calls `Platform.mainScene(window.windowScene)` from `didMoveToWindow`. That records the scene
     in a weak table and shapes it. `UIScene.didActivateNotification` shapes it again only if it's in that table.
@@ -14909,15 +14912,16 @@ Not verified - only the Mac can tell (docs/ios.md checks 424-433), beyond what t
   a drawer's shadow, the bar's three columns at 880 (424, 426, 427, 430);
 - that a click on each row lands where MacSidebar says, the switch's turn included, and that the folds and the side
   come back after a relaunch (424);
-- the sidebar's field: typing shows Search's page, Return asks at once, Escape empties it, ⌘F puts the cursor there
-  from any page and with the sidebar hidden, and Space types a space there (425);
+- the sidebar's field from the keyboard: ⌘F's key itself, Return asking at once, Escape emptying it, Space typing a
+  space there (425) - Find giving it the cursor, and typing showing Search's page, the smoke runs saw;
 - the bar's scrubber under a mouse (a click and a drag), the clocks, the cover full size and Escape on it, the •••'s
   items (426);
 - the panels under a pointer - the page, the sidebar and the bar still taking clicks with a drawer over the page -
   and Escape against a field (427);
 - the albums grid's columns as the window is dragged, and the readable pages centred (428);
 - playback carrying on through a resize from the smallest window to full screen (429);
-- the sign-in and can't-reach screens filling the window, and a sheet keeping its own size (431);
+- the sign-in and can't-reach screens filling the window, and Edit album's sheet keeping its own size - the EQ's
+  was 470 x 400 in the smoke runs (431);
 - VoiceOver over the sidebar (Collapsed and Expanded, the counts) and the bar;
 - the iPhones: nothing there changed in the code the iPhone runs - every change is behind Platform's Mac side or
   `MacFrame.drawsDesktop` - but both phones on the build is James's check (433).
@@ -14933,3 +14937,65 @@ Known, and left:
   on the Mac. It's a Core word the phone shares.
 - **No hover**: the rows, the bar's buttons and the panel's rows draw no hover state.
 - **The bar's scrubber** moves twice a second at most, as the ticker does, not frame by frame.
+- **Slice 2's words that a sheet is a scene of its own** (MacCommands.swift's MacRefresh, Presenting.swift, the
+  72079a8 merge's tests) stay as they were. The smoke runs saw a sheet in a window of its own but no second
+  UIWindowScene. What they guard holds either way: ⌘R's pages are let go by their own `deinit`, not by scene notices.
+
+### The smoke runs (17 Nov, at 675243e)
+
+James's own deadwax wasn't open (`pgrep` found nothing before each run). How each run was made:
+- **The build**: a scratch git worktree at 675243e in the session's scratch space, with ios/Config/Local.xcconfig
+  copied in for the team. A temporary hook was added (`DEADWAX_DIAG=<mode>`, acting 6 s after launch, `NSLog("DIAG:
+  …")` before, at each step and after) - a Diag.swift, a `.task` on DesktopFrame, and four notices PlayerBar heard
+  for its EQ sheet and its cover. It was built Debug for Mac Catalyst (arm64, signed) through build-locked.sh into
+  ~/Library/Caches/deadwax-s3-diag.
+- **Each run**: through `open -n --env DEADWAX_DIAG=<mode> --stdout … --stderr …`, then `kill -0` and `sample`, then
+  `kill`.
+- **What was logged**: AppNavigation's state, and each connected UIWindowScene - its role, least and greatest size,
+  window, title bar, and every view controller presented in its windows (type, window size, whether in the same
+  window, presentation style).
+- **Afterwards**: the scratch worktree and every DerivedData folder were deleted. Nothing was committed from it.
+
+The app was signed in, as it is on James's Mac, with a queue put back paused, so the bar had a song and Up Next had
+rows. Nothing was played.
+
+Every run was alive when sampled, its main thread idle in `-[NSApplication run]`'s event wait. None made a new crash
+report (six Deadwax-*.ips before each run and six after, every one older than the runs). None logged `Fatal error`,
+`multiple times per frame` or `Publishing changes from within view updates`.
+
+- **frame**: the desktop frame at launch.
+  - The Library at its root (Albums), the sidebar shown, no panel, the column style.
+  - **One connected scene**, the application's: least 880 x 600, no greatest width, title hidden. Its window was
+    1920 x 1205, the size macOS kept for the app.
+- **sections**: every row through `MacSidebar.move` and `macMove`, 2 s apart, each lit afterwards as `current` says.
+  - Yours' Albums and Artists; the switch turned on Albums gave All's Albums (`sideFlip`).
+  - All's Albums, Artists, Songs and Downloaded, each a section on the Library's stack.
+  - Requests; Playlists (the Library's Playlists page).
+  - Edit an album, Needs a look, Library care, Server settings, Event log and People, each the one page on Settings'
+    stack; then Settings at its root.
+  - All's Albums clicked again stayed on All's Albums.
+  - Yours' Songs (with a library of your own not one of Yours' rows, so never drawn) asked of the Library gave its
+    first page, as LibraryPages.showing does.
+  - The sidebar hidden, then Find: shown again, and `findWanted` taken by the field's FindFocus.
+  - `nowPlayingShown` set true was put back false at once.
+- **panels**: Up Next, Lyrics and Info toggled in turn, one at a time, each a column at 1920.
+  - The window was then asked (`requestGeometryUpdate`) to 1000 x 720: the drawer style, Info still open. Up Next
+    swapped in.
+  - At 1400 x 860: the column again. Up Next closed by its own toggle.
+  - At 880 x 600, the least, the window took exactly 880 x 600 (the drawer style); at 1280 x 820, the column.
+  - The window's size came back to 1920 x 1205 on the next launch.
+- **sheet**: the bar's •••'s EQ, its `showsEQ` set by a notice.
+  - Up, it was a `PresentationHostingController` with the form-sheet style, **in a window of its own, 470 x 400** -
+    not the main window, and not held to 880 x 600.
+  - **Still one connected UIWindowScene**, the main one, shaped as before.
+  - Down, gone. (The first run of this mode logged scenes alone. The presented controllers were added for a second
+    run, which saw the above.)
+- **cover**: the bar's cover full size (`CoverViewing.put` with the song's cover, as a click on it does).
+  - A `PresentationHostingController` with the over-full-screen style, in the main window (1920 x 1205).
+  - Gone again when cleared.
+- **find**: the sidebar hidden, then `find()`.
+  - The sidebar was shown and the first responder was a text field with the placeholder "Search", the sidebar's.
+  - `insertText("beatles")` into it showed Search's page (the tab went to Search), the field holding the words.
+
+**What they don't show**: anything a pointer or a key does (the clicks were the rows' own calls, the keys never
+pressed), and how any of it looks - which is what checks 424-433 are for.
