@@ -331,7 +331,7 @@ struct ArtistRow: View {
             .accessibilityElement(children: .combine)
             .accessibilityLabel([artist.name ?? "", line].filter { (part: String) -> Bool in !part.isEmpty }
                 .joined(separator: ", "))
-            .accessibilityValue(dimmed ? DownloadWords.notOnPhone : "")
+            .accessibilityValue(dimmed ? DownloadWords.notOnDevice(Platform.device) : "")
             Divider().padding(.leading, LibraryRow.textInset)
         }
     }

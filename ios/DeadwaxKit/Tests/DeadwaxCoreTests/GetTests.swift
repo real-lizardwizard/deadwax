@@ -245,7 +245,7 @@ import Testing
 
     @Test func onlyAnAnswerThatNeverCameIsUnansweredRatherThanRefused() {
         let server = ServerAddress(base: URL(string: "http://deadwax.test:8080")!)
-        let none = APIFailure.NoAnswer(server: server, method: "POST", path: "/download/enqueue", reason: "timed out")
+        let none = APIFailure.NoAnswer(server: server, method: "POST", path: "/download/enqueue", reason: "timed out", device: .iPhone)
         func answered(_ status: Int) -> APIFailure {
             .answered(.init(status: status, method: "POST", path: "/download/enqueue", detail: "already downloading from bob"))
         }
@@ -461,7 +461,7 @@ import Testing
 
     @Test func deadwaxBackRunsTheVerySearchThatFailedForWantOfIt() {
         let server = ServerAddress(base: URL(string: "http://deadwax.test:8080")!)
-        let none = APIFailure.NoAnswer(server: server, method: "POST", path: "/download/find_candidates", reason: "no route")
+        let none = APIFailure.NoAnswer(server: server, method: "POST", path: "/download/find_candidates", reason: "no route", device: .iPhone)
         let typed = SourcesRun.requery(override: "portishead third lp")
         // a search again by hand that never reached deadwax, or had no answer in time: the very search again - the
         // words it sent - and never a pick

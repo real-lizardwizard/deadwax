@@ -38,7 +38,7 @@ struct ServerAddressView: View {
                 Button(server.checkingAddress ? "Checking\u{2026}" : "Check") { check() }
                     .disabled(server.checkingAddress)
                 if checked, let report = server.addressReport {
-                    ForEach(report.lines, id: \.self) { line in
+                    ForEach(report.lines(Platform.device), id: \.self) { line in
                         Text(line)
                             .font(Typeface.footnote)
                             .fixedSize(horizontal: false, vertical: true)
@@ -49,7 +49,7 @@ struct ServerAddressView: View {
                 Text("deadwax's address")
                     .font(Typeface.footnote)
             } footer: {
-                Text("The address you open deadwax at, by IP or by name. The first time, iOS asks to let deadwax find devices on your local network: say yes.")
+                Text(AddressWords.footer(Platform.device))
                     .font(Typeface.footnote)
             }
         }
@@ -60,7 +60,7 @@ struct ServerAddressView: View {
             if typed.isEmpty { focused = true }
         }
         .onChange(of: server.addressReport) { _, report in
-            if checked, let line = report?.lines.first { Notice.announce(line) }
+            if checked, let line = report?.lines(Platform.device).first { Notice.announce(line) }
         }
     }
 

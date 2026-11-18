@@ -113,7 +113,7 @@ def test_the_graphic_sits_over_the_hero_saying_a_pages_words():
         assert source.count("PullShuffleGraphic(") == 1, path.name
     graphic = code(PULL_VIEW)
     assert "var of: PullShuffleOf = .library" in graphic
-    assert "PullShuffleWords.line(phase, can: can, of: of)" in graphic
+    assert "PullShuffleWords.line(phase, can: can, of: of, device: Platform.device)" in graphic
 
 
 def test_what_it_can_do_is_from_the_songs_the_heros_shuffle_takes():
@@ -149,7 +149,7 @@ def test_the_release_is_the_heros_shuffle_in_the_lift():
         # nothing awaited before the player is called (the gesture rule)
         assert "await" not in pulled and "Task" not in pulled, path.name
         # the songs on this phone gone since it armed: said, as the Library's pull says it, and nothing played
-        said = pulled.index("player.say(PullShuffleWords.nothingHere)")
+        said = pulled.index("player.say(PullShuffleWords.nothingHere(Platform.device))")
         assert pulled.index("if playable.isEmpty,") < said < pulled.index("return") < pulled.index("play(at: nil")
     # the player's own calls, unchanged: the album as the album, the playlist's songs each with its own album
     for path, call in ((ALBUM, "player.play(songs: songs, album: album, at: index, shuffle: shuffle)"),

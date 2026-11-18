@@ -12,7 +12,7 @@ import Testing
 
 @Suite(.serialized) struct EQStartTests {
     static let key = "speaker"
-    static let speaker = EQOutputs.speaker
+    static let speaker = EQOutputs.speaker(.iPhone)
 
     static func desk() -> EQStartDesk {
         EQStartDesk(muffleKey: EQTestCurve.key, muffleBank: { (rate: Double, version: Int) -> EQBank in

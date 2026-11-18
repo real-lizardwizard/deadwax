@@ -7,8 +7,8 @@ import Testing
 /// runs at always lands. The orders are run against EQHost's own rules here (a model of them, `Host`) and against the
 /// real EQHost in DeadwaxAudioTests' EQStartTests.
 @Suite struct EQStartBookTests {
-    static let airpods = EQOutputs.output(EQRoutePort(port: .bluetoothA2DP, portType: "", name: "Pods", uid: "a"))
-    static let car = EQOutputs.output(EQRoutePort(port: .carAudio, portType: "", name: "Golf", uid: "c"))
+    static let airpods = EQOutputs.output(EQRoutePort(port: .bluetoothA2DP, portType: "", name: "Pods", uid: "a"), device: .iPhone)
+    static let car = EQOutputs.output(EQRoutePort(port: .carAudio, portType: "", name: "Golf", uid: "c"), device: .iPhone)
 
     static func settings(_ tone: String, on: Bool = true) -> EQSettings {
         var s = EQSettings()

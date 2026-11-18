@@ -414,9 +414,9 @@ struct EQScreen: View {
     /// 6. Other outputs (3.12): each to its own page; swipe for Rename and Forget (never the speaker), which asks first.
     private func othersSection(_ key: String) -> some View {
         Section {
-            ForEach(EQScreenRules.others(eq.settings, shown: key), id: \.key) { other in
+            ForEach(EQScreenRules.others(eq.settings, shown: key, device: Platform.device), id: \.key) { other in
                 EQLink(route: .output(other.key)) {
-                    EQOtherOutputRow(output: other.output, short: EQWords.shortSetting(other, in: eq.settings))
+                    EQOtherOutputRow(output: other.output(Platform.device), short: EQWords.shortSetting(other, in: eq.settings))
                 }
                 .swipeActions(edge: .trailing, allowsFullSwipe: false) {
                     if EQScreenRules.forgets(other.key) {

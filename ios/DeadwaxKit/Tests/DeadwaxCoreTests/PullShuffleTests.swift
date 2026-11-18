@@ -171,18 +171,18 @@ import Testing
     }
 
     @Test func theGraphicsWords() {
-        #expect(PullShuffleWords.line(.pulling(0.4), can: .ready) == "Pull to shuffle")
-        #expect(PullShuffleWords.line(.idle, can: .ready) == "Pull to shuffle")
-        #expect(PullShuffleWords.line(.armed, can: .ready) == "Release to shuffle")
-        #expect(PullShuffleWords.line(.released, can: .ready) == "Shuffling")
-        #expect(PullShuffleWords.line(.released, can: .downloads) == "Shuffling")
-        #expect(PullShuffleWords.line(.pulling(0.4), can: .downloads) == "Pull to shuffle your downloads")
-        #expect(PullShuffleWords.line(.armed, can: .downloads) == "Release to shuffle your downloads")
-        #expect(PullShuffleWords.line(.pulling(1), can: .gettingReady) == "Getting ready\u{2026}")
-        #expect(PullShuffleWords.line(.pulling(1), can: .failed("Couldn't get your songs ready to shuffle"))
+        #expect(PullShuffleWords.line(.pulling(0.4), can: .ready, device: .iPhone) == "Pull to shuffle")
+        #expect(PullShuffleWords.line(.idle, can: .ready, device: .iPhone) == "Pull to shuffle")
+        #expect(PullShuffleWords.line(.armed, can: .ready, device: .iPhone) == "Release to shuffle")
+        #expect(PullShuffleWords.line(.released, can: .ready, device: .iPhone) == "Shuffling")
+        #expect(PullShuffleWords.line(.released, can: .downloads, device: .iPhone) == "Shuffling")
+        #expect(PullShuffleWords.line(.pulling(0.4), can: .downloads, device: .iPhone) == "Pull to shuffle your downloads")
+        #expect(PullShuffleWords.line(.armed, can: .downloads, device: .iPhone) == "Release to shuffle your downloads")
+        #expect(PullShuffleWords.line(.pulling(1), can: .gettingReady, device: .iPhone) == "Getting ready\u{2026}")
+        #expect(PullShuffleWords.line(.pulling(1), can: .failed("Couldn't get your songs ready to shuffle"), device: .iPhone)
                 == "Couldn't get your songs ready to shuffle")
-        #expect(PullShuffleWords.line(.pulling(0.2), can: .nothingHere) == "Nothing on this phone to shuffle")
-        #expect(PullShuffleWords.line(.pulling(0.2), can: .none) == "", "nothing to shuffle: nothing drawn")
+        #expect(PullShuffleWords.line(.pulling(0.2), can: .nothingHere, device: .iPhone) == "Nothing on this phone to shuffle")
+        #expect(PullShuffleWords.line(.pulling(0.2), can: .none, device: .iPhone) == "", "nothing to shuffle: nothing drawn")
     }
 
     /// An album's or a playlist's page (notes/ios.md "Pull to shuffle on an album's and a playlist's page"): what its
@@ -205,16 +205,16 @@ import Testing
     }
 
     @Test func aPagesWords() {
-        #expect(PullShuffleWords.line(.pulling(0.4), can: .ready, of: .page) == "Pull to shuffle")
-        #expect(PullShuffleWords.line(.armed, can: .ready, of: .page) == "Release to shuffle")
-        #expect(PullShuffleWords.line(.pulling(0.4), can: .downloads, of: .page)
+        #expect(PullShuffleWords.line(.pulling(0.4), can: .ready, of: .page, device: .iPhone) == "Pull to shuffle")
+        #expect(PullShuffleWords.line(.armed, can: .ready, of: .page, device: .iPhone) == "Release to shuffle")
+        #expect(PullShuffleWords.line(.pulling(0.4), can: .downloads, of: .page, device: .iPhone)
                 == "Pull to shuffle the songs on this phone")
-        #expect(PullShuffleWords.line(.armed, can: .downloads, of: .page) == "Release to shuffle the songs on this phone")
-        #expect(PullShuffleWords.line(.released, can: .downloads, of: .page) == "Shuffling")
-        #expect(PullShuffleWords.line(.pulling(1), can: .nothingHere, of: .page) == "Nothing on this phone to shuffle")
-        #expect(PullShuffleWords.line(.pulling(0.5), can: .none, of: .page) == "")
+        #expect(PullShuffleWords.line(.armed, can: .downloads, of: .page, device: .iPhone) == "Release to shuffle the songs on this phone")
+        #expect(PullShuffleWords.line(.released, can: .downloads, of: .page, device: .iPhone) == "Shuffling")
+        #expect(PullShuffleWords.line(.pulling(1), can: .nothingHere, of: .page, device: .iPhone) == "Nothing on this phone to shuffle")
+        #expect(PullShuffleWords.line(.pulling(0.5), can: .none, of: .page, device: .iPhone) == "")
         // the Library's own, unchanged by the default
-        #expect(PullShuffleWords.line(.armed, can: .downloads, of: .library) == "Release to shuffle your downloads")
-        #expect(PullShuffleWords.line(.armed, can: .downloads) == "Release to shuffle your downloads")
+        #expect(PullShuffleWords.line(.armed, can: .downloads, of: .library, device: .iPhone) == "Release to shuffle your downloads")
+        #expect(PullShuffleWords.line(.armed, can: .downloads, device: .iPhone) == "Release to shuffle your downloads")
     }
 }

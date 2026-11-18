@@ -122,9 +122,9 @@ public struct AutoEqProfile: Codable, Equatable, Sendable {
 
     /// The profile read (APOReader, as it reads a file - eq.md 3.9) and made the output's correction: its filters
     /// numbered from 1, the text kept so "Back to AutoEq's" has it. The reader's refusal when AutoEq has changed its
-    /// format.
-    public func correction() -> Result<EQCorrection, APORefusal> {
-        APOReader.read(Data(text.utf8)).map { (reading: APOReading) -> EQCorrection in
+    /// format, in `device`'s words.
+    public func correction(_ device: Device) -> Result<EQCorrection, APORefusal> {
+        APOReader.read(Data(text.utf8), device: device).map { (reading: APOReading) -> EQCorrection in
             EQCorrection.autoeq(id: id, name: name, source: source, rig: rig, form: form, text: text, reading: reading)
         }
     }

@@ -70,7 +70,7 @@ import Testing
     }
 
     @Test func aNewOutputIsOff() {
-        let output = EQOutputs.output([EQRoutePort(port: .bluetoothA2DP, portType: "BluetoothA2DPOutput", name: "Sennheiser HD 450BT", uid: "u")])!
+        let output = EQOutputs.output([EQRoutePort(port: .bluetoothA2DP, portType: "BluetoothA2DPOutput", name: "Sennheiser HD 450BT", uid: "u")], device: .iPhone)!
         let setting = EQSettings.newOutput(output, seen: "2026-11-12T10:41:00Z")
         #expect(!setting.on && setting.correction == nil && setting.tone == .preset("flat") && setting.preamp == .automatic)
         #expect(setting.key == "bluetooth:u" && setting.type == .bluetoothA2DP && setting.renamed == nil && setting.suggestion == nil)

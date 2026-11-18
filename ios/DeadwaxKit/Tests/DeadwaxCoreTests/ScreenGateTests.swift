@@ -25,7 +25,7 @@ import Testing
         #expect(Screens.same(NavidromeGate.deadwaxUnreached, words["DEADWAX_UNREACHED"].string))
         #expect(Screens.same(NavidromeGate.musicUnset, words["MUSIC_UNSET"].string))
         #expect(Screens.same(NavidromeGate.adminSetsUp, words["ADMIN_SETS_UP"].string))
-        #expect(Screens.same(NavidromeGate.navidromeRequired, words["NAVIDROME_REQUIRED"].string))
+        #expect(Screens.same(NavidromeGate.navidromeRequired(.iPhone), words["NAVIDROME_REQUIRED"].string))
         #expect(Screens.same(NavidromeGate.navidromeUnreached, words["NAVIDROME_UNREACHED"].string))
     }
 
@@ -42,7 +42,7 @@ import Testing
                                         server: status["server"].string, problem: status["problem"].string),
                 offline: status["offline"].bool ?? false)
             let label = "\(row["reader"].string!) / \(row["status"].string!)"
-            let shown = NavidromeGate.shown(checked, access: access)
+            let shown = NavidromeGate.shown(checked, access: access, device: .iPhone)
             let drawn = row["drawn"]
             if drawn.string == "open" {
                 diffs.check("\(label): open", shown, .open)
@@ -67,11 +67,11 @@ import Testing
     @Test func aFailedCheckIsOfflineOnlyWhenNothingAnswered() throws {
         let server = try ServerAddress.parse("http://192.168.1.20:8090").get()
         let unreached = APIFailure.offline(.init(server: server, method: "GET", path: "/navidrome/status",
-                                                 reason: "The Internet connection appears to be offline."))
+                                                 reason: "The Internet connection appears to be offline.", device: .iPhone))
         let refused = APIFailure.answered(.init(status: 502, method: "GET", path: "/navidrome/status",
                                                 detail: "Navidrome couldn't be reached"))
         let timedOut = APIFailure.timeout(.init(server: server, method: "GET", path: "/navidrome/status",
-                                                reason: "The request timed out."))
+                                                reason: "The request timed out.", device: .iPhone))
         let checks = fixture["checks"]
         for (name, error) in [("deadwaxUnreached", unreached), ("navidromeRefused", refused), ("timedOut", timedOut)] {
             let checked = NavidromeGate.Checked.failed(error, problem: error.words)
@@ -87,10 +87,10 @@ import Testing
     /// web's rule.
     @Test func thePhoneDrawsTheLibraryUntilACheckFindsNavidromeMissing() {
         let listener = Access(me: Me(user: "ethan", admin: false, auth: "on", permissions: ["request"]))
-        #expect(NavidromeGate.shownOnPhone(nil, access: listener) == .open)
+        #expect(NavidromeGate.shownOnPhone(nil, access: listener, device: .iPhone) == .open)
         let down = NavidromeGate.Checked(status: NavidromeStatus(configured: true, ok: false, problem: "x"))
-        #expect(NavidromeGate.shownOnPhone(down, access: listener) == NavidromeGate.shown(down, access: listener))
+        #expect(NavidromeGate.shownOnPhone(down, access: listener, device: .iPhone) == NavidromeGate.shown(down, access: listener, device: .iPhone))
         let reached = NavidromeGate.Checked(status: NavidromeStatus(configured: true, ok: true, server: "Navidrome 0.64.2"))
-        #expect(NavidromeGate.shownOnPhone(reached, access: listener) == .open)
+        #expect(NavidromeGate.shownOnPhone(reached, access: listener, device: .iPhone) == .open)
     }
 }

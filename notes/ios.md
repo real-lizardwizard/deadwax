@@ -15190,3 +15190,198 @@ The runs:
 
 No other run logged an exception, `Fatal error`, `multiple times per frame` or `Publishing changes from within view
 updates`.
+
+## The Mac app, slice 4: the Mac's words (2026-11-18)
+
+The Mac app's plan (~/Desktop/Code/deadwax-plans/mac-app.md), slice 4. It covers:
+- section 1.5, Words;
+- section 2's slice-4 rows: Settings' "This phone" called This Mac, and Debug's install line;
+- item 4 of section 6;
+- checks 434-438 of section 7;
+- section 3.3's rule: `targetEnvironment(macCatalyst)` is said only in App/Shared/Platform.swift, and Core takes the
+  device as a value.
+
+Built on `mac-s4`, from c97a824 (slice 3 after review). What it leaves alone:
+- src/__init__.py is untouched and the app is still 0.13 (13). There is **no server change**.
+- **ios/Deadwax.xcodeproj is untouched**: the new Core file is in the package, and the package's sources are found
+  by folder.
+- The engine files and DeadwaxAudio have no diff. Platform.swift has none either: `Platform.device` was slice 1's.
+
+**No word an iPhone shows changes, and that is held by a snapshot, not by reading.** The first commit (0abb493) added
+DeviceWordsTests and Fixtures/words/iphone.json before any word moved. iphone.json holds 552 words, generated from
+c97a824's own code (`DEADWAX_WORDS_WRITE=iphone`): every word this slice touches, in each state it can be in
+(downloads waiting, failed, offline; the EQ's outputs and import refusals; the install line's four cases; and so on).
+The App's literals that moved into Core are in it under `App.<file>.<name>`, written from the App's text at
+c97a824. After the change, the iPhone's words are compared with it key by key.
+
+### How a word knows the device
+
+- **Device.swift** gained `noun` ("phone" or "Mac") and `this` ("This phone" or "This Mac").
+- **Every Core word that names the device is a function of it.** A word with no other input takes
+  `(_ device: Device)`; one with inputs takes a trailing `device:`. **None has a default**: a default would let an App
+  caller go on saying the iPhone's word on the Mac, unseen. Without one, the compiler names every caller.
+- **The App hands Core `Platform.device`** at every one of those calls: 122 lines in 43 App files. No device is named
+  in the App.
+- **The client carries the device for its errors.** `DeadwaxClient` holds `device` (from ServerModel's makeClient),
+  and `APIFailure.NoAnswer` carries it. So every "couldn't reach" says the right place: the unreachable screen, the
+  address screen's Check, and an event stream's failure.
+- **Literals that were in the App moved to Core**, so they can be tested on Linux for both devices:
+  - Debug's footers and its "on the phone": **DebugWords.swift** (new);
+  - DownloadModel's two log lines: LibraryFollowWords' `unreadableAtLaunch`, `underReserveNoted`;
+  - PlayerModel+Engine's "Not on this phone, and deadwax can't be reached.": DownloadWords' `notHereUnreached`;
+  - the address screen's footer: Check.swift's `AddressWords.footer`.
+- **The EQ's speaker keeps its key.**
+  - `EQOutputs.speakerKey` is "speaker" on both devices; `EQOutputs.speaker(_:)` makes the device's own.
+  - Every place that compared with the old `speaker.key` (Forget, the others list, the drawing) compares with
+    `speakerKey`.
+  - A kept output's name is drawn as `shownName` (yours if renamed, else the kept one), as before.
+  - A Mac that kept the speakers' EQ under an earlier build's "iPhone speaker" has that name brought up to date by
+    `met()` the next time the speakers are the output, as it already brought up any output's iOS name; its EQ is
+    kept.
+
+### Every word that differs on the Mac
+
+209 of the 552 snapshot keys differ. The rest are the same on both. Each line below is the iPhone's, then the Mac's.
+
+- **Settings**:
+  - This phone → **This Mac**, the row and its page's title;
+  - Normalization's "This is kept on this phone." → "…this Mac.".
+- **Downloads** (DownloadWords, 98 keys): every "this phone" → "this Mac". That covers:
+  - the usage and footer lines ("41.2 GB free on this Mac", "3 of 12 songs on this Mac · 92 MB");
+  - "Waiting for space on this Mac" and "Waiting for the Mac to charge";
+  - album, song and tile lines, menus, Remove's messages, and failures ("…this Mac couldn't …").
+  Three are reworded:
+  - **The foot**: "Closing deadwax from the app switcher stops downloads until you open it again; locking the phone
+    doesn't. Downloads stay on this phone when you sign out." → "Downloads stay on this Mac when you sign out."
+    There is no app switcher. Whether quitting stops downloads is slice 5's to find out, so nothing is claimed.
+  - **The store unreadable**: "…close deadwax from the app switcher and open it again." → "This Mac couldn't read its
+    downloads - quit deadwax and open it again."
+  - **The offline banner**: "Offline - showing what's on this Mac", then "Join a network to play what isn't on this
+    Mac." The phone's "Turn off Airplane Mode or…" is dropped: a Mac has none.
+- **The rest of downloading**:
+  - Download your library (AutoDownloadWords, 26 keys; LibraryFollowWords, 7);
+  - a playlist's downloads (PlaylistDownloadWords, 12);
+  - Album info's **On this Mac**, with its waiting lines;
+  - the offline skip line (SkipRun);
+  - an offline album's note (OfflineAlbum.note).
+- **Pull to shuffle** (12): "Pull to shuffle the songs on this Mac", "Nothing on this Mac to shuffle", and its other
+  lines.
+- **The EQ**:
+  - **iPhone speaker → Mac speakers**, its mark `iphone` → `laptopcomputer` (an assumption: a Mac mini's speaker
+    would show a laptop - check 436 asks);
+  - **Import from Files… → Import…**;
+  - Settings' EQ foot → "Each output keeps its own EQ - your headphones, the Mac's speakers, a USB DAC - and the EQ
+    switches by itself when the output changes. This is kept on this Mac.";
+  - the unit not made → "The EQ can't play on this Mac just now, so the sound is as it is. Quitting deadwax and opening
+    it again may help.";
+  - an import's frequency refusal → "…higher than this Mac plays…";
+  - its channels note → "…which deadwax doesn't play on a Mac". The phone's "which a phone doesn't have" isn't true of
+    a Mac; deadwax plays two channels there too.
+  - AutoEq's correction read through the same import rules, so its refusals say this Mac.
+- **Can't reach deadwax** (HTTP.swift's `unreachableWords`):
+  - "Is the phone on your home Wi-Fi, or on WireGuard? If you said no when asked about the local network, turn
+    deadwax on in the iPhone's Settings > Privacy & Security > Local Network."
+  - → "Is the Mac on your home network, or on WireGuard? … turn deadwax on in System Settings > Privacy & Security >
+    Local Network."
+  - The address screen's foot: "The first time, iOS asks…" → "…macOS asks…".
+- **Change password**: "…deadwax sent this Mac no new sign-in.", and "This Mac's sign-in ended while your password
+  was being changed…".
+- **Lyrics**: "Lyrics - not on this phone" → "Lyrics - not on this Mac". This is slice 3's known "phone" on the Mac,
+  now gone.
+- **Connect Navidrome**: "…so the phone never needs Navidrome's password." → "…so the Mac never needs…".
+- **Debug**:
+  - the install line → "This install doesn't expire: a Mac keeps opening deadwax without installing it again.", for
+    every case: no profile, days left, soon, ran out. A Mac's install has no profile; one in it would be install-mac.sh's
+    to refuse.
+  - the foot "deadwax for iPhone 0.13 (13)" → "deadwax for Mac 0.13 (13)";
+  - "on the phone" → "on the Mac";
+  - the test sounds' "downloaded to this phone" → "…this Mac";
+  - the engine log's foot → "…on the Mac's clock… Console shows them too, as they happen: choose this Mac, …";
+  - the two background log lines → "the Mac's".
+- **Unchanged here**: Resume's "Mac" (slice 1).
+
+Left saying phone or iOS on the Mac, on purpose:
+- **The turntable's words**: there is no turntable on the Mac.
+- **The audio engine's own errors** (DeadwaxAudio: "iOS couldn't decode…", "The phone couldn't write the stream to
+  its disk."). The engine has no diff, and these are rare and mostly an admin's detail.
+- **The App's two "iOS couldn't…" engine failures** (PlayerModel's `lastFailure`, an admin's detail), and DownloadWords'
+  raw "iOS couldn't open or decode the file" for an admin.
+- **Debug's EQ render-block row** ("iOS asked for it…").
+- **The turntable recording's file name and user agent**, which are data.
+- **People's `phonePasswordPlace`**, and anything stored, sent or keyed: download states such as `phone_full`, the
+  speaker's key, play_queue's labels, and the plists.
+- **`forceQuit` and `over()`** (Downloads): slice 5's to reword, with sleep and power.
+
+### Departures from the web
+
+The web's words are the phone's in three places, so the Mac departs from them:
+- **LyricsWords.notKept**: the web's LYRICS_NOT_KEPT is "Lyrics - not on this phone".
+- **NavidromeGate.navidromeRequired**: the web's NeedsNavidrome.tsx says "the phone never needs…".
+- **YouWords.kept**: the web's You says "kept on this device". The phone's "this phone" was already a departure, and
+  the Mac's "this Mac" follows it.
+
+### The plists and App Intents
+
+- Both plists' strings were read. NSLocalNetworkUsageDescription ("deadwax plays your music from your deadwax server
+  on this network.") fits both devices, and no other string names a device.
+- There are no App Intents, Siri or Shortcuts definitions.
+- Both are now held by test_ios_mac.py.
+
+### Tests
+
+- **Core: DeviceWordsTests** (7).
+  - The iPhone's 552 words equal iphone.json.
+  - The Mac's equal mac.json (`DEADWAX_WORDS_WRITE=mac` writes it), under the same names.
+  - No Mac word says phone or iPhone (`\bi?phones?\b`, any case).
+  - The Mac's differ wherever the phone's say phone. The exceptions are the phone's own words for its own things,
+    listed by name.
+  - The Local Network words point to each device's settings, through `NoAnswer` too.
+  - The Mac's install line never expires.
+  - The speaker keeps its key, and a speaker kept under "iPhone speaker" and met on the Mac is named "Mac speakers",
+    its EQ kept.
+- **About 45 Core test files** now pass `.iPhone` (or `device: .iPhone`) where a word became a function. Their
+  expectations are unchanged.
+- **test_ios_mac.py** (33, from 30):
+  - the App hands Core `Platform.device` at a named call of each kind, and never names a device;
+  - no literal the App writes itself says phone, but the turntable recording's file name and user agent;
+  - the speaker's key is said once, the plists' strings name no device, and there are no App Intents.
+- **test_ios_settings.py, test_ios_pull_to_shuffle.py, test_ios_change_password.py**: the call shapes they read
+  (`YouWords.thisDevice(Platform.device)`, `PullShuffleWords.line(…, device: Platform.device)`, `flow.ended(…,
+  device: Platform.device)`, …). The seven checks failed on the old shapes first. `swift_words` now also reads a
+  `func <name>(_ device: Device) -> String`.
+- **Each new check was seen failing on its fault**, one at a time or together, and put back:
+  - an iPhone word reworded;
+  - a Mac word reworded;
+  - a Mac word saying "a phone";
+  - "System Settings" dropped from the Mac's unreachable words;
+  - "doesn't expire" reworded;
+  - the speaker's key changed (all seven DeviceWordsTests failed);
+  - `device: .iPhone` written in AlbumHero;
+  - Debug's foot put back as an App literal;
+  - a plist string saying phone.
+
+### Verified, and not
+
+Verified on the tip (2026-11-18), on James's Mac, nothing installed:
+- `swift test` through build-locked.sh, the whole package: 2292 tests passed, none failed - 2122 in Core's (DeviceWordsTests'
+  7 among them), 158 in the audio engine's and 12 in the turntable's;
+- an unsigned iPhone Debug build, and an unsigned Mac Catalyst Release build (arm64): both succeed, with no warnings;
+- check_project.py: ok;
+- pytest of tests/test_ios_*.py, test_source_bytes.py and test_logins.py: 697 passed, 1 skipped. pyflakes over src
+  and tests: clean;
+- all 100 sims on Node 22, each in a TMPDIR of its own: 100 passed;
+- ios/Deadwax.xcodeproj unchanged.
+
+**No smoke run.** James's own deadwax was open (`pgrep` found ~/Applications/deadwax.app running), and the brief
+says not to run one then. Nothing on the Mac has shown these words yet.
+
+Not verified - only the Mac can tell (docs/ios.md checks 434-438):
+- that each page shows the Mac's words: Settings, Downloads, the banner, Album info and the EQ (434, 435, 436);
+- whether `laptopcomputer` suits the speakers, and what macOS names its outputs (436). The Mac's own speakers are
+  assumed to come through Catalyst's AVAudioSession as `.builtInSpeaker`, and so be "Mac speakers". If they came as
+  another port, they'd be named and keyed by what macOS calls them ("MacBook Air Speakers"), as check 412 already
+  asks. Headphones and AirPods are named as on the phone.
+- what the Mac shows with Local Network turned off: the unreachable words on the address screen and the unreachable
+  screen, and connecting once it's on (437);
+- the phones: both on the build, every word as before (438). The snapshot holds it in Core, and every App call hands
+  `Platform.device`, which is `.iPhone` there.

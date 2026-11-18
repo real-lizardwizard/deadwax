@@ -140,24 +140,25 @@ public enum PullShuffleWords {
     public static let releaseDownloads = "Release to shuffle your downloads"
     /// An album's or a playlist's page playing only its songs on this phone - "the songs on this phone" as the album
     /// page's own line for an album gone from the collection says it (DownloadWords.albumGoneHere).
-    public static let pullHere = "Pull to shuffle the songs on this phone"
-    public static let releaseHere = "Release to shuffle the songs on this phone"
-    public static let nothingHere = "Nothing on this phone to shuffle"
+    public static func pullHere(_ device: Device) -> String { "Pull to shuffle the songs on this \(device.noun)" }
+    public static func releaseHere(_ device: Device) -> String { "Release to shuffle the songs on this \(device.noun)" }
+    public static func nothingHere(_ device: Device) -> String { "Nothing on this \(device.noun) to shuffle" }
 
     /// The line for `phase`, as the Shuffle `can`, on a pull that shuffles `of` - "" when there is nothing to shuffle
     /// at all (nothing is drawn).
-    public static func line(_ phase: PullShuffle.Phase, can: ShuffleCan, of: PullShuffleOf = .library) -> String {
+    public static func line(_ phase: PullShuffle.Phase, can: ShuffleCan, of: PullShuffleOf = .library,
+                            device: Device) -> String {
         if phase == .released { return shuffling }
         switch can {
         case .none: return ""
         case .gettingReady: return ShuffleWords.gettingReady
         case .failed(let why): return why
-        case .nothingHere: return nothingHere
+        case .nothingHere: return nothingHere(device)
         case .ready: return phase == .armed ? release : pull
         case .downloads:
             switch of {
             case .library: return phase == .armed ? releaseDownloads : pullDownloads
-            case .page: return phase == .armed ? releaseHere : pullHere
+            case .page: return phase == .armed ? releaseHere(device) : pullHere(device)
             }
         }
     }

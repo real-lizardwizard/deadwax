@@ -7,10 +7,10 @@ import Testing
 /// the correction alone, imported again, plays the same.
 @Suite struct EQImportRulesTests {
     static let airpods = EQAdvancedTests.airpods
-    static let car = EQOutputs.output(EQRoutePort(port: .carAudio, portType: "CarAudio", name: "Golf", uid: "car-1"))
+    static let car = EQOutputs.output(EQRoutePort(port: .carAudio, portType: "CarAudio", name: "Golf", uid: "car-1"), device: .iPhone)
 
     static func read(_ text: String, pasted: Bool = false) throws -> APOReading {
-        switch APOReader.read(Data(text.utf8), pasted: pasted) {
+        switch APOReader.read(Data(text.utf8), pasted: pasted, device: .iPhone) {
         case .success(let reading): return reading
         case .failure(let refusal): throw refusal
         }
@@ -80,9 +80,9 @@ import Testing
         var settings = EQSettings()
         settings.met(Self.car, at: "2026-11-10T08:00:00Z")
         settings.met(Self.airpods, at: "2026-11-12T10:00:00Z")
-        let keys = EQImportRules.outputs(settings, route: Self.car).map(\.key)
-        #expect(keys == [Self.car.key, Self.airpods.key, EQOutputs.speaker.key])
-        #expect(EQImportRules.outputs(EQSettings(), route: EQOutputs.speaker).map(\.key) == [EQOutputs.speaker.key])
+        let keys = EQImportRules.outputs(settings, route: Self.car, device: .iPhone).map(\.key)
+        #expect(keys == [Self.car.key, Self.airpods.key, EQOutputs.speakerKey])
+        #expect(EQImportRules.outputs(EQSettings(), route: EQOutputs.speaker(.iPhone), device: .iPhone).map(\.key) == [EQOutputs.speakerKey])
     }
 
     /// The text kept: UTF-8 (its mark dropped), UTF-16 with its mark, else Windows-1252 - and a line for whoever runs
@@ -110,7 +110,7 @@ import Testing
     /// A refusal names its line: the line itself is for whoever runs deadwax (3.17).
     @Test func aRefusalsLine() throws {
         let text = "Preamp: -3 dB\nFilter: ON PK Fc 100 Hz Gain 2 dB Q 1\nInclude: bass.txt\n"
-        guard case .failure(let refusal) = APOReader.read(Data(text.utf8), pasted: true) else {
+        guard case .failure(let refusal) = APOReader.read(Data(text.utf8), pasted: true, device: .iPhone) else {
             Issue.record("Include is refused")
             return
         }
@@ -124,7 +124,7 @@ import Testing
     @Test func anExportImportedAgainPlaysTheSame() throws {
         for profile in try EQFixtures.profiles().profiles {
             let data = try Fixtures.data("eq/\(profile.path)")
-            guard case .success(let reading) = APOReader.read(data) else { continue }
+            guard case .success(let reading) = APOReader.read(data, device: .iPhone) else { continue }
             let c = EQCorrection.autoeq(id: profile.path, name: "x", source: profile.measurer, rig: nil, form: nil,
                                         text: String(decoding: data, as: UTF8.self), reading: reading)
             for preamp in [EQPreampSetting.automatic, .hand(-7.5)] {
@@ -216,7 +216,7 @@ import Testing
                     "\(what): \(twice.left.count) of \(left), \(twice.right.count) of \(right)")
             //? and exported so, 84 an ear: refused, as any file over 74 is
             let again = APOWriter.export(after.output(Self.airpods.key)!, in: after, whole: true, day: "2026-11-13")
-            guard case .failure(let refusal) = APOReader.read(Data(again.utf8)) else {
+            guard case .failure(let refusal) = APOReader.read(Data(again.utf8), device: .iPhone) else {
                 Issue.record("\(what): 84 an ear read back")
                 return
             }
@@ -305,7 +305,7 @@ import Testing
             #expect(reading.filters.count == shared + left + right)
         }
         for (shared, left, right, most) in [(75, 0, 0, 75), (70, 4, 5, 75), (0, 74, 75, 75), (74, 1, 0, 75), (90, 0, 0, 90)] {
-            guard case .failure(let refusal) = APOReader.read(Data(file(shared: shared, left: left, right: right).utf8)) else {
+            guard case .failure(let refusal) = APOReader.read(Data(file(shared: shared, left: left, right: right).utf8), device: .iPhone) else {
                 Issue.record("\(shared) + \(left) + \(right) read")
                 continue
             }

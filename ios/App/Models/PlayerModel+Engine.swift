@@ -209,7 +209,7 @@ final class PlayerEngineLink: EngineLink {
                 } else if !reach.online, files.cache.reusable(song) == nil {
                     // deadwax out of reach, and no whole copy kept from streaming: not asked for at all - the model
                     // passes over it (OfflinePlay)
-                    throw AudioFailure("Not on this phone, and deadwax can't be reached.", kind: .network)
+                    throw AudioFailure(DownloadWords.notHereUnreached(Platform.device), kind: .network)
                 } else {
                     guard let client = box.client else {
                         throw AudioFailure("There's no deadwax address to stream the song from.", kind: .other)

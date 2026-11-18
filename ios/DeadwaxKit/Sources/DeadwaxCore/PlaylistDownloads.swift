@@ -489,10 +489,10 @@ public enum PlaylistDownloadWords {
     /// A downloaded playlist's hero line: the album's line (DownloadWords.albumLine) while its songs come or some didn't,
     /// and `playsOffline` once they are all here (`smartKept` for a smart one); not downloaded, a smart playlist's
     /// `smartOnline`, else none.
-    public static func heroLine(_ state: AlbumDownload?, smart: Bool = false) -> String? {
+    public static func heroLine(_ state: AlbumDownload?, smart: Bool = false, device: Device) -> String? {
         guard let state else { return smart ? smartOnline : nil }
         if case .downloaded = state { return smart ? smartKept : playsOffline }
-        return DownloadWords.albumLine(state)
+        return DownloadWords.albumLine(state, device: device)
     }
     /// The Library's On this phone place, and its screen's title.
     public static let place = "Downloaded playlists"
@@ -503,34 +503,34 @@ public enum PlaylistDownloadWords {
     public static let offlineDownloaded = "Your downloaded playlists - the rest show once deadwax is back."
 
     /// Downloading's row: what its songs wait for (a wait a setting or the room causes), else "3 of 12 songs to go".
-    public static func downloadingRow(_ progress: PlaylistDownloads.Progress, wait: DownloadWait?) -> String {
-        if let wait, wait != .queued { return DownloadWords.wait(wait) }
+    public static func downloadingRow(_ progress: PlaylistDownloads.Progress, wait: DownloadWait?, device: Device) -> String {
+        if let wait, wait != .queued { return DownloadWords.wait(wait, device: device) }
         let of = "\(UpNextWords.grouped(progress.of)) \(progress.of == 1 ? "song" : "songs")"
         return "\(UpNextWords.grouped(progress.toGo)) of \(of) to go"
     }
 
     /// Spoken: "Late night, 3 of 12 songs to go, 40 percent".
-    public static func downloadingSpoken(_ name: String, _ progress: PlaylistDownloads.Progress, wait: DownloadWait?)
-        -> String {
-        "\(name), \(downloadingRow(progress, wait: wait)), \(DownloadWords.percent(progress.fraction))"
+    public static func downloadingSpoken(_ name: String, _ progress: PlaylistDownloads.Progress, wait: DownloadWait?,
+                                         device: Device) -> String {
+        "\(name), \(downloadingRow(progress, wait: wait, device: device)), \(DownloadWords.percent(progress.fraction))"
     }
 
     /// A place row's count, spoken: "1 playlist", "3 playlists".
     public static func count(_ n: Int) -> String { "\(UpNextWords.grouped(n)) \(n == 1 ? "playlist" : "playlists")" }
 
     /// Remove All's dialog, with playlists downloaded: they go too (nil for none).
-    public static func removeAllToo(playlists n: Int) -> String? {
+    public static func removeAllToo(playlists n: Int, device: Device) -> String? {
         guard n > 0 else { return nil }
-        if n == 1 { return "Your downloaded playlist goes from this phone too - it stays in your playlists." }
-        return "Your \(UpNextWords.grouped(n)) downloaded playlists go from this phone too - they stay in your playlists."
+        if n == 1 { return "Your downloaded playlist goes from this \(device.noun) too - it stays in your playlists." }
+        return "Your \(UpNextWords.grouped(n)) downloaded playlists go from this \(device.noun) too - they stay in your playlists."
     }
 
-    /// Every line, for the vocabulary's test.
-    public static var everyLine: [String] {
+    /// Every line, as `device` says it, for the vocabulary's test.
+    public static func everyLine(_ device: Device) -> [String] {
         let progress = PlaylistDownloads.Progress(toGo: 3, of: 12)
         return [downloadedWith("Late night"), playsOffline, smartOnline, smartKept, place, noneYet, noneYetHow, offlineDownloaded,
-                downloadingRow(progress, wait: nil), downloadingRow(progress, wait: .wifi),
-                downloadingSpoken("Late night", progress, wait: nil), count(1), count(3),
-                removeAllToo(playlists: 1) ?? "", removeAllToo(playlists: 3) ?? ""]
+                downloadingRow(progress, wait: nil, device: device), downloadingRow(progress, wait: .wifi, device: device),
+                downloadingSpoken("Late night", progress, wait: nil, device: device), count(1), count(3),
+                removeAllToo(playlists: 1, device: device) ?? "", removeAllToo(playlists: 3, device: device) ?? ""]
     }
 }

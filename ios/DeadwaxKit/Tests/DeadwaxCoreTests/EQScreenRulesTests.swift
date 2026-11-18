@@ -7,10 +7,10 @@ import Testing
 /// slider's drag and steps, and Info's and Debug's rows.
 @Suite struct EQScreenRulesTests {
     static let airpods = EQOutputs.output(EQRoutePort(port: .bluetoothA2DP, portType: "BluetoothA2DPOutput",
-                                                      name: "James's AirPods Pro", uid: "60:F8:1D:01-tacl"))
-    static let car = EQOutputs.output(EQRoutePort(port: .carAudio, portType: "CarAudio", name: "Golf", uid: "car-1"))
-    static let kitchen = EQOutputs.output(EQRoutePort(port: .airPlay, portType: "AirPlay", name: "Kitchen", uid: "ap-1"))
-    static let speaker = EQOutputs.speaker
+                                                      name: "James's AirPods Pro", uid: "60:F8:1D:01-tacl"), device: .iPhone)
+    static let car = EQOutputs.output(EQRoutePort(port: .carAudio, portType: "CarAudio", name: "Golf", uid: "car-1"), device: .iPhone)
+    static let kitchen = EQOutputs.output(EQRoutePort(port: .airPlay, portType: "AirPlay", name: "Kitchen", uid: "ap-1"), device: .iPhone)
+    static let speaker = EQOutputs.speaker(.iPhone)
 
     // MARK: which output a page shows (3.2; 8, question 30)
 
@@ -248,50 +248,50 @@ import Testing
         s.met(Self.airpods, at: "2026-11-12T10:00:00Z")
         s.met(Self.car, at: "2026-11-10T08:00:00Z")
         s.met(Self.kitchen, at: "2026-11-12T10:00:00Z")
-        let others = EQScreenRules.others(s, shown: Self.airpods.key).map(\.key)
+        let others = EQScreenRules.others(s, shown: Self.airpods.key, device: .iPhone).map(\.key)
         #expect(others == [Self.kitchen.key, Self.car.key, "speaker"])
         //? the AirPods and the Kitchen were last the output at the same moment: by name, "James's…" before "Kitchen"
-        let fromCar = EQScreenRules.others(s, shown: Self.car.key).map(\.key)
+        let fromCar = EQScreenRules.others(s, shown: Self.car.key, device: .iPhone).map(\.key)
         #expect(fromCar == [Self.airpods.key, Self.kitchen.key, "speaker"])
         //? the speaker met takes its place by when
         s.met(Self.speaker, at: "2026-11-11T00:00:00Z")
-        #expect(EQScreenRules.others(s, shown: Self.airpods.key).map(\.key) == [Self.kitchen.key, "speaker", Self.car.key])
+        #expect(EQScreenRules.others(s, shown: Self.airpods.key, device: .iPhone).map(\.key) == [Self.kitchen.key, "speaker", Self.car.key])
         //? on the speaker's own page, no speaker
-        #expect(!EQScreenRules.others(s, shown: "speaker").contains { $0.key == "speaker" })
+        #expect(!EQScreenRules.others(s, shown: "speaker", device: .iPhone).contains { $0.key == "speaker" })
         //? a rename sorts by the name shown
         s.rename(Self.kitchen.key, to: "Attic")
-        #expect(EQScreenRules.others(s, shown: Self.car.key).map(\.key).prefix(2) == [Self.kitchen.key, Self.airpods.key])
+        #expect(EQScreenRules.others(s, shown: Self.car.key, device: .iPhone).map(\.key).prefix(2) == [Self.kitchen.key, Self.airpods.key])
     }
 
     /// The line under the curve, state by state (3.3).
     @Test func theLineUnderTheCurve() {
         typealias R = EQScreenRules
-        #expect(R.line(on: false, identity: true, preamp: .automatic, played: 0, top: 0, unitNotMade: false)
+        #expect(R.line(on: false, identity: true, preamp: .automatic, played: 0, top: 0, unitNotMade: false, device: .iPhone)
                 == EQLine("Off: nothing changes the sound."))
-        #expect(R.line(on: true, identity: true, preamp: .automatic, played: 0, top: 0, unitNotMade: false)
+        #expect(R.line(on: true, identity: true, preamp: .automatic, played: 0, top: 0, unitNotMade: false, device: .iPhone)
                 == EQLine("Flat: nothing changes the sound yet."))
-        #expect(R.line(on: true, identity: false, preamp: .automatic, played: -4.2, top: 4.2, unitNotMade: false)
+        #expect(R.line(on: true, identity: false, preamp: .automatic, played: -4.2, top: 4.2, unitNotMade: false, device: .iPhone)
                 == EQLine("Preamp -4.2 dB, so loud songs don't clip."))
         //? a curve that only cuts: the automatic preamp is 0, and the line says so plainly (back-home 15a) - the
         //  smallest boost takes a tenth off, and says the preamp
-        #expect(R.line(on: true, identity: false, preamp: .automatic, played: 0, top: 0, unitNotMade: false)
+        #expect(R.line(on: true, identity: false, preamp: .automatic, played: 0, top: 0, unitNotMade: false, device: .iPhone)
                 == EQLine("Cuts only: nothing gets louder."))
-        #expect(R.line(on: true, identity: false, preamp: .automatic, played: -0.0, top: -3, unitNotMade: false)
+        #expect(R.line(on: true, identity: false, preamp: .automatic, played: -0.0, top: -3, unitNotMade: false, device: .iPhone)
                 == EQLine("Cuts only: nothing gets louder."))
-        #expect(R.line(on: true, identity: false, preamp: .automatic, played: -0.1, top: 0.01, unitNotMade: false)
+        #expect(R.line(on: true, identity: false, preamp: .automatic, played: -0.1, top: 0.01, unitNotMade: false, device: .iPhone)
                 == EQLine("Preamp -0.1 dB, so loud songs don't clip."))
         //? set by hand at 0, it is yours, and said as yours
-        #expect(R.line(on: true, identity: false, preamp: .hand(0), played: 0, top: 0, unitNotMade: false)
+        #expect(R.line(on: true, identity: false, preamp: .hand(0), played: 0, top: 0, unitNotMade: false, device: .iPhone)
                 == EQLine("Preamp 0.0 dB, set by you."))
-        #expect(R.line(on: true, identity: false, preamp: .hand(-6), played: -6, top: 5, unitNotMade: false)
+        #expect(R.line(on: true, identity: false, preamp: .hand(-6), played: -6, top: 5, unitNotMade: false, device: .iPhone)
                 == EQLine("Preamp -6.0 dB, set by you."))
-        #expect(R.line(on: true, identity: false, preamp: .hand(-3.6), played: -3.6, top: 6, unitNotMade: false)
+        #expect(R.line(on: true, identity: false, preamp: .hand(-3.6), played: -3.6, top: 6, unitNotMade: false, device: .iPhone)
                 == EQLine("Loud songs may clip: the curve boosts 2.4 dB more than this preamp takes away.", .amber))
         //? a preamp taking away exactly the curve's top is enough; a tenth less is not
-        #expect(R.line(on: true, identity: false, preamp: .hand(-6), played: -6, top: 6, unitNotMade: false).tone == .quiet)
-        #expect(R.line(on: true, identity: false, preamp: .hand(-6), played: -6, top: 6.1, unitNotMade: false).tone == .amber)
+        #expect(R.line(on: true, identity: false, preamp: .hand(-6), played: -6, top: 6, unitNotMade: false, device: .iPhone).tone == .quiet)
+        #expect(R.line(on: true, identity: false, preamp: .hand(-6), played: -6, top: 6.1, unitNotMade: false, device: .iPhone).tone == .amber)
         //? the unit not made says so before anything - Off included
-        #expect(R.line(on: false, identity: true, preamp: .automatic, played: 0, top: 0, unitNotMade: true).tone == .danger)
+        #expect(R.line(on: false, identity: true, preamp: .automatic, played: 0, top: 0, unitNotMade: true, device: .iPhone).tone == .danger)
     }
 
     /// back-home 15a, from the presets themselves: each that only cuts (Bass Reduce, Treble Reduce) plays at an
@@ -302,7 +302,7 @@ import Testing
                 let bank = EQBank.make(rate: rate, key: "k", version: 0, on: true, correction: [], offsets: .zero,
                                        bands: preset.gains, preamp: nil)
                 let line = EQScreenRules.line(on: true, identity: bank.isIdentity, preamp: .automatic,
-                                              played: bank.preamp, top: 0, unitNotMade: false)
+                                              played: bank.preamp, top: 0, unitNotMade: false, device: .iPhone)
                 let cuts = preset.gains.allSatisfy { $0 <= 0 }
                 #expect(cuts == ["bassReduce", "trebleReduce"].contains(preset.id))
                 #expect((bank.preamp == 0) == cuts, "\(preset.id) at \(rate): \(bank.preamp)")
@@ -436,21 +436,21 @@ import Testing
         s.met(Self.airpods, at: "2026-11-12T10:00:00Z")
         s.rename(Self.airpods.key, to: "Pods")
         //? kept: as kept, yours from Rename, playing or not
-        #expect(R.output(Self.airpods.key, route: Self.airpods, in: s, lastDrawn: nil).name == "Pods")
-        #expect(R.output(Self.airpods.key, route: Self.car, in: s, lastDrawn: nil).name == "Pods")
+        #expect(R.output(Self.airpods.key, route: Self.airpods, in: s, lastDrawn: nil, device: .iPhone).name == "Pods")
+        #expect(R.output(Self.airpods.key, route: Self.car, in: s, lastDrawn: nil, device: .iPhone).name == "Pods")
         //? the output now before it is kept, and the speaker never met
-        #expect(R.output(Self.car.key, route: Self.car, in: s, lastDrawn: nil) == Self.car)
-        #expect(R.output("speaker", route: Self.car, in: s, lastDrawn: nil) == Self.speaker)
+        #expect(R.output(Self.car.key, route: Self.car, in: s, lastDrawn: nil, device: .iPhone) == Self.car)
+        #expect(R.output("speaker", route: Self.car, in: s, lastDrawn: nil, device: .iPhone) == Self.speaker)
         //? forgotten while a page bound to it is up: as that page last drew it - never the car, which plays now
-        let drawn = R.output(Self.airpods.key, route: Self.airpods, in: s, lastDrawn: nil)
+        let drawn = R.output(Self.airpods.key, route: Self.airpods, in: s, lastDrawn: nil, device: .iPhone)
         s.forget(Self.airpods.key)
         s.met(Self.car, at: "2026-11-12T11:00:00Z")
-        #expect(R.output(Self.airpods.key, route: Self.car, in: s, lastDrawn: drawn) == drawn)
-        #expect(R.output(Self.airpods.key, route: Self.car, in: s, lastDrawn: Self.kitchen).key == Self.airpods.key)
-        let unknown = R.output(Self.airpods.key, route: Self.car, in: s, lastDrawn: nil)
+        #expect(R.output(Self.airpods.key, route: Self.car, in: s, lastDrawn: drawn, device: .iPhone) == drawn)
+        #expect(R.output(Self.airpods.key, route: Self.car, in: s, lastDrawn: Self.kitchen, device: .iPhone).key == Self.airpods.key)
+        let unknown = R.output(Self.airpods.key, route: Self.car, in: s, lastDrawn: nil, device: .iPhone)
         #expect(unknown.key == Self.airpods.key && unknown.name == Self.airpods.key)
         //? and a slider moved on that page changes its own setting, not the car's
-        s.setBand(0, to: 6, for: R.output(Self.airpods.key, route: Self.car, in: s, lastDrawn: drawn))
+        s.setBand(0, to: 6, for: R.output(Self.airpods.key, route: Self.car, in: s, lastDrawn: drawn, device: .iPhone))
         #expect(s.output(Self.car.key)?.on == false && s.output(Self.car.key)?.tone == .preset("flat"))
         #expect(s.output(Self.airpods.key)?.on == true)
     }

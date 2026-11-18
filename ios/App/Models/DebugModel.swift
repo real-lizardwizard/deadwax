@@ -40,7 +40,7 @@ final class DebugModel {
         self.server = server
         self.player = player
         self.downloads = downloads
-        installLine = InstallExpiry.line(expiration: Self.profile()?.expiration, now: Date())
+        installLine = InstallExpiry.line(expiration: Self.profile()?.expiration, now: Date(), device: Platform.device)
     }
 
     /// The app's own provisioning profile: how long this install runs.

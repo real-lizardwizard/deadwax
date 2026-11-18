@@ -69,7 +69,7 @@ struct YouView: View {
                         }
                     }
                     NavigationLink(value: AppRoute.thisPhone) {
-                        LabeledContent(YouWords.thisPhone) {
+                        LabeledContent(YouWords.thisDevice(Platform.device)) {
                             Text(server.address?.host ?? "")
                                 .font(Typeface.mono(.body))
                                 .lineLimit(1)

@@ -535,12 +535,13 @@ extension DeadwaxClient {
             opened = try await streaming.lines(for: built)
         } catch {
             if APIFailure.isCancellation(error) { throw CancellationError() }
-            throw APIFailure.noAnswer(error, to: built, server: server)
+            throw APIFailure.noAnswer(error, to: built, server: server, device: device)
         }
         guard opened.response.status == 200 else { throw failure(opened.response, to: built) }
         let type = opened.response.header("Content-Type")
         guard EventStream.isStream(type) else { throw EventStream.NotTheStream(contentType: type) }
         let server = self.server
+        let device = self.device
         let sent = built
         let lines = opened.lines
         return AsyncThrowingStream { (continuation: AsyncThrowingStream<EventStream.Frame, any Error>.Continuation) in
@@ -553,7 +554,7 @@ extension DeadwaxClient {
                     continuation.finish()
                 } catch {
                     continuation.finish(throwing: APIFailure.isCancellation(error)
-                                        ? CancellationError() : APIFailure.noAnswer(error, to: sent, server: server))
+                                        ? CancellationError() : APIFailure.noAnswer(error, to: sent, server: server, device: device))
                 }
             }
             continuation.onTermination = { _ in reading.cancel() }

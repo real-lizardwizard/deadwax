@@ -38,9 +38,9 @@ struct DownloadsFooter: View {
             (AutoDownloadWords.youFooter(downloads.follower.scope ?? AlbumScope.albums(for: server.me), progress), false)
         }
         let footer: (text: String, amber: Bool)? = downloads.storeProblem != nil
-            ? (DownloadWords.storeUnreadable, true)
+            ? (DownloadWords.storeUnreadable(Platform.device), true)
             : DownloadWords.youFooter(fetching: summary.fetching, toGo: summary.toGo, firstWait: summary.firstWait,
-                                      failed: summary.failed) ?? library
+                                      failed: summary.failed, device: Platform.device) ?? library
         if let footer {
             Text(footer.text)
                 .foregroundStyle(footer.amber ? Palette.amber : Palette.quiet)

@@ -29,7 +29,7 @@ import Testing
 
     @Test func youNowPlayingAndInfo() {
         #expect(W.You.row == "EQ")
-        #expect(W.You.footer == "Each output keeps its own EQ - your headphones, the speaker, the car - and the EQ switches by itself when the output changes. This is kept on this phone.")
+        #expect(W.You.footer(.iPhone) == "Each output keeps its own EQ - your headphones, the speaker, the car - and the EQ switches by itself when the output changes. This is kept on this phone.")
         let s = Self.settings
         func short(_ on: Bool, _ c: EQCorrection?, _ t: EQTone) -> String { W.shortSetting(Self.output(on: on, correction: c, tone: t), in: s) }
         var file = Self.autoeq
@@ -75,7 +75,7 @@ import Testing
         #expect(W.Screen.hand(-6, top: 8.4) == "Loud songs may clip: the curve boosts 2.4 dB more than this preamp takes away.")
         #expect(W.Screen.hand(-6, top: 6.01) == "Loud songs may clip: the curve boosts 0.1 dB more than this preamp takes away.")
         #expect(W.Screen.notConnectedLine == "Not connected: this is what it plays when it is.")
-        #expect(W.Screen.unitNotMade == "The EQ can't play on this phone just now, so the sound is as it is. Closing deadwax and opening it again may help.")
+        #expect(W.Screen.unitNotMade(.iPhone) == "The EQ can't play on this phone just now, so the sound is as it is. Closing deadwax and opening it again may help.")
         #expect(W.Screen.fallback == "The EQ comes in after a moment's pause.")
         #expect(W.Screen.gainLabels == ["+12", "0", "-12"] && W.Screen.frequencyLabels == ["100", "1k", "10k"])
         #expect(W.Screen.left == "Left" && W.Screen.right == "Right")
@@ -98,8 +98,8 @@ import Testing
         #expect(c.value(nil) == "None" && c.value(Self.autoeq) == "Apple AirPods Pro" && c.value(built) == "Your own filters")
         #expect(c.headphonesFooter == "Evens out what these headphones do to the sound, so they sound neutral. Your tone goes on top.")
         #expect(c.otherFooter == "Evens out what this output does to the sound. Your tone goes on top.")
-        #expect(c.footer(EQOutputs.speaker) == c.otherFooter)
-        #expect(c.footer(EQOutputs.output(EQRoutePort(port: .headphones, portType: "", name: "", uid: ""))) == c.headphonesFooter)
+        #expect(c.footer(EQOutputs.speaker(.iPhone)) == c.otherFooter)
+        #expect(c.footer(EQOutputs.output(EQRoutePort(port: .headphones, portType: "", name: "", uid: ""), device: .iPhone)) == c.headphonesFooter)
         #expect(c.suggestion("Apple AirPods Pro") == "AutoEq has a correction for Apple AirPods Pro")
         #expect(c.measuredBy("crinacle") == "Measured by crinacle")
         #expect(c.suggestions("AirPods Pro") == "AutoEq has corrections for AirPods Pro")
@@ -202,7 +202,7 @@ import Testing
 
     @Test func importsWords() throws {
         let i = W.Import.self
-        #expect(i.fromFiles == "Import from Files…" && i.importButton == "Import" && i.cancel == "Cancel")
+        #expect(i.fromFiles(.iPhone) == "Import from Files…" && i.importButton == "Import" && i.cancel == "Cancel")
         #expect(i.from(file: "HD650 ParametricEQ.txt") == "From \"HD650 ParametricEQ.txt\"")
         #expect(i.fromClipboard == "From the clipboard" && i.forLabel == "For" && i.skipped == "Skipped")
         #expect(i.refusedTitle == "Can't import this file" && i.done == "Done")
@@ -235,7 +235,7 @@ import Testing
             "deadwax EQ for Headphones, 2026-11-12", "Correction: From Wavelet.txt, converted", "Converted from a GraphicEQ curve"])
 
         //? the whole curve: the correction by frequency, the tone's bands, the preamp as it plays - read back the same
-        guard case .success(let reading) = APOReader.read(try Fixtures.data("eq/autoeq/results/crinacle/711 in-ear/Apple AirPods Pro/Apple AirPods Pro ParametricEQ.txt")) else {
+        guard case .success(let reading) = APOReader.read(try Fixtures.data("eq/autoeq/results/crinacle/711 in-ear/Apple AirPods Pro/Apple AirPods Pro ParametricEQ.txt"), device: .iPhone) else {
             Issue.record("refused")
             return
         }
@@ -266,7 +266,7 @@ import Testing
             Filter 14: ON PK Fc 250 Hz Gain 1.0 dB Q 1.41
 
             """)
-        guard case .success(let back) = APOReader.read(Data(whole.utf8)) else {
+        guard case .success(let back) = APOReader.read(Data(whole.utf8), device: .iPhone) else {
             Issue.record("refused")
             return
         }
@@ -285,7 +285,7 @@ import Testing
 
     @Test func outputsAndVoiceOver() {
         let o = W.Outputs.self
-        #expect(o.speaker == "iPhone speaker" && o.headphones == "Headphones" && o.others == "Other outputs")
+        #expect(o.speaker(.iPhone) == "iPhone speaker" && o.headphones == "Headphones" && o.others == "Other outputs")
         #expect(o.renameTitle == "Rename Output" && o.rename == "Rename" && o.forget == "Forget" && o.forgetThis == "Forget This Output")
         #expect(o.forgetQuestion("James's AirPods Pro") == "Forget James's AirPods Pro? Its EQ is deleted. It starts Off next time it connects.")
         #expect(o.cancel == "Cancel" && o.save == "Save")

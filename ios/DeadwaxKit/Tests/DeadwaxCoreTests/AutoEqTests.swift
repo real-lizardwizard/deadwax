@@ -221,7 +221,7 @@ enum AutoEqAnswers {
 
     @Test func aProfileIsReadToItsCorrection() throws {
         let airpods = try AutoEqAnswers.profile("crinacle's AirPods Pro")
-        let c = try airpods.correction().get()
+        let c = try airpods.correction(.iPhone).get()
         #expect(c.kind == .autoeq && c.id == airpods.id && c.name == "Apple AirPods Pro")
         #expect(c.source == "crinacle" && c.rig == "711" && c.form == "in-ear")
         #expect(c.text == airpods.text)
@@ -229,12 +229,12 @@ enum AutoEqAnswers {
         #expect(c.preamp.all == -6.0)
         #expect(!c.changed && !c.converted)
         #expect(EQWords.Correction.source(c) == "AutoEq, measured by crinacle")
-        let hd650 = try AutoEqAnswers.profile("oratory1990's HD 650").correction().get()
+        let hd650 = try AutoEqAnswers.profile("oratory1990's HD 650").correction(.iPhone).get()
         #expect(hd650.filters.count == 10 && hd650.preamp.all == -6.1 && hd650.rig == nil)
         // a file the reader refuses is the reader's refusal, not a correction
         let broken = AutoEqProfile(id: "0123456789abcdef", name: "X", source: "Y", rig: nil, form: nil,
                                    text: "IIR: 1 2 3 4 5 6")
-        #expect(throws: APORefusal.self) { try broken.correction().get() }
+        #expect(throws: APORefusal.self) { try broken.correction(.iPhone).get() }
     }
 }
 
@@ -419,7 +419,7 @@ enum AutoEqAnswers {
         #expect(EQSuggestionRules.asks(airpods, setting))
         // gone once there's a correction
         let profile = try AutoEqAnswers.profile("crinacle's AirPods Pro")
-        setting.correction = try profile.correction().get()
+        setting.correction = try profile.correction(.iPhone).get()
         #expect(!EQSuggestionRules.asks(airpods, setting))
         // the speaker, a car, AirPlay, wired: never asked (8, question 20)
         for port in [EQPort.builtInSpeaker, .carAudio, .airPlay, .headphones, .hdmi] {
@@ -438,7 +438,7 @@ enum AutoEqAnswers {
 
     @Test func usingAProfileIsTheCorrectionAndTurnsTheEQOn() throws {
         let profile = try AutoEqAnswers.profile("crinacle's AirPods Pro")
-        let correction = try profile.correction().get()
+        let correction = try profile.correction(.iPhone).get()
         var settings = EQSettings()
         // never met: given its setting first, Off - and using turns it on
         let changed1 = settings.use(correction, for: Self.airpods)
@@ -508,7 +508,7 @@ enum AutoEqAnswers {
     }
 
     @Test func aProfilesCurveIsTheCorrectionAloneAt48kHz() throws {
-        let correction = try AutoEqAnswers.profile("crinacle's AirPods Pro").correction().get()
+        let correction = try AutoEqAnswers.profile("crinacle's AirPods Pro").correction(.iPhone).get()
         var settings = EQSettings()
         // the output's own setting - Bass Boost, Off, a preamp by hand - changes nothing on the profile's page
         settings.choose(.preset("bassBoost"), for: Self.airpods)

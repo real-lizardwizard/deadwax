@@ -8,8 +8,8 @@ import Testing
 /// "Use Q instead".
 @Suite struct EQAdvancedTests {
     static let airpods = EQOutputs.output(EQRoutePort(port: .bluetoothA2DP, portType: "BluetoothA2DPOutput",
-                                                      name: "James's AirPods Pro", uid: "60:F8:1D:01-tacl"))
-    static let speaker = EQOutputs.speaker
+                                                      name: "James's AirPods Pro", uid: "60:F8:1D:01-tacl"), device: .iPhone)
+    static let speaker = EQOutputs.speaker(.iPhone)
 
     static func peak(_ id: Int, _ fc: Double, _ gain: Double = 3, q: Double = 1, channel: EQChannel = .all,
                      on: Bool = true) -> EQFilter {
@@ -24,7 +24,7 @@ import Testing
     static func autoEq() throws -> EQCorrection {
         let path = "eq/autoeq/results/crinacle/711 in-ear/Apple AirPods Pro/Apple AirPods Pro ParametricEQ.txt"
         let data = try Fixtures.data(path)
-        guard case .success(let reading) = APOReader.read(data) else { throw Failure.unread }
+        guard case .success(let reading) = APOReader.read(data, device: .iPhone) else { throw Failure.unread }
         return EQCorrection.autoeq(id: "crinacle/711 in-ear/Apple AirPods Pro", name: "Apple AirPods Pro",
                                    source: "crinacle", rig: "711", form: "in-ear",
                                    text: String(decoding: data, as: UTF8.self), reading: reading)
@@ -95,7 +95,7 @@ import Testing
         let lines = (1...70).map { (i: Int) -> String in "Filter \(i): ON PK Fc \(20 * i + 30) Hz Gain 1.0 dB Q 2.00" }
             + ["Channel: L"] + (71...74).map { (i: Int) -> String in "Filter \(i): ON PK Fc \(1000 * (i - 69)) Hz Gain -1.0 dB Q 2.00" }
         let text = "Preamp: -1.0 dB\n" + lines.joined(separator: "\n") + "\n"
-        guard case .success(let reading) = APOReader.read(Data(text.utf8)) else {
+        guard case .success(let reading) = APOReader.read(Data(text.utf8), device: .iPhone) else {
             Issue.record("74 for the left, 70 for the right, refused")
             return
         }
@@ -186,7 +186,7 @@ import Testing
         settings.addFilter(for: Self.airpods)
         edited = settings.output(Self.airpods.key)!.correction!
         #expect(edited.filters.count == 10 && edited.changed)
-        #expect(settings.backToAutoEq(for: Self.airpods) == false)
+        #expect(settings.backToAutoEq(for: Self.airpods, device: .iPhone) == false)
         #expect(settings.output(Self.airpods.key)?.correction == original)
         // nothing to go back to now, nor for a file
         #expect(!EQAdvancedRules.goesBack(original))
@@ -625,7 +625,7 @@ import Testing
     /// eq.json keeps it. Your own filters are never "changed".
     @Test func anEditMarksAFileChanged() throws {
         let text = "Preamp: -6.4 dB\nFilter 1: ON PK Fc 1000 Hz Gain 6 dB Q 1\nFilter 2: ON LSC Fc 105 Hz Gain 2.6 dB Q 0.7\n"
-        guard case .success(let reading) = APOReader.read(Data(text.utf8)) else {
+        guard case .success(let reading) = APOReader.read(Data(text.utf8), device: .iPhone) else {
             Issue.record("refused")
             return
         }
@@ -651,7 +651,7 @@ import Testing
                 #expect(EQWords.Correction.source(edited) == said, "\(way)")
                 #expect(EQWords.Correction.value(edited) == EQWords.Correction.value(c), "\(way)")
                 #expect(!EQAdvancedRules.goesBack(edited))
-                #expect(settings.backToAutoEq(for: Self.airpods) == false)
+                #expect(settings.backToAutoEq(for: Self.airpods, device: .iPhone) == false)
                 //? kept in eq.json
                 let kept = try JSONDecoder().decode(EQSettings.self, from: try JSONEncoder().encode(settings))
                 #expect(kept.output(Self.airpods.key)?.correction?.changed == true)
@@ -699,7 +699,7 @@ import Testing
     /// by its corner keeps its corner. Exported and read again, each plays as it did.
     @Test func aShelfGivenAWidthPlaysTheSameExported() throws {
         let text = "Filter: ON LS Fc 100 Hz Gain 6 dB\nFilter: ON HS Fc 8000 Hz Gain -4 dB\nFilter: ON LS Fc 200 Hz Gain 3 dB Q 0.7\n"
-        guard case .success(let reading) = APOReader.read(Data(text.utf8)) else { throw Failure.unread }
+        guard case .success(let reading) = APOReader.read(Data(text.utf8), device: .iPhone) else { throw Failure.unread }
         var settings = Self.settings(EQImportRules.correction(name: "a.txt", text: text, reading: reading))
         let ids = reading.filters.map(\.id)
         let stepped = try #require(EQEditorRules.stepped(reading.filters[0], .q, up: true))
@@ -710,7 +710,7 @@ import Testing
         #expect(filters.map(\.written) == ["LSC", "HSC", "LS"] && filters.map(\.corner) == [false, false, true])
         #expect(filters[0].f0 == 100 && filters[1].f0 == 8000)
         let file = APOWriter.write(filters: filters, preamp: .zero)
-        guard case .success(let back) = APOReader.read(Data(file.utf8)) else { throw Failure.unread }
+        guard case .success(let back) = APOReader.read(Data(file.utf8), device: .iPhone) else { throw Failure.unread }
         #expect(back.filters.count == 3)
         for (mine, read) in zip(filters, back.filters) {
             #expect(mine.f0 == read.f0, "\(file)")
@@ -761,7 +761,7 @@ import Testing
         #expect(EQAdvancedRules.takes(EQFilter(id: 3, kind: .lowPass, fc: 100, width: .q(0))))
         // a band pass's gain plays nothing, and a file's of 45 dB is kept: it can still be switched off
         let file = "Filter: ON BP Fc 1000 Hz Gain 45 dB Q 2"
-        guard case .success(let reading) = APOReader.read(Data(file.utf8)) else {
+        guard case .success(let reading) = APOReader.read(Data(file.utf8), device: .iPhone) else {
             Issue.record("a band pass's gain is kept as written")
             return
         }
@@ -775,12 +775,12 @@ import Testing
     @Test func everyFilterAFileGivesCanBeEdited() throws {
         var filters: [EQFilter] = []
         for c in try EQFixtures.apo().readings {
-            if case .success(let reading) = APOReader.read(try EQFixtures.bytes(of: c), pasted: c.pasted) {
+            if case .success(let reading) = APOReader.read(try EQFixtures.bytes(of: c), pasted: c.pasted, device: .iPhone) {
                 filters += reading.filters
             }
         }
         for profile in try EQFixtures.profiles().profiles {
-            if case .success(let reading) = APOReader.read(try Fixtures.data("eq/\(profile.path)")) {
+            if case .success(let reading) = APOReader.read(try Fixtures.data("eq/\(profile.path)"), device: .iPhone) {
                 filters += reading.filters
             }
         }

@@ -37,7 +37,7 @@ PAGES = [
     ("gettingAlbums", "GettingAlbumsPage", "RequestWords.gettingAlbums", GETTING),
     ("playback", "PlaybackPage", "YouWords.playback", PLAYBACK),
     ("account", "AccountPage", "YouWords.account", ACCOUNT),
-    ("thisPhone", "ThisPhonePage", "YouWords.thisPhone", THIS_PHONE),
+    ("thisPhone", "ThisPhonePage", "YouWords.thisDevice(Platform.device)", THIS_PHONE),
     ("about", "AboutPage", "YouWords.about", ROOT),
 ]
 
@@ -147,7 +147,7 @@ def test_the_root_is_the_headline_then_rows_that_open_pages():
     assert "} footer: {" in group and "DownloadsFooter()" in group.split("} footer: {", 1)[1]
     # the values at the right: the server's host, the app's version - both the data face
     this_phone = root[root.index("AppRoute.thisPhone"):root.index("AppRoute.about")]
-    assert "LabeledContent(YouWords.thisPhone)" in this_phone and "server.address?.host" in this_phone
+    assert "LabeledContent(YouWords.thisDevice(Platform.device))" in this_phone and "server.address?.host" in this_phone
     about = root[root.index("AppRoute.about"):]
     assert "LabeledContent(YouWords.about)" in about and "Text(Self.appVersion)" in about
     assert this_phone.count("Typeface.mono(.body)") == 1 and about.count("Typeface.mono(.body)") == 1
@@ -159,7 +159,7 @@ def test_the_root_is_the_headline_then_rows_that_open_pages():
     row = body(struct(code(DOWNLOADS_ROW), "DownloadsRow"))
     assert "Section" not in row and "NavigationLink(value: AppRoute.downloads)" in row
     footer = body(struct(code(DOWNLOADS_ROW), "DownloadsFooter"))
-    assert "DownloadWords.youFooter(" in footer and "DownloadWords.storeUnreadable" in footer
+    assert "DownloadWords.youFooter(" in footer and "DownloadWords.storeUnreadable(Platform.device)" in footer
 
 
 def test_manage_keeps_its_rules_and_every_row_is_the_apps_own():
@@ -301,11 +301,11 @@ def test_a_choices_own_line_moved_into_its_footer():
     normalization = playback[playback.index("Picker(Normalization.title"):playback.index("EQLink(route: .now)")]
     assert ".accessibilityHint(player.normalization.note)" in normalization
     footer = normalization.split("} footer: {", 1)[1]
-    in_order(footer, ["Text(player.normalization.note)", "Text(YouWords.normalizationNote)", "Text(YouWords.kept)"])
+    in_order(footer, ["Text(player.normalization.note)", "Text(YouWords.normalizationNote)", "Text(YouWords.kept(Platform.device))"])
     downloads = struct(code(DOWNLOADS), "DownloadOverSection")
     assert "let chosen = DownloadWords.over(downloads.downloadOver)" in downloads
     assert ".accessibilityHint(chosen.note)" in downloads
-    in_order(downloads.split("} footer: {", 1)[1], ["Text(chosen.note)", "DownloadWords.overNow(", "DownloadWords.overKept"])
+    in_order(downloads.split("} footer: {", 1)[1], ["Text(chosen.note)", "DownloadWords.overNow(", "DownloadWords.overKept(Platform.device)"])
     # the looks and Getting albums' choices had no line of their own: their footers are as they were
     assert "Text(TurntableWords.lookNote)" in playback
     getting = code(GETTING)

@@ -354,7 +354,8 @@ public enum AlbumInfoWords {
 
     public static let qualityTitle = "Quality"
     public static let albumTitle = "The album"
-    public static let phoneTitle = "On this phone"
+    /// "On this phone", "On this Mac".
+    public static func deviceTitle(_ device: Device) -> String { DownloadWords.onThisDevice(device) }
     public static let releaseTitle = "The release"
     public static let musicBrainzTitle = "MusicBrainz"
     public static let serverTitle = InfoWords.serverTitle
@@ -592,10 +593,11 @@ public enum AlbumInfo {
     /// What this phone holds of the album: "All 10 songs · 412 MB", "3 of 12 songs · 92 MB", "Not downloaded" - and
     /// what is under way (the album page's line: "Downloading - 4 of 12", "Waiting for Wi-Fi", "2 songs didn't
     /// download") under it.
-    public static func onPhone(_ download: AlbumDownload, here: Int, of total: Int, bytes: Int64) -> AlbumInfoRow {
+    public static func onPhone(_ download: AlbumDownload, here: Int, of total: Int, bytes: Int64,
+                               device: Device) -> AlbumInfoRow {
         let moving: String? = {
             switch download {
-            case .downloading, .waiting, .failed: return DownloadWords.albumLine(download)
+            case .downloading, .waiting, .failed: return DownloadWords.albumLine(download, device: device)
             case .none, .partial, .downloaded: return nil
             }
         }()
@@ -840,12 +842,12 @@ public enum AlbumInfo {
     // MARK: the sections
 
     /// What is drawn at once, from the album in hand and this phone: Quality, The album, On this phone.
-    public static func local(album: Album, onPhone: AlbumInfoRow?) -> [AlbumInfoSection] {
+    public static func local(album: Album, onPhone: AlbumInfoRow?, device: Device) -> [AlbumInfoSection] {
         let songs = album.song ?? []
         return [
             AlbumInfoSection(title: AlbumInfoWords.qualityTitle, rows: quality(songs)),
             AlbumInfoSection(title: AlbumInfoWords.albumTitle, rows: theAlbum(album)),
-            AlbumInfoSection(title: AlbumInfoWords.phoneTitle, rows: onPhone.map { [$0] } ?? []),
+            AlbumInfoSection(title: AlbumInfoWords.deviceTitle(device), rows: onPhone.map { [$0] } ?? []),
         ].filter { !$0.rows.isEmpty }
     }
 

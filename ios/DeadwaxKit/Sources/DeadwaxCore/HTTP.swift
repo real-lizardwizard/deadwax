@@ -99,11 +99,19 @@ public func detailWords(_ body: Data, status: Int) -> String {
     return "deadwax answered \(status) and said nothing more."
 }
 
-/// The words for an address that didn't answer, with the two things that cause it on a phone.
-public func unreachableWords(_ address: ServerAddress, reason: String?) -> String {
+/// The words for an address that didn't answer, with the two things that cause it on `device`: not on the network
+/// (a Mac may be on a cable, so its is the home network), and Local Network refused - in the iPhone's Settings, or the
+/// Mac's System Settings (notes/ios.md "The Mac app, slice 4: the Mac's words").
+public func unreachableWords(_ address: ServerAddress, reason: String?, device: Device) -> String {
     var words = "Couldn't reach deadwax at \(address)."
     if let reason, !reason.isEmpty { words += " (\(reason))" }
-    words += " Is the phone on your home Wi-Fi, or on WireGuard? If you said no when asked about the local"
-    words += " network, turn deadwax on in the iPhone's Settings > Privacy & Security > Local Network."
+    switch device {
+    case .iPhone:
+        words += " Is the phone on your home Wi-Fi, or on WireGuard? If you said no when asked about the local"
+        words += " network, turn deadwax on in the iPhone's Settings > Privacy & Security > Local Network."
+    case .mac:
+        words += " Is the Mac on your home network, or on WireGuard? If you said no when asked about the local"
+        words += " network, turn deadwax on in System Settings > Privacy & Security > Local Network."
+    }
     return words
 }

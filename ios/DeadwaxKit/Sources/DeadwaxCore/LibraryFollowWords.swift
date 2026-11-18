@@ -32,7 +32,9 @@ public enum LibraryFollowWords {
     public static let section = "Your library"
     /// (slice 2) Debug shows what Download your library follows; it is turned on and off in Settings > Downloads (the
     /// tab was You until 16 Nov).
-    public static let followNote = "What Download your library follows, what fits on this phone, and the last check. It is turned on and off in Settings > Downloads; the library's log lines are the Downloads section's."
+    public static func followNote(_ device: Device) -> String {
+        "What Download your library follows, what fits on this \(device.noun), and the last check. It is turned on and off in Settings > Downloads; the library's log lines are the Downloads section's."
+    }
     public static let checkNow = "Check now"
     public static let notFollowing = "Off: Download your library is turned off in Settings > Downloads."
     public static let noCheckYet = "No check yet"
@@ -56,12 +58,12 @@ public enum LibraryFollowWords {
     }
 
     /// Why the last list's absences weren't believed: "No", or the reason.
-    public static func held(_ held: LibraryFollow.Held?) -> String {
+    public static func held(_ held: LibraryFollow.Held?, device: Device) -> String {
         switch held {
         case nil:
             return "No"
         case .empty(let kept)?:
-            return "deadwax listed no albums while this phone follows \(count(kept)), so nothing is marked missing."
+            return "deadwax listed no albums while this \(device.noun) follows \(count(kept)), so nothing is marked missing."
         case .drop(let gone, let of)?:
             return "The list left out \(count(gone)) of \(count(of)) albums at once, so nothing is marked missing."
         case .truncated?:
@@ -142,21 +144,21 @@ public enum LibraryFollowWords {
     }
 
     /// "412 of 3,010 fit in 20 GB", "All 3,010 fit in 20 GB", "412 of 3,010 fit on this phone" (No limit).
-    public static func wouldFit(_ plan: LibraryFill.Plan, limit: StorageLimit) -> String {
-        let place = limit.bytes == nil ? "on this phone" : "in \(limit.label)"
+    public static func wouldFit(_ plan: LibraryFill.Plan, limit: StorageLimit, device: Device) -> String {
+        let place = limit.bytes == nil ? "on this \(device.noun)" : "in \(limit.label)"
         if plan.allFit && plan.of > 0 { return "All \(count(plan.of)) fit \(place)" }
         return "\(count(plan.fit)) of \(count(plan.of)) fit \(place)"
     }
 
     /// "They take 19.6 GB · 3 wait for room on the phone · 12 not read yet · 1 kept off" - the counts that are there.
-    public static func fitDetail(_ plan: LibraryFill.Plan) -> String {
+    public static func fitDetail(_ plan: LibraryFill.Plan, device: Device) -> String {
         var parts = ["They take \(Bytes.words(plan.bytes))"]
         let room = plan.count(.room)
         let phone = plan.count(.phoneFull)
         let unread = plan.count(.unread)
         let keptOff = plan.count(.keptOff)
         if room > 0 { parts.append("\(count(room)) over the limit") }
-        if phone > 0 { parts.append("\(count(phone)) wait for room on the phone") }
+        if phone > 0 { parts.append("\(count(phone)) wait for room on the \(device.noun)") }
         if unread > 0 { parts.append("\(count(unread)) not read yet") }
         if keptOff > 0 { parts.append("\(count(keptOff)) kept off") }
         if !plan.giveWay.isEmpty { parts.append("\(count(plan.giveWay.count)) would give way") }
@@ -199,4 +201,14 @@ public enum LibraryFollowWords {
 
     /// The log's line for a read that failed: "library read <id>: <words>".
     public static func readFailed(_ album: String, _ words: String) -> String { "library read \(album): \(words)" }
+
+    /// The log's line for a launch before the device's first unlock, when the settings can't be read.
+    public static func unreadableAtLaunch(_ device: Device) -> String {
+        "background: this launch couldn't read the settings (before the \(device.noun)'s first unlock) - nothing asked"
+    }
+
+    /// The log's line when a plan first finds the device under its reserve.
+    public static func underReserveNoted(_ device: Device) -> String {
+        "library: the \(device.noun) is under its reserve - looked at again in 3 minutes"
+    }
 }

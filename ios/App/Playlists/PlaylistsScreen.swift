@@ -326,7 +326,7 @@ struct PlaylistRow: View {
         .disabled(dimmed)
         .accessibilityElement(children: .combine)
         .accessibilityLabel("\(playlist.name), \(PlaylistRules.rowLine(playlist))")
-        .accessibilityValue(dimmed ? DownloadWords.notOnPhone : "")
+        .accessibilityValue(dimmed ? DownloadWords.notOnDevice(Platform.device) : "")
         // (the Mac app, slice 2) the playlist page's ••• on a right-click; nothing on the iPhone
         .playlistRightClick(PlaylistRoute(playlist))
     }

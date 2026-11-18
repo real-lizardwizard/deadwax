@@ -24,7 +24,10 @@ public enum EQWords {
 
     /// 3.9's words: each refusal and each note, and the preview's lines.
     public enum Import {
-        public static let fromFiles = "Import from Files…"
+        /// "Import from Files…" - a Mac has no Files app: its button opens the Open panel, "Import…".
+        public static func fromFiles(_ device: Device) -> String {
+            device == .mac ? "Import\u{2026}" : "Import from Files\u{2026}"
+        }
         public static let title = "Import"
         public static let importButton = "Import"
         public static let cancel = "Cancel"
@@ -129,8 +132,8 @@ public enum EQWords {
             refusal(.frequencyLow, n, "Line \(n): a filter's frequency must be at least 1 Hz.")
         }
 
-        public static func frequencyHigh(line n: Int, hz: Double) -> APORefusal {
-            refusal(.frequencyHigh, n, "Line \(n): \(number(hz)) Hz is higher than this phone plays - the highest a filter can be is 22000 Hz.")
+        public static func frequencyHigh(line n: Int, hz: Double, device: Device) -> APORefusal {
+            refusal(.frequencyHigh, n, "Line \(n): \(number(hz)) Hz is higher than this \(device.noun) plays - the highest a filter can be is 22000 Hz.")
         }
 
         public static func gain(line n: Int, dB: Double) -> APORefusal {
@@ -187,15 +190,17 @@ public enum EQWords {
                     text: "Line \(n) (\(text)) chooses a device in Equalizer APO - deadwax keeps a setting for each output itself.")
         }
 
-        /// "Lines 12-20 are for the centre channel (C), which a phone doesn't have."
-        public static func channels(first: Int, last: Int, words: [[Unicode.Scalar]]) -> APONote {
+        /// "Lines 12-20 are for the centre channel (C), which a phone doesn't have." The Mac's EQ plays two channels
+        /// too - a Mac may well have a centre speaker, so its words say what deadwax plays rather than what it has.
+        public static func channels(first: Int, last: Int, words: [[Unicode.Scalar]], device: Device) -> APONote {
             let one = first == last
             let whom = one ? "Line \(first) is" : "Lines \(first)-\(last) are"
             let text: String
             if words.isEmpty {
                 text = "\(whom) for no channel: the Channel line before \(one ? "it" : "them") names none."
             } else {
-                text = "\(whom) for \(positions(words.map { APOReader.text($0) })), which a phone doesn't have."
+                let lacks = device == .mac ? "which deadwax doesn't play on a Mac" : "which a phone doesn't have"
+                text = "\(whom) for \(positions(words.map { APOReader.text($0) })), \(lacks)."
             }
             return APONote(kind: .channels, first: first, last: last, text: text)
         }
@@ -328,7 +333,13 @@ extension EQWords {
 
     public enum You {
         public static let row = "EQ"
-        public static let footer = "Each output keeps its own EQ - your headphones, the speaker, the car - and the EQ switches by itself when the output changes. This is kept on this phone."
+        /// The Mac has no car to name; its own speakers and a USB DAC are its outputs.
+        public static func footer(_ device: Device) -> String {
+            switch device {
+            case .iPhone: return "Each output keeps its own EQ - your headphones, the speaker, the car - and the EQ switches by itself when the output changes. This is kept on this phone."
+            case .mac: return "Each output keeps its own EQ - your headphones, the Mac's speakers, a USB DAC - and the EQ switches by itself when the output changes. This is kept on this Mac."
+            }
+        }
     }
 
     /// The short setting (You's row, Now Playing's subtitle, Other outputs): "Off", "Flat", "Bass Boost", "Custom",
@@ -416,7 +427,12 @@ extension EQWords {
             return "Preamp \(signedDB(preamp)), set by you."
         }
         public static let notConnectedLine = "Not connected: this is what it plays when it is."
-        public static let unitNotMade = "The EQ can't play on this phone just now, so the sound is as it is. Closing deadwax and opening it again may help."
+        public static func unitNotMade(_ device: Device) -> String {
+            switch device {
+            case .iPhone: return "The EQ can't play on this phone just now, so the sound is as it is. Closing deadwax and opening it again may help."
+            case .mac: return "The EQ can't play on this Mac just now, so the sound is as it is. Quitting deadwax and opening it again may help."
+            }
+        }
         public static let fallback = "The EQ comes in after a moment's pause."
 
         // the curve's labels
@@ -729,7 +745,11 @@ extension EQWords {
     // ------------------------------------------------------------ outputs (3.12)
 
     public enum Outputs {
-        public static let speaker = "iPhone speaker"
+        /// The device's own speaker: "iPhone speaker", "Mac speakers" (a Mac's are a pair, and macOS's own name for
+        /// them is "MacBook Air Speakers" and the like). Only the name differs: its key is "speaker" on both.
+        public static func speaker(_ device: Device) -> String {
+            device == .mac ? "Mac speakers" : "iPhone speaker"
+        }
         public static let headphones = "Headphones"
         public static let others = "Other outputs"
         public static let renameTitle = "Rename Output"

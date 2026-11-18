@@ -13,7 +13,7 @@ import Testing
         let file = try EQFixtures.apo()
         #expect(file.readings.count == 57)
         for c in file.readings {
-            let result = APOReader.read(try EQFixtures.bytes(of: c), pasted: c.pasted)
+            let result = APOReader.read(try EQFixtures.bytes(of: c), pasted: c.pasted, device: .iPhone)
             let expected = c.reading
             if let refused = expected.refused {
                 guard case .failure(let r) = result else {
@@ -82,7 +82,7 @@ import Testing
     /// AutoEq's ParametricEQ.txt files: read to their filters with nothing skipped, the file's preamp shared.
     @Test func everyAutoEqProfileIsReadToItsFilters() throws {
         for profile in try EQFixtures.profiles().profiles {
-            guard case .success(let reading) = APOReader.read(try Fixtures.data("eq/\(profile.path)")) else {
+            guard case .success(let reading) = APOReader.read(try Fixtures.data("eq/\(profile.path)"), device: .iPhone) else {
                 Issue.record("\(profile.name): refused")
                 continue
             }
@@ -98,7 +98,7 @@ import Testing
     /// The two GraphicEQ.txt files: their one line read to the points a plain parse gives, and converted by 3.10's fit.
     @Test func theGraphicEQFilesAreReadToTheirPoints() throws {
         for fit in try EQFixtures.graphic().fits {
-            guard case .success(let reading) = APOReader.read(try Fixtures.data("eq/\(fit.path)")) else {
+            guard case .success(let reading) = APOReader.read(try Fixtures.data("eq/\(fit.path)"), device: .iPhone) else {
                 Issue.record("\(fit.path): refused")
                 continue
             }
@@ -278,9 +278,9 @@ import Testing
         // every reading of the fixtures is one eq.json can hold
         for c in try EQFixtures.apo().readings {
             let bytes = try EQFixtures.bytes(of: c)
-            guard case .success(let reading) = APOReader.read(bytes, pasted: c.pasted) else { continue }
+            guard case .success(let reading) = APOReader.read(bytes, pasted: c.pasted, device: .iPhone) else { continue }
             var settings = EQSettings()
-            var o = EQSettings.newOutput(EQOutputs.speaker, seen: "")
+            var o = EQSettings.newOutput(EQOutputs.speaker(.iPhone), seen: "")
             o.correction = EQCorrection.file(name: "x.txt", text: EQImportRules.text(bytes), reading: reading)
             settings.outputs = [o]
             #expect(throws: Never.self, "\(c.name)") { _ = try settings.written() }

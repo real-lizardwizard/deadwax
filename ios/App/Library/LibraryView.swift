@@ -204,7 +204,7 @@ struct LibraryView: View {
     /// didn't answer: that one is asked again as deadwax comes back, and the albums kept on disk draw meanwhile.
     private var gate: NavidromeGate.Shown {
         guard NavidromeGate.consulted(reachability.reach), library.navidrome?.offline != true else { return .open }
-        return NavidromeGate.shownOnPhone(library.navidrome, access: server.access)
+        return NavidromeGate.shownOnPhone(library.navidrome, access: server.access, device: Platform.device)
     }
 
     /// Navidrome really answers - not the gate merely giving way: deadwax in reach, and the newest check (only the
@@ -555,7 +555,7 @@ struct LibraryView: View {
             // the list the readiness counted; should it have emptied since (a removal), said, as the pull would
             let here = downloads.songsHere
             guard !here.isEmpty else {
-                player.say(PullShuffleWords.nothingHere)
+                player.say(PullShuffleWords.nothingHere(Platform.device))
                 return
             }
             player.play(playlist: here, at: nil, shuffle: true)
@@ -667,7 +667,7 @@ struct NavidromeGateView: View {
                 }
                 if NavidromeGate.showsDownloaded(.closed(closed), anythingHere: downloads.anythingHere) {
                     // Navidrome down is no reason to hide what plays from this phone (5.4)
-                    PlaceGroup(title: DownloadWords.onThisPhone) {
+                    PlaceGroup(title: DownloadWords.onThisDevice(Platform.device)) {
                         PlaceRow(symbol: DownloadWords.downloadSymbol, label: DownloadWords.downloadedTitle,
                                  count: downloads.albumCount, route: .downloaded)
                     }

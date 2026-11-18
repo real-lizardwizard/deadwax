@@ -124,7 +124,7 @@ import Testing
 
         let server = try ServerAddress.parse("192.168.3.20:8090").get()
         let lost = APIFailure.timeout(.init(server: server, method: "POST", path: "/library/delete",
-                                            reason: "The request timed out."))
+                                            reason: "The request timed out.", device: .iPhone))
         #expect(RetagFlow.outcome(of: lost) == .unanswered)
         #expect(EditWords.writeFailure(lost, failed: DeleteWords.failed, admin: false) == nil,
                 "no words of deadwax's: the page says it may have finished")

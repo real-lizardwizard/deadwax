@@ -50,7 +50,9 @@ public enum OwnPassword {
     /// A 200 with no new cookie: the password changed, but this phone's sign-in wasn't renewed - a copy of its old cookie
     /// may still work (NOT_RENEWED), or the session ended meanwhile (signed out from elsewhere). Under it the answer's
     /// warning, or `signInAgain` when it sent none.
-    public static let notRenewed = "Password changed, but deadwax sent this phone no new sign-in."
+    public static func notRenewed(_ device: Device) -> String {
+        "Password changed, but deadwax sent this \(device.noun) no new sign-in."
+    }
     public static let signInAgain = "Sign out and sign in again here with the new password."
     /// No answer, a timeout, or a 5xx with no words of deadwax's: the change may have gone through - the answer is what
     /// says so, and it never came. What to do next: a change that went through moved this phone's session under a new
@@ -63,8 +65,10 @@ public enum OwnPassword {
     /// (review) The sign-in's reason when this phone's session ended while its own change was out and the change may
     /// have gone through (anything but a refusal): deadwax's words for that 401 - PASSWORD_CHANGED's "Your password was
     /// changed from another device" - would name the wrong device.
-    public static let endedWhileChanging = "This phone's sign-in ended while your password was being changed - sign in "
-        + "again, with the new password if the change went through."
+    public static func endedWhileChanging(_ device: Device) -> String {
+        "\(device.this)'s sign-in ended while your password was being changed - sign in "
+            + "again, with the new password if the change went through."
+    }
     /// src/routes/own_password.py NOT_YOUR_PASSWORD's kind: Current is emptied and focused, as the web does.
     public static let notYourPassword = "not_your_password"
 
@@ -373,7 +377,7 @@ public struct OwnPasswordFlow: Sendable, Equatable {
     /// session ended), kept to correct after a refusal, Current emptied and focused when it was wrong. Returns what
     /// VoiceOver is told, once - nil for an older ticket, or nothing said, or (`signInOver`) the sign-in come over the
     /// app as it answered: the sign-in says what happened, and two announcements would cut each other off.
-    public mutating func ended(_ ticket: Int, _ outcome: OwnPassword.Outcome, signInOver: Bool) -> String? {
+    public mutating func ended(_ ticket: Int, _ outcome: OwnPassword.Outcome, signInOver: Bool, device: Device) -> String? {
         guard ticket == tickets, changing else { return nil }
         changing = false
         switch outcome {
@@ -382,7 +386,7 @@ public struct OwnPasswordFlow: Sendable, Equatable {
             said = .done(words: OwnPassword.doneWords(signedOut), warning: warning)
         case .notRenewed(_, let warning):
             form = OwnPasswordForm()
-            said = .done(words: OwnPassword.notRenewed, warning: warning ?? OwnPassword.signInAgain)
+            said = .done(words: OwnPassword.notRenewed(device), warning: warning ?? OwnPassword.signInAgain)
         case .refused(let words, let kind, let fix):
             said = .problem(words: words, fix: fix)
             if let kind, OwnPassword.same(kind, OwnPassword.notYourPassword) {
@@ -495,7 +499,7 @@ public struct PasswordRekey: Sendable, Equatable {
     /// changed here, so the session ended for a reason of its own), and the phone's own after anything else (the change
     /// may have gone through: deadwax's PASSWORD_CHANGED would name another device). An answer that leaves it unsure
     /// whether the session in hand stands asks /me - a cancelled request among them, which may still have reached deadwax.
-    public mutating func ended(_ outcome: OwnPassword.Outcome) -> After {
+    public mutating func ended(_ outcome: OwnPassword.Outcome, device: Device) -> After {
         defer { forgot() }
         switch outcome {
         case .changed:
@@ -505,7 +509,7 @@ public struct PasswordRekey: Sendable, Equatable {
         case .refused:
             return heard ? .signIn(reason: reason) : .nothing
         case .notRenewed, .failed, .unknown, .cancelled:
-            return heard ? .signIn(reason: OwnPassword.endedWhileChanging) : .askMe
+            return heard ? .signIn(reason: OwnPassword.endedWhileChanging(device)) : .askMe
         }
     }
 }

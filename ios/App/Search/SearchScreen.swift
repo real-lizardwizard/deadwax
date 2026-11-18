@@ -857,7 +857,7 @@ struct SearchRowView: View {
     private func link(_ route: AppRoute, _ line: SearchList.Line, round: Bool, cover: String?,
                       dimmed: Bool) -> some View {
         let opacity: Double = dimmed ? Palette.off : 1
-        let value: String = dimmed ? DownloadWords.notOnPhone : ""
+        let value: String = dimmed ? DownloadWords.notOnDevice(Platform.device) : ""
         return NavigationLink(value: route) {
             face(line, round: round, cover: cover, plays: false)
                 .opacity(opacity)
@@ -924,7 +924,7 @@ struct SearchRowView: View {
         let opens: Bool = !(song.albumId ?? "").isEmpty
         let opacity: Double = dimmed ? Palette.off : 1
         let said: String = spoken(line) + Self.tapSaid(plays: plays, opens: opens, dimmed: dimmed)
-        let value: String = dimmed ? DownloadWords.notOnPhone : ""
+        let value: String = dimmed ? DownloadWords.notOnDevice(Platform.device) : ""
         HStack(spacing: 4) {
             Button {
                 tapped(song)

@@ -145,7 +145,7 @@ import Testing
         var flow = Self.previewed()
         #expect(Self.take(&flow) { $0.beginApply(Self.plan) })
         let server = try ServerAddress.parse("192.168.3.20:8090").get()
-        let none = APIFailure.NoAnswer(server: server, method: "POST", path: "/library/retag/apply", reason: "The request timed out.")
+        let none = APIFailure.NoAnswer(server: server, method: "POST", path: "/library/retag/apply", reason: "The request timed out.", device: .iPhone)
         #expect(RetagFlow.outcome(of: APIFailure.timeout(none)) == .unanswered)
         #expect(RetagFlow.outcome(of: APIFailure.offline(none)) == .unanswered)
         #expect(RetagFlow.outcome(of: APIFailure.other("lost")) == .unanswered)
@@ -451,7 +451,7 @@ import Testing
         #expect(EditWords.said(forbidden, failed: RetagWords.applyFailed, admin: true) == EditWords.noPermission)
         let server = try ServerAddress.parse("192.168.3.20:8090").get()
         let none = APIFailure.NoAnswer(server: server, method: "POST", path: "/library/retag/preview",
-                                       reason: "The request timed out.")
+                                       reason: "The request timed out.", device: .iPhone)
         let listener = EditWords.said(APIFailure.timeout(none), failed: RetagWords.previewFailed, admin: false)
         #expect(!listener.contains("timed out.") && !listener.isEmpty, "a listener's words, not the transport's")
         #expect(EditWords.said(APIFailure.timeout(none), failed: RetagWords.previewFailed, admin: true)

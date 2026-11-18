@@ -66,8 +66,8 @@ struct AlbumView: View {
     /// What your library says of this album on its page, if anything: it waits for room, or you removed its download.
     private var libraryLine: String? {
         switch downloads.libraryMark(album: route.id) {
-        case .waitsForRoom: return AutoDownloadWords.waitsForRoom(downloads.libraryScope, limit: downloads.storageLimit)
-        case .keptOff: return AutoDownloadWords.keptOff(downloads.libraryScope)
+        case .waitsForRoom: return AutoDownloadWords.waitsForRoom(downloads.libraryScope, limit: downloads.storageLimit, device: Platform.device)
+        case .keptOff: return AutoDownloadWords.keptOff(downloads.libraryScope, device: Platform.device)
         case .none, .withLibrary: return nil
         }
     }
@@ -79,7 +79,7 @@ struct AlbumView: View {
         let download = downloads.album(model.songs)
         let offline = !reachability.online
         let note = OfflineAlbum.note(online: reachability.online, haveSongs: model.album != nil, gone: model.goneButHere,
-                                     anyHere: download.hasSongsHere)
+                                     anyHere: download.hasSongsHere, device: Platform.device)
         let playable = self.playable
         let can = pullCan(playable)
         List {
@@ -151,7 +151,7 @@ struct AlbumView: View {
                 VStack(alignment: .leading, spacing: 4) {
                     Text(model.footer)
                     let here = downloads.here(model.songs)
-                    if let line = DownloadWords.footer(here: here.count, of: model.songs.count, bytes: here.bytes) {
+                    if let line = DownloadWords.footer(here: here.count, of: model.songs.count, bytes: here.bytes, device: Platform.device) {
                         Text(line)
                     }
                 }
@@ -282,7 +282,7 @@ struct AlbumView: View {
     /// gone since it armed (a removal), said, as the Library's pull says it.
     private func pulled() {
         if playable.isEmpty, !reachability.online || model.goneButHere {
-            player.say(PullShuffleWords.nothingHere)
+            player.say(PullShuffleWords.nothingHere(Platform.device))
             return
         }
         play(at: nil, shuffle: true)
@@ -326,7 +326,7 @@ struct AlbumView: View {
         case .downloadAgain: downloads.tryAgain(song.id)
         case .remove:
             downloads.remove(song.id)
-            player.say(DownloadWords.removed(song.title ?? ""))
+            player.say(DownloadWords.removed(song.title ?? "", device: Platform.device))
         }
     }
 

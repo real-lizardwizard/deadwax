@@ -46,8 +46,8 @@ import Testing
         let web = try #require(fixture["words"]["webFooter"].string)
         #expect(web.hasSuffix("Normalization from the next thing you play."))
         #expect(web.contains("Maximum quality"))
-        #expect(YouWords.kept.hasSuffix("Normalization changes from the next thing you play."))
-        #expect(!YouWords.kept.contains("Maximum quality"))
+        #expect(YouWords.kept(.iPhone).hasSuffix("Normalization changes from the next thing you play."))
+        #expect(!YouWords.kept(.iPhone).contains("Maximum quality"))
         #expect(!YouWords.normalizationNote.contains("Maximum quality"))
     }
 
@@ -122,15 +122,15 @@ private enum ServerModelNobody {
     let listener = Access(me: Me(user: "ethan", admin: false, auth: "on"))
 
     @Test func nothingAnsweredSaysUnreachedWithPhaseZerosWordsFolded() {
-        let failure = APIFailure.offline(.init(server: server, method: "GET", path: "/me", reason: "The Internet connection appears to be offline."))
+        let failure = APIFailure.offline(.init(server: server, method: "GET", path: "/me", reason: "The Internet connection appears to be offline.", device: .iPhone))
         let nobody = UnreachedLines(failure, access: nil)
         #expect(nobody.text == ErrorWords.unreached)
-        #expect(nobody.detail == unreachableWords(server, reason: "The Internet connection appears to be offline."))
+        #expect(nobody.detail == unreachableWords(server, reason: "The Internet connection appears to be offline.", device: .iPhone))
         #expect(nobody.detail?.contains("WireGuard") == true && nobody.detail?.contains("Local Network") == true)
         #expect(UnreachedLines(failure, access: admin).detail == nobody.detail)
         // someone known, who isn't shown an error's own words: the sentence alone
         #expect(said(UnreachedLines(failure, access: listener)) == [ErrorWords.unreached, nil])
-        let timeout = APIFailure.timeout(.init(server: server, method: "GET", path: "/me", reason: "The request timed out."))
+        let timeout = APIFailure.timeout(.init(server: server, method: "GET", path: "/me", reason: "The request timed out.", device: .iPhone))
         #expect(UnreachedLines(timeout, access: nil).text == ErrorWords.unreached)
         // an answer the app couldn't read, a TLS failure: nothing deadwax said, so not reached either
         #expect(said(UnreachedLines(.other("Something answered at http://192.168.1.20:8090, but it isn't deadwax."), access: nil))

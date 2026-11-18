@@ -27,8 +27,8 @@ public enum EQImportRules {
 
     /// For's outputs (3.9): the one connected now first, then every other the phone has met, as Other outputs lists
     /// them (the speaker always among them) - so a file for headphones not connected can be put on them.
-    public static func outputs(_ settings: EQSettings, route: EQOutput) -> [EQOutputSetting] {
-        [settings.setting(for: route)] + EQScreenRules.others(settings, shown: route.key)
+    public static func outputs(_ settings: EQSettings, route: EQOutput, device: Device) -> [EQOutputSetting] {
+        [settings.setting(for: route)] + EQScreenRules.others(settings, shown: route.key, device: device)
     }
 
     /// The preview for an output (3.9) at the rate it plays at (48 kHz while it isn't connected): the summary - a

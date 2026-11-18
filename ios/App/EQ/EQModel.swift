@@ -78,7 +78,7 @@ final class EQModel {
         writable = loaded.writable
         let nowPorts = EQRouteReader.ports()
         ports = nowPorts
-        route = EQOutputs.output(nowPorts) ?? EQOutputs.speaker
+        route = EQOutputs.output(nowPorts, device: Platform.device) ?? EQOutputs.speaker(Platform.device)
         desk = EQStartDesk(muffleKey: EQTestCurve.key, muffleBank: { (rate: Double, version: Int) -> EQBank in
             EQTestCurve.bank(on: true, rate: rate, version: version)
         }, clock: { AVAudioTime.seconds(forHostTime: mach_absolute_time()) })
@@ -171,7 +171,7 @@ final class EQModel {
 
     private func routeChanged() {
         let nowPorts = EQRouteReader.ports()
-        let output = EQOutputs.output(nowPorts) ?? EQOutputs.speaker
+        let output = EQOutputs.output(nowPorts, device: Platform.device) ?? EQOutputs.speaker(Platform.device)
         ports = nowPorts
         guard output != route else { return }
         let moved = output.key != route.key
@@ -197,7 +197,7 @@ final class EQModel {
     /// it was last drawn. Never another output's: a page bound to the AirPods changes the AirPods. Each answer is
     /// remembered, the route's included, so a page whose output goes keeps its name while it goes.
     func output(_ key: String) -> EQOutput {
-        let output = EQScreenRules.output(key, route: route, in: settings, lastDrawn: known[key])
+        let output = EQScreenRules.output(key, route: route, in: settings, lastDrawn: known[key], device: Platform.device)
         known[key] = output
         return output
     }
@@ -229,7 +229,7 @@ final class EQModel {
         let setting = self.setting(output(key))
         let drawing = self.drawing(key)
         return EQScreenRules.line(on: setting.on, identity: drawing.identity, preamp: setting.preamp,
-                                  played: drawing.preamp, top: drawing.top, unitNotMade: unitProblem != nil)
+                                  played: drawing.preamp, top: drawing.top, unitNotMade: unitProblem != nil, device: Platform.device)
     }
 
     /// You's row and Now Playing's subtitle: the output now's name and its short setting.
@@ -440,7 +440,7 @@ final class EQModel {
 
     /// "Back to AutoEq's".
     func backToAutoEq(for output: EQOutput) {
-        apply { (s: inout EQSettings) -> Bool in s.backToAutoEq(for: output) }
+        apply { (s: inout EQSettings) -> Bool in s.backToAutoEq(for: output, device: Platform.device) }
     }
 
     /// The Preamp section's Automatic - off, beginning at the preamp the curve plays at (on, as the change turns it on),
@@ -487,7 +487,7 @@ final class EQModel {
     /// the start puts it in). The route is read again first, so a change never lands on an output that has just gone.
     private func publish() {
         let nowPorts = EQRouteReader.ports()
-        let output = EQOutputs.output(nowPorts) ?? EQOutputs.speaker
+        let output = EQOutputs.output(nowPorts, device: Platform.device) ?? EQOutputs.speaker(Platform.device)
         if output.key != route.key {
             ports = nowPorts
             route = output

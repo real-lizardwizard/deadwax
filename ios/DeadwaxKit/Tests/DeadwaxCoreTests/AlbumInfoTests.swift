@@ -294,14 +294,14 @@ import Testing
     // MARK: On this phone
 
     @Test func whatThisPhoneHolds() {
-        #expect(AlbumInfo.onPhone(.none, here: 0, of: 10, bytes: 0).value == "Not downloaded")
-        let all = AlbumInfo.onPhone(.downloaded(checking: false), here: 10, of: 10, bytes: 412_000_000)
+        #expect(AlbumInfo.onPhone(.none, here: 0, of: 10, bytes: 0, device: .iPhone).value == "Not downloaded")
+        let all = AlbumInfo.onPhone(.downloaded(checking: false), here: 10, of: 10, bytes: 412_000_000, device: .iPhone)
         #expect(all.label == "Downloaded" && all.value == "All 10 songs · 412 MB" && all.lines == [])
-        #expect(AlbumInfo.onPhone(.partial(here: 3, of: 12), here: 3, of: 12, bytes: 92_000_000).value == "3 of 12 songs · 92 MB")
-        let going = AlbumInfo.onPhone(.downloading(here: 4, of: 12, fraction: 0.4), here: 4, of: 12, bytes: 120_000_000)
+        #expect(AlbumInfo.onPhone(.partial(here: 3, of: 12), here: 3, of: 12, bytes: 92_000_000, device: .iPhone).value == "3 of 12 songs · 92 MB")
+        let going = AlbumInfo.onPhone(.downloading(here: 4, of: 12, fraction: 0.4), here: 4, of: 12, bytes: 120_000_000, device: .iPhone)
         #expect(going.value == "4 of 12 songs · 120 MB")
         #expect(going.lines == ["Downloading - 4 of 12 songs"])
-        #expect(AlbumInfo.onPhone(.downloading(here: 0, of: 12, fraction: 0.1), here: 0, of: 12, bytes: 0).value == "Downloading - 0 of 12 songs")
+        #expect(AlbumInfo.onPhone(.downloading(here: 0, of: 12, fraction: 0.1), here: 0, of: 12, bytes: 0, device: .iPhone).value == "Downloading - 0 of 12 songs")
     }
 
     // MARK: The release, from every source
@@ -447,9 +447,9 @@ import Testing
 
     @Test func aSectionWithNothingToSayIsLeftOut() throws {
         let album = Album(id: "al", song: [Self.song("a")])
-        let local = AlbumInfo.local(album: album, onPhone: nil)
+        let local = AlbumInfo.local(album: album, onPhone: nil, device: .iPhone)
         #expect(local.map(\.title) == ["Quality", "The album"])
-        let withPhone = AlbumInfo.local(album: album, onPhone: AlbumInfo.onPhone(.none, here: 0, of: 1, bytes: 0))
+        let withPhone = AlbumInfo.local(album: album, onPhone: AlbumInfo.onPhone(.none, here: 0, of: 1, bytes: 0, device: .iPhone), device: .iPhone)
         #expect(withPhone.map(\.title) == ["Quality", "The album", "On this phone"])
         #expect(AlbumInfo.fromServer(album: Album(id: "e"), extras: nil, store: nil, files: nil, folders: true).isEmpty)
         let full = AlbumInfo.fromServer(album: Album(id: "al", musicBrainzId: Self.release), extras: nil,

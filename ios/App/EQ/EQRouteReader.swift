@@ -15,7 +15,7 @@ enum EQRouteReader {
 
     /// The output now - the speaker for a route with no output (between two, a moment).
     nonisolated static func output() -> EQOutput {
-        EQOutputs.output(ports()) ?? EQOutputs.speaker
+        EQOutputs.output(ports(), device: Platform.device) ?? EQOutputs.speaker(Platform.device)
     }
 
     /// The output's rate as the session gives it - the unit's own once it has started (`EQHost.rate`).

@@ -36,12 +36,18 @@ public struct ProvisioningProfile: Sendable, Equatable {
     }
 }
 
-/// The line in the corner: "This install runs until Thu 30 Oct, 14:02".
+/// The line in the corner: "This install runs until Thu 30 Oct, 14:02". On the Mac, that it doesn't expire: a Mac
+/// build carries no provisioning profile for the app to read (notes/ios.md "The Mac app, slice 4: the Mac's words"),
+/// and deadwax keeps opening there without install-mac.sh run again (docs/ios.md check 415).
 public enum InstallExpiry {
     /// From this long before the end, the line also says what to do.
     public static let warnBefore: TimeInterval = 2 * 24 * 60 * 60
 
-    public static func line(expiration: Date?, now: Date, timeZone: TimeZone = .current) -> String {
+    /// The Mac's line, whatever is read.
+    public static let mac = "This install doesn't expire: a Mac keeps opening deadwax without installing it again."
+
+    public static func line(expiration: Date?, now: Date, timeZone: TimeZone = .current, device: Device) -> String {
+        if device == .mac { return mac }
         guard let expiration else {
             return "No install date to show: this build wasn't signed for a phone."
         }

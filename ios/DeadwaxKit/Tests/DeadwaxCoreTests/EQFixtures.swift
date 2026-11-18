@@ -305,6 +305,6 @@ extension EQFixtures {
 
     /// A file's reading, or its refusal.
     static func read(_ text: String, pasted: Bool = false) -> Result<APOReading, APORefusal> {
-        APOReader.read(Data(text.utf8), pasted: pasted)
+        APOReader.read(Data(text.utf8), pasted: pasted, device: .iPhone)
     }
 }

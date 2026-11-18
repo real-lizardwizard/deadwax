@@ -45,7 +45,7 @@ enum EQImportReading {
                 let end = try? handle.seekToEnd()
                 return tooBig(end.map { (bytes: UInt64) -> Int in Int(clamping: bytes) } ?? data.count)
             }
-            return EQImportItem(name: name, text: EQImportRules.text(data), result: APOReader.read(data), detail: nil,
+            return EQImportItem(name: name, text: EQImportRules.text(data), result: APOReader.read(data, device: Platform.device), detail: nil,
                                 forKey: forKey)
         } catch {
             return EQImportItem(name: name, text: "", result: .failure(EQWords.Import.unreadable),
@@ -55,7 +55,7 @@ enum EQImportReading {
 
     /// What Paste gave.
     static func pasted(_ text: String, forKey: String?) -> EQImportItem {
-        EQImportItem(name: nil, text: text, result: APOReader.read(Data(text.utf8), pasted: true), detail: nil,
+        EQImportItem(name: nil, text: text, result: APOReader.read(Data(text.utf8), pasted: true, device: Platform.device), detail: nil,
                      forKey: forKey)
     }
 
@@ -85,7 +85,7 @@ struct EQImportRows: View {
         Button {
             choosing = true
         } label: {
-            Label(EQWords.Import.fromFiles, systemImage: "doc")
+            Label(EQWords.Import.fromFiles(Platform.device), systemImage: "doc")
         }
         .fileImporter(isPresented: $choosing, allowedContentTypes: [.plainText], allowsMultipleSelection: false) {
             (result: Result<[URL], any Error>) -> Void in
@@ -194,7 +194,7 @@ struct EQImportPreview: View {
     }
 
     private func preview(_ reading: APOReading) -> some View {
-        let outputs = EQImportRules.outputs(eq.settings, route: eq.route)
+        let outputs = EQImportRules.outputs(eq.settings, route: eq.route, device: Platform.device)
         let key = key(outputs)
         let output = eq.output(key)
         let setting = eq.setting(output)
@@ -277,7 +277,7 @@ struct EQImportPreview: View {
 
     /// Import: For's correction from now on, the EQ on ("EQ on"), the sheet closed.
     private func take(_ reading: APOReading) {
-        let outputs = EQImportRules.outputs(eq.settings, route: eq.route)
+        let outputs = EQImportRules.outputs(eq.settings, route: eq.route, device: Platform.device)
         let output = eq.output(key(outputs))
         eq.importCorrection(EQImportRules.correction(name: item.name, text: item.text, reading: reading), for: output)
         navigation.importAnswered(item.id)

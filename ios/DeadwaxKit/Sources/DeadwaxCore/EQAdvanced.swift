@@ -167,9 +167,9 @@ extension EQSettings {
     /// "Back to AutoEq's" (3.8): an AutoEq correction edited, read again from the text it kept (4) - its filters, ids
     /// and preamp as they came, "changed" gone. Nothing for any other. True when it turned the EQ on.
     @discardableResult
-    public mutating func backToAutoEq(for o: EQOutput) -> Bool {
+    public mutating func backToAutoEq(for o: EQOutput, device: Device) -> Bool {
         guard let c = setting(for: o).correction, EQAdvancedRules.goesBack(c), let text = c.text,
-              case .success(let reading) = APOReader.read(Data(text.utf8)) else { return false }
+              case .success(let reading) = APOReader.read(Data(text.utf8), device: device) else { return false }
         let back = EQCorrection.autoeq(id: c.id ?? "", name: c.name, source: c.source ?? "", rig: c.rig, form: c.form,
                                        text: text, reading: reading)
         return change(o) { (s: inout EQOutputSetting) -> Void in s.correction = back }
@@ -580,7 +580,9 @@ public enum EQEditorRules {
 extension EQDrawing {
     /// The editor's curve (3.8): the filter alone, for both ears, at no preamp - flat while it is off.
     public static func filter(_ f: EQFilter, rate: Double) -> EQDrawing {
-        var setting = EQSettings.newOutput(EQOutputs.speaker, seen: "")
+        // a setting of its own, never kept or shown: the speaker's key, and no name to say
+        var setting = EQSettings.newOutput(EQOutput(key: EQOutputs.speakerKey, port: .builtInSpeaker, portType: "",
+                                                    uid: "", name: "", symbol: ""), seen: "")
         setting.on = true
         setting.preamp = .hand(0)
         var alone = f

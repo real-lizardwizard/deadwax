@@ -52,24 +52,24 @@ import Testing
 
     @Test func oneSkipIsNamed() {
         var run = OfflinePlay.SkipRun()
-        #expect(run.skipped(title: "Roads", now: 100) == "Skipped \"Roads\" - it isn't on this phone")
+        #expect(run.skipped(title: "Roads", now: 100, device: .iPhone) == "Skipped \"Roads\" - it isn't on this phone")
         #expect(run.count == 1)
     }
 
     @Test func aRunWithinTheNoticesTimeIsCounted() {
         var run = OfflinePlay.SkipRun()
-        _ = run.skipped(title: "Roads", now: 100)
-        #expect(run.skipped(title: "Undenied", now: 100.2) == "Skipped 2 songs that aren't on this phone")
-        #expect(run.skipped(title: "Humming", now: 104.9) == "Skipped 3 songs that aren't on this phone")
+        _ = run.skipped(title: "Roads", now: 100, device: .iPhone)
+        #expect(run.skipped(title: "Undenied", now: 100.2, device: .iPhone) == "Skipped 2 songs that aren't on this phone")
+        #expect(run.skipped(title: "Humming", now: 104.9, device: .iPhone) == "Skipped 3 songs that aren't on this phone")
         //? past the notice's 5 s, a new run
-        #expect(run.skipped(title: "Mysterons", now: 110) == "Skipped \"Mysterons\" - it isn't on this phone")
+        #expect(run.skipped(title: "Mysterons", now: 110, device: .iPhone) == "Skipped \"Mysterons\" - it isn't on this phone")
     }
 
     @Test func aSongWithNoTitleIsASong() {
         var run = OfflinePlay.SkipRun()
-        #expect(run.skipped(title: "", now: 0) == "Skipped \"a song\" - it isn't on this phone")
+        #expect(run.skipped(title: "", now: 0, device: .iPhone) == "Skipped \"a song\" - it isn't on this phone")
         var again = OfflinePlay.SkipRun()
-        #expect(again.skipped(title: nil, now: 0) == "Skipped \"a song\" - it isn't on this phone")
+        #expect(again.skipped(title: nil, now: 0, device: .iPhone) == "Skipped \"a song\" - it isn't on this phone")
     }
 
     // MARK: the album page
@@ -82,13 +82,13 @@ import Testing
     }
 
     @Test func thePagesOwnLine() {
-        #expect(OfflineAlbum.note(online: true, haveSongs: true, gone: true, anyHere: true) == DownloadWords.albumGoneHere)
-        #expect(OfflineAlbum.note(online: false, haveSongs: true, gone: true, anyHere: true) == DownloadWords.albumGoneHere)
-        #expect(OfflineAlbum.note(online: false, haveSongs: false, gone: false, anyHere: false) == DownloadWords.albumNotHere)
+        #expect(OfflineAlbum.note(online: true, haveSongs: true, gone: true, anyHere: true, device: .iPhone) == DownloadWords.albumGoneHere(.iPhone))
+        #expect(OfflineAlbum.note(online: false, haveSongs: true, gone: true, anyHere: true, device: .iPhone) == DownloadWords.albumGoneHere(.iPhone))
+        #expect(OfflineAlbum.note(online: false, haveSongs: false, gone: false, anyHere: false, device: .iPhone) == DownloadWords.albumNotHere(.iPhone))
         //? nothing of it here, gone: Phase 1's own gone line, not this one
-        #expect(OfflineAlbum.note(online: true, haveSongs: false, gone: true, anyHere: false) == nil)
-        #expect(OfflineAlbum.note(online: false, haveSongs: true, gone: false, anyHere: true) == nil)
-        #expect(OfflineAlbum.note(online: true, haveSongs: true, gone: false, anyHere: false) == nil)
+        #expect(OfflineAlbum.note(online: true, haveSongs: false, gone: true, anyHere: false, device: .iPhone) == nil)
+        #expect(OfflineAlbum.note(online: false, haveSongs: true, gone: false, anyHere: true, device: .iPhone) == nil)
+        #expect(OfflineAlbum.note(online: true, haveSongs: true, gone: false, anyHere: false, device: .iPhone) == nil)
     }
 
     // MARK: Now Playing's •••

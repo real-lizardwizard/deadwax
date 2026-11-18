@@ -315,7 +315,7 @@ struct PlaylistView: View {
     /// gone since it armed (a removal), said, as the Library's pull says it.
     private func pulled() {
         if playable.isEmpty, !reachability.online {
-            player.say(PullShuffleWords.nothingHere)
+            player.say(PullShuffleWords.nothingHere(Platform.device))
             return
         }
         play(at: nil, shuffle: true)
@@ -365,7 +365,7 @@ struct PlaylistView: View {
         case .downloadAgain: downloads.tryAgain(song.id)
         case .remove:
             downloads.remove(song.id)
-            player.say(DownloadWords.removed(song.title ?? ""))
+            player.say(DownloadWords.removed(song.title ?? "", device: Platform.device))
         }
     }
 
@@ -692,11 +692,11 @@ private struct PlaylistHero: View {
 
             // (slice 3) downloaded: the album's line, its own - and, all here, that it plays with no connection (a smart
             // one's, that it stays as it was); a smart one not downloaded: why there is no Download
-            if let download, let words = PlaylistDownloadWords.heroLine(download, smart: smart) {
+            if let download, let words = PlaylistDownloadWords.heroLine(download, smart: smart, device: Platform.device) {
                 DownloadLine(download: download, line: words)
                     .padding(.top, 6)
                     .transition(.opacity)
-            } else if !model.gone, let words = PlaylistDownloadWords.heroLine(download, smart: smart) {
+            } else if !model.gone, let words = PlaylistDownloadWords.heroLine(download, smart: smart, device: Platform.device) {
                 Text(words)
                     .font(Typeface.footnote)
                     .foregroundStyle(Palette.quiet)
@@ -810,7 +810,7 @@ private struct PlaylistSongRow: View {
         var parts = [song.title ?? ""]
         if current { parts.append(PlayingBars.label(paused: !playing)) }
         if !line.isEmpty { parts.append(line) }
-        let state: String? = dimmed ? DownloadWords.notOnPhone : DownloadWords.songLine(download)
+        let state: String? = dimmed ? DownloadWords.notOnDevice(Platform.device) : DownloadWords.songLine(download, device: Platform.device)
         if let state { parts.append(state) }
         let time = Format.trackTime(song.duration)
         if !time.isEmpty { parts.append(time) }

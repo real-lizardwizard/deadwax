@@ -44,8 +44,8 @@ public struct CheckReport: Sendable, Equatable {
 
     public var needsSignIn: Bool { who == .needsSignIn }
 
-    /// The lines shown under Check, first to last.
-    public var lines: [String] {
+    /// The lines shown under Check, first to last, as `device` says them.
+    public func lines(_ device: Device) -> [String] {
         var lines: [String] = []
         switch health {
         case .failure(let error):
@@ -64,12 +64,21 @@ public struct CheckReport: Sendable, Equatable {
         case .signedIn(let me)?:
             lines.append("Logins are on: signed in as \(me.user)\(me.admin ? ", an admin" : "").")
         case .needsSignIn?:
-            lines.append("Logins are on, and this phone isn't signed in. Sign in below with your Navidrome name and password.")
+            lines.append("Logins are on, and this \(device.noun) isn't signed in. Sign in below with your Navidrome name and password.")
         case .unknown(let words)?:
             lines.append(words)
         case nil:
             break
         }
         return lines
+    }
+}
+
+/// The address screen's own words that name the device (App/Root/ServerAddressView.swift).
+public enum AddressWords {
+    /// Under the address: the first time, the system asks for the local network - iOS on the iPhone, macOS on the Mac.
+    public static func footer(_ device: Device) -> String {
+        "The address you open deadwax at, by IP or by name. The first time, \(device == .mac ? "macOS" : "iOS") asks to "
+            + "let deadwax find devices on your local network: say yes."
     }
 }

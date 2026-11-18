@@ -24,7 +24,7 @@ struct OfflineBanner: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            if let banner = DownloadWords.banner(reachability.reach) {
+            if let banner = DownloadWords.banner(reachability.reach, device: Platform.device) {
                 strip(banner)
                     .transition(reduceMotion ? .opacity : .move(edge: .top).combined(with: .opacity))
             }

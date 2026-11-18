@@ -69,7 +69,7 @@ struct AccountSection: View {
         } footer: {
             Group {
                 // with anything on the phone, where someone signing out wonders: the downloads stay (6.1)
-                Text(SignOutRow.footnote(user: user) + (downloads.anythingHere ? DownloadWords.staysAfterSignOut : ""))
+                Text(SignOutRow.footnote(user: user) + (downloads.anythingHere ? DownloadWords.staysAfterSignOut(Platform.device) : ""))
             }
             .font(Typeface.footnote)
         }

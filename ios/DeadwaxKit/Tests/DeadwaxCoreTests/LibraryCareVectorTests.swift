@@ -26,7 +26,7 @@ import Testing
     static func outcome(_ web: Web) -> BulkTargets.Outcome { EditVectorTests.decoded(BulkTargets.Outcome.self, web) }
 
     static let server = try! ServerAddress.parse("192.168.3.20:8090").get()
-    static let noAnswer = APIFailure.offline(.init(server: server, method: "POST", path: "/library/art/fetch", reason: "offline"))
+    static let noAnswer = APIFailure.offline(.init(server: server, method: "POST", path: "/library/art/fetch", reason: "offline", device: .iPhone))
 
     static func refusal(_ status: Int) -> APIFailure {
         .answered(.init(status: status, method: "POST", path: "/library/art/fetch"))

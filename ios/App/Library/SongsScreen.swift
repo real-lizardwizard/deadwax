@@ -205,7 +205,7 @@ struct SongsScreen: View {
         case .downloads:
             let here = downloads.songsHere
             guard !here.isEmpty else {
-                player.say(PullShuffleWords.nothingHere)
+                player.say(PullShuffleWords.nothingHere(Platform.device))
                 return
             }
             player.play(playlist: here, at: nil, shuffle: true)
@@ -367,7 +367,7 @@ struct SongRow: View {
             .disabled(dimmed)
             .accessibilityElement(children: .combine)
             .accessibilityLabel(SongWords.spoken(song))
-            .accessibilityValue(dimmed ? DownloadWords.notOnPhone : "")
+            .accessibilityValue(dimmed ? DownloadWords.notOnDevice(Platform.device) : "")
         } else {
             face
                 .accessibilityElement(children: .combine)

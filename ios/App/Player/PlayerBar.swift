@@ -191,7 +191,7 @@ struct PlayerBar: View {
             }
             .disabled(dimmed)
             .opacity(dimmed ? Palette.off : 1)
-            .accessibilityLabel(LyricsWords.label(lyrics.have))
+            .accessibilityLabel(LyricsWords.label(lyrics.have, device: Platform.device))
             .accessibilityAddTraits(lyricsOn ? .isSelected : [])
             Button {
                 navigation.togglePanel(.upNext)

@@ -28,29 +28,29 @@ import Testing
             (Self.port(.other, "Something", "o-1", type: "Receiver"), "other:Receiver:o-1", "Something", "speaker.wave.2"),
         ]
         for (p, key, name, symbol) in rows {
-            let o = EQOutputs.output([p])!
+            let o = EQOutputs.output([p], device: .iPhone)!
             #expect(o.key == key && o.name == name && o.symbol == symbol, "\(p.port)")
             #expect(o.port == p.port && o.uid == p.uid)
         }
-        #expect(EQOutputs.output([]) == nil)
-        #expect(EQOutputs.speaker == EQOutputs.output([Self.port(.builtInSpeaker, "Speaker", "")])!.withPortType("Speaker"))
+        #expect(EQOutputs.output([], device: .iPhone) == nil)
+        #expect(EQOutputs.speaker(.iPhone) == EQOutputs.output([Self.port(.builtInSpeaker, "Speaker", "")], device: .iPhone)!.withPortType("Speaker"))
     }
 
     @Test func severalAirPlayOutputsAreOne() {
-        let o = EQOutputs.output([Self.port(.airPlay, "Living Room", "B-2"), Self.port(.airPlay, "Kitchen", "A-1")])!
+        let o = EQOutputs.output([Self.port(.airPlay, "Living Room", "B-2"), Self.port(.airPlay, "Kitchen", "A-1")], device: .iPhone)!
         #expect(o.key == "airplay:A-1+B-2" && o.name == "Kitchen + Living Room" && o.symbol == "airplayaudio")
         #expect(o.isAirPlay && !o.isHeadphones && !o.offersSuggestion)
         //? the same rooms in either order are the same output
-        let again = EQOutputs.output([Self.port(.airPlay, "Kitchen", "A-1"), Self.port(.airPlay, "Living Room", "B-2")])!
+        let again = EQOutputs.output([Self.port(.airPlay, "Kitchen", "A-1"), Self.port(.airPlay, "Living Room", "B-2")], device: .iPhone)!
         #expect(again.key == o.key)
         //? anything else with several ports is its first
-        let mixed = EQOutputs.output([Self.port(.usbAudio, "DAC", "u"), Self.port(.airPlay, "Kitchen", "A-1")])!
+        let mixed = EQOutputs.output([Self.port(.usbAudio, "DAC", "u"), Self.port(.airPlay, "Kitchen", "A-1")], device: .iPhone)!
         #expect(mixed.key == "usb:u")
     }
 
     @Test func headphonesAndTheSuggestion() {
         for p in EQPort.allCases {
-            let o = EQOutputs.output(Self.port(p, "x", "1"))
+            let o = EQOutputs.output(Self.port(p, "x", "1"), device: .iPhone)
             #expect(o.isHeadphones == [.bluetoothA2DP, .bluetoothLE, .headphones, .usbAudio].contains(p), "\(p)")
             #expect(o.offersSuggestion == [.bluetoothA2DP, .bluetoothLE, .usbAudio].contains(p), "\(p)")
         }

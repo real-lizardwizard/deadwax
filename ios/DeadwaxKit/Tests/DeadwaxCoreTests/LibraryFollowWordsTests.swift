@@ -49,15 +49,15 @@ private let gb: Int64 = 1_000_000_000
     @Test func wouldFitSaysNOfM() {
         let some = LibraryFill.plan([.init(id: "a", bytes: 15 * gb), .init(id: "b", bytes: 10 * gb), .init(id: "c", bytes: nil)],
                                     .init(limit: StorageLimit.gb20.bytes, freeSpace: 100 * gb))
-        #expect(LibraryFollowWords.wouldFit(some, limit: .gb20) == "1 of 3 fit in 20 GB")
-        #expect(LibraryFollowWords.fitDetail(some) == "They take 15 GB \u{00B7} 1 over the limit \u{00B7} 1 not read yet")
+        #expect(LibraryFollowWords.wouldFit(some, limit: .gb20, device: .iPhone) == "1 of 3 fit in 20 GB")
+        #expect(LibraryFollowWords.fitDetail(some, device: .iPhone) == "They take 15 GB \u{00B7} 1 over the limit \u{00B7} 1 not read yet")
         let all = LibraryFill.plan([.init(id: "a", bytes: gb)], .init(limit: nil, freeSpace: 100 * gb))
-        #expect(LibraryFollowWords.wouldFit(all, limit: .none) == "All 1 fit on this phone")
+        #expect(LibraryFollowWords.wouldFit(all, limit: .none, device: .iPhone) == "All 1 fit on this phone")
         let none = LibraryFill.plan([], .init(limit: nil, freeSpace: 100 * gb))
-        #expect(LibraryFollowWords.wouldFit(none, limit: .none) == "0 of 0 fit on this phone")
+        #expect(LibraryFollowWords.wouldFit(none, limit: .none, device: .iPhone) == "0 of 0 fit on this phone")
         let full = LibraryFill.plan([.init(id: "a", bytes: 5 * gb, here: gb), .init(id: "b", bytes: 1, keptOff: true)],
                                     .init(limit: nil, freeSpace: 1_500_000_000, deficitConfirmed: true))
-        #expect(LibraryFollowWords.fitDetail(full) == "They take 0 MB \u{00B7} 1 wait for room on the phone \u{00B7} 1 kept off \u{00B7} 1 would give way")
+        #expect(LibraryFollowWords.fitDetail(full, device: .iPhone) == "They take 0 MB \u{00B7} 1 wait for room on the phone \u{00B7} 1 kept off \u{00B7} 1 would give way")
     }
 
     @Test func missingAndHeld() {
@@ -68,10 +68,10 @@ private let gb: Int64 = 1_000_000_000
         later.missingSince = now - 60_000
         #expect(LibraryFollowWords.missing([listed], now: now) == "None")
         #expect(LibraryFollowWords.missing([listed, gone, later], now: now) == "2 (the first 4 min ago)")
-        #expect(LibraryFollowWords.held(nil) == "No")
-        #expect(LibraryFollowWords.held(.empty(kept: 1_412)).contains("1,412"))
-        #expect(LibraryFollowWords.held(.drop(gone: 300, of: 412)).contains("300 of 412"))
-        #expect(LibraryFollowWords.held(.truncated).contains("10,000"))
+        #expect(LibraryFollowWords.held(nil, device: .iPhone) == "No")
+        #expect(LibraryFollowWords.held(.empty(kept: 1_412), device: .iPhone).contains("1,412"))
+        #expect(LibraryFollowWords.held(.drop(gone: 300, of: 412), device: .iPhone).contains("300 of 412"))
+        #expect(LibraryFollowWords.held(.truncated, device: .iPhone).contains("10,000"))
         #expect(LibraryFollowWords.read(2_998, of: 3_010) == "2,998 of 3,010")
         #expect(LibraryFollowWords.scope(.yours) != LibraryFollowWords.scope(.store))
     }

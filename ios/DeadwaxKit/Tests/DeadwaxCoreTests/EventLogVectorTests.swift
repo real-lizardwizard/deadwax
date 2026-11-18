@@ -18,7 +18,7 @@ import Testing
     }
 
     static let server = try! ServerAddress.parse("192.168.3.20:8090").get()
-    static let deadwax = DeadwaxClient(server: server, transport: FakeTransport())
+    static let deadwax = DeadwaxClient(server: server, transport: FakeTransport(), device: .iPhone)
 
     /// The stream's address as the phone asks it, from where the page stands: its path and query, as the web's is
     /// written (`/deadwax/...?after=..&boot=..`).

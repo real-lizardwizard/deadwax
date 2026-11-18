@@ -28,7 +28,7 @@ import Testing
 
     static let refused = APIFailure.answered(.init(status: 400, method: "PUT", path: "/settings",
                                                    detail: "LIBRARY_PATH: not a directory"))
-    static let unreached = APIFailure.offline(.init(server: server, method: "PUT", path: "/settings", reason: "offline"))
+    static let unreached = APIFailure.offline(.init(server: server, method: "PUT", path: "/settings", reason: "offline", device: .iPhone))
 
     // MARK: the marks
 

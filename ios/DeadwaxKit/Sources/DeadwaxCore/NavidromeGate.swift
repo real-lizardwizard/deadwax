@@ -70,8 +70,12 @@ public enum NavidromeGate {
     public static let musicUnset = "deadwax hasn't been connected to a music server yet. \(ErrorWords.tell)"
     /// Someone with Settings and the log who isn't an admin: Navidrome's rows are an admin's alone.
     public static let adminSetsUp = "An admin can set it up in Server settings (Connections)."
-    public static let navidromeRequired = "deadwax needs Navidrome for your library: the app shows and plays the albums "
-        + "Navidrome lists, through deadwax - so the phone never needs Navidrome's password."
+    /// The web's words say "the phone" (NeedsNavidrome.tsx); the Mac's say "the Mac" - a departure from the web, named
+    /// with the others (notes/ios.md "The Mac app, slice 4: the Mac's words").
+    public static func navidromeRequired(_ device: Device) -> String {
+        "deadwax needs Navidrome for your library: the app shows and plays the albums "
+            + "Navidrome lists, through deadwax - so the \(device.noun) never needs Navidrome's password."
+    }
     public static let navidromeUnreached = "Your library comes from Navidrome, so it shows here once deadwax can reach it."
     /// An admin's, after navidromeRequired (D8: the words kept). Since Phase 8's slice 8 the button opens the app's own
     /// Server settings at Connections, as a sheet over the Library - the web's `showServerSettingsTab('connections')` -
@@ -85,7 +89,7 @@ public enum NavidromeGate {
     // MARK: the rule
 
     /// What the gate draws for what the last check found (nil: none has yet), for `access` (NeedsNavidrome).
-    public static func shown(_ checked: Checked?, access: Access) -> Shown {
+    public static func shown(_ checked: Checked?, access: Access, device: Device) -> Shown {
         guard let checked else { return .connecting }
         let status = checked.status
         if status.ok { return .open }
@@ -99,7 +103,7 @@ public enum NavidromeGate {
             return .closed(Closed(title: cantReach, lines: [problem, navidromeUnreached].filter { !$0.isEmpty },
                                   tryAgain: true, setUp: false))
         }
-        let how = "\(navidromeRequired) \(access.isAdmin ? setItUp : adminSetsUp)"
+        let how = "\(navidromeRequired(device)) \(access.isAdmin ? setItUp : adminSetsUp)"
         return .closed(Closed(title: connect, lines: [problem, how].filter { !$0.isEmpty }, tryAgain: false,
                               setUp: access.isAdmin))
     }
@@ -107,8 +111,8 @@ public enum NavidromeGate {
     /// The phone's gate (its own rule, not the web's): before the first check has found anything, the Library is drawn
     /// rather than the spinner - its list kept on disk draws at once (D2), or its own loading shows - and only a check
     /// that finds Navidrome isn't there closes it. Once something is found it is `shown`'s.
-    public static func shownOnPhone(_ checked: Checked?, access: Access) -> Shown {
+    public static func shownOnPhone(_ checked: Checked?, access: Access, device: Device) -> Shown {
         guard let checked else { return .open }
-        return shown(checked, access: access)
+        return shown(checked, access: access, device: device)
     }
 }

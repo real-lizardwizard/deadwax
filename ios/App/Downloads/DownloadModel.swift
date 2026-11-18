@@ -1068,7 +1068,7 @@ final class DownloadModel {
         if readable {
             if !stateKept { UserDefaults.standard.set(true, forKey: LibraryBackground.readableKey) }
         } else {
-            note("background: this launch couldn't read the settings (before the phone's first unlock) - nothing asked")
+            note(LibraryFollowWords.unreadableAtLaunch(Platform.device))
         }
     }
 
@@ -1406,7 +1406,7 @@ final class DownloadModel {
         let now = Int64(ProcessInfo.processInfo.systemUptime * 1000)
         let was = deficitSince
         deficitSince = LibraryFill.deficitSince(deficitSince, deficit: short, now: now)
-        if was == nil, deficitSince != nil { note("library: the phone is under its reserve - looked at again in 3 minutes") }
+        if was == nil, deficitSince != nil { note(LibraryFollowWords.underReserveNoted(Platform.device)) }
         let confirmed = LibraryFill.deficitConfirmed(since: deficitSince, now: now)
         if confirmed != libraryDeficitConfirmed { libraryDeficitConfirmed = confirmed }
         if let since = deficitSince, !confirmed {

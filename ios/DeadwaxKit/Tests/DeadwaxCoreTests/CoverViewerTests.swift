@@ -147,7 +147,7 @@ import Testing
     @Test func aTransportsTooLargeIsSaidAsItself() async throws {
         // the app's transport calls the read off past the request's most, and throws HTTPTooLarge: never "no answer"
         let server = try ServerAddress.parse("192.168.3.20:8090").get()
-        let deadwax = DeadwaxClient(server: server, session: nil, transport: CalledOff())
+        let deadwax = DeadwaxClient(server: server, session: nil, transport: CalledOff(), device: .iPhone)
         await #expect(throws: HTTPTooLarge(most: CoverZoom.fullMostBytes)) {
             try await deadwax.fullCover(coverID: "al-4_0")
         }

@@ -686,12 +686,12 @@ private struct UpNextDownload: ViewModifier {
                 .accessibilityValue(words(state, notHere: notHere))
         case .card:
             content
-                .accessibilityValue(DownloadWords.songLine(state) ?? "")
+                .accessibilityValue(DownloadWords.songLine(state, device: Platform.device) ?? "")
         }
     }
 
     private func words(_ state: SongDownload, notHere: Bool) -> String {
-        (notHere ? DownloadWords.notOnPhone : DownloadWords.songLine(state)) ?? ""
+        (notHere ? DownloadWords.notOnDevice(Platform.device) : DownloadWords.songLine(state, device: Platform.device)) ?? ""
     }
 }
 

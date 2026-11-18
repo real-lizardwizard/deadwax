@@ -132,7 +132,7 @@ final class SearchModel {
     /// Navidrome known not to be there (the Library's gate, closed): nothing asked of search3.
     var navidromeAway: NavidromeGate.Closed? {
         guard NavidromeGate.consulted(reachability.reach), library.navidrome?.offline != true else { return nil }
-        if case .closed(let closed) = NavidromeGate.shownOnPhone(library.navidrome, access: server.access) { return closed }
+        if case .closed(let closed) = NavidromeGate.shownOnPhone(library.navidrome, access: server.access, device: Platform.device) { return closed }
         return nil
     }
 

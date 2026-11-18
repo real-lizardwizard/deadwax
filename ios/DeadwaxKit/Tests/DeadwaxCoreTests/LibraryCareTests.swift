@@ -24,7 +24,7 @@ import Testing
     }
 
     static let server = try! ServerAddress.parse("192.168.3.20:8090").get()
-    static let noAnswer = APIFailure.timeout(.init(server: server, method: "POST", path: "/library/art/fetch", reason: "timed out"))
+    static let noAnswer = APIFailure.timeout(.init(server: server, method: "POST", path: "/library/art/fetch", reason: "timed out", device: .iPhone))
 
     static func refusal(_ status: Int) -> APIFailure {
         .answered(.init(status: status, method: "POST", path: "/library/art/fetch"))

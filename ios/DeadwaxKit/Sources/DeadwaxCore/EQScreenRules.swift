@@ -176,7 +176,7 @@ extension EQSettings {
 
     /// Forget (3.12): its setting deleted; met again, it starts Off. Never the speaker, which is always there.
     public mutating func forget(_ key: String) {
-        guard key != EQOutputs.speaker.key else { return }
+        guard key != EQOutputs.speakerKey else { return }
         outputs.removeAll { $0.key == key }
     }
 
@@ -208,9 +208,9 @@ extension EQSettings {
 }
 
 extension EQOutputSetting {
-    /// The output it is, as the screen draws it: its key as kept, its symbol and kind from its port and name.
-    public var output: EQOutput {
-        let symbol = EQOutputs.output(EQRoutePort(port: type, portType: "", name: name, uid: uid)).symbol
+    /// The output it is, as the screen draws it on `device`: its key as kept, its symbol and kind from its port and name.
+    public func output(_ device: Device) -> EQOutput {
+        let symbol = EQOutputs.output(EQRoutePort(port: type, portType: "", name: name, uid: uid), device: device).symbol
         return EQOutput(key: key, port: type, portType: "", uid: uid, name: shownName, symbol: symbol)
     }
 }
@@ -241,11 +241,11 @@ public enum EQPlaying: Equatable, Sendable {
 public enum EQScreenRules {
     /// Other outputs (3.12): every output the phone has met but the one the page shows, the most recent first - and
     /// the speaker, always there, met or not (last, when it never was). Ties by name.
-    public static func others(_ settings: EQSettings, shown: String) -> [EQOutputSetting] {
+    public static func others(_ settings: EQSettings, shown: String, device: Device) -> [EQOutputSetting] {
         var list = settings.outputs.filter { $0.key != shown }
-        let speaker = EQOutputs.speaker.key
+        let speaker = EQOutputs.speakerKey
         if shown != speaker && !list.contains(where: { $0.key == speaker }) {
-            list.append(EQSettings.newOutput(EQOutputs.speaker, seen: ""))
+            list.append(EQSettings.newOutput(EQOutputs.speaker(device), seen: ""))
         }
         return list.sorted { (a: EQOutputSetting, b: EQOutputSetting) -> Bool in
             if a.seen != b.seen { return a.seen > b.seen }
@@ -260,11 +260,11 @@ public enum EQScreenRules {
     /// "Forget This Output" (3.2): only on the page of an output that isn't connected, has been met, and isn't the
     /// speaker.
     public static func forgets(_ page: EQPage, met: Bool) -> Bool {
-        !page.connected && met && page.output != EQOutputs.speaker.key
+        !page.connected && met && page.output != EQOutputs.speakerKey
     }
 
     /// Other outputs' Forget (3.12): never the speaker.
-    public static func forgets(_ key: String) -> Bool { key != EQOutputs.speaker.key }
+    public static func forgets(_ key: String) -> Bool { key != EQOutputs.speakerKey }
 
     /// The output a page bound to `key` draws and changes (3.2): as kept (iOS's name as it was last met, yours from
     /// Rename), else the route's own while it is the output now, the speaker (always there), or as the page last drew
@@ -272,10 +272,11 @@ public enum EQScreenRules {
     /// forgotten meanwhile, a page bound to the AirPods reads and writes the AirPods (the review: the first build fell
     /// back to the output now, so a page whose output had been forgotten would have changed the one playing). An output
     /// none of those knows (Debug's Started with, for one forgotten since) is named by its key.
-    public static func output(_ key: String, route: EQOutput, in settings: EQSettings, lastDrawn: EQOutput?) -> EQOutput {
-        if let kept = settings.output(key) { return kept.output }
+    public static func output(_ key: String, route: EQOutput, in settings: EQSettings, lastDrawn: EQOutput?,
+                              device: Device) -> EQOutput {
+        if let kept = settings.output(key) { return kept.output(device) }
         if key == route.key { return route }
-        if key == EQOutputs.speaker.key { return EQOutputs.speaker }
+        if key == EQOutputs.speakerKey { return EQOutputs.speaker(device) }
         if let lastDrawn, lastDrawn.key == key { return lastDrawn }
         return EQOutput(key: key, port: .other, portType: "", uid: "", name: key, symbol: "speaker.wave.2")
     }
@@ -283,7 +284,7 @@ public enum EQScreenRules {
     /// You's row and Now Playing's subtitle (3.1): the output now's name and its short setting.
     public static func now(_ settings: EQSettings, route: EQOutput) -> (name: String, short: String) {
         let setting = settings.setting(for: route)
-        return (setting.output.name, EQWords.shortSetting(setting, in: settings))
+        return (setting.shownName, EQWords.shortSetting(setting, in: settings))
     }
 
     /// The line at the top of a page pushed for an output that isn't connected (3.2) - none on the EQ page itself,
@@ -298,8 +299,8 @@ public enum EQScreenRules {
     /// is, with no preamp (back-home 15a). `top` is the curve's top over the ears before the preamp (only read for a
     /// preamp by hand).
     public static func line(on: Bool, identity: Bool, preamp: EQPreampSetting, played: Double, top: Double,
-                            unitNotMade: Bool) -> EQLine {
-        if unitNotMade { return EQLine(EQWords.Screen.unitNotMade, .danger) }
+                            unitNotMade: Bool, device: Device) -> EQLine {
+        if unitNotMade { return EQLine(EQWords.Screen.unitNotMade(device), .danger) }
         guard on else { return EQLine(EQWords.Screen.off) }
         if identity { return EQLine(EQWords.Screen.flat) }
         switch preamp {
@@ -312,7 +313,7 @@ public enum EQScreenRules {
 
     /// Info's Sound row (3.1): "Bass Boost on James's AirPods Pro, preamp -6.4 dB" - none while Off (8, question 8).
     public static func infoSound(_ setting: EQOutputSetting, in settings: EQSettings, preamp: Double) -> String? {
-        EQWords.Info.sound(short: EQWords.shortSetting(setting, in: settings), output: setting.output.name,
+        EQWords.Info.sound(short: EQWords.shortSetting(setting, in: settings), output: setting.shownName,
                            preamp: preamp, on: setting.on)
     }
 

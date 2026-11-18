@@ -31,7 +31,7 @@ struct DownloadsScreen: View {
             DownloadOverSection(waitingForIt: shelf.waitingForNetwork)
             if downloads.storeProblem != nil {
                 // downloads are off for this launch: no list to draw, nothing to remove
-                Section {} footer: { Text(DownloadWords.lastFooter).font(Typeface.footnote) }
+                Section {} footer: { Text(DownloadWords.lastFooter(Platform.device)).font(Typeface.footnote) }
             } else if shelf.isEmpty {
                 Section {
                     VStack(alignment: .leading, spacing: 4) {
@@ -47,7 +47,7 @@ struct DownloadsScreen: View {
                     Text(DownloadWords.downloadedHeader)
                         .font(Typeface.footnote)
                 } footer: {
-                    Text(DownloadWords.lastFooter)
+                    Text(DownloadWords.lastFooter(Platform.device))
                         .font(Typeface.footnote)
                 }
             } else {
@@ -78,13 +78,13 @@ struct DownloadsScreen: View {
                         Platform.dialogCancel()
                     } message: {
                         let scope = downloads.follower.scope ?? AlbumScope.albums(for: server.me)
-                        Text([DownloadWords.removeAllMessage(songs: shelf.songsHere, bytes: downloads.bytesHere),
+                        Text([DownloadWords.removeAllMessage(songs: shelf.songsHere, bytes: downloads.bytesHere, device: Platform.device),
                               downloads.follower.on ? AutoDownloadWords.removeAllToo(scope) : nil,
-                              PlaylistDownloadWords.removeAllToo(playlists: PlaylistDownloads.shelf(downloads.playlists.kept).count)]
+                              PlaylistDownloadWords.removeAllToo(playlists: PlaylistDownloads.shelf(downloads.playlists.kept).count, device: Platform.device)]
                             .compactMap { $0 }.joined(separator: " "))
                     }
                 } footer: {
-                    Text(DownloadWords.lastFooter)
+                    Text(DownloadWords.lastFooter(Platform.device))
                         .font(Typeface.footnote)
                 }
             }
@@ -185,10 +185,10 @@ private struct DownloadShelf {
         }
         playlistsGoing = entries.compactMap { (entry: KeptPlaylist) -> PlaylistLine? in
             guard let going = downloads.playlistProgress(entry) else { return nil }
-            let line = PlaylistDownloadWords.downloadingRow(going.progress, wait: going.wait)
+            let line = PlaylistDownloadWords.downloadingRow(going.progress, wait: going.wait, device: Platform.device)
             let name = entry.name.isEmpty ? PlayerWords.untitled : entry.name
             return PlaylistLine(id: entry.id, name: name, coverArt: entry.answer?.playlist.coverArt, line: line,
-                            spoken: PlaylistDownloadWords.downloadingSpoken(name, going.progress, wait: going.wait),
+                            spoken: PlaylistDownloadWords.downloadingSpoken(name, going.progress, wait: going.wait, device: Platform.device),
                             fraction: going.fetching ? going.progress.fraction : nil)
         }
         playlistsHere = entries.compactMap { (entry: KeptPlaylist) -> PlaylistLine? in
@@ -210,7 +210,7 @@ private struct DownloadShelf {
             }
             let only = all.count == 1 ? downloads.song(all[0].id)?.title ?? PlayerWords.untitled : nil
             return Going(id: albumID, album: downloads.keptAlbum(albumID),
-                         line: DownloadWords.downloadingRow(here: here, of: of, wait: wait, onlySong: only),
+                         line: DownloadWords.downloadingRow(here: here, of: of, wait: wait, onlySong: only, device: Platform.device),
                          fraction: fraction, records: records)
         }
         allWaitForWifi = !waits.isEmpty && waits.allSatisfy { $0 == .waiting(.wifi) }
@@ -222,7 +222,7 @@ private struct DownloadShelf {
         failed = Self.byAlbum(downloads.failed).map { albumID, records in
             let first = records.first { $0.failure != nil }
             let reason = DownloadWords.failure(first?.failure ?? .unsaved, songID: first?.id ?? "",
-                                               server: server.address, admin: server.access.seesDetail)
+                                               server: server.address, admin: server.access.seesDetail, device: Platform.device)
             return Failed(id: albumID, album: downloads.keptAlbum(albumID), records: records, reason: reason)
         }
 
@@ -287,7 +287,7 @@ private struct StorageSection: View {
                 }
                 DownloadBar(fraction: over ? 1 : fraction(bytes, limit: limit), amber: over)
                     .padding(.vertical, 2)
-                Text(DownloadWords.usageLine(albums: shelf.albumsHere, songs: shelf.songsHere, free: free))
+                Text(DownloadWords.usageLine(albums: shelf.albumsHere, songs: shelf.songsHere, free: free, device: Platform.device))
                     .font(Typeface.footnote)
                     .foregroundStyle(Palette.quiet)
                     .fixedSize(horizontal: false, vertical: true)
@@ -301,7 +301,7 @@ private struct StorageSection: View {
             .padding(.vertical, 6)
             .accessibilityElement(children: .ignore)
             .accessibilityLabel(DownloadWords.downloads)
-            .accessibilityValue([DownloadWords.usageSpoken(bytes, limit: limit, free: free),
+            .accessibilityValue([DownloadWords.usageSpoken(bytes, limit: limit, free: free, device: Platform.device),
                                  over ? DownloadWords.overLimit(limit) : nil].compactMap { $0 }.joined(separator: ". "))
 
             Picker(DownloadWords.storageLimit, selection: $downloads.storageLimit) {
@@ -314,7 +314,7 @@ private struct StorageSection: View {
             if downloads.otherBytes > 0 {
                 HStack(alignment: .firstTextBaseline, spacing: 12) {
                     VStack(alignment: .leading, spacing: 2) {
-                        Text(DownloadWords.otherAccounts)
+                        Text(DownloadWords.otherAccounts(Platform.device))
                         Text(Bytes.words(downloads.otherBytes))
                             .font(Typeface.subheadline)
                             .foregroundStyle(Palette.quiet)
@@ -329,13 +329,13 @@ private struct StorageSection: View {
                             Button(DownloadWords.remove, role: .destructive) { downloads.removeOthers() }
                             Platform.dialogCancel()
                         } message: {
-                            Text(DownloadWords.removeOthersMessage(downloads.otherBytes))
+                            Text(DownloadWords.removeOthersMessage(downloads.otherBytes, device: Platform.device))
                         }
                 }
             }
 
             if let problem = downloads.storeProblem {
-                ErrorNote(text: DownloadWords.storeUnreadable, detail: problem)
+                ErrorNote(text: DownloadWords.storeUnreadable(Platform.device), detail: problem)
                     .foregroundStyle(Palette.amber)
             }
         } header: {
@@ -375,7 +375,7 @@ private struct LibrarySection: View {
             Toggle(isOn: Binding(get: { follower.on }, set: { turn($0) })) {
                 VStack(alignment: .leading, spacing: 3) {
                     Text(AutoDownloadWords.switchName(scope))
-                    Text(AutoDownloadWords.note(scope))
+                    Text(AutoDownloadWords.note(scope, device: Platform.device))
                         .font(Typeface.footnote)
                         .foregroundStyle(Palette.quiet)
                         .fixedSize(horizontal: false, vertical: true)
@@ -383,7 +383,7 @@ private struct LibrarySection: View {
             }
             .accessibilityElement(children: .ignore)
             .accessibilityLabel(AutoDownloadWords.switchName(scope))
-            .accessibilityHint(AutoDownloadWords.note(scope))
+            .accessibilityHint(AutoDownloadWords.note(scope, device: Platform.device))
             .accessibilityValue(follower.on ? "On" : "Off")
             .accessibilityAddTraits(.isButton)
             .accessibilityAction { turn(!follower.on) }
@@ -393,13 +393,13 @@ private struct LibrarySection: View {
                 Button(AutoDownloadWords.offAndRemove, role: .destructive) { follower.on = false }
                 Platform.dialogCancel()
             } message: {
-                Text(AutoDownloadWords.offMessage(bytes: offBytes))
+                Text(AutoDownloadWords.offMessage(bytes: offBytes, device: Platform.device))
             }
             if follower.on {
                 fit(follower, scope: scope)
                 ChargingToggle(scope: scope)
                 if follower.asks, let held = follower.held,
-                   let question = AutoDownloadWords.question(held, scope: scope, here: albumsHere(follower)) {
+                   let question = AutoDownloadWords.question(held, scope: scope, here: albumsHere(follower), device: Platform.device) {
                     QuestionRow(question: question)
                 }
             }
@@ -446,7 +446,7 @@ private struct LibrarySection: View {
             .accessibilityLabel(AutoDownloadWords.reading(scope, read: reading.read, of: reading.of))
             .accessibilityAddTraits(.updatesFrequently)
         } else if let plan = downloads.libraryFill {
-            Text(AutoDownloadWords.fit(plan, limit: downloads.storageLimit, bytes: plan.bytes))
+            Text(AutoDownloadWords.fit(plan, limit: downloads.storageLimit, bytes: plan.bytes, device: Platform.device))
                 .foregroundStyle(plan.allFit ? Color.primary : Palette.amber)
                 .fixedSize(horizontal: false, vertical: true)
                 .accessibilityElement(children: .combine)
@@ -488,7 +488,7 @@ private struct ChargingToggle: View {
                              set: { (on: Bool) -> Void in downloads.onlyWhileCharging = on })) {
             VStack(alignment: .leading, spacing: 3) {
                 Text(AutoDownloadWords.onlyWhileCharging)
-                Text(AutoDownloadWords.chargingNote(scope))
+                Text(AutoDownloadWords.chargingNote(scope, device: Platform.device))
                     .font(Typeface.footnote)
                     .foregroundStyle(Palette.quiet)
                     .fixedSize(horizontal: false, vertical: true)
@@ -496,7 +496,7 @@ private struct ChargingToggle: View {
         }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(AutoDownloadWords.onlyWhileCharging)
-        .accessibilityHint(AutoDownloadWords.chargingNote(scope))
+        .accessibilityHint(AutoDownloadWords.chargingNote(scope, device: Platform.device))
         .accessibilityValue(downloads.onlyWhileCharging ? "On" : "Off")
         .accessibilityAddTraits(.isButton)
         .accessibilityAction { downloads.onlyWhileCharging.toggle() }
@@ -587,7 +587,7 @@ private struct LibraryDownloadingRow: View {
 
     var body: some View {
         let scope = downloads.follower.scope ?? AlbumScope.albums(for: server.me)
-        let line = downloads.libraryWait.map { DownloadWords.wait($0) } ?? AutoDownloadWords.downloadingRow(progress)
+        let line = downloads.libraryWait.map { DownloadWords.wait($0, device: Platform.device) } ?? AutoDownloadWords.downloadingRow(progress)
         Button {
             navigation.open(.downloaded)
         } label: {
@@ -613,7 +613,7 @@ private struct LibraryDownloadingRow: View {
         }
         .buttonStyle(.plain)
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel(downloads.libraryWait.map { "\(AutoDownloadWords.downloadingTitle(scope)), \(DownloadWords.wait($0))" }
+        .accessibilityLabel(downloads.libraryWait.map { "\(AutoDownloadWords.downloadingTitle(scope)), \(DownloadWords.wait($0, device: Platform.device))" }
                             ?? AutoDownloadWords.downloadingSpoken(scope, progress))
         .accessibilityAddTraits([.isButton, .updatesFrequently])
     }
@@ -651,7 +651,7 @@ private struct DownloadOverSection: View {
                     Text(chosen.note)
                     Text(DownloadWords.overNow(reachability.path, setting: downloads.downloadOver))
                         .foregroundStyle(waitingForIt ? Palette.amber : Palette.quiet)
-                    Text(DownloadWords.overKept)
+                    Text(DownloadWords.overKept(Platform.device))
                 }
             }
             .font(Typeface.footnote)
@@ -783,11 +783,11 @@ private struct FailedRow: View {
         }
         .removable(name: row.album?.name, asks: asks, ask: ask, offered: removes) { remove() }
         // keeping a library album off lets go of its songs already here too: said, with Cancel
-        .confirmationDialog(AutoDownloadWords.keepOffTitle(name), isPresented: $askingKeepOff,
+        .confirmationDialog(AutoDownloadWords.keepOffTitle(name, device: Platform.device), isPresented: $askingKeepOff,
                             titleVisibility: .visible) {
             Button(DownloadWords.removeDownload, role: .destructive) {
                 remove()
-                player.say(DownloadWords.removed(name))
+                player.say(DownloadWords.removed(name, device: Platform.device))
             }
             Platform.dialogCancel()
         } message: {
@@ -1023,7 +1023,7 @@ private struct Removable: ViewModifier {
             } else {
                 Button(DownloadWords.remove, systemImage: "trash", role: .destructive) {
                     remove()
-                    player.say(DownloadWords.removed(name ?? PlayerWords.untitled))
+                    player.say(DownloadWords.removed(name ?? PlayerWords.untitled, device: Platform.device))
                 }
             }
         }

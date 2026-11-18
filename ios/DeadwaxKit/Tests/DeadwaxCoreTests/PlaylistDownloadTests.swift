@@ -509,11 +509,11 @@ private func listed(_ id: String, changed: String = "c1") -> Playlist {
         #expect(PlaylistDownloads.choices(.downloaded(checking: false)) == [.remove])
         #expect(PlaylistDownloads.choices(.waiting(.wifi, here: 0, of: 3)) == [.remove])
         // the hero's line: the album's while its songs come, its own once all are here
-        #expect(PlaylistDownloadWords.heroLine(.downloaded(checking: false)) == PlaylistDownloadWords.playsOffline)
-        #expect(PlaylistDownloadWords.heroLine(.downloaded(checking: true)) == PlaylistDownloadWords.playsOffline)
-        let failedLine = failed.flatMap { (state: AlbumDownload) -> String? in PlaylistDownloadWords.heroLine(state) }
+        #expect(PlaylistDownloadWords.heroLine(.downloaded(checking: false), device: .iPhone) == PlaylistDownloadWords.playsOffline)
+        #expect(PlaylistDownloadWords.heroLine(.downloaded(checking: true), device: .iPhone) == PlaylistDownloadWords.playsOffline)
+        let failedLine = failed.flatMap { (state: AlbumDownload) -> String? in PlaylistDownloadWords.heroLine(state, device: .iPhone) }
         #expect(failedLine == "1 song didn't download" && failedLine == DownloadWords.didntDownload(1))
-        #expect(PlaylistDownloadWords.heroLine(.waiting(.wifi, here: 0, of: 3)) == DownloadWords.wait(.wifi))
+        #expect(PlaylistDownloadWords.heroLine(.waiting(.wifi, here: 0, of: 3), device: .iPhone) == DownloadWords.wait(.wifi, device: .iPhone))
     }
 
     @Test func downloadingsRowCountsTheSongsToCome() {
@@ -525,13 +525,13 @@ private func listed(_ id: String, changed: String = "c1") -> Playlist {
         #expect(progress?.fraction == 0.5)
         #expect(PlaylistDownloads.progress(entry, states: [.done(.matched), .done(.matched), .failed(.unsaved), .done(.bySize)]) == nil)
         let row = PlaylistDownloads.Progress(toGo: 3, of: 12)
-        #expect(PlaylistDownloadWords.downloadingRow(row, wait: nil) == "3 of 12 songs to go")
-        #expect(PlaylistDownloadWords.downloadingRow(row, wait: .queued) == "3 of 12 songs to go")
-        #expect(PlaylistDownloadWords.downloadingRow(row, wait: .room) == DownloadWords.wait(.room))
-        #expect(PlaylistDownloadWords.downloadingSpoken("Late night", row, wait: nil) == "Late night, 3 of 12 songs to go, 75 percent")
-        #expect(PlaylistDownloadWords.downloadingRow(PlaylistDownloads.Progress(toGo: 1_200, of: 2_000), wait: nil)
+        #expect(PlaylistDownloadWords.downloadingRow(row, wait: nil, device: .iPhone) == "3 of 12 songs to go")
+        #expect(PlaylistDownloadWords.downloadingRow(row, wait: .queued, device: .iPhone) == "3 of 12 songs to go")
+        #expect(PlaylistDownloadWords.downloadingRow(row, wait: .room, device: .iPhone) == DownloadWords.wait(.room, device: .iPhone))
+        #expect(PlaylistDownloadWords.downloadingSpoken("Late night", row, wait: nil, device: .iPhone) == "Late night, 3 of 12 songs to go, 75 percent")
+        #expect(PlaylistDownloadWords.downloadingRow(PlaylistDownloads.Progress(toGo: 1_200, of: 2_000), wait: nil, device: .iPhone)
                 == "1,200 of 2,000 songs to go")
-        #expect(PlaylistDownloadWords.downloadingRow(PlaylistDownloads.Progress(toGo: 1, of: 1), wait: nil)
+        #expect(PlaylistDownloadWords.downloadingRow(PlaylistDownloads.Progress(toGo: 1, of: 1), wait: nil, device: .iPhone)
                 == "1 of 1 song to go")
     }
 
@@ -539,11 +539,11 @@ private func listed(_ id: String, changed: String = "c1") -> Playlist {
         #expect(PlaylistDownloadWords.playsOffline == "This playlist is downloaded - it plays with no connection.")
         #expect(PlaylistDownloadWords.place == "Downloaded playlists")
         #expect(PlaylistDownloadWords.count(1) == "1 playlist" && PlaylistDownloadWords.count(3) == "3 playlists")
-        #expect(PlaylistDownloadWords.removeAllToo(playlists: 0) == nil)
-        #expect(PlaylistDownloadWords.removeAllToo(playlists: 1)?.hasPrefix("Your downloaded playlist goes") == true)
-        #expect(PlaylistDownloadWords.removeAllToo(playlists: 3)?.hasPrefix("Your 3 downloaded playlists go") == true)
+        #expect(PlaylistDownloadWords.removeAllToo(playlists: 0, device: .iPhone) == nil)
+        #expect(PlaylistDownloadWords.removeAllToo(playlists: 1, device: .iPhone)?.hasPrefix("Your downloaded playlist goes") == true)
+        #expect(PlaylistDownloadWords.removeAllToo(playlists: 3, device: .iPhone)?.hasPrefix("Your 3 downloaded playlists go") == true)
         let banned = ["Navidrome", "the store", "cache", "sync", "MD5", "offline mode", "everything", "checksum", "Browse"]
-        let lines = PlaylistDownloadWords.everyLine
+        let lines = PlaylistDownloadWords.everyLine(.iPhone)
         #expect(lines.count > 10)
         for line in lines {
             #expect(!line.isEmpty)

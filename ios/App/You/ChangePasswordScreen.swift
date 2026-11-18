@@ -197,7 +197,7 @@ struct ChangePasswordScreen: View {
         Task {
             let outcome = await server.changeOwnPassword(body)
             // (review) nothing announced when the sign-in came over the app as it answered: the sign-in says it
-            let words = flow.ended(ticket, outcome, signInOver: server.signInOver != nil)
+            let words = flow.ended(ticket, outcome, signInOver: server.signInOver != nil, device: Platform.device)
             // told here too, not only by onChange: the answer may come while the page is off screen (another tab)
             navigation.passwordChanging(flow.changing)
             if let words {

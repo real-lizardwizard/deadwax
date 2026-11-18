@@ -187,7 +187,7 @@ struct EQProfileScreen: View {
         do {
             let profile = try await client.autoEqProfile(id: page.shown.id)
             guard !Task.isCancelled else { return }
-            loaded = Loaded(profile: profile, reading: profile.correction())
+            loaded = Loaded(profile: profile, reading: profile.correction(Platform.device))
         } catch {
             guard !Task.isCancelled, !(error is CancellationError) else { return }
             // a 404 in deadwax's words is the measurement gone; FastAPI's own, a deadwax older than its AutoEq routes

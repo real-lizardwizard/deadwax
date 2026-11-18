@@ -98,7 +98,7 @@ struct TrackRow: View {
     /// The one slot (1.2): the song's mark, or the room for one held - every row of the album lines up. Its words are
     /// VoiceOver's, read between the title and the time; "Not on this phone" for a dimmed row.
     @ViewBuilder private var stateSlot: some View {
-        let words = dimmed ? DownloadWords.notOnPhone : DownloadWords.songLine(download)
+        let words = dimmed ? DownloadWords.notOnDevice(Platform.device) : DownloadWords.songLine(download, device: Platform.device)
         ZStack {
             if let mark = DownloadWords.mark(download) {
                 DownloadMark(mark: mark, fraction: DownloadWords.Mark.fraction(download), font: Typeface.symbol(.caption))

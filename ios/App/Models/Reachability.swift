@@ -146,7 +146,7 @@ final class Reachability {
 
     /// The banner's coming and going, for VoiceOver - its line as it comes (or changes), "Back online" as it goes.
     private func announce(from was: Reach) {
-        let words = reach == .online ? DownloadWords.backOnline : DownloadWords.banner(reach)?.line
+        let words = reach == .online ? DownloadWords.backOnline : DownloadWords.banner(reach, device: Platform.device)?.line
         guard let words else { return }
         UIAccessibility.post(notification: .announcement, argument: words)
     }

@@ -434,11 +434,11 @@ struct FirstAskCard: View {
         if !asked, downloads.isOpen, !downloads.follower.on {
             let scope = downloads.libraryScope
             VStack(alignment: .leading, spacing: 10) {
-                Text(AutoDownloadWords.askTitle(scope))
+                Text(AutoDownloadWords.askTitle(scope, device: Platform.device))
                     .font(Typeface.headline)
                     .fixedSize(horizontal: false, vertical: true)
                     .accessibilityAddTraits(.isHeader)
-                Text(AutoDownloadWords.askLine(scope, limit: downloads.storageLimit))
+                Text(AutoDownloadWords.askLine(scope, limit: downloads.storageLimit, device: Platform.device))
                     .font(Typeface.subheadline)
                     .foregroundStyle(Palette.quiet)
                     .fixedSize(horizontal: false, vertical: true)

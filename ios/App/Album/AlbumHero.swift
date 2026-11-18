@@ -55,7 +55,7 @@ struct AlbumHero: View {
                 .padding(.top, 10)
 
             // its own line, so the badge never slides as the count moves; none at all for an album never downloaded
-            if let line = DownloadWords.albumLine(download) {
+            if let line = DownloadWords.albumLine(download, device: Platform.device) {
                 DownloadLine(download: download, line: line)
                     .padding(.top, 6)
                     .transition(.opacity)
@@ -65,7 +65,7 @@ struct AlbumHero: View {
                 .padding(.top, 16)
         }
         .frame(maxWidth: .infinity)
-        .animation(reduceMotion ? nil : .default, value: DownloadWords.albumLine(download) != nil)
+        .animation(reduceMotion ? nil : .default, value: DownloadWords.albumLine(download, device: Platform.device) != nil)
     }
 
     /// (Phase 4, slice 4) The artist (ArtistLink, AlbumPage.tsx's): a link to their page in the accent when the album

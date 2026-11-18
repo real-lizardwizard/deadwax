@@ -144,7 +144,7 @@ struct PullShuffleGraphic: View {
 
     var body: some View {
         let phase = state.pull.phase
-        let line = PullShuffleWords.line(phase, can: can, of: of)
+        let line = PullShuffleWords.line(phase, can: can, of: of, device: Platform.device)
         let progress = state.pull.progress
         let armed = phase == .armed || phase == .released
         VStack(spacing: 6) {

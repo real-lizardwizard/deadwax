@@ -186,7 +186,7 @@ struct AlbumDownloadControl: View {
         }
         .disabled(album == nil || !downloads.isOpen || (gone && state == .none))
         .accessibilityLabel(DownloadWords.controlLabel)
-        .accessibilityValue(DownloadWords.controlValue(state) ?? "")
+        .accessibilityValue(DownloadWords.controlValue(state, device: Platform.device) ?? "")
         .accessibilityAddTraits(isFetching(state) ? .updatesFrequently : [])
         .accessibilityShowsLargeContentViewer {
             Label(DownloadWords.controlLabel, systemImage: largeSymbol(state))
@@ -210,7 +210,7 @@ struct AlbumDownloadControl: View {
         var first: String?
         if case .failed(_, let failure) = state, let song = songs.first(where: { isFailed(downloads.state($0.id)) }) {
             first = DownloadWords.failure(failure, songID: song.id, server: server.address,
-                                          admin: server.access.seesDetail).text
+                                          admin: server.access.seesDetail, device: Platform.device).text
         }
         // (slice 3) every song of it a downloaded playlist keeps: no Remove Download here - the title says whose it is
         if case .downloaded = state, let album, let name = downloads.keepingPlaylist(songs, album: album.id) {
@@ -220,7 +220,7 @@ struct AlbumDownloadControl: View {
             return AutoDownloadWords.controlMenuTitle(downloads.libraryScope, bytesHere: downloads.here(songs).bytes)
         }
         return DownloadWords.controlMenuTitle(state, limit: downloads.storageLimit,
-                                              bytesHere: downloads.here(songs).bytes, firstFailure: first)
+                                              bytesHere: downloads.here(songs).bytes, firstFailure: first, device: Platform.device)
     }
 
     /// The menu's items (2.5): a failed album's Download is "Download Again".
@@ -238,7 +238,7 @@ struct AlbumDownloadControl: View {
             asked()
         case .remove:
             downloads.remove(album: album.id)
-            player.say(DownloadWords.removed(album.name ?? ""))
+            player.say(DownloadWords.removed(album.name ?? "", device: Platform.device))
         }
     }
 
@@ -283,7 +283,7 @@ struct DownloadMenuSection: View {
                 Group {
                     if songs.count == 1, case .failed(let failure) = downloads.state(songs[0].id) {
                         Text(DownloadWords.failure(failure, songID: songs[0].id, server: server.address,
-                                                   admin: server.access.seesDetail).text)
+                                                   admin: server.access.seesDetail, device: Platform.device).text)
                     } else if let name = downloads.keepingPlaylist(songs, album: album?.id) {
                         // (slice 3) kept by a downloaded playlist: why there is no Remove Download
                         Text(PlaylistDownloadWords.downloadedWith(name))
@@ -307,7 +307,7 @@ struct DownloadMenuSection: View {
             if songs.count == 1, let words = downloaded?(songs[0]) { player.say(words) }
         case .remove:
             if let album { downloads.remove(album: album.id) } else { downloads.remove(songs: songs.map(\.id)) }
-            player.say(DownloadWords.removed(name))
+            player.say(DownloadWords.removed(name, device: Platform.device))
         }
     }
 }
@@ -351,7 +351,7 @@ struct PlaylistDownloadControl: View {
         }
         .disabled(!downloads.isOpen)
         .accessibilityLabel(DownloadWords.controlLabel)
-        .accessibilityValue(state.flatMap { (shown: AlbumDownload) -> String? in DownloadWords.controlValue(shown) } ?? "")
+        .accessibilityValue(state.flatMap { (shown: AlbumDownload) -> String? in DownloadWords.controlValue(shown, device: Platform.device) } ?? "")
         .accessibilityAddTraits(isFetching(state) ? .updatesFrequently : [])
         .accessibilityShowsLargeContentViewer {
             Label(DownloadWords.controlLabel, systemImage: DownloadWords.Mark.control.rawValue)
@@ -416,13 +416,13 @@ struct PlaylistDownloadMenuSection: View {
         if case .failed(_, let failure) = state,
            let song = entry.songIDs.first(where: { (songID: String) -> Bool in isFailed(downloads.state(songID)) }) {
             first = DownloadWords.failure(failure, songID: song, server: server.address,
-                                          admin: server.access.seesDetail).text
+                                          admin: server.access.seesDetail, device: Platform.device).text
         }
         let bytes = downloads.playlistHere(entry).bytes
-        if case .downloaded = state, let line = PlaylistDownloadWords.heroLine(state, smart: smart) {
+        if case .downloaded = state, let line = PlaylistDownloadWords.heroLine(state, smart: smart, device: Platform.device) {
             return "\(line)\n\(Bytes.words(bytes))"
         }
-        return DownloadWords.controlMenuTitle(state, limit: downloads.storageLimit, bytesHere: bytes, firstFailure: first)
+        return DownloadWords.controlMenuTitle(state, limit: downloads.storageLimit, bytesHere: bytes, firstFailure: first, device: Platform.device)
     }
 
     private func act(_ choice: DownloadChoice) {
@@ -435,7 +435,7 @@ struct PlaylistDownloadMenuSection: View {
             downloads.tryAgain(playlist: id)
         case .remove:
             downloads.remove(playlist: id)
-            player.say(DownloadWords.removed(name.isEmpty ? PlayerWords.untitled : name))
+            player.say(DownloadWords.removed(name.isEmpty ? PlayerWords.untitled : name, device: Platform.device))
         }
     }
 

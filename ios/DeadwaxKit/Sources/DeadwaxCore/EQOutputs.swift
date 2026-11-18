@@ -30,7 +30,7 @@ public struct EQOutput: Equatable, Sendable {
     public var portType: String
     /// the UID as iOS gives it (several AirPlay outputs' joined by +)
     public var uid: String
-    /// the name iOS gives it ("iPhone speaker", "Headphones", or its `portName`)
+    /// the name iOS gives it ("iPhone speaker" - "Mac speakers" on the Mac - "Headphones", or its `portName`)
     public var name: String
     /// its SF Symbol
     public var symbol: String
@@ -47,13 +47,21 @@ public struct EQOutput: Equatable, Sendable {
 }
 
 public enum EQOutputs {
-    /// The speaker: always there, met or not.
-    public static let speaker = EQOutput(key: "speaker", port: .builtInSpeaker, portType: "Speaker", uid: "",
-                                         name: "iPhone speaker", symbol: "iphone")
+    /// The speaker's key, kept in the settings file: "speaker" on both devices - only its name and mark differ.
+    public static let speakerKey = "speaker"
+
+    /// The speaker: always there, met or not - the iPhone's ("iPhone speaker", its phone's mark) or the Mac's ("Mac
+    /// speakers", a Mac's).
+    public static func speaker(_ device: Device) -> EQOutput {
+        EQOutput(key: speakerKey, port: .builtInSpeaker, portType: "Speaker", uid: "", name: EQWords.Outputs.speaker(device),
+                 symbol: speakerSymbol(device))
+    }
+
+    static func speakerSymbol(_ device: Device) -> String { device == .mac ? "laptopcomputer" : "iphone" }
 
     /// The output a route is (3.12's table): several AirPlay outputs at once (multi-room) are one, keyed by their
     /// UIDs sorted; anything else with several ports is its first. Nil for a route with none.
-    public static func output(_ ports: [EQRoutePort]) -> EQOutput? {
+    public static func output(_ ports: [EQRoutePort], device: Device) -> EQOutput? {
         guard let first = ports.first else { return nil }
         if ports.count > 1 && ports.allSatisfy({ $0.port == .airPlay }) {
             let sorted = ports.sorted { $0.uid < $1.uid }
@@ -61,15 +69,15 @@ public enum EQOutputs {
             return EQOutput(key: "airplay:" + uids, port: .airPlay, portType: first.portType, uid: uids,
                             name: sorted.map(\.name).joined(separator: " + "), symbol: "airplayaudio")
         }
-        return output(first)
+        return output(first, device: device)
     }
 
-    public static func output(_ p: EQRoutePort) -> EQOutput {
+    public static func output(_ p: EQRoutePort, device: Device) -> EQOutput {
         func made(_ key: String, _ name: String, _ symbol: String) -> EQOutput {
             EQOutput(key: key, port: p.port, portType: p.portType, uid: p.uid, name: name, symbol: symbol)
         }
         switch p.port {
-        case .builtInSpeaker: return made("speaker", "iPhone speaker", "iphone")
+        case .builtInSpeaker: return made(speakerKey, EQWords.Outputs.speaker(device), speakerSymbol(device))
         case .headphones: return made("wired", "Headphones", "headphones")
         case .bluetoothA2DP, .bluetoothLE: return made("bluetooth:" + p.uid, p.name, symbol(bluetooth: p.name))
         case .usbAudio: return made("usb:" + p.uid, p.name, "cable.connector")

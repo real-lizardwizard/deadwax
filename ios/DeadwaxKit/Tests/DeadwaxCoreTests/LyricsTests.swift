@@ -106,7 +106,7 @@ private func have(_ raw: String) throws -> LyricsHave {
         let words = try LyricsVectors.vectors().words
         #expect(LyricsWords.lyrics == words.LYRICS)
         #expect(LyricsWords.none == words.LYRICS_NONE)
-        #expect(LyricsWords.notKept == words.LYRICS_NOT_KEPT)
+        #expect(LyricsWords.notKept(.iPhone) == words.LYRICS_NOT_KEPT)
         #expect(LyricsWords.loading == words.LOADING_LYRICS)
         #expect(LyricsWords.noLyrics == words.NO_LYRICS)
         #expect(LyricsWords.nothingPlaying == words.NOTHING_PLAYING)
@@ -117,7 +117,7 @@ private func have(_ raw: String) throws -> LyricsHave {
         #expect(LyricsWords.goToLit == words.GO_TO_LIT)
         // and as the spec has them (notes/app-lyrics.md 2.1), so a change on both sides is a choice, not a slip
         #expect(LyricsWords.none == "Lyrics - none for this song")
-        #expect(LyricsWords.notKept == "Lyrics - not on this phone")
+        #expect(LyricsWords.notKept(.iPhone) == "Lyrics - not on this phone")
         #expect(LyricsWords.songGone == "This song isn't here any more - it may have been moved or deleted.")
         #expect(LyricsWords.goToLit == "Go to the line being sung")
     }
@@ -139,7 +139,7 @@ private func have(_ raw: String) throws -> LyricsHave {
         }
         #expect(Set(vectors.label.map(\.have)) == Set(LyricsHave.allCases.map(\.rawValue)))
         for one in vectors.label {
-            #expect(LyricsWords.label(try have(one.have)) == one.label, "\(one.have)")
+            #expect(LyricsWords.label(try have(one.have), device: .iPhone) == one.label, "\(one.have)")
         }
         for one in vectors.dimmed {
             #expect(Lyrics.dimmed(try have(one.have), on: one.on) == one.dimmed, "\(one.have) on \(one.on)")
@@ -280,7 +280,7 @@ private func have(_ raw: String) throws -> LyricsHave {
         #expect(Lyrics.have(some, online: false) == .some)
         #expect(Lyrics.have(none, online: false) == .empty)
         #expect(Lyrics.have(none, online: true) == .empty)
-        #expect(LyricsWords.label(Lyrics.have(nil, online: false)) == "Lyrics - not on this phone")
+        #expect(LyricsWords.label(Lyrics.have(nil, online: false), device: .iPhone) == "Lyrics - not on this phone")
         // dimmed off, the same words selected on (2.7's last row)
         #expect(Lyrics.dimmed(.notKept, on: false))
         #expect(!Lyrics.dimmed(.notKept, on: true))
@@ -301,7 +301,7 @@ private func have(_ raw: String) throws -> LyricsHave {
         let gone = APIFailure.answered(.init(status: 404, method: "GET", path: path, detail: "Navidrome has nothing by that id"))
         let down = APIFailure.answered(.init(status: 502, method: "GET", path: path))
         let server = ServerAddress(base: URL(string: "http://deadwax.test:8080")!)
-        let offline = APIFailure.offline(.init(server: server, method: "GET", path: path, reason: "The Internet connection appears to be offline."))
+        let offline = APIFailure.offline(.init(server: server, method: "GET", path: path, reason: "The Internet connection appears to be offline.", device: .iPhone))
         let plain = SongLyrics(synced: false, lines: [LyricLine(time: nil, text: "One")])
         #expect(Lyrics.face(nil, asking: true, failure: nil) == .loading)
         #expect(Lyrics.face(nil, asking: false, failure: nil) == .loading)

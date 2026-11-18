@@ -48,8 +48,10 @@ NEW = "a-fresh-phone-password"
 
 
 def swift_words(name: str) -> str:
-    """A `public static let <name> = "..."` of OwnPassword.swift, its `+`-joined pieces joined."""
-    found = re.search(r"public static let " + name + r' = ((?:"[^"\n]*"\s*(?:\+\s*)?)+)', OWN)
+    """A `public static let <name> = "..."` of OwnPassword.swift, its `+`-joined pieces joined - or (the Mac app,
+    slice 4) the words a `public static func <name>(_ device: Device) -> String` returns, its interpolations as written."""
+    found = re.search(r"public static (?:let " + name + r" = |func " + name + r"\(_ device: Device\) -> String \{\s*)"
+                      + r'((?:"[^"\n]*"\s*(?:\+\s*)?)+)', OWN)
     assert found, f"no {name}"
     return "".join(re.findall(r'"([^"\n]*)"', found.group(1)))
 
@@ -249,7 +251,7 @@ def test_the_new_session_is_kept_before_it_is_used_and_a_401_is_held_while_out()
                                              "guard PasswordRekey.answerStands(sent: sent, now: changeContext) else {",
                                              "SessionStore.save(cookie, for: address.key)", "session = cookie",
                                              "self.client = makeClient(address, session: cookie)",
-                                             "let then = rekey.ended(outcome)", "changingPassword = false")]
+                                             "let then = rekey.ended(outcome, device: Platform.device)", "changingPassword = false")]
     assert order == sorted(order)
     # the cookie kept, in hand and in the client in one turn: nothing awaited between, so nothing asks under the old one
     kept = change[change.index("SessionStore.save(cookie"):change.index("self.client = makeClient(address")]
@@ -273,11 +275,11 @@ def test_the_new_session_is_kept_before_it_is_used_and_a_401_is_held_while_out()
     drop = swift_like(server, "dropChange")
     assert "rekey.forgot()" in drop and "changingPassword = false" in drop
     # Core's hold: what each outcome leaves
-    after = own_function("ended(_ outcome: OwnPassword.Outcome)")
+    after = own_function("ended(_ outcome: OwnPassword.Outcome, device: Device)")
     assert "defer { forgot() }" in after
     assert re.search(r"case \.changed:\s*return \.nothing", after)
     assert ("case .notRenewed, .failed, .unknown, .cancelled:\n"
-            "            return heard ? .signIn(reason: OwnPassword.endedWhileChanging) : .askMe") in after
+            "            return heard ? .signIn(reason: OwnPassword.endedWhileChanging(device)) : .askMe") in after
     holds = own_function("holds(reason said: String?, session: String?)")
     assert "guard out, under == .some(session) else { return false }" in holds
     assert "now.ready && sent == now" in own_function("answerStands(sent: Context, now: Context)")
@@ -365,7 +367,7 @@ def test_the_page_draws_as_the_spec_says():
     assert change.index("flow.begin(user: user, online: reachability.online,") < change.index("Task {")
     assert "Notice.announce(words)" in change
     # nothing announced under the sign-in: it says what happened
-    assert "let words = flow.ended(ticket, outcome, signInOver: server.signInOver != nil)" in change
+    assert "let words = flow.ended(ticket, outcome, signInOver: server.signInOver != nil, device: Platform.device)" in change
     assert "return signInOver ? nil : said?.announcement" in own_function("ended(_ ticket: Int")
     # Account's row pushes it, offered by the web's rule
     account = _code(app_file("You", "AccountSection.swift"))

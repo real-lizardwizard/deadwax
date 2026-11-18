@@ -69,9 +69,10 @@ public enum APOReader {
     /// 256 KB: an EQ file is a few KB.
     public static let maxBytes = 256 * 1024
 
-    public static func read(_ data: Data, pasted: Bool = false) -> Result<APOReading, APORefusal> {
+    /// `data` read as Equalizer APO reads it, its refusal and notes in `device`'s words (two say what the device plays).
+    public static func read(_ data: Data, pasted: Bool = false, device: Device) -> Result<APOReading, APORefusal> {
         do {
-            return .success(try reading([UInt8](data), pasted: pasted))
+            return .success(try reading([UInt8](data), pasted: pasted, device: device))
         } catch {
             return .failure(error)
         }
@@ -351,7 +352,7 @@ public enum APOReader {
     /// APO's types in its factory's order, for the note on a type written in another case.
     static let typeOrder = ["PK", "PEQ", "Modal", "LP", "LPQ", "HP", "HPQ", "BP", "LS", "HS", "LSC", "HSC", "NO", "AP"]
 
-    static func reading(_ data: [UInt8], pasted: Bool) throws(APORefusal) -> APOReading {
+    static func reading(_ data: [UInt8], pasted: Bool, device: Device) throws(APORefusal) -> APOReading {
         if data.count > maxBytes { throw EQWords.Import.tooBig(bytes: data.count) }
         let (lines, utf16) = try lines(data)
         var notes: [APONote] = []
@@ -366,7 +367,7 @@ public enum APOReader {
 
         func closeGroup() {
             if let g = group, let first = g.first {
-                notes.append(EQWords.Import.channels(first: first, last: g.last ?? first, words: g.words))
+                notes.append(EQWords.Import.channels(first: first, last: g.last ?? first, words: g.words, device: device))
             }
         }
 
@@ -457,7 +458,7 @@ public enum APOReader {
                 }.map(\.element)
                 graphic.append(APOGraphicLine(channel: channel, line: n, points: sorted))
             } else {
-                let (made, note) = try filter(line: n, value: value, channel: channel)
+                let (made, note) = try filter(line: n, value: value, channel: channel, device: device)
                 if let note { notes.append(note) }
                 if var made {
                     made.id = filters.count + 1
@@ -551,7 +552,7 @@ public enum APOReader {
     }
 
     /// One `Filter` line: the filter, or a note on why APO leaves it out (or neither, for `None`).
-    static func filter(line n: Int, value: Line, channel: EQChannel) throws(APORefusal) -> (EQFilter?, APONote?) {
+    static func filter(line n: Int, value: Line, channel: EQChannel, device: Device) throws(APORefusal) -> (EQFilter?, APONote?) {
         let v = replacingCommas(value)
         var isOn = true
         var m = match(on, v, at: 0)
@@ -627,7 +628,7 @@ public enum APOReader {
         }
 
         if fcValue < EQLimits.frequency.lowerBound { throw EQWords.Import.frequencyLow(line: n) }
-        if fcValue > EQLimits.frequency.upperBound { throw EQWords.Import.frequencyHigh(line: n, hz: fcValue) }
+        if fcValue > EQLimits.frequency.upperBound { throw EQWords.Import.frequencyHigh(line: n, hz: fcValue, device: device) }
         if kind.hasGain && !(-EQLimits.gain <= gainValue && gainValue <= EQLimits.gain) {
             throw EQWords.Import.gain(line: n, dB: gainValue)
         }

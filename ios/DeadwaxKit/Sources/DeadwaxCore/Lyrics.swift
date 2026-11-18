@@ -62,8 +62,10 @@ public enum LyricsWords {
     public static let lyrics = "Lyrics"
     /// ...when the song playing has none: dimmed while lyrics are off, selected while they're on.
     public static let none = "Lyrics - none for this song"
-    /// ...offline, with none kept on this phone for the song.
-    public static let notKept = "Lyrics - not on this phone"
+    /// ...offline, with none kept on this phone for the song. The web's word (lyricsView.ts LYRICS_NOT_KEPT) is the
+    /// phone's; on the Mac it says this Mac - a departure from the web, named with the others (notes/ios.md "The Mac app,
+    /// slice 4: the Mac's words").
+    public static func notKept(_ device: Device) -> String { "Lyrics - not on this \(device.noun)" }
     /// The spinner's name, while asking.
     public static let loading = "Loading lyrics"
     /// None, where a place must say something (the web's desktop panel; the phone shows the cover instead).
@@ -83,10 +85,10 @@ public enum LyricsWords {
     public static let goToLit = "Go to the line being sung"
 
     /// The Lyrics button's name - the same off and on, its state said by VoiceOver's "Selected" (lyricsLabel).
-    public static func label(_ have: LyricsHave) -> String {
+    public static func label(_ have: LyricsHave, device: Device) -> String {
         switch have {
         case .empty: return none
-        case .notKept: return notKept
+        case .notKept: return notKept(device)
         case .unknown, .some: return lyrics
         }
     }

@@ -11,7 +11,7 @@ struct ThisPhonePage: View {
         List {
             ThisPhoneSection(debug: lines.debug)
         }
-        .navigationTitle(YouWords.thisPhone)
+        .navigationTitle(YouWords.thisDevice(Platform.device))
     }
 }
 

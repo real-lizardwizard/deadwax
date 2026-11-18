@@ -153,13 +153,13 @@ private func tasks(_ plan: [String: DownloadPlan.Decision], album: String) -> [S
     // MARK: the words
 
     @Test func theWordsSayIt() {
-        #expect(DownloadWords.wait(.charging) == "Waiting for the phone to charge")
+        #expect(DownloadWords.wait(.charging, device: .iPhone) == "Waiting for the phone to charge")
         #expect(DownloadWords.waitSetting(.charging, limit: .gb20) == "Only while charging is on - in Settings > Downloads.")
         #expect(AutoDownloadWords.onlyWhileCharging == "Only while charging")
-        #expect(AutoDownloadWords.chargingNote(.yours)
+        #expect(AutoDownloadWords.chargingNote(.yours, device: .iPhone)
                 == "Your library's albums download only while the phone is charging. Albums you download yourself don't wait.")
-        #expect(AutoDownloadWords.chargingNote(.store).hasPrefix("The collection's albums download"))
-        #expect(AutoDownloadWords.everyLine.contains(AutoDownloadWords.chargingNote(.yours)))
+        #expect(AutoDownloadWords.chargingNote(.store, device: .iPhone).hasPrefix("The collection's albums download"))
+        #expect(AutoDownloadWords.everyLine(.iPhone).contains(AutoDownloadWords.chargingNote(.yours, device: .iPhone)))
         #expect(PowerState.allCases.map(LibraryFollowWords.power)
                 == ["Not known", "Not charging", "Charging", "Full, on the charger"])
         let now: Int64 = 10 * 3_600_000

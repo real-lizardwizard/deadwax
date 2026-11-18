@@ -56,7 +56,7 @@ import Testing
     }
 
     @Test func everyOtherFailureIsNotGone() {
-        let none = APIFailure.NoAnswer(server: server, method: "GET", path: "/navidrome/albums/al-1", reason: "offline")
+        let none = APIFailure.NoAnswer(server: server, method: "GET", path: "/navidrome/albums/al-1", reason: "offline", device: .iPhone)
         for failure in [answered(502, detail: "Navidrome said no"), answered(503), answered(500), answered(401),
                         answered(403), answered(408), APIFailure.offline(none), APIFailure.timeout(none),
                         APIFailure.other("deadwax's answer couldn't be read")] {

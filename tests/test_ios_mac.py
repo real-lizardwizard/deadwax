@@ -991,3 +991,70 @@ def test_the_grids_and_the_readable_pages():
     assert ".contentMargins(.horizontal, margin > 0 ? CGFloat(margin) : nil, for: .scrollContent)" in readable
     assert "MacFrame.readableMargin(width: Double(page.size.width))" in readable
     assert "frame(maxWidth: CGFloat(MacFrame.readableWidth))" not in mac
+
+
+# ----------------------------------------------------------------------------- the Mac's words (slice 4)
+
+#? (slice 4, notes/ios.md "The Mac app, slice 4: the Mac's words") the words that differ on the Mac are Core's, decided
+#? from the device it is handed - DeviceWordsTests holds both devices' words on Linux, the iPhone's against a snapshot
+#? of c97a824's - and the App hands it Platform.device: one call of each kind, where the brief named the word
+DEVICE_WORDS = {
+    "Models/ServerModel.swift": [
+        "DeadwaxClient(server: address, session: session, transport: transport, device: Platform.device)",
+        "rekey.ended(outcome, device: Platform.device)"],
+    "You/YouView.swift": ["LabeledContent(YouWords.thisDevice(Platform.device))"],
+    "You/ThisPhoneSection.swift": [".navigationTitle(YouWords.thisDevice(Platform.device))"],
+    "EQ/EQImport.swift": ["Label(EQWords.Import.fromFiles(Platform.device), systemImage: \"doc\")"],
+    "EQ/EQScreen.swift": ["EQOtherOutputRow(output: other.output(Platform.device),"],
+    "Models/DebugModel.swift": [
+        "InstallExpiry.line(expiration: Self.profile()?.expiration, now: Date(), device: Platform.device)"],
+    "Root/ServerAddressView.swift": ["Text(AddressWords.footer(Platform.device))",
+                                     "ForEach(report.lines(Platform.device), id: \\.self)"],
+    "Library/PullShuffleView.swift": ["PullShuffleWords.line(phase, can: can, of: of, device: Platform.device)"],
+    "You/ChangePasswordScreen.swift": [
+        "flow.ended(ticket, outcome, signInOver: server.signInOver != nil, device: Platform.device)"],
+    "You/DownloadsRow.swift": ["DownloadWords.storeUnreadable(Platform.device)"],
+    "Models/PlayerModel+Engine.swift": ["AudioFailure(DownloadWords.notHereUnreached(Platform.device), kind: .network)"],
+}
+
+#? the App's own literals naming a phone: the turntable recording's file name and the user agent written into it (data,
+#? read by the bench's replay - and the Mac has no turntable); each as it starts
+PHONE_LITERALS = {"Player/Turntable/DeckController.swift": ['"deadwax-turntable-phone-"', '"deadwax iPhone app \\(']}
+PHONE_WORD = re.compile(r'"[^"\n]*\bi?[Pp]hones?\b[^"\n]*"')
+
+
+def test_the_app_hands_core_the_device_for_its_words():
+    app = app_sources()
+    for path, calls in DEVICE_WORDS.items():
+        for call in calls:
+            assert call in app[path], f"{path}: {call}"
+    for path, text in app.items():
+        if path == PLATFORM:
+            continue
+        # never a device named in the App: Core is handed this build's, so the iPhone's words are the iPhone's there
+        assert not re.search(r"\bdevice:\s*\.(?:iPhone|mac)\b|\(\s*\.(?:iPhone|mac)\s*\)", bare(text)), path
+
+
+def test_no_word_the_app_writes_itself_says_phone():
+    for path, text in app_sources().items():
+        code = reader.views(text)[0]
+        found = PHONE_WORD.findall(code)
+        allowed = PHONE_LITERALS.get(path, [])
+        assert len(found) == len(allowed) and all(said.startswith(start) for said, start in zip(found, allowed)), (path, found)
+
+
+def test_nothing_stored_sent_or_keyed_changes_with_the_words():
+    outputs = (CORE / "EQOutputs.swift").read_text(encoding="utf-8")
+    #? the built-in speaker's key, the EQ's stored settings' - "iPhone speaker" or "Mac speakers" is only its name
+    assert 'public static let speakerKey = "speaker"' in outputs
+    keys = [path.name for path in sorted(KIT.rglob("*.swift"))
+            if re.search(r'"speaker"', reader.views(path.read_text(encoding="utf-8"))[0])]
+    assert keys == ["EQOutputs.swift"] and reader.views(outputs)[0].count('"speaker"') == 1, keys
+    # the plists ask in words that fit both, and there are no App Intents, Siri or Shortcuts words to say a phone in
+    for name in ("Info.plist", "Info-Mac.plist"):
+        plist = (IOS / "Config" / name).read_text(encoding="utf-8")
+        strings = re.findall(r"<string>([^<]*)</string>", plist)
+        assert "deadwax plays your music from your deadwax server on this network." in strings, name
+        assert not [s for s in strings if re.search(r"\bi?[Pp]hones?\b|\biOS\b", s)], name
+    assert not list(APP.rglob("*.intentdefinition")) and not list(APP.rglob("*.appintents"))
+    assert not any(re.search(r"\bimport AppIntents\b|\bAppIntent\b", bare(text)) for text in app_sources().values())

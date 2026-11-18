@@ -52,7 +52,7 @@ struct MineBlock: View {
     /// album's download is your library's alone (phase3-autodownload.md 3.4).
     private var line: String? {
         guard goesToo, mine.action == .remove else { return mine.note }
-        return [mine.note, AutoDownloadWords.goesToo].compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: " ")
+        return [mine.note, AutoDownloadWords.goesToo(Platform.device)].compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: " ")
     }
 }
 

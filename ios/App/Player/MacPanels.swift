@@ -95,7 +95,7 @@ struct LyricsPanel: View {
                     .padding(.horizontal, 20)
                 }
             case .cover:
-                note(lyrics.have == .notKept ? LyricsWords.label(.notKept) : LyricsWords.noLyrics)
+                note(lyrics.have == .notKept ? LyricsWords.label(.notKept, device: Platform.device) : LyricsWords.noLyrics)
             }
         } else {
             note(LyricsWords.nothingPlaying)

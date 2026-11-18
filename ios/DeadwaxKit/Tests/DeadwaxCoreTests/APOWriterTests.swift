@@ -10,12 +10,12 @@ import Testing
     static func corrections() throws -> [(String, APOReading)] {
         var out: [(String, APOReading)] = []
         for c in try EQFixtures.apo().readings where c.reading.refused == nil {
-            if case .success(let reading) = APOReader.read(try EQFixtures.bytes(of: c), pasted: c.pasted) {
+            if case .success(let reading) = APOReader.read(try EQFixtures.bytes(of: c), pasted: c.pasted, device: .iPhone) {
                 out.append((c.name, reading))
             }
         }
         for profile in try EQFixtures.profiles().profiles {
-            if case .success(let reading) = APOReader.read(try Fixtures.data("eq/\(profile.path)")) {
+            if case .success(let reading) = APOReader.read(try Fixtures.data("eq/\(profile.path)"), device: .iPhone) {
                 out.append((profile.name, reading))
             }
         }
@@ -47,7 +47,7 @@ import Testing
                 let most = [EQChannel.left, .right].map { ear in filters.filter { $0.channel == .all || $0.channel == ear }.count }.max()!
                 largest = max(largest, most)
                 if most > EQLimits.importPerEar {
-                    guard case .failure(let refusal) = APOReader.read(Data(text.utf8)) else {
+                    guard case .failure(let refusal) = APOReader.read(Data(text.utf8), device: .iPhone) else {
                         Issue.record("\(name) + \(preset?.id ?? "nothing"): \(most) filters for an ear read back")
                         continue
                     }
@@ -55,7 +55,7 @@ import Testing
                     tooMany += 1
                     continue
                 }
-                guard case .success(let back) = APOReader.read(Data(text.utf8)) else {
+                guard case .success(let back) = APOReader.read(Data(text.utf8), device: .iPhone) else {
                     Issue.record("\(name) + \(preset?.id ?? "nothing"): refused\n\(text)")
                     continue
                 }
@@ -79,7 +79,7 @@ import Testing
     @Test func autoEqsFilesAreWrittenBackByteForByte() throws {
         for profile in try EQFixtures.profiles().profiles {
             let data = try Fixtures.data("eq/\(profile.path)")
-            guard case .success(let reading) = APOReader.read(data) else {
+            guard case .success(let reading) = APOReader.read(data, device: .iPhone) else {
                 Issue.record("\(profile.name): refused")
                 continue
             }

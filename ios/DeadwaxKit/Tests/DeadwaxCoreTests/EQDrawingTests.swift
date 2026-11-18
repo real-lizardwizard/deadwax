@@ -7,7 +7,7 @@ import Testing
 /// another's.
 @Suite struct EQDrawingTests {
     static let airpods = EQOutputs.output(EQRoutePort(port: .bluetoothA2DP, portType: "", name: "James's AirPods Pro",
-                                                      uid: "a"))
+                                                      uid: "a"), device: .iPhone)
 
     static func settings(_ tone: EQTone, on: Bool = true, preamp: EQPreampSetting = .automatic,
                          correction: EQCorrection? = nil) -> (EQSettings, EQOutputSetting) {
@@ -126,7 +126,7 @@ import Testing
         let d = EQDrawing.make(o, in: s, rate: 48_000)
         #expect(d.preamp == -3 && d.top > 5.9 && d.top < 6.1)
         let line = EQScreenRules.line(on: d.on, identity: d.identity, preamp: o.preamp, played: d.preamp, top: d.top,
-                                      unitNotMade: false)
+                                      unitNotMade: false, device: .iPhone)
         #expect(line.tone == .amber && line.text.hasPrefix("Loud songs may clip: the curve boosts 3."))
     }
 
@@ -135,7 +135,7 @@ import Testing
         let d = EQDrawing.make(o, in: s, rate: 48_000)
         #expect(d.on && d.identity && d.summary == "Flat.")
         #expect(EQScreenRules.line(on: true, identity: d.identity, preamp: o.preamp, played: d.preamp, top: 0,
-                                   unitNotMade: false).text == "Flat: nothing changes the sound yet.")
+                                   unitNotMade: false, device: .iPhone).text == "Flat: nothing changes the sound yet.")
     }
 
     @Test func placesInThePlot() {

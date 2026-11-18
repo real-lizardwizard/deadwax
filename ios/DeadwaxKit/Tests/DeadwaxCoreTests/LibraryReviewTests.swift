@@ -408,9 +408,9 @@ private struct Store {
         #expect(LibraryDownloads.keptOffLoses("b", songs: songs) == 0 && LibraryDownloads.keptOffLoses("c", songs: songs) == 0)
         #expect(AutoDownloadWords.offTitle(.yours, albums: 412) == "Remove the 412 albums downloaded with your library?")
         #expect(AutoDownloadWords.offTitle(.store, albums: 1) == "Remove the album downloaded with the collection?")
-        #expect(AutoDownloadWords.offMessage(bytes: 12_400_000_000)
+        #expect(AutoDownloadWords.offMessage(bytes: 12_400_000_000, device: .iPhone)
                 == "They go from this phone (12.4 GB). What you downloaded yourself stays.")
-        #expect(AutoDownloadWords.keepOffTitle("Blue") == "Leave Blue off this phone?")
+        #expect(AutoDownloadWords.keepOffTitle("Blue", device: .iPhone) == "Leave Blue off this phone?")
         #expect(AutoDownloadWords.keepOffMessage(.yours, songsHere: 9)
                 == "Your library leaves it off until you download it again. Its 9 songs already here go too; songs of it you downloaded yourself stay.")
     }

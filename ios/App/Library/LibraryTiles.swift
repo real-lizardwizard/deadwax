@@ -52,7 +52,7 @@ struct LibraryTile: View {
     /// What VoiceOver says of a tile or a row, in the order the web's button reads: the title, the artist, its download
     /// ("Downloaded", "Partly downloaded", "Downloading"... - "Not on this phone" while dimmed) and "New in your library".
     static func spoken(_ album: IndexAlbum, isNew: Bool, download: AlbumDownload = .none, notHere: Bool = false) -> String {
-        [album.name, album.artist, DownloadWords.tileSpoken(download, notHere: notHere),
+        [album.name, album.artist, DownloadWords.tileSpoken(download, notHere: notHere, device: Platform.device),
          isNew ? LibraryWords.newMarkSpoken : nil]
             .compactMap { $0 }
             .filter { !$0.isEmpty }

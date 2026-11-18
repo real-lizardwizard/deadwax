@@ -345,7 +345,7 @@ struct NowPlayingView: View {
         .buttonStyle(.plain)
         .disabled(dimmed)
         .opacity(dimmed ? Palette.off : 1)
-        .accessibilityLabel(LyricsWords.label(have))
+        .accessibilityLabel(LyricsWords.label(have, device: Platform.device))
         .accessibilityAddTraits(on ? .isSelected : [])
     }
 

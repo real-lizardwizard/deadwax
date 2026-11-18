@@ -1,8 +1,8 @@
 import Foundation
 
 /// Every word Phase 2 adds (notes/ios-specs/phase2-downloads.md), each tested. "Download" is the verb, as Apple Music
-/// has it; "Downloaded" the state; "this phone" wherever "download" alone could be read as deadwax fetching from
-/// Soulseek. The web's words hold: "your library", "the collection" - never "Navidrome", "the store", "cache", "sync",
+/// has it; "Downloaded" the state; "this phone" ("this Mac" on the Mac - `Device.noun`) wherever "download" alone
+/// could be read as deadwax fetching from Soulseek. The web's words hold: "your library", "the collection" - never "Navidrome", "the store", "cache", "sync",
 /// "MD5", "offline mode" or "everything" for a listener. A failed request is said by ErrorWords, through an
 /// APIFailure for the stream's path; only the download's own failures are said here, in the same voice.
 public enum DownloadWords {
@@ -60,31 +60,31 @@ public enum DownloadWords {
 
     /// "3 of 12 songs downloaded", "Downloading - 4 of 12 songs", a wait's words, "2 songs didn't download",
     /// "Downloaded"; nil for none.
-    public static func albumLine(_ album: AlbumDownload) -> String? {
+    public static func albumLine(_ album: AlbumDownload, device: Device) -> String? {
         switch album {
         case .none: return nil
         case .partial(let here, let of): return "\(here) of \(songs(of)) downloaded"
         case .downloading(let here, let of, _): return "Downloading - \(here) of \(songs(of))"
-        case .waiting(let reason, _, _): return wait(reason)
+        case .waiting(let reason, _, _): return wait(reason, device: device)
         case .failed(let count, _): return didntDownload(count)
         case .downloaded: return downloaded
         }
     }
 
     /// The control's VoiceOver value: "Downloading, 40 percent" while fetching, else the album's line.
-    public static func controlValue(_ album: AlbumDownload) -> String? {
+    public static func controlValue(_ album: AlbumDownload, device: Device) -> String? {
         if case .downloading(_, _, let fraction) = album { return downloading(percent: fraction) }
-        return albumLine(album)
+        return albumLine(album, device: device)
     }
 
     /// The control's label in every state (VoiceOver), and the Large Content Viewer's.
     public static let controlLabel = "Download"
 
     /// A song's words - its row's VoiceOver words after the title, its menu's - nil for none.
-    public static func songLine(_ state: SongDownload) -> String? {
+    public static func songLine(_ state: SongDownload, device: Device) -> String? {
         switch state {
         case .none: return nil
-        case .waiting(let reason): return wait(reason)
+        case .waiting(let reason): return wait(reason, device: device)
         case .fetching(let fraction): return downloading(percent: fraction)
         case .done: return downloaded
         case .failed: return didntDownloadOne
@@ -106,8 +106,8 @@ public enum DownloadWords {
 
     /// A tile's or a Library row's words for VoiceOver (5.3), after the artist: "Downloaded", "Partly downloaded",
     /// "Downloading", "Waiting to download", "Didn't download" - and, dimmed offline, "Not on this phone".
-    public static func tileSpoken(_ album: AlbumDownload, notHere: Bool = false) -> String? {
-        if notHere { return notOnPhone }
+    public static func tileSpoken(_ album: AlbumDownload, notHere: Bool = false, device: Device) -> String? {
+        if notHere { return notOnDevice(device) }
         switch album {
         case .none: return nil
         case .partial: return "Partly downloaded"
@@ -120,7 +120,7 @@ public enum DownloadWords {
 
     public static let downloaded = "Downloaded"
     public static let didntDownloadOne = "Didn't download"
-    public static let notOnPhone = "Not on this phone"
+    public static func notOnDevice(_ device: Device) -> String { "Not on this \(device.noun)" }
 
     /// "Downloading, 40 percent".
     public static func downloading(percent fraction: Double) -> String {
@@ -140,7 +140,7 @@ public enum DownloadWords {
     public static func songs(_ count: Int) -> String { "\(count) \(count == 1 ? "song" : "songs")" }
 
     /// A wait, in words (2.3).
-    public static func wait(_ reason: DownloadWait) -> String {
+    public static func wait(_ reason: DownloadWait, device: Device) -> String {
         switch reason {
         case .queued: return "Waiting to download"
         case .connection: return "Waiting for a connection"
@@ -150,8 +150,8 @@ public enum DownloadWords {
         case .hotspot: return "Waiting - this Wi-Fi is a hotspot"
         case .lowData: return "Waiting - Low Data Mode is on"
         case .room: return "Waiting for room - the storage limit is reached"
-        case .phoneFull: return "Waiting for space on this phone"
-        case .charging: return "Waiting for the phone to charge"
+        case .phoneFull: return "Waiting for space on this \(device.noun)"
+        case .charging: return "Waiting for the \(device.noun) to charge"
         }
     }
 
@@ -169,19 +169,19 @@ public enum DownloadWords {
     /// The control's menu's title (3.1): the album's line, a setting's line under it, and the size once downloaded -
     /// "Downloaded · 412 MB". One or two lines, a newline between them.
     public static func controlMenuTitle(_ album: AlbumDownload, limit: StorageLimit, bytesHere: Int64,
-                                        firstFailure: String? = nil) -> String {
+                                        firstFailure: String? = nil, device: Device) -> String {
         var lines: [String] = []
         switch album {
         case .downloaded:
             lines.append("\(downloaded) \u{00B7} \(Bytes.words(bytesHere))")
         case .waiting(let reason, _, _):
-            lines.append(wait(reason))
+            lines.append(wait(reason, device: device))
             if let setting = waitSetting(reason, limit: limit) { lines.append(setting) }
         case .failed:
-            lines.append(albumLine(album) ?? "")
+            lines.append(albumLine(album, device: device) ?? "")
             if let firstFailure, !firstFailure.isEmpty { lines.append(firstFailure) }
         default:
-            if let line = albumLine(album) { lines.append(line) }
+            if let line = albumLine(album, device: device) { lines.append(line) }
         }
         return lines.joined(separator: "\n")
     }
@@ -189,19 +189,23 @@ public enum DownloadWords {
     // MARK: the album page (3.5, 3.6, 3.7)
 
     /// The footer's second line: "412 MB on this phone", or for a partial album "3 of 12 songs on this phone · 92 MB".
-    public static func footer(here: Int, of total: Int, bytes: Int64) -> String? {
+    public static func footer(here: Int, of total: Int, bytes: Int64, device: Device) -> String? {
         guard here > 0 else { return nil }
-        if here >= total { return "\(Bytes.words(bytes)) on this phone" }
-        return "\(here) of \(songs(total)) on this phone \u{00B7} \(Bytes.words(bytes))"
+        if here >= total { return "\(Bytes.words(bytes)) on this \(device.noun)" }
+        return "\(here) of \(songs(total)) on this \(device.noun) \u{00B7} \(Bytes.words(bytes))"
     }
 
     /// An album deadwax no longer has, with songs of it on this phone.
-    public static let albumGoneHere = "This album isn't in the collection any more - the songs on this phone still play."
+    public static func albumGoneHere(_ device: Device) -> String {
+        "This album isn't in the collection any more - the songs on this \(device.noun) still play."
+    }
     /// An album not on this phone, opened while deadwax can't be reached.
-    public static let albumNotHere = "This album isn't on this phone - it plays once deadwax is back."
+    public static func albumNotHere(_ device: Device) -> String {
+        "This album isn't on this \(device.noun) - it plays once deadwax is back."
+    }
 
     /// "Removed from this phone: Dummy".
-    public static func removed(_ name: String) -> String { "Removed from this phone: \(name)" }
+    public static func removed(_ name: String, device: Device) -> String { "Removed from this \(device.noun): \(name)" }
     /// Now Playing's: "Downloading: Roads".
     public static func downloadingSong(_ title: String) -> String { "Downloading: \(title)" }
     /// "Downloading 23 songs from Up Next", "Downloading 1 song from Up Next".
@@ -217,13 +221,14 @@ public enum DownloadWords {
     public static let songGone = "This song isn't on deadwax any more."
     public static let wrongSize = "The copy kept arriving the wrong size."
     public static let soundMismatch = "The copy's sound didn't match the original."
-    public static let unreadable = "This phone couldn't read the copy."
-    public static let unsaved = "This phone couldn't save it."
+    public static func unreadable(_ device: Device) -> String { "\(device.this) couldn't read the copy." }
+    public static func unsaved(_ device: Device) -> String { "\(device.this) couldn't save it." }
 
     /// Why a song didn't download, for the reader `admin` says (`Access.seesDetail`): an HTTP answer or no answer as
     /// ErrorWords says any failure of the stream's route, a 404 as `songGone`; the download's own in its words, with
     /// ErrorWords' advice for "other".
-    public static func failure(_ failure: DownloadFailure, songID: String, server: ServerAddress?, admin: Bool) -> ErrorWords.Line {
+    public static func failure(_ failure: DownloadFailure, songID: String, server: ServerAddress?, admin: Bool,
+                               device: Device) -> ErrorWords.Line {
         let path = "/navidrome/stream/\(DeadwaxClient.segment(songID))"
         let error: APIFailure
         switch failure {
@@ -231,12 +236,12 @@ public enum DownloadWords {
             error = .answered(.init(status: status, method: "GET", path: path, detail: detail))
         case .offline(let reason), .timeout(let reason):
             guard let server else { return own(ErrorWords.offline, raw: reason, admin: admin) }
-            let none = APIFailure.NoAnswer(server: server, method: "GET", path: path, reason: reason)
+            let none = APIFailure.NoAnswer(server: server, method: "GET", path: path, reason: reason, device: device)
             if case .timeout = failure { error = .timeout(none) } else { error = .offline(none) }
         case .wrongSize: return own(wrongSize, raw: "the length wasn't Navidrome's size, three times", admin: admin)
         case .soundMismatch: return own(soundMismatch, raw: "the decoded audio's MD5 wasn't STREAMINFO's, three times", admin: admin)
-        case .unreadable: return own(unreadable, raw: "iOS couldn't open or decode the file", admin: admin)
-        case .unsaved: return own(unsaved, raw: "the file couldn't be written", admin: admin)
+        case .unreadable: return own(unreadable(device), raw: "iOS couldn't open or decode the file", admin: admin)
+        case .unsaved: return own(unsaved(device), raw: "the file couldn't be written", admin: admin)
         }
         return ErrorWords.of(error, admin: admin, gone: songGone)
     }
@@ -252,12 +257,12 @@ public enum DownloadWords {
     public static let streamed = "Streamed from deadwax"
 
     /// Info's Plays from: "This phone - checked", "... - checked by size", "... - not checked yet", or streamed.
-    public static func playsFrom(_ check: CopyCheck?, isFLAC: Bool) -> String {
+    public static func playsFrom(_ check: CopyCheck?, isFLAC: Bool, device: Device) -> String {
         guard let check else { return streamed }
         switch DownloadRules.verdict(check, isFLAC: isFLAC) {
-        case .checked: return "This phone - checked"
-        case .bySize: return "This phone - checked by size"
-        case .checking: return "This phone - not checked yet"
+        case .checked: return "\(device.this) - checked"
+        case .bySize: return "\(device.this) - checked by size"
+        case .checking: return "\(device.this) - not checked yet"
         }
     }
 
@@ -276,7 +281,7 @@ public enum DownloadWords {
     // MARK: the Library (5)
 
     public static let downloadedTitle = "Downloaded"
-    public static let onThisPhone = "On this phone"
+    public static func onThisDevice(_ device: Device) -> String { "On this \(device.noun)" }
     public static let nothingYet = "Nothing downloaded yet."
     public static let nothingYetHow = "Download an album from its page, and it plays here even when deadwax can't be reached."
     /// The root's one row while it is Downloaded and deadwax can't be reached (5.4).
@@ -288,15 +293,18 @@ public enum DownloadWords {
 
     /// You's Downloads row's footer, only while something is happening: "Downloading - 6 songs to go", the first wait,
     /// or "2 songs didn't download" (amber - `amber`).
-    public static func youFooter(fetching: Int, toGo: Int, firstWait: DownloadWait?, failed: Int) -> (text: String, amber: Bool)? {
+    public static func youFooter(fetching: Int, toGo: Int, firstWait: DownloadWait?, failed: Int,
+                                 device: Device) -> (text: String, amber: Bool)? {
         if fetching > 0 { return ("Downloading - \(songs(toGo)) to go", false) }
-        if let firstWait { return (wait(firstWait), false) }
+        if let firstWait { return (wait(firstWait, device: device), false) }
         if failed > 0 { return (didntDownload(failed), true) }
         return nil
     }
 
     /// Added to You > Account's footnote when anything is on the phone.
-    public static let staysAfterSignOut = " Your downloads stay on this phone for when you sign in again."
+    public static func staysAfterSignOut(_ device: Device) -> String {
+        " Your downloads stay on this \(device.noun) for when you sign in again."
+    }
 
     // MARK: You > Downloads (6.2 - 6.7)
 
@@ -310,8 +318,8 @@ public enum DownloadWords {
     }
 
     /// "12 albums · 148 songs · 41.2 GB free on this phone" (nothing here: the free space alone).
-    public static func usageLine(albums: Int, songs count: Int, free: Int64) -> String {
-        let freeWords = "\(Bytes.words(free)) free on this phone"
+    public static func usageLine(albums: Int, songs count: Int, free: Int64, device: Device) -> String {
+        let freeWords = "\(Bytes.words(free)) free on this \(device.noun)"
         guard count > 0 else { return freeWords }
         return "\(albums) \(albums == 1 ? "album" : "albums") \u{00B7} \(songs(count)) \u{00B7} \(freeWords)"
     }
@@ -324,18 +332,18 @@ public enum DownloadWords {
     public static let nothingYetHeadline = "Nothing downloaded yet"
 
     /// The usage row's VoiceOver value: "2.1 GB of 20 GB used, 41.2 GB free on this phone".
-    public static func usageSpoken(_ bytes: Int64, limit: StorageLimit, free: Int64) -> String {
+    public static func usageSpoken(_ bytes: Int64, limit: StorageLimit, free: Int64, device: Device) -> String {
         let of = limit.bytes == nil ? "downloaded" : "of \(limit.label) used"
-        return "\(Bytes.words(bytes)) \(of), \(Bytes.words(free)) free on this phone"
+        return "\(Bytes.words(bytes)) \(of), \(Bytes.words(free)) free on this \(device.noun)"
     }
 
     public static let storageFooter = "The storage limit is what downloads may take - songs kept from streaming (up to 2 GB) are apart from it."
 
-    public static let otherAccounts = "Other accounts on this phone"
+    public static func otherAccounts(_ device: Device) -> String { "Other accounts on this \(device.noun)" }
     public static let remove = "Remove"
     public static let removeOthersTitle = "Remove other accounts' downloads?"
-    public static func removeOthersMessage(_ bytes: Int64) -> String {
-        "\(Bytes.words(bytes)) of music downloaded by other accounts goes from this phone. They can download it again when they sign in."
+    public static func removeOthersMessage(_ bytes: Int64, device: Device) -> String {
+        "\(Bytes.words(bytes)) of music downloaded by other accounts goes from this \(device.noun). They can download it again when they sign in."
     }
 
     public static let downloadOver = "Download over"
@@ -361,7 +369,7 @@ public enum DownloadWords {
     }
 
     /// Download over's footer, after what's used now (as Normalization's footer, YouWords.kept).
-    public static let overKept = "These are kept on this phone."
+    public static func overKept(_ device: Device) -> String { "These are kept on this \(device.noun)." }
 
     public static let downloadingHeader = "Downloading"
     public static let didntDownloadHeader = "Didn't download"
@@ -369,8 +377,9 @@ public enum DownloadWords {
 
     /// A Downloading row's line (6.5): the wait's words; the song's title when only one song of the album is asked
     /// (never "1 of 1 song"); else "4 of 12 songs".
-    public static func downloadingRow(here: Int, of total: Int, wait: DownloadWait?, onlySong: String?) -> String {
-        if let wait, wait != .queued { return self.wait(wait) }
+    public static func downloadingRow(here: Int, of total: Int, wait: DownloadWait?, onlySong: String?,
+                                      device: Device) -> String {
+        if let wait, wait != .queued { return self.wait(wait, device: device) }
         if let onlySong { return onlySong }
         return "\(here) of \(songs(total))"
     }
@@ -405,28 +414,41 @@ public enum DownloadWords {
     public static let removeAll = "Remove All Downloads"
     public static let removeAllTitle = "Remove all downloads?"
     /// "148 songs (2.1 GB) go from this phone. They stay in the collection, and you can download them again."
-    public static func removeAllMessage(songs count: Int, bytes: Int64) -> String {
-        "\(songs(count)) (\(Bytes.words(bytes))) go from this phone. They stay in the collection, and you can download them again."
+    public static func removeAllMessage(songs count: Int, bytes: Int64, device: Device) -> String {
+        "\(songs(count)) (\(Bytes.words(bytes))) go from this \(device.noun). They stay in the collection, and you can download them again."
     }
     public static let removedAll = "Removed all downloads"
 
-    /// The screen's last footer.
-    public static let lastFooter = "Closing deadwax from the app switcher stops downloads until you open it again; locking the phone doesn't. Downloads stay on this phone when you sign out."
+    /// The screen's last footer. A Mac has no app switcher to close deadwax from, and what quitting and sleep do to its
+    /// downloads is slice 5's to find out (mac-app.md checks 442-445), so the Mac's says only what is so already.
+    public static func lastFooter(_ device: Device) -> String {
+        switch device {
+        case .iPhone: return "Closing deadwax from the app switcher stops downloads until you open it again; locking the phone doesn't. Downloads stay on this phone when you sign out."
+        case .mac: return "Downloads stay on this Mac when you sign out."
+        }
+    }
 
-    /// When the store can't be read: downloads are off for this launch, nothing is deleted.
-    public static let storeUnreadable = "This phone couldn't read its downloads - close deadwax from the app switcher and open it again."
+    /// When the store can't be read: downloads are off for this launch, nothing is deleted. A Mac's deadwax is quit and
+    /// opened again, not closed from the app switcher.
+    public static func storeUnreadable(_ device: Device) -> String {
+        switch device {
+        case .iPhone: return "This phone couldn't read its downloads - close deadwax from the app switcher and open it again."
+        case .mac: return "This Mac couldn't read its downloads - quit deadwax and open it again."
+        }
+    }
 
     // MARK: offline (7)
 
-    /// The banner's line, its mark and its second line, by why (7.2).
-    public static func banner(_ reach: Reach) -> (line: String, symbol: String, more: String)? {
+    /// The banner's line, its mark and its second line, by why (7.2). A Mac has no Airplane Mode.
+    public static func banner(_ reach: Reach, device: Device) -> (line: String, symbol: String, more: String)? {
         switch reach {
         case .online: return nil
         case .noNetwork:
-            return ("Offline - showing what's on this phone", "wifi.slash",
-                    "Turn off Airplane Mode or join a network to play what isn't on this phone.")
+            return ("Offline - showing what's on this \(device.noun)", "wifi.slash",
+                    device == .mac ? "Join a network to play what isn't on this Mac."
+                        : "Turn off Airplane Mode or join a network to play what isn't on this phone.")
         case .unreachable:
-            return ("Can't reach deadwax - showing what's on this phone", "wifi.exclamationmark",
+            return ("Can't reach deadwax - showing what's on this \(device.noun)", "wifi.exclamationmark",
                     "Check you're on the right network (or your VPN is on).")
         }
     }
@@ -437,29 +459,38 @@ public enum DownloadWords {
     public static let showingMore = "Showing more"
 
     /// The player's: a song not on the phone, passed over while deadwax can't be reached (7.3).
-    public static func skippedNotHere(title: String) -> String { "Skipped \"\(title)\" - it isn't on this phone" }
+    public static func skippedNotHere(title: String, device: Device) -> String {
+        "Skipped \"\(title)\" - it isn't on this \(device.noun)"
+    }
     /// A run of them within the notice's 5 s.
-    public static func skippedNotHere(count: Int) -> String {
-        count == 1 ? "Skipped 1 song that isn't on this phone" : "Skipped \(count) songs that aren't on this phone"
+    public static func skippedNotHere(count: Int, device: Device) -> String {
+        count == 1 ? "Skipped 1 song that isn't on this \(device.noun)" : "Skipped \(count) songs that aren't on this \(device.noun)"
     }
     /// The player stopped on the first song not here, nothing after it here either.
-    public static let stoppedNotHere = "Not on this phone - it plays once deadwax is back."
+    public static func stoppedNotHere(_ device: Device) -> String { "Not on this \(device.noun) - it plays once deadwax is back." }
+    /// The player's own failure for a song not here with deadwax out of reach, and no copy kept from streaming.
+    public static func notHereUnreached(_ device: Device) -> String { "Not on this \(device.noun), and deadwax can't be reached." }
 
-    /// Every listener's line above, for the vocabulary test.
-    public static var everyLine: [String] {
+    /// Every listener's line above, as `device` says it, for the vocabulary test.
+    public static func everyLine(_ device: Device) -> [String] {
         var lines = [download, removeDownload, downloadAgain, downloadUpNext, controlLabel, downloaded, didntDownloadOne,
-                     notOnPhone, albumGoneHere, albumNotHere, songGone, wrongSize, soundMismatch, unreadable, unsaved,
-                     playsFrom, streamed, downloadedTitle, onThisPhone, nothingYet, nothingYetHow, onlyDownloadedPlay,
-                     downloads, staysAfterSignOut, storage, storageLimit, noLimit, nothingYetHeadline, storageFooter,
-                     otherAccounts, remove, removeOthersTitle, removeOthersMessage(1_200_000_000), downloadOver, overKept,
+                     notOnDevice(device), albumGoneHere(device), albumNotHere(device), songGone, wrongSize, soundMismatch,
+                     unreadable(device), unsaved(device),
+                     playsFrom, streamed, downloadedTitle, onThisDevice(device), nothingYet, nothingYetHow, onlyDownloadedPlay,
+                     downloads, staysAfterSignOut(device), storage, storageLimit, noLimit, nothingYetHeadline, storageFooter,
+                     otherAccounts(device), remove, removeOthersTitle, removeOthersMessage(1_200_000_000, device: device),
+                     downloadOver, overKept(device),
                      downloadingHeader, didntDownloadHeader, downloadedHeader, allWaitForWifi, forceQuit, tryAgain,
-                     tryAllAgain, downloadedFooter, removeAll, removeAllTitle, removeAllMessage(songs: 148, bytes: 2_100_000_000),
-                     removedAll, lastFooter, storeUnreadable, trying, backOnline, showsMore, showingMore,
-                     skippedNotHere(title: "Roads"), skippedNotHere(count: 3), stoppedNotHere,
-                     removed("Dummy"), downloadingSong("Roads"), downloadingUpNext(23), ended("Dummy", failed: 0),
-                     ended("Dummy", failed: 2), overLimit(.gb10), usageSpoken(2_100_000_000, limit: .gb20, free: 41_200_000_000),
-                     usageLine(albums: 12, songs: 148, free: 41_200_000_000)]
-        lines += DownloadWait.allCases.map(wait)
+                     tryAllAgain, downloadedFooter, removeAll, removeAllTitle,
+                     removeAllMessage(songs: 148, bytes: 2_100_000_000, device: device),
+                     removedAll, lastFooter(device), storeUnreadable(device), trying, backOnline, showsMore, showingMore,
+                     skippedNotHere(title: "Roads", device: device), skippedNotHere(count: 3, device: device),
+                     stoppedNotHere(device),
+                     removed("Dummy", device: device), downloadingSong("Roads"), downloadingUpNext(23), ended("Dummy", failed: 0),
+                     ended("Dummy", failed: 2), overLimit(.gb10),
+                     usageSpoken(2_100_000_000, limit: .gb20, free: 41_200_000_000, device: device),
+                     usageLine(albums: 12, songs: 148, free: 41_200_000_000, device: device)]
+        lines += DownloadWait.allCases.map { wait($0, device: device) }
         lines += DownloadWait.allCases.compactMap { waitSetting($0, limit: .gb20) }
         lines += DownloadOver.allCases.flatMap { [over($0).name, over($0).note] }
         for kind in [NetworkPath(satisfied: true, wifi: true), NetworkPath(satisfied: true, cellular: true, expensive: true),
@@ -467,8 +498,8 @@ public enum DownloadWords {
                      .none] {
             lines += DownloadOver.allCases.map { overNow(kind, setting: $0) }
         }
-        lines += [Reach.noNetwork, .unreachable].compactMap { banner($0) }.flatMap { [$0.line, $0.more] }
-        lines += CopyCheck.allCases.flatMap { [playsFrom($0, isFLAC: true), playsFrom($0, isFLAC: false)] }
+        lines += [Reach.noNetwork, .unreachable].compactMap { banner($0, device: device) }.flatMap { [$0.line, $0.more] }
+        lines += CopyCheck.allCases.flatMap { [playsFrom($0, isFLAC: true, device: device), playsFrom($0, isFLAC: false, device: device)] }
         lines += [DownloadRules.Verdict.checked, .bySize, .checking].map(verdict)
         return lines
     }

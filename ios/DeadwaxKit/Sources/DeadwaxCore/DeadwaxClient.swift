@@ -12,16 +12,20 @@ public struct DeadwaxClient: Sendable {
     /// The `deadwax_session` value, when signed in (logins on). Sent as `Cookie:` on every request.
     public var session: String?
     let transport: any HTTPTransport
+    /// The device asking (ios/App/Shared/Platform.swift's `Platform.device`): what an address that didn't answer says
+    /// to check on it (`unreachableWords`).
+    public let device: Device
     /// Told when deadwax says this phone's session has ended - a 401 from any route but the sign-in's own
     /// (api/http.ts noteSignedOut) - with the session the request went out under: one sent under a session a
     /// sign-in has since replaced says nothing about the new one.
     public var onSignedOut: (@Sendable (_ failure: APIFailure, _ sentUnder: String?) -> Void)?
 
-    public init(server: ServerAddress, session: String? = nil, transport: any HTTPTransport,
+    public init(server: ServerAddress, session: String? = nil, transport: any HTTPTransport, device: Device,
                 onSignedOut: (@Sendable (_ failure: APIFailure, _ sentUnder: String?) -> Void)? = nil) {
         self.server = server
         self.session = session
         self.transport = transport
+        self.device = device
         self.onSignedOut = onSignedOut
     }
 
@@ -650,7 +654,7 @@ public struct DeadwaxClient: Sendable {
             if APIFailure.isCancellation(error) { throw CancellationError() }
             // deadwax answered, past the request's mostBytes: said as itself, never as no answer
             if error is HTTPTooLarge { throw error }
-            throw APIFailure.noAnswer(error, to: request, server: server)
+            throw APIFailure.noAnswer(error, to: request, server: server, device: device)
         }
     }
 

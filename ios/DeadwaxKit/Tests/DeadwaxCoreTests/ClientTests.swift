@@ -47,7 +47,7 @@ final class FakeTransport: HTTPTransport, @unchecked Sendable {
 func client(session: String? = nil) -> (DeadwaxClient, FakeTransport) {
     let transport = FakeTransport()
     let server = try! ServerAddress.parse("192.168.3.20:8090").get()
-    return (DeadwaxClient(server: server, session: session, transport: transport), transport)
+    return (DeadwaxClient(server: server, session: session, transport: transport, device: .iPhone), transport)
 }
 
 /// What a client's signed-out hook was told.
@@ -335,7 +335,7 @@ func sentJSON(_ request: HTTPRequest?) throws -> [String: SentValue] {
     @Test func anIPv6AddressKeepsItsPathAndQuery() throws {
         for typed in ["[::1]:8090", "http://[fe80::1%25en0]:8090/player/", "[2001:db8::20]"] {
             let server = try ServerAddress.parse(typed).get()
-            let deadwax = DeadwaxClient(server: server, transport: FakeTransport())
+            let deadwax = DeadwaxClient(server: server, transport: FakeTransport(), device: .iPhone)
             let url = deadwax.url(Routes.search, query: [("q", "x"), ("songCount", "1")])
             #expect(url.path == "/deadwax/navidrome/search", "\(typed) -> \(url)")
             #expect(url.query == "q=x&songCount=1", "\(typed) -> \(url)")

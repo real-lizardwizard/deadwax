@@ -204,8 +204,8 @@ private final class Record {
         #expect(PlaylistKeeping().download(answer(["s1"], smart: true), body: Data(), at: t0, carrying: []) == nil)
         #expect(PlaylistDownloads.choices(nil, smart: true).isEmpty)
         #expect(PlaylistDownloads.choices(nil) == [.download])
-        #expect(PlaylistDownloadWords.heroLine(nil, smart: true) == PlaylistDownloadWords.smartOnline)
-        #expect(PlaylistDownloadWords.heroLine(nil) == nil)
+        #expect(PlaylistDownloadWords.heroLine(nil, smart: true, device: .iPhone) == PlaylistDownloadWords.smartOnline)
+        #expect(PlaylistDownloadWords.heroLine(nil, device: .iPhone) == nil)
         // the page's: smart when the answer in hand says so, or the one kept here does
         let frozen = PlaylistDownloads.read(kept(["s1"]), answer: answer(["s1"], smart: true), body: Data(),
                                             carrying: ["s1"], at: t0)
@@ -237,8 +237,8 @@ private final class Record {
         #expect(PlaylistDownloads.dueReads([read], now: t0 + 60 * minute).isEmpty && PlaylistDownloads.nextLook([read]) == nil)
         // Remove Download still offered, its words its own
         #expect(PlaylistDownloads.choices(.downloaded(checking: false), smart: true) == [.remove])
-        #expect(PlaylistDownloadWords.heroLine(.downloaded(checking: false), smart: true) == PlaylistDownloadWords.smartKept)
-        #expect(PlaylistDownloadWords.heroLine(.downloaded(checking: false)) == PlaylistDownloadWords.playsOffline)
+        #expect(PlaylistDownloadWords.heroLine(.downloaded(checking: false), smart: true, device: .iPhone) == PlaylistDownloadWords.smartKept)
+        #expect(PlaylistDownloadWords.heroLine(.downloaded(checking: false), device: .iPhone) == PlaylistDownloadWords.playsOffline)
         // and its Remove takes its origin as any playlist's
         let keeping = PlaylistKeeping(kept: [read])
         #expect(try #require(keeping.remove("p1", carrying: ["s1", "s2"])).effects == [.take(["s1", "s2"], from: "p1")])

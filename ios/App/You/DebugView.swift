@@ -42,7 +42,7 @@ struct DebugView: View {
                     .font(Typeface.footnote)
                     .foregroundStyle(Palette.quiet)
             } footer: {
-                Text("deadwax for iPhone \(YouView.appVersion)")
+                Text(DebugWords.footer(version: YouView.appVersion, device: Platform.device))
                     .font(Typeface.footnote)
             }
         }
@@ -88,7 +88,7 @@ struct DebugView: View {
                 Task { await model.check() }
             }
             .disabled(model.checking)
-            ForEach(model.report?.lines ?? [], id: \.self) { line in
+            ForEach(model.report?.lines(Platform.device) ?? [], id: \.self) { line in
                 Text(line).font(Typeface.footnote)
             }
         } header: {
@@ -122,7 +122,7 @@ struct DebugView: View {
             Text("Test sounds")
                 .font(Typeface.footnote)
         } footer: {
-            Text("Songs 1 to 8 are three beeps each: tap one to play the album from it and count the beeps - all three, every time? Songs 9 and 10 are one tone cut in two: played one into the other, the tone should never break. A song downloaded to this phone plays from there, as every song does; \"Stream even when downloaded\" (under Downloads) streams it instead, to hear the two side by side. \(TurntableDebugRows.trialFooter)")
+            Text(DebugWords.testSoundsFooter(trial: TurntableDebugRows.trialFooter, device: Platform.device))
                 .font(Typeface.footnote)
         }
     }
@@ -163,7 +163,7 @@ struct DebugView: View {
         }
         if let suffix = song.suffix { parts.append(suffix.uppercased()) }
         if let duration = song.duration { parts.append(clock(duration)) }
-        parts.append(model.downloaded.contains(song.id) ? "on the phone" : "not downloaded")
+        parts.append(model.downloaded.contains(song.id) ? DebugWords.onThe(Platform.device) : "not downloaded")
         return parts.joined(separator: " \u{00B7} ")
     }
 
@@ -495,7 +495,7 @@ private struct EngineLogSection: View {
             Text("Engine log")
                 .font(Typeface.footnote)
         } footer: {
-            Text("The engine's last \(EngineTrace.log.capacity) lines, the newest last (\(shown.total) so far); once there are \(EngineTrace.log.capacity), the oldest go as new ones come, so the lines move up while you read - Copy keeps them as they are. Each line starts with a time in seconds on the phone's clock: the gaps between lines are what count. Console on a Mac shows them too, as they happen: choose the iPhone, turn on Action > Include Info Messages, press Start, then search for subsystem:net.lizardlounge.deadwax.")
+            Text(DebugWords.engineLogFooter(capacity: EngineTrace.log.capacity, total: shown.total, device: Platform.device))
                 .font(Typeface.footnote)
         }
     }
@@ -618,7 +618,7 @@ private struct LibraryFollowDebugSection: View {
             Text(LibraryFollowWords.section)
                 .font(Typeface.footnote)
         } footer: {
-            Text(LibraryFollowWords.followNote)
+            Text(LibraryFollowWords.followNote(Platform.device))
                 .font(Typeface.footnote)
         }
     }
@@ -649,7 +649,7 @@ private struct LibraryFollowDebugSection: View {
                 .font(Typeface.footnote.monospacedDigit())
         }
         LabeledContent("Held back") {
-            Text(LibraryFollowWords.held(follower.held)
+            Text(LibraryFollowWords.held(follower.held, device: Platform.device)
                  + (follower.believing ? " \u{00B7} believing (Remove)" : "")
                  + (follower.keptThem ? " \u{00B7} kept them" : ""))
                 .font(Typeface.footnote)
@@ -675,8 +675,8 @@ private struct LibraryFollowDebugSection: View {
         }
         if let plan = downloads.libraryFill {
             VStack(alignment: .leading, spacing: 2) {
-                Text(LibraryFollowWords.wouldFit(plan, limit: downloads.storageLimit))
-                Text(LibraryFollowWords.fitDetail(plan))
+                Text(LibraryFollowWords.wouldFit(plan, limit: downloads.storageLimit, device: Platform.device))
+                Text(LibraryFollowWords.fitDetail(plan, device: Platform.device))
                     .font(Typeface.footnote)
                     .foregroundStyle(Palette.quiet)
                 if plan.deficit > 0 {

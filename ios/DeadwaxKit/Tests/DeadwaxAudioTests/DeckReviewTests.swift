@@ -253,7 +253,7 @@ import Testing
     /// Question 6: a newer ask cancels the /scrub fetch before it - the fetch itself, not only its answer.
     @Test func aNewerAskCancelsTheScrubFetch() throws {
         let server = HeldServer()
-        let client = DeadwaxClient(server: ServerAddress(base: try #require(URL(string: "http://deadwax.test:8080"))), transport: server)
+        let client = DeadwaxClient(server: ServerAddress(base: try #require(URL(string: "http://deadwax.test:8080"))), transport: server, device: .iPhone)
         try withFolder { (folder: URL) -> Void in
             let windows = DeckWindows(scrubFolder: folder, answerQueue: DispatchQueue(label: "deck-review.answers"))
             windows.make(scrub: client, songID: "first", from: 2, seconds: 40, outputRate: Self.rate, factor: nil) { _ in }

@@ -68,12 +68,15 @@ public enum APIFailure: Error, Sendable, Equatable {
         public let path: String
         /// The system's words (URLError's description) - the web's "Load failed".
         public let reason: String
+        /// The device that asked: `words` says what to check on it.
+        public let device: Device
 
-        public init(server: ServerAddress, method: String, path: String, reason: String) {
+        public init(server: ServerAddress, method: String, path: String, reason: String, device: Device) {
             self.server = server
             self.method = method
             self.path = path
             self.reason = reason
+            self.device = device
         }
     }
 }
@@ -120,7 +123,7 @@ extension APIFailure {
             if !answer.problems.isEmpty { return answer.problems.joined(separator: " ") }
             return "deadwax answered \(answer.status) and said nothing more."
         case .offline(let none), .timeout(let none):
-            return unreachableWords(none.server, reason: none.reason)
+            return unreachableWords(none.server, reason: none.reason, device: none.device)
         case .other(let words):
             return words
         }
@@ -153,14 +156,18 @@ extension APIFailure {
     /// A transport's error, said as what it means: no network (offline), no answer in time (timeout), or anything
     /// else (`other`, in Phase 0's words for an address that didn't answer, the system's reason in them).
     /// A cancellation is no failure: check `isCancellation` first.
-    public static func noAnswer(_ error: any Error, to request: HTTPRequest, server: ServerAddress) -> APIFailure {
+    public static func noAnswer(_ error: any Error, to request: HTTPRequest, server: ServerAddress,
+                                device: Device) -> APIFailure {
         if let failure = error as? APIFailure { return failure }
         let reason = (error as? URLError)?.localizedDescription ?? error.localizedDescription
-        let none = NoAnswer(server: server, method: request.method, path: route(of: request.url), reason: reason)
-        guard let code = (error as? URLError)?.code else { return .other(unreachableWords(server, reason: reason)) }
+        let none = NoAnswer(server: server, method: request.method, path: route(of: request.url), reason: reason,
+                            device: device)
+        guard let code = (error as? URLError)?.code else {
+            return .other(unreachableWords(server, reason: reason, device: device))
+        }
         if code == .timedOut { return .timeout(none) }
         if isOffline(code) { return .offline(none) }
-        return .other(unreachableWords(server, reason: reason))
+        return .other(unreachableWords(server, reason: reason, device: device))
     }
 
     /// The task was cancelled (Swift's own, or URLSession's) - a page left before its answer, never a failure.

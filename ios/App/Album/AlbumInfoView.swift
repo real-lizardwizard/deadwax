@@ -82,7 +82,7 @@ struct AlbumInfoList: View {
             }
 
             if let whole {
-                ForEach(AlbumInfo.local(album: whole, onPhone: onPhone(whole))) { section in
+                ForEach(AlbumInfo.local(album: whole, onPhone: onPhone(whole), device: Platform.device)) { section in
                     infoSection(section)
                 }
             }
@@ -269,7 +269,7 @@ struct AlbumInfoList: View {
         let songs = album.song ?? []
         guard downloads.isOpen, !songs.isEmpty else { return nil }
         let here = downloads.here(songs)
-        return AlbumInfo.onPhone(downloads.album(songs), here: here.count, of: songs.count, bytes: here.bytes)
+        return AlbumInfo.onPhone(downloads.album(songs), here: here.count, of: songs.count, bytes: here.bytes, device: Platform.device)
     }
 
     // MARK: acting

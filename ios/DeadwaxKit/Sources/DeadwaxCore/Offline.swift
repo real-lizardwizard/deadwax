@@ -256,14 +256,14 @@ public enum OfflinePlay {
         public init() {}
 
         /// One more passed over at `now` (seconds on any clock that only goes forward): the notice's words.
-        public mutating func skipped(title: String?, now: Double) -> String {
+        public mutating func skipped(title: String?, now: Double, device: Device) -> String {
             count = now - last <= Self.window ? count + 1 : 1
             last = now
             guard count > 1 else {
                 let name = title.flatMap { $0.isEmpty ? nil : $0 } ?? PlayerWords.untitled
-                return DownloadWords.skippedNotHere(title: name)
+                return DownloadWords.skippedNotHere(title: name, device: device)
             }
-            return DownloadWords.skippedNotHere(count: count)
+            return DownloadWords.skippedNotHere(count: count, device: device)
         }
     }
 }
@@ -279,9 +279,9 @@ public enum OfflineAlbum {
     /// - the album gone from the collection (a 404 or `{}`) with songs of it on this phone: `albumGoneHere`;
     /// - not on this phone at all (no songs in hand), opened while deadwax can't be reached: `albumNotHere` - a state,
     ///   not a failure: nothing was asked.
-    public static func note(online: Bool, haveSongs: Bool, gone: Bool, anyHere: Bool) -> String? {
-        if gone && anyHere { return DownloadWords.albumGoneHere }
-        if !online && !haveSongs { return DownloadWords.albumNotHere }
+    public static func note(online: Bool, haveSongs: Bool, gone: Bool, anyHere: Bool, device: Device) -> String? {
+        if gone && anyHere { return DownloadWords.albumGoneHere(device) }
+        if !online && !haveSongs { return DownloadWords.albumNotHere(device) }
         return nil
     }
 }

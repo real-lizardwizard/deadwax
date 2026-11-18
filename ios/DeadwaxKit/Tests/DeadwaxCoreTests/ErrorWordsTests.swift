@@ -74,8 +74,8 @@ final class WordDiffs {
             return .answered(.init(status: answer.status, method: answer.method ?? "GET", path: answer.path,
                                    detail: answer.detail, why: answer.why, kind: answer.kind, busy: answer.busy == true))
         }
-        if let words = spec.offline { return .offline(.init(server: server, method: "GET", path: "/me", reason: words)) }
-        if let words = spec.timeout { return .timeout(.init(server: server, method: "GET", path: "/me", reason: words)) }
+        if let words = spec.offline { return .offline(.init(server: server, method: "GET", path: "/me", reason: words, device: .iPhone)) }
+        if let words = spec.timeout { return .timeout(.init(server: server, method: "GET", path: "/me", reason: words, device: .iPhone)) }
         return .other(spec.other ?? "")
     }
 

@@ -30,7 +30,9 @@ public enum YouWords {
         + "is levelled, deadwax measures it, so its first song can take a few seconds to start."
     /// The web's footer is "These are kept on this device. Maximum quality changes from the next song, and
     /// Normalization from the next thing you play." The phone keeps one setting, and has no Maximum quality.
-    public static let kept = "This is kept on this phone. Normalization changes from the next thing you play."
+    public static func kept(_ device: Device) -> String {
+        "This is kept on this \(device.noun). Normalization changes from the next thing you play."
+    }
 
     // MARK: the rest
 
@@ -40,8 +42,8 @@ public enum YouWords {
     public static let logins = "Logins"
     public static let loginsOn = "On"
     public static let loginsOff = "Off"
-    /// The phone's own: where this phone finds deadwax.
-    public static let thisPhone = "This phone"
+    /// The phone's own: where this phone finds deadwax - "This Mac" on the Mac.
+    public static func thisDevice(_ device: Device) -> String { device.this }
     public static let server = "Server"
     public static let changeAddress = "Change address"
     /// Phase 0's test screen, for an admin (D1).

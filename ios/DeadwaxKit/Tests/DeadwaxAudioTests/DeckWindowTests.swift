@@ -170,7 +170,7 @@ private func scrubFixture() throws -> (flac: Data, header: DeckScrub.Header, tex
         let fixture = try scrubFixture()
         let server = ScrubServer(flac: fixture.flac, header: fixture.text)
         let client = DeadwaxClient(server: ServerAddress(base: try #require(URL(string: "http://deadwax.test:8080"))),
-                                   transport: server)
+                                   transport: server, device: .iPhone)
         let answers = DispatchQueue(label: "deck-window-test.answers")
         let local = try DeckWindows.window(of: DeckCases.deckFixture("deck-44k.flac"), from: 2, seconds: 40,
                                            outputRate: Self.output, factor: nil)

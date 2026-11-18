@@ -251,7 +251,7 @@ struct InfoView: View {
                                           engine: engine, album: album).map { section in
             //? Sent to this device gains the copy on this phone (Phase 2)
             guard section.title == Self.sentTitle else { return section }
-            let onPhone = InfoRow(label: DownloadWords.onThisPhone,
+            let onPhone = InfoRow(label: DownloadWords.onThisDevice(Platform.device),
                                   value: DownloadWords.debugOnPhone(downloads.records[track.id], channels: song.channelCount))
             return InfoSection(title: section.title, rows: section.rows + [onPhone])
         }
@@ -274,7 +274,7 @@ struct InfoView: View {
         guard let record = downloads.records[songID], record.state == .done, !downloads.streamEvenWhenDownloaded else {
             return DownloadWords.streamed
         }
-        return DownloadWords.playsFrom(record.check ?? .unchecked, isFLAC: record.suffix.lowercased() == "flac")
+        return DownloadWords.playsFrom(record.check ?? .unchecked, isFLAC: record.suffix.lowercased() == "flac", device: Platform.device)
     }
 
     /// Debug's clock: a tick each second while it shows, none otherwise.

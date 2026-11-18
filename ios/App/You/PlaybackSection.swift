@@ -91,7 +91,7 @@ struct PlaybackSection: View {
                     // the chosen one's own line first: what it does
                     Text(player.normalization.note)
                     Text(YouWords.normalizationNote)
-                    Text(YouWords.kept)
+                    Text(YouWords.kept(Platform.device))
                 }
             }
             .font(Typeface.footnote)
@@ -112,7 +112,7 @@ struct PlaybackSection: View {
                 }
             }
         } footer: {
-            Text(EQWords.You.footer)
+            Text(EQWords.You.footer(Platform.device))
                 .font(Typeface.footnote)
         }
     }

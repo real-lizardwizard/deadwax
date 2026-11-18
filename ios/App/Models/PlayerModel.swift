@@ -1083,12 +1083,12 @@ final class PlayerModel {
             act { skippedTo = controller.skipFailed() }
             if skippedTo != nil {
                 errorLine = nil
-                say(skipRun.skipped(title: title, now: Monotonic.seconds()))
+                say(skipRun.skipped(title: title, now: Monotonic.seconds(), device: Platform.device))
                 return
             }
         }
         controller.intendsToPlay = false
-        errorLine = DownloadWords.stoppedNotHere
+        errorLine = DownloadWords.stoppedNotHere(Platform.device)
     }
 
     /// The song plays with deadwax out of reach: downloaded to this phone, or whole in the streaming cache.

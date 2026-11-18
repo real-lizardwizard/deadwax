@@ -75,7 +75,7 @@ import Testing
             return
         }
         _ = flow.ended(ticket, .refused(words: "That isn't your current password.", kind: page["wrongCurrentKind"].string,
-                                        fix: nil), signInOver: false)
+                                        fix: nil), signInOver: false, device: .iPhone)
         #expect(flow.form.current.isEmpty && flow.form.password == "a-fresh-own-password" && flow.focusCurrent == 1)
     }
 

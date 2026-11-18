@@ -141,8 +141,8 @@ final class ScreenDiffs {
 /// answer in time (`timeout`), or another (`other`).
 func screenFailure(_ spec: Web, path: String = "/auth/login", method: String = "POST") -> APIFailure {
     let server = try! ServerAddress.parse("192.168.3.20:8090").get()
-    if let words = spec["offline"].string { return .offline(.init(server: server, method: method, path: path, reason: words)) }
-    if let words = spec["timeout"].string { return .timeout(.init(server: server, method: method, path: path, reason: words)) }
+    if let words = spec["offline"].string { return .offline(.init(server: server, method: method, path: path, reason: words, device: .iPhone)) }
+    if let words = spec["timeout"].string { return .timeout(.init(server: server, method: method, path: path, reason: words, device: .iPhone)) }
     if let words = spec["other"].string { return .other(words) }
     return .answered(.init(status: spec["status"].int ?? 0, method: method, path: spec["path"].string ?? path,
                            detail: spec["detail"].string, why: spec["why"].string, kind: spec["kind"].string,

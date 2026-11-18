@@ -87,7 +87,7 @@ import Testing
     @Test func aFailedIdleReadNeverArmsAnother() {
         let due = 100 + People.idleCheckSeconds + 60
         let offline = APIFailure.offline(.init(server: Self.server, method: "GET", path: "/people",
-                                               reason: "The request timed out."))
+                                               reason: "The request timed out.", device: .iPhone))
         let failures: [PeopleRead] = [
             People.readOutcome(of: Self.answered(403, "Not yours.", path: "/people"), admin: false),
             People.readOutcome(of: Self.answered(502, nil, path: "/people"), admin: true),
@@ -422,8 +422,8 @@ import Testing
     // MARK: what a failure means
 
     @Test func eachFailureIsWhatItMeans() throws {
-        let offline = APIFailure.offline(.init(server: Self.server, method: "POST", path: "/people/create", reason: "The network connection was lost."))
-        let timeout = APIFailure.timeout(.init(server: Self.server, method: "POST", path: "/people/create", reason: "timed out"))
+        let offline = APIFailure.offline(.init(server: Self.server, method: "POST", path: "/people/create", reason: "The network connection was lost.", device: .iPhone))
+        let timeout = APIFailure.timeout(.init(server: Self.server, method: "POST", path: "/people/create", reason: "timed out", device: .iPhone))
         let cases: [(any Error, PeopleOutcome)] = [
             (Self.answered(409, "Unlock People with your Navidrome password.", kind: "locked"),
              .refused(words: "Unlock People with your Navidrome password.", kind: "locked", fix: nil, askMe: false)),

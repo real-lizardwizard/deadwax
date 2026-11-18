@@ -82,7 +82,7 @@ import Testing
         #expect(ended(.disc, refused).said == "This album already has CD art: disc.jpg.")
 
         let lost = APIFailure.timeout(.init(server: server, method: "POST", path: "/library/lyrics/fetch",
-                                            reason: "The request timed out."))
+                                            reason: "The request timed out.", device: .iPhone))
         #expect(ended(.lyrics, lost).state == .unanswered && ended(.lyrics, lost).wrote)
         #expect(GetResults.label(.lyrics, ended(.lyrics, lost), trackCount: 12) == "Try again")
         let crashed = APIFailure.answered(.init(status: 500, method: "POST", path: "/library/art/fetch"))

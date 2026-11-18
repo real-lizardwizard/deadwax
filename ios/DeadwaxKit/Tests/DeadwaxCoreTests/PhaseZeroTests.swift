@@ -8,33 +8,33 @@ import Testing
     @Test func loginsOffSaysTheSharedAccount() {
         let report = CheckReport.from(health: .success(ok), me: .success(Me(user: "local", admin: true, auth: "off")))
         #expect(report.ok && !report.needsSignIn)
-        #expect(report.lines == ["deadwax 2.0.0 answered: OK.",
+        #expect(report.lines(.iPhone) == ["deadwax 2.0.0 answered: OK.",
                                  "Logins are off: everyone uses the shared account (local)."])
     }
 
     @Test func loginsOnSaysWho() {
         let report = CheckReport.from(health: .success(ok), me: .success(Me(user: "james", admin: true, auth: "on")))
-        #expect(report.lines.last == "Logins are on: signed in as james, an admin.")
+        #expect(report.lines(.iPhone).last == "Logins are on: signed in as james, an admin.")
         let ethan = CheckReport.from(health: .success(ok), me: .success(Me(user: "ethan", admin: false, auth: "on")))
-        #expect(ethan.lines.last == "Logins are on: signed in as ethan.")
+        #expect(ethan.lines(.iPhone).last == "Logins are on: signed in as ethan.")
     }
 
     @Test func a401IsASignInToDo() {
         let report = CheckReport.from(health: .success(ok), me: .failure(.answered(.init(status: 401, method: "GET", path: "/me", detail: "Sign in."))))
         #expect(report.needsSignIn && !report.ok)
-        #expect(report.lines.last?.hasPrefix("Logins are on, and this phone isn't signed in.") == true)
+        #expect(report.lines(.iPhone).last?.hasPrefix("Logins are on, and this phone isn't signed in.") == true)
     }
 
     @Test func nothingAnsweringIsOneLine() {
         let report = CheckReport.from(health: .failure(.other("Couldn't reach deadwax.")), me: nil)
-        #expect(report.lines == ["Couldn't reach deadwax."])
+        #expect(report.lines(.iPhone) == ["Couldn't reach deadwax."])
         #expect(!report.ok)
     }
 
     @Test func aStoppedPollerIsSaid() {
         let sick = Health(status: "unhealthy", version: "2.0.0", poller: "stopped")
         let report = CheckReport.from(health: .success(sick), me: .success(Me(user: "local", admin: true, auth: "off")))
-        #expect(report.lines.first?.contains("download poller has stopped") == true)
+        #expect(report.lines(.iPhone).first?.contains("download poller has stopped") == true)
     }
 }
 
@@ -151,12 +151,12 @@ import Testing
         let utc = TimeZone(identifier: "UTC")!
         let end = Date(timeIntervalSince1970: 1_793_368_920) // Fri 30 Oct 2026, 14:02 UTC
         let now = end.addingTimeInterval(-6 * 86_400)
-        #expect(InstallExpiry.line(expiration: end, now: now, timeZone: utc) == "This install runs until Fri 30 Oct, 14:02")
-        #expect(InstallExpiry.line(expiration: end, now: end.addingTimeInterval(-86_400), timeZone: utc)
+        #expect(InstallExpiry.line(expiration: end, now: now, timeZone: utc, device: .iPhone) == "This install runs until Fri 30 Oct, 14:02")
+        #expect(InstallExpiry.line(expiration: end, now: end.addingTimeInterval(-86_400), timeZone: utc, device: .iPhone)
                 == "This install runs until Fri 30 Oct, 14:02. Run install.sh on the Mac before then.")
-        #expect(InstallExpiry.line(expiration: end, now: end.addingTimeInterval(60), timeZone: utc)
+        #expect(InstallExpiry.line(expiration: end, now: end.addingTimeInterval(60), timeZone: utc, device: .iPhone)
                 == "This install ran out on Fri 30 Oct, 14:02. Run install.sh on the Mac to put it back.")
-        #expect(InstallExpiry.line(expiration: nil, now: now).hasPrefix("No install date to show"))
+        #expect(InstallExpiry.line(expiration: nil, now: now, device: .iPhone).hasPrefix("No install date to show"))
     }
 
     @Test func theTimeIsThePhonesOwnZone() {

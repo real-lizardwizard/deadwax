@@ -81,9 +81,9 @@ final class FakeLineTransport: HTTPLineTransport, @unchecked Sendable {
     }
 
     static let offline = APIFailure.offline(.init(server: server, method: "GET", path: "/interface_logs/recent",
-                                                  reason: "The Internet connection appears to be offline."))
+                                                  reason: "The Internet connection appears to be offline.", device: .iPhone))
     static let timedOut = APIFailure.timeout(.init(server: server, method: "GET", path: "/interface_logs/interface_logs",
-                                                   reason: "The request timed out."))
+                                                   reason: "The request timed out.", device: .iPhone))
 
     static func line(_ seq: Int?, _ words: String = "w", boot: String? = "b1", type: String = "INFO") -> LogLine {
         LogLine(eventType: type, eventContent: words, src: nil, seq: seq, time: 1763300000, boot: boot)
@@ -523,7 +523,7 @@ final class FakeLineTransport: HTTPLineTransport, @unchecked Sendable {
         let transport = FakeLineTransport()
         transport.answer(200, "text/event-stream; charset=utf-8",
                          [":", "", "data: {\"event_type\":\"INFO\",\"event_content\":\"a\",\"seq\":5}", "", ":", ""])
-        let deadwax = DeadwaxClient(server: Self.server, session: "s3ss10n", transport: transport)
+        let deadwax = DeadwaxClient(server: Self.server, session: "s3ss10n", transport: transport, device: .iPhone)
         var frames: [EventStream.Frame] = []
         for try await frame in try await deadwax.logStream(after: 4, boot: "b1") { frames.append(frame) }
         #expect(frames == [.comment(""), .message(type: "message", data: "{\"event_type\":\"INFO\",\"event_content\":\"a\",\"seq\":5}", id: ""), .comment("")])
@@ -543,7 +543,7 @@ final class FakeLineTransport: HTTPLineTransport, @unchecked Sendable {
     @Test func aRefusalIsTheRoutesAndA401TellsTheApp() async throws {
         let transport = FakeLineTransport()
         let heard = SignedOutHeard()
-        let deadwax = DeadwaxClient(server: Self.server, session: "old", transport: transport) { failure, under in
+        let deadwax = DeadwaxClient(server: Self.server, session: "old", transport: transport, device: .iPhone) { failure, under in
             heard.hear(failure, under)
         }
         transport.answer(401, "application/json", [], body: #"{"detail":"Not signed in."}"#)
@@ -569,7 +569,7 @@ final class FakeLineTransport: HTTPLineTransport, @unchecked Sendable {
 
     @Test func noAnswerAndAStreamThatFailsAreSaidAsNoAnswer() async throws {
         let transport = FakeLineTransport()
-        let deadwax = DeadwaxClient(server: Self.server, transport: transport)
+        let deadwax = DeadwaxClient(server: Self.server, transport: transport, device: .iPhone)
         transport.handle { _ in throw URLError(.notConnectedToInternet) }
         do {
             _ = try await deadwax.logStream(after: nil, boot: nil)
@@ -604,7 +604,7 @@ final class FakeLineTransport: HTTPLineTransport, @unchecked Sendable {
     @Test func whoeverReadsTheStreamStoppingCallsTheRequestOff() async throws {
         let transport = FakeLineTransport()
         transport.answer(200, "text/event-stream", [":", ""], endless: true)
-        let deadwax = DeadwaxClient(server: Self.server, transport: transport)
+        let deadwax = DeadwaxClient(server: Self.server, transport: transport, device: .iPhone)
         let reading = Task {
             var count = 0
             for try await _ in try await deadwax.logStream(after: nil, boot: nil) { count += 1 }

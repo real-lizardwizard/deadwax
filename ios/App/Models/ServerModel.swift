@@ -386,7 +386,7 @@ final class ServerModel {
             asks += 1
             askingMe = false
         }
-        let then = rekey.ended(outcome)
+        let then = rekey.ended(outcome, device: Platform.device)
         changingPassword = false
         switch then {
         case .nothing:
@@ -419,7 +419,7 @@ final class ServerModel {
     // MARK: the rules' wiring
 
     private func makeClient(_ address: ServerAddress, session: String?) -> DeadwaxClient {
-        DeadwaxClient(server: address, session: session, transport: transport) { [weak self] failure, sentUnder in
+        DeadwaxClient(server: address, session: session, transport: transport, device: Platform.device) { [weak self] failure, sentUnder in
             Task { @MainActor in self?.noteSignedOut(failure, sentUnder: sentUnder) }
         }
     }

@@ -12,10 +12,10 @@ public enum AutoDownloadWords {
     }
 
     /// The switch's note.
-    public static func note(_ scope: AlbumScope) -> String {
+    public static func note(_ scope: AlbumScope, device: Device) -> String {
         scope == .yours
-            ? "Keeps your library on this phone, newest first, as much as fits in the storage limit - albums you add come by themselves, and albums you remove go."
-            : "Keeps the collection on this phone, newest first, as much as fits in the storage limit."
+            ? "Keeps your library on this \(device.noun), newest first, as much as fits in the storage limit - albums you add come by themselves, and albums you remove go."
+            : "Keeps the collection on this \(device.noun), newest first, as much as fits in the storage limit."
     }
 
     /// The section's header: what the switch keeps.
@@ -25,8 +25,8 @@ public enum AutoDownloadWords {
     public static let onlyWhileCharging = "Only while charging"
 
     /// Its note.
-    public static func chargingNote(_ scope: AlbumScope) -> String {
-        "\(scope == .yours ? "Your library's" : "The collection's") albums download only while the phone is charging. Albums you download yourself don't wait."
+    public static func chargingNote(_ scope: AlbumScope, device: Device) -> String {
+        "\(scope == .yours ? "Your library's" : "The collection's") albums download only while the \(device.noun) is charging. Albums you download yourself don't wait."
     }
 
     /// "1,240 albums" / "1 album".
@@ -35,7 +35,7 @@ public enum AutoDownloadWords {
     /// The fit line (3.1): "All 212 albums fit in 20 GB." / "1,240 of 3,010 albums fit in 20 GB. Raise the limit or
     /// download fewer." / "All 3,010 albums, 1.4 TB." (No limit) / "1,240 of 3,010 albums fit on this phone." - with
     /// " - 3 wait for space on this phone" when the phone is short as well. `bytes`: what the albums that fit take.
-    public static func fit(_ plan: LibraryFill.Plan, limit: StorageLimit, bytes: Int64) -> String {
+    public static func fit(_ plan: LibraryFill.Plan, limit: StorageLimit, bytes: Int64, device: Device) -> String {
         let of = plan.of
         guard of > 0 else { return "Nothing to download yet." }
         let phone = plan.count(.phoneFull)
@@ -44,9 +44,9 @@ public enum AutoDownloadWords {
             if limit.bytes == nil { return "All \(albums(of)), \(Bytes.words(bytes))." }
             return of == 1 ? "The 1 album fits in \(limit.label)." : "All \(albums(of)) fit in \(limit.label)."
         }
-        let place = limit.bytes == nil ? "on this phone" : "in \(limit.label)"
+        let place = limit.bytes == nil ? "on this \(device.noun)" : "in \(limit.label)"
         var line = "\(UpNextWords.grouped(plan.fit)) of \(albums(of)) fit \(place)"
-        if phone > 0 && limit.bytes != nil { line += " - \(UpNextWords.grouped(phone)) wait for space on this phone" }
+        if phone > 0 && limit.bytes != nil { line += " - \(UpNextWords.grouped(phone)) wait for space on this \(device.noun)" }
         line += "."
         if room > 0 { line += " Raise the limit or download fewer." }
         return line
@@ -83,13 +83,13 @@ public enum AutoDownloadWords {
 
     /// An empty list or a large drop, held back: nothing has gone - asked. `here`: the library's albums with songs on
     /// this phone.
-    public static func question(_ held: LibraryFollow.Held, scope: AlbumScope, here: Int) -> String? {
+    public static func question(_ held: LibraryFollow.Held, scope: AlbumScope, here: Int, device: Device) -> String? {
         let whose = scope == .yours ? "your library" : "the collection"
         switch held {
         case .empty:
-            return "deadwax says \(whose) is empty. Remove the \(albums(here)) downloaded with it from this phone?"
+            return "deadwax says \(whose) is empty. Remove the \(albums(here)) downloaded with it from this \(device.noun)?"
         case .drop(let gone, let of):
-            return "deadwax's list of \(whose) lost \(UpNextWords.grouped(gone)) of \(albums(of)) at once. Remove them from this phone?"
+            return "deadwax's list of \(whose) lost \(UpNextWords.grouped(gone)) of \(albums(of)) at once. Remove them from this \(device.noun)?"
         case .truncated:
             return nil
         }
@@ -123,14 +123,14 @@ public enum AutoDownloadWords {
     // MARK: the album page (3.4)
 
     /// In your library, no room: "Your library doesn't all fit in 20 GB - this one waits for room."
-    public static func waitsForRoom(_ scope: AlbumScope, limit: StorageLimit) -> String {
+    public static func waitsForRoom(_ scope: AlbumScope, limit: StorageLimit, device: Device) -> String {
         let what = scope == .yours ? "Your library" : "The collection"
-        if limit.bytes == nil { return "\(what) doesn't all fit on this phone - this one waits for space." }
+        if limit.bytes == nil { return "\(what) doesn't all fit on this \(device.noun) - this one waits for space." }
         return "\(what) doesn't all fit in \(limit.label) - this one waits for room."
     }
 
-    public static func keptOff(_ scope: AlbumScope) -> String {
-        "You removed this download - \(scope == .yours ? "your library" : "the collection") leaves it off this phone."
+    public static func keptOff(_ scope: AlbumScope, device: Device) -> String {
+        "You removed this download - \(scope == .yours ? "your library" : "the collection") leaves it off this \(device.noun)."
     }
 
     /// The control's menu's first line for an album here with your library.
@@ -144,7 +144,7 @@ public enum AutoDownloadWords {
     }
 
     /// Added to the mine block's Remove line when a download of the album came with your library and none by hand.
-    public static let goesToo = "Its download goes from this phone too."
+    public static func goesToo(_ device: Device) -> String { "Its download goes from this \(device.noun) too." }
 
     /// Added to Remove All's message while the switch is on.
     public static func removeAllToo(_ scope: AlbumScope) -> String {
@@ -160,15 +160,15 @@ public enum AutoDownloadWords {
     }
 
     /// Its message: what goes, and what stays.
-    public static func offMessage(bytes: Int64) -> String {
-        "They go from this phone (\(Bytes.words(bytes))). What you downloaded yourself stays."
+    public static func offMessage(bytes: Int64, device: Device) -> String {
+        "They go from this \(device.noun) (\(Bytes.words(bytes))). What you downloaded yourself stays."
     }
 
     /// Its destructive button.
     public static let offAndRemove = "Turn Off and Remove"
 
     /// Didn't download's Remove on an album your library downloaded, with songs of it here: what else goes.
-    public static func keepOffTitle(_ name: String) -> String { "Leave \(name) off this phone?" }
+    public static func keepOffTitle(_ name: String, device: Device) -> String { "Leave \(name) off this \(device.noun)?" }
 
     public static func keepOffMessage(_ scope: AlbumScope, songsHere n: Int) -> String {
         let what = scope == .yours ? "Your library" : "The collection"
@@ -180,12 +180,12 @@ public enum AutoDownloadWords {
 
     // MARK: the first ask (3.2)
 
-    public static func askTitle(_ scope: AlbumScope) -> String {
-        scope == .yours ? "Keep your library on this phone?" : "Keep the collection on this phone?"
+    public static func askTitle(_ scope: AlbumScope, device: Device) -> String {
+        scope == .yours ? "Keep your library on this \(device.noun)?" : "Keep the collection on this \(device.noun)?"
     }
 
-    public static func askLine(_ scope: AlbumScope, limit: StorageLimit) -> String {
-        let fits = limit.bytes == nil ? "as much as fits on this phone" : "as much as fits in \(limit.label)"
+    public static func askLine(_ scope: AlbumScope, limit: StorageLimit, device: Device) -> String {
+        let fits = limit.bytes == nil ? "as much as fits on this \(device.noun)" : "as much as fits in \(limit.label)"
         return scope == .yours
             ? "deadwax can download your library, newest first, \(fits), and keep it in step as you add and remove albums."
             : "deadwax can download the collection, newest first, \(fits), and keep it in step as it changes."
@@ -194,26 +194,28 @@ public enum AutoDownloadWords {
     public static let turnOn = "Turn On"
     public static let notNow = "Not Now"
 
-    /// Every line, both scopes, for the ban list.
-    public static var everyLine: [String] {
-        var lines: [String] = [couldntCheck, questionNote, keepThem, remove, goesToo, turnOn, notNow, offAndRemove,
-                               offMessage(bytes: 12_400_000_000), keepOffTitle("Album"), onlyWhileCharging]
+    /// Every line, both scopes, as `device` says it, for the ban list.
+    public static func everyLine(_ device: Device) -> [String] {
+        var lines: [String] = [couldntCheck, questionNote, keepThem, remove, goesToo(device), turnOn, notNow, offAndRemove,
+                               offMessage(bytes: 12_400_000_000, device: device), keepOffTitle("Album", device: device),
+                               onlyWhileCharging]
         let plan = LibraryFill.plan([.init(id: "a", bytes: 1), .init(id: "b", bytes: 30_000_000_000)],
                                     .init(limit: StorageLimit.gb20.bytes, freeSpace: 25_000_000_000))
         for scope in AlbumScope.allCases {
-            lines += [switchName(scope), note(scope), header(scope), chargingNote(scope),
+            lines += [switchName(scope), note(scope, device: device), header(scope), chargingNote(scope, device: device),
                       reading(scope, read: 1_240, of: 3_010),
-                      waitsForRoom(scope, limit: .gb20), waitsForRoom(scope, limit: .none), keptOff(scope),
-                      menuTitle(scope), controlMenuTitle(scope, bytesHere: 412_000_000), removeAllToo(scope), askTitle(scope), askLine(scope, limit: .gb20),
-                      askLine(scope, limit: .none),
+                      waitsForRoom(scope, limit: .gb20, device: device), waitsForRoom(scope, limit: .none, device: device),
+                      keptOff(scope, device: device), menuTitle(scope), controlMenuTitle(scope, bytesHere: 412_000_000),
+                      removeAllToo(scope), askTitle(scope, device: device), askLine(scope, limit: .gb20, device: device),
+                      askLine(scope, limit: .none, device: device),
                       downloadingSpoken(scope, LibraryDownloads.Progress(toGo: 38, of: 412, bytes: 12_400_000_000)),
                       youFooter(scope, LibraryDownloads.Progress(toGo: 38, of: 412, bytes: 12_400_000_000)),
                       offTitle(scope, albums: 412), offTitle(scope, albums: 1), keepOffMessage(scope, songsHere: 9),
                       keepOffMessage(scope, songsHere: 1)]
             lines += [LibraryFollow.Held.empty(kept: 212), .drop(gone: 1_240, of: 3_010)]
-                .compactMap { question($0, scope: scope, here: 212) }
+                .compactMap { question($0, scope: scope, here: 212, device: device) }
         }
-        lines += [fit(plan, limit: .gb20, bytes: 1), fit(plan, limit: .none, bytes: 1),
+        lines += [fit(plan, limit: .gb20, bytes: 1, device: device), fit(plan, limit: .none, bytes: 1, device: device),
                   checked(nil, now: 0), checked(0, now: 5_000), checked(0, now: 180_000), checked(0, now: 7_200_000),
                   downloadingRow(LibraryDownloads.Progress(toGo: 38, of: 412, bytes: 12_400_000_000))]
         return lines

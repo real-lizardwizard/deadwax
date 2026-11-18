@@ -118,9 +118,9 @@ import Testing
         }
         diffs.done()
         let server = try! ServerAddress.parse("192.168.3.20:8090").get()
-        #expect(!SignInRules.endsSession(.offline(.init(server: server, method: "GET", path: "/me", reason: "offline")),
+        #expect(!SignInRules.endsSession(.offline(.init(server: server, method: "GET", path: "/me", reason: "offline", device: .iPhone)),
                                          sentUnder: "s.1", current: "s.1"))
-        #expect(!SignInRules.endsSession(.timeout(.init(server: server, method: "GET", path: "/me", reason: "timed out")),
+        #expect(!SignInRules.endsSession(.timeout(.init(server: server, method: "GET", path: "/me", reason: "timed out", device: .iPhone)),
                                          sentUnder: nil, current: nil))
         #expect(!SignInRules.endsSession(.other("unreadable"), sentUnder: "s.1", current: "s.1"))
     }
