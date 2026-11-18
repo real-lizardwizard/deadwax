@@ -117,6 +117,7 @@ struct EQSheet: View {
             if !up { navigation.importAnswered() }
         })) {
             EQImportSheetContent()
+                .macSheet()
         }
         .task { () async -> Void in
             try? await Task.sleep(for: .milliseconds(400))

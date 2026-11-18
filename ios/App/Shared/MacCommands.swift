@@ -18,8 +18,8 @@ struct MacCommands: Commands {
     let navigation: AppNavigation
     let server: ServerModel
 
-    /// The menus' state now: the player's, the window's (a text field with the cursor, the sign-in, Now Playing, the
-    /// page shown's Refresh).
+    /// The menus' state now: the player's, the window's (a text field with the cursor, the sign-in, Now Playing, a
+    /// sheet, the page shown's Refresh).
     private var state: MacMenu.State {
         let track = player.current?.track
         return MacMenu.State(queued: player.hasQueue, playing: player.isPlaying, shuffle: player.shuffle,
@@ -27,7 +27,8 @@ struct MacCommands: Commands {
                              hasAlbum: track.flatMap { PlayedAlbum.route($0, player: player) } != nil,
                              typing: TextEditing.shared.typing,
                              tabs: server.launch == .ready && server.signInOver == nil,
-                             refresh: MacRefresh.shared.state, nowPlaying: navigation.nowPlayingShown)
+                             refresh: MacRefresh.shared.state, nowPlaying: navigation.nowPlayingShown,
+                             sheet: MacRefresh.shared.sheetUp)
     }
 
     var body: some Commands {
@@ -138,7 +139,9 @@ struct MacCommands: Commands {
 /// Whether a text field has the cursor (the Mac's, slice 2): Space, ⌘→ and ⌘← are the field's meanwhile, off their
 /// Controls items (MacMenu.yieldsToTyping) - so typing a space in Search never pauses the music. Read from UIKit's own
 /// notices, every field and text view the app draws (SwiftUI's TextField, a search bar's field, the editors' text
-/// views); started at launch on the Mac only (Platform.launching).
+/// views), and counted again each time the window comes to the front - a field that lost the cursor with no notice
+/// (its window closed, the app in the background) never leaves the keys off; started at launch on the Mac only
+/// (Platform.launching).
 @MainActor
 @Observable
 final class TextEditing {
@@ -163,6 +166,10 @@ final class TextEditing {
                 MainActor.assumeIsolated { TextEditing.shared.changed(field, began: began) }
             }
         }
+        _ = NotificationCenter.default.addObserver(forName: UIScene.didActivateNotification, object: nil,
+                                                   queue: .main) { (_: Notification) in
+            MainActor.assumeIsolated { TextEditing.shared.changed(nil, began: false) }
+        }
     }
 
     private func changed(_ field: NSObject?, began: Bool) {
@@ -177,28 +184,61 @@ final class TextEditing {
 
 /// View > Refresh (⌘R, the Mac's, slice 2): the page shown asked again - each page's own phone pull (`pullToRefresh`) or,
 /// where the phone's pull shuffles, its •••'s Refresh (`refreshCommand`). The page shown is the one that last appeared
-/// and hasn't gone (a page pushed over another, a tab, a sheet's page); one refresh at a time, Refresh dimmed while it
-/// is on its way.
+/// and hasn't gone (a page pushed over another, a tab); one refresh at a time, Refresh dimmed while it is on its way.
+///
+/// A sheet leaves the page under it on screen - it never disappears - so each sheet's root says it is up (`macSheet`,
+/// MacSheet): every page and sheet carries how many sheets deep it is drawn (the environment's `macSheetLevel`), and only
+/// the deepest counts. A sheet with no Refresh of its own dims Refresh, and Settings…, Find and Go to Current Song with it
+/// (`sheetUp`); a page inside the sheet that has one (Edit album's release page) is the page shown. Everything is let go
+/// as the window's scene comes or goes, so a page that never said it went (its window closed under it) can't linger.
 @MainActor
 @Observable
 final class MacRefresh {
     static let shared = MacRefresh()
 
-    /// One page's Refresh: its action, as its view last drew it.
+    /// One page's Refresh, or a sheet's root: its action, as its view last drew it, and how many sheets deep it is.
     @MainActor
     final class Page {
         var action: (@MainActor () async -> Void)?
+        /// Sheets deep: 0 on the tabs (and on Now Playing), 1 in a sheet over them, 2 in one over that.
+        var level = 0
+        /// A sheet's root (MacSheet), not a page with a Refresh.
+        var sheet = false
 
         nonisolated init() {}
     }
 
-    /// The pages showing with a Refresh, the latest last.
+    /// The pages showing with a Refresh, and the sheets up - the latest last.
     private var shown: [Page] = []
     private var running = false
+    @ObservationIgnored private var started = false
 
     var state: MacMenu.Refresh {
         if running { return .running }
-        return shown.last?.action == nil ? .none : .ready
+        return front?.action == nil ? .none : .ready
+    }
+
+    /// A sheet is up: the page under it out of reach.
+    var sheetUp: Bool { deepest > 0 }
+
+    /// How many sheets deep the deepest thing showing is.
+    private var deepest: Int { shown.map { (page: Page) -> Int in page.level }.max() ?? 0 }
+
+    /// The page shown: the latest page as deep as the deepest - none while a sheet with no Refresh is over the pages.
+    private var front: Page? {
+        let deepest = self.deepest
+        return shown.last { (page: Page) -> Bool in !page.sheet && page.level == deepest }
+    }
+
+    /// At launch on the Mac (Platform.launching): everything let go as a scene comes or goes.
+    func start() {
+        guard !started else { return }
+        started = true
+        for name in [UIScene.willConnectNotification, UIScene.didDisconnectNotification] {
+            _ = NotificationCenter.default.addObserver(forName: name, object: nil, queue: .main) { (_: Notification) in
+                MainActor.assumeIsolated { MacRefresh.shared.forgetAll() }
+            }
+        }
     }
 
     func appeared(_ page: Page) {
@@ -210,8 +250,13 @@ final class MacRefresh {
         shown.removeAll { $0 === page }
     }
 
+    /// The window's scene came or went: what its pages said is let go - a new window's pages say it afresh.
+    func forgetAll() {
+        if !shown.isEmpty { shown = [] }
+    }
+
     func run() {
-        guard !running, let page = shown.last, page.action != nil else { return }
+        guard !running, let page = front, page.action != nil else { return }
         running = true
         Task { @MainActor in
             await page.action?()
@@ -220,16 +265,108 @@ final class MacRefresh {
     }
 }
 
-/// A page's ⌘R while it shows (MacRefresh).
+/// How many sheets deep a view is drawn (MacRefresh): 0 on the tabs, one more inside each sheet's root (MacSheet).
+private struct MacSheetLevel: EnvironmentKey {
+    static let defaultValue = 0
+}
+
+extension EnvironmentValues {
+    var macSheetLevel: Int {
+        get { self[MacSheetLevel.self] }
+        set { self[MacSheetLevel.self] = newValue }
+    }
+}
+
+/// A page's ⌘R while it shows (MacRefresh), as deep as it is drawn.
 struct MacRefreshing: ViewModifier {
     let action: @MainActor () async -> Void
+    @Environment(\.macSheetLevel) private var level
     @State private var page = MacRefresh.Page()
 
     func body(content: Content) -> some View {
         page.action = action
+        page.level = level
         return content
             .onAppear { MacRefresh.shared.appeared(page) }
             .onDisappear { MacRefresh.shared.went(page) }
+    }
+}
+
+/// A sheet's root (Platform's `macSheet`): up while it shows, one sheet deeper than what it was opened over - and so is
+/// everything inside it.
+struct MacSheet: ViewModifier {
+    @Environment(\.macSheetLevel) private var level
+    @State private var page = MacRefresh.Page()
+
+    func body(content: Content) -> some View {
+        page.sheet = true
+        page.level = level + 1
+        return content
+            .environment(\.macSheetLevel, level + 1)
+            .onAppear { MacRefresh.shared.appeared(page) }
+            .onDisappear { MacRefresh.shared.went(page) }
+    }
+}
+
+/// The window can't be closed while it holds work a close would lose (the Mac's, slice 2): Edit album's changes, a
+/// playlist's Edit with something changed (Platform's `keepsWindowOpen`). Close Window (⌘W) and the window's close
+/// button are off meanwhile - the scene's own `isClosable` - and on again once nothing holds it: its Done, Discard or
+/// Cancel, or the view holding it gone (a hold is let go with its view, so nothing gone can keep the window).
+@MainActor
+final class WindowWork {
+    static let shared = WindowWork()
+
+    /// One view's hold - the view's own, let go with it.
+    @MainActor
+    final class Holder {
+        var on = false
+
+        nonisolated init() {}
+
+        deinit {
+            Task { @MainActor in WindowWork.shared.apply() }
+        }
+    }
+
+    private let holders = NSHashTable<Holder>.weakObjects()
+    private var started = false
+
+    /// At launch on the Mac (Platform.launching): a window told as it comes.
+    func start() {
+        guard !started else { return }
+        started = true
+        for name in [UIScene.willConnectNotification, UIScene.didActivateNotification] {
+            _ = NotificationCenter.default.addObserver(forName: name, object: nil, queue: .main) { (_: Notification) in
+                MainActor.assumeIsolated { WindowWork.shared.apply() }
+            }
+        }
+    }
+
+    func hold(_ holder: Holder, _ on: Bool) {
+        holder.on = on
+        holders.add(holder)
+        apply()
+    }
+
+    /// Each window closable while nothing holds work, and not while something does.
+    func apply() {
+        let closable = !holders.allObjects.contains { (holder: Holder) -> Bool in holder.on }
+        for case let scene as UIWindowScene in UIApplication.shared.connectedScenes {
+            guard let behaviors = scene.windowingBehaviors, behaviors.isClosable != closable else { continue }
+            behaviors.isClosable = closable
+        }
+    }
+}
+
+/// A view holding work (Platform's `keepsWindowOpen`): its hold kept in step with `on`.
+struct WindowKeptOpen: ViewModifier {
+    let on: Bool
+    @State private var holder = WindowWork.Holder()
+
+    func body(content: Content) -> some View {
+        content
+            .onAppear { WindowWork.shared.hold(holder, on) }
+            .onChange(of: on) { (_: Bool, now: Bool) -> Void in WindowWork.shared.hold(holder, now) }
     }
 }
 

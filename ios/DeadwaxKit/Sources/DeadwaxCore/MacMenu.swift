@@ -4,9 +4,12 @@ import Foundation
 // window"): what deadwax adds to the menu bar - Settings… in the app's menu, Find in Edit, Refresh in View, and the
 // Controls menu - each item's words, its shortcut and whether it can be used now, from the player's state and the
 // window's. The App draws these and nothing else (ios/App/Shared/MacCommands.swift); every rule is here, tested on
-// Linux. The words are the app's own where it has them - Play/Pause, Next and Previous the player's, Shuffle and Repeat
-// Up Next's (shuffleLabel, repeatLabel, UpNextWords.repeatSaid), Refresh the Library's •••'s, Settings the tab's - never
-// retyped; Forward 10 Seconds, Back 10 Seconds and Go to Current Song are the Mac's own, as Music names them.
+// Linux. The words are the app's own where it has them, never retyped: Play/Pause, Next and Previous the player's;
+// Shuffle the name of Now Playing's Shuffle button (shuffleLabel - "Shuffle - shuffling your whole library", or "...all
+// music", during a library's shuffle); the Repeat submenu the Repeat button's name with Repeat off (repeatLabel), and its
+// three items what Up Next says to VoiceOver as Repeat changes (UpNextWords.repeatSaid: "Repeat off", "Repeat all",
+// "Repeat one"); Refresh the Library's •••'s; Settings the tab's. Forward 10 Seconds, Back 10 Seconds and Go to Current
+// Song are the Mac's own, as Music names them.
 
 public enum MacMenu {
     /// What the menus are drawn from - read by the App each time it draws them.
@@ -35,10 +38,13 @@ public enum MacMenu {
         /// Now Playing is over the pages: what shows is the player, which has nothing to refresh - the page under it isn't
         /// asked again unseen.
         public var nowPlaying: Bool
+        /// A sheet is up (Edit album, Up Next, Add to a playlist…, any of them): the page under it is out of reach - it
+        /// isn't refreshed unseen, and Settings…, Find and Go to Current Song don't change the tab under the sheet.
+        public var sheet: Bool
 
         public init(queued: Bool = false, playing: Bool = false, shuffle: Bool = false, paged: PagedScope? = nil,
                     repeatMode: Repeat = .off, length: Double = 0, hasAlbum: Bool = false, typing: Bool = false,
-                    tabs: Bool = true, refresh: Refresh = .none, nowPlaying: Bool = false) {
+                    tabs: Bool = true, refresh: Refresh = .none, nowPlaying: Bool = false, sheet: Bool = false) {
             self.queued = queued
             self.playing = playing
             self.shuffle = shuffle
@@ -50,6 +56,7 @@ public enum MacMenu {
             self.tabs = tabs
             self.refresh = refresh
             self.nowPlaying = nowPlaying
+            self.sheet = sheet
         }
     }
 
@@ -155,10 +162,6 @@ public enum MacMenu {
         public static let settings = "\(YouWords.title)\u{2026}"
         /// The submenu Repeat's three are in: Repeat's own word when it's off.
         public static let repeatMenu = repeatLabel(.off)
-        /// A dialog's Cancel the iPhone leaves the system to draw, drawn on the Mac so Return presses it (the Remove
-        /// dialogs of Downloads): the system's own word.
-        public static let cancel = "Cancel"
-
     }
 
     /// How far Forward and Back move, in seconds.
@@ -229,14 +232,14 @@ public enum MacMenu {
 
     static func enabled(_ command: Command, _ state: State) -> Bool {
         switch command {
-        case .settings, .find: return state.tabs
-        case .refresh: return state.tabs && !state.nowPlaying && state.refresh == .ready
+        case .settings, .find: return state.tabs && !state.sheet
+        case .refresh: return state.tabs && !state.nowPlaying && !state.sheet && state.refresh == .ready
         case .playPause, .next, .previous: return state.queued
         case .forward, .back: return state.queued && state.length > 0
         //? as Now Playing's Shuffle: a library's shuffle can't be turned off
         case .shuffle: return state.queued && state.paged == nil
         case .repeatOff, .repeatAll, .repeatOne: return state.queued
-        case .goToCurrentSong: return state.tabs && state.queued && state.hasAlbum
+        case .goToCurrentSong: return state.tabs && !state.sheet && state.queued && state.hasAlbum
         }
     }
 

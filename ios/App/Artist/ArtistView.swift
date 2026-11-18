@@ -142,6 +142,7 @@ struct ArtistView: View {
         }
         .sheet(item: $toolSheet) { (open: ArtistToolSheet) in
             toolSheetView(open, managing)
+                .macSheet()
         }
         .task(id: taskKey) {
             // which of MusicBrainz's albums are yours is the library's folders' word: asked again as the page shows

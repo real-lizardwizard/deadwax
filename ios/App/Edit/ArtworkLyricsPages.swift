@@ -113,6 +113,7 @@ struct ArtworkPage: View {
         .navigationBarTitleDisplayMode(.inline)
         .fullScreenCover(item: $full) { (cover: FullCover) in
             FullCoverView(cover: cover)
+                .macSheet()
         }
     }
 }

@@ -102,7 +102,9 @@ struct AddPersonSheet: View {
                         people.closed()
                     }
                     .disabled(writing)
-                    .escapeCloses()
+                    // (the Mac app, slice 2) Escape is Close only with no password typed: Close forgets them without
+                    // asking (PeopleFlow.closed - the names it keeps)
+                    .escapeCloses(flow.add.password.isEmpty && flow.add.again.isEmpty)
                 }
                 ToolbarItemGroup(placement: .keyboard) {
                     Spacer()
@@ -214,7 +216,9 @@ struct ResetPasswordSheet: View {
                         people.closed()
                     }
                     .disabled(writing)
-                    .escapeCloses()
+                    // (the Mac app, slice 2) Escape is Cancel only with nothing typed: Cancel forgets the passwords
+                    // without asking
+                    .escapeCloses(flow.resetPasswords.password.isEmpty && flow.resetPasswords.again.isEmpty)
                 }
                 ToolbarItemGroup(placement: .keyboard) {
                     Spacer()

@@ -176,6 +176,9 @@ struct PlaylistView: View {
             .onChange(of: model.editing) { _, editing in
                 navigation.editing(route.id, editing)
             }
+            // (the Mac app, slice 2) Edit's changes aren't lost by closing the window: ⌘W and the close button are off
+            // while Cancel would ask
+            .keepsWindowOpen(model.editing && model.changed)
             .onAppear { shown = true }
             .onDisappear {
                 shown = false

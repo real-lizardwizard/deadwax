@@ -14,7 +14,8 @@ import UIKit
 /// (Slice 2, notes/ios.md "The Mac app, slice 2: menus, keys, right-click and the window") Every helper below is the
 /// iPhone's exactly as before on the iPhone - `self`, or SwiftUI's own - and the Mac's on the Mac: its menus and keys
 /// (MacCommands.swift), ⌘R hung on the same pulls, the ••• menus' items on a right-click, Escape on a sheet's Close,
-/// Return on a dialog's Cancel, Find's cursor, and one window.
+/// Return on a dialog's Cancel, Find's cursor, a sheet's root known to the menus, the window kept open over work, and
+/// one window.
 enum Platform {
     /// The device this build is, for Core.
     static var device: Device { mac ? .mac : .iPhone }
@@ -44,14 +45,20 @@ extension Platform {
                 MainActor.assumeIsolated { shape(scene) }
             }
         }
-        // (slice 2) whether a text field has the cursor: Space, ⌘→ and ⌘← are its own meanwhile (MacMenu)
-        MainActor.assumeIsolated { TextEditing.shared.start() }
+        // (slice 2) whether a text field has the cursor: Space, ⌘→ and ⌘← are its own meanwhile (MacMenu); the pages
+        // and sheets showing, let go as a window comes or goes (MacRefresh); the window's close kept in step with the
+        // work it holds (WindowWork)
+        MainActor.assumeIsolated {
+            TextEditing.shared.start()
+            MacRefresh.shared.start()
+            WindowWork.shared.start()
+        }
     }
 
     /// (Slice 2) A dialog's Cancel where the iPhone leaves it to the system to draw: drawn on the Mac, so Return presses
-    /// it - never the dialog's Remove.
+    /// it - never the dialog's Remove. The app's own Cancel (the web's word, QueuePickWords').
     @MainActor static func dialogCancel() -> some View {
-        Button(MacMenu.Words.cancel, role: .cancel) {}
+        Button(QueuePickWords.cancel, role: .cancel) {}
             .returnCancels()
     }
 
@@ -109,9 +116,23 @@ extension View {
     }
 
     /// (Slice 2) A sheet's Close, Cancel or Done - or Now Playing's and a cover's: Escape presses it, so Escape does
-    /// what it does, asking first where it asks. `on` false: not this one (a form inside a sheet whose own Cancel has it).
-    func escapeCloses(_ on: Bool = true) -> some View {
-        keyboardShortcut(on ? .cancelAction : nil)
+    /// what it does, asking first where it asks. `on` false: not now - something is typed that this Close would throw
+    /// away without asking (Escape then does nothing, and Close is a click away), or a form inside a sheet whose own
+    /// Cancel has it. Read only here (an autoclosure): the iPhone never reads it.
+    func escapeCloses(_ on: @autoclosure () -> Bool = true) -> some View {
+        keyboardShortcut(on() ? .cancelAction : nil)
+    }
+
+    /// (Slice 2) A sheet's root: while it is up the page under it is out of the menus' reach - ⌘R, Settings…, Find and
+    /// Go to Current Song dimmed, unless a page inside the sheet has a Refresh of its own (MacRefresh, MacSheet).
+    func macSheet() -> some View {
+        modifier(MacSheet())
+    }
+
+    /// (Slice 2) While `on` - work a close would lose (Edit album's changes, a playlist's Edit) - the window can't be
+    /// closed: ⌘W and its close button are off until the work is done or discarded (WindowWork).
+    func keepsWindowOpen(_ on: @autoclosure () -> Bool) -> some View {
+        modifier(WindowKeptOpen(on: on()))
     }
 
     /// (Slice 2) A dialog's Cancel (Keep editing, Don't delete…): Return presses it, so Return never confirms a delete
@@ -179,8 +200,18 @@ extension View {
         self
     }
 
-    /// The Mac's alone: no key is added to a button.
-    func escapeCloses(_ on: Bool = true) -> some View {
+    /// The Mac's alone: no key is added to a button, and `on` is never read.
+    func escapeCloses(_ on: @autoclosure () -> Bool = true) -> some View {
+        self
+    }
+
+    /// The Mac's alone: a sheet as before.
+    func macSheet() -> some View {
+        self
+    }
+
+    /// The Mac's alone: the iPhone has no window to close, and `on` is never read.
+    func keepsWindowOpen(_ on: @autoclosure () -> Bool) -> some View {
         self
     }
 

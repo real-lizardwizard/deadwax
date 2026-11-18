@@ -91,6 +91,7 @@ struct LibraryView: View {
             // Server settings' Connections page over the Library; it goes when Close says so, or Navidrome answers
             .sheet(isPresented: $settingUp) {
                 SetUpNavidromeSheet()
+                    .macSheet()
             }
             .onChange(of: navidromeAnswers) { _, _ in setUpDone() }
             .onChange(of: serverSettings.flow.saving) { _, _ in setUpDone() }
@@ -301,6 +302,7 @@ struct LibraryView: View {
         .refreshCommand { refresh() }
         .sheet(isPresented: $editingOrder) {
             EditOrderSheet(saved: $savedOrder, personal: server.access.hasLibrary)
+                .macSheet()
         }
     }
 

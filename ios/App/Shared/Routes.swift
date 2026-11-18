@@ -547,6 +547,12 @@ final class AppNavigation {
         moved(&you)
     }
 
+    /// (The Mac app, slice 2) The album `id`'s id now: the one an apply gave it (AlbumEdit.movedTo), or `id` - what a
+    /// right-click on a tile drawn before the move asks for (MacRightClick).
+    func albumId(_ id: String) -> String {
+        AlbumEdit.movedTo(moves, id) ?? id
+    }
+
     /// An album route by the id its album has now (AlbumEdit.movedTo); every other route as it is.
     private func followed(_ route: AppRoute) -> AppRoute {
         guard case .album(let album) = route, let to = AlbumEdit.movedTo(moves, album.id) else { return route }

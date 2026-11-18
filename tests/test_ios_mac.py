@@ -119,7 +119,8 @@ def test_platform_is_the_iphones_exactly_as_before_on_the_iphone():
     for helper in (r"refreshCommand\(_ action: @escaping @MainActor @Sendable \(\) async -> Void\)",
                    r"macContextMenu<Items: View>\(@ViewBuilder _ items: \(\) -> Items\)",
                    r"albumRightClick\(_ route: AlbumRoute\)", r"playlistRightClick\(_ route: PlaylistRoute\)",
-                   r"escapeCloses\(_ on: Bool = true\)", r"returnCancels\(\)", r"findField\(\)", r"oneWindow\(\)"):
+                   r"escapeCloses\(_ on: @autoclosure \(\) -> Bool = true\)", r"returnCancels\(\)", r"findField\(\)",
+                   r"oneWindow\(\)", r"macSheet\(\)", r"keepsWindowOpen\(_ on: @autoclosure \(\) -> Bool\)"):
         assert re.search(r"func " + helper + r" -> some View \{\s*self\s*\}", phone), helper
         assert re.search(r"func " + helper + r" -> some View \{", mac), helper
     assert re.search(r"static func dialogCancel\(\) -> some View \{\s*EmptyView\(\)\s*\}", phone)
@@ -130,12 +131,17 @@ def test_platform_is_the_iphones_exactly_as_before_on_the_iphone():
                      r"refreshCommand\(action\)\s*\}", mac)
     assert re.search(r"func refreshCommand\([^)]*\)[^{]*\{\s*modifier\(MacRefreshing\(action: action\)\)\s*\}", mac)
     assert re.search(r"func macContextMenu<[^{]*\{\s*contextMenu\(menuItems: items\)\s*\}", mac)
-    assert re.search(r"func escapeCloses\([^{]*\{\s*keyboardShortcut\(on \? \.cancelAction : nil\)\s*\}", mac)
+    # (the review) Escape's and the window's conditions are autoclosures: read on the Mac alone, never on the iPhone
+    assert re.search(r"func escapeCloses\([^{]*\{\s*keyboardShortcut\(on\(\) \? \.cancelAction : nil\)\s*\}", mac)
+    assert re.search(r"func macSheet\(\) -> some View \{\s*modifier\(MacSheet\(\)\)\s*\}", mac)
+    assert re.search(r"func keepsWindowOpen\([^{]*\{\s*modifier\(WindowKeptOpen\(on: on\(\)\)\)\s*\}", mac)
     assert re.search(r"func returnCancels\(\) -> some View \{\s*keyboardShortcut\(\.defaultAction\)\s*\}", mac)
     assert re.search(r"func oneWindow\(\) -> some View \{\s*handlesExternalEvents\(preferring: \[\"\*\"\], allowing: \[\"\*\"\]\)\s*\}",
                      app_sources()[PLATFORM].split("\n#else\n")[0])
     assert re.search(r"\.commands \{\s*CommandGroup\(replacing: \.newItem\) \{\}\s*CommandGroup\(replacing: \.help\) \{\}\s*menus\s*\}", mac)
-    assert "TextEditing.shared.start()" in mac.split("static func launching()")[1].split("\n    }\n")[0]
+    launching = mac.split("static func launching()")[1].split("\n    }\n")[0]
+    for start in ("TextEditing.shared.start()", "MacRefresh.shared.start()", "WindowWork.shared.start()"):
+        assert start in launching, start
     assert "refreshable" not in mac
     assert "CommandGroup(replacing: .newItem) {}" in mac and "CommandGroup(replacing: .help) {}" in mac
     for size in ("CGSize(width: 390, height: 640)", "widest: CGFloat = 600", "CGSize(width: 430, height: 860)"):
@@ -210,12 +216,27 @@ def test_command_r_is_every_pull_and_every_pages_refresh():
     assert found == REFRESH_COMMANDS
     commands = bare(app_sources()["Shared/MacCommands.swift"])
     # the page shown is the one that last appeared and hasn't gone; one at a time
-    assert ".onAppear { MacRefresh.shared.appeared(page) }" in commands
-    assert ".onDisappear { MacRefresh.shared.went(page) }" in commands
+    assert commands.count(".onAppear { MacRefresh.shared.appeared(page) }") == 2, "a page with a Refresh, a sheet's root"
+    assert commands.count(".onDisappear { MacRefresh.shared.went(page) }") == 2
     run = commands[commands.index("func run() {"):]
     run = run[:run.index("\n    }\n")]
-    assert "guard !running, let page = shown.last, page.action != nil else { return }" in run
+    assert "guard !running, let page = front, page.action != nil else { return }" in run
     assert run.index("running = true") < run.index("await page.action?()") < run.index("running = false")
+    # (the review) the page in front is the latest page as many sheets deep as the deepest thing showing: a sheet with no
+    # Refresh dims it; a page inside a sheet that has one is the page in front
+    assert "shown.last { (page: Page) -> Bool in !page.sheet && page.level == deepest }" in commands
+    assert "var sheetUp: Bool { deepest > 0 }" in commands
+    refreshing = commands[commands.index("struct MacRefreshing: ViewModifier {"):commands.index("struct MacSheet: ViewModifier {")]
+    assert "@Environment(\\.macSheetLevel) private var level" in refreshing and "page.level = level" in refreshing
+    sheet = commands[commands.index("struct MacSheet: ViewModifier {"):commands.index("final class WindowWork")]
+    for line in ("page.sheet = true", "page.level = level + 1", ".environment(\\.macSheetLevel, level + 1)"):
+        assert line in sheet, line
+    # (the review) a page that never said it went - its window closed under it - is let go as a scene comes or goes
+    start = commands[commands.index("final class MacRefresh"):]
+    start = start[start.index("func start() {"):]
+    start = start[:start.index("\n    }\n")]
+    assert "[UIScene.willConnectNotification, UIScene.didDisconnectNotification]" in start
+    assert "MacRefresh.shared.forgetAll()" in start
 
 
 # ----------------------------------------------------------------------------- the menus and keys (slice 2)
@@ -246,7 +267,7 @@ def test_the_menus_are_mac_menus_and_nothing_else():
                  "paged: player.paged?.scope", "repeatMode: player.repeatMode", "length: player.duration",
                  "PlayedAlbum.route($0, player: player)", "typing: TextEditing.shared.typing",
                  "tabs: server.launch == .ready && server.signInOver == nil", "refresh: MacRefresh.shared.state",
-                 "nowPlaying: navigation.nowPlayingShown"):
+                 "nowPlaying: navigation.nowPlayingShown", "sheet: MacRefresh.shared.sheetUp"):
         assert read in state, read
     # each click as the player's button makes it, read again as it lands
     perform = commands[commands.index("private func perform("):commands.index("static func shortcut(")]
@@ -276,6 +297,9 @@ def test_a_text_field_keeps_its_keys():
         assert notice in editing, notice
     assert "NSHashTable<AnyObject>.weakObjects()" in editing and "isFirstResponder == true" in editing
     assert "if typing != now { typing = now }" in editing
+    # (the review) and again each time the window comes to the front, so the keys can't stay off
+    assert "forName: UIScene.didActivateNotification" in editing
+    assert "TextEditing.shared.changed(nil, began: false)" in editing
 
 
 def test_find_puts_the_cursor_in_searchs_field():
@@ -361,8 +385,23 @@ def test_a_right_click_is_the_menus_own_items():
     playlist = bare(app["Playlists/PlaylistView.swift"])
     assert "QueueMenuRequest.playlist(model.answer, name: model.name, songs: model.songs)" in playlist
     clicks = bare(app["Shared/MacRightClick.swift"])
-    assert "QueueMenuRequest.album(album, gone: false" in clicks
-    assert "QueueMenuRequest.playlist(answer, name: answer.playlist.name, songs: answer.songs)" in clicks
+    # (the review) the album page's gone-but-here carried, never a fixed false
+    assert "QueueMenuRequest.album(album, gone: gone," in clicks and "gone: false," not in clicks.split("func request(")[1][:200]
+    assert "downloads.keptAlbum(had.id) != nil, downloads.here(had.song ?? []).count > 0" in clicks
+    # (the review) asked again at every rest, the answer in hand kept for what it was asked for alone: who, the album's id
+    # now (an apply's new one), its writes - a playlist's changes here
+    assert "let id = navigation.albumId(route.id)" in clicks
+    assert "Stamp(person: server.person, id: id, writes: navigation.albumWrites[id] ?? 0)" in clicks
+    assert "Stamp(person: server.person, id: route.id, writes: changes)" in clicks
+    assert ".onChange(of: playlists.lastChange)" in clicks and "if change?.id == route.id { changes += 1 }" in clicks
+    assert clicks.count(".task(id: Asking(over: over, stamp: stamp)) {") == 2
+    assert clicks.count("guard over, !asking else { return }") == 2, "every rest asks again, not only the first"
+    assert clicks.count("guard person == server.person, stamp == asked") == 4
+    assert clicks.count("let shown = answered == stamp ? ") == 2
+    # (the review) Loading whenever an answer can come - not only once the rest is over
+    assert clicks.count("} else if shown == nil, !nothing, reachability.online, server.client != nil {") == 2
+    assert "asking {" not in clicks.replace("!asking {", "")
+    assert "QueueMenuRequest.playlist(shown, name: shown.playlist.name, songs: shown.songs)" in clicks
     assert "navigation.editingPlaylist != route.id" in clicks
     # the page's Refresh stays the page's: a right-click never offers it
     assert "refresh" not in clicks.replace("Refresh", "")
@@ -378,6 +417,17 @@ ESCAPES = {
     "Manage/PeopleSheets.swift": 3, "Manage/ServerSettingsGroupScreen.swift": 1, "Player/CoverViewer.swift": 1,
     "Player/NowPlayingView.swift": 1, "Playlists/PlaylistPicker.swift": 2, "Playlists/PlaylistView.swift": 1,
     "Search/PressingPickerSheet.swift": 1, "UpNext/UpNextScreen.swift": 1,
+}
+
+
+#? (the review) Escape where a Close or Cancel throws typed words away without asking: only with nothing typed
+GUARDED_ESCAPES = {
+    "Manage/PeopleSheets.swift": ["flow.add.password.isEmpty && flow.add.again.isEmpty)",
+                                  "flow.resetPasswords.password.isEmpty && flow.resetPasswords.again.isEmpty)"],
+    "Artist/ArtistMoveSheet.swift": ["model.map { (model: ArtistWhoModel) -> Bool in model.query == name } ?? true)"],
+    "Artist/ArtistImagesSheet.swift": ["model.map { (model: ArtistImagesModel) -> Bool in"],
+    "Get/SourcesSheet.swift": ["!model.edited)"],
+    "Playlists/PlaylistPicker.swift": ["!(model.making && nameTyped))", "escapes && blank)"],
 }
 
 
@@ -406,15 +456,24 @@ def test_escape_presses_close_and_return_never_confirms():
     assert found == ESCAPES
     # the playlist picker's form inside it: Escape is the picker's own Cancel there, the form's only on its own sheet
     picker = bare(app["Playlists/PlaylistPicker.swift"])
-    assert ".escapeCloses(escapes)" in picker and "var escapes = false" in picker
+    assert ".escapeCloses(escapes && blank)" in picker and "var escapes = false" in picker
     assert "NewPlaylistFields(escapes: true)" in bare(app["Playlists/PlaylistsScreen.swift"])
     # Escape on Edit album's Close and Artist images' Close: the button itself, before the question it asks
     for name in ("Edit/EditAlbumSheet.swift", "Artist/ArtistImagesSheet.swift"):
         code = bare(app[name])
-        assert code.index(".escapeCloses()") < code.index(".confirmationDialog(EditWords.discardTitle")
+        assert code.index(".escapeCloses(") < code.index(".confirmationDialog(EditWords.discardTitle")
     platform = bare(app[PLATFORM]).split("\n#else\n")[0]
-    assert re.search(r"static func dialogCancel\(\) -> some View \{\s*Button\(MacMenu\.Words\.cancel, role: \.cancel\) \{\}"
-                     r"\s*\.returnCancels\(\)\s*\}", platform)
+    assert re.search(r"static func dialogCancel\(\) -> some View \{\s*Button\(QueuePickWords\.cancel, role: \.cancel\) \{\}"
+                     r"\s*\.returnCancels\(\)\s*\}", platform), "the app's own Cancel, never retyped"
+    # (the review) where Close or Cancel throws typed words away without asking, Escape waits for nothing typed
+    for name, guards in GUARDED_ESCAPES.items():
+        found = re.findall(r"\.escapeCloses\(([^\n]*)", bare(app[name]))
+        for guard in guards:
+            assert any(each.startswith(guard) for each in found), f"{name}: {guard}"
+    picker = bare(app["Playlists/PlaylistPicker.swift"])
+    assert "typed: Platform.mac ? $nameTyped : nil" in picker, "the iPhone's picker told nothing"
+    assert ".onChange(of: blank, initial: true) { (_: Bool, now: Bool) -> Void in typed?.wrappedValue = !now }" in picker
+    assert "var edited: Bool { !Sources.queryOverride(query, shownQuery).isEmpty }" in bare(app["Models/SourcesSearch.swift"])
 
 
 # ----------------------------------------------------------------------------- the sign-in
@@ -516,3 +575,67 @@ def test_the_mac_is_called_what_the_web_calls_it():
     assert 'case .mac: return "Mac"' in core and "case .iPhone: return label" in core
     from src.play_queue import LABEL
     assert LABEL.match("Mac") and LABEL.match("iPhone")
+
+
+# ----------------------------------------------------------------------------- a sheet up, the window kept (the review)
+
+#? every sheet's root, and each full-screen cover's - but Now Playing's, whose Find and Settings… close it
+SHEET_ROOTS = {
+    "Album/AlbumView.swift": 1, "Artist/ArtistView.swift": 1, "EQ/EQImport.swift": 1, "EQ/EQRoute.swift": 1,
+    "Edit/ArtworkLyricsPages.swift": 1, "Edit/ReleasePage.swift": 1, "Edit/TagsPages.swift": 1,
+    "Library/LibraryView.swift": 2, "Manage/PeopleScreen.swift": 3, "Player/NowPlayingView.swift": 4,
+    "Playlists/PlaylistsScreen.swift": 1, "Root/MainTabs.swift": 3, "Search/GroupView.swift": 2,
+    "Shared/MacRightClick.swift": 1,
+}
+
+
+def test_a_sheet_keeps_the_page_under_it_out_of_the_menus_reach():
+    """A sheet never makes the page under it disappear: each sheet's root says it's up (`.macSheet()`), so ⌘R, Find,
+    Settings… and Go to Current Song don't act on the page beneath (MacMenu's `sheet`)."""
+    found = {}
+    for name, text in app_sources().items():
+        if name == PLATFORM:
+            continue
+        code = bare(text)
+        sheets = len(re.findall(r"\.(sheet|fullScreenCover)\(", code))
+        roots = code.count(".macSheet()")
+        if roots:
+            found[name] = roots
+        # every presentation has its root marked (Now Playing's cover aside)
+        assert sheets - (1 if name == "Root/MainTabs.swift" else 0) <= roots, f"{name}: a sheet without .macSheet()"
+    assert found == SHEET_ROOTS
+    tabs = bare(app_sources()["Root/MainTabs.swift"])
+    cover = tabs[tabs.index(".fullScreenCover(isPresented: $navigation.nowPlayingShown) {"):]
+    assert cover[:cover.index("}")].split("{", 1)[1].strip() == "NowPlayingView()", "Now Playing is no sheet"
+
+
+def test_the_window_is_kept_open_over_work_a_close_would_lose():
+    app = app_sources()
+    uses = {name: re.findall(r"\.keepsWindowOpen\(([^\n]*)\)\n", bare(text)) for name, text in app.items() if name != PLATFORM}
+    assert {name: found for name, found in uses.items() if found} == {
+        "Edit/EditAlbumSheet.swift": ["model?.holdsWork == true"],
+        "Playlists/PlaylistView.swift": ["model.editing && model.changed"],
+    }
+    commands = bare(app["Shared/MacCommands.swift"])
+    work = commands[commands.index("final class WindowWork"):commands.index("struct WindowKeptOpen")]
+    assert "NSHashTable<Holder>.weakObjects()" in work, "a hold goes with its view"
+    assert "deinit {\n            Task { @MainActor in WindowWork.shared.apply() }" in work
+    assert "behaviors.isClosable = closable" in work
+    assert "let closable = !holders.allObjects.contains { (holder: Holder) -> Bool in holder.on }" in work
+    kept = commands[commands.index("struct WindowKeptOpen"):]
+    assert ".onAppear { WindowWork.shared.hold(holder, on) }" in kept
+    assert ".onChange(of: on) { (_: Bool, now: Bool) -> Void in WindowWork.shared.hold(holder, now) }" in kept
+
+
+def test_the_mac_has_no_turntable():
+    """James's direction for the Mac: no turntable - Now Playing is the cover, with no look button, and Settings >
+    Playback hasn't the turntable's two rows. The iPhone exactly as before (Platform.mac is false there)."""
+    app = app_sources()
+    now = bare(app["Player/NowPlayingView.swift"])
+    assert "private var look: TurntableSettings.Look { Platform.mac ? .cover : switched ?? deck.opensAs }" in now
+    assert re.search(r"if !Platform\.mac \{\s*LookButton\(showingTurntable: look == \.turntable, action: lookTapped\)\s*\}", now)
+    assert now.count("LookButton(") == 1
+    playback = bare(app["You/PlaybackSection.swift"])
+    block = playback[playback.index("if !Platform.mac {"):playback.index("Picker(Normalization.title")]
+    assert "Picker(TurntableWords.opensAs" in block and "Toggle(TurntableWords.windDown" in block
+    assert playback.count("TurntableWords.opensAs") == 1 and playback.count("TurntableWords.windDown,") == 1

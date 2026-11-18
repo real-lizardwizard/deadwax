@@ -203,6 +203,7 @@ struct AlbumView: View {
         }
         .sheet(item: $albumInfo) { album in
             AlbumInfoSheet(album: album)
+                .macSheet()
         }
         .onChange(of: download) { _, now in ended(now) }
         // (Phase 8, slice 1) Edit album wrote to this album's folder: asked again, as the web's page is after an edit

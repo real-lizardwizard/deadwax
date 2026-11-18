@@ -18,7 +18,8 @@ struct PlaybackPage: View {
 ///   line under it what that means (Open question 1).
 /// - The turntable's two (turntable.md 6.1, app 0.6): **Now Playing opens as** - Cover or Turntable - and **Pause
 ///   winds the record down**, each a Section with the web's note as its footer, less the note's last sentence about the
-///   web's desktop frame. Both DeckController's, kept on this phone under the web's keys.
+///   web's desktop frame. Both DeckController's, kept on this phone under the web's keys. (The Mac app, slice 2) Not on
+///   the Mac, which has no turntable: Now Playing is the cover there (NowPlayingView's `look`).
 /// - **Normalization**, the web's four choices with the web's names (Core's Normalization: Off's note without "unless
 ///   Maximum quality converts it", D3), Automatic by default. The choice is PlayerModel's `normalization`, kept on this
 ///   phone (UserDefaults, the web's key) and read at each play's tap - so it changes from the next thing played, never
@@ -45,28 +46,31 @@ struct PlaybackSection: View {
                 .font(Typeface.footnote)
         }
 
-        Section {
-            Picker(TurntableWords.opensAs, selection: Binding<TurntableSettings.Look>(get: { deck.opensAs },
-                                                                                   set: { (look: TurntableSettings.Look) -> Void in
-                                                                                       deck.opensAs = look
-                                                                                   })) {
-                ForEach(TurntableSettings.Look.allCases, id: \.self) { (look: TurntableSettings.Look) in
-                    Text(Self.name(look)).tag(look)
+        // the turntable's two: not on the Mac, which has no turntable (NowPlayingView's `look`)
+        if !Platform.mac {
+            Section {
+                Picker(TurntableWords.opensAs, selection: Binding<TurntableSettings.Look>(get: { deck.opensAs },
+                                                                                       set: { (look: TurntableSettings.Look) -> Void in
+                                                                                           deck.opensAs = look
+                                                                                       })) {
+                    ForEach(TurntableSettings.Look.allCases, id: \.self) { (look: TurntableSettings.Look) in
+                        Text(Self.name(look)).tag(look)
+                    }
                 }
+                .pickerStyle(.menu)
+            } footer: {
+                Text(TurntableWords.lookNote)
+                    .font(Typeface.footnote)
             }
-            .pickerStyle(.menu)
-        } footer: {
-            Text(TurntableWords.lookNote)
-                .font(Typeface.footnote)
-        }
 
-        Section {
-            Toggle(TurntableWords.windDown, isOn: Binding<Bool>(get: { deck.windDown }, set: { (on: Bool) -> Void in
-                deck.windDown = on
-            }))
-        } footer: {
-            Text(TurntableWords.windDownNote)
-                .font(Typeface.footnote)
+            Section {
+                Toggle(TurntableWords.windDown, isOn: Binding<Bool>(get: { deck.windDown }, set: { (on: Bool) -> Void in
+                    deck.windDown = on
+                }))
+            } footer: {
+                Text(TurntableWords.windDownNote)
+                    .font(Typeface.footnote)
+            }
         }
 
         Section {

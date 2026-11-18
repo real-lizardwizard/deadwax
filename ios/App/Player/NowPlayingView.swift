@@ -67,8 +67,9 @@ struct NowPlayingView: View {
     /// Lyrics take the cover's place: on, and the song has some (or they are on their way, or failed).
     private var lyricsShown: Bool { Lyrics.shows(lyrics.have, on: lyrics.showing) }
 
-    /// The look showing, the button's or You's.
-    private var look: TurntableSettings.Look { switched ?? deck.opensAs }
+    /// The look showing, the button's or You's. (The Mac app, slice 2) The cover, always, on the Mac: James's direction
+    /// for the Mac is no turntable - no look button there, nor Settings > Playback's two turntable rows.
+    private var look: TurntableSettings.Look { Platform.mac ? .cover : switched ?? deck.opensAs }
 
     /// A sheet is over Now Playing, at its full height: Up Next, Info, the EQ, Add to a playlist or the cover full screen
     /// - the scrubber under it unseen.
@@ -99,10 +100,10 @@ struct NowPlayingView: View {
             }
         }
         .offset(y: dragY)
-        .sheet(isPresented: $showsUpNext, onDismiss: eqAfterSheet) { UpNextScreen() }
-        .sheet(isPresented: $showsInfo, onDismiss: eqAfterSheet) { InfoView() }
-        .sheet(isPresented: $showsEQ) { EQSheet() }
-        .sheet(item: $playlistPick) { (request: PlaylistPickRequest) in PlaylistPicker(request: request) }
+        .sheet(isPresented: $showsUpNext, onDismiss: eqAfterSheet) { UpNextScreen().macSheet() }
+        .sheet(isPresented: $showsInfo, onDismiss: eqAfterSheet) { InfoView().macSheet() }
+        .sheet(isPresented: $showsEQ) { EQSheet().macSheet() }
+        .sheet(item: $playlistPick) { (request: PlaylistPickRequest) in PlaylistPicker(request: request).macSheet() }
         .coverViewer($viewing, onDismiss: eqAfterSheet)
         .onAppear { lyrics.opened() }
         // the deck told what shows as it opens and as the look changes - and that it doesn't, as it closes (2.1)
@@ -262,8 +263,10 @@ struct NowPlayingView: View {
             .escapeCloses()
             Spacer()
             // named for the look, not for what shows (NowPlaying.tsx:382): over the lyrics, the look's square still says
-            // a tap shows the cover, as it will
-            LookButton(showingTurntable: look == .turntable, action: lookTapped)
+            // a tap shows the cover, as it will. None on the Mac, which has no turntable (`look`)
+            if !Platform.mac {
+                LookButton(showingTurntable: look == .turntable, action: lookTapped)
+            }
         }
         // the notice (D11), said over Now Playing - which covers the capsule over the mini player: in the top
         // row, centred, where nothing else is, so it moves nothing and covers no button (phase2-downloads.md

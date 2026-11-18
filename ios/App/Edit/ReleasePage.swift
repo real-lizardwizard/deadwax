@@ -469,6 +469,7 @@ struct CompareCoversView: View {
         }
         .fullScreenCover(item: $full) { (cover: FullCover) in
             FullCoverView(cover: cover)
+                .macSheet()
         }
     }
 

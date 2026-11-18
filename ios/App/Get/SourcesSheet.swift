@@ -141,7 +141,9 @@ struct SourcesSheet: View {
                         model.close()
                         dismiss()
                     }
-                    .escapeCloses()
+                    // (the Mac app, slice 2) Escape is Cancel only with the search's words as searched: Cancel throws
+                    // edited words away without asking
+                    .escapeCloses(!model.edited)
                 }
                 if foundFolders {
                     // (James) at the right of the title, so a long list needn't be scrolled to its end to search again

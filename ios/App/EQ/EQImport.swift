@@ -302,6 +302,7 @@ private struct EQPageImport: ViewModifier {
             if !up { navigation.importAnswered() }
         })) {
             EQImportSheetContent()
+                .macSheet()
         }
     }
 }

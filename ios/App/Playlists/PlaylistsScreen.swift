@@ -92,6 +92,7 @@ struct PlaylistsPage: View {
                 .navigationBarTitleDisplayMode(.inline)
             }
             .presentationDetents([.medium, .large])
+            .macSheet()
         }
         .onAppear { shown = true }
         .onDisappear { shown = false }

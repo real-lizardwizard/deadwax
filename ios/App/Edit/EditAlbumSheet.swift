@@ -114,6 +114,8 @@ struct EditAlbumSheet: View {
         }
         // typed work isn't lost by a swipe: Close asks
         .interactiveDismissDisabled(model?.holdsWork == true)
+        // (the Mac app, slice 2) nor by closing the window: ⌘W and the close button are off meanwhile
+        .keepsWindowOpen(model?.holdsWork == true)
         // (slice 6) in queue mode, each step opens the session's next album afresh - with the page's scan
         .task(id: request.queue?.steps ?? 0) {
             let wanted = request.queue?.steps ?? 0

@@ -74,6 +74,9 @@ final class SourcesSearch {
 
     /// What the last answer said it searched for: a query typed is an edit only when it differs.
     @ObservationIgnored private var shownQuery = ""
+    /// The field holds words of the person's own - what Search again would search (Sources.queryOverride): (the Mac
+    /// app, slice 2) Escape doesn't cancel the sheet meanwhile. Read with `query`, which changes whenever this can.
+    var edited: Bool { !Sources.queryOverride(query, shownQuery).isEmpty }
     @ObservationIgnored private var task: Task<Void, Never>?
     /// One more for each run and each stop: an answer of an older number lands nothing.
     @ObservationIgnored private var runs = 0

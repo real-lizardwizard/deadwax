@@ -196,6 +196,7 @@ struct TrackPageView: View {
         .navigationBarTitleDisplayMode(.inline)
         .fullScreenCover(item: $full) { (cover: FullCover) in
             FullCoverView(cover: cover)
+                .macSheet()
         }
         .confirmationDialog(EditWords.discardTitle, isPresented: $discarding, titleVisibility: .visible) {
             Button(EditWords.discard, role: .destructive) { push() }

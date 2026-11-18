@@ -67,6 +67,7 @@ struct PeopleScreen: View {
         }
         .sheet(item: addSheet) { (_: PeopleSheet) in
             AddPersonSheet()
+                .macSheet()
         }
         .confirmationDialog(People.forgetQuestion(forgetting?.user ?? ""),
                             isPresented: Binding(get: { forgetting != nil },
@@ -224,8 +225,10 @@ struct PersonScreen: View {
             switch sheet {
             case .reset(let shown):
                 ResetPasswordSheet(id: shown, person: people.flow.person(shown))
+                    .macSheet()
             case .remove(let shown):
                 RemovePersonSheet(id: shown, person: people.flow.person(shown))
+                    .macSheet()
             case .add:
                 EmptyView()
             }

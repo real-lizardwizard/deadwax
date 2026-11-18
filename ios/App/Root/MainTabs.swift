@@ -82,10 +82,12 @@ struct MainTabs: View {
         // Now Playing, Now Playing opens its own
         .sheet(isPresented: $navigation.eqImportSheet) {
             EQSheet()
+                .macSheet()
         }
         // Add to a playlist from a page's ••• (Phase 4, slice 2) - Now Playing's opens over Now Playing
         .sheet(item: $navigation.playlistPick) { (request: PlaylistPickRequest) in
             PlaylistPicker(request: request)
+                .macSheet()
         }
         // (Phase 8, slice 1) Edit album, from an album page's ••• or Choose the folder - over the tabs, so the album
         // page beneath can follow the album to a new id while it is up. (slice 6's review) Its dismissal, however it
@@ -93,6 +95,7 @@ struct MainTabs: View {
         // the sheet really goes, never on its content disappearing (a full-screen cover over it does that too)
         .sheet(item: $navigation.albumEdit, onDismiss: { navigation.editorDismissed() }) { (request: AlbumEditRequest) in
             EditAlbumSheet(request: request)
+                .macSheet()
         }
         .onChange(of: player.hasQueue) { _, queued in
             if !queued { navigation.nowPlayingShown = false }

@@ -36,6 +36,8 @@ struct PlaylistPicker: View {
     @Environment(\.dismiss) private var dismiss
     @State private var model: PlaylistPickerModel
     @AccessibilityFocusState private var focus: PickerFocus?
+    /// (The Mac app, slice 2) The new playlist's form has a name typed (NewPlaylistFields' `typed`).
+    @State private var nameTyped = false
 
     init(request: PlaylistPickRequest) {
         self.request = request
@@ -71,7 +73,9 @@ struct PlaylistPicker: View {
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button(PlaylistWords.cancel) { dismiss() }
-                        .escapeCloses()
+                        // (the Mac app, slice 2) Escape is Cancel - but not with a new playlist's name typed, which
+                        // Cancel throws away without asking
+                        .escapeCloses(!(model.making && nameTyped))
                 }
             }
         }
@@ -98,7 +102,7 @@ struct PlaylistPicker: View {
                     .foregroundStyle(Palette.quiet)
             }
             if model.making {
-                NewPlaylistFields(busyOutside: playlists.writes.busy) { name in
+                NewPlaylistFields(busyOutside: playlists.writes.busy, typed: Platform.mac ? $nameTyped : nil) { name in
                     try await model.make(name: name, playlists: playlists, player: player)
                 } cancel: {
                     model.making = false
@@ -298,8 +302,11 @@ struct NewPlaylistFields: View {
     /// Another write is out (the picker's add): Create waits for it.
     var busyOutside = false
     /// (The Mac app, slice 2) Escape is this Cancel - the Playlists screen's sheet's, whose only Cancel it is; not the
-    /// picker's, whose own Cancel closes the picker.
+    /// picker's, whose own Cancel closes the picker. Never with a name typed, which Cancel throws away without asking.
     var escapes = false
+    /// (The Mac app, slice 2) Told whether a name is typed - the picker's on the Mac, whose own Cancel's Escape waits
+    /// on it; nil on the iPhone.
+    var typed: Binding<Bool>?
     let create: (String) async throws -> Void
     let cancel: () -> Void
 
@@ -335,10 +342,12 @@ struct NewPlaylistFields: View {
                 Spacer()
                 Button(PlaylistWords.cancel, role: .cancel, action: cancel)
                     .buttonStyle(SecondaryPill())
-                    .escapeCloses(escapes)
+                    .escapeCloses(escapes && blank)
             }
         }
         .onAppear { focused = true }
+        .onChange(of: blank, initial: true) { (_: Bool, now: Bool) -> Void in typed?.wrappedValue = !now }
+        .onDisappear { typed?.wrappedValue = false }
     }
 
     private func send() {

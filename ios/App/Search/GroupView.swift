@@ -136,6 +136,7 @@ struct GroupView: View {
                     // pick is always kept, so the song's own choice never comes back over it
                     model.picked = route.song.isEmpty && id == view.defaultId ? nil : id
                 }
+                .macSheet()
             }
         }
         // (slice 3's review) the sheet let go - swiped away, or closed: its search goes as the dismissal begins
@@ -154,6 +155,7 @@ struct GroupView: View {
                 queued = true
                 getting = nil
             }
+            .macSheet()
         }
         .task(id: server.person) {
             search.refreshOwned()

@@ -276,7 +276,9 @@ struct ArtistWhoSheet: View {
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button(EditWords.close) { dismiss() }
-                        .escapeCloses()
+                        // (the Mac app, slice 2) Escape is Close only while the search is the page's name, as it opened:
+                        // Close throws away other words without asking
+                        .escapeCloses(model.map { (model: ArtistWhoModel) -> Bool in model.query == name } ?? true)
                 }
             }
         }

@@ -4,8 +4,8 @@ import Testing
 
 /// The Mac's menus and keys (the Mac app's plan 1.3; notes/ios.md "The Mac app, slice 2"): each item's words, its
 /// shortcut and whether it can be used, from the player's state and the window's - nothing queued, playing and paused,
-/// Repeat's three, a library's shuffle, a text field with the cursor. The App draws MacMenu's items and nothing else
-/// (tests/test_ios_mac.py holds MacCommands.swift to them).
+/// Repeat's three, a library's shuffle, a text field with the cursor, Now Playing open, a sheet up. The App draws
+/// MacMenu's items and nothing else (tests/test_ios_mac.py holds MacCommands.swift to them).
 @Suite struct MacMenuTests {
     private static let playing = MacMenu.State(queued: true, playing: true, length: 240, hasAlbum: true)
 
@@ -74,7 +74,9 @@ import Testing
             #expect(item.words == shuffleLabel(scope), "named for why, as Now Playing's")
             #expect(item.ticked && !item.enabled, "on, and can't be turned off")
         }
+        // the words check 416 names
         #expect(shuffleLabel(.yours) == "Shuffle - shuffling your whole library")
+        #expect(shuffleLabel(.store) == "Shuffle - shuffling all music")
     }
 
     @Test func aTextFieldKeepsItsOwnKeys() {
@@ -127,7 +129,6 @@ import Testing
         #expect(MacMenu.item(.back, state).words == "Back 10 Seconds")
         #expect(MacMenu.item(.goToCurrentSong, state).words == "Go to Current Song")
         #expect(MacMenu.Words.controls == "Controls")
-        #expect(MacMenu.Words.cancel == "Cancel" && MacMenu.Words.cancel == QueuePickWords.cancel)
         // the menu's sections, in order
         let sections = MacMenu.controls(state).map { $0.map(\.command) }
         #expect(sections == [[.playPause, .next, .previous], [.forward, .back],
@@ -181,5 +182,33 @@ import Testing
         #expect(!MacMenu.item(.refresh, state).enabled)
         #expect(MacMenu.item(.find, state).enabled && MacMenu.item(.settings, state).enabled)
         #expect(MacMenu.item(.goToCurrentSong, state).enabled && MacMenu.item(.playPause, state).enabled)
+    }
+
+    @Test func aSheetUpKeepsThePageUnderItAsItIs() {
+        // a sheet over the page (Edit album, Up Next, Add to a playlist…): the page under it isn't refreshed unseen, and
+        // nothing changes the tab under the sheet - Settings…, Find and Go to Current Song wait for it to close
+        var state = Self.playing
+        state.refresh = .ready
+        state.sheet = true
+        for command in [MacMenu.Command.refresh, .settings, .find, .goToCurrentSong] {
+            #expect(!MacMenu.item(command, state).enabled, "\(command) with a sheet up")
+            #expect(MacMenu.item(command, state).shortcut == MacMenu.key(command), "\(command): its key stays drawn")
+        }
+        // the music's own controls carry on
+        for command in [MacMenu.Command.playPause, .next, .previous, .forward, .back, .shuffle] + MacMenu.Command.repeats {
+            #expect(MacMenu.item(command, state) == MacMenu.item(command, Self.playing), "\(command)")
+        }
+        #expect(MacMenu.item(.playPause, state).enabled && MacMenu.item(.playPause, state).words == "Pause")
+        // the sheet gone: each as it was
+        state.sheet = false
+        for command in [MacMenu.Command.refresh, .settings, .find, .goToCurrentSong] {
+            #expect(MacMenu.item(command, state).enabled, "\(command) with the sheet gone")
+        }
+        // a sheet over Now Playing (Up Next, Info): the same
+        state = MacMenu.State(queued: true, playing: true, length: 240, hasAlbum: true, refresh: .ready, nowPlaying: true,
+                              sheet: true)
+        #expect(!MacMenu.item(.find, state).enabled && !MacMenu.item(.settings, state).enabled)
+        #expect(!MacMenu.item(.refresh, state).enabled && !MacMenu.item(.goToCurrentSong, state).enabled)
+        #expect(MacMenu.item(.next, state).enabled)
     }
 }
