@@ -89,7 +89,7 @@ struct AlbumRightClick: ViewModifier {
                     asking = false
                 }
             }
-            .sheet(item: $info) { (album: Album) in
+            .appSheet(item: $info) { (album: Album) in
                 AlbumInfoSheet(album: album)
                     .macSheet()
             }

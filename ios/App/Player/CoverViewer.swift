@@ -18,8 +18,9 @@ extension View {
     /// The cover viewer, over Now Playing while `viewing` holds a cover - put on Now Playing's root, beside its sheets,
     /// never on the cover; `onDismiss` once it is gone (the EQ sheet a shared file waited for).
     func coverViewer(_ viewing: Binding<ViewedCover?>, onDismiss: @escaping () -> Void) -> some View {
-        fullScreenCover(item: viewing, onDismiss: onDismiss) { (cover: ViewedCover) in
+        appCover(item: viewing, onDismiss: onDismiss) { (cover: ViewedCover) in
             CoverViewer(cover: cover) { CoverViewing.put(nil, into: viewing) }
+                .macSheet()
         }
     }
 }

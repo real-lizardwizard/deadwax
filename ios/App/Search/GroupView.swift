@@ -129,7 +129,7 @@ struct GroupView: View {
                     .accessibilityHidden(!titleInBar)
             }
         }
-        .sheet(isPresented: $picking) {
+        .appSheet(isPresented: $picking) {
             if let view = page.view {
                 PressingPickerSheet(view: view) { (id: String) -> Void in
                     // the default chosen again is the default: nothing kept of it - but on a page opened from a song a
@@ -140,7 +140,7 @@ struct GroupView: View {
             }
         }
         // (slice 3's review) the sheet let go - swiped away, or closed: its search goes as the dismissal begins
-        .sheet(item: Binding(get: { getting }, set: { (next: GetRequest?) in
+        .appSheet(item: Binding(get: { getting }, set: { (next: GetRequest?) in
             if next == nil { getting?.search.close() }
             getting = next
         }), onDismiss: {

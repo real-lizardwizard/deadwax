@@ -392,12 +392,12 @@ def test_the_pages_draw_as_the_spec_says():
     # take the sheet - and put away only once Navidrome answers (a check deadwax answered, in reach), never mid-save
     library = app_file("Library", "LibraryView.swift")
     gate = library[library.index("struct NavidromeGateView"):]
-    assert "SetUpNavidromeSheet()" not in gate and ".sheet(" not in gate[:gate.index("private extension View")]
+    assert "SetUpNavidromeSheet()" not in gate and ".appSheet(" not in gate[:gate.index("private extension View")]
     assert "openURL" not in gate[:gate.index("private extension View")]
     assert "NavidromeGateView(closed: closed) { settingUp = true }" in library
     view = library[library.index("struct LibraryView"):library.index("struct NavidromeGateView")]
     body = view[view.index("    var body: some View {"):]
-    assert body.index("ZStack { root }") < body.index(".sheet(isPresented: $settingUp) {\n                SetUpNavidromeSheet()")
+    assert body.index("ZStack { root }") < body.index(".appSheet(isPresented: $settingUp) {\n                SetUpNavidromeSheet()")
     assert "return !checked.offline && checked.status.ok" in view
     assert "guard NavidromeGate.consulted(reachability.reach), let checked = library.navidrome else { return false }" in view
     assert "guard settingUp, navidromeAnswers, !serverSettings.flow.saving else { return }" in view

@@ -45,12 +45,10 @@ extension Platform {
                 MainActor.assumeIsolated { shape(scene) }
             }
         }
-        // (slice 2) whether a text field has the cursor: Space, ⌘→ and ⌘← are its own meanwhile (MacMenu); the pages
-        // and sheets showing, let go as a window comes or goes (MacRefresh); the window's close kept in step with the
-        // work it holds (WindowWork)
+        // (slice 2) whether a text field has the cursor: Space, ⌘→ and ⌘← are its own meanwhile (MacMenu); the window's
+        // close kept in step with the work it holds (WindowWork)
         MainActor.assumeIsolated {
             TextEditing.shared.start()
-            MacRefresh.shared.start()
             WindowWork.shared.start()
         }
     }
@@ -150,6 +148,12 @@ extension View {
     func oneWindow() -> some View {
         handlesExternalEvents(preferring: ["*"], allowing: ["*"])
     }
+
+    /// A presented page on the Mac: given its presenter's models (Presenting.swift - a presentation's own scene starts
+    /// it with an empty environment here, and its first `@Environment(PlayerModel.self)` would be a crash).
+    func carryingApp(_ carried: AppCarried) -> some View {
+        modifier(CarriesApp(carried: carried))
+    }
 }
 
 #else
@@ -227,6 +231,11 @@ extension View {
 
     /// The iPhone has one scene.
     func oneWindow() -> some View {
+        self
+    }
+
+    /// A presented page on the iPhone inherits its presenter's environment, as it always has: nothing to hand on.
+    func carryingApp(_ carried: AppCarried) -> some View {
         self
     }
 }

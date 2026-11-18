@@ -14188,6 +14188,8 @@ The first Mac results, slice 1's build. James: "the Mac app opened fine, Local N
   the IP and again for the name, wasn't said.
 - Nothing else of 404-415 was reported. docs/ios.md keeps them **Not done yet** as a group, with what's been seen noted
   under 404 and 406 so it isn't asked again.
+- Then the click that opened Now Playing crashed the app. That, and its fix, is "On James's Mac: every sheet carries
+  the app's models" below.
 
 ## Main's 2.1.35 brought into ios: the tab is Settings on both (2026-11-17)
 
@@ -14237,6 +14239,63 @@ skipped; pyflakes over src and tests; `swift test` (2244: 2074 in Core - one few
 12 and 158), all passed; the iPhone's unsigned generic-iOS Debug build and the Mac's unsigned Release build (Mac
 Catalyst, arm64, 0.13), each BUILD SUCCEEDED with only the AppIntents warning; check_project.py. Nothing the app
 itself shows changed (it said Settings already), so nothing here was run on a phone or the Mac.
+
+## On James's Mac: every sheet carries the app's models (2026-11-17)
+
+**What James saw** (Mac app 0.13 at 64e3e9c, slice 1): "the Mac app opened fine, Local Network allowed" (404 in part:
+nothing asked before it opened, so no Gatekeeper or Open Anyway for a build made on this Mac; 406: the Local Network
+prompt came, he chose Allow - whether it asked again for the IP versus the name, not said). Then: "I tried to open the
+play screen and the mac app has become completely non-functional".
+
+**What the Mac said.** Three runs. The first crashed as the click presented Now Playing - its crash report and its log:
+`SwiftUICore/Environment+Objects.swift:34: Fatal error: No Observable object of type PlayerModel found`, raised in
+`PresentationHostingController.init` under `SheetBridge.present`, with none of the app's own frames between: the page
+presented had NO environment at all, not one model missing. The next two hung on the same click (12 s and 24 s, two
+`.hang` reports in /Library/Logs/DiagnosticReports - the main thread in layout under a UINavigationController's
+transition, with `<OnScrollGeometryChange Modifier> tried to update multiple times per frame` logged as it began) until
+he quit. Each click's log shows the Mac making a scene of its own for the presentation ("Creating foregrounded scene
+(persistentID: UINSSceneHostingViewController-…)").
+
+**Reproduced here, without a click.** A scratch build (never committed) with a hook - an environment variable opening
+Now Playing, or the EQ import sheet, 6 s after launch - run through `open --env … --stdout …` (run straight from the
+shell, the app waits for ever in `AVAudioSession sharedInstance`'s XPC: macOS's audio service won't answer a process
+LaunchServices didn't start). Both crashed the same way: Now Playing on `PlayerModel`, the plain `.sheet` on
+`AppNavigation`, its first. So every sheet and cover on the Mac, not Now Playing's alone - slice 1 shipped with none of
+them ever opened (nothing here can click, and its checks hadn't been run).
+
+**Why.** On the iPhone a presented page inherits its presenter's environment, so the 23 models DeadwaxApp puts on its
+root reach every sheet. On the Mac (macOS 27.2's Catalyst, the Mac idiom) the presentation is hosted in that scene of
+its own and its page starts from an empty environment. Putting the models on the WindowGroup scene instead
+(`Scene.environment`) was tried in the scratch build: the same two crashes - the presentation's scene isn't the
+WindowGroup's.
+
+**What changed.**
+- **Shared/Presenting.swift (new)**: `appSheet` and `appCover`, the `isPresented` and the `item` forms of SwiftUI's
+  `.sheet` and `.fullScreenCover`, each a modifier that reads, on the presenter's side, `\.appModels` (AppModels, one
+  field for each of DeadwaxApp's 23 models) and the two layout values a page's sheets inherit on the iPhone
+  (`\.tabBarRoom`, `\.playerClearance`), and puts them on the page it presents through `carryingApp`. `CarriesApp` puts
+  each model back, `\.appModels` itself (so a sheet over a sheet carries them on), the two values, and the root's tint
+  and font.
+- **Platform.swift**: `carryingApp` is `modifier(CarriesApp(carried:))` on the Mac and `self` on the iPhone - so on the
+  iPhone every presentation is SwiftUI's own exactly as before, inheriting as it always has.
+- **DeadwaxApp.swift**: `.environment(\.appModels, AppModels(…))` beside the 23 `.environment(model)`.
+- **All 23 presentations** (13 files, CoverViewer's `coverViewer` among them) call `appSheet` / `appCover`.
+- **tests/test_ios_mac.py**: no `sheet(`, `fullScreenCover(`, `popover(` or `inspector(` in the App outside
+  Presenting.swift (whose four are each followed by `.carryingApp(carried)`); AppModels' fields, the `AppModels(…)`
+  DeadwaxApp makes and CarriesApp's `.environment(m.…)` are DeadwaxApp's `.environment(…)` models, in its order; Platform
+  says `carryingApp` as above on each side. Both new tests were seen failing: on a bare `.sheet(` put back in AlbumView,
+  and on `people` left out of CarriesApp.
+
+**Not carried, on purpose**: values set beside a presentation rather than above it - EQSheet's `\.eqDone` and
+`EQSheetStack`, `\.editMode` - which its sheets don't inherit on the iPhone either (each is put on inside the modifier
+that presents).
+
+**Verified here**: the scratch build with this change and the hook - Now Playing opened and stayed up, and the EQ
+import sheet too, each still running 20 s later at 0% CPU, no crash report, no "multiple times per frame" fault;
+test_ios_mac.py and test_ios_install_mac.py; the builds and checks listed in the commit. **Not verified**: whether the
+hang James saw was this same fault seen another way (it never came back in the scratch runs, but no click was made in
+them) - check 408's Now Playing step and 413's every-page pass say; `Menu` and `.contextMenu` contents, which aren't
+presentations here, were never opened on the Mac either.
 
 ## The Mac app, slice 2: menus, keys, right-click and the window (2026-11-17)
 
@@ -14457,7 +14516,8 @@ menu item for item; the plist parity rule is narrow). What it found, fixed on ma
    is on. A hold is its view's @State object in a weak table, re-applied when it goes (deinit), so a view gone without
    saying so can't keep the window shut; applied again as a scene connects or comes to the front.
 7. **Old ⌘R pages**: MacRefresh forgets every page and sheet when a scene connects or disconnects (a window closed
-   under its pages may never say they went). Not on going to the background: a hidden app's pages are still showing
+   under its pages may never say they went). (Replaced when 72079a8 was merged - on the Mac a sheet is a scene too:
+   see "Merged with the ios branch's 72079a8" below.) Not on going to the background: a hidden app's pages are still showing
    and wouldn't appear again to re-register.
 8. **TextEditing's `typing`** is counted again whenever a scene becomes active, so a field that lost the cursor without
    its end notice can't keep Space and the arrows off.
@@ -14492,3 +14552,108 @@ Catalyst (if not, nested sheets are all one level - harmless but for a page with
 a sheet's root's onAppear and onDisappear come as on iOS; `isClosable` turning Close Window and the red button off and
 on (421); whether a window closed with its pages showing disconnects its scene (the clear's trigger); the Mac's
 Now Playing without the turntable (no look button, Playback's two rows gone).
+
+### Merged with the ios branch's 72079a8 (17 Nov) - the sheets' models, and how deep each sheet is
+
+72079a8 ("On James's Mac: every sheet carries the app's models", above) merged into mac-s2 at 47496d6. On the Mac each
+presentation is a scene of its own and its page starts with an empty environment, so whatever a page of slice 2 reads
+from its presenter has to be handed on too.
+
+**The conflicts, and how each went**:
+- **Platform.swift**: both kept. The Mac side's slice 2 helpers, then `carryingApp` (CarriesApp). The iPhone side's
+  `self` stubs for them, then its `carryingApp`, also `self`.
+- **LibraryView.swift**: Edit order is `.appSheet(isPresented: $editingOrder) { EditOrderSheet(...).macSheet() }`, below
+  the Library's `.refreshCommand`. Set up Navidrome merged by itself the same way.
+- **NowPlayingView.swift**: Up Next, Info, the EQ and Add to a playlist are each `.appSheet(...) { X().macSheet() }`.
+- **The 10 other presentation files** merged without a conflict. Each is `appSheet` / `appCover` with its
+  `.macSheet()` root. Now Playing's own cover in MainTabs is `appCover` with no root, as before: Find and Settings…
+  close it.
+- **tests/test_ios_mac.py**: both sides' tests kept, the slice 2 ones read for the wrappers (below).
+- **This file**: 72079a8's section first, as it stands on ios, then slice 2's.
+- **docs/ios.md** merged without a conflict. 72079a8 only changed 408.
+
+**What slice 2 reads in a presented page.**
+- **`\.macSheetLevel`**: how many sheets deep (MacSheet, MacRefreshing). Lost on the Mac, every sheet counted one deep
+  whatever it was over, so a sheet over a sheet with a Refresh under it would have let ⌘R through.
+  - `AppCarried` has a fourth field, `sheetLevel`.
+  - Both presenting modifiers (CarriedPresentation, CarriedItemPresentation) read it on the presenter's side,
+    `@Environment(\.macSheetLevel)`, beside `\.appModels` and the two layout values.
+  - `CarriesApp` puts it back, `.environment(\.macSheetLevel, carried.sheetLevel)`, outside the page's own `.macSheet()`,
+    which counts one on from it.
+  - On the iPhone `carryingApp` is `self` and the level is always 0: nothing changes there.
+- **The models**: all of them are AppModels' types, and slice 2 added no shared model.
+  - The right-clicks read ServerModel, DownloadModel, Reachability, AppNavigation and PlaylistsModel.
+  - QueueMenuItems reads PlayerModel, DownloadModel, Reachability and AppNavigation.
+  - FindFocus reads AppNavigation.
+- **The rest isn't environment**: MacRefresh, TextEditing and WindowWork are singletons, and the Escape and Return
+  helpers are `keyboardShortcut`s.
+
+**The right-click's Album info** was the one bare `.sheet(` slice 2 had added (72079a8's test found it). It is now
+`.appSheet(item: $info)`.
+
+**The cover viewer's root** (CoverViewer's `coverViewer`, over Now Playing) now has `.macSheet()` too.
+- The review's count missed it: its presentation had no leading dot.
+- Without it, ⌘F and ⌘, closed Now Playing from under the full-size cover.
+- That makes 24 presentations. 23 are marked (every one but Now Playing's), with 24 roots: People's person sheet has
+  two.
+
+**A sheet being a scene undid two of the review's fixes, so both changed.**
+- **⌘R's pages (review item 7)**: MacRefresh forgot every page and sheet as any scene connected or disconnected. A
+  sheet's scene connecting would then have forgotten the page under it. That page never appears again, so ⌘R stayed
+  dimmed after any sheet until the page was left. Now:
+  - each page is its view's own `@State` (as before), held weakly in `shown`, with `pages` the ones still there;
+  - one let go without its `onDisappear` (its window closed under it) is dropped by its own `deinit`, which calls
+    `letGo()` (only if listed, so the throwaway values SwiftUI makes as a view is re-made schedule nothing), and the
+    menus are drawn again;
+  - no scene notices, and `start()` and `forgetAll()` are gone (Platform.launching no longer starts MacRefresh).
+- **WindowWork**: `apply()` set every connected window scene closable whenever nothing held work. A sheet's scene, as it
+  connected or came to the front, would have been made closable whether macOS had it so or not. Now:
+  - it shuts the closable ones while something holds work, and keeps them in a weak table (`shut`);
+  - once nothing holds work, it opens again those alone.
+- **TextEditing's** count on a scene's activation is kept: a sheet's scene coming to the front counts again, which is
+  right.
+
+**Left for the coordinator** (slice 1's, not changed): `Platform.launching` shapes every `UIWindowScene` as it connects
+and as it comes to the front. That includes a sheet's own scene: the window's 390 x 640 minimum, 600 maximum width,
+hidden title and unified toolbar. Whether that shows on a sheet only a Mac can tell.
+
+**Tests** (test_ios_mac.py):
+- **The sheet roots** are counted on `appSheet(` / `appCover(` (Presenting.swift aside). Now Playing's
+  `.appCover(isPresented: $navigation.nowPlayingShown)` is still checked to be NowPlayingView alone. SHEET_ROOTS gained
+  CoverViewer's root, and the cover viewer's root is checked to end with `.macSheet()`.
+- **What CarriesApp puts on** includes `.environment(\.macSheetLevel, carried.sheetLevel)`.
+  - AppCarried's fields are models, tabBarRoom, playerClearance and sheetLevel.
+  - CarriesApp's `carried.*` values are in that order.
+  - Each presenting modifier reads exactly `\.appModels`, `\.tabBarRoom`, `\.playerClearance` and `\.macSheetLevel`, and
+    builds AppCarried from them.
+- **⌘R's pages**: held weakly, `pages` everywhere `shown` was read, the guarded `deinit`, listed on and off, no
+  UIScene, `start()` or `forgetAll()`, and launching without MacRefresh.
+- **WindowWork**: shuts only closable scenes and records them, and opens again only what it shut.
+- Each new check was seen failing on its fault, one at a time and put back:
+  - the level left out of CarriesApp, or the item presenter carrying 0;
+  - the cover viewer's root unmarked;
+  - the right-click's sheet bare again (72079a8's own test);
+  - the pages held strongly, or the `deinit` unguarded;
+  - WindowWork opening every scene;
+  - MacRefresh started at launch again.
+
+docs/ios.md:
+- the Mac section's "while a sheet is up" names a cover full size;
+- check 419 adds that closing Edit album leaves ⌘R working on Needs a look.
+
+**Verified on the merged tip** (17 Nov), on James's Mac, nothing installed:
+- `swift test` through build-locked.sh: 2255 passed, none failed (Core 2085, audio 158, turntable 12).
+- The unsigned iPhone Debug build and the unsigned Mac Catalyst Release build (arm64): each BUILD SUCCEEDED, with only
+  the AppIntents metadata note. The Page's guarded `deinit` reads `listed` with no warning.
+- check_project.py: ok.
+- pytest of tests/test_ios_*.py, test_source_bytes.py and test_logins.py: 686 passed, 1 skipped. pyflakes over src and
+  tests: clean.
+- All 99 sims on Node 22, each in a TMPDIR of its own.
+- ios/Deadwax.xcodeproj unchanged: Presenting.swift is in the synchronized App folder.
+
+**Not verified - only a Mac can tell**:
+- that a sheet's level reaches its page through CarriesApp (Edit album's release page: ⌘R its own; a sheet over one
+  with a Refresh is dimmed);
+- that SwiftUI lets a view's `@State` object go when its window closes (the weak pages, as WindowWork's holds already
+  assume);
+- whether a sheet's scene has `windowingBehaviors` at all, and what ⌘W does with a sheet in front (421).

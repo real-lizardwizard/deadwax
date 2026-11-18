@@ -247,10 +247,10 @@ this guide is the help). Every Controls item is dimmed while nothing is queued. 
 Shuffle button is: during the Library's Shuffle it reads **Shuffle - shuffling your whole library** (**Shuffle -
 shuffling all music** for all of deadwax's), ticked and dimmed, as Now Playing's is - that order is the shuffle. The
 Repeat submenu's three items are the words Up Next says to VoiceOver as Repeat changes: Repeat off, Repeat all, Repeat
-one. **While a sheet is up** (Edit album, Up Next, Add to a playlist, any of them) Settings…, Find, Refresh and Go to
-Current Song are dimmed: they'd act on the page under the sheet. **While a text field has the cursor** - Search, Find
-in the Library, a name - Space types a space and ⌘→ and ⌘← move along the line: they don't play, pause or skip then
-(their menu items still do). Forward and Back stay within the song. There's no volume of deadwax's own: the Mac's
+one. **While a sheet is up** (Edit album, Up Next, Add to a playlist, a cover full size - any of them) Settings…,
+Find, Refresh and Go to Current Song are dimmed: they'd act on the page under the sheet. **While a text field has the
+cursor** - Search, Find in the Library, a name - Space types a space and ⌘→ and ⌘← move along the line: they don't
+play, pause or skip then (their menu items still do). Forward and Back stay within the song. There's no volume of deadwax's own: the Mac's
 volume keys and menu bar volume work, as for any app.
 
 The rest of the differences:
@@ -5575,8 +5575,9 @@ home Wi-Fi, signed in as an admin with logins on. Install with `ios/scripts/inst
   data from other apps: **Allow** - see [Where the Mac keeps your sign-in](#where-the-mac-keeps-your-sign-in)), and
   `tmutil isexcluded` with the same path says `[Excluded]`: kept out of Time Machine. Sign out (Settings > Account),
   quit, open: the sign-in - and the same `ls` shows no file.
-- **408 It plays.** Play an album: the first song starts within a couple of seconds; the join between two songs that run
-  into each other is gapless (the test album's songs 9 and 10); dragging the scrubber lands where you let go.
+- **408 It plays.** Play an album: the first song starts within a couple of seconds. Click the play bar: Now Playing
+  opens over the window, and its Up Next, Info and EQ each open over it and close again; the join between two songs
+  that run into each other is gapless (the test album's songs 9 and 10); dragging the scrubber lands where you let go.
   Headphones in: the sound moves to them.
 - **409 The media keys.** With another app in front: F8 pauses and plays, F9 next, F7 previous. AirPods: a press pauses.
 - **410 The menu bar's Now Playing.** Control Center (or the menu bar's Now Playing) shows the song, the artist and the
@@ -5629,7 +5630,8 @@ Say "pass", or what you saw.
   the Library: it's asked again, as its ••• > Refresh does; on an album's page and a playlist's; on Settings (its pull
   on the phone). Is ⌘R dimmed on Search, on Requests, and with Now Playing open? ⌘,: Settings, from any tab, Now Playing
   closed. ⌘L: the album of the song playing, on the tab you're on. Open Edit album from Settings > Needs a look and
-  press ⌘R: nothing happens under it (Refresh is dimmed) - and on its release page, ⌘R asks that page again.
+  press ⌘R: nothing happens under it (Refresh is dimmed) - and on its release page, ⌘R asks that page again. Close
+  Edit album: ⌘R asks Needs a look again. Closing a sheet never leaves Refresh dimmed.
 - **420 Right-click.** Each the same as its •••, the page's Refresh left out. A song on an album's page: **Add to
   Queue**, **Add to a playlist…**, and its download item (**Download**, or **Remove Download**) - the same with a song
   on a playlist's page, in All songs and in Search. An album's tile in the Library (rest the pointer on it a moment

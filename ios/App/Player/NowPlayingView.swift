@@ -100,10 +100,10 @@ struct NowPlayingView: View {
             }
         }
         .offset(y: dragY)
-        .sheet(isPresented: $showsUpNext, onDismiss: eqAfterSheet) { UpNextScreen().macSheet() }
-        .sheet(isPresented: $showsInfo, onDismiss: eqAfterSheet) { InfoView().macSheet() }
-        .sheet(isPresented: $showsEQ) { EQSheet().macSheet() }
-        .sheet(item: $playlistPick) { (request: PlaylistPickRequest) in PlaylistPicker(request: request).macSheet() }
+        .appSheet(isPresented: $showsUpNext, onDismiss: eqAfterSheet) { UpNextScreen().macSheet() }
+        .appSheet(isPresented: $showsInfo, onDismiss: eqAfterSheet) { InfoView().macSheet() }
+        .appSheet(isPresented: $showsEQ) { EQSheet().macSheet() }
+        .appSheet(item: $playlistPick) { (request: PlaylistPickRequest) in PlaylistPicker(request: request).macSheet() }
         .coverViewer($viewing, onDismiss: eqAfterSheet)
         .onAppear { lyrics.opened() }
         // the deck told what shows as it opens and as the look changes - and that it doesn't, as it closes (2.1)

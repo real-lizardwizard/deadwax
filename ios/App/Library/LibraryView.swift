@@ -89,7 +89,7 @@ struct LibraryView: View {
         // a ZStack over the root's switch, so what is attached below stays on one view whichever list is drawn
         ZStack { root }
             // Server settings' Connections page over the Library; it goes when Close says so, or Navidrome answers
-            .sheet(isPresented: $settingUp) {
+            .appSheet(isPresented: $settingUp) {
                 SetUpNavidromeSheet()
                     .macSheet()
             }
@@ -300,7 +300,7 @@ struct LibraryView: View {
         // (the Mac app, slice 2) ⌘R: the •••'s Refresh, while the Library shows; nothing on the iPhone, where the pull
         // shuffles and the ••• has it
         .refreshCommand { refresh() }
-        .sheet(isPresented: $editingOrder) {
+        .appSheet(isPresented: $editingOrder) {
             EditOrderSheet(saved: $savedOrder, personal: server.access.hasLibrary)
                 .macSheet()
         }

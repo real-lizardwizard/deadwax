@@ -140,7 +140,7 @@ struct ArtistView: View {
             guard managing.may.any else { return }
             await tools.summarize(managing.names, client: server.client, online: online, again: summaryAsks > 0)
         }
-        .sheet(item: $toolSheet) { (open: ArtistToolSheet) in
+        .appSheet(item: $toolSheet) { (open: ArtistToolSheet) in
             toolSheetView(open, managing)
                 .macSheet()
         }

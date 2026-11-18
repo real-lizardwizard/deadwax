@@ -111,7 +111,7 @@ struct ArtworkPage: View {
         }
         .navigationTitle(GetResults.artwork)
         .navigationBarTitleDisplayMode(.inline)
-        .fullScreenCover(item: $full) { (cover: FullCover) in
+        .appCover(item: $full) { (cover: FullCover) in
             FullCoverView(cover: cover)
                 .macSheet()
         }

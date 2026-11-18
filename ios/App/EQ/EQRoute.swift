@@ -110,7 +110,7 @@ struct EQSheet: View {
         }
         .environment(\.eqDone, dismiss)
         .environment(stack)
-        .sheet(isPresented: Binding<Bool>(get: {
+        .appSheet(isPresented: Binding<Bool>(get: {
             ready && navigation.eqImport != nil && navigation.eqImportPage == nil
         }, set: { (up: Bool) -> Void in
             // swiped away: Cancel's answer

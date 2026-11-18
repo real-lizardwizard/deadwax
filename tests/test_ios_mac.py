@@ -140,14 +140,19 @@ def test_platform_is_the_iphones_exactly_as_before_on_the_iphone():
                      app_sources()[PLATFORM].split("\n#else\n")[0])
     assert re.search(r"\.commands \{\s*CommandGroup\(replacing: \.newItem\) \{\}\s*CommandGroup\(replacing: \.help\) \{\}\s*menus\s*\}", mac)
     launching = mac.split("static func launching()")[1].split("\n    }\n")[0]
-    for start in ("TextEditing.shared.start()", "MacRefresh.shared.start()", "WindowWork.shared.start()"):
+    for start in ("TextEditing.shared.start()", "WindowWork.shared.start()"):
         assert start in launching, start
+    # (the merge of 72079a8) ⌘R's pages aren't let go as a scene comes or goes: on the Mac every sheet is a scene
+    assert "MacRefresh" not in launching
     assert "refreshable" not in mac
     assert "CommandGroup(replacing: .newItem) {}" in mac and "CommandGroup(replacing: .help) {}" in mac
     for size in ("CGSize(width: 390, height: 640)", "widest: CGFloat = 600", "CGSize(width: 430, height: 860)"):
         assert size in mac
     assert "sizeRestrictions?.minimumSize" in mac and "sizeRestrictions?.maximumSize" in mac
     assert "titlebar?.titleVisibility = .hidden" in mac
+    # a presented page: its presenter's models handed on, the Mac's alone (Presenting.swift)
+    assert re.search(r"func carryingApp\(_ carried: AppCarried\) -> some View \{\s*self\s*\}", phone)
+    assert re.search(r"func carryingApp\(_ carried: AppCarried\) -> some View \{\s*modifier\(CarriesApp\(carried: carried\)\)\s*\}", mac)
 
 
 def test_the_app_is_wired_to_platform():
@@ -224,19 +229,29 @@ def test_command_r_is_every_pull_and_every_pages_refresh():
     assert run.index("running = true") < run.index("await page.action?()") < run.index("running = false")
     # (the review) the page in front is the latest page as many sheets deep as the deepest thing showing: a sheet with no
     # Refresh dims it; a page inside a sheet that has one is the page in front
-    assert "shown.last { (page: Page) -> Bool in !page.sheet && page.level == deepest }" in commands
+    assert "pages.last { (page: Page) -> Bool in !page.sheet && page.level == deepest }" in commands
     assert "var sheetUp: Bool { deepest > 0 }" in commands
     refreshing = commands[commands.index("struct MacRefreshing: ViewModifier {"):commands.index("struct MacSheet: ViewModifier {")]
     assert "@Environment(\\.macSheetLevel) private var level" in refreshing and "page.level = level" in refreshing
     sheet = commands[commands.index("struct MacSheet: ViewModifier {"):commands.index("final class WindowWork")]
     for line in ("page.sheet = true", "page.level = level + 1", ".environment(\\.macSheetLevel, level + 1)"):
         assert line in sheet, line
-    # (the review) a page that never said it went - its window closed under it - is let go as a scene comes or goes
-    start = commands[commands.index("final class MacRefresh"):]
-    start = start[start.index("func start() {"):]
-    start = start[:start.index("\n    }\n")]
-    assert "[UIScene.willConnectNotification, UIScene.didDisconnectNotification]" in start
-    assert "MacRefresh.shared.forgetAll()" in start
+    # (the review, then the merge of 72079a8) a page that never said it went - its window closed under it - is let go
+    # with its view: each page its view's @State, held here weakly, and let go as it goes. Not as a scene comes or goes:
+    # on the Mac every sheet is a scene of its own, and that would forget the pages under it
+    refresh = commands[commands.index("final class MacRefresh"):commands.index("private struct MacSheetLevel")]
+    assert "private var shown: [Shown] = []" in refresh and "weak var page: Page?" in refresh
+    assert "private var pages: [Page] { shown.compactMap { (each: Shown) -> Page? in each.page } }" in refresh
+    assert "shown.last" not in refresh and "shown.map" not in refresh, "only the pages still there count"
+    assert "deinit {\n            if listed { Task { @MainActor in MacRefresh.shared.letGo() } }" in refresh
+    assert "UIScene" not in refresh and "forgetAll" not in commands and "func start()" not in refresh
+    appeared = refresh[refresh.index("func appeared(_ page: Page) {"):refresh.index("func went(")]
+    assert "page.listed = true" in appeared
+    went = refresh[refresh.index("func went(_ page: Page) {"):refresh.index("func letGo()")]
+    assert "page.listed = false" in went
+    for name in ("MacRefreshing", "MacSheet"):
+        modifier = commands[commands.index(f"struct {name}: ViewModifier {{"):]
+        assert "@State private var page = MacRefresh.Page()" in modifier[:modifier.index("func body")], name
 
 
 # ----------------------------------------------------------------------------- the menus and keys (slice 2)
@@ -583,9 +598,9 @@ def test_the_mac_is_called_what_the_web_calls_it():
 SHEET_ROOTS = {
     "Album/AlbumView.swift": 1, "Artist/ArtistView.swift": 1, "EQ/EQImport.swift": 1, "EQ/EQRoute.swift": 1,
     "Edit/ArtworkLyricsPages.swift": 1, "Edit/ReleasePage.swift": 1, "Edit/TagsPages.swift": 1,
-    "Library/LibraryView.swift": 2, "Manage/PeopleScreen.swift": 3, "Player/NowPlayingView.swift": 4,
-    "Playlists/PlaylistsScreen.swift": 1, "Root/MainTabs.swift": 3, "Search/GroupView.swift": 2,
-    "Shared/MacRightClick.swift": 1,
+    "Library/LibraryView.swift": 2, "Manage/PeopleScreen.swift": 3, "Player/CoverViewer.swift": 1,
+    "Player/NowPlayingView.swift": 4, "Playlists/PlaylistsScreen.swift": 1, "Root/MainTabs.swift": 3,
+    "Search/GroupView.swift": 2, "Shared/MacRightClick.swift": 1,
 }
 
 
@@ -594,10 +609,11 @@ def test_a_sheet_keeps_the_page_under_it_out_of_the_menus_reach():
     Settings… and Go to Current Song don't act on the page beneath (MacMenu's `sheet`)."""
     found = {}
     for name, text in app_sources().items():
-        if name == PLATFORM:
+        if name in (PLATFORM, PRESENTING):
             continue
         code = bare(text)
-        sheets = len(re.findall(r"\.(sheet|fullScreenCover)\(", code))
+        # (the merge of 72079a8) every presentation is appSheet / appCover - the test below holds that
+        sheets = len(re.findall(r"\bapp(?:Sheet|Cover)\((?:isPresented|item):", code))
         roots = code.count(".macSheet()")
         if roots:
             found[name] = roots
@@ -605,8 +621,11 @@ def test_a_sheet_keeps_the_page_under_it_out_of_the_menus_reach():
         assert sheets - (1 if name == "Root/MainTabs.swift" else 0) <= roots, f"{name}: a sheet without .macSheet()"
     assert found == SHEET_ROOTS
     tabs = bare(app_sources()["Root/MainTabs.swift"])
-    cover = tabs[tabs.index(".fullScreenCover(isPresented: $navigation.nowPlayingShown) {"):]
+    cover = tabs[tabs.index(".appCover(isPresented: $navigation.nowPlayingShown) {"):]
     assert cover[:cover.index("}")].split("{", 1)[1].strip() == "NowPlayingView()", "Now Playing is no sheet"
+    viewer = bare(app_sources()["Player/CoverViewer.swift"])
+    viewer = viewer[viewer.index("appCover(item: viewing, onDismiss: onDismiss) {"):]
+    assert viewer[:viewer.index("\n        }\n")].rstrip().endswith(".macSheet()"), "the cover viewer's root"
 
 
 def test_the_window_is_kept_open_over_work_a_close_would_lose():
@@ -620,8 +639,13 @@ def test_the_window_is_kept_open_over_work_a_close_would_lose():
     work = commands[commands.index("final class WindowWork"):commands.index("struct WindowKeptOpen")]
     assert "NSHashTable<Holder>.weakObjects()" in work, "a hold goes with its view"
     assert "deinit {\n            Task { @MainActor in WindowWork.shared.apply() }" in work
-    assert "behaviors.isClosable = closable" in work
-    assert "let closable = !holders.allObjects.contains { (holder: Holder) -> Bool in holder.on }" in work
+    # (the merge of 72079a8) only the windows shut here are opened again: a sheet's own scene, on the Mac, is never made
+    # closable by this
+    assert "let holding = holders.allObjects.contains { (holder: Holder) -> Bool in holder.on }" in work
+    assert "guard let behaviors = scene.windowingBehaviors, behaviors.isClosable else { continue }" in work
+    assert work.index("behaviors.isClosable = false") < work.index("shut.add(scene)")
+    assert "for scene in shut.allObjects {\n                scene.windowingBehaviors?.isClosable = true" in work
+    assert work.count("isClosable = true") == 1 and "shut.removeAllObjects()" in work
     kept = commands[commands.index("struct WindowKeptOpen"):]
     assert ".onAppear { WindowWork.shared.hold(holder, on) }" in kept
     assert ".onChange(of: on) { (_: Bool, now: Bool) -> Void in WindowWork.shared.hold(holder, now) }" in kept
@@ -639,3 +663,62 @@ def test_the_mac_has_no_turntable():
     block = playback[playback.index("if !Platform.mac {"):playback.index("Picker(Normalization.title")]
     assert "Picker(TurntableWords.opensAs" in block and "Toggle(TurntableWords.windDown" in block
     assert playback.count("TurntableWords.opensAs") == 1 and playback.count("TurntableWords.windDown,") == 1
+
+
+# ----------------------------------------------------------------------------- every presentation carries the app's models
+
+PRESENTING = "Shared/Presenting.swift"
+PRESENTS = re.compile(r"\b(sheet|fullScreenCover|popover|inspector)\s*\(")
+
+
+def test_every_sheet_and_cover_goes_through_the_carrying_wrappers():
+    """On the Mac a presented page starts with an empty environment, and its first @Environment(PlayerModel.self) is a
+    crash (17 Nov: opening Now Playing on James's Mac). appSheet and appCover hand the presenter's models on; SwiftUI's
+    own are called only inside them, so a sheet added later can't miss it."""
+    used = 0
+    for name, text in app_sources().items():
+        code = bare(text)
+        if name == PRESENTING:
+            assert [m.group(1) for m in PRESENTS.finditer(code)] == ["sheet", "fullScreenCover", "sheet", "fullScreenCover"]
+            assert code.count(".carryingApp(carried)") == 4
+            continue
+        found = [m.group(0) for m in PRESENTS.finditer(code)]
+        assert not found, f"{name}: {found} - present through appSheet / appCover (Shared/Presenting.swift)"
+        used += len(re.findall(r"\bapp(?:Sheet|Cover)\((?:isPresented|item):", code))
+    assert used >= 23, used
+
+
+def test_the_carried_models_are_every_model_the_root_shares():
+    """A model DeadwaxApp shares but AppModels leaves out would be missing from every sheet on the Mac alone."""
+    app = app_sources()
+    root = bare(app["DeadwaxApp.swift"])
+    group = root[root.index("WindowGroup {"):root.index(".backgroundTask(")]
+    shared = re.findall(r"\.environment\((\w+)\)", group)
+    assert len(shared) == 23 and len(set(shared)) == 23, shared
+    presenting = bare(app[PRESENTING])
+    models = presenting[presenting.index("struct AppModels {"):presenting.index("extension EnvironmentValues")]
+    fields = re.findall(r"^\s*let (\w+): \w+$", models, re.M)
+    assert fields == shared, "AppModels' fields are DeadwaxApp's .environment(...) models, in its order"
+    made = group[group.index("AppModels("):]
+    assert re.findall(r"(\w+): (\w+)", made[:made.index("))")]) == [(name, name) for name in shared]
+    carries = presenting[presenting.index("struct CarriesApp"):presenting.index("private enum PresentationKind")]
+    assert re.findall(r"\.environment\(m\.(\w+)\)", carries) == shared
+    for value in (".environment(\\.appModels, m)", ".environment(\\.tabBarRoom, carried.tabBarRoom)",
+                  ".environment(\\.playerClearance, carried.playerClearance)",
+                  ".environment(\\.macSheetLevel, carried.sheetLevel)", ".tint(Palette.accent)", ".font(Typeface.body)"):
+        assert value in carries, value
+    # (Mac slice 2) every value the presenter reads is put back, in AppCarried's order: the two layout values and how
+    # many sheets deep it is (MacSheet counts one on from it - not carried, a sheet over a sheet would be no deeper)
+    carried = presenting[presenting.index("struct AppCarried {"):presenting.index("struct CarriesApp")]
+    assert re.findall(r"^\s*let (\w+): ", carried, re.M) == ["models", "tabBarRoom", "playerClearance", "sheetLevel"]
+    assert re.findall(r"\.environment\(\\\.(\w+), carried\.(\w+)\)", carries) == [
+        ("tabBarRoom", "tabBarRoom"), ("playerClearance", "playerClearance"), ("macSheetLevel", "sheetLevel")]
+    for kind in ("private struct CarriedPresentation", "private struct CarriedItemPresentation"):
+        presenter = presenting[presenting.index(kind):]
+        presenter = presenter[:presenter.index("\n}\n")]
+        reads = re.findall(r"@Environment\(\\\.(\w+)\) private var (\w+)", presenter)
+        assert reads == [("appModels", "models"), ("tabBarRoom", "tabBarRoom"), ("playerClearance", "playerClearance"),
+                         ("macSheetLevel", "sheetLevel")], (kind, reads)
+        assert ("AppCarried(models: models, tabBarRoom: tabBarRoom, playerClearance: playerClearance,\n"
+                "                                 sheetLevel: sheetLevel)") in presenter, kind
+

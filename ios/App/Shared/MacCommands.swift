@@ -189,8 +189,10 @@ final class TextEditing {
 /// A sheet leaves the page under it on screen - it never disappears - so each sheet's root says it is up (`macSheet`,
 /// MacSheet): every page and sheet carries how many sheets deep it is drawn (the environment's `macSheetLevel`), and only
 /// the deepest counts. A sheet with no Refresh of its own dims Refresh, and Settings…, Find and Go to Current Song with it
-/// (`sheetUp`); a page inside the sheet that has one (Edit album's release page) is the page shown. Everything is let go
-/// as the window's scene comes or goes, so a page that never said it went (its window closed under it) can't linger.
+/// (`sheetUp`); a page inside the sheet that has one (Edit album's release page) is the page shown. Each page is its view's
+/// own, held here weakly and let go with its view: one that never said it went (its window closed under it) can't
+/// linger. Not let go as a scene comes or goes - on the Mac every sheet is a scene of its own (notes/ios.md "Every sheet
+/// carries the app's models"), so a scene coming or going says nothing of the pages under it.
 @MainActor
 @Observable
 final class MacRefresh {
@@ -204,14 +206,27 @@ final class MacRefresh {
         var level = 0
         /// A sheet's root (MacSheet), not a page with a Refresh.
         var sheet = false
+        /// Among the pages showing: let go here if its view goes without saying so.
+        var listed = false
 
         nonisolated init() {}
+
+        deinit {
+            if listed { Task { @MainActor in MacRefresh.shared.letGo() } }
+        }
+    }
+
+    /// One of the pages showing, held weakly: its view holds it.
+    private struct Shown {
+        weak var page: Page?
     }
 
     /// The pages showing with a Refresh, and the sheets up - the latest last.
-    private var shown: [Page] = []
+    private var shown: [Shown] = []
     private var running = false
-    @ObservationIgnored private var started = false
+
+    /// Those still there.
+    private var pages: [Page] { shown.compactMap { (each: Shown) -> Page? in each.page } }
 
     var state: MacMenu.Refresh {
         if running { return .running }
@@ -222,37 +237,29 @@ final class MacRefresh {
     var sheetUp: Bool { deepest > 0 }
 
     /// How many sheets deep the deepest thing showing is.
-    private var deepest: Int { shown.map { (page: Page) -> Int in page.level }.max() ?? 0 }
+    private var deepest: Int { pages.map { (page: Page) -> Int in page.level }.max() ?? 0 }
 
     /// The page shown: the latest page as deep as the deepest - none while a sheet with no Refresh is over the pages.
     private var front: Page? {
         let deepest = self.deepest
-        return shown.last { (page: Page) -> Bool in !page.sheet && page.level == deepest }
-    }
-
-    /// At launch on the Mac (Platform.launching): everything let go as a scene comes or goes.
-    func start() {
-        guard !started else { return }
-        started = true
-        for name in [UIScene.willConnectNotification, UIScene.didDisconnectNotification] {
-            _ = NotificationCenter.default.addObserver(forName: name, object: nil, queue: .main) { (_: Notification) in
-                MainActor.assumeIsolated { MacRefresh.shared.forgetAll() }
-            }
-        }
+        return pages.last { (page: Page) -> Bool in !page.sheet && page.level == deepest }
     }
 
     func appeared(_ page: Page) {
-        shown.removeAll { $0 === page }
-        shown.append(page)
+        shown.removeAll { (each: Shown) -> Bool in each.page == nil || each.page === page }
+        page.listed = true
+        shown.append(Shown(page: page))
     }
 
     func went(_ page: Page) {
-        shown.removeAll { $0 === page }
+        page.listed = false
+        shown.removeAll { (each: Shown) -> Bool in each.page == nil || each.page === page }
     }
 
-    /// The window's scene came or went: what its pages said is let go - a new window's pages say it afresh.
-    func forgetAll() {
-        if !shown.isEmpty { shown = [] }
+    /// A page gone with its view, unsaid (its window closed under it): off the list, the menus drawn again.
+    func letGo() {
+        guard shown.contains(where: { (each: Shown) -> Bool in each.page == nil }) else { return }
+        shown.removeAll { (each: Shown) -> Bool in each.page == nil }
     }
 
     func run() {
@@ -329,6 +336,9 @@ final class WindowWork {
     }
 
     private let holders = NSHashTable<Holder>.weakObjects()
+    /// The windows shut here - the only ones opened again: a scene macOS made unclosable itself (a sheet's own, on the
+    /// Mac) is never made closable.
+    private let shut = NSHashTable<UIWindowScene>.weakObjects()
     private var started = false
 
     /// At launch on the Mac (Platform.launching): a window told as it comes.
@@ -348,12 +358,20 @@ final class WindowWork {
         apply()
     }
 
-    /// Each window closable while nothing holds work, and not while something does.
+    /// Every window shut while something holds work; those shut opened again once nothing does.
     func apply() {
-        let closable = !holders.allObjects.contains { (holder: Holder) -> Bool in holder.on }
-        for case let scene as UIWindowScene in UIApplication.shared.connectedScenes {
-            guard let behaviors = scene.windowingBehaviors, behaviors.isClosable != closable else { continue }
-            behaviors.isClosable = closable
+        let holding = holders.allObjects.contains { (holder: Holder) -> Bool in holder.on }
+        if holding {
+            for case let scene as UIWindowScene in UIApplication.shared.connectedScenes {
+                guard let behaviors = scene.windowingBehaviors, behaviors.isClosable else { continue }
+                behaviors.isClosable = false
+                shut.add(scene)
+            }
+        } else {
+            for scene in shut.allObjects {
+                scene.windowingBehaviors?.isClosable = true
+            }
+            shut.removeAllObjects()
         }
     }
 }

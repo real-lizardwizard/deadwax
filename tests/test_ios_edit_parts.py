@@ -219,7 +219,7 @@ def test_artwork_draws_the_cover_and_cd_art_and_offers_each_get_as_the_web_does(
     assert "Text(GetResults.noDiscArt)" in page and "Text(GetResults.discArtBeside)" in page
     assert "if GetResults.offersDiscArt(album) {" in page and "GetButton(model: model, kind: .disc" in page
     assert "if let pointer = GetResults.discArtPointer(album) {" in page
-    assert ".fullScreenCover(item: $full)" in page
+    assert ".appCover(item: $full)" in page
     picture = declared(pages, "struct", "DiscArtPicture")
     assert "client.libraryDiscArt(path: path, file: file)" in picture and ".clipShape(Corners.artShape)" in picture
     release = code(RELEASE)
