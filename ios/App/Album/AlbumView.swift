@@ -163,6 +163,8 @@ struct AlbumView: View {
         .listStyle(.plain)
         // the pull shuffles the album (never refreshes), while the page is the one on top
         .pullsToShuffle(PullShuffling(state: pull, can: can, on: shown, start: pulled))
+        // (the Mac app, slice 2) ⌘R: the •••'s Refresh, while the page shows; nothing on the iPhone
+        .refreshCommand { refresh() }
         .navigationTitle(model.name)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
@@ -257,16 +259,12 @@ struct AlbumView: View {
 
     /// The bar's •••: the whole album, as an album - nil (the ••• dimmed) until its songs are in. (Phase 8, slice 1)
     /// With the album's Edit (Edit albums or Look after the library - Managing.albumEdit), Edit album over the tabs. And
-    /// Album info, for everyone.
+    /// Album info, for everyone. (The Mac app, slice 2) The album's own ••• (QueueMenuRequest.album, a tile's right-click
+    /// too), and the page's Refresh after it.
     private var albumMenu: QueueMenuRequest? {
-        guard let album = model.album, let pick = model.albumPick else { return nil }
-        var request = QueueMenuRequest(pick: pick, album: album, gone: model.goneButHere)
-        request.albumInfo = { albumInfo = album }
-        if Managing.albumEdit(server.access.permissions).shown {
-            request.editAlbum = {
-                navigation.editAlbum(AlbumEditRequest(target: .album(AlbumEdit.Subject(album))))
-            }
-        }
+        guard let album = model.album,
+              var request = QueueMenuRequest.album(album, gone: model.goneButHere, permissions: server.access.permissions,
+                                                   navigation: navigation, info: { albumInfo = album }) else { return nil }
         request.refresh = { refresh() }
         return request
     }

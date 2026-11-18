@@ -581,6 +581,13 @@ def test_the_mac_plist_cant_drift_from_the_phones(config):
         (mac, lambda i: i.update(CFBundleName="$(PRODUCT_NAME)"), "CFBundleName is '$(PRODUCT_NAME)', not 'deadwax'"),
         (mac, lambda i: i.update(LSApplicationCategoryType="public.app-category.utilities"), "LSApplicationCategoryType"),
         (mac, lambda i: i.pop("CFBundleIconFile"), "no CFBundleIconFile"),
+        # (slice 2) the scene manifest: the Mac's many scenes, and otherwise the phone's dictionary, key for key
+        (mac, lambda i: i["UIApplicationSceneManifest"].update(UIApplicationSupportsMultipleScenes=False),
+         "UIApplicationSceneManifest is {'UIApplicationSupportsMultipleScenes': False}, not "
+         "{'UIApplicationSupportsMultipleScenes': True} as Info.plist has it, with the Mac's values within it"),
+        (mac, lambda i: i["UIApplicationSceneManifest"].update(UISceneConfigurations={}), "UIApplicationSceneManifest is"),
+        (phone, lambda i: i["UIApplicationSceneManifest"].update(UISceneConfigurations={}), "UIApplicationSceneManifest is"),
+        (mac, lambda i: i.pop("UIApplicationSceneManifest"), "no UIApplicationSceneManifest"),
     ]
     for path, change, words in cases:
         edit_plist(path, change)
@@ -588,6 +595,17 @@ def test_the_mac_plist_cant_drift_from_the_phones(config):
         assert len(found) == 1 and words in found[0] and "drifted" in found[0], (words, found)
         phone.write_bytes(original_phone)
         mac.write_bytes(original_mac)
+    # the iPhone keeps its one scene: never loosened to match the Mac's
+    edit_plist(phone, lambda i: i["UIApplicationSceneManifest"].update(UIApplicationSupportsMultipleScenes=True))
+    found = mac_problems(config)
+    assert found == ["Info.plist: UIApplicationSceneManifest's UIApplicationSupportsMultipleScenes is True, not False - "
+                     "the iPhone's, as before"], found
+    phone.write_bytes(original_phone)
+    edit_plist(phone, lambda i: i.update(UIApplicationSceneManifest=[]))
+    assert any("isn't a dictionary" in p for p in mac_problems(config))
+    phone.write_bytes(original_phone)
+    assert plistlib.loads(mac.read_bytes())["UIApplicationSceneManifest"] == {"UIApplicationSupportsMultipleScenes": True}
+    assert plistlib.loads(phone.read_bytes())["UIApplicationSceneManifest"] == {"UIApplicationSupportsMultipleScenes": False}
     mac.write_text("not a plist", encoding="utf-8")
     assert any("doesn't parse" in p for p in mac_problems(config))
 

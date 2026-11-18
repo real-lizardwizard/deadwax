@@ -258,6 +258,8 @@ struct NowPlayingView: View {
             }
             .buttonStyle(.plain)
             .accessibilityLabel(NowPlayingWords.close)
+            // (the Mac app, slice 2) Escape closes Now Playing; nothing on the iPhone
+            .escapeCloses()
             Spacer()
             // named for the look, not for what shows (NowPlaying.tsx:382): over the lyrics, the look's square still says
             // a tap shows the cover, as it will

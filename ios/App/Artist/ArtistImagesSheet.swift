@@ -46,9 +46,12 @@ struct ArtistImagesSheet: View {
                 ToolbarItem(placement: .cancellationAction) {
                     Button(EditWords.close, action: close)
                         .disabled(model?.flow.saving == true)
+                        // (the Mac app, slice 2) Escape is Close: it closes, or asks first with something chosen
+                        .escapeCloses()
                         .confirmationDialog(EditWords.discardTitle, isPresented: $askingDiscard, titleVisibility: .visible) {
                             Button(EditWords.discard, role: .destructive) { dismiss() }
                             Button(EditWords.keepEditing, role: .cancel) {}
+                                .returnCancels()
                         }
                 }
             }

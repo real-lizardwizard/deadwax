@@ -220,17 +220,54 @@ happens in `~/Library/Caches/deadwax-build`, and the last build's whole log is `
 The same app runs on a Mac too, built from the same code through Apple's Mac Catalyst - not the web app in a window,
 and not a second app. It's the same version as the phone's (app 0.13 (13) now), it talks only to deadwax as the phone
 does, and it plays through the same audio engine: seamless joins, normalization, the EQ, downloads. **This is its
-first build** (the Mac app's slice 1, "it runs and plays"), and **nothing of it has been seen on a Mac yet** - what
-only a Mac can tell is what [its checks](#the-mac-apps-checks-404-415) are for.
+second build** - the first ran and played (the Mac app's slice 1); this one adds the Mac's menus, keyboard shortcuts
+and right-click menus, and a window you can close while the music plays (slice 2) - and **nothing of it has been seen
+on a Mac yet**: what only a Mac can tell is what its checks are for ([404-415](#the-mac-apps-checks-404-415) and
+[416-423](#the-mac-apps-menus-keys-and-window-checks-416-423)).
 
 **What it is today.** The phone's app in a window shaped like a phone: the four tabs along the foot, every page as on
 the iPhone, in macOS's sizes and controls (the Mac idiom). The window is at least 390 x 640 points, no wider than 600,
-and opens at 430 x 860; macOS remembers its size and place after that. The menu bar says **deadwax** (About deadwax,
-Hide deadwax, Quit deadwax ⌘Q), with no File > New Window - there is only ever one window - and no deadwax Help, as
-there's no Mac help book. What the phone does, the Mac does, with these differences:
+and opens at 430 x 860; macOS remembers its size and place after that. What the phone does, the Mac does, with the
+Mac's menus and keys, and these differences.
 
-- **Pull to refresh** isn't on the Mac: macOS refuses it in the Mac's layout. The Library's **•••** > **Refresh**
-  does the same for the Library, and a later build brings Refresh (⌘R) to every page.
+**The menu bar** keeps the Mac's own menus - Undo to Select All, Close Window ⌘W, Enter Full Screen, the Window menu -
+and adds deadwax's:
+
+| menu | what deadwax adds |
+| --- | --- |
+| **deadwax** | About deadwax, **Settings…** ⌘, (the Settings tab), Hide deadwax ⌘H, Quit deadwax ⌘Q |
+| **File** | Close Window ⌘W - and no New Window: there is only ever one window |
+| **Edit** | **Find** ⌘F: Search, with the cursor in its field (macOS 15 and later - on macOS 14, Find opens Search and you click in the field) |
+| **View** | **Refresh** ⌘R: the page you're on, asked again (see below) |
+| **Controls** | **Play** or **Pause** (Space), **Next** ⌘→, **Previous** ⌘←, **Forward 10 Seconds** ⌥⌘→, **Back 10 Seconds** ⌥⌘←, **Shuffle**, **Repeat** (Repeat off, Repeat all, Repeat one - the one that's on is ticked), **Go to Current Song** ⌘L (the album of the song playing) |
+
+Format has nothing of deadwax's in it (there's nothing to format), and there's no deadwax Help (no Mac help book:
+this guide is the help). Every Controls item is dimmed while nothing is queued; Shuffle and Repeat say what Up Next says, and during
+the Library's Shuffle (your whole library shuffled) Shuffle is ticked and dimmed, as Now Playing's is - that order is
+the shuffle. **While a text field has the cursor** - Search, Find in the Library, a name - Space types a space and ⌘→
+and ⌘← move along the line: they don't play, pause or skip then (their menu items still do). Forward and Back stay
+within the song. There's no volume of deadwax's own: the Mac's volume keys and menu bar volume work, as for any app.
+
+The rest of the differences:
+
+- **Pull to refresh** isn't on the Mac: macOS refuses it in the Mac's layout. **View > Refresh** (⌘R) does what the
+  page's pull does on the phone, on every page that has one - and on the Library, an album and a playlist, whose pull
+  shuffles on the phone, what their **•••** > **Refresh** does. Refresh is dimmed on a page that has none, while one is
+  on its way, and while Now Playing is open.
+- **Right-click** a song, an album or a playlist for the menu its **•••** has: a song's row (on an album, a playlist,
+  All songs or Search) its own •••'s; an album's tile or row (the Library's albums, Search's, an artist's) the album
+  page's •••; a playlist's row its page's •••. Only the page's own Refresh is left out - that's ⌘R on the page.
+  An album's or a playlist's menu needs its songs, which deadwax is asked for as the pointer rests on it: right-click
+  in the first moment and the menu says Loading - right-click again. Artists have no right-click menu, as their rows
+  have no •••. The EQ's correction and the event log's lines keep their long-press menus, as a right-click.
+- **Escape** closes the sheet in front - its Close, Cancel or Done, so where Close asks before throwing away what you
+  typed (Edit album, Artist images, a playlist's Edit), Escape asks too. It closes Now Playing, and a cover shown full
+  size. **Return never confirms a delete or a write** in a question deadwax asks: Return is the question's Cancel
+  (Keep editing, Keep it, Keep as it is, Cancel). A text field's own Return is as on the phone - New playlist's name
+  field creates the playlist.
+- **Closing the window** (⌘W, or its red button) leaves the music playing, as Music's does. Click deadwax in the Dock
+  and the window comes back on the tab and page you left, the Library on the page it showed. **⌘Q** quits deadwax,
+  and the music stops.
 - **Your sign-in** is kept in a file rather than the Keychain - see [Where the Mac keeps your sign-in](#where-the-mac-keeps-your-sign-in).
 - **The EQ's Import from Files…** opens the Mac's Open panel: deadwax may read the file you choose there, and nothing
   else outside its own folder. **Export…** shares the file through the Mac's Share menu rather than the phone's sheet.
@@ -241,13 +278,11 @@ there's no Mac help book. What the phone does, the Mac does, with these differen
   and the phone's notice says "Picked up from your Mac".
 - **Settings > This phone > Debug** says "No install date to show: this build wasn't signed for a phone." The Mac
   app doesn't run out - see below.
-- **Closing the window may quit deadwax**, and stop the music: in this build, keep the window open (or minimised,
-  ⌘M) while you listen. A later build lets the music play on with the window closed, as Music's does.
 
-Still to come, each in a build of its own: the Mac's menus and keyboard shortcuts (Play/Pause on the space bar,
-Refresh ⌘R, Settings… ⌘,, right-click menus), a layout for a big window (a sidebar, the player bar along the foot,
-Up Next and Lyrics beside the page) - without the turntable, which stays the phone's - and the Mac's own words ("This
-Mac" where it says "This phone"). Until then, the words say "phone" and "iPhone" in places.
+Still to come, each in a build of its own: a layout for a big window (a sidebar, the player bar along the foot, Up
+Next and Lyrics beside the page, View's Show Sidebar, Up Next, Lyrics and Info) - without the turntable, which stays
+the phone's - the Mac's own words ("This Mac" where it says "This phone"), and File > Import EQ File… ⌘O. Until then,
+the words say "phone" and "iPhone" in places.
 
 ### What the Mac needs
 
@@ -5548,6 +5583,50 @@ home Wi-Fi, signed in as an admin with logins on. Install with `ios/scripts/inst
   "Quitting deadwax (--quit).", asks nothing, and the new build opens.
 - **415 A week on.** Eight days after an install, deadwax still opens. Settings > This phone > Debug says "No install
   date to show: this build wasn't signed for a phone."
+
+### The Mac app's menus, keys and window checks (416-423)
+
+**Not done yet.** These come with [the Mac app](#the-mac-app)'s second build - menus, keys, right-click and the window
+(still app 0.13 (13)). No server change is needed, and nothing changes on the phone. As for 404-415: deadwax's plain
+`http://` address, the home Wi-Fi, signed in as an admin with logins on, installed with `ios/scripts/install-mac.sh`.
+Say "pass", or what you saw.
+
+- **416 The menus.** The deadwax menu has **Settings…** ⌘, - it opens the Settings tab. **Controls** has Play, Next,
+  Previous, Forward 10 Seconds, Back 10 Seconds, Shuffle, Repeat (a submenu: Repeat off, Repeat all, Repeat one) and Go
+  to Current Song - every one dimmed with nothing queued. Play an album: Play becomes **Pause** while it plays, without
+  opening the menu twice? Repeat's tick follows Up Next's button, and Shuffle's tick its Shuffle; during the Library's
+  Shuffle, Shuffle is ticked and dimmed. **Edit** has **Find** ⌘F: are Spelling and Grammar, Substitutions and the
+  rest gone from it - and are Undo to Select All still there? **View** has **Refresh** ⌘R. File has no New Window,
+  there's no Help menu - and is there a Format menu at all, or an empty one?
+- **417 Space.** With the window in front, Space pauses and plays, on any page. Click in Search's field and type two
+  words: Space types a space and the music doesn't stop; ⌘← and ⌘→ go to the start and end of the line, nothing skips.
+  The same in the Library's Find. Click out of the field (on a song's page, say): Space pauses again.
+- **418 The arrows.** ⌘→ goes to the next song, ⌘← to the one before (past the first few seconds, the song again from
+  its start, as Previous does). ⌥⌘→ and ⌥⌘← move 10 seconds; near the end, ⌥⌘→ goes no further than the end, and near
+  the start ⌥⌘← no further back than the start.
+- **419 Find, Refresh, Settings, Go to Current Song.** From the Library, ⌘F: Search, at its top page, the cursor in its
+  field - type at once (on macOS 14, the field needs a click). ⌘F with Now Playing open: it closes, and the same. ⌘R on
+  the Library: it's asked again, as its ••• > Refresh does; on an album's page and a playlist's; on Settings (its pull
+  on the phone). Is ⌘R dimmed on Search, on Requests, and with Now Playing open? ⌘,: Settings, from any tab, Now Playing
+  closed. ⌘L: the album of the song playing, on the tab you're on.
+- **420 Right-click.** Each the same as its •••, the page's Refresh left out. A song on an album's page: **Add to
+  Queue**, **Add to a playlist…**, and its download item (**Download**, or **Remove Download**) - the same with a song
+  on a playlist's page, in All songs and in Search. An album's tile in the Library (rest the pointer on it a moment
+  first): Add to Queue, Add to a playlist…, the album's download items, **Album info** - which opens its sheet - and
+  **Edit album**; the same on an album's row (the Library's list), in Search and on an artist's page. Right-click a tile
+  the instant the pointer reaches it: it says Loading - and again: the menu. A playlist's row: Add to Queue, Add to a
+  playlist…, the playlist's download items. An artist: no menu. Does the trackpad's two-finger swipe on a song still
+  add it to the queue?
+- **421 Closing the window.** Playing, close the window (⌘W): the music plays on, and the media keys and the menu bar's
+  Now Playing still work. Is deadwax still in the Dock, with its dot? Click its Dock icon: the window comes back on the
+  page you left - try it with an album's page open over the Library, and with the Library on its Playlists page. ⌘Q:
+  the music stops and deadwax quits. With Edit album open, close the window and bring it back: what shows?
+- **422 Escape and Return.** Edit album with nothing typed: Escape closes it. Type in a field, Escape: it asks to
+  discard - and Return there keeps editing, it doesn't discard. Escape closes Up Next, Info, Album info, the Sources
+  sheet, Add to a playlist, a cover full size and Now Playing. A playlist's Edit: Escape leaves it, asking first after
+  a change. Settings > Downloads > Remove All Downloads: Return cancels, nothing removed. A playlist's Delete: Return
+  keeps it. In a playlist's Edit, and in the EQ's import preview, does Return press Done or Import? It shouldn't.
+- **423 VoiceOver** (⌘F5) reads the menus, a song row, a right-click menu's items and the player's buttons by name.
 
 ## What it can't do yet
 

@@ -168,6 +168,7 @@ struct EQImportPreview: View {
         case .success(let reading):
             ToolbarItem(placement: .cancellationAction) {
                 Button(EQWords.Import.cancel) { navigation.importAnswered(item.id) }
+                    .escapeCloses()
             }
             ToolbarItem(placement: .confirmationAction) {
                 Button {
@@ -179,6 +180,7 @@ struct EQImportPreview: View {
         case .failure:
             ToolbarItem(placement: .confirmationAction) {
                 Button(EQWords.Import.done) { navigation.importAnswered(item.id) }
+                    .escapeCloses()
             }
         }
     }

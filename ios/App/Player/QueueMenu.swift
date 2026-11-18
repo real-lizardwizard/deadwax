@@ -28,6 +28,35 @@ struct QueueMenuRequest {
     var refresh: (@MainActor () -> Void)?
 }
 
+extension QueueMenuRequest {
+    /// An album's own ••• (the album page's bar, screens.md 4): the whole album, as an album, with Album info - and
+    /// (Phase 8, slice 1) Edit album, over the tabs, for someone the web gives the album's Edit (Managing.albumEdit).
+    /// nil until the album's songs are in. (The Mac app, slice 2) The one list: the page's bar draws it, adding its
+    /// Refresh, and on the Mac a right-click on the album's tile or row draws it as it is (AlbumRightClick), so the two
+    /// never offer different things.
+    @MainActor
+    static func album(_ album: Album, gone: Bool, permissions: Set<Access.Permission>, navigation: AppNavigation,
+                      info: @escaping @MainActor () -> Void) -> QueueMenuRequest? {
+        guard let pick = QueuePick.album(album) else { return nil }
+        var request = QueueMenuRequest(pick: pick, album: album, gone: gone)
+        request.albumInfo = info
+        if Managing.albumEdit(permissions).shown {
+            request.editAlbum = {
+                navigation.editAlbum(AlbumEditRequest(target: .album(AlbumEdit.Subject(album))))
+            }
+        }
+        return request
+    }
+
+    /// A playlist's own ••• (its page's bar, Phase 4): the whole playlist, as songs, with the playlist's own download
+    /// items (slice 3) - nil until its songs are in. (The Mac app, slice 2) The page's bar draws it, adding its Refresh,
+    /// and on the Mac a right-click on the playlist's row (PlaylistRightClick).
+    static func playlist(_ answer: PlaylistWithSongs?, name: String, songs: [Song]) -> QueueMenuRequest? {
+        guard let pick = PlaylistPlay.pick(name: name, songs: songs) else { return nil }
+        return QueueMenuRequest(pick: pick, album: nil, playlist: answer)
+    }
+}
+
 /// The queue menu (screens.md 5; the web's app/QueueMenu.tsx): Add to Queue, opened FROM the ••• tapped - a SwiftUI
 /// Menu on the button, as Apple's own ••• are. It was a confirmationDialog on the album page until James's check of 0.2
 /// (2): since iOS 26 a confirmation dialog is a popover from the view it is attached to, here the page, so it came up
@@ -79,60 +108,71 @@ struct QueueMenu<Label: View>: View {
     let request: QueueMenuRequest?
     @ViewBuilder let label: () -> Label
 
+    var body: some View {
+        Menu {
+            QueueMenuItems(request: request)
+        } label: {
+            label()
+        }
+        .menuOrder(.fixed)
+        .disabled(request == nil)
+    }
+}
+
+/// The ••• menu's items (the Mac app, slice 2): the one list, drawn by the ••• (QueueMenu, above) and - on the Mac - by
+/// a right-click on the same row, tile or page (Platform's `macContextMenu`, MacRightClick.swift), so the two can never
+/// offer different things. Nothing for a nil request, which leaves a right-click with no menu, as the ••• is dimmed.
+struct QueueMenuItems: View {
+    let request: QueueMenuRequest?
+
     @Environment(PlayerModel.self) private var player
     @Environment(DownloadModel.self) private var downloads
     @Environment(Reachability.self) private var reachability
     @Environment(AppNavigation.self) private var navigation
 
     var body: some View {
-        Menu {
-            if let request {
-                if let pick = AddToQueue.pick(request.pick, online: reachability.online, gone: request.gone,
-                                              here: downloads.isHere) {
-                    Section(request.pick.title) {
-                        Button(AddToQueue.words, systemImage: AddToQueue.symbol) {
-                            player.addToQueue(pick, album: request.album)
-                        }
-                        if reachability.online, !request.gone, !request.pick.tracks.isEmpty {
-                            Button(PlaylistWords.addToAPlaylistRow, systemImage: PlaylistWords.addSymbol) {
-                                navigation.playlistPick = PlaylistPickRequest(PlaylistPick(request.pick))
-                            }
-                        }
+        if let request {
+            if let pick = AddToQueue.pick(request.pick, online: reachability.online, gone: request.gone,
+                                          here: downloads.isHere) {
+                Section(request.pick.title) {
+                    Button(AddToQueue.words, systemImage: AddToQueue.symbol) {
+                        player.addToQueue(pick, album: request.album)
                     }
-                }
-                if let playlist = request.playlist {
-                    PlaylistDownloadMenuSection(answer: playlist)
-                } else if request.offersDownload {
-                    DownloadMenuSection(songs: request.pick.tracks,
-                                        album: request.pick.queuedAs == .album ? request.album : nil,
-                                        gone: request.gone, name: request.pick.title)
-                }
-                let editAlbum = reachability.online && !request.gone ? request.editAlbum : nil
-                if request.albumInfo != nil || editAlbum != nil || request.refresh != nil {
-                    Section {
-                        if let albumInfo = request.albumInfo {
-                            Button(AlbumInfoWords.title, systemImage: AlbumInfoWords.symbol) {
-                                albumInfo()
-                            }
-                        }
-                        if let editAlbum {
-                            Button(EditWords.menuItem, systemImage: EditWords.symbol) {
-                                editAlbum()
-                            }
-                        }
-                        if let refresh = request.refresh {
-                            // the Library's own Refresh, word and symbol
-                            Button(LibrarySwitchWords.refresh, systemImage: "arrow.clockwise") {
-                                refresh()
-                            }
+                    if reachability.online, !request.gone, !request.pick.tracks.isEmpty {
+                        Button(PlaylistWords.addToAPlaylistRow, systemImage: PlaylistWords.addSymbol) {
+                            navigation.playlistPick = PlaylistPickRequest(PlaylistPick(request.pick))
                         }
                     }
                 }
             }
-        } label: {
-            label()
+            if let playlist = request.playlist {
+                PlaylistDownloadMenuSection(answer: playlist)
+            } else if request.offersDownload {
+                DownloadMenuSection(songs: request.pick.tracks,
+                                    album: request.pick.queuedAs == .album ? request.album : nil,
+                                    gone: request.gone, name: request.pick.title)
+            }
+            let editAlbum = reachability.online && !request.gone ? request.editAlbum : nil
+            if request.albumInfo != nil || editAlbum != nil || request.refresh != nil {
+                Section {
+                    if let albumInfo = request.albumInfo {
+                        Button(AlbumInfoWords.title, systemImage: AlbumInfoWords.symbol) {
+                            albumInfo()
+                        }
+                    }
+                    if let editAlbum {
+                        Button(EditWords.menuItem, systemImage: EditWords.symbol) {
+                            editAlbum()
+                        }
+                    }
+                    if let refresh = request.refresh {
+                        // the Library's own Refresh, word and symbol
+                        Button(LibrarySwitchWords.refresh, systemImage: "arrow.clockwise") {
+                            refresh()
+                        }
+                    }
+                }
+            }
         }
-        .menuOrder(.fixed)
-        .disabled(request == nil)
     }
 }

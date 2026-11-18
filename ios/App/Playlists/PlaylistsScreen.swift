@@ -82,7 +82,7 @@ struct PlaylistsPage: View {
         .sheet(item: $newSheet, onDismiss: openMade) { (sheet: NewSheet) in
             NavigationStack {
                 List {
-                    NewPlaylistFields { name in
+                    NewPlaylistFields(escapes: true) { name in
                         try await make(name, from: sheet)
                     } cancel: {
                         if newSheet == sheet { newSheet = nil }
@@ -326,6 +326,8 @@ struct PlaylistRow: View {
         .accessibilityElement(children: .combine)
         .accessibilityLabel("\(playlist.name), \(PlaylistRules.rowLine(playlist))")
         .accessibilityValue(dimmed ? DownloadWords.notOnPhone : "")
+        // (the Mac app, slice 2) the playlist page's ••• on a right-click; nothing on the iPhone
+        .playlistRightClick(PlaylistRoute(playlist))
     }
 }
 

@@ -132,6 +132,8 @@ struct PlaylistView: View {
             .listStyle(.plain)
             // the pull shuffles the playlist (never refreshes), while the page is the one on top and Edit isn't open
             .pullsToShuffle(PullShuffling(state: pull, can: can, on: shown && !editing, start: pulled))
+            // (the Mac app, slice 2) ⌘R: the •••'s Refresh, while the page shows; nothing on the iPhone
+            .refreshCommand { refresh() }
             .environment(\.editMode, .constant(editing ? .active : .inactive))
             .navigationTitle(model.name)
             .navigationBarTitleDisplayMode(.inline)
@@ -239,9 +241,12 @@ struct PlaylistView: View {
                     if model.changed { asksDiscard = true } else { leaveEdit() }
                 }
                 .disabled(model.busy)
+                // (the Mac app, slice 2) Escape is Cancel: it leaves Edit, or asks first with something changed
+                .escapeCloses()
                 .confirmationDialog(PlaylistWords.discardQuestion, isPresented: $asksDiscard, titleVisibility: .visible) {
                     Button(PlaylistWords.discard, role: .destructive) { leaveEdit() }
                     Button(PlaylistWords.keepEditing, role: .cancel) { refocus(.toggle) }
+                        .returnCancels()
                 }
             }
             ToolbarItem(placement: .confirmationAction) {
@@ -291,8 +296,7 @@ struct PlaylistView: View {
     /// dimmed) until its songs are in, once gone, and while Edit is open.
     private var playlistMenu: QueueMenuRequest? {
         guard !model.gone, !model.editing,
-              let pick = PlaylistPlay.pick(name: model.name, songs: model.songs) else { return nil }
-        var request = QueueMenuRequest(pick: pick, album: nil, playlist: model.answer)
+              var request = QueueMenuRequest.playlist(model.answer, name: model.name, songs: model.songs) else { return nil }
         request.refresh = { refresh() }
         return request
     }
@@ -448,6 +452,7 @@ struct PlaylistView: View {
                                     titleVisibility: .visible) {
                     Button(PlaylistWords.deletePlaylist, role: .destructive) { deletePlaylist() }
                     Button(PlaylistWords.keepIt, role: .cancel) { refocus(.delete) }
+                        .returnCancels()
                 }
                 if let failure = model.deleteFailure {
                     ErrorNote(failure)
@@ -792,6 +797,8 @@ private struct PlaylistSongRow: View {
             .accessibilityLabel(AlbumPageLines.moreForSong(song.title ?? ""))
         }
         .addsToQueue(menu, in: .list)
+        // (the Mac app, slice 2) the row's ••• on a right-click; nothing on the iPhone
+        .macContextMenu { QueueMenuItems(request: menu) }
     }
 
     /// The row as VoiceOver reads it: the title, playing or paused, the line, the download state, the time.

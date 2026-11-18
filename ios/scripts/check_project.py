@@ -25,7 +25,9 @@ Checks the iPhone app's project files without Xcode - what can be checked on Lin
     every Mac setting [sdk=macosx*] - the Mac idiom, Info-Mac.plist, the App Sandbox and the outgoing network as build
     settings, and a file the person chooses read (no entitlements file, no profile), each after the plain setting it qualifies (a plain one after it hides
     it) - and no MACOSX_DEPLOYMENT_TARGET; Info-Mac.plist is Info.plist with
-    exactly the Mac's differences (MAC_PLIST), so the two can't drift; and the Mac's icon, AppIcon.icns, holds its
+    exactly the Mac's differences (MAC_PLIST), so the two can't drift - (slice 2) one of them a value inside a
+    dictionary both have, the scene manifest's UIApplicationSupportsMultipleScenes, YES on the Mac (its window closed,
+    the music plays on) and NO on the iPhone, held so; and the Mac's icon, AppIcon.icns, holds its
     images (a 1024-pixel one opaque at its centre, transparent at its corners).
 
     python3 ios/scripts/check_project.py      # exit 0 and "ok", or every problem and exit 1
@@ -67,7 +69,15 @@ MAC_PLIST = {
         "NSSupportsAutomaticTermination": False,                    # a music player is never quit by macOS while it
         "NSSupportsSuddenTermination": False,                       # plays with no window in front
     },
+    # (slice 2) a value inside a dictionary both have: the rest of that dictionary still the phone's, key for key
+    "within": {
+        # macOS quits a one-scene Catalyst app as its window closes: with scenes, the window closes and the music plays on
+        # (decision 4), the Dock's icon opening it again. The iPhone keeps its one scene (NO) - checked too
+        "UIApplicationSceneManifest": {"UIApplicationSupportsMultipleScenes": True},
+    },
 }
+# what the iPhone's Info.plist holds where the Mac's differs within (its one scene)
+PHONE_WITHIN = {"UIApplicationSceneManifest": {"UIApplicationSupportsMultipleScenes": False}}
 MAC_ICNS = "AppIcon.icns"
 # the icns's image types and their sizes (make-icon.py's MAC_TYPES among them)
 ICNS_SIZES = {"icp4": 16, "icp5": 32, "icp6": 64, "ic07": 128, "ic08": 256, "ic09": 512, "ic10": 1024,
@@ -420,13 +430,25 @@ def check_mac_plist(problems: list) -> None:
         return
     wanted = {key: value for key, value in phone.items() if key not in MAC_PLIST["remove"]}
     wanted.update(MAC_PLIST["set"])
+    # (slice 2) the values set inside a dictionary: the phone's dictionary with them, and with nothing else changed
+    for key, inside in MAC_PLIST["within"].items():
+        held = phone.get(key)
+        if not isinstance(held, dict):
+            problems.append(f"Info.plist: {key} isn't a dictionary - the Mac's values within it have nowhere to go")
+            continue
+        for name, value in PHONE_WITHIN.get(key, {}).items():
+            if held.get(name) != value:
+                problems.append(f"Info.plist: {key}'s {name} is {held.get(name)!r}, not {value!r} - the iPhone's, as before")
+        wanted[key] = {**held, **inside}
     for key in sorted(set(wanted) | set(mac)):
         if key not in mac:
             problems.append(f"Info-Mac.plist: no {key} - Info.plist has it (or the Mac's own keys do): the two have drifted")
         elif key not in wanted:
             problems.append(f"Info-Mac.plist: {key} isn't in Info.plist, nor one of the Mac's own keys: the two have drifted")
         elif mac[key] != wanted[key]:
-            said = "the Mac's own keys have it" if key in MAC_PLIST["set"] else "Info.plist has it"
+            said = ("the Mac's own keys have it" if key in MAC_PLIST["set"]
+                    else "Info.plist has it, with the Mac's values within it" if key in MAC_PLIST["within"]
+                    else "Info.plist has it")
             problems.append(f"Info-Mac.plist: {key} is {mac[key]!r}, not {wanted[key]!r} as {said}: the two have drifted")
 
 

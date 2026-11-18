@@ -55,6 +55,7 @@ struct PressingPickerSheet: View {
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
                     Button(Pressings.done) { dismiss() }
+                        .escapeCloses()
                 }
             }
             .modifier(PressingFilter(on: filterable, typed: $typed))

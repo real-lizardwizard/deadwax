@@ -45,9 +45,11 @@ struct ArtistMoveSheet: View {
                 ToolbarItem(placement: .cancellationAction) {
                     if model?.flow.outcome != nil {
                         Button(ArtistManageWords.done) { dismiss() }
+                            .escapeCloses()
                     } else {
                         Button(ArtistManageWords.cancel) { dismiss() }
                             .disabled(model?.flow.applying == true)
+                            .escapeCloses()
                     }
                 }
             }
@@ -274,6 +276,7 @@ struct ArtistWhoSheet: View {
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button(EditWords.close) { dismiss() }
+                        .escapeCloses()
                 }
             }
         }

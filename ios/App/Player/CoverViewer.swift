@@ -236,6 +236,8 @@ private struct CoverCloseButton: View {
         }
         .buttonStyle(.plain)
         .accessibilityLabel(CoverViewerWords.close)
+        // (the Mac app, slice 2) Escape closes the viewer; nothing on the iPhone
+        .escapeCloses()
     }
 }
 

@@ -326,6 +326,13 @@ final class AppNavigation {
     /// (Phase 8, slice 11) A People write is out: the tab tapped again goes back no further than People's last page,
     /// where its answer is said (People.pagesKept).
     private(set) var writingPeople = false
+    /// (The Mac app, slice 2) Edit > Find (⌘F) asked for Search's field: Search takes it as it shows (FindFocus), and
+    /// says so (`findTaken`). Never set on the iPhone.
+    private(set) var findWanted = false
+    /// (The Mac app, slice 2) The Library switch's page as the Mac's window last showed it: a window closed and opened
+    /// again from the Dock comes back on it, as the tab and its pages do (they are all the app's, not the window's).
+    /// Only the Mac's window writes it (LibraryView).
+    var macLibraryPage: LibraryPage?
 
     /// A file shared to deadwax (`.onOpenURL`): shown by the preview that is up, in place - else by the EQ sheet,
     /// opened over Now Playing (by Now Playing) or over the tabs (here).
@@ -365,6 +372,27 @@ final class AppNavigation {
         case .you:
             if you.isEmpty { youScrollToTop += 1 } else { backToRoot(&you) }
         }
+    }
+
+    /// (The Mac app, slice 2) Edit > Find (⌘F): Search at its root - its pages popped as the tab tapped again pops them -
+    /// Now Playing closed, and its field to take the cursor as it shows.
+    func find() {
+        nowPlayingShown = false
+        tab = .search
+        backToRoot(&search)
+        findWanted = true
+    }
+
+    /// (The Mac app, slice 2) Search's field has the cursor Find asked for.
+    func findTaken() {
+        findWanted = false
+    }
+
+    /// (The Mac app, slice 2) deadwax > Settings… (⌘,): the Settings tab, its pages as they were - as a tap on the tab
+    /// from another - and Now Playing closed.
+    func showSettings() {
+        nowPlayingShown = false
+        tab = .you
     }
 
     /// (Phase 6, slice 2) A download asked for from the Sources sheet (App.tsx `gotten`, `router.root('requests')`):
@@ -593,6 +621,8 @@ final class AppNavigation {
         session += 1
         importAnswered()
         tab = .library
+        findWanted = false
+        macLibraryPage = nil
         // (slice 6's review) Needs a look's session over - once the session has moved on, so nothing is noted, read or
         // asked for the next person
         editor?.queue?.editorClosed()

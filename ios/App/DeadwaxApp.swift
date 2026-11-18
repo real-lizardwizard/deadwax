@@ -183,6 +183,10 @@ struct DeadwaxApp: App {
                 .tint(Palette.accent)
                 // (Noto Sans, 15 Nov) the words of every Text and control that sets no font of its own
                 .font(Typeface.body)
+                // (the Mac app, slice 2) one window: a file or link opened comes to it, never a second; the window
+                // closed, the app and the music go on (UIApplicationSupportsMultipleScenes, Info-Mac.plist) and the
+                // Dock's icon opens it again on the page it showed - every model is the app's, here, not the window's
+                .oneWindow()
         }
         .backgroundTask(.urlSession(DownloadSession.identifier)) {
             let began = ContinuousClock().now
@@ -190,8 +194,9 @@ struct DeadwaxApp: App {
             // the events and the plan after them within one budget (slice 3's review)
             await BackgroundWork.shared.eventsHandled(began: began)
         }
-        // (the Mac app, slice 1) on the Mac, its window: phone-sized, no New Window, no Help - nothing on the iPhone
-        .macWindow()
+        // (the Mac app, slice 1) on the Mac, its window: phone-sized, no New Window, no Help - and (slice 2) deadwax's
+        // menus and keys, drawn from the player and the window (MacCommands). Nothing on the iPhone
+        .macWindow(MacCommands(player: player, navigation: navigation, server: server))
     }
 }
 

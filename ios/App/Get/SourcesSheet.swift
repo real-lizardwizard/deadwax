@@ -141,6 +141,7 @@ struct SourcesSheet: View {
                         model.close()
                         dismiss()
                     }
+                    .escapeCloses()
                 }
                 if foundFolders {
                     // (James) at the right of the title, so a long list needn't be scrolled to its end to search again

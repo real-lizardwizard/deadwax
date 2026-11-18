@@ -60,6 +60,8 @@ struct SearchScreen: View {
                     placement: .navigationBarDrawer(displayMode: .always), prompt: Text(SearchWords.prompt))
         .autocorrectionDisabled()
         .textInputAutocapitalization(.never)
+        // (the Mac app, slice 2) Edit > Find (⌘F) puts the cursor here; nothing on the iPhone
+        .findField()
         .onSubmit(of: .search) { search.submitted() }
         .onAppear { search.shown() }
         .onChange(of: navigation.tab) { _, tab in
@@ -759,8 +761,10 @@ struct SearchRowView: View {
         case .album(let album):
             link(AppRoute.album(AlbumRoute(album)), line, round: false, cover: album.coverArt,
                  dimmed: dims(album: album.id))
+                .albumRightClick(AlbumRoute(album))
         case .song(let song):
             songRow(song, line)
+                .macContextMenu { QueueMenuItems(request: menu(song)) }
         case .group(let group):
             groupRow(group, line)
         case .mbArtist(let match):

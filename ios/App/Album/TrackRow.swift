@@ -91,6 +91,8 @@ struct TrackRow: View {
             .accessibilityLabel(AlbumPageLines.moreForSong(song.title ?? ""))
         }
         .addsToQueue(menu, in: .list)
+        // (the Mac app, slice 2) the row's ••• on a right-click - its own items; nothing on the iPhone
+        .macContextMenu { QueueMenuItems(request: menu) }
     }
 
     /// The one slot (1.2): the song's mark, or the room for one held - every row of the album lines up. Its words are

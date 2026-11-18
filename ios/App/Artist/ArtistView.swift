@@ -548,6 +548,8 @@ private struct ArtistAlbumRow: View {
             .accessibilityElement(children: .combine)
             .accessibilityLabel([row.title, line].filter { (part: String) -> Bool in !part.isEmpty }.joined(separator: ", "))
             .accessibilityValue(dimmed ? DownloadWords.notOnPhone : "")
+            // (the Mac app, slice 2) the album page's ••• on a right-click; nothing on the iPhone
+            .albumRightClick(AlbumRoute(id: row.albumId, name: row.title, coverArt: row.coverArt))
             Divider().padding(.leading, LibraryRow.textInset)
         }
     }

@@ -45,6 +45,8 @@ struct LibraryTile: View {
         .buttonStyle(.plain)
         .disabled(dimmed)
         .accessibilityLabel(LibraryTile.spoken(album, isNew: isNew, download: download, notHere: dimmed))
+        // (the Mac app, slice 2) the album page's ••• on a right-click; nothing on the iPhone
+        .albumRightClick(AlbumRoute(album))
     }
 
     /// What VoiceOver says of a tile or a row, in the order the web's button reads: the title, the artist, its download
@@ -128,6 +130,8 @@ struct LibraryRow: View {
         .buttonStyle(.plain)
         .disabled(dimmed)
         .accessibilityLabel(LibraryTile.spoken(album, isNew: isNew, download: download, notHere: dimmed))
+        // (the Mac app, slice 2) the album page's ••• on a right-click; nothing on the iPhone
+        .albumRightClick(AlbumRoute(album))
     }
 }
 

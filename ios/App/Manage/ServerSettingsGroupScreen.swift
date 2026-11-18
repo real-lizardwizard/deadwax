@@ -290,6 +290,7 @@ private struct SavedAnswersSection: View {
                     settings.clearAnswers()
                 }
                 Button(SavedAnswers.cancel, role: .cancel) {}
+                    .returnCancels()
             } message: {
                 Text(SavedAnswers.clearHint)
             }
@@ -318,6 +319,7 @@ struct SetUpNavidromeSheet: View {
                             dismiss()
                         }
                         .disabled(settings.flow.saving)
+                        .escapeCloses()
                     }
                 }
         }

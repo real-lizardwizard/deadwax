@@ -81,6 +81,7 @@ struct TagsListView: View {
                 if let names = discarding { push(names) }
             }
             Button(EditWords.keepEditing, role: .cancel) {}
+                .returnCancels()
         }
         .task(id: ObjectIdentifier(tags)) { tags.start() }
     }
@@ -199,6 +200,7 @@ struct TrackPageView: View {
         .confirmationDialog(EditWords.discardTitle, isPresented: $discarding, titleVisibility: .visible) {
             Button(EditWords.discard, role: .destructive) { push() }
             Button(EditWords.keepEditing, role: .cancel) {}
+                .returnCancels()
         }
         .task(id: ObjectIdentifier(tags)) { tags.start() }
     }

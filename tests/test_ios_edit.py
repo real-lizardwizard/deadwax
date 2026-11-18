@@ -68,11 +68,15 @@ def test_an_albums_menu_has_edit_album_with_the_albums_edit():
     assert info < edit < refresh
     # it opens nothing in Safari any more
     assert "openURL" not in menu and "webEdit" not in menu
+    # (the Mac app, slice 2) the album's own ••• built once - for its page's bar and a tile's right-click alike
+    builder = menu[menu.index("static func album(_ album: Album, gone: Bool, permissions: Set<Access.Permission>"):]
+    builder = block(builder, builder.index("{"))
+    assert "if Managing.albumEdit(permissions).shown {" in builder
+    assert "navigation.editAlbum(AlbumEditRequest(target: .album(AlbumEdit.Subject(album))))" in builder
     album = code(ALBUM)
     menu_request = album[album.index("private var albumMenu: QueueMenuRequest?"):]
     menu_request = block(menu_request, menu_request.index("{"))
-    assert "if Managing.albumEdit(server.access.permissions).shown {" in menu_request
-    assert "navigation.editAlbum(AlbumEditRequest(target: .album(AlbumEdit.Subject(album))))" in menu_request
+    assert "QueueMenuRequest.album(album, gone: model.goneButHere, permissions: server.access.permissions," in menu_request
 
 
 def test_the_sheet_is_opened_over_the_tabs_once():

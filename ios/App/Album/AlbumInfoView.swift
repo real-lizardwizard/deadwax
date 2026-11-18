@@ -15,6 +15,7 @@ struct AlbumInfoSheet: View {
                 .toolbar {
                     ToolbarItem(placement: .confirmationAction) {
                         Button(AlbumInfoWords.done) { dismiss() }
+                            .escapeCloses()
                     }
                 }
         }

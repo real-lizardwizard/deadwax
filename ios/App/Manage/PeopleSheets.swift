@@ -102,6 +102,7 @@ struct AddPersonSheet: View {
                         people.closed()
                     }
                     .disabled(writing)
+                    .escapeCloses()
                 }
                 ToolbarItemGroup(placement: .keyboard) {
                     Spacer()
@@ -213,6 +214,7 @@ struct ResetPasswordSheet: View {
                         people.closed()
                     }
                     .disabled(writing)
+                    .escapeCloses()
                 }
                 ToolbarItemGroup(placement: .keyboard) {
                     Spacer()
@@ -314,6 +316,7 @@ struct RemovePersonSheet: View {
                         people.closed()
                     }
                     .disabled(writing)
+                    .escapeCloses()
                 }
                 ToolbarItemGroup(placement: .keyboard) {
                     Spacer()

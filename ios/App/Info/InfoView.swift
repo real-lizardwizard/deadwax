@@ -83,6 +83,7 @@ struct InfoView: View {
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
                     Button(InfoWords.done) { dismiss() }
+                        .escapeCloses()
                 }
             }
         }

@@ -273,6 +273,7 @@ struct UpNextScreen: View {
                         if editing { editing = false } else { dismiss() }
                     }
                     .accessibilityFocused($focus, equals: .done)
+                    .escapeCloses()
                 }
             }
         }

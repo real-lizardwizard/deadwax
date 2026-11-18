@@ -96,7 +96,8 @@ struct LibraryView: View {
             .onChange(of: serverSettings.flow.saving) { _, _ in setUpDone() }
             .onAppear {
                 look()
-                if page == nil { show(LibraryPages.first(shownOrder)) }
+                // (the Mac app, slice 2) the Mac's window opened again: on the page it showed (never set on the iPhone)
+                if page == nil { show(navigation.macLibraryPage ?? LibraryPages.first(shownOrder)) }
                 guard !shownOnce else { return }
                 shownOnce = true
                 if reachability.online { shown() }
@@ -120,6 +121,10 @@ struct LibraryView: View {
                 look()
                 // back: Navidrome asked again - a check that failed while deadwax was away says nothing of it
                 if online { shown() }
+            }
+            .onChange(of: page) { (_: LibraryPage?, now: LibraryPage?) -> Void in
+                // (the Mac app, slice 2) kept beside the tab for the window closed and opened again - the Mac's alone
+                if Platform.mac { navigation.macLibraryPage = now }
             }
             .onChange(of: server.person) { _, _ in
                 // a new person opens on the first page, Find closed and empty - and no Set up Navidrome left up
@@ -291,6 +296,9 @@ struct LibraryView: View {
         // the title the pages pushed over it go back to; the bar itself is the Library's own top
         .navigationTitle("Library")
         .toolbar(.hidden, for: .navigationBar)
+        // (the Mac app, slice 2) ⌘R: the •••'s Refresh, while the Library shows; nothing on the iPhone, where the pull
+        // shuffles and the ••• has it
+        .refreshCommand { refresh() }
         .sheet(isPresented: $editingOrder) {
             EditOrderSheet(saved: $savedOrder, personal: server.access.hasLibrary)
         }
@@ -597,6 +605,7 @@ private struct EditOrderSheet: View {
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
                     Button(LibrarySwitchWords.done) { dismiss() }
+                        .escapeCloses()
                 }
             }
         }

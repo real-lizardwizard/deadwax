@@ -140,6 +140,7 @@ private struct EQDoneButton: ViewModifier {
             if let done {
                 ToolbarItem(placement: .confirmationAction) {
                     Button(EQWords.Screen.done) { done() }
+                        .escapeCloses()
                 }
             }
         }

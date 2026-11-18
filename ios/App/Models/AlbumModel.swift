@@ -120,8 +120,6 @@ final class AlbumModel {
     var headings: [String?] { album.map(DiscHeadings.headings) ?? [] }
     /// Under the songs: "12 songs, 48 min".
     var footer: String { AlbumPageLines.footer(songs) }
-    /// The album's own •••: all its songs as an album - nil until they are in.
-    var albumPick: QueuePick<Song>? { album.flatMap { QueuePick.album($0) } }
 
     // MARK: asking
 

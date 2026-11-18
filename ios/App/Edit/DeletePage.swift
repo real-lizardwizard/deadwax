@@ -117,6 +117,7 @@ struct DeletePage: View {
                 Task { await model.delete(path: asked.path, summary: asked.summary) }
             }
             Button(DeleteWords.cancel, role: .cancel) {}
+                .returnCancels()
         } message: { _ in
             Text(DeleteWords.noUndo)
         }

@@ -71,6 +71,7 @@ struct PlaylistPicker: View {
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button(PlaylistWords.cancel) { dismiss() }
+                        .escapeCloses()
                 }
             }
         }
@@ -296,6 +297,9 @@ final class PlaylistPickerModel {
 struct NewPlaylistFields: View {
     /// Another write is out (the picker's add): Create waits for it.
     var busyOutside = false
+    /// (The Mac app, slice 2) Escape is this Cancel - the Playlists screen's sheet's, whose only Cancel it is; not the
+    /// picker's, whose own Cancel closes the picker.
+    var escapes = false
     let create: (String) async throws -> Void
     let cancel: () -> Void
 
@@ -331,6 +335,7 @@ struct NewPlaylistFields: View {
                 Spacer()
                 Button(PlaylistWords.cancel, role: .cancel, action: cancel)
                     .buttonStyle(SecondaryPill())
+                    .escapeCloses(escapes)
             }
         }
         .onAppear { focused = true }

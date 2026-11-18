@@ -76,6 +76,7 @@ struct PeopleScreen: View {
                 people.forget(entry)
             }
             Button(People.keepIt, role: .cancel) {}
+                .returnCancels()
         }
         .onAppear { people.shows() }
         .onDisappear {
@@ -238,6 +239,7 @@ struct PersonScreen: View {
                 if let now = people.flow.person(asked.id), now.admin == asked.admin { people.flip(now) }
             }
             Button(People.keepAsItIs, role: .cancel) {}
+                .returnCancels()
         } message: { (asked: PeoplePerson) in
             Text(People.flipWords(asked).body)
         }

@@ -546,6 +546,7 @@ struct FullCoverView: View {
         .onTapGesture { dismiss() }
         .overlay(alignment: .topTrailing) {
             Button(EditWords.close) { dismiss() }
+                .escapeCloses()
                 .font(Typeface.headline)
                 .padding()
         }

@@ -352,6 +352,8 @@ struct SongRow: View {
         }
         // the list's own padding (`list(page:)`): the purple runs out to the screen's edge
         .addsToQueue(menu, in: .stack(inset: 16))
+        // (the Mac app, slice 2) the row's ••• on a right-click; nothing on the iPhone
+        .macContextMenu { QueueMenuItems(request: menu) }
     }
 
     /// The row's link to its album - or, with none to open, the row alone.

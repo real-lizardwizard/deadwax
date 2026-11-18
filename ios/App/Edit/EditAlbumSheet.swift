@@ -89,6 +89,8 @@ struct EditAlbumSheet: View {
                 ToolbarItem(placement: .cancellationAction) {
                     Button(EditWords.close, action: close)
                         .disabled(model?.applying == true)
+                        // (the Mac app, slice 2) Escape is Close: it closes, or asks first with something typed
+                        .escapeCloses()
                         .confirmationDialog(EditWords.discardTitle, isPresented: $askingDiscard, titleVisibility: .visible) {
                             Button(EditWords.discard, role: .destructive) {
                                 if let delta = pendingStep {
@@ -100,6 +102,7 @@ struct EditAlbumSheet: View {
                                 }
                             }
                             Button(EditWords.keepEditing, role: .cancel) { pendingStep = nil }
+                                .returnCancels()
                         }
                 }
             }

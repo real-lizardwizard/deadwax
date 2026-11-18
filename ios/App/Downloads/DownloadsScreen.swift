@@ -75,6 +75,7 @@ struct DownloadsScreen: View {
                             downloads.removeAll()
                             player.say(DownloadWords.removedAll)
                         }
+                        Platform.dialogCancel()
                     } message: {
                         let scope = downloads.follower.scope ?? AlbumScope.albums(for: server.me)
                         Text([DownloadWords.removeAllMessage(songs: shelf.songsHere, bytes: downloads.bytesHere),
@@ -326,6 +327,7 @@ private struct StorageSection: View {
                         .confirmationDialog(DownloadWords.removeOthersTitle, isPresented: $askingRemoveOthers,
                                             titleVisibility: .visible) {
                             Button(DownloadWords.remove, role: .destructive) { downloads.removeOthers() }
+                            Platform.dialogCancel()
                         } message: {
                             Text(DownloadWords.removeOthersMessage(downloads.otherBytes))
                         }
@@ -389,6 +391,7 @@ private struct LibrarySection: View {
             .confirmationDialog(AutoDownloadWords.offTitle(scope, albums: offAlbums), isPresented: $askingOff,
                                 titleVisibility: .visible) {
                 Button(AutoDownloadWords.offAndRemove, role: .destructive) { follower.on = false }
+                Platform.dialogCancel()
             } message: {
                 Text(AutoDownloadWords.offMessage(bytes: offBytes))
             }
@@ -786,6 +789,7 @@ private struct FailedRow: View {
                 remove()
                 player.say(DownloadWords.removed(name))
             }
+            Platform.dialogCancel()
         } message: {
             Text(AutoDownloadWords.keepOffMessage(downloads.libraryScope, songsHere: songsHere))
         }

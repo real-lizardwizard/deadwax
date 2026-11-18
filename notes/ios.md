@@ -14225,3 +14225,170 @@ skipped; pyflakes over src and tests; `swift test` (2244: 2074 in Core - one few
 12 and 158), all passed; the iPhone's unsigned generic-iOS Debug build and the Mac's unsigned Release build (Mac
 Catalyst, arm64, 0.13), each BUILD SUCCEEDED with only the AppIntents warning; check_project.py. Nothing the app
 itself shows changed (it said Settings already), so nothing here was run on a phone or the Mac.
+
+## The Mac app, slice 2: menus, keys, right-click and the window (2026-11-17)
+
+The Mac app's plan (~/Desktop/Code/deadwax-plans/mac-app.md), slice 2 - sections 1.1 (closing the window, decision 4)
+and 1.3, item 2 of section 6, checks 416-423 of section 7. Built on `mac-s2`, from the `ios` branch at 64e3e9c (slice
+1 and main's 2.1.35). src/__init__.py untouched, the app still 0.13 (13); **no server change**;
+**ios/Deadwax.xcodeproj untouched** (the App folder is synchronized, so the two new App files needed nothing); the
+engine files and DeadwaxAudio have no diff. **Nothing an iPhone user sees or does changes**: every new helper is
+Platform.swift's, and is the view itself (or EmptyView) on the iPhone.
+
+### Core (DeadwaxCore)
+
+- **MacMenu.swift** (new): what deadwax adds to the menu bar - each item's words, key, whether it can be used and
+  whether it's ticked, from a `State` the App reads each time the menus are drawn (queued, playing, shuffle, a
+  library's shuffle (`paged`), Repeat, the song's length, whether it names an album, a text field with the cursor,
+  the tabs shown, the page's Refresh (none, ready, on its way), Now Playing open).
+  - **The commands and keys** (the plan's 1.3): Settings… ⌘, - Find ⌘F - Refresh ⌘R - Play/Pause Space - Next ⌘→ -
+    Previous ⌘← - Forward 10 Seconds ⌥⌘→ - Back 10 Seconds ⌥⌘← - Shuffle - Repeat off, Repeat all, Repeat one (a
+    submenu, Up Next's order) - Go to Current Song ⌘L. No two share a key, none is the system's (⌘Q, ⌘W, ⌘H, ⌘M, ⌃⌘F).
+  - **The words** are the app's where it has them, never retyped: Play/Pause and Next the player's (PlayerWords),
+    Previous Now Playing's, Shuffle `shuffleLabel(paged)`, Repeat's submenu `repeatLabel(.off)` and its three
+    `UpNextWords.repeatSaid`, Refresh the Library's ••• (LibrarySwitchWords.refresh), Settings… the tab's own name
+    (YouWords.title) with the Mac's ellipsis. Controls, Forward/Back 10 Seconds, Go to Current Song and Find are the
+    Mac's own, as Music names them; `Words.cancel` is the dialogs' Cancel the Mac draws (below).
+  - **Enabled**: every Controls item needs something queued; Forward and Back a known length; Shuffle not a library's
+    shuffle (on and dimmed then, as Now Playing's); Go to Current Song an album and the tabs; Settings… and Find the
+    tabs (signed in, the sign-in not over them); Refresh the tabs, a page with one, none on its way and Now Playing
+    closed (the page under it isn't refreshed unseen). **Ticked**: Shuffle while on, the Repeat that's set - nothing
+    with nothing queued.
+  - **A text field with the cursor** (`typing`): Space, ⌘→ and ⌘← are the field's (a space, the line's end and
+    start), so they come off Play/Pause, Next and Previous meanwhile (`yieldsToTyping`); the items still work from
+    the menu. ⌘→/⌘← yielding is a decision beyond the plan's (it names only Space): a field moves on them.
+  - `skip(_:from:length:)`: Forward and Back 10 s, within the song (Scrub.clamp), nil with no length.
+- **MacMenuTests** (Swift Testing, 10): nothing queued; playing and paused; Repeat's three each ticked alone; Shuffle
+  and a library's; a text field keeping its keys; the keys as the plan has them; the words the app's own; the skips;
+  Go to Current Song; Refresh (where there is one, one at a time, not under Now Playing).
+
+### The app
+
+- **Shared/MacCommands.swift** (new) - `MacCommands: Commands`, handed to `Scene.macWindow(_:)` by DeadwaxApp:
+  `CommandGroup(replacing: .appSettings)` Settings…, `(replacing: .textEditing)` Find, `(replacing: .textFormatting)`
+  nothing, `(after: .toolbar)` Refresh, and `CommandMenu("Controls")` - MacMenu's sections with dividers, Shuffle and
+  Repeat's three as Toggles (ticks), Repeat's in a Menu. No words or keys of its own (test_ios_mac reads the file for
+  a literal); each click is the player's own call (`toggle`, `next`, `previous`, `seek(to:)` with MacMenu.skip from
+  `shownPosition`, `toggleShuffle`, `setRepeat`, `navigation.openAlbum(PlayedAlbum.route(...))`), MacMenu read again
+  as it lands. Also here:
+  - **TextEditing** - whether a text field has the cursor, from UIKit's begin/end notices for UITextField and
+    UITextView (SwiftUI's fields, a search bar's, the editors' text views), a weak table of fields, `typing` true
+    while one of them is first responder. Started in `Platform.launching()` on the Mac only.
+  - **MacRefresh** and **MacRefreshing** - ⌘R's page: each page's refresh registers as it appears and leaves as it
+    goes; the page shown is the latest still there (a page pushed over another, a tab, a sheet's page). One at a
+    time: `running` while its action is out. `Page` is a MainActor class holding the action as its view last drew it
+    (a Sendable closure stored in the modifier warned; a MainActor class doesn't).
+  - **FindFocus** - Search's field takes the cursor (`searchFocused`, iOS 18 / macOS 15) 150 ms after Find asks,
+    the tab's switch drawn; on macOS 14 Find opens Search and the field waits for a click.
+- **Shared/MacRightClick.swift** (new) - AlbumRightClick and PlaylistRightClick: a tile or row has no songs, so they
+  are asked for once the pointer rests on it a quarter second (`onHover`, then a fetch not called off by the pointer
+  leaving - a menu opening over the tile takes it), the answer kept with a download first, as the pages do; dropped
+  if someone else signed in meanwhile. Before it's in, the menu says Loading (the menu doesn't redraw while open:
+  right-click again); out of reach with nothing kept, no menu. The album's Album info opens its sheet from the tile.
+- **Player/QueueMenu.swift**: the •••'s items are `QueueMenuItems` - the very list, drawn by `QueueMenu` (the •••)
+  and by every right-click, so the two can't differ. `QueueMenuRequest.album(...)` and `.playlist(...)` build an
+  album's and a playlist's own ••• in one place: the album and playlist pages call them (adding their Refresh), and
+  so do the right-clicks (without it). AlbumModel's `albumPick` went with it (nothing else read it).
+- **Shared/Platform.swift**: the Mac's `macWindow(_ menus:)` adds `menus` to the commands; `pullToRefresh` is
+  `refreshCommand(action)` on the Mac (⌘R where the phone pulls); and the new helpers, each `self` (or EmptyView) on
+  the iPhone: `refreshCommand` (MacRefreshing), `macContextMenu` (`contextMenu(menuItems:)`), `albumRightClick`,
+  `playlistRightClick`, `escapeCloses(_ on:)` (`keyboardShortcut(.cancelAction)`), `returnCancels`
+  (`.defaultAction`), `findField`, `oneWindow` (`handlesExternalEvents(preferring: ["*"], allowing: ["*"])`) and
+  `Platform.dialogCancel()`.
+- **Right-click, where**: a song's row - TrackRow, PlaylistSongRow, SongRow, Search's song row - its own •••'s
+  request; an album's tile or row - LibraryTile, LibraryRow, Search's album row, the artist page's ArtistAlbumRow -
+  the album page's •••; a playlist's row (PlaylistRow, the Library's Playlists and Downloaded playlists) the playlist
+  page's •••, nothing while that page's Edit is open. The EQ's correction row and the event log's line keep their
+  phone long presses, as they were (a right-click on the Mac).
+- **⌘R, where**: every `pullToRefresh` (17 in 15 files, through the helper) and `refreshCommand { refresh() }` on the
+  three pages whose pull shuffles - the Library's pager, an album's page, a playlist's - their •••'s Refresh.
+- **Escape**: `.escapeCloses()` on every sheet's Close, Cancel or Done (Add to a playlist, Sources, Up Next, Info,
+  Album info, the EQ's Done, Pressings, Edit order, the EQ import's two, Edit album, Set up Navidrome, People's three,
+  Artist images, Move albums' three), Now Playing's chevron, the cover viewer's ✕, a full-size cover's Close, and a
+  playlist's Edit Cancel - so where Close asks, Escape asks. New playlist's form only on its own sheet
+  (`NewPlaylistFields(escapes: true)`), as inside Add to a playlist the picker's own Cancel has Escape.
+- **Return**: `.returnCancels()` on every confirmation dialog's role-cancel button (Keep editing, Keep it, Keep as it
+  is, Cancel - 11 dialogs); Downloads' four dialogs, which leave Cancel to the system, draw `Platform.dialogCancel()`
+  on the Mac - a Cancel with Return on it - and nothing on the iPhone. The EQ's name alert (a field, Save, Cancel) is
+  left as it is: Return there is the field's.
+- **The window**: `UIApplicationSupportsMultipleScenes` YES in Info-Mac.plist (NO on the iPhone, as before), so
+  closing it doesn't quit (decision 4). Every model is DeadwaxApp's, so the tab and every pushed page come back with
+  a new window; `server.start()` guards itself, so a new window doesn't relaunch anything. The Library's page is the
+  pager's @State, lost with the window - so on the Mac LibraryView writes it to `AppNavigation.macLibraryPage` and
+  opens on it (nil, the first page as before, on the iPhone). `oneWindow()` sends a file or a link to the window
+  that's open. File > New Window is gone since slice 1.
+- **AppNavigation** (Routes.swift): `find()` (Now Playing closed, Search at its root - popped as the tab tapped again
+  pops - and `findWanted`), `findTaken()`, `showSettings()` (Now Playing closed, the Settings tab), `macLibraryPage`;
+  `reset()` clears the last two.
+- **check_project.py**: MAC_PLIST's `within` - a value set inside a dictionary both plists have, the rest of that
+  dictionary still the phone's, key for key - holds the scene manifest's one difference, and `PHONE_WITHIN` holds the
+  iPhone's NO, so the parity rule names the difference rather than loosening.
+
+### Decided here (beyond the plan's words)
+
+- **The iPhone had no long press on any of these rows** (songs, albums, playlists, artists): so the right-click is
+  the Mac's alone, and the iPhone gets none.
+- **Album tiles and rows** take the album page's ••• (the tile has none of its own), less Refresh; **playlists** the
+  playlist page's. **Artists get no right-click**: an artist's row has no •••, and the artist page's ••• is an
+  admin's managing (Artist images…, Move albums…), drawn from the page's own facts.
+- **The ••• has no Go to album** (and no Play Next or Play Last since 16 Nov's Add to Queue): check 420 lists what the
+  menus really offer - Add to Queue, Add to a playlist…, the download items, Album info, Edit album.
+- **⌘R on the Library, an album and a playlist** is their •••'s Refresh, as the phone's pull there shuffles; and
+  dimmed under Now Playing.
+- **Find** replaces Edit's text-editing group (Find, Spelling and Grammar, Substitutions...); **Format** is emptied.
+- **Return in a field** stays the phone's (New playlist's name creates it, Change password's last field changes it,
+  the sign-in's signs in): only dialogs are held to Cancel, as the plan's 1.3 says ("the dialogs' default stays
+  Cancel"). If James wants a field's Return held too on the Mac, it's a line per field through Platform.
+
+### Tests
+
+test_ios_mac.py: Platform's helpers on the iPhone (`self`, EmptyView, no key, menu or command) and on the Mac; the
+scene wired with MacCommands and oneWindow; ⌘R on every pull and on the three pages, the same `refresh()` as their
+•••; MacCommands drawing MacMenu alone (no literal, Button/Toggle/Menu/CommandMenu words MacMenu's, two keys both
+`Self.shortcut(item.shortcut)`, each click the player's call, every MacMenu command handled, no volume); TextEditing's
+four notices; Find (SearchScreen's one `.findField()` after `.searchable`, AppNavigation's find/showSettings/reset,
+FindFocus); the Library page kept on the Mac only; right-click only through the helpers, each with QueueMenuItems,
+the rows and tiles counted, the two builders used by the pages and the right-clicks, no Refresh offered; Escape
+counted per file and on every toolbar Cancel/Close, every dialog's Cancel with Return and nothing else.
+test_ios_install_mac.py's parity case: the Mac's scenes NO, a key added inside either's manifest, the manifest
+removed, the phone's set YES (refused, not loosened), a manifest that isn't a dictionary. test_ios_edit.py reads the
+album builder.
+
+### Verified, and not
+
+Verified on the tip (2026-11-17), on James's Mac, nothing installed:
+
+- `swift test` through build-locked.sh, the whole package: 2254 tests passed, none failed - 2084 in Core's
+  (MacMenuTests' 10 among them), 158 in the audio engine's, 12 in the turntable's.
+- An unsigned iPhone Debug build and an unsigned Mac Catalyst Release build (arm64) both succeed, each with only the
+  AppIntents metadata note it already had (MacRefresh's Page made a @MainActor class to clear a Sendable warning the
+  first Mac build gave).
+- check_project.py: ok, with Info-Mac.plist's multiple scenes named within the scene manifest and the iPhone's NO
+  checked.
+- pytest of tests/test_ios_*.py, test_source_bytes.py and test_logins.py: 681 passed, 1 skipped. pyflakes over src
+  and tests: clean.
+- All 99 sims on Node 22, each in a TMPDIR of its own: 99 passed (no sim changed).
+- ios/Deadwax.xcodeproj unchanged: the App folder is synchronized, so the two new App files needed no project change,
+  and Core's two are the package's.
+
+Not verified - only the Mac can tell (docs/ios.md checks 416-423):
+
+- whether Catalyst redraws the menus as the player changes (Play to Pause, the ticks) - Commands reading @Observable
+  models - or only as the menu opens (416);
+- whether Space as a menu key reaches the menu while no field has the cursor, and stays off while one has (417);
+  whether TextEditing's notices come for SwiftUI's fields on Catalyst as on iOS;
+- whether `.textEditing` takes Spelling and Substitutions with it, and whether an emptied Format menu goes (416);
+- `searchFocused` on macOS 15 putting the cursor in a `.searchable` field after a tab's switch (419);
+- that a page pushed over another, a tab switched and a sheet send onDisappear on Catalyst as on iOS, so ⌘R is the
+  page in front (a sheet with no Refresh of its own leaves ⌘R on the page under it - harmless, a read);
+- the right-click on Catalyst: `.contextMenu` on a Button or NavigationLink, `onHover` with a mouse, the menu as
+  opened (Loading until asked again), Album info's sheet from a tile (420);
+- that multiple scenes keep the app and the music going with the window closed, the Dock's icon bringing it back,
+  and what comes back with a sheet up (Edit album's is AppNavigation's, so it shows again; its typed fields don't)
+  (421);
+- Escape on `.cancelAction` buttons with two registered (a sheet over Now Playing), and with a field's cursor; Return
+  on a dialog's `.defaultAction` Cancel - and whether Catalyst gives a toolbar's `.confirmationAction` (a playlist
+  Edit's Done, the EQ import's Import) Return by itself (422);
+- VoiceOver's reading of the menus and the right-click (423).
+- On the iPhone, assumed rather than seen: a dialog's actions with `Platform.dialogCancel()`'s EmptyView among them
+  draw exactly as before (the system's Cancel still added).

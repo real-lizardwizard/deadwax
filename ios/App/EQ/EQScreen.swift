@@ -122,6 +122,7 @@ struct EQScreen: View {
         }), titleVisibility: .visible, presenting: forgetting) { (asked: Forgetting) in
             Button(EQWords.Outputs.forget, role: .destructive) { forget(asked) }
             Button(EQWords.Outputs.cancel, role: .cancel) {}
+                .returnCancels()
         }
         .eqImportPreview(page: pageID)
         .onAppear { appeared = true }

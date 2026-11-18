@@ -113,10 +113,29 @@ def test_platform_is_the_iphones_exactly_as_before_on_the_iphone():
     assert "static let mac = false" in phone and "static let mac = true" in mac
     assert re.search(r"func pullToRefresh\(_ action: @escaping @MainActor @Sendable \(\) async -> Void\) -> some View \{\s*"
                      r"refreshable\(action: action\)\s*\}", phone)
-    assert re.search(r"func macWindow\(\) -> some Scene \{\s*self\s*\}", phone)
+    assert re.search(r"func macWindow\(_ menus: MacCommands\) -> some Scene \{\s*self\s*\}", phone)
     assert re.search(r"static func launching\(\) \{\}", phone)
-    # the Mac's: no refresh control at all, the window phone-shaped, New Window and Help gone
-    assert re.search(r"func pullToRefresh\(_ action: @escaping @MainActor @Sendable \(\) async -> Void\) -> some View \{\s*self\s*\}", mac)
+    # (slice 2) every helper the Mac's alone: the view itself on the iPhone - no key, no menu, no long press added
+    for helper in (r"refreshCommand\(_ action: @escaping @MainActor @Sendable \(\) async -> Void\)",
+                   r"macContextMenu<Items: View>\(@ViewBuilder _ items: \(\) -> Items\)",
+                   r"albumRightClick\(_ route: AlbumRoute\)", r"playlistRightClick\(_ route: PlaylistRoute\)",
+                   r"escapeCloses\(_ on: Bool = true\)", r"returnCancels\(\)", r"findField\(\)", r"oneWindow\(\)"):
+        assert re.search(r"func " + helper + r" -> some View \{\s*self\s*\}", phone), helper
+        assert re.search(r"func " + helper + r" -> some View \{", mac), helper
+    assert re.search(r"static func dialogCancel\(\) -> some View \{\s*EmptyView\(\)\s*\}", phone)
+    assert "keyboardShortcut" not in phone and "contextMenu" not in phone and "commands" not in phone
+    # the Mac's: no refresh control at all - (slice 2) the same action on ⌘R - the window phone-shaped, New Window and
+    # Help gone, and deadwax's menus
+    assert re.search(r"func pullToRefresh\(_ action: @escaping @MainActor @Sendable \(\) async -> Void\) -> some View \{\s*"
+                     r"refreshCommand\(action\)\s*\}", mac)
+    assert re.search(r"func refreshCommand\([^)]*\)[^{]*\{\s*modifier\(MacRefreshing\(action: action\)\)\s*\}", mac)
+    assert re.search(r"func macContextMenu<[^{]*\{\s*contextMenu\(menuItems: items\)\s*\}", mac)
+    assert re.search(r"func escapeCloses\([^{]*\{\s*keyboardShortcut\(on \? \.cancelAction : nil\)\s*\}", mac)
+    assert re.search(r"func returnCancels\(\) -> some View \{\s*keyboardShortcut\(\.defaultAction\)\s*\}", mac)
+    assert re.search(r"func oneWindow\(\) -> some View \{\s*handlesExternalEvents\(preferring: \[\"\*\"\], allowing: \[\"\*\"\]\)\s*\}",
+                     app_sources()[PLATFORM].split("\n#else\n")[0])
+    assert re.search(r"\.commands \{\s*CommandGroup\(replacing: \.newItem\) \{\}\s*CommandGroup\(replacing: \.help\) \{\}\s*menus\s*\}", mac)
+    assert "TextEditing.shared.start()" in mac.split("static func launching()")[1].split("\n    }\n")[0]
     assert "refreshable" not in mac
     assert "CommandGroup(replacing: .newItem) {}" in mac and "CommandGroup(replacing: .help) {}" in mac
     for size in ("CGSize(width: 390, height: 640)", "widest: CGFloat = 600", "CGSize(width: 430, height: 860)"):
@@ -128,7 +147,9 @@ def test_platform_is_the_iphones_exactly_as_before_on_the_iphone():
 def test_the_app_is_wired_to_platform():
     app = app_sources()
     root = bare(app["DeadwaxApp.swift"])
-    assert ".macWindow()" in root, "the scene's Mac window and menus"
+    assert root.count(".macWindow(MacCommands(player: player, navigation: navigation, server: server))") == 1, \
+        "the scene's Mac window and (slice 2) its menus"
+    assert root.count(".oneWindow()") == 1
     assert root.count("Platform.launching()") == 1
     delegate = root[root.index("final class AppDelegate"):]
     assert "Platform.launching()" in delegate, "at launch, before the first window connects"
@@ -166,6 +187,234 @@ def test_every_pull_to_refresh_goes_through_the_one_helper():
         if count:
             found[name] = count
     assert found == PULLS
+
+
+#? (slice 2) the pages whose phone pull shuffles: ⌘R is their •••'s Refresh, the very action it calls
+REFRESH_COMMANDS = {"Library/LibraryView.swift": 1, "Album/AlbumView.swift": 1, "Playlists/PlaylistView.swift": 1}
+
+
+def test_command_r_is_every_pull_and_every_pages_refresh():
+    """⌘R (the Mac app's plan 1.3): wherever the phone has a pull to refresh - through the very helper, so no page can
+    have one without the other - and the three pages whose pull shuffles, their •••'s own Refresh."""
+    found = {}
+    for name, text in app_sources().items():
+        if name == PLATFORM:
+            continue
+        code = bare(text)
+        count = code.count(".refreshCommand { refresh() }")
+        assert count == code.count(".refreshCommand"), f"{name}: ⌘R is the page's own refresh()"
+        if count:
+            found[name] = count
+            # the same action the •••'s Refresh calls
+            assert "request.refresh = { refresh() }" in code or "Button(action: refresh)" in code, name
+    assert found == REFRESH_COMMANDS
+    commands = bare(app_sources()["Shared/MacCommands.swift"])
+    # the page shown is the one that last appeared and hasn't gone; one at a time
+    assert ".onAppear { MacRefresh.shared.appeared(page) }" in commands
+    assert ".onDisappear { MacRefresh.shared.went(page) }" in commands
+    run = commands[commands.index("func run() {"):]
+    run = run[:run.index("\n    }\n")]
+    assert "guard !running, let page = shown.last, page.action != nil else { return }" in run
+    assert run.index("running = true") < run.index("await page.action?()") < run.index("running = false")
+
+
+# ----------------------------------------------------------------------------- the menus and keys (slice 2)
+
+def test_the_menus_are_mac_menus_and_nothing_else():
+    """MacCommands draws Core's MacMenu and nothing of its own: every item's words, key, dimming and tick MacMenu's, and
+    every click the player's own call - the one its button makes."""
+    code = bare(app_sources()["Shared/MacCommands.swift"])
+    commands = code[code.index("struct MacCommands: Commands {"):code.index("final class TextEditing")]
+    # no words of its own: no string literal in the menus at all (a literal reads "" once its contents are blanked)
+    assert '"' not in commands, "a string literal in the menus: their words are MacMenu's"
+    assert re.findall(r"\b(Button|Toggle|Menu|CommandMenu)\(([^,){]*)", commands) == [
+        ("CommandMenu", "MacMenu.Words.controls"), ("Menu", "MacMenu.Words.repeatMenu"),
+        ("Button", "item.words"), ("Toggle", "item.words"),
+    ]
+    assert commands.count(".keyboardShortcut(Self.shortcut(item.shortcut))") == 2
+    assert commands.count(".keyboardShortcut(") == 2 and commands.count(".disabled(!item.enabled)") == 2
+    assert "Binding(get: { item.ticked }" in commands
+    # the system's menus kept but New Window, Help and Format; Settings…, Find, Refresh in their places; Controls
+    for group in ("CommandGroup(replacing: .appSettings) {\n            item(.settings, state)",
+                  "CommandGroup(replacing: .textEditing) {\n            item(.find, state)",
+                  "CommandGroup(replacing: .textFormatting) {}",
+                  "CommandGroup(after: .toolbar) {\n            item(.refresh, state)"):
+        assert group in commands, group
+    # the state each time it's drawn, from the player and the window
+    state = commands[commands.index("private var state: MacMenu.State {"):commands.index("var body: some Commands {")]
+    for read in ("queued: player.hasQueue", "playing: player.isPlaying", "shuffle: player.shuffle",
+                 "paged: player.paged?.scope", "repeatMode: player.repeatMode", "length: player.duration",
+                 "PlayedAlbum.route($0, player: player)", "typing: TextEditing.shared.typing",
+                 "tabs: server.launch == .ready && server.signInOver == nil", "refresh: MacRefresh.shared.state",
+                 "nowPlaying: navigation.nowPlayingShown"):
+        assert read in state, read
+    # each click as the player's button makes it, read again as it lands
+    perform = commands[commands.index("private func perform("):commands.index("static func shortcut(")]
+    assert "let now = MacMenu.item(command, state)\n        guard now.enabled else { return }" in perform
+    for call in ("navigation.showSettings()", "navigation.find()", "MacRefresh.shared.run()", "player.toggle()",
+                 "player.next()", "player.previous()",
+                 "MacMenu.skip(command, from: player.shownPosition, length: player.duration) { player.seek(to: to) }",
+                 "player.toggleShuffle()", "player.setRepeat(mode)", "navigation.openAlbum(route)"):
+        assert call in perform, call
+    # no volume of deadwax's own (audio fidelity first), and nothing of the engine's
+    assert not re.search(r"(?i)volume|gain", code)
+    # every MacMenu command is drawn once
+    core = (CORE / "MacMenu.swift").read_text(encoding="utf-8")
+    cases = re.findall(r"^\s*case ([a-z][\w, ]*)$", bare(core[core.index("public enum Command"):core.index("public static let repeats")]), re.M)
+    every = [name.strip() for line in cases for name in line.split(",")]
+    assert every == ["settings", "find", "refresh", "playPause", "next", "previous", "forward", "back", "shuffle",
+                     "repeatOff", "repeatAll", "repeatOne", "goToCurrentSong"]
+    for name in every:
+        assert f"case .{name}" in perform or f".{name}," in perform or f", .{name}" in perform, name
+
+
+def test_a_text_field_keeps_its_keys():
+    code = bare(app_sources()["Shared/MacCommands.swift"])
+    editing = code[code.index("final class TextEditing"):code.index("final class MacRefresh")]
+    for notice in ("UITextField.textDidBeginEditingNotification", "UITextField.textDidEndEditingNotification",
+                   "UITextView.textDidBeginEditingNotification", "UITextView.textDidEndEditingNotification"):
+        assert notice in editing, notice
+    assert "NSHashTable<AnyObject>.weakObjects()" in editing and "isFirstResponder == true" in editing
+    assert "if typing != now { typing = now }" in editing
+
+
+def test_find_puts_the_cursor_in_searchs_field():
+    app = app_sources()
+    search = bare(app["Search/SearchScreen.swift"])
+    assert search.count(".findField()") == 1
+    assert search.index(".searchable(") < search.index(".findField()") < search.index(".onSubmit(of: .search)")
+    assert sum(bare(text).count(".findField()") for name, text in app.items() if name != PLATFORM) == 1
+    routes = bare(app["Shared/Routes.swift"])
+    find = routes[routes.index("func find() {"):]
+    find = find[:find.index("\n    }\n")]
+    assert "nowPlayingShown = false" in find and "tab = .search" in find and "backToRoot(&search)" in find
+    assert "findWanted = true" in find
+    settings = routes[routes.index("func showSettings() {"):]
+    settings = settings[:settings.index("\n    }\n")]
+    assert "tab = .you" in settings and "nowPlayingShown = false" in settings
+    reset = routes[routes.index("func reset() {"):]
+    reset = reset[:reset.index("\n    }\n")]
+    assert "findWanted = false" in reset and "macLibraryPage = nil" in reset
+    focus = bare(app["Shared/MacCommands.swift"])
+    focus = focus[focus.index("struct FindFocus: ViewModifier"):]
+    assert "content.searchFocused($focused)" in focus and "if #available(iOS 18.0, *) {" in focus
+    assert "navigation.findTaken()" in focus
+
+
+def test_the_window_comes_back_on_the_page_it_showed():
+    library = bare(app_sources()["Library/LibraryView.swift"])
+    assert "if page == nil { show(navigation.macLibraryPage ?? LibraryPages.first(shownOrder)) }" in library
+    assert "if Platform.mac { navigation.macLibraryPage = now }" in library
+    assert library.count("macLibraryPage") == 2, "written only on the Mac: nil on the iPhone, the first page as before"
+
+
+# ----------------------------------------------------------------------------- right-click (slice 2)
+
+#? a song's row: its own •••'s request, on a right-click
+SONG_ROWS = {"Album/TrackRow.swift": 1, "Library/SongsScreen.swift": 1, "Playlists/PlaylistView.swift": 1,
+             "Search/SearchScreen.swift": 1}
+#? an album's tile or row: the album page's •••; a playlist's row: its page's
+ALBUM_TILES = {"Library/LibraryTiles.swift": 2, "Search/SearchScreen.swift": 1, "Artist/ArtistView.swift": 1}
+PLAYLIST_ROWS = {"Playlists/PlaylistsScreen.swift": 1}
+#? the phone's own long presses, from before: the EQ's Back to AutoEq and the event log's Copy - a right-click there too
+PHONE_LONG_PRESSES = {"EQ/EQScreen.swift": 1, "Manage/EventLogScreen.swift": 1}
+
+
+def test_a_right_click_is_the_menus_own_items():
+    """Built from the ••• menus' own items (QueueMenuItems), never a second list: the ••• draws them, and so does every
+    right-click - a song row's from its own request, a tile's from the request its album page's ••• is built by."""
+    app = app_sources()
+    menu = bare(app["Player/QueueMenu.swift"])
+    queue = menu[menu.index("struct QueueMenu<Label: View>: View {"):menu.index("struct QueueMenuItems: View {")]
+    assert "QueueMenuItems(request: request)" in queue and "Button(" not in queue, "the ••• draws the items, and only them"
+    items = menu[menu.index("struct QueueMenuItems: View {"):]
+    assert "Button(AddToQueue.words, systemImage: AddToQueue.symbol)" in items
+    # no context menu but these, each with the items - and the phone's own two long presses, exactly as they were
+    for name, text in app.items():
+        code = bare(text)
+        if name == PLATFORM:
+            assert code.count("contextMenu(") == 1
+        elif name == "Shared/MacRightClick.swift":
+            assert code.count(".contextMenu {") == 2 and code.count("QueueMenuItems(request: request)") == 2
+        else:
+            assert code.count("contextMenu") == PHONE_LONG_PRESSES.get(name, 0), \
+                f"{name}: a right-click only through Platform's helpers"
+    found = {}
+    for name, text in app.items():
+        if name == PLATFORM:
+            continue
+        code = bare(text)
+        uses = re.findall(r"\.macContextMenu \{ ([^}]*) \}", code)
+        assert len(uses) == code.count(".macContextMenu"), name
+        if uses:
+            found[name] = len(uses)
+            for use in uses:
+                assert re.fullmatch(r"QueueMenuItems\(request: menu(\(song\))?\)", use), f"{name}: {use}"
+    assert found == SONG_ROWS
+    tiles = {name: bare(text).count(".albumRightClick(") for name, text in app.items() if name != PLATFORM}
+    assert {name: n for name, n in tiles.items() if n} == ALBUM_TILES
+    rows = {name: bare(text).count(".playlistRightClick(") for name, text in app.items() if name != PLATFORM}
+    assert {name: n for name, n in rows.items() if n} == PLAYLIST_ROWS
+    # the album's and the playlist's ••• are built in one place, for the page's bar and the right-click alike
+    album = bare(app["Album/AlbumView.swift"])
+    assert "QueueMenuRequest.album(album, gone: model.goneButHere" in album
+    playlist = bare(app["Playlists/PlaylistView.swift"])
+    assert "QueueMenuRequest.playlist(model.answer, name: model.name, songs: model.songs)" in playlist
+    clicks = bare(app["Shared/MacRightClick.swift"])
+    assert "QueueMenuRequest.album(album, gone: false" in clicks
+    assert "QueueMenuRequest.playlist(answer, name: answer.playlist.name, songs: answer.songs)" in clicks
+    assert "navigation.editingPlaylist != route.id" in clicks
+    # the page's Refresh stays the page's: a right-click never offers it
+    assert "refresh" not in clicks.replace("Refresh", "")
+
+
+# ----------------------------------------------------------------------------- Escape and Return (slice 2)
+
+#? every sheet's Close, Cancel or Done, Now Playing's chevron, the covers' Close - and playlist Edit's Cancel
+ESCAPES = {
+    "Album/AlbumInfoView.swift": 1, "Artist/ArtistImagesSheet.swift": 1, "Artist/ArtistMoveSheet.swift": 3,
+    "EQ/EQImport.swift": 2, "EQ/EQRoute.swift": 1, "Edit/EditAlbumSheet.swift": 1, "Edit/ReleasePage.swift": 1,
+    "Get/SourcesSheet.swift": 1, "Info/InfoView.swift": 1, "Library/LibraryView.swift": 1,
+    "Manage/PeopleSheets.swift": 3, "Manage/ServerSettingsGroupScreen.swift": 1, "Player/CoverViewer.swift": 1,
+    "Player/NowPlayingView.swift": 1, "Playlists/PlaylistPicker.swift": 2, "Playlists/PlaylistView.swift": 1,
+    "Search/PressingPickerSheet.swift": 1, "UpNext/UpNextScreen.swift": 1,
+}
+
+
+def test_escape_presses_close_and_return_never_confirms():
+    app = app_sources()
+    found = {}
+    for name, text in app.items():
+        if name == PLATFORM:
+            continue
+        code = bare(text)
+        # no key of its own anywhere: Escape and Return only through Platform's helpers, the menus only MacCommands'
+        if name != "Shared/MacCommands.swift":
+            assert "keyboardShortcut" not in code, f"{name}: a key only through Platform's helpers"
+        count = code.count(".escapeCloses(")
+        if count:
+            found[name] = count
+        # every toolbar Cancel or Close has Escape (Up Next's is Edit: its Done has it)
+        if name != "UpNext/UpNextScreen.swift":
+            assert code.count("placement: .cancellationAction") <= count, f"{name}: a sheet's Close without Escape"
+        # every dialog's Cancel is pressed by Return - a dialog the system draws a Cancel for gets one on the Mac
+        dialogs = code.count(".confirmationDialog(")
+        assert dialogs == code.count(".returnCancels()") + code.count("Platform.dialogCancel()"), name
+        for at in [m.end() for m in re.finditer(r"\.returnCancels\(\)", code)]:
+            line = code[:at].rsplit("\n", 2)[-2]
+            assert "role: .cancel)" in line, f"{name}: Return presses a dialog's Cancel only: {line.strip()}"
+    assert found == ESCAPES
+    # the playlist picker's form inside it: Escape is the picker's own Cancel there, the form's only on its own sheet
+    picker = bare(app["Playlists/PlaylistPicker.swift"])
+    assert ".escapeCloses(escapes)" in picker and "var escapes = false" in picker
+    assert "NewPlaylistFields(escapes: true)" in bare(app["Playlists/PlaylistsScreen.swift"])
+    # Escape on Edit album's Close and Artist images' Close: the button itself, before the question it asks
+    for name in ("Edit/EditAlbumSheet.swift", "Artist/ArtistImagesSheet.swift"):
+        code = bare(app[name])
+        assert code.index(".escapeCloses()") < code.index(".confirmationDialog(EditWords.discardTitle")
+    platform = bare(app[PLATFORM]).split("\n#else\n")[0]
+    assert re.search(r"static func dialogCancel\(\) -> some View \{\s*Button\(MacMenu\.Words\.cancel, role: \.cancel\) \{\}"
+                     r"\s*\.returnCancels\(\)\s*\}", platform)
 
 
 # ----------------------------------------------------------------------------- the sign-in
