@@ -8,7 +8,8 @@ import UIKit
 /// what is playing (with the engine's own words for its last failure, D7, and an Up Next edit held for the join, D4),
 /// the EQ (eq.md 3.13: the route's outputs, its key, the unit, the curve, what the last start put in and how long it
 /// took, the kept file) and "Muffle what plays" (slice 2), the engine's log (its last 500 lines, with Copy and
-/// Share), the Library's last album list asks (how many albums, how long - check 1), and how long this install runs. Phase 2's Downloads section: the songs by state, the session's
+/// Share), the Library's last album list asks (how many albums, how long - check 1) and its top's last reading (18 Nov,
+/// LibraryTop), and how long this install runs. Phase 2's Downloads section: the songs by state, the session's
 /// tasks, reachability, what waits to be sent, the time each check took, the download log and "Stream even when
 /// downloaded" (phase2-downloads.md 6.9). Phase 3's Your library (phase3-autodownload.md 3.5): Follow your library, what
 /// is followed, the albums and their songs read, the last check, the first read's time and what would fit. The address
@@ -73,6 +74,12 @@ struct DebugView: View {
             }
             if library.lastFetch.isEmpty {
                 Text("Not asked yet").foregroundStyle(Palette.quiet)
+            }
+            // (18 Nov) the Library's top's last reading - the row in its window, the window's inset, the room it came
+            // down, whether something was presented: what to send if the row still stands in the Dynamic Island
+            LabeledContent("Top") {
+                Text(model.libraryTop?.line ?? "Not measured yet")
+                    .font(Typeface.footnote.monospacedDigit())
             }
         } header: {
             Text("Library")

@@ -32,6 +32,12 @@ final class DebugModel {
     /// How long this install runs (7 days on a free account).
     let installLine: String
 
+    /// The Library's top's last reading (LibraryTop, 18 Nov - notes/ios.md "The Library's top after Now Playing"): where
+    /// its row was in its window, the window's top inset, the room it came down, whether something was presented and
+    /// what SwiftUI said - shown in Debug's Library section, for a phone where the row still stands in the island.
+    /// Written by LibraryTop alone, and only when it changes; nil before the Library has drawn.
+    var libraryTop: TopClearance.Reading?
+
     private let server: ServerModel
     private let player: PlayerModel
     private let downloads: DownloadModel

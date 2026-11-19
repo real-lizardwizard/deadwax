@@ -2744,7 +2744,12 @@ Debug, under Settings > This phone for an admin, is where Phase 0's test screen 
     until iOS has run one: iOS decides when, and may not at all. A run before the phone's first unlock
     after a restart does nothing and isn't listed (the Downloads events say so).
 - **Library**: how many albums each list had, whether it came new or the kept one still stood, and
-  how long it took to come.
+  how long it took to come. **Top**: the Library's top row as it was last measured, for when the row
+  sits in the Dynamic Island - "row 0 · window 62 · down 62 · nothing presented · SwiftUI 0, safe 0 ·
+  after presentation gone": where the row's top was in the app's window, the window's room at its top
+  (the status bar's and the island's), how far the row came down, whether a sheet or Now Playing was
+  over it then (its room is kept as it was while one is), what SwiftUI itself said of the row, and
+  what asked for the measure. "Not measured yet" until the Library has shown.
 - At the bottom, how long this install runs. In its last two days, it also says to run install.sh
   before then.
 
@@ -4779,15 +4784,23 @@ makes the row measure where it is on the screen and come down by what it lacks o
 it, James: "the library top clears the island now" - the first sentence below. The rest of 249 (scrolling, Find, the
 offline banner, the largest text size, another phone, no jump as sheets and pages come and go) is not done yet.
 
+On 18 Nov James found the row back in the island after Now Playing: "after pulling up the play screen and going back
+to library, the top bar is back inside the Dynamic Island". The build after that (still app 0.13 (13)) measures the row
+through UIKit, in its own window, and measures it again once Now Playing or a sheet has gone - the new step after the
+first sentence below.
+
 - **249 Clear of the Dynamic Island.** Open the Library: the magnifying glass, the switch and the ••• sit wholly
   below the Dynamic Island and the status bar's time and battery, none of them touching it, with the bar's colour
-  running up behind the status bar and nothing of the pages showing there. Scroll a page up: it goes under the row's
-  foot, never up behind the status bar. Tap the magnifying glass: Find's field opens under the row, the keyboard up,
-  and the row stays put; type, Cancel. Swipe between the pages, and tap the switch: as before. Turn off Wi-Fi and
+  running up behind the status bar and nothing of the pages showing there. Open Now Playing, close it: the row is
+  still clear - do it a few times, closing it each way you can (its control, a swipe down), and once with Find open
+  first. Scroll a page up: it goes under the row's foot, never up behind the status bar. Tap the magnifying glass:
+  Find's field opens under the row, the keyboard up, and the row stays put; type, Cancel. Swipe between the pages, and tap the switch: as before. Turn off Wi-Fi and
   WireGuard: the offline banner shows under the row, not over it. Do it all again at the largest text size. If you
   can, try a phone with a notch, or an SE. Open Now Playing, an album's •••, Find and a sheet (the switch's Edit
   order), and close each: the row is where it was, with no jump as each goes. Push an album and swipe back: the row
-  doesn't move. If any of the row still touches the island, a screenshot of it says where it stands.
+  doesn't move. If any of the row still touches the island, a screenshot of it says where it stands - and then,
+  without opening anything else first, Settings > This phone > Debug's **Library** section: its **Top** line
+  ("row … · window … · down … · …") is the row's last measure; send it as it reads.
 
 ### The tab bar, lower's check (250)
 

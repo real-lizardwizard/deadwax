@@ -8,6 +8,10 @@ import SwiftUI
 /// sheet with it. Putting them on the WindowGroup scene instead doesn't reach that scene either (tried). So the
 /// presenter, which has them, hands them on - on the Mac alone (Platform's `carryingApp`); on the iPhone a presented
 /// page inherits its presenter's environment as it always has, and `carryingApp` is nothing.
+///
+/// (18 Nov, notes/ios.md "The Library's top after Now Playing") Each one's going is said too, once it has gone - after
+/// the presenter's own `onDismiss`, on both devices: `Notification.Name.appPresentationGone`, on which the Library's
+/// top measures again (LibraryTop's probe), what was under the presentation the screen's again.
 extension View {
     /// SwiftUI's `.sheet(isPresented:onDismiss:content:)`, the page in it given the app's models on the Mac.
     func appSheet<Sheet: View>(isPresented: Binding<Bool>, onDismiss: (() -> Void)? = nil,
@@ -66,6 +70,20 @@ struct AppModels {
 extension EnvironmentValues {
     /// The app's models as one value, put on DeadwaxApp's root beside them - what a presenter hands its page on the Mac.
     @Entry var appModels: AppModels? = nil
+}
+
+extension Notification.Name {
+    /// A sheet or cover presented through `appSheet` or `appCover` has gone (SwiftUI's onDismiss, after the presenter's
+    /// own): the Library's top measures again (LibraryTop's probe).
+    static let appPresentationGone = Notification.Name("deadwax.presentationGone")
+}
+
+/// What runs as a presentation goes: the presenter's own `onDismiss`, then the word that it has gone.
+private func gone(_ onDismiss: (() -> Void)?) -> () -> Void {
+    {
+        onDismiss?()
+        NotificationCenter.default.post(name: .appPresentationGone, object: nil)
+    }
 }
 
 /// What a presenter hands its page on the Mac: the app's models (this value among them, so a sheet over a sheet is
@@ -144,9 +162,11 @@ private struct CarriedPresentation<Page: View>: ViewModifier {
                                  sheetLevel: sheetLevel)
         switch kind {
         case .sheet:
-            content.sheet(isPresented: isPresented, onDismiss: onDismiss) { page().carryingApp(carried) }
+            content.sheet(isPresented: isPresented, onDismiss: gone(onDismiss)) { page().carryingApp(carried) }
         case .cover:
-            content.fullScreenCover(isPresented: isPresented, onDismiss: onDismiss) { page().carryingApp(carried) }
+            content.fullScreenCover(isPresented: isPresented, onDismiss: gone(onDismiss)) {
+                page().carryingApp(carried)
+            }
         }
     }
 }
@@ -168,9 +188,11 @@ private struct CarriedItemPresentation<Item: Identifiable, Page: View>: ViewModi
                                  sheetLevel: sheetLevel)
         switch kind {
         case .sheet:
-            content.sheet(item: item, onDismiss: onDismiss) { (shown: Item) in page(shown).carryingApp(carried) }
+            content.sheet(item: item, onDismiss: gone(onDismiss)) { (shown: Item) in page(shown).carryingApp(carried) }
         case .cover:
-            content.fullScreenCover(item: item, onDismiss: onDismiss) { (shown: Item) in page(shown).carryingApp(carried) }
+            content.fullScreenCover(item: item, onDismiss: gone(onDismiss)) { (shown: Item) in
+                page(shown).carryingApp(carried)
+            }
         }
     }
 }

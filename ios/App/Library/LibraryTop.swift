@@ -1,5 +1,6 @@
 import DeadwaxCore
 import SwiftUI
+import UIKit
 
 /// The Library's top (the squared look, 14 Nov - notes/ios.md "The squared look"). James, on app 0.11: "the search bar
 /// is kinda in the way"; "let's put a magnifying glass button on the left side of the slider, and then maybe refine the
@@ -14,6 +15,14 @@ import SwiftUI
 /// laid out in the safe area its views are given, it still stood in the island's strip on his iPhone 17 Pro, so it
 /// comes down by whatever of the window's own top safe area its top, as drawn on the screen, doesn't clear
 /// (TopClearance) - nothing, laid out as it should be.
+///
+/// Read by UIKit since 18 Nov (James: "after pulling up the play screen and going back to library, the top bar is back
+/// inside the Dynamic Island"; notes/ios.md "The Library's top after Now Playing"): a probe behind the row (TopProbe)
+/// reads where the row's top is in its own window and that window's top inset - never SwiftUI's global space, never a
+/// guessed key window - each time UIKit puts it in a window, lays it out or changes its safe area, a presentation the
+/// app made goes, the scene comes to the front, and SwiftUI asks (the row appearing, its geometry changing). Under a
+/// presentation the row keeps the room it has; with nothing presented it is measured afresh (TopClearance.room). The
+/// last reading is Debug's (DebugModel.libraryTop).
 struct LibraryTop<Find: View, Switch: View, More: View>: View {
     /// Find is open: its field drawn under the row.
     let finding: Bool
@@ -26,10 +35,14 @@ struct LibraryTop<Find: View, Switch: View, More: View>: View {
     @ViewBuilder let more: More
 
     @Environment(\.displayScale) private var displayScale
-    /// How far the row comes down under the status bar and the island (TopClearance), kept while it shows.
+    @Environment(DebugModel.self) private var debug
+    /// How far the row comes down under the status bar and the island (TopClearance.room): measured afresh with nothing
+    /// presented, kept as it is under a presentation.
     @State private var clearance: CGFloat = 0
-    /// The window's top safe area `clearance` was worked out under.
-    @State private var windowTop: CGFloat = 0
+    /// The probe behind the row, for SwiftUI's own moments: the row appearing, SwiftUI's geometry for it changing.
+    @State private var eyes = TopProbe.Eyes()
+    /// What SwiftUI last said of the row - its top in SwiftUI's global space, its top safe area - for Debug's reading.
+    @State private var swiftUI: [CGFloat] = []
 
     /// Between the circles' targets and the switch: their faces' 4 pt of target and this make 12 pt either side.
     private static var gap: CGFloat { 8 }
@@ -65,26 +78,196 @@ struct LibraryTop<Find: View, Switch: View, More: View>: View {
             Palette.tabBar
                 .ignoresSafeArea(.container, edges: .top)
         }
+        // the row's own frame, never the fill's: its top is the row's top, its padding inside it, so coming down never
+        // moves what it reads
+        .background {
+            TopProbe(eyes: eyes) { (sample: TopProbe.Sample) -> Void in
+                take(sample)
+            }
+        }
         .overlay(alignment: .bottom) {
             Palette.border
                 .frame(height: 1 / max(displayScale, 1))
                 .accessibilityHidden(true)
         }
-        // where the row's own top is on the screen (its padding inside it, so coming down never moves it), and the safe
-        // area it is given - either changed, the room under the island worked out again
+        // SwiftUI's account of the row - its top in SwiftUI's global space, the safe area it is given: either changed,
+        // the probe reads at once, in this pass, where the room changed before the probe, and again once UIKit has laid
+        // out what moved (SwiftUI's numbers are Debug's, never the room's)
         .onGeometryChange(for: [CGFloat].self) { (proxy: GeometryProxy) -> [CGFloat] in
             [proxy.frame(in: .global).minY, proxy.safeAreaInsets.top]
         } action: { (measured: [CGFloat]) -> Void in
-            clear(top: measured[0])
+            swiftUI = measured
+            eyes.probe?.now("geometry")
+            eyes.probe?.soon("geometry")
         }
+        // back on screen - the tabs back from under Now Playing's full-screen cover, another tab, a page popped: read
+        // again, once what is under way is laid out
+        .onAppear { eyes.probe?.soon("appear") }
     }
 
-    /// The row's top at `top` on the screen: it comes down by what of the key window's top safe area that doesn't clear.
-    private func clear(top: CGFloat) {
-        let window = KeyWindow.safeArea.top
-        let now = TopClearance.extra(top: Double(top), windowTop: Double(window))
-        clearance = CGFloat(TopClearance.kept(Double(clearance), now: now, windowChanged: window != windowTop))
-        windowTop = window
+    /// The probe's reading: the room worked out again (TopClearance.room - kept under a presentation, afresh otherwise),
+    /// and the reading kept for Debug, each only when it changed.
+    private func take(_ sample: TopProbe.Sample) {
+        let room = TopClearance.room(kept: Double(clearance), top: Double(sample.top), windowTop: Double(sample.windowTop),
+                                     presented: sample.presented)
+        if CGFloat(room) != clearance { clearance = CGFloat(room) }
+        let said = swiftUI.count == 2 ? swiftUI.map { (value: CGFloat) -> Double in Double(value) } : nil
+        let reading = TopClearance.Reading(top: Double(sample.top), windowTop: Double(sample.windowTop), room: room,
+                                           presented: sample.presented, cause: sample.cause,
+                                           swiftTop: said?[0], swiftSafe: said?[1])
+        if debug.libraryTop != reading { debug.libraryTop = reading }
+    }
+}
+
+/// LibraryTop's eyes in UIKit (18 Nov, notes/ios.md "The Library's top after Now Playing"): a view of the row's own
+/// frame, drawn behind it, that reads - in its OWN window, never a guessed key window - where its top is
+/// (`convert(bounds, to: nil)`, the window's coordinates, whatever SwiftUI's global space says) and that window's top
+/// safe area, and whether something is presented over the window. Out of a window it reads nothing (under a full-screen
+/// cover iOS takes the tabs out of the window).
+///
+/// When: UIKit putting it in a window, laying it out and changing its safe area; a presentation the app made going
+/// (Notification.Name.appPresentationGone, after its onDismiss); the scene coming to the front; and SwiftUI's asks (the
+/// row appearing, SwiftUI's geometry changing). Each reads once, on the main loop's next turn, after the layout under
+/// way - however many ask meanwhile; SwiftUI's geometry changing reads at once in its action too (`now`), so the room
+/// changes in the pass that moved the row, as it did before the probe. Under a presentation it reads again every
+/// `gap` until nothing is presented, at most `tries` times after the last ask from outside: a cover going reads afresh
+/// as soon as it has gone, even should its onDismiss come before UIKit lets it go; a sheet left up keeps the room until
+/// its going is said.
+///
+/// Nothing in it is drawn or touchable, and VoiceOver passes it by.
+private struct TopProbe: UIViewRepresentable {
+    /// LibraryTop's hold on its probe, for SwiftUI's own moments. Weak: the probe is UIKit's to keep.
+    @MainActor final class Eyes {
+        weak var probe: Probe?
+    }
+
+    /// One reading: the row's top in its window, the window's top inset, whether something is presented over it, and
+    /// what asked.
+    struct Sample {
+        let top: CGFloat
+        let windowTop: CGFloat
+        let presented: Bool
+        let cause: String
+    }
+
+    let eyes: Eyes
+    let measured: (Sample) -> Void
+
+    func makeUIView(context: Context) -> Probe {
+        let probe = Probe()
+        probe.measured = measured
+        eyes.probe = probe
+        return probe
+    }
+
+    func updateUIView(_ probe: Probe, context: Context) {
+        probe.measured = measured
+        eyes.probe = probe
+    }
+
+    final class Probe: UIView {
+        /// Under a presentation, read again this often...
+        private static let gap: TimeInterval = 0.25
+        /// ...and this many times at most after the last ask from outside: 3 s, past any presentation's going.
+        private static let tries = 12
+
+        var measured: ((Sample) -> Void)?
+        /// What asked for the reading waiting for the main loop's next turn - nil while none waits.
+        private var waiting: String?
+        /// Reads again under a presentation: one waiting, and how many since the last ask from outside.
+        private var againWaiting = false
+        private var tried = 0
+
+        override init(frame: CGRect) {
+            super.init(frame: frame)
+            isUserInteractionEnabled = false
+            isAccessibilityElement = false
+            accessibilityElementsHidden = true
+            backgroundColor = .clear
+            let centre = NotificationCenter.default
+            centre.addObserver(self, selector: #selector(presentationGone), name: .appPresentationGone, object: nil)
+            centre.addObserver(self, selector: #selector(sceneActive), name: UIScene.didActivateNotification, object: nil)
+        }
+
+        required init?(coder: NSCoder) { fatalError("init(coder:) is not used") }
+
+        override func didMoveToWindow() {
+            super.didMoveToWindow()
+            soon("window")
+        }
+
+        override func layoutSubviews() {
+            super.layoutSubviews()
+            soon("layout")
+        }
+
+        override func safeAreaInsetsDidChange() {
+            super.safeAreaInsetsDidChange()
+            soon("safe area")
+        }
+
+        @objc private func presentationGone() {
+            soon("presentation gone")
+        }
+
+        @objc private func sceneActive() {
+            soon("scene active")
+        }
+
+        /// A reading now (SwiftUI's geometry changing - LibraryTop reads in its action). An ask from outside starts the
+        /// reads again under a presentation afresh.
+        func now(_ cause: String) {
+            tried = 0
+            read(cause)
+        }
+
+        /// A reading on the main loop's next turn - one, however many ask before it. An ask from outside (`again` false)
+        /// starts the reads again under a presentation afresh.
+        func soon(_ cause: String, again: Bool = false) {
+            if !again { tried = 0 }
+            guard waiting == nil else { return }
+            waiting = cause
+            DispatchQueue.main.async { [weak self] in
+                guard let self else { return }
+                let asked = waiting ?? ""
+                waiting = nil
+                read(asked)
+            }
+        }
+
+        /// Where the row's top is in its window, that window's top inset and whether something is presented over it,
+        /// told to LibraryTop - nothing out of a window.
+        private func read(_ cause: String) {
+            guard let window else { return }
+            let presented = presentedOver(window)
+            measured?(Sample(top: convert(bounds, to: nil).minY, windowTop: window.safeAreaInsets.top,
+                             presented: presented, cause: cause))
+            if presented { readAgain() }
+        }
+
+        /// Something presented: read again a moment later, as long as there are tries left.
+        private func readAgain() {
+            guard !againWaiting, tried < Self.tries else { return }
+            againWaiting = true
+            tried += 1
+            DispatchQueue.main.asyncAfter(deadline: .now() + Self.gap) { [weak self] in
+                guard let self else { return }
+                againWaiting = false
+                soon("presentation", again: true)
+            }
+        }
+
+        /// Something presented over `window`: by its root view controller - and, should a container nearer the row
+        /// have presented it, by the controller the row is in.
+        private func presentedOver(_ window: UIWindow) -> Bool {
+            if window.rootViewController?.presentedViewController != nil { return true }
+            var responder: UIResponder? = next
+            while let current = responder {
+                if let controller = current as? UIViewController { return controller.presentedViewController != nil }
+                responder = current.next
+            }
+            return false
+        }
     }
 }
 

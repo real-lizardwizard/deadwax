@@ -120,7 +120,8 @@ struct MainTabs: View {
         }
     }
 
-    /// The key window's bottom safe area (`home`'s), 0 before there is a window.
+    /// The app's window's bottom safe area (`home`'s - KeyWindow's, the scene's key window when it is the app's own), 0
+    /// before there is a window.
     @MainActor private static func windowHome() -> CGFloat {
         KeyWindow.safeArea.bottom
     }

@@ -10075,6 +10075,121 @@ safe area SwiftUI gave the Library's views really was short of the window's, and
 works. Why SwiftUI's was short is still not known. **Not verified**: the rest of check 249 - no jump as sheets, Now
 Playing and pushed pages come and go, Find, the offline banner, the largest text size, a phone with a notch or an SE.
 
+### The Library's top after Now Playing (18 Nov)
+
+James, on his iPhone 17 Pro (iOS 27.2): "after pulling up the play screen and going back to library, the top bar is back
+inside the Dynamic Island". Open Now Playing (MainTabs' full-screen cover, `.appCover(isPresented:
+$navigation.nowPlayingShown)`), close it, and LibraryTop's row - the magnifying glass, the switch, the ••• - stood in
+the island's strip again. 267ea8f had cleared it on the Library as it opens; check 249's "no jump as sheets, Now Playing
+and pushed pages come and go" was never seen.
+
+**What could do it** - four causes read from the code, none proven: there is no simulator (the rules rule one out),
+and the phone's numbers weren't to hand.
+1. **The cover takes the tabs out of the window.** Under a `.fullScreen` cover iOS removes the presenting views
+   (MainTabs' onDisappear/onAppear rely on it). Out of a window, and as they come back, SwiftUI can report geometry and
+   safe areas that aren't the screen's.
+2. **KeyWindow could read another window.** It was `windows.first { $0.isKeyWindow } ?? windows.first`, and a scene's
+   windows aren't only the app's (the keyboard's, the text effects'). One reading taken with no key window could take
+   another window's inset. As "a new window inset" that started `kept` afresh at 0 - and if SwiftUI's geometry then
+   settled on the very values it had before, onGeometryChange never came again and the row stayed in the strip.
+3. **A top above the screen came down only the inset.** `extra` clamped the top at 0 (`max(windowTop - max(top, 0),
+   0)`), so a row laid out above the window's edge still stood in the strip.
+4. **`.global` is SwiftUI's own space.** Inside the TabView's and the NavigationStack's UIKit containers it isn't sure
+   to be the window's: UIKit can move a container without SwiftUI seeing any change.
+
+**What it does now** - the row's room no longer depends on any of the four.
+- **A UIKit probe** (TopProbe, in LibraryTop.swift). It is a view of the row's own frame: a background after the
+  padding, so its top is the row's top and doesn't move as the row comes down - not the fill that ignores the safe
+  area. It reads, in ITS OWN window, where its top is (`convert(bounds, to: nil).minY`), that window's
+  `safeAreaInsets.top`, and whether anything is presented over the window (the window's root view controller's
+  `presentedViewController`, or the controller the row is in). Out of a window it reads nothing.
+- **When it reads.** On `didMoveToWindow`, `layoutSubviews` and `safeAreaInsetsDidChange`; when a sheet or cover the app
+  presented has gone; when the scene becomes active; on LibraryTop's onAppear; and when SwiftUI's geometry for the row
+  changes - SwiftUI's numbers kept for Debug alone. UIKit's moments read once, on the main loop's next turn, after the
+  layout under way, however many ask meanwhile. SwiftUI's geometry change reads at once in its action, where the room
+  changed before the probe (so a row SwiftUI moves comes down in the same pass, as it did), and again on the next turn.
+- **No measuring under a presentation.** While something is presented the row keeps the room it has - a sheet can draw
+  the screen beneath it smaller, or move it, which is what `kept` was for. With nothing presented it is measured
+  afresh with no floor from before (Core's `TopClearance.room`; `kept` is gone), so a stale room, large or small, can't
+  stick.
+- **After a cover.** The tabs come back into the window as the dismissal starts, still under the presentation, so
+  that read keeps the room. Something must read once `presentedViewController` is nil, and two things do, whichever
+  comes first:
+  - under a presentation the probe reads again every 0.25 s while it lasts - at most 12 times (3 s) after the last ask
+    from outside;
+  - every `appSheet` and `appCover` posts `Notification.Name.appPresentationGone` after its own onDismiss
+    (Presenting.swift's `gone`), which SwiftUI calls once the dismissal is done.
+  A sheet left up longer than 3 s keeps the room until its going is said.
+- **Core** (`TopClearance.extra`): a row drawn above the window's edge comes down the whole way - what it is above the
+  edge, and the inset - up to twice the inset (`most`): a row higher than a whole inset above the edge is mid-way
+  through something, not a layout to follow. With no window inset, no room.
+- **KeyWindow** is MainTabs' alone now, for the home indicator's room. It returns the scene's key window when that is
+  one of the app's (a normal window's level, showing, a page in it), the scene in front first; else the first of the
+  app's windows that shows; never `windows.first`, whatever that is. With the app's window key, as it is, it gives
+  what it gave: the tab bar is unchanged.
+- **Debug's readout.** Settings > This phone > Debug > Library > **Top**, for when the row still stands in the island.
+  It reads, e.g., "row 0 · window 62 · down 62 · nothing presented · SwiftUI 0, safe 0 · after presentation gone":
+  the row's top in its window, the window's top inset, the room it came down, whether something was presented (the
+  room was then kept), what SwiftUI said of the row (its global top and its top safe area), and what asked for the
+  reading. It is DebugModel.libraryTop, written by LibraryTop only when it changes; the words are Core's
+  `TopClearance.Reading.line`. Going to Settings takes the Library out of the window, so the line stays the
+  Library's last.
+- **The Mac** runs the same code (the desktop frame draws LibraryTop too). In steady state the probe reads the same
+  two numbers the old read used - the row's top in the main window, and the main window's inset - so the room is what
+  it was. Under a sheet (on the Mac, a window of its own, whose inset the old key-window read then took) the row now
+  keeps its room. Not run on a Mac.
+
+**Which of the four it covers.**
+1. Nothing is read out of a window or under a presentation, and the room is read afresh once the presentation has
+   gone.
+2. The probe reads its own window, and `windowChanged` went with `kept`. KeyWindow, MainTabs' still, no longer takes
+   another window.
+3. Core comes down the whole way.
+4. The room is from UIKit's window coordinates; SwiftUI's numbers are Debug's only.
+
+Not covered: UIKit moving a container while nothing reaches the probe - no layout, safe-area or window change, and no
+SwiftUI geometry change. The room is then read again at the next of the moments above, and Debug's "after …" says which
+came last.
+
+**Tests.**
+- TopClearanceTests (Core, on Linux, 7 now): a top above the edge the whole way, and bounded; a stale room, large or
+  small, never sticks with nothing presented; under a presentation the room is kept either way; no inset, no room;
+  Debug's line.
+- `test_the_librarys_top_sits_under_the_status_bar` holds:
+  - the probe after the padding, with no ignore on it;
+  - its window's coordinates and inset, and nothing out of a window;
+  - each moment it reads on, and LibraryTop's hold on it;
+  - no KeyWindow, no `.global` in the room, no `kept`;
+  - the presentation check and the reads again, and every wrapper's `gone`;
+  - Debug's reading, field and line;
+  - the views reaching under the status bar, as they were (the probe adds none).
+- The tab bar's test holds KeyWindow's new rule.
+
+Each new check was seen failing on its fault once, then put back: 28 faults against the two Python tests (the probe
+before the padding or ignoring the safe area, each moment dropped in turn, a read out of a window, the probe's frame
+for its window position, KeyWindow for the inset, `kept` back, SwiftUI's top in the room, the presentation check, the
+reads again, a wrapper without `gone`, `gone` posting nothing, Debug's write, field and line, and KeyWindow's four
+rules); and six against the Swift ones (the top clamped at 0, no bound, a floor from before, a read under a
+presentation, an inset of none or less, Debug's words).
+
+**Verified** on this tip, on James's Mac, nothing installed:
+- `swift test`: 2125 Core, 158 audio and 12 turntable tests passed;
+- the unsigned iPhone Debug build and the unsigned Mac Catalyst Release build (arm64) both succeed, with no warnings;
+- check_project.py: ok; the project file is unchanged;
+- pytest of test_ios_*.py, test_source_bytes.py and test_logins.py: 698 passed, 1 skipped; pyflakes over src and
+  tests: clean;
+- No sims: nothing they read changed.
+
+**Not verified** - only the phone can tell (docs/ios.md check 249, with its new step):
+- the row clear after Now Playing closes, and after every sheet;
+- no jump as each goes;
+- which of the four it was. If the row still stands in the island, Debug's Top line, read straight after, says where
+  UIKit and SwiftUI each put it.
+
+Also not seen anywhere:
+- that SwiftUI calls onDismiss once `presentedViewController` is nil (the reads again don't depend on it);
+- the Mac's Library top unchanged.
+
 ## The tab bar, lower (15 Nov)
 
 James: "there might be a little too much space below the bottom tab bar". AppTabBar was an overlay inside the safe
