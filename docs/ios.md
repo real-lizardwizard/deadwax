@@ -4794,7 +4794,7 @@ the player, but not first when I open the app". Its Debug line said why: as the 
 Playing it was measured for a moment far above the screen's top edge, came down twice the island's room, and wasn't
 measured again once it settled. The build after that (still app 0.13 (13)) ignores a measure taken above the screen's
 edge, and measures again for three seconds after each time it measures - the same step, now also: no lower than
-when the app opened.
+when the app opened. On it, James, after Now Playing: "Right height now".
 
 - **249 Clear of the Dynamic Island.** Open the Library: the magnifying glass, the switch and the ••• sit wholly
   below the Dynamic Island and the status bar's time and battery, none of them touching it, with the bar's colour

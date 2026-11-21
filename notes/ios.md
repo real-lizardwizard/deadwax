@@ -10227,9 +10227,10 @@ tests, 8 against the Python one.
 
 **Verified** on this tip, on James's Mac: `swift test`; the unsigned iPhone Debug and Mac Catalyst Release builds;
 check_project.py; pytest of test_ios_*.py, test_source_bytes.py and test_logins.py (698 passed, 1 skipped); pyflakes.
-**Not verified**: on the phone - the row as it opens and after Now Playing, at the same height (check 249); that the
-row settles within the 3 s of reads again (if not, the room kept from before the cover is the one it had as the app
-opened, which is right as long as the row settles where it opened).
+**Verified on James's iPhone 17 Pro** (20 Nov, this build): after Now Playing closes, the row is back at the height it
+opens at - James: "Right height now". **Not verified**: the rest of check 249 (scrolling, Find, the offline banner,
+the largest text size, the second phone); whether it was a read again that put it there or the room kept from before
+the cover (both give 62 on that phone).
 
 ## The tab bar, lower (15 Nov)
 
