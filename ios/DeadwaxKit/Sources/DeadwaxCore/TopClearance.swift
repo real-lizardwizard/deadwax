@@ -13,31 +13,40 @@ import Foundation
 /// After Now Playing (18 Nov, James: "after pulling up the play screen and going back to library, the top bar is back
 /// inside the Dynamic Island"; notes/ios.md "The Library's top after Now Playing"): the room kept no longer has a floor
 /// from before. Under a presentation - a sheet can draw the screen beneath it smaller, or move it - the row keeps the
-/// room it has; with nothing presented it is measured afresh, so a stale room, too large or too small, never sticks. And
-/// a row drawn above the window's top edge comes down the whole way, not only the inset.
+/// room it has; with nothing presented it is measured afresh, so a stale room, too large or too small, never sticks.
+///
+/// Not mid-move (20 Nov, James: "well now the whole screen is too low", "It's after I leave the player, but not first
+/// when I open the app"; notes/ios.md "The Library's top, too low after Now Playing"): his phone's Debug read "row -117.3
+/// · window 62 · down 124 · nothing presented · SwiftUI -117.3, safe 0 · after window" - the tabs back in the window
+/// from under Now Playing's cover, the row 117 points above its top edge for that moment, and 18 Nov's rule brought it
+/// down the whole way, twice the inset; the row then settled at the edge with nothing telling it, 62 points too low. A
+/// row above its window's top edge is mid-way through something, never a layout to follow: it keeps the room it has, as
+/// under a presentation (`settled`), and the probe reads again once it has settled.
 ///
 /// Pure, so it is tested on Linux; LibraryTop pads its row by it, from what its UIKit probe reads.
 public enum TopClearance {
     /// How far the row's contents come down, its top at `top` points from its window's top edge, in a window whose top
-    /// safe area is `windowTop` points: the part of `windowTop` above `top` - and for a row drawn above the edge (a
-    /// negative `top`), what it is above the edge too, up to `most`. 0 with no window inset, or a number that isn't one.
+    /// safe area is `windowTop` points: the part of `windowTop` below `top` - never more than the inset, a top above the
+    /// edge read as at it. 0 with no window inset, or a number that isn't one.
     public static func extra(top: Double, windowTop: Double) -> Double {
         guard top.isFinite, windowTop.isFinite, windowTop > 0 else { return 0 }
-        return min(max(windowTop - top, 0), most(windowTop: windowTop))
+        return max(windowTop - max(top, 0), 0)
     }
 
-    /// The most the row comes down: twice the window's inset - a row as much as a whole inset above the window's edge
-    /// comes all the way down; one drawn higher than that is mid-way through something, not a layout to follow, and
-    /// comes down no further.
-    public static func most(windowTop: Double) -> Double {
-        2 * windowTop
+    /// How far above its window's top edge a row can be read and still be laid out - a point's rounding.
+    public static let edge = 1.0
+
+    /// A row laid out, not mid-way through something: its top a number, and no more than `edge` above its window's top
+    /// edge. One higher - 117 points above it, the tabs just back from under Now Playing (20 Nov) - is mid-move.
+    public static func settled(top: Double) -> Bool {
+        top.isFinite && top >= -edge
     }
 
     /// The room the row has after a reading - its top at `top` in its window, the window's top safe area `windowTop`,
-    /// having come down `kept`: with something presented over the window (`presented`) the room it has, as it is; with
-    /// nothing presented, `extra` afresh, whatever it had before.
+    /// having come down `kept`: with something presented over the window (`presented`), or the row mid-move (not
+    /// `settled`), the room it has, as it is; otherwise `extra` afresh, whatever it had before.
     public static func room(kept: Double, top: Double, windowTop: Double, presented: Bool) -> Double {
-        if presented { return kept.isFinite ? max(kept, 0) : 0 }
+        if presented || !settled(top: top) { return kept.isFinite ? max(kept, 0) : 0 }
         return extra(top: top, windowTop: windowTop)
     }
 
@@ -71,11 +80,13 @@ public enum TopClearance {
             self.swiftSafe = swiftSafe
         }
 
-        /// Debug's line, its parts between middle dots: "row 0", "window 62", "down 62", "nothing presented",
-        /// "SwiftUI 0, safe 0" (once SwiftUI has said), "after layout".
+        /// Debug's line, its parts between middle dots: "row 0", "window 62", "down 62", "nothing presented" (or why the
+        /// room was kept: "kept, something presented", "kept, row above the window"), "SwiftUI 0, safe 0" (once SwiftUI
+        /// has said), "after layout".
         public var line: String {
-            var parts = ["row \(Self.points(top))", "window \(Self.points(windowTop))", "down \(Self.points(room))",
-                         presented ? "kept, something presented" : "nothing presented"]
+            let held = presented ? "kept, something presented"
+                : TopClearance.settled(top: top) ? "nothing presented" : "kept, row above the window"
+            var parts = ["row \(Self.points(top))", "window \(Self.points(windowTop))", "down \(Self.points(room))", held]
             if let swiftTop, let swiftSafe {
                 parts.append("SwiftUI \(Self.points(swiftTop)), safe \(Self.points(swiftSafe))")
             }

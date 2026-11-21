@@ -4789,16 +4789,24 @@ to library, the top bar is back inside the Dynamic Island". The build after that
 through UIKit, in its own window, and measures it again once Now Playing or a sheet has gone - the new step after the
 first sentence below.
 
+On 20 Nov James found that build put it too low instead: "well now the whole screen is too low", "It's after I leave
+the player, but not first when I open the app". Its Debug line said why: as the Library came back from under Now
+Playing it was measured for a moment far above the screen's top edge, came down twice the island's room, and wasn't
+measured again once it settled. The build after that (still app 0.13 (13)) ignores a measure taken above the screen's
+edge, and measures again for three seconds after each time it measures - the same step, now also: no lower than
+when the app opened.
+
 - **249 Clear of the Dynamic Island.** Open the Library: the magnifying glass, the switch and the ••• sit wholly
   below the Dynamic Island and the status bar's time and battery, none of them touching it, with the bar's colour
   running up behind the status bar and nothing of the pages showing there. Open Now Playing, close it: the row is
-  still clear - do it a few times, closing it each way you can (its control, a swipe down), and once with Find open
-  first. Scroll a page up: it goes under the row's foot, never up behind the status bar. Tap the magnifying glass:
+  still clear, and no lower than when the app opened - do it a few times, closing it each way you can (its control, a
+  swipe down), and once with Find open first. Scroll a page up: it goes under the row's foot, never up behind the status bar. Tap the magnifying glass:
   Find's field opens under the row, the keyboard up, and the row stays put; type, Cancel. Swipe between the pages, and tap the switch: as before. Turn off Wi-Fi and
   WireGuard: the offline banner shows under the row, not over it. Do it all again at the largest text size. If you
   can, try a phone with a notch, or an SE. Open Now Playing, an album's •••, Find and a sheet (the switch's Edit
   order), and close each: the row is where it was, with no jump as each goes. Push an album and swipe back: the row
-  doesn't move. If any of the row still touches the island, a screenshot of it says where it stands - and then,
+  doesn't move. If any of the row still touches the island, or sits lower than it did, a screenshot of it says where
+  it stands - and then,
   without opening anything else first, Settings > This phone > Debug's **Library** section: its **Top** line
   ("row … · window … · down … · …") is the row's last measure; send it as it reads.
 

@@ -434,7 +434,8 @@ def test_the_librarys_top_sits_under_the_status_bar():
     # in a VStack, which is laid out in the safe area whatever they do, and only the top's fill reaches up behind the
     # status bar. The Library is the only page that hides iOS's navigation bar, and every other view that reaches
     # under the status bar is a fill (or keeps its content in the safe area). Since 18 Nov the row's room is read by a
-    # UIKit probe in its own window, kept under a presentation and measured afresh otherwise.
+    # UIKit probe in its own window, kept under a presentation and measured afresh otherwise; since 20 Nov kept too while
+    # the row is above its window's edge, and read again after every ask.
     library = (APP / "Library" / "LibraryView.swift").read_text(encoding="utf-8")
     pager = library[library.index("private func pager(albums: AlbumList)"):library.index("private func pageView(")]
     assert ".safeAreaInset(edge: .top" not in library and ".showsOfflineBanner()" not in pager
@@ -483,10 +484,28 @@ def test_the_librarys_top_sits_under_the_status_bar():
     assert ("TopClearance.room(kept: Double(clearance), top: Double(sample.top), windowTop: Double(sample.windowTop),\n"
             "                                     presented: sample.presented)") in take
     assert "global" not in take
-    # no measuring under a presentation: the window's root view controller presenting (or the row's own controller),
-    # read again a moment later until it has gone; and every sheet and cover says it has gone once it has
+    # no measuring under a presentation: the window's root view controller presenting (or the row's own controller);
+    # and every sheet and cover says it has gone once it has
     assert "if window.rootViewController?.presentedViewController != nil { return true }" in probe
-    assert "let presented = presentedOver(window)" in probe and "if presented { readAgain() }" in probe
+    assert "let presented = presentedOver(window)" in probe
+    # (20 Nov, James: "well now the whole screen is too low", "It's after I leave the player") read as the tabs came
+    # back from under Now Playing, the row was 117 points above its window's edge, came down twice the inset, then
+    # settled with nothing telling the probe. So a row above the edge keeps its room (Core's `settled`, no `most`), and
+    # every ask is followed by reads again - 12, a quarter second apart - whatever is presented; a read again doesn't
+    # start them afresh, an ask does
+    assert "if presented || !settled(top: top) { return kept.isFinite ? max(kept, 0) : 0 }" in clearance
+    assert "public static func settled(top: Double) -> Bool {\n        top.isFinite && top >= -edge\n" in clearance
+    assert "public static let edge = 1.0\n" in clearance and "func most(" not in clearance
+    assert "return max(windowTop - max(top, 0), 0)" in clearance
+    assert "private static let gap: TimeInterval = 0.25\n" in probe and "private static let tries = 12\n" in probe
+    assert "presented: presented, cause: cause))\n            readAgain()\n        }" in probe
+    assert "if presented { readAgain() }" not in probe
+    assert "func now(_ cause: String) {\n            follow(cause)\n            read(cause)\n" in probe
+    assert "func soon(_ cause: String) {\n            follow(cause)\n            schedule(cause)\n" in probe
+    assert "left = Self.tries\n            asked = cause\n" in probe
+    again = probe[probe.index("private func readAgain() {"):probe.index("private func presentedOver(")]
+    assert "guard !againWaiting, left > 0 else { return }" in again and "left -= 1" in again
+    assert 'schedule("\\(asked), again")' in again and "soon(" not in again and "follow(" not in again
     presenting = (APP / "Shared" / "Presenting.swift").read_text(encoding="utf-8")
     assert presenting.count("onDismiss: gone(onDismiss)") == 4 and "onDismiss: onDismiss)" not in presenting
     assert "onDismiss?()\n        NotificationCenter.default.post(name: .appPresentationGone, object: nil)" in presenting

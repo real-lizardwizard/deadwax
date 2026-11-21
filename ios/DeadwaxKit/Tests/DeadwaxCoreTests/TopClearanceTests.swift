@@ -3,7 +3,7 @@ import Testing
 
 // The Library's top, measured (15 Nov, TopClearance): the row comes down by what of its window's top safe area its own
 // top doesn't clear. After Now Playing (18 Nov): measured afresh whenever nothing is presented - no floor from before -
-// kept as it is under a presentation, and a row drawn above the window's edge comes down the whole way.
+// and kept as it is under a presentation. (20 Nov) A row above its window's top edge is mid-move: its room kept too.
 @Suite struct TopClearanceTests {
     @Test func aRowLaidOutAtTheScreensTopComesDownUnderTheIsland() {
         // an iPhone 17 Pro's 62 points of status bar and island, the row drawn from the top edge
@@ -32,17 +32,25 @@ import Testing
         #expect(TopClearance.room(kept: 62, top: 0, windowTop: 0, presented: false) == 0)
     }
 
-    @Test func aRowAboveTheWindowsEdgeComesDownTheWholeWay() {
-        // drawn 30 above the edge: the 30, then the whole inset under it - its contents land at the inset's foot
-        #expect(TopClearance.extra(top: -30, windowTop: 62) == 92)
-        // a whole inset above the edge: still all the way down
-        #expect(TopClearance.extra(top: -62, windowTop: 62) == 124)
-        // higher than that is mid-way through something: no further than twice the inset
-        #expect(TopClearance.most(windowTop: 62) == 124)
-        #expect(TopClearance.extra(top: -500, windowTop: 62) == 124)
-        #expect(TopClearance.extra(top: -1e12, windowTop: 20) == 40)
-        // and through `room`, the same with nothing presented
-        #expect(TopClearance.room(kept: 62, top: -30, windowTop: 62, presented: false) == 92)
+    @Test func aRowAboveTheWindowsEdgeIsMidMoveAndKeepsItsRoom() {
+        // 20 Nov, James's phone after Now Playing: "row -117.3 · window 62 · down 124 · nothing presented" - the tabs
+        // back in the window, the row above its top edge for that moment. Not a layout to follow: the room is kept as it
+        // is, whatever it was, never twice the inset
+        #expect(TopClearance.room(kept: 62, top: -117.3, windowTop: 62, presented: false) == 62)
+        #expect(TopClearance.room(kept: 0, top: -117.3, windowTop: 62, presented: false) == 0)
+        #expect(TopClearance.room(kept: 62, top: -30, windowTop: 62, presented: false) == 62)
+        #expect(TopClearance.room(kept: 62, top: -.infinity, windowTop: 62, presented: false) == 62)
+        #expect(TopClearance.room(kept: .nan, top: -117.3, windowTop: 62, presented: false) == 0)
+        #expect(!TopClearance.settled(top: -117.3) && !TopClearance.settled(top: -1.5) && !TopClearance.settled(top: .nan))
+        // a point's rounding above the edge is laid out: read as at the edge, the inset and no more
+        #expect(TopClearance.settled(top: -1) && TopClearance.settled(top: 0) && TopClearance.settled(top: 62))
+        #expect(TopClearance.room(kept: 124, top: -0.4, windowTop: 62, presented: false) == 62)
+        // and `extra` never comes down more than the inset, however high the top
+        #expect(TopClearance.extra(top: -30, windowTop: 62) == 62)
+        #expect(TopClearance.extra(top: -1e12, windowTop: 20) == 20)
+        // once it has settled, read afresh: at the edge the inset, under the status bar nothing
+        #expect(TopClearance.room(kept: 124, top: 0, windowTop: 62, presented: false) == 62)
+        #expect(TopClearance.room(kept: 124, top: 62, windowTop: 62, presented: false) == 0)
     }
 
     @Test func aStaleRoomNeverSticksOnceNothingIsPresented() {
@@ -74,6 +82,9 @@ import Testing
                                         cause: "presentation gone", swiftTop: 0, swiftSafe: 0)
         #expect(full.line == "row -30 \u{00B7} window 61.7 \u{00B7} down 61.7 \u{00B7} kept, something presented "
             + "\u{00B7} SwiftUI 0, safe 0 \u{00B7} after presentation gone")
+        let above = TopClearance.Reading(top: -117.3, windowTop: 62, room: 62, presented: false, cause: "window")
+        #expect(above.line == "row -117.3 \u{00B7} window 62 \u{00B7} down 62 \u{00B7} kept, row above the window "
+            + "\u{00B7} after window")
         #expect(TopClearance.Reading.points(.nan) == "?")
         #expect(TopClearance.Reading.points(-0.04) == "0")
         #expect(TopClearance.Reading.points(1e12) == "1000000000000.0")

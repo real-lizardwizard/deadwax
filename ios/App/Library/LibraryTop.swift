@@ -23,6 +23,12 @@ import UIKit
 /// app made goes, the scene comes to the front, and SwiftUI asks (the row appearing, its geometry changing). Under a
 /// presentation the row keeps the room it has; with nothing presented it is measured afresh (TopClearance.room). The
 /// last reading is Debug's (DebugModel.libraryTop).
+///
+/// Too low after Now Playing (20 Nov, James: "well now the whole screen is too low", "It's after I leave the player";
+/// notes/ios.md "The Library's top, too low after Now Playing"): read as the tabs came back into the window, the row was
+/// 117 points above its top edge, came down twice the inset, then settled at the edge with nothing telling the probe. So
+/// a row above its window's top edge keeps the room it has (TopClearance.settled), and every ask is followed by reads
+/// again for a while, whatever is presented, so the row is read once it has settled.
 struct LibraryTop<Find: View, Switch: View, More: View>: View {
     /// Find is open: its field drawn under the row.
     let finding: Bool
@@ -129,10 +135,11 @@ struct LibraryTop<Find: View, Switch: View, More: View>: View {
 /// (Notification.Name.appPresentationGone, after its onDismiss); the scene coming to the front; and SwiftUI's asks (the
 /// row appearing, SwiftUI's geometry changing). Each reads once, on the main loop's next turn, after the layout under
 /// way - however many ask meanwhile; SwiftUI's geometry changing reads at once in its action too (`now`), so the room
-/// changes in the pass that moved the row, as it did before the probe. Under a presentation it reads again every
-/// `gap` until nothing is presented, at most `tries` times after the last ask from outside: a cover going reads afresh
-/// as soon as it has gone, even should its onDismiss come before UIKit lets it go; a sheet left up keeps the room until
-/// its going is said.
+/// changes in the pass that moved the row, as it did before the probe. After each ask it reads again every `gap`,
+/// `tries` times (3 s) after the last, whatever is presented (20 Nov): UIKit can move the row's container without a
+/// word to it or to SwiftUI - the tabs back from under Now Playing's cover settled 117 points lower than they were first
+/// read - and a cover going reads afresh as soon as it has gone, even should its onDismiss come before UIKit lets it go.
+/// A sheet left up longer keeps the room until its going is said.
 ///
 /// Nothing in it is drawn or touchable, and VoiceOver passes it by.
 private struct TopProbe: UIViewRepresentable {
@@ -166,17 +173,19 @@ private struct TopProbe: UIViewRepresentable {
     }
 
     final class Probe: UIView {
-        /// Under a presentation, read again this often...
+        /// After an ask, read again this often...
         private static let gap: TimeInterval = 0.25
-        /// ...and this many times at most after the last ask from outside: 3 s, past any presentation's going.
+        /// ...this many times after the last: 3 s, past any presentation's going and the tabs settling after it.
         private static let tries = 12
 
         var measured: ((Sample) -> Void)?
         /// What asked for the reading waiting for the main loop's next turn - nil while none waits.
         private var waiting: String?
-        /// Reads again under a presentation: one waiting, and how many since the last ask from outside.
+        /// Reads again: one waiting, and how many are left since the last ask.
         private var againWaiting = false
-        private var tried = 0
+        private var left = 0
+        /// The last ask - what Debug's "after …" says of a read again ("window, again").
+        private var asked = ""
 
         override init(frame: CGRect) {
             super.init(frame: frame)
@@ -214,46 +223,56 @@ private struct TopProbe: UIViewRepresentable {
             soon("scene active")
         }
 
-        /// A reading now (SwiftUI's geometry changing - LibraryTop reads in its action). An ask from outside starts the
-        /// reads again under a presentation afresh.
+        /// A reading now (SwiftUI's geometry changing - LibraryTop reads in its action), the reads again started afresh.
         func now(_ cause: String) {
-            tried = 0
+            follow(cause)
             read(cause)
         }
 
-        /// A reading on the main loop's next turn - one, however many ask before it. An ask from outside (`again` false)
-        /// starts the reads again under a presentation afresh.
-        func soon(_ cause: String, again: Bool = false) {
-            if !again { tried = 0 }
+        /// A reading on the main loop's next turn - one, however many ask before it - the reads again started afresh.
+        func soon(_ cause: String) {
+            follow(cause)
+            schedule(cause)
+        }
+
+        /// An ask: `tries` reads again from here, said as after it.
+        private func follow(_ cause: String) {
+            left = Self.tries
+            asked = cause
+        }
+
+        /// A reading on the main loop's next turn, after the layout under way - one, however many ask before it.
+        private func schedule(_ cause: String) {
             guard waiting == nil else { return }
             waiting = cause
             DispatchQueue.main.async { [weak self] in
                 guard let self else { return }
-                let asked = waiting ?? ""
+                let cause = waiting ?? ""
                 waiting = nil
-                read(asked)
+                read(cause)
             }
         }
 
         /// Where the row's top is in its window, that window's top inset and whether something is presented over it,
-        /// told to LibraryTop - nothing out of a window.
+        /// told to LibraryTop - nothing out of a window. Then a read again, while any are left.
         private func read(_ cause: String) {
             guard let window else { return }
             let presented = presentedOver(window)
             measured?(Sample(top: convert(bounds, to: nil).minY, windowTop: window.safeAreaInsets.top,
                              presented: presented, cause: cause))
-            if presented { readAgain() }
+            readAgain()
         }
 
-        /// Something presented: read again a moment later, as long as there are tries left.
+        /// Read again a moment later, as long as there are reads left since the last ask: whatever UIKit moves without a
+        /// word, and a presentation's going, read once they have settled.
         private func readAgain() {
-            guard !againWaiting, tried < Self.tries else { return }
+            guard !againWaiting, left > 0 else { return }
             againWaiting = true
-            tried += 1
+            left -= 1
             DispatchQueue.main.asyncAfter(deadline: .now() + Self.gap) { [weak self] in
                 guard let self else { return }
                 againWaiting = false
-                soon("presentation", again: true)
+                schedule("\(asked), again")
             }
         }
 

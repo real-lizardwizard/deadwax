@@ -10190,6 +10190,47 @@ Also not seen anywhere:
 - that SwiftUI calls onDismiss once `presentedViewController` is nil (the reads again don't depend on it);
 - the Mac's Library top unchanged.
 
+### The Library's top, too low after Now Playing (20 Nov)
+
+James, on 63e7e2a: "well now the whole screen is too low", then "It's after I leave the player, but not first when I
+open the app", with Debug's Top line, read in Settings straight after:
+
+> row -117.3 · window 62 · down 124 · nothing presented · SwiftUI -117.3, safe 0 · after window
+
+- **What it says.** As the tabs came back into the window from under Now Playing's cover (`after window`: the probe's
+  didMoveToWindow), the row was 117.3 points above its window's top edge - UIKit and SwiftUI agreeing - and nothing was
+  presented any more. 18 Nov's rule ("a row above the edge comes down the whole way, up to twice the inset") made that
+  124. The row then settled - at the edge, as it opens (SwiftUI's safe area there is still 0, as on 15 Nov) - and nothing
+  read it again, so it stood 62 points too low with everything under it. Had it stayed at -117.3, 124 would have left
+  it in the island, not too low, so it moved. Nothing told the probe: a container UIKit moves without a word changes
+  none of the probe's size, window or safe area, and SwiftUI's geometry didn't change either.
+- **Why the 18 Nov cause 3 was wrong.** "A row above the window's edge" was read from the code as a layout to follow.
+  On the phone it is a moment mid-move, never a place the row is drawn.
+
+**What it does now.**
+- **Core** (`TopClearance`): a row more than `edge` (1 point, rounding) above its window's top edge isn't `settled`, and
+  `room` keeps the room it has, as under a presentation. `extra` never comes down more than the inset: a top above the
+  edge reads as at it. `most` is gone. Debug's line says "kept, row above the window" for such a reading.
+- **The probe reads again after every ask**, whatever is presented: 12 times, a quarter second apart (3 s), after the
+  last ask - the window, a layout, a safe area, a presentation gone, the scene active, the row appearing, SwiftUI's
+  geometry. A read again doesn't start them afresh; an ask does. So a row UIKit moves after it was read is read again
+  once it has settled, and Debug's "after window, again" says that a read again was the last. 18 Nov's reads again ran
+  only under a presentation.
+- On James's phone, then: the -117.3 reading keeps the 62 it had before the cover, and the reads again find the row
+  at the edge, which wants 62 - no change, no jump.
+
+**Tests.** TopClearanceTests (7): the above-the-edge test now holds the room kept, from his reading's numbers, and a
+point's rounding read as at the edge; Debug's line for it. `test_the_librarys_top_sits_under_the_status_bar` holds the
+Core rule (`settled`, `edge`, no `most`, `extra`'s clamp) and the probe's reads again (12, 0.25 s, after every read,
+started afresh by an ask, never by a read again). Each new check was seen failing on its fault: 4 against the Swift
+tests, 8 against the Python one.
+
+**Verified** on this tip, on James's Mac: `swift test`; the unsigned iPhone Debug and Mac Catalyst Release builds;
+check_project.py; pytest of test_ios_*.py, test_source_bytes.py and test_logins.py (698 passed, 1 skipped); pyflakes.
+**Not verified**: on the phone - the row as it opens and after Now Playing, at the same height (check 249); that the
+row settles within the 3 s of reads again (if not, the room kept from before the cover is the one it had as the app
+opened, which is right as long as the row settles where it opened).
+
 ## The tab bar, lower (15 Nov)
 
 James: "there might be a little too much space below the bottom tab bar". AppTabBar was an overlay inside the safe
