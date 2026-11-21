@@ -632,14 +632,14 @@ private struct DownloadOverSection: View {
     @Environment(Reachability.self) private var reachability
 
     var body: some View {
-        let chosen = DownloadWords.over(downloads.downloadOver)
+        let chosen = DownloadWords.over(downloads.downloadOver, device: Platform.device)
         Section {
             Picker(DownloadWords.downloadOver, selection: Binding<DownloadOver>(get: { downloads.downloadOver },
                                                                               set: { (choice: DownloadOver) -> Void in
                                                                                   downloads.downloadOver = choice
                                                                               })) {
                 ForEach(DownloadOver.allCases, id: \.self) { (choice: DownloadOver) in
-                    Text(DownloadWords.over(choice).name).tag(choice)
+                    Text(DownloadWords.over(choice, device: Platform.device).name).tag(choice)
                 }
             }
             .pickerStyle(.menu)
@@ -649,7 +649,7 @@ private struct DownloadOverSection: View {
                 VStack(alignment: .leading, spacing: 8) {
                     // the chosen one's own line first: what it does
                     Text(chosen.note)
-                    Text(DownloadWords.overNow(reachability.path, setting: downloads.downloadOver))
+                    Text(DownloadWords.overNow(reachability.path, setting: downloads.downloadOver, device: Platform.device))
                         .foregroundStyle(waitingForIt ? Palette.amber : Palette.quiet)
                     Text(DownloadWords.overKept(Platform.device))
                 }
@@ -695,8 +695,8 @@ private struct DownloadingSection: View {
                 .font(Typeface.footnote)
         } footer: {
             Group {
-                let lines = [allWaitForWifi ? DownloadWords.allWaitForWifi : nil,
-                             downloads.forceQuitShown ? DownloadWords.forceQuit : nil].compactMap { $0 }
+                let lines = [allWaitForWifi ? DownloadWords.allWaitForWifi(Platform.device) : nil,
+                             downloads.forceQuitShown ? DownloadWords.forceQuit(Platform.device) : nil].compactMap { $0 }
                 if !lines.isEmpty {
                     Text(lines.joined(separator: "\n\n"))
                 }

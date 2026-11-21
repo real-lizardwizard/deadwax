@@ -248,7 +248,7 @@ struct InfoView: View {
                                       eq: eq.infoDebug)
         let sections = InfoDebug.sections(song: song, level: track.level, key: entry.key, decisions: player.levelDecisions,
                                           live: track.albumId.flatMap { player.loudness(albumID: $0) },
-                                          engine: engine, album: album).map { section in
+                                          engine: engine, album: album, device: Platform.device).map { section in
             //? Sent to this device gains the copy on this phone (Phase 2)
             guard section.title == Self.sentTitle else { return section }
             let onPhone = InfoRow(label: DownloadWords.onThisDevice(Platform.device),

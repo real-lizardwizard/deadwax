@@ -194,8 +194,8 @@ import Testing
     }
 
     @Test func theEmptyBoardAndAFailedLookSayWhatTheyShould() {
-        #expect(RequestWords.emptyLine(gets: true) == RequestWords.empty)
-        #expect(RequestWords.emptyLine(gets: false) == RequestWords.getOff)
+        #expect(RequestWords.emptyLine(gets: true, device: .iPhone) == RequestWords.empty(.iPhone))
+        #expect(RequestWords.emptyLine(gets: false, device: .iPhone) == RequestWords.getOff)
         #expect(RequestWords.keepsAsking(empty: true) == RequestWords.keepsAsking)
         #expect(RequestWords.keepsAsking(empty: false) == RequestWords.keepsAskingBelow)
         let empty: RequestsView = RequestsView.make(RequestsInput(), now: 0)

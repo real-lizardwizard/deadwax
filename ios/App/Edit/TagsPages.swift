@@ -39,7 +39,7 @@ struct TagsListView: View {
                     }
                 } footer: {
                     if at == discs.count - 1, let files = tags.files, !files.isEmpty {
-                        Text(tags.selection.isEmpty ? TagEditWords.selectNote
+                        Text(tags.selection.isEmpty ? TagEditWords.selectNote(Platform.device)
                              : TagEditWords.selected(tags.selection.count, of: files.count))
                             .font(Typeface.footnote)
                     }

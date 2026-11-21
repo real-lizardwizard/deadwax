@@ -1,3 +1,4 @@
+import AVFAudio
 import DeadwaxAudio
 import DeadwaxCore
 import os
@@ -16,6 +17,13 @@ import os
 enum EngineTrace {
     static let log = EngineLog()
     private static let logger = Logger(subsystem: "net.lizardlounge.deadwax", category: "engine")
+
+    /// (The Mac app, slice 5) A line of the app's own about the player - the Mac's sleep and wake, an output gone -
+    /// kept and sent as the engine's are, after the host clock's time as the engine's lines have it.
+    static func note(_ line: String) {
+        let kept = log.append(String(format: "%.3f ", AVAudioTime.seconds(forHostTime: mach_absolute_time())) + line)
+        logger.info("\(kept, privacy: .public)")
+    }
 
     /// Made outside the main actor, as the engine calls it on its own queue (PlayerModel.lead's reason).
     static func attach(_ engine: PlaybackEngine) {

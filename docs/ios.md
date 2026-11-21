@@ -220,14 +220,16 @@ happens in `~/Library/Caches/deadwax-build`, and the last build's whole log is `
 The same app runs on a Mac too, built from the same code through Apple's Mac Catalyst - not the web app in a window,
 and not a second app. It's the same version as the phone's (app 0.13 (13) now), it talks only to deadwax as the phone
 does, and it plays through the same audio engine: seamless joins, normalization, the EQ, downloads. **This is its
-fourth build** - the first ran and played (the Mac app's slice 1), the second added the Mac's menus, keyboard shortcuts
+fifth build** - the first ran and played (the Mac app's slice 1), the second added the Mac's menus, keyboard shortcuts
 and right-click menus, and a window you can close while the music plays (slice 2), the third laid the window out as the
-web app's desktop is laid out - a sidebar, the page, side panels and a player bar (slice 3); this one gives it the Mac's
-own words - **This Mac** where the phone says This phone (slice 4). **Little of it has been seen on a Mac yet** - the
+web app's desktop is laid out - a sidebar, the page, side panels and a player bar (slice 3), the fourth gave it the
+Mac's own words - **This Mac** where the phone says This phone (slice 4); this one pauses for sleep and for headphones
+taken out, reads a Mac's power for Only while charging, keeps a long run's display on, keeps work going with the
+window hidden, and says the Mac's words for Download over (slice 5). **Little of it has been seen on a Mac yet** - the
 first build installed, opened and was allowed onto the local network (17 Nov), and no more: what only a Mac can tell is
 what its checks are for ([404-415](#the-mac-apps-checks-404-415),
-[416-423](#the-mac-apps-menus-keys-and-window-checks-416-423), [424-433](#the-mac-apps-desktop-frame-checks-424-433)
-and [434-438](#the-mac-apps-words-checks-434-438)).
+[416-423](#the-mac-apps-menus-keys-and-window-checks-416-423), [424-433](#the-mac-apps-desktop-frame-checks-424-433),
+[434-438](#the-mac-apps-words-checks-434-438) and [439-446](#the-mac-apps-sleep-power-and-downloads-checks-439-446)).
 
 **What it is today.** The window is laid out as the web app's desktop is, whatever its size: the **sidebar** at the
 left, the **page** you're on beside it, **Up Next, Lyrics or Info** in a panel at the right when you open one, and the
@@ -363,12 +365,34 @@ The rest of the differences:
   later: macOS 14 has no such switch, and never asks. **Settings > This Mac > Debug** says "This install doesn't
   expire: a Mac keeps opening deadwax without installing it again." - see below - or, for a build installed with a
   provisioning profile (`install-mac.sh --allow-profile`), the date it runs out.
-- **Still the phone's words**, until a later build (the Mac app's slice 5, with sleep, power and downloads):
-  Settings > Downloads' **Download over** - "Wi-Fi and cellular", "mobile data", and "On Wi-Fi now." on a Mac on a
-  cable - and its note that downloads stopped when deadwax was "closed from the app switcher"; **Only while charging**,
-  which on a Mac with no battery waits for a charge that never comes (see
-  [When something goes wrong](#when-something-goes-wrong)); and, in Debug (an admin's), "ended by iOS" and some of
-  the audio engine's rarer errors, which say "phone" or "iOS". A few lines say "tap" where the Mac clicks.
+- **Sleep.** Playing when the Mac goes to sleep - the lid closed, Apple menu > Sleep, or asleep by itself when left -
+  pauses the music, and the Mac wakes with it paused at the same place: nothing plays until you press Play, which goes
+  on from there - never music out of a laptop opened in a meeting. With the lid closed on an external display the Mac
+  doesn't sleep, so it plays on.
+- **Headphones out.** Unplugging headphones, AirPods or a Bluetooth speaker disconnecting, a USB DAC pulled out: the
+  music pauses, as on the phone. Choosing another output yourself (the menu bar's Sound, say) doesn't pause.
+- **Download over** (Settings > Downloads) is **Wi-Fi or Ethernet only** (the default) or **Any connection** - "Downloads
+  use Wi-Fi or a cable alone - never a hotspot or Low Data Mode." and "Downloads use a hotspot too, when this Mac is on
+  one." Under it the Mac says "On Wi-Fi or Ethernet now." (a cable counts as Wi-Fi), and on a phone's hotspot -
+  over Wi-Fi, a cable or Bluetooth - "On a hotspot now - downloads wait until you're off it." A download waiting for
+  it says "Waiting for Wi-Fi or Ethernet". It's the same setting the phone keeps, by its Mac names.
+- **Only while charging** reads where the Mac's power comes from: plugged in, your library downloads; on battery it
+  waits ("Waiting for the Mac to charge") until you plug in. A Mac with no battery (a Mac mini, an iMac, a Studio) is
+  always plugged in, so it never waits. Debug's Power says "Plugged in" or "On battery".
+- **A long run keeps the display on.** A Library care run, or Re-time saved lyrics, keeps the Mac's display awake
+  while its page is in front, as the phone keeps its screen on, until the run ends.
+- **Work goes on out of sight.** A download or an apply (Edit album's, say) carries on at full speed while the window
+  is hidden (⌘H) or covered by other apps - macOS doesn't slow it down. So does a Library care run or Re-time while
+  its window is covered. Hiding deadwax or minimizing its window may count as the app going to the background, as
+  switching apps does on the phone - only a Mac can tell - and then a run stops after the album it's on and says so,
+  as on the phone: running it again carries on. A download still lets the Mac sleep when it's left alone, as it would anyway (a MacBook downloading a whole library
+  on battery isn't kept awake for hours); a run or an apply keeps it awake until it ends.
+- **Clicks, not taps**: where the phone's words say tap, the Mac's say click - "Couldn't open it - click to try
+  again." in Requests, "Click a track's name…" in Edit album, Settings > Getting albums' **When I click Get**, the
+  Library's downloaded playlists, Debug's test sounds. After People's permissions are saved: "Saved - Sam has them
+  from the next thing they do in deadwax." The note after a force quit says "force quit", not the app switcher.
+- **Still the phone's words**: in Debug (an admin's), some of the audio engine's rarer errors, which say "phone" or
+  "iOS".
 
 Still to come, in a build of its own: File > Import EQ File… ⌘O.
 
@@ -2734,12 +2758,14 @@ Debug, under Settings > This phone for an admin, is where Phase 0's test screen 
     Add to or Remove from my library - and when iOS runs the app in the background for it. Each check
     is a line starting "library" in the Downloads events above.
   - **Power**: the phone's power as Only while charging reads it - "Charging", "Full, on the charger",
-    "Not charging" or "Not known" - and "only while charging" when that's on. **Albums out**: how many
+    "Not charging" or "Not known" (on the Mac "Plugged in" or "On battery") - and "only while charging" when
+    that's on. **Albums out**: how many
     of your library's albums have downloads handed to iOS now (with Only while charging on, never more
     than one).
   - **In the background**: the last five times iOS ran the app in the background for your library,
     newest first - "Refresh · checked, 3 read, 1 album downloading, charging · 4.20 s · 2 h ago" (the
-    refresh, or **Charger** for the run iOS starts when the phone is plugged in), or "ended by iOS",
+    refresh, or **Charger** for the run iOS starts when the phone is plugged in), or "ended by iOS" (on the Mac
+    "ended by macOS", and "plugged in" or "on battery" where the phone says charging),
     "couldn't ask deadwax", "nothing to ask: Download your library is off". "No background runs yet"
     until iOS has run one: iOS decides when, and may not at all. A run before the phone's first unlock
     after a restart does nothing and isn't listed (the Downloads events say so).
@@ -5831,8 +5857,7 @@ you saw - and anywhere on the Mac that still says "phone" or "iPhone", which pag
   on this Mac?"). Turn the Mac's Wi-Fi off: the banner says "Offline - showing what's on this Mac", and under it
   "Join a network to play what isn't on this Mac." Offline, a song with no
   lyrics kept on this Mac has Lyrics dimmed, and the Lyrics panel says "Lyrics - not on this Mac" - if you come across
-  one. Never phone - but Download over's choices and notes, and the note after a force quit, which are still the
-  phone's (see [The Mac app](#the-mac-app)).
+  one. Never phone.
 - **436 Outputs.** The EQ page: the Mac's own speakers are **Mac speakers**, with a speaker for their picture - with
   the EQ you gave them in an earlier build, if you did. Headphones in the jack, then AirPods: each its own output, AirPods
   by their name. Settings > Playback, under the EQ: the foot names "the Mac's speakers, a USB DAC" and says it's kept
@@ -5846,6 +5871,26 @@ you saw - and anywhere on the Mac that still says "phone" or "iPhone", which pag
 - **438 The phones' words.** Both iPhones on the same build: Settings' **This phone**, Settings > Downloads' foot
   ("Closing deadwax from the app switcher stops downloads…"), the EQ's **iPhone speaker** and **Import from Files…**,
   Debug's install line ("This install runs until …") and "deadwax for iPhone" - every word as before.
+
+### The Mac app's sleep, power and downloads checks (439-446)
+
+**Not done yet.** These come with [the Mac app](#the-mac-app)'s fifth build - sleep, power and downloads (still app
+0.13 (13)). No server change is needed, and nothing on the phone changes. As for 404-438: deadwax's plain `http://`
+address, the home Wi-Fi, signed in as an admin with logins on, installed with `ios/scripts/install-mac.sh`. Say
+"pass", or what you saw - and for 439 and 440, copy Settings > This Mac > Debug's engine log after it: its "power:"
+and "output gone:" lines say what macOS told deadwax.
+
+- **439 The lid.** Playing on the speakers, close the lid for a minute (no external display). Open it: paused, at the
+  same place; Play goes on from there.
+- **440 Headphones out.** Playing on wired headphones or AirPods, take them out: it pauses, as the phone does.
+- **441 A care run.** Library care, a run over many albums, the Mac left alone: the display stays on until it ends.
+- **442 A download, hidden.** Download an album, then ⌘H and use other apps: it carries on and lands.
+- **443 Quit mid-download.** ⌘Q with a download half done; open again: it carries on.
+- **444 Only while charging.** On battery with Only while charging on: Download your library waits, said so; plug in:
+  it starts.
+- **445 The library, later.** Download your library on, deadwax quit overnight: next morning, did new albums arrive
+  before you opened it? (macOS's to decide; either answer is fine - it is written up.)
+- **446 A hotspot.** On the iPhone's hotspot with Download over Wi-Fi only: downloads wait, and say why.
 
 ## What it can't do yet
 
@@ -5921,9 +5966,9 @@ there. Looking after deadwax isn't among them any more: every managing tool is t
 | A Get's row under Needs attention says **"didn't start"** and **"It's already downloading."** (or **"…already in your library."**) | It was got - by you elsewhere, or by someone else - after the sheet searched. It's already in Requests, or already yours; **Clear done** takes the refused row away. |
 | A Get's row under Needs attention says **"no answer"** and **"deadwax didn't answer in time, so this may have started anyway."** | The person sharing it took more than ten minutes to be reached, or deadwax was stuck. Look under Waiting and Downloading - it may be there - and if it isn't, get it again. **Clear done** takes the row away. |
 | An album you don't have says **"Getting albums is off for you - ask an admin."** where Get the album goes | With logins on, an admin gives **Get albums** in [People](#people) (on their phone, or the web app's). Open Settings afterwards, so the phone asks deadwax again. |
-| An album stays on **"Waiting for Wi-Fi"** | Download over is Wi-Fi only (Settings > Downloads): join a Wi-Fi network that isn't a phone's hotspot, with Low Data Mode off - or choose Wi-Fi and cellular. |
+| An album stays on **"Waiting for Wi-Fi"** (on the Mac, **"Waiting for Wi-Fi or Ethernet"**) | Download over is Wi-Fi only (Settings > Downloads): join a Wi-Fi network that isn't a phone's hotspot, with Low Data Mode off - or choose Wi-Fi and cellular. On the Mac it's **Wi-Fi or Ethernet only**: join a Wi-Fi network or plug in a cable, not a phone's hotspot - or choose **Any connection**. |
 | **"Waiting for room - the storage limit is reached"** | Raise the Storage limit in Settings > Downloads, or remove something there (largest first). |
-| Your library's albums stay on **"Waiting for the phone to charge"** (on the Mac, **"…the Mac to charge"**) | Only while charging is on (Settings > Downloads, under Download your library): plug the phone in, or turn it off. Albums you download yourself don't wait for it. On a Mac with no battery (a Mac mini, an iMac, a Studio) it can wait for ever: turn **Only while charging** off there, until a later build knows a Mac with no battery is always plugged in. |
+| Your library's albums stay on **"Waiting for the phone to charge"** (on the Mac, **"…the Mac to charge"**) | Only while charging is on (Settings > Downloads, under Download your library): plug the phone in, or turn it off. Albums you download yourself don't wait for it. On a Mac it waits only while the Mac is on battery: plug it in. A Mac with no battery (a Mac mini, an iMac, a Studio) counts as always plugged in, so it never waits there. |
 | Your library didn't download with the app closed | iOS decides when the app runs in the background, and may not for hours; Background App Refresh off (the iPhone's Settings > General) or Low Power Mode stops it, and so does swiping deadwax away in the app switcher. Opening the app checks and downloads at once. Settings > This phone > Debug > Your library > In the background (an admin's) says whether iOS ran it. |
 | **"Waiting for space on this phone"** (on the Mac, **"…on this Mac"**) | The phone itself is full: make room in the iPhone's Settings > General > iPhone Storage. On the Mac, its disk is: make room (System Settings > General > Storage). |
 | **"2 songs didn't download"**, with why ("The copy kept arriving the wrong size.", "The copy's sound didn't match the original.", "This song isn't on deadwax any more.") | **Try again** in Settings > Downloads. If it keeps failing, the file on the server may be damaged: play it on the web app. |

@@ -493,9 +493,10 @@ public enum People {
             + "password - their other music apps need it too."
     }
 
-    /// permissions.ts `savedWords`.
-    public static func savedWords(_ user: String) -> String {
-        "Saved - \(user) has them from their next tap."
+    /// permissions.ts `savedWords`. (The Mac app, slice 5) On a Mac, "from the next thing they do in deadwax" - not a
+    /// click: they may be on a phone, the web or a Mac.
+    public static func savedWords(_ user: String, device: Device) -> String {
+        device == .mac ? "Saved - \(user) has them from the next thing they do in deadwax." : "Saved - \(user) has them from their next tap."
     }
 
     // MARK: the page (people.ts)

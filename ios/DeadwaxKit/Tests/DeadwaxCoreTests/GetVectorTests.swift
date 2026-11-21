@@ -388,7 +388,7 @@ enum GetVectors {
 
         let getting = v.words.getting
         #expect(RequestWords.gettingAlbums == getting.section)
-        #expect([GettingWords.modeTitle, GettingWords.floorTitle, GettingWords.formatTitle] == getting.titles)
+        #expect([GettingWords.modeTitle(.iPhone), GettingWords.floorTitle, GettingWords.formatTitle] == getting.titles)
         #expect(GetMode.allCases.map(\.rawValue) == getting.modes.map(\.value))
         #expect(GetMode.allCases.map(\.label) == getting.modes.map(\.label))
         #expect(FormatPreference.youOrder.map(\.rawValue) == getting.formats.map(\.value))

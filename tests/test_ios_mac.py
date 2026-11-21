@@ -1082,3 +1082,203 @@ def test_debug_reads_the_macs_profile_where_install_mac_finds_it():
     assert '"$app/Contents/embedded.provisionprofile"' in script
     core = (CORE / "InstallExpiry.swift").read_text(encoding="utf-8")
     assert 'return device == .mac ? mac : "No install date to show: this build wasn\'t signed for a phone."' in core
+
+
+# ----------------------------------------------------------------------------- slice 5: sleep, power and downloads
+# (notes/ios.md "The Mac app, slice 5: sleep, power and downloads") IOKit's sleep and power, CoreAudio's default output
+# and ProcessInfo's activities are the Mac's alone, so they are said only in Platform.swift's Mac half - their imports
+# inside the switch - and Core's MacPower holds every rule they follow.
+
+def _halves() -> tuple[str, str]:
+    """Platform.swift's Mac half and iPhone half - the switch's own text alone, not what is above or below it."""
+    code = bare(app_sources()[PLATFORM])
+    mac = code.split("\n#if targetEnvironment(macCatalyst)\n", 1)[1].split("\n#else\n")[0]
+    return mac, code.split("\n#else\n", 1)[1].split("\n#endif\n")[0]
+
+
+def _body(code: str, start: str) -> str:
+    """The text from `start` to the end of the declaration it opens, by its braces."""
+    at = code.index(start)
+    opened = code.index("{", at)
+    depth = 0
+    for i in range(opened, len(code)):
+        depth += {"{": 1, "}": -1}.get(code[i], 0)
+        if depth == 0:
+            return code[at:i + 1]
+    raise AssertionError(f"unclosed: {start}")
+
+
+MAC_ONLY = re.compile(r"\b(IORegisterForSystemPower|IOAllowPowerChange|IOPS\w+|AudioObject\w+|kAudio\w+|beginActivity|"
+                      r"endActivity|import\s+(?:IOKit|CoreAudio)\b)")
+
+
+def test_the_macs_power_apis_are_said_in_platforms_mac_half_alone():
+    mac, phone = _halves()
+    for name, text in app_sources().items():
+        code = bare(text)
+        if name == PLATFORM:
+            # neither the iPhone's half nor anything outside the switch (an import above it would be the phone's too)
+            outside = code.replace(mac, "")
+            assert not MAC_ONLY.search(outside), MAC_ONLY.search(outside).group(0)
+            continue
+        found = MAC_ONLY.search(code)
+        assert not found, (name, found and found.group(0))
+    for module in ("import CoreAudio", "import IOKit.ps", "import IOKit.pwr_mgt"):
+        assert re.search(rf"^{re.escape(module)}$", mac, re.M), module
+    # the engine has no diff: nothing of slice 5's is in DeadwaxAudio
+    for path in sorted((KIT / "DeadwaxAudio").rglob("*.swift")):
+        code = bare(path.read_text(encoding="utf-8"))
+        assert not re.search(r"\b(MacPower|IOKit|IORegisterForSystemPower|beginActivity|WorkAwake|ScreenAwake)\b", code), path.name
+
+
+def test_will_sleep_pauses_then_allows_and_a_sleep_is_never_refused():
+    mac, _ = _halves()
+    told = _body(mac, "static func told(_ message: UInt32, _ argument: UnsafeMutableRawPointer?)")
+    assert "switch MacPower.answer(to: message) {" in told
+    allow = told[told.index("case .allowNow:"):told.index("case .pauseThenAllow:")]
+    assert allow.split() == ["case", ".allowNow:", "IOAllowPowerChange(root,", "Int(bitPattern:", "argument))"], allow
+    then = told[told.index("case .pauseThenAllow:"):told.index("case .woke:")]
+    assert then.index("willSleep?()") < then.index("IOAllowPowerChange(root, Int(bitPattern: argument))"), \
+        "the player pauses, then the sleep is allowed"
+    woke = told[told.index("case .woke:"):told.index("case .nothing:")]
+    assert woke.split() == ["case", ".woke:", "woke?()"]
+    # never a refusal, anywhere
+    for name, text in {**app_sources(), **kit_sources()}.items():
+        assert "IOCancelPowerChange" not in bare(text), name
+    # registered once, on the main run loop
+    watch = _body(mac, "static func watch(willSleep: @escaping @MainActor () -> Void, woke: @escaping @MainActor () -> Void)")
+    assert "IORegisterForSystemPower(nil, &made," in watch and "MainActor.assumeIsolated { MacSleep.told(message, argument) }" in watch
+    assert "CFRunLoopAddSource(CFRunLoopGetMain(), IONotificationPortGetRunLoopSource(made).takeUnretainedValue(), .commonModes)" in watch
+    assert "guard root == 0 else { return }" in watch and "EngineTrace.note(MacPower.sleepUnwatched)" in watch
+    # the player: paused at will-sleep, and the wake only noted - nothing started
+    player = bare(app_sources()["Models/PlayerModel.swift"])
+    assert ("Platform.watchSleep(willSleep: { [weak self] in self?.willSleep() }, woke: { EngineTrace.note(MacPower.wakeNote) })"
+            in player)
+    sleep = _body(player, "private func willSleep()")
+    assert "let at = MacPower.willSleep(playing: isPlaying, retrying: retrying, interrupted: interrupted)" in sleep
+    assert "if at.pause { pause() }" in sleep and "resume" not in sleep.lower().replace("no resume", "")
+
+
+def test_the_power_messages_are_io_message_hs():
+    core = (CORE / "MacPower.swift").read_text(encoding="utf-8")
+    # IOMessage.h: iokit_common_msg(n) = sys_iokit | sub_iokit_common | n; sys_iokit = err_system(0x38) = 0x38 << 26
+    common = lambda n: ((0x38 & 0x3F) << 26) | 0 | n  # noqa: E731
+    for name, n in (("canSystemSleep", 0x270), ("systemWillSleep", 0x280), ("systemHasPoweredOn", 0x300)):
+        found = re.search(rf"public static let {name}: UInt32 = (0x[0-9a-f_]+)$", core, re.M)
+        assert found, name
+        assert int(found.group(1).replace("_", ""), 16) == common(n), name
+    assert common(0x270) == 0xE0000270 and common(0x280) == 0xE0000280 and common(0x300) == 0xE0000300
+    for case, message in (("allowNow", "canSystemSleep"), ("pauseThenAllow", "systemWillSleep"), ("woke", "systemHasPoweredOn")):
+        assert f"case {message}: return .{case}" in core, case
+
+
+def test_interrupted_is_cleared_at_sleep_and_none_armed_until_the_next_play():
+    """The trap: an interruption's end with "should resume" plays again. If macOS posts one around a sleep, the wake
+    would start the music - so at will-sleep `interrupted` is cleared, and until the listener plays again no
+    interruption sets it (the engine's pause lands a moment after it is asked for, so "playing" alone could)."""
+    core = bare((CORE / "MacPower.swift").read_text(encoding="utf-8"))
+    assert "AtSleep(pause: playing || retrying, interrupted: false, sleptSincePlay: true)" in core
+    assert "(playing || retrying) && !sleptSincePlay" in core
+    player = bare(app_sources()["Models/PlayerModel.swift"])
+    sleep = _body(player, "private func willSleep()")
+    assert sleep.index("interrupted = at.interrupted") < sleep.index("if at.pause { pause() }")
+    assert sleep.index("sleptSincePlay = at.sleptSincePlay") < sleep.index("if at.pause { pause() }")
+    interruption = _body(player, "private func interruption(began: Bool, shouldResume: Bool)")
+    assert ("interrupted = MacPower.interruptionArms(playing: isPlaying, retrying: retrying, sleptSincePlay: sleptSincePlay)"
+            in interruption)
+    # set at will-sleep alone; let go at the listener's next play - Play, or a new queue
+    assert "@ObservationIgnored private var sleptSincePlay = false" in player
+    assert len(re.findall(r"(?<!var )\bsleptSincePlay = ", player)) == 3
+    assert "sleptSincePlay = false" in _body(player, "func resume()")
+    assert "sleptSincePlay = false" in _body(player, "private func startQueue(")
+
+
+def test_an_output_gone_pauses_as_the_phone_does_and_says_who_said_so():
+    player = bare(app_sources()["Models/PlayerModel.swift"])
+    assert "session.onOldDeviceGone = { [weak self] in self?.outputGone(.session) }" in player
+    assert "Platform.watchOutputs { [weak self] in self?.outputGone(.coreAudio) }" in player
+    gone = _body(player, "private func outputGone(_ by: MacPower.OutputGoneBy)")
+    assert gone.index("EngineTrace.note(MacPower.outputGoneNote(by, playing: isPlaying || retrying))") < gone.index("pause()")
+    # twice is harmless: the engine's pause is nothing while paused
+    engine = bare((KIT / "DeadwaxAudio" / "PlaybackEngine.swift").read_text(encoding="utf-8"))
+    assert re.search(r"private func pauseNow\(\) \{\s*guard wantsPlay else \{ return \}", engine)
+    # CoreAudio's default output, listened to on a queue of its own and judged on the main actor by Core's rule
+    mac, _ = _halves()
+    outputs = _body(mac, "private enum MacOutputs")
+    assert "AudioObjectAddPropertyListenerBlock(AudioObjectID(kAudioObjectSystemObject), &address, queue, listener())" in outputs
+    assert "mSelector: kAudioHardwarePropertyDefaultOutputDevice" in outputs and "kAudioHardwarePropertyDevices" in outputs
+    assert "nonisolated static let queue = DispatchQueue(label: " in outputs
+    assert "DispatchQueue.main.async {" in outputs
+    assert "if MacPower.outputGone(previous: previous, now: now.output, devices: devices) { gone?() }" in outputs
+    assert "guard let devices = now.devices else { return }" in outputs, "no answer is never a device gone"
+
+
+def test_only_while_charging_reads_iokit_on_a_mac_and_the_battery_on_the_phone():
+    mac, phone = _halves()
+    read = _body(mac, "private enum MacPowerSource")
+    assert "IOPSCopyPowerSourcesInfo()?.takeRetainedValue()" in read
+    assert "IOPSGetProvidingPowerSourceType(info)?.takeUnretainedValue()" in read
+    assert "return MacPower.power(source: type.map { $0 as String })" in read
+    assert "guard let info = IOPSCopyPowerSourcesInfo()?.takeRetainedValue() else { return MacPower.power(source: nil) }" in read
+    assert "IOPSNotificationCreateRunLoopSource(" in read and "CFRunLoopAddSource(CFRunLoopGetMain(), made, .defaultMode)" in read
+    # the phone's reading, moved here from DownloadModel word for word
+    power = _body(phone, "@MainActor static func power() -> PowerState")
+    assert power.split("{", 1)[1].split() == (
+        "switch UIDevice.current.batteryState { case .charging: return .charging case .full: return .full "
+        "case .unplugged: return .unplugged case .unknown: return .unknown @unknown default: return .unknown } }").split()
+    assert re.search(r"static func watchPower\(_ changed: @escaping @MainActor \(\) -> Void\) \{\}", phone)
+    downloads = bare(app_sources()["Downloads/DownloadModel.swift"])
+    assert downloads.count("Platform.power()") == 2 and "Platform.watchPower { [weak self] in self?.readPower() }" in downloads
+    assert "UIDevice.batteryStateDidChangeNotification" in downloads, "the phone's changes as before"
+    # UIDevice's battery read nowhere but there: not in DownloadModel, not in the Mac's half, not anywhere else
+    battery = re.compile(r"\bbatteryState\b")
+    for name, text in app_sources().items():
+        code = bare(text) if name != PLATFORM else bare(text).replace(phone, "")
+        assert not battery.search(code), name
+    assert len(battery.findall(phone)) == 1
+    # unknown means plugged in: only the battery and a UPS are unplugged
+    core = bare((CORE / "MacPower.swift").read_text(encoding="utf-8"))
+    rule = _body(core, "public static func power(source: String?) -> PowerState")
+    assert "case batteryPower?, upsPower?: return .unplugged" in rule and "default: return .pluggedIn" in rule
+
+
+def test_a_care_run_holds_the_display_on_and_work_keeps_app_nap_off():
+    mac, phone = _halves()
+    display = _body(mac, "@MainActor static func keepDisplayOn(_ on: Bool)")
+    assert "options: [.idleDisplaySleepDisabled, .userInitiated]," in display
+    assert "if on, MacActivities.display == nil {" in display and "ProcessInfo.processInfo.endActivity(held)" in display
+    working = _body(mac, "@MainActor static func keepWorking(_ work: Work, _ on: Bool)")
+    runs = working[working.index("case .runs:"):working.index("case .downloads:")]
+    downloads = working[working.index("case .downloads:"):]
+    assert "options = [.userInitiated]" in runs
+    # downloads: out of App Nap, the Mac's idle sleep still allowed (a whole library on battery isn't held awake)
+    assert "options = [.userInitiatedAllowingIdleSystemSleep]" in downloads
+    assert "if on, MacActivities.work[work] == nil {" in working
+    assert "else if !on, let held = MacActivities.work.removeValue(forKey: work) {" in working
+    # the phone: the idle timer as ScreenAwake set it, and nothing for App Nap
+    assert re.search(r"static func keepDisplayOn\(_ on: Bool\) \{\s*UIApplication\.shared\.isIdleTimerDisabled = on\s*\}", phone)
+    assert re.search(r"static func keepWorking\(_ work: Work, _ on: Bool\) \{\}", phone)
+    assert re.search(r"static func watchSleep\([^{]*\{\}", phone) and re.search(r"static func watchOutputs\([^{]*\{\}", phone)
+    # who wants each: one place each, and ScreenAwake, WorkAwake the only callers
+    app = {name: bare(text) for name, text in app_sources().items()}
+    awake = app["Manage/ScreenAwake.swift"]
+    assert "Platform.keepDisplayOn(!wanted.isEmpty)" in awake
+    assert "Platform.keepWorking(.runs, holds > 0 || wanted.contains(.libraryCare) || wanted.contains(.retime))" in awake
+    assert "Platform.keepWorking(.downloads, wanted.contains(.downloads))" in awake
+    for name, code in app.items():
+        if name not in (PLATFORM, "Manage/ScreenAwake.swift"):
+            assert "keepDisplayOn" not in code and "keepWorking" not in code, name
+    assert "WorkAwake.keep(runs.under != nil, for: .libraryCare)" in _body(app["Manage/CareRunModel.swift"], "private func screen()")
+    assert "WorkAwake.keep(retime.running, for: .retime)" in _body(app["Manage/ServerSettingsModel.swift"], "private func screen()")
+    assert re.search(r"private var live: \[String: Int\] = \[:\] \{\s*didSet \{ WorkAwake\.keep\(!live\.isEmpty, for: \.downloads\) \}",
+                     app["Downloads/DownloadModel.swift"])
+    hold = _body(app["Edit/EditAlbumModel.swift"], "final class BackgroundHold")
+    init = _body(hold, "init(named name: String)")
+    assert init.index("WorkAwake.hold(true)") < init.index("UIApplication.shared.beginBackgroundTask(withName: name)")
+    end = _body(hold, "func end()")
+    assert "WorkAwake.hold(false)" in end and "working = false" in end
+    # iOS running out ends the background task alone - the hold's App Nap activity is the apply's to end
+    assert "MainActor.assumeIsolated { self?.endTask() }" in init
+    # beginBackgroundTask stays as it is everywhere
+    began = {name: code.count("beginBackgroundTask(") for name, code in app.items() if "beginBackgroundTask(" in code}
+    assert began == {"Edit/EditAlbumModel.swift": 1, "Downloads/DownloadModel.swift": 1, "Models/PlayerModel+Resume.swift": 1}, began

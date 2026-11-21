@@ -107,7 +107,7 @@ enum DeviceWords {
         add("DownloadWords.otherAccounts", DownloadWords.otherAccounts(device))
         add("DownloadWords.removeOthersMessage", DownloadWords.removeOthersMessage(1_200_000_000, device: device))
         add("DownloadWords.overKept", DownloadWords.overKept(device))
-        add("DownloadWords.forceQuit", DownloadWords.forceQuit)
+        add("DownloadWords.forceQuit", DownloadWords.forceQuit(device))
         add("DownloadWords.removeAllMessage", DownloadWords.removeAllMessage(songs: 148, bytes: 2_100_000_000, device: device))
         add("DownloadWords.lastFooter", DownloadWords.lastFooter(device))
         add("DownloadWords.storeUnreadable", DownloadWords.storeUnreadable(device))
@@ -120,6 +120,29 @@ enum DeviceWords {
         add("DownloadWords.skippedNotHere(3)", DownloadWords.skippedNotHere(count: 3, device: device))
         add("DownloadWords.stoppedNotHere", DownloadWords.stoppedNotHere(device))
         for (i, line) in DownloadWords.everyLine(device).enumerated() { add("DownloadWords.everyLine[\(i)]", line) }
+
+        // (slice 5) Download over: its choices, what's used now on each kind of path - a cable and a phone's by USB too -
+        // the waits that name the setting, and the footer while everything waits for it
+        for choice in DownloadOver.allCases {
+            let over = DownloadWords.over(choice, device: device)
+            add("DownloadWords.over(\(choice.rawValue))", "\(over.name) | \(over.note)")
+        }
+        let paths: [(String, NetworkPath)] = [
+            ("wifi", NetworkPath(satisfied: true, wifi: true)), ("wired", NetworkPath(satisfied: true)),
+            ("cellular", NetworkPath(satisfied: true, cellular: true, expensive: true)),
+            ("tethered", NetworkPath(satisfied: true, expensive: true)),
+            ("hotspot", NetworkPath(satisfied: true, wifi: true, expensive: true)),
+            ("lowData", NetworkPath(satisfied: true, wifi: true, constrained: true)), ("none", .none),
+        ]
+        for (name, path) in paths {
+            for choice in DownloadOver.allCases {
+                add("DownloadWords.overNow(\(name), \(choice.rawValue))", DownloadWords.overNow(path, setting: choice, device: device))
+            }
+        }
+        for reason in reasons {
+            add("DownloadWords.waitSetting(\(reason.rawValue))", DownloadWords.waitSetting(reason, limit: .gb20, device: device))
+        }
+        add("DownloadWords.allWaitForWifi", DownloadWords.allWaitForWifi(device))
 
         // MARK: Download your library
 
@@ -160,6 +183,18 @@ enum DeviceWords {
         add("AutoDownloadWords.offMessage", AutoDownloadWords.offMessage(bytes: 12_400_000_000, device: device))
         add("AutoDownloadWords.keepOffTitle", AutoDownloadWords.keepOffTitle("Dummy", device: device))
         add("LibraryFollowWords.followNote", LibraryFollowWords.followNote(device))
+        // (slice 5) Only while charging's reading, and Debug's background runs
+        for state in PowerState.allCases {
+            add("LibraryFollowWords.power(\(state.rawValue))", LibraryFollowWords.power(state, device: device))
+        }
+        let ranAt: Int64 = 10 * 3_600_000
+        for (name, outcome) in [("charging", LibraryBackground.Outcome.ran(checked: true, read: 3, downloading: 1, charging: true)),
+                                ("notCharging", .ran(checked: false, read: 0, downloading: 0, charging: false)),
+                                ("off", .off), ("couldntAsk", .couldntAsk), ("expired", .expired)] {
+            let run = LibraryBackground.Run(task: LibraryBackground.chargingID, began: ranAt - 3_600_000, seconds: 4.2,
+                                            outcome: outcome)
+            add("LibraryFollowWords.backgroundRun(\(name))", LibraryFollowWords.backgroundRun(run, now: ranAt, device: device))
+        }
         add("LibraryFollowWords.notFollowing", LibraryFollowWords.notFollowing)
         for (name, held) in [("nil", LibraryFollow.Held?.none), ("empty", .empty(kept: 212)),
                              ("drop", .drop(gone: 1_240, of: 3_010)), ("truncated", .truncated)] {
@@ -289,6 +324,18 @@ enum DeviceWords {
             add("PasswordRekey.ended(\(name), held)", Self.after(rekey.ended(outcome, device: device)))
         }
 
+        // MARK: (slice 5) a tap, a click on the Mac
+
+        add("RequestWords.empty", RequestWords.empty(device))
+        add("RequestWords.emptyLine(gets)", RequestWords.emptyLine(gets: true, device: device))
+        add("RequestWords.notLookedUp", RequestWords.notLookedUp(device))
+        add("TagEditWords.selectNote", TagEditWords.selectNote(device))
+        add("People.savedWords", People.savedWords("ethan", device: device))
+        add("PlaylistDownloadWords.noneYetHow", PlaylistDownloadWords.noneYetHow(device))
+        add("GettingWords.modeTitle", GettingWords.modeTitle(device))
+        add("InfoDebug.engineRows(lastStart)", InfoDebug.engineRows(InfoDebug.Engine(lastStartSeconds: 0.306), device: device)
+            .map { "\($0.label) | \($0.value)" }.joined(separator: " / "))
+
         // MARK: Debug
 
         let utc = TimeZone(identifier: "UTC")!
@@ -380,32 +427,29 @@ enum DeviceWords {
         }
     }
 
-    /// Slice 5's, left saying the phone's words on the Mac for now (notes/ios.md "The Mac app, slice 4 after review"):
-    /// Download over's choices and notes and what's used now, the force-quit footer - and an admin's raw "iOS
-    /// couldn't…" (DeadwaxAudio's own words, which have no diff). Listed so a phone word outside them is noticed.
-    static let slice5Leftovers: [String] = [
-        DownloadWords.forceQuit, DownloadWords.over(.wifi).note, DownloadWords.over(.any).name,
-        DownloadWords.over(.any).note,
-        DownloadWords.overNow(NetworkPath(satisfied: true, cellular: true, expensive: true), setting: .wifi),
-        DownloadWords.overNow(NetworkPath(satisfied: true, cellular: true, expensive: true), setting: .any),
+    /// Left saying the phone's words on the Mac, on purpose (notes/ios.md "Left saying phone or iOS on the Mac, on
+    /// purpose"): an admin's raw "iOS couldn't…" (DeadwaxAudio's own words, which have no diff). Slice 4 listed slice
+    /// 5's here too - Download over's choices, notes and what's used now, and the force-quit footer - and slice 5 gave
+    /// each the Mac's words. Listed so a phone word outside them is noticed.
+    static let leftOnPurpose: [String] = [
         "iOS couldn't open or decode the file",
     ]
 
-    /// No word OF THIS SNAPSHOT (DeviceWords.all - the words that named the device at c97a824, and the downloads' lists
-    /// of every line) calls the Mac a phone or an iPhone (headphones are headphones), nor says iOS, the app switcher,
-    /// cellular, mobile data or Airplane Mode - but slice 5's leftovers, named above. A word outside the snapshot isn't
-    /// read here (Debug's "ended by iOS" is one, notes/ios.md has the rest).
+    /// No word OF THIS SNAPSHOT (DeviceWords.all - the words that named the device at c97a824, slice 5's, and the
+    /// downloads' lists of every line) calls the Mac a phone or an iPhone (headphones are headphones), nor says iOS, the
+    /// app switcher, cellular, mobile data or Airplane Mode - nor (slice 5) a tap, where the Mac clicks - but those left
+    /// on purpose, named above. A word outside the snapshot isn't read here (notes/ios.md has the rest).
     @Test func noWordOfTheSnapshotSaysThePhonesOnTheMac() {
         let words = DeviceWords.all(.mac)
         for (name, word) in words {
             var said = word
-            for left in Self.slice5Leftovers { said = said.replacingOccurrences(of: left, with: "") }
-            let phone = said.range(of: #"(?i)\b(i?phones?|ios|app switcher|cellular|mobile data|airplane mode)\b"#,
+            for left in Self.leftOnPurpose { said = said.replacingOccurrences(of: left, with: "") }
+            let phone = said.range(of: #"(?i)\b(i?phones?|ios|app switcher|cellular|mobile data|airplane mode|tap(s|ped|ping)?)\b"#,
                                    options: .regularExpression)
             #expect(phone == nil, "\(name): \(word)")
         }
         // each leftover is still said: a stale list is noticed
-        for left in Self.slice5Leftovers { #expect(words.contains { $0.1.contains(left) }, "\(left)") }
+        for left in Self.leftOnPurpose { #expect(words.contains { $0.1.contains(left) }, "\(left)") }
     }
 
     /// What differs between the two, and how: every word the phone says with "phone" in it says "Mac" on the Mac - and
@@ -422,6 +466,16 @@ enum DeviceWords {
             "APIFailure.timeout.words", "App.ServerAddressView.footer", "App.DebugView.footer",
             "App.DebugView.engineLogFooter", "InstallExpiry.line(nil)",
             "InstallExpiry.line(soon)", "InstallExpiry.line(ran out)", "Resume.label",
+            // slice 5's (notes/ios.md "The Mac app, slice 5: sleep, power and downloads"): Download over's choices and
+            // what's used now, the force-quit footer, Only while charging's reading and Debug's background runs, and
+            // People's "next thing they do in deadwax"
+            "DownloadWords.forceQuit", "DownloadWords.over(wifi)", "DownloadWords.over(any)",
+            "DownloadWords.overNow(wifi, wifi)", "DownloadWords.overNow(wifi, any)", "DownloadWords.overNow(wired, wifi)",
+            "DownloadWords.overNow(wired, any)", "DownloadWords.overNow(cellular, wifi)", "DownloadWords.overNow(cellular, any)",
+            "DownloadWords.overNow(tethered, wifi)", "DownloadWords.overNow(tethered, any)",
+            "LibraryFollowWords.power(unplugged)", "LibraryFollowWords.backgroundRun(charging)",
+            "LibraryFollowWords.backgroundRun(notCharging)", "LibraryFollowWords.backgroundRun(expired)",
+            "People.savedWords",
         ]
         // a line of the downloads' everyLine (the banned-words checks' list) is no word of its own: one that differs
         // repeats a named word - or one part of one, a banner's line - on both devices, and is held where that is
@@ -441,8 +495,15 @@ enum DeviceWords {
                 #expect(repeatsANamedWord(name), "\(name) differs and repeats no named word: \(word)")
                 continue
             }
-            // the rest: "phone" said "Mac", "This phone" "This Mac", the speaker named for the Mac, and nothing else
+            // the rest: "phone" said "Mac", "This phone" "This Mac", the speaker named for the Mac, and (slice 5) a tap a
+            // click, and Wi-Fi's waits Wi-Fi or Ethernet's - Download over's choice by its Mac name - and nothing else
             let swapped = word.replacingOccurrences(of: "This phone", with: "This Mac")
+                .replacingOccurrences(of: " tap ", with: " click ")
+                .replacingOccurrences(of: "Tap ", with: "Click ")
+                .replacingOccurrences(of: "Waiting for Wi-Fi", with: "Waiting for Wi-Fi or Ethernet")
+                .replacingOccurrences(of: "Download over is Wi-Fi only", with: "Download over is Wi-Fi or Ethernet only")
+                .replacingOccurrences(of: "Downloads wait for Wi-Fi - Download over is set to Wi-Fi only.",
+                                      with: "Downloads wait for Wi-Fi or Ethernet - Download over is set to Wi-Fi or Ethernet only.")
                 .replacingOccurrences(of: "this phone", with: "this Mac")
                 .replacingOccurrences(of: "the phone", with: "the Mac")
                 .replacingOccurrences(of: "a phone", with: "a Mac")

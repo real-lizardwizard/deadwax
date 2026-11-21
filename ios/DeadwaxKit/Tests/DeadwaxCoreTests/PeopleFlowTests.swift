@@ -72,7 +72,7 @@ import Testing
         #expect(flow.answeredAt == 100 && flow.idleDue(now: 100 + People.idleCheckSeconds))
         // a write's answer is a use of the unlock: the clock starts again
         let (ticket, _) = flow.beginForget(PeopleKnownOnly(user: "gone"), online: true, signInOver: false)!
-        _ = flow.ended(ticket, .done(.forgot), now: 500, signInOver: false, origin: "")
+        _ = flow.ended(ticket, .done(.forgot), now: 500, signInOver: false, origin: "", device: .iPhone)
         #expect(flow.answeredAt == 500 && !flow.idleDue(now: 100 + People.idleCheckSeconds))
         // locked: nothing to check
         var locked = PeopleFlow()
@@ -127,7 +127,7 @@ import Testing
         _ = wrote.readEnded(sent, .failed(words: People.readFailed, askMe: false), now: due)
         #expect(wrote.idleWait(now: due) == nil)
         let (forget, _) = wrote.beginForget(PeopleKnownOnly(user: "gone"), online: true, signInOver: false)!
-        _ = wrote.ended(forget, .done(.forgot), now: due + 10, signInOver: false, origin: "")
+        _ = wrote.ended(forget, .done(.forgot), now: due + 10, signInOver: false, origin: "", device: .iPhone)
         #expect(wrote.idleWait(now: due + 10) == People.idleCheckSeconds)
         // People left: the next opening starts afresh
         wrote.left()
@@ -187,23 +187,23 @@ import Testing
         #expect(body.password == "james-navidrome-pw" && flow.unlockPassword.isEmpty, "emptied as it is sent")
         #expect(flow.beginUnlock(online: true, signInOver: false) == nil, "one at a time")
         let after = flow.ended(ticket, .refused(words: "That isn't the password you signed in with.", kind: "not_your_password",
-                                                fix: nil, askMe: false), now: 2, signInOver: false, origin: "")
+                                                fix: nil, askMe: false), now: 2, signInOver: false, origin: "", device: .iPhone)
         #expect(after == PeopleAfter(announce: "That isn't the password you signed in with.", askMe: false, read: true))
         #expect(flow.focusUnlock == 1 && flow.said(at: .unlock)?.problem == true && flow.view == .locked)
         flow.typed(at: .unlock)
         #expect(flow.said == nil, "typing again clears what was said of the last try")
         flow.unlockPassword = "right-one-now"
         let (again, _) = flow.beginUnlock(online: true, signInOver: false)!
-        let done = flow.ended(again, .done(.unlocked), now: 3, signInOver: false, origin: "")
+        let done = flow.ended(again, .done(.unlocked), now: 3, signInOver: false, origin: "", device: .iPhone)
         #expect(done?.read == true && done?.announce == nil && flow.said == nil, "the list read again says it")
-        #expect(flow.ended(again, .done(.unlocked), now: 3, signInOver: false, origin: "") == nil, "once")
+        #expect(flow.ended(again, .done(.unlocked), now: 3, signInOver: false, origin: "", device: .iPhone) == nil, "once")
     }
 
     @Test func lockShowsUnlockPeopleAtOnce() {
         var flow = Self.listed()
         flow.add = PeopleAddForm(user: "maya", name: "Maya", password: "maya-pass-1", again: "maya-pass-1")
         let ticket = flow.beginLock(online: true, signInOver: false)!
-        _ = flow.ended(ticket, .done(.locked), now: 2, signInOver: false, origin: "")
+        _ = flow.ended(ticket, .done(.locked), now: 2, signInOver: false, origin: "", device: .iPhone)
         #expect(flow.view == .locked && flow.state?.people.isEmpty == true)
         #expect(flow.add.user == "maya" && flow.add.password.isEmpty && flow.add.again.isEmpty)
     }
@@ -224,7 +224,7 @@ import Testing
         let words = "Unlock People with your Navidrome password."
         let after = flow.ended(ticket, People.outcome(of: Self.answered(409, words, kind: "locked"), failed: People.createFailed,
                                                       admin: true),
-                               now: 2, signInOver: false, origin: "")
+                               now: 2, signInOver: false, origin: "", device: .iPhone)
         #expect(after?.read == true && after?.announce == words)
         #expect(flow.view == .locked && flow.state?.people.isEmpty == true && flow.state?.knownOnly.isEmpty == true)
         #expect(flow.add.user == "maya" && flow.add.name == "Maya")
@@ -250,7 +250,7 @@ import Testing
         #expect(flow.writing(.create) && !flow.canWrite(online: true, signInOver: false))
         let origin = People.origin(Self.server)
         let after = flow.ended(ticket, .done(.made(user: "maya", warning: "Navidrome gives them no library.")), now: 2,
-                               signInOver: false, origin: origin)!
+                               signInOver: false, origin: origin, device: .iPhone)!
         let said = flow.said(at: .add)!
         #expect(said.words == People.madeWords("maya", origin: "http://192.168.3.20:8090") && !said.problem)
         #expect(said.warning == "Navidrome gives them no library.")
@@ -260,7 +260,7 @@ import Testing
         var unnamed = Self.listed()
         unnamed.add = PeopleAddForm(user: "zoe", password: "zoe-pass-12", again: "zoe-pass-12")
         let (again, _) = unnamed.beginCreate(online: true, signInOver: false)!
-        _ = unnamed.ended(again, .done(.made(user: "", warning: nil)), now: 2, signInOver: false, origin: "http://x")
+        _ = unnamed.ended(again, .done(.made(user: "", warning: nil)), now: 2, signInOver: false, origin: "http://x", device: .iPhone)
         #expect(unnamed.said?.words == People.madeWords("zoe", origin: "http://x"))
     }
 
@@ -273,7 +273,7 @@ import Testing
         #expect(!flow.canReset(Self.you, online: true, signInOver: false), "refused for you, and not your sheet")
         let (ticket, body) = flow.beginReset(ethan, online: true, signInOver: false)!
         #expect(body.user == "ethan" && body.password == "ethan-new-pw" && body.passwordAgain == "ethan-new-pw")
-        _ = flow.ended(ticket, .done(.reset(user: "ethan", signedOut: 2)), now: 2, signInOver: false, origin: "")
+        _ = flow.ended(ticket, .done(.reset(user: "ethan", signedOut: 2)), now: 2, signInOver: false, origin: "", device: .iPhone)
         #expect(flow.resetPasswords.isEmpty && flow.sheet == nil)
         #expect(flow.said(at: .person(ethan.id))?.words == People.resetWords("ethan", signedOut: 2))
     }
@@ -283,11 +283,11 @@ import Testing
         let ethan = Self.ethan()
         let (ticket, body) = flow.beginFlip(ethan, online: true, signInOver: false)!
         #expect(body == PeopleAdminBody(user: "ethan", admin: true))
-        let after = flow.ended(ticket, .done(.admin(user: "ethan", admin: true)), now: 2, signInOver: false, origin: "")
+        let after = flow.ended(ticket, .done(.admin(user: "ethan", admin: true)), now: 2, signInOver: false, origin: "", device: .iPhone)
         #expect(after?.askMe == true && flow.said(at: .person(ethan.id))?.words == "ethan is an admin now.")
         var failed = Self.listed()
         let (again, _) = failed.beginFlip(ethan, online: true, signInOver: false)!
-        let unknown = failed.ended(again, .unknown(words: EditWords.mayHaveFinished), now: 2, signInOver: false, origin: "")
+        let unknown = failed.ended(again, .unknown(words: EditWords.mayHaveFinished), now: 2, signInOver: false, origin: "", device: .iPhone)
         #expect(unknown?.askMe == true && unknown?.read == true)
         var yours = Self.listed()
         #expect(yours.beginFlip(Self.you, online: true, signInOver: false) == nil, "you can't flip yourself")
@@ -307,7 +307,7 @@ import Testing
         #expect(yours.beginRemove(Self.you, online: true, signInOver: false) == nil, "nor can you remove yourself")
         let (ticket, body) = flow.beginRemove(ethan, online: true, signInOver: false)!
         #expect(body == PeopleRemoveBody(user: "ethan", confirm: "ethan"))
-        let after = flow.ended(ticket, .done(.removed), now: 2, signInOver: false, origin: "")
+        let after = flow.ended(ticket, .done(.removed), now: 2, signInOver: false, origin: "", device: .iPhone)
         #expect(after?.leave == ethan.id && flow.sheet == nil && flow.removeTyped.isEmpty && flow.drafts.isEmpty)
         #expect(flow.said(at: .list)?.words == People.removed("ethan"))
     }
@@ -318,7 +318,7 @@ import Testing
         #expect(body == PeopleForgetBody(user: "gone"))
         let refused = People.outcome(of: Self.answered(404, "deadwax keeps nothing for gone.", kind: "not_found"),
                                      failed: People.forgetFailed, admin: false)
-        _ = flow.ended(ticket, refused, now: 2, signInOver: false, origin: "")
+        _ = flow.ended(ticket, refused, now: 2, signInOver: false, origin: "", device: .iPhone)
         #expect(flow.said(at: .known("gone"))?.words == "deadwax keeps nothing for gone." && flow.view == .list)
         // Save: only a change, all five sent
         var save = Self.listed()
@@ -328,8 +328,8 @@ import Testing
         #expect(save.canSave(ethan, online: true, signInOver: false))
         let (saved, sent) = save.beginSave(ethan, online: true, signInOver: false)!
         #expect(sent == PeoplePermissionsBody(user: "ethan", PeopleTicks(request: true, library: true)))
-        _ = save.ended(saved, .done(.saved), now: 2, signInOver: false, origin: "")
-        #expect(save.said(at: .person(ethan.id))?.words == People.savedWords("ethan"))
+        _ = save.ended(saved, .done(.saved), now: 2, signInOver: false, origin: "", device: .iPhone)
+        #expect(save.said(at: .person(ethan.id))?.words == People.savedWords("ethan", device: .iPhone))
         // the list read again with the saved ticks: the draft goes
         let read = save.readBegan()
         _ = save.readEnded(read, .answered(Self.list([Self.you, Self.ethan(ticks: PeopleTicks(request: true, library: true))])),
@@ -344,20 +344,20 @@ import Testing
     @Test func aWriteEndingUnderTheSignInSaysNothingAndA401ReadsNothing() {
         var flow = Self.listed()
         let (ticket, _) = flow.beginForget(PeopleKnownOnly(user: "gone"), online: true, signInOver: false)!
-        let after = flow.ended(ticket, .done(.forgot), now: 2, signInOver: true, origin: "")
+        let after = flow.ended(ticket, .done(.forgot), now: 2, signInOver: true, origin: "", device: .iPhone)
         #expect(after?.announce == nil && after?.read == true, "the sign-in says what happened")
         var signedOut = Self.listed()
         signedOut.open(.add)
         signedOut.add = PeopleAddForm(user: "maya", password: "maya-pass-1", again: "maya-pass-1")
         let (create, _) = signedOut.beginCreate(online: true, signInOver: false)!
         let ended = signedOut.ended(create, People.outcome(of: Self.answered(401, "Signed out."), failed: "", admin: false),
-                                    now: 2, signInOver: false, origin: "")
+                                    now: 2, signInOver: false, origin: "", device: .iPhone)
         #expect(ended?.read == false && ended?.announce == nil && signedOut.add.password.isEmpty)
         #expect(signedOut.sheet == nil, "a sheet would stand over the sign-in")
         #expect(signedOut.add.user == "maya", "the names are safe to keep")
         var cancelled = Self.listed()
         let lock = cancelled.beginLock(online: true, signInOver: false)!
-        #expect(cancelled.ended(lock, .cancelled, now: 2, signInOver: false, origin: "")?.read == true)
+        #expect(cancelled.ended(lock, .cancelled, now: 2, signInOver: false, origin: "", device: .iPhone)?.read == true)
     }
 
     @Test func theSignInComingPutsTheSheetAwayButNotUnderAWrite() {
@@ -388,7 +388,7 @@ import Testing
         made.signInCame()
         #expect(made.sheet == .add)
         let after = made.ended(create, .done(.made(user: "maya", warning: nil)), now: 2, signInOver: true,
-                               origin: "http://x")
+                               origin: "http://x", device: .iPhone)
         #expect(after?.announce == nil && after?.read == true && made.sheet == nil && made.said(at: .add) == nil)
         #expect(made.add.isEmpty)
         // a Reset refused as the sign-in came (its onChange not yet run): the sheet and its passwords go
@@ -399,7 +399,7 @@ import Testing
         let (ticket, _) = reset.beginReset(ethan, online: true, signInOver: false)!
         let refused = reset.ended(ticket, .refused(words: "That's a lot of changes in a minute.", kind: "too_many",
                                                    fix: nil, askMe: false),
-                                  now: 2, signInOver: true, origin: "")
+                                  now: 2, signInOver: true, origin: "", device: .iPhone)
         #expect(refused?.announce == nil && reset.sheet == nil && reset.resetPasswords.isEmpty)
         // Remove's sheet, failed under it: gone with the name typed; the person's page stays
         var remove = Self.listed()
@@ -407,7 +407,7 @@ import Testing
         remove.removeTyped = "ethan"
         let (gone, _) = remove.beginRemove(ethan, online: true, signInOver: false)!
         let failed = remove.ended(gone, .failed(words: "Navidrome didn't answer.", fix: nil), now: 2, signInOver: true,
-                                  origin: "")
+                                  origin: "", device: .iPhone)
         #expect(failed?.leave == nil && remove.sheet == nil && remove.removeTyped.isEmpty)
         // the same refusal with no sign-in keeps the sheet up, and the passwords to try again
         var open = Self.listed()
@@ -415,7 +415,7 @@ import Testing
         open.resetPasswords = PeoplePasswords(password: "ethan-new-pw", again: "ethan-new-pw")
         let (kept, _) = open.beginReset(ethan, online: true, signInOver: false)!
         _ = open.ended(kept, .refused(words: "No.", kind: "too_many", fix: nil, askMe: false), now: 2,
-                       signInOver: false, origin: "")
+                       signInOver: false, origin: "", device: .iPhone)
         #expect(open.sheet == .reset(ethan.id) && !open.resetPasswords.isEmpty)
     }
 
@@ -579,7 +579,7 @@ import Testing
         var flow = Self.listed(Self.list([Self.you] + many))
         #expect(flow.accountsListed == 7 && PeopleWaits.read(accounts: flow.accountsListed) == 300)
         let lock = flow.beginLock(online: true, signInOver: false)!
-        _ = flow.ended(lock, .done(.locked), now: 2, signInOver: false, origin: "")
+        _ = flow.ended(lock, .done(.locked), now: 2, signInOver: false, origin: "", device: .iPhone)
         #expect(flow.view == .locked && flow.state?.people.isEmpty == true && flow.accountsListed == 7)
         let read = flow.readBegan(now: 3)
         _ = flow.readEnded(read, .answered(Self.locked), now: 4)
@@ -588,7 +588,7 @@ import Testing
         var refused = Self.listed(Self.list([Self.you] + many))
         let (forget, _) = refused.beginForget(PeopleKnownOnly(user: "gone"), online: true, signInOver: false)!
         _ = refused.ended(forget, .refused(words: "Unlock People.", kind: "locked", fix: nil, askMe: false), now: 2,
-                          signInOver: false, origin: "")
+                          signInOver: false, origin: "", device: .iPhone)
         #expect(refused.view == .locked && refused.accountsListed == 7)
         // People left and opened again
         refused.left()

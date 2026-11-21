@@ -304,7 +304,7 @@ import Testing
             let label = "\(Screens.spelled(user)) at \(origin)"
             diffs.text("\(label), made", People.madeWords(user, origin: origin), row["made"])
             diffs.text("\(label), reset \(count)", People.resetWords(user, signedOut: count), row["reset"])
-            diffs.text("\(label), saved", People.savedWords(user), row["saved"])
+            diffs.text("\(label), saved", People.savedWords(user, device: .iPhone), row["saved"])
             diffs.text("\(label), flipped on", People.flipped(user: user, admin: true), row["flippedOn"])
             diffs.text("\(label), flipped off", People.flipped(user: user, admin: false), row["flippedOff"])
             diffs.text("\(label), the unlock's line", People.unlockLine(user), row["unlockLine"])

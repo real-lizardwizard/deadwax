@@ -14,7 +14,7 @@ public enum DebugWords {
 
     /// Test sounds' footer, the turntable's trial after it (`trial`: TurntableDebugRows.trialFooter).
     public static func testSoundsFooter(trial: String, device: Device) -> String {
-        "Songs 1 to 8 are three beeps each: tap one to play the album from it and count the beeps - all three, every "
+        "Songs 1 to 8 are three beeps each: \(device == .mac ? "click" : "tap") one to play the album from it and count the beeps - all three, every "
             + "time? Songs 9 and 10 are one tone cut in two: played one into the other, the tone should never break. A "
             + "song downloaded to this \(device.noun) plays from there, as every song does; \"Stream even when "
             + "downloaded\" (under Downloads) streams it instead, to hear the two side by side. \(trial)"

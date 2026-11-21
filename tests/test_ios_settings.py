@@ -278,7 +278,7 @@ def test_every_choice_is_one_menu_row():
     assert "guard live, let now, now != chosen else { return }" in choice
     assert 'if chosen == nil {\n                Text(verbatim: "").tag(Choice?.none)' in choice
     assert ".tag(Choice?.some(option))" in choice and ".disabled(!live)" in choice
-    for title, cases, chosen in (("GettingWords.modeTitle", "GetMode.allCases", "settings?.mode"),
+    for title, cases, chosen in (("GettingWords.modeTitle(Platform.device)", "GetMode.allCases", "settings?.mode"),
                                  ("GettingWords.floorTitle", "QualityFloor.allCases", "settings?.floor"),
                                  ("GettingWords.formatTitle", "FormatPreference.youOrder", "settings?.format")):
         assert f"choice({title}, {cases}, chosen: {chosen}, live: live," in getting, title
@@ -303,7 +303,7 @@ def test_a_choices_own_line_moved_into_its_footer():
     footer = normalization.split("} footer: {", 1)[1]
     in_order(footer, ["Text(player.normalization.note)", "Text(YouWords.normalizationNote)", "Text(YouWords.kept(Platform.device))"])
     downloads = struct(code(DOWNLOADS), "DownloadOverSection")
-    assert "let chosen = DownloadWords.over(downloads.downloadOver)" in downloads
+    assert "let chosen = DownloadWords.over(downloads.downloadOver, device: Platform.device)" in downloads
     assert ".accessibilityHint(chosen.note)" in downloads
     in_order(downloads.split("} footer: {", 1)[1], ["Text(chosen.note)", "DownloadWords.overNow(", "DownloadWords.overKept(Platform.device)"])
     # the looks and Getting albums' choices had no line of their own: their footers are as they were

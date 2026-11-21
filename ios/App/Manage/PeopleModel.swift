@@ -328,7 +328,7 @@ final class PeopleModel {
             let outcome = await call()
             guard mine == generation else { return }
             let after = flow.ended(ticket, outcome, now: now, signInOver: signInOver,
-                                   origin: People.origin(server.address))
+                                   origin: People.origin(server.address), device: Platform.device)
             navigation.peopleWriting(flow.writing != nil)
             guard let after else { return }
             if let words = after.announce, !words.isEmpty { Notice.announce(words) }

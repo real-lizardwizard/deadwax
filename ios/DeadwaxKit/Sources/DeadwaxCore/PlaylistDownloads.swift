@@ -498,7 +498,10 @@ public enum PlaylistDownloadWords {
     public static let place = "Downloaded playlists"
     /// That screen with none.
     public static let noneYet = "No downloaded playlists yet."
-    public static let noneYetHow = "Open a playlist and tap the download button beside its ••• - it then plays with no connection, and keeps in step as it changes."
+    /// ... and how to download one: tap it on the phone, click it on a Mac (the Mac app, slice 5).
+    public static func noneYetHow(_ device: Device) -> String {
+        "Open a playlist and \(device == .mac ? "click" : "tap") the download button beside its ••• - it then plays with no connection, and keeps in step as it changes."
+    }
     /// The Playlists screen offline with no list in hand, over the downloaded ones.
     public static let offlineDownloaded = "Your downloaded playlists - the rest show once deadwax is back."
 
@@ -528,7 +531,7 @@ public enum PlaylistDownloadWords {
     /// Every line, as `device` says it, for the vocabulary's test.
     public static func everyLine(_ device: Device) -> [String] {
         let progress = PlaylistDownloads.Progress(toGo: 3, of: 12)
-        return [downloadedWith("Late night"), playsOffline, smartOnline, smartKept, place, noneYet, noneYetHow, offlineDownloaded,
+        return [downloadedWith("Late night"), playsOffline, smartOnline, smartKept, place, noneYet, noneYetHow(device), offlineDownloaded,
                 downloadingRow(progress, wait: nil, device: device), downloadingRow(progress, wait: .wifi, device: device),
                 downloadingSpoken("Late night", progress, wait: nil, device: device), count(1), count(3),
                 removeAllToo(playlists: 1, device: device) ?? "", removeAllToo(playlists: 3, device: device) ?? ""]

@@ -189,7 +189,10 @@ public enum TagEditWords {
     public static let selectAll = "Select every track"
     public static let deselectAll = "Deselect every track"
     /// The list's line with nothing selected - the web's words for a phone's sheet.
-    public static let selectNote = "Select tracks to edit only those. Tap a track's name to see everything in its file."
+    /// (The Mac app, slice 5) "Click a track's name" on a Mac.
+    public static func selectNote(_ device: Device) -> String {
+        "Select tracks to edit only those. \(device == .mac ? "Click" : "Tap") a track's name to see everything in its file."
+    }
     /// The bar's button that turns multi-select on (the web's verb since 2.0.8: "Select", never "Tick").
     public static let select = "Select"
 

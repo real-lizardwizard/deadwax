@@ -667,7 +667,7 @@ final class RequestsModel {
                 guard !Task.isCancelled, let self, self.live(epoch, period), self.opening == key,
                       !APIFailure.isCancellation(error) else { return }
                 self.opening = nil
-                self.notes[release] = RequestWords.cantOpen(self.library.navidrome) ?? RequestWords.notLookedUp
+                self.notes[release] = RequestWords.cantOpen(self.library.navidrome) ?? RequestWords.notLookedUp(Platform.device)
             }
         }
     }

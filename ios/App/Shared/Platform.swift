@@ -16,12 +16,27 @@ import UIKit
 /// (MacCommands.swift), ⌘R hung on the same pulls, the ••• menus' items on a right-click, Escape on a sheet's Close,
 /// Return on a dialog's Cancel, Find's cursor, a sheet's root known to the menus, the window kept open over work, and
 /// one window.
+///
+/// (Slice 5, notes/ios.md "The Mac app, slice 5: sleep, power and downloads") And the Mac's sleep, power and outputs -
+/// IOKit's and CoreAudio's, the Mac's alone, so their imports are inside the switch too - and its ProcessInfo
+/// activities: the display kept on over a care run, App Nap kept off over work. On the iPhone: the idle timer and
+/// UIDevice's battery exactly as before, and nothing else.
 enum Platform {
     /// The device this build is, for Core.
     static var device: Device { mac ? .mac : .iPhone }
+
+    /// (Slice 5) The work App Nap is kept off for on the Mac (WorkAwake): runs and applies, and downloads.
+    enum Work: Hashable {
+        case runs
+        case downloads
+    }
 }
 
 #if targetEnvironment(macCatalyst)
+
+import CoreAudio
+import IOKit.ps
+import IOKit.pwr_mgt
 
 extension Platform {
     /// The Mac's build.
@@ -84,6 +99,225 @@ extension Platform {
         scene.sizeRestrictions?.maximumSize = CGSize(width: Window.widest, height: CGFloat.greatestFiniteMagnitude)
         scene.titlebar?.titleVisibility = .hidden
         scene.titlebar?.toolbarStyle = .unified
+    }
+}
+
+// MARK: (slice 5) sleep, power, outputs, the display and App Nap
+
+extension Platform {
+    /// The Mac's sleep, followed from the main run loop (IOKit's IORegisterForSystemPower): may-sleep is allowed at once
+    /// - deadwax never refuses a sleep; at will-sleep `willSleep` (the player pauses) and only then the sleep allowed;
+    /// at the wake `woke`, which starts nothing. Once for the app; called again, the newest handlers are the ones
+    /// called. IOKit refusing (the sandbox, say) is said in the engine log, and the music plays on through a sleep.
+    @MainActor static func watchSleep(willSleep: @escaping @MainActor () -> Void, woke: @escaping @MainActor () -> Void) {
+        MacSleep.watch(willSleep: willSleep, woke: woke)
+    }
+
+    /// The Mac's default output, followed (CoreAudio, on a queue of its own, the answer handed to the main actor):
+    /// `gone` when the output in use went away (MacPower.outputGone) - never for another output chosen while the old
+    /// one is still there. CoreAudio refusing is said in the engine log.
+    @MainActor static func watchOutputs(_ gone: @escaping @MainActor () -> Void) {
+        MacOutputs.watch(gone)
+    }
+
+    /// Only while charging's reading: which source IOKit says powers the Mac (MacPower.power(source:)) - plugged in or
+    /// on battery, and anything it doesn't say plugged in.
+    @MainActor static func power() -> PowerState {
+        MacPowerSource.read()
+    }
+
+    /// The power source's changes (IOKit's run loop source on the main run loop): `changed`, which reads it again.
+    @MainActor static func watchPower(_ changed: @escaping @MainActor () -> Void) {
+        MacPowerSource.watch(changed)
+    }
+
+    /// The display kept on (ScreenAwake: a care run or Re-time, its page in front): one activity with idle display
+    /// sleep off, user initiated - begun when it's first wanted, ended when nothing wants it.
+    @MainActor static func keepDisplayOn(_ on: Bool) {
+        if on, MacActivities.display == nil {
+            MacActivities.display = ProcessInfo.processInfo.beginActivity(
+                options: [.idleDisplaySleepDisabled, .userInitiated],
+                reason: "A Library care or Re-time saved lyrics run, its page in front")
+        } else if !on, let held = MacActivities.display {
+            ProcessInfo.processInfo.endActivity(held)
+            MacActivities.display = nil
+        }
+    }
+
+    /// App Nap kept off while `work` goes (WorkAwake), so a hidden window doesn't slow it: one activity for each kind,
+    /// begun when it's first wanted, ended when nothing wants it. Runs and applies are user initiated (short, and asked
+    /// for); downloads user initiated with the Mac's idle sleep still allowed - a MacBook downloading a whole library
+    /// may sleep as it would, rather than be kept awake on battery for hours.
+    @MainActor static func keepWorking(_ work: Work, _ on: Bool) {
+        if on, MacActivities.work[work] == nil {
+            let options: ProcessInfo.ActivityOptions
+            let reason: String
+            switch work {
+            case .runs:
+                options = [.userInitiated]
+                reason = "A Library care run, Re-time saved lyrics or an apply under way"
+            case .downloads:
+                options = [.userInitiatedAllowingIdleSystemSleep]
+                reason = "Downloads under way"
+            }
+            MacActivities.work[work] = ProcessInfo.processInfo.beginActivity(options: options, reason: reason)
+        } else if !on, let held = MacActivities.work.removeValue(forKey: work) {
+            ProcessInfo.processInfo.endActivity(held)
+        }
+    }
+}
+
+/// keepDisplayOn's and keepWorking's activities, while each is held.
+@MainActor
+private enum MacActivities {
+    static var display: NSObjectProtocol?
+    static var work: [Platform.Work: NSObjectProtocol] = [:]
+}
+
+/// watchSleep's: one registration for the app, kept for its life.
+@MainActor
+private enum MacSleep {
+    static var root: io_connect_t = 0
+    static var port: IONotificationPortRef?
+    static var notifier: io_object_t = 0
+    static var willSleep: (@MainActor () -> Void)?
+    static var woke: (@MainActor () -> Void)?
+
+    static func watch(willSleep: @escaping @MainActor () -> Void, woke: @escaping @MainActor () -> Void) {
+        self.willSleep = willSleep
+        self.woke = woke
+        guard root == 0 else { return }
+        var made: IONotificationPortRef?
+        var notifier: io_object_t = 0
+        let root = IORegisterForSystemPower(nil, &made, { (_: UnsafeMutableRawPointer?, _: io_service_t, message: UInt32,
+                                                          argument: UnsafeMutableRawPointer?) -> Void in
+            // on the main run loop (its source is added there below)
+            MainActor.assumeIsolated { MacSleep.told(message, argument) }
+        }, &notifier)
+        guard root != 0, let made else {
+            EngineTrace.note(MacPower.sleepUnwatched)
+            return
+        }
+        self.root = root
+        port = made
+        self.notifier = notifier
+        CFRunLoopAddSource(CFRunLoopGetMain(), IONotificationPortGetRunLoopSource(made).takeUnretainedValue(), .commonModes)
+    }
+
+    /// A power message: answered as MacPower says - the pause before the sleep is allowed, never a refusal.
+    static func told(_ message: UInt32, _ argument: UnsafeMutableRawPointer?) {
+        switch MacPower.answer(to: message) {
+        case .allowNow:
+            IOAllowPowerChange(root, Int(bitPattern: argument))
+        case .pauseThenAllow:
+            willSleep?()
+            IOAllowPowerChange(root, Int(bitPattern: argument))
+        case .woke:
+            woke?()
+        case .nothing:
+            break
+        }
+    }
+}
+
+/// watchOutputs': CoreAudio's default output and its devices, read on a queue of its own - the main thread never waits
+/// on the audio hardware - and judged on the main actor against the last reading.
+@MainActor
+private enum MacOutputs {
+    struct Reading: Sendable {
+        let output: AudioObjectID?
+        /// nil when CoreAudio didn't answer: nothing is judged gone from no answer.
+        let devices: [AudioObjectID]?
+    }
+
+    static var gone: (@MainActor () -> Void)?
+    static var watching = false
+    /// The default output as last read: what "previous" is at the next change.
+    static var current: AudioObjectID?
+    nonisolated static let queue = DispatchQueue(label: "net.lizardlounge.deadwax.outputs")
+
+    static func watch(_ gone: @escaping @MainActor () -> Void) {
+        self.gone = gone
+        guard !watching else { return }
+        var address = AudioObjectPropertyAddress(mSelector: kAudioHardwarePropertyDefaultOutputDevice,
+                                                 mScope: kAudioObjectPropertyScopeGlobal,
+                                                 mElement: kAudioObjectPropertyElementMain)
+        let status = AudioObjectAddPropertyListenerBlock(AudioObjectID(kAudioObjectSystemObject), &address, queue, listener())
+        guard status == noErr else {
+            EngineTrace.note(MacPower.outputsUnwatched)
+            return
+        }
+        watching = true
+        // the first reading, in order before any change's (one serial queue, then the main queue)
+        queue.async { hand(read()) }
+    }
+
+    /// The listener, made outside the main actor: CoreAudio calls it on `queue`.
+    nonisolated private static func listener() -> AudioObjectPropertyListenerBlock {
+        { (_: UInt32, _: UnsafePointer<AudioObjectPropertyAddress>) -> Void in
+            hand(read())
+        }
+    }
+
+    nonisolated private static func hand(_ reading: Reading) {
+        DispatchQueue.main.async {
+            MainActor.assumeIsolated { changed(reading) }
+        }
+    }
+
+    /// The default output changed (or the first reading): gone if the one in use is no longer a device at all.
+    private static func changed(_ now: Reading) {
+        let previous = current
+        current = now.output
+        guard let devices = now.devices else { return }
+        if MacPower.outputGone(previous: previous, now: now.output, devices: devices) { gone?() }
+    }
+
+    nonisolated private static func read() -> Reading {
+        let system = AudioObjectID(kAudioObjectSystemObject)
+        var address = AudioObjectPropertyAddress(mSelector: kAudioHardwarePropertyDefaultOutputDevice,
+                                                 mScope: kAudioObjectPropertyScopeGlobal,
+                                                 mElement: kAudioObjectPropertyElementMain)
+        var device = AudioObjectID(kAudioObjectUnknown)
+        var size = UInt32(MemoryLayout<AudioObjectID>.size)
+        let output: AudioObjectID? = AudioObjectGetPropertyData(system, &address, 0, nil, &size, &device) == noErr
+            ? device : nil
+        address.mSelector = kAudioHardwarePropertyDevices
+        var bytes: UInt32 = 0
+        guard AudioObjectGetPropertyDataSize(system, &address, 0, nil, &bytes) == noErr else {
+            return Reading(output: output, devices: nil)
+        }
+        var devices = [AudioObjectID](repeating: AudioObjectID(kAudioObjectUnknown),
+                                      count: Int(bytes) / MemoryLayout<AudioObjectID>.size)
+        guard AudioObjectGetPropertyData(system, &address, 0, nil, &bytes, &devices) == noErr else {
+            return Reading(output: output, devices: nil)
+        }
+        return Reading(output: output, devices: Array(devices.prefix(Int(bytes) / MemoryLayout<AudioObjectID>.size)))
+    }
+}
+
+/// power()'s and watchPower's: IOKit's power sources.
+@MainActor
+private enum MacPowerSource {
+    static var changed: (@MainActor () -> Void)?
+    static var source: CFRunLoopSource?
+
+    static func read() -> PowerState {
+        guard let info = IOPSCopyPowerSourcesInfo()?.takeRetainedValue() else { return MacPower.power(source: nil) }
+        let type = IOPSGetProvidingPowerSourceType(info)?.takeUnretainedValue()
+        return MacPower.power(source: type.map { $0 as String })
+    }
+
+    static func watch(_ changed: @escaping @MainActor () -> Void) {
+        self.changed = changed
+        guard source == nil else { return }
+        let made = IOPSNotificationCreateRunLoopSource({ (_: UnsafeMutableRawPointer?) -> Void in
+            // on the main run loop (the source is added there below)
+            MainActor.assumeIsolated { MacPowerSource.changed?() }
+        }, nil)?.takeRetainedValue()
+        guard let made else { return }
+        source = made
+        CFRunLoopAddSource(CFRunLoopGetMain(), made, .defaultMode)
     }
 }
 
@@ -240,6 +474,36 @@ extension Platform {
     @MainActor static func dialogCancel() -> some View {
         EmptyView()
     }
+
+    // (slice 5) sleep, power, outputs, the display and App Nap
+
+    /// The Mac's alone: a phone's lock is no sleep - it plays on.
+    @MainActor static func watchSleep(willSleep: @escaping @MainActor () -> Void, woke: @escaping @MainActor () -> Void) {}
+
+    /// The Mac's alone: the audio session's route change is the phone's (AudioSessionController).
+    @MainActor static func watchOutputs(_ gone: @escaping @MainActor () -> Void) {}
+
+    /// The phone's battery, exactly as before (UIDevice.batteryState, monitoring on).
+    @MainActor static func power() -> PowerState {
+        switch UIDevice.current.batteryState {
+        case .charging: return .charging
+        case .full: return .full
+        case .unplugged: return .unplugged
+        case .unknown: return .unknown
+        @unknown default: return .unknown
+        }
+    }
+
+    /// The Mac's alone: the phone's changes come as UIDevice's notification (DownloadModel).
+    @MainActor static func watchPower(_ changed: @escaping @MainActor () -> Void) {}
+
+    /// The idle timer, exactly as before.
+    @MainActor static func keepDisplayOn(_ on: Bool) {
+        UIApplication.shared.isIdleTimerDisabled = on
+    }
+
+    /// The Mac's alone: beginBackgroundTask stays as it is.
+    @MainActor static func keepWorking(_ work: Work, _ on: Bool) {}
 }
 
 extension Scene {

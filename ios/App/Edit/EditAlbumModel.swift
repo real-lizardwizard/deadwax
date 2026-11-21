@@ -733,18 +733,30 @@ final class EditAlbumModel {
 }
 
 /// A background task held while an apply waits for its answer (UIApplication's: the seconds iOS gives an app sent to
-/// the background) - ended once, by the apply or by iOS running out of time.
+/// the background) - ended once, by the apply or by iOS running out of time. (The Mac app, slice 5) And on the Mac,
+/// App Nap kept off until the apply ends (WorkAwake's) - by the apply alone: a hidden window is never short of time, so
+/// iOS's running out ends only the background task.
 @MainActor
 final class BackgroundHold {
     private var task: UIBackgroundTaskIdentifier = .invalid
+    private var working = true
 
     init(named name: String) {
+        WorkAwake.hold(true)
         task = UIApplication.shared.beginBackgroundTask(withName: name) { [weak self] in
-            MainActor.assumeIsolated { self?.end() }
+            MainActor.assumeIsolated { self?.endTask() }
         }
     }
 
     func end() {
+        if working {
+            working = false
+            WorkAwake.hold(false)
+        }
+        endTask()
+    }
+
+    private func endTask() {
         guard task != .invalid else { return }
         UIApplication.shared.endBackgroundTask(task)
         task = .invalid

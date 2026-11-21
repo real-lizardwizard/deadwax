@@ -65,7 +65,7 @@ import Testing
         diffs.text("removed", TagEditWords.removed, words["removed"])
         diffs.text("none", TagEditWords.none, words["none"])
         diffs.text("title", TagEditWords.title, words["title"])
-        diffs.text("selectNote", TagEditWords.selectNote, words["selectNote"])
+        diffs.text("selectNote", TagEditWords.selectNote(.iPhone), words["selectNote"])
         diffs.text("selectAll", TagEditWords.selectAll, words["selectAll"])
         diffs.text("deselectAll", TagEditWords.deselectAll, words["deselectAll"])
         for row in words["hint"].list {

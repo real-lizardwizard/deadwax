@@ -260,8 +260,9 @@ def test_the_runs_are_the_apps_and_only_carry_out_what_core_decides():
     # the screen stays on only while a run goes and its page shows - through ScreenAwake, the one place the idle timer
     # is set since slice 8's Re-time wants it too (tests/test_ios_server_settings.py holds the rest of the app to it)
     assert "ScreenAwake.keep(runs.keepsScreenOn(visible: visible), for: .libraryCare)" in model
+    # (the Mac app, slice 5) set in Platform.swift's iPhone half, ScreenAwake its one caller
     for path in (CORE.parent.parent.parent / "App").rglob("*.swift"):
-        if path.name != "ScreenAwake.swift":
+        if path.name != "Platform.swift":
             assert "isIdleTimerDisabled" not in path.read_text(encoding="utf-8"), path.name
     # to the background, the run stops after the album out; another person, it stops where it is
     assert "runs.suspended()" in swift_like(model, "scene")

@@ -15413,6 +15413,7 @@ c97a824 code. The fixture it committed holds 552 - corrected here, not by rewrit
   - **The foot**: "Closing deadwax from the app switcher stops downloads until you open it again; locking the phone
     doesn't. Downloads stay on this phone when you sign out." → "Downloads stay on this Mac when you sign out."
     There is no app switcher. Whether quitting stops downloads is slice 5's to find out, so nothing is claimed.
+    (Slice 5 left it so: check 443 tells.)
   - **The store unreadable**: "…close deadwax from the app switcher and open it again." → "This Mac couldn't read its
     downloads - quit deadwax and open it again."
   - **The offline banner**: "Offline - showing what's on this Mac", then "Join a network to play what isn't on this
@@ -15471,7 +15472,10 @@ Left saying phone or iOS on the Mac, on purpose:
 - **The turntable recording's file name and user agent**, which are data.
 - **People's `phonePasswordPlace`**, and anything stored, sent or keyed: download states such as `phone_full`, the
   speaker's key, play_queue's labels, and the plists.
-- **Slice 5's, with sleep, power and downloads** (DeviceWordsTests' `slice5Leftovers` lists the snapshot's):
+- **Slice 5's, with sleep, power and downloads** (DeviceWordsTests' `slice5Leftovers` lists the snapshot's). All of
+  these are the Mac's own since slice 5, and `slice5Leftovers` is `leftOnPurpose`, holding only the admin's raw
+  "iOS couldn't open or decode the file" (see "The Mac app, slice 5: sleep, power and downloads"). As slice 4 left
+  them:
   - `over()`: "Wi-Fi and cellular", "never mobile data…", "Downloads use mobile data too…";
   - `overNow`: "On Wi-Fi now." on a Mac on a cable (Ethernet counts as Wi-Fi), and its mobile-data lines (added by
     the review);
@@ -15482,7 +15486,8 @@ Left saying phone or iOS on the Mac, on purpose:
     ("unknown means plugged in"); docs/ios.md's troubleshooting says to turn Only while charging off meanwhile.
 - **"tap"** in a dozen listener words (Requests' "tap to try again", Edit album's "Tap a track's name", People's
   "from their next tap", a playlist's empty Downloaded, Debug's test sounds) - a touch word rather than a phone
-  word, and not plan 1.5's; left for a later slice, named in docs/ios.md.
+  word, and not plan 1.5's; left for a later slice, named in docs/ios.md. (Slice 5 took them: "click" on the Mac, and
+  `tap` banned in the snapshot's Mac words.)
 
 ### Departures from the web
 
@@ -15594,8 +15599,10 @@ It asked for six fixes. Each was checked against the code first, and each held.
      data", "On Wi-Fi now." on a cable), the force-quit note, Only while charging with no battery, Debug's "ended by
      iOS" and the engine's errors, and "tap".
    - The slice-5 list in "The Mac app, slice 4" above gained `overNow` and "ended by iOS".
+   - (Slice 5 made every one of them the Mac's own, and the bullet now says only the engine's rarer errors.)
 3. **"Waiting for the Mac to charge" on a Mac with no battery.** The behaviour stays slice 5's. docs/ios.md's
    troubleshooting row now gives the Mac's words and says to turn Only while charging off there until then.
+   (Slice 5: a Mac with no battery counts as plugged in, and the row says so instead.)
 4. **The Local Network words on macOS 14.** The app runs from macOS 14.0.
    - The SDK's annotations don't settle it: Network's `nw_path_unsatisfied_reason_local_network_denied` and
      NSNetServices' `MissingRequiredConfiguration` error are marked macOS 11, which is when the API appeared, not
@@ -15668,3 +15675,261 @@ Not verified - only the Mac can tell:
 - a Mac build carrying a profile, read and dated by Debug (434);
 - macOS 14 against 15: what each says and asks (437);
 - how `hifispeaker` looks beside the other outputs (436).
+
+## The Mac app, slice 5: sleep, power and downloads (2026-11-20)
+
+The Mac app's plan (~/Desktop/Code/deadwax-plans/mac-app.md), slice 5. It covers:
+- section 2's rows for the audio session (headphones out), sleep and the background;
+- section 6's slice-5 item: pause at sleep, wake paused, headphones out, a care run holding the display, activities
+  for downloads, runs and applies, "Only while charging" with no battery;
+- the slice-4 leftovers: the phone's words still said on the Mac (Download over, the force quit, "ended by iOS",
+  "tap");
+- checks 439-446 of section 7 (docs/ios.md, all not done yet).
+
+Built on `ios` from 1ddcc978. What it leaves alone:
+- src/__init__.py is untouched and the app is still 0.13 (13). There is **no server change**.
+- **ios/Deadwax.xcodeproj is untouched**: the one new file, Core's MacPower.swift, is in the package (found by
+  folder); the App's additions are in files it already had (Platform.swift, ScreenAwake.swift).
+- **The engine files have no diff**: PlaybackEngine.swift and the rest of DeadwaxAudio, and AudioSessionController.swift.
+  Everything here is PlayerModel's and Platform's.
+- **No word an iPhone shows changes.** iphone.json gained 45 keys (every word this slice made device-aware, in each
+  state) and changed none: its diff is additions only, each written from 1ddcc978's wording.
+- The one switch stays one: `targetEnvironment(macCatalyst)` is still said only in Platform.swift, and the Mac's
+  imports (CoreAudio, IOKit.ps, IOKit.pwr_mgt) sit inside its Mac half. Core's MacPower has no platform condition:
+  its rules are read only where the App reads IOKit or CoreAudio, which only the Mac's build does.
+
+### Sleep: paused, and woken paused (439)
+
+- **Platform.watchSleep** (the Mac half's MacSleep): IORegisterForSystemPower, once for the app, its notification
+  port's run loop source on the main run loop in `.commonModes` (a menu being tracked mustn't hold a sleep's answer).
+  The C callback captures nothing; it reaches MacSleep's static state through `MainActor.assumeIsolated`, which holds
+  because the source is on the main run loop.
+- **Each message answered as Core's `MacPower.answer(to:)` says**:
+  - may-sleep (kIOMessageCanSystemSleep, idle sleep): IOAllowPowerChange at once. **Never IOCancelPowerChange** - a
+    sleep is never refused, idle or not.
+  - will-sleep (kIOMessageSystemWillSleep): PlayerModel's `willSleep()`, **then** IOAllowPowerChange (macOS waits up to
+    30 seconds for that answer, so the pause is asked for before the Mac is let go).
+  - has-powered-on (kIOMessageSystemHasPoweredOn): nothing starts. The engine log says "power: the Mac woke - nothing
+    started".
+  - anything else (a sleep called off, waking about to begin): nothing.
+- **IOMessage.h's constants aren't imported by Swift** (C macros on `iokit_common_msg`), so MacPower spells them -
+  0xe0000270, 0xe0000280, 0xe0000300 - and a Core test and a Python test each hold them to the header's arithmetic
+  (sys_iokit, 0x38 << 26, with the message's own number).
+- **PlayerModel.willSleep()**: `MacPower.willSleep(playing:retrying:interrupted:)` says pause if something plays or a
+  retry waits (a retry would start the music once the network came back after the wake), `interrupted` cleared, and
+  `sleptSincePlay` set; then the pause, then the engine log's line ("power: the Mac will sleep - paused, no resume at
+  the wake", or "nothing playing").
+- **The wake**: the player is as the sleep left it, paused at the same place, and Play goes on from there (the
+  engine's resume, as after any pause). What the engine does at a wake without the pause - the plan's unknown - no
+  longer matters to 439: it's paused before the sleep.
+- **IOKit refusing** (IORegisterForSystemPower answering 0 - the sandbox, say) is said once in the engine log
+  ("power: can't follow the Mac's sleep ... - playing on"), and the music plays on through a sleep, as before.
+- The iPhone half is empty: a phone's lock is no sleep.
+
+**`sleptSincePlay`, past the brief's "clear interrupted".** The engine's pause is asynchronous (PlaybackEngine's
+`pause()` hands `pauseNow` to its queue), so `isPlaying` can still read true a moment after the pause is asked for.
+If macOS posts an audio-session interruption just after will-sleep (whether Catalyst posts one at all is 439's to
+tell), `interruption()` would read "playing", set `interrupted`, and its end at the wake ("should resume") would start
+the music - the one thing 439 forbids. So an interruption arms a resume only through
+`MacPower.interruptionArms(playing:retrying:sleptSincePlay:)`, which says no once a sleep paused the music, until the
+listener plays again (`resume()`, or a new queue's `startQueue`, clear it). Nothing sets it on the iPhone, where the
+rule is the phone's exactly: `playing || retrying`.
+
+### Headphones out (440)
+
+- **The session's path is kept**: AudioSessionController's `onOldDeviceGone` (oldDeviceUnavailable), unchanged; it
+  now reaches PlayerModel's `outputGone(.session)`, which says it in the engine log and pauses - on the phone the
+  same pause as before, with a log line.
+- **New on the Mac: CoreAudio's default output** (Platform.watchOutputs, the Mac half's MacOutputs).
+  AudioObjectAddPropertyListenerBlock on kAudioHardwarePropertyDefaultOutputDevice, on a serial queue of its own
+  (the main thread never waits on the audio hardware). Each change reads the default output and
+  kAudioHardwarePropertyDevices on that queue, hands the reading to the main actor, and Core's
+  `MacPower.outputGone(previous:now:devices:)` judges it:
+  - the output that was in use is no longer a device at all (headphones out - on Apple silicon "External Headphones"
+    is a device of its own - AirPods or a Bluetooth speaker gone, a USB DAC pulled): **pause**;
+  - another output chosen, the old one still listed (the menu bar's Sound, say): nothing, as on the phone for a
+    route you chose;
+  - no previous reading, CoreAudio's unknown object (0), no change, or the devices unreadable: nothing.
+  The listener is made in a nonisolated function, so it isn't the main actor's and runs on its queue.
+- **Both may fire for one unplug**, so the engine log names each - "output gone: the session said so - paused" and
+  "output gone: CoreAudio - paused" (or "nothing playing") - and 440's log says which macOS posts. **Pausing twice is
+  harmless**: PlayerModel's pause cancels a retry, clears intends-to-play and asks the engine, whose `pauseNow` is
+  nothing once it isn't playing (`guard wantsPlay`), and the resume record is told again (the same state).
+- **CoreAudio refusing the listener** is said once in the engine log; only the session's route changes pause then.
+- **Not built: the plan's fallback** (pause on the engine's configuration change when the output becomes the built-in
+  speaker). The device list tells gone from chosen directly, and the configuration change is the engine's, whose
+  files have no diff.
+- **Known limit: Intel Macs' headphone jack.** There, headphones are a data source of the built-in output device, so
+  the default device doesn't change when they're pulled and CoreAudio's path says nothing: only the session's, if
+  Catalyst posts it. Bluetooth and USB outputs come and go as devices on both. James's Mac is Apple silicon.
+
+### Only while charging on a Mac (444)
+
+- **Platform.power()**: on the Mac IOPSCopyPowerSourcesInfo and IOPSGetProvidingPowerSourceType, read by Core's
+  `MacPower.power(source:)`:
+  - "Battery Power", and "UPS Power" (a UPS providing means the mains has gone): **unplugged**;
+  - "AC Power", and anything else - no answer, an empty one, one it doesn't know: **plugged in**, a new PowerState
+    case (`.pluggedIn`) that `charging` counts. So a Mac mini, an iMac or a Studio never waits.
+  On the iPhone `UIDevice.batteryState`, its switch moved verbatim from DownloadModel (which no longer reads UIDevice
+  for it).
+- **Changes**: IOPSNotificationCreateRunLoopSource on the main run loop (Platform.watchPower), calling DownloadModel's
+  `readPower()`, which plans again as the phone's battery notification does. That observer stays, for the phone; the
+  Mac doesn't rely on UIDevice's.
+- **Why `.pluggedIn` and not `.charging`**: IOKit's answer says which source powers the Mac, not whether a battery
+  charges. "Charging" would be untrue of a full MacBook and of every Mac with no battery.
+- **The words** (LibraryFollowWords, by device): Debug's Power says "Plugged in" or "On battery"; a background run's
+  line "plugged in" or "on battery" where the phone says charging, and "ended by macOS". A download waiting says
+  "Waiting for the Mac to charge" (slice 4's), now only ever on battery.
+- docs/ios.md's troubleshooting no longer tells a Mac with no battery to turn Only while charging off.
+- The plan's unknown - `UIDevice.batteryState` on a MacBook and on a Mac with no battery - is gone with it: the Mac
+  reads what its own battery menu reads.
+
+### The display, and App Nap (441-443)
+
+- **ScreenAwake** now calls `Platform.keepDisplayOn(_:)`: on the iPhone the idle timer, exactly as before; on the Mac
+  one ProcessInfo activity, `[.idleDisplaySleepDisabled, .userInitiated]`, begun when it's first wanted and ended when
+  nothing wants it. As on the phone, it's wanted while a Library care run or Re-time saved lyrics goes **and its page
+  is in front** (`keepsScreenOn(visible:)`).
+- **WorkAwake** (new, in ScreenAwake.swift): App Nap kept off while work goes, its page in front or not. It holds
+  - a Library care run (`runs.under != nil`, CareRunModel),
+  - Re-time saved lyrics (`retime.running`, ServerSettingsModel),
+  - every BackgroundHold (a count): Edit album's Apply, Edit tags, Get and Delete, a Library care run's album,
+    Server settings' save, clearing MusicBrainz's saved answers, Re-time's reads and albums, In nobody's library,
+    People's writes, Artist images' Save, Move albums, Change password,
+  - downloads: DownloadModel's tasks of this launch (`live` not empty).
+  It begins one activity for the runs and the holds and another for downloads (`Platform.keepWorking`), each ended
+  when nothing wants it, and calls Platform only when what's wanted changes.
+- **The runs and holds are `.userInitiated`**, as the plan says: short, asked for, and kept going with the Mac left
+  alone.
+- **Downloads are `.userInitiatedAllowingIdleSystemSleep` - a departure from the plan**, which says `.userInitiated`
+  for them too. `.userInitiated` includes idle system sleep disabled, so a MacBook left with Download your library
+  under way - hours of it, on battery - would be held awake until the last album landed. The downloads themselves are
+  the background URLSession's (nsurlsessiond's), which carries them across a sleep and a quit as it can (443's and
+  445's to tell); the activity is only so a hidden window's own share - the queue, the planning, the store - isn't
+  App Napped. So the Mac may still sleep as it would, and work stops being slowed while it's awake.
+- **BackgroundHold**: `WorkAwake.hold(true)` as it's made, `hold(false)` once at `end()`. iOS running out of time ends
+  only the background task (the expiration handler calls `endTask()`): a hidden Mac window is never short of time, so
+  the Mac's hold lasts as long as the apply. Every one of the fourteen holds is ended by its owner - twelve by a
+  `defer`, Re-time's two straight after their await with no return between - read, not assumed. (The review counted
+  them again: the first count, ten, missed Library care's album, People's writes and the artist page's two.)
+- **A run still stops at the background** (the review's): CareRunModel's and ServerSettingsModel's `scene(.background)`
+  stop a run after the album out, as on the phone, and WorkAwake changes none of that. So the runs' activity matters
+  while the window is covered or behind other apps; if Catalyst counts ⌘H or a minimized window as the background
+  (only the Mac can tell), a run stops there and says so - docs/ios.md says so rather than promising it carries on.
+- **beginBackgroundTask stays as it is**, on both: EditAlbumModel's BackgroundHold, DownloadModel's and
+  PlayerModel+Resume's, once each.
+- **Nothing changes on the iPhone**: `keepWorking`'s iPhone half is empty, and its display is the idle timer as before.
+
+### The phone's words left on the Mac
+
+Every word below takes the device (no default, as slice 4's rule has it), and the App passes `Platform.device`.
+Each line is the iPhone's, then the Mac's.
+- **Download over** (DownloadWords): the setting keeps its values (`.wifi`, `.any`); only their names and notes move.
+  - `over(.wifi)`: "Wi-Fi only" → **"Wi-Fi or Ethernet only"**, "Downloads use Wi-Fi or a cable alone - never a
+    hotspot or Low Data Mode."
+  - `over(.any)`: "Wi-Fi and cellular" → **"Any connection"**, "Downloads use a hotspot too, when this Mac is on
+    one." (The review's wording; the first was "when it's what this Mac is on".)
+  - `overNow`: "On Wi-Fi now." → "On Wi-Fi or Ethernet now." (on Wi-Fi or a cable). A Mac on mobile data is on a
+    phone's hotspot (tethered or Bluetooth), so `.mobileData` says the hotspot's words on the Mac.
+  - Past the brief, because each names the setting's choice: `waitSetting` ("Download over is Wi-Fi or Ethernet only
+    - in Settings > Downloads."), `wait(.wifi)` ("Waiting for Wi-Fi or Ethernet"), `allWaitForWifi` ("Downloads wait
+    for Wi-Fi or Ethernet - Download over is set to Wi-Fi or Ethernet only.").
+- **The force quit**: "…closed from the app switcher…" → "Downloads stopped when deadwax was force quit, and carried
+  on when it opened again."
+- **Debug's background runs**: "ended by iOS" → "ended by macOS"; charging → plugged in or on battery.
+- **"tap" → "click"**: RequestWords' `empty`, `emptyLine(gets:)` and `notLookedUp` ("Couldn't open it - click to try
+  again."), TagEditWords' `selectNote` ("Click a track's name…"), GettingWords' `modeTitle` ("When I click Get"),
+  PlaylistDownloadWords' `noneYetHow` ("click the download button"), Debug's test-sounds footer ("click one"),
+  PeopleFlow's `ended` and `saidAfter`, and - past the brief - Info > Debug's engine rows ("from the click to sound").
+  People's `savedWords` says neither: "Saved - Sam has them from the next thing they do in deadwax." (A first "next
+  click or tap" failed the tap ban.)
+
+**DeviceWordsTests**:
+- the snapshot gained the 45 keys above (Download over's and overNow's seven paths under both settings, waitSetting's
+  reasons, power's states, the background run's five outcomes, the click words);
+- `slice5Leftovers` became `leftOnPurpose`, holding only the admin's raw "iOS couldn't open or decode the file", still
+  required to be said so a stale list is noticed;
+- the Mac's banned words gained `tap(s|ped|ping)?`;
+- ownWords - the words that must differ on the Mac - gained the force quit, over()'s two, overNow's lines for Wi-Fi,
+  a cable, cellular and tethering, power's unplugged, the background run's charging, not-charging and expired, and
+  People's saved words.
+mac.json was written again (`DEADWAX_WORDS_WRITE=mac`) and read: only those words moved. docs/ios.md's "Still the
+phone's words" bullet now names only the engine's rarer errors.
+
+### Tests
+
+- **Core, MacPowerTests (new, 11)**: the messages are IOMessage.h's; a sleep is allowed and never refused; will-sleep
+  pauses (playing, retrying, both, neither) and disarms the resume; no interruption arms a resume since a sleep, and
+  without one it's the phone's rule; the power source (AC, battery, UPS, nil, empty, unknown); the power said as the
+  Mac has it; the output in use gone is gone (and chosen, unchanged, unknown, no previous aren't); each pause says who
+  said the output went; Download over, the force quit and the clicks on a Mac.
+- **Core, updated**: LibraryChargingTests (`.pluggedIn` counted as charging, and its word), DeviceWordsTests (above),
+  and the tests calling the words that took a device now pass `.iPhone`.
+- **Python, test_ios_mac.py (seven new)**: the power APIs only in Platform's Mac half (and no MacPower or activity in
+  the iPhone's); will-sleep pauses then allows, and no IOCancelPowerChange anywhere; the constants against the header;
+  `interrupted` cleared at sleep and none armed until the next play (three assignments of `sleptSincePlay`, two of
+  them clearing it in `resume()` and `startQueue`); an output gone pauses as the phone does and says who said so;
+  Only while charging reads IOKit on a Mac and the battery on the phone (UIDevice's battery nowhere else); a care run
+  holds the display on, work keeps App Nap off, and beginBackgroundTask is where it was, once each.
+- **Python, updated**: test_ios_server_settings.py (the idle timer only in Platform's iPhone half, ScreenAwake through
+  `keepDisplayOn`), test_ios_library_care.py (the same exception, moved), test_ios_settings.py (`modeTitle` and
+  `over` given the device).
+
+### Faults seen
+
+Each new check was seen failing on its fault, then put back (the file restored byte for byte):
+- **Core** (swift test, Xcode's toolchain):
+  - willSleep leaving `interrupted` as it was: `willSleepPausesAndDisarmsTheResume`;
+  - a UPS read as plugged in, and no answer read as on battery: `thePowerSourceIsPluggedInUnlessItSaysBattery`, each;
+  - `outputGone` true with the device still there: `theOutputInUseGoneIsGone`;
+  - an interruption arming a resume after a sleep: `noInterruptionArmsAResumeSinceASleep`;
+  - will-sleep's constant as 0x290: `theMessagesAreIOMessageHs` and `aSleepIsAllowedAndNeverRefused`;
+  - a may-sleep answered with nothing: `aSleepIsAllowedAndNeverRefused`;
+  - "tap" left in the Mac's `notLookedUp`: `aMacClicksWhereAPhoneTaps`, and DeviceWordsTests' snapshot and banned
+    words;
+  - the Mac's force quit back to the phone's words: `theForceQuitOnAMac`, and DeviceWordsTests' snapshot, banned
+    words and own words;
+  - the iPhone's `over(.any)` reworded: `theIPhonesWordsAreAsTheyWere`.
+- **Python** (test_ios_mac.py):
+  - IOAllowPowerChange before `willSleep?()`, and an IOCancelPowerChange at may-sleep: the will-sleep test, each;
+  - will-sleep's constant as 0x290: the constants test;
+  - `interrupted = at.interrupted` dropped, and `sleptSincePlay` not cleared by Play: the interrupted test, each;
+  - downloads' activity as `.userInitiated`, the display's without `.idleDisplaySleepDisabled`, and iOS's expiry
+    ending the Mac's hold: the display and App Nap test, each;
+  - CoreAudio's change pausing without `outputGone`: the output-gone test.
+  - **Two missed at first, and the tests were tightened**: UIDevice's battery read again in DownloadModel
+    (`.batteryState ==`, which the narrow "batteryState)" check let by), and `import CoreAudio` moved above the
+    switch (`_halves()` counted the file's head as the Mac's half). Now `batteryState` is banned in every App file
+    and in Platform's Mac half, and said once in its iPhone half; the halves are the switch's own text, and nothing
+    of the Mac's may be outside it. Both faults, and a third (the Mac's `power()` reading UIDevice), then failed.
+
+### Verified, and not
+
+Verified in the working tree, on James's Mac, nothing installed or launched:
+- `swift test`, the whole package (with Xcode's toolchain - see below): 2306 passed (2136 Core, 158 audio, 12 turntable);
+- the unsigned iPhone Debug build and the unsigned Mac Catalyst Release build (arm64): both succeed, no warnings but
+  appintentsmetadataprocessor's usual one;
+- check_project.py: ok;
+- pytest of test_ios_*.py, test_source_bytes.py and test_logins.py: 705 passed, 1 skipped. pyflakes: clean;
+- ios/Deadwax.xcodeproj, src/__init__.py, PlaybackEngine.swift and the rest of DeadwaxAudio, and
+  AudioSessionController.swift: no diff.
+
+`swift test` from the Command Line Tools crashes here before it builds (dyld: a BuildServerProtocol symbol missing
+from CommandLineTools' swift-package), so it runs with `DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer`, as
+build-locked.sh sets for the builds.
+
+No check on the Mac yet: 439-446 are James's.
+
+### What only the Mac can tell
+
+- **439**: whether IORegisterForSystemPower works in the sandbox (expected to; not seen), whether Catalyst posts an
+  audio-session interruption around a sleep, and the engine's state at the wake. The engine log's "power:" lines
+  say what came.
+- **440**: which path fires - the session's oldDeviceUnavailable, CoreAudio's, or both (the "output gone:" lines).
+- **441**: that the activity holds the display (`pmset -g assertions` lists it while a run goes).
+- **442**: App Nap off with the window hidden (Activity Monitor's App Nap column says No while a download goes).
+- **443 and 445**: what nsurlsessiond does with the app quit, and whether BGTaskScheduler runs at all on macOS -
+  to be written up from the checks; nothing here claims either.
+- **444**: IOKit's answers on a MacBook, on battery and plugged in (and "AC Power", or nothing, on a Mac with no
+  battery).
+- **446**: the hotspot's waiting words, on the iPhone's hotspot over Wi-Fi.

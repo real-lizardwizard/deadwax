@@ -199,8 +199,8 @@ public struct GetChoice: Encodable, Sendable, Equatable {
 /// exporter and held here. The section's title is RequestWords.gettingAlbums, and its offline line the phone's own
 /// StoreLine.offline ("Getting albums works once deadwax is back.").
 public enum GettingWords {
-    /// The three choices' titles.
-    public static let modeTitle = "When I tap Get"
+    /// The three choices' titles - (the Mac app, slice 5) "When I click Get" on a Mac. The setting kept is the same.
+    public static func modeTitle(_ device: Device) -> String { device == .mac ? "When I click Get" : "When I tap Get" }
     public static let floorTitle = "Quality floor"
     public static let formatTitle = "Format"
     /// The note under the three (You.tsx `app-get-note`).

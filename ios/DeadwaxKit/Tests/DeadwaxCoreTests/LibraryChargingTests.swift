@@ -114,7 +114,7 @@ private func tasks(_ plan: [String: DownloadPlan.Decision], album: String) -> [S
     // MARK: the power, the tasks asked for, the runs kept
 
     @Test func chargingIsChargingOrFullNothingElse() {
-        #expect(PowerState.allCases.filter(\.charging) == [.charging, .full])
+        #expect(PowerState.allCases.filter(\.charging) == [.charging, .full, .pluggedIn])
         #expect(DownloadWait.charging.rawValue == "charging" && DownloadWait(rawValue: "charging") == .charging)
         #expect(DownloadWait.charging.isTheSettings && !DownloadWait.charging.isTheNetwork)
     }
@@ -154,25 +154,25 @@ private func tasks(_ plan: [String: DownloadPlan.Decision], album: String) -> [S
 
     @Test func theWordsSayIt() {
         #expect(DownloadWords.wait(.charging, device: .iPhone) == "Waiting for the phone to charge")
-        #expect(DownloadWords.waitSetting(.charging, limit: .gb20) == "Only while charging is on - in Settings > Downloads.")
+        #expect(DownloadWords.waitSetting(.charging, limit: .gb20, device: .iPhone) == "Only while charging is on - in Settings > Downloads.")
         #expect(AutoDownloadWords.onlyWhileCharging == "Only while charging")
         #expect(AutoDownloadWords.chargingNote(.yours, device: .iPhone)
                 == "Your library's albums download only while the phone is charging. Albums you download yourself don't wait.")
         #expect(AutoDownloadWords.chargingNote(.store, device: .iPhone).hasPrefix("The collection's albums download"))
         #expect(AutoDownloadWords.everyLine(.iPhone).contains(AutoDownloadWords.chargingNote(.yours, device: .iPhone)))
-        #expect(PowerState.allCases.map(LibraryFollowWords.power)
-                == ["Not known", "Not charging", "Charging", "Full, on the charger"])
+        #expect(PowerState.allCases.map { LibraryFollowWords.power($0, device: .iPhone) }
+                == ["Not known", "Not charging", "Charging", "Full, on the charger", "Plugged in"])
         let now: Int64 = 10 * 3_600_000
         let ran = LibraryBackground.Run(task: LibraryBackground.refreshID, began: now - 2 * 3_600_000, seconds: 4.2,
                                         outcome: .ran(checked: true, read: 3, downloading: 1, charging: true))
-        #expect(LibraryFollowWords.backgroundRun(ran, now: now)
+        #expect(LibraryFollowWords.backgroundRun(ran, now: now, device: .iPhone)
                 == "Refresh \u{00B7} checked, 3 read, 1 album downloading, charging \u{00B7} 4.20 s \u{00B7} 2 h ago")
         let expired = LibraryBackground.Run(task: LibraryBackground.chargingID, began: now, seconds: 30, outcome: .expired)
-        #expect(LibraryFollowWords.backgroundRun(expired, now: now) == "Charger \u{00B7} ended by iOS \u{00B7} 30.00 s \u{00B7} just now")
+        #expect(LibraryFollowWords.backgroundRun(expired, now: now, device: .iPhone) == "Charger \u{00B7} ended by iOS \u{00B7} 30.00 s \u{00B7} just now")
         let off = LibraryBackground.Run(task: LibraryBackground.refreshID, began: now, seconds: 0, outcome: .off)
-        #expect(LibraryFollowWords.backgroundRun(off, now: now).contains("Download your library is off"))
+        #expect(LibraryFollowWords.backgroundRun(off, now: now, device: .iPhone).contains("Download your library is off"))
         let failed = LibraryBackground.Run(task: LibraryBackground.refreshID, began: now, seconds: 1,
                                            outcome: .ran(checked: false, read: 0, downloading: 0, charging: false))
-        #expect(LibraryFollowWords.backgroundRun(failed, now: now).hasPrefix("Refresh \u{00B7} check failed, not charging"))
+        #expect(LibraryFollowWords.backgroundRun(failed, now: now, device: .iPhone).hasPrefix("Refresh \u{00B7} check failed, not charging"))
     }
 }

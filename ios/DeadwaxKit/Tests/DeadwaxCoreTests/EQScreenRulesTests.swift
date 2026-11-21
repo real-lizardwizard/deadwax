@@ -327,9 +327,9 @@ import Testing
                 == "Filtering: 20 filters at 48 kHz, preamp -6.4 dB")
         #expect(EQScreenRules.infoDebug(.crossfading) == "Changing: crossfading to the new curve")
         //? Debug's Sent to this device: EQ after the engine's rows
-        let rows = InfoDebug.engineRows(InfoDebug.Engine(outputRate: 48_000, lastStartSeconds: 0.2, eq: "Off: every sample passed through untouched"))
+        let rows = InfoDebug.engineRows(InfoDebug.Engine(outputRate: 48_000, lastStartSeconds: 0.2, eq: "Off: every sample passed through untouched"), device: .iPhone)
         #expect(rows.map(\.label) == ["Output", "Last start", "EQ"])
-        #expect(InfoDebug.engineRows(InfoDebug.Engine(outputRate: 48_000)).map(\.label) == ["Output"])
+        #expect(InfoDebug.engineRows(InfoDebug.Engine(outputRate: 48_000), device: .iPhone).map(\.label) == ["Output"])
     }
 
     /// The ••• button's name gains ", EQ", always last (3.13).

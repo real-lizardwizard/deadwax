@@ -52,7 +52,7 @@ final class DownloadModel {
         didSet {
             guard onlyWhileCharging != oldValue else { return }
             UserDefaults.standard.set(onlyWhileCharging, forKey: AutoDownload.onlyWhileChargingKey)
-            note("library: only while charging \(onlyWhileCharging ? "on" : "off") (\(LibraryFollowWords.power(power)))")
+            note("library: only while charging \(onlyWhileCharging ? "on" : "off") (\(LibraryFollowWords.power(power, device: Platform.device)))")
             replan()
         }
     }
@@ -97,7 +97,9 @@ final class DownloadModel {
     private(set) var bytesHere: Int64 = 0
     /// Other accounts' downloads on this phone, from this server (6.3).
     private(set) var otherBytes: Int64 = 0
-    /// (slice 3) The phone's power as last read (UIDevice.batteryState, monitoring on) - Only while charging's.
+    /// (slice 3) The phone's power as last read (UIDevice.batteryState, monitoring on) - Only while charging's. (The Mac
+    /// app, slice 5) The Mac's from IOKit: plugged in or on battery, a Mac with no battery always plugged in
+    /// (Platform.power, MacPower.power(source:)).
     private(set) var power: PowerState = .unknown
     /// (slice 3) The last few background runs, newest first (Debug's, check 61) - kept per phone.
     private(set) var backgroundRuns: [LibraryBackground.Run] = []
@@ -140,7 +142,11 @@ final class DownloadModel {
     /// Stores opened for a task's end that isn't the signed-in person's (a background relaunch, someone else signed in).
     @ObservationIgnored private var elsewhere: [String: DownloadStore] = [:]
     /// The task the app made for each song this launch, by song id - an older task's end is not this one's.
-    @ObservationIgnored private var live: [String: Int] = [:]
+    /// (The Mac app, slice 5) While any is out, a download is under way: on the Mac a hidden window doesn't slow it
+    /// (WorkAwake's App Nap activity - the Mac's idle sleep still allowed). Nothing on the iPhone.
+    @ObservationIgnored private var live: [String: Int] = [:] {
+        didSet { WorkAwake.keep(!live.isEmpty, for: .downloads) }
+    }
     /// When each task was made (monotonic): a failure is a try only when deadwax answered since.
     @ObservationIgnored private var madeAt: [String: Double] = [:]
     /// The Download over each task of this launch was made under: a task's resume data is kept only while it is still
@@ -213,7 +219,7 @@ final class DownloadModel {
         stateKept = UserDefaults.standard.bool(forKey: LibraryBackground.readableKey)
         backgroundRuns = LibraryBackground.runs(raw: UserDefaults.standard.data(forKey: LibraryBackground.runsKey))
         UIDevice.current.isBatteryMonitoringEnabled = true
-        power = Self.power(UIDevice.current.batteryState)
+        power = Platform.power()
         DownloadStore.retirePhase0()
         session.connect { [weak self] event in self?.handle(event) }
         reachability.whenChanged { [weak self] in self?.reachabilityChanged() }
@@ -244,6 +250,8 @@ final class DownloadModel {
         observers.append(center.addObserver(forName: UIDevice.batteryStateDidChangeNotification, object: nil, queue: .main) { [weak self] _ in
             MainActor.assumeIsolated { self?.readPower() }
         })
+        // (slice 5) the Mac's power source's changes (IOKit's); nothing on the iPhone, whose notification is above
+        Platform.watchPower { [weak self] in self?.readPower() }
         watchServer()
         serverChanged()
     }
@@ -1041,23 +1049,13 @@ final class DownloadModel {
     // MARK: Only while charging, and the background (Phase 3, slice 3)
 
     /// The phone's power read again: a change plans again - with Only while charging on, an unplug lets the library's
-    /// tasks go (their resume data kept), and charging makes them again.
+    /// tasks go (their resume data kept), and charging makes them again. (Slice 5) The Mac's from IOKit (Platform.power).
     private func readPower() {
-        let now = Self.power(UIDevice.current.batteryState)
+        let now = Platform.power()
         guard now != power else { return }
         power = now
-        if onlyWhileCharging { note("power: \(LibraryFollowWords.power(now))") }
+        if onlyWhileCharging { note("power: \(LibraryFollowWords.power(now, device: Platform.device))") }
         replan()
-    }
-
-    private static func power(_ state: UIDevice.BatteryState) -> PowerState {
-        switch state {
-        case .charging: return .charging
-        case .full: return .full
-        case .unplugged: return .unplugged
-        case .unknown: return .unknown
-        @unknown default: return .unknown
-        }
     }
 
     /// (slice 3's review) Whether this launch read the settings, settled as the launch ends (BackgroundWork.register,
@@ -1122,7 +1120,7 @@ final class DownloadModel {
                                         outcome: outcome)
         backgroundRuns = LibraryBackground.keep(run, in: backgroundRuns)
         UserDefaults.standard.set(LibraryBackground.raw(backgroundRuns), forKey: LibraryBackground.runsKey)
-        note("background: " + LibraryFollowWords.backgroundRun(run, now: began))
+        note("background: " + LibraryFollowWords.backgroundRun(run, now: began, device: Platform.device))
         // asked as it began; again only if what they're for has changed since
         askBackgroundTasks(always: false)
     }

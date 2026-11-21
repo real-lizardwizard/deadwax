@@ -147,7 +147,7 @@ struct RequestsScreen: View {
                 .font(Typeface.headline)
                 .fixedSize(horizontal: false, vertical: true)
             // "tap Get" only to someone who can Get - anyone else's list holds what they join
-            Text(RequestWords.emptyLine(gets: server.access.can(.request)))
+            Text(RequestWords.emptyLine(gets: server.access.can(.request), device: Platform.device))
                 .font(Typeface.callout)
                 .foregroundStyle(Palette.quiet)
                 .fixedSize(horizontal: false, vertical: true)

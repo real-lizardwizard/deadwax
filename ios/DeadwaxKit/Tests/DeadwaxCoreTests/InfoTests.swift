@@ -120,7 +120,7 @@ import Testing
     @Test func debugsSectionsOnThePhone() throws {
         let song = Self.song(rate: 192000, bits: 24)
         let sections = InfoDebug.sections(song: song, level: nil, key: 0, decisions: LevelDecisions(), live: nil,
-                                          engine: InfoDebug.Engine(), album: nil)
+                                          engine: InfoDebug.Engine(), album: nil, device: .iPhone)
         #expect(sections.map(\.title) == ["The file", "Sent to this device", "Fields from Navidrome"])
         #expect(sections.map { $0.rows.map(\.label) } == [["Format"], ["Sent as", "Normalization", "Gapless"],
                                                          ["Song fields", "Only on other songs", "Album fields"]])
@@ -130,7 +130,7 @@ import Testing
         #expect(all["Gapless"] == ["On"])
         //? a levelled FLAC no answer has come for yet: Debug's own words for that
         let levelled = InfoDebug.sections(song: song, level: .album, key: 0, decisions: LevelDecisions(), live: nil,
-                                          engine: InfoDebug.Engine(), album: nil)
+                                          engine: InfoDebug.Engine(), album: nil, device: .iPhone)
         #expect(Self.table(levelled)["Normalization"] == [LevelWords.notKnownYet])
         #expect(Self.table([InfoSection(title: "", rows: [InfoRow(label: "Format", value: LevelWords.debugFormat(FileFacts(song: Self.song(suffix: nil, contentType: nil, rate: nil, bits: nil, channels: nil))))])])["Format"]
                 == ["Navidrome didn't say"])
@@ -139,7 +139,7 @@ import Testing
     @Test func theEnginesOwnRows() {
         let engine = InfoDebug.Engine(outputRate: 48000, outputName: "AirPods Pro", latency: 0.0214, conversion: "24-bit 192 kHz FLAC file → 48 kHz output",
                                       laneRate: 44100, laneChannels: 2, nodeRate: 48000, converting: true, aheadSeconds: 1.84, lastStartSeconds: 0.306)
-        let rows = InfoDebug.engineRows(engine)
+        let rows = InfoDebug.engineRows(engine, device: .iPhone)
         #expect(rows.map(\.label) == ["Output", "Conversion", "Lane", "Buffered ahead", "Last start"])
         #expect(rows.map(\.value) == ["48 kHz · AirPods Pro · 21 ms latency", "24-bit 192 kHz FLAC file → 48 kHz output",
                                       "44.1 kHz stereo, converted to 48 kHz", "1.8 s", "0.31 s from the tap to sound"])
@@ -147,10 +147,10 @@ import Testing
         #expect(InfoDebug.laneLine(rate: 88200, channels: 1, nodeRate: 48000, converting: true) == "88.2 kHz mono, converted to 48 kHz")
         #expect(InfoDebug.laneLine(rate: 22050, channels: 6, nodeRate: 48000, converting: true) == "22.05 kHz 6 channels, converted to 48 kHz")
         //? what the engine hasn't said is left out, never guessed
-        #expect(InfoDebug.engineRows(InfoDebug.Engine()) == [])
+        #expect(InfoDebug.engineRows(InfoDebug.Engine(), device: .iPhone) == [])
         #expect(InfoDebug.outputLine(rate: nil, name: " ", latency: nil) == nil)
         #expect(InfoDebug.outputLine(rate: 44100, name: nil, latency: nil) == "44.1 kHz")
-        #expect(InfoDebug.engineRows(InfoDebug.Engine(aheadSeconds: .nan, lastStartSeconds: -1)) == [])
+        #expect(InfoDebug.engineRows(InfoDebug.Engine(aheadSeconds: .nan, lastStartSeconds: -1), device: .iPhone) == [])
     }
 
     // ------------------------------------------------------------ About's inputs

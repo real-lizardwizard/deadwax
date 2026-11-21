@@ -408,11 +408,14 @@ public enum RequestWords {
     public static let clearDone = "Clear done"
     public static let nothingYet = "Nothing requested yet"
     /// Requests with nothing in it, for someone who can Get...
-    public static let empty = "Albums you get show here while they download, and once they've arrived - find one in Search and tap Get."
+    /// (The Mac app, slice 5) "click Get" on a Mac.
+    public static func empty(_ device: Device) -> String {
+        "Albums you get show here while they download, and once they've arrived - find one in Search and \(device == .mac ? "click" : "tap") Get."
+    }
     /// ...and for anyone else, who can only join (Requests.tsx REQUESTS_EMPTY_JOIN).
     public static let emptyJoin = getOff
     /// The empty board's line.
-    public static func emptyLine(gets: Bool) -> String { gets ? empty : emptyJoin }
+    public static func emptyLine(gets: Bool, device: Device) -> String { gets ? empty(device) : emptyJoin }
 
     /// Over a failed look - the rows below as the last answer had them.
     public static let unreached = "Can't update your requests right now"
@@ -433,7 +436,8 @@ public enum RequestWords {
     // a Done row that can't open (Requests.tsx)
     public static let notInNavidrome = "Not ready to play yet - it may still be scanning."
     public static let notInStore = "Can't find this album to open it - it may have moved, or isn't matched to a pressing."
-    public static let notLookedUp = "Couldn't open it - tap to try again."
+    /// (Slice 5) "click to try again" on a Mac.
+    public static func notLookedUp(_ device: Device) -> String { "Couldn't open it - \(device == .mac ? "click" : "tap") to try again." }
     public static let cantOpenUnset = "Can't open this album yet - the music server isn't set up."
     public static let cantOpenDown = "Can't open this album right now - the music server can't be reached. Try again in a minute."
     public static let cantOpenOffline = "Can't open this album right now - can't connect to deadwax. Check your connection, then try again."

@@ -185,9 +185,11 @@ final class ServerSettingsModel {
         checkIfNeeded()
     }
 
-    /// The screen stays on while a Re-time run goes and its page is in front - and only then.
+    /// The screen stays on while a Re-time run goes and its page is in front - and only then. (The Mac app, slice 5) And
+    /// on the Mac App Nap is kept off while it runs, its page in front or not (WorkAwake).
     private func screen() {
         ScreenAwake.keep(retime.keepsScreenOn(visible: retimeShown > 0 && active), for: .retime)
+        WorkAwake.keep(retime.running, for: .retime)
     }
 
     private func announce(_ words: String) {

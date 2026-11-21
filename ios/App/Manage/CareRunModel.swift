@@ -164,9 +164,11 @@ final class CareRunModel {
     }
 
     /// The screen stays on while a run goes and its page is in front - and only then (ScreenAwake: with Re-time's, slice
-    /// 8's, the one place the idle timer is set).
+    /// 8's, the one place the idle timer is set). (The Mac app, slice 5) And on the Mac App Nap is kept off while a run
+    /// goes, its page in front or not (WorkAwake).
     private func screen() {
         ScreenAwake.keep(runs.keepsScreenOn(visible: visible), for: .libraryCare)
+        WorkAwake.keep(runs.under != nil, for: .libraryCare)
     }
 
     // MARK: reading

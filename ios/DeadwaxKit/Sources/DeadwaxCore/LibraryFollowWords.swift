@@ -93,20 +93,23 @@ public enum LibraryFollowWords {
     // MARK: slice 3's (Debug)
 
     /// The phone's power, as Only while charging reads it: "Charging", "Full, on the charger", "Not charging",
-    /// "Not known".
-    public static func power(_ state: PowerState) -> String {
+    /// "Not known". (The Mac app, slice 5) The Mac's, read from IOKit (MacPower.power(source:)): "Plugged in" or "On
+    /// battery" - a Mac's battery is said by where its power comes from, not by whether it charges.
+    public static func power(_ state: PowerState, device: Device) -> String {
         switch state {
         case .charging: return "Charging"
         case .full: return "Full, on the charger"
-        case .unplugged: return "Not charging"
+        case .unplugged: return device == .mac ? "On battery" : "Not charging"
         case .unknown: return "Not known"
+        case .pluggedIn: return "Plugged in"
         }
     }
 
     /// A background run: "Refresh · checked, 3 read, 1 album downloading, charging · 4.20 s · 2 h ago" - or "Charger ·
     /// ended by iOS · ...", "Refresh · nothing to ask: Download your library is off · ...", "Refresh · couldn't ask
-    /// deadwax · ...". "No background runs yet" for none.
-    public static func backgroundRun(_ run: LibraryBackground.Run, now: Int64) -> String {
+    /// deadwax · ...". "No background runs yet" for none. (Slice 5) On a Mac: "plugged in" or "on battery", and "ended by
+    /// macOS".
+    public static func backgroundRun(_ run: LibraryBackground.Run, now: Int64, device: Device) -> String {
         let task = run.task == LibraryBackground.chargingID ? "Charger" : "Refresh"
         let what: String
         switch run.outcome {
@@ -114,11 +117,15 @@ public enum LibraryFollowWords {
             var parts = [checked ? "checked" : "check failed"]
             if read > 0 { parts.append("\(count(read)) read") }
             if downloading > 0 { parts.append("\(count(downloading)) album\(downloading == 1 ? "" : "s") downloading") }
-            parts.append(charging ? "charging" : "not charging")
+            if device == .mac {
+                parts.append(charging ? "plugged in" : "on battery")
+            } else {
+                parts.append(charging ? "charging" : "not charging")
+            }
             what = parts.joined(separator: ", ")
         case .off: what = "nothing to ask: Download your library is off"
         case .couldntAsk: what = "couldn't ask deadwax"
-        case .expired: what = "ended by iOS"
+        case .expired: what = device == .mac ? "ended by macOS" : "ended by iOS"
         }
         return "\(task) \u{00B7} \(what) \u{00B7} \(duration(run.seconds)) \u{00B7} \(ago(run.began, now: now))"
     }

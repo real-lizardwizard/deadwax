@@ -335,10 +335,17 @@ def test_the_app_only_carries_out_what_core_decides():
 def test_the_screen_stays_on_only_through_screen_awake():
     # Library care's runs and Re-time each say whether they want it; one place sets the idle timer
     awake = app_file("Manage", "ScreenAwake.swift")
-    assert "UIApplication.shared.isIdleTimerDisabled = !wanted.isEmpty" in awake
+    assert "Platform.keepDisplayOn(!wanted.isEmpty)" in awake
+    # (the Mac app, slice 5) the idle timer is set in Platform.swift's iPhone half alone, as ScreenAwake set it before -
+    # the Mac's display activity in its Mac half - and ScreenAwake is the one caller of either
+    phone = app_file("Shared", "Platform.swift").split("\n#else\n")[1]
+    assert "UIApplication.shared.isIdleTimerDisabled = on" in phone
     for path in APP.rglob("*.swift"):
-        if path.name != "ScreenAwake.swift":
-            assert "isIdleTimerDisabled" not in path.read_text(encoding="utf-8"), path.name
+        text = path.read_text(encoding="utf-8")
+        if path.name != "Platform.swift":
+            assert "isIdleTimerDisabled" not in text, path.name
+        if path.name not in ("ScreenAwake.swift", "Platform.swift"):
+            assert "keepDisplayOn" not in text, path.name
     care = app_file("Manage", "CareRunModel.swift")
     assert "ScreenAwake.keep(runs.keepsScreenOn(visible: visible), for: .libraryCare)" in care
     model = app_file("Manage", "ServerSettingsModel.swift")

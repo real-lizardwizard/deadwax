@@ -2,6 +2,9 @@ import Foundation
 
 /// The phone's power as the app reads it (UIDevice.batteryState, monitoring on) - Only while charging's (Phase 3, slice
 /// 3, phase3-autodownload.md 2.8). Core's own, so the rules have no UIKit.
+///
+/// (The Mac app, slice 5) The Mac's is read from IOKit instead (MacPower.power(source:)): plugged in, or unplugged - on
+/// battery.
 public enum PowerState: String, Sendable, CaseIterable {
     /// Not known: monitoring off, or iOS can't tell. Not charging - Only while charging is literal.
     case unknown
@@ -9,9 +12,12 @@ public enum PowerState: String, Sendable, CaseIterable {
     case charging
     /// On the charger, full.
     case full
+    /// (Slice 5) The Mac's: on the mains, charging or not - IOKit says which source powers it, not whether a battery
+    /// charges - and a Mac with no battery, always. Never read on a phone.
+    case pluggedIn
 
-    /// Charging, or full on the charger: Only while charging lets the library's songs go.
-    public var charging: Bool { self == .charging || self == .full }
+    /// Charging, full on the charger, or (a Mac) plugged in: Only while charging lets the library's songs go.
+    public var charging: Bool { self == .charging || self == .full || self == .pluggedIn }
 }
 
 /// Your library in the background (phase3-autodownload.md 2.9): the two tasks iOS may run with the app suspended, when

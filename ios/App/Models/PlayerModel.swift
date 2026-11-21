@@ -199,6 +199,9 @@ final class PlayerModel {
     @ObservationIgnored private var refusalSaid = false
     @ObservationIgnored private var ticker: Timer?
     @ObservationIgnored private var interrupted = false
+    /// (The Mac app, slice 5) The Mac went to sleep since the listener last played (Play, or a new queue): no
+    /// interruption arms a resume meanwhile (MacPower.interruptionArms). Never set on the iPhone.
+    @ObservationIgnored private var sleptSincePlay = false
     @ObservationIgnored private var artwork: (id: String, image: UIImage)?
     @ObservationIgnored private var coverAsked: String?
     /// The lock screen's cover that last failed, and when: not asked again for `coverAgainSeconds`.
@@ -266,7 +269,7 @@ final class PlayerModel {
         reporter.onCounted = { [weak self] songID, at in self?.history?.counted(songID: songID, at: at) }
         book.onAnswer = { [weak self] album, answer in self?.loudnessAnswers[album] = answer }
         session.onInterruption = { [weak self] began, shouldResume in self?.interruption(began: began, shouldResume: shouldResume) }
-        session.onOldDeviceGone = { [weak self] in self?.pause() }
+        session.onOldDeviceGone = { [weak self] in self?.outputGone(.session) }
         session.onReset = { [weak self] in self?.mediaReset() }
         feed.send = { [weak self] (ask: FeedAsk) -> Void in self?.feedSend(ask) }
         feed.adding = { [weak self] (songs: [Song]) -> Void in self?.shelve(songs) }
@@ -281,6 +284,10 @@ final class PlayerModel {
             seek: { [weak self] seconds in self?.seek(to: seconds) }
         ))
         watchServer()
+        // (the Mac app, slice 5) the Mac's sleep and its default output: paused at sleep, nothing at the wake; paused
+        // when the output in use goes - nothing on the iPhone (Platform)
+        Platform.watchSleep(willSleep: { [weak self] in self?.willSleep() }, woke: { EngineTrace.note(MacPower.wakeNote) })
+        Platform.watchOutputs { [weak self] in self?.outputGone(.coreAudio) }
     }
 
     // MARK: playing
@@ -428,6 +435,7 @@ final class PlayerModel {
             errorLine = nil
         }
         controller.intendsToPlay = true
+        sleptSincePlay = false
         link.resume()
         sayRefusal()
         startTicking()
@@ -695,6 +703,7 @@ final class PlayerModel {
     private func startQueue(cancelsRetry: Bool = true, _ body: (QueueController) -> Void) {
         guard let controller = ensureController(), let link else { return }
         if cancelsRetry { cancelRetry() }
+        sleptSincePlay = false
         let generation = link.generation
         link.beginStart()
         act { body(controller) }
@@ -1167,13 +1176,34 @@ final class PlayerModel {
 
     private func interruption(began: Bool, shouldResume: Bool) {
         if began {
-            // a song waiting its retry was meant to play too: the call ended, it is asked for again
-            interrupted = isPlaying || retrying
+            // a song waiting its retry was meant to play too: the call ended, it is asked for again - (slice 5) never
+            // since a sleep paused it, so the wake starts nothing
+            interrupted = MacPower.interruptionArms(playing: isPlaying, retrying: retrying, sleptSincePlay: sleptSincePlay)
             pause()
         } else if shouldResume, interrupted {
             interrupted = false
             resume()
         }
+    }
+
+    /// The output in use went away - the session's route change (the phone's: AirPods out, headphones unplugged), or
+    /// (the Mac app, slice 5) CoreAudio's default output gone (MacPower.outputGone): paused, as the phone always has, and
+    /// said in the engine log with who said so, so check 440 tells which macOS posts. Both saying it is harmless: the
+    /// engine's pause is nothing while paused.
+    private func outputGone(_ by: MacPower.OutputGoneBy) {
+        EngineTrace.note(MacPower.outputGoneNote(by, playing: isPlaying || retrying))
+        pause()
+    }
+
+    /// (The Mac app, slice 5) The Mac is going to sleep (IOKit's will-sleep - the sleep is allowed once this returns):
+    /// paused if playing or waiting on a retry, the interruption's resume disarmed, and none armed until the listener
+    /// plays again - so the wake starts nothing, and the Mac wakes paused at the same place (MacPower.willSleep).
+    private func willSleep() {
+        let at = MacPower.willSleep(playing: isPlaying, retrying: retrying, interrupted: interrupted)
+        interrupted = at.interrupted
+        sleptSincePlay = at.sleptSincePlay
+        if at.pause { pause() }
+        EngineTrace.note(MacPower.sleepNote(at))
     }
 
     // MARK: the cache, the ticker, the lock screen

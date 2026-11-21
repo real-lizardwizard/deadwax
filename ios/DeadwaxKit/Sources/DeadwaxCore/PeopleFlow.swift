@@ -386,7 +386,7 @@ public struct PeopleFlow: Sendable, Equatable, CustomStringConvertible, CustomDe
     /// asked again, the person's page to leave, and whether the list is read again (always, but after a 401). Nil for an
     /// older ticket.
     public mutating func ended(_ ticket: Int, _ outcome: PeopleOutcome, now: Double, signInOver: Bool,
-                               origin: String) -> PeopleAfter? {
+                               origin: String, device: Device) -> PeopleAfter? {
         guard ticket == writes, let write = writing else { return nil }
         writing = nil
         // nothing writes again until a read begun after this one lands
@@ -395,7 +395,7 @@ public struct PeopleFlow: Sendable, Equatable, CustomStringConvertible, CustomDe
         switch outcome {
         case .done(let done):
             if view == .list { answeredAt = now }
-            said = saidAfter(write, done, origin: origin)
+            said = saidAfter(write, done, origin: origin, device: device)
             switch write {
             case .lock:
                 // Unlock People at once - the list read again says the same
@@ -440,7 +440,7 @@ public struct PeopleFlow: Sendable, Equatable, CustomStringConvertible, CustomDe
         return after
     }
 
-    private func saidAfter(_ write: PeopleWrite, _ done: PeopleDone, origin: String) -> PeopleSaid? {
+    private func saidAfter(_ write: PeopleWrite, _ done: PeopleDone, origin: String, device: Device) -> PeopleSaid? {
         switch (write, done) {
         case (.create(let sent), .made(let user, let warning)):
             return PeopleSaid(place: .add, words: People.madeWords(user.isEmpty ? sent : user, origin: origin),
@@ -455,7 +455,7 @@ public struct PeopleFlow: Sendable, Equatable, CustomStringConvertible, CustomDe
         case (.forget(let user), _):
             return PeopleSaid(place: .list, words: People.forgot(user))
         case (.permissions(let id, let user), _):
-            return PeopleSaid(place: .person(id), words: People.savedWords(user))
+            return PeopleSaid(place: .person(id), words: People.savedWords(user, device: device))
         default:
             // unlocked or locked: the list read again says it
             return nil

@@ -248,7 +248,7 @@ struct DownloadedPlaylistsScreen: View {
             if shelf.isEmpty {
                 VStack(alignment: .leading, spacing: 8) {
                     Text(PlaylistDownloadWords.noneYet)
-                    Text(PlaylistDownloadWords.noneYetHow)
+                    Text(PlaylistDownloadWords.noneYetHow(Platform.device))
                         .font(Typeface.subheadline)
                         .fixedSize(horizontal: false, vertical: true)
                 }

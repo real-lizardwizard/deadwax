@@ -146,7 +146,7 @@ public enum DownloadWords {
         case .connection: return "Waiting for a connection"
         case .deadwax: return "Waiting for deadwax"
         case .signIn: return "Waiting for you to sign in"
-        case .wifi: return "Waiting for Wi-Fi"
+        case .wifi: return device == .mac ? "Waiting for Wi-Fi or Ethernet" : "Waiting for Wi-Fi"
         case .hotspot: return "Waiting - this Wi-Fi is a hotspot"
         case .lowData: return "Waiting - Low Data Mode is on"
         case .room: return "Waiting for room - the storage limit is reached"
@@ -156,10 +156,11 @@ public enum DownloadWords {
     }
 
     /// A wait a setting causes, its second line in the control's menu (3.1): where the setting is - never a way round it.
-    /// (16 Nov) Settings > Downloads, the tab You was.
-    public static func waitSetting(_ reason: DownloadWait, limit: StorageLimit) -> String? {
+    /// (16 Nov) Settings > Downloads, the tab You was. (The Mac app, slice 5) Download over's choice by its name on the
+    /// device (`over`): Wi-Fi or Ethernet only, on a Mac.
+    public static func waitSetting(_ reason: DownloadWait, limit: StorageLimit, device: Device) -> String? {
         switch reason {
-        case .wifi, .hotspot, .lowData: return "Download over is Wi-Fi only - in Settings > Downloads."
+        case .wifi, .hotspot, .lowData: return "Download over is \(over(.wifi, device: device).name) - in Settings > Downloads."
         case .room: return "The storage limit is \(limit.label) - in Settings > Downloads."
         case .charging: return "Only while charging is on - in Settings > Downloads."
         default: return nil
@@ -176,7 +177,7 @@ public enum DownloadWords {
             lines.append("\(downloaded) \u{00B7} \(Bytes.words(bytesHere))")
         case .waiting(let reason, _, _):
             lines.append(wait(reason, device: device))
-            if let setting = waitSetting(reason, limit: limit) { lines.append(setting) }
+            if let setting = waitSetting(reason, limit: limit, device: device) { lines.append(setting) }
         case .failed:
             lines.append(albumLine(album, device: device) ?? "")
             if let firstFailure, !firstFailure.isEmpty { lines.append(firstFailure) }
@@ -348,21 +349,29 @@ public enum DownloadWords {
 
     public static let downloadOver = "Download over"
 
-    /// A choice's name and its note (6.4).
-    public static func over(_ choice: DownloadOver) -> (name: String, note: String) {
-        switch choice {
-        case .wifi: return ("Wi-Fi only", "Downloads use Wi-Fi alone - never mobile data, a hotspot or Low Data Mode.")
-        case .any: return ("Wi-Fi and cellular", "Downloads use mobile data too, whenever there's no Wi-Fi.")
+    /// A choice's name and its note (6.4). (The Mac app, slice 5) A Mac has no mobile data of its own - its metered
+    /// connection is a phone's hotspot - and a cable counts as Wi-Fi (NetworkPath.kind), so its choices say so: Wi-Fi or
+    /// Ethernet only, and Any connection. The setting kept is the same (DownloadOver's raw values).
+    public static func over(_ choice: DownloadOver, device: Device) -> (name: String, note: String) {
+        switch (choice, device) {
+        case (.wifi, .iPhone): return ("Wi-Fi only", "Downloads use Wi-Fi alone - never mobile data, a hotspot or Low Data Mode.")
+        case (.any, .iPhone): return ("Wi-Fi and cellular", "Downloads use mobile data too, whenever there's no Wi-Fi.")
+        case (.wifi, .mac):
+            return ("Wi-Fi or Ethernet only", "Downloads use Wi-Fi or a cable alone - never a hotspot or Low Data Mode.")
+        case (.any, .mac): return ("Any connection", "Downloads use a hotspot too, when this Mac is on one.")
         }
     }
 
-    /// Download over's footer, first line: what's used now - amber while something waits for it (`amber`).
-    public static func overNow(_ path: NetworkPath, setting: DownloadOver) -> String {
+    /// Download over's footer, first line: what's used now - amber while something waits for it (`amber`). (Slice 5) On
+    /// a Mac, Wi-Fi is Wi-Fi or a cable (NetworkPath can't tell the two apart: a cable counts as Wi-Fi), and mobile data
+    /// is a phone's - a hotspot, by USB or Bluetooth - so it's said as a hotspot is.
+    public static func overNow(_ path: NetworkPath, setting: DownloadOver, device: Device) -> String {
         let wifiOnly = setting == .wifi
         switch path.kind {
-        case .wifi: return "On Wi-Fi now."
+        case .wifi: return device == .mac ? "On Wi-Fi or Ethernet now." : "On Wi-Fi now."
+        case .mobileData where device == .mac, .hotspot:
+            return wifiOnly ? "On a hotspot now - downloads wait until you're off it." : "On a hotspot now - downloads use it."
         case .mobileData: return wifiOnly ? "On mobile data now - downloads wait for Wi-Fi." : "On mobile data now - downloads use it."
-        case .hotspot: return wifiOnly ? "On a hotspot now - downloads wait until you're off it." : "On a hotspot now - downloads use it."
         case .lowData: return wifiOnly ? "Low Data Mode is on - downloads wait until it's off." : "Low Data Mode is on - downloads use it."
         case .none: return "No connection now."
         }
@@ -384,10 +393,19 @@ public enum DownloadWords {
         return "\(here) of \(songs(total))"
     }
 
-    /// The Downloading section's footer: all waiting for Wi-Fi.
-    public static let allWaitForWifi = "Downloads wait for Wi-Fi - Download over is set to Wi-Fi only."
-    /// ... after a force quit, until the downloads it names have finished, or a day.
-    public static let forceQuit = "Downloads stopped when deadwax was closed from the app switcher, and carried on when it opened again."
+    /// The Downloading section's footer: all waiting for Wi-Fi (on a Mac, Wi-Fi or Ethernet - slice 5).
+    public static func allWaitForWifi(_ device: Device) -> String {
+        device == .mac
+            ? "Downloads wait for Wi-Fi or Ethernet - Download over is set to Wi-Fi or Ethernet only."
+            : "Downloads wait for Wi-Fi - Download over is set to Wi-Fi only."
+    }
+    /// ... after a force quit, until the downloads it names have finished, or a day. (Slice 5) A Mac has no app
+    /// switcher: what stops its downloads is a force quit (Force Quit… or Activity Monitor's) - ⌘Q is check 443's.
+    public static func forceQuit(_ device: Device) -> String {
+        device == .mac
+            ? "Downloads stopped when deadwax was force quit, and carried on when it opened again."
+            : "Downloads stopped when deadwax was closed from the app switcher, and carried on when it opened again."
+    }
     /// How long the force-quit footer may show, at most.
     public static let forceQuitShownSeconds: Double = 24 * 60 * 60
 
@@ -480,7 +498,7 @@ public enum DownloadWords {
                      downloads, staysAfterSignOut(device), storage, storageLimit, noLimit, nothingYetHeadline, storageFooter,
                      otherAccounts(device), remove, removeOthersTitle, removeOthersMessage(1_200_000_000, device: device),
                      downloadOver, overKept(device),
-                     downloadingHeader, didntDownloadHeader, downloadedHeader, allWaitForWifi, forceQuit, tryAgain,
+                     downloadingHeader, didntDownloadHeader, downloadedHeader, allWaitForWifi(device), forceQuit(device), tryAgain,
                      tryAllAgain, downloadedFooter, removeAll, removeAllTitle,
                      removeAllMessage(songs: 148, bytes: 2_100_000_000, device: device),
                      removedAll, lastFooter(device), storeUnreadable(device), trying, backOnline, showsMore, showingMore,
@@ -491,12 +509,12 @@ public enum DownloadWords {
                      usageSpoken(2_100_000_000, limit: .gb20, free: 41_200_000_000, device: device),
                      usageLine(albums: 12, songs: 148, free: 41_200_000_000, device: device)]
         lines += DownloadWait.allCases.map { wait($0, device: device) }
-        lines += DownloadWait.allCases.compactMap { waitSetting($0, limit: .gb20) }
-        lines += DownloadOver.allCases.flatMap { [over($0).name, over($0).note] }
+        lines += DownloadWait.allCases.compactMap { waitSetting($0, limit: .gb20, device: device) }
+        lines += DownloadOver.allCases.flatMap { [over($0, device: device).name, over($0, device: device).note] }
         for kind in [NetworkPath(satisfied: true, wifi: true), NetworkPath(satisfied: true, cellular: true, expensive: true),
                      NetworkPath(satisfied: true, wifi: true, expensive: true), NetworkPath(satisfied: true, wifi: true, constrained: true),
                      .none] {
-            lines += DownloadOver.allCases.map { overNow(kind, setting: $0) }
+            lines += DownloadOver.allCases.map { overNow(kind, setting: $0, device: device) }
         }
         lines += [Reach.noNetwork, .unreachable].compactMap { banner($0, device: device) }.flatMap { [$0.line, $0.more] }
         lines += CopyCheck.allCases.flatMap { [playsFrom($0, isFLAC: true, device: device), playsFrom($0, isFLAC: false, device: device)] }

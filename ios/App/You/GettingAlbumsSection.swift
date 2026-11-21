@@ -51,7 +51,7 @@ struct GettingAlbumsSection: View {
         let settings = getting.settings
         let live = settings != nil && reachability.online
         Section {
-            choice(GettingWords.modeTitle, GetMode.allCases, chosen: settings?.mode, live: live,
+            choice(GettingWords.modeTitle(Platform.device), GetMode.allCases, chosen: settings?.mode, live: live,
                    name: { (mode: GetMode) -> String in mode.label }) { (mode: GetMode) -> Void in
                 getting.choose(GetChoice(mode: mode))
             }

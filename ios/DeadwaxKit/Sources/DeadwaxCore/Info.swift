@@ -316,8 +316,9 @@ public enum InfoDebug {
         return converting ? "\(Self.rate(rate))\(shape), converted to \(Self.rate(nodeRate))" : "\(Self.rate(rate))\(shape), no conversion"
     }
 
-    /// The phone's own rows, those the engine has something for.
-    public static func engineRows(_ engine: Engine) -> [InfoRow] {
+    /// The phone's own rows, those the engine has something for. (The Mac app, slice 5) A start is from the click on a
+    /// Mac.
+    public static func engineRows(_ engine: Engine, device: Device) -> [InfoRow] {
         var rows: [InfoRow] = []
         if let output = outputLine(rate: engine.outputRate, name: engine.outputName, latency: engine.latency) {
             rows.append(InfoRow(label: "Output", value: output))
@@ -333,7 +334,7 @@ public enum InfoDebug {
             rows.append(InfoRow(label: "Buffered ahead", value: "\(jsFixed(ahead, 1)) s"))
         }
         if let start = engine.lastStartSeconds, start.isFinite, start >= 0 {
-            rows.append(InfoRow(label: "Last start", value: "\(jsFixed(start, 2)) s from the tap to sound"))
+            rows.append(InfoRow(label: "Last start", value: "\(jsFixed(start, 2)) s from the \(device == .mac ? "click" : "tap") to sound"))
         }
         //? after the engine's rows (eq.md 3.1)
         if let eq = engine.eq, !eq.isEmpty {
@@ -346,14 +347,14 @@ public enum InfoDebug {
     /// device - Sent as, Normalization (from what the queue settled for the entry, else what deadwax says now),
     /// Gapless, the engine's rows; Fields from Navidrome, on the album answer as Navidrome sent it.
     public static func sections(song: Song, level: Level?, key: Int, decisions: LevelDecisions, live: AlbumLoudness?,
-                                engine: Engine, album: RawJSON?) -> [InfoSection] {
+                                engine: Engine, album: RawJSON?, device: Device) -> [InfoSection] {
         [
             InfoSection(title: "The file", rows: [InfoRow(label: "Format", value: LevelWords.debugFormat(FileFacts(song: song)))]),
             InfoSection(title: "Sent to this device", rows: [
                 sentAs(song),
                 InfoRow(label: "Normalization", value: LevelWords.debug(song: song, level: level, key: key, decisions: decisions, live: live)),
                 InfoRow(label: "Gapless", value: "On"),
-            ] + engineRows(engine)),
+            ] + engineRows(engine, device: device)),
             fieldsSection(songID: song.id, album: album),
         ]
     }

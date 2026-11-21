@@ -708,7 +708,7 @@ private struct LibraryFollowDebugSection: View {
     @ViewBuilder
     private func backgroundRows() -> some View {
         LabeledContent("Power") {
-            Text(LibraryFollowWords.power(downloads.power)
+            Text(LibraryFollowWords.power(downloads.power, device: Platform.device)
                  + (downloads.onlyWhileCharging ? " \u{00B7} only while charging" : ""))
                 .font(Typeface.footnote)
         }
@@ -726,7 +726,7 @@ private struct LibraryFollowDebugSection: View {
             }
             ForEach(Array(downloads.backgroundRuns.enumerated()), id: \.offset) {
                 (item: (offset: Int, element: LibraryBackground.Run)) in
-                Text(LibraryFollowWords.backgroundRun(item.element, now: now))
+                Text(LibraryFollowWords.backgroundRun(item.element, now: now, device: Platform.device))
                     .font(Typeface.footnote.monospacedDigit())
                     .foregroundStyle(Palette.quiet)
             }
