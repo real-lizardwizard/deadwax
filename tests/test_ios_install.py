@@ -115,6 +115,56 @@ def test_a_paired_iphone_out_of_reach_is_not_found(tmp_path):
     assert helper.devices(write(tmp_path, "near.json", one)) == ["D\tAway iPhone\t?"]
 
 
+def choose_phone(tmp_path: Path, phones: list[str], saved: str, ask: int, answer: str = ""):
+    """install.sh's own "Finding your iPhone" step, run alone: the phones in reach (devicectl's answer, as the helper
+    gives it) and the one used last, with --yes (ask 0) or asked (ask 1, `answer` typed)."""
+    import subprocess
+
+    script = (SCRIPTS / "install.sh").read_text(encoding="utf-8")
+    step = script[script.index('step "Finding your iPhone"'):script.index('step "Installing over the app')]
+    step = step.replace('xcrun devicectl list devices --json-output "$scratch/devices.json" >/dev/null 2>&1 || true\n', "")
+    step = step.replace('helper devices "$scratch/devices.json" "$saved" > "$scratch/phones" || true\n', "")
+    config = tmp_path / "config"
+    config.mkdir(exist_ok=True)
+    (config / "device").write_text(saved + "\n" if saved else "", encoding="utf-8")
+    (tmp_path / "phones").write_text("".join(p + "\n" for p in phones), encoding="utf-8")
+    prelude = (f'say() {{ printf "%s\\n" "$*"; }}\nstep() {{ printf "== %s\\n" "$*"; }}\n'
+               f'stop() {{ printf "Stopped: %s\\n" "$*" >&2; exit 1; }}\n'
+               f'config={config}\nscratch={tmp_path}\nask={ask}\n')
+    ran = subprocess.run(["bash", "-c", prelude + step + '\necho "chose $device $phone"'], input=answer,
+                         capture_output=True, text=True, timeout=20)
+    return ran, (config / "device").read_text(encoding="utf-8").strip()
+
+
+ANOLE = "00008150-001670913605401C\tGreen Anole\t27.2"
+SECOND = "00008150-001A35D83439401C\t*^_\\|~\t27.2"
+
+
+def test_with_yes_the_iphone_asked_for_out_of_reach_stops_rather_than_another(tmp_path):
+    # 23 Nov: the second phone named, only Green Anole in reach - the install went to Green Anole and said it had
+    ran, device = choose_phone(tmp_path, [ANOLE], "*^_\\|~", ask=0)
+    assert ran.returncode == 1
+    assert "*^_\\|~ isn't in reach now, so nothing was installed" in ran.stderr
+    assert "In reach: Green Anole." in ran.stderr
+    assert "chose" not in ran.stdout
+    assert device == "*^_\\|~"                     # the phone asked for stays the one asked for
+    # in reach, it's the one chosen
+    ran, device = choose_phone(tmp_path, [SECOND, ANOLE], "*^_\\|~", ask=0)
+    assert ran.returncode == 0 and "chose 00008150-001A35D83439401C *^_\\|~" in ran.stdout
+    # none named yet (a first run): the one in reach, as before
+    ran, device = choose_phone(tmp_path, [ANOLE], "", ask=0)
+    assert ran.returncode == 0 and "chose 00008150-001670913605401C Green Anole" in ran.stdout and device == "Green Anole"
+
+
+def test_asked_another_iphone_is_used_only_on_a_yes(tmp_path):
+    ran, device = choose_phone(tmp_path, [ANOLE], "*^_\\|~", ask=1, answer="\n")
+    assert ran.returncode == 1 and "Nothing installed: *^_\\|~ isn't in reach." in ran.stderr
+    assert device == "*^_\\|~"
+    ran, device = choose_phone(tmp_path, [ANOLE], "*^_\\|~", ask=1, answer="y\n")
+    assert ran.returncode == 0 and "chose 00008150-001670913605401C Green Anole" in ran.stdout
+    assert device == "Green Anole"
+
+
 def test_no_devices_answer_is_no_phones(tmp_path):
     assert helper.devices(write(tmp_path, "empty.json", {"result": {"devices": []}})) == []
     assert helper.devices(write(tmp_path, "error.json", {"error": {"code": 1}})) == []

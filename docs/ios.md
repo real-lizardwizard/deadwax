@@ -209,10 +209,14 @@ took and the Mac's free space before and after. Xcode doesn't need to be open.
 | option | what it does |
 | --- | --- |
 | `--no-pull` | builds what's checked out, without `git pull` |
-| `--yes` | doesn't ask: uses the first team and iPhone it finds, and builds even if the checks failed |
+| `--yes` | doesn't ask: uses the first team it finds and the iPhone it installed on last (the first it finds the first time), and builds even if the checks failed |
 | `--debug` | builds Debug instead of Release |
 
-It remembers which iPhone it installed on, in `ios/Config/device` (also ignored by git). The build
+It remembers which iPhone it installed on, in `ios/Config/device` (also ignored by git). If that
+iPhone isn't in reach - not unlocked, or not on the same Wi-Fi as the Mac or on its cable - it asks
+before installing on another one, and with `--yes` it stops instead: "… isn't in reach now, so nothing
+was installed", with the iPhones that are. To install on another iPhone, write its name in
+`ios/Config/device`, or run it without `--yes` and say yes. The build
 happens in `~/Library/Caches/deadwax-build`, and the last build's whole log is `last-build.log` there.
 
 ## The Mac app

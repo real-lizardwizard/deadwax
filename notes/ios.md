@@ -15980,3 +15980,22 @@ should be a fraction of the four seconds); whether the watchdog stops. reload() 
 and albums from SQLite at every download event - in memory now, but if a trace still shows it, the next step is reading
 only the rows an event touched.
 
+## install.sh: the iPhone asked for, or none (2026-11-23)
+
+James, 23 Nov: "ethan's saying the app wasn't reinstalled on his phone" - the second phone (`*^_\|~`, Ethan's). On 22 Nov
+it was out of reach, and install.sh, asked for it in ios/Config/device with `--yes`, took the first iPhone in reach -
+Green Anole, 5 seconds, the same build already on it - wrote Green Anole into ios/Config/device and said "Installed …,
+runs until …". The helper puts the saved phone first only when it's in reach; nothing said it wasn't.
+
+Now, with a phone named in ios/Config/device and that phone not in reach: `--yes` stops - "<name> isn't in reach now, so
+nothing was installed. It needs to be unlocked, and on the same Wi-Fi as this Mac or on its cable. In reach: …" - and
+the file keeps the phone asked for; asked, it asks "Install on <other> instead? [y/N]", no by default. With none named
+(a first run) or the named one in reach, as before. Tests: test_ios_install.py runs install.sh's own "Finding your
+iPhone" step alone (its devicectl and helper lines taken out, the phones in reach given) - `--yes` stopping, the named
+phone in reach chosen, a first run's, and the question's no and yes - each failing with the guard taken out. docs/ios.md
+says so under the options.
+
+Not the repo's, the same day: `~/Library/Caches/deadwax-build/build-locked.sh` kept its lock in an old session's
+scratchpad, which a temp clean-up removed - its `mkdir` then failed for want of the parent and every build waited for
+ever ("waiting 1680s for another build ()"). The lock is now beside the script, its parent made first, and a lock with no
+pid older than a minute is taken as nobody's.

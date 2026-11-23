@@ -6,7 +6,8 @@
 #     ~/Developer/deadwax/ios/scripts/install.sh [--no-pull] [--yes] [--debug]
 #
 #   --no-pull   build what is checked out, without `git pull`
-#   --yes       don't ask: use the one team and the one iPhone there are, build even if CI failed
+#   --yes       don't ask: use the one team and the one iPhone there are (only the one in ios/Config/device, when
+#               it names one), build even if CI failed
 #   --debug     build Debug instead of Release (Release is what to use day to day)
 #
 # What it does: pulls; asks GitHub whether ios.yml passed on that commit; builds with xcodebuild
@@ -186,6 +187,17 @@ count="$(grep -c . "$scratch/phones" || true)"
 network' in Xcode > Window > Devices, with both on the same Wi-Fi), unlock it, and run this again."
 device="$(head -1 "$scratch/phones" | cut -f1)"
 phone="$(head -1 "$scratch/phones" | cut -f2)"
+# (23 Nov) the iPhone used last (ios/Config/device) out of reach: never another one without a word. With --yes it stops
+# here - it once put a second phone's install on the first one in reach, and said it had installed - and asked, it asks.
+if [ -n "$saved" ] && [ "$phone" != "$saved" ]; then
+    reach="$(cut -f2 "$scratch/phones" | paste -sd ',' - | sed 's/,/, /g')"
+    [ "$ask" = 1 ] || stop "$saved isn't in reach now, so nothing was installed. It needs to be unlocked, and on the same
+Wi-Fi as this Mac or on its cable. In reach: $reach."
+    if [ "$count" = 1 ]; then
+        read -r -p "$saved isn't in reach now. Install on $phone instead? [y/N] " answer || answer=n
+        case "$answer" in [yY]*) ;; *) stop "Nothing installed: $saved isn't in reach." ;; esac
+    fi
+fi
 if [ "$phone" != "$saved" ] && [ "$count" -gt 1 ] && [ "$ask" = 1 ]; then
     say "Paired iPhones:"
     awk -F'\t' '{printf "  %d. %s (iOS %s)\n", NR, $2, $3}' "$scratch/phones"
