@@ -15975,10 +15975,14 @@ song, settle's one listing with its fallback, the planner's kept reading) - each
 song's URL without its hint, a cover's built in the model, settle's stat per song, the planner reading afresh).
 
 **Verified** on James's Mac: swift test, the unsigned iPhone and Mac builds, check_project.py, the iOS pytests,
-pyflakes. **Not verified yet**: a second trace on the phone after it (the launch's main thread before the first frame
-should be a fraction of the four seconds); whether the watchdog stops. reload() still reads the store's songs, origins
-and albums from SQLite at every download event - in memory now, but if a trace still shows it, the next step is reading
-only the rows an event touched.
+pyflakes. **A second trace on Green Anole after it** (23 Nov, the same template, by its UDID - by name it timed out
+twice "waiting for device to boot"): the main thread busy 516 ms in the launch's first two seconds, against about 4 s
+before (609, 992, 994, 987, 474 samples a second; 353 and 163 now). About 270 ms of that is still DownloadModel - init's
+open and reload (61), settle (67, its one listing and the .part sweep), becameActive's settle (33), plan (24, one free
+space reading) - and reload's SQLite reads (DownloadDatabase.transaction, 36) the largest single part; the next burst,
+at 6-7 s, is SwiftUI drawing the Albums shelf once the album index arrives. **Not verified yet**: whether the watchdog
+stops, which only days of launches can say. If a trace shows reload again, the next step is still reading only the rows
+an event touched.
 
 ## install.sh: the iPhone asked for, or none (2026-11-23)
 
