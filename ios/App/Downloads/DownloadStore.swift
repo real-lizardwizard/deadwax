@@ -77,16 +77,23 @@ final class DownloadStore {
         guard let file = LocalFiles.name(songID: name.songID, suffix: name.suffix) else { return nil }
         return folder(server: name.server, person: name.person)
             .appendingPathComponent("music", isDirectory: true)
-            .appendingPathComponent(file + ".part")
+            .appendingPathComponent(file + ".part", isDirectory: false)
     }
 
-    /// The song's copy, whether or not it is there.
+    /// The song's copy, whether or not it is there. Said to be a file (23 Nov, notes/ios.md "A slow start, and the
+    /// watchdog"): with no hint, Foundation asks the disk whether each name is a folder - an lstat per song, thousands at
+    /// a launch, on the main thread.
     func fileURL(_ record: DownloadRecord) -> URL? {
-        record.fileName.map { music.appendingPathComponent($0) }
+        record.fileName.map { music.appendingPathComponent($0, isDirectory: false) }
     }
 
     func partURL(_ record: DownloadRecord) -> URL? {
-        record.fileName.map { music.appendingPathComponent($0 + ".part") }
+        record.fileName.map { music.appendingPathComponent($0 + ".part", isDirectory: false) }
+    }
+
+    /// A kept cover's file, said to be a file (as fileURL).
+    func coverURL(_ name: String) -> URL {
+        covers.appendingPathComponent(name, isDirectory: false)
     }
 
     /// A cover's file name: its id made safe, the size, and the kind of image it is.
@@ -140,6 +147,19 @@ final class DownloadStore {
             .resourceValues(forKeys: [.volumeAvailableCapacityForImportantUsageKey])
         return values?.volumeAvailableCapacityForImportantUsage
     }
+
+    /// The planner's free space (23 Nov, notes/ios.md "A slow start, and the watchdog"): the volume's "important usage"
+    /// capacity takes the system a while to work out, and the planner asks at every plan - several a second while songs
+    /// land - so a reading is kept for KeptFreeSpace.keptFor, less what was downloaded since (`used`, the bytes here).
+    @MainActor static func plannersFreeSpace(used: Int64) -> Int64? {
+        let now = ProcessInfo.processInfo.systemUptime
+        if let answer = keptFreeSpace?.estimate(now: now, used: used) { return answer }
+        let bytes = freeSpace()
+        keptFreeSpace = bytes.map { KeptFreeSpace(bytes: $0, at: now, used: used) }
+        return bytes
+    }
+
+    @MainActor private static var keptFreeSpace: KeptFreeSpace?
 
     /// Everything downloaded deleted - the songs, the albums, their covers - keeping the plays and the queue save
     /// waiting to be sent (they are the person's, not the downloads'). `emptied` is told once the database is (slice 3's

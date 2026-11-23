@@ -15933,3 +15933,50 @@ No check on the Mac yet: 439-446 are James's.
 - **444**: IOKit's answers on a MacBook, on battery and plugged in (and "AC Power", or nothing, on a Mac with no
   battery).
 - **446**: the hotspot's waiting words, on the iPhone's hotspot over Wi-Fi.
+
+## A slow start, and the watchdog (2026-11-23)
+
+James, 23 Nov: "the ios app takes quite a while to start and sometimes crashed" - a blank or plain screen before
+anything is drawn.
+
+**The crashes.** Green Anole held six of deadwax's crash reports (16-23 Nov, copied with `devicectl device copy from
+--domain-type systemCrashLogs`). All six are iOS's watchdog, 0x8BADF00D, never a fault in the app's code: four "scene-update
+watchdog transgression" (the app didn't answer a scene update - coming to the front - within its 10 or 30 seconds) and
+two "Failed to terminate gracefully after 5.0s" (iOS ending it in the background). Each main thread was caught in
+SwiftUI or UIKit layout, which says only that the main thread was busy, not with what.
+
+**What kept it busy** - a Time Profiler trace of a launch on Green Anole (`xctrace record --template 'Time Profiler'
+--launch -- net.lizardlounge.deadwax`, with James's yes): the main thread fully busy for about four seconds before the
+first frame, 2,600 of its samples in `lstat`, 270 in getattrlist, 320 in the xattr calls:
+
+- `DownloadModel.reload()` (2,750 samples): `store.fileURL(record)` for every downloaded song was
+  `music.appendingPathComponent(name)`, and with no directory hint Foundation asks the disk whether the name is a
+  folder - an lstat per song, thousands of them. reload() runs at launch, after every update, and again at every
+  download event (DownloadSession.tell → handle), so with downloads under way the main thread was seldom free: the
+  watchdog's scene updates.
+- `settle()` (860): each time the app comes to the front, `DownloadStore.length(url)` - attributesOfItem, so a stat and
+  the xattr calls - for every done song, to find files gone.
+- `plan()`'s `DownloadStore.freeSpace()` (200): the volume's "important usage" capacity, which takes the system a while,
+  read at every plan.
+
+**The fix** (no change to what the downloads do):
+- A song's, a part's and a cover's URL say they're files (`appendingPathComponent(_:isDirectory: false)`, and
+  `DownloadStore.coverURL` for every cover's) - building one asks the disk nothing.
+- settle() reads the music folder once (`contentsOfDirectory(atPath:)`) and a done song whose name the listing lacks is
+  missing, as a missing file was. A folder that can't be read - or a name with a "/" in it, which LocalFiles.name never
+  makes - asks the file itself, as before, so a failed listing never reads as every song gone. The .part sweep and the
+  unnamed files read the same listing (they listed it again after).
+- The planner's free space is kept for 30 seconds on the uptime clock, less what was downloaded since and plus what was
+  removed (Core's `KeptFreeSpace`); then read again. The Downloads screen's own reading is as it was.
+
+**Tests**: KeptFreeSpaceTests (Core, 3: half a minute, what landed and went, another clock's reading and overflow);
+tests/test_ios_downloads_launch.py (4, reading the Swift: the URLs said to be files, reload asking the disk nothing per
+song, settle's one listing with its fallback, the planner's kept reading) - each seen failing on a fault of its own (the
+song's URL without its hint, a cover's built in the model, settle's stat per song, the planner reading afresh).
+
+**Verified** on James's Mac: swift test, the unsigned iPhone and Mac builds, check_project.py, the iOS pytests,
+pyflakes. **Not verified yet**: a second trace on the phone after it (the launch's main thread before the first frame
+should be a fraction of the four seconds); whether the watchdog stops. reload() still reads the store's songs, origins
+and albums from SQLite at every download event - in memory now, but if a trace still shows it, the next step is reading
+only the rows an event touched.
+

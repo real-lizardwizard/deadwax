@@ -987,17 +987,23 @@ final class DownloadModel {
         }
         if !orphans.isEmpty { _ = await session.cancel(orphans, resume: false) }
         let first = launchedFor.insert("\(opened.server)|\(opened.person)").inserted
+        // (23 Nov, notes/ios.md "A slow start, and the watchdog") the music folder read once, and a done song missing
+        // from it is missing - not a stat of every song's file on the main thread each time the app comes to the front.
+        // A folder that can't be read asks each file, as before.
+        let listed = try? FileManager.default.contentsOfDirectory(atPath: opened.music.path)
+        let present = listed.map(Set.init)
         update(Array(records.keys)) { record in
             var r = record
             if r.state == .fetching, self.live[r.id] == nil { r = DownloadRules.apply(.cancelled(resume: nil), to: r) }
-            if r.state == .done, let url = opened.fileURL(r), DownloadStore.length(url) == nil {
+            if r.state == .done, let name = r.fileName, let url = opened.fileURL(r),
+               present.flatMap({ name.contains("/") ? nil : !$0.contains(name) }) ?? (DownloadStore.length(url) == nil) {
                 r = DownloadRules.apply(.fileMissing, to: r)
             }
             if first { r = DownloadRules.apply(.launched, to: r) }
             return r
         }
         // a .part is a file between its move and its check: one left now was never checked
-        let parts = (try? FileManager.default.contentsOfDirectory(at: opened.music, includingPropertiesForKeys: nil)) ?? []
+        let parts = (listed ?? []).map { opened.music.appendingPathComponent($0, isDirectory: false) }
         for part in parts where part.pathExtension == "part" {
             let id = part.deletingPathExtension().deletingPathExtension().lastPathComponent
             if records[id]?.state != .fetching { try? FileManager.default.removeItem(at: part) }
@@ -1384,7 +1390,7 @@ final class DownloadModel {
             let left = Set(rows.map(\.albumID))
             for kept in (try? store.database.albums()) ?? [] where !left.contains(kept.id) {
                 if let cover = kept.cover {
-                    try? FileManager.default.removeItem(at: store.covers.appendingPathComponent(cover))
+                    try? FileManager.default.removeItem(at: store.coverURL(cover))
                 }
                 try? store.database.deleteAlbum(kept.id)
             }
@@ -1452,7 +1458,7 @@ final class DownloadModel {
         let idle = await readStalls()
         guard self.store === store else { return }
         let asked = records.values.filter { $0.state == .wanted || $0.state == .fetching }
-        let freeSpace = DownloadStore.freeSpace() ?? Int64.max / 4
+        let freeSpace = DownloadStore.plannersFreeSpace(used: bytesHere) ?? Int64.max / 4
         // your library (Phase 3): the store's songs as its rules read them, its albums' places in the fill's order -
         // and what of it the library could give back, the one number the fill and the planner both count
         let library = follower.on ? follower.ordered : []
@@ -1865,7 +1871,7 @@ final class DownloadModel {
                     let data = try await client.cover(coverID: cover, size: DownloadStore.coverSize)
                     guard self.store === store else { return }
                     let name = DownloadStore.coverName(cover, data: data)
-                    let url = store.covers.appendingPathComponent(name)
+                    let url = store.coverURL(name)
                     try data.write(to: url, options: .atomic)
                     DownloadStore.protect(url)
                     try store.database.setCover(album: albumID, file: name)
@@ -1998,7 +2004,7 @@ final class DownloadModel {
             coverBytes[answer.id] = length
             guard let album = albums[answer.id] ?? (try? JSONDecoder().decode(Album.self, from: answer.json)) else { continue }
             keptAlbums[answer.id] = album
-            if let cover = album.coverArt, let file = answer.cover { covers[cover] = store.covers.appendingPathComponent(file) }
+            if let cover = album.coverArt, let file = answer.cover { covers[cover] = store.coverURL(file) }
         }
         if keptAlbums != albums { albums = keptAlbums }
         keptCoverBytes = coverBytes
@@ -2016,7 +2022,7 @@ final class DownloadModel {
     /// A kept cover's length, read from disk once.
     private func coverLength(_ file: String, in store: DownloadStore) -> Int64 {
         if let known = coverLengths[file] { return known }
-        let length = DownloadStore.length(store.covers.appendingPathComponent(file)) ?? 0
+        let length = DownloadStore.length(store.coverURL(file)) ?? 0
         if length > 0 { coverLengths[file] = length }
         return length
     }
