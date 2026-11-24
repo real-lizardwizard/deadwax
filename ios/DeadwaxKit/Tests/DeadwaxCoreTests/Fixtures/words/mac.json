@@ -405,6 +405,7 @@
   "EQScreenRules.output(speaker, route)" : "speaker | Mac speakers | hifispeaker | builtInSpeaker",
   "EQScreenRules.output(speaker)" : "speaker | Mac speakers | hifispeaker | builtInSpeaker",
   "EQSettings.newOutput(speaker)" : "speaker | Mac speakers | Mac speakers | builtInSpeaker",
+  "EQWords.Export.items" : "save: Save the Whole Curve… | save: Save the Correction Alone… || share: Share the Whole Curve | share: Share the Correction Alone",
   "EQWords.Import.channels(C, 12-20)" : "Lines 12-20 are for the centre channel (C), which deadwax doesn't play on a Mac.",
   "EQWords.Import.channels(none, 4)" : "Line 4 is for no channel: the Channel line before it names none.",
   "EQWords.Import.channels(RL RR, 4)" : "Line 4 is for the rear channels (RL, RR), which deadwax doesn't play on a Mac.",

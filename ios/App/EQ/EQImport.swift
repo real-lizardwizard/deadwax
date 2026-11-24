@@ -1,3 +1,4 @@
+import CoreTransferable
 import DeadwaxCore
 import Foundation
 import SwiftUI
@@ -67,6 +68,23 @@ enum EQImportReading {
         let inbox = documents.appendingPathComponent("Inbox", isDirectory: true).resolvingSymlinksInPath().path
         let folder = url.deletingLastPathComponent().resolvingSymlinksInPath().path
         if folder == inbox { try? FileManager.default.removeItem(at: url) }
+    }
+}
+
+/// (The Mac app, slice 6 - notes/ios.md "The Mac app, slice 6: EQ files") A plain-text file dropped on deadwax's window
+/// or its EQ sheet (Platform's `eqFileDrop`, the Mac's): read the way a file opened with deadwax is - EQImportReading.file,
+/// For the output now - inside the import, while what the system handed over is still there. It asks to read the file
+/// where it is (no copy of a big one is made, and the read stops past 256 KB); where the system makes a copy instead,
+/// the copy is its own to remove. Only read: the file dropped stays where it was, unchanged - EQImportReading deletes
+/// nothing outside the container's own Documents/Inbox.
+struct EQDroppedFile: Transferable, Sendable {
+    let item: EQImportItem
+
+    static var transferRepresentation: some TransferRepresentation {
+        FileRepresentation(importedContentType: .plainText, shouldAttemptToOpenInPlace: true) {
+            (received: ReceivedTransferredFile) async throws -> EQDroppedFile in
+            EQDroppedFile(item: EQImportReading.file(received.file, forKey: nil))
+        }
     }
 }
 

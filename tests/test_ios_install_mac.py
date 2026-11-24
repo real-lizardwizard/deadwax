@@ -41,8 +41,10 @@ helper = load("install_helper")
 project = load("check_project")
 
 GOOD_ENTITLEMENTS = {"com.apple.security.app-sandbox": True, "com.apple.security.network.client": True,
-                     "com.apple.security.files.user-selected.read-only": True,
+                     "com.apple.security.files.user-selected.read-write": True,
                      "com.apple.security.get-task-allow": True}
+#? (slice 6) what install-mac.sh says is missing without the read-write one: the EQ's Open panel and its Save panel
+NO_FILES = "no reading a file chosen in the Open panel and writing one saved in the Save panel"
 
 
 # ----------------------------------------------------------------------------- a Mac of stand-ins
@@ -309,7 +311,7 @@ def test_an_install_builds_checks_copies_and_opens(tmp_path):
     assert sorted(p.name for p in (home / "Applications").iterdir()) == ["deadwax.app"], "nothing left beside it"
     assert (home / "Library" / "Caches" / "deadwax-build-mac" / "last-build.log").is_file()
     out = ran.stdout
-    assert "Signed, sandboxed, allowed out to the network and to read a file you choose; net.lizardlounge.deadwax." in out
+    assert "Signed, sandboxed, allowed out to the network and to open and save a file you choose; net.lizardlounge.deadwax." in out
     assert "Installed deadwax 0.13 (13) in ~/Applications - it doesn't run out" in out
     assert re.search(r"Built in \d+ min \d+ s\.", out) and re.search(r"Took \d+ min \d+ s\. Space: .* before, .* now\.", out)
     # nothing asked of deadwax but whether it's open
@@ -365,10 +367,11 @@ def test_a_build_that_isnt_right_isnt_installed(tmp_path, fake, words):
 @pytest.mark.parametrize("entitlements, words", [
     ({"com.apple.security.network.client": True}, "no App Sandbox"),
     ({"com.apple.security.app-sandbox": True}, "no outgoing network connections"),
-    ({key: value for key, value in GOOD_ENTITLEMENTS.items() if "user-selected" not in key},
-     "no reading a file chosen in the Open panel"),
+    ({key: value for key, value in GOOD_ENTITLEMENTS.items() if "user-selected" not in key}, NO_FILES),
+    #? (slice 6) read-only alone isn't enough: the Save panel's file couldn't be written
     (dict({key: value for key, value in GOOD_ENTITLEMENTS.items() if "user-selected" not in key},
-          **{"com.apple.security.files.user-selected.read-write": True}), "no reading a file chosen in the Open panel"),
+          **{"com.apple.security.files.user-selected.read-only": True}), NO_FILES),
+    (dict(GOOD_ENTITLEMENTS, **{"com.apple.security.files.user-selected.read-write": False}), NO_FILES),
     (dict(GOOD_ENTITLEMENTS, **{"keychain-access-groups": ["X.net.lizardlounge.deadwax"]}), "need a provisioning profile"),
 ])
 def test_the_entitlements_it_was_signed_with_are_checked(tmp_path, entitlements, words):
@@ -504,8 +507,8 @@ def test_the_helper_reads_the_entitlements(tmp_path):
     path.write_bytes(plistlib.dumps({}))
     assert helper.entitlements(str(path)) == ("no App Sandbox (com.apple.security.app-sandbox); no outgoing network "
                                               "connections (com.apple.security.network.client); no reading a file "
-                                              "chosen in the Open panel (com.apple.security.files.user-selected."
-                                              "read-only)")
+                                              "chosen in the Open panel and writing one saved in the Save panel "
+                                              "(com.apple.security.files.user-selected.read-write)")
     path.write_bytes(plistlib.dumps(dict(GOOD_ENTITLEMENTS, **{"com.apple.security.application-groups": ["g"]})))
     assert "provisioning profile" in helper.entitlements(str(path))
     path.write_bytes(plistlib.dumps(dict(GOOD_ENTITLEMENTS, **{"com.apple.security.app-sandbox": False})))
@@ -621,8 +624,11 @@ def test_the_mac_plist_cant_drift_from_the_phones(config):
      "ENABLE_OUTGOING_NETWORK_CONNECTIONS[sdk=macosx*] is None"),
     ("INFOPLIST_FILE[sdk=macosx*] = Config/Info-Mac.plist", "INFOPLIST_FILE[sdk=macosx*] = Config/Info.plist",
      "INFOPLIST_FILE[sdk=macosx*] is 'Config/Info.plist'"),
-    ("ENABLE_USER_SELECTED_FILES[sdk=macosx*] = readonly", "ENABLE_USER_SELECTED_FILES[sdk=macosx*] = readwrite",
-     "ENABLE_USER_SELECTED_FILES[sdk=macosx*] is 'readwrite', not 'readonly'"),
+    #? (slice 6) read and write: the EQ's Save panel writes - read only is refused, as is none
+    ("ENABLE_USER_SELECTED_FILES[sdk=macosx*] = readwrite", "ENABLE_USER_SELECTED_FILES[sdk=macosx*] = readonly",
+     "ENABLE_USER_SELECTED_FILES[sdk=macosx*] is 'readonly', not 'readwrite'"),
+    ("ENABLE_USER_SELECTED_FILES[sdk=macosx*] = readwrite\n", "",
+     "ENABLE_USER_SELECTED_FILES[sdk=macosx*] is None"),
     ("SUPPORTS_MACCATALYST = YES\n", "SUPPORTS_MACCATALYST = YES\nCODE_SIGN_ENTITLEMENTS[sdk=iphoneos*] = x.plist\n",
      "a conditional setting the Mac app's rules don't name"),
     ("SUPPORTS_MACCATALYST = YES\n", "SUPPORTS_MACCATALYST = YES\nMACOSX_DEPLOYMENT_TARGET[sdk=macosx*] = 15.0\n",

@@ -53,10 +53,9 @@ ALLOWED = {
 
 #? what the app shares (ShareLink's item), the same way: each a file or words made on the phone, none an address
 SHARED = {
-    ("EQ/EQExport.swift", "EQExportFile(setting: setting, settings: settings, whole: true, rate: rate)"):
-        "the EQ's Export... - The Whole Curve, a file made on the phone",
-    ("EQ/EQExport.swift", "EQExportFile(setting: setting, settings: settings, whole: false, rate: rate)"):
-        "the EQ's Export... - The Correction Alone",
+    ("EQ/EQExport.swift", "file(item.whole)"):
+        "the EQ's Export... - The Whole Curve or The Correction Alone (on a Mac Share the Whole Curve or Share the "
+        "Correction Alone), a file made on the device",
     ("You/DebugView.swift", "url"): "Debug's recording of the turntable's sound, a file saved on the phone",
     ("You/DebugView.swift", "shown.text"): "Debug's engine log, as text",
 }
@@ -601,13 +600,11 @@ def test_the_matcher_passes_what_isnt_a_way_out():
     people = ("if !state.on, let guide = URL(string: People.sharingDoc) {\n"
               "    Link(People.sharing, destination: guide)\n}")
     assert refusals("Manage/PeopleScreen.swift", people) == []
-    # the four allowed shares, the same way
+    # the three allowed shares, the same way
     assert refusals("You/DebugView.swift", "if case .saved = status, let url {\n ShareLink(item: url) { Text(action) }\n}"
                     "\nShareLink(item: shown.text, preview: SharePreview(\"deadwax engine log\")) { }") == []
-    for whole in ("true", "false"):
-        export = (f"ShareLink(item: EQExportFile(setting: setting, settings: settings, whole: {whole}, rate: rate),\n"
-                  "          preview: SharePreview(name)) { Text(words) }")
-        assert refusals("EQ/EQExport.swift", export) == []
+    export = "ShareLink(item: file(item.whole), preview: SharePreview(name)) {\n    Text(item.words)\n}"
+    assert refusals("EQ/EQExport.swift", export) == []
     # DownloadModel's application, and the placeholder ALLOWED_WORDS keeps
     assert refusals(DOWNLOAD_MODEL, "let application = UIApplication.shared\n"
                                     "if application.applicationState == .background { }") == []

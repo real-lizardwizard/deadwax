@@ -138,12 +138,14 @@ def plist(path: str, key: str) -> str:
 
 
 # What the Mac app must be signed with (the Mac app, slice 1 - notes/ios.md): the App Sandbox, the outgoing network and
-# a file the person chooses read (the EQ's Import from Files…), all made from build settings (ENABLE_APP_SANDBOX,
-# ENABLE_OUTGOING_NETWORK_CONNECTIONS, ENABLE_USER_SELECTED_FILES in Base.xcconfig), which need no provisioning profile
-# - and no keychain access groups, which would.
+# a file the person chooses read - and (slice 6) one they save written: the EQ's Open panel and its Save panel. All
+# made from build settings (ENABLE_APP_SANDBOX, ENABLE_OUTGOING_NETWORK_CONNECTIONS, ENABLE_USER_SELECTED_FILES in
+# Base.xcconfig), which need no provisioning profile - and no keychain access groups, which would. Read-only alone
+# isn't enough since slice 6: the Save panel couldn't write.
 MAC_ENTITLEMENTS = {"com.apple.security.app-sandbox": "App Sandbox",
                     "com.apple.security.network.client": "outgoing network connections",
-                    "com.apple.security.files.user-selected.read-only": "reading a file chosen in the Open panel"}
+                    "com.apple.security.files.user-selected.read-write":
+                        "reading a file chosen in the Open panel and writing one saved in the Save panel"}
 
 
 def entitlements(path: str) -> str:

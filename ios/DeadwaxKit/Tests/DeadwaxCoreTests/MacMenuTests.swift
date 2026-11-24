@@ -108,7 +108,9 @@ import Testing
                          .goToCurrentSong: "\u{2318}L",
                          // (slice 3) the View menu's frame
                          .sidebar: "\u{2303}\u{2318}S", .upNext: "\u{2325}\u{2318}U", .lyrics: "\u{2325}\u{2318}L",
-                         .info: "\u{2318}I"])
+                         .info: "\u{2318}I",
+                         // (slice 6) File's
+                         .importEQFile: "\u{2318}O"])
         // no two items share a key
         let keys = MacMenu.Command.allCases.compactMap(MacMenu.key)
         for (i, key) in keys.enumerated() {
@@ -279,5 +281,38 @@ import Testing
         for command in MacMenu.Command.panels + [.sidebar] {
             #expect(!MacMenu.yieldsToTyping(command), "\(command)")
         }
+    }
+
+    // MARK: (slice 6) File's Import EQ File…
+
+    @Test func importEQFileOpensThePanelFromThePages() {
+        let item = MacMenu.item(.importEQFile, Self.playing)
+        #expect(item.words == "Import EQ File\u{2026}" && item.words == MacMenu.Words.importEQFile)
+        #expect(item.shortcut == MacMenu.Shortcut(.character("o"), .command) && item.shortcut?.said == "\u{2318}O")
+        #expect(item.enabled && !item.ticked)
+        // the music doesn't matter to it: nothing queued, paused, a library's shuffle, Repeat one
+        for state in [MacMenu.State(), MacMenu.State(queued: true), MacMenu.State(queued: true, paged: .yours, repeatMode: .one)] {
+            #expect(MacMenu.item(.importEQFile, state).enabled, "\(state)")
+        }
+        // never over the sign-in (the tabs not drawn), and never over a sheet - as Settings… and Find
+        #expect(!MacMenu.item(.importEQFile, MacMenu.State(tabs: false)).enabled)
+        var sheet = Self.playing
+        sheet.sheet = true
+        #expect(!MacMenu.item(.importEQFile, sheet).enabled)
+        #expect(MacMenu.item(.importEQFile, sheet).shortcut == MacMenu.key(.importEQFile), "its key stays drawn")
+        for state in [MacMenu.State(tabs: false), sheet, Self.playing, MacMenu.State()] {
+            #expect(MacMenu.item(.importEQFile, state).enabled == MacMenu.item(.settings, state).enabled, "\(state)")
+            #expect(MacMenu.item(.importEQFile, state).enabled == MacMenu.item(.find, state).enabled, "\(state)")
+        }
+        // a text field with the cursor keeps its key: ⌘O types nothing
+        var typing = Self.playing
+        typing.typing = true
+        #expect(!MacMenu.yieldsToTyping(.importEQFile))
+        #expect(MacMenu.item(.importEQFile, typing).shortcut?.said == "\u{2318}O" && MacMenu.item(.importEQFile, typing).enabled)
+        // a page whose Refresh is on its way, a panel open, the sidebar hidden: still there
+        let busy = MacMenu.State(queued: true, playing: true, refresh: .running, sidebarShown: false, panel: .lyrics)
+        #expect(MacMenu.item(.importEQFile, busy).enabled)
+        // no Controls or View item: it's File's alone
+        #expect(!(MacMenu.controls(Self.playing) + MacMenu.view(Self.playing)).flatMap { $0 }.contains { $0.command == .importEQFile })
     }
 }

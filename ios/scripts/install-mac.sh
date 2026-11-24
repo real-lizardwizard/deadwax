@@ -16,7 +16,7 @@
 #
 # What it does: pulls; asks GitHub whether ios.yml passed on that commit; builds Release for this Mac (arm64) with
 # xcodebuild, signed with your team and no provisioning profile, so the install never runs out; checks what it made
-# (signed, sandboxed, allowed out to the network and to read a file you choose, the right bundle id, no profile);
+# (signed, sandboxed, allowed out to the network and to open and save a file you choose, the right bundle id, no profile);
 # quits deadwax if it's open - asking first (unless --quit), never by force; copies the new app to ~/Applications/deadwax.app
 # (never /Applications), keeping the old one until the new one is in place; and opens it. Its sign-in, settings,
 # downloads and EQ are in its container (~/Library/Containers/net.lizardlounge.deadwax), so every install keeps them.
@@ -206,7 +206,7 @@ $(cat "$scratch/verify")"
     made="$(helper plist "$app/Contents/Info.plist" CFBundleIdentifier)"
     [ "$made" = "$BUNDLE_ID" ] || stop "The new app's bundle id is '$made', not $BUNDLE_ID - it would be another,
 empty app. Base.xcconfig's PRODUCT_BUNDLE_IDENTIFIER and DERIVE_MACCATALYST_PRODUCT_BUNDLE_IDENTIFIER say why."
-    say "Signed, sandboxed, allowed out to the network and to read a file you choose; $made."
+    say "Signed, sandboxed, allowed out to the network and to open and save a file you choose; $made."
     if [ -e "$app/Contents/embedded.provisionprofile" ]; then
         # The Mac app is signed with no profile so that it never runs out (James, 17 Nov): one Xcode made after all
         # would be the 7-day app that was decided against, so it isn't installed unless asked for by name.

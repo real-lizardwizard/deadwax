@@ -6,7 +6,8 @@ import UIKit
 /// the window"): deadwax > Settings… (⌘,), Edit > Find (⌘F), View > Refresh (⌘R) and the Controls menu - Play/Pause
 /// (Space), Next (⌘→), Previous (⌘←), Forward and Back 10 Seconds (⌥⌘→, ⌥⌘←), Shuffle, Repeat's three and Go to Current
 /// Song (⌘L) - and (slice 3, the desktop frame) View's Show/Hide Sidebar (⌃⌘S), Up Next (⌥⌘U), Lyrics (⌥⌘L) and Info
-/// (⌘I), the three side panels ticked while theirs shows. Drawn from Core's MacMenu and nothing else: each item's words, key, dimming and tick are MacMenu's, read
+/// (⌘I), the three side panels ticked while theirs shows - and (slice 6, EQ files) File's Import EQ File… (⌘O), the Open
+/// panel, at the top of File where New Window was. Drawn from Core's MacMenu and nothing else: each item's words, key, dimming and tick are MacMenu's, read
 /// from the player and the window each time the menus are drawn; this only carries the click out, through the very
 /// calls the player's own buttons make. The system's menus stay - About, Hide, Quit (⌘Q), Undo to Select All, Close
 /// Window (⌘W), Enter Full Screen, the Window menu; File > New Window and Help go (Platform's `macWindow`), and Format
@@ -39,6 +40,10 @@ struct MacCommands: Commands {
         let state = self.state
         CommandGroup(replacing: .appSettings) {
             item(.settings, state)
+        }
+        // (slice 6) File's first item, where New Window was (emptied by Platform's macWindow): the Open panel, for an EQ file
+        CommandGroup(after: .newItem) {
+            item(.importEQFile, state)
         }
         // Edit's Find, in place of the system's Find, Spelling and Substitutions - there is no document to find in
         CommandGroup(replacing: .textEditing) {
@@ -143,6 +148,8 @@ struct MacCommands: Commands {
             navigation.macSidebarShown.toggle()
         case .upNext, .lyrics, .info:
             if let panel = command.panel { navigation.togglePanel(panel) }
+        case .importEQFile:
+            navigation.openEQFile()
         }
     }
 

@@ -283,6 +283,50 @@ import Testing
         #expect(!alone.contains("Tone:") && alone.contains("Preamp: -6.0 dB\n"))
     }
 
+    /// (The Mac app, slice 6) Export…'s items on each device: the iPhone's exactly as they were - two shares, one section;
+    /// the Mac's the Save panel's two, then a share of each, every item saying which it does. The correction alone needs
+    /// a correction on both.
+    @Test func exportsItemsOnEachDevice() throws {
+        typealias Item = W.Export.Item
+        #expect(W.Export.items(.iPhone) == [[Item(way: .share, whole: true, words: "The Whole Curve"),
+                                             Item(way: .share, whole: false, words: "The Correction Alone")]])
+        #expect(W.Export.items(.iPhone).flatMap { $0 }.map(\.words) == [W.Export.whole, W.Export.alone], "the phone's own words")
+        #expect(W.Export.items(.mac) == [
+            [Item(way: .save, whole: true, words: "Save the Whole Curve\u{2026}"),
+             Item(way: .save, whole: false, words: "Save the Correction Alone\u{2026}")],
+            [Item(way: .share, whole: true, words: "Share the Whole Curve"),
+             Item(way: .share, whole: false, words: "Share the Correction Alone")]])
+        for device in Device.allCases {
+            let items = W.Export.items(device).flatMap { $0 }
+            // each curve once for each way the device has, the whole curve first
+            for way in Set(items.map(\.way)) {
+                #expect(items.filter { $0.way == way }.map(\.whole) == [true, false], "\(device) \(way)")
+            }
+            for item in items {
+                #expect(item.enabled(hasCorrection: true))
+                #expect(item.enabled(hasCorrection: false) == item.whole, "\(device): \(item.words)")
+            }
+        }
+        #expect(!W.Export.items(.iPhone).flatMap { $0 }.contains { $0.way == .save }, "the phone has no Save panel")
+        //? what the Mac saves is the very file the phone shares - and it reads back on the Mac as it does on the phone
+        guard case .success(let reading) = APOReader.read(try Fixtures.data("eq/autoeq/results/crinacle/711 in-ear/Apple AirPods Pro/Apple AirPods Pro ParametricEQ.txt"), device: .mac) else {
+            Issue.record("refused")
+            return
+        }
+        let correction = EQCorrection.autoeq(id: "x", name: "Apple AirPods Pro", source: "crinacle", rig: "711", form: "in-ear",
+                                             text: "", reading: reading)
+        let output = Self.output(on: true, correction: correction, tone: .preset("bassBoost"))
+        for whole in [true, false] {
+            let text = APOWriter.export(output, in: Self.settings, whole: whole, day: "2026-11-23")
+            guard case .success(let mac) = APOReader.read(Data(text.utf8), device: .mac),
+                  case .success(let phone) = APOReader.read(Data(text.utf8), device: .iPhone) else {
+                Issue.record("an export refused")
+                return
+            }
+            #expect(mac.filters == phone.filters && mac.preamp.all == phone.preamp.all && mac.notes.isEmpty, "\(whole)")
+        }
+    }
+
     @Test func outputsAndVoiceOver() {
         let o = W.Outputs.self
         #expect(o.speaker(.iPhone) == "iPhone speaker" && o.headphones == "Headphones" && o.others == "Other outputs")

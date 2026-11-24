@@ -723,6 +723,45 @@ extension EQWords {
         public static let menu = "Export…"
         public static let whole = "The Whole Curve"
         public static let alone = "The Correction Alone"
+        /// (The Mac app, slice 6) The Mac's Save panel's two: each saved where you choose - an ellipsis, as the Mac writes
+        /// an item that opens a panel.
+        public static let saveWhole = "Save the Whole Curve\u{2026}"
+        public static let saveAlone = "Save the Correction Alone\u{2026}"
+        /// (The Mac app, slice 6) The Mac's share of each (its Share menu: AirDrop, Mail), beside the Save panel's.
+        public static let shareWhole = "Share the Whole Curve"
+        public static let shareAlone = "Share the Correction Alone"
+
+        /// (The Mac app, slice 6 - notes/ios.md "The Mac app, slice 6: EQ files") One of Export…'s items: how it hands
+        /// the file out, and which curve.
+        public struct Item: Sendable, Equatable {
+            public enum Way: String, Sendable {
+                /// the Save panel (the Mac's): the file written where the person saves it
+                case save
+                /// the share sheet, or on a Mac its Share menu: Files, AirDrop, Mail
+                case share
+            }
+
+            public let way: Way
+            /// The whole curve; false, the correction alone.
+            public let whole: Bool
+            public let words: String
+
+            /// The correction alone needs a correction; the whole curve is always there.
+            public func enabled(hasCorrection: Bool) -> Bool { whole || hasCorrection }
+        }
+
+        /// Export…'s items as each device draws them, its sections in order. The iPhone's as they always were: the share
+        /// sheet's The Whole Curve and The Correction Alone, one section. The Mac's: the Save panel's two, then a share of
+        /// each - every item saying which it does, so a click never leaves you guessing whether it saves or shares.
+        public static func items(_ device: Device) -> [[Item]] {
+            switch device {
+            case .iPhone:
+                return [[Item(way: .share, whole: true, words: whole), Item(way: .share, whole: false, words: alone)]]
+            case .mac:
+                return [[Item(way: .save, whole: true, words: saveWhole), Item(way: .save, whole: false, words: saveAlone)],
+                        [Item(way: .share, whole: true, words: shareWhole), Item(way: .share, whole: false, words: shareAlone)]]
+            }
+        }
 
         /// `<output name> EQ.txt`, the name with `/` and `:` taken out.
         public static func fileName(_ output: String) -> String {

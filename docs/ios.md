@@ -75,9 +75,10 @@ and what only a phone can tell is what [the checks](#the-checks) are for. Until 
 everything about downloads, lyrics, the EQ, the turntable, play history, your library, playlists, artists,
 songs, Search, Requests, Get and Manage below as what the app is built to do.
 
-**On a Mac too.** Still app 0.13, the same app runs on a Mac with Apple silicon - in a phone-shaped window for now -
-installed with `ios/scripts/install-mac.sh` and never running out. It hasn't been seen on a Mac yet either: see [The
-Mac app](#the-mac-app).
+**On a Mac too.** Still app 0.13, the same app runs on a Mac with Apple silicon - a sidebar, a player bar and side
+panels in a window that resizes freely, with the Mac's menus and keys - installed with `ios/scripts/install-mac.sh`
+and never running out. It has run on a Mac since 17 Nov; what is still to check there is in [The Mac
+app](#the-mac-app).
 
 The app talks only to deadwax, never to Navidrome, through deadwax's own routes, so the phone never
 needs the Navidrome account deadwax itself uses. With logins on, you sign in with your own Navidrome
@@ -224,16 +225,19 @@ happens in `~/Library/Caches/deadwax-build`, and the last build's whole log is `
 The same app runs on a Mac too, built from the same code through Apple's Mac Catalyst - not the web app in a window,
 and not a second app. It's the same version as the phone's (app 0.13 (13) now), it talks only to deadwax as the phone
 does, and it plays through the same audio engine: seamless joins, normalization, the EQ, downloads. **This is its
-fifth build** - the first ran and played (the Mac app's slice 1), the second added the Mac's menus, keyboard shortcuts
+sixth build** - the first ran and played (the Mac app's slice 1), the second added the Mac's menus, keyboard shortcuts
 and right-click menus, and a window you can close while the music plays (slice 2), the third laid the window out as the
 web app's desktop is laid out - a sidebar, the page, side panels and a player bar (slice 3), the fourth gave it the
-Mac's own words - **This Mac** where the phone says This phone (slice 4); this one pauses for sleep and for headphones
+Mac's own words - **This Mac** where the phone says This phone (slice 4), the fifth pauses for sleep and for headphones
 taken out, reads a Mac's power for Only while charging, keeps a long run's display on, keeps work going with the
-window hidden, and says the Mac's words for Download over (slice 5). **Little of it has been seen on a Mac yet** - the
-first build installed, opened and was allowed onto the local network (17 Nov), and no more: what only a Mac can tell is
-what its checks are for ([404-415](#the-mac-apps-checks-404-415),
+window hidden, and says the Mac's words for Download over (slice 5); this one brings EQ files in and out the Mac's way -
+**File > Import EQ File…** ⌘O, Export…'s Save panel, Finder's Open With and a file dropped on the window or the Dock
+(slice 6). **Most of it is still unchecked on a Mac** - it
+has been opened and used on one since the first build (17 Nov), but what only a Mac can tell is what its checks are
+for ([404-415](#the-mac-apps-checks-404-415),
 [416-423](#the-mac-apps-menus-keys-and-window-checks-416-423), [424-433](#the-mac-apps-desktop-frame-checks-424-433),
-[434-438](#the-mac-apps-words-checks-434-438) and [439-446](#the-mac-apps-sleep-power-and-downloads-checks-439-446)).
+[434-438](#the-mac-apps-words-checks-434-438), [439-446](#the-mac-apps-sleep-power-and-downloads-checks-439-446)
+and [447-451](#the-mac-apps-eq-files-checks-447-451)).
 
 **What it is today.** The window is laid out as the web app's desktop is, whatever its size: the **sidebar** at the
 left, the **page** you're on beside it, **Up Next, Lyrics or Info** in a panel at the right when you open one, and the
@@ -297,7 +301,7 @@ and adds deadwax's:
 | menu | what deadwax adds |
 | --- | --- |
 | **deadwax** | About deadwax, **Settings…** ⌘, (the Settings tab), Hide deadwax ⌘H, Quit deadwax ⌘Q |
-| **File** | Close Window ⌘W - and no New Window: there is only ever one window |
+| **File** | **Import EQ File…** ⌘O: the Mac's Open panel, for an EQ setting's `.txt` (see EQ files below); Close Window ⌘W - and no New Window: there is only ever one window |
 | **Edit** | **Find** ⌘F: the cursor in the sidebar's search field, the sidebar shown if it was hidden |
 | **View** | **Show Sidebar** or **Hide Sidebar** ⌃⌘S; **Up Next** ⌥⌘U, **Lyrics** ⌥⌘L, **Info** ⌘I - each opens its panel, or closes it, ticked while it shows; **Refresh** ⌘R: the page you're on, asked again (see below) |
 | **Controls** | **Play** or **Pause** (Space), **Next** ⌘→, **Previous** ⌘←, **Forward 10 Seconds** ⌥⌘→, **Back 10 Seconds** ⌥⌘←, **Shuffle**, **Repeat** (Repeat off, Repeat all, Repeat one - the one that's on is ticked), **Go to Current Song** ⌘L (the album of the song playing) |
@@ -309,8 +313,8 @@ shuffling all music** for all of deadwax's), ticked and dimmed, as Now Playing's
 Repeat submenu's three items are the words Up Next says to VoiceOver as Repeat changes: Repeat off, Repeat all, Repeat
 one. Up Next and Info are dimmed with nothing queued (unless open: then they close it), and Lyrics too, and for a song
 known to have none. **While a sheet is up** (Edit album, Add to a playlist, the EQ, a cover full size - any of them)
-Settings…, Find, Refresh, Go to Current Song, the sidebar and the panels are dimmed: they'd act on the window under the
-sheet. **While a text field has the
+Settings…, Import EQ File…, Find, Refresh, Go to Current Song, the sidebar and the panels are dimmed: they'd act on the
+window under the sheet - and all of them until you're signed in. **While a text field has the
 cursor** - Search, Find in the Library, a name - Space types a space and ⌘→ and ⌘← move along the line: they don't
 play, pause or skip then (their menu items still do). Forward and Back stay within the song. There's no volume of deadwax's own: the Mac's
 volume keys and menu bar volume work, as for any app.
@@ -348,9 +352,25 @@ The rest of the differences:
 - **No turntable**: there's no Now Playing on the Mac to show it, and Settings > Playback hasn't Now Playing opens as
   or Pause winds the record down. The turntable stays the phone's.
 - **Your sign-in** is kept in a file rather than the Keychain - see [Where the Mac keeps your sign-in](#where-the-mac-keeps-your-sign-in).
-- **The EQ's Import…** (the phone's Import from Files…) opens the Mac's Open panel: deadwax may read the file you
-  choose there, and nothing else outside its own folder. **Export…** shares the file through the Mac's Share menu
-  rather than the phone's sheet.
+- **EQ files.** An Equalizer APO setting - a `.txt` from AutoEq, say - comes in five
+  ways, each to the preview the phone's Import from Files… shows, For the output playing now (from an EQ page's
+  Import… or Paste, that page's output, as on the phone), over whatever page or sheet is up:
+  - **File > Import EQ File…** ⌘O, from any page: the Mac's Open panel, for one plain-text file.
+  - The EQ page's **Import…** (the phone's Import from Files…): the same Open panel.
+  - **Finder's Open With**: right-click a `.txt` > Open With > deadwax. deadwax is offered for a text file but never
+    made the Mac's default for one - a double-click still opens TextEdit. It comes to deadwax's one window, never a
+    second, and with the window closed, that window comes back for it.
+  - **Dropped**: drag a `.txt` onto deadwax's window - or onto the EQ's sheet, a window of its own - or onto deadwax's
+    icon in the Dock.
+  - **Paste**, the EQ page's button, as on the phone: copy the setting's text anywhere, then click Paste. There's no ⌘V
+    for it - Edit > Paste is the text fields'.
+
+  The file stays where it was, unchanged: deadwax only reads it. deadwax may read a file you choose, open with it or
+  drop, and write one you save, and nothing else outside its own folder. **Export…** has four items on the Mac:
+  **Save the Whole Curve…** and **Save the Correction Alone…** open the Mac's Save panel, the file named
+  `<output name> EQ.txt` as the phone's share names it, and write it where you save it; then **Share the Whole Curve**
+  and **Share the Correction Alone** hand it to the Mac's Share menu - AirDrop, Mail. The correction alone needs a
+  correction, as on the phone (dimmed otherwise). A file saved or shared imports again.
 - **The Mac's Now Playing** - in Control Center and the menu bar - shows the song, its artist and cover, and whether
   it's playing or paused; its buttons, the keyboard's media keys (F7, F8, F9) and AirPods' presses play, pause and
   skip, as the lock screen's do on the phone.
@@ -398,7 +418,8 @@ The rest of the differences:
 - **Still the phone's words**: in Debug (an admin's), some of the audio engine's rarer errors, which say "phone" or
   "iOS".
 
-Still to come, in a build of its own: File > Import EQ File… ⌘O.
+Still to come, in a build of its own: Edit album and Manage's pages made for a Mac's window, and their keys - Tab
+between fields, ⌘S for Server settings' Save changes, ⌘C in the event log.
 
 ### What the Mac needs
 
@@ -418,7 +439,7 @@ Still to come, in a build of its own: File > Import EQ File… ⌘O.
 
 It pulls the latest code, asks GitHub whether the app's checks passed on it (they build the Mac app too) and asks
 you before building one that failed or is still running, then builds the Mac app (Release, for Apple silicon) and
-checks what it made: signed, in the App Sandbox, allowed out to the network and to read a file you choose, with the
+checks what it made: signed, in the App Sandbox, allowed out to the network and to open and save a file you choose, with the
 app's id, and with no provisioning profile in it - one Xcode added after all would make the app stop opening when it
 ran out, so install-mac.sh stops there and installs nothing, saying how to be rid of it (`--allow-profile` installs
 it anyway). If deadwax is open, it asks "deadwax is open - quit it to install the new one? (If it's playing, the music
@@ -5679,7 +5700,8 @@ home Wi-Fi, signed in as an admin with logins on. Install with `ios/scripts/inst
 - **404 Install.** First `ios/scripts/install-mac.sh --dry-run`: it says what it would do and does none of it. Then
   `ios/scripts/install-mac.sh`. It says Xcode's version and the free space, "Signing with team …, with no
   provisioning profile", builds (a few minutes the first time - note how long it says), then "Signed, sandboxed,
-  allowed out to the network and to read a file you choose; net.lizardlounge.deadwax." and opens deadwax from
+  allowed out to the network and to open and save a file you choose; net.lizardlounge.deadwax." (before the sixth
+  build: "to read a file you choose") and opens deadwax from
   ~/Applications. Does it stop instead with "Not installed: Xcode signed this build with a provisioning profile…"? If
   so, say what it names, and don't use `--allow-profile`. Does macOS ask anything before deadwax opens - and if so,
   what exactly? *Seen on 17 Nov (slice 1's build, installed for you): it built in 2 min 45 s and opened from
@@ -5896,6 +5918,32 @@ and "output gone:" lines say what macOS told deadwax.
   before you opened it? (macOS's to decide; either answer is fine - it is written up.)
 - **446 A hotspot.** On the iPhone's hotspot with Download over Wi-Fi only: downloads wait, and say why.
 
+### The Mac app's EQ files checks (447-451)
+
+**Not done yet.** These come with [the Mac app](#the-mac-app)'s sixth build - EQ files (still app 0.13 (13)). No server
+change is needed, and nothing on the phone changes. As for 404-446: deadwax's plain `http://` address, the home Wi-Fi,
+signed in as an admin with logins on, installed with `ios/scripts/install-mac.sh` - whose check now says "allowed out
+to the network and to open and save a file you choose". Have a `.txt` from AutoEq in the Mac's Downloads folder and
+something playing, so For names an output. **If deadwax quits as it opens, say so before anything else**: macOS throws
+out an app whose menus have one key twice, and only a Mac can say whether its File menu has a ⌘O of its own. Say
+"pass", or what you saw.
+
+- **447 Import.** File > Import EQ File… (⌘O): the Mac's Open panel; a `.txt` from AutoEq; its preview; For an output.
+  With Edit album up, is Import EQ File… dimmed? Then the EQ page's own **Import…**, both in the EQ sheet (the bar's
+  ••• > EQ) and on Settings > Playback > EQ: does each still open the Open panel? With the page's own Open panel (or
+  Export's Save panel) up on Settings > Playback > EQ, press ⌘O, then cancel that panel: does a second panel come up
+  by itself? And does ⌘O open the panel again afterwards?
+- **448 Export.** Export a preset: the Save panel; the file is where you saved it, and imports again. (Export… > Save
+  the Whole Curve…: the panel names it `<output name> EQ.txt`; then Import EQ File… that file.) Save from the EQ sheet
+  and from Settings > Playback > EQ: does the panel open from both? Does Share the Whole Curve offer AirDrop and Mail?
+- **449 Open With.** In Finder, right-click a `.txt` > Open With > deadwax: its preview. The file is still where it was,
+  unchanged. Again with deadwax's window closed (⌘W, the music playing): the window comes back with the preview, and
+  the Window menu lists one deadwax window, not two. Does a double-click on the `.txt` still open TextEdit?
+- **450 Dropped.** Drag a `.txt` onto deadwax's window, and onto its Dock icon: the same preview. And onto the EQ's
+  sheet with it up. One from the Desktop or iCloud Drive too: its preview, or "deadwax couldn't read this file."?
+- **451 Paste.** Copy an EQ's text in a browser; Paste on an EQ page: its preview. Is the Paste button there on the
+  Mac's EQ page, and does macOS ask before deadwax reads what you copied?
+
 ## What it can't do yet
 
 These are the web app's for now - open deadwax's address in a browser for them, since nothing in the app takes you
@@ -5989,8 +6037,9 @@ there. Looking after deadwax isn't among them any more: every managing tool is t
 | The Mac app: **"Couldn't reach deadwax at ..."** on the address screen | On macOS 15 or later, if you said no to "find devices on your local network", turn deadwax on in the Mac's System Settings > Privacy & Security > Local Network, then quit deadwax and open it again (macOS 14 has no such switch). Otherwise the same as on the phone: the address, and that the Mac is on your home network or WireGuard. |
 | The Mac app: macOS says deadwax **can't be opened**, or that it **can't check it for malicious software** | Open System Settings > Privacy & Security, and under the message about deadwax choose **Open Anyway**. An app built and signed on your own Mac isn't expected to be stopped - say so if it is. |
 | The Mac app asks you to sign in **every time it opens** | Its sign-in can't be kept in its folder (see [Where the Mac keeps your sign-in](#where-the-mac-keeps-your-sign-in)). Check the Mac's disk isn't full; then, with deadwax quit, delete `~/Library/Containers/net.lizardlounge.deadwax/Data/Library/Application Support/deadwax/sessions` and sign in again - it's made afresh. If macOS asks whether "Terminal" would like to access data from other apps, **Allow** is right: it's deadwax's own folder. |
-| The Mac app: the EQ's **Import…** says **"deadwax couldn't read this file."** for a `.txt` you can open in TextEdit | The Mac app is meant to be allowed to read the file you choose in the Open panel - say so, with any words under it. Meanwhile **Paste** brings it in: open the file in TextEdit, Select All, Copy, and Paste on the EQ page. |
-| The Mac app: closing its window **stopped the music** | In this build, closing deadwax's window quits it. Keep the window open, or minimised (⌘M), while you listen. |
+| The Mac app: **Import EQ File…**, the EQ's **Import…**, Open With or a file dropped says **"deadwax couldn't read this file."** for a `.txt` you can open in TextEdit | The Mac app is meant to be allowed to read the file you choose in the Open panel, open with it or drop - say so, with any words under it. Meanwhile **Paste** brings it in: open the file in TextEdit, Select All, Copy, and Paste on the EQ page. |
+| The Mac app: Export…'s **Save the Whole Curve…** (or the Correction Alone) puts no file where you saved it | The Mac app is meant to be allowed to write the file you save in the Save panel - say so. Meanwhile **Share the Whole Curve** hands the same file to AirDrop or Mail. |
+| The Mac app: closing its window **stopped the music** | Closing the window is meant to leave the music playing (check 421) - say so, and whether it happens every time. Meanwhile keep the window open, or minimised (⌘M), while you listen. |
 | install-mac.sh: **"There's no ios/Config/Local.xcconfig"** or **"has no team id in it"** | Run `ios/scripts/install.sh` once - it offers to write the file from the teams Xcode knows - or copy `Local.xcconfig.example` beside it and put your team id in it (step 4 of [Once](#once)). |
 | install-mac.sh: **"Only … free. A build of the Mac app needs about 4 GB free"** | Free some space - emptying the Trash, or deleting `~/Library/Caches/deadwax-build-mac`, which only makes the next build start afresh - and run it again. |
 | install-mac.sh: **the build failed** with a signing or certificate error | Xcode has no Apple Development certificate for your team yet: Xcode > Settings > Accounts, select your Apple ID, **Manage Certificates…**, **+** > **Apple Development**. Then run it again. The whole log is `~/Library/Caches/deadwax-build-mac/last-build.log`. |

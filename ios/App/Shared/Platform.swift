@@ -21,6 +21,10 @@ import UIKit
 /// IOKit's and CoreAudio's, the Mac's alone, so their imports are inside the switch too - and its ProcessInfo
 /// activities: the display kept on over a care run, App Nap kept off over work. On the iPhone: the idle timer and
 /// UIDevice's battery exactly as before, and nothing else.
+///
+/// (Slice 6, notes/ios.md "The Mac app, slice 6: EQ files") And the Mac's ways in and out for an EQ file: File > Import
+/// EQ File…'s Open panel, a file dropped on the window, Export…'s Save panel - and a file opened with deadwax brought to
+/// the one window. On the iPhone none of them: its ways are Import from Files…, Paste, the share sheet, as before.
 enum Platform {
     /// The device this build is, for Core.
     static var device: Device { mac ? .mac : .iPhone }
@@ -37,6 +41,7 @@ enum Platform {
 import CoreAudio
 import IOKit.ps
 import IOKit.pwr_mgt
+import UniformTypeIdentifiers
 
 extension Platform {
     /// The Mac's build.
@@ -321,10 +326,54 @@ private enum MacPowerSource {
     }
 }
 
+// MARK: (slice 6) EQ files
+
+extension View {
+    /// (Slice 6) File > Import EQ File… (⌘O): the Mac's Open panel while `shown`, a plain-text file, one - `chosen` takes
+    /// it the way a file opened with deadwax comes (RootView's `shared`: EQImportReading.file, then the preview over
+    /// what's up). Cancelled, or refused, nothing.
+    func eqOpenPanel(_ shown: Binding<Bool>, chosen: @escaping (URL) -> Void) -> some View {
+        fileImporter(isPresented: shown, allowedContentTypes: [.plainText], allowsMultipleSelection: false) {
+            (result: Result<[URL], any Error>) -> Void in
+            guard case .success(let urls) = result, let url = urls.first else { return }
+            chosen(url)
+        }
+    }
+
+    /// (Slice 6) A plain-text file dropped here - the window, the EQ sheet: read as a file opened with deadwax is
+    /// (EQDroppedFile: EQImportReading.file, For the output now), the first of several, then `dropped` (AppNavigation's
+    /// `share`). Nothing else is taken: a drop of anything but plain text isn't this one's.
+    func eqFileDrop(_ dropped: @escaping (EQImportItem) -> Void) -> some View {
+        dropDestination(for: EQDroppedFile.self) { (files: [EQDroppedFile], _: CGPoint) -> Bool in
+            guard let file = files.first else { return false }
+            dropped(file.item)
+            return true
+        }
+    }
+
+    /// (Slice 6) Export…'s Save items (EQExportMenu): the Mac's Save panel for `file` while it is set - a plain-text
+    /// file, named as the share names it (`<output name> EQ.txt`), written where the person saves it. Saved or
+    /// cancelled, `file` is let go.
+    func eqSavePanel(_ file: Binding<EQExportFile?>) -> some View {
+        fileExporter(isPresented: Binding<Bool>(get: { file.wrappedValue != nil }, set: { (up: Bool) -> Void in
+            if !up { file.wrappedValue = nil }
+        }), item: file.wrappedValue, contentTypes: [.plainText],
+        defaultFilename: file.wrappedValue.map { (each: EQExportFile) -> String in
+            EQWords.Export.fileName(each.setting.shownName)
+        }) { (_: Result<URL, any Error>) -> Void in
+            file.wrappedValue = nil
+        } onCancellation: {
+            file.wrappedValue = nil
+        }
+    }
+}
+
 extension Scene {
     /// The Mac's window: opening at the desktop frame's size (slice 3), and the menus without File > New Window (one
     /// window: never a second copy of the app's pages) or Help (there is no Mac help book) - and (slice 2) deadwax's
-    /// own: Settings…, Find, Refresh and Controls (MacCommands).
+    /// own: Settings…, Find, Refresh and Controls (MacCommands). (Slice 6) Every file or link opened with deadwax is this
+    /// window's: with it open, RootView's `oneWindow()` takes it there; with it closed (the music playing on), this one
+    /// window opens for it - never a second.
     func macWindow(_ menus: MacCommands) -> some Scene {
         defaultSize(width: Platform.Window.opening.width, height: Platform.Window.opening.height)
             .commands {
@@ -332,6 +381,7 @@ extension Scene {
                 CommandGroup(replacing: .help) {}
                 menus
             }
+            .handlesExternalEvents(matching: ["*"])
     }
 }
 
@@ -415,7 +465,9 @@ extension View {
         background(MainWindowMarker().accessibilityHidden(true))
     }
 
-    /// (Slice 2) The one window: a file opened, or a link, comes to the window that's open rather than a second one.
+    /// (Slice 2) The one window: a file opened, or a link, comes to the window that's open rather than a second one -
+    /// (slice 6) Finder's Open With, a file dropped on the Dock's icon. Its other half is macWindow's
+    /// `handlesExternalEvents(matching:)`, which opens this one window for it when none is open.
     func oneWindow() -> some View {
         handlesExternalEvents(preferring: ["*"], allowing: ["*"])
     }
@@ -504,6 +556,25 @@ extension Platform {
 
     /// The Mac's alone: beginBackgroundTask stays as it is.
     @MainActor static func keepWorking(_ work: Work, _ on: Bool) {}
+}
+
+// (slice 6) EQ files
+
+extension View {
+    /// The Mac's alone: the phone has no File menu - its EQ page's Import from Files… is its way in, as before.
+    func eqOpenPanel(_ shown: Binding<Bool>, chosen: @escaping (URL) -> Void) -> some View {
+        self
+    }
+
+    /// The Mac's alone: nothing is dropped on the phone's screen - its ways in are as before.
+    func eqFileDrop(_ dropped: @escaping (EQImportItem) -> Void) -> some View {
+        self
+    }
+
+    /// The Mac's alone: the phone's Export… shares, as before.
+    func eqSavePanel(_ file: Binding<EQExportFile?>) -> some View {
+        self
+    }
 }
 
 extension Scene {

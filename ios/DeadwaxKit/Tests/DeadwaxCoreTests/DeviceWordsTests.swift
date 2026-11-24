@@ -236,6 +236,10 @@ enum DeviceWords {
         add("EQScreenRules.line(unitNotMade)", EQScreenRules.line(on: true, identity: false, preamp: .automatic, played: 0, top: 0,
                                                                   unitNotMade: true, device: device).text)
         add("EQWords.Outputs.speaker", EQWords.Outputs.speaker(device))
+        // (slice 6) Export…'s menu: its sections (" || ") and items, each with how it hands the file out
+        add("EQWords.Export.items", EQWords.Export.items(device).map { (section: [EQWords.Export.Item]) -> String in
+            section.map { "\($0.way.rawValue): \($0.words)" }.joined(separator: " | ")
+        }.joined(separator: " || "))
         add("EQOutputs.speaker", Self.output(EQOutputs.speaker(device)))
         for port in EQPort.allCases {
             let p = EQRoutePort(port: port, portType: "Type", name: "James's AirPods Pro", uid: "u-1")
@@ -476,6 +480,8 @@ enum DeviceWords {
             "LibraryFollowWords.power(unplugged)", "LibraryFollowWords.backgroundRun(charging)",
             "LibraryFollowWords.backgroundRun(notCharging)", "LibraryFollowWords.backgroundRun(expired)",
             "People.savedWords",
+            // slice 6's (notes/ios.md "The Mac app, slice 6: EQ files"): Export…'s Save panel beside its share
+            "EQWords.Export.items",
         ]
         // a line of the downloads' everyLine (the banned-words checks' list) is no word of its own: one that differs
         // repeats a named word - or one part of one, a banner's line - on both devices, and is held where that is

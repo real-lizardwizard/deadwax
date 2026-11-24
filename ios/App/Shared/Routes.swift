@@ -297,6 +297,9 @@ final class AppNavigation {
     var eqImportSheet = false
     /// A preview is drawn (EQImportSheetContent says so).
     var eqPreviewUp = false
+    /// (The Mac app, slice 6) File > Import EQ File… (⌘O) asked for the Open panel: RootView shows it (Platform's
+    /// `eqOpenPanel`), and the file chosen there comes the way a shared file does (`share`). Never set on the iPhone.
+    var eqFileChoosing = false
     /// Add to a playlist (Phase 4, slice 2), opened from a page's ••• (QueueMenu): the picker over the tabs, with the
     /// songs in hand. Now Playing opens its own, over itself.
     var playlistPick: PlaylistPickRequest?
@@ -351,6 +354,22 @@ final class AppNavigation {
         guard !eqPreviewUp else { return }
         eqImportPage = nil
         if !nowPlayingShown { eqImportSheet = true }
+    }
+
+    /// (The Mac app, slice 6) File > Import EQ File… (⌘O): the Open panel, over the pages (MacMenu dims it over a sheet
+    /// and the sign-in). (Slice 6's review) Asked again while it still reads as up - a panel that never came, because
+    /// the EQ page's own Open or Save panel or an alert was up, or one SwiftUI hasn't said is gone - it is put down and
+    /// asked again a moment later, so ⌘O never stays dead until a sign-out.
+    func openEQFile() {
+        guard eqFileChoosing else {
+            eqFileChoosing = true
+            return
+        }
+        eqFileChoosing = false
+        Task { @MainActor [weak self] () async -> Void in
+            try? await Task.sleep(for: .milliseconds(100))
+            self?.openEQFile()
+        }
     }
 
     /// An EQ page's own import (Files, Paste): its preview, over that page.
@@ -764,6 +783,7 @@ final class AppNavigation {
         you.removeAll()
         nowPlayingShown = false
         eqImportSheet = false
+        eqFileChoosing = false
         playlistPick = nil
         editingPlaylist = nil
         changingPassword = false

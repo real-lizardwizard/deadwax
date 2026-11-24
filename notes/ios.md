@@ -16003,3 +16003,195 @@ Not the repo's, the same day: `~/Library/Caches/deadwax-build/build-locked.sh` k
 scratchpad, which a temp clean-up removed - its `mkdir` then failed for want of the parent and every build waited for
 ever ("waiting 1680s for another build ()"). The lock is now beside the script, its parent made first, and a lock with no
 pid older than a minute is taken as nobody's.
+
+## The Mac app, slice 6: EQ files (2026-11-23)
+
+The Mac app's plan (~/Desktop/Code/deadwax-plans/mac-app.md), slice 6: File > Import EQ File… ⌘O through the Open
+panel, Export through the Save panel, Finder's Open With and a file dropped on the window or the Dock icon, Paste, and
+the user-selected-files entitlement made read-write. Checks 447-451 (docs/ios.md, all not done yet). Built on `ios`
+from 31c573b. What it leaves alone:
+- src/__init__.py is untouched and the app is still 0.13 (13). There is **no server change**.
+- **ios/Deadwax.xcodeproj is untouched**: no new file - every addition is in a file the project or the package already
+  had (MacMenu.swift and EQWords.swift in Core; Platform.swift, MacCommands.swift, Routes.swift, RootView.swift,
+  EQExport.swift, EQImport.swift, EQRoute.swift in the App).
+- **The engine files have no diff**, nor does anything of DeadwaxAudio's.
+- **No word an iPhone shows changes.** iphone.json gained one key, `EQWords.Export.items`, written from 31c573b's
+  menu: the iPhone's Export… is the two shares it was, The Whole Curve and The Correction Alone.
+- The one switch stays one: the Open panel, the Save panel, the drop and the scene's external events are said only in
+  Platform.swift's Mac half (`fileImporter` also stays where it was, on the EQ page's Import…), and the iPhone half's
+  three new helpers each return the view itself.
+
+### File > Import EQ File… ⌘O (447)
+
+- **Core's MacMenu** has a new command, `importEQFile`: "Import EQ File…", ⌘O, enabled as Settings… and Find are -
+  `tabs && !sheet`: never under the sign-in (no app yet), and never over a sheet. The Open panel is presented from
+  RootView, and SwiftUI presents one thing at a time from a view: with Edit album or the EQ sheet up, the panel would be
+  the window under's, or not come at all. It keeps its key while a field is typing (⌘O is no text field's) and while a
+  run is busy (opening a file is no write). It is in neither Controls nor View: MacCommands draws it in File, in
+  `CommandGroup(after: .newItem)` - `.newItem` is replaced empty (no New Window), so after it is the top of File.
+  SwiftUI's `.importExport` placement was the other choice; it wasn't taken because nothing says what Catalyst's
+  UIKit menu makes of it, and `.newItem` is a place slice 2 already proved there.
+- **A key twice throws at launch** (slice 3's ⌃⌘S: "Replacement elements contain duplicates"). No ⌘O is known in a
+  Catalyst app's File menu without documents, but only a Mac can say - docs/ios.md's 447 asks first whether deadwax
+  opens at all.
+- **AppNavigation** has `eqFileChoosing` (the panel up) and `openEQFile()`, the one thing that sets it; `reset()` lets
+  it go with the rest of a person's navigation.
+- **RootView** carries the panel (Platform's `eqOpenPanel`: `fileImporter`, plain text, one file), and the file chosen
+  goes to `shared(url)` - the very function `.onOpenURL` calls for a file shared to deadwax: `EQImportReading.file(url,
+  forKey: nil)` off the main thread (security-scoped access started and stopped, the 256 KB limit, deleteIfInbox),
+  then `navigation.share(item)`, the preview over whatever is up, For the output now. Nothing new reads a file.
+
+### Export… through the Save panel (448)
+
+- **Core's EQWords.Export.items(device)**: the menu as sections of `Item(way, whole, words)`, with
+  `enabled(hasCorrection:)` (the whole curve always; the correction alone only with a correction - the phone's rule).
+  - The iPhone: one section, `share` The Whole Curve, `share` The Correction Alone - the words it had.
+  - The Mac: **Save the Whole Curve…**, **Save the Correction Alone…**, a divider, **Share the Whole Curve**, **Share
+    the Correction Alone**.
+- **Why this shape.** The Save panel is how a Mac puts a file somewhere, so it comes first, and the share stays after
+  it for AirDrop and Mail (the plan's "ShareLink stays for AirDrop"). Flat, so each item says what it does in one
+  click; the ellipsis marks the two that open a panel, as the Mac's own menus do. Not chosen: Save and Share
+  submenus of the phone's two words each (two moves for every export), or the phone's two words opening the Save
+  panel alone (AirDrop lost).
+- **EQExportMenu** draws the items, each `.disabled(!item.enabled(...))`. A share item is the ShareLink it was, of
+  `file(item.whole)`; a save item sets `saving`, and the menu's `.eqSavePanel($saving)` (Platform's Mac half:
+  `fileExporter(isPresented:item:contentTypes:defaultFilename:...)`, iOS 17's Transferable form) presents the Save
+  panel with that `EQExportFile` - the same Transferable the share hands out, its `FileRepresentation(exportedContentType:
+  .plainText)` writing APOWriter's text, so a saved file is the shared file, byte for byte, named
+  `EQWords.Export.fileName(shownName)` (`<output name> EQ.txt`) as the share names it. Saved, failed or cancelled,
+  `saving` is let go.
+- **It imports again**: EQWordsTests' new test exports AirPods Pro's AutoEq correction, whole and alone, and reads each
+  back through APOReader with `device: .mac` and `.iPhone`: the same filters and preamp, no notes.
+- **A failed save says nothing**, as the share sheet's never did. If 448 shows that a refused save is silent and
+  confusing, a line under the menu is the next step.
+- test_ios_no_web_app.py's SHARED now keys the one ShareLink as it is written, `file(item.whole)`.
+
+### Finder's Open With and the Dock icon, in the one window (449, 450)
+
+- Nothing new was needed to be offered: Info-Mac.plist's CFBundleDocumentTypes (slice 1) lists public.plain-text as a
+  Viewer at rank **Alternate** - deadwax is in a `.txt`'s Open With, never its default (TextEdit stays that). Open
+  With and a file dropped on the Dock's icon each reach the app as an open event, which SwiftUI hands to `.onOpenURL`,
+  so both go down `shared(url)`, as a share does.
+- **One window, both halves said.** The view half is slice 2's `oneWindow()` on the root view -
+  `handlesExternalEvents(preferring: ["*"], allowing: ["*"])`: the window that's open takes every event rather than a
+  new one being made for it. New here, the scene half: `macWindow` adds `.handlesExternalEvents(matching: ["*"])` to
+  the one WindowGroup, so with no window open (⌘W, the music playing on) this scene is the one SwiftUI opens for the
+  event - one window, which then takes it. Said explicitly rather than left to SwiftUI's choice of scene, so a second
+  scene added one day can't take a file. Both are in Platform's Mac half; the iPhone half's `macWindow` and
+  `oneWindow` return what they're given.
+- **The file stays where it was, unchanged.** An import only reads: `EQImportReading.file` opens a FileHandle for
+  reading, and the one `removeItem` in EQImport.swift is deleteIfInbox's, which removes a file only when its folder is
+  the app's own Documents/Inbox (where iOS puts its copy of a file shared to the app; macOS opens one in place -
+  Info-Mac.plist has no LSSupportsOpeningDocumentsInPlace, which macOS refuses as NO, slice 1). Finder's original is
+  never that folder. test_ios_mac.py holds both: one removeItem,
+  under that check, and no move, copy, write or trash in the file.
+
+### A file dropped on the window (450)
+
+- **EQDroppedFile** (EQImport.swift): a Transferable whose `FileRepresentation(importedContentType: .plainText,
+  shouldAttemptToOpenInPlace: true)` reads the file with `EQImportReading.file(received.file, forKey: nil)` inside its
+  importing closure - the received file is only promised there (a copy the system makes is removed after it). In place
+  where it can be, so no copy of a big file is made just to read 256 KB of it; read the same way, with the same words,
+  as every other way in.
+- **Platform's `eqFileDrop`**: `dropDestination(for: EQDroppedFile.self)` (iOS 16) in the Mac half; the first file of
+  several; true once taken. On RootView (the window) and on EQSheet - on the Mac a window of its own, which RootView's
+  drop doesn't reach - each giving the item to `navigation.share`. Other sheets (Edit album, Add to a playlist) take no
+  drop. On the iPhone it is the view itself.
+- Nothing else in the App takes a drop (`onDrop` and `dropDestination` appear nowhere else - test_ios_mac.py's
+  FILE_PANELS), so no list of the app's has a drop of its own to clash with.
+
+### Paste (451)
+
+- **PasteButton stays the EQ page's**, unchanged: SwiftUI's PasteButton is iOS 16 and Catalyst has it, so the Mac's EQ
+  page draws it beside Import…. Whether macOS draws it as a button and asks before reading the clipboard is 451's.
+- **No ⌘V path.** SwiftUI's `onPasteCommand` and `pasteDestination` are `iOS 27.0` on Catalyst (the iOS 27.2 SDK's
+  SwiftUI interface), past the deployment target (iOS 17 / macOS 14); a UIKit responder's `paste(_:)` would be a second,
+  hand-made way of reading the clipboard beside the system's own button; and Edit > Paste belongs to the text fields.
+  The button is a click on the page, so nothing is lost.
+
+### The entitlement
+
+- **Base.xcconfig**: `ENABLE_USER_SELECTED_FILES[sdk=macosx*] = readwrite` (it was `readonly`; Xcode's xcspec takes
+  "", readonly or readwrite). Read-write is `com.apple.security.files.user-selected.read-write`: the Open panel's file,
+  a file opened with deadwax or dropped, read; the Save panel's, written.
+- **check_project.py**'s MAC_SETTINGS holds `readwrite`. **install_helper.py**'s MAC_ENTITLEMENTS requires the
+  read-write key: a build with read-only alone is refused ("no reading a file chosen in the Open panel and writing one
+  saved in the Save panel"), since it would fail 448 without a word. **install-mac.sh** says "Signed, sandboxed,
+  allowed out to the network and to open and save a file you choose".
+
+### Tests, and the faults they were seen to catch
+
+- **Core** (vectors): MacMenuTests' `theKeysAsThePlanHasThem` has ⌘O, and `importEQFileOpensThePanelFromThePages`
+  holds the words, the key, the dimming (no tabs, a sheet), the same rule as Settings… and Find, the key kept while
+  typing and busy, and its menu (neither Controls nor View). EQWordsTests' `exportsItemsOnEachDevice` holds both
+  devices' items, the correction rule and the round trip. DeviceWordsTests writes `EQWords.Export.items` into both
+  fixtures (mac.json regenerated; its diff is that one line) and lists it among the Mac's own words.
+  Faults seen: the import enabled over a sheet; on ⌘I; a Save item on the iPhone; `enabled` always true; the Mac's
+  Share the Correction Alone reworded - each failed the test meant for it.
+- **App** (tests/test_ios_mac.py, read as Swift reads it): the ⌘O item wired to the shared path; Export's items, Save
+  panel and share; the drop's path and its two places; every file panel and drop in the App one of its own
+  (FILE_PANELS), Paste still the one PasteButton; the one window and the file left alone; the entitlement. The slice 2
+  menu test's every-command list and the iPhone-half helper list have the new ones. Faults seen (each restored byte for
+  byte): the item calling Find; reset() leaving the panel asking; the panel bypassing `shared()`; the panel taking many
+  files; a Save item always whole; the Save panel not let go on cancel; no disabled rule; the EQ sheet without its
+  drop; the drop asking for a copy; an `onDrop` added elsewhere; PasteButton gone; the scene half removed; a moveItem
+  in the import; deleteIfInbox's Inbox check removed; the build setting `readonly`; the helper wanting read-only.
+- **tests/test_ios_install_mac.py**: the good entitlements read-write; none, read-only alone or read-write false each
+  refused with NO_FILES; check_project's readwrite to readonly, or removed, refused; the install's words. Faults seen:
+  the helper's key back to read-only (22 failed), check_project's `readonly` (3), install-mac.sh's old words (1).
+
+### What is verified, and what only James's Mac can say
+
+Verified here (23 Nov): `swift test` (2141 tests in 218 suites, 158 in 17, 12 in 1 - all passed); the unsigned
+iPhone build (Debug) and Mac build (Release, Mac Catalyst, arm64) both succeeded, with no warning but AppIntents'
+usual one; check_project.py ok; pyflakes clean; tests/test_ios_*.py, test_source_bytes.py and test_logins.py 719
+passed, 1 skipped. Nothing was run, installed or launched.
+
+Not verified - each is a 447-451 question:
+- **Whether the system's File menu has a ⌘O of its own**, which would make UIKit throw at launch (447 asks first).
+- **Whether Open With and the Dock's drop reuse the window**, and whether one opens for them with the window closed
+  (449).
+- **Whether a dropped file arrives with its access** - read in place under the drop's scope, or as the system's copy -
+  and whether one from the Desktop or iCloud Drive reads (450).
+- **Whether PasteButton draws on the Mac**, and whether macOS asks before it reads (451).
+- **Whether the Save panel writes** under read-write, and what a refused save looks like (448).
+- **Two file panels in one window.** On the Mac the EQ page's own Import… (its `fileImporter`) and Export…'s Save
+  panel can be on a page inside the window under RootView's Open panel - Settings > Playback > EQ - as well as in the EQ
+  sheet. SwiftUI has had trouble with more than one file panel in a hierarchy; if the page's Import… or Save stops
+  opening its panel there, the fix is one panel for the window (the page's Import… asking RootView's, with its
+  output's key). 447 and 448 are worded to try both places.
+- Whether a dragged text selection (not a file) is taken too - a plain-text FileRepresentation may receive it as a
+  file the system writes - and what name it is shown with.
+
+### The review (23 Nov)
+
+One review read the whole change against the plan, the SDK's headers and swiftinterfaces, and these notes. It found
+nothing that crashes on either device and no confirmed bug. What it settled, and what came of it:
+- **⌘O and UIKit's own menu**: no evidence of a clash. Catalyst's headers name an Open menu (`UIMenuOpen`,
+  `UIMenuOpenRecent`) but no standard `open:` action with a key; the `.document` menu Catalyst adds (Duplicate, Move,
+  Rename, Export) has no ⌘O. Still unknown: whether `CommandGroup(after: .newItem)` lands with `.newItem` replaced by
+  nothing (slice 2 proved the replacing only) - 447's first step shows a missing item.
+- **⌘O left dead (PLAUSIBLE, fixed)**: the menu's `sheet` counts neither file panels nor alerts, so ⌘O stays enabled
+  with the EQ page's own Open panel, Export's Save panel or its Rename and Forget up. RootView's panel can't come over
+  them, and `eqFileChoosing` could stay true - every later ⌘O then set true again, no change, and nothing opened
+  until a sign-out's reset. `openEQFile()` now puts a flag that still reads as up down and asks again 100 ms later
+  (a Task, `self` weak), so ⌘O always asks afresh; test_ios_mac.py's ⌘O test holds it, seen failing with the re-ask
+  taken out. Not fixed: such a panel may come up by itself once the other one has gone - only the Mac shows whether.
+- **The drop's file** is read inside its importing closure (CoreTransferable: the file is "only guaranteed to exist
+  within the importing closure"), its scope started and stopped by `EQImportReading.file`; nothing is written, and the
+  system's copy, if it makes one, is CoreTransferable's to remove.
+- **handlesExternalEvents** on the scene and the view is what the SDK documents for one WindowGroup taking every
+  event: no route to a second window was found.
+- **A drop over the sign-in (left as it is)**: the drop is on RootView's outermost view, so it is live over the address
+  and sign-in screens where ⌘O is dimmed - its preview can come up over the sign-in. Open With and shares through
+  `.onOpenURL` have always done the same on both devices, so the drop keeps their way rather than a rule of its own.
+- **With the window closed** Import EQ File… stays enabled (MacMenu knows no window), as Settings… and Find do.
+- **Docs fixed**: docs/ios.md said all five ways in start For on the output playing (the EQ page's Import… and Paste
+  start on that page's); ios/README.md's install words; these notes said Catalyst copies an opened file to
+  Documents/Inbox (macOS opens one in place). Older lines put right with it: the troubleshooting row saying closing
+  the window quits deadwax (it leaves the music playing, check 421), and the READMEs' and the guide's "phone-shaped
+  window for now" and "not seen on a Mac yet" from before slice 3.
+
+After the review's fix (23 Nov): both unsigned builds succeeded again, check_project.py ok, pyflakes clean, and
+tests/test_ios_*.py, test_source_bytes.py and test_logins.py 719 passed, 1 skipped. Core was unchanged by it (`swift
+test` as above).

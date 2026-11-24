@@ -125,7 +125,11 @@ def test_platform_is_the_iphones_exactly_as_before_on_the_iphone():
                    r"escapeCloses\(_ on: @autoclosure \(\) -> Bool = true\)", r"returnCancels\(\)",
                    r"findField\(_ focused: FocusState<Bool>\.Binding\)",
                    r"oneWindow\(\)", r"macSheet\(\)", r"keepsWindowOpen\(_ on: @autoclosure \(\) -> Bool\)",
-                   r"readableOnMac\(\)", r"shapesWindow\(\)"):
+                   r"readableOnMac\(\)", r"shapesWindow\(\)",
+                   # (slice 6) the EQ's files: no Open panel, Save panel or drop of the Mac's on the iPhone
+                   r"eqOpenPanel\(_ shown: Binding<Bool>, chosen: @escaping \(URL\) -> Void\)",
+                   r"eqFileDrop\(_ dropped: @escaping \(EQImportItem\) -> Void\)",
+                   r"eqSavePanel\(_ file: Binding<EQExportFile\?>\)"):
         assert re.search(r"func " + helper + r" -> some View \{\s*self\s*\}", phone), helper
         assert re.search(r"func " + helper + r" -> some View \{", mac), helper
     assert re.search(r"static func dialogCancel\(\) -> some View \{\s*EmptyView\(\)\s*\}", phone)
@@ -290,6 +294,7 @@ def test_the_menus_are_mac_menus_and_nothing_else():
                   "CommandGroup(replacing: .textEditing) {\n            item(.find, state)",
                   "CommandGroup(replacing: .textFormatting) {}",
                   "CommandGroup(after: .toolbar) {\n            item(.refresh, state)",
+                  "CommandGroup(after: .newItem) {\n            item(.importEQFile, state)",
                   "CommandGroup(replacing: .sidebar) {\n            let sections = MacMenu.view(state)"):
         assert group in commands, group
     #? (slice 3's review, smoke-run) the sidebar place replaced, never added beside: the system's Show Sidebar kept has
@@ -324,7 +329,8 @@ def test_the_menus_are_mac_menus_and_nothing_else():
     cases = re.findall(r"^\s*case ([a-z][\w, ]*)$", bare(core[core.index("public enum Command"):core.index("public static let repeats")]), re.M)
     every = [name.strip() for line in cases for name in line.split(",")]
     assert every == ["settings", "find", "refresh", "playPause", "next", "previous", "forward", "back", "shuffle",
-                     "repeatOff", "repeatAll", "repeatOne", "goToCurrentSong", "sidebar", "upNext", "lyrics", "info"]
+                     "repeatOff", "repeatAll", "repeatOne", "goToCurrentSong", "sidebar", "upNext", "lyrics", "info",
+                     "importEQFile"]
     for name in every:
         assert f"case .{name}" in perform or f".{name}," in perform or f", .{name}" in perform, name
 
@@ -1282,3 +1288,198 @@ def test_a_care_run_holds_the_display_on_and_work_keeps_app_nap_off():
     # beginBackgroundTask stays as it is everywhere
     began = {name: code.count("beginBackgroundTask(") for name, code in app.items() if "beginBackgroundTask(" in code}
     assert began == {"Edit/EditAlbumModel.swift": 1, "Downloads/DownloadModel.swift": 1, "Models/PlayerModel+Resume.swift": 1}, began
+
+
+# ----------------------------------------------------------------------------- EQ files (slice 6)
+
+# (notes/ios.md "The Mac app, slice 6: EQ files") File > Import EQ File… (⌘O)'s Open panel, Finder's Open With, a file
+# dropped on the Dock's icon or on the window, all one way in - a shared file's (EQImportReading.file, then
+# AppNavigation's share); Export…'s Save panel beside its share; read and write for the files chosen; one window.
+
+def _raw_halves() -> tuple[str, str]:
+    """Platform.swift's two halves with their string literals as written (`bare` blanks them: "*" would read "")."""
+    text = app_sources()[PLATFORM]
+    mac = text.split("\n#if targetEnvironment(macCatalyst)\n", 1)[1].split("\n#else\n")[0]
+    return mac, text.split("\n#else\n", 1)[1].split("\n#endif\n")[0]
+
+
+#? the App's file panels and drops, by file: the EQ page's own Import… (Files on the phone, the Open panel on a Mac), and
+#? Platform's Mac half's three - nothing else asks the system for a file, writes one out, or takes a drop
+FILE_PANELS = {
+    "fileImporter": {"EQ/EQImport.swift": 1, PLATFORM: 1},
+    "fileExporter": {PLATFORM: 1},
+    "dropDestination": {PLATFORM: 1},
+    "onDrop": {},
+    "onPasteCommand": {},
+    "pasteDestination": {},
+}
+
+
+def test_file_import_eq_file_opens_the_panel_and_takes_a_shared_files_way():
+    app = app_sources()
+    commands = bare(app["Shared/MacCommands.swift"])
+    assert "CommandGroup(after: .newItem) {\n            item(.importEQFile, state)\n        }" in commands
+    perform = _body(commands, "private func perform(_ command: MacMenu.Command)")
+    assert "case .importEQFile:\n            navigation.openEQFile()" in perform
+    routes = bare(app["Shared/Routes.swift"])
+    opener = _body(routes, "func openEQFile()")
+    assert "guard eqFileChoosing else {\n            eqFileChoosing = true\n            return\n        }" in opener
+    # (the review) asked again while it still reads as up (a panel that never came): down, then up a moment later -
+    # never left dead until a sign-out
+    assert "eqFileChoosing = false" in opener
+    assert re.search(r"Task \{ @MainActor \[weak self\] \(\) async -> Void in\s*"
+                     r"try\? await Task\.sleep\(for: \.milliseconds\(100\)\)\s*self\?\.openEQFile\(\)\s*\}", opener)
+    assert "var eqFileChoosing = false" in routes
+    assert "eqFileChoosing = false" in _body(routes, "func reset()"), "a new person: no Open panel left asking"
+    assert routes.count("eqFileChoosing = true") == 1, "only the menu asks for it"
+    # RootView: the panel's file goes the way a shared file does - read as one, then the preview over what's up
+    root = bare(app["Root/RootView.swift"])
+    assert root.count(".onOpenURL { (url: URL) -> Void in shared(url) }") == 1
+    assert re.search(r"\.eqOpenPanel\(Binding<Bool>\(get: \{ navigation\.eqFileChoosing \}, set: \{ \(up: Bool\) -> Void in\s*"
+                     r"navigation\.eqFileChoosing = up\s*\}\)\) \{ \(url: URL\) -> Void in shared\(url\) \}", root)
+    shared = _body(root, "private func shared(_ url: URL)")
+    assert "guard url.isFileURL else { return }" in shared
+    assert shared.index("EQImportReading.file(url, forKey: nil)") < shared.index("navigation.share(item)")
+    assert "Task.detached(priority: .userInitiated)" in shared, "read off the main thread"
+    # the Mac's Open panel: plain text, one file - the phone has none
+    mac, phone = _halves()
+    panel = _body(mac, "func eqOpenPanel(_ shown: Binding<Bool>, chosen: @escaping (URL) -> Void) -> some View")
+    assert "fileImporter(isPresented: shown, allowedContentTypes: [.plainText], allowsMultipleSelection: false)" in panel
+    assert "guard case .success(let urls) = result, let url = urls.first else { return }\n            chosen(url)" in panel
+    assert re.search(r"func eqOpenPanel\(_ shown: Binding<Bool>, chosen: @escaping \(URL\) -> Void\) -> some View \{\s*self\s*\}",
+                     phone)
+    assert "import UniformTypeIdentifiers" in mac and "UniformTypeIdentifiers" not in phone
+    # (the menus' state) its words, key and dimming are MacMenu's - drawn by `item`, as Settings… and Find are
+    assert commands.count("item(.importEQFile, state)") == 1
+
+
+def test_export_saves_through_the_save_panel_and_shares_as_before():
+    app = app_sources()
+    export = bare(app["EQ/EQExport.swift"])
+    menu = _body(export, "struct EQExportMenu: View")
+    assert '"' not in re.sub(r'systemImage: "\s*"', "", menu), "no words of its own: Core's, by device"
+    assert 'Label(EQWords.Export.menu, systemImage: "square.and.arrow.up")' in app["EQ/EQExport.swift"]
+    assert "let sections = EQWords.Export.items(Platform.device)" in menu
+    assert "if index > 0 { Divider() }" in menu
+    assert ".disabled(!item.enabled(hasCorrection: setting.correction != nil))" in menu
+    assert "Label(EQWords.Export.menu, systemImage:" in menu
+    assert re.search(r"\}\s*\.eqSavePanel\(\$saving\)\s*\}", menu), "the Save panel on the menu itself, not inside it"
+    entry = _body(menu, "@ViewBuilder private func entry(_ item: EQWords.Export.Item, name: String) -> some View")
+    assert re.search(r"case \.share:\s*ShareLink\(item: file\(item\.whole\), preview: SharePreview\(name\)\) \{\s*"
+                     r"Text\(item\.words\)\s*\}", entry)
+    assert re.search(r"case \.save:\s*Button\(item\.words\) \{ saving = file\(item\.whole\) \}", entry)
+    assert menu.count("saving = ") == 1, "only a Save item sets it"
+    assert re.search(r"private func file\(_ whole: Bool\) -> EQExportFile \{\s*"
+                     r"EQExportFile\(setting: setting, settings: settings, whole: whole, rate: rate\)\s*\}", menu)
+    # one file for both ways: the share's Transferable, plain text
+    assert "struct EQExportFile: Transferable, Sendable {" in export
+    assert "FileRepresentation(exportedContentType: .plainText)" in export
+    # the Mac's Save panel: that file, named as the share names it; the phone's Export… shares, as before
+    mac, phone = _halves()
+    save = _body(mac, "func eqSavePanel(_ file: Binding<EQExportFile?>) -> some View")
+    assert "fileExporter(isPresented: Binding<Bool>(get: { file.wrappedValue != nil }" in save
+    assert "item: file.wrappedValue, contentTypes: [.plainText]," in save
+    assert "EQWords.Export.fileName(each.setting.shownName)" in save
+    assert save.count("file.wrappedValue = nil") == 3, "let go however it ends - saved, cancelled, put away"
+    assert re.search(r"func eqSavePanel\(_ file: Binding<EQExportFile\?>\) -> some View \{\s*self\s*\}", phone)
+
+
+def test_a_file_dropped_on_the_window_comes_the_way_a_shared_one_does():
+    app = app_sources()
+    mac, phone = _halves()
+    drop = _body(mac, "func eqFileDrop(_ dropped: @escaping (EQImportItem) -> Void) -> some View")
+    assert "dropDestination(for: EQDroppedFile.self) { (files: [EQDroppedFile], _: CGPoint) -> Bool in" in drop
+    assert "guard let file = files.first else { return false }\n            dropped(file.item)\n            return true" in drop
+    assert re.search(r"func eqFileDrop\(_ dropped: @escaping \(EQImportItem\) -> Void\) -> some View \{\s*self\s*\}", phone)
+    # read inside the import, the way a file opened with deadwax is - asked for where it is, only read
+    imported = bare(app["EQ/EQImport.swift"])
+    dropped = _body(imported, "struct EQDroppedFile: Transferable, Sendable")
+    assert "FileRepresentation(importedContentType: .plainText, shouldAttemptToOpenInPlace: true)" in dropped
+    assert "EQDroppedFile(item: EQImportReading.file(received.file, forKey: nil))" in dropped
+    assert "import CoreTransferable" in imported
+    # on the window and on the EQ sheet (on the Mac a window of its own), each to AppNavigation's share
+    uses = {name: bare(text).count(".eqFileDrop {") for name, text in app.items() if name != PLATFORM}
+    assert {name: n for name, n in uses.items() if n} == {"Root/RootView.swift": 1, "EQ/EQRoute.swift": 1}
+    for name in ("Root/RootView.swift", "EQ/EQRoute.swift"):
+        assert ".eqFileDrop { (item: EQImportItem) -> Void in navigation.share(item) }" in bare(app[name]), name
+    sheet = _body(bare(app["EQ/EQRoute.swift"]), "struct EQSheet: View")
+    assert sheet.index(".eqFileDrop {") < sheet.index(".appSheet(isPresented:"), "on the sheet's own page, under its preview"
+
+
+def test_every_file_panel_and_drop_is_one_of_the_apps_own():
+    found = {kind: {} for kind in FILE_PANELS}
+    for name, text in app_sources().items():
+        code = bare(text)
+        for kind in FILE_PANELS:
+            n = len(re.findall(rf"\b{kind}\s*\(", code))
+            if n:
+                found[kind][name] = n
+    assert found == FILE_PANELS, found
+    # Platform's three are in its Mac half, none outside the switch
+    mac, phone = _halves()
+    for kind in ("fileImporter", "fileExporter", "dropDestination"):
+        assert re.search(rf"\b{kind}\s*\(", mac) and not re.search(rf"\b{kind}\s*\(", phone), kind
+    # Paste stays the EQ page's PasteButton - drawn on the Mac too (Catalyst has it from 16): one, beside Import…
+    rows = bare(app_sources()["EQ/EQImport.swift"])
+    rows = _body(rows, "struct EQImportRows: View")
+    assert "PasteButton(payloadType: String.self) { (strings: [String]) -> Void in" in rows
+    assert "read { EQImportReading.pasted(text, forKey: key) }" in rows
+    assert sum(bare(text).count("PasteButton(") for text in app_sources().values()) == 1
+
+
+def test_a_file_opened_with_deadwax_comes_to_the_one_window_and_stays_where_it_was():
+    mac, phone = _raw_halves()
+    # the open window takes every file or link opened with deadwax; with none open, this one window opens for it
+    assert re.search(r"func oneWindow\(\) -> some View \{\s*handlesExternalEvents\(preferring: \[\"\*\"\], allowing: \[\"\*\"\]\)\s*\}", mac)
+    window = _body(bare(mac), "func macWindow(_ menus: MacCommands) -> some Scene")
+    assert re.search(r"\.commands \{.*?\}\s*\.handlesExternalEvents\(matching: \[\"\s*\"\]\)\s*\}$", window, re.S)
+    assert '.handlesExternalEvents(matching: ["*"])' in mac
+    assert "handlesExternalEvents" not in phone and re.search(r"func macWindow\(_ menus: MacCommands\) -> some Scene \{\s*self\s*\}", phone)
+    for name, text in app_sources().items():
+        if name != PLATFORM:
+            assert "handlesExternalEvents" not in bare(text), name
+    assert bare(app_sources()["DeadwaxApp.swift"]).count(".oneWindow()") == 1
+    # offered for a .txt, never the Mac's default for one - and opened where it is (no Inbox copy on a Mac)
+    import plistlib
+    plist = plistlib.loads((IOS / "Config" / "Info-Mac.plist").read_bytes())
+    assert plist["CFBundleDocumentTypes"] == [{"CFBundleTypeName": "Equalizer APO file", "CFBundleTypeRole": "Viewer",
+                                               "LSHandlerRank": "Alternate", "LSItemContentTypes": ["public.plain-text"]}]
+    assert "LSSupportsOpeningDocumentsInPlace" not in plist
+    # the file is only read: the one delete is the phone's own Inbox copy, and nothing in an import writes or moves
+    imported = bare(app_sources()["EQ/EQImport.swift"])
+    inbox = _body(imported, "private static func deleteIfInbox(_ url: URL)")
+    assert re.search(r'let inbox = documents\.appendingPathComponent\("\s*", isDirectory: true\)\.resolvingSymlinksInPath\(\)\.path',
+                     inbox)
+    assert "let folder = url.deletingLastPathComponent().resolvingSymlinksInPath().path" in inbox
+    assert "if folder == inbox { try? FileManager.default.removeItem(at: url) }" in inbox
+    assert 'appendingPathComponent("Inbox", isDirectory: true)' in app_sources()["EQ/EQImport.swift"]
+    assert len(re.findall(r"\bremoveItem\(", imported)) == 1
+    for call in (r"\bmoveItem\(", r"\breplaceItem", r"\bcopyItem\(", r"\.write\(to:", r"\bcreateFile\(",
+                 r"FileHandle\(forWritingTo", r"FileHandle\(forUpdating", r"\btrashItem\("):
+        assert not re.search(call, imported), call
+    reading = _body(imported, "static func file(_ url: URL, forKey: String?) -> EQImportItem")
+    assert "let scoped = url.startAccessingSecurityScopedResource()" in reading
+    assert "if scoped { url.stopAccessingSecurityScopedResource() }\n            deleteIfInbox(url)" in reading
+    assert "FileHandle(forReadingFrom: url)" in reading
+
+
+def test_the_files_chosen_are_read_and_written_and_nothing_else():
+    """Read and write for the file the person chooses (the Open panel and the Save panel), from a build setting - no
+    entitlements file, no profile; install-mac.sh refuses a build signed read-only."""
+    base = (IOS / "Config" / "Base.xcconfig").read_text(encoding="utf-8")
+    assert re.findall(r"^ENABLE_USER_SELECTED_FILES\S*\s*=\s*(\S+)$", base, re.M) == ["readwrite"]
+    assert "ENABLE_USER_SELECTED_FILES[sdk=macosx*] = readwrite" in base
+    project = _load_script("check_project")
+    assert project.MAC_SETTINGS["ENABLE_USER_SELECTED_FILES[sdk=macosx*]"] == "readwrite"
+    helper = _load_script("install_helper")
+    assert "com.apple.security.files.user-selected.read-write" in helper.MAC_ENTITLEMENTS
+    assert not any("read-only" in key for key in helper.MAC_ENTITLEMENTS)
+    for path in IOS.rglob("*.entitlements"):
+        raise AssertionError(f"{path}: the Mac's entitlements are build settings")
+
+
+def _load_script(name: str):
+    spec = importlib.util.spec_from_file_location(f"_mac_script_{name}", IOS / "scripts" / f"{name}.py")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module

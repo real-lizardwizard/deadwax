@@ -405,6 +405,7 @@
   "EQScreenRules.output(speaker, route)" : "speaker | iPhone speaker | iphone | builtInSpeaker",
   "EQScreenRules.output(speaker)" : "speaker | iPhone speaker | iphone | builtInSpeaker",
   "EQSettings.newOutput(speaker)" : "speaker | iPhone speaker | iPhone speaker | builtInSpeaker",
+  "EQWords.Export.items" : "share: The Whole Curve | share: The Correction Alone",
   "EQWords.Import.channels(C, 12-20)" : "Lines 12-20 are for the centre channel (C), which a phone doesn't have.",
   "EQWords.Import.channels(none, 4)" : "Line 4 is for no channel: the Channel line before it names none.",
   "EQWords.Import.channels(RL RR, 4)" : "Line 4 is for the rear channels (RL, RR), which a phone doesn't have.",

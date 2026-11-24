@@ -45,9 +45,10 @@ INFOPLIST_FILE[sdk=macosx*] = Config/Info-Mac.plist
 // the App Sandbox: every path the app uses is its container's, as on the phone; and its requests may go out
 ENABLE_APP_SANDBOX[sdk=macosx*] = YES
 ENABLE_OUTGOING_NETWORK_CONNECTIONS[sdk=macosx*] = YES
-// the EQ's Import from Files…: the sandbox lets the app read a file the person chooses in the Open panel, and nothing
-// else outside its container (read only - Export… is a share, which needs nothing). Needs no profile either.
-ENABLE_USER_SELECTED_FILES[sdk=macosx*] = readonly
+// the EQ's files: the sandbox lets the app read a file the person chooses in the Open panel (Import…, File > Import EQ
+// File…) and write one where they save it in the Save panel (Export…'s Save items, slice 6) - and nothing else outside
+// its container. Read and write: saving needs the write. Needs no profile either.
+ENABLE_USER_SELECTED_FILES[sdk=macosx*] = readwrite
 
 // Swift 5 language mode, as the package's audio target: nothing of the app compiles on Linux, so a
 // strict-concurrency error would only show on the Mac.

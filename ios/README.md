@@ -50,10 +50,10 @@ tools, Needs a look, Library care, Server settings, the event log, Change passwo
 has been seen on an iPhone yet.
 Phase 0's test screen lives on in the app's Debug.
 
-**On a Mac too.** The same app, built for the Mac through Mac Catalyst from the same files: the iPhone's layout in a
-phone-shaped window for now, in the Mac's sizes and controls, with the Mac's Now Playing and media keys. It is signed
-with your team and no provisioning profile, so it never runs out, and keeps its sign-in in a file in its sandbox
-container rather than the Keychain. Nothing of it has been seen on a Mac yet.
+**On a Mac too.** The same app, built for the Mac through Mac Catalyst from the same files: a sidebar, a player bar and
+side panels in a window that resizes freely, in the Mac's sizes and controls, with its menus and keys, the Mac's Now
+Playing and media keys. It is signed with your team and no provisioning profile, so it never runs out, and keeps its
+sign-in in a file in its sandbox container rather than the Keychain. It has run on a Mac since 17 Nov.
 
 - **To install it, and every week after:** [docs/ios.md](../docs/ios.md) - the steps once on the Mac
   and the iPhone, the weekly `ios/scripts/install.sh`, the test album
@@ -64,10 +64,10 @@ container rather than the Keychain. Nothing of it has been seen on a Mac yet.
 - **To install it on a Mac:** `ios/scripts/install-mac.sh` (`--dry-run` says what it would do first) - after
   install.sh has been run once for the team it writes, `ios/Config/Local.xcconfig`. It builds the Mac app (Release,
   Apple silicon) in `~/Library/Caches/deadwax-build-mac`, checks it's signed, sandboxed, allowed out to the network
-  and to read a file you choose, and has no provisioning profile (it stops there, installing nothing, if Xcode added
+  and to open and save a file you choose, and has no provisioning profile (it stops there, installing nothing, if Xcode added
   one - `--allow-profile` to install it anyway), asks before quitting deadwax if it's open (`--quit` doesn't ask;
   never by force), and puts it in `~/Applications/deadwax.app`.
-  How, and the Mac's checks, 404-415: [The Mac app](../docs/ios.md#the-mac-app) in docs/ios.md.
+  How, and the Mac's checks, 404-451: [The Mac app](../docs/ios.md#the-mac-app) in docs/ios.md.
 - **How it is built, and why:** [notes/ios.md](../notes/ios.md).
 - **Before pushing a change here, on Linux:** `ios/scripts/check-linux.sh`. GitHub's `ios.yml` compiles
   the rest on macOS.

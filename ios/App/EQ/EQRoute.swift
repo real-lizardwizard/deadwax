@@ -110,6 +110,9 @@ struct EQSheet: View {
         }
         .environment(\.eqDone, dismiss)
         .environment(stack)
+        // (the Mac app, slice 6) a file dropped on the EQ sheet - on the Mac a window of its own - shows over it, as one
+        // shared while it's up does (AppNavigation's `share`). Nothing on the iPhone
+        .eqFileDrop { (item: EQImportItem) -> Void in navigation.share(item) }
         .appSheet(isPresented: Binding<Bool>(get: {
             ready && navigation.eqImport != nil && navigation.eqImportPage == nil
         }, set: { (up: Bool) -> Void in

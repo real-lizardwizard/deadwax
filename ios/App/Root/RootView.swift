@@ -76,10 +76,18 @@ struct RootView: View {
             people.nowPlaying(shown)
         }
         .onOpenURL { (url: URL) -> Void in shared(url) }
+        // (the Mac app, slice 6) File > Import EQ File… (⌘O)'s Open panel, and a file dropped on the window: each the way
+        // a shared file comes - read as one is, its preview over whatever is up. Nothing on the iPhone
+        .eqOpenPanel(Binding<Bool>(get: { navigation.eqFileChoosing }, set: { (up: Bool) -> Void in
+            navigation.eqFileChoosing = up
+        })) { (url: URL) -> Void in shared(url) }
+        .eqFileDrop { (item: EQImportItem) -> Void in navigation.share(item) }
     }
 
     /// A file shared to deadwax (eq.md 3.9: "deadwax" in the share sheet for a .txt) - read off the main thread, then
-    /// shown in the EQ's import preview over whatever is on top, For set to the output now.
+    /// shown in the EQ's import preview over whatever is on top, For set to the output now. (The Mac app, slice 6) And
+    /// on the Mac: Finder's Open With, a file dropped on the Dock's icon (both `.onOpenURL`, as a share), and the file
+    /// chosen in File > Import EQ File…'s Open panel.
     private func shared(_ url: URL) {
         guard url.isFileURL else { return }
         let navigation = self.navigation

@@ -23,7 +23,7 @@ Checks the iPhone app's project files without Xcode - what can be checked on Lin
     entitlements);
   - (the Mac app, slice 1 - notes/ios.md) the Mac's build: SUPPORTS_MACCATALYST YES, its bundle id never derived, and
     every Mac setting [sdk=macosx*] - the Mac idiom, Info-Mac.plist, the App Sandbox and the outgoing network as build
-    settings, and a file the person chooses read (no entitlements file, no profile), each after the plain setting it qualifies (a plain one after it hides
+    settings, and a file the person chooses read and (slice 6) one they save written (no entitlements file, no profile), each after the plain setting it qualifies (a plain one after it hides
     it) - and no MACOSX_DEPLOYMENT_TARGET; Info-Mac.plist is Info.plist with
     exactly the Mac's differences (MAC_PLIST), so the two can't drift - (slice 2) one of them a value inside a
     dictionary both have, the scene manifest's UIApplicationSupportsMultipleScenes, YES on the Mac (its window closed,
@@ -57,7 +57,7 @@ MAC_SETTINGS = {
     "INFOPLIST_FILE[sdk=macosx*]": "Config/Info-Mac.plist",
     "ENABLE_APP_SANDBOX[sdk=macosx*]": "YES",
     "ENABLE_OUTGOING_NETWORK_CONNECTIONS[sdk=macosx*]": "YES",
-    "ENABLE_USER_SELECTED_FILES[sdk=macosx*]": "readonly",          # the EQ's Import from Files… (the Open panel)
+    "ENABLE_USER_SELECTED_FILES[sdk=macosx*]": "readwrite",         # the EQ's Open panel, and (slice 6) its Save panel
 }
 MAC_PLIST = {
     # macOS refuses LSSupportsOpeningDocumentsInPlace NO (and opens a file in place: EQImport reads it under its scope)
