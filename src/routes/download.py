@@ -91,6 +91,11 @@ class FindCandidatesRequest(BaseModel):
     format_preference: str = "prefer_lossless"
     #? lets the UI re-run a tweaked query when the generated one finds nothing
     query_override: str | None = None
+    #? (2.1.37) A MANUAL search - the iPhone and Mac app's Search Soulseek: an artist and an album as typed,
+    #? no release behind them - ranked by how closely each folder's name fits the words (matching.name_match).
+    #? Declared, as everything here is: pydantic drops an undeclared field without a word, and a manual
+    #? question would then be scored as a trackless Get, a wrong album the words found beside the right one.
+    manual: bool = False
 
 
 class EnqueueFile(BaseModel):
@@ -422,6 +427,10 @@ async def find_candidates(request: Request, body: FindCandidatesRequest, user: s
     try:
         slskd_client = request.app.state.slskd_client
 
+        #? (2.1.37) a manual search is scored against the words, so it needs both; the app never sends one without
+        if body.manual and not (body.artist.strip() and body.album.strip()):
+            raise HTTPException(status_code=400, detail="Type an artist and an album.")
+
         #? before any search starts - a few indexed reads, and per folder held a listing and each
         #? audio file's tags (existing_tracks), in a thread
         store_state = await _store_state(request, body, _asker(user))
@@ -479,6 +488,8 @@ async def find_candidates(request: Request, body: FindCandidatesRequest, user: s
             "year": body.year,
             "edition_tags": body.edition_tags,
             "tracks": [t.model_dump() for t in body.tracks],
+            #? (2.1.37) scored by the folder's name first (matching.score_candidate); False scores as ever
+            "manual": body.manual,
         }
 
         #? in a thread: scoring every folder a search returns is plain CPU, and done on the event

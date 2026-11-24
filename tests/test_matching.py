@@ -11,6 +11,8 @@ Run with:  .venv/bin/python -m pytest tests/ -q
 import sys
 from pathlib import Path
 
+import pytest
+
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from src.matching import (  # noqa: E402
@@ -546,3 +548,224 @@ def test_disc_folders_are_joined_only_when_it_is_certain():
 def test_two_peers_disc_folders_are_never_joined_together():
     responses = [make_response("a", experience_set()[:5]), make_response("b", experience_set()[5:])]
     assert all(not c.get("disc_folders") for c in rank_candidates(responses, EXPERIENCE))
+
+
+# ---------------------------------------------------------------- a manual search (2.1.37)
+#
+# The iPhone and Mac app's Search Soulseek: an artist and an album as typed, no release behind them - no
+# tracklist, no year. Ranked by `name_match`, how closely the folder's name is the typed album and its path
+# the typed artist, 0.80 of the score, with the usual edition, format and availability blend as the rest.
+# The folders are invented, as everything in this file is.
+
+from src.matching import FORMAT_WORDS, MANUAL_NAME_WEIGHT, name_match  # noqa: E402
+
+MANUAL = {"artist": "Radiohead", "album": "OK Computer", "year": None, "tracks": [], "edition_tags": [],
+          "manual": True}
+
+
+def folder_files(directory, count=3, extension="flac"):
+    return [make_file(f"{directory}\\{n:02d} Track {n}.{extension}") for n in range(1, count + 1)]
+
+
+def fit(path, artist="Radiohead", album="OK Computer", files=None):
+    """name_match of a Soulseek path, as group_files_by_directory hands it on ("/" between folders)."""
+    directory = path.replace("\\", "/")
+    return name_match(directory, folder_files(path) if files is None else files, artist, album)
+
+
+def manual_ranked(*responses, expected=None, **kwargs):
+    return rank_candidates(list(responses), expected or MANUAL, **kwargs)
+
+
+def test_an_exact_folder_ranks_above_one_with_extra_words():
+    exact = make_response("alice", folder_files(r"@@a\Music\Radiohead\OK Computer"))
+    extra = make_response("bob", folder_files(r"@@b\Music\Radiohead\OK Computer OKNOTOK 1997 2017"))
+    ranked = manual_ranked(extra, exact)
+    assert [c["username"] for c in ranked] == ["alice", "bob"]
+    assert ranked[0]["signals"]["name_match"] == 1.0
+    #? two of three words: the album fit is 0.67, the artist is in the path
+    assert ranked[1]["signals"]["name_match"] == round(0.65 * 2 / 3 + 0.35, 3)
+
+
+def test_format_words_years_and_disc_markers_cost_nothing():
+    for path in (r"@@a\Radiohead - 1997 - OK Computer [FLAC 24-96]", r"@@a\Radiohead\OK Computer (1997)",
+                 r"@@a\Radiohead\OK Computer CD1", r"@@a\Radiohead\OK Computer WEB", r"@@a\Radiohead\OK Computer 24bit 96khz",
+                 r"@@a\Radiohead\OK Computer [320kbps MP3]", r"@@a\Radiohead\OK Computer (Disc One)"):
+        assert fit(path) == 1.0, path
+
+
+def test_a_disc_folder_is_read_with_its_album():
+    assert fit(r"@@a\Radiohead\OK Computer\CD 1") == 1.0
+    assert fit(r"@@a\Radiohead\OK Computer\Disc 2") == 1.0
+
+
+def test_a_folder_named_only_by_its_format_reads_the_folder_above():
+    assert fit(r"@@a\Radiohead\OK Computer\FLAC") == 1.0
+    assert fit(r"@@a\Radiohead\OK Computer\FLAC 24bit") == 1.0
+    #? once: a format folder above a format folder is not read through to the album
+    assert fit(r"@@a\Radiohead\OK Computer\FLAC\MP3") < 1.0
+
+
+def test_a_self_titled_album_keeps_its_word():
+    assert fit(r"@@a\Music\Weezer - Weezer (1994)", artist="Weezer", album="Weezer") == 1.0
+    assert fit(r"@@a\Music\Weezer\Weezer", artist="Weezer", album="Weezer") == 1.0
+
+
+@pytest.mark.parametrize("artist, album, right, wrong", [
+    #? (review) the artist's word is the album's too, so an "Artist - Other Album" folder kept it and
+    #? outranked the album itself
+    ("Weezer", "Weezer", r"@@b\Weezer\Weezer (Blue Album) [FLAC]", r"@@a\Music\Weezer - Pinkerton"),
+    ("Weezer", "Weezer", r"@@b\Weezer\Weezer - 1994 - Weezer (Blue Album)", r"@@a\Weezer\Weezer - 1996 - Pinkerton"),
+    ("Weezer", "Weezer", r"@@b\Music\Weezer - Weezer", r"@@a\Music\Weezer - Pinkerton (Deluxe Edition)"),
+    ("Peter Gabriel", "Peter Gabriel", r"@@b\Music\Peter Gabriel 3 (Melt)", r"@@a\Music\Peter Gabriel - So (1986)"),
+    ("Peter Gabriel", "Peter Gabriel", r"@@b\Music\Peter Gabriel - Peter Gabriel 3 (Melt)",
+     r"@@a\Peter Gabriel\Peter Gabriel - So (1986)"),
+])
+def test_a_self_titled_search_ranks_the_album_above_the_artists_others(artist, album, right, wrong):
+    expected = {**MANUAL, "artist": artist, "album": album}
+    ranked = manual_ranked(make_response("wrong", folder_files(wrong)), make_response("right", folder_files(right)),
+                           expected=expected)
+    assert [c["username"] for c in ranked] == ["right", "wrong"]
+    assert ranked[0]["score"] > ranked[1]["score"], "outranked, not tied"
+
+
+def test_the_artist_before_a_dash_is_taken_out_once():
+    #? the prefix stops counting, the album's own word still does - and a name that is only the artist and
+    #? noise after it is still the album
+    assert fit(r"@@a\Music\Weezer - Weezer (1994)", artist="Weezer", album="Weezer") == 1.0
+    assert fit(r"@@a\Music\Weezer - 1994 [FLAC]", artist="Weezer", album="Weezer") == 1.0
+    assert fit(r"@@a\Music\Weezer - Pinkerton", artist="Weezer", album="Weezer") == 0.35
+    assert fit(r"@@a\Music\The Beatles - The Beatles (White Album)", artist="The Beatles",
+               album="The Beatles") == pytest.approx(0.65 / 3 + 0.35)
+    #? a hyphen inside a name is not a dash between artist and album
+    assert fit(r"@@a\Music\Jay-Z\Jay-Z [2003]", artist="Jay-Z", album="Jay-Z") == 1.0
+
+
+def test_an_artist_found_only_in_the_file_names_counts():
+    named = [make_file(rf"@@a\Music\OK Computer\{n:02d} Radiohead - Track {n}.flac") for n in range(1, 5)]
+    assert fit(r"@@a\Music\OK Computer", files=named) == 1.0
+    #? in fewer than half the names, it doesn't
+    unnamed = named[:1] + folder_files(r"@@a\Music\OK Computer", count=3)
+    assert fit(r"@@a\Music\OK Computer", files=unnamed) == 0.65
+    assert fit(r"@@a\Music\OK Computer", files=[]) == 0.65
+
+
+def test_the_beatles_fits_beatles_abbey_road():
+    assert fit(r"@@a\Music\Beatles - Abbey Road", artist="The Beatles", album="Abbey Road") == 1.0
+    #? "&" and "and" are one word as far as fit goes
+    assert fit(r"@@a\Music\Simon and Garfunkel - Bookends", artist="Simon & Garfunkel", album="Bookends") == 1.0
+
+
+def test_edition_words_are_the_edition_signals_alone():
+    for path in (r"@@a\Radiohead\OK Computer (Deluxe Edition)", r"@@a\Radiohead\OK Computer [Super Deluxe]",
+                 r"@@a\Radiohead\OK Computer - Remastered", r"@@a\Radiohead\OK Computer (Instrumental)"):
+        assert fit(path) == 1.0, path
+    #? typed with its edition, the album's words are the rest - and the edition signal asks for it
+    assert fit(r"@@a\Radiohead\OK Computer", album="OK Computer (Deluxe Edition)") == 1.0
+
+
+def test_an_album_named_only_by_noise_or_an_edition_word_still_fits():
+    assert fit(r"@@a\Music\Taylor Swift\1989 (2014)", artist="Taylor Swift", album="1989") == 1.0
+    assert fit(r"@@a\Music\Taylor Swift\1989 (2014)", artist="Taylor Swift", album="1988") < 0.5
+    assert fit(r"@@a\Music\The The - Soul Mining", artist="The The", album="Soul Mining") == 1.0
+    assert fit(r"@@a\Music\Harmonia - Deluxe (1975)", artist="Harmonia", album="Deluxe") == 1.0
+
+
+def test_a_different_album_by_the_artist_fits_only_by_its_artist():
+    assert fit(r"@@a\Radiohead\The Bends") == 0.35
+    assert fit(r"@@a\Other\Kid A") == 0.0
+
+
+def test_the_worked_examples():
+    """The plan's table, with prefer_lossless: fit first, then edition, format and availability."""
+    def score(path, **response):
+        return manual_ranked(make_response("p", folder_files(path, extension=response.pop("extension", "flac")),
+                                           **response))[0]["score"]
+
+    slow = {"free_slot": False, "queue": 40, "speed": 1_000}
+    assert round(score(r"@@a\Radiohead\OK Computer", extension="mp3", **slow), 2) == 0.92
+    assert round(score(r"@@a\Radiohead\OK Computer OKNOTOK"), 2) == 0.83
+    assert score(r"@@a\Radiohead\OK Computer") == 1.0
+    assert round(score(r"@@a\Radiohead\OK Computer (Instrumental)"), 2) == 0.95
+
+
+def test_a_perfect_fit_mp3_from_a_slow_peer_ranks_above_a_poorer_fit_flac_from_a_fast_one():
+    mp3 = make_response("slow", folder_files(r"@@a\Radiohead\OK Computer", extension="mp3"),
+                        free_slot=False, queue=40, speed=1_000)
+    flac = make_response("fast", folder_files(r"@@b\Radiohead\OK Computer OKNOTOK"), speed=5_000_000)
+    assert [c["username"] for c in manual_ranked(flac, mp3)] == ["slow", "fast"]
+
+
+def test_between_two_perfect_fits_flac_comes_first_then_the_free_slot():
+    flac = make_response("flac", folder_files(r"@@a\Radiohead\OK Computer"))
+    mp3 = make_response("mp3", folder_files(r"@@b\Radiohead\OK Computer", extension="mp3"))
+    assert [c["username"] for c in manual_ranked(mp3, flac)] == ["flac", "mp3"]
+    free = make_response("free", folder_files(r"@@c\Radiohead\OK Computer"))
+    queued = make_response("queued", folder_files(r"@@d\Radiohead\OK Computer"), free_slot=False, queue=40)
+    assert [c["username"] for c in manual_ranked(queued, free)] == ["free", "queued"]
+
+
+def test_the_score_and_the_fit_stay_between_0_and_1_whatever_the_folder():
+    for directory, files in (("", []), ("@@a/Radiohead/OK Computer", []), ("!!! ??? ...", []),
+                             ("@@a/---/[]", [{"filename": "@@a/---/[]/().flac"}])):
+        value = name_match(directory, files, "Radiohead", "OK Computer")
+        assert 0.0 <= value <= 1.0
+    for artist, album in (("", ""), ("!!!", "???"), ("Radiohead", ""), ("", "OK Computer")):
+        assert 0.0 <= name_match("@@a/Radiohead/OK Computer", [], artist, album) <= 1.0
+    many = [make_response(f"peer{n}", folder_files(rf"@@{n}\Folder {n} {'OK Computer' if n % 3 else 'Other'}"),
+                          free_slot=bool(n % 2), queue=n, speed=n * 1000) for n in range(300)]
+    many.append(make_response("empty", []))
+    ranked = manual_ranked(*many, limit=500)
+    assert len(ranked) == 300
+    for candidate in ranked:
+        assert 0.0 <= candidate["score"] <= 1.0 and 0.0 <= candidate["signals"]["name_match"] <= 1.0
+    assert len(manual_ranked(*many)) == 50, "the limit is still 50"
+
+
+def test_a_manual_question_with_nothing_to_go_on_scores_its_rest_and_nothing_else():
+    candidate = group_files_by_directory([make_response("a", folder_files(r"@@a\x"))])[0]
+    scored = score_candidate(candidate, {**MANUAL, "artist": "", "album": ""})
+    assert scored["signals"]["name_match"] == 0.0
+    assert scored["score"] == round((1 - MANUAL_NAME_WEIGHT) * 1.0, 4)
+
+
+def test_lossless_only_still_drops_lossy_folders_from_a_manual_search():
+    mp3 = make_response("mp3", folder_files(r"@@a\Radiohead\OK Computer", extension="mp3"))
+    flac = make_response("flac", folder_files(r"@@b\Radiohead\OK Computer OKNOTOK"))
+    ranked = manual_ranked(mp3, flac, format_preference="lossless_only")
+    assert [c["username"] for c in ranked] == ["flac"]
+
+
+def test_the_folder_name_is_the_first_reason_a_manual_card_gives():
+    ranked = manual_ranked(make_response("a", folder_files(r"@@a\Radiohead\OK Computer")))
+    assert list(ranked[0]["signals"]) == ["name_match", "title_match", "track_count", "duration_match",
+                                          "edition", "format", "peer"]
+    assert ranked[0]["signals"]["title_match"] is None and ranked[0]["matched_tracks"] == 0
+
+
+def test_format_words_are_the_plans():
+    assert FORMAT_WORDS >= {"flac", "mp3", "web", "cd", "vinyl", "lossless", "hires", "mqa", "v0", "v2", "lp"}
+
+
+#? scores and signals computed from matching.py as it was at 2.1.35, before the manual search existed
+GOLDEN_RESPONSES = (
+    ("alice", r"share\Boards of Canada\Music Has the Right to Children (1998) [FLAC]", "flac", {}),
+    ("bob", r"share\MHTRTC", "mp3", {"free_slot": False, "queue": 40, "speed": 50_000}),
+    ("carol", r"share\BoC - MHTRTC (Deluxe Edition)", "flac", {"queue": 3, "speed": 500_000}),
+)
+GOLDEN_FULL = [("alice", 1.0, (1.0, 1.0, 1.0, 1.0, 1.0, 1.0)), ("carol", 0.89, (1.0, 1.0, 1.0, 0.4, 1.0, 0.75)),
+               ("bob", 0.854, (1.0, 1.0, 1.0, 1.0, 0.45, 0.0))]
+GOLDEN_TRACKLESS = [("alice", 1.0, (None, None, None, 1.0, 1.0, 1.0)),
+                    ("carol", 0.6857, (None, None, None, 0.4, 1.0, 0.75)),
+                    ("bob", 0.5829, (None, None, None, 1.0, 0.45, 0.0))]
+
+
+def test_a_question_without_manual_scores_exactly_as_before():
+    responses = [make_response(user, album_files(path, extension=extension), **peer)
+                 for user, path, extension, peer in GOLDEN_RESPONSES]
+    order = ("title_match", "track_count", "duration_match", "edition", "format", "peer")
+    for expected, golden in ((EXPECTED_BASE, GOLDEN_FULL), ({**EXPECTED_BASE, "tracks": []}, GOLDEN_TRACKLESS)):
+        for question in (expected, {**expected, "manual": False}):
+            ranked = rank_candidates(responses, question)
+            assert [(c["username"], c["score"], tuple(c["signals"][k] for k in order)) for c in ranked] == golden
+            assert all(list(c["signals"]) == list(order) for c in ranked), "no name_match key"

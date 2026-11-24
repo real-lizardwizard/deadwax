@@ -84,3 +84,39 @@ The artist isn't one of the signals: a folder filed under `Ye/` and one filed un
 returns folders whose paths contain every word of the query. So each search runs under the
 album's credited artist, the artist's current name, and any former names MusicBrainz records,
 side by side.
+
+## A manual search
+
+A manual search is the iPhone and Mac app's **Search Soulseek**: an artist and an album typed by hand,
+for an album MusicBrainz doesn't have or one you'd rather find by name. There's no release behind it,
+so there's no tracklist, year or id: track names, track count and track lengths all drop out, as they
+do for an album as a whole. On their own, edition, format and availability can't tell the album you
+typed from another album the same words found, so a manual search adds a seventh signal, **Folder
+name**: *how closely the folder's name is the artist and album you typed*. Nothing on the web sends
+one, and every other search is scored exactly as above.
+
+**Folder name** is mostly the album. The folder's own name (with its album folder, for a disc folder
+like `OK Computer / CD 1`) is compared word for word with the album you typed, and the score is how
+many words the two share out of all the words either has: `OK Computer` against
+`OK Computer OKNOTOK` shares two words out of three. Before they're compared:
+
+- the artist's words are taken out of the folder's name. When the album has them too - a
+  self-titled album - only the artist's own are: the ones before a dash, or one too many. So typed
+  *Weezer* / *Weezer*, `Weezer - Weezer (1994)` and a `Weezer (Blue Album)` folder inside `Weezer/` fit,
+  while `Weezer - Pinkerton` doesn't;
+- format words, years and other numbers, bitrates and sample rates, disc markers, *the*, *a*, *an*
+  and *and* are taken out, unless the album you typed has them (`1989` still fits `1989 (2014)`), so
+  `Radiohead - 1997 - OK Computer [FLAC 24-96]` is a perfect fit;
+- edition words (*deluxe*, *remaster*, *instrumental*… and *edition*) are left to the Edition signal,
+  so they're never counted twice;
+- a folder whose name is nothing but those words - `FLAC` inside `OK Computer` - is read by the folder
+  above it.
+
+The rest of Folder name is the artist: the share of the artist's words found anywhere in the folder's
+path, or in at least half its files' names. The album is 65% of it and the artist 35%.
+
+The score is then **80% Folder name** and 20% the usual blend of edition, format and availability, so
+the folders that are the album you typed come first, and among them, FLAC before MP3 and a free slot
+before a queue: a perfect fit in MP3 from a slow user ranks above a FLAC from a fast one called
+`OK Computer OKNOTOK`. An edition word you typed (*Deluxe*) is asked for as an edition, as it is for a pressing. The
+80% and 65% are reasoned from how folders are named, not yet measured.
