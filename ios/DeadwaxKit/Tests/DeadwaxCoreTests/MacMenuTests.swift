@@ -109,8 +109,8 @@ import Testing
                          // (slice 3) the View menu's frame
                          .sidebar: "\u{2303}\u{2318}S", .upNext: "\u{2325}\u{2318}U", .lyrics: "\u{2325}\u{2318}L",
                          .info: "\u{2318}I",
-                         // (slice 6) File's
-                         .importEQFile: "\u{2318}O"])
+                         // (slice 6) File's - and (slice 7) Server settings' Save changes
+                         .importEQFile: "\u{2318}O", .saveChanges: "\u{2318}S"])
         // no two items share a key
         let keys = MacMenu.Command.allCases.compactMap(MacMenu.key)
         for (i, key) in keys.enumerated() {
@@ -118,8 +118,9 @@ import Testing
         }
         // the Mac's order for the modifiers
         #expect(MacMenu.Modifiers([.command, .shift, .option, .control]).said == "\u{2303}\u{2325}\u{21E7}\u{2318}")
-        // none of ⌘Q, ⌘W, ⌘H, ⌘M, ⌃⌘F - the system's own
-        for taken in ["q", "w", "h", "m"] {
+        // none of ⌘Q, ⌘W, ⌘H, ⌘M, ⌃⌘F - the system's own - nor (slice 7) Edit's ⌘Z, ⌘X, ⌘C, ⌘V and ⌘A, which the event
+        // log's Copy and Select All ride rather than drawing a second of
+        for taken in ["q", "w", "h", "m", "z", "x", "c", "v", "a"] {
             #expect(!keys.contains(MacMenu.Shortcut(.character(Character(taken)), .command)), "\(taken)")
         }
         #expect(!keys.contains(MacMenu.Shortcut(.character("f"), [.control, .command])))
@@ -314,5 +315,88 @@ import Testing
         #expect(MacMenu.item(.importEQFile, busy).enabled)
         // no Controls or View item: it's File's alone
         #expect(!(MacMenu.controls(Self.playing) + MacMenu.view(Self.playing)).flatMap { $0 }.contains { $0.command == .importEQFile })
+    }
+
+    // MARK: (slice 7) File's Save changes, and Tab
+
+    @Test func saveChangesIsServerSettingsOwnButtonOnItsPage() {
+        let open = MacMenu.State(serverSettings: true, saveOpen: true)
+        let item = MacMenu.item(.saveChanges, open)
+        #expect(item.words == "Save changes" && item.words == ServerSettings.save, "the button's own words")
+        #expect(item.shortcut == MacMenu.Shortcut(.character("s"), .command) && item.shortcut?.said == "\u{2318}S")
+        #expect(item.enabled && !item.ticked)
+        // every way it can be: only with the tabs drawn, not under Now Playing, Server settings' page in front and its
+        // button's own rule open - nothing else matters (the music, a sheet that holds the page, a field typing)
+        for tabs in [true, false] {
+            for nowPlaying in [true, false] {
+                for settings in [true, false] {
+                    for saveOpen in [true, false] {
+                        for sheet in [true, false] {
+                            for typing in [true, false] {
+                                let state = MacMenu.State(queued: typing, playing: sheet, typing: typing, tabs: tabs,
+                                                          nowPlaying: nowPlaying, sheet: sheet,
+                                                          serverSettings: settings, saveOpen: saveOpen)
+                                let now = MacMenu.item(.saveChanges, state)
+                                #expect(now.enabled == (tabs && !nowPlaying && settings && saveOpen), "\(state)")
+                                // its key stays drawn, dimmed or not: ⌘S types nothing, so a field keeps it off nothing
+                                #expect(now.shortcut == MacMenu.key(.saveChanges), "\(state)")
+                                #expect(now.words == ServerSettings.save, "never Saving…: dimmed while a save is out")
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        #expect(!MacMenu.yieldsToTyping(.saveChanges))
+        // nothing unsaved (or a save out, or out of reach): dimmed, as the button is
+        #expect(!MacMenu.item(.saveChanges, MacMenu.State(serverSettings: true)).enabled)
+        // another page in front, or another sheet over Server settings (the App says serverSettings false for both)
+        #expect(!MacMenu.item(.saveChanges, MacMenu.State(saveOpen: true)).enabled)
+        // in Set up Navidrome's sheet, which holds Server settings' Connections page: its page is the one in front
+        #expect(MacMenu.item(.saveChanges, MacMenu.State(sheet: true, serverSettings: true, saveOpen: true)).enabled)
+        // File's alone: no Controls or View item
+        #expect(!(MacMenu.controls(open) + MacMenu.view(open)).flatMap { $0 }.contains { $0.command == .saveChanges })
+        // what Settings…, Find and Import EQ File… do is as it was with Server settings in front
+        for command in [MacMenu.Command.settings, .find, .importEQFile, .refresh] {
+            #expect(MacMenu.item(command, open) == MacMenu.item(command, MacMenu.State()), "\(command)")
+        }
+    }
+
+    @Test func tabMovesToTheNextFieldInThePagesOrderAndLeavesTheEndsToTheSystem() {
+        enum Field: Equatable { case artist, album, year, originalYear, edition }
+        let release: [Field] = [.artist, .album, .year, .originalYear, .edition]
+        #expect(MacMenu.tab(release, from: .artist, back: false) == .album)
+        #expect(MacMenu.tab(release, from: .year, back: false) == .originalYear)
+        #expect(MacMenu.tab(release, from: .year, back: true) == .album)
+        // the ends: nothing of the page's - the key left to the system, which moves on out of the fields
+        #expect(MacMenu.tab(release, from: .edition, back: false) == nil)
+        #expect(MacMenu.tab(release, from: .artist, back: true) == nil)
+        // no field of the page's with the cursor: the key isn't the page's at all
+        #expect(MacMenu.tab(release, from: nil, back: false) == nil && MacMenu.tab(release, from: nil, back: true) == nil)
+        #expect(MacMenu.tab([Field](), from: .artist, back: false) == nil)
+        #expect(MacMenu.tab([Field.album], from: .artist, back: false) == nil)
+        // from the first, Tab reaches every field once, in order; from the last, Shift-Tab every one back - each walk
+        // held to one step past the fields, so a Tab that went round would fail here rather than walk for ever
+        var at: Field? = .artist
+        var forward: [Field] = []
+        while let now = at, forward.count <= release.count {
+            forward.append(now)
+            at = MacMenu.tab(release, from: now, back: false)
+        }
+        #expect(forward == release)
+        at = .edition
+        var back: [Field] = []
+        while let now = at, back.count <= release.count {
+            back.append(now)
+            at = MacMenu.tab(release, from: now, back: true)
+        }
+        #expect(back == release.reversed())
+        // Edit tags' fields, in the order the page draws them - its four sections' - across each section's end
+        let tags = TagEdit.sections.flatMap { (section: (title: String, keys: [String])) -> [String] in section.keys }
+        #expect(tags.count == TagEdit.fields.count && Set(tags) == Set(TagEdit.fields.map(\.key)))
+        #expect(MacMenu.tab(tags, from: "tracknumber", back: false) == "album")
+        #expect(MacMenu.tab(tags, from: "album", back: true) == "tracknumber")
+        #expect(MacMenu.tab(tags, from: "originaldate", back: false) == "genre")
+        #expect(MacMenu.tab(tags, from: "composer", back: false) == nil && MacMenu.tab(tags, from: "title", back: true) == nil)
     }
 }

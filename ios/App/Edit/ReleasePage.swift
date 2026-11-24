@@ -18,6 +18,9 @@ struct ReleasePage: View {
         case artist, album, year, originalYear, edition
     }
 
+    /// (The Mac app, slice 7) The fields in the order the page draws them: Tab's on the Mac.
+    private static let order: [Field] = [.artist, .album, .year, .originalYear, .edition]
+
     var body: some View {
         let plan = retag.currentPlan
         Form {
@@ -109,6 +112,7 @@ struct ReleasePage: View {
                 .textInputAutocapitalization(digits ? .never : .words)
                 .autocorrectionDisabled()
                 .focused($focused, equals: name)
+                .tabs($focused, in: Self.order)
         }
     }
 

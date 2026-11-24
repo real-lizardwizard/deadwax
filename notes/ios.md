@@ -16195,3 +16195,241 @@ nothing that crashes on either device and no confirmed bug. What it settled, and
 After the review's fix (23 Nov): both unsigned builds succeeded again, check_project.py ok, pyflakes clean, and
 tests/test_ios_*.py, test_source_bytes.py and test_logins.py 719 passed, 1 skipped. Core was unchanged by it (`swift
 test` as above).
+
+## The Mac app, slice 7: managing on a big screen (2026-11-23)
+
+The Mac app's plan (~/Desktop/Code/deadwax-plans/mac-app.md), slice 7, the last: "The editor and Manage's pages at
+window sizes; Tab between fields, Return in a field never applying, ⌘S for Server settings' Save changes, ⌘C in the
+event log; tables where the phone has lists (Needs a look, People) only if checks 452-458 say the lists don't read
+well wide." Checks 452-458 (docs/ios.md, all not done yet). Built on `ios` from c396eb7. What it leaves alone:
+- src/__init__.py is untouched and the app is still 0.13 (13). There is **no server change**.
+- **ios/Deadwax.xcodeproj is untouched**: the one new file, Core's MacManagingTests.swift, is in the package (found by
+  folder); every other addition is in a file the project or the package already had (MacMenu.swift, MacFrame.swift,
+  EventLog.swift, LibraryCare.swift, ServerSettings.swift in Core; Platform.swift, MacCommands.swift, DeadwaxApp.swift,
+  Routes.swift, DesktopFrame.swift, ReleasePage.swift, TagsPages.swift, PeopleSheets.swift, EventLogScreen.swift,
+  LibraryCareScreen.swift, ServerSettingsScreen.swift, ServerSettingsGroupScreen.swift in the App).
+- **The engine files have no diff**, nor does anything of DeadwaxAudio's.
+- **No word an iPhone shows changes.** iphone.json gained four keys - `LibraryCare.quitNote(covers)`, `(disc)`,
+  `(lyrics)` and `RetimeRun.quitNote` - each `<nil>`: the iPhone says nothing new. Its diff is those four lines;
+  mac.json's is the same four with the Mac's words.
+- **No table.** The plan's tables were conditional on 457; nothing here says the lists read badly wide, and the web's
+  desktop draws Needs a look and People as lists at a readable width - so this slice gives them that width and leaves
+  the tables to what 457 finds.
+- The one switch stays one: `onKeyPress`, `presentationSizing`, `List(selection:)` and the responder chain's Copy are
+  said only in Platform.swift's Mac half; the iPhone half's four new helpers each return the view itself, and its
+  SelectingList is the `List` it was.
+
+### File > Save changes ⌘S (455)
+
+- **Core's MacMenu** has a new command, `saveChanges`: **Save changes** (`ServerSettings.save`, the save bar's own
+  word), ⌘S, in File under Import EQ File… and a divider. Its rule is `tabs && !nowPlaying && serverSettings &&
+  saveOpen`. The State's two new facts:
+  - `serverSettings`: a page of Server settings is the one in front (below);
+  - `saveOpen`: the save bar's own rule, `ServerSettingsModel.saveOpen(online:)` - Settings and the log allowed,
+    deadwax in reach, the settings read, no save on its way, a draft, no check out. The button and the item read one
+    function, so they can't disagree.
+- **Not dimmed by `sheet`** (the rule Settings…, Find and ⌘O have): a sheet over Server settings already makes the page
+  in front the sheet's, so `serverSettings` is false - and the one sheet that holds a page of Server settings, the
+  Library's Set up Navidrome (Connections' group page), is where ⌘S is that sheet's Save changes, as its bar is.
+  **Kept while typing**: a setting's field writes its draft at every key (`settings.edit` in the binding's set), so ⌘S
+  saves what's typed, and ⌘S is no text field's own. Never under the sign-in (`tabs`), never over Now Playing.
+- **The very call**: MacCommands' `perform` is `serverSettings.save()`, the bar's button's - which takes the batch from
+  the drafts as they are (`flow.save(online:allowed:)` checks `saveOpen` again and builds the batch then). Nothing is
+  planned twice or sent by another way.
+- **Which page is in front.** MacRefresh, slice 3's list of the pages and sheet roots showing (each at its sheet's
+  level), has a third kind: `settings`, a page of Server settings, set by `MacSettingsPage` - put on
+  ServerSettingsPageFrame, so on the root, every group page and Set up Navidrome's, with nothing else to remember.
+  `settingsInFront` is whether the latest page at the deepest level (sheet roots aside) is one. ⌘R's `front` leaves
+  them out, so Refresh stays as it was on them (they have none).
+- **No ⌘S in UIKit's own menu** - the evidence, since a key twice throws at launch (slice 3's ⌃⌘S): UIKitMacHelper's
+  MainMenu.nib (macOS 27.2.1, read item by item: 81 items) has ⌘V, ⌘Q, ⌘H, ⇧⌘Z, ⌘M, ⌘:, ⌘C, ⌘A, ⌘W, ⌃⌘F, ⌘;, ⌘Z,
+  ⌘X, ⌥⌘H, ⌥⌘V, ⌘T, ⌘B, ⌘I, ⌘U, ⌘+, ⌘-, ⇧⌘C, ⌥⌘C, ⌘{, ⌘|, ⌘} - no S; UIKitCore's 72 MACMENUITEM strings have no Save;
+  the `.document` menu Catalyst adds is Duplicate, Move, Rename, Export; UIResponderStandardEditActions has no `save:`.
+  ⌘I (Info, slice 3) meets Format's Italic only in the base nib, and Format is emptied. test_ios_mac.py reads every
+  ⌘-letter of MacMenu's against that set. Only a launch proves it, so 452-458 open by asking whether deadwax opens.
+
+### Copy in the event log (456)
+
+- **How lines are selected.** On the Mac the log's List is `List(selection:)` (Platform's SelectingList) bound to a
+  `Set<EventLog.Line.ID>`: since iPadOS 16 (what Catalyst runs: WWDC22's iPad lists) a List with a selection binding
+  selects with a pointer outside edit mode - a click for one, ⌘-click to add, ⇧-click for a run, as a Mac list does -
+  so there is no Edit button. That it does so on the Mac is 456's to show. Its ForEach rows are tagged by their own
+  ids (the lines are Identifiable); the page's line, the spinner and a problem aren't tagged, so can't be selected.
+  The ids are the line's identity (its run, number and when it was taken), so a selection stays on the same lines as
+  new ones come in above. On the iPhone the List is `List(content:)`, as it was, and `selected` is never set.
+- **How ⌘C copies them.** Edit > Copy and Select All are the system's own items: UIKit asks the first responder, and
+  each next one, whether it can (`canPerformAction`), and sends `copy:` or `selectAll:` to the first that says yes. So
+  a view drawing nothing behind the list (SelectionCopier; as a `.background` it is the list's size, behind the
+  collection view, hidden from VoiceOver) answers them: it takes the keyboard's focus each time a selection is made,
+  and again each time a text field lets the cursor go with lines selected (both in a Task after the update, never from
+  a field with the cursor - `TextEditing.shared.typing` - whose own Copy that is), and says yes to `copy:` only while a
+  selected line is still listed (`copies`, a set check - the text, `EventLog.copyText(selected, of:)`, is made only
+  for the copy itself), so Copy is dimmed with nothing selected. `copy:` puts that text on the clipboard; `selectAll:` selects every line listed;
+  every other action goes on up the chain (`super`).
+- **What is copied** is Core's `EventLog.copyText(_ selected:of:in:)`: each line selected that is still listed, in the
+  list's order (newest first, as shown), as the long press copies one (its time, level, part and words), one to a line;
+  nil when none is still listed - a line gone past the 500, or Clear. The right-click Copy (the phone's long press)
+  stays, for one line.
+- **Not taken**: SwiftUI's `copyable(_:)` and `onCopyCommand` are `iOS 27.0` on Catalyst (the SDK's macabi
+  swiftinterface), past the deployment target; a ⌘C item of deadwax's would be a second ⌘C in Edit, which throws at
+  launch; a UIKeyCommand would be the same key twice.
+
+### Sizes (452, 457)
+
+- **Edit album** is the one sheet with pages of its own (Release, Tags, Artwork, Lyrics, Delete album…), drawn for a
+  phone. Core's `MacFrame.sheetSize(width:height:)`: as wide as the readable width (760, the web's
+  `--app-desk-content-max`, what slice 3 keeps a phone's page at) but never closer than `sheetRoom` (40) to either side
+  of the window, and the window's height less 40 above and below - so at every size down to the smallest (880 x 600) it
+  fits inside the window. 40 is chosen, not the web's: the web's Edit is a side panel (`--app-desk-panel`, 470), not a
+  sheet. The size is from DesktopFrame's own geometry (the frame under the title bar: a second `onGeometryChange`,
+  beside the width slice 3 reads), since `PresentationSizingContext` carries nothing of the window; it is given through
+  a `PresentationSizing` of deadwax's (`proposedSize` returns it), which is iOS 18 - macOS 15 - on Catalyst. On macOS
+  14 the sheet is the size macOS gives it, as before.
+- Only Edit album's: Add to a playlist, the EQ, People's sheets and the rest keep the system's own size
+  (test_ios_mac.py counts one `sizedSheet`).
+- **Manage's pages** take slice 3's `readableOnMac()` - the page's scroll views given margins beyond 760, so it reads
+  at that width and scrolls anywhere across the page: Choose the folder, Needs a look, Library care, In nobody's
+  library, Server settings and each group, the event log, People and a person. The web's desktop caps the same pages'
+  bodies at `--app-desk-content-max`. Change password (You's) is as it was.
+
+### Tab and Return (453, 454)
+
+- **Tab.** What Tab does by itself between a SwiftUI Form's fields on Catalyst is UIKit's focus system's, which knows
+  nothing of the page's `@FocusState` or its order, and isn't documented for a Form - so Platform's `tabs(_:in:)`,
+  `onKeyPress` for Tab and back-tab on each field, moves the page's `@FocusState` to the next field of its order, or
+  back with Shift (a back-tab character, U+0019, or Tab with ⇧ - both are read). Core's `MacMenu.tab`
+  is the rule: the next or the one before in the order, nil at either end or from a field not in it - and nil is
+  `.ignored`, so the key is the system's there. Where: Release (Artist, Album, Year, Original year, Edition), Edit tags
+  (its eleven, in TagEdit.sections' order - the order they're drawn), Add a person (four) and Reset password (two).
+  Server settings' fields have no focus of deadwax's, so Tab there is the system's.
+- **Return in a field never applies, saves or deletes** - already so since slice 2, checked now: in Edit/ and Manage/
+  every `onSubmit` moves focus, puts the keyboard away, searches (Choose a release) or unlocks People (a password
+  checked, nothing written), and nothing is `defaultAction` or has a keyboardShortcut. test_ios_mac.py holds it as an
+  allowlist. Change password's last field, You's, still changes it - slice 2's decision.
+- **454** is slice 2's: Delete permanently's Cancel is the dialog's `role: .cancel` (Escape) with `.returnCancels()`.
+
+### Quitting during a run (458)
+
+- **No question first.** A Catalyst app has no `applicationShouldTerminate`: nothing holds a quit from the Dock, a
+  logout or restart, or AppleScript (install-mac.sh's own quit). deadwax's Quit item could be replaced
+  (`CommandGroup(replacing: .appTermination)` is public on Catalyst, and so is UIKit's `UIMenuQuit`) and ask, but that
+  question would cover one way out of several - and look like a promise the others break. (The first write-up said
+  replacing it needed a private path; slice 7's review found both public.) So 458's other half: **the page says what
+  happens**. Under Stop, on the Mac alone, Library care's run says "Quitting deadwax stops the run - open
+  deadwax again, and Get covers carries on." (Get CD art, Get lyrics by kind - `LibraryCare.quitNote(device, kind:)`),
+  and Re-time saved lyrics "Quitting deadwax stops it - open deadwax again, and running it again carries on."
+  (`RetimeRun.quitNote`). nil on the iPhone, where iOS's background time (beginBackgroundTask, slice 5) is the story.
+- **Why that is true.** A run is the app's: one POST per album, from the client. ⌘Q ends the process, so the next
+  album is never asked for. The one in flight: deadwax's middleware is plain ASGI (src/api/app.py), but
+  `/art/fetch`, `/disc_art/fetch` and `/lyrics/fetch` (src/routes/library.py; Re-time is the last with `retime`) never
+  ask `is_disconnected` - only the download route does - so deadwax most likely finishes that album's write after the
+  app has gone. Started again, a run takes only the albums still without (`BulkTargets`), so nothing is done twice;
+  Re-time leaves an album already at the lead as it is.
+
+### Tests, and the faults they were seen to catch
+
+- **Core** (vectors):
+  - MacMenuTests: `theKeysAsThePlanHasThem` has ⌘S, and the system keys deadwax may never take now include ⌘Z, ⌘X, ⌘C,
+    ⌘V and ⌘A. `saveChangesIsServerSettingsOwnButtonOnItsPage` is the whole truth table - tabs, Now Playing, a Server
+    settings page in front, the bar's rule, a sheet, typing - with the key kept drawn, the words the bar's, the item
+    File's alone and every other item as it was.
+    `tabMovesToTheNextFieldInThePagesOrderAndLeavesTheEndsToTheSystem`: Release's order, the ends, no field, a field
+    not in the order, the walk forward and back (each held to one step past the fields), and Edit tags' sections
+    flattened across each section's end.
+  - MacFrameTests' `aSheetWithPagesFitsTheWindowAtEverySize`: the opening window (760 x 740), the smallest (760 x 520
+    for 880 x 600), a grid of windows from the smallest (less 60 of title bar) to 3000 x 2000 - inside the window by 40
+    each side, 760 wide, more than 400 tall - and below the smallest (620 x 320 for 700 x 400; 0 for 0).
+  - MacManagingTests (new, 3): Copy puts the lines selected as shown, newest first, one to a line, and leaves the
+    others; nothing selected, or nothing still listed, copies nothing; a run's quit words on the Mac, none on the
+    iPhone.
+  - DeviceWordsTests writes the four quit words into both fixtures and lists them among the Mac's own.
+  - Faults seen: Save changes enabled without the bar's rule; over Now Playing; on ⌘C; saying Saving…; Tab wrapping
+    round (at first the walk had no bound and the run hung, so it was bounded: then it failed, five issues); the sheet
+    as wide as the window; the window's full height; Copy oldest first; Copy giving "" for none; the quit note on the
+    iPhone; Re-time's reworded - each failed the test meant for it (and the words snapshot, for the last two).
+- **App** (tests/test_ios_mac.py, read as Swift reads it, seven new):
+  - ⌘S: the item drawn once, its perform the bar's `serverSettings.save()` and the last case, the bar's button the same
+    call under the same rule, every page of Server settings through its one frame, `settingsInFront` and the page
+    modifier (a page, never a sheet's root);
+  - no ⌘-letter of MacMenu's is one the system's menus have (⌘I aside: Format's, emptied), and no ⌘C or ⌘A of
+    deadwax's anywhere;
+  - the log's SelectingList, its copy closure Core's, the copier's four overrides (every other action to `super`), the
+    focus taken after the update and never from a field typing, the iPhone's List as it was;
+  - Edit album's `sizedSheet` from the window's two sizes, only there, iOS 18 only; every Manage page readable,
+    Change password as it was;
+  - Tab on each field after its own focus (1, 1 and 6 by file), the orders as drawn, Shift read both ways; every
+    `onSubmit` in Edit/ and Manage/ on an allowlist, no `defaultAction` or keyboardShortcut there;
+  - the quit note under each run's Stop, Core's words, and no `applicationShouldTerminate` or `terminate(`.
+  - Updated: the wiring test's MacCommands call, the refresh test's three registrations and `front` leaving Server
+    settings out, the menu test's File group, state reads and perform, the iPhone-half helper list (four more, and the
+    Mac-only names that mustn't be in it).
+  - `MacFrame.sheet` was renamed `sheetSize`: test_ios_mac.py's carrying-wrappers check (every presentation through
+    appSheet) read `MacFrame.sheet(` as a SwiftUI `.sheet(`.
+  - Faults seen (each restored byte for byte), each failing the test meant for it: ⌘S's perform calling Discard; the
+    item's rule without the bar's (`saveOpen: true`); no page of Server settings known (`.macSettingsPage()` gone);
+    `settingsInFront` counting a sheet's root; ⌘R's `front` counting Server settings' pages (the ⌘R test); Copy always
+    on; the focus taken from a field typing; every other action swallowed (`false` for `super`); the iPhone's list
+    selecting (and the iPhone-half test); a ⌘C of deadwax's (`.keyboardShortcut("c")` on Clear - the key test, and the
+    Tab test's no-keyboardShortcut rule); the log's list a plain List; Edit album not sized; People not readable; the
+    sizing without its iOS 18 availability; a field without Tab; Release's order not the drawn order; Shift-Tab read as
+    Tab; Return applying (Add a person's last field creating); no quit note under a care run, or under Re-time; Core's
+    Save changes on ⌘W (the system-keys test).
+
+### What is verified, and what only James's Mac can say
+
+Verified here (23 Nov): `swift test` (2147 tests in 219 suites, 158 in 17, 12 in 1 - all passed); the unsigned
+iPhone build (Debug) and Mac build (Release, Mac Catalyst, arm64) both succeeded, with no warning but AppIntents'
+usual one; check_project.py ok; pyflakes clean; tests/test_ios_*.py, test_source_bytes.py and test_logins.py 725
+passed, 1 skipped. ios/Deadwax.xcodeproj, src/, ui/ and DeadwaxAudio: no diff. Nothing was run, installed or
+launched.
+
+Not verified - each is a 452-458 question:
+- **Whether the menus have ⌘S twice** - none was found in macOS's own (above), but a duplicate throws at launch, so
+  452-458 ask first whether deadwax opens.
+- **Whether `List(selection:)` selects with clicks on the Mac** without edit mode, and what it draws: the selected
+  rows' highlight once the copier has the keyboard (it may turn the inactive grey), and whether the arrow keys still
+  move the selection after a click - the copier takes the focus from the list, so they may not. If they don't, or the
+  highlight is unreadable, the next step is the copier as the list's own key handler (`onKeyPress` for the arrows)
+  rather than a second responder (456).
+- **Whether Copy is enabled at once after a click**: the copier asks for the focus in a Task after the update, so a
+  ⌘C pressed in the same instant could meet the old first responder. With a field of the sidebar's typing, Copy is
+  that field's - by design.
+- **Whether `onKeyPress` sees Tab in a field.** A UITextField on Catalyst may take Tab for UIKit's own focus move
+  before SwiftUI's handler hears it; then Tab is the system's, and in what order is 453's to say. Shift-Tab is read
+  both ways (back-tab, and Tab with ⇧) since which Catalyst sends isn't documented.
+- **The sheet's size**: `presentationSizing` with a custom size is macOS 15's; whether Catalyst honours both sizes,
+  and whether the sheet follows a window resized under it (the size is re-read as the window changes, but a sheet
+  already up may keep its first), is 452's. On macOS 14 it is the system's size.
+- **⌘S under an alert**: the menu's rule knows sheets, not alerts - Clear saved answers' confirmation over its page
+  leaves ⌘S on, and it would save the drafts as the bar's button does (as slice 6's review found for ⌘O). Not
+  changed: the save is the button's own, and nothing in the dialog is lost by it.
+- **What happens at ⌘Q mid-run** (458): whether the album in flight is written (most likely, from the routes as read),
+  and whether macOS shows anything as deadwax quits with a request out.
+- **457**: whether Needs a look and People read well at 760 - the tables wait on that answer.
+
+### The review (24 Nov)
+
+One review of the slice's diff. Nothing would crash at launch or change the iPhone; three things were changed:
+
+- **The copier tried again only on a new selection.** Its focus was asked for in `.onChange(of: selection)` alone, so a
+  click that landed while the sidebar's search still had the cursor was refused (by design: that Copy is the field's)
+  and never asked again - the same line clicked once more is the same selection, and nothing changes. The docs' advice
+  was exactly that ("click a line again"). Now it is also asked for each time a field lets the cursor go with lines
+  selected (`.onChange(of: TextEditing.shared.typing)`), and the docs say "click another line", or Tab away from the
+  field. Not covered still: the list itself taking the focus back with the same lines selected - 456 says whether that
+  happens.
+- **The reason ⌘Q doesn't ask was wrong.** The write-up and docs/ios.md said replacing Quit needed a private path, or
+  that macOS gives no way. Both `CommandGroup(replacing: .appTermination)` and `UIMenuQuit` are public on Catalyst;
+  what is missing is a hold on the other ways out (the Dock, a logout, AppleScript). The choice stands (the plan
+  allowed either), its reason is now the true one.
+- **Copy was asked for at the cost of the whole text.** `canPerformAction(copy:)` built every selected line's text -
+  500 after Select All - each time the menu was checked. Now it asks `copies`, whether a selected line is still listed
+  (a set check, the same rule as `EventLog.copyText`'s nil), and the text is made for the copy alone.
+- And: the copier is "a view drawing nothing", not "of no size" (a `.background` is the list's size); and
+  `test_no_key_of_deadwaxs_is_one_the_systems_menus_have` compared only plain-⌘ keys - it now compares every key of
+  deadwax's with more than ⌘ (⌃⌘S, ⌥⌘U, ⌥⌘L, ⌥⌘→, ⌥⌘← - the arrows aren't characters, so the three it reads)
+  against the nib's (⇧⌘Z, ⌥⌘H, ⌃⌘F, ⌥⇧⌘V, ⇧⌘C, ⌥⌘C, ⌥⌘V).
+
+Left as they were, from the review's list of what only a Mac can say: whether the arrow keys still move the selection
+once the copier has the focus (it takes it at each selection, arrow-made ones too), the inactive highlight of the
+selected rows, Tab inside a field, and the sheet following a resized window - 452, 453 and 456.

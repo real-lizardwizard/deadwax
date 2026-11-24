@@ -240,6 +240,11 @@ enum DeviceWords {
         add("EQWords.Export.items", EQWords.Export.items(device).map { (section: [EQWords.Export.Item]) -> String in
             section.map { "\($0.way.rawValue): \($0.words)" }.joined(separator: " | ")
         }.joined(separator: " || "))
+        // (slice 7) what quitting does to a run under way - the Mac's alone
+        for kind in BulkTargets.kinds {
+            add("LibraryCare.quitNote(\(kind.rawValue))", LibraryCare.quitNote(device, kind: kind))
+        }
+        add("RetimeRun.quitNote", RetimeRun.quitNote(device))
         add("EQOutputs.speaker", Self.output(EQOutputs.speaker(device)))
         for port in EQPort.allCases {
             let p = EQRoutePort(port: port, portType: "Type", name: "James's AirPods Pro", uid: "u-1")
@@ -482,6 +487,9 @@ enum DeviceWords {
             "People.savedWords",
             // slice 6's (notes/ios.md "The Mac app, slice 6: EQ files"): Export…'s Save panel beside its share
             "EQWords.Export.items",
+            // slice 7's (notes/ios.md "The Mac app, slice 7: managing on a big screen"): what quitting does to a run
+            "LibraryCare.quitNote(covers)", "LibraryCare.quitNote(disc)", "LibraryCare.quitNote(lyrics)",
+            "RetimeRun.quitNote",
         ]
         // a line of the downloads' everyLine (the banned-words checks' list) is no word of its own: one that differs
         // repeats a named word - or one part of one, a banner's line - on both devices, and is held where that is

@@ -73,6 +73,31 @@ import Testing
         let page = 1687.0
         #expect(page - 2 * MacFrame.readableMargin(width: page) == MacFrame.readableWidth)
     }
+
+    @Test func aSheetWithPagesFitsTheWindowAtEverySize() {
+        // (slice 7) Edit album over the window as it opens: the readable width, the window's height less the room
+        #expect(MacFrame.sheetSize(width: MacFrame.openingWidth, height: MacFrame.openingHeight)
+                == MacFrame.Size(width: MacFrame.readableWidth, height: MacFrame.openingHeight - 2 * MacFrame.sheetRoom))
+        #expect(MacFrame.sheetSize(width: 1280, height: 820) == MacFrame.Size(width: 760, height: 740))
+        // the smallest window: still the readable width - 880 less the room is wider - inside it
+        #expect(MacFrame.sheetSize(width: MacFrame.smallestWidth, height: MacFrame.smallestHeight)
+                == MacFrame.Size(width: 760, height: 520))
+        // every window from the smallest up, its page under a title bar of any height: inside it with room either side,
+        // never wider than its pages read well, and as tall as the window leaves
+        for width in stride(from: MacFrame.smallestWidth, through: 3000, by: 53) {
+            for height in stride(from: MacFrame.smallestHeight - 60, through: 2000, by: 71) {
+                let sheet = MacFrame.sheetSize(width: width, height: height)
+                #expect(sheet.width + 2 * MacFrame.sheetRoom <= width, "\(width) x \(height)")
+                #expect(sheet.height + 2 * MacFrame.sheetRoom == height, "\(width) x \(height)")
+                #expect(sheet.width == MacFrame.readableWidth, "\(width): wider than the readable width")
+                #expect(sheet.height > 400, "\(height): room for a page of rows")
+            }
+        }
+        // narrower than the readable width and its room (no window is, but the rule holds), and nothing at all
+        #expect(MacFrame.sheetSize(width: 700, height: 400) == MacFrame.Size(width: 620, height: 320))
+        #expect(MacFrame.sheetSize(width: 0, height: 0) == MacFrame.Size(width: 0, height: 0))
+        #expect(MacFrame.sheetRoom == 40)
+    }
 }
 
 @Suite struct MacSidebarTests {

@@ -16,6 +16,9 @@ struct AddPersonSheet: View {
 
     private enum Field: Hashable { case user, name, password, again }
 
+    /// (The Mac app, slice 7) The fields in the order the sheet draws them: Tab's on the Mac.
+    private static let order: [Field] = [.user, .name, .password, .again]
+
     var body: some View {
         let flow = people.flow
         let writing = flow.writing(.create)
@@ -32,11 +35,13 @@ struct AddPersonSheet: View {
                         .autocorrectionDisabled()
                         .submitLabel(.next)
                         .focused($focused, equals: .user)
+                        .tabs($focused, in: Self.order)
                         .onSubmit { focused = .name }
                     TextField(People.displayLabel, text: people.typing(\.add.name, at: .add, most: People.displayField))
                         .autocorrectionDisabled()
                         .submitLabel(.next)
                         .focused($focused, equals: .name)
+                        .tabs($focused, in: Self.order)
                         .onSubmit { focused = .password }
                     SecureField(People.passwordLabel,
                                 text: people.typing(\.add.password, at: .add, most: People.passwordField))
@@ -45,6 +50,7 @@ struct AddPersonSheet: View {
                         .autocorrectionDisabled()
                         .submitLabel(.next)
                         .focused($focused, equals: .password)
+                        .tabs($focused, in: Self.order)
                         .onSubmit { focused = .again }
                     SecureField(People.againLabel, text: people.typing(\.add.again, at: .add, most: People.passwordField))
                         .textContentType(.newPassword)
@@ -52,6 +58,7 @@ struct AddPersonSheet: View {
                         .autocorrectionDisabled()
                         .submitLabel(.done)
                         .focused($focused, equals: .again)
+                        .tabs($focused, in: Self.order)
                         .onSubmit { focused = nil }
                     if let problem = People.formProblem(flow.add) {
                         // what's wrong as typed: read where it is, never announced at each key
@@ -133,6 +140,9 @@ struct ResetPasswordSheet: View {
 
     private enum Field: Hashable { case password, again }
 
+    /// (The Mac app, slice 7) The fields in the order the sheet draws them: Tab's on the Mac.
+    private static let order: [Field] = [.password, .again]
+
     init(id: String, person: PeoplePerson?) {
         self.id = id
         _opened = State(initialValue: person)
@@ -153,6 +163,7 @@ struct ResetPasswordSheet: View {
                         .autocorrectionDisabled()
                         .submitLabel(.next)
                         .focused($focused, equals: .password)
+                        .tabs($focused, in: Self.order)
                         .onSubmit { focused = .again }
                     SecureField(People.newAgainLabel,
                                 text: people.typing(\.resetPasswords.again, at: .reset(id), most: People.passwordField))
@@ -161,6 +172,7 @@ struct ResetPasswordSheet: View {
                         .autocorrectionDisabled()
                         .submitLabel(.done)
                         .focused($focused, equals: .again)
+                        .tabs($focused, in: Self.order)
                         .onSubmit { focused = nil }
                     if let problem = People.resetProblem(flow.resetPasswords, user: user) {
                         PeopleLine(text: problem, quiet: true)

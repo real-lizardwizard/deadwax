@@ -16,11 +16,17 @@ import UIKit
 /// with Try again, and the stream still says what happens from now. Gone out of reach, the lines are how they were under
 /// the amber line Edit album has. With Reduce Motion new lines don't slide in; VoiceOver reads each line once, its words
 /// first; at the largest text sizes a line's time, level and part stack over its words.
+///
+/// (The Mac app, slice 7) On the Mac the lines are selected as a Mac list's rows are - a click, ⌘-click, ⇧-click, or
+/// Edit > Select All - and Edit > Copy (⌘C) copies those selected, as shown (EventLog.copyText): Platform's SelectingList
+/// and copiesSelection. On the iPhone the list is as it was, and `selected` is never set.
 struct EventLogScreen: View {
     @Environment(EventLogModel.self) private var log
     @Environment(Reachability.self) private var reachability
     @Environment(AppNavigation.self) private var navigation
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    /// (Slice 7) The lines selected, the Mac's alone: their identities, which stay the same lines as others come.
+    @State private var selected: Set<EventLog.Line.ID> = []
 
     var body: some View {
         let feed = log.feed
@@ -75,7 +81,7 @@ struct EventLogScreen: View {
     }
 
     @ViewBuilder private func lines(_ feed: EventStream.Feed) -> some View {
-        List {
+        SelectingList(selection: $selected) {
             Section {
                 Text(EventLog.pageLine)
                     .font(Typeface.footnote)
@@ -119,6 +125,10 @@ struct EventLogScreen: View {
                 transaction.disablesAnimations = true
                 transaction.animation = nil
             }
+        }
+        // (slice 7) Edit > Copy and Select All on the Mac: the lines selected, as shown, newest first
+        .copiesSelection($selected, of: feed.log.lines.map(\.id)) { (chosen: Set<EventLog.Line.ID>) -> String? in
+            EventLog.copyText(chosen, of: log.feed.log.lines)
         }
     }
 }

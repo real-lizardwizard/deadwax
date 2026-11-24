@@ -310,6 +310,15 @@ public enum EventLog {
             .joined(separator: " ")
     }
 
+    /// (The Mac app, slice 7) What Edit > Copy (⌘C) puts on the clipboard from the lines selected: each as Copy puts one
+    /// (copyText), one to a line, in the order the page shows them - newest first - whatever order they were selected in.
+    /// nil with none of them still listed (Clear, or gone with the oldest): Copy is dimmed then.
+    public static func copyText(_ selected: Set<Line.ID>, of lines: [Line], in zone: TimeZone = .current) -> String? {
+        let chosen = lines.filter { (line: Line) -> Bool in selected.contains(line.id) }
+        guard !chosen.isEmpty else { return nil }
+        return chosen.map { (line: Line) -> String in copyText(line, in: zone) }.joined(separator: "\n")
+    }
+
     /// The phone's own: what VoiceOver reads of a line, once - its words, then its level, time and part.
     public static func spoken(_ line: Line, in zone: TimeZone = .current) -> String {
         var parts = [line.eventContent]

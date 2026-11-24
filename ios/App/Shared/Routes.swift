@@ -836,16 +836,18 @@ extension View {
                 case .allSongs: SongsScreen()
                 case .group(let group): GroupView(route: group).readableOnMac()
                 case .mbArtist(let artist): MBArtistView(route: artist).readableOnMac()
-                case .chooseFolder: ChooseFolderScreen()
-                case .needsALook: NeedsLookScreen()
-                case .libraryCare: LibraryCareScreen()
-                case .heldByNobody: HeldByNobodyScreen()
-                case .serverSettings: ServerSettingsScreen()
-                case .serverSettingsGroup(let id): ServerSettingsGroupScreen(id: id)
-                case .eventLog: EventLogScreen()
+                // (the Mac app, slice 7) Manage's pages at the same readable width - the web's desktop draws Needs a
+                // look, Server settings, the event log and Library care so - their lists' rows never a window wide
+                case .chooseFolder: ChooseFolderScreen().readableOnMac()
+                case .needsALook: NeedsLookScreen().readableOnMac()
+                case .libraryCare: LibraryCareScreen().readableOnMac()
+                case .heldByNobody: HeldByNobodyScreen().readableOnMac()
+                case .serverSettings: ServerSettingsScreen().readableOnMac()
+                case .serverSettingsGroup(let id): ServerSettingsGroupScreen(id: id).readableOnMac()
+                case .eventLog: EventLogScreen().readableOnMac()
                 case .changePassword: ChangePasswordScreen()
-                case .people: PeopleScreen()
-                case .person(let id): PersonScreen(id: id)
+                case .people: PeopleScreen().readableOnMac()
+                case .person(let id): PersonScreen(id: id).readableOnMac()
                 }
             }
             .clearsPlayer()

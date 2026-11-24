@@ -231,6 +231,13 @@ private struct RetimeSection: View {
                     .font(Typeface.footnote)
                     .foregroundStyle(Palette.quiet)
                     .fixedSize(horizontal: false, vertical: true)
+                // (the Mac app, slice 7) what ⌘Q does to it; none on the iPhone
+                if let quit = RetimeRun.quitNote(Platform.device) {
+                    Text(quit)
+                        .font(Typeface.footnote)
+                        .foregroundStyle(Palette.quiet)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
             } else {
                 Button(RetimeRun.button) {
                     settings.startRetime()

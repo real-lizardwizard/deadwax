@@ -31,6 +31,8 @@ struct DesktopFrame: View {
 
     /// The window's width: how a panel is drawn (MacFrame.panelStyle).
     @State private var width: Double = MacFrame.openingWidth
+    /// (Slice 7) And its height, under the title bar: with the width, Edit album's sheet's size (MacFrame.sheetSize).
+    @State private var height: Double = MacFrame.openingHeight
 
     private var style: MacFrame.PanelStyle { MacFrame.panelStyle(width: width) }
 
@@ -69,6 +71,11 @@ struct DesktopFrame: View {
         } action: { (now: Double) -> Void in
             width = now
         }
+        .onGeometryChange(for: Double.self) { (frame: GeometryProxy) -> Double in
+            Double(frame.size.height)
+        } action: { (now: Double) -> Void in
+            height = now
+        }
         .onChange(of: style, initial: true) { (_: MacFrame.PanelStyle, now: MacFrame.PanelStyle) -> Void in
             navigation.macPanelStyle = now
         }
@@ -83,8 +90,10 @@ struct DesktopFrame: View {
                 .macSheet()
         }
         .appSheet(item: $navigation.albumEdit, onDismiss: { navigation.editorDismissed() }) { (request: AlbumEditRequest) in
+            // (slice 7) its pages at the readable width, as tall as the window leaves: never past the window's edges
             EditAlbumSheet(request: request)
                 .macSheet()
+                .sizedSheet(MacFrame.sheetSize(width: width, height: height))
         }
         .onChange(of: navigation.nowPlayingShown, initial: true) { (_: Bool, shown: Bool) -> Void in
             //? Now Playing never opens on the Mac (MacFrame.opensNowPlaying): nothing here opens it, nor stays opened

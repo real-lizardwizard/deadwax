@@ -213,6 +213,13 @@ struct LibraryCareScreen: View {
                     .font(Typeface.footnote)
                     .foregroundStyle(Palette.quiet)
                     .fixedSize(horizontal: false, vertical: true)
+                // (the Mac app, slice 7) what ⌘Q does to it - nothing keeps it going past a quit; none on the iPhone
+                if let quit = LibraryCare.quitNote(Platform.device, kind: kind) {
+                    Text(quit)
+                        .font(Typeface.footnote)
+                        .foregroundStyle(Palette.quiet)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
             } else if let targets, !targets.isEmpty {
                 Button(LibraryCare.startLabel(kind, count: targets.count)) {
                     care.start(kind)

@@ -1328,6 +1328,11 @@ public struct RetimeRun: Sendable, Equatable {
         + "again is safe."
     /// Said while a run is under way and its page is in front.
     public static let screenOnNote = "The screen stays on while it runs and this page shows."
+    /// (The Mac app, slice 7) Under a run under way on the Mac: ⌘Q stops it (the app's own, an album at a time), and
+    /// running it again is safe. None on the iPhone, where closing the app is going to the background, said as it stops.
+    public static func quitNote(_ device: Device) -> String? {
+        device == .mac ? "Quitting deadwax stops it - open deadwax again, and running it again carries on." : nil
+    }
 }
 
 // MARK: Connections

@@ -225,19 +225,21 @@ happens in `~/Library/Caches/deadwax-build`, and the last build's whole log is `
 The same app runs on a Mac too, built from the same code through Apple's Mac Catalyst - not the web app in a window,
 and not a second app. It's the same version as the phone's (app 0.13 (13) now), it talks only to deadwax as the phone
 does, and it plays through the same audio engine: seamless joins, normalization, the EQ, downloads. **This is its
-sixth build** - the first ran and played (the Mac app's slice 1), the second added the Mac's menus, keyboard shortcuts
+seventh build** - the first ran and played (the Mac app's slice 1), the second added the Mac's menus, keyboard shortcuts
 and right-click menus, and a window you can close while the music plays (slice 2), the third laid the window out as the
 web app's desktop is laid out - a sidebar, the page, side panels and a player bar (slice 3), the fourth gave it the
 Mac's own words - **This Mac** where the phone says This phone (slice 4), the fifth pauses for sleep and for headphones
 taken out, reads a Mac's power for Only while charging, keeps a long run's display on, keeps work going with the
-window hidden, and says the Mac's words for Download over (slice 5); this one brings EQ files in and out the Mac's way -
+window hidden, and says the Mac's words for Download over (slice 5), the sixth brings EQ files in and out the Mac's way -
 **File > Import EQ File…** ⌘O, Export…'s Save panel, Finder's Open With and a file dropped on the window or the Dock
-(slice 6). **Most of it is still unchecked on a Mac** - it
+(slice 6); this one is looking after deadwax on a big screen - Edit album sized by the window, Manage's pages at a
+readable width, **File > Save changes** ⌘S for Server settings, Tab between the editor's fields, and the event log's
+lines selected and copied with ⌘C (slice 7). **Most of it is still unchecked on a Mac** - it
 has been opened and used on one since the first build (17 Nov), but what only a Mac can tell is what its checks are
 for ([404-415](#the-mac-apps-checks-404-415),
 [416-423](#the-mac-apps-menus-keys-and-window-checks-416-423), [424-433](#the-mac-apps-desktop-frame-checks-424-433),
-[434-438](#the-mac-apps-words-checks-434-438), [439-446](#the-mac-apps-sleep-power-and-downloads-checks-439-446)
-and [447-451](#the-mac-apps-eq-files-checks-447-451)).
+[434-438](#the-mac-apps-words-checks-434-438), [439-446](#the-mac-apps-sleep-power-and-downloads-checks-439-446),
+[447-451](#the-mac-apps-eq-files-checks-447-451) and [452-458](#the-mac-apps-managing-checks-452-458)).
 
 **What it is today.** The window is laid out as the web app's desktop is, whatever its size: the **sidebar** at the
 left, the **page** you're on beside it, **Up Next, Lyrics or Info** in a panel at the right when you open one, and the
@@ -301,8 +303,8 @@ and adds deadwax's:
 | menu | what deadwax adds |
 | --- | --- |
 | **deadwax** | About deadwax, **Settings…** ⌘, (the Settings tab), Hide deadwax ⌘H, Quit deadwax ⌘Q |
-| **File** | **Import EQ File…** ⌘O: the Mac's Open panel, for an EQ setting's `.txt` (see EQ files below); Close Window ⌘W - and no New Window: there is only ever one window |
-| **Edit** | **Find** ⌘F: the cursor in the sidebar's search field, the sidebar shown if it was hidden |
+| **File** | **Import EQ File…** ⌘O: the Mac's Open panel, for an EQ setting's `.txt` (see EQ files below); **Save changes** ⌘S: Server settings' Save changes, while one of its pages is in front (see Managing below); Close Window ⌘W - and no New Window: there is only ever one window |
+| **Edit** | **Find** ⌘F: the cursor in the sidebar's search field, the sidebar shown if it was hidden. The Mac's own **Copy** ⌘C and **Select All** ⌘A also copy and select the event log's lines (see Managing below) |
 | **View** | **Show Sidebar** or **Hide Sidebar** ⌃⌘S; **Up Next** ⌥⌘U, **Lyrics** ⌥⌘L, **Info** ⌘I - each opens its panel, or closes it, ticked while it shows; **Refresh** ⌘R: the page you're on, asked again (see below) |
 | **Controls** | **Play** or **Pause** (Space), **Next** ⌘→, **Previous** ⌘←, **Forward 10 Seconds** ⌥⌘→, **Back 10 Seconds** ⌥⌘←, **Shuffle**, **Repeat** (Repeat off, Repeat all, Repeat one - the one that's on is ticked), **Go to Current Song** ⌘L (the album of the song playing) |
 
@@ -314,7 +316,8 @@ Repeat submenu's three items are the words Up Next says to VoiceOver as Repeat c
 one. Up Next and Info are dimmed with nothing queued (unless open: then they close it), and Lyrics too, and for a song
 known to have none. **While a sheet is up** (Edit album, Add to a playlist, the EQ, a cover full size - any of them)
 Settings…, Import EQ File…, Find, Refresh, Go to Current Song, the sidebar and the panels are dimmed: they'd act on the
-window under the sheet - and all of them until you're signed in. **While a text field has the
+window under the sheet - and Save changes is, unless the sheet is Server settings' own page (the Library's Set up
+Navidrome) - and all of them until you're signed in. **While a text field has the
 cursor** - Search, Find in the Library, a name - Space types a space and ⌘→ and ⌘← move along the line: they don't
 play, pause or skip then (their menu items still do). Forward and Back stay within the song. There's no volume of deadwax's own: the Mac's
 volume keys and menu bar volume work, as for any app.
@@ -371,6 +374,31 @@ The rest of the differences:
   `<output name> EQ.txt` as the phone's share names it, and write it where you save it; then **Share the Whole Curve**
   and **Share the Correction Alone** hand it to the Mac's Share menu - AirDrop, Mail. The correction alone needs a
   correction, as on the phone (dimmed otherwise). A file saved or shared imports again.
+- **Managing on a big screen.**
+  - **Edit album** is a sheet 760 points wide - the width an album's page reads at - and as tall as the window less 40
+    points above and below, so it always fits inside the window, whatever its size (on macOS 15 or later; on macOS 14
+    it's the size macOS gives a sheet). Release, Tags, Artwork, Lyrics and Delete album… open inside it, as on the phone.
+  - **Manage's pages** - Edit an album's Choose the folder, Needs a look, Library care, In nobody's library, Server
+    settings and each of its groups, the event log, People and a person's page - sit in the middle of the page at the
+    same readable width as an album's, scrolling with the pointer anywhere across the page.
+  - **Tab** goes to the next field, and **Shift-Tab** back, in the order they're drawn: Edit album's Release and Edit
+    tags, People's Add a person and Reset password. Past the last field (or before the first) Tab is the Mac's own.
+  - **Return in a field never applies, saves or deletes** there: Apply, Save changes and Delete permanently are clicks.
+    In Add a person and Reset password, Return goes to the next field; in People's Unlock, it unlocks; in Choose a
+    release, it searches. Change password is as on the phone: Return in its last field changes it.
+  - **File > Save changes** ⌘S is Server settings' **Save changes**, the same as clicking it: on while a Server settings
+    page is in front with something unsaved; dimmed while nothing is, while a save is on its way, with deadwax out of
+    reach, and with another page or sheet in front.
+  - **The event log's lines** are selected as a Mac list's rows are: click a line, ⌘-click to add another, ⇧-click for
+    a run of them, or - once a line is selected - **Edit > Select All** ⌘A for every one. **Edit > Copy** ⌘C copies
+    them as they're shown - each line's time, level, part and words, one to a line, newest first - ready to paste into
+    Notes or a message. Copy is dimmed with no line selected. Right-click a line for Copy of that one line, as before.
+  - **A run and ⌘Q.** While a Library care run (or Re-time saved lyrics) is under way its page says what quitting
+    does: "Quitting deadwax stops the run - open deadwax again, and Get covers carries on." (Get CD art or Get lyrics
+    for theirs; "Quitting deadwax stops it - open deadwax again, and running it again carries on." for Re-time). ⌘Q
+    doesn't ask first: deadwax's own Quit could ask, but quitting from the Dock, by logging out or restarting can't
+    be asked about in an app like this one, so the page says it instead - and the run stops there. Started again, a run
+    takes only the albums still without, and Re-time leaves an album already at the lead as it is.
 - **The Mac's Now Playing** - in Control Center and the menu bar - shows the song, its artist and cover, and whether
   it's playing or paused; its buttons, the keyboard's media keys (F7, F8, F9) and AirPods' presses play, pause and
   skip, as the lock screen's do on the phone.
@@ -418,8 +446,8 @@ The rest of the differences:
 - **Still the phone's words**: in Debug (an admin's), some of the audio engine's rarer errors, which say "phone" or
   "iOS".
 
-Still to come, in a build of its own: Edit album and Manage's pages made for a Mac's window, and their keys - Tab
-between fields, ⌘S for Server settings' Save changes, ⌘C in the event log.
+That is the last of the Mac app's planned builds. What comes next is what its checks find - tables in place of Needs
+a look's or People's lists, say, if [457](#the-mac-apps-managing-checks-452-458) finds the lists don't read well wide.
 
 ### What the Mac needs
 
@@ -5944,6 +5972,37 @@ out an app whose menus have one key twice, and only a Mac can say whether its Fi
 - **451 Paste.** Copy an EQ's text in a browser; Paste on an EQ page: its preview. Is the Paste button there on the
   Mac's EQ page, and does macOS ask before deadwax reads what you copied?
 
+### The Mac app's managing checks (452-458)
+
+**Not done yet.** These come with [the Mac app](#the-mac-app)'s seventh build - managing on a big screen (still app
+0.13 (13)). No server change is needed, and nothing on the phone changes. As for 404-451: deadwax's plain `http://`
+address, the home Wi-Fi, signed in as an admin with logins on, installed with `ios/scripts/install-mac.sh`. **If
+deadwax quits as it opens, say so before anything else**: macOS throws out an app whose menus have one key twice, and
+only a Mac can say whether its File menu has a ⌘S of its own (none was found in macOS's own menus). Say "pass", or what
+you saw.
+
+- **452 Edit album.** An album's ••• > Edit album: the sheet fits the window; Release, Tags, Artwork, Lyrics, Delete
+  album… each open. Is the sheet 760 points wide and nearly as tall as the window - or the size it was before (say
+  which macOS the Mac has)? Narrow and shorten the window as far as it goes with Edit album shut, then open it: does
+  it still fit? Does it follow the window if you resize it with the sheet up?
+- **453 The keyboard in the editor.** Tab moves between the fields; Return in a field doesn't apply; Apply is a click.
+  In Release: Artist, Tab, Album, Tab, Year… in that order, and Shift-Tab back. In Edit tags the same, through all
+  eleven fields, from Track's into Album's. Does Tab ever skip a field, or move two at once? Return in any of them:
+  nothing applies. Then People > Add a person: Tab through its four fields.
+- **454 Delete.** Delete permanently's dialog: Cancel is the default; Return and Escape both cancel. Nothing is deleted.
+- **455 Server settings.** Change a setting: ⌘S saves, as Save changes does; Unsaved is cleared. Is File > Save changes
+  dimmed with nothing changed, and on another page? With a sheet up over Server settings - Add to a playlist from the
+  player bar, say? And in the Library's Set up Navidrome sheet, with an address typed, does ⌘S save it?
+- **456 The event log.** Select lines, ⌘C, paste into Notes: the lines as shown. Click one, ⇧-click another: the run
+  between is selected. Then ⌘A: every line. Does Edit > Copy dim with no line selected - and is it on once you click
+  one? If Copy stays dimmed with lines selected, click another line and say so. Do the arrow keys still move the
+  selection after a click? Are an error's red words readable on a selected row?
+- **457 People and Needs a look** read well at full width - or say which wants a table. Full screen too.
+- **458 A run, then quit.** A Library care run, ⌘Q midway: it asks first, or says what happens to the run. It says,
+  under Stop: "Quitting deadwax stops the run - open deadwax again, and Get covers carries on." Quit; open deadwax;
+  Library care: Get covers counts only the albums still without a cover. Was the album it was on when you quit given
+  its cover?
+
 ## What it can't do yet
 
 These are the web app's for now - open deadwax's address in a browser for them, since nothing in the app takes you
@@ -6039,6 +6098,9 @@ there. Looking after deadwax isn't among them any more: every managing tool is t
 | The Mac app asks you to sign in **every time it opens** | Its sign-in can't be kept in its folder (see [Where the Mac keeps your sign-in](#where-the-mac-keeps-your-sign-in)). Check the Mac's disk isn't full; then, with deadwax quit, delete `~/Library/Containers/net.lizardlounge.deadwax/Data/Library/Application Support/deadwax/sessions` and sign in again - it's made afresh. If macOS asks whether "Terminal" would like to access data from other apps, **Allow** is right: it's deadwax's own folder. |
 | The Mac app: **Import EQ File…**, the EQ's **Import…**, Open With or a file dropped says **"deadwax couldn't read this file."** for a `.txt` you can open in TextEdit | The Mac app is meant to be allowed to read the file you choose in the Open panel, open with it or drop - say so, with any words under it. Meanwhile **Paste** brings it in: open the file in TextEdit, Select All, Copy, and Paste on the EQ page. |
 | The Mac app: Export…'s **Save the Whole Curve…** (or the Correction Alone) puts no file where you saved it | The Mac app is meant to be allowed to write the file you save in the Save panel - say so. Meanwhile **Share the Whole Curve** hands the same file to AirDrop or Mail. |
+| The Mac app **quits the moment it opens**, after a new build | macOS throws out an app whose menus have one key twice. Say so, with the build - deadwax's menus were checked against macOS's own, but only a Mac can show it. Meanwhile install the build before it. |
+| The Mac app: **Edit > Copy** stays dimmed in the event log with lines selected | Copy answers for the lines once the list has the keyboard: click another line (clicking the same one again changes nothing). If a text field has the cursor (the sidebar's search, say), Copy is that field's - press Tab or click away from the field, and Copy is the lines' again. Meanwhile right-click a line for its own Copy. |
+| The Mac app: **File > Save changes** (⌘S) stays dimmed on Server settings | It's on only with something changed and not yet saved, deadwax in reach, no save on its way, and Server settings' page in front - not with another sheet over it. The bar's **Save changes** says the same: if that's on and ⌘S isn't, say so. |
 | The Mac app: closing its window **stopped the music** | Closing the window is meant to leave the music playing (check 421) - say so, and whether it happens every time. Meanwhile keep the window open, or minimised (⌘M), while you listen. |
 | install-mac.sh: **"There's no ios/Config/Local.xcconfig"** or **"has no team id in it"** | Run `ios/scripts/install.sh` once - it offers to write the file from the teams Xcode knows - or copy `Local.xcconfig.example` beside it and put your team id in it (step 4 of [Once](#once)). |
 | install-mac.sh: **"Only … free. A build of the Mac app needs about 4 GB free"** | Free some space - emptying the Trash, or deleting `~/Library/Caches/deadwax-build-mac`, which only makes the next build start afresh - and run it again. |

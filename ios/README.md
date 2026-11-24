@@ -67,7 +67,7 @@ sign-in in a file in its sandbox container rather than the Keychain. It has run 
   and to open and save a file you choose, and has no provisioning profile (it stops there, installing nothing, if Xcode added
   one - `--allow-profile` to install it anyway), asks before quitting deadwax if it's open (`--quit` doesn't ask;
   never by force), and puts it in `~/Applications/deadwax.app`.
-  How, and the Mac's checks, 404-451: [The Mac app](../docs/ios.md#the-mac-app) in docs/ios.md.
+  How, and the Mac's checks, 404-458: [The Mac app](../docs/ios.md#the-mac-app) in docs/ios.md.
 - **How it is built, and why:** [notes/ios.md](../notes/ios.md).
 - **Before pushing a change here, on Linux:** `ios/scripts/check-linux.sh`. GitHub's `ios.yml` compiles
   the rest on macOS.

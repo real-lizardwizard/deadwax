@@ -7,7 +7,8 @@ import UIKit
 /// (Space), Next (⌘→), Previous (⌘←), Forward and Back 10 Seconds (⌥⌘→, ⌥⌘←), Shuffle, Repeat's three and Go to Current
 /// Song (⌘L) - and (slice 3, the desktop frame) View's Show/Hide Sidebar (⌃⌘S), Up Next (⌥⌘U), Lyrics (⌥⌘L) and Info
 /// (⌘I), the three side panels ticked while theirs shows - and (slice 6, EQ files) File's Import EQ File… (⌘O), the Open
-/// panel, at the top of File where New Window was. Drawn from Core's MacMenu and nothing else: each item's words, key, dimming and tick are MacMenu's, read
+/// panel, at the top of File where New Window was - and (slice 7, managing on a big screen) File's Save changes (⌘S),
+/// Server settings' own, while one of its pages is the one in front. Drawn from Core's MacMenu and nothing else: each item's words, key, dimming and tick are MacMenu's, read
 /// from the player and the window each time the menus are drawn; this only carries the click out, through the very
 /// calls the player's own buttons make. The system's menus stay - About, Hide, Quit (⌘Q), Undo to Select All, Close
 /// Window (⌘W), Enter Full Screen, the Window menu; File > New Window and Help go (Platform's `macWindow`), and Format
@@ -21,6 +22,9 @@ struct MacCommands: Commands {
     let server: ServerModel
     /// (Slice 3) Whether the song has lyrics: View > Lyrics is dimmed for one known to have none, as the bar's button.
     let lyrics: LyricsModel
+    /// (Slice 7) Server settings, for File > Save changes: its button's rule, and its button's call.
+    let serverSettings: ServerSettingsModel
+    let reachability: Reachability
 
     /// The menus' state now: the player's, the window's (a text field with the cursor, the sign-in, Now Playing, a
     /// sheet, the page shown's Refresh).
@@ -33,7 +37,9 @@ struct MacCommands: Commands {
                              tabs: server.launch == .ready && server.signInOver == nil,
                              refresh: MacRefresh.shared.state, nowPlaying: navigation.nowPlayingShown,
                              sheet: MacRefresh.shared.sheetUp, sidebarShown: navigation.macSidebarShown,
-                             panel: navigation.macPanel, lyrics: lyrics.have)
+                             panel: navigation.macPanel, lyrics: lyrics.have,
+                             serverSettings: MacRefresh.shared.settingsInFront,
+                             saveOpen: serverSettings.saveOpen(online: reachability.online))
     }
 
     var body: some Commands {
@@ -41,9 +47,12 @@ struct MacCommands: Commands {
         CommandGroup(replacing: .appSettings) {
             item(.settings, state)
         }
-        // (slice 6) File's first item, where New Window was (emptied by Platform's macWindow): the Open panel, for an EQ file
+        // (slice 6) File's first item, where New Window was (emptied by Platform's macWindow): the Open panel, for an EQ file -
+        // and (slice 7) Server settings' Save changes under it, above the system's Close Window
         CommandGroup(after: .newItem) {
             item(.importEQFile, state)
+            Divider()
+            item(.saveChanges, state)
         }
         // Edit's Find, in place of the system's Find, Spelling and Substitutions - there is no document to find in
         CommandGroup(replacing: .textEditing) {
@@ -150,6 +159,9 @@ struct MacCommands: Commands {
             if let panel = command.panel { navigation.togglePanel(panel) }
         case .importEQFile:
             navigation.openEQFile()
+        // (slice 7) the save bar's own call: every draft at once, as they are now
+        case .saveChanges:
+            serverSettings.save()
         }
     }
 
@@ -242,6 +254,8 @@ final class MacRefresh {
         var level = 0
         /// A sheet's root (MacSheet), not a page with a Refresh.
         var sheet = false
+        /// (Slice 7) A page of Server settings (MacSettingsPage), not a page with a Refresh: ⌘S's, never ⌘R's.
+        var settings = false
         /// Among the pages showing: let go here if its view goes without saying so.
         var listed = false
 
@@ -276,9 +290,18 @@ final class MacRefresh {
     private var deepest: Int { pages.map { (page: Page) -> Int in page.level }.max() ?? 0 }
 
     /// The page shown: the latest page as deep as the deepest - none while a sheet with no Refresh is over the pages.
+    /// (Slice 7) Server settings' pages aren't among them: ⌘R is as it was on them.
     private var front: Page? {
         let deepest = self.deepest
-        return pages.last { (page: Page) -> Bool in !page.sheet && page.level == deepest }
+        return pages.last { (page: Page) -> Bool in !page.sheet && !page.settings && page.level == deepest }
+    }
+
+    /// (Slice 7) A page of Server settings is the one in front: the latest page as deep as the deepest thing showing - a
+    /// sheet's root aside - is one of its own. On the pages, or in the sheet that holds one (Set up Navidrome's); with any
+    /// other sheet over it, or another page shown since, it isn't.
+    var settingsInFront: Bool {
+        let deepest = self.deepest
+        return pages.last { (page: Page) -> Bool in !page.sheet && page.level == deepest }?.settings == true
     }
 
     func appeared(_ page: Page) {
@@ -346,6 +369,22 @@ struct MacSheet: ViewModifier {
         page.level = level + 1
         return content
             .environment(\.macSheetLevel, level + 1)
+            .onAppear { MacRefresh.shared.appeared(page) }
+            .onDisappear { MacRefresh.shared.went(page) }
+    }
+}
+
+/// (Slice 7) A page of Server settings (Platform's `macSettingsPage`, on every page's frame): known to the menus while it
+/// shows, as deep as it is drawn, so File > Save changes (⌘S) is its Save changes while it is the page in front
+/// (MacRefresh.settingsInFront).
+struct MacSettingsPage: ViewModifier {
+    @Environment(\.macSheetLevel) private var level
+    @State private var page = MacRefresh.Page()
+
+    func body(content: Content) -> some View {
+        page.settings = true
+        page.level = level
+        return content
             .onAppear { MacRefresh.shared.appeared(page) }
             .onDisappear { MacRefresh.shared.went(page) }
     }

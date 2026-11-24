@@ -303,7 +303,8 @@ private struct SaveBar: View {
 
 extension View {
     /// Every Server settings page's frame: told to the model as it shows and goes, its permissions watched, the save bar
-    /// at its foot, and the amber line while deadwax is out of reach.
+    /// at its foot, and the amber line while deadwax is out of reach - and (the Mac app, slice 7) on the Mac known to the
+    /// menus, so File > Save changes (⌘S) is the bar's Save changes while the page is the one in front.
     func serverSettingsPage(_ page: ServerSettingsModel.Page) -> some View {
         modifier(ServerSettingsPageFrame(page: page))
     }
@@ -323,6 +324,7 @@ private struct ServerSettingsPageFrame: ViewModifier {
                 }
             }
             .editOutOfReach(!reachability.online && settings.flow.answer != nil)
+            .macSettingsPage()
             .onAppear { settings.shows(page) }
             .onDisappear { settings.hides(page) }
             // a part given (or taken) while the page is up: asked for now

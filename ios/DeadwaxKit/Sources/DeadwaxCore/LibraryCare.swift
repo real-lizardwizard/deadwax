@@ -391,6 +391,12 @@ public enum LibraryCare {
 
     /// Kept on screen while a run is under way and its page is in front (isIdleTimerDisabled).
     public static let screenOnNote = "The screen stays on while a run is under way and this page shows."
+    /// (The Mac app, slice 7) Under a run under way on the Mac: nothing keeps a run going past ⌘Q - it is the app's own,
+    /// an album at a time - so what quitting does, and how it carries on: Start takes only the albums still without.
+    /// None on the iPhone, where closing the app is going to the background, already said as it stops.
+    public static func quitNote(_ device: Device, kind: BulkTargets.Kind) -> String? {
+        device == .mac ? "Quitting deadwax stops the run - open deadwax again, and \(label(kind)) carries on." : nil
+    }
     /// Another kind's run is under way: one run at a time on the phone.
     public static func waiting(for kind: BulkTargets.Kind) -> String {
         "One run at a time - this one can start once \(heading(kind)) has finished."

@@ -156,6 +156,25 @@ public enum MacFrame {
         max(0, (width - readableWidth) / 2)
     }
 
+    /// (Slice 7, notes/ios.md "The Mac app, slice 7: managing on a big screen") A sheet's size.
+    public struct Size: Sendable, Equatable {
+        public let width: Double
+        public let height: Double
+
+        public init(width: Double, height: Double) {
+            self.width = width
+            self.height = height
+        }
+    }
+
+    /// (Slice 7) A sheet that holds pages of its own - Edit album, its Release, Tags, Artwork, Lyrics and Delete album -
+    /// over a window whose page is `width` x `height` (the frame under the title bar): the readable width, as a page drawn
+    /// for a phone is kept on the Mac, and the window's height, each less the room kept round a sheet (sheetRoom), so it
+    /// fits inside the window at every size down to the smallest, and is never wider than its pages read well.
+    public static func sheetSize(width: Double, height: Double) -> Size {
+        Size(width: max(0, min(readableWidth, width - 2 * sheetRoom)), height: max(0, height - 2 * sheetRoom))
+    }
+
     // MARK: sizes, in points - the web's CSS px (app-desktop.css, held by the fixture)
 
     /// --app-desk-side: the sidebar.
@@ -192,4 +211,6 @@ public enum MacFrame {
     /// The window as it first opens - a column's width, so a panel opens beside the page; macOS remembers it after.
     public static let openingWidth: Double = 1280
     public static let openingHeight: Double = 820
+    /// (Slice 7) The room kept between a sheet and the window's edges, either side.
+    public static let sheetRoom: Double = 40
 }

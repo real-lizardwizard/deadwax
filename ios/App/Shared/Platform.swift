@@ -25,6 +25,11 @@ import UIKit
 /// (Slice 6, notes/ios.md "The Mac app, slice 6: EQ files") And the Mac's ways in and out for an EQ file: File > Import
 /// EQ File…'s Open panel, a file dropped on the window, Export…'s Save panel - and a file opened with deadwax brought to
 /// the one window. On the iPhone none of them: its ways are Import from Files…, Paste, the share sheet, as before.
+///
+/// (Slice 7, notes/ios.md "The Mac app, slice 7: managing on a big screen") And managing at a window's size: Edit album's
+/// sheet sized by the window it is over (presentationSizing, macOS 15 and later), Server settings' pages known to the
+/// menus for ⌘S, Tab between a page's fields, and the event log's lines selected as a Mac list's are and copied with
+/// Edit > Copy - the system's own item, through the responder chain. On the iPhone each is the view as before.
 enum Platform {
     /// The device this build is, for Core.
     static var device: Device { mac ? .mac : .iPhone }
@@ -477,6 +482,152 @@ extension View {
     func carryingApp(_ carried: AppCarried) -> some View {
         modifier(CarriesApp(carried: carried))
     }
+
+    /// (Slice 7) A sheet that holds pages of its own (Edit album): `size`, MacFrame.sheetSize's for the window it is over -
+    /// from macOS 15, where SwiftUI sizes a presentation (presentationSizing, iOS 18 on Catalyst). On macOS 14 the
+    /// system's own sheet size, as it was.
+    @ViewBuilder func sizedSheet(_ size: MacFrame.Size) -> some View {
+        if #available(iOS 18.0, *) {
+            presentationSizing(WindowSheetSizing(size: size))
+        } else {
+            self
+        }
+    }
+
+    /// (Slice 7) A page of Server settings (its frame, ServerSettingsPageFrame): File > Save changes (⌘S) is its Save
+    /// changes while it is the page in front, as deep as it is drawn (MacRefresh.settingsInFront, MacSettingsPage).
+    func macSettingsPage() -> some View {
+        modifier(MacSettingsPage())
+    }
+
+    /// (Slice 7) A page's text field: Tab goes to the next of `order`, the page's fields in the order it draws them, and
+    /// Shift-Tab back (MacMenu.tab) - at either end, or from a field not in `order`, the key is the system's, as before.
+    func tabs<Field: Hashable>(_ focused: FocusState<Field?>.Binding, in order: [Field]) -> some View {
+        onKeyPress(keys: [.tab, Platform.backTab]) { (press: KeyPress) -> KeyPress.Result in
+            let back = press.key == Platform.backTab || press.modifiers.contains(.shift)
+            guard let next = MacMenu.tab(order, from: focused.wrappedValue, back: back) else { return .ignored }
+            focused.wrappedValue = next
+            return .handled
+        }
+    }
+
+    /// (Slice 7) The rows selected in a SelectingList: Edit > Copy (⌘C) copies them and Select All (⌘A) selects every
+    /// row of `ids` - the system's own two items, never a second ⌘C of deadwax's - `text` what Copy puts on the
+    /// clipboard for a selection (nil: Copy dimmed - as it is with no selected row still among `ids`). A view drawing
+    /// nothing, behind this one, answers them in the responder chain, taking the keyboard's focus as the selection
+    /// changes, and again as a text field lets the cursor go with rows selected (SelectionCopier) - but never from a
+    /// text field with the cursor, whose own Copy it is.
+    func copiesSelection<ID: Hashable>(_ selection: Binding<Set<ID>>, of ids: [ID],
+                                       text: @escaping (Set<ID>) -> String?) -> some View {
+        modifier(SelectionCopying(selection: selection, ids: ids, text: text))
+    }
+}
+
+extension Platform {
+    /// (Slice 7) Shift-Tab, as a Mac's keyboard may send it: the back-tab character, U+0019.
+    static let backTab = KeyEquivalent(Character(Unicode.Scalar(UInt8(0x19))))
+}
+
+/// (Slice 7) A list whose rows are selected as a Mac list's are - a click, ⌘-click and ⇧-click, with no Edit button -
+/// into `selection`; ForEach's rows are tagged with their own ids, the rest (a page's line, a spinner) can't be. The
+/// iPhone's is the List it was.
+struct SelectingList<ID: Hashable, Content: View>: View {
+    let selection: Binding<Set<ID>>
+    @ViewBuilder let content: () -> Content
+
+    var body: some View {
+        List(selection: selection, content: content)
+    }
+}
+
+/// sizedSheet's: the size proposed to the sheet, which its pages fill.
+@available(iOS 18.0, *)
+private struct WindowSheetSizing: PresentationSizing {
+    let size: MacFrame.Size
+
+    func proposedSize(for root: PresentationSizingRoot, context: PresentationSizingContext) -> ProposedViewSize {
+        ProposedViewSize(width: CGFloat(size.width), height: CGFloat(size.height))
+    }
+}
+
+/// copiesSelection's: the copier behind the list, told when to take the keyboard's focus - each time a selection is made,
+/// and (slice 7's review) each time a text field lets the cursor go while rows are selected: a click on a row can land
+/// while the sidebar's search still has the cursor, and the same row clicked again changes no selection.
+private struct SelectionCopying<ID: Hashable>: ViewModifier {
+    let selection: Binding<Set<ID>>
+    let ids: [ID]
+    let text: (Set<ID>) -> String?
+    @State private var asked = 0
+
+    func body(content: Content) -> some View {
+        let selection = self.selection
+        let ids = self.ids
+        let text = self.text
+        return content
+            .background(SelectionCopier(copied: { () -> String? in text(selection.wrappedValue) },
+                                        copies: { () -> Bool in !selection.wrappedValue.isDisjoint(with: ids) },
+                                        selectAll: ids.isEmpty ? nil : { selection.wrappedValue = Set(ids) },
+                                        asked: asked)
+                .accessibilityHidden(true))
+            .onChange(of: selection.wrappedValue) { (_: Set<ID>, now: Set<ID>) -> Void in
+                if !now.isEmpty { asked += 1 }
+            }
+            .onChange(of: TextEditing.shared.typing) { (_: Bool, typing: Bool) -> Void in
+                if !typing, !selection.wrappedValue.isEmpty { asked += 1 }
+            }
+    }
+}
+
+/// A view drawing nothing, behind the list, that answers Edit > Copy and Select All while it has the keyboard's focus:
+/// UIKit asks the first responder, then each next one, whether it can (canPerformAction) - so Copy is dimmed with
+/// nothing to copy, and every other action goes on up the chain as before. Asking is cheap (`copies`: a selected row
+/// still listed); the text is made only for the copy itself.
+private struct SelectionCopier: UIViewRepresentable {
+    let copied: () -> String?
+    let copies: () -> Bool
+    let selectAll: (() -> Void)?
+    let asked: Int
+
+    func makeUIView(context: Context) -> Copier {
+        Copier()
+    }
+
+    func updateUIView(_ copier: Copier, context: Context) {
+        copier.copied = copied
+        copier.copies = copies
+        copier.selectingAll = selectAll
+        guard copier.asked != asked else { return }
+        copier.asked = asked
+        // after this update, not inside it; and never from a text field with the cursor (the sidebar's search)
+        Task { @MainActor in
+            guard copier.window != nil, !copier.isFirstResponder, !TextEditing.shared.typing else { return }
+            _ = copier.becomeFirstResponder()
+        }
+    }
+
+    final class Copier: UIView {
+        var copied: () -> String? = { nil }
+        var copies: () -> Bool = { false }
+        var selectingAll: (() -> Void)?
+        var asked = 0
+
+        override var canBecomeFirstResponder: Bool { true }
+
+        override func canPerformAction(_ action: Selector, withSender sender: Any?) -> Bool {
+            if action == #selector(UIResponderStandardEditActions.copy(_:)) { return copies() }
+            if action == #selector(UIResponderStandardEditActions.selectAll(_:)) { return selectingAll != nil }
+            return super.canPerformAction(action, withSender: sender)
+        }
+
+        override func copy(_ sender: Any?) {
+            guard let text = copied() else { return }
+            UIPasteboard.general.string = text
+        }
+
+        override func selectAll(_ sender: Any?) {
+            selectingAll?()
+        }
+    }
 }
 
 /// readableOnMac's: the page's width read, and the room beyond the readable width given to its scroll views as their
@@ -658,6 +809,37 @@ extension View {
     /// A presented page on the iPhone inherits its presenter's environment, as it always has: nothing to hand on.
     func carryingApp(_ carried: AppCarried) -> some View {
         self
+    }
+
+    /// The Mac's alone: the iPhone's sheets are the screen's, as before.
+    func sizedSheet(_ size: MacFrame.Size) -> some View {
+        self
+    }
+
+    /// The Mac's alone: the iPhone has no menus - Save changes is the save bar's.
+    func macSettingsPage() -> some View {
+        self
+    }
+
+    /// The Mac's alone: a field's keys as before.
+    func tabs<Field: Hashable>(_ focused: FocusState<Field?>.Binding, in order: [Field]) -> some View {
+        self
+    }
+
+    /// The Mac's alone: a line's long press Copy is the iPhone's, as before.
+    func copiesSelection<ID: Hashable>(_ selection: Binding<Set<ID>>, of ids: [ID],
+                                       text: @escaping (Set<ID>) -> String?) -> some View {
+        self
+    }
+}
+
+/// The iPhone's list exactly as before: no selection, `selection` never read.
+struct SelectingList<ID: Hashable, Content: View>: View {
+    let selection: Binding<Set<ID>>
+    @ViewBuilder let content: () -> Content
+
+    var body: some View {
+        List(content: content)
     }
 }
 

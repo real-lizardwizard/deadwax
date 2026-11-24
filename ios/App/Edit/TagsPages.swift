@@ -402,6 +402,11 @@ struct EditTagsView: View {
 
     @FocusState private var focused: String?
 
+    /// (The Mac app, slice 7) The fields in the order the page draws them - its sections', in turn: Tab's on the Mac.
+    private static let order = TagEdit.sections.flatMap { (section: (title: String, keys: [String])) -> [String] in
+        section.keys
+    }
+
     var body: some View {
         Form {
             if tags.flow.mayHaveFinished {
@@ -500,6 +505,7 @@ struct EditTagsView: View {
                     .textInputAutocapitalization(field.short ? .never : .words)
                     .autocorrectionDisabled()
                     .focused($focused, equals: field.key)
+                    .tabs($focused, in: Self.order)
             } label: {
                 Text(field.label)
             }

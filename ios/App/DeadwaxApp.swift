@@ -222,7 +222,8 @@ struct DeadwaxApp: App {
         }
         // (the Mac app, slice 1) on the Mac, its window: phone-sized, no New Window, no Help - and (slice 2) deadwax's
         // menus and keys, drawn from the player and the window (MacCommands). Nothing on the iPhone
-        .macWindow(MacCommands(player: player, navigation: navigation, server: server, lyrics: lyrics))
+        .macWindow(MacCommands(player: player, navigation: navigation, server: server, lyrics: lyrics,
+                                serverSettings: serverSettings, reachability: reachability))
     }
 }
 

@@ -19,6 +19,12 @@ import Foundation
 // plain-text file whose EQ shows in its preview - the way a file opened with deadwax comes. From the pages alone, as
 // Settings… and Find: not over the sign-in, and not over a sheet (the panel is the window's own, and a sheet is already
 // up in front of it).
+//
+// (Slice 7, notes/ios.md "The Mac app, slice 7: managing on a big screen") And File's Save changes (⌘S): Server settings'
+// own Save changes, the button's words and the button's rule (SettingsFlow.saveOpen) - only with a page of Server settings
+// the one in front, as deep as the deepest sheet (so Set up Navidrome's sheet, which is one, counts, and any other sheet
+// over the page dims it), and never under the sign-in. And Tab in a page's fields (`tab`): the next field in the order
+// the page draws them.
 
 public enum MacMenu {
     /// What the menus are drawn from - read by the App each time it draws them.
@@ -57,11 +63,18 @@ public enum MacMenu {
         /// (Slice 3) What is known of the song playing's lyrics: Lyrics is dimmed while it is known there are none to
         /// open, as the bar's button is (Lyrics.dimmed).
         public var lyrics: LyricsHave
+        /// (Slice 7) A page of Server settings is the one in front - as deep as the deepest sheet showing: on the pages,
+        /// or in the sheet that holds it (Set up Navidrome's, over the Library). Another sheet over it, and it isn't.
+        public var serverSettings: Bool
+        /// (Slice 7) Its Save changes can be pressed now - the button's own rule (ServerSettingsModel.saveOpen: changes
+        /// unsaved, none saving, deadwax in reach, the permission).
+        public var saveOpen: Bool
 
         public init(queued: Bool = false, playing: Bool = false, shuffle: Bool = false, paged: PagedScope? = nil,
                     repeatMode: Repeat = .off, length: Double = 0, hasAlbum: Bool = false, typing: Bool = false,
                     tabs: Bool = true, refresh: Refresh = .none, nowPlaying: Bool = false, sheet: Bool = false,
-                    sidebarShown: Bool = true, panel: MacFrame.Panel = .none, lyrics: LyricsHave = .unknown) {
+                    sidebarShown: Bool = true, panel: MacFrame.Panel = .none, lyrics: LyricsHave = .unknown,
+                    serverSettings: Bool = false, saveOpen: Bool = false) {
             self.queued = queued
             self.playing = playing
             self.shuffle = shuffle
@@ -77,6 +90,8 @@ public enum MacMenu {
             self.sidebarShown = sidebarShown
             self.panel = panel
             self.lyrics = lyrics
+            self.serverSettings = serverSettings
+            self.saveOpen = saveOpen
         }
     }
 
@@ -92,8 +107,9 @@ public enum MacMenu {
         case shuffle, repeatOff, repeatAll, repeatOne
         case goToCurrentSong
         case sidebar, upNext, lyrics, info
-        // (slice 6) File's
+        // (slice 6) File's - and (slice 7) Server settings' Save changes
         case importEQFile
+        case saveChanges
 
         /// (Slice 3) The View menu's three panels, in the bar's order (Lyrics, Up Next, then Info from its •••).
         public static let panels: [Command] = [.upNext, .lyrics, .info]
@@ -225,8 +241,18 @@ public enum MacMenu {
         case .lyrics: return Shortcut(.character("l"), [.option, .command])
         case .info: return Shortcut(.character("i"), .command)
         case .importEQFile: return Shortcut(.character("o"), .command)
+        case .saveChanges: return Shortcut(.character("s"), .command)
         case .shuffle, .repeatOff, .repeatAll, .repeatOne: return nil
         }
+    }
+
+    /// (Slice 7) Tab in a page's text fields: the field after `from` in `order` (the order the page draws them) - the one
+    /// before it with Shift. nil at either end, and from no field of the page's: the key is left to the system then, so
+    /// Tab moves on out of the fields as it would anyway, and a page never keeps the cursor from leaving.
+    public static func tab<Field: Equatable>(_ order: [Field], from: Field?, back: Bool) -> Field? {
+        guard let from, let at = order.firstIndex(of: from) else { return nil }
+        let to = back ? at - 1 : at + 1
+        return order.indices.contains(to) ? order[to] : nil
     }
 
     /// The keys a text field has its own use for while it has the cursor: Space types a space, ⌘→ and ⌘← go to the
@@ -283,6 +309,7 @@ public enum MacMenu {
         case .lyrics: return LyricsWords.lyrics
         case .info: return InfoWords.title
         case .importEQFile: return Words.importEQFile
+        case .saveChanges: return ServerSettings.save
         }
     }
 
@@ -306,6 +333,9 @@ public enum MacMenu {
         //? (slice 6) as Settings… and Find: the pages in front - never over the sign-in, and never over a sheet, which is
         //? already presented in front of the window the Open panel is shown from
         case .importEQFile: return state.tabs && !state.sheet
+        //? (slice 7) Server settings' Save changes, pressed: its page in front - not under Now Playing or another sheet
+        //? (`serverSettings` says the page is the one in front, sheet or none) - and the button's own rule
+        case .saveChanges: return state.tabs && !state.nowPlaying && state.serverSettings && state.saveOpen
         }
     }
 

@@ -16,6 +16,10 @@ reading: comments and string literals blanked, so a word in either is never code
   - (Slice 3, notes/ios.md "The Mac app, slice 3: the desktop frame") The Mac's window is always the desktop frame - the
     sidebar, the page, the side panels and the player bar - and never opens Now Playing; only the app's own window
     scene is shaped; the iPhone's tabs exactly as they were.
+  - (Slice 7, notes/ios.md "The Mac app, slice 7: managing on a big screen") File > Save changes (⌘S) is Server settings'
+    own button, from its page in front; the event log's lines selected and copied with the system's Edit > Copy; Edit
+    album's sheet sized by the window; Manage's pages readable; Tab between the editor's fields; Return never applying;
+    a run under way saying what ⌘Q does - each the iPhone's as before.
 """
 
 import importlib.util
@@ -129,7 +133,12 @@ def test_platform_is_the_iphones_exactly_as_before_on_the_iphone():
                    # (slice 6) the EQ's files: no Open panel, Save panel or drop of the Mac's on the iPhone
                    r"eqOpenPanel\(_ shown: Binding<Bool>, chosen: @escaping \(URL\) -> Void\)",
                    r"eqFileDrop\(_ dropped: @escaping \(EQImportItem\) -> Void\)",
-                   r"eqSavePanel\(_ file: Binding<EQExportFile\?>\)"):
+                   r"eqSavePanel\(_ file: Binding<EQExportFile\?>\)",
+                   # (slice 7) managing: no sheet size, menu page, Tab or Copy of the Mac's on the iPhone
+                   r"sizedSheet\(_ size: MacFrame\.Size\)", r"macSettingsPage\(\)",
+                   r"tabs<Field: Hashable>\(_ focused: FocusState<Field\?>\.Binding, in order: \[Field\]\)",
+                   r"copiesSelection<ID: Hashable>\(_ selection: Binding<Set<ID>>, of ids: \[ID\],\s*"
+                   r"text: @escaping \(Set<ID>\) -> String\?\)"):
         assert re.search(r"func " + helper + r" -> some View \{\s*self\s*\}", phone), helper
         assert re.search(r"func " + helper + r" -> some View \{", mac), helper
     assert re.search(r"static func dialogCancel\(\) -> some View \{\s*EmptyView\(\)\s*\}", phone)
@@ -139,6 +148,10 @@ def test_platform_is_the_iphones_exactly_as_before_on_the_iphone():
                      r"prompt: Text\(prompt\)\)\s*\}", phone)
     assert re.search(r"func searchField\(text: Binding<String>, prompt: String\) -> some View \{\s*self\s*\}", mac)
     assert "keyboardShortcut" not in phone and "contextMenu" not in phone and "commands" not in phone
+    # (slice 7) nor a key press, a responder, the clipboard, a sheet's size or a list's selection
+    for mac_only in ("onKeyPress", "UIResponder", "UIPasteboard", "canPerformAction", "becomeFirstResponder",
+                     "presentationSizing", "List(selection:", "MacSettingsPage"):
+        assert mac_only not in phone, mac_only
     # the Mac's: no refresh control at all - (slice 2) the same action on ⌘R - the window phone-shaped, New Window and
     # Help gone, and deadwax's menus
     assert re.search(r"func pullToRefresh\(_ action: @escaping @MainActor @Sendable \(\) async -> Void\) -> some View \{\s*"
@@ -177,8 +190,10 @@ def test_platform_is_the_iphones_exactly_as_before_on_the_iphone():
 def test_the_app_is_wired_to_platform():
     app = app_sources()
     root = bare(app["DeadwaxApp.swift"])
-    assert root.count(".macWindow(MacCommands(player: player, navigation: navigation, server: server, lyrics: lyrics))") == 1, \
-        "the scene's Mac window and (slice 2) its menus - (slice 3) the lyrics' state for View > Lyrics"
+    assert root.count(".macWindow(MacCommands(player: player, navigation: navigation, server: server, lyrics: lyrics,\n"
+                      "                                serverSettings: serverSettings, reachability: reachability))") == 1, \
+        "the scene's Mac window and (slice 2) its menus - (slice 3) the lyrics' state for View > Lyrics - (slice 7) " \
+        "Server settings' rule and call for File > Save changes"
     assert root.count(".oneWindow()") == 1
     assert root.count("Platform.launching()") == 1
     delegate = root[root.index("final class AppDelegate"):]
@@ -240,19 +255,22 @@ def test_command_r_is_every_pull_and_every_pages_refresh():
     assert found == REFRESH_COMMANDS
     commands = bare(app_sources()["Shared/MacCommands.swift"])
     # the page shown is the one that last appeared and hasn't gone; one at a time
-    assert commands.count(".onAppear { MacRefresh.shared.appeared(page) }") == 2, "a page with a Refresh, a sheet's root"
-    assert commands.count(".onDisappear { MacRefresh.shared.went(page) }") == 2
+    assert commands.count(".onAppear { MacRefresh.shared.appeared(page) }") == 3, \
+        "a page with a Refresh, a sheet's root - (slice 7) a page of Server settings"
+    assert commands.count(".onDisappear { MacRefresh.shared.went(page) }") == 3
     run = commands[commands.index("func run() {"):]
     run = run[:run.index("\n    }\n")]
     assert "guard !running, let page = front, page.action != nil else { return }" in run
     assert run.index("running = true") < run.index("await page.action?()") < run.index("running = false")
     # (the review) the page in front is the latest page as many sheets deep as the deepest thing showing: a sheet with no
     # Refresh dims it; a page inside a sheet that has one is the page in front
-    assert "pages.last { (page: Page) -> Bool in !page.sheet && page.level == deepest }" in commands
+    #? (slice 7) Server settings' pages are ⌘S's, never ⌘R's: Refresh is as it was on them
+    front = _body(commands, "private var front: Page? {")
+    assert "return pages.last { (page: Page) -> Bool in !page.sheet && !page.settings && page.level == deepest }" in front
     assert "var sheetUp: Bool { deepest > 0 }" in commands
     refreshing = commands[commands.index("struct MacRefreshing: ViewModifier {"):commands.index("struct MacSheet: ViewModifier {")]
     assert "@Environment(\\.macSheetLevel) private var level" in refreshing and "page.level = level" in refreshing
-    sheet = commands[commands.index("struct MacSheet: ViewModifier {"):commands.index("final class WindowWork")]
+    sheet = commands[commands.index("struct MacSheet: ViewModifier {"):commands.index("struct MacSettingsPage: ViewModifier {")]
     for line in ("page.sheet = true", "page.level = level + 1", ".environment(\\.macSheetLevel, level + 1)"):
         assert line in sheet, line
     # (the review, then the merge of 72079a8) a page that never said it went - its window closed under it - is let go
@@ -268,7 +286,7 @@ def test_command_r_is_every_pull_and_every_pages_refresh():
     assert "page.listed = true" in appeared
     went = refresh[refresh.index("func went(_ page: Page) {"):refresh.index("func letGo()")]
     assert "page.listed = false" in went
-    for name in ("MacRefreshing", "MacSheet"):
+    for name in ("MacRefreshing", "MacSheet", "MacSettingsPage"):
         modifier = commands[commands.index(f"struct {name}: ViewModifier {{"):]
         assert "@State private var page = MacRefresh.Page()" in modifier[:modifier.index("func body")], name
 
@@ -294,7 +312,8 @@ def test_the_menus_are_mac_menus_and_nothing_else():
                   "CommandGroup(replacing: .textEditing) {\n            item(.find, state)",
                   "CommandGroup(replacing: .textFormatting) {}",
                   "CommandGroup(after: .toolbar) {\n            item(.refresh, state)",
-                  "CommandGroup(after: .newItem) {\n            item(.importEQFile, state)",
+                  "CommandGroup(after: .newItem) {\n            item(.importEQFile, state)\n            Divider()\n"
+                  "            item(.saveChanges, state)\n        }",
                   "CommandGroup(replacing: .sidebar) {\n            let sections = MacMenu.view(state)"):
         assert group in commands, group
     #? (slice 3's review, smoke-run) the sidebar place replaced, never added beside: the system's Show Sidebar kept has
@@ -311,7 +330,10 @@ def test_the_menus_are_mac_menus_and_nothing_else():
                  "PlayedAlbum.route($0, player: player)", "typing: TextEditing.shared.typing",
                  "tabs: server.launch == .ready && server.signInOver == nil", "refresh: MacRefresh.shared.state",
                  "nowPlaying: navigation.nowPlayingShown", "sheet: MacRefresh.shared.sheetUp",
-                 "sidebarShown: navigation.macSidebarShown", "panel: navigation.macPanel", "lyrics: lyrics.have"):
+                 "sidebarShown: navigation.macSidebarShown", "panel: navigation.macPanel", "lyrics: lyrics.have",
+                 # (slice 7) Server settings' page in front, and its button's own rule
+                 "serverSettings: MacRefresh.shared.settingsInFront",
+                 "saveOpen: serverSettings.saveOpen(online: reachability.online)"):
         assert read in state, read
     # each click as the player's button makes it, read again as it lands
     perform = commands[commands.index("private func perform("):commands.index("static func shortcut(")]
@@ -320,7 +342,8 @@ def test_the_menus_are_mac_menus_and_nothing_else():
                  "player.next()", "player.previous()",
                  "MacMenu.skip(command, from: player.shownPosition, length: player.duration) { player.seek(to: to) }",
                  "player.toggleShuffle()", "player.setRepeat(mode)", "navigation.openAlbum(route)",
-                 "navigation.macSidebarShown.toggle()", "if let panel = command.panel { navigation.togglePanel(panel) }"):
+                 "navigation.macSidebarShown.toggle()", "if let panel = command.panel { navigation.togglePanel(panel) }",
+                 "case .saveChanges:\n            serverSettings.save()"):
         assert call in perform, call
     # no volume of deadwax's own (audio fidelity first), and nothing of the engine's
     assert not re.search(r"(?i)volume|gain", code)
@@ -330,7 +353,7 @@ def test_the_menus_are_mac_menus_and_nothing_else():
     every = [name.strip() for line in cases for name in line.split(",")]
     assert every == ["settings", "find", "refresh", "playPause", "next", "previous", "forward", "back", "shuffle",
                      "repeatOff", "repeatAll", "repeatOne", "goToCurrentSong", "sidebar", "upNext", "lyrics", "info",
-                     "importEQFile"]
+                     "importEQFile", "saveChanges"]
     for name in every:
         assert f"case .{name}" in perform or f".{name}," in perform or f", .{name}" in perform, name
 
@@ -988,7 +1011,7 @@ def test_the_grids_and_the_readable_pages():
     routes = bare(app["Shared/Routes.swift"])
     destinations = routes[routes.index("func appRoutes() -> some View {"):]
     readable = re.findall(r"case \.(\w+)\(let \w+\): [^\n]*\.readableOnMac\(\)", destinations)
-    assert readable == ["album", "artist", "group", "mbArtist"]
+    assert readable == ["album", "artist", "group", "mbArtist", "serverSettingsGroup", "person"]
     mac = bare(app[PLATFORM]).split("\n#else\n")[0]
     #? (slice 3's review) the room either side given to the page's scroll view as its content's margins, never the
     #? scroll view narrowed: the page scrolls anywhere across it, its scroll bar at the page's edge
@@ -1318,7 +1341,7 @@ FILE_PANELS = {
 def test_file_import_eq_file_opens_the_panel_and_takes_a_shared_files_way():
     app = app_sources()
     commands = bare(app["Shared/MacCommands.swift"])
-    assert "CommandGroup(after: .newItem) {\n            item(.importEQFile, state)\n        }" in commands
+    assert "CommandGroup(after: .newItem) {\n            item(.importEQFile, state)\n            Divider()" in commands
     perform = _body(commands, "private func perform(_ command: MacMenu.Command)")
     assert "case .importEQFile:\n            navigation.openEQFile()" in perform
     routes = bare(app["Shared/Routes.swift"])
@@ -1476,6 +1499,237 @@ def test_the_files_chosen_are_read_and_written_and_nothing_else():
     assert not any("read-only" in key for key in helper.MAC_ENTITLEMENTS)
     for path in IOS.rglob("*.entitlements"):
         raise AssertionError(f"{path}: the Mac's entitlements are build settings")
+
+# ----------------------------------------------------------------------------- managing on a big screen (slice 7)
+
+#? (slice 7) Manage's pages, each at the readable width - and Change password, You's, the phone's page as it was
+MANAGE_PAGES = {
+    "chooseFolder": "ChooseFolderScreen()", "needsALook": "NeedsLookScreen()", "libraryCare": "LibraryCareScreen()",
+    "heldByNobody": "HeldByNobodyScreen()", "serverSettings": "ServerSettingsScreen()",
+    "serverSettingsGroup(let id)": "ServerSettingsGroupScreen(id: id)", "eventLog": "EventLogScreen()",
+    "people": "PeopleScreen()", "person(let id)": "PersonScreen(id: id)",
+}
+
+
+def test_file_save_changes_is_server_settings_own_button_from_its_page():
+    """⌘S (the Mac app's plan, slice 7): Server settings' Save changes - its words, its rule and its very call - from a
+    page of it in front, as deep as it is drawn; never a second way round the save bar."""
+    app = app_sources()
+    commands = bare(app["Shared/MacCommands.swift"])
+    # drawn by `item`, as every other item: MacMenu's words, key and dimming - in File, under Import EQ File…
+    assert commands.count("item(.saveChanges, state)") == 1
+    perform = _body(commands, "private func perform(_ command: MacMenu.Command)")
+    assert "case .saveChanges:\n            serverSettings.save()\n        case" not in perform
+    assert perform.rstrip().endswith("case .saveChanges:\n            serverSettings.save()\n        }\n    }")
+    # the save bar's button calls the same, under the same rule
+    screen = bare(app["Manage/ServerSettingsScreen.swift"])
+    bar = _body(screen, "@ViewBuilder private func buttons(_ flow: SettingsFlow) -> some View")
+    assert "settings.save()\n            }" in bar and ".disabled(!settings.saveOpen(online: reachability.online))" in bar
+    model = bare(app["Manage/ServerSettingsModel.swift"])
+    assert model.count("func save() {") == 1 and "flow.save(online: reachability.online, allowed: parts.page)" in model
+    assert "flow.saveOpen(online: online, allowed: parts.page)" in _body(model, "func saveOpen(online: Bool) -> Bool")
+    # every page of Server settings known to the menus, through its one frame - the root and each group, and so the
+    # Connections page in Set up Navidrome's sheet
+    frame = _body(screen, "private struct ServerSettingsPageFrame: ViewModifier")
+    assert frame.count(".macSettingsPage()") == 1
+    assert sum(bare(text).count(".macSettingsPage()") for name, text in app.items() if name != PLATFORM) == 1
+    group = bare(app["Manage/ServerSettingsGroupScreen.swift"])
+    assert screen.count(".serverSettingsPage(") == 1 and group.count(".serverSettingsPage(") == 1
+    assert "ServerSettingsGroupScreen(id: ServerSettings.connectionsGroup)" in group
+    mac, phone = _halves()
+    assert re.search(r"func macSettingsPage\(\) -> some View \{\s*modifier\(MacSettingsPage\(\)\)\s*\}", mac)
+    # the page in front: the latest page as deep as the deepest thing showing, one of Server settings' own
+    refresh = commands[commands.index("final class MacRefresh"):commands.index("private struct MacSheetLevel")]
+    settings = _body(refresh, "var settingsInFront: Bool {")
+    assert "return pages.last { (page: Page) -> Bool in !page.sheet && page.level == deepest }?.settings == true" in settings
+    page = _body(commands, "struct MacSettingsPage: ViewModifier {")
+    for line in ("@Environment(\\.macSheetLevel) private var level", "page.settings = true", "page.level = level\n"):
+        assert line in page, line
+    assert "page.sheet" not in page and ".environment(\\.macSheetLevel" not in page, "a page, never a sheet's root"
+
+
+#? The keys UIKit's own Catalyst menu was seen to carry (UIKitMacHelper's MainMenu.nib, read on macOS 27.2.1, and
+#? UIKitCore's MACMENUITEM strings - no Save among them): deadwax adds none of them, so UIKit never meets one key twice
+SYSTEM_KEYS = {"q", "h", "w", "m", "z", "x", "c", "v", "a", "t", "b", "i", "u", ";", ":"}
+#? (Slice 7's review) the system's keys with more than ⌘, read from the same MainMenu.nib (macOS 27.2): ⇧⌘Z Redo,
+#? ⌥⌘H Hide Others, ⌃⌘F Full Screen, ⌥⇧⌘V Paste and Match Style, ⇧⌘C and ⌥⌘C, ⌥⌘V
+SYSTEM_MODIFIED_KEYS = {("z", frozenset({"shift"})), ("h", frozenset({"option"})), ("f", frozenset({"control"})),
+                        ("v", frozenset({"option", "shift"})), ("c", frozenset({"shift"})), ("c", frozenset({"option"})),
+                        ("v", frozenset({"option"}))}
+
+
+def test_no_key_of_deadwaxs_is_one_the_systems_menus_have():
+    core = bare((CORE / "MacMenu.swift").read_text(encoding="utf-8"))
+    keys = _body(core, "public static func key(_ command: Command) -> Shortcut? {")
+    found = re.findall(r'case \.(\w+): return Shortcut\(\.character\("\s*"\), (\.command|\[[^\]]*\])\)', keys)
+    raw = (CORE / "MacMenu.swift").read_text(encoding="utf-8")
+    chars = dict(re.findall(r'case \.(\w+): return Shortcut\(\.character\("(.)"\), \.command\)', raw))
+    assert chars["saveChanges"] == "s" and chars["importEQFile"] == "o"
+    for command, char in chars.items():
+        if command == "info":
+            #? ⌘I is Format's Italic in the base menu - Format is emptied (CommandGroup(replacing: .textFormatting))
+            continue
+        assert char not in SYSTEM_KEYS, (command, char)
+    assert found, "the keys are read"
+    # and every key of deadwax's with more than ⌘ against the system's with more than ⌘
+    modified = re.findall(r'case \.(\w+): return Shortcut\(\.character\("(.)"\), \[([^\]]*)\]\)', raw)
+    assert len(modified) >= 3, modified
+    for command, char, mods in modified:
+        others = frozenset(m.strip().lstrip(".") for m in mods.split(",")) - {"command"}
+        assert others and (char, others) not in SYSTEM_MODIFIED_KEYS, (command, char, others)
+    commands = bare(app_sources()["Shared/MacCommands.swift"])
+    assert "CommandGroup(replacing: .textFormatting) {}" in commands
+    # Copy and Select All are the system's own items: deadwax draws no ⌘C or ⌘A of its own anywhere
+    for name, text in app_sources().items():
+        assert not re.search(r'KeyEquivalent\("[ca]"\)|keyboardShortcut\("[ca]"', text), name
+
+
+def test_the_event_logs_lines_are_selected_and_copied_with_the_systems_copy():
+    app = app_sources()
+    screen = bare(app["Manage/EventLogScreen.swift"])
+    lines = _body(screen, "@ViewBuilder private func lines(_ feed: EventStream.Feed) -> some View")
+    # the list selects on the Mac (List(selection:)) and is the List it was on the iPhone
+    assert lines.count("SelectingList(selection: $selected) {") == 1 and "List {" not in lines
+    assert "@State private var selected: Set<EventLog.Line.ID> = []" in screen
+    assert ("ForEach(feed.log.lines) { (line: EventLog.Line) in" in lines), "rows tagged by their own identities"
+    # Edit > Copy: the lines selected, as Core says them; Select All every line listed
+    assert re.search(r"\.copiesSelection\(\$selected, of: feed\.log\.lines\.map\(\\\.id\)\) \{ \(chosen: Set<EventLog\.Line\.ID>\) "
+                     r"-> String\? in\s*EventLog\.copyText\(chosen, of: log\.feed\.log\.lines\)\s*\}", lines)
+    # a line's right-click Copy (the phone's long press) stays as it was
+    row = screen[screen.index("private struct LogRow"):]
+    assert ".contextMenu {" in row and "UIPasteboard.general.string = EventLog.copyText(line)" in row
+    mac, phone = _halves()
+    # the Mac's list: selection, no Edit button; the iPhone's: List(content:), its selection never read
+    listing = _body(mac, "struct SelectingList<ID: Hashable, Content: View>: View {")
+    assert "List(selection: selection, content: content)" in listing
+    phone_list = _body(phone, "struct SelectingList<ID: Hashable, Content: View>: View {")
+    assert "List(content: content)" in phone_list and "selection:" not in phone_list.split("var body")[1]
+    # the system's Copy and Select All, through the responder chain - never a key of deadwax's
+    copier = _body(mac, "private struct SelectionCopier: UIViewRepresentable {")
+    assert "override var canBecomeFirstResponder: Bool { true }" in copier
+    # asked cheaply - a selected row still listed - the text made only for the copy itself (slice 7's review)
+    assert "if action == #selector(UIResponderStandardEditActions.copy(_:)) { return copies() }" in copier
+    assert "if action == #selector(UIResponderStandardEditActions.selectAll(_:)) { return selectingAll != nil }" in copier
+    assert "return super.canPerformAction(action, withSender: sender)" in copier, "every other action up the chain"
+    copy = _body(copier, "override func copy(_ sender: Any?) {")
+    assert "guard let text = copied() else { return }\n            UIPasteboard.general.string = text" in copy
+    assert "selectingAll?()" in _body(copier, "override func selectAll(_ sender: Any?) {")
+    # the focus taken as a selection is made - after the update, never from a field with the cursor
+    update = _body(copier, "func updateUIView(_ copier: Copier, context: Context) {")
+    assert "guard copier.asked != asked else { return }" in update
+    assert "guard copier.window != nil, !copier.isFirstResponder, !TextEditing.shared.typing else { return }" in update
+    assert update.index("Task { @MainActor in") < update.index("copier.becomeFirstResponder()")
+    copying = _body(mac, "private struct SelectionCopying<ID: Hashable>: ViewModifier {")
+    assert "if !now.isEmpty { asked += 1 }" in copying
+    assert "copies: { () -> Bool in !selection.wrappedValue.isDisjoint(with: ids) }" in copying
+    # asked again as a field lets the cursor go with rows selected: a click that landed while the search had it
+    # changes no selection when repeated (slice 7's review)
+    assert re.search(r"\.onChange\(of: TextEditing\.shared\.typing\) \{ \(_: Bool, typing: Bool\) -> Void in\s*"
+                     r"if !typing, !selection\.wrappedValue\.isEmpty \{ asked \+= 1 \}\s*\}", copying)
+    assert "selectAll: ids.isEmpty ? nil : { selection.wrappedValue = Set(ids) }" in copying
+    assert "keyboardShortcut" not in copier + copying and "UIKeyCommand" not in mac
+    for name, text in app.items():
+        if name != PLATFORM:
+            assert "canPerformAction" not in bare(text) and "UIResponderStandardEditActions" not in bare(text), name
+
+
+def test_edit_albums_sheet_is_sized_by_the_window_and_managings_pages_are_readable():
+    app = app_sources()
+    frame = bare(app["Root/DesktopFrame.swift"])
+    edit = frame[frame.index(".appSheet(item: $navigation.albumEdit"):]
+    edit = edit[:edit.index("\n        }\n")]
+    assert re.search(r"EditAlbumSheet\(request: request\)\s*\.macSheet\(\)\s*\.sizedSheet\(MacFrame\.sheetSize\(width: width, "
+                     r"height: height\)\)$", edit.strip())
+    assert "@State private var height: Double = MacFrame.openingHeight" in frame
+    assert re.search(r"\.onGeometryChange\(for: Double\.self\) \{ \(frame: GeometryProxy\) -> Double in\s*"
+                     r"Double\(frame\.size\.height\)\s*\} action: \{ \(now: Double\) -> Void in\s*height = now\s*\}", frame)
+    # only Edit album's: the other sheets keep the system's own size
+    assert sum(bare(text).count(".sizedSheet(") for name, text in app.items() if name != PLATFORM) == 1
+    mac, phone = _halves()
+    sized = _body(mac, "@ViewBuilder func sizedSheet(_ size: MacFrame.Size) -> some View {")
+    assert re.search(r"if #available\(iOS 18\.0, \*\) \{\s*presentationSizing\(WindowSheetSizing\(size: size\)\)\s*\} else \{\s*"
+                     r"self\s*\}", sized), "macOS 14: the system's size, as it was"
+    sizing = _body(mac, "private struct WindowSheetSizing: PresentationSizing {")
+    assert "ProposedViewSize(width: CGFloat(size.width), height: CGFloat(size.height))" in sizing
+    assert "@available(iOS 18.0, *)\nprivate struct WindowSheetSizing" in mac
+    # Manage's pages at the readable width - by the rule the album's page has; Change password as it was
+    routes = bare(app["Shared/Routes.swift"])
+    destinations = _body(routes, "func appRoutes() -> some View {")
+    for case, page in MANAGE_PAGES.items():
+        assert f"case .{case}: {page}.readableOnMac()\n" in destinations, case
+    assert "case .changePassword: ChangePasswordScreen()\n" in destinations
+
+
+def test_tab_moves_between_the_fields_and_return_in_one_never_applies():
+    app = app_sources()
+    #? every page or sheet of the editor and Manage whose fields have an order: Tab follows it, through Platform's one
+    #? helper (MacMenu.tab), each field's own
+    TABS = {"Edit/ReleasePage.swift": 1, "Edit/TagsPages.swift": 1, "Manage/PeopleSheets.swift": 6}
+    found = {}
+    for name, text in app.items():
+        if name == PLATFORM:
+            continue
+        code = bare(text)
+        assert "onKeyPress" not in code, f"{name}: a key only through Platform's helpers"
+        count = code.count(".tabs($focused, in: Self.order)")
+        if count:
+            found[name] = count
+            # each right after its field's own focus
+            assert count == len(re.findall(r"\.focused\(\$focused, equals: [\w.]+\)\n\s*\.tabs\(\$focused, in: Self\.order\)",
+                                            code)), name
+    assert found == TABS
+    release = bare(app["Edit/ReleasePage.swift"])
+    assert "private static let order: [Field] = [.artist, .album, .year, .originalYear, .edition]" in release
+    fields = _body(release, "private var fieldsSection: some View {")
+    assert re.findall(r"field\(EditWords\.\w+, \\\.\w+, \.(\w+)", fields) == ["artist", "album", "year", "originalYear", "edition"]
+    tags = bare(app["Edit/TagsPages.swift"])
+    assert "private static let order = TagEdit.sections.flatMap" in tags
+    assert "ForEach(TagEdit.sections, id: \\.title)" in tags, "drawn in the sections' order, Tab's order"
+    people = bare(app["Manage/PeopleSheets.swift"])
+    assert "private static let order: [Field] = [.user, .name, .password, .again]" in people
+    assert "private static let order: [Field] = [.password, .again]" in people
+    mac, phone = _halves()
+    tab = _body(mac, "func tabs<Field: Hashable>(_ focused: FocusState<Field?>.Binding, in order: [Field]) -> some View {")
+    assert "onKeyPress(keys: [.tab, Platform.backTab])" in tab
+    assert "let back = press.key == Platform.backTab || press.modifiers.contains(.shift)" in tab
+    assert "guard let next = MacMenu.tab(order, from: focused.wrappedValue, back: back) else { return .ignored }" in tab
+    assert tab.index("focused.wrappedValue = next") < tab.index("return .handled")
+    assert "static let backTab = KeyEquivalent(Character(Unicode.Scalar(UInt8(0x19))))" in mac
+    # Return in a field never applies, deletes or saves: in the editor and Manage's pages a field's Return moves to the
+    # next field, puts the keyboard away, searches or unlocks People (a password checked, nothing written) - nothing else
+    allowed = re.compile(r"\.onSubmit(?: \{ focused = (?:\.\w+|nil|false) \}| \{ people\.unlock\(\) \}|\(of: \.search\) \{)")
+    for name, text in app.items():
+        if not (name.startswith("Edit/") or name.startswith("Manage/")):
+            continue
+        code = bare(text)
+        for submit in re.finditer(r"\.onSubmit\b[^\n]*", code):
+            assert allowed.match(submit.group(0)), f"{name}: {submit.group(0)}"
+        assert "defaultAction" not in code and "keyboardShortcut" not in code, name
+    search = _body(bare(app["Edit/ReleasePage.swift"]), ".onSubmit(of: .search) {")
+    assert "apply" not in search.lower() and "write" not in search.lower(), "Choose a release's Return searches"
+
+
+def test_a_run_under_way_says_what_quitting_does_on_the_mac():
+    app = app_sources()
+    care = bare(app["Manage/LibraryCareScreen.swift"])
+    kind = _body(care, "private func kindSection(_ kind: BulkTargets.Kind, online: Bool) -> some View {")
+    running = kind[kind.index("if let stop = runs.stopLabel(kind) {"):kind.index("} else if let targets, !targets.isEmpty {")]
+    assert running.index("Text(LibraryCare.screenOnNote)") < running.index(
+        "if let quit = LibraryCare.quitNote(Platform.device, kind: kind) {\n                    Text(quit)")
+    group = bare(app["Manage/ServerSettingsGroupScreen.swift"])
+    retime = group[group.index("if run.running {"):]
+    retime = retime[:retime.index("} else {")]
+    assert retime.index("Text(RetimeRun.screenOnNote)") < retime.index(
+        "if let quit = RetimeRun.quitNote(Platform.device) {\n                    Text(quit)")
+    #? no veto of a quit: Catalyst has no applicationShouldTerminate, and a run is the app's own - so it says, never asks
+    for name, text in app.items():
+        code = bare(text)
+        assert "applicationShouldTerminate" not in code and "terminate(" not in code, name
+    # the words are Core's, by the device: nothing on the iPhone
+    words = (CORE / "LibraryCare.swift").read_text(encoding="utf-8")
+    assert 'device == .mac ? "Quitting deadwax stops the run - open deadwax again, and \\(label(kind)) carries on." : nil' in words
+    retimed = (CORE / "ServerSettings.swift").read_text(encoding="utf-8")
+    assert 'device == .mac ? "Quitting deadwax stops it - open deadwax again, and running it again carries on." : nil' in retimed
 
 
 def _load_script(name: str):
