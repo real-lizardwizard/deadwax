@@ -8,7 +8,8 @@ names them. Both are writes, so the same-origin guard stands in front of them li
 page elsewhere can't sign the browser in to an account of its choosing.
 
 The answer to a sign-in is what `GET /deadwax/me` answers - {user, admin, auth, version, permissions,
-permissions_unverified} (2.0.0-player.61: `admin` the Navidrome admin flag getUser has just said) - and a cookie;
+permissions_unverified, lastfm} (2.0.0-player.61: `admin` the Navidrome admin flag getUser has just said; 2.1.36:
+`lastfm`) - and a cookie;
 NEVER the Navidrome token, which stays in deadwax, encrypted. The cookie: `deadwax_session`, HttpOnly
 (no script on any page reads it), SameSite=Strict, Path=/, and Secure when the page came over HTTPS -
 itself, or through a proxy's X-Forwarded-Proto. Plain http on the LAN and WireGuard is how James reaches
@@ -22,6 +23,7 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
 from src import __version__, auth
+from src.api.lastfm_endpoint import lastfm
 from src.config import Config
 from src.users import PERMISSIONS, permissions, permissions_unverified
 
@@ -70,7 +72,7 @@ async def login(body: SignIn, request: Request):
     unverified = await asyncio.to_thread(permissions_unverified, request, user)
     response = JSONResponse({"user": user, "admin": admin, "auth": "on", "version": __version__,
                              "permissions": [name for name in PERMISSIONS if name in allowed],
-                             "permissions_unverified": unverified})
+                             "permissions_unverified": unverified, "lastfm": lastfm.state()})
     _set_cookie(response, request, value, max_age)
     return response
 

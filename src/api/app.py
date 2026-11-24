@@ -13,7 +13,7 @@ from starlette.middleware.gzip import GZipMiddleware
 from src.routes import search_musicbrainz, interface_logs, monitor_slskd, download, library, settings, navidrome, me, pins, store_album
 from src.routes import play_history
 from src.routes import auth as auth_routes, coverart, describe, eq, held, my_library, own_password, people
-from src import auth, permissions, player_cache, stars
+from src import auth, lastfm_kept, permissions, player_cache, stars
 from src.api import navidrome_admin
 from src.musicbrainz_cache import saved_answers
 from src.users import current_user, require
@@ -26,6 +26,7 @@ from src.api.musicbrainz_endpoint import MusicBrainzClient
 from src.api.slskd_endpoint import SlskdClient
 from src.api.lrclib_endpoint import lrclib
 from src.api.wikipedia_endpoint import wikipedia
+from src.api.lastfm_endpoint import lastfm
 from src.api.autoeq_endpoint import autoeq_client
 from src.api.coverart_endpoint import archive_fronts
 from src.api.artist_images_endpoint import artist_pictures
@@ -136,6 +137,10 @@ async def lifespan(app: FastAPI):
     else:
         logger.info("MUSICBRAINZ_CACHE_MB is 0, so MusicBrainz's answers are kept in memory only, for an hour")
 
+    #? (2.1.36) Last.fm's kept answers: none kept without a key - its terms ask for its data to go when its use ends -
+    #? and none of an older shape. After the overrides, since LASTFM_API_KEY can be one.
+    await lastfm_kept.at_start(app.state.store, Config.lastfm_key() is not None)
+
     #? An empty store index - the first start of a version with one - is filled from the saved
     #? scan, so Find knows what the library holds before anyone opens its tab (step 2). After the
     #? overrides, since LIBRARY_PATH can be one; from the database alone, never the disk.
@@ -192,6 +197,8 @@ async def lifespan(app: FastAPI):
     await library.artist_images_client.close_client()
     await lrclib.close_client()
     await wikipedia.close_client()
+    await lastfm_kept.stop()
+    await lastfm.close_client()
     await eq.stop_refreshing(app)
     await autoeq_client.close_client()
     await coverart.stop(app)

@@ -31,6 +31,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, ConfigDict
 
 from src import __version__
+from src.api.lastfm_endpoint import lastfm
 from src.users import PERMISSIONS, auth_mode, current_user, is_admin, permissions, permissions_unverified
 
 router = APIRouter()
@@ -117,11 +118,14 @@ def me(request: Request, user: str = Depends(current_user)):
     """Who is asking, and (2.0.0-player.61) what they may do: `permissions`, the effective list in PERMISSIONS'
     order - every one for an admin, and for `local` with logins off - and `permissions_unverified`, whether an
     admin gave them something this session doesn't honour (their account couldn't be checked as they signed in).
+    And (2.1.36) `lastfm`: "off" with no LASTFM_API_KEY, "refused" while Last.fm refuses it (an hour from its last
+    refusal), else "on" - the iPhone and Mac app draw nothing of Last.fm's unless it is "on" (notes/lastfm.md).
     SYNCHRONOUS: the permissions table is read from SQLite the first time, in FastAPI's thread pool."""
     allowed = permissions(request, user)
     return {"user": user, "admin": is_admin(user), "auth": auth_mode(), "version": __version__,
             "permissions": [name for name in PERMISSIONS if name in allowed],
-            "permissions_unverified": permissions_unverified(request, user)}
+            "permissions_unverified": permissions_unverified(request, user),
+            "lastfm": lastfm.state()}
 
 
 @router.get("/preferences")

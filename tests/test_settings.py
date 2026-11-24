@@ -500,3 +500,88 @@ def test_library_paths_row_says_what_reads_it_now_the_library_tab_is_navidromes(
     effect = find(call_settings(), "LIBRARY_PATH")["effect"]
     assert "Needs a look, Library care, the Edit panel" in effect
     assert "what the library tab reads" not in effect and "Navidrome" in effect
+
+
+# ===== LASTFM_API_KEY (2.1.36) ================================================
+
+
+LASTFM_KEY = "0123456789abcdef0123456789abcdef"
+
+
+def _connections_keys(payload: dict) -> list[str]:
+    [group] = [group for group in payload["groups"] if group["id"] == "connections"]
+    return [setting["key"] for setting in group["settings"]]
+
+
+def test_the_lastfm_key_is_a_secret_after_fanart_tv_s_keys(monkeypatch):
+    from src.routes.settings import ADMINS_ONLY
+
+    monkeypatch.setattr(Config, "LASTFM_API_KEY", LASTFM_KEY)
+    payload = call_settings()
+    keys = _connections_keys(payload)
+    row = find(payload, "LASTFM_API_KEY")
+
+    assert keys.index("LASTFM_API_KEY") == keys.index("FANARTTV_PERSONAL_KEY") + 1
+    assert keys.index("LASTFM_API_KEY") < keys.index("MUSICBRAINZ_EMAIL")
+    assert row["secret"] is True and row["value"] == "set" and row["editable"] is True
+    assert row["status"] == "ok" and row["detail"] is None
+    assert LASTFM_KEY not in str(payload)
+    #? like fanart.tv's, it controls nothing: anyone given Settings and the log may set it
+    assert "LASTFM_API_KEY" not in ADMINS_ONLY
+    assert row["effect"].startswith("Optional: an artist's listeners, top songs, similar artists and radio")
+
+
+def test_no_lastfm_key_is_unset_not_an_error(monkeypatch):
+    monkeypatch.setattr(Config, "LASTFM_API_KEY", None)
+    row = find(call_settings(), "LASTFM_API_KEY")
+    assert row["value"] is None and row["status"] == "unset"
+
+    #? a blank saved over the environment's is no key
+    monkeypatch.setattr(Config, "LASTFM_API_KEY", "   ")
+    row = find(call_settings(), "LASTFM_API_KEY")
+    assert row["value"] is None and row["status"] == "unset"
+
+
+def test_a_lastfm_key_with_a_space_or_a_control_character_inside_is_refused():
+    for value in ("0123456789abcdef 0123456789abcdef", "0123456789abcdef\t0123456789abcdef",
+                  "0123456789abcdef" + chr(0x200B) + "0123456789abcdef", "api key"):
+        assert _validate("LASTFM_API_KEY", value) == "a Last.fm API key is one word - letters and digits, no spaces"
+    #? a paste's newline at the end is trimmed, not refused; a blank is no key at all
+    assert _validate("LASTFM_API_KEY", LASTFM_KEY + "\n") is None
+    assert _validate("LASTFM_API_KEY", "") is None
+
+
+def test_a_lastfm_key_that_doesn_t_look_like_one_is_stored_and_flagged(monkeypatch):
+    short = LASTFM_KEY[:31]
+    assert _validate("LASTFM_API_KEY", short) is None
+
+    monkeypatch.setattr(Config, "LASTFM_API_KEY", short)
+    row = find(call_settings(), "LASTFM_API_KEY")
+
+    assert row["status"] == "error"
+    assert row["detail"] == ("doesn't look like a Last.fm API key (32 letters and digits) - check you copied the API "
+                             "key, not the shared secret")
+
+
+def test_a_refused_lastfm_key_says_when_and_what_last_fm_said(monkeypatch):
+    import time
+
+    from src.api.lastfm_endpoint import REFUSED_HOLD_S, lastfm
+    from src.lastfm import Refused
+
+    at = time.mktime((2026, 11, 24, 14, 5, 0, 0, 0, -1))
+    monkeypatch.setattr(Config, "LASTFM_API_KEY", LASTFM_KEY)
+    #? `at` is the wall clock's - what the row says; the hour is timed on the monotonic one
+    monkeypatch.setattr(lastfm, "refusal", Refused(10, "Invalid API key - You must be granted a valid key", at))
+    monkeypatch.setattr(lastfm, "refused_since", 500.0)
+    monkeypatch.setattr(lastfm, "monotonic", lambda: 560.0)
+
+    row = find(call_settings(), "LASTFM_API_KEY")
+
+    assert row["status"] == "error"
+    assert row["detail"] == ("Last.fm refused this key at 14:05 (error 10: Invalid API key - You must be granted a "
+                             "valid key) - check it's the API key, not the shared secret")
+
+    #? an hour on, the next ask tries again: the row no longer says so
+    monkeypatch.setattr(lastfm, "monotonic", lambda: 500.0 + REFUSED_HOLD_S)
+    assert find(call_settings(), "LASTFM_API_KEY")["status"] == "ok"
