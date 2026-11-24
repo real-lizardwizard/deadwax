@@ -167,6 +167,50 @@ def test_resolve_album_dir_shares_a_folder_it_cannot_identify(tmp_path):
     assert path == existing
 
 
+def test_a_folder_is_known_by_its_files_though_its_first_is_untagged(tmp_path):
+    """
+    2.1.39: read_album_mbid answered from the first readable file alone. A hidden or bonus track with no tags,
+    sorted first, made another pressing's folder read as untagged - and this pressing's download was filed
+    into it, its tracks counted as that pressing by the scan (which keys a folder on its commonest id).
+    """
+    from tests.test_library import write_flac
+    held = tmp_path / "Tame Impala" / "The Slow Rush (2020)"
+    write_flac(held / "00 Hidden.flac", title="Hidden")
+    for n, title in ((1, "One More Year"), (2, "Instant Destiny")):
+        write_flac(held / f"0{n} - {title}.flac", musicbrainz_albumid="the-uk-pressing", title=title,
+                   tracknumber=n)
+
+    path, discriminator = resolve_album_dir(str(tmp_path), {**BASE, "catalog_number": "MOSH 555"})
+
+    assert path.name == "The Slow Rush (2020) [MOSH 555]" and discriminator == "MOSH 555"
+    # and the same pressing still shares it
+    assert resolve_album_dir(str(tmp_path), {**BASE, "release_mbid": "the-uk-pressing"}) == (held, "")
+
+
+def test_a_folders_release_is_its_commonest_as_the_scan_reads_it(tmp_path):
+    from src.library import read_album_dir
+    from src.organizer import read_album_mbid
+    from tests.test_library import write_flac
+    folder = tmp_path / "Tame Impala" / "The Slow Rush (2020)"
+    write_flac(folder / "01 - One More Year.flac", musicbrainz_albumid="stray", tracknumber=1)
+    for n in (2, 3):
+        write_flac(folder / f"0{n} - Track.flac", musicbrainz_albumid="the-pressing", tracknumber=n)
+    write_flac(folder / "04 - Untagged.flac", tracknumber=4)
+
+    assert read_album_mbid(folder) == "the-pressing" == read_album_dir(folder, tmp_path)["release_mbid"]
+
+    # a tie goes as the scan's does: the first in running order (disc, track, name), not by file name
+    tie = tmp_path / "Tame Impala" / "Lonerism (2012)"
+    write_flac(tie / "01 - A.flac", musicbrainz_albumid="named-first", tracknumber=2)
+    write_flac(tie / "02 - B.flac", musicbrainz_albumid="played-first", tracknumber=1)
+    assert read_album_mbid(tie) == "played-first" == read_album_dir(tie, tmp_path)["release_mbid"]
+
+    untagged = tmp_path / "Tame Impala" / "Currents (2015)"
+    for n in (1, 2):
+        write_flac(untagged / f"0{n} - Track.flac", tracknumber=n)
+    assert read_album_mbid(untagged) is None and read_album_mbid(tmp_path / "not there") is None
+
+
 def test_resolve_album_dir_escalates_when_a_different_release_holds_the_name(tmp_path, monkeypatch):
     """Same title, year and disambiguation, different release - the pressing case."""
     import src.organizer as organizer

@@ -7,9 +7,9 @@ landed side by side - one album in Navidrome with every track twice - and a grab
 tracklist, which keeps the sharer's own filenames, did it even in the same format.
 
 Now a track the folder already has is skipped, and a missing one still files, so a second
-download can fill gaps a partial one left. "Already has" is the same disc and track number when
-the folder holds this very release, and the same title otherwise (v1.0.2) - two pressings can
-number their tracks differently.
+download can fill gaps a partial one left. "Already has" is the same disc and track number in a
+file tagged with this very release, and the same title in any other file (v1.0.2; file by file
+since 2.1.39) - two pressings can number their tracks differently.
 """
 
 import asyncio
@@ -197,6 +197,45 @@ def test_the_same_release_is_judged_by_number_even_with_retitled_files(tmp_path)
     names = ["01 Wildlife Analysis.flac"]
     plan = plan_organization(job(names), downloads_with(tmp_path, names), str(tmp_path / "music"))
     assert plan["operations"][0].get("duplicate_of") == "01 - Wildlife Analysis.flac"
+
+
+RIP = ["Opening", "Second", "Third", "Fourth", "Fifth", "Sixth", "Seventh", "Eighth", "Ninth", "Closing"]
+WITH_BONUS = {**RELEASE, "release_mbid": "mb-deluxe",
+              "tracks": [{"position": n, "title": t} for n, t in enumerate(RIP[:5] + ["Bonus"] + RIP[5:], 1)]}
+
+
+def rip_filled_in_by_one_track(tmp_path):
+    """
+    An old untagged rip of ten tracks, and the eleven-track pressing's bonus (track 6) filed into it by
+    deadwax - the folder's commonest id is that pressing's now, as the scan reads it (2.1.39).
+    """
+    folder = tmp_path / "music" / ALBUM
+    for n, title in enumerate(RIP, 1):
+        write_flac(folder / f"{n:02d} {title}.flac", tracknumber=n, title=title)
+    write_flac(folder / "06 - Bonus.flac", tracknumber=6, title="Bonus", musicbrainz_albumid="mb-deluxe")
+    return str(tmp_path / "music")
+
+
+def test_an_untagged_rips_numbers_never_say_which_song_it_is(tmp_path):
+    """
+    2.1.39 (review): judged by the folder, the rip read as the pressing and was matched by number - the
+    pressing's "Closing" (its track 11) found no file numbered 11 and was filed beside the rip's "Closing"
+    (its 10): one song twice. File by file, the rip's untagged files are matched by title.
+    """
+    library = rip_filled_in_by_one_track(tmp_path)
+    names = ["06 Bonus.flac", "11 Closing.flac"]
+    plan = plan_organization(job(names, WITH_BONUS), downloads_with(tmp_path, names), library)
+
+    assert [op.get("duplicate_of") for op in plan["operations"]] == ["06 - Bonus.flac", "10 Closing.flac"]
+    assert plan["same_release"] is False, "a twin in the rip is not provably this pressing's"
+
+
+def test_everything_already_in_this_pressings_files_is_the_same_release(tmp_path):
+    library = rip_filled_in_by_one_track(tmp_path)
+    names = ["06 Bonus.flac"]
+    plan = plan_organization(job(names, WITH_BONUS), downloads_with(tmp_path, names), library)
+    assert [op.get("duplicate_of") for op in plan["operations"]] == ["06 - Bonus.flac"]
+    assert plan["same_release"] is True
 
 
 def test_the_sidecars_of_an_unfiled_copy_stay_with_it(tmp_path):

@@ -25,11 +25,11 @@ an album, right after it does:
 Art, CD art and lyrics change nothing it holds. A snapshot never touches it: a snapshot is the
 last scan, not the disk.
 
-**Nothing counts as held on the index's word alone.** Each folder is looked at before it counts:
-it must still be there, its first audio file must be tagged with this release
-(organizer.read_album_mbid), and each file's title and (disc, track) are read as filing reads them
-- what is held is the release's distinct tracks, not its files. The index says where to look; the
-disk says what is there.
+**Nothing counts as held on the index's word alone.** Each folder is looked at before it counts: it
+must still be there, it must be tagged with this release - the id most of its files carry, as the
+scan reads it (organizer.read_album_mbid, every file since 2.1.39) - and each file's title and
+(disc, track) are read as filing reads them - what is held is the release's distinct tracks, not its
+files. The index says where to look; the disk says what is there.
 
 **Everything degrades to "not held".** A broken index, an unreadable folder, a database that
 wouldn't open - each costs the check, never the download. The worst a failure here can do is let a
@@ -348,10 +348,11 @@ def audio_tracks(release: dict) -> list[dict]:
 
 def _look(folder: Path, release_mbid: str) -> dict | None:
     """
-    What is in this folder now: None when it is gone (or holds no audio any more), else whether
-    its first audio file is tagged with this release, and every audio file's folded title and
-    (disc, track) as filing reads them (organizer.existing_tracks: its tags, then deadwax's
-    "NN - Title" name) - no more than filing's own duplicate check reads.
+    What is in this folder now: None when it is gone (or holds no audio any more), else whether it
+    is tagged with this release (read_album_mbid: its commonest id, as the scan reads it - every
+    file since 2.1.39), and every audio file's folded title and (disc, track) as filing reads them
+    (organizer.existing_tracks: its tags, then deadwax's "NN - Title" name) - no more than filing's
+    own duplicate check reads.
     """
     if not folder.is_dir():
         return None
@@ -423,8 +424,8 @@ async def held_copy(store, root: str, release_mbid: str | None, release: dict | 
     part copies, an interview track) read as a complete pressing and refuse the download of the
     tracks nobody had (step 2 review). Video tracks don't count (audio_tracks).
 
-    A folder that has gone is marked `missing`; one whose first file isn't tagged with this
-    release - a folder shared with an untagged rip - simply doesn't count, and the download goes
+    A folder that has gone is marked `missing`; one that names another release, or none (an
+    untagged rip), simply doesn't count, and the download goes
     ahead for filing's duplicate rules to sort out.
     """
     if not _usable(store) or not root or not release_mbid:

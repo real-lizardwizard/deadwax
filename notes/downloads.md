@@ -438,7 +438,7 @@ of the same name as one album or two (M9 - it decides S3's "exactly one" rule).
   whose first file was untagged (a hidden track sorted first) read as untagged, and a manual download was
   filed into it. A manual job now asks `holds_album_id`, every file read; read_album_mbid's other callers
   were left as they are (the non-manual `resolve_album_dir` shares the same blind spot for a matched job -
-  reported, not changed). `test_a_folder_naming_a_pressing_in_any_file_is_never_shared_though_its_first_is_untagged`.
+  reported, not changed then; fixed in 2.1.39, below). `test_a_folder_naming_a_pressing_in_any_file_is_never_shared_though_its_first_is_untagged`.
 - *Ranking.* The artist's word in a self-titled search - in 2.1.37's write-up above.
 - *Filing.* The disc prefix trusted the disc tag over the folder: CD1/01.flac and CD2/01.flac, both tagged
   disc 1, met on one name and 2 of 4 files were filed with `failed: 0`; a `-1` disc tag named `-1-b.flac`.
@@ -458,3 +458,73 @@ Known limits, kept on purpose:
 - A CD1/CD2 set whose files are all tagged disc 1 keeps that tag (a file gets only what it lacks): the
   files are filed apart, but the scan reads every track as disc 1 and orders them by number, then name -
   1-01, 2-01, 1-02, 2-02, the discs interleaved - until a release is applied.
+
+### Every file's release id (2.1.39)
+
+James, 24 Nov, on the blind spot manual search's review found: "Yes, fix it first". `read_album_mbid` read the
+first readable audio file and stopped - "every track in a folder belongs to the same release". Not so: a hidden
+track or a bonus rip with no tags, sorted first by name, made a folder of one pressing read as untagged, and the
+untagged rule ("never treat unknown as different") then shared it with a download of ANOTHER pressing. Its
+tracks went in, and the scan, which keys a folder on its commonest id, counted them as the first pressing.
+
+- **`organizer.folder_release_ids(directory)`** reads every audio file with the scan's own reader
+  (`library.read_track`), in the scan's running order (`track_order`), "" for a file with none. A folder that
+  can't be listed raises, as before - the caller decides, nothing is guessed.
+- **`read_album_mbid` is the commonest of them** (`library._commonest`, the scan's rule, ties to the first in
+  running order), None when no file has one. So a folder is the release the scan will call it - for every caller
+  at once: `resolve_album_dir` (sharing a folder), the plan's `same_release` (duplicates by number or by title),
+  the store index's `_look` ("tagged") and `_moved_to`, and Artwork's lookup by the album's own release.
+- **`holds_album_id`** (a manual search's: any id at all) reads the same list; an unlistable folder still counts
+  as holding one.
+- **What changes for a folder mixing untagged files with one release's**: it now counts as that release for
+  sharing a folder and for Find's "already have it". Untagged files don't vote, so ONE tagged file among ten
+  untagged ones makes the folder that release - an old rip that one deadwax download filled in. Before, it
+  depended on which file sorted first.
+- **Duplicates are judged file by file** (the review, below): `existing_tracks` carries each file's own id
+  (`_read_track_and_release`, the same open), and `find_duplicate(existing, key, title, release_mbid)` matches a
+  file tagged with this release by (disc, track), any other file - untagged, another pressing's, or all of them
+  for a job naming no release - by title. It returns the entry, not its name.
+- **The plan's `same_release`** (what grant_for gives on a filing that placed nothing) is the folder's commonest
+  id being this release AND every track found already there being found in a file of this release. A twin in an
+  untagged rip's file makes it False: FLAGGED, nobody's on a guess.
+- **Cost**, N audio files in the folder (each open parses the tags, embedded pictures included):
+
+  | path | before | now |
+  | --- | --- | --- |
+  | Find, `/enqueue`, retries, Add to my library (`_look`), per held folder | N+1 | 2N |
+  | Find on a part-held album (`filing_folder` -> `resolve_album_dir`), per candidate folder | +1 | +N |
+  | the filing plan on an existing folder (resolve, `existing_tracks`, `same_release`) | about N+3 | up to 4N |
+  | an artist's re-file (`reindex_moved`), per album | 1 | N |
+  | Library care's bulk Get covers, per album without art | 1 | N |
+
+  Nothing runs per track or inside a scan; the bulk run waits on the network anyway. Not measured on a NAS.
+  Left for later: `_look` and the plan could take the commonest from `existing_tracks`' own pass, but it is in
+  name order with the filename's number as a fallback, so a tie could differ from the scan's.
+
+Tests (`tests/test_editions.py`), each seen failing on 2.1.38's code:
+`test_a_folder_is_known_by_its_files_though_its_first_is_untagged` (a hidden untagged "00" first, the rest
+another pressing: kept apart by its catalogue number; the same pressing still shares it) and
+`test_a_folders_release_is_its_commonest_as_the_scan_reads_it` (a stray id outvoted; a 1:1 tie goes to the
+first in running order, not by name, exactly as `read_album_dir` - seen failing with the sort taken out; no ids
+is None). One test pinned the old accident and was restated: tests/test_store_index.py's
+`test_a_folder_whose_first_file_is_not_this_release_is_not_held` (this release's two tracks and an untagged
+"00 - Intro" read as not held, where a "99 - Outro" would have been held) is now
+`test_a_folder_is_this_release_by_most_of_its_files_not_by_its_first`: held, complete; not held once three files
+name another release, nor with every file untagged. It fails on 2.1.38's code.
+
+**The review (one agent, 24 Nov).** No folder where `read_album_mbid` and the scan disagree (same files, order,
+tie-break, stripping; an unlistable folder raises as before; `read_track` is more forgiving per file than the old
+unguarded `audio.get`). No import cycle (store_index imports library at its top). Found and fixed:
+- *A gap-filled rip judged as the pressing.* With the folder's commonest id deciding `same_release`, a rip of ten
+  untagged tracks plus deadwax's bonus track 6 of the eleven-track pressing read as that pressing, and a second
+  download's "Closing" (its 11) found no file numbered 11 and was filed beside the rip's "Closing" (its 10) - one
+  song twice; and a filing that placed nothing there was granted, not flagged. Fixed by judging duplicates file
+  by file (above). tests/test_no_second_copy.py's `test_an_untagged_rips_numbers_never_say_which_song_it_is`
+  (seen failing with the folder judged as a whole, and its `same_release` line with the grant change taken out)
+  and `test_everything_already_in_this_pressings_files_is_the_same_release`.
+- *The docs said "most of its files"*; untagged files don't vote. README, organizing.md and downloading.md say
+  "its tagged files name most often" now, and organizing.md's second-copy rule is file by file.
+- *Cost understated* ("once more"): the table above.
+- Noticed, not changed: disc_art.py (around 220) takes the first file that has an id, not the commonest; a
+  folder whose first file is untagged now gets Library care's bulk Get covers (bulkTargets picks by the scan's
+  id, which the art lookup now agrees with).

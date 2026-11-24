@@ -82,16 +82,17 @@ come back to it - so after a Get it says **Already downloading**, and a download
 Requests stops being said. While it's asked again, what it said last stays.
 
 What counts as held is checked on disk every time: the folder has to still be there, with its
-files tagged as that release (deadwax reads the first one), and what's counted is the release's
-tracks it holds. Each file is matched to a track by its title first, so a set numbered across
-its discs, or a stray disc number, still counts; a file whose title isn't the release's (or
-that has none) is matched by its disc and track number instead. A track you have twice, as FLAC
-and MP3 say, counts once, and audio that isn't one of its tracks doesn't count. A folder whose first file
-isn't tagged as that release, such as one shared with untagged files from before deadwax,
-doesn't count, so the download goes ahead and filing skips whatever tracks the folder already
-has (see [organizing](organizing.md)). An album copied in by another program counts once a scan
-has seen it: **Library care → Rescan** ([the library](library.md#library-care)). A Get of the
-album as a whole has no release id and isn't checked.
+files tagged as that release (the release its tagged files name most often, as the library scan
+reads it), and what's counted is the release's tracks it holds. Each file is matched to a track
+by its title first, so a set numbered across its discs, or a stray disc number, still counts; a
+file whose title isn't the release's (or that has none) is matched by its disc and track number
+instead. A track you have twice, as FLAC and MP3 say, counts once, and audio that isn't one of
+its tracks doesn't count. A folder that names another release, or none (untagged files from
+before deadwax), doesn't count, so the download goes ahead and filing skips whatever tracks the
+folder already has (see [organizing](organizing.md)). An album copied in by another program
+counts once a scan has seen it: **Library care → Rescan**
+([the library](library.md#library-care)). A Get of the album as a whole has no release id and
+isn't checked.
 
 The tracks of a DVD-Video or Blu-ray in a pressing (a deluxe edition's concert film, say), and
 any track MusicBrainz lists as a video, aren't counted: they never arrive as audio, so a pressing
@@ -453,10 +454,11 @@ rather than joined.
   your starred albums in Navidrome - when it ends, for everyone still waiting for it (not anyone who
   left it, nor the break-glass `deadwax`, which has no library), and its row in Requests says so:
   - **filed** - added: **In your library** (an admin's row of somebody else's: **In their library**);
-  - **every file was already there**, in the folder of that same release - a second copy isn't filed
-    beside the first, and it's added: **Already in the collection, added to your library**;
-  - **every file was already there** in a folder of **another pressing or an untagged rip** - given to
-    nobody on a guess, and an admin is asked to look (**Library care → In nobody's library**):
+  - **every file was already there**, in that same release's folder and files - a second copy isn't
+    filed beside the first, and it's added: **Already in the collection, added to your library**;
+  - **every file was already there**, but in a folder of **another pressing** or among an
+    **untagged rip's** files - given to nobody on a guess, and an admin is asked to look
+    (**Library care → In nobody's library**):
     **Not added - the collection's copy may be another pressing, so an admin has been asked to check it**.
     Once the admin has looked, the row says so: **Already in the collection, added to your library** after
     their **Add for them**, **Not added - the collection's copy may be another pressing; an admin has

@@ -612,15 +612,32 @@ def test_a_folder_that_has_gone_is_marked_missing_not_held(tmp_path, store):
     assert rows(store)[0]["state"] == "missing"
 
 
-def test_a_folder_whose_first_file_is_not_this_release_is_not_held(tmp_path, store):
-    """A folder shared with an untagged rip: the download goes ahead, filing's duplicate rules decide."""
+def test_a_folder_is_this_release_by_most_of_its_files_not_by_its_first(tmp_path, store):
+    """
+    2.1.39: a folder is the release most of its files name, as the scan reads it. An untagged file sorted first
+    (an intro ripped apart) made a folder of this release's tracks read as not held - while one named "99 - "
+    would not have. A folder whose files name another release, or none (shared with an untagged rip), still
+    isn't held: the download goes ahead, and filing's duplicate rules decide.
+    """
     root = str(tmp_path)
     directory = on_disk(tmp_path)
     run(store.index_upsert(root, album()))
     write_flac(directory / "00 - Intro.flac", title="Intro", tracknumber="0")
 
+    held = run(held_copy(store, root, "rel-1", release_of(2)))
+    assert (held["track_count"], held["complete"]) == (2, True)
+
+    for n in (3, 4, 5):
+        write_flac(directory / f"0{n} - Other {n}.flac", title=f"Other {n}", tracknumber=str(n),
+                   musicbrainz_albumid="rel-other")
     assert run(held_copy(store, root, "rel-1", release_of(2))) is None
     assert rows(store)[0]["state"] == "present", "it is still there - just not provably this release"
+
+    for entry in directory.iterdir():
+        entry.unlink()
+    for n in (1, 2):
+        write_flac(directory / f"0{n} - Track {n}.flac", title=f"Track {n}", tracknumber=str(n))
+    assert run(held_copy(store, root, "rel-1", release_of(2))) is None
 
 
 def test_other_pressings_that_have_gone_are_left_out(tmp_path, store):

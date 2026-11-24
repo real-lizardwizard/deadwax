@@ -114,8 +114,8 @@ below).
   the disk. An install that never opened the library tab starts empty and fills on the first real
   scan, which `/owned` makes beside the first search after a restart (the library is "behind").
 - **Nothing counts as held on the index's word, and what is held is TRACKS.** For each live row of
-  the release, the folder must exist and hold audio and `read_album_mbid` (its first audio file)
-  must be this release. Then every audio file's folded title and (disc, track) are read as filing
+  the release, the folder must exist and hold audio and `read_album_mbid` (its first audio file;
+  since 2.1.39 the commonest id of every file, as the scan reads it) must be this release. Then every audio file's folded title and (disc, track) are read as filing
   reads them (`organizer.existing_tracks`: tags, then deadwax's `NN - ` name), and each of the
   release's tracks is held (`held_tracks`) **by title first** - some file carries its folded title
   (`matching.normalize`) and no other track of the release shares it - else by number: its
@@ -132,8 +132,8 @@ below).
   number are counted by name against the number of tracks; with no tracklist at all, whatever is
   there is all of it. Reading every file's tags is a mutagen open per track of each held folder, in
   a thread - fine locally, noticeable on a spun-down NAS the first time. A folder that's gone
-  becomes `missing`; one whose first file isn't this release (shared with an untagged rip) simply
-  doesn't count and the download goes ahead.
+  becomes `missing`; one that isn't this release (another's, or untagged - before 2.1.39, judged by
+  its first file) simply doesn't count and the download goes ahead.
 - **Video tracks don't count** (`store_index.audio_tracks`). Both payload builders mark a track
   `video` - with `isVideoTrack()` in ui/src/lib/release.ts, for the editor (flattenTracks) and,
   since 2.0.0-player.15, for a download (lib/releasePayload.ts; until then its twin in
@@ -188,7 +188,7 @@ below).
   slskd reach slskd once. An ENQUEUE with no release id takes no lock - two such provably run side
   by side.
 - **Find's lookup costs little and runs before any search**: one indexed read for the release, one
-  for its group, one for jobs, and per held folder a listing, the first file's release tag and each
+  for its group, one for jobs, and per held folder a listing, every file's release tag (2.1.39) and each
   file's title and (disc, track); for a part held, one `resolve_album_dir`. For a download in flight it asks
   slskd for that one peer's transfers (bounded at 3s, `PROGRESS_BUDGET_SECONDS`) to say "4 of 10
   files". `FindCandidatesRequest.release_group_mbid` is DECLARED now - the browser always sent it
