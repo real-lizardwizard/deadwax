@@ -160,6 +160,8 @@ It searches under every name the artist has put records out under, because Souls
 <br><br>
 <strong>Get</strong> won't fetch what you already have. On a pressing that's in your library complete it doesn't search Soulseek at all, and says where the album is, how many tracks and in what format; on one that's already downloading in full it names the user it's coming from and how far it has got. A pressing you have only part of is searched as usual, with a note saying which of its tracks you have and whether getting it would fill in that folder or add a separate copy. It's checked on disk each time, and it counts the pressing's tracks, not files. Settings' <em>Pick the best source for me</em> queues the best match itself when one scores 75 or more under your quality floor.
 <br><br>
+For an album MusicBrainz doesn't have, the iPhone and Mac app's manual search takes an artist and an album as typed, ranks the folders it finds by how closely their names fit them, then by format and availability, and files the one you get by its own tags, never into the folder of a pressing you've matched - <em>Edit → Release</em> matches it later.
+<br><br>
 
 ![The Sources panel beside Dummy on a desktop, each folder scored against its tracklist, with the six signals behind every score](assets/images/candidates.png)
 

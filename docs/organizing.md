@@ -116,6 +116,36 @@ Existing files are never overwritten. If a track of the same name is already in 
 that track is skipped and the job says so, so an album that didn't arrive can't be marked done
 without a word.
 
+## Filed by its own tags
+
+A download from a **manual search** (the iPhone and Mac app's Search Soulseek, an artist and an album
+typed by hand) has no release behind it, so there's nothing from MusicBrainz to file it by. It's filed
+by **the files' own tags** instead:
+
+- **The folder** is named from the tags the files carry - the commonest album artist (or artist), album
+  and year among them, read the way the library scan reads them - so the album shows under the names
+  its tags give, not as you typed them, and Needs a look doesn't call its folder misnamed. The words
+  you typed are used only where no file has a value: an untagged share is filed as
+  `<artist you typed>/<album you typed>`.
+- **No tag a file carries is changed.** A file with no album gets the album; a file with neither an
+  artist nor an album artist gets both. A compilation's own artists stay track by track.
+- **The sharer's MusicBrainz release and release-group ids are taken out**, so the album never claims
+  a pressing nobody chose. The artist ids stay.
+- **The files keep their names**, as the sharer had them. When the download spans more than one disc,
+  each name starts with its disc - `1-01.flac`, `2-01.flac` - from the file's disc tag or its `CD 1`
+  folder (the folders, when every file is tagged disc 1 but they sit in `CD 1` and `CD 2`), so a set
+  whose discs repeat file names files every track. Two files that would still share a name keep apart
+  by their own folder's name (`Side A-01.flac`, `Side B-01.flac`), or a number (`01 (2).flac`): every
+  file is filed, never one over another.
+- **Never into a pressing you've matched.** A folder of the same name is shared only when none of its
+  files has a MusicBrainz release id. If any has one, the download is filed beside it as
+  `OK Computer (1997) [unmatched]` (or `[unmatched-<number>]` when that's taken too).
+
+It then stands in Needs a look as newly imported and **Not matched to MusicBrainz**. **Edit →
+Release** matches it to a pressing whenever you like: applying one writes that pressing's tags and
+renames the folder by it, dropping any `[unmatched]`. An album MusicBrainz doesn't have can stay
+unmatched, its issue ignored.
+
 ## Covers, sidecars and lyrics
 
 - **Covers and other sidecars** (images, `.cue`, `.log`, `.nfo`, `.txt`, `.m3u`, `.sfv`) that

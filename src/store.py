@@ -948,6 +948,9 @@ class JobStore:
                                COALESCE(NULLIF(TRIM(json_extract(release_json, '$.edition_label')), ''),
                                         NULLIF(TRIM(json_extract(release_json, '$.disambiguation')), ''))
                            END AS edition,
+                           CASE WHEN json_valid(release_json) THEN
+                               json_extract(release_json, '$.manual')
+                           END AS manual,
                            CASE WHEN status IN ({retryable}){not_filed} THEN
                                (SELECT json_group_array(json_object('username', json_extract(value, '$.username')))
                                   FROM json_each(alternatives_json))

@@ -593,6 +593,16 @@ Their folder names don't match what the template makes from their tags: albums f
 another tool, or filed before you changed `ALBUM_FOLDER_TEMPLATE`. Changing the template never
 moves anything. Applying the album's release (**Edit → Release**) renames the folder to match.
 
+## A manual search's album is filed under a name I didn't type, or as "[unmatched]"
+
+A manual search (the iPhone and Mac app's) is filed by the files' own tags, not by the words you
+typed ([organizing](organizing.md#filed-by-its-own-tags)): if the sharer's files say "Radiohead" and
+"OK Computer", that's its folder however you typed them, and if their tags are wrong, so is its
+folder. A folder ending `[unmatched]` means a folder of that name already holds a pressing you've
+matched, and an unmatched download is never filed into it. Either way, **Edit → Release** matches it
+to a pressing, writes that pressing's tags and renames the folder by it; **Edit → Tags** puts the tags
+right by hand.
+
 ## A downloaded reissue is filed under its reissue's year
 
 Before 1.0.2, a download was filed under the year of the pressing you picked, and with no

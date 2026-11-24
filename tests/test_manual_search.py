@@ -1,12 +1,15 @@
 """
-A manual search through the routes (2.1.37): the iPhone and Mac app's Search Soulseek, an artist and an
-album as typed with no release behind them, POSTed as `manual: true`.
+A manual search through the routes: the iPhone and Mac app's Search Soulseek, an artist and an album as
+typed with no release behind them, POSTed as `manual: true` - to Find (2.1.37, and its echo since 2.1.38) and
+with the release a Get enqueues (2.1.38).
 
 pydantic drops an undeclared field without a word, so each of these goes through the whole app start()
 builds (no lifespan, so nothing connects) with real JSON: a `manual` the model didn't declare would be
 dropped here, and the question scored as a trackless Get. A fake slskd answers the search; the store is
 real SQLite. How the folders are ranked is tests/test_matching.py's.
 """
+
+import asyncio
 
 import pytest
 from fastapi.testclient import TestClient
@@ -111,3 +114,45 @@ def test_a_blank_album_without_manual_is_not_refused_by_it(store):
 def test_the_request_model_keeps_manual():
     assert download.FindCandidatesRequest(**MANUAL).model_dump()["manual"] is True
     assert download.FindCandidatesRequest(artist="a", album="b").model_dump()["manual"] is False
+
+
+# ---------------------------------------------------------------- the download (2.1.38)
+
+ENQUEUE = "/deadwax/download/enqueue"
+
+
+class Enqueuing(Slskd):
+    async def enqueue(self, username, files):
+        self.enqueued = (username, files)
+        return True, None
+
+
+def get(store, release):
+    body = {"username": "bob", "directory": "share\\Radiohead\\OK Computer",
+            "files": [{"filename": "share\\Radiohead\\OK Computer\\01.flac", "size": 10}], "release": release}
+    answer = client(store, Enqueuing()).post(ENQUEUE, json=body)
+    assert answer.status_code == 200
+    return asyncio.run(store.get_job(answer.json()["job_id"]))
+
+
+def test_a_manual_get_is_stored_as_manual_with_the_job(store):
+    stored = get(store, {"artist": "radiohead", "album_artist": "radiohead", "album": "ok computer", "manual": True})
+    assert stored["release"]["manual"] is True
+
+
+def test_any_other_get_stores_its_release_exactly_as_before(store):
+    #? no `manual` key at all, said or not: every other job's stored release is byte for byte what it was
+    for release in ({"artist": "Portishead", "album": "Dummy"}, {"artist": "Portishead", "album": "Dummy",
+                                                                 "manual": False}):
+        assert "manual" not in get(store, release)["release"]
+
+
+def test_the_enqueue_model_keeps_manual():
+    assert download.EnqueueRelease(artist="a", album="b", manual=True).model_dump()["manual"] is True
+
+
+def test_find_echoes_a_manual_question_and_no_other(store):
+    #? the app's gate: a server that answers without it would file a manual Get by the typed words
+    assert client(store, Slskd(SHARES)).post(FIND, json=MANUAL).json()["manual"] is True
+    assert "manual" not in client(store, Slskd(SHARES)).post(FIND, json={"artist": "Radiohead",
+                                                                          "album": "OK Computer"}).json()
