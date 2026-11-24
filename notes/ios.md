@@ -16433,3 +16433,12 @@ One review of the slice's diff. Nothing would crash at launch or change the iPho
 Left as they were, from the review's list of what only a Mac can say: whether the arrow keys still move the selection
 once the copier has the focus (it takes it at each selection, arrow-made ones too), the inactive highlight of the
 selected rows, Tab inside a field, and the sheet following a resized window - 452, 453 and 456.
+
+## Main's 2.1.36-2.1.38 merged, and the save's wait (2026-11-24)
+
+Main's 2.1.36 (Last.fm's key, notes/lastfm.md) made the settings save one SQLite connection longer when it leaves no
+`LASTFM_API_KEY`: Last.fm's kept answers are emptied (`store.lastfm_clear()`). `ServerSettings.saveWait` now counts it
+(`count + 2` store waits, not `count + 1`). Rounded up to the minute, with the route's 60 s floor, a save of one
+setting still waits 60 s and twelve still 180 s; a save of 2, 8, 14 or 20 settings waits a minute longer than it did
+(2: 120 s, 20: 300 s) - only ever longer, never shorter. ServerSettingsTests pins twenty, and fails with the old
+count; `test_each_wait_is_past_the_servers_own_worst_case_or_pinned` reads the third `await store.` and its guard.

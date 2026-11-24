@@ -271,3 +271,16 @@ def test_the_runners_up_are_still_counted_only_where_they_can_be_used(store):
 
     assert found[failed]["alternatives_left"] == 1
     assert "alternatives_left" not in found[filed]
+
+
+def test_a_manual_searchs_row_says_so_and_no_other_row_has_the_key(store):
+    """(2.1.38) read by SQLite out of the stored release, like the edition, and only when true."""
+    manual = job(store, status="organized", release_mbid=None, release_group_mbid=None, disambiguation=None,
+                 manual=True)
+    plain = job(store, status="organized")
+    said_false = job(store, status="organized", manual=False)
+
+    found = rows(store)
+
+    assert found[manual]["manual"] is True
+    assert "manual" not in found[plain] and "manual" not in found[said_false]

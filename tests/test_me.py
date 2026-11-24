@@ -8,18 +8,22 @@ from fastapi.testclient import TestClient
 
 from src import __version__
 from src.api.app import start
+from src.api.lastfm_endpoint import REFUSED_HOLD_S, lastfm
+from src.config import Config
+from src.lastfm import Refused
 from src.routes import me
 from src.users import LOCAL_USER, current_user
 
 
-def test_logins_off_means_the_one_implicit_admin():
+def test_logins_off_means_the_one_implicit_admin(monkeypatch):
+    monkeypatch.setattr(Config, "LASTFM_API_KEY", None)
     response = TestClient(start()).get("/deadwax/me")  # no `with`: no lifespan, nothing connects
 
     assert response.status_code == 200
     #? (2.0.0-player.61) and every permission - an intended change: the implicit admin has them all
     assert response.json() == {"user": "local", "admin": True, "auth": "off", "version": __version__,
                                "permissions": ["request", "edit", "library", "downloads", "server", "people"],
-                               "permissions_unverified": False}
+                               "permissions_unverified": False, "lastfm": "off"}
 
 
 def test_the_user_comes_from_the_dependency_not_from_the_route():
@@ -49,3 +53,34 @@ def test_the_implicit_user_is_local():
 def test_only_a_get():
     client = TestClient(start())
     assert client.post("/deadwax/me").status_code == 405
+
+
+# ----- lastfm (2.1.36): what the iPhone and Mac app draw Last.fm's parts by -----------------------------------------
+
+def lastfm_says(monkeypatch, key, refusal=None, now=1_000_000.0):
+    """/me's lastfm with `refusal` held since 1_000_000.0 on the client's monotonic clock, which now reads `now`."""
+    monkeypatch.setattr(Config, "LASTFM_API_KEY", key)
+    monkeypatch.setattr(lastfm, "refusal", refusal)
+    monkeypatch.setattr(lastfm, "refused_since", 1_000_000.0)
+    monkeypatch.setattr(lastfm, "monotonic", lambda: now)
+    return TestClient(start()).get("/deadwax/me").json()["lastfm"]
+
+
+def test_lastfm_is_off_with_no_key(monkeypatch):
+    assert lastfm_says(monkeypatch, None) == "off"
+    assert lastfm_says(monkeypatch, "   ") == "off"
+
+
+def test_lastfm_is_on_with_a_key(monkeypatch):
+    assert lastfm_says(monkeypatch, "0123456789abcdef0123456789abcdef") == "on"
+
+
+def test_lastfm_is_refused_while_last_fm_refuses_the_key(monkeypatch):
+    refusal = Refused(10, "Invalid API key", 1_000_000.0)
+    key = "0123456789abcdef0123456789abcdef"
+
+    assert lastfm_says(monkeypatch, key, refusal, now=1_000_000.0 + REFUSED_HOLD_S - 1) == "refused"
+    #? the hour is up: the next ask tries again, so the app may ask
+    assert lastfm_says(monkeypatch, key, refusal, now=1_000_000.0 + REFUSED_HOLD_S) == "on"
+    #? a refusal of a key since removed is no key at all
+    assert lastfm_says(monkeypatch, None, refusal) == "off"

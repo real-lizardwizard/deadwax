@@ -409,6 +409,7 @@ section of that title in notes/: `grep -rn "### X" notes/` finds it.
 | the native iPhone app (ios/): DeadwaxKit, the audio engine, the project without Xcode, install.sh, ios.yml, the phases; the EQ's AutoEq routes on the server (2.1.7); the Cover Art Archive relay (2.1.24) | `notes/ios.md` |
 | lyrics for listeners: the route by song id, the view on Now Playing, the phone's (design and build) | `notes/app-lyrics.md` |
 | play history that lasts: every song started, per person, kept for ever - the table, the routes, Up Next's list | `notes/play-history.md` |
+| Last.fm: `LASTFM_API_KEY`, the client and its pace, refusals, the kept answers, the match keys and their vectors, the recorder | `notes/lastfm.md` |
 
 **A change's write-up goes into its area's notes file** (a new file for a new area, added to the
 table above), never here. Add to this file only a rule that holds everywhere.

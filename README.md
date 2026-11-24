@@ -160,6 +160,8 @@ It searches under every name the artist has put records out under, because Souls
 <br><br>
 <strong>Get</strong> won't fetch what you already have. On a pressing that's in your library complete it doesn't search Soulseek at all, and says where the album is, how many tracks and in what format; on one that's already downloading in full it names the user it's coming from and how far it has got. A pressing you have only part of is searched as usual, with a note saying which of its tracks you have and whether getting it would fill in that folder or add a separate copy. It's checked on disk each time, and it counts the pressing's tracks, not files. Settings' <em>Pick the best source for me</em> queues the best match itself when one scores 75 or more under your quality floor.
 <br><br>
+For an album MusicBrainz doesn't have, the iPhone and Mac app's manual search takes an artist and an album as typed, ranks the folders it finds by how closely their names fit them, then by format and availability, and files the one you get by its own tags, never into the folder of a pressing you've matched - <em>Edit → Release</em> matches it later.
+<br><br>
 
 ![The Sources panel beside Dummy on a desktop, each folder scored against its tracklist, with the six signals behind every score](assets/images/candidates.png)
 
@@ -346,6 +348,12 @@ A native iPhone app is being built in phases, with its own audio engine: each so
 <details>
 <summary style="font-style:italic">Your headphones' correction, looked up by deadwax</summary>
 The iPhone app's EQ, being built on the <code>ios</code> branch, can start from a correction for your headphones made by <a href="https://github.com/jaakkopasanen/AutoEq">AutoEq</a> (Jaakko Pasanen's project, MIT-licensed) from measurements by oratory1990, crinacle and AutoEq's other sources. deadwax 2.1.7 does the looking up for it, so the phone only ever talks to deadwax: it searches AutoEq's list - 8,850 corrections as this is written - by name ("hd650" and "HD 650" both find the Sennheiser), one row per headphone with its measurers in a fixed order (oratory1990's first, then crinacle's) and the others under it, and fetches one correction when you pick it - one at a time, for the person listening, never the set. <strong>The server needs to reach <code>api.github.com</code> and <code>raw.githubusercontent.com</code></strong>: deadwax fetches AutoEq's list from GitHub the first time someone searches it and again once a week after that when someone does, and keeps the list, and each correction once fetched (until AutoEq's list changes), in its database. If it can't, the app says <em>deadwax can't reach AutoEq just now</em> - <a href="docs/troubleshooting.md#autoeq-cant-be-reached">troubleshooting</a> has what to do.
+</details>
+
+### Last.fm, for the iPhone app's artist pages
+<details>
+<summary style="font-style:italic">Top songs, listeners, similar artists and radio, from a key of your own</summary>
+The iPhone and Mac app's artist pages are getting an artist's listeners, their ten most played songs, similar artists and radio from similar songs, all from <a href="https://www.last.fm">Last.fm</a>, with Last.fm's descriptions first on the web. They need a Last.fm <strong>API key</strong> of your own, free at <a href="https://www.last.fm/api/account/create">last.fm/api/account/create</a> - only the API key, not the shared secret - set as <code>LASTFM_API_KEY</code> in Server settings → Connections. deadwax does all the asking, so the phone never talks to Last.fm, and keeps its answers in its database, asking again after a week (and keeps none once the key is removed). <strong>deadwax 2.1.36 takes the key and checks it</strong>; what it gives comes with the versions after it. Without a key, nothing of Last.fm's shows and nothing else changes. <a href="docs/troubleshooting.md#settings-says-lastfm-refused-the-key">Troubleshooting</a> has what to do if Last.fm refuses the key.
 </details>
 
 ### On a desktop

@@ -562,3 +562,51 @@ def test_nothing_to_settle_touches_nothing(tmp_path):
     job_id = seed_job(store)
     assert asyncio.run(settle_interrupted_filing(store)) == 0
     assert status_of(store, job_id) == "queued"
+
+
+# ---------------------------------------------------------------- a manual search's download (2.1.38)
+
+MANUAL_RELEASE = {"artist": "radiohead", "album_artist": "radiohead", "album": "ok computer", "release_mbid": None,
+                  "tracks": [], "manual": True}
+
+
+def _a_manual_download(tmp_path, monkeypatch, tagged: bool):
+    from src.config import Config
+    from tests.test_library import write_flac
+    downloads = tmp_path / "downloads" / "album"
+    downloads.mkdir(parents=True)
+    for n, title in ((1, "Airbag"), (2, "Paranoid Android")):
+        if tagged:
+            write_flac(downloads / f"0{n}.flac", album="OK Computer", albumartist="Radiohead", artist="Radiohead",
+                       date="1997", title=title, musicbrainz_albumid="the-sharers-pressing")
+        else:
+            (downloads / f"0{n}.flac").write_bytes(b"not a flac")
+    monkeypatch.setattr(Config, "SLSKD_DOWNLOAD_PATH", str(tmp_path / "downloads"))
+    monkeypatch.setattr(Config, "LIBRARY_PATH", str(tmp_path / "music"))
+    monkeypatch.setattr(Config, "FETCH_LYRICS", "off")
+
+    store = make_store(tmp_path)
+    job_id = asyncio.run(store.create_job("bob", "share/album", FILES, MANUAL_RELEASE))
+    asyncio.run(poll_downloads_once(FakeSlskd(_all_done()), store, {}))
+    return store, job_id
+
+
+def test_a_manual_downloads_review_row_is_labelled_as_its_tags_name_it(tmp_path, monkeypatch):
+    store, job_id = _a_manual_download(tmp_path, monkeypatch, tagged=True)
+
+    assert status_of(store, job_id) == "organized"
+    album = asyncio.run(store.new_import_summary())["albums"][0]
+    #? what it was filed as - not the lowercase words typed to find it
+    assert (album["artist"], album["album"], album["album_path"]) == ("Radiohead", "OK Computer",
+                                                                      "Radiohead/OK Computer (1997)")
+
+
+def test_a_manual_download_of_files_nothing_can_read_is_filed_under_the_typed_words(tmp_path, monkeypatch):
+    store, job_id = _a_manual_download(tmp_path, monkeypatch, tagged=False)
+
+    job = next(j for j in asyncio.run(store.list_jobs()) if j["id"] == job_id)
+    assert (job["status"], job["error"]) == ("organized", None)
+    assert sorted(p.name for p in (tmp_path / "music" / "radiohead" / "ok computer").iterdir()) == [
+        "01.flac", "02.flac"]
+    album = asyncio.run(store.new_import_summary())["albums"][0]
+    assert (album["artist"], album["album"]) == ("radiohead", "ok computer")

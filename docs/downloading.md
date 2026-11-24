@@ -261,6 +261,21 @@ sources are searched again for it**, keeping your filters - and never picking a 
 with **Pick the best source for me**, since you're choosing. The panel's close button, or Escape while
 you're in it, closes it.
 
+## A manual search
+
+The iPhone and Mac app add a **manual search**: an artist and an album typed by hand, for an album
+MusicBrainz doesn't have, or one you'd rather find by name. Nothing on the web asks for one. It's
+searched as any Get is - the artist and album you typed - with no pressing behind it, so there's no
+"already in your library" check first and no tracklist to judge the folders by. Instead they're ranked
+first by **Folder name**, how closely each folder's name is the artist and album you typed, then by
+edition, format and availability ([matching](matching.md#a-manual-search)). An artist or album left
+blank is refused: "Type an artist and an album."
+
+Its download shows in Requests like any other, and is retried, cancelled and cleared the same way.
+When it's done it's filed **by the files' own tags**, not by the words you typed, and never into the
+folder of a pressing you've matched ([organizing](organizing.md#filed-by-its-own-tags)); **Edit →
+Release** matches it to a pressing whenever you like.
+
 ## Requests
 
 The **Requests** tab follows every download, with a count on the tab of the ones on their way, on a

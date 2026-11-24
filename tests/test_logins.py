@@ -328,6 +328,8 @@ def run(coroutine):
 @pytest.fixture
 def on(monkeypatch, tmp_path):
     monkeypatch.setattr(Config, "AUTH_MODE", "on")
+    #? (2.1.36) /me's `lastfm` is "off" in the answers asserted whole
+    monkeypatch.setattr(Config, "LASTFM_API_KEY", None)
     monkeypatch.setattr(Config, "DEADWAX_SECRET_KEY", SECRET)
     monkeypatch.setattr(Config, "DEADWAX_ADMIN_PASSWORD", GLASS)
     monkeypatch.setattr(Config, "NAVIDROME_URL", "http://navidrome:4533")
@@ -533,7 +535,7 @@ def test_every_route_asks_for_exactly_its_permission(on):
 def test_a_user_reaches_what_is_theirs(on):
     ethan = signed_in(on, "ethan")
     assert ethan.get(ME).json() == {"user": "ethan", "admin": False, "auth": "on", "version": __version__,
-                                    "permissions": ["request"], "permissions_unverified": False}
+                                    "permissions": ["request"], "permissions_unverified": False, "lastfm": "off"}
     assert ethan.get("/deadwax/me/preferences").status_code == 200
     assert ethan.get("/deadwax/me/pins").status_code == 200
     assert ethan.get("/deadwax/download/jobs").status_code == 200
@@ -602,7 +604,7 @@ def test_the_artist_picture_relay_is_edit_albums_and_nothing_is_asked_for_anyone
 def test_an_admin_reaches_the_admin_routes(on):
     james = signed_in(on, "james")
     assert james.get(ME).json() == {"user": "james", "admin": True, "auth": "on", "version": __version__,
-                                    "permissions": list(PERMISSIONS), "permissions_unverified": False}
+                                    "permissions": list(PERMISSIONS), "permissions_unverified": False, "lastfm": "off"}
     assert james.get("/deadwax/settings").status_code == 200
     assert james.get("/deadwax/library/queue/new_imports").status_code == 200
 
@@ -611,10 +613,11 @@ def test_an_admin_reaches_the_admin_routes(on):
 
 def test_off_is_the_implicit_admin_with_no_sign_in(monkeypatch):
     monkeypatch.setattr(Config, "AUTH_MODE", None)
+    monkeypatch.setattr(Config, "LASTFM_API_KEY", None)
     client = TestClient(start())
     response = client.get(ME)
     assert response.json() == {"user": LOCAL_USER, "admin": True, "auth": "off", "version": __version__,
-                               "permissions": list(PERMISSIONS), "permissions_unverified": False}
+                               "permissions": list(PERMISSIONS), "permissions_unverified": False, "lastfm": "off"}
     assert "set-cookie" not in response.headers
     assert client.post(LOGIN, json={"username": "james", "password": "x"}).status_code == 409
     assert current_user() == LOCAL_USER and is_admin(LOCAL_USER) and not is_admin("james")
@@ -678,7 +681,7 @@ def test_signing_in_asks_navidromes_getuser_with_a_token_of_deadwaxs_own(on):
     response = sign_in(on.client, "Ethan", PASSWORDS["ethan"])
     assert response.status_code == 200
     assert response.json() == {"user": "ethan", "admin": False, "auth": "on", "version": __version__,
-                               "permissions": ["request"], "permissions_unverified": False}
+                               "permissions": ["request"], "permissions_unverified": False, "lastfm": "off"}
 
     [asked] = on.fake.seen
     sent = query(asked)
@@ -1316,7 +1319,7 @@ def test_break_glass_signs_in_the_fixed_admin_without_navidrome_or_the_database(
     response = sign_in(glass, "Deadwax", GLASS)
     assert response.status_code == 200
     assert response.json() == {"user": "deadwax", "admin": True, "auth": "on", "version": __version__,
-                               "permissions": list(PERMISSIONS), "permissions_unverified": False}
+                               "permissions": list(PERMISSIONS), "permissions_unverified": False, "lastfm": "off"}
     assert on.fake.asks() == 0
     raw = glass.cookies[auth.COOKIE]
     assert raw.startswith("b.") and "=" not in raw

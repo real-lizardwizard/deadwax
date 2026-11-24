@@ -52,6 +52,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
 
 from src import __version__, coverart_cache, musicbrainz_cache, player_cache
+from src.api.lastfm_endpoint import lastfm
 from src.api.musicbrainz_endpoint import MusicBrainzClient
 from src.config import (COVER_ART_SIZES, DEFAULT_MUSICBRAINZ_CACHE_MB, DEFAULT_PLAYER_CACHE_MB, LYRICS_LEAD_LIMIT_MS,
                         MUSICBRAINZ_CACHE_FILE, MUSICBRAINZ_CACHE_MB_RANGE, PLAYER_CACHE_MB_RANGE,
@@ -61,6 +62,7 @@ from src.config import (COVER_ART_SIZES, DEFAULT_MUSICBRAINZ_CACHE_MB, DEFAULT_P
                         parse_rename_wait, parse_search_timeout,
                         describe_contact, describe_navidrome_url, describe_slskd_url, parse_lyrics_lead,
                         setting_source, shadowed_by_empty_env, without_login)
+from src.lastfm import KEY_LOOKS_WRONG, KEY_NOT_ONE_WORD, KEY_SHAPE, one_word, refused_detail
 from src.matching import AUDIO_EXTENSIONS, file_extension
 from src.organizer import (can_move_out_of, folders_overlap, folders_under, mounted_read_only,
                            why_cannot_move_out_of)
@@ -598,6 +600,34 @@ def _musicbrainz_rows() -> list[dict]:
     return rows
 
 
+def _lastfm_row() -> dict:
+    """
+    LASTFM_API_KEY (2.1.36): the key as it is sent, stripped - so a saved blank reads unset - flagged while Last.fm
+    refuses it (the client holds a refusal an hour), or when it isn't the 32 hex digits a key is. Stored either way:
+    a key that looks wrong is only flagged, so a wrong guess about Last.fm's keys costs nothing.
+    """
+    key = Config.lastfm_key()
+    status, detail = None, None
+    refusal = lastfm.held() if key else None
+    if refusal is not None:
+        status, detail = "error", refused_detail(refusal)
+    elif key and not KEY_SHAPE.fullmatch(key):
+        status, detail = "error", KEY_LOOKS_WRONG
+    return _setting(
+        "LASTFM_API_KEY",
+        key,
+        secret=True,
+        effect=(
+            "Optional: an artist's listeners, top songs, similar artists and radio in the iPhone and Mac app, and "
+            "Last.fm's artist and album descriptions first. Make a free API key of your own at "
+            "last.fm/api/account/create - deadwax can't come with one. Only the API key: the shared secret isn't "
+            "needed"
+        ),
+        status=status,
+        detail=detail,
+    )
+
+
 def _cover_art_row() -> dict:
     """COVER_ART_SIZE, offered as the sizes the Archive actually serves."""
     size = Config.COVER_ART_SIZE
@@ -1018,6 +1048,7 @@ async def settings():
                             "key, so images added in the last week show too"
                         ),
                     ),
+                    _lastfm_row(),
                     *_musicbrainz_rows(),
                     *_navidrome_rows(),
                 ],
@@ -1204,6 +1235,11 @@ def _validate(key: str, value: str) -> str | None:
         problem = describe_navidrome_url(value)
         if problem:
             return problem
+
+    #? (2.1.36) a key with a space or a control character inside it can never be one; anything else is stored, and
+    #? one that doesn't look like a key is flagged on its row (_lastfm_row)
+    if key == "LASTFM_API_KEY" and not one_word(value):
+        return KEY_NOT_ONE_WORD
 
     if key == "COVER_ART_SIZE" and value not in COVER_ART_SIZES:
         return f"expected one of {', '.join(COVER_ART_SIZES)}"
@@ -1493,6 +1529,14 @@ async def update_settings(updates: list[SettingUpdate], request: Request, user: 
         #? name now, trimmed to the size they now allow
         await _saved_answers().reset()
         logger.info("MusicBrainz's saved answers will use the new settings from the next answer on")
+
+    if "lastfm" in invalidate:
+        #? (2.1.36) what Last.fm said of the old key says nothing of this one - and with no key now, nothing of
+        #? Last.fm's is kept (its terms ask for its data to go when its use ends)
+        lastfm.forget_refusal()
+        if not Config.lastfm_key():
+            dropped = await store.lastfm_clear()
+            logger.info(f"no LASTFM_API_KEY now, so Last.fm's kept answers were emptied ({dropped})")
 
     if "library" in invalidate:
         #? The scan cache keys on folder mtime under the OLD root, so it is meaningless now.

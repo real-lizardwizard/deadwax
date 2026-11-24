@@ -532,6 +532,21 @@ CREATE TABLE IF NOT EXISTS play_history (
     recorded_at   INTEGER NOT NULL,   -- the server's ms when it arrived: a late offline send tells itself
     PRIMARY KEY (user, started_at, song_id)
 ) WITHOUT ROWID;
+
+CREATE TABLE IF NOT EXISTS lastfm_kept (
+    -- (2.1.36) Last.fm's answers as deadwax parsed and trimmed them (src/lastfm_kept.py), kept so an artist page
+    -- visited again asks Last.fm nothing - shared by everyone, like the descriptions: Last.fm's numbers are nobody's
+    -- own. Keyed '<LASTFM_SHAPE>|<method>|mbid|<mbid>' or '...|name|<folded name>[|<folded album or title>]', so a
+    -- shape bumped never reads an old row. `body` is deadwax's JSON, never Last.fm's raw answer; NULL is a kept "Last.fm
+    -- doesn't know this". A failure is never kept. `used_at` moves as a row is read (at most hourly) and the oldest
+    -- used go first past 50 MB (LASTFM_KEPT_BYTES), half the 100 MB Last.fm's terms allow; `size` is the key's and the
+    -- body's bytes. Emptied when there is no LASTFM_API_KEY: at start-up, and by the save that removes it.
+    key         TEXT PRIMARY KEY,
+    body        TEXT,
+    fetched_at  REAL NOT NULL,
+    used_at     REAL NOT NULL,
+    size        INTEGER NOT NULL
+);
 """
 
 #? (2.0.0-player.51) the states a library entry is held in - waiting or starred - beside `removed`
@@ -933,6 +948,9 @@ class JobStore:
                                COALESCE(NULLIF(TRIM(json_extract(release_json, '$.edition_label')), ''),
                                         NULLIF(TRIM(json_extract(release_json, '$.disambiguation')), ''))
                            END AS edition,
+                           CASE WHEN json_valid(release_json) THEN
+                               json_extract(release_json, '$.manual')
+                           END AS manual,
                            CASE WHEN status IN ({retryable}){not_filed} THEN
                                (SELECT json_group_array(json_object('username', json_extract(value, '$.username')))
                                   FROM json_each(alternatives_json))
@@ -3683,6 +3701,113 @@ class JobStore:
         except Exception as e:
             logger.error(f"failed to keep an AutoEq profile: {e}")
             return False
+
+
+    # ===== Last.fm's kept answers (2.1.36) ===================================
+    #
+    # src/lastfm_kept.py's. A failure here costs only what was to be kept: the answer is still given, and asked of
+    # Last.fm again next time.
+
+    async def lastfm_get(self, key: str, now: float, touch_after: float = 3600.0) -> dict | None:
+        """The answer kept under `key` - {body, fetched_at}, body None for a kept "not known" - or None when none is
+        kept (or it can't be read). Read, it is used: `used_at` moves to `now` once it is `touch_after` old."""
+        if not self.available:
+            return None
+
+        def read():
+            with self._connect() as connection:
+                row = connection.execute("SELECT body, fetched_at, used_at FROM lastfm_kept WHERE key = ?",
+                                         (key,)).fetchone()
+                if row is not None and now - row["used_at"] >= touch_after:
+                    connection.execute("UPDATE lastfm_kept SET used_at = ? WHERE key = ?", (now, key))
+            return {"body": row["body"], "fetched_at": float(row["fetched_at"])} if row else None
+
+        try:
+            return await asyncio.to_thread(read)
+        except Exception as e:
+            logger.error(f"failed to read a kept Last.fm answer: {e}")
+            return None
+
+    async def lastfm_put(self, key: str, body: str | None, fetched_at: float) -> bool:
+        """An answer kept under `key`, in place of what was (`body` None keeps "not known") - used as it is kept."""
+        if not self.available:
+            return False
+
+        def write():
+            #? measured here, inside the try: a string UTF-8 can't hold fails the write, never the caller
+            size = len(key.encode()) + (len(body.encode()) if body is not None else 0)
+            with self._connect() as connection:
+                connection.execute(
+                    "INSERT OR REPLACE INTO lastfm_kept (key, body, fetched_at, used_at, size) VALUES (?, ?, ?, ?, ?)",
+                    (key, body, fetched_at, fetched_at, size))
+            return True
+
+        try:
+            return await asyncio.to_thread(write)
+        except Exception as e:
+            logger.error(f"failed to keep a Last.fm answer: {e}")
+            return False
+
+    async def lastfm_trim(self, most: int, down_to: int) -> int:
+        """Past `most` bytes, the answers used longest ago dropped until `down_to` is left - how many were."""
+        if not self.available:
+            return 0
+
+        def write():
+            with self._connect() as connection:
+                total = connection.execute("SELECT COALESCE(SUM(size), 0) FROM lastfm_kept").fetchone()[0]
+                if total <= most:
+                    return 0
+                dropped = []
+                for row in connection.execute("SELECT key, size FROM lastfm_kept ORDER BY used_at, fetched_at"):
+                    if total <= down_to:
+                        break
+                    dropped.append((row["key"],))
+                    total -= row["size"]
+                connection.executemany("DELETE FROM lastfm_kept WHERE key = ?", dropped)
+            return len(dropped)
+
+        try:
+            return await asyncio.to_thread(write)
+        except Exception as e:
+            logger.error(f"failed to trim Last.fm's kept answers: {e}")
+            return 0
+
+    async def lastfm_clear(self, keep_prefix: str | None = None) -> int:
+        """Every kept answer gone - or, with `keep_prefix`, every one whose key doesn't begin with it (an older
+        shape's). How many went."""
+        if not self.available:
+            return 0
+
+        def write():
+            with self._connect() as connection:
+                if keep_prefix is None:
+                    return connection.execute("DELETE FROM lastfm_kept").rowcount
+                return connection.execute("DELETE FROM lastfm_kept WHERE substr(key, 1, ?) != ?",
+                                          (len(keep_prefix), keep_prefix)).rowcount
+
+        try:
+            return await asyncio.to_thread(write)
+        except Exception as e:
+            logger.error(f"failed to empty Last.fm's kept answers: {e}")
+            return 0
+
+    async def lastfm_kept_rows(self) -> list[dict]:
+        """Every kept row - key, body, fetched_at, used_at, size - used longest ago first (what the tests read)."""
+        if not self.available:
+            return []
+
+        def read():
+            with self._connect() as connection:
+                rows = connection.execute(
+                    "SELECT key, body, fetched_at, used_at, size FROM lastfm_kept ORDER BY used_at, key").fetchall()
+            return [dict(row) for row in rows]
+
+        try:
+            return await asyncio.to_thread(read)
+        except Exception as e:
+            logger.error(f"failed to read Last.fm's kept answers: {e}")
+            return []
 
 
 #? slskd reports a stopped transfer as "Completed, <substate>". "Succeeded" is the only good

@@ -22,13 +22,14 @@ import re
 import shutil
 import stat
 import time
+from collections import Counter
 from pathlib import Path
 
 from src.editions import edition_discriminator, resolve_edition_label
 from src.naming import DEFAULT_ALBUM_FOLDER, render_album_folder, validate_template
 from src.logger import logger
 from src.tagkeys import easy_file
-from src.matching import (AUDIO_EXTENSIONS, file_extension, match_tracks_to_files, normalize,
+from src.matching import (AUDIO_EXTENSIONS, file_disc, file_extension, match_tracks_to_files, normalize,
                           split_remote_path)
 
 
@@ -412,6 +413,32 @@ def read_album_mbid(directory: Path) -> str | None:
     return None
 
 
+def holds_album_id(directory: Path) -> bool:
+    """
+    Whether ANY audio file in this folder carries a MusicBrainz release id (2.1.38, review) - what a manual
+    search's download asks before sharing a folder. read_album_mbid answers from the first readable file
+    alone, so a folder whose first file happened to be untagged (a hidden track, a bonus rip) read as
+    untagged while every other file named the pressing, and the manual download joined it - counted as that
+    pressing by the scan, which keys a folder on its commonest id. Every file is read here; a folder that
+    can't be listed counts as holding one, so it is never shared on a guess.
+    """
+    try:
+        entries = sorted(directory.iterdir()) if directory.is_dir() else []
+    except OSError:
+        return True
+    for entry in entries:
+        if not entry.is_file() or file_extension(entry.name) not in AUDIO_EXTENSIONS:
+            continue
+        try:
+            audio = easy_file(entry)
+            values = (audio.get("musicbrainz_albumid") or []) if audio is not None else []
+        except Exception:
+            continue
+        if any(str(value).strip() for value in values):
+            return True
+    return False
+
+
 def _track_key(disc, number) -> tuple[int, int] | None:
     """A track's place as (disc, number), disc 1 when untagged. None when the number is unknown."""
     track = _disc_number(number)  # same parsing: '3', '03' and '3/12' are all 3
@@ -513,7 +540,8 @@ def find_duplicate(existing: list[dict], key, title: str, same_release: bool) ->
     return None
 
 
-def resolve_album_dir(library_root: str, release: dict, quiet: bool = False) -> tuple[Path, str]:
+def resolve_album_dir(library_root: str, release: dict, quiet: bool = False, manual: bool = False,
+                      job_id=None) -> tuple[Path, str]:
     """
     Where this release's folder should be, avoiding a different release's folder.
 
@@ -528,10 +556,19 @@ def resolve_album_dir(library_root: str, release: dict, quiet: bool = False) -> 
 
     `quiet` asks without saying so in the event log - Find wants to know where a download
     WOULD be filed (store_index.filing_folder), and nothing is being filed.
+
+    `manual` (2.1.38) is a manual search's download, named by its own tags (own_tags_release): it
+    shares a folder of its name only when that folder holds NO release id - an untagged one, the
+    settled rule. A folder holding one is a known pressing, and an unknown pressing's tracks in it
+    would be counted as that pressing (the scan keys a folder on its commonest id), so it is filed
+    beside it as `[unmatched]`, then `[unmatched-<job id>]`.
     """
     artist = sanitize_filename(filed_artist(release), "Unknown Artist")
     artist_dir = Path(library_root) / artist
     wanted_mbid = (release.get("release_mbid") or "").strip()
+
+    if manual:
+        return _resolve_unmatched_dir(artist_dir, release, quiet, job_id)
 
     for discriminator in ("", edition_discriminator(release)):
         candidate = artist_dir / build_album_dirname(release, discriminator)
@@ -556,6 +593,29 @@ def resolve_album_dir(library_root: str, release: dict, quiet: bool = False) -> 
     #? both attempts are taken by other releases, which needs the release id to break
     fallback = artist_dir / build_album_dirname(release, wanted_mbid[:8] or "alt")
     return fallback, wanted_mbid[:8] or "alt"
+
+
+#? (2.1.38) the discriminator a manual search's download is filed under beside a known pressing's folder of
+#? its name - through the template's own discriminator, so edition_from_dirname reads it back and the folder
+#? still matches its tags; applying a release later renames the folder by that release, which drops it
+UNMATCHED = "unmatched"
+
+
+def _resolve_unmatched_dir(artist_dir: Path, release: dict, quiet: bool, job_id) -> tuple[Path, str]:
+    """resolve_album_dir for a manual search's download: never into a folder holding a release id."""
+    tag = f"{UNMATCHED}-{job_id if job_id is not None else 'alt'}"
+    tried = ["", UNMATCHED, tag]
+    for discriminator in tried + [f"{tag}-{n}" for n in range(2, 100)]:
+        candidate = artist_dir / build_album_dirname(release, discriminator)
+        if not candidate.exists() or not holds_album_id(candidate):
+            return candidate, discriminator
+        if not discriminator and not quiet:
+            logger.info(
+                f"'{candidate.name}' holds a pressing matched to MusicBrainz, filing this manual search's "
+                f"download beside it, unmatched",
+                extra={"frontend": True, "src": "slskd"},
+            )
+    return artist_dir / build_album_dirname(release, f"{tag}-x"), f"{tag}-x"
 
 
 def can_move_out_of(folder: Path) -> bool:
@@ -598,6 +658,126 @@ def why_cannot_move_out_of(folder: Path | str) -> str:
             f"slskd's downloads")
 
 
+#? (2.1.38) the ids a manual search's download loses: the SHARER's release and release group, which would
+#? claim a pressing nobody chose (the v1.0.1 rule, extended to the group). The artist ids stay - they say
+#? who, not which pressing - and Apply release rewrites them anyway.
+MANUAL_DROPPED = ("musicbrainz_albumid", "musicbrainz_releasegroupid")
+
+
+def own_tags_release(release: dict, tags: list[dict]) -> dict:
+    """
+    What a manual search's download is filed as (2.1.38): the commonest of the files' own tags, by the
+    library scan's own rule (library._commonest, in the scan's running order), so the folder is named from
+    exactly what the scan will read back and Needs a look never calls it misfiled. The typed words are used
+    only where no file has a value. Pure: `tags` are library.read_track dicts, {} for an unreadable file.
+
+    No edition fields and no ids - nothing names a pressing - and `manual`, so it is still known for one.
+    """
+    from src.library import _commonest, track_order  # library imports this module at its top
+
+    ordered = sorted(tags, key=lambda t: track_order({"disc": t.get("disc"), "position": t.get("position"),
+                                                      "filename": t.get("filename") or ""}))
+
+    def commonest(key: str) -> str:
+        return _commonest([(t.get(key) or "").strip() for t in ordered])
+
+    album_artist = (commonest("albumartist") or commonest("artist")
+                    or (release.get("album_artist") or release.get("artist") or "").strip())
+    return {
+        "artist": album_artist,
+        "album_artist": album_artist,
+        "album": commonest("album") or (release.get("album") or "").strip(),
+        "year": commonest("date")[:4],
+        "original_year": commonest("originaldate")[:4],
+        "manual": True,
+    }
+
+
+def own_tags_fill(tags: dict, naming: dict) -> dict:
+    """
+    The tags a manual search's file lacks (2.1.38), from what the album is filed as: the album when it has
+    none, and the artist and albumartist only when it has NEITHER - a compilation's per-track artists with no
+    albumartist get no albumartist. Nothing a file carries is overwritten. Pure.
+    """
+    fill = {}
+    if not (tags.get("album") or "").strip() and naming.get("album"):
+        fill["album"] = naming["album"]
+    if not ((tags.get("artist") or "").strip() or (tags.get("albumartist") or "").strip()) \
+            and naming.get("album_artist"):
+        fill["artist"] = naming["album_artist"]
+        fill["albumartist"] = naming["album_artist"]
+    return fill
+
+
+def _manual_names(located: list[tuple[dict, Path | None]]) -> tuple[dict[str, str], dict[str, dict]]:
+    """
+    For a manual search's download (2.1.38): each found file's name in the library - its sharer's, with a
+    `<disc>-` prefix only when the job's audio spans more than one disc, the disc from the file's own disc
+    tag, else its folder's marker (matching.file_disc), so a CD1/CD2 set never collides on "01.flac" and no
+    number is made up - and its own tags (library.read_track, {} when unreadable). Keyed by remote name.
+    """
+    from src.library import read_track  # library imports this module at its top
+
+    tags: dict[str, dict] = {}
+    by_tag: dict[str, int | None] = {}
+    by_folder: dict[str, int | None] = {}
+    for file_entry, source in located:
+        if source is None:
+            continue
+        remote = file_entry.get("filename", "")
+        try:
+            read = read_track(source) or {}
+        except Exception:
+            read = {}
+        tags[remote] = read
+        #? a disc is a number from 1 (review): a "-1" or "0" tag says nothing, and must not name a "-1-b.flac"
+        by_tag[remote] = _positive(read.get("disc"))
+        by_folder[remote] = _positive(file_disc(remote))
+
+    #? (review) the folders' markers when they tell discs apart and the tags don't - a CD1/CD2 set whose files
+    #? are all tagged disc 1 collided on "01.flac" and half of it wasn't filed; otherwise the file's own tag
+    if len({d for d in by_tag.values() if d}) <= 1 < len({d for d in by_folder.values() if d}):
+        discs = by_folder
+    else:
+        discs = {remote: by_tag[remote] or by_folder[remote] for remote in tags}
+    several = len({disc for disc in discs.values() if disc}) > 1
+
+    extension = {remote: file_extension(split_remote_path(remote)[1]) or "bin" for remote in tags}
+
+    def filed_as(remote: str, name: str) -> str:
+        """the name it will have in the library - which the scan orders by last (track_order)"""
+        return sanitize_filename(name, "untitled") + f".{extension[remote]}"
+
+    names = {}
+    for remote in tags:
+        stem = Path(split_remote_path(remote)[1]).stem
+        names[remote] = f"{discs[remote]}-{stem}" if several and discs[remote] else stem
+
+    #? (review) never two sources to one name: names that still meet (folder by folder, not discs - "Side A"
+    #? and "Side B" each with an "01.flac") are told apart by their own folder's name, and anything still the
+    #? same is numbered. Compared as the disk would, case folded.
+    meeting = Counter(filed_as(remote, names[remote]).casefold() for remote in tags)
+    for remote in tags:
+        folder = split_remote_path(split_remote_path(remote)[0])[1]
+        if meeting[filed_as(remote, names[remote]).casefold()] > 1 and folder:
+            names[remote] = f"{folder}-{names[remote]}"
+    taken: set[str] = set()
+    for remote in tags:
+        name, number = names[remote], 1
+        while filed_as(remote, name).casefold() in taken:
+            number += 1
+            name = f"{names[remote]} ({number})"
+        taken.add(filed_as(remote, name).casefold())
+        names[remote] = name
+        tags[remote] = {**tags[remote], "filename": filed_as(remote, name)}
+    return names, tags
+
+
+def _positive(value) -> int | None:
+    """A disc number that is one - an int from 1 - or None."""
+    return value if isinstance(value, int) and value > 0 else None
+
+
 def plan_organization(job: dict, download_root: str, library_root: str) -> dict:
     """
     Work out every file operation this job implies. Touches nothing.
@@ -627,9 +807,26 @@ def plan_organization(job: dict, download_root: str, library_root: str) -> dict:
         entry["file"]["filename"]: entry["track"] for entry in mapping.values()
     }
 
+    #? every file found first, once: a manual search's download is named by what they carry
+    located = [(file_entry, find_local_file(download_root, file_entry.get("filename", ""),
+                                            job.get("directory", ""), library_root))
+               for file_entry in files]
+
+    #? (2.1.38) A MANUAL search's download (the app's Search Soulseek) has no release behind it, only the
+    #? typed artist and album. It is filed by its OWN tags: the folder from the commonest of them, by the
+    #? scan's rule (own_tags_release), the files keeping their sharer's names (a disc prefix when the set
+    #? spans discs), and only what a file lacks filled in (own_tags_fill) - so the filed album reads back as
+    #? what its tags say, never as the typed words over a compilation's artists or a sharer's capitals.
+    manual = bool(release.get("manual"))
+    own_names: dict[str, str] = {}
+    own_tags: dict[str, dict] = {}
+    if manual:
+        own_names, own_tags = _manual_names(located)
+        release = own_tags_release(release, list(own_tags.values()))
+
     #? decided once for the whole job, so every track lands in the same folder even if the
     #? escalation kicked in - resolving per file could split an album across two directories
-    album_target, discriminator = resolve_album_dir(library_root, release)
+    album_target, discriminator = resolve_album_dir(library_root, release, manual=manual, job_id=job.get("id"))
 
     #? What's already in that folder, by disc and track. resolve_album_dir shares a folder that
     #? holds this same release (or an untagged one), and filing a second copy into it used to put
@@ -644,9 +841,8 @@ def plan_organization(job: dict, download_root: str, library_root: str) -> dict:
     problems = []
     used_targets: set[Path] = set()
 
-    for file_entry in files:
+    for file_entry, source in located:
         remote_filename = file_entry.get("filename", "")
-        source = find_local_file(download_root, remote_filename, job.get("directory", ""), library_root)
 
         if source is None:
             problems.append(f"not found on disk: {remote_filename}")
@@ -665,7 +861,7 @@ def plan_organization(job: dict, download_root: str, library_root: str) -> dict:
         target = build_target_path(
             library_root,
             release,
-            track or {"filename": Path(basename).stem},
+            track or {"filename": own_names.get(remote_filename) or Path(basename).stem},
             extension,
             discriminator,
         )
@@ -682,6 +878,9 @@ def plan_organization(job: dict, download_root: str, library_root: str) -> dict:
             "track": track,
             "exists": target.exists(),
         }
+        if manual:
+            #? (2.1.38) only what this file lacks - written by write_own_tags, never write_tags
+            operation["fill"] = own_tags_fill(own_tags.get(remote_filename) or {}, release)
         if already_here:
             key, title = _planned_track(release, track, source)
             duplicate = find_duplicate(already_here, key, title, same_release)
@@ -740,7 +939,7 @@ def plan_organization(job: dict, download_root: str, library_root: str) -> dict:
                    if not op.get("duplicate_of") and not op.get("exists")}
     read_only_dirs = sorted(str(folder) for folder in moving_from if not can_move_out_of(folder))
 
-    return {
+    plan = {
         "job_id": job.get("id"),
         "album_dir": str(album_dir) if album_dir else None,
         "operations": operations + companions,
@@ -760,6 +959,11 @@ def plan_organization(job: dict, download_root: str, library_root: str) -> dict:
         #? (src/library_ledger.py grant_for). Reading it changes nothing filed.
         "same_release": same_release,
     }
+    if manual:
+        #? (2.1.38) filed by its own tags, as `naming` - which the poller labels the review row with
+        plan["manual"] = True
+        plan["naming"] = release
+    return plan
 
 
 def _is_multi_disc(release: dict) -> bool:
@@ -950,6 +1154,57 @@ def write_tags(path: Path, release: dict, track: dict | None, drop_stale_release
         logger.warning(f"could not write tags to {path.name}: {e}")
 
 
+def write_own_tags(path: Path, fill: dict, drop: tuple[str, ...] = MANUAL_DROPPED) -> None:
+    """
+    A manual search's file, tagged (2.1.38): only `fill` set - the tags it lacked (own_tags_fill) - and the
+    `drop` ids removed. Every other tag stays as the sharer's tagger left it. Failures are logged and
+    tolerated, as in write_tags: a filed-but-untagged file beats a half-organized album.
+    """
+    try:
+        audio = easy_file(path)
+    except Exception as e:
+        logger.warning(f"could not read tags on {path.name}: {e}")
+        return
+
+    if audio is None:
+        logger.warning(f"unsupported audio format for tagging: {path.name}")
+        return
+
+    for key, value in fill.items():
+        if not value:
+            continue
+        try:
+            audio[key] = value
+        except Exception:
+            continue
+
+    for key in drop:
+        try:
+            if key in audio:
+                del audio[key]
+        except Exception:
+            pass
+
+    try:
+        audio.save()
+    except Exception as e:
+        logger.warning(f"could not write tags to {path.name}: {e}")
+        return
+
+    #? Easy MP4 has no name for the release group, which Picard writes as a freeform atom - the one the
+    #? scan reads raw (library._mp4_release_group) - so it is taken out of the atoms themselves
+    if "musicbrainz_releasegroupid" in drop and file_extension(path.name) in {"m4a", "mp4", "alac", "aac"}:
+        try:
+            from mutagen.mp4 import MP4
+            from src.library import MP4_RELEASE_GROUP_ATOM
+            mp4 = MP4(str(path))
+            if mp4.tags is not None and MP4_RELEASE_GROUP_ATOM in mp4.tags:
+                del mp4.tags[MP4_RELEASE_GROUP_ATOM]
+                mp4.save()
+        except Exception as e:
+            logger.warning(f"could not remove the release group from {path.name}: {e}")
+
+
 def execute_plan(plan: dict, release: dict) -> dict:
     """
     Carry out a plan: MOVE each file to its target, then tag it. The only way filing goes since
@@ -998,7 +1253,11 @@ def execute_plan(plan: dict, release: dict) -> dict:
             shutil.move(str(source), str(target))
 
             if not operation.get("companion"):
-                write_tags(target, release, operation.get("track"), drop_stale_release_id=True)
+                if plan.get("manual"):
+                    #? (2.1.38) filed by its own tags: only what it lacked, and the sharer's ids out
+                    write_own_tags(target, operation.get("fill") or {})
+                else:
+                    write_tags(target, release, operation.get("track"), drop_stale_release_id=True)
                 results["tracks_organized"] += 1
 
             results["organized"] += 1

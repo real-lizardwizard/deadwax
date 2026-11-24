@@ -298,3 +298,163 @@ store keeps one row per peer.
   body off the `HTTPError` - "User bob appears to be offline" rather than "refused".
 - **`/jobs` asks for queue positions side by side** (v0.9.9) - one after another, every queued
   job added a slskd round trip to every poll of the panel.
+
+### Manual search (2.1.37, 2.1.38)
+
+James (2026-11-24): "let's add a manual search in the requests tab" - chosen as **Soulseek by artist + album**:
+type an artist and an album, including ones MusicBrainz doesn't have, see the folders people share ranked by
+how well they fit, then by format and speed, and Get one. The iPhone and Mac app only, never the web. The
+whole design, with the app's half and the checks for James's devices, is
+`~/Desktop/Code/deadwax-plans/manual-search.md`; this is the server's half as built. One flag, `manual`,
+declared on `FindCandidatesRequest` (2.1.37) and `EnqueueRelease` (2.1.38) - no new route, no schema change.
+
+**Why the ranking had to change (2.1.37).** A question with no release id and no tracklist - the web's "album
+as a whole" Get, and a manual search - has every track signal None, so the score renormalised over edition,
+format and availability: **nothing scored the folder's name against the words**, and a wrong album the same
+words found scored the same as the right one. So `matching.name_match(directory, files, artist, album)`, a
+seventh signal, pure, 0..1:
+
+- every word set is `normalize(text).split()`. **Noise**: all-digit words, `\d+(bit|khz|k|kbps)`,
+  `FORMAT_WORDS`, disc markers (`_DISC_MARKER`, matched on the normalized TEXT, so "disc one" is both its
+  words) and the, a, an, and. **Edition words**: every word an `EDITION_PATTERNS` match touches (so "super
+  deluxe" and "box set" are both their words), plus "edition" - the edition signal's alone, never counted twice;
+- A (the typed album) and B (the typed artist) lose their noise and edition words unless that empties them
+  ("1989", "The The", Harmonia's "Deluxe");
+- D is `folder_label(directory)`'s words ("Album / CD 1" for a disc folder) - or, when every word is noise
+  (a "FLAC" inside "OK Computer"), the folder above the label's, once. Cleaned: B's words out - all of them
+  when A hasn't the word; when A has it (a self-titled album), ONE occurrence, counted, and only the artist's
+  own: before a dash (`_artist_prefix`: the name opens with B's words and a spaced dash or an en/em dash -
+  "Weezer - Pinkerton", not "Jay-Z") or where the name has the word more often than the typed album does
+  ("Weezer Weezer"); a name left with nothing is the self-titled album's and keeps it ("Weezer - 1994
+  [FLAC]"). Noise out unless in A, edition words out **unless in A** (a departure:
+  the plan takes them out unconditionally, which would score Harmonia's "Deluxe" folder 0 against its own
+  typed name; A keeps an edition word only when it has nothing else, so "edition words don't lower the fit"
+  is unaffected);
+- `album_fit = |A ∩ D| / |A ∪ D|` ("OK Computer" against "OK Computer OKNOTOK" is 0.67); `artist_fit` is the
+  share of B's words found in the path's words, or - per word - in at least half the audio files' names;
+  `name_match = 0.65 album_fit + 0.35 artist_fit` (`ALBUM_FIT_SHARE`). A field with no words left (punctuation
+  only) has no opinion, as a None signal has none: the other alone, and 0 with neither.
+
+`score_candidate`, when `expected["manual"]`: `signals["name_match"]` first (the app draws the reasons in
+order), and the score is `MANUAL_NAME_WEIGHT (0.80) x name_match + 0.20 x` the usual weighted blend of the
+active signals - so fit comes first and format and availability sort folders that fit equally. The plan's worked
+examples hold (prefer_lossless): a perfect fit in MP3 from a slow peer 0.92, a 0.67-fit FLAC from a fast one
+0.83, a perfect FLAC 1.00, a perfect INSTRUMENTAL 0.95 (ranked under the plain one, its edition tag shown).
+lossless_only still filters, the limit is still 50. **Without `manual` nothing changes**: no `name_match` key,
+the same score - held by `test_a_question_without_manual_scores_exactly_as_before`, whose numbers were computed
+from matching.py as it was at 2.1.35. **The 0.80 and 0.65 are reasoned, not measured**: check M3 settles them
+on James's own searches.
+
+The route: `find_candidates` answers **400 "Type an artist and an album."** for a manual question with either
+field blank after stripping (the app never sends one), before anything is searched, and `expected` carries
+`"manual": body.manual`. The search itself is any Find's - the typed words under `search_names`, no MusicBrainz
+lookup (no artist id), `_store_state` silent (no release id); `query_override` is searched as typed and still
+scored against the two fields.
+
+**Review (2026-11-24), the artist's word in a self-titled search.** As first built, a word both the artist's
+and the album's was kept in every folder name, so typed Weezer / Weezer gave `Weezer - Pinkerton` 0.675 and
+`Weezer/Weezer (Blue Album) [FLAC]` 0.567, and `Peter Gabriel - So (1986)` tied `Peter Gabriel 3 (Melt)` at
+0.783. The review proposed counting one occurrence of each artist word out of every name; that alone ties
+"Weezer (Blue Album)" in `Weezer/` with "Weezer - Pinkerton" (both lose their one Weezer) and Melt with So,
+so the occurrence counted out is the artist's own - before a dash, or one too many - as above. Pinkerton is
+now 0.35, the Blue Album 0.567, Melt 0.783 and So 0.35;
+`test_a_self_titled_search_ranks_the_album_above_the_artists_others` holds five such pairs at equal format
+and peer (seen failing before the fix, and with the plain one-out-of-every-name rule).
+
+Tests: tests/test_matching.py's "a manual search" section (fit, order, bounds, unchanged), and
+tests/test_manual_search.py through the whole app with real JSON (the flag reaches the ranking - it fails with
+the field undeclared - the 400, and no `name_match` without it). Every fault the plan lists was put in and seen
+failing, then restored.
+
+**Filing by its own tags (2.1.38).** What happened to a release-less, trackless job was the opposite of what
+a manual search wants: the folder named from the TYPED words (a lowercase "radiohead" made a second artist
+folder), shared with any folder of that name (a known pressing's folder got an unknown pressing's tracks),
+album/albumartist/artist overwritten with the typed words on every file (a compilation's artists lost), a
+CD1/CD2 set with "01.flac" in each colliding ("two files map to the same destination"), and - the surviving
+date tag making the expected name "OK Computer (1997)" - every tagged share flagged `misfiled`. All of it is
+now changed only when `release.get("manual")`; every other job plans and writes exactly as before
+(`test_a_release_less_job_without_manual_is_planned_and_tagged_exactly_as_before`, the group fallback's plan
+and tags spelled out).
+
+- `EnqueueRelease.manual` declared, reaching release_json through `model_dump()` - **only when true**
+  (`exclude={"manual"}` otherwise), so every other job's stored release is byte for byte what it was.
+- `plan_organization` finds every source FIRST (`located`, once per file - the loop used to find each as it
+  went; same calls, same results), then for a manual job `_manual_names` reads each with
+  `library.read_track` (imported inside: library imports organizer at its top) - an unreadable file is
+  `{}`, untagged, and reading never raises - and `own_tags_release(release, tags)` (pure) names it:
+  `_commonest(albumartist) or _commonest(artist) or` the typed artist, `_commonest(album) or` the typed
+  album, `_commonest(date)[:4]`, `_commonest(originaldate)[:4]` - **library._commonest over the tags in the
+  scan's own running order** (`track_order`, with each file's filed name), so the folder is named from
+  exactly what `read_album_dir` reads back and `expected_dirname` agrees, ties included. No edition fields,
+  no ids, `manual: True`. The plan carries `manual` and `naming` (only on a manual plan).
+- `resolve_album_dir(..., manual=True, job_id=...)` -> `_resolve_unmatched_dir`: the plain name, then
+  `[unmatched]`, then `[unmatched-<job id>]` (then `-2`, `-3`…, never back to a pressing's
+  folder), sharing a folder only when no audio file in it holds a release id (`holds_album_id`, which reads
+  every file, and counts a folder it can't list as holding one) - an untagged folder (the settled rule), its
+  duplicate titles skipped by `find_duplicate` as for any id-less job. `UNMATCHED` goes through the
+  template's discriminator, so `edition_from_dirname` reads it back and the folder isn't misfiled; Apply
+  release renames by the release and drops it (retag's merge when that pressing is already held - read, not
+  run).
+- Files keep their sharer's names; when the job's audio spans more than one disc, a `<disc>-` prefix, the
+  disc from the file's own disc tag else its folder's marker (`matching.file_disc`) - from the file's facts,
+  no number made up, and none on one disc. A disc is a number from 1 (a `-1` or `0` tag is none); when the
+  tags name one disc or none but the folders' markers several, the folders' are used. Names that still meet
+  (compared case folded, as a case-insensitive disk would) take their own folder's name before them
+  (`Side A-01.flac`), and anything left is numbered (`01 (2).flac`): no two sources are ever planned to
+  one name.
+- Each audio operation carries `fill` (`own_tags_fill`, pure): `album` when the file has none; `artist` and
+  `albumartist` only when it has NEITHER (a compilation's per-track artists without an albumartist get no
+  albumartist). `execute_plan` calls `write_own_tags(path, fill, drop=MANUAL_DROPPED)` for a manual plan
+  instead of `write_tags`: only the fill set, `musicbrainz_albumid` and `musicbrainz_releasegroupid` deleted
+  (the v1.0.1 rule, extended to the group), the artist ids kept (they say who; Apply release rewrites them),
+  failures logged and tolerated. Easy MP4 has no name for the group, so for an m4a the raw atom the scan reads
+  (`library.MP4_RELEASE_GROUP_ATOM`) is deleted too. The plan writes nothing (`test_a_manual_plan_touches_nothing`).
+- The poller's `_enrol_for_review` labels a manual plan's review row with `naming`'s artist and album, not
+  the typed words. `grant_job` is untouched: same_release is always False without an id, so a filing is
+  ADDED and everything already there FLAGGED (logins on), as for any id-less job. Library care's flag keeps
+  the typed words as its label.
+- Find's answer gains `"manual": true` for a manual question (left out otherwise) - the app's gate: an older
+  server would drop the flag and file by the typed words. `/jobs` reads `json_extract(release_json,
+  '$.manual')` beside the group and edition, and a row gains `"manual": true` only when true.
+
+What stays as it is, on purpose (the plan's 2.4): no "already have it" check by name, no lock for a manual
+Get (two at once are two jobs; the second files its new tracks or is FLAGGED), `_store_state`, `already_have`,
+`in_flight`, `held_copy` and `other_pressings` untouched.
+
+Tests (real mutagen FLACs, and the tiny m4a): tests/test_organizer.py's "a manual search, filed by its own
+tags" - Picard-tagged FLACs, typed lowercase, untagged, mixed, a two-album folder, every collision, CD1/CD2,
+the binding check (`inspect_album` of the SCANNED album holds `no_release` and neither `misfiled` nor
+`artist_split`, four shares), the golden job, grants, errors degrading, the m4a; tests/test_poller.py (the
+review row's label, unreadable files through the whole poller); tests/test_jobs_route.py (`manual` on a manual
+row only); tests/test_manual_search.py (stored as declared, nothing stored otherwise, Find's echo). Every
+fault the plan lists for S2 was put in and seen failing, then restored.
+
+Not verified: a real slskd and Navidrome (the poller's path for a release-less job ran only against the
+suite's fakes); Soulseek's real tag habits; whether Navidrome shows an `[unmatched]` album beside a matched one
+of the same name as one album or two (M9 - it decides S3's "exactly one" rule).
+
+**Review (2026-11-24), what it found and what was fixed.** Three things, each with a test seen failing first:
+- *Filing safety.* `read_album_mbid` answers from the first readable file, so a matched pressing's folder
+  whose first file was untagged (a hidden track sorted first) read as untagged, and a manual download was
+  filed into it. A manual job now asks `holds_album_id`, every file read; read_album_mbid's other callers
+  were left as they are (the non-manual `resolve_album_dir` shares the same blind spot for a matched job -
+  reported, not changed). `test_a_folder_naming_a_pressing_in_any_file_is_never_shared_though_its_first_is_untagged`.
+- *Ranking.* The artist's word in a self-titled search - in 2.1.37's write-up above.
+- *Filing.* The disc prefix trusted the disc tag over the folder: CD1/01.flac and CD2/01.flac, both tagged
+  disc 1, met on one name and 2 of 4 files were filed with `failed: 0`; a `-1` disc tag named `-1-b.flac`.
+  Now the folders' markers when the tags can't tell discs apart, a disc from 1, and no two sources to one
+  name (the bullet above).
+
+Known limits, kept on purpose:
+- Under an `ALBUM_FOLDER_TEMPLATE` without `{edition}`, the discriminator is appended as ` [unmatched]`, which
+  `edition_from_dirname` doesn't read back, so Needs a look flags that folder "Folder name doesn't match the
+  tags" until a release is applied.
+- An INSTRUMENTAL (or any other edition) of the album scores 0.95 to the plain one's 1.00: only 0.20 of a
+  manual score is left to edition, format and the peer, so a plain MP3 from a busy peer falls under an
+  instrumental FLAC from a free one. Edition is weighted, never a filter; its tag shows on the row.
+- A manual download of a pressing deadwax already holds is filed as a second copy, under `[unmatched]`: the
+  sharer's ids are dropped before filing and a manual job never compares them, so nothing says it's the
+  same. Applying that release to it later goes through retag's merge (read, not run).
+- A CD1/CD2 set whose files are all tagged disc 1 keeps that tag (a file gets only what it lacks): the
+  files are filed apart, but the scan reads every track as disc 1 and orders them by number, then name -
+  1-01, 2-01, 1-02, 2-02, the discs interleaved - until a release is applied.

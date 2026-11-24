@@ -91,6 +91,11 @@ class FindCandidatesRequest(BaseModel):
     format_preference: str = "prefer_lossless"
     #? lets the UI re-run a tweaked query when the generated one finds nothing
     query_override: str | None = None
+    #? (2.1.37) A MANUAL search - the iPhone and Mac app's Search Soulseek: an artist and an album as typed,
+    #? no release behind them - ranked by how closely each folder's name fits the words (matching.name_match).
+    #? Declared, as everything here is: pydantic drops an undeclared field without a word, and a manual
+    #? question would then be scored as a trackless Get, a wrong album the words found beside the right one.
+    manual: bool = False
 
 
 class EnqueueFile(BaseModel):
@@ -135,6 +140,13 @@ class EnqueueRelease(BaseModel):
     #? hook for a future metadata manager, so that picking an edition by hand is a matter of
     #? writing this field rather than changing how editions are resolved.
     edition_label: str | None = None
+    #? (2.1.38) A MANUAL search's download - the app's Search Soulseek, an artist and album typed, no release
+    #? behind them: filed by the files' OWN tags (organizer.own_tags_release), never into a known pressing's
+    #? folder. Declared: pydantic drops an undeclared field without a word, and the download would then be
+    #? filed by the typed words, written over every file's own album and artists. Stored with the job in
+    #? release_json like every other field here, so filing never needs the app again - and only when true,
+    #? so every other job's stored release is what it always was.
+    manual: bool = False
 
 
 class Quality(BaseModel):
@@ -422,6 +434,10 @@ async def find_candidates(request: Request, body: FindCandidatesRequest, user: s
     try:
         slskd_client = request.app.state.slskd_client
 
+        #? (2.1.37) a manual search is scored against the words, so it needs both; the app never sends one without
+        if body.manual and not (body.artist.strip() and body.album.strip()):
+            raise HTTPException(status_code=400, detail="Type an artist and an album.")
+
         #? before any search starts - a few indexed reads, and per folder held a listing and each
         #? audio file's tags (existing_tracks), in a thread
         store_state = await _store_state(request, body, _asker(user))
@@ -479,6 +495,8 @@ async def find_candidates(request: Request, body: FindCandidatesRequest, user: s
             "year": body.year,
             "edition_tags": body.edition_tags,
             "tracks": [t.model_dump() for t in body.tracks],
+            #? (2.1.37) scored by the folder's name first (matching.score_candidate); False scores as ever
+            "manual": body.manual,
         }
 
         #? in a thread: scoring every folder a search returns is plain CPU, and done on the event
@@ -509,6 +527,9 @@ async def find_candidates(request: Request, body: FindCandidatesRequest, user: s
             "candidates": serialized,
             #? part of it held (a note that downloading fills the gaps), and other pressings
             **store_state,
+            #? (2.1.38) a manual question echoed - the app's word that this server files a manual download by its
+            #? own tags, so it offers Get only then; left out otherwise, every other answer as it always was
+            **({"manual": True} if body.manual else {}),
         }
 
     except HTTPException:
@@ -635,7 +656,8 @@ async def enqueue(request: Request, body: EnqueueRequest, user: str = Depends(cu
         slskd_client = request.app.state.slskd_client
         store = getattr(request.app.state, "store", None)
         files = [f.model_dump() for f in body.files]
-        release = body.release.model_dump()
+        #? `manual` stored only when true (2.1.38): every other job's release_json is byte for byte as before
+        release = body.release.model_dump(exclude=None if body.release.manual else {"manual"})
 
         async with release_lock(release.get("release_mbid")):
             #? the whole pressing already coming for someone else: join it, under the same lock (logins on)
@@ -769,6 +791,9 @@ async def jobs(request: Request, user: str = Depends(current_user)):
                 "release_mbid": job.get("release_mbid"),
                 "release_group_mbid": job.get("release_group_mbid"),
                 "edition": job.get("edition"),
+                #? (2.1.38) a manual search's download, read by SQLite like the edition - only when true, so
+                #? every other row is as it was
+                **({"manual": True} if job.get("manual") else {}),
                 #? how it ended, from the status and poller.py's named messages - None while going (and,
                 #? with logins on, 2.0.0-player.51, `not_filed` for one nothing of could be filed)
                 "outcome": job_outcome(job["status"], job["error"], not_filed=logins),

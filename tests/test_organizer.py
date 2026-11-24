@@ -14,6 +14,8 @@ import inspect
 import sys
 from pathlib import Path
 
+import pytest
+
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from src.organizer import (  # noqa: E402
@@ -642,3 +644,460 @@ def test_the_editor_naming_no_release_leaves_the_files_id_alone(tmp_path):
     path = write_flac(tmp_path / "01.flac", musicbrainz_albumid="picard-wrote-this")
     write_tags(path, {**RELEASE, "release_mbid": None}, RELEASE["tracks"][0])
     assert FLAC(str(path))["musicbrainz_albumid"] == ["picard-wrote-this"]
+
+
+# ---------------------------------------------------------------- a manual search, filed by its own tags (2.1.38)
+#
+# The iPhone and Mac app's Search Soulseek downloads a folder found by a typed artist and album, with no release
+# behind it. It is filed by the files' OWN tags: the folder from the commonest of them by the library scan's own
+# rule, only what a file lacks filled in (the typed words, for an untagged share), the sharer's release and
+# release-group ids taken out, the files keeping their names - and never into a known pressing's folder.
+
+from src.library_ledger import ADDED, FLAGGED, grant_for  # noqa: E402
+from src.organizer import own_tags_release, resolve_album_dir, write_own_tags, write_tags  # noqa: E402
+
+#? typed in lowercase, as a person types - the tags spell it their own way
+TYPED = {"artist": "radiohead", "album_artist": "radiohead", "album": "ok computer", "year": None,
+         "original_year": None, "release_mbid": None, "release_group_mbid": None, "edition_tags": [],
+         "tracks": [], "manual": True}
+SHARE = "share\\Radiohead\\OK Computer"
+
+PICARD = {"album": "OK Computer", "albumartist": "Radiohead", "artist": "Radiohead", "date": "1997-05-21",
+          "originaldate": "1997-05-21", "musicbrainz_albumid": "the-sharers-pressing",
+          "musicbrainz_releasegroupid": "the-sharers-group", "musicbrainz_artistid": "radiohead-id",
+          "musicbrainz_albumartistid": "radiohead-id"}
+
+
+def manual_job(names, release=None, directory=SHARE, job_id=7):
+    return {"id": job_id, "artist": "radiohead", "album": "ok computer", "username": "bob", "directory": directory,
+            "release": release or TYPED,
+            "files": [{"filename": f"{directory}\\{name}", "size": 1000} for name in names]}
+
+
+def share(tmp_path, files: dict, folder="OK Computer"):
+    """Real FLACs where slskd would have put them: {name: tags}, None for a file with no tags at all."""
+    from tests.test_library import write_flac
+    root = tmp_path / "downloads"
+    for name, tags in files.items():
+        path = root / folder / name
+        if tags is None:
+            path.parent.mkdir(parents=True, exist_ok=True)
+            write_minimal_flac(path)
+        else:
+            write_flac(path, **tags)
+    return root
+
+
+def file_manually(tmp_path, files: dict, release=None, job_id=7, folder="OK Computer"):
+    root = share(tmp_path, files, folder)
+    library = tmp_path / "music"
+    job = manual_job(list(files), release, job_id=job_id)
+    plan = plan_organization(job, str(root), str(library))
+    return plan, execute_plan(plan, job["release"]), library
+
+
+def tags_of(path) -> dict:
+    from mutagen.flac import FLAC
+    return {key: list(values) for key, values in (FLAC(str(path)).tags or {}).as_dict().items()}
+
+
+def scanned(library, path):
+    from src import library as scan
+    return next(a for a in scan.scan_library(str(library), force=True)["albums"] if a["path"] == path)
+
+
+def test_picard_tagged_flacs_are_filed_by_their_own_tags_and_lose_only_the_sharers_ids(tmp_path):
+    files = {"01 Airbag.flac": {**PICARD, "title": "Airbag", "tracknumber": "1", "discnumber": "1"},
+             "02 Paranoid Android.flac": {**PICARD, "title": "Paranoid Android", "tracknumber": "2", "discnumber": "1"}}
+    before = {name: {k: [v] for k, v in tags.items()} for name, tags in files.items()}
+    plan, results, library = file_manually(tmp_path, files)
+
+    album = library / "Radiohead" / "OK Computer (1997)"
+    assert plan["album_dir"] == str(album) and plan["manual"] is True
+    assert results["organized"] == 2 and results["failed"] == 0
+    #? the sharer's names, kept
+    assert sorted(p.name for p in album.iterdir()) == ["01 Airbag.flac", "02 Paranoid Android.flac"]
+    for name in files:
+        after = tags_of(album / name)
+        #? everything as the sharer's tagger left it - titles, numbers, dates, artist ids - but the two ids
+        assert after == {k: v for k, v in before[name].items()
+                         if k not in ("musicbrainz_albumid", "musicbrainz_releasegroupid")}
+        assert after["musicbrainz_artistid"] == ["radiohead-id"] and "musicbrainz_albumid" not in after
+
+
+def test_a_compilations_own_artists_are_kept_track_by_track(tmp_path):
+    comp = {"album": "Sounds of the Seventies", "albumartist": "Various Artists", "date": "2001"}
+    files = {"01.flac": {**comp, "artist": "Can", "title": "Vitamin C"},
+             "02.flac": {**comp, "artist": "Neu!", "title": "Hallogallo"}}
+    plan, _, library = file_manually(tmp_path, files, {**TYPED, "artist": "various", "album": "seventies"})
+
+    album = library / "Various Artists" / "Sounds of the Seventies (2001)"
+    assert plan["album_dir"] == str(album)
+    assert [tags_of(album / n)["artist"] for n in ("01.flac", "02.flac")] == [["Can"], ["Neu!"]]
+
+
+def test_the_typed_words_never_overwrite_what_the_tags_say(tmp_path):
+    files = {"01 Airbag.flac": {**PICARD, "title": "Airbag"}}
+    _, _, library = file_manually(tmp_path, files)
+
+    album = library / "Radiohead" / "OK Computer (1997)"
+    assert [p.name for p in (library).iterdir()] == ["Radiohead"]
+    values = {v for values in tags_of(album / "01 Airbag.flac").values() for v in values}
+    assert not values & {"radiohead", "ok computer"}
+
+
+def test_an_untagged_share_is_filed_and_filled_with_the_typed_words(tmp_path):
+    files = {"01 Airbag.flac": None, "02 Paranoid Android.flac": None}
+    plan, results, library = file_manually(tmp_path, files)
+
+    album = library / "radiohead" / "ok computer"
+    assert plan["album_dir"] == str(album) and results["organized"] == 2
+    for name in files:
+        tags = tags_of(album / name)
+        assert tags == {"album": ["ok computer"], "artist": ["radiohead"], "albumartist": ["radiohead"]}
+        #? no title or number is made up
+        assert "title" not in tags and "tracknumber" not in tags
+
+
+def test_a_mixed_share_gets_only_what_each_file_lacks(tmp_path):
+    files = {"01.flac": {"album": "OK Computer", "albumartist": "Radiohead", "artist": "Radiohead", "title": "a"},
+             "02.flac": {"artist": "Radiohead", "title": "b"},
+             "03.flac": {"title": "c"}}
+    _, _, library = file_manually(tmp_path, files)
+
+    album = library / "Radiohead" / "OK Computer"
+    assert tags_of(album / "01.flac") == {"album": ["OK Computer"], "albumartist": ["Radiohead"],
+                                          "artist": ["Radiohead"], "title": ["a"]}
+    #? the album it lacked; an artist and no albumartist gets no albumartist
+    assert tags_of(album / "02.flac") == {"artist": ["Radiohead"], "title": ["b"], "album": ["OK Computer"]}
+    #? neither, so both - the album's, which the tags gave, not the typed words
+    assert tags_of(album / "03.flac") == {"title": ["c"], "album": ["OK Computer"], "artist": ["Radiohead"],
+                                          "albumartist": ["Radiohead"]}
+
+
+def test_a_two_album_folder_is_named_for_the_commonest_album_and_the_scan_says_so(tmp_path):
+    from src.metadata_health import inspect_album
+    tag = {"albumartist": "Radiohead", "artist": "Radiohead", "date": "1997"}
+    files = {"01.flac": {**tag, "album": "OK Computer"}, "02.flac": {**tag, "album": "Kid A"},
+             "03.flac": {**tag, "album": "OK Computer"}}
+    plan, _, library = file_manually(tmp_path, files)
+
+    assert Path(plan["album_dir"]).name == "OK Computer (1997)"
+    issues = inspect_album(scanned(library, "Radiohead/OK Computer (1997)"))
+    assert "mixed_tags" in issues and "misfiled" not in issues
+
+
+def test_the_naming_is_the_commonest_of_the_tags_and_the_typed_words_only_where_none_has_one():
+    tags = [{"album": "OK Computer", "albumartist": "", "artist": "Radiohead", "date": "1997-05-21",
+             "originaldate": ""}, {"album": "OK Computer", "artist": "radiohead"}, {}]
+    assert own_tags_release(TYPED, tags) == {
+        "artist": "Radiohead", "album_artist": "Radiohead", "album": "OK Computer", "year": "1997",
+        "original_year": "", "manual": True}
+    assert own_tags_release(TYPED, [{}, {}]) == {
+        "artist": "radiohead", "album_artist": "radiohead", "album": "ok computer", "year": "",
+        "original_year": "", "manual": True}
+
+
+def test_a_known_pressings_folder_of_that_name_is_never_shared(tmp_path):
+    from tests.test_library import write_flac
+    held = tmp_path / "music" / "Radiohead" / "OK Computer (1997)"
+    write_flac(held / "01 - Airbag.flac", musicbrainz_albumid="the-pressing-i-matched", title="Airbag")
+
+    plan, results, library = file_manually(tmp_path, {"01 Airbag.flac": {**PICARD, "title": "Airbag"}})
+
+    assert Path(plan["album_dir"]).name == "OK Computer (1997) [unmatched]"
+    assert results["organized"] == 1 and sorted(p.name for p in held.iterdir()) == ["01 - Airbag.flac"]
+
+
+def test_an_unmatched_folder_held_by_a_pressing_too_means_the_jobs_own(tmp_path):
+    from tests.test_library import write_flac
+    for name in ("OK Computer (1997)", "OK Computer (1997) [unmatched]"):
+        write_flac(tmp_path / "music" / "Radiohead" / name / "01.flac", musicbrainz_albumid=f"id-{name}")
+
+    plan, _, _ = file_manually(tmp_path, {"01 Airbag.flac": {**PICARD, "title": "Airbag"}}, job_id=42)
+    assert Path(plan["album_dir"]).name == "OK Computer (1997) [unmatched-42]"
+
+
+def test_a_folder_naming_a_pressing_in_any_file_is_never_shared_though_its_first_is_untagged(tmp_path):
+    """
+    Review (2026-11-24): read_album_mbid answers from the first file alone, so a hidden track with no tags
+    sorted first made a matched pressing's folder read as untagged, and the manual download joined it.
+    """
+    from tests.test_library import write_flac
+    held = tmp_path / "music" / "Radiohead" / "OK Computer (1997)"
+    write_flac(held / "00 Hidden.flac", title="Hidden")
+    for n, title in ((1, "Airbag"), (2, "Paranoid Android"), (3, "Subterranean Homesick Alien")):
+        write_flac(held / f"0{n} - {title}.flac", musicbrainz_albumid="the-pressing-i-matched", title=title)
+
+    plan, results, _ = file_manually(tmp_path, {"01 Airbag.flac": {**PICARD, "title": "Airbag"}})
+
+    assert Path(plan["album_dir"]).name == "OK Computer (1997) [unmatched]"
+    assert results["organized"] == 1 and len(list(held.iterdir())) == 4
+
+
+def test_a_folder_that_cannot_be_read_counts_as_holding_a_release(tmp_path, monkeypatch):
+    from src.organizer import holds_album_id
+    assert holds_album_id(tmp_path) is False and holds_album_id(tmp_path / "not there") is False
+
+    def unreadable(self):
+        raise PermissionError(13, "Permission denied")
+    monkeypatch.setattr(Path, "iterdir", unreadable)
+    assert holds_album_id(tmp_path) is True
+
+
+def test_an_untagged_folder_of_that_name_is_shared_and_its_titles_are_not_filed_twice(tmp_path):
+    from tests.test_library import write_flac
+    held = tmp_path / "music" / "Radiohead" / "OK Computer (1997)"
+    write_flac(held / "Airbag.mp3.flac", title="Airbag")
+    files = {"01 Airbag.flac": {**PICARD, "title": "Airbag"},
+             "02 Paranoid Android.flac": {**PICARD, "title": "Paranoid Android"}}
+
+    plan, results, _ = file_manually(tmp_path, files)
+
+    assert plan["album_dir"] == str(held)
+    assert (results["organized"], results["duplicates"]) == (1, 1)
+    assert sorted(p.name for p in held.iterdir()) == ["02 Paranoid Android.flac", "Airbag.mp3.flac"]
+
+
+def test_the_template_reads_unmatched_back_so_the_folder_still_matches_its_tags(tmp_path):
+    from src.metadata_health import inspect_album
+    from tests.test_library import write_flac
+    write_flac(tmp_path / "music" / "Radiohead" / "OK Computer (1997)" / "x.flac", musicbrainz_albumid="known",
+               album="OK Computer", albumartist="Radiohead", date="1997")
+    file_manually(tmp_path, {"01 Airbag.flac": {**PICARD, "title": "Airbag"}})
+
+    issues = inspect_album(scanned(tmp_path / "music", "Radiohead/OK Computer (1997) [unmatched]"))
+    assert "no_release" in issues and "misfiled" not in issues
+
+
+def test_a_set_shared_one_folder_per_disc_files_every_track_with_its_disc_before_its_name(tmp_path):
+    root = tmp_path / "downloads"
+    for disc in ("CD1", "CD2"):
+        (root / disc).mkdir(parents=True)
+        write_minimal_flac(root / disc / "01.flac")
+        write_minimal_flac(root / disc / "02.flac")
+    library = tmp_path / "music"
+    job = manual_job([f"CD{d}\\0{n}.flac" for d in (1, 2) for n in (1, 2)])
+
+    plan = plan_organization(job, str(root), str(library))
+    results = execute_plan(plan, job["release"])
+
+    assert plan["problems"] == [] and results["organized"] == 4
+    assert sorted(p.name for p in (library / "radiohead" / "ok computer").iterdir()) == [
+        "1-01.flac", "1-02.flac", "2-01.flac", "2-02.flac"]
+
+
+def test_the_disc_a_file_is_tagged_with_names_it_before_its_folder_does(tmp_path):
+    files = {"01.flac": {**PICARD, "discnumber": "1", "title": "a"},
+             "01 (2).flac": {**PICARD, "discnumber": "2/2", "title": "b"}}
+    _, _, library = file_manually(tmp_path, files)
+    assert sorted(p.name for p in (library / "Radiohead" / "OK Computer (1997)").iterdir()) == [
+        "1-01.flac", "2-01 (2).flac"]
+
+
+def test_one_disc_is_never_given_a_prefix(tmp_path):
+    files = {"01.flac": {**PICARD, "discnumber": "1"}, "02.flac": {**PICARD, "discnumber": "1"}}
+    _, _, library = file_manually(tmp_path, files)
+    assert sorted(p.name for p in (library / "Radiohead" / "OK Computer (1997)").iterdir()) == ["01.flac", "02.flac"]
+
+
+def test_a_set_whose_files_are_all_tagged_disc_one_is_told_apart_by_its_folders(tmp_path):
+    """Review (2026-11-24): CD1/01.flac and CD2/01.flac, both tagged disc 1, met on one name and half the set
+    wasn't filed, with nothing failed."""
+    from tests.test_library import write_flac
+    root = tmp_path / "downloads"
+    for disc in (1, 2):
+        for n in (1, 2):
+            write_flac(root / f"CD{disc}" / f"0{n}.flac", **PICARD, discnumber="1", tracknumber=str(n),
+                       title=f"disc {disc} track {n}")
+    library = tmp_path / "music"
+    job = manual_job([f"CD{d}\\0{n}.flac" for d in (1, 2) for n in (1, 2)])
+
+    plan = plan_organization(job, str(root), str(library))
+    results = execute_plan(plan, job["release"])
+
+    assert plan["problems"] == [] and (results["organized"], results["failed"]) == (4, 0)
+    assert sorted(p.name for p in (library / "Radiohead" / "OK Computer (1997)").iterdir()) == [
+        "1-01.flac", "1-02.flac", "2-01.flac", "2-02.flac"]
+
+
+@pytest.mark.parametrize("bad", ["-1", "0"])
+def test_a_disc_tag_below_one_is_no_disc(tmp_path, bad):
+    files = {"a.flac": {**PICARD, "discnumber": bad, "title": "a"}, "b.flac": {**PICARD, "discnumber": "1", "title": "b"},
+             "c.flac": {**PICARD, "discnumber": "2", "title": "c"}}
+    _, _, library = file_manually(tmp_path, files)
+    assert sorted(p.name for p in (library / "Radiohead" / "OK Computer (1997)").iterdir()) == [
+        "1-b.flac", "2-c.flac", "a.flac"]
+
+
+def test_two_files_that_would_be_filed_under_one_name_are_told_apart_by_their_folders(tmp_path):
+    from tests.test_library import write_flac
+    root = tmp_path / "downloads"
+    for side in ("Side A", "Side B"):
+        write_flac(root / side / "01.flac", **PICARD, title=side)
+    library = tmp_path / "music"
+    job = manual_job(["Side A\\01.flac", "Side B\\01.flac"])
+
+    results = execute_plan(plan_organization(job, str(root), str(library)), job["release"])
+
+    assert (results["organized"], results["failed"]) == (2, 0)
+    assert sorted(p.name for p in (library / "Radiohead" / "OK Computer (1997)").iterdir()) == [
+        "Side A-01.flac", "Side B-01.flac"]
+
+
+def test_no_two_sources_are_ever_given_one_name(tmp_path):
+    """Names that differ only in case meet on a case-insensitive disk: what's left after the folders is numbered."""
+    from src.organizer import _manual_names
+    from tests.test_library import write_flac
+    located = []
+    for n, name in enumerate(["01.flac", "01.FLAC", "x/01.flac", "x/01.Flac"]):
+        write_flac(tmp_path / f"{n}.flac", title=str(n))
+        located.append(({"filename": f"share\\Album\\{name}"}, tmp_path / f"{n}.flac"))
+
+    _, tags = _manual_names(located)
+
+    filed = [read["filename"] for read in tags.values()]
+    assert len({name.casefold() for name in filed}) == 4, filed
+
+
+@pytest.mark.parametrize("files, path", [
+    ({"01 Airbag.flac": {**PICARD, "title": "Airbag", "tracknumber": "1"},
+      "02 Paranoid Android.flac": {**PICARD, "title": "Paranoid Android", "tracknumber": "2"}},
+     "Radiohead/OK Computer (1997)"),
+    ({"01.flac": {**PICARD, "originaldate": "1997", "date": "2017", "title": "a"},
+      "02.flac": {"title": "b"}}, "Radiohead/OK Computer (1997)"),
+    ({"01.flac": None, "02.flac": None}, "radiohead/ok computer"),
+    ({"01.flac": {"artist": "Radiohead", "date": "1997"}, "02.flac": {"title": "b"}}, "Radiohead/ok computer (1997)"),
+])
+def test_the_filed_album_reads_back_as_what_its_tags_say(tmp_path, files, path):
+    """
+    What ties the naming to the scan's rule: Needs a look says it isn't matched to MusicBrainz - the hook for
+    Release - and neither that its folder disagrees with its tags nor that its artist is filed twice.
+    """
+    from src.metadata_health import inspect_album
+    _, _, library = file_manually(tmp_path, files)
+
+    issues = inspect_album(scanned(library, path))
+    assert "no_release" in issues
+    assert "misfiled" not in issues and "artist_split" not in issues
+
+
+def test_a_manual_plan_touches_nothing(tmp_path):
+    root = share(tmp_path, {"01 Airbag.flac": {**PICARD, "title": "Airbag"}, "02.flac": None})
+    library = tmp_path / "music"
+    before = {p: (p.read_bytes(), p.stat().st_mtime_ns) for p in root.rglob("*") if p.is_file()}
+
+    plan = plan_organization(manual_job(["01 Airbag.flac", "02.flac"]), str(root), str(library))
+
+    assert plan["operations"] and not library.exists()
+    assert {p: (p.read_bytes(), p.stat().st_mtime_ns) for p in root.rglob("*") if p.is_file()} == before
+    #? what it will fill, written in the plan rather than worked out again when it's executed
+    assert [op["fill"] for op in plan["operations"]] == [
+        {}, {"album": "OK Computer", "artist": "Radiohead", "albumartist": "Radiohead"}]
+    assert plan["naming"]["album"] == "OK Computer"
+
+
+def test_an_unreadable_file_is_filed_and_filled_rather_than_raising(tmp_path):
+    root = seed_downloads(tmp_path, ["01.flac", "02.flac"], subdir="OK Computer")  # not real FLACs
+    library = tmp_path / "music"
+    job = manual_job(["01.flac", "02.flac"])
+
+    plan = plan_organization(job, str(root), str(library))
+    results = execute_plan(plan, job["release"])
+
+    assert (results["organized"], results["failed"]) == (2, 0)
+    assert sorted(p.name for p in (library / "radiohead" / "ok computer").iterdir()) == ["01.flac", "02.flac"]
+
+
+def test_a_manual_filing_is_given_and_one_with_everything_already_there_is_flagged(tmp_path):
+    from tests.test_library import write_flac
+    plan, results, _ = file_manually(tmp_path, {"01 Airbag.flac": {**PICARD, "title": "Airbag"}})
+    assert grant_for(results, plan["same_release"]) == ADDED
+
+    again = tmp_path / "again"
+    write_flac(again / "music" / "Radiohead" / "OK Computer (1997)" / "Airbag.flac", title="Airbag")
+    plan, results, _ = file_manually(again, {"01 Airbag.flac": {**PICARD, "title": "Airbag"}})
+    assert (results["organized"], results["skipped"]) == (0, 1)
+    assert grant_for(results, plan["same_release"]) == FLAGGED
+
+
+def test_write_own_tags_sets_only_what_it_is_given_and_drops_the_two_ids(tmp_path):
+    from tests.test_library import write_flac
+    path = write_flac(tmp_path / "01.flac", **PICARD, title="Airbag")
+    write_own_tags(path, {})
+    after = tags_of(path)
+    assert "musicbrainz_albumid" not in after and "musicbrainz_releasegroupid" not in after
+    assert after["album"] == ["OK Computer"] and after["musicbrainz_albumartistid"] == ["radiohead-id"]
+
+
+def test_an_m4a_loses_its_sharers_release_group_too(tmp_path):
+    """Easy MP4 has no name for it, so the atom the scan reads raw is taken out itself."""
+    from mutagen.mp4 import MP4, MP4FreeForm
+    from src import library as scan
+    from tests.test_disc_titles import TINY_M4A
+    path = tmp_path / "01.m4a"
+    path.write_bytes(TINY_M4A)
+    mp4 = MP4(str(path))
+    mp4.tags[scan.MP4_RELEASE_GROUP_ATOM] = [MP4FreeForm(b"the-sharers-group")]
+    mp4.tags["----:com.apple.iTunes:MusicBrainz Album Id"] = [MP4FreeForm(b"the-sharers-pressing")]
+    mp4.save()
+
+    write_own_tags(path, {"album": "ok computer"})
+
+    tags = MP4(str(path)).tags
+    assert scan.MP4_RELEASE_GROUP_ATOM not in tags and "----:com.apple.iTunes:MusicBrainz Album Id" not in tags
+    assert scan.read_track(path)["album"] == "ok computer"
+
+
+# ---- a question without `manual`: exactly as at 2.1.37 (the group fallback - MusicBrainz couldn't list pressings)
+
+GROUP_FALLBACK = {"artist": "Portishead", "album_artist": "Portishead", "album": "Dummy", "year": "1994",
+                  "original_year": "1994", "release_mbid": None, "release_group_mbid": "rg-dummy",
+                  "edition_tags": [], "tracks": []}
+
+
+@pytest.mark.parametrize("release", [GROUP_FALLBACK, {**GROUP_FALLBACK, "manual": False}])
+def test_a_release_less_job_without_manual_is_planned_and_tagged_exactly_as_before(tmp_path, release):
+    root = share(tmp_path, {"01 Mysterons.flac": {**PICARD, "title": "Mysterons", "artist": "portishead"},
+                            "02.flac": None}, folder="Dummy")
+    library = tmp_path / "music"
+    job = {"id": 3, "artist": "Portishead", "album": "Dummy", "username": "bob", "directory": "share\\Dummy",
+           "release": release, "files": [{"filename": f"share\\Dummy\\{n}", "size": 1000}
+                                         for n in ("01 Mysterons.flac", "02.flac")]}
+
+    plan = plan_organization(job, str(root), str(library))
+
+    album = library / "Portishead" / "Dummy (1994)"
+    assert plan == {
+        "job_id": 3, "album_dir": str(album), "companion_count": 0,
+        "operations": [
+            {"source": str(root / "Dummy" / "01 Mysterons.flac"), "target": str(album / "01 Mysterons.flac"),
+             "track": None, "exists": False},
+            {"source": str(root / "Dummy" / "02.flac"), "target": str(album / "02.flac"), "track": None,
+             "exists": False}],
+        "source_dirs": [str(root / "Dummy")], "read_only_dirs": [], "overlap": None, "problems": [],
+        "matched_tracks": 0, "total_tracks": 0, "same_release": False,
+    }
+
+    execute_plan(plan, release)
+    #? the album's words over every file, the release group written, the sharer's pressing gone - as before
+    assert tags_of(album / "01 Mysterons.flac") == {
+        "album": ["Dummy"], "albumartist": ["Portishead"], "artist": ["Portishead"], "date": ["1994"],
+        "originaldate": ["1994"], "musicbrainz_releasegroupid": ["rg-dummy"],
+        "musicbrainz_artistid": ["radiohead-id"], "musicbrainz_albumartistid": ["radiohead-id"],
+        "title": ["Mysterons"]}
+    assert tags_of(album / "02.flac") == {
+        "album": ["Dummy"], "albumartist": ["Portishead"], "artist": ["Portishead"], "date": ["1994"],
+        "originaldate": ["1994"], "musicbrainz_releasegroupid": ["rg-dummy"]}
+
+
+def test_resolve_album_dir_without_manual_still_shares_any_folder_for_a_job_naming_no_release(tmp_path):
+    from tests.test_library import write_flac
+    held = tmp_path / "Portishead" / "Dummy (1994)"
+    write_flac(held / "01.flac", musicbrainz_albumid="a-pressing")
+    assert resolve_album_dir(str(tmp_path), GROUP_FALLBACK) == (held, "")
+
+
+def test_write_tags_is_still_what_a_non_manual_filing_uses():
+    assert "write_tags(target, release" in inspect.getsource(execute_plan)
+    assert write_tags is not write_own_tags

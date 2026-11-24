@@ -448,8 +448,13 @@ async def _enrol_for_review(job: dict, results: dict, store) -> None:
         logger.debug(f"not enrolling {album_dir} for review, it is outside LIBRARY_PATH")
         return
 
+    #? (2.1.38) a manual search's download is labelled as its tags name it - what it was filed as, and what
+    #? the scan will show - not as the words typed to find it
+    plan = results.get("plan") or {}
+    named = (plan.get("naming") or {}) if plan.get("manual") else {}
     await store.record_albums_seen(
-        [{"path": path, "artist": job.get("artist"), "album": job.get("album")}],
+        [{"path": path, "artist": named.get("album_artist") or job.get("artist"),
+          "album": named.get("album") or job.get("album")}],
         source="import",
     )
 

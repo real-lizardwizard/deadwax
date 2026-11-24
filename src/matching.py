@@ -11,6 +11,7 @@ over plain dicts so it can be tested without a live slskd (tests/test_matching.p
 """
 
 import re
+from collections import Counter
 from difflib import SequenceMatcher
 
 
@@ -498,14 +499,173 @@ def is_single_disc(expected: dict) -> bool:
     return bool(tracks) and len({t.get("disc") or 1 for t in tracks}) == 1
 
 
+# ---------------------------------------------------------------- a manual search (2.1.37)
+
+#? A MANUAL search (the iPhone and Mac app's Search Soulseek, 2.1.37) is a typed artist and album, with no
+#? release behind it: no tracklist, no year, no id. Every track signal is None, and what is left - edition,
+#? format, availability - says nothing about whether a folder IS the album typed, so a wrong album the same
+#? words found ranked with the right one. `name_match` is the signal for it: how closely the folder's name is
+#? the typed album, and its path the typed artist. Only a question that says `manual` is scored by it; every
+#? other is scored exactly as before (score_candidate). See "Manual search" in notes/downloads.md.
+
+#? what a folder name carries that says nothing about WHICH album it is - formats, rips, sources
+FORMAT_WORDS = {
+    "flac", "mp3", "aac", "m4a", "alac", "ogg", "opus", "wav", "aiff", "ape", "wv", "lossless", "lossy",
+    "kbps", "cbr", "vbr", "v0", "v2", "bit", "khz", "hi", "res", "hires", "web", "cd", "cdrip", "rip",
+    "vinyl", "vinylrip", "webrip", "lp", "retail", "mqa",
+}
+#? the articles and "and", which sharers drop, add and swap for "&" at will ("Beatles - Abbey Road")
+_FILLER_WORDS = {"the", "a", "an", "and"}
+#? "24bit", "96khz", "320k", "320kbps"
+_UNIT_WORD = re.compile(r"\d+(?:bit|khz|k|kbps)")
+#? a disc marker anywhere in a NORMALIZED name - "cd1", "cd 2", "disc one" - matched on the text, so a
+#? two-word marker is both its words
+_DISC_IN_TEXT = re.compile(r"(?<![0-9a-z])" + _DISC_MARKER)
+#? how much of name_match is the album's fit; the rest is the artist's
+ALBUM_FIT_SHARE = 0.65
+#? how much of a manual question's score is name_match; the rest is edition, format and availability
+#? blended as for any other question - so fit comes first, and they sort folders that fit equally.
+#? Reasoned, not measured: check M3 in the plan settles both on James's own searches.
+MANUAL_NAME_WEIGHT = 0.80
+
+
+def _classified_words(text: str) -> list[tuple[str, bool, bool]]:
+    """
+    normalize(text)'s words in order, each as (word, is noise, is an edition word). Noise: all-digit words
+    (years, bitrates, catalogue numbers), units, FORMAT_WORDS, disc markers and the filler words. Edition
+    words: every word an EDITION_PATTERNS pattern touches - "super deluxe" is both its words - and "edition",
+    which the edition signal judges, so the name is never counted against it twice.
+    """
+    norm = normalize(text)
+    if not norm:
+        return []
+    marked = [m.span() for m in _DISC_IN_TEXT.finditer(norm)]
+    editions = [m.span() for pattern, _ in EDITION_PATTERNS for m in pattern.finditer(norm)]
+
+    def touches(spans, start, end) -> bool:
+        return any(s < end and start < e for s, e in spans)
+
+    words = []
+    for match in re.finditer(r"\S+", norm):
+        word, start, end = match.group(), match.start(), match.end()
+        noise = (word.isdigit() or bool(_UNIT_WORD.fullmatch(word)) or word in FORMAT_WORDS
+                 or word in _FILLER_WORDS or touches(marked, start, end))
+        edition = word == "edition" or touches(editions, start, end)
+        words.append((word, noise, edition))
+    return words
+
+
+def _typed_words(text: str) -> set[str]:
+    """A typed field's words without its noise and edition words - all of them, when that leaves none
+    ("1989", "The The")."""
+    words = _classified_words(text)
+    kept = {word for word, noise, edition in words if not noise and not edition}
+    return kept or {word for word, _, _ in words}
+
+
+def _folder_name(directory: str, album: set[str]) -> str:
+    """
+    The folder's own name, as folder_label shows it ("Album / CD 1" for a disc folder) - or, when every word
+    of it is noise (a "FLAC" inside "OK Computer"), the folder above's, once.
+    """
+    label = folder_label(directory)
+    words = _classified_words(label)
+    if words and all(noise and word not in album for word, noise, _ in words):
+        #? above every folder the label used: a disc folder's label is its album folder's name too
+        parent, _, name = directory.rpartition("/")
+        found = disc_folder(name)
+        above = parent.rpartition("/")[0] if found and not found[0] and parent else parent
+        if above:
+            return folder_label(above)
+    return label
+
+
+#? an artist set off from the album by a dash - "Weezer - Pinkerton", "Weezer [1994] - Pinkerton": a dash with
+#? spaces round it, or an en or em dash. A hyphen inside a name ("Jay-Z", "Hi-Res") is not one.
+_ARTIST_DASH = re.compile(r"\s+[-\u2013\u2014]+\s+|\s*[\u2013\u2014]\s*")
+
+
+def _artist_prefix(label: str, artist: set[str]) -> bool:
+    """Whether the name opens with the typed artist and a dash before anything else: "Artist - …"."""
+    parts = _ARTIST_DASH.split(label, maxsplit=1)
+    return bool(artist) and len(parts) == 2 and bool(normalize(parts[1])) and _typed_words(parts[0]) == artist
+
+
+def name_match(directory: str, files: list[dict], artist: str, album: str) -> float:
+    """
+    How closely a folder is the album and artist TYPED for a manual search, 0..1. Pure.
+
+    album_fit is the overlap of the typed album's words with the folder name's (|A ∩ D| / |A ∪ D|), once the
+    name has lost the artist's words - all of them, unless the album has them too; then ONE of each, counted:
+    the artist's own, before a dash ("Weezer - Pinkerton") or where the name has the word more often than the
+    album does ("Weezer - Weezer"), so a self-titled album keeps its word and the artist's other albums don't
+    get it free (review) - its noise (unless the album has it - "1989" in "1989 (2014)") and its edition words (the edition signal's
+    alone; also unless the album has them, for an album only an edition word names). artist_fit is the share
+    of the typed artist's words found in the folder's path, any part of it, or else in at least half its
+    audio files' names. name_match is ALBUM_FIT_SHARE of the one and the rest of the other - or the one alone
+    when the other field has no words to look for.
+    """
+    wanted_album = _typed_words(album)
+    wanted_artist = _typed_words(artist)
+
+    label = _folder_name(directory or "", wanted_album)
+    words = _classified_words(label)
+    prefix = _artist_prefix(label, wanted_artist)
+    in_album = Counter(normalize(album).split())
+    in_name = Counter(word for word, _, _ in words)
+
+    def name_words(artist_out: bool) -> set[str]:
+        name: set[str] = set()
+        taken: Counter = Counter()
+        for word, noise, edition in words:
+            #? a word both the artist's and the album's: the artist's own occurrence counted out, once
+            if (artist_out and word in wanted_artist and word in wanted_album
+                    and taken[word] < (1 if prefix or in_name[word] > in_album[word] else 0)):
+                taken[word] += 1
+                continue
+            if word in wanted_album:
+                name.add(word)
+            elif not (noise or edition or word in wanted_artist):
+                name.add(word)
+        return name
+
+    #? a name that is the artist and nothing else (but noise) is the self-titled album's: "Weezer - 1994 [FLAC]"
+    name = name_words(True) or name_words(False)
+    union = wanted_album | name
+    album_fit = len(wanted_album & name) / len(union) if wanted_album and union else 0.0
+
+    artist_fit = 0.0
+    if wanted_artist:
+        in_path = set(normalize(directory or "").split())
+        named = [set(normalize(filename_stem(split_remote_path(f.get("filename", ""))[1])).split())
+                 for f in files or []]
+        found = sum(1 for word in wanted_artist
+                    if word in in_path or (named and sum(word in words for words in named) * 2 >= len(named)))
+        artist_fit = found / len(wanted_artist)
+
+    if wanted_album and wanted_artist:
+        fit = ALBUM_FIT_SHARE * album_fit + (1 - ALBUM_FIT_SHARE) * artist_fit
+    elif wanted_album:
+        fit = album_fit
+    else:
+        fit = artist_fit
+    return max(0.0, min(1.0, fit))
+
+
 def score_candidate(candidate: dict, expected: dict, format_preference: str = "prefer_lossless") -> dict:
     """Score one (user, directory) candidate against the picked release. Returns it enriched."""
     files = candidate["files"]
     expected_tracks = expected.get("tracks") or []
+    manual = bool(expected.get("manual"))
 
     mapping = match_tracks_to_files(expected_tracks, files) if expected_tracks else {}
 
     signals: dict[str, float | None] = {}
+
+    if manual:
+        #? first, as the app draws the reasons in order: the folder's fit is what ranks a manual search
+        signals["name_match"] = name_match(candidate["directory"], files, expected.get("artist") or "",
+                                           expected.get("album") or "")
 
     signals["title_match"] = (len(mapping) / len(expected_tracks)) if expected_tracks else None
     signals["track_count"] = score_track_count(len(expected_tracks), len(files))
@@ -519,9 +679,13 @@ def score_candidate(candidate: dict, expected: dict, format_preference: str = "p
     #? when a release has no tracklist (release-group level search) the tracklist-dependent
     #? signals are None. Renormalize over whatever we do have rather than scoring those
     #? candidates as though they'd failed.
-    active = {k: v for k, v in signals.items() if v is not None}
+    active = {k: v for k, v in signals.items() if v is not None and k in WEIGHTS}
     total_weight = sum(WEIGHTS[k] for k in active)
     score = sum(WEIGHTS[k] * v for k, v in active.items()) / total_weight if total_weight else 0.0
+
+    if manual:
+        #? the usual blend is what sorts folders that fit equally: FLAC before MP3, a free slot before a queue
+        score = MANUAL_NAME_WEIGHT * signals["name_match"] + (1 - MANUAL_NAME_WEIGHT) * score
 
     response = candidate["response"]
 

@@ -548,6 +548,12 @@ class Config:
     FANARTTV_KEY = _env("FANARTTV_KEY")
     FANARTTV_PERSONAL_KEY = _env("FANARTTV_PERSONAL_KEY")
 
+    #? (2.1.36) Optional: a Last.fm API key, for an artist's listeners, top songs, similar artists and radio in the
+    #? iPhone and Mac app, and Last.fm's artist and album descriptions first (notes/lastfm.md). Only the API key:
+    #? every method deadwax asks is a read, so the shared secret isn't needed. Like fanart.tv's, it has to be yours -
+    #? Last.fm gives one free to anyone with an account - so it cannot be shipped in a public repo.
+    LASTFM_API_KEY = _env("LASTFM_API_KEY")
+
     #? Needed for the app's library (2.0.0-player.46 - no longer optional): without them the app at
     #? /player/ says "Connect Navidrome" where the library would be, and plays nothing, while its
     #? searching, Get, Requests and You work. Navidrome is what lists and plays the library; deadwax
@@ -650,6 +656,9 @@ class Config:
         "THEAUDIODB_KEY": None,
         "FANARTTV_KEY": None,
         "FANARTTV_PERSONAL_KEY": None,
+        #? (2.1.36) read per request, but a change clears what Last.fm said of the old key (a refusal held), and one
+        #? that leaves no key empties Last.fm's kept answers - see the settings route
+        "LASTFM_API_KEY": "lastfm",
         #? the Navidrome client caches its base URL, so a change drops it for a rebuild
         "NAVIDROME_URL": "navidrome",
         #? signed into each request's token, so nothing to rebuild
@@ -727,6 +736,11 @@ class Config:
                 f"applied {len(cls.OVERRIDDEN)} setting(s) saved in Server settings: "
                 f"{', '.join(sorted(cls.OVERRIDDEN))}"
             )
+
+    @classmethod
+    def lastfm_key(cls) -> str | None:
+        """LASTFM_API_KEY as it is sent, stripped - or None when there is none (a saved blank included)."""
+        return (cls.LASTFM_API_KEY or "").strip() or None
 
     @classmethod
     def lyrics_lead_ms(cls) -> int:

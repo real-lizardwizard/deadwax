@@ -582,9 +582,10 @@ public enum ServerSettings {
 
     /// The batch's wait (`PUT /settings`): the settings read again (`settingsRead`, as the GET is given), and before it
     /// each setting's row written and the overrides read back - each its own SQLite connection, which may wait out the
-    /// busy timeout (store._connect's 10 s) first; never less than Routes.timeouts gives the route.
+    /// busy timeout (store._connect's 10 s) first - and (server 2.1.36) Last.fm's kept answers emptied when the save
+    /// leaves no LASTFM_API_KEY, one more; never less than Routes.timeouts gives the route.
     public static func saveWait(_ count: Int) -> Double {
-        EditWaits.wait(settingsRead + storeBusy * Double(count + 1), floor: Routes.timeouts[Routes.saveServerSettings])
+        EditWaits.wait(settingsRead + storeBusy * Double(count + 2), floor: Routes.timeouts[Routes.saveServerSettings])
     }
 
     /// The settings' read: no bound on the server - each path stat'ed and slskd's folder probed (at most PROBE_VISITS

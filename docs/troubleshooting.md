@@ -311,6 +311,30 @@ see, the fix an admin's.
 - **Not found** - MusicBrainz answered that it has nothing at the address deadwax asked. That's never the
   connection: the container's log names the address.
 
+## Settings says Last.fm refused the key
+
+`LASTFM_API_KEY`'s row in Server settings → **Connections** says **"Last.fm refused this key at 14:05 (error 10:
+…) - check it's the API key, not the shared secret"**, and the Event log said once **"Last.fm refused
+LASTFM_API_KEY (error 10: …): top songs, similar artists and radio are off until it's fixed in Server settings."**
+The words after the error number are Last.fm's own.
+
+- **Error 10 is a key Last.fm doesn't know.** The likeliest reason is the wrong one of the two: Last.fm gives each
+  API account an **API key** and a **Shared secret**, which look alike, and deadwax needs the API key. Otherwise a
+  character was lost or added in copying it. Paste the API key into `LASTFM_API_KEY` again and save.
+- **Error 26 is a key Last.fm has suspended.** That's Last.fm's decision about the key, not something deadwax can
+  change: make a new key at [last.fm/api/account/create](https://www.last.fm/api/account/create) and save that.
+
+While Last.fm refuses the key, deadwax asks it nothing for an hour, then tries once more; anything already kept
+from Last.fm is still shown meanwhile. Saving the key (the same one or a new one), reverting it, or clearing it
+ends the wait at once, and the next request asks with whatever is saved. Clearing it also empties what deadwax kept
+of Last.fm's answers.
+
+**"doesn't look like a Last.fm API key (32 letters and digits)"** on the row is deadwax's own check, made before
+anything is asked: Last.fm's keys are 32 letters and digits, and the value saved isn't. It's saved all the same, so
+a key of a shape deadwax doesn't expect still gets tried - but it's usually a key cut short, or something else
+copied. A key with a space inside it can't be saved at all: **"a Last.fm API key is one word - letters and digits,
+no spaces"**.
+
 ## A search fails with "not logged in", or slskd refused it
 
 Searches are refused while slskd isn't signed in to Soulseek; it answers with a `409`, which the
@@ -568,6 +592,16 @@ ask MusicBrainz through deadwax, so the same slow minutes reach them.
 Their folder names don't match what the template makes from their tags: albums filed by
 another tool, or filed before you changed `ALBUM_FOLDER_TEMPLATE`. Changing the template never
 moves anything. Applying the album's release (**Edit → Release**) renames the folder to match.
+
+## A manual search's album is filed under a name I didn't type, or as "[unmatched]"
+
+A manual search (the iPhone and Mac app's) is filed by the files' own tags, not by the words you
+typed ([organizing](organizing.md#filed-by-its-own-tags)): if the sharer's files say "Radiohead" and
+"OK Computer", that's its folder however you typed them, and if their tags are wrong, so is its
+folder. A folder ending `[unmatched]` means a folder of that name already holds a pressing you've
+matched, and an unmatched download is never filed into it. Either way, **Edit → Release** matches it
+to a pressing, writes that pressing's tags and renames the folder by it; **Edit → Tags** puts the tags
+right by hand.
 
 ## A downloaded reissue is filed under its reissue's year
 

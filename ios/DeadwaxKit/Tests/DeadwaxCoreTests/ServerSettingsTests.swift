@@ -624,10 +624,13 @@ import Testing
         #expect(Routes.timeouts[Routes.savedAnswers] == 30 && Routes.timeouts[Routes.clearSavedAnswers] == 120)
         #expect(Routes.timeouts[Routes.pingMusicBrainz]! > ArtistWaits.musicBrainz)
         #expect(Routes.timeouts[Routes.pingSlskd] == 30)
-        // one setting: its row and the overrides read back, 10 s each, and the settings' read - under the route's own
+        // one setting: its row, the overrides read back and Last.fm's kept answers emptied (2.1.36), 10 s each, and the
+        // settings' read - the route's own
         #expect(ServerSettings.saveWait(1) == 60)
-        // twelve: 30 + 130, to the minute
+        // twelve: 30 + 140, to the minute
         #expect(ServerSettings.saveWait(12) == 180)
+        // twenty: 30 + 220, to the minute - one store wait fewer would be 240
+        #expect(ServerSettings.saveWait(20) == 300)
         // Re-time: two tracks at a time, each up to two names by two requests - and never less than the route's
         #expect(EditWaits.retime(ScanAlbum(path: "A", lyricsCount: 1)) == 600)
         #expect(EditWaits.retime(ScanAlbum(path: "A", trackCount: 30, lyricsCount: 12)) == 1380)

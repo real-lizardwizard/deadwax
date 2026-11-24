@@ -218,7 +218,9 @@ def test_each_wait_is_past_the_servers_own_worst_case_or_pinned():
     # the save: each setting's row written (a set or a clear, one store call each) and the overrides read back (one
     # more), each its own SQLite connection that may wait out the busy timeout - then the settings read as the GET is
     handler = inspect.getsource(settings_route.update_settings)
-    assert handler.count("await store.") == 2, "set_setting or clear_setting, one per update"
+    # (2.1.36) and one more when the save leaves no LASTFM_API_KEY: Last.fm's kept answers emptied
+    assert handler.count("await store.") == 3, "set_setting or clear_setting, one per update, and lastfm_clear"
+    assert re.search(r"if not Config\.lastfm_key\(\):\n\s+dropped = await store\.lastfm_clear\(\)", handler)
     assert re.search(r"for update in updates:\n\s+if update\.value is None:\n\s+await store\.clear_setting\(update\.key\)"
                      r"\n\s+else:\n\s+await store\.set_setting\(update\.key, update\.value\)", handler)
     assert handler.count("store.stored_settings()") == 1
@@ -226,7 +228,7 @@ def test_each_wait_is_past_the_servers_own_worst_case_or_pinned():
     busy = re.search(r"sqlite3\.connect\(self\.path, timeout=(\d+)\)", inspect.getsource(JobStore._connect))
     assert busy and int(busy.group(1)) == 10
     assert "public static let storeBusy: Double = 10" in SETTINGS
-    assert ("EditWaits.wait(settingsRead + storeBusy * Double(count + 1), floor: "
+    assert ("EditWaits.wait(settingsRead + storeBusy * Double(count + 2), floor: "
             "Routes.timeouts[Routes.saveServerSettings])") in settings_function("saveWait")
     assert "Routes.timeouts[Routes.serverSettings] ?? 30" in SETTINGS
     # no bound of the server's own on the read (each path stat'ed, slskd's folder probed, PROBE_VISITS at most) - the
