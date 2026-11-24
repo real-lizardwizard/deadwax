@@ -44,10 +44,10 @@ Pink Floyd/Wish You Were Here (1975) [2011 remaster]/01 - Shine On You Crazy Dia
   multi-disc set is numbered straight through, so it stays in order inside one folder; the disc
   numbers go in the tags. A file that couldn't be matched to a track keeps its own name.
 - **A second copy isn't filed beside the first.** If the folder already has a track, whatever
-  its format, the new file is left in slskd's folder. When the folder holds the same release,
-  "already has" means the same disc and track number; when it holds another pressing, or files
-  with no release id, it means the same title, since two pressings can number their tracks
-  differently (the US *Dummy* has an extra song at 6). A download of an album already there
+  its format, the new file is left in slskd's folder. It's judged file by file: a file tagged
+  with the same release has it when it has the same disc and track number; any other file -
+  another pressing's, or one with no release id - when it has the same title, since two pressings
+  can number their tracks differently (the US *Dummy* has an extra song at 6). A download of an album already there
   ends as already there (its row in Requests says so). A track the folder is missing still files, so a second
   download can finish an album a first one left partial. When any track is left behind, so are
   the download's cover and sidecars (log, cue and so on): they describe the copy they came with,
@@ -95,10 +95,12 @@ comes from, in order:
 4. the country, only if `COUNTRY_IN_FOLDER` is on.
 
 An ordinary, one-edition album gets no edition in its folder name, so the common case stays
-clean. If a **different** release would still land in the same folder, its catalogue number,
-and failing that its release id, is added. A folder with **no MusicBrainz tags at all** (an old
-rip) is never treated as a different release, because forking every album that predates deadwax
-would be worse than sharing a folder.
+clean. If a **different** release would still land in the same folder, its catalogue number, and
+failing that its release id, is added. A folder is the release its tagged files name most often,
+read from every file as the library scan reads it - untagged files don't count either way - so one
+untagged file (a hidden track, a bonus rip) doesn't hide which pressing the folder holds. A folder with **no MusicBrainz tags at all** (an
+old rip) is never treated as a different release, because forking every album that predates
+deadwax would be worse than sharing a folder.
 
 Instrumental, acoustic and a cappella versions count as editions for a reason: they have the
 same titles and track count as the album itself, so without one every file would look like one

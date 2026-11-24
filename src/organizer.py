@@ -372,71 +372,57 @@ def find_companion_files(source_dir: Path, placed: set[str]) -> list[Path]:
     ]
 
 
+def folder_release_ids(directory: Path) -> list[str]:
+    """
+    Each readable audio file's MusicBrainz release id in this folder ("" for a file with none), in the
+    library scan's running order (library.read_track and track_order - the scan's own reader), so a
+    question about the folder is answered from the very values the scan keys it on. Every file is read
+    (2.1.39): the first one alone was the old answer, and a hidden or bonus track with no tags sorted first
+    made a folder of one pressing read as untagged. A folder that can't be listed raises OSError - the
+    caller decides what that means, never a guess here.
+    """
+    from src.library import read_track, track_order  # library imports this module at its top
+
+    tracks = [track for track in (read_track(entry) for entry in sorted(directory.iterdir())
+                                  if entry.is_file() and file_extension(entry.name) in AUDIO_EXTENSIONS)
+              if track]
+    tracks.sort(key=track_order)
+    return [(track.get("release_mbid") or "").strip() for track in tracks]
+
+
 def read_album_mbid(directory: Path) -> str | None:
     """
     The MusicBrainz release id already filed in this folder, if any.
 
     Identity rather than appearance: two releases are the same edition when they share a
-    release MBID, whatever their folders happen to be called. Reads the first audio file it
-    can and stops - every track in a folder belongs to the same release, so there is nothing
-    to gain from opening the rest.
+    release MBID, whatever their folders happen to be called. The folder's id is its commonest,
+    exactly as the library scan keys it (library._commonest over folder_release_ids) - 2.1.39; it
+    was the first readable file's until then, so a folder whose first file was untagged read as
+    untagged whatever the others said, and a download of another pressing was filed into it.
 
-    Returns None for a folder deadwax didn't organize (no MBID tag), which the caller must
-    treat as "unknown", NOT as "different" - guessing wrong there would fork someone's
-    existing library into duplicate folders.
+    Returns None for a folder no file of which carries an MBID tag (one deadwax didn't organize),
+    which the caller must treat as "unknown", NOT as "different" - guessing wrong there would fork
+    someone's existing library into duplicate folders.
     """
-    import mutagen
+    from src.library import _commonest  # library imports this module at its top
 
     if not directory.is_dir():
         return None
-
-    for entry in sorted(directory.iterdir()):
-        if not entry.is_file() or not file_extension(entry.name) in AUDIO_EXTENSIONS:
-            continue
-
-        try:
-            audio = mutagen.File(str(entry), easy=True)
-        except Exception:
-            continue
-
-        if audio is None:
-            continue
-
-        values = audio.get("musicbrainz_albumid") or []
-        if values:
-            return str(values[0]).strip() or None
-
-        #? a readable audio file that simply has no MBID tag is answer enough - the folder
-        #? wasn't organized by us, so stop rather than opening every track hoping otherwise
-        return None
-
-    return None
+    return _commonest(folder_release_ids(directory)) or None
 
 
 def holds_album_id(directory: Path) -> bool:
     """
     Whether ANY audio file in this folder carries a MusicBrainz release id (2.1.38, review) - what a manual
-    search's download asks before sharing a folder. read_album_mbid answers from the first readable file
-    alone, so a folder whose first file happened to be untagged (a hidden track, a bonus rip) read as
-    untagged while every other file named the pressing, and the manual download joined it - counted as that
-    pressing by the scan, which keys a folder on its commonest id. Every file is read here; a folder that
-    can't be listed counts as holding one, so it is never shared on a guess.
+    search's download asks before sharing a folder. Stricter than read_album_mbid's commonest: an unknown
+    pressing's tracks in a folder holding any id could be counted as that pressing. Every file is read
+    (folder_release_ids); a folder that can't be listed counts as holding one, so it is never shared on a
+    guess.
     """
     try:
-        entries = sorted(directory.iterdir()) if directory.is_dir() else []
+        return directory.is_dir() and any(folder_release_ids(directory))
     except OSError:
         return True
-    for entry in entries:
-        if not entry.is_file() or file_extension(entry.name) not in AUDIO_EXTENSIONS:
-            continue
-        try:
-            audio = easy_file(entry)
-            values = (audio.get("musicbrainz_albumid") or []) if audio is not None else []
-        except Exception:
-            continue
-        if any(str(value).strip() for value in values):
-            return True
-    return False
 
 
 def _track_key(disc, number) -> tuple[int, int] | None:
@@ -457,9 +443,16 @@ def _read_track(path: Path) -> tuple[tuple[int, int] | None, str]:
     Where a file sits in its album and what it's called: ((disc, track) or None, folded title).
     From its own tags, with deadwax's "NN - Title.ext" name as the fallback for either.
     """
+    key, title, _ = _read_track_and_release(path)
+    return key, title
+
+
+def _read_track_and_release(path: Path) -> tuple[tuple[int, int] | None, str, str]:
+    """_read_track's place and title, and (2.1.39) the file's own MusicBrainz release id ("" for none), from the
+    same open - what says whether its number can be trusted for a release (find_duplicate)."""
     import mutagen
 
-    key, title = None, ""
+    key, title, release = None, "", ""
     try:
         audio = mutagen.File(str(path), easy=True)
     except Exception:
@@ -468,6 +461,7 @@ def _read_track(path: Path) -> tuple[tuple[int, int] | None, str]:
         try:
             key = _track_key((audio.get("discnumber") or [None])[0], (audio.get("tracknumber") or [None])[0])
             title = str((audio.get("title") or [""])[0])
+            release = str((audio.get("musicbrainz_albumid") or [""])[0]).strip()
         except Exception:
             pass
     named = _NUMBERED_NAME.match(path.name)
@@ -477,18 +471,18 @@ def _read_track(path: Path) -> tuple[tuple[int, int] | None, str]:
     #? nothing, and two of them would otherwise "match" on a meaningless stem
     if not title and named:
         title = Path(path.name[named.end():]).stem
-    return key, normalize(title)
+    return key, normalize(title), release
 
 
 def existing_tracks(directory: Path) -> list[dict]:
-    """Every audio file already in this folder: its place, folded title and filename."""
+    """Every audio file already in this folder: its place, folded title, filename and (2.1.39) its own release id."""
     if not directory.is_dir():
         return []
     found = []
     for entry in sorted(directory.iterdir()):
         if entry.is_file() and file_extension(entry.name) in AUDIO_EXTENSIONS:
-            key, title = _read_track(entry)
-            found.append({"key": key, "title": title, "name": entry.name})
+            key, title, release = _read_track_and_release(entry)
+            found.append({"key": key, "title": title, "name": entry.name, "release": release})
     return found
 
 
@@ -517,26 +511,36 @@ def _planned_track(release: dict, track: dict | None, source: Path) -> tuple[tup
     return _read_track(source)
 
 
-def find_duplicate(existing: list[dict], key, title: str, same_release: bool) -> str | None:
+def find_duplicate(existing: list[dict], key, title: str, release_mbid: str) -> dict | None:
     """
-    The file already in the folder that this incoming track would duplicate, or None.
+    The file already in the folder that this incoming track would duplicate (its existing_tracks
+    entry), or None.
 
-    Holding the SAME release, the folder's numbering is the release's, so (disc, track) says
-    which song it is. Otherwise - an untagged folder resolve_album_dir chose to share, or a job
-    naming no release - numbers mean nothing across pressings (a 10-track and an 11-track CD
-    disagree from the bonus track on), so only the same title counts, on the same disc when both
-    are known. An unknown title is never a duplicate.
+    Judged file by file (2.1.39). A file tagged with this very release is numbered as the release
+    is, so (disc, track) says which song it is - a retitled track is still that track. Any other
+    file - untagged, another pressing's, or every file for a job naming no release - says nothing
+    by its number (a 10-track and an 11-track CD disagree from the bonus track on), so only the
+    same title counts, on the same disc when both are known. An unknown title is never a duplicate.
+    Until 2.1.39 the whole folder was judged by its first file's id: an old untagged rip that one
+    deadwax download had filled in was numbered as the release, and a bonus track's number could
+    claim one of the rip's songs.
     """
-    if same_release and key is not None:
-        for entry in existing:
-            if entry["key"] == key:
-                return entry["name"]
-        return None
+    release_mbid = (release_mbid or "").strip()
+    numbered = bool(release_mbid) and key is not None
+
+    def by_number(entry: dict) -> bool:
+        return numbered and entry.get("release") == release_mbid
+
+    for entry in existing:
+        if by_number(entry) and entry["key"] == key:
+            return entry
     if not title:
         return None
     for entry in existing:
+        if by_number(entry):
+            continue
         if entry["title"] == title and (key is None or entry["key"] is None or entry["key"][0] == key[0]):
-            return entry["name"]
+            return entry
     return None
 
 
@@ -835,6 +839,8 @@ def plan_organization(job: dict, download_root: str, library_root: str) -> dict:
     #? files, so a download can fill the gaps a partial one left.
     already_here = existing_tracks(album_target)
     wanted_mbid = (release.get("release_mbid") or "").strip()
+    #? the folder is this release as the scan reads it (its commonest id) - and below, every track
+    #? found already there must be found in a file of this release, or it isn't "the same release"
     same_release = bool(already_here and wanted_mbid and read_album_mbid(album_target) == wanted_mbid)
 
     operations = []
@@ -883,9 +889,13 @@ def plan_organization(job: dict, download_root: str, library_root: str) -> dict:
             operation["fill"] = own_tags_fill(own_tags.get(remote_filename) or {}, release)
         if already_here:
             key, title = _planned_track(release, track, source)
-            duplicate = find_duplicate(already_here, key, title, same_release)
+            duplicate = find_duplicate(already_here, key, title, wanted_mbid)
             if duplicate:
-                operation["duplicate_of"] = duplicate
+                operation["duplicate_of"] = duplicate["name"]
+                #? (2.1.39) a twin in an untagged rip's or another pressing's file: that copy is not
+                #? provably this release, so nobody is given it on a guess (grant_for's FLAGGED)
+                if duplicate.get("release") != wanted_mbid:
+                    same_release = False
         operations.append(operation)
 
     if overlap:
@@ -956,7 +966,8 @@ def plan_organization(job: dict, download_root: str, library_root: str) -> dict:
         "total_tracks": len(tracks),
         #? (2.0.0-player.51) whether the folder already held this very release before anything was
         #? written - what decides if a download that filed nothing new is given to those who asked
-        #? (src/library_ledger.py grant_for). Reading it changes nothing filed.
+        #? (src/library_ledger.py grant_for). Reading it changes nothing filed. Since 2.1.39: the
+        #? folder's commonest id is this release AND every track already there is in a file of it.
         "same_release": same_release,
     }
     if manual:
