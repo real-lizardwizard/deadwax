@@ -106,8 +106,9 @@ public struct GetSettings: Decodable, Sendable, Equatable {
     }
 
     /// The chips the sheet draws, in order, for a floor and what is pressed now (`sourceChips`): 320 kbps only while the
-    /// floor is 320 or it is pressed, so that floor is never a filter on out of sight.
-    public static func chips(_ floor: QualityFloor, _ filters: SourceFilters) -> [Chip] {
+    /// floor is 320 or it is pressed, so that floor is never a filter on out of sight. (Manual search, slice A1) No
+    /// Complete albums only for a manual search: there is no tracklist to judge a folder complete against.
+    public static func chips(_ floor: QualityFloor, _ filters: SourceFilters, manual: Bool = false) -> [Chip] {
         var chips = [
             Chip(key: .lossless, label: "Lossless", on: filters.lossless),
             Chip(key: .bit24, label: "24-bit", on: filters.bit24),
@@ -115,7 +116,7 @@ public struct GetSettings: Decodable, Sendable, Equatable {
             Chip(key: .freeSlot, label: "Starts now", on: filters.freeSlot),
         ]
         if floor == .kbps320 || filters.kbps320 { chips.insert(Chip(key: .kbps320, label: "320 kbps", on: filters.kbps320), at: 2) }
-        chips.append(Chip(key: .complete, label: "Complete albums only", on: filters.complete))
+        if !manual { chips.append(Chip(key: .complete, label: "Complete albums only", on: filters.complete)) }
         return chips
     }
 

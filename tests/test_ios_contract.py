@@ -1492,7 +1492,9 @@ def _jobs_row_keys() -> tuple[set[str], set[str]]:
     assert "**_per_person(job, user, admin)" in source
     person = set().union(*(literal_keys(one) for one in returned_literals(download_route._per_person)))
     assert '**({"requested_by": others} if admin else {})' in inspect.getsource(download_route._per_person)
-    return always | summary | person | {"alternatives_left", "library", "requested_by"}, always
+    #? (2.1.38, manual search slice A1) a manual search's download is marked - only when it is one
+    assert '**({"manual": True} if job.get("manual") else {})' in source
+    return always | summary | person | {"alternatives_left", "library", "requested_by", "manual"}, always
 
 
 def test_a_download_is_read_as_the_jobs_route_sends_it():
@@ -1534,7 +1536,8 @@ def test_the_jobs_route_answers_what_the_app_decodes(monkeypatch, tmp_path):
 
     async def jobs():
         await store.create_job("bob", "share\\Dummy", files, release, [])
-        filed = await store.create_job("dave", "share\\Dummy", files, release, [])
+        #? (manual search, slice A1) the filed one a manual search's, as /enqueue stores it: marked on its release
+        filed = await store.create_job("dave", "share\\Dummy", files, {**release, "manual": True}, [])
         await store.update_status(filed, "organized")
         failed = await store.create_job("erin", "share\\Dummy", files, release,
                                         [{"username": "carol", "directory": "x", "files": files}])
@@ -1558,6 +1561,9 @@ def test_the_jobs_route_answers_what_the_app_decodes(monkeypatch, tmp_path):
     queued = next(row for row in rows if row["status"] == "queued")
     assert (queued["queue_position"], queued["matched"], queued["files_total"]) == (4, True, 2)
     assert next(row for row in rows if row["status"] == "failed")["alternatives_left"] == 1
+    # the manual one marked, and only it: every other row as it always was, without the key
+    assert [row["status"] for row in rows if "manual" in row] == ["organized"]
+    assert next(row for row in rows if row["status"] == "organized")["manual"] is True
 
 
 def test_the_four_writes_answer_what_the_app_decodes():
@@ -1682,8 +1688,12 @@ def test_a_search_is_read_as_find_candidates_sends_it():
     answers = returned_literals(download_route.find_candidates)
     assert len(answers) == 2
     for answer in answers:
-        assert set(fields("FindCandidatesAnswer")) <= literal_keys(answer)
+        assert set(fields("FindCandidatesAnswer")) - {"manual"} <= literal_keys(answer)
         assert "**store_state" in answer
+    #? (2.1.38, manual search slice A1) a manual question echoed - only on a search, only when it was one; the app
+    #? reads its absence as a server that would file the download as a matched pressing (ManualSearch.needsNewer)
+    assert [answer for answer in answers if '**({"manual": True} if body.manual else {})' in answer] == [answers[1]]
+    assert "manual = fields.looseField(Bool.self, .manual) ?? false" in swift_struct("FindCandidatesAnswer")
     assert "store = try StoreStateAnswer(from: decoder)" in swift_struct("FindCandidatesAnswer")
     # an enqueue: its job, or (logins on) the download somebody else asked for, joined
     enqueued = returned_literals(download_route.enqueue)

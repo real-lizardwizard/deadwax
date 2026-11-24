@@ -27,10 +27,13 @@ public struct PendingDownload: Sendable, Equatable, Decodable {
     /// The phone stopped waiting for deadwax's answer (`RequestOverlays.unanswered`): the row stays "starting…" while
     /// the poll looks for its job - and, given up on after `unansweredSeconds`, says it may have started.
     public var unanswered: Bool?
+    /// (Manual search, slice A1) Asked for from Search Soulseek: its row marked "manual search" from the tap, as its job's
+    /// will be. Nil in the web's vectors.
+    public var manual: Bool?
 
     public init(key: String, artist: String, album: String, username: String, jobId: Int? = nil, error: String? = nil,
                 detail: String? = nil, releaseMbid: String? = nil, directory: String? = nil, listedBefore: [Int]? = nil,
-                unanswered: Bool? = nil) {
+                unanswered: Bool? = nil, manual: Bool? = nil) {
         self.key = key
         self.artist = artist
         self.album = album
@@ -42,6 +45,7 @@ public struct PendingDownload: Sendable, Equatable, Decodable {
         self.directory = directory
         self.listedBefore = listedBefore
         self.unanswered = unanswered
+        self.manual = manual
     }
 
     /// Given up on with no answer: it may have started all the same (`RequestOverlays.gaveUp`).

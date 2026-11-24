@@ -279,11 +279,13 @@ private struct ReasonLine: View {
 
 /// Done: how it ended and how long ago. A download whose album is in the library opens it - the row is a button - and
 /// one this download filed has the ▶, which plays it (the screen decides, in the tap, whether its songs are in hand).
-/// `note`: why a tapped row couldn't open; `opening` while it looks, faded so the tap shows it was taken.
+/// `note`: why a tapped row couldn't open; `opening` while it looks, faded so the tap shows it was taken. `filed`:
+/// (manual search) how a manual search's download was filed, quietly under how it ended.
 struct DoneRowView: View {
     let row: RequestRow
     let opening: Bool
     let note: String?
+    let filed: String?
     let runs: Bool
     let onOpen: () -> Void
     let onPlay: () -> Void
@@ -335,6 +337,12 @@ struct DoneRowView: View {
                     .font(Typeface.footnote)
                     .foregroundStyle(toneColour(row.lineTone))
                     .fixedSize(horizontal: false, vertical: true)
+                if let filed {
+                    Text(filed)
+                        .font(Typeface.footnote)
+                        .foregroundStyle(Palette.quiet)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
                 if runs, let detail = row.reasonDetail, !detail.isEmpty {
                     Text(detail)
                         .font(Typeface.mono(.footnote))

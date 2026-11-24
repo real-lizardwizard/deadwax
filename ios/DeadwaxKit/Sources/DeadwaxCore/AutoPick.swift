@@ -98,10 +98,11 @@ extension Sources {
     /// What an answer landing leads to (useCandidateSearch.ts): only for a FRESH Get - never a search again you are
     /// steering by hand - with When I tap Get set to pick, both read as the answer lands; never for a pressing held or on
     /// its way, or with no tracklist or release id; the top of the list through `filters` by best match, at
-    /// `autoGrabMinScore` or more - else why not.
+    /// `autoGrabMinScore` or more - else why not. (Manual search, slice A1) Never for a manual search, and nothing said:
+    /// the folder is yours to choose, as James asked - not "no tracklist to check the sources against".
     public static func autoPick(fresh: Bool, mode: GetMode, answer: FindCandidatesAnswer, release: GetRelease,
                                 filters: CandidateFilters) -> AutoPick {
-        guard fresh, mode == .pick else { return .off }
+        guard fresh, mode == .pick, !release.manual else { return .off }
         let blocked = autoPickBlocked(answer, release: release)
         if blocked == nil, let grab = autoGrabPick(answer.candidates, filters, pickSort) {
             return .picked(grab.pick, list: grab.list)

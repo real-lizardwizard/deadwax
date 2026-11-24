@@ -501,7 +501,7 @@ def test_a_right_click_is_the_menus_own_items():
 ESCAPES = {
     "Album/AlbumInfoView.swift": 1, "Artist/ArtistImagesSheet.swift": 1, "Artist/ArtistMoveSheet.swift": 3,
     "EQ/EQImport.swift": 2, "EQ/EQRoute.swift": 1, "Edit/EditAlbumSheet.swift": 1, "Edit/ReleasePage.swift": 1,
-    "Get/SourcesSheet.swift": 1, "Info/InfoView.swift": 1, "Library/LibraryView.swift": 1,
+    "Get/ManualSearchSheet.swift": 1, "Get/SourcesSheet.swift": 1, "Info/InfoView.swift": 1, "Library/LibraryView.swift": 1,
     "Manage/PeopleSheets.swift": 3, "Manage/ServerSettingsGroupScreen.swift": 1, "Player/CoverViewer.swift": 1,
     "Player/MacPanels.swift": 1, "Root/MacSidebarView.swift": 1,
     "Player/NowPlayingView.swift": 1, "Playlists/PlaylistPicker.swift": 2, "Playlists/PlaylistView.swift": 1,
@@ -516,6 +516,8 @@ GUARDED_ESCAPES = {
     "Artist/ArtistMoveSheet.swift": ["model.map { (model: ArtistWhoModel) -> Bool in model.query == name } ?? true)"],
     "Artist/ArtistImagesSheet.swift": ["model.map { (model: ArtistImagesModel) -> Bool in"],
     "Get/SourcesSheet.swift": ["!model.edited)"],
+    #? (manual search, slice A1) Search Soulseek's Cancel throws the typed artist and album away
+    "Get/ManualSearchSheet.swift": ["artist.isEmpty && album.isEmpty)"],
     "Playlists/PlaylistPicker.swift": ["!(model.making && nameTyped))", "escapes && blank)"],
     #? (slice 3, and its review) the main window's Escape has one owner, MacFrame.escape's: a field with the cursor (the
     #? sidebar's search, a page's), then the side panel's Done, then the page's - a playlist's Edit, its Cancel
@@ -689,6 +691,8 @@ SHEET_ROOTS = {
     "Library/LibraryView.swift": 2, "Manage/PeopleScreen.swift": 3, "Player/CoverViewer.swift": 1,
     "Player/NowPlayingView.swift": 4, "Playlists/PlaylistsScreen.swift": 1, "Root/MainTabs.swift": 3,
     "Search/GroupView.swift": 2, "Shared/MacRightClick.swift": 1,
+    #? (manual search, slice A1) Search Soulseek, from Requests' first row
+    "Requests/RequestsScreen.swift": 1,
     #? (slice 3) the desktop frame's: MainTabs' three over the frame - (its review) the EQ the bar's too, never a second
     "Root/DesktopFrame.swift": 3,
 }
@@ -1664,7 +1668,9 @@ def test_tab_moves_between_the_fields_and_return_in_one_never_applies():
     app = app_sources()
     #? every page or sheet of the editor and Manage whose fields have an order: Tab follows it, through Platform's one
     #? helper (MacMenu.tab), each field's own
-    TABS = {"Edit/ReleasePage.swift": 1, "Edit/TagsPages.swift": 1, "Manage/PeopleSheets.swift": 6}
+    TABS = {"Edit/ReleasePage.swift": 1, "Edit/TagsPages.swift": 1, "Manage/PeopleSheets.swift": 6,
+            #? (manual search, slice A1) Search Soulseek's Artist and Album
+            "Get/ManualSearchSheet.swift": 2}
     found = {}
     for name, text in app.items():
         if name == PLATFORM:
@@ -1688,6 +1694,9 @@ def test_tab_moves_between_the_fields_and_return_in_one_never_applies():
     people = bare(app["Manage/PeopleSheets.swift"])
     assert "private static let order: [Field] = [.user, .name, .password, .again]" in people
     assert "private static let order: [Field] = [.password, .again]" in people
+    manual = bare(app["Get/ManualSearchSheet.swift"])
+    assert "private static let order: [Field] = [.artist, .album]" in manual
+    assert manual.index("TextField(ManualSearch.artistField") < manual.index("TextField(ManualSearch.albumField")
     mac, phone = _halves()
     tab = _body(mac, "func tabs<Field: Hashable>(_ focused: FocusState<Field?>.Binding, in order: [Field]) -> some View {")
     assert "onKeyPress(keys: [.tab, Platform.backTab])" in tab
@@ -1707,6 +1716,13 @@ def test_tab_moves_between_the_fields_and_return_in_one_never_applies():
         assert "defaultAction" not in code and "keyboardShortcut" not in code, name
     search = _body(bare(app["Edit/ReleasePage.swift"]), ".onSubmit(of: .search) {")
     assert "apply" not in search.lower() and "write" not in search.lower(), "Choose a release's Return searches"
+    # (manual search, slice A1) Search Soulseek: Return in Artist moves to Album, Return in Album searches - never a Get
+    manual = bare(app["Get/ManualSearchSheet.swift"])
+    assert re.findall(r"\.onSubmit\b[^\n]*", manual) == [".onSubmit { focused = .album }", ".onSubmit { search() }"]
+    assert "defaultAction" not in manual and "keyboardShortcut" not in manual
+    searched = _body(manual, "private func search() {")
+    assert searched.split("\n", 1)[1].lstrip().startswith("guard searchable, !showing else { return }")
+    assert "download" not in searched and "onQueued" not in searched, "Search pushes the results; only a card's Get gets"
 
 
 def test_a_run_under_way_says_what_quitting_does_on_the_mac():

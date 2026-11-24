@@ -207,18 +207,23 @@ public struct FindCandidatesAnswer: Decodable, Sendable, Equatable {
     public let responseCount: Int
     public let candidates: [Candidate]
     public let store: StoreStateAnswer
+    /// (Manual search, slice A1) The server echoed a manual question (`"manual": true`, deadwax 2.1.38 on): it files a
+    /// manual download by its own tags, so Get is offered (ManualSearch.needsNewer). False for every other answer, and
+    /// for a server that dropped the flag without a word.
+    public let manual: Bool
 
     public init(query: String, queries: [String]? = nil, responseCount: Int = 0, candidates: [Candidate] = [],
-                store: StoreStateAnswer = StoreStateAnswer()) {
+                store: StoreStateAnswer = StoreStateAnswer(), manual: Bool = false) {
         self.query = query
         self.queries = queries
         self.responseCount = responseCount
         self.candidates = candidates
         self.store = store
+        self.manual = manual
     }
 
     enum CodingKeys: String, CodingKey {
-        case query, queries, candidates
+        case query, queries, candidates, manual
         case responseCount = "response_count"
     }
 
@@ -229,6 +234,7 @@ public struct FindCandidatesAnswer: Decodable, Sendable, Equatable {
         responseCount = fields.looseField(Int.self, .responseCount) ?? 0
         candidates = fields.looseList(Candidate.self, .candidates) ?? []
         store = try StoreStateAnswer(from: decoder)
+        manual = fields.looseField(Bool.self, .manual) ?? false
     }
 }
 
@@ -471,6 +477,16 @@ public enum Sources {
         ("peer", "availability", "how soon it can start: a free slot, a short queue, their speed"),
     ]
 
+    /// (Manual search, slice A1 - the app's own; the web never asks a manual question) The seventh signal, a manual
+    /// search's: how closely the folder's name fits the words typed (matching.py `name_match`, server 2.1.37). Kept
+    /// apart from `signals`, which are the web's six word for word (GetVectorTests).
+    public static let nameMatch: (signal: String, label: String, meaning: String) =
+        ("name_match", "folder name", "how closely the folder's name is the artist and album you typed")
+
+    /// Every signal a card's reasons name, in their order: the folder name first - a manual search's score is mostly
+    /// it - then the six. A web answer never has `name_match`, so its reasons are the six as before.
+    public static let named: [(signal: String, label: String, meaning: String)] = [nameMatch] + signals
+
     public static let losslessFormats: Set<String> = ["flac", "alac", "ape", "wav", "aiff", "aif", "wv"]
 
     /// `candidateKey`: a candidate's identity within one result - a peer's folder.
@@ -667,14 +683,14 @@ public enum Sources {
         public var id: String { signal }
     }
 
-    /// The score's signals as chips (`signalChips`): the six in their order, then any other the server sent by name - a
-    /// signal not judged left out.
+    /// The score's signals as chips (`signalChips`): the six in their order - (manual search, slice A1) after the folder
+    /// name - then any other the server sent by name - a signal not judged left out.
     public static func signalChips(_ candidate: Candidate) -> [SignalChip] {
-        let known = Set(signals.map(\.signal))
+        let known = Set(Self.named.map(\.signal))
         let others = candidate.signals.keys.filter { !known.contains($0) }
             .sorted { Array($0.utf16).lexicographicallyPrecedes(Array($1.utf16)) }
-        let named = Dictionary(signals.map { ($0.signal, $0) }, uniquingKeysWith: { first, _ in first })
-        return (signals.map(\.signal) + others).compactMap { signal in
+        let named = Dictionary(Self.named.map { ($0.signal, $0) }, uniquingKeysWith: { first, _ in first })
+        return (Self.named.map(\.signal) + others).compactMap { signal in
             guard let raw = candidate.signals[signal] else { return nil }
             let value = JSMath.round(raw * 100)
             let word = named[signal]?.label ?? signal

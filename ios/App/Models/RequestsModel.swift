@@ -428,9 +428,11 @@ final class RequestsModel {
         pendingKeys += 1
         let key = "pending-\(pendingKeys)"
         let asked = Monotonic.seconds()
+        //? (manual search) its row marked "manual search" from the tap, as its job's will be
         overlays = overlays.withPending(PendingDownload(key: key, artist: body.release.artist, album: body.release.album,
                                                         username: body.username, releaseMbid: body.release.releaseMbid,
-                                                        directory: body.directory, listedBefore: polled.map(\.id)))
+                                                        directory: body.directory, listedBefore: polled.map(\.id),
+                                                        manual: body.release.manual ? true : nil))
         redraw()
         write { [weak self] epoch in
             do {

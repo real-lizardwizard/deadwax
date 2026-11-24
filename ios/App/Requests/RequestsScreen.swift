@@ -16,6 +16,11 @@ import SwiftUI
 ///   first; one card asks at a time, and a second tap on its ✕ closes the question.
 /// - A Done row's ▶ plays its album in the tap when its songs are in hand (question 6), else does what the row's tap
 ///   does: open the album, here, once the id bridge finds it.
+/// - (Manual search, slice A1 - notes/ios.md "Manual search, slice A1"; James, 24 Nov: "A row at the top") Search
+///   Soulseek…, the list's first row, above the headings and whatever stands in their place - only with Get albums, and
+///   dimmed while deadwax is out of reach, as Clear done is. It opens the form (ManualSearchSheet). A manual search's
+///   download reads "… · manual search" where the edition goes, and its Done row, once filed, says it was filed by its
+///   own tags.
 struct RequestsScreen: View {
     @Environment(RequestsModel.self) private var requests
     @Environment(ServerModel.self) private var server
@@ -25,8 +30,12 @@ struct RequestsScreen: View {
 
     /// The card asking "cancel it?", by its row's key - one at a time.
     @State private var asking: String?
+    /// (Manual search) Search Soulseek's form is up.
+    @State private var searching = false
 
     private static let top = "requests-top"
+    /// (Manual search) The Search Soulseek… row's: the list's top whenever it is drawn.
+    private static let searchRow = "requests-search"
 
     var body: some View {
         let board = requests.board
@@ -48,10 +57,16 @@ struct RequestsScreen: View {
                 .disabled(!board.clearable || !reachability.online)
             }
         }
+        .appSheet(isPresented: $searching) {
+            // a Get from its results: the sheet goes, onto Requests - already showing
+            ManualSearchSheet { searching = false }
+                .macSheet()
+        }
     }
 
-    /// What the list's top is: a card above the rows, or the first row.
+    /// What the list's top is: (manual search) Search Soulseek…, else a card above the rows, or the first row.
     private func topRow(_ board: RequestsView) -> String {
+        if server.access.can(.request) { return Self.searchRow }
         guard reachability.online, requests.failure == nil, requests.trackingEnabled, !board.empty else { return Self.top }
         for section in RequestSection.allCases {
             if let first = board.rows(section).first { return first.key }
@@ -60,6 +75,12 @@ struct RequestsScreen: View {
     }
 
     @ViewBuilder private func content(_ board: RequestsView) -> some View {
+        if server.access.can(.request) {
+            Section {
+                manualSearch
+                    .id(Self.searchRow)
+            }
+        }
         if !reachability.online {
             ShelfNote(RequestWords.offline)
                 .id(Self.top)
@@ -109,6 +130,18 @@ struct RequestsScreen: View {
                 }
             }
         }
+    }
+
+    /// (Manual search) Search Soulseek…: the form, in a sheet. Dimmed while deadwax is out of reach.
+    private var manualSearch: some View {
+        Button {
+            asking = nil
+            searching = true
+        } label: {
+            Label(ManualSearch.row, systemImage: "plus.magnifyingglass")
+        }
+        .disabled(!reachability.online)
+        .accessibilityLabel(ManualSearch.title)
     }
 
     /// A look that failed: what went wrong in a listener's words - no "try again", it asks again by itself, as the line
@@ -167,7 +200,8 @@ struct RequestsScreen: View {
             }
         case .done:
             DoneRowView(row: row, opening: requests.opening == row.key,
-                        note: row.release.flatMap { requests.notes[$0] }, runs: server.access.seesDetail,
+                        note: row.release.flatMap { requests.notes[$0] },
+                        filed: ManualSearch.doneLine(row, edits: server.access.can(.edit)), runs: server.access.seesDetail,
                         onOpen: { requests.open(row) }, onPlay: { play(row) })
         }
     }

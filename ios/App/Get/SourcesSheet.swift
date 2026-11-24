@@ -69,8 +69,18 @@ struct GetRequest: Identifiable {
 /// Cancel - or the sheet swiped away - lets the search go (its request cancelled, which stops it in slskd too): as the
 /// sheet starts going for good (SheetGoing, and GroupView's binding), not once it has slid away, so nothing is picked
 /// or asked for once you have let it go.
-struct SourcesSheet: View {
+///
+/// - (Manual search, slice A1 - notes/ios.md "Manual search, slice A1") This is the PAGE, SourcesPage: the album page's
+///   sheet is it in a NavigationStack of its own (SourcesSheet, below - exactly as it was), and Requests' Search
+///   Soulseek pushes it from its form (ManualSearchSheet, `pushed`), where Back stands in Cancel's place and the search
+///   goes as the page does (onDisappear; SheetGoing still when the whole sheet goes). For a manual search the chips
+///   have no Complete albums only (no tracklist to judge by), nothing is picked (Sources.autoPick), and a server that
+///   didn't echo the question (before deadwax 2.1.38, which would file it by the typed words) has every Get off, with
+///   why above the cards (ManualSearch.tooOldLine) - said to VoiceOver with the outcome.
+struct SourcesPage: View {
     let request: GetRequest
+    /// Pushed from Search Soulseek's form: no Cancel - Back is there.
+    let pushed: Bool
     /// A download asked for: the sheet goes, and Requests shows.
     let onQueued: () -> Void
 
@@ -101,40 +111,41 @@ struct SourcesSheet: View {
     private var online: Bool { reachability.online }
 
     var body: some View {
-        NavigationStack {
-            VStack(spacing: 14) {
-                if !request.subtitle.isEmpty {
-                    Text(request.subtitle)
-                        .font(Typeface.footnote)
-                        .foregroundStyle(Palette.text2)
-                        .multilineTextAlignment(.center)
-                        .fixedSize(horizontal: false, vertical: true)
-                        .frame(maxWidth: .infinity)
-                        .padding(.horizontal, 16)
-                }
-                if again == .top && foundFolders {
-                    // the bar's Search again: the words to change above the chips, where no scroll takes them away
-                    queryForm(focus: true) {
-                        EmptyView()
-                    }
+        VStack(spacing: 14) {
+            if !request.subtitle.isEmpty {
+                Text(request.subtitle)
+                    .font(Typeface.footnote)
+                    .foregroundStyle(Palette.text2)
+                    .multilineTextAlignment(.center)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .frame(maxWidth: .infinity)
                     .padding(.horizontal, 16)
-                }
-                chips
-                ScrollView {
-                    LazyVStack(alignment: .leading, spacing: 10) {
-                        content
-                    }
-                    .padding(.horizontal, 16)
-                    .padding(.bottom, 24)
-                }
-                .scrollDismissesKeyboard(.interactively)
             }
-            .padding(.top, 4)
-            // the sheet going for good - a swipe let go, not one pulled back: the search goes with it, there and then
-            .background(SheetGoing { model.close() })
-            .navigationTitle(SourcesWords.title)
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
+            if again == .top && foundFolders {
+                // the bar's Search again: the words to change above the chips, where no scroll takes them away
+                queryForm(focus: true) {
+                    EmptyView()
+                }
+                .padding(.horizontal, 16)
+            }
+            chips
+            ScrollView {
+                LazyVStack(alignment: .leading, spacing: 10) {
+                    content
+                }
+                .padding(.horizontal, 16)
+                .padding(.bottom, 24)
+            }
+            .scrollDismissesKeyboard(.interactively)
+        }
+        .padding(.top, 4)
+        // the sheet going for good - a swipe let go, not one pulled back: the search goes with it, there and then
+        .background(SheetGoing { model.close() })
+        .navigationTitle(SourcesWords.title)
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            // (manual search) pushed from Search Soulseek's form, Back is there in its place
+            if !pushed {
                 ToolbarItem(placement: .cancellationAction) {
                     Button(SourcesWords.cancel) {
                         // the search let go in the tap, then the sheet closes
@@ -145,11 +156,11 @@ struct SourcesSheet: View {
                     // edited words away without asking
                     .escapeCloses(!model.edited)
                 }
-                if foundFolders {
-                    // (James) at the right of the title, so a long list needn't be scrolled to its end to search again
-                    ToolbarItem(placement: .topBarTrailing) {
-                        againInBar
-                    }
+            }
+            if foundFolders {
+                // (James) at the right of the title, so a long list needn't be scrolled to its end to search again
+                ToolbarItem(placement: .topBarTrailing) {
+                    againInBar
                 }
             }
         }
@@ -221,7 +232,12 @@ struct SourcesSheet: View {
         let status = search.answer.flatMap { storeBox($0) }
         return Sources.announcement(pending: search.pending, release: search.release, error: error, status: status,
                                     answer: search.answer, shown: passing(search.answer).count,
-                                    notPicked: model.notPicked, format: search.format)
+                                    notPicked: model.notPicked ?? tooOld(search), format: search.format)
+    }
+
+    /// (Manual search) A server that dropped the manual question's flag: why every Get is off, or nil.
+    private func tooOld(_ search: SourcesSearch.Search) -> String? {
+        ManualSearch.tooOldLine(search.release, search.answer, runs: server.access.seesDetail)
     }
 
     /// The store's box for an answer, as the web's sheet draws it: Join with Get albums, and once Add has added from
@@ -237,7 +253,7 @@ struct SourcesSheet: View {
     private var chips: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 8) {
-                ForEach(GetSettings.chips(floor, filters)) { (chip: GetSettings.Chip) in
+                ForEach(GetSettings.chips(floor, filters, manual: request.release.manual)) { (chip: GetSettings.Chip) in
                     Button(chip.label) {
                         touched = true
                         filters[chip.key].toggle()
@@ -323,8 +339,9 @@ struct SourcesSheet: View {
                 .opacity(online ? 1 : Palette.dimmed)
         } else {
             StoreLineView(status: nil, notes: notes)
-            if let notPicked = model.notPicked {
-                // When I tap Get said pick, and nothing qualified: why, above the sources
+            if let notPicked = model.notPicked ?? model.search.flatMap({ tooOld($0) }) {
+                // When I tap Get said pick, and nothing qualified: why, above the sources - (manual search) or why
+                // every Get is off
                 Text(notPicked)
                     .font(Typeface.footnote)
                     .foregroundStyle(Palette.text2)
@@ -366,8 +383,9 @@ struct SourcesSheet: View {
                 .padding(.vertical, 40)
                 searchAgain
             } else {
+                let gets = online && !ManualSearch.needsNewer(release, answer)
                 ForEach(shown) { (candidate: Candidate) in
-                    SourceCardView(candidate: candidate, best: Sources.key(candidate) == best, gets: online) {
+                    SourceCardView(candidate: candidate, best: Sources.key(candidate) == best, gets: gets) {
                         get(candidate, release: release, shown: shown)
                     }
                 }
@@ -387,9 +405,10 @@ struct SourcesSheet: View {
     /// for, with the list as shown (a pick's, the list it tops) for the next peers - once per search - and the sheet
     /// handing over to Requests only once the request is out. Refused while deadwax is out of reach; one that couldn't
     /// be asked keeps the sheet, saying why. True once it is asked for.
+    /// (Manual search) Never one a server too old to file it by its own tags would file by the typed words.
     @discardableResult
     private func get(_ candidate: Candidate, release: GetRelease, shown: [Candidate]) -> Bool {
-        guard online, model.download() else { return false }
+        guard online, !ManualSearch.needsNewer(release, model.search?.answer), model.download() else { return false }
         guard requests.enqueue(EnqueueBody(candidate: candidate, release: release, shown: shown)) else {
             model.downloadAgain()
             getFailure = URLError(.notConnectedToInternet)
@@ -531,6 +550,21 @@ struct SourcesSheet: View {
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, focus ? 0 : 40)
+    }
+}
+
+/// Choose a source as the album page's Get opens it: SourcesPage in a sheet of its own - its Cancel, Search again in its
+/// bar, a swipe down letting the search go - exactly as it was before the page was split out for Requests' Search
+/// Soulseek (manual search, slice A1).
+struct SourcesSheet: View {
+    let request: GetRequest
+    /// A download asked for: the sheet goes, and Requests shows.
+    let onQueued: () -> Void
+
+    var body: some View {
+        NavigationStack {
+            SourcesPage(request: request, pushed: false, onQueued: onQueued)
+        }
     }
 }
 

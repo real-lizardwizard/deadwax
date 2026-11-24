@@ -60,7 +60,8 @@ sign-in in a file in its sandbox container rather than the Keychain. It has run 
   (`ios/scripts/make-test-album.py`), what the app does, and the checks, phase by phase - Phase 7's are 237-246,
   Edit album's 320-329, its Tags' 330-334, its Artwork and Lyrics' 335-337, its Delete's 338-342, the artist
   tools' 343-348, Needs a look's 349-354, Library care's 355-360, Server settings' 361-369, the event log's 370-373,
-  Change password's 374-378, People's 379-387, no way out to the web app's 388-391, Add to Queue's 392-403.
+  Change password's 374-378, People's 379-387, no way out to the web app's 388-391, Add to Queue's 392-403,
+  manual search's 459-474.
 - **To install it on a Mac:** `ios/scripts/install-mac.sh` (`--dry-run` says what it would do first) - after
   install.sh has been run once for the team it writes, `ios/Config/Local.xcconfig`. It builds the Mac app (Release,
   Apple silicon) in `~/Library/Caches/deadwax-build-mac`, checks it's signed, sandboxed, allowed out to the network

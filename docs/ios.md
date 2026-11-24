@@ -1558,6 +1558,9 @@ the chosen pressing's facts: the page's one big button, for the pressing chosen 
 choose it first. Without **Get albums** (with logins on, an admin gives it) there's no button, and in its place
 "Getting albums is off for you - ask an admin."
 
+For an album MusicBrainz doesn't have, or one you'd rather find by name, **Search Soulseek…** at the top of
+[Requests](#requests) searches by the artist and album you type, and opens the same Choose a source page.
+
 **The line under it** says what deadwax already has of that pressing before you tap anything, in the web app's
 words (see [Downloading](downloading.md#when-you-already-have-it)). deadwax looks without searching Soulseek: as the
 pressing is chosen, as a download is filed, and each time the page comes back into view - from another tab, from the
@@ -1680,6 +1683,28 @@ lines rather than cut short.
 The **Requests** tab, between Search and Settings, lists every download you asked for - on this phone (see [Getting an
 album](#getting-an-album)), in the web app, or on another phone - under the web app's four headings, in the web
 app's words. A heading shows only when it has something under it.
+
+**Search Soulseek…**, the first row - above the headings, and there with nothing requested yet - gets an album by
+its name rather than by MusicBrainz's pressing: one MusicBrainz doesn't have, or one you'd rather find by name. It's
+there only with **Get albums** (with logins on, an admin gives it), and dimmed while deadwax can't be reached. Tap
+it: **Search Soulseek**, with **Artist** (the cursor in it) and **Album**. Return in Artist goes to Album, and Return
+in Album searches, as **Search** under them does once both have words. Offline, the form says "Getting albums works
+once deadwax is back." and Search is off.
+
+Search opens **Choose a source** - the page an album's Get the album opens (see [Getting an
+album](#getting-an-album)) - for "Your own search · filed by its own tags": "Looking for “OK Computer” by
+Radiohead…", then the folders people share, ranked first by how closely each folder's name is the artist and album
+you typed, then by format and availability. A card's score shows **Folder name** first and no track parts - there's
+no tracklist to check against, so its tracks read "12 files". There's no **Complete albums only**, and **Pick the
+best source for me** picks nothing here: you choose. **Search again** works as it does there; **Back** returns to
+your two fields as you left them. **Get** on a card closes it all, and the download is in Requests at once as "OK
+Computer · manual search". It's filed by the files' own tags, never into a pressing you've matched (see
+[Organizing](organizing.md#filed-by-its-own-tags)), and its Done row says so: "Filed by its own tags. Edit album >
+Release can match it to a pressing." - or, without **Edit albums**, "Filed by its own tags, not matched to a
+pressing." It doesn't open from Requests yet: find it in the Library. **It needs deadwax 2.1.38 or later**: on an
+older server the cards' Gets are off and the page says "This needs a newer deadwax - ask whoever runs it." (whoever
+runs deadwax reads "This needs deadwax 2.1.38 or later on the server."). On the Mac, Tab and Shift-Tab move between
+the two fields, and Escape closes the form while both are empty.
 
 - **Downloading**: the pressing's cover, the album and its edition ("Mezzanine · 1998 CD"), the artist and who
   it's coming from ("Massive Attack · from mellotron", with "2nd try" once it's on another source), the bar, and
@@ -6002,6 +6027,52 @@ you saw.
   under Stop: "Quitting deadwax stops the run - open deadwax again, and Get covers carries on." Quit; open deadwax;
   Library care: Get covers counts only the albums still without a cover. Was the album it was on when you quit given
   its cover?
+
+### Manual search's checks (459-474)
+
+**Not done yet.** These come with manual search's first slice - [Search Soulseek…](#requests) in Requests (still app
+0.13 (13)); opening its Done row, and ▶ on it, come with the next. They need **deadwax 2.1.38 or later** on the server
+(main's `:experimental` has it): an older one answers the search but keeps every Get off. On the phone and on the Mac,
+deadwax's plain `http://` address, signed in as an admin with logins on. Use one album MusicBrainz has (Portishead
+"Dummy", for comparing), one it may not (a bootleg or a self-released record you know is shared), and one you already
+have matched. Say "pass", or what you saw.
+
+- **459 The row and the form.** Requests: Search Soulseek… is the first row, above the headings - and there with
+  nothing requested. Tap it: Search Soulseek, the cursor in Artist. Type an artist; Return goes to Album; Search stays
+  dimmed until both have words.
+- **460 A search.** Search "Portishead" / "Dummy": "Looking for “Dummy” by Portishead…", then cards. Is the top card a
+  folder called Dummy? Tap its score: Folder name first, then Edition, Format, Availability, and no track parts.
+  There's no Complete albums only chip.
+- **461 The ranking.** Among the first five cards, is every folder the album you typed, before any other album, live
+  record or reissue? Among those, lossless before MP3, and Starts now before a long queue? Would you have picked the
+  top one yourself?
+- **462 Back.** Search again with other words, then Back: the form, your two fields as you left them. Change Album
+  and Search: a fresh list. On the phone, start swiping back from the left edge and let go halfway, so the results
+  stay: do Search again and Get still work?
+- **463 Get.** Get the top card: the sheet closes, and the row is under Waiting, "Dummy · manual search",
+  "starting…", then downloading.
+- **464 Done.** When it's done: "In your library", and "Filed by its own tags. Edit album > Release can match it to a
+  pressing." In the Library, the album is under the artist and title its tags give (try typing them in lowercase:
+  the folder and the Library still show the tags' spelling), and it plays.
+- **465 Needs a look.** The album newly imported, "Not matched to MusicBrainz", and no "Folder name doesn't match the
+  tags". Edit album > Release, Choose a release, Apply: matched, the folder renamed, the issue gone.
+- **466 An album MusicBrainz may not have.** Get one. Filed, playing, and staying "Not matched to MusicBrainz". Ignore
+  that issue: it stays quiet.
+- **467 An album you have matched.** Search it by hand and Get another copy. It's filed beside yours as
+  "… [unmatched]", not into your folder. Does Navidrome show it as a second album, or join them?
+- **468 Two discs.** A two-disc set shared as CD1/CD2 with the same file names: every track arrives, as "1-01…" and
+  "2-01…".
+- **469 Pick the best source for me** on (Settings > Getting albums): a manual search shows the cards, picks nothing,
+  and says nothing about why.
+- **470 Offline** (Wi-Fi and WireGuard off): the Search Soulseek… row is dimmed. With the form open, "Getting albums
+  works once deadwax is back." and Search off; on the results, dimmed cards with Gets off. Back on: all live.
+- **471 Without Get albums.** An account without it: no Search Soulseek… row in Requests.
+- **472 An album page's Get the album, after the split.** The Choose a source sheet is exactly as before: Cancel,
+  Search again at the top, a swipe to close stopping the search.
+- **473 On the Mac.** Requests' first row is Search Soulseek… there too; the form as a sheet; Tab and Shift-Tab
+  between the fields; Return in Album searches. Escape closes the form while both fields are empty - with words
+  typed it does nothing, and Cancel closes it. Then the results, a Get, and the row in Requests.
+- **474 VoiceOver.** "Search Soulseek, button"; the two fields by name; the outcome said as the results land.
 
 ## What it can't do yet
 

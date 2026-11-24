@@ -16442,3 +16442,119 @@ Main's 2.1.36 (Last.fm's key, notes/lastfm.md) made the settings save one SQLite
 setting still waits 60 s and twelve still 180 s; a save of 2, 8, 14 or 20 settings waits a minute longer than it did
 (2: 120 s, 20: 300 s) - only ever longer, never shorter. ServerSettingsTests pins twenty, and fails with the old
 count; `test_each_wait_is_past_the_servers_own_worst_case_or_pinned` reads the third `await store.` and its guard.
+
+## Manual search, slice A1 (2026-11-24)
+
+James, 24 Nov: "let's add a manual search in the requests tab" - Soulseek by artist and album, for an album
+MusicBrainz doesn't have or one you'd rather find by name. The design is ~/Desktop/Code/deadwax-plans/manual-search.md;
+this is its slice A1 (3.2 but A2's parts, 3.3, 3.4): the whole feature but opening the Done row, which is A2's. The
+server's half shipped on main as 2.1.36-2.1.38 and was merged into `ios` at 6e87d7da. James's answer on where it sits
+(the spec's 8.1): **"A row at the top"** - a Search Soulseek… row first in the Requests list, above the headings, there
+above an empty state too, with `plus.magnifyingglass` before it, only with Get albums and dimmed offline; the Mac the
+same. Checks 459-474 (docs/ios.md, all not done yet; the spec's M1-M16 renumbered, M17 left for A2). What it leaves
+alone:
+- src/ and ui/ are untouched; the app is still 0.13 (13). **ios/Deadwax.xcodeproj is untouched**: ManualSearchSheet.swift
+  is in the App's synchronized folder, ManualSearch.swift and ManualSearchTests.swift in the package (found by folder).
+- **The engine files have no diff**, nor does anything of DeadwaxAudio's; nothing plays differently.
+- **The album page's Get is as it was.** `SourcesSheet` is now `NavigationStack { SourcesPage(request:, pushed: false,
+  onQueued:) }` - the page's body as it was, its stack moved out, its Cancel drawn only `if !pushed`. GroupView still
+  builds SourcesSheet exactly as before.
+
+### What was built
+
+**Core (pure, tested on Linux and macOS):**
+- `GetRelease.manual` and `GetRelease.manual(artist:album:)`: the words trimmed (JSText.trim), album artist the artist,
+  every pressing field null or empty, no pressing's four, edition tags detected from the album's own words (a typed
+  "Deluxe" asks for deluxe, as a pressing's title does). `manual` is **encoded only when true**, so every other body is
+  byte for byte the web's - the get vectors still match the web's TypeScript.
+- `FindCandidatesAnswer.manual`: the server's echo (2.1.38), read leniently - anything but `true` is no echo.
+- `Sources.nameMatch` and `Sources.named` (`[nameMatch] + signals`): the score's chips read Folder name first - "how
+  closely the folder's name is the artist and album you typed" - then the web's six as before. A card with no track
+  signals shows none of them (the three are null), and its Tracks reads "12 files" as an album-as-a-whole card does.
+- `GetSettings.chips(_:_:manual:)`: no Complete albums only for a manual search (nothing to be complete against).
+- `Sources.autoPick`: `.off` for a manual search, saying nothing - the spec's "James chooses the folder" - where the
+  album as a whole says it has no tracklist.
+- `DownloadJob.manual` (/jobs sends `"manual": true` only on a manual row), `PendingDownload.manual`, and on
+  `RequestRow` `manual` and `ownTags`. A manual row's title is the album with "manual search" where an edition goes
+  ("ok computer · manual search", the typed words as the job keeps them), under every heading and from the tap;
+  `ownTags` is set on a Done row whose outcome is filed or partly_filed - the endings where this download filed
+  something.
+- `ManualSearch`: the sheet's words, `canSearch` (both fields with words, trimmed), the subtitle "Your own search ·
+  filed by its own tags", `needsNewer` (a manual question answered without the echo), `tooOldLine` ("This needs a
+  newer deadwax - ask whoever runs it." / for whoever runs it "This needs deadwax 2.1.38 or later on the server."),
+  `mark`, and `doneLine` ("Filed by its own tags. Edit album > Release can match it to a pressing." with Edit albums,
+  "Filed by its own tags, not matched to a pressing." without).
+
+**The App:**
+- `Requests/RequestsScreen.swift`: the row (`manualSearch`, first in `content` under `can(.request)`), its sheet
+  (`.appSheet(isPresented: $searching) { ManualSearchSheet { searching = false }.macSheet() }`), the list's top the row
+  while it's drawn, and the Done card's `filed:` line. `Requests/RequestCards.swift`: DoneRowView draws that line,
+  quiet, under the row's own.
+- `Get/ManualSearchSheet.swift`: a Form - the offline note, Artist and Album (words capitalised, nothing
+  autocorrected, Artist focused once as the sheet opens), the footer, Search (PrimaryFace, off until `searchable`).
+  Return in Artist moves to Album; Return in Album searches; nothing else. Tab and Shift-Tab through Platform's `tabs`
+  (the Mac app's slice 7). Search makes a new `GetRequest` (a new `SourcesSearch` each time) and pushes `SourcesPage(…,
+  pushed: true)`; a card's Get closes the whole sheet (`queued` checks it is still the search that asked).
+- `Get/SourcesSheet.swift`: SourcesPage's chips take `manual:`, its cards' Gets are off and `get()` refuses while
+  `needsNewer`, and the gate's line is said where "not picked" is, above the cards, and appended to VoiceOver's
+  announcement of the outcome.
+- `Models/RequestsModel.swift`: the pending row from the tap carries `manual`, so it is marked before deadwax answers.
+
+### Departures from the spec, and why
+
+- **`Sources.signals` stays the web's six.** GetVectorTests holds it to the web word for word; name_match is the app's
+  own, kept in `Sources.nameMatch` and read first through `Sources.named`.
+- **No new rows in Fixtures/get or Fixtures/requests.** Both are exported from the web's TypeScript and checked byte
+  for byte by `ui/test/iosget.sim.cjs` and `iosrequests.sim.cjs` (`export --check`); the web never asks a manual
+  question, so a hand-added row would fail them. The manual cases are held by hand in ManualSearchTests.swift instead,
+  with the bodies and the answer written as the routes take and send them, and tests/test_ios_manual_search.py holds
+  the same shapes through the real routes.
+- **Escape closes the form only with both fields empty** (473's wording changed from the spec's "Escape to close"):
+  slice 2's review rule - Escape where a Cancel throws typed words away without asking waits for nothing typed. The
+  pushed results page has no Cancel (it has Back), so no Escape.
+- **The list's top is the Search Soulseek… row** whenever it's drawn (the tab tapped again scrolls to it).
+- **An unanswered manual Get isn't claimed by its job** (`RequestOverlays.claimed` needs a release id) - exactly as an
+  album-as-a-whole Get's isn't. Unchanged.
+- **The Done line shows only for filed and partly_filed**, not for "You already had it" or a download that filed
+  nothing.
+- **Back doesn't put the cursor back in Artist** (the `opened` flag): the keyboard stays down on the form until a
+  field is tapped.
+
+### Tests, and the faults they were seen failing on
+
+- ManualSearchTests.swift (13 tests). Each fault applied alone or in a batch whose tests don't overlap, the suite run,
+  then restored: `manual` always encoded (everyOtherQuestionIsSentWithoutTheFlag); the Complete chip kept
+  (theChipsHaveNoCompleteAlbumsOnlyForAManualSearch); auto-pick not off (nothingIsPickedForAManualSearchAndNothingSaid);
+  `ownTags` for every outcome (onlyAManualDownloadThisFiledSaysItWasFiledByItsOwnTags); the pending row unmarked
+  (aManualGetIsMarkedFromTheTap); name_match not first (aManualAnswerIsReadWithTheFolderNameFirstAndNoTrackParts);
+  the gate not asking whether the question was manual (aServerThatDroppedTheFlagHasEveryGetOffAndSaysWhy); the echo
+  read as true when absent (that, and theSheetSaysWhatItLooksForInTheTypedWords); the job's row unmarked
+  (aManualDownloadIsMarkedUnderEveryHeading); `manual` not decoded from /jobs (aManualRowIsReadAsJobsSendsIt).
+- DeviceWordsTests: 15 keys (ManualSearch's words, the searching line, Sources.nameMatch), the same on both - none
+  names the device. iphone.json by hand; mac.json written by `DEADWAX_WORDS_WRITE=mac`.
+- tests/test_ios_manual_search.py (8): the split, the gate in `get()`, the row and its sheet, Return in the two
+  fields, the app's bodies' keys against GetRelease's CodingKeys, and the app's question and Get through the real
+  routes (the echo, name_match first, the three track signals null, nothing expected, the store's four null, the 400,
+  and /jobs marking the row). Seen failing on: the Cancel drawn on a pushed page; Get not gated; the row without
+  `can(.request)`; Return in Album doing more than search; `.macSheet()` dropped; `manual` gone from GetRelease's
+  CodingKeys; the question sent without the flag.
+- tests/test_ios_mac.py: ESCAPES, GUARDED_ESCAPES (`artist.isEmpty && album.isEmpty)`), SHEET_ROOTS (RequestsScreen
+  1), TABS (ManualSearchSheet 2, in the drawn order), and Return in the sheet's fields. Seen failing on Escape
+  unguarded, a field without Tab, Return in Album doing more, `.macSheet()` dropped.
+- tests/test_ios_contract.py: /jobs' `manual` among what a row can send, the jobs route through the real app with a
+  manual row (and only it marked), and Find's echo only on the search's answer. Seen failing on the app reading
+  `is_manual` from /jobs, and the echo read under another name.
+
+### Not verified - only James's phone and Mac can say (459-474)
+
+- Everything on a device: the row's look at the top of the list, the form's look (PrimaryFace in a Form row with a
+  clear background), Artist getting the cursor as the sheet opens, the keyboard's Next and Search keys.
+- Back from the results: the page's own onDisappear lets the search go once the pop is done - and its SheetGoing should
+  stay quiet on a pop (it acts only when the sheet itself is being dismissed). Read, not seen. (Slice A1's review took
+  out an `.onChange(of: showing)` that let it go as the pop started: a back-swipe let go and cancelled would have left
+  the results up with their search shut - every Get and Search again doing nothing.)
+- On the Mac: Tab inside a Catalyst text field (the slice 7 question again), Escape with words typed doing nothing,
+  the form as a sheet over the window.
+- VoiceOver: the row, the two fields by name, the outcome and the gate's line said together.
+- The ranking against real Soulseek folders (the server's 0.80/0.65 weights, 461), and every filing check
+  (464-468) - the server's half, run only against fakes.

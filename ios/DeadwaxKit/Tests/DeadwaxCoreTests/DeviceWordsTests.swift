@@ -345,6 +345,24 @@ enum DeviceWords {
         add("InfoDebug.engineRows(lastStart)", InfoDebug.engineRows(InfoDebug.Engine(lastStartSeconds: 0.306), device: device)
             .map { "\($0.label) | \($0.value)" }.joined(separator: " / "))
 
+        // MARK: (manual search, slice A1) Search Soulseek - the same words on both: none names the device
+
+        add("ManualSearch.title", ManualSearch.title)
+        add("ManualSearch.row", ManualSearch.row)
+        add("ManualSearch.artistField", ManualSearch.artistField)
+        add("ManualSearch.albumField", ManualSearch.albumField)
+        add("ManualSearch.footer", ManualSearch.footer)
+        add("ManualSearch.search", ManualSearch.search)
+        add("ManualSearch.offline", ManualSearch.offline)
+        add("ManualSearch.subtitle", ManualSearch.subtitle)
+        add("ManualSearch.searchingLine", Sources.searchingLine(GetRelease.manual(artist: "Radiohead", album: "OK Computer")))
+        add("ManualSearch.mark", ManualSearch.mark)
+        add("ManualSearch.doneFiled(edits)", ManualSearch.doneFiled(edits: true))
+        add("ManualSearch.doneFiled", ManualSearch.doneFiled(edits: false))
+        add("ManualSearch.tooOld(runs)", ManualSearch.tooOld(runs: true))
+        add("ManualSearch.tooOld", ManualSearch.tooOld(runs: false))
+        add("Sources.nameMatch", "\(Sources.nameMatch.label) | \(Sources.nameMatch.meaning)")
+
         // MARK: Debug
 
         let utc = TimeZone(identifier: "UTC")!

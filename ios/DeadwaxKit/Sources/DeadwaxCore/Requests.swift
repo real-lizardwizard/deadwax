@@ -58,6 +58,9 @@ public struct DownloadJob: Decodable, Sendable, Equatable, Identifiable {
     public let requestedBy: [String]?
     /// (logins on) What its filing gave those who asked: added, incomplete, flagged, looked.
     public let library: String?
+    /// (Manual search, slice A1) A download from Requests' Search Soulseek (server 2.1.38: sent only when true): filed by
+    /// its files' own tags, its artist and album the words typed.
+    public let manual: Bool?
 
     enum CodingKeys: String, CodingKey {
         case id, artist, album, year, username, directory, status, error
@@ -77,7 +80,7 @@ public struct DownloadJob: Decodable, Sendable, Equatable, Identifiable {
         case alternativesLeft = "alternatives_left"
         case attempt, mine, shared
         case requestedBy = "requested_by"
-        case library
+        case library, manual
     }
 
     public init(id: Int, status: String, artist: String? = nil, album: String? = nil, year: String? = nil,
@@ -87,7 +90,7 @@ public struct DownloadJob: Decodable, Sendable, Equatable, Identifiable {
                 state: String? = nil, speed: Double? = nil, bytesTransferred: Double? = nil, filesDone: Int? = nil,
                 filesTotal: Int? = nil, filesFailed: Int? = nil, failureReason: String? = nil, matched: Bool? = nil,
                 alternativesLeft: Int? = nil, attempt: Int? = nil, mine: Bool? = nil, shared: Bool? = nil,
-                requestedBy: [String]? = nil, library: String? = nil) {
+                requestedBy: [String]? = nil, library: String? = nil, manual: Bool? = nil) {
         self.id = id
         self.status = status
         self.artist = artist
@@ -118,6 +121,7 @@ public struct DownloadJob: Decodable, Sendable, Equatable, Identifiable {
         self.shared = shared
         self.requestedBy = requestedBy
         self.library = library
+        self.manual = manual
     }
 
     /// Read leniently but for the id and the status: a field of a shape this app doesn't know is none, so one odd value
@@ -154,6 +158,7 @@ public struct DownloadJob: Decodable, Sendable, Equatable, Identifiable {
         shared = c.looseField(Bool.self, .shared)
         requestedBy = c.looseList(String.self, .requestedBy)
         library = c.looseField(String.self, .library)
+        manual = c.looseField(Bool.self, .manual)
     }
 
     /// Work is outstanding (lib/jobs.ts ACTIVE_STATUSES): queued, downloading or being filed.
@@ -278,6 +283,11 @@ public struct RequestRow: Sendable, Equatable, Identifiable {
     public var plays: Bool
     public var askedBy: String?
     public var cancelWords: CancelWords
+    /// (Manual search, slice A1) A download from Search Soulseek: "manual search" where the edition goes.
+    public var manual: Bool
+    /// (Manual search, slice A1) A manual search's download this filed (in the library, all or part): filed by its own
+    /// tags, which its Done row says under it (ManualSearch.doneLine).
+    public var ownTags: Bool
 
     public var id: String { key }
 
@@ -309,6 +319,8 @@ public struct RequestRow: Sendable, Equatable, Identifiable {
         plays = false
         askedBy = nil
         cancelWords = PerPerson.cancelDefault
+        manual = false
+        ownTags = false
     }
 }
 
@@ -659,8 +671,12 @@ public enum RequestWords {
 
     static func jobRow(_ job: DownloadJob, _ input: RequestsInput, now: Int64) -> RequestRow {
         let section = self.section(job)
+        let manual = job.manual == true
+        //? (manual search) "OK Computer · manual search": no pressing, so no edition - the words say where it came from
         var row = RequestRow(key: RequestRow.key(job: job.id), jobId: job.id, section: section,
-                             title: titleOf(job.album, job.edition), artist: job.artist ?? "", album: job.album ?? "")
+                             title: titleOf(job.album, manual ? ManualSearch.mark : job.edition), artist: job.artist ?? "",
+                             album: job.album ?? "")
+        row.manual = manual
         row.cover = said(job.releaseMbid)
         row.askedBy = PerPerson.askedByText(mine: job.mine, shared: job.shared, requestedBy: job.requestedBy)
         row.cancelWords = PerPerson.cancelWords(mine: job.mine, shared: job.shared, requestedBy: job.requestedBy)
@@ -735,14 +751,19 @@ public enum RequestWords {
                 row.release = release
                 row.plays = filed.contains(ending)
             }
+            //? (manual search) what this download filed went by its files' own tags: said under the row
+            row.ownTags = manual && job.outcome.map { filed.contains($0) } == true
         }
         return row
     }
 
     static func pendingRow(_ pending: PendingDownload, personal: Bool) -> RequestRow {
         let refused = pending.error != nil
+        let manual = pending.manual == true
         var row = RequestRow(key: pending.key, jobId: nil, section: refused ? .attention : .waiting,
-                             title: titleOf(pending.album, nil), artist: pending.artist, album: pending.album)
+                             title: titleOf(pending.album, manual ? ManualSearch.mark : nil), artist: pending.artist,
+                             album: pending.album)
+        row.manual = manual
         if pending.mayHaveStarted {
             //? the phone's own: no answer, not a refusal - so not said as one (RequestOverlays.gaveUp)
             row.line = who(row.artist, pending.username, RequestWords.noAnswer)

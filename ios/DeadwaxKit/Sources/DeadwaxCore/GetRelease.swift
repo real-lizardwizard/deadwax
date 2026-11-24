@@ -72,6 +72,11 @@ public struct GetRelease: Encodable, Sendable, Equatable {
     public let catalogNumber: String?
     /// Whether the four above are sent at all - a pressing's are (null when it has none), the album as a whole's aren't.
     let pressing: Bool
+    /// (Manual search, slice A1 - notes/ios.md "Manual search, slice A1") Requests' Search Soulseek: an artist and an album
+    /// as typed, no release behind them - ranked by how closely each folder's name fits the words, and filed by the
+    /// files' own tags (server 2.1.37, 2.1.38). Sent as `"manual": true` ONLY when true, so every other body is byte for
+    /// byte the web's.
+    public let manual: Bool
 
     enum CodingKeys: String, CodingKey {
         case artist, album, year, tracks, disambiguation, country
@@ -83,6 +88,7 @@ public struct GetRelease: Encodable, Sendable, Equatable {
         case releaseGroupMbid = "release_group_mbid"
         case mediaFormat = "media_format"
         case catalogNumber = "catalog_number"
+        case manual
     }
 
     public func encode(to encoder: any Encoder) throws {
@@ -97,6 +103,8 @@ public struct GetRelease: Encodable, Sendable, Equatable {
         try fields.encode(editionTags, forKey: .editionTags)
         try fields.encode(tracks, forKey: .tracks)
         try fields.encode(releaseGroupMbid, forKey: .releaseGroupMbid)
+        //? only when true: a body without it is the web's, and a server before 2.1.37 ignores it (Find's echo says so)
+        if manual { try fields.encode(true, forKey: .manual) }
         guard pressing else { return }
         try fields.encode(disambiguation, forKey: .disambiguation)
         try fields.encode(mediaFormat, forKey: .mediaFormat)
@@ -183,7 +191,8 @@ public struct GetRelease: Encodable, Sendable, Equatable {
             mediaFormat: present(formats.joined(separator: " + ")),
             country: present(country),
             catalogNumber: present(numbers.joined(separator: ", ")),
-            pressing: true)
+            pressing: true,
+            manual: false)
     }
 
     /// The album as a whole, no pressing (`groupFallback`): no tracklist to match against, no release id - nothing
@@ -192,7 +201,20 @@ public struct GetRelease: Encodable, Sendable, Equatable {
         GetRelease(artist: context.artist, albumArtist: context.albumArtist, artistMbids: context.artistMbids,
                    album: context.album, year: realYear(context.year), originalYear: realYear(context.year),
                    releaseMbid: nil, editionTags: [], tracks: [], releaseGroupMbid: present(context.releaseGroupId),
-                   disambiguation: nil, mediaFormat: nil, country: nil, catalogNumber: nil, pressing: false)
+                   disambiguation: nil, mediaFormat: nil, country: nil, catalogNumber: nil, pressing: false, manual: false)
+    }
+
+    /// (Manual search, slice A1) Search Soulseek's question: the artist and the album as typed, trimmed - the artist both
+    /// as credited (what is searched for and scored against) and as who it is by - with the edition words the album's
+    /// own words name (a typed "Deluxe" asks for deluxe, as a pressing's title does). No year, no ids, no tracklist: the
+    /// server ranks the folders by their names and files the one you get by its own tags.
+    public static func manual(artist: String, album: String) -> GetRelease {
+        let artist = JSText.trim(artist)
+        let album = JSText.trim(album)
+        return GetRelease(artist: artist, albumArtist: artist, artistMbids: [], album: album, year: nil, originalYear: nil,
+                          releaseMbid: nil, editionTags: EditionTags.detect(title: album, disambiguation: nil, packaging: nil),
+                          tracks: [], releaseGroupMbid: nil, disambiguation: nil, mediaFormat: nil, country: nil,
+                          catalogNumber: nil, pressing: false, manual: true)
     }
 
     /// Every track of every disc, with both numberings (`tracksOf`): `position` running across the whole release,
