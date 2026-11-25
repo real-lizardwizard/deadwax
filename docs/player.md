@@ -652,14 +652,24 @@ An artist's page, an album's and the album you don't have show a short descripti
 does - under the artist's **Play** and **Shuffle**, under an album's **Play** and **Shuffle** (or its
 **Get the album**) - and a one-line **subtitle**: "English band", "1994 studio album by Portishead".
 
-- **Where the words come from**: Navidrome's own first - what Navidrome fetches from its metadata agents for the
-  artist or album: an artist's from Deezer with its defaults, and from Last.fm too (albums' from Last.fm alone) once
-  Navidrome is given a Last.fm key - with **More on Last.fm** under it, a link to the Last.fm page when Navidrome
-  has one. When Navidrome has nothing, Wikipedia: the opening paragraph of the artist's or the album's English
-  Wikipedia article, found through MusicBrainz's link to Wikidata (or MusicBrainz's own link to the English
-  article), with **From Wikipedia** under it, a link to the article. An album or artist with neither has no
-  description at all - no empty box. An album you don't have only ever has Wikipedia's (Navidrome has nothing of
-  it); an album or artist with no MusicBrainz id only ever has Navidrome's.
+- **Where the words come from**, with a Last.fm API key (`LASTFM_API_KEY` in Server settings → Connections,
+  [configuration](configuration.md#connections); deadwax 2.1.42 on):
+  1. **Last.fm's own** - the artist's biography or the album's wiki on Last.fm, asked by deadwax itself: an artist by
+     their MusicBrainz id (and, if Last.fm doesn't know the id, by the name MusicBrainz gives them), an album by its
+     title and its artist's name as MusicBrainz has them. Only the prose is said: not Last.fm's "Read more" link or
+     its licence line, and not a discography or line-up listed after the prose. A Last.fm page for several artists
+     of one name says nothing. **More on Last.fm** under it links to the Last.fm page.
+  2. **Wikipedia**, when Last.fm has nothing: the opening paragraph of the artist's or the album's English Wikipedia
+     article, found through MusicBrainz's link to Wikidata (or MusicBrainz's own link to the English article), with
+     **From Wikipedia** under it, a link to the article.
+  3. **Navidrome's own**, when neither has anything - what Navidrome fetches from its metadata agents (below).
+
+  Without a key, Navidrome's own come first and Wikipedia's after, as before 2.1.42: what Navidrome fetches from its
+  metadata agents for the artist or album - an artist's from Deezer with its defaults, and from Last.fm too (albums'
+  from Last.fm alone) once Navidrome is given a Last.fm key of its own - with **More on Last.fm** under it, a link to
+  the Last.fm page when Navidrome has one; then Wikipedia's. An album or artist with none of them has no description
+  at all - no empty box. An album you don't have never has Navidrome's (Navidrome has nothing of it): Last.fm's with
+  a key, else Wikipedia's. An album or artist with no MusicBrainz id only ever has Navidrome's.
 - **The subtitle** is Wikidata's one-line English description of the same artist or album, whichever source the
   paragraph came from - none when Wikidata has none, or MusicBrainz has no Wikidata link. An artist's sits under
   their name, in the picture at the top of the page, on one line (a longer one ends in "…"); an album's heads its
@@ -674,10 +684,13 @@ does - under the artist's **Play** and **Shuffle**, under an album's **Play** an
   with **Try again** under where it would go. A page you come back to (**Back**) draws as it was, at once.
 - **Kept**: deadwax keeps what Wikipedia and Wikidata said in its database - a found description for a month,
   "there's none" for three days - so a page you've seen before asks them nothing; the app keeps what it was told
-  for the rest of the visit. Navidrome keeps its own words itself. Nothing is kept of a failure: with Navidrome,
-  Wikipedia, Wikidata or MusicBrainz away the page has what the others gave that time - nothing is said about
-  it - and the app asks again when the page next opens, from a minute on. Nothing to set up: Wikipedia and Wikidata need no key, and are
-  asked with the same user agent MusicBrainz is (built around your `MUSICBRAINZ_EMAIL` -
+  for the rest of the visit. What Last.fm said is kept a week ("it doesn't know them" three days), with the rest of
+  Last.fm's answers - an artist's is the same answer the iPhone app's artist page uses, asked once for both.
+  Navidrome keeps its own words itself. Nothing is kept of a failure: with Last.fm, Navidrome, Wikipedia, Wikidata
+  or MusicBrainz away - or Last.fm refusing the key, or taking longer than four seconds (what it says then is kept
+  as it comes, for next time) - the page has what the others gave that time - nothing is said about it - and the
+  app asks again when the page next opens, from a minute on. Wikipedia and Wikidata need no key,
+  and are asked with the same user agent MusicBrainz is (built around your `MUSICBRAINZ_EMAIL` -
   [Connections](configuration.md#connections)).
 
 ### Managing an artist

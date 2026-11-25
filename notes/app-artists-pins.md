@@ -772,6 +772,10 @@ artists and albums" - binding, and built that way after review:
    the French page, and is never said. Not an article (`type` disambiguation and the rest): none.
 3. Neither: no paragraph - no empty box.
 
+**Since 2.1.42, with a `LASTFM_API_KEY`**: Last.fm's own words come first (deadwax's own ask: an artist's getInfo
+bio, an album's album.getInfo wiki), then Wikipedia's, then Navidrome's - notes/lastfm.md "S3". Without a key, the
+order above, unchanged.
+
 **The subtitle** (James, later the same day: "yes to Wikidata's one-line description as a small SUBTITLE under
 the artist's and the album's name"): the Wikidata item's `descriptions.en` ("English band", "1994 studio album
 by Portishead" - recorded 2026-10-24), from the SAME wbgetentities request as the English page

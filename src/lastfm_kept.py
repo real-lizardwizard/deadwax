@@ -77,6 +77,14 @@ def album_key(method: str, artist: str, album: str) -> str:
     return f"{lastfm.LASTFM_SHAPE}|{method}|name|{name_key(artist)}|{name_key(album)}"
 
 
+def release_group_key(method: str, mbid: str) -> str:
+    """(2.1.42) An album's method kept under its MusicBrainz release group, whatever names it is asked of Last.fm by:
+    names fold alike for different albums - name_key drops a bracketed aside and a leading "The", so "Fearless" and
+    "Fearless (Taylor's Version)", "Live" and "Live [Bonus]", "The Wall" and "Wall" would share one answer, the first
+    asked shown for both."""
+    return f"{lastfm.LASTFM_SHAPE}|{method}|group|{mbid.strip().lower()}"
+
+
 def track_key(method: str, artist: str, title: str) -> str:
     return f"{lastfm.LASTFM_SHAPE}|{method}|name|{name_key(artist)}|{match_key(title)}"
 
