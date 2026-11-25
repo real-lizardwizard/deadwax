@@ -10,12 +10,15 @@ import UIKit
 /// (R3's review) Now Playing's bottom row lays it under the output's whole column, its own glyph hidden (`glyph`
 /// false: clear in both tints) under the glyph and the name the row draws, so all of the column takes the tap - and
 /// VoiceOver hears where the music plays as its value (`playsTo`, the output's name as the EQ names it). The Mac's bar
-/// and its output keep its glyph, with no value.
+/// and its output keep its glyph, with no value. (R3b's review) The EQ page's output button says what it says instead
+/// (`said`): the page's output and whether it's connected, AirPlay's list still its double tap.
 struct AirPlayButton: UIViewRepresentable {
     /// Whether it draws AirPlay's own glyph.
     var glyph = true
     /// Where the music plays, said as the button's value.
     var playsTo: String?
+    /// (R3b's review) What VoiceOver says of it in place of "AirPlay" and `playsTo`: its name, value and hint.
+    var said: AirPlaySaid?
 
     func makeUIView(context: Context) -> AVRoutePickerView {
         let picker = AVRoutePickerView()
@@ -31,7 +34,16 @@ struct AirPlayButton: UIViewRepresentable {
     private func dress(_ picker: AVRoutePickerView) {
         picker.tintColor = glyph ? UIColor.label : UIColor.clear
         picker.activeTintColor = glyph ? UIColor(Palette.accent) : UIColor.clear
-        picker.accessibilityLabel = NowPlayingWords.airPlay
-        picker.accessibilityValue = playsTo
+        picker.accessibilityLabel = said?.label ?? NowPlayingWords.airPlay
+        picker.accessibilityValue = said?.value ?? playsTo
+        picker.accessibilityHint = said?.hint
     }
+}
+
+/// (R3b's review) What AirPlay's button says to VoiceOver where it lies under a control of the app's own: that
+/// control's name and value, and a hint saying the double tap is AirPlay's.
+struct AirPlaySaid: Equatable {
+    let label: String
+    let value: String
+    let hint: String
 }

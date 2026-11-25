@@ -244,7 +244,7 @@ for ([404-415](#the-mac-apps-checks-404-415),
 [416-423](#the-mac-apps-menus-keys-and-window-checks-416-423), [424-433](#the-mac-apps-desktop-frame-checks-424-433),
 [434-438](#the-mac-apps-words-checks-434-438), [439-446](#the-mac-apps-sleep-power-and-downloads-checks-439-446),
 [447-451](#the-mac-apps-eq-files-checks-447-451), [452-458](#the-mac-apps-managing-checks-452-458) and
-[518-525 and 532-538](#the-mac-redesigns-checks-518-607)).
+[518-525 and 532-540](#the-mac-redesigns-checks-518-607)).
 
 **What it is today.** The window is laid out as the web app's desktop is, whatever its size: the **sidebar** at the
 left, the **page** you're on beside it, the **side panel** at the right when you open it - Queue, Lyrics, Info or EQ - and the
@@ -2129,11 +2129,13 @@ Playing** puts it away). The web app calls it Up Next:
   [picked up](#picking-up-where-you-left-off) it comes back as that plain list, every song in order,
   without Playing Next or the Shuffle chip.
   What goes in it, and where it's kept: [What you've played](#what-youve-played).
-- **The song playing**, where the Queue opens - and with Repeat One on, "Repeat one: this song plays again
-  until you skip it." Under it, **Shuffle** and **Repeat**, the same settings as on Now Playing.
+- **The song playing**, where the Queue opens - on the phone the first row, lit as the selected row - and
+  with Repeat One on, "Repeat one: this song plays again until you skip it." On the Mac, **Shuffle** and **Repeat**
+  are under it, the same settings as on Now Playing; on the phone they're along the Queue's foot (below).
 - **Playing Next**: the songs you've added, in the order they'll play, with **Clear** to take them all
-  out. It's there only when you've added some.
-- **The rest of the album or list this time round**, headed "From Mezzanine" for one album's songs or
+  out (on the phone Clear is at the top). It's there only when you've added some.
+- **The rest of the album or list this time round**, headed "From Mezzanine" for one album's songs - on the
+  phone "Next from Mezzanine", and each row just its title, as the heading has said the album - or
   "Still to play" for several albums', up to 100 of them, then "And 380 more songs." Under it, what
   comes after: "Then Mezzanine again from the top." with Repeat All ("Then Mezzanine again, in a new
   order." with Shuffle on too), or "Nothing after this song." at the last song with Repeat off.
@@ -2146,6 +2148,16 @@ Playing** puts it away). The web app calls it Up Next:
 - **After Previous**, a song you'd added that was still waiting stays where it was - after the song you
   went back from - so the Queue lists it there, in the album's group, rather than under Playing Next;
   **Clear** takes only the songs under Playing Next.
+- **On the phone, the top and the foot**: at the top, beside **‹ Now Playing**, **History** - which scrolls up to
+  what you've played - **Clear** and **Edit**; from the text size after the standard one, History and Clear are in a
+  **•••** beside Edit. Along the foot, **Shuffle** and **Repeat**, lit while on, and the time left: "8 songs · 33 min
+  left" - the songs after the one playing, and how long they take with the rest of this one, at the speed it's
+  playing. What you've played never counts. Under a minute it says "under 1 min left", and nothing at all once
+  nothing is left. It says "over 33 min left" when a song's length isn't known or there are more songs than are
+  listed (and just the songs, "8 songs", when what's known is under a minute); with Repeat One on, just "8 songs";
+  with Repeat All on, it counts what's listed - the rest of this time through, not every time after it. Where the
+  three don't fit on one line, the time left goes under the two. On the Mac the time left is at the left of the
+  foot of the panel's Queue tab.
 - **Edit** gives each row a handle to drag it by and a red minus button that takes it out at once,
   one tap a song. A song moves within its own group (Playing Next, or the album's), and each change is
   made as you make it. What you've played isn't shown while you edit. **Done** ends Edit. Outside Edit, a row can't be swiped away, so a song isn't
@@ -2213,15 +2225,30 @@ takes away their soft top and bottom edges. Nothing about lyrics is on the lock 
 ### Info
 
 **Info** (Now Playing's bottom row, or its **•••**) opens in Now Playing's sheet, on its Info page, and has an
-**About** tab (on the Mac, the side panel's Info tab - see [The Mac app](#the-mac-app)):
+**About** tab (on the Mac, the side panel's Info tab - see [The Mac app](#the-mac-app)). On the phone:
 
-- **The song**: its title and artist, a line like "Track 4 of 10 · 7:05 · played 12 times", its disc,
-  and who wrote it, when Navidrome says.
-- **The album**: tap it to go to its page. With logins on, it says which pressing it is, and an admin
-  also sees its folder on the server. **Album info**, under it, opens [everything known about the
-  album](#album-info) inside Info - its Back goes back to Info. From a playlist, it's the whole album's, not only the
-  playlist's songs of it.
+- **The song** at the top: its cover, title and artist, and its album and year ("Wilco (The Album) · 2009").
+- **This song**: **Format**, **Track** ("4 of 10"), **Disc**, **Length**, **Size** - the file's size and bit rate,
+  "24 MB · 921 kbps", when Navidrome gives them - **Played** - "19 times · today", the
+  day ("yesterday", "3 days ago", "12 Nov") only when Navidrome says when it last played, and no Played row for a
+  song never played - and **Written by** when Navidrome says; then the rest of **Sound** (below), **Plays from** and
+  the **EQ**.
+- **The album**: **Released**, **Label**, **Songs**, with logins on **This pressing** - which pressing it is - and
+  for an admin **Folder**, its folder on the server. **Album info**, under them, opens [everything known about the
+  album](#album-info) inside Info - its Back goes back to Info. From a playlist, it's the whole album's, not only
+  the playlist's songs of it.
+- **Go to album** and **Go to artist**: each puts Now Playing away and opens the page.
+
+On the Mac:
+
+- **The song**: its title and artist, then its **Track**, **Disc**, **Length**, **Size**, **Played** and **Written
+  by**, as the phone's This song has them.
+- **The album**: click it to go to its page. With logins on, it says which pressing it is, and an admin
+  also sees its folder on the server. **Album info**, under it, opens everything known about the album inside Info.
 - **The artist.**
+
+On both:
+
 - **Sound**: the file's **Format**, **Gapless** (always On: the app joins every song end to end), and
   **Normalization**: what was done to this song's level, and from what. For example "Album volume
   matching, 3.6 dB quieter", "Song volume matching, 2.1 dB louder - as loud as it can go without
@@ -2986,14 +3013,19 @@ switches to the right one by itself whenever the output changes - AirPods connec
 their own EQ from the first sound in them. An output the phone hasn't met before starts **Off**.
 
 Open it from **Settings > Playback > EQ**, or from **EQ** at the right of Now Playing's bottom row, which opens
-it in Now Playing's sheet, on its EQ page (**Done**, or **‹ Now Playing**, puts the sheet away; the strip at its top
+it in Now Playing's sheet, on its EQ page (**‹ Now Playing** puts the sheet away, as **Done** does on a page opened from it; the strip at its top
 moves to the Queue or Info). Either way it opens on the output playing now. On the Mac it's the side panel's EQ tab
 (**View > EQ** ⌥⌘E), and Settings > Playback's **EQ** row opens that tab.
 
 **The EQ page**, top to bottom:
 
 - **The output**: its name and "Connected now" (or "Not connected"), and the **EQ** switch. Over
-  AirPlay, a note says a change is heard about 2 seconds later.
+  AirPlay, a note says a change is heard about 2 seconds later. On the phone the output is a button across the
+  page - "Output" and its name, "· Not connected" after it for one that isn't - which opens AirPlay's list, as Now
+  Playing's does - VoiceOver reads it as the output's name and whether it's connected; and the switch is **EQ on**,
+  at the top of Now Playing's sheet beside the **•••** (at the largest text size the switch alone, without its
+  words; from Settings, under the output's button). The page's parts are groups, as drawn: Correction, Tone,
+  Preamp, Other outputs and Advanced.
 - **The curve**: what you hear on that output, low notes on the left and high on the right, louder
   above the middle line and quieter below. It goes grey and flat while the EQ is off. The line under
   it says what is happening: "Off: nothing changes the sound.", "Flat: nothing changes the sound
@@ -3012,7 +3044,9 @@ moves to the Queue or Info). Either way it opens on the output playing now. On t
   and then **Save as Preset…** keeps it under a name of yours.
 - **Other outputs**: every other output the phone has met, the most recent first, with the iPhone
   speaker always there, and each one's setting ("Off", "Bass Boost"). Tap one to open its own EQ
-  page, which stays on that output. Swipe one for **Rename** and **Forget** (not the speaker).
+  page, which stays on that output. Swipe one for **Rename** and **Forget** (not the speaker) - on the phone, touch
+  and hold it instead; they're also the output's own page's (its **•••** > **Rename…**, and **Forget This
+  Output**), and VoiceOver's actions on the row.
   Other outputs shows only on the page of the output that's playing.
 - On the page of an output that isn't connected: "Not connected: this is what it plays when it is."
   above its curve, and **Forget This Output** at the bottom. Forgetting asks first ("Forget James's
@@ -3101,8 +3135,8 @@ under the Correction row:
   is a choice even when it's the only one AutoEq has.
 - **Nothing** (a speaker, a car, a name AutoEq doesn't have): no row.
 
-It's only ever a suggestion - nothing changes until you tap **Use**. Swipe it for **Not now** (or
-use VoiceOver's action) and it doesn't come back for those headphones. It isn't shown offline, or
+It's only ever a suggestion - nothing changes until you tap **Use**. Tap **Not now** beside it (on the Mac,
+swipe it; or use VoiceOver's action) and it doesn't come back for those headphones. It isn't shown offline, or
 once the headphones have a correction.
 
 **Picking AirPods.** iOS calls the first AirPods Pro and the AirPods Pro 2 both "AirPods Pro", so the
@@ -3179,8 +3213,10 @@ to right. Each says its type - "Peak", "Low shelf", "High shelf", "Low pass", "H
 pass", "Notch", "All pass" - and under it its numbers: "105 Hz · +2.6 dB · Q 0.70" ("BW 1.0 oct" for a
 width in octaves, "12 dB/oct" for a shelf's slope, "Left" or "Right" after it for one ear's filter).
 Each has its own switch. A filter above the highest note an output plays says "Above what this
-output plays, so it's left out." Tap a filter to edit it; swipe it for **Delete**. Under the
-filters:
+output plays, so it's left out." Tap a filter to edit it; swipe it for **Delete** (on the phone, touch and hold
+it; or **Delete Filter** in its editor, or VoiceOver's action). On the phone each filter's switch is the purple
+one. Leaving the editor with a number still being typed - **Back**, the strip, or the sheet put away - keeps it, as
+leaving the field does, if it's in range. Under the filters:
 
 - **Add Filter**: a peak at 1000 Hz, 0 dB, Q 1, opened for you to edit. You can add up to 64 filters
   for each ear; past that it says "64 filters is the most you can add". (A file can bring up to 74 -
@@ -6382,6 +6418,45 @@ and the Mac (the web app keeps Up Next). Each tab's page is still the one it was
   then the sheet opens on EQ with the preview. A swipe down from Now Playing's top still closes Now Playing.
 - **538 Both phones.** **Not done yet.** On Green Anole, everything else - every tab, the player, Edit album, Settings'
   EQ - is as before. On Ethan's phone, 536-537, or "not done yet".
+
+#### The Queue, Info and the EQ inside (539-542)
+
+**Not done yet.** The sheet's three pages in the new look, on the phone: the **Queue**, **Info** and the **EQ** as
+drawn, each with **‹ Now Playing** and the strip at its top. On the Mac the side panel's Queue and Info tabs get the
+time left and Played. Play an album with songs still to come, and add a song or two with Add to Queue.
+
+- **539 The Queue.** **Not done yet.** On the phone, open **Queue**: **History**, **Clear** and **Edit** at the top
+  right; the song playing first, lit, with no heading over it; the songs you added after it, each with its artist and
+  album; then "Next from" the album with each row its title; and along the foot **Shuffle**, **Repeat** and the time
+  left ("8 songs · 33 min left"). Count the songs after the one playing: the number matches, and the minutes come
+  down as the song plays - what you've played isn't counted. History scrolls up to what you've played; a tap on a
+  song there goes back to it, as before. Clear takes Playing Next out. Edit's handles move songs and its minus takes
+  one out; Done ends it. A tap on a song plays it. At the largest text sizes History and Clear are in the **•••**
+  beside Edit, nothing at the top is cut off, and the time left goes under Shuffle and Repeat. Near the end of the
+  last song it says "under 1 min left", never "0 min". On the Mac, the panel's Queue tab shows the time left at the
+  left of its foot, in the status bar's type.
+- **540 Info.** **Not done yet.** On the phone, open **Info**: the song at the top, then **This song** - Format,
+  Track, Length, Size ("24 MB · 921 kbps"), Played ("19 times · today", or the day it last played) and the rest - and
+  **The album**, then **Go to album** and **Go to artist**, each opening its page with Now Playing put away. A song
+  never played has no Played row. Leave Info up past midnight (or set the phone's clock past it): "today" becomes
+  "yesterday". As an admin, choose **Debug**, move to the Queue and back: Debug is still chosen. On the Mac, the
+  panel's Info tab has Played among the song's rows.
+- **541 The EQ.** **Not done yet.** On the phone, open **EQ**: the output's button at the top - "Output" and its
+  name - opens AirPlay's list, and VoiceOver reads it as the output, "Connected now" or "Not connected"; **EQ on** at the
+  top right is a purple switch, and VoiceOver reads it as a switch, "EQ for" the output, on or off - at the largest
+  text size the switch alone, nothing cut off. Touch and hold a filter in Advanced: **Delete**; an output under Other
+  outputs: **Rename** and **Forget**; Correction, after changing an AutoEq correction in Advanced: **Back to
+  AutoEq's** - none of them opens the filter or the output first. The filters' switches are purple. The curve sits in
+  a well; Correction, Tone and Advanced are groups; the sliders' knobs are round. Every control does what it did, and
+  the sound is as before: the switch, Preset, the sliders, Correction, AutoEq's suggestion and its **Not now**, Other
+  outputs, Advanced and its filters. Connect other headphones with the EQ up: the page follows the output - but not
+  with Preset's list or a filter's page open over it, and it catches up when you come back. In Advanced, open a
+  filter, type a frequency and go **Back** without tapping elsewhere: the new frequency is kept. Again with the
+  strip, and with the sheet swiped away. From Settings > Playback > EQ the page is the same, with the switch under
+  the output's button. On the Mac, the panel's EQ tab in Advanced: each filter's row in the List's own type, its
+  switch in the app's colour, as before.
+- **542 Both phones.** **Not done yet.** On Green Anole, everything else - every tab, the player, Now Playing, Edit
+  album, the EQ from Settings - is as before. On Ethan's phone, 539-541, or "not done yet".
 
 #### The player bar, the mini player and the tab bar (543-549)
 

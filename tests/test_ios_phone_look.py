@@ -939,19 +939,24 @@ def declared(folder: Path) -> set[str]:
 #? one on a phone screen adds that file here - R2 the Library's top, its pages and their rows; R3: Now Playing's sheet
 #? (PhoneTop, PhoneBack, PhoneStrip) and its bottom row (PhoneTabItem, PhoneLook's sizes, DWPalette's accent for the
 #? output's name); R8: Requests on the phone, its cards (PhoneCard, DWMeter, DWRaised, DWButtonStyle) and its screen;
+#? R3b: the sheet's three pages - the Queue (its rows, top and foot), Info (PhoneGroup, its kv rows, PhoneGo) and the EQ
+#? (its groups, the switch, the output's button, the curve's well, the sliders' faces), and the sheet's ground (DWPalette)
 #? R4: the mini player (PhoneMiniGround, PhoneLook's sizes, DWPalette's seek line) and the tab bar (PhoneLitLine, DWCount)
+#? R5: an album's page and a playlist's on the phone (iAlbum, iPlaylist - their heroes, rows and ground), and the Add to
+#? a playlist sheet's shared buttons (PlaylistPicker's NewPlaylistFields, the Look's alone)
 R2_LIBRARY = {"Library/LibraryTop.swift", "Library/LibraryView.swift", "Library/LibraryTiles.swift",
               "Library/AlbumsScreen.swift", "Library/ArtistsScreen.swift", "Library/SongsScreen.swift",
               "Playlists/PlaylistsScreen.swift"}
-#? R5: an album's page and a playlist's on the phone (iAlbum, iPlaylist - their heroes, rows and ground), and the Add to
-#? a playlist sheet's shared buttons (PlaylistPicker's NewPlaylistFields, the Look's alone)
+R3B_PAGES = {"UpNext/UpNextScreen.swift", "Info/InfoView.swift", "EQ/EQScreen.swift", "EQ/EQSliders.swift",
+             "EQ/EQCurveView.swift", "EQ/EQOutputViews.swift", "Player/NowPlayingSheet.swift"}
 R4_BARS = {"Player/MiniPlayerView.swift", "Root/MainTabs.swift"}
 R5_PAGES = {"Album/AlbumHero.swift", "Album/TrackRow.swift", "Album/AlbumView.swift", "Playlists/PlaylistView.swift"}
+SLICES = R2_LIBRARY | R3B_PAGES | R4_BARS | R5_PAGES
 PHONE_PIECES_DRAWN_IN: set[str] = {"Player/NowPlayingSheet.swift", "Player/NowPlayingView.swift",
-                                   "Requests/RequestCards.swift", "Requests/RequestsScreen.swift"} | R2_LIBRARY | R4_BARS | R5_PAGES
+                                   "Requests/RequestCards.swift", "Requests/RequestsScreen.swift"} | SLICES
 LOOK_PIECES_DRAWN_IN = {"Root/MacSidebarView.swift", "Root/DesktopFrame.swift", "Player/PlayerBar.swift",
                         "Player/MacPanels.swift", "Player/NowPlayingView.swift", "Requests/RequestCards.swift",
-                        "Requests/RequestsScreen.swift"} | R2_LIBRARY | R4_BARS | R5_PAGES | {"Playlists/PlaylistPicker.swift"}
+                        "Requests/RequestsScreen.swift"} | SLICES | {"Playlists/PlaylistPicker.swift"}
 
 
 def test_the_phones_pieces_are_drawn_nowhere_yet():

@@ -89,8 +89,23 @@ struct EQFilterEditor: View {
             if isGone { goBack() }
         }
         .onDisappear {
+            //? (R3b; R3's review) gone with a field still typed in - Back, the sheet's strip or ‹ Now Playing, the sheet
+            //? put down - what was typed is applied, as leaving the field applies it; before the holds are let go, so
+            //? the file is written once, with it
+            leave()
             while holding > 0 { hold(false) }
         }
+    }
+
+    /// The page going: every field still typed in applied where it is in range (EQEditorRules.leaving), as its field
+    /// left would be - nothing typed, or out of range, nothing changes.
+    private func leave() {
+        let output = eq.output(page.output)
+        guard let f = eq.setting(output).correction?.filters.first(where: { (g: EQFilter) -> Bool in g.id == page.id }),
+              let left = EQEditorRules.leaving(editing, filter: f) else { return }
+        editing = [:]
+        refused = []
+        edit(left, output)
     }
 
     // MARK: the sections

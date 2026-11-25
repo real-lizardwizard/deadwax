@@ -13,7 +13,7 @@ and what the slice promised to leave alone:
     (the review) the dock's EQ tab, its preview over it - one EQ, never a second.
   - (The review) A dock tab with nothing to be about says so, never a blank page.
   - The drag down still closes Now Playing.
-  - EQScreen changes only where it reads `inSidePanel` (R3b redraws it).
+  - EQScreen's List - the Mac's side panel's - as R3 left it (R3b redrew the phone's: test_ios_nowplaying_pages_look.py).
   - "Queue on both" (James, 25 Nov, 3.8 answer 3): no word the app shows on the phone or the Mac says "Up Next".
 """
 
@@ -105,16 +105,21 @@ def test_now_playing_has_one_sheet_for_the_queue_info_and_the_eq():
 def test_the_sheet_draws_one_tab_under_its_back_link_and_strip():
     sheet = code(SHEET)
     body = body_of(sheet)
-    order = [body.index(part) for part in ("PhoneTop(leading: {", "PhoneBack(words: NowPlayingTabs.Words.back) { dismiss() }",
-                                           "PhoneStrip(options: NowPlayingTabs.strip, words: NowPlayingTabs.Words.tab, shown: $tab,",
-                                           "switch tab {")]
+    #? (R3b) each page draws the top itself (`sheetTop`, its own buttons at its right): `‹ Now Playing` - the sheet's
+    #? own put-down, read outside every page's stack - in the page's bar, the strip its first row
+    assert "let top = SheetTop(tab: $tab, close: dismiss)" in body
+    bar = member(sheet, "struct SheetTopBar<Trailing: View>: ViewModifier")
+    order = [bar.index(part) for part in ("PhoneStrip(options: NowPlayingTabs.strip, words: NowPlayingTabs.Words.tab, shown: top.tab,",
+                                          "\n            content\n",
+                                          "PhoneBack(words: NowPlayingTabs.Words.back) { top.close() }")]
     assert order == sorted(order)
     #? one tab's page at a time, each once: the tab is the page drawn
     assert body.count("switch tab {") == 1
-    for page in ("case .upNext:\n                    UpNextScreen()", "case .info:\n                    InfoView()",
-                 "case .eq:\n                    EQSheet()"):
+    for page in ("case .upNext:\n                UpNextScreen(sheet: top)",
+                 "case .info:\n                InfoView(sheet: top, picked: $infoTab)",
+                 "case .eq:\n                EQSheet(sheet: top)"):
         assert page in body, page
-    for page in ("UpNextScreen()", "InfoView()", "EQSheet()"):
+    for page in ("UpNextScreen(", "InfoView(", "EQSheet("):
         assert sheet.count(page) == 1, page
     #? no Lyrics in the sheet: they take the cover's place (James, 25 Nov, answer 2)
     for lyrics in ("Lyrics", ".lyrics"):
@@ -198,7 +203,7 @@ def test_a_shared_eq_file_opens_the_sheet_on_eq():
     assert [line.strip() for line in rule.strip().splitlines()] == [
         "if sheet == nil && coverUp { return .waitThenShow(.eq) }", "return .show(.eq)"]
     #? the EQ's own wait (3.9) is EQSheet's, unchanged: the sheet's EQ tab is it
-    assert "EQSheet()" in code(SHEET)
+    assert "EQSheet(sheet: top)" in code(SHEET)
 
 
 # ----------------------------------------------------------------------------- a shared EQ file on the Mac
@@ -282,21 +287,44 @@ def test_the_drag_down_still_closes_now_playing():
     assert ".offset(y: dragY)" in body_of(now)
 
 
-# ----------------------------------------------------------------------------- EQScreen left for R3b
+# ----------------------------------------------------------------------------- EQScreen's List, the Mac's
 
-#? EQScreen's code with every line that reads inSidePanel taken out and its comments blanked, as R3 left it: R3 changed it
-#? only there (the dock's EQ tab titled inline). R3b, which redraws the EQ, sets this afresh.
-EQ_SCREEN_OUTSIDE_THE_PANEL = "c9df3458ccafdd40eef142137bd4fc890988655c5eb6b11dcbc4d7149662a10f"
+#? (R3b) EQScreen's List - the Mac's side panel's page, `listPage` and its sections, and (R3b's review) its filter row,
+#? EQFilterRowView - with its comments blanked, as R3 left it: R3b redrew the phone's EQ as groups of its own beside it
+#? (test_ios_nowplaying_pages_look.py; the phone's filter row is EQPhoneFilterRow), and left the Mac's List alone.
+EQ_SCREEN_LIST = "a6bca7868807bcd99772dfbd3c9fa7180bc44fe39a7b29b969e1c03b48767bee"
 
 
-def outside_the_panel(text: str) -> str:
-    lines = [line.rstrip() for line in reader.views(text)[0].splitlines() if "inSidePanel" not in line]
+def mac_filter_row(text: str) -> str:
+    """EQFilterRowView, the Mac's List's filter row, comments blanked: its declaration to its closing brace."""
+    code_text = reader.views(text)[0]
+    start = text.index("struct EQFilterRowView: View {")
+    return code_text[start:text.index("\n}\n", start) + 2]
+
+
+def the_list(text: str) -> str:
+    code_text = reader.views(text)[0]
+    page = code_text[text.index("    private func listPage("):text.index("    /// What the suggestion is asked again on:")]
+    sections = code_text[text.index("    // MARK: the sections"):text.index("    // MARK: the phone's groups")]
+    lines = [line.rstrip() for line in (page + sections + mac_filter_row(text)).splitlines()]
     return "\n".join(line for line in lines if line.strip())
 
 
-def test_eq_screen_changes_only_where_it_reads_in_side_panel():
+def test_eq_screens_list_is_as_r3_left_it():
     text = EQ_SCREEN.read_text(encoding="utf-8")
-    assert hashlib.sha256(outside_the_panel(text).encode()).hexdigest() == EQ_SCREEN_OUTSIDE_THE_PANEL
+    assert hashlib.sha256(the_list(text).encode()).hexdigest() == EQ_SCREEN_LIST
+    #? (R3b's review) the Mac's filter row takes the List's font and accent: no nil font or tint, which resets them, no
+    #? tint at all, the type's line in the List's own font (only the detail lines set theirs, as R3 had them), and no
+    #? phone path - the phone's row is a struct of its own
+    row = mac_filter_row(text)
+    for reset in (".font(nil", ".tint(", "phone", "Phone", "PhoneLook", "toggleStyle", "Platform."):
+        assert reset not in row, reset
+    assert re.findall(r"\.font\(([^()]*(?:\([^()]*\))?[^()]*)\)", row) == ["Typeface.footnote.monospacedDigit()",
+                                                                           "Typeface.footnote"]
+    #? the Mac's List draws the Mac's row; the phone's groups the phone's, never the Mac's
+    groups = code(EQ_SCREEN)[text.index("    // MARK: the phone's groups"):]
+    assert "EQFilterRowView(row:" in the_list(text) and "EQPhoneFilterRow(" not in the_list(text)
+    assert "EQPhoneFilterRow(row:" in groups and "EQFilterRowView(" not in groups
     reads = [line.strip() for line in reader.views(text)[0].splitlines() if "inSidePanel" in line]
     assert reads == ["@Environment(\\.inSidePanel) private var inSidePanel",
                      ".navigationBarTitleDisplayMode(done == nil && !inSidePanel ? .large : .inline)"], reads

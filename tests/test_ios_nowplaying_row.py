@@ -300,10 +300,12 @@ def test_the_output_is_airplays_picker_alone_saying_where_it_plays():
     assert background.strip() == "AirPlayButton(glyph: false, playsTo: name)"
     assert "let name = eq.settings.setting(for: eq.route).shownName" in item and "Text(name)" in drawn
     assert "Image(systemName: NowPlayingTabs.symbol(.output) ?? \"\")" in code(NOW_PLAYING)
-    #? the picker: AirPlay by name, where it plays as its value, its glyph hidden there
+    #? the picker: AirPlay by name, where it plays as its value, its glyph hidden there - (R3b's review) unless it is
+    #? told what to say (`said`, the EQ page's output button's alone); this column tells it nothing (above)
     picker = bare(AIRPLAY)
     dress = member(picker, "private func dress")
-    for line in ("picker.accessibilityLabel = NowPlayingWords.airPlay", "picker.accessibilityValue = playsTo",
+    for line in ("picker.accessibilityLabel = said?.label ?? NowPlayingWords.airPlay",
+                 "picker.accessibilityValue = said?.value ?? playsTo",
                  "picker.tintColor = glyph ? UIColor.label : UIColor.clear",
                  "picker.activeTintColor = glyph ? UIColor(Palette.accent) : UIColor.clear"):
         assert line in dress, line

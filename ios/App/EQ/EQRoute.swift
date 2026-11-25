@@ -5,7 +5,7 @@ import SwiftUI
 /// Playing on the sheet's own stack - so the pages link through `EQLink`, which pushes the value the stack they are on
 /// takes.
 enum EQRoute: Hashable {
-    /// The EQ page of the output now (You's row, Now Playing's •••): it follows the route.
+    /// The EQ page of the output now (You's row, Now Playing's EQ): it follows the route.
     case now
     /// One output's EQ page (Other outputs): it stays on that output.
     case output(String)
@@ -99,6 +99,9 @@ struct EQDestination: View {
 /// "Done" at the top right of each, closing the sheet. Over the tabs too, for a file shared to deadwax (3.9) - and
 /// either way a shared file's preview comes up over it as it stands, once it is itself up.
 struct EQSheet: View {
+    /// (The redesign, R3b) In Now Playing's sheet, its EQ tab: the sheet's top, handed to the EQ page at the stack's
+    /// root - nil for the EQ sheet over the tabs (a shared file's, 3.9).
+    var sheet: SheetTop? = nil
     /// The sheet's own (read outside its stack, so it closes the sheet rather than popping a page).
     @Environment(\.dismiss) private var dismiss
     @Environment(AppNavigation.self) private var navigation
@@ -109,7 +112,7 @@ struct EQSheet: View {
 
     var body: some View {
         NavigationStack(path: $stack.path) {
-            EQScreen(opened: .now)
+            EQScreen(opened: .now, sheet: sheet)
                 .navigationDestination(for: EQRoute.self) { route in
                     EQDestination(route: route)
                 }

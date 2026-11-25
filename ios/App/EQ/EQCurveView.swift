@@ -24,6 +24,10 @@ import SwiftUI
 ///   the selected one's numbers in a capsule above the plot - its room kept whether or not one is selected, so the
 ///   plot doesn't move when one is. The handles are hidden from VoiceOver: each filter's row reaches everything they
 ///   do. The filter's editor draws its own curve the same way, 120 pt, its one handle.
+/// - **In a well** (`well`: the redesign, slice R3b - the phone's EQ page, iEQ's `.well`): the same curve in the look's
+///   colours - the grid in the card's colour, the 0 dB line in a button's edge, the line in the accent (the right ear in
+///   its lighter shade), a correction's and the tone's in the third colour, and the labels in the third colour in mono.
+///   What it draws, and how it moves, are as they were.
 struct EQCurveView: View {
     let drawing: EQDrawing
     /// the output's name, for the audio graph's title
@@ -34,6 +38,8 @@ struct EQCurveView: View {
     var height: CGFloat = EQCurveView.height
     /// Advanced's handles; nil for none
     var handles: EQHandles?
+    /// (R3b) drawn for a well, in the look's colours (the phone's EQ page)
+    var well = false
 
     static let height: CGFloat = 150
 
@@ -78,9 +84,9 @@ struct EQCurveView: View {
     private var plot: some View {
         ZStack(alignment: .topLeading) {
             EQGridShape(range: drawing.range)
-                .stroke(increased ? Palette.textTertiary : Palette.barEdge, lineWidth: hairline)
+                .stroke(gridColour, lineWidth: hairline)
             EQZeroLine()
-                .stroke(Palette.textTertiary, lineWidth: 1)
+                .stroke(well ? DWPalette.buttonEdge : Palette.textTertiary, lineWidth: 1)
             if drawing.on, let heard = drawing.lines.first {
                 EQCurveShape(values: EQVector(heard.db), frequencies: drawing.frequencies, range: drawing.range,
                              closed: true)
@@ -98,13 +104,27 @@ struct EQCurveView: View {
     }
 
     private func color(_ line: EQDrawing.Line) -> Color {
-        guard drawing.on else { return Palette.quiet }
+        guard drawing.on else { return labelColour }
         switch line.kind {
-        case .heard: return Palette.accent
-        case .right: return Palette.accentText
-        case .correction, .tone: return Palette.quiet
+        case .heard: return accent
+        case .right: return rightEar
+        case .correction, .tone: return labelColour
         }
     }
+
+    /// The grid's hairlines: the card's colour in a well, `barEdge` otherwise - `textTertiary` under Increase Contrast.
+    private var gridColour: Color {
+        if increased { return well ? DWPalette.t3 : Palette.textTertiary }
+        return well ? DWPalette.card : Palette.barEdge
+    }
+
+    /// The line's colour, and the right ear's.
+    private var accent: Color { well ? DWPalette.acc : Palette.accent }
+    private var rightEar: Color { well ? DWPalette.acct : Palette.accentText }
+    /// The labels', and a correction's and the tone's lines'.
+    private var labelColour: Color { well ? DWPalette.t3 : Palette.quiet }
+    /// The labels' face: in mono, in a well.
+    private var labelFont: Font { well ? Typeface.Phone.mono(.extraSmall) : Typeface.caption2.monospacedDigit() }
 
     private func style(_ line: EQDrawing.Line) -> StrokeStyle {
         switch line.kind {
@@ -123,8 +143,8 @@ struct EQCurveView: View {
             let height = Double(geometry.size.height)
             ForEach(Array(zip([12.0, 0, -12], EQWords.Screen.gainLabels)), id: \.1) { gain, label in
                 Text(label)
-                    .font(Typeface.caption2.monospacedDigit())
-                    .foregroundStyle(Palette.quiet)
+                    .font(labelFont)
+                    .foregroundStyle(labelColour)
                     .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
                     .fixedSize()
                     // just above its line, so the line runs under it unbroken
@@ -139,8 +159,8 @@ struct EQCurveView: View {
             let height = Double(geometry.size.height)
             ForEach(drawing.lines.filter { $0.label != nil }, id: \.kind) { line in
                 Text(line.label ?? "")
-                    .font(Typeface.caption2)
-                    .foregroundStyle(line.kind == .right ? Palette.accentText : Palette.accent)
+                    .font(well ? Typeface.Phone.text(.extraSmall) : Typeface.caption2)
+                    .foregroundStyle(line.kind == .right ? rightEar : accent)
                     .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
                     .fixedSize()
                     .position(x: Double(geometry.size.width) - 24,
@@ -155,8 +175,8 @@ struct EQCurveView: View {
         GeometryReader { geometry in
             ForEach(Array(zip([100.0, 1_000, 10_000], EQWords.Screen.frequencyLabels)), id: \.1) { frequency, label in
                 Text(label)
-                    .font(Typeface.caption2.monospacedDigit())
-                    .foregroundStyle(Palette.quiet)
+                    .font(labelFont)
+                    .foregroundStyle(labelColour)
                     .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
                     .fixedSize()
                     .position(x: EQDrawing.x(frequency, width: Double(geometry.size.width)),

@@ -43,6 +43,9 @@ public struct SongDetails: Decodable, Sendable, Equatable {
     public let suffix: String?
     /// left out by Navidrome until the song has been played
     public let playCount: Double?
+    /// (R3b) when it was last played, as Navidrome sends it ("2026-11-25T09:14:03.117Z") - left out until it has been
+    /// played, and by a Navidrome too old to say
+    public let played: String?
     /// OpenSubsonic: who wrote it, as one line
     public let displayComposer: String?
     /// OpenSubsonic: everyone credited, by role
@@ -50,7 +53,7 @@ public struct SongDetails: Decodable, Sendable, Equatable {
 
     public init(id: String? = nil, artist: String? = nil, artistId: String? = nil, track: Double? = nil, discNumber: Double? = nil,
                 duration: Double? = nil, suffix: String? = nil, playCount: Double? = nil, displayComposer: String? = nil,
-                contributors: [Credit]? = nil) {
+                contributors: [Credit]? = nil, played: String? = nil) {
         self.id = id
         self.artist = artist
         self.artistId = artistId
@@ -59,12 +62,13 @@ public struct SongDetails: Decodable, Sendable, Equatable {
         self.duration = duration
         self.suffix = suffix
         self.playCount = playCount
+        self.played = played
         self.displayComposer = displayComposer
         self.contributors = contributors
     }
 
     enum CodingKeys: String, CodingKey {
-        case id, artist, artistId, track, discNumber, duration, suffix, playCount, displayComposer, contributors
+        case id, artist, artistId, track, discNumber, duration, suffix, playCount, played, displayComposer, contributors
     }
 
     public init(from decoder: Decoder) throws {
@@ -77,6 +81,7 @@ public struct SongDetails: Decodable, Sendable, Equatable {
         duration = keyed.aboutNumber(.duration)
         suffix = keyed.aboutString(.suffix)
         playCount = keyed.aboutNumber(.playCount)
+        played = keyed.aboutString(.played)
         displayComposer = keyed.aboutString(.displayComposer)
         contributors = keyed.aboutList(.contributors)
     }
@@ -358,6 +363,96 @@ public enum AboutCard {
         return WebText.unique(names).joined(separator: ", ")
     }
 
+    /// (R3b) Info's facts as rows (iInfo's This song and The album, cards of kv rows - and the Mac's dock's Info): the
+    /// song's Track ("4 of 10"), Disc, Length, Size (R3b's review: the file's `size` in bytes and `bitRate` in kbps, as
+    /// Navidrome's song carries them, "24 MB · 921 kbps" - either alone, no row for neither), Played and Written by;
+    /// the album's Released, Label, Songs, This pressing
+    /// and, for an admin (`folders`), Folder - each only where `about` would say it, from the same answers, in the same
+    /// words (AboutFactWords' labels before them). The album's format is left to the song's Format row (Sound's, which
+    /// says it whole: "FLAC 16-bit 44.1 kHz"), as iInfo has one Format. And the song's row's line, "Wilco (The Album) ·
+    /// 2009", and the artist Go to artist opens. Nothing of `about` changes.
+    public static func facts(track: AboutTrack, album: AboutAlbum?, details: AboutDetails? = nil, folders: Bool = false,
+                             size: Int64? = nil, bitRate: Int? = nil, now: Int64, zone: TimeZone = .current) -> AboutFacts {
+        let songs = album?.song ?? []
+        let song = songs.first { $0.id.map { WebText.same($0, track.id) } ?? false }
+        let all = album?.partial == true ? [] : songs
+        let fresh = details?.song.flatMap { $0.id.map { WebText.same($0, track.id) } == true ? $0 : nil }
+        typealias W = AboutFactWords
+        var mine: [InfoRow] = []
+        if let song {
+            let of = trackOf(song, all)
+            if !of.isEmpty { mine.append(InfoRow(label: W.track, value: String(of.dropFirst("Track ".count)), mono: true)) }
+            if let album, album.partial != true {
+                let disc = discLine(song, album)
+                if !disc.isEmpty { mine.append(InfoRow(label: W.disc, value: String(disc.dropFirst("Disc ".count)))) }
+            }
+        }
+        let length = trackTime(song?.duration ?? track.duration)
+        if !length.isEmpty { mine.append(InfoRow(label: W.length, value: length, mono: true)) }
+        let file = sizeLine(size: size, bitRate: bitRate)
+        if !file.isEmpty { mine.append(InfoRow(label: W.size, value: file, mono: true)) }
+        if let played = played(track: track, album: album, details: details, now: now, zone: zone) {
+            mine.append(InfoRow(label: W.played, value: played, mono: true))
+        }
+        let writers = writtenBy(fresh ?? song)
+        if !writers.isEmpty { mine.append(InfoRow(label: W.writtenBy, value: writers)) }
+
+        var its: [InfoRow] = []
+        let year = WebText.whole(album?.year).map(String.init) ?? ""
+        if !year.isEmpty { its.append(InfoRow(label: W.released, value: year, mono: true)) }
+        let label = labelLine(album?.recordLabels)
+        if !label.isEmpty { its.append(InfoRow(label: W.label, value: label)) }
+        let format = sharedFormat(all) ?? ""
+        let count = !all.isEmpty ? all.count : (WebText.whole(album?.songCount) ?? 0)
+        if count > 0 { its.append(InfoRow(label: W.songs, value: String(count), mono: true)) }
+        let present = details?.present ?? []
+        if pressingAdds(present, year: year, format: format), let pressing = pressingLine(present) {
+            its.append(InfoRow(label: W.pressing, value: String(pressing.dropFirst("This pressing: ".count))))
+        }
+        if folders, let folder = folderLine(present) {
+            its.append(InfoRow(label: W.folder, value: folder, mono: true))
+        }
+        let line = [WebText.trim(album?.name ?? track.album), year].filter { !$0.isEmpty }.joined(separator: dot)
+        return AboutFacts(song: mine, album: its, line: line,
+                          artistID: artistID(track: track, album: album, song: fresh ?? song))
+    }
+
+    /// (R3b's review) Info's Size row's value: the file's size in the web's words (Sources.size: "24 MB", "1.2 GB") and
+    /// its bit rate ("921 kbps", Navidrome's own number, in kbps) - "24 MB · 921 kbps", either alone, "" for neither (no
+    /// size, none of 0; no bit rate, none at or below 0).
+    public static func sizeLine(size: Int64?, bitRate: Int?) -> String {
+        let bytes = size.flatMap { $0 > 0 ? Sources.size(Double($0)) : nil } ?? ""
+        let rate = bitRate.flatMap { $0 > 0 ? "\($0) kbps" : nil } ?? ""
+        return [bytes, rate].filter { !$0.isEmpty }.joined(separator: dot)
+    }
+
+    /// (R3b) The artist Info's Go to artist opens: the song's own artist's id - as Navidrome has the song now, else as
+    /// its album had it - else the album's artist's, only where the album's artist is the song's (a compilation's
+    /// "Various Artists" is never the song's). Nil where none is known: no Go to artist.
+    static func artistID(track: AboutTrack, album: AboutAlbum?, song: SongDetails?) -> String? {
+        if let id = song?.artistId.map(WebText.trim), !id.isEmpty { return id }
+        guard let album, let id = album.artistId.map(WebText.trim), !id.isEmpty,
+              let name = album.artist, WebText.same(WebText.trim(name), WebText.trim(track.artist)) else { return nil }
+        return id
+    }
+
+    /// (R3b) Info's Played row (iInfo's "19 times · today"): how often the song playing has been played - by the song
+    /// as Navidrome has it now, else as it was when its album was played from, as `about`'s line counts it - and, only
+    /// where that answer says when, the day it last was, in the Library's words (ArtistTotals.lastPlayedWords: today,
+    /// yesterday, 3 days ago, last week, 12 Nov) against `now`, in milliseconds. Nil for a song never played: no count,
+    /// or none above 0 - never "0 times". A day without a count is never said.
+    public static func played(track: AboutTrack, album: AboutAlbum?, details: AboutDetails?, now: Int64,
+                              zone: TimeZone = .current) -> String? {
+        let song = (album?.song ?? []).first { $0.id.map { WebText.same($0, track.id) } ?? false }
+        let fresh = details?.song.flatMap { $0.id.map { WebText.same($0, track.id) } == true ? $0 : nil }
+        let counted = fresh ?? song
+        guard let plays = WebText.whole(counted?.playCount), plays > 0 else { return nil }
+        let times = plays == 1 ? "once" : "\(plays) times"
+        let when = AlbumTime.ms(counted?.played, zone: zone).flatMap { (ms: Int64) -> Int64? in ms > 0 ? ms : nil }
+        let day = ArtistTotals.lastPlayedWords(when, now: now, zone: zone)
+        return day.isEmpty ? times : times + dot + day
+    }
+
     /// "played 12 times", "played once" - "" for a song never played (Navidrome then sends no count).
     public static func playedLine(_ count: Double?) -> String {
         guard let plays = WebText.whole(count) else { return "" }
@@ -464,6 +559,44 @@ public enum AboutCard {
         let paths = present.compactMap(\.path).filter { !$0.isEmpty }
         return paths.isEmpty ? nil : paths.joined(separator: "\n")
     }
+}
+
+/// (R3b) Info's facts as rows: the song's and the album's (AboutCard.facts).
+public struct AboutFacts: Sendable, Equatable {
+    public let song: [InfoRow]
+    public let album: [InfoRow]
+    /// The song's row's line under its artist: "Wilco (The Album) · 2009" - "" when neither is known.
+    public let line: String
+    /// The artist Go to artist opens; nil: none known.
+    public let artistID: String?
+
+    public init(song: [InfoRow], album: [InfoRow], line: String = "", artistID: String? = nil) {
+        self.song = song
+        self.album = album
+        self.line = line
+        self.artistID = artistID
+    }
+}
+
+/// (R3b) Info's own words on the phone (iInfo) and in the Mac's dock: its two cards' legends, their rows' labels, and
+/// the two ways on.
+public enum AboutFactWords {
+    public static let thisSong = "This song"
+    public static let theAlbum = InfoWords.albumTitle
+    public static let track = "Track"
+    public static let disc = "Disc"
+    public static let length = "Length"
+    /// (R3b's review) iInfo's Size: the file's size and bit rate.
+    public static let size = "Size"
+    public static let played = "Played"
+    public static let writtenBy = "Written by"
+    public static let released = "Released"
+    public static let label = "Label"
+    public static let songs = "Songs"
+    public static let pressing = "This pressing"
+    public static let folder = InfoWords.folder
+    public static let goToAlbum = "Go to album"
+    public static let goToArtist = "Go to artist"
 }
 
 extension KeyedDecodingContainer {

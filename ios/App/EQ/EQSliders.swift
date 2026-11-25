@@ -18,6 +18,10 @@ import UIKit
 /// - **Moves**: a preset chosen moves the knobs over 0.25 s, at once under Reduce Motion; a drag never animates.
 /// - **VoiceOver**: each column one adjustable element - "125 hertz", "plus 3.5 decibels" - a swipe up or down 1 dB,
 ///   and the action "Reset to 0"; the ten in frequency order. The tick isn't given to VoiceOver's steps.
+/// - **On the phone** (the redesign, slice R3b - iEQ's Tone): the same sliders in the look's colours - each track a well,
+///   square, the 0 dB line in a button's edge, the scale and the names in the third colour in mono, the held value on the
+///   card's colour. The knob stays round (round stays round), in the switch's knob's face and drop. The Mac's are as
+///   they were. Sizes, the drag, the moves and VoiceOver are the same on both.
 struct EQSliders: View {
     let gains: [Double]
     /// a band's new value
@@ -29,6 +33,8 @@ struct EQSliders: View {
     static let knob: CGFloat = 24
     /// room above and below the track for the knob's half, and the held value's capsule
     static let margin: CGFloat = 14
+    /// (R3b) Drawn in the phone's look.
+    static var phone: Bool { !Platform.mac }
 
     @State private var grab: Grab?
     @State private var lastTap: (band: Int, at: Date)?
@@ -51,7 +57,7 @@ struct EQSliders: View {
                 ZStack(alignment: .topLeading) {
                     // the 0 dB line across all ten, under the tracks
                     Rectangle()
-                        .fill(Palette.textTertiary)
+                        .fill(Self.phone ? DWPalette.buttonEdge : Palette.textTertiary)
                         .frame(width: geometry.size.width, height: 1)
                         .offset(y: Self.margin + Self.track / 2 - 0.5)
                     scale
@@ -90,8 +96,8 @@ struct EQSliders: View {
     private var scale: some View {
         ForEach(Array(zip([12.0, 0, -12], EQWords.Screen.gainLabels)), id: \.1) { gain, label in
             Text(label)
-                .font(Typeface.caption2.monospacedDigit())
-                .foregroundStyle(Palette.quiet)
+                .font(Self.labelFont)
+                .foregroundStyle(Self.labelColour)
                 .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
                 .fixedSize()
                 .position(x: 10, y: Self.margin + Self.track * EQSliderRules.place(gain) - 8)
@@ -104,8 +110,8 @@ struct EQSliders: View {
         HStack(spacing: 0) {
             ForEach(gains.indices, id: \.self) { band in
                 Text(EQWords.Tone.bands[band])
-                    .font(Typeface.caption2.monospacedDigit())
-                    .foregroundStyle(Palette.quiet)
+                    .font(Self.labelFont)
+                    .foregroundStyle(Self.labelColour)
                     .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
                     .lineLimit(1)
                     .minimumScaleFactor(0.7)
@@ -114,6 +120,10 @@ struct EQSliders: View {
         }
         .accessibilityHidden(true)
     }
+
+    /// The scale's and the names' face and colour: the third colour in mono on the phone.
+    static var labelFont: Font { phone ? Typeface.Phone.mono(.extraSmall) : Typeface.caption2.monospacedDigit() }
+    static var labelColour: Color { phone ? DWPalette.t3 : Palette.quiet }
 
     private func drag(column: CGFloat) -> some Gesture {
         DragGesture(minimumDistance: 0, coordinateSpace: .local)
@@ -177,28 +187,25 @@ private struct EQBandColumn: View {
         let knobY = top + track * EQSliderRules.place(gain)
         let zeroY = top + track / 2
         ZStack(alignment: .top) {
-            Corners.trackShape
-                .fill(Palette.barTrack)
-                .overlay(Corners.trackShape.strokeBorder(Palette.barEdge, lineWidth: 1 / max(displayScale, 1)))
+            trackFace
                 .frame(width: 4, height: track)
                 .offset(y: top)
             Rectangle()
-                .fill(Palette.accent)
+                .fill(EQSliders.phone ? DWPalette.acc : Palette.accent)
                 .frame(width: 4, height: abs(knobY - zeroY))
                 .offset(y: min(knobY, zeroY))
-            Circle()
-                .fill(Color.white)
+            knob
                 .frame(width: EQSliders.knob, height: EQSliders.knob)
-                .shadow(color: .black.opacity(0.3), radius: 3, y: 2)
                 .offset(y: knobY - EQSliders.knob / 2)
             if held {
                 Text(EQWords.held(gain))
-                    .font(Typeface.caption.monospacedDigit().weight(.semibold))
+                    .font(EQSliders.phone ? Typeface.Phone.mono(.extraSmall).weight(.semibold)
+                                          : Typeface.caption.monospacedDigit().weight(.semibold))
                     .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
                     .fixedSize()
                     .padding(.horizontal, 6)
                     .padding(.vertical, 2)
-                    .background(Palette.barTrack, in: Corners.controlShape)
+                    .background { chipFace }
                     // above the knob; below it near the top, where above is off the row
                     .offset(y: gain > 6 ? knobY + EQSliders.knob / 2 + 4 : knobY - EQSliders.knob / 2 - 24)
                     .allowsHitTesting(false)
@@ -217,6 +224,42 @@ private struct EQBandColumn: View {
             }
         }
         .accessibilityAction(named: EQWords.Tone.resetToZero, onReset)
+    }
+
+    /// The track: (R3b) on the phone a well, square, in the line's edge; on the Mac `barTrack` in its hairline.
+    @ViewBuilder private var trackFace: some View {
+        if EQSliders.phone {
+            DWCorners.boxShape
+                .fill(DWPalette.well.shadow(.inner(color: DWPalette.wellShade, radius: 1, x: 0, y: 1)))
+                .overlay(DWCorners.boxShape.strokeBorder(DWPalette.line, lineWidth: 1 / max(displayScale, 1)))
+        } else {
+            Corners.trackShape
+                .fill(Palette.barTrack)
+                .overlay(Corners.trackShape.strokeBorder(Palette.barEdge, lineWidth: 1 / max(displayScale, 1)))
+        }
+    }
+
+    /// The knob, round on both (round stays round): (R3b) on the phone the switch's knob's face and drop; on the Mac
+    /// white with the iOS slider's own shadow.
+    @ViewBuilder private var knob: some View {
+        if EQSliders.phone {
+            Circle()
+                .fill(DWPalette.switchKnob)
+                .shadow(color: DWPalette.switchKnobDrop, radius: 1, x: 0, y: 1)
+        } else {
+            Circle()
+                .fill(Color.white)
+                .shadow(color: .black.opacity(0.3), radius: 3, y: 2)
+        }
+    }
+
+    /// The held value's chip: (R3b) on the phone the card's colour, square; on the Mac `barTrack`.
+    @ViewBuilder private var chipFace: some View {
+        if EQSliders.phone {
+            DWCorners.buttonShape.fill(DWPalette.card)
+        } else {
+            Corners.controlShape.fill(Palette.barTrack)
+        }
     }
 }
 

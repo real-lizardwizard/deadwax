@@ -17302,6 +17302,237 @@ committed.
 
 Tests after review: test_ios_phone_look 22 (from 19), DWLookTests 5 (from 4).
 
+## The redesign, slice R3b: the Queue, Info and the EQ inside (2026-11-25)
+
+The build plan's 3.4 "R3b" (~/Desktop/Code/deadwax-plans/mac-redesign-build.md): Now Playing's sheet's three pages
+redrawn on the phone as iQueue, iInfo and iEQ, and on the Mac the dock's Queue and Info tabs given the same time left
+and Played. "Queue" on both. No server data, no engine diff (DeadwaxAudio, AudioSessionController, Core's UpNext and
+QueueController are untouched), and the EQ's settings, curve and processing are as they were: its controls are redrawn,
+each making the same EQModel call it made. The app is still 0.13 (13); `__version__` is untouched.
+
+### What was built
+
+**The sheet's top is each page's (NowPlayingSheet.swift).** R3's sheet drew PhoneTop and the strip over every page. Now
+`SheetTop` (the strip's tab binding and the sheet's own dismiss, read outside every page's stack) is handed to each page,
+and `sheetTop(top) { trailing }` puts `‹ Now Playing` and the page's own buttons in the page's NavigationStack bar
+(iOS 26's glass behind them hidden), with the strip as the root page's first row. A page pushed on a stack (Album info,
+the EQ's pages) has the system's bar and Back as before; the strip is on root pages only. The sheet keeps Info's
+About/Debug choice (`infoTab`), so the strip's taps keep it (R3's review, 9). `.presentationBackground(DWPalette.panel)`.
+
+**The Queue (UpNextScreen.swift; Core QueueTimeLeft.swift).** On the phone (`sheet != nil`) still a List - Edit's
+moves and removals are the List's - in the plain style with the look's rows:
+- The top: History (scrolls the song playing's row to the view's foot, what was played over it) and Clear (Playing
+  Next out), then Edit/Done, each DWButtonStyle small. From xLarge (`folds`: `size > .large`) History and Clear go in
+  a •••. Worked out for 375 points at 0.55 em a letter: about 362 at Large unfolded, 395 at xLarge unfolded (so it
+  folds there), about 323 at xxxLarge folded, where the top stops growing.
+- The song playing as the selected row (selbg/selbd/selt, tallRowHeight), first - (R3b's review) with no heading over
+  it, nor over Playing Next's songs after it, each saying its artist and album; `QueuePageWords.heading` turns "From
+  X" into "Next from X", the one heading; under an album's heading of one album and one artist the rows are their
+  titles alone (`showsLines`). Rows are rowHeight (48 on the phone), Edit's rows too (`QueueRowHeight`, a modifier,
+  never a frame of 0 on the Mac - lookHeight is an exact height there).
+- The foot: Shuffle and Repeat (lit while on, VoiceOver's "selected"), and the time left. ViewThatFits: one line, or
+  the time on its own line under the two. Capped at xxxLarge.
+- `QueueTimeLeft.words(view, position:speed:)`: "8 songs · 33 min left" from UpNextView's rows - Playing Next's, the
+  list's and its `more` - plus what is left of the song playing (its length less the position, never below none),
+  divided by the speed. History never counts. Rounded up to the minute (`span`: "1 hr 12 min"); (R3b's review)
+  `left`: under a minute "under 1 min left", none left no time at all. "over …" with a song of unknown length or
+  `more`, rounded DOWN so it never says more than is known, and under a whole minute known no time ("2 songs") -
+  never "over 0 min left". Repeat One says the songs alone; Repeat All counts the one round the list draws (the rest
+  of the round playing, or at its last song the next round, "again"), never the rounds after - the `then` line's;
+  nothing playing, or nothing to say, nil. Read in `QueueTimeLeftLine`, a small view of its own - the only one
+  reading `player.shownPosition` and `player.speed`.
+- The plays are unchanged: a row's tap is `player.jump(to: row.key)`, History's `guard player.jump(to: row.key)`, an
+  older row's `player.rollBack(handed.rows, floor:)`, each in the tap with nothing awaited before it.
+- The Mac keeps its insetGrouped List, its headers with Clear, its toolbar Edit and Done with Escape; it gains the time
+  left along the panel's foot (`macFoot`), (R3b's review) in the status bar's 11.5 in its own type (Typeface.Look's
+  chip, not mono), at the foot's left.
+
+**Info (InfoView.swift; Core About.swift, additive).** `InfoView(sheet:picked:)`. In the sheet, a ScrollView of:
+- the song's row (cover 64, title, artist in the accent, `facts.line` "Wilco (The Album) · 2009"), one element;
+- DWSegmented About/Debug for an admin, bound to the sheet's `infoTab`;
+- **This song** (PhoneGroup): Sound's Format first, then `facts.song` - Track, Disc, Length, Size, Played, Written
+  by - then the rest of Sound, Plays from, and the EQ's row (InfoEQRow, its own view, reading `eq.infoSound`);
+- **The album**: `facts.album` - Released, Label, Songs, This pressing (logins on), Folder (an admin) - and Album
+  info, pushed on the page's stack as before;
+- **Go to album** (`navigation.openAlbum(route)`) and **Go to artist** (Now Playing put away, then the artist's
+  page - not pushed again when it is already the page on top), DWButtonStyle filled, stacked at the accessibility sizes.
+- Each kv row (InfoKV) is one element, its value under its label at the accessibility sizes. Debug's sections are the
+  same as before, in the look's rows.
+- `AboutCard.facts(track:album:details:folders:size:bitRate:now:zone:)` gives the rows; the album's own Format row is
+  left out, as the song's Format says it whole. (R3b's review) **Size** is `AboutCard.sizeLine`: the file's `size` in
+  Sources.size's words ("24 MB", "1.2 GB" - the web's, rounded to the MB) and its `bitRate` ("921 kbps"), "24 MB ·
+  921 kbps", either alone, no row for neither (nil, or 0) - from the song as the player has it (`player.song(for:
+  entry)`, Navidrome's Song; a queue put back has none, so no row), mono. `AboutCard.played` is "19 times · today":
+  the count from the fresh song answer, else the album's; nil for no count or 0 (never "0 times"); the day only where
+  that answer has a `played` date, in `ArtistTotals.lastPlayedWords`' words. Live, only the fresh answer can carry
+  that date: Info's ask decodes getSong as the relay passes it on (`played` among it), while the album's songs come
+  from the routes' Song through `SongDetails(song:)`, which has no `played` - so the fallback is the count alone
+  (InfoPlayedTests now says so). `artistID` is the song's artist's id, else the album's only when the album's artist
+  is the song's (never "Various Artists").
+- `now` is `@State`, set from `ArtistTotals.now()` on appear and on `significantTimeChangeNotification`, so "today"
+  moves at midnight.
+- The Mac's dock: the song section's lines become `facts.song`'s rows (LabeledContent), Played among them. The rest of
+  the Mac's Info is as it was; Go to artist is the phone's only.
+
+**The EQ (EQScreen, EQSliders, EQCurveView, EQOutputViews; EQRoute for the way in).** `EQSheet(sheet:)` hands the
+sheet's top to `EQScreen(opened: .now, sheet:)` at its stack's root only (EQDestination's pages have none).
+- On the phone (`cards = !Platform.mac`, You's stack included) a ScrollView of the look's groups: the output's button
+  (EQOutputButton: "Output", the name, " · Not connected" where it isn't, a caret, on DWRaised - its face not
+  hit-tested and hidden from VoiceOver, AirPlayButton(glyph: false) under it, so a tap is AirPlay's list; (R3b's
+  review) AirPlay's button says what the old EQOutputHeader said - its name the page's output ("James's AirPods
+  Pro"), its value "Connected now" or "Not connected" - and as its hint "Opens AirPlay. Playing on James's iPhone
+  now." (`EQWords.Screen.outputHint`), through `AirPlayButton(said:)`; everywhere else AirPlay's button says
+  "AirPlay" and where the music plays, as before), the curve in a well (`EQCurveView(well: true)` over DWWell, its
+  lines in the look's colours), the line under it, then Correction, Tone, Preamp (Advanced), Other outputs and
+  Advanced as PhoneGroups, and Forget This Output as a danger button.
+- "EQ on" is a real Toggle with `.toggleStyle(.phoneSwitch)` (PhoneSwitchStyle - VoiceOver reads a switch, "EQ for
+  James's AirPods Pro"): in the sheet at the top's right beside the ••• (small, square, `menuIndicator(.hidden)`)
+  with no Done (`‹ Now Playing` puts the sheet down); on You's stack the system title, the toolbar ••• and Done as
+  before, and the switch under the output's button. (R3b's review) In the sheet's top from xxxLarge (`folds`: `size >
+  .xxLarge`) the switch stands alone, its words folded away (VoiceOver's name for it the same): worked out at 0.55 em
+  a letter, counting the switch's gap on both sides of its Spacer, the top is about 306 at Large, 328 at xLarge, 350
+  at xxLarge, 372 at xxxLarge unfolded - too close to 375 - and about 312 folded. "EQ on" is iEQ's own word, kept as
+  drawn. Advanced's switch is the purple switch too, and (R3b's review) so are the filters' switches -
+  `EQPhoneFilterRow`, the phone's row of its own, its switch `.toggleStyle(.phoneSwitch)` (the knob the look's
+  switchKnob, never the accent's tint). The Mac's filter row, `EQFilterRowView`, is R3's byte for byte: R3b's first
+  cut gave it a `phone:` path that set `.font(nil)` and `.tint(nil)` on the Mac, resetting the List's font and
+  accent - the review caught it.
+- The sliders on the phone: the track a square well, the fill the accent, the chip the card's; the knobs stay round
+  (Circle, the switch's knob colour and drop). The Mac's sliders are as they were.
+- The Mac keeps the List verbatim (`listPage`, the sections and its filter row EQFilterRowView, byte for byte -
+  test_ios_panels_look.py hashes them, and checks the row sets no nil font, no tint and has no phone path), with its
+  swipes and its one contextMenu.
+- **What the groups can't have, the List's swipes and long press**, and what replaced each on the phone - (R3b's
+  review) by touch, on the row itself, without opening the editor or the output's page: a filter's swipe to Delete is
+  a long press with Delete (and VoiceOver's action, and the editor's Delete Filter); Other outputs' swipe to Rename
+  and Forget is a long press with Rename and Forget (never the speaker; VoiceOver's actions too, and the output's own
+  page's •••); Correction's long press keeps Back to AutoEq's (in Advanced, for a changed AutoEq correction; also the
+  •••'s); AutoEq's suggestion's Not now is a small button beside it (and still VoiceOver's action). **A departure for
+  James: on the phone the List's swipes became long presses.** Why not a List styled as the groups (the review's
+  first choice): a List draws its own disclosure chevrons and row highlight on NavigationLinks (EQLink), doubling
+  PhoneGo's chevron; its rows can't draw a group's one border (per-row edges, the first and last rounded); and none
+  of it could be seen without a simulator, which this work may not use. A context menu is the system's own long
+  press, on rows that stay as drawn. test_ios_mac.py's PHONE_LONG_PRESSES counts EQScreen's four.
+- `onTop` and the route-following are unchanged: `appeared && ask == nil && forgetting == nil && !eqPreviewUp && !(done
+  == nil && (nowPlayingShown || eqImportSheet))`, `.onChange(of: onTop)` and `.onChange(of: eq.route.key)` as before.
+- The header comment no longer mentions Now Playing's ••• (R3's review): "Now Playing's EQ".
+
+**The filter editor (EQFilterEditor.swift; Core EQPhonePage.swift), from R3's review.** Back, the strip, `‹ Now
+Playing` or the sheet swiped away never leave the field the way a tap elsewhere does, so a typed value was lost.
+`onDisappear` now calls `leave()` before letting the holds go: `EQEditorRules.leaving(editing, filter:)` applies each
+typed field in range, in the editor's order (Frequency, Gain, the width), each checked against the filter as the ones
+before left it; out of range or nothing typed, nothing (nil). Applied with the editor's own `edit`, so the file is
+written once, with it.
+
+### What else is lost when the sheet's page goes (R3's review asked)
+
+- **A page pushed on a tab's stack** (the EQ's presets, correction or a filter; Info's Album info) is gone when the
+  strip moves to another tab: one tab's page is drawn at a time, so its stack goes with it. Keeping it would mean
+  keeping each tab's view alive (or its path in the sheet) - not cheap or safe for the EQ, whose page follows the route
+  on appear; left as it is. The filter editor's typed value, the one thing that was lost unsaid, is now applied.
+- **Info's About/Debug choice**: kept, in the sheet (`infoTab`).
+- **The Queue's scroll place**: it opens at the song playing each time, as it always did.
+
+### Left out
+
+- iInfo's **On this iPhone 281 MB**: no such data for a song (and not asked for). (Its **Size** is built, R3b's review.)
+- iEQ's **Flat** button and **Find yours…**: new behaviour, not a redraw - Find yours is reachable through Correction.
+- The album's **Format** row (the song's says it whole).
+- **PasteButton** (Advanced's Paste) stays the system's: it can't be restyled.
+
+### R3b's review (2026-11-25)
+
+Fixed, each in its section above: the Mac's filter row's `.font(nil)` and `.tint(nil)` (the row is R3's again, the
+phone's its own, the hash extended to cover it); the phone EQ's swipes and long press back, as long presses; the output
+button's VoiceOver; Info's Size row; the Mac's time left in the chip's own type at the left; never "over 0 min left";
+Repeat All's count said and pinned; no "Now playing" or "Playing Next" heading under the sheet's top (iQueue draws a
+"Now playing" heading; the review asked it gone, as the top says `‹ Now Playing` over the strip); the EQ's top folding
+at xxxLarge; the filters' switches the phone's; InfoPlayedTests fed what Info is fed live. "EQ on" kept, as iEQ draws it.
+
+**Left as they are, for James to decide** (the review's list):
+- **A page pushed on a tab's stack is lost on a strip switch** (the EQ's presets, correction or a filter; Album info) -
+  see "What else is lost" above.
+- **Flat and "Find yours…" left out** of iEQ's Correction group: new behaviour; Find yours is reachable through
+  Correction's picker.
+- **The album's Format row and PasteButton left out** (as above).
+- **The song playing's row shows its length, not what is left of it** (iQueue's 3:41): the time left at the foot says
+  what remains; the row doesn't tick.
+- **The Library's Shuffle reads "over …"** at the Queue's foot: its songs past the drawn ones have no length here, so
+  the time is a least.
+
+### Words
+
+No change to iphone.json or mac.json. New Core words: `EQWords.Screen.on` "EQ on", `.output` "Output", (the review)
+`outputHint` "Opens AirPlay. Playing on … now."; `QueuePageWords.more` "More for the Queue", `heading` (the review
+took `nowPlaying` out with its heading); `QueueTimeLeft`'s "under 1 min left"; `AboutFactWords` (This song, The album,
+Track, Disc, Length, Size, Played, Written by, Released, Label, Songs, This pressing, Folder, Go to album, Go to
+artist). Nothing says "Up Next".
+
+### Tests
+
+- Swift: QueueTimeLeftTests (12, among them the review's `neverNoMinutesLeft`, every tenth of a second of three songs, and
+  `repeatAllCountsTheRoundDrawnOnly`, on a real Repeat All queue: the round's rest, then at its last song the next
+  round "again", never the rounds after), InfoPlayedTests (9 - the times, never "0 times", the day only with a date,
+  across midnight, the fresh answer first - the album's songs made as live, from the routes' Song - the facts as rows
+  with Size, `theSizeRow`, which artist Go to artist opens), EQPhonePageTests (5, `theOutputButtonsHint`).
+- tests/test_ios_nowplaying_pages_look.py (15): each page draws the sheet's top; the Queue's top fits 375 and folds at
+  xLarge (and not later); its rows and foot - no heading over the song playing or Playing Next's, the Mac's time left
+  at the left; the time left a small view of its own, in the chip's type on the Mac, never 0 min; Info's groups;
+  Played against a day that moves at midnight, Size from the player's song; "EQ on" a real Toggle drawn as the switch;
+  (the review) the EQ's top worked out at each size, folding at xxxLarge with room to spare; the knobs round; onTop and
+  the route's following as before; the phone's groups make exactly the List's EQModel calls, with no swipes; (the
+  review) the List's swipes and long press as long presses on the same rows, none opening a page, the filters'
+  switches the phone's; the output's button saying the page's output; the editor's leaving; tokens only (the phone's
+  filter row among them).
+- test_ios_panels_look.py: the sheet test reads `SheetTop`/`sheetTop`; the shared-file test reads `EQSheet(sheet:
+  top)`; R3's hash of EQScreen outside `inSidePanel` became a hash of the Mac's List, sections and (the review) filter
+  row (the same text as R3 left them - the row compared with b6f8dcfa's, equal, before hashing), and the row sets no
+  nil font, no tint and has no phone path. test_ios_phone_look.py: `R3B_PAGES`. test_ios_mac.py: PHONE_LONG_PRESSES'
+  EQScreen 1 -> 4 (the review's three long presses, the phone's only). test_ios_nowplaying_row.py: the AirPlay
+  button's `dress` lines read `said?.label ?? NowPlayingWords.airPlay` and `said?.value ?? playsTo` (Now Playing's
+  output column passes no `said`, which the same test already pins).
+
+### Mutations (each applied, seen to fail, reverted)
+
+- **The time left counting History** (`view.history +` the rows): QueueTimeLeftTests
+  `historyNeverCountsNorTheSongPlayingWhole`, and `test_the_time_left_is_a_small_view_of_its_own_reading_the_rows_drawn`.
+- **The whole song playing** (no `- heard`): QueueTimeLeftTests `eightSongsAndWhatIsLeftOfThePlayingOne`,
+  `historyNeverCountsNorTheSongPlayingWhole` and `theLastSongAndNothingPlaying`, and the same Python test.
+- **A nil playCount shown as 0** (`?? 0`, no guard): InfoPlayedTests `neverPlayedSaysNothing` and `theFactsAsRows`,
+  and `test_played_is_said_against_a_day_that_moves_at_midnight`.
+- **"today" wrong across midnight**, twice: Info's `now` never moved by significantTimeChangeNotification -
+  `test_played_is_said_against_a_day_that_moves_at_midnight`; the day as the last 24 hours, not the calendar's -
+  InfoPlayedTests `todayAcrossMidnight` and `timesAndTheDay`, and the same Python test.
+- **The switch drawn as an image** (an Image over the Toggle): `test_eq_on_is_a_real_toggle_drawn_as_the_purple_switch`.
+- **A knob squared** (Rectangle for the phone's Circle): `test_the_knobs_stay_round`.
+- **The EQ following the route while not on top** (`appeared &&` dropped from onTop):
+  `test_the_eq_follows_the_route_only_while_it_is_on_top`.
+- **The filter's typed value lost** (mine), twice: `leave()` dropped from onDisappear -
+  `test_a_filters_editor_applies_what_was_typed_as_it_goes`; `leaving` always nil - EQPhonePageTests
+  `whatWasTypedIsApplied`, `outOfRangeChangesNothing` and `anEmptyWidthIsTheTypesDefault`.
+- (The review's, each applied, seen to fail, reverted.) **The Mac's filter row given `.tint(nil)` again**:
+  `test_eq_screens_list_is_as_r3_left_it`. **A filter's long press gone**, and **one that opens the editor first**:
+  `test_the_lists_swipes_are_long_presses_here`, both. **The filter's switch tinted with the accent**: the same.
+  **The output's button saying "AirPlay" again** (no `said`): `test_the_outputs_button_says_the_pages_output` and
+  `test_the_phones_groups_make_the_lists_calls_and_no_others`. **"EQ on" never folded**, and **folded a size late**:
+  `test_the_eqs_top_fits_a_375_point_phone_and_folds_at_xxxlarge`, both. **A heading back over the song playing**:
+  `test_the_queues_rows_and_foot_on_the_phone`. **The Mac's time left in mono**:
+  `test_the_time_left_is_a_small_view_of_its_own_reading_the_rows_drawn`. **Size never asked of the player's
+  song**: `test_played_is_said_against_a_day_that_moves_at_midnight`. **"over 0 min left"** (a least's guard
+  dropped): QueueTimeLeftTests `neverNoMinutesLeft` and the time-left Python test. **The bit rate left out of
+  Size**: InfoPlayedTests `theSizeRow` and `theFactsAsRows`. **The hint untrimmed**: EQPhonePageTests
+  `theOutputButtonsHint`.
+
+### Not verified
+
+What only the devices can tell (checks 539-542): the sheet's top in the bar on iOS 26 (no glass) and 18; the output's
+button opening AirPlay's list through its face, and VoiceOver reading the page's output there; VoiceOver on the
+switch, the kv rows and the Queue's top; the Queue's fold at xLarge and the EQ's at xxxLarge on a real 375-point phone;
+the long presses on a filter, Other outputs and Correction; the time left ticking down, and "under 1 min left" at a
+song's end; Info's Size row; Go to artist from another tab; the EQ following the route with a page over it; the
+filter's value kept on Back, the strip and a swipe down; the Mac's dock with the time left (at its left) and Played,
+and the Mac's filter rows in the List's own font and accent. Mac smoke run: not done (James's app was running).
+
 ## The redesign, slice R2: Albums and Artists, and the Library's top (2026-11-25)
 
 R2 of ~/Desktop/Code/deadwax-plans/mac-redesign-build.md (section 3.4, "#### R2"), built to wave-b-common.md and to

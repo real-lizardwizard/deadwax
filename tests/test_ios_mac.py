@@ -441,8 +441,10 @@ ALBUM_TILES = {"Library/LibraryTiles.swift": 2, "Search/SearchScreen.swift": 1, 
 PLAYLIST_ROWS = {"Playlists/PlaylistsScreen.swift": 1}
 #? (R8's review) a request's row on the Mac: RequestAction's, the list its buttons and its ••• are
 REQUEST_ROWS = "Mac/Requests/MacRequestsPage.swift"
-#? the phone's own long presses, from before: the EQ's Back to AutoEq and the event log's Copy - a right-click there too
-PHONE_LONG_PRESSES = {"EQ/EQScreen.swift": 1, "Manage/EventLogScreen.swift": 1}
+#? the phone's own long presses, from before: the EQ's Back to AutoEq and the event log's Copy - a right-click there too;
+#? (R3b's review) and the phone's EQ groups' three, the List's swipes and long press there (a filter's Delete, Other
+#? outputs' Rename and Forget, Correction's Back to AutoEq's) - drawn only on the phone, never in the Mac's List
+PHONE_LONG_PRESSES = {"EQ/EQScreen.swift": 4, "Manage/EventLogScreen.swift": 1}
 
 
 def test_a_right_click_is_the_menus_own_items():

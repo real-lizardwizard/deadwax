@@ -46,6 +46,13 @@ import SwiftUI
 /// never dimmed. VoiceOver hears the state as the row's value. No download control here. The mark and the dim are
 /// small views of their own, so a download's progress redraws them, never this list.
 struct UpNextScreen: View {
+    /// (R3b) In the sheet over Now Playing (iQueue): `‹ Now Playing` and the strip at its top, History, Clear and Edit at
+    /// the top's right, the song playing as the selected row first - (R3b's review) no heading over it, nor over
+    /// Playing Next's songs after it: the top has said where the page is - "Next from …" over the list, rows 48 tall,
+    /// and Shuffle, Repeat and the time left at its foot. Nil in the Mac's side panel, which keeps its list as it
+    /// was, with the time left at its foot in the Mac's look.
+    var sheet: SheetTop?
+
     @Environment(PlayerModel.self) private var player
     @Environment(DownloadModel.self) private var downloads
     @Environment(HistoryModel.self) private var history
@@ -55,6 +62,7 @@ struct UpNextScreen: View {
     @Environment(\.inSidePanel) private var inSidePanel
     @Environment(AppNavigation.self) private var navigation
     @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @State private var editing = false
     /// The entry a roll-back moved to (a tap above the card): its change of song keeps the scroll where it is - nothing
     /// above the row tapped changed, so the card is where the row was, under the finger.
@@ -95,17 +103,30 @@ struct UpNextScreen: View {
         var placed = false
     }
 
-    /// The covers' sizes: the song playing's, and a row's.
+    /// The covers' sizes: the song playing's, and a row's - (R3b) on the phone the selected row's alone, iQueue's
+    /// `.row.tall .cover` (44): its rows have none.
     private static let playingCover: CGFloat = 64
     private static let rowCover: CGFloat = 44
-    /// The song playing's card, scrolled to the top.
+    /// (R3b) iQueue: its rows' sides (`.row > div` padding 16; the Mac's dock's 10), the heading's room under its words
+    /// (`.row.grp` padding-bottom 6), and the foot (`.f` height 60, gap 8, padding 0 16px).
+    private static let side: CGFloat = 16
+    private static let macSide: CGFloat = 10
+    private static let headingFoot: CGFloat = 6
+    private static let foot: Double = 60
+    private static let footGap: CGFloat = 8
+    /// The song playing's card, scrolled to the top - (R3b) on the phone its row.
     private static let card = "playing"
     /// Lower bounds of the card with the chips under it, and of a row - so the bottom margin made from them is never
     /// too little for the card to reach the top (at most a little more than needed).
     private static let cardAtLeast: CGFloat = 120
     private static let rowAtLeast: CGFloat = 56
 
-    init() {}
+    init(sheet: SheetTop? = nil) {
+        self.sheet = sheet
+    }
+
+    /// (R3b) The phone's page, iQueue's: in the sheet's top, with its own rows.
+    private var phone: Bool { sheet != nil }
 
     var body: some View {
         let view = player.upNext
@@ -131,6 +152,7 @@ struct UpNextScreen: View {
                                             Button(UpNextWords.tryAgain) { history.retry() }
                                                 .buttonStyle(.borderless)
                                         }
+                                        .modifier(QueuePhoneNote(phone: phone, side: Self.side))
                                     }
                                     ForEach(Array(past.enumerated()), id: \.element.key) { index, row in
                                         pastRow(row)
@@ -148,75 +170,103 @@ struct UpNextScreen: View {
                             }
 
                             Section {
-                                playingCard(playing)
-                                    .id(Self.card)
-                                    .onAppear { seen.ids.insert(Self.card) }
-                                    .onDisappear { seen.ids.remove(Self.card) }
-                                if view.repeatOne {
-                                    Text(UpNextWords.repeatingOne)
-                                        .font(Typeface.footnote)
-                                        .foregroundStyle(Palette.quiet)
+                                if phone {
+                                    //? (R3b's review) the selected row first, no heading over it: `‹ Now Playing`
+                                    //? over the strip has said it
+                                    playingRow(playing)
+                                        .id(Self.card)
+                                        .onAppear { seen.ids.insert(Self.card) }
+                                        .onDisappear { seen.ids.remove(Self.card) }
+                                } else {
+                                    playingCard(playing)
+                                        .id(Self.card)
+                                        .onAppear { seen.ids.insert(Self.card) }
+                                        .onDisappear { seen.ids.remove(Self.card) }
                                 }
-                                modes
+                                if view.repeatOne {
+                                    note(UpNextWords.repeatingOne)
+                                }
+                                //? (R3b) on the phone Shuffle and Repeat are the foot's
+                                if !phone {
+                                    modes
+                                }
                                 if player.paged != nil {
-                                    Text(UpNextWords.shufflingLibrary)
-                                        .font(Typeface.footnote)
-                                        .foregroundStyle(Palette.quiet)
+                                    note(UpNextWords.shufflingLibrary)
                                 }
                             }
 
                             if !view.added.isEmpty {
-                                Section {
-                                    rows(view.added) { index in
-                                        view.added.indices.contains(index + 1) ? view.added[index + 1] : listRows.first
-                                    }
-                                } header: {
-                                    Group {
-                                        HStack {
-                                            Text(UpNextWords.playingNext)
-                                                .accessibilityAddTraits(.isHeader)
-                                            Spacer()
-                                            Button(UpNextWords.clear, action: clear)
-                                                .buttonStyle(.borderless)
-                                                .font(Typeface.subheadline)
+                                if phone {
+                                    //? (R3b's review) no heading: Playing Next's songs follow the song playing, each
+                                    //? with its artist and album, the album's own rows under "Next from …" after them
+                                    Section {
+                                        rows(view.added, lines: true) { index in
+                                            view.added.indices.contains(index + 1) ? view.added[index + 1] : listRows.first
                                         }
-                                        .textCase(nil)
                                     }
-                                    .font(Typeface.footnote)
+                                } else {
+                                    Section {
+                                        rows(view.added, lines: true) { index in
+                                            view.added.indices.contains(index + 1) ? view.added[index + 1] : listRows.first
+                                        }
+                                    } header: {
+                                        Group {
+                                            HStack {
+                                                Text(UpNextWords.playingNext)
+                                                    .accessibilityAddTraits(.isHeader)
+                                                Spacer()
+                                                Button(UpNextWords.clear, action: clear)
+                                                    .buttonStyle(.borderless)
+                                                    .font(Typeface.subheadline)
+                                            }
+                                            .textCase(nil)
+                                        }
+                                        .font(Typeface.footnote)
+                                    }
                                 }
                             }
 
                             if let list = view.list {
-                                Section {
-                                    //? (2.1.3) Playing Next is carried after a list row tapped: what plays next is its head
-                                    rows(list.rows) { index in
-                                        view.added.first ?? (list.rows.indices.contains(index + 1) ? list.rows[index + 1] : nil)
+                                if phone {
+                                    Section {
+                                        heading(QueuePageWords.heading(list.title))
+                                        //? (2.1.3) Playing Next is carried after a list row tapped: what plays next is
+                                        //? its head. (R3b) Under an album's heading its rows are their titles.
+                                        rows(list.rows, lines: QueuePageWords.showsLines(list.rows, title: list.title)) { index in
+                                            view.added.first ?? (list.rows.indices.contains(index + 1) ? list.rows[index + 1] : nil)
+                                        }
+                                        if list.more > 0 {
+                                            note(UpNextWords.more(list.more))
+                                        }
                                     }
-                                    if list.more > 0 {
-                                        Text(UpNextWords.more(list.more))
-                                            .font(Typeface.footnote)
-                                            .foregroundStyle(Palette.quiet)
+                                } else {
+                                    Section {
+                                        //? (2.1.3) Playing Next is carried after a list row tapped: what plays next is its head
+                                        rows(list.rows, lines: true) { index in
+                                            view.added.first ?? (list.rows.indices.contains(index + 1) ? list.rows[index + 1] : nil)
+                                        }
+                                        if list.more > 0 {
+                                            note(UpNextWords.more(list.more))
+                                        }
+                                    } header: {
+                                        Group {
+                                            Text(list.title)
+                                                .textCase(nil)
+                                                .accessibilityAddTraits(.isHeader)
+                                        }
+                                        .font(Typeface.footnote)
                                     }
-                                } header: {
-                                    Group {
-                                        Text(list.title)
-                                            .textCase(nil)
-                                            .accessibilityAddTraits(.isHeader)
-                                    }
-                                    .font(Typeface.footnote)
                                 }
                             }
 
                             if let then = view.then {
                                 Section {
-                                    Text(then)
-                                        .font(Typeface.footnote)
-                                        .foregroundStyle(Palette.quiet)
+                                    note(then)
                                 }
                             }
                         }
                     }
-                    .listStyle(.insetGrouped)
+                    .modifier(QueueListLook(phone: phone))
                     //? near an album's end the card can't reach the top - scrollTo stops where the content ends - so room
                     //? below it, from lower bounds of what follows the card: never too little, at most a little more
                     .contentMargins(.bottom, room(space.size.height, view), for: .scrollContent)
@@ -229,6 +279,15 @@ struct UpNextScreen: View {
                                 .background(.regularMaterial, in: Corners.cardShape)
                                 .padding(.top, 8)
                                 .accessibilityLabel(UpNextWords.loadingEarlier)
+                        }
+                    }
+                    //? (R3b) the time left at the foot: on the phone with Shuffle and Repeat (iQueue's), on the Mac in
+                    //? the dock's look
+                    .safeAreaInset(edge: .bottom, spacing: 0) {
+                        if phone {
+                            phoneFoot(view)
+                        } else {
+                            macFoot(view)
                         }
                     }
                     .onAppear {
@@ -258,27 +317,11 @@ struct UpNextScreen: View {
                         toCard(proxy, then: target)
                     }
                     .onChange(of: editing) { _, _ in toCard(proxy) }
-                }
-            }
-            .navigationTitle(UpNextWords.title)
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    if !editing && editable {
-                        Button(UpNextWords.edit) {
-                            editing = true
-                            refocus(.done)
-                        }
+                    .queueTop(sheet) {
+                        phoneTop(view, editable: editable, earlier: !past.isEmpty || !view.history.isEmpty, proxy: proxy)
+                    } mac: {
+                        macToolbar(editable: editable)
                     }
-                }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button(UpNextWords.done) {
-                        if editing { editing = false } else { close() }
-                    }
-                    .accessibilityFocused($focus, equals: .done)
-                    // (the Mac app, slice 3) a panel's Done: Escape's after a field with the cursor, before the page's
-                    // Edit (MacFrame.escape - one owner)
-                    .escapeCloses(MacFrame.escape(typing: TextEditing.shared.typing, panel: navigation.macPanel) == .panel)
                 }
             }
         }
@@ -295,6 +338,144 @@ struct UpNextScreen: View {
     /// Put away: the sheet over Now Playing, or (the Mac app, slice 3) the desktop frame's side panel.
     private func close() {
         if inSidePanel { navigation.closePanel() } else { dismiss() }
+    }
+
+    // MARK: the tops (R3b)
+
+    /// The Mac's side panel's toolbar, as it was: its title, Edit at the left, Done at the right.
+    @ToolbarContentBuilder
+    private func macToolbar(editable: Bool) -> some ToolbarContent {
+        ToolbarItem(placement: .cancellationAction) {
+            if !editing && editable {
+                Button(UpNextWords.edit) {
+                    editing = true
+                    refocus(.done)
+                }
+            }
+        }
+        ToolbarItem(placement: .confirmationAction) {
+            Button(UpNextWords.done) {
+                if editing { editing = false } else { close() }
+            }
+            .accessibilityFocused($focus, equals: .done)
+            // (the Mac app, slice 3) a panel's Done: Escape's after a field with the cursor, before the page's
+            // Edit (MacFrame.escape - one owner)
+            .escapeCloses(MacFrame.escape(typing: TextEditing.shared.typing, panel: navigation.macPanel) == .panel)
+        }
+    }
+
+    /// (R3b) The phone's top's right (iQueue's): History - the songs before the one playing, scrolled to - and Clear,
+    /// then Edit (Done while editing - focused after a change with nothing left to focus, as the old Done was; dimmed
+    /// with nothing to edit). From xLarge text the two go into a ••• beside Edit (`folds`): `‹ Now Playing` (17), History,
+    /// Clear and Edit (13.5, 11 either side, 8 apart) and the bar's margins take about 362 of a 375-point phone at Large
+    /// (0.55 em a letter, taken wide), and would take about 395 at xLarge; folded, about 323 at xxxLarge, where the top
+    /// stops growing (test_ios_nowplaying_pages_look.py works it out).
+    @ViewBuilder
+    private func phoneTop(_ view: UpNextView, editable: Bool, earlier: Bool, proxy: ScrollViewProxy) -> some View {
+        let clearable = !view.added.isEmpty
+        if !editing {
+            if Self.folds(dynamicTypeSize) {
+                Menu {
+                    Button(UpNextWords.history) { toHistory(proxy) }
+                        .disabled(!earlier)
+                    Button(UpNextWords.clear, action: clear)
+                        .disabled(!clearable)
+                } label: {
+                    Image(systemName: "ellipsis")
+                        .accessibilityLabel(QueuePageWords.more)
+                }
+                .menuStyle(.button)
+                .buttonStyle(DWButtonStyle(size: .small))
+            } else {
+                Button(UpNextWords.history) { toHistory(proxy) }
+                    .buttonStyle(DWButtonStyle(size: .small))
+                    .disabled(!earlier)
+                Button(UpNextWords.clear, action: clear)
+                    .buttonStyle(DWButtonStyle(size: .small))
+                    .disabled(!clearable)
+            }
+        }
+        Button(editing ? UpNextWords.done : UpNextWords.edit) {
+            if editing {
+                editing = false
+            } else {
+                editing = true
+                refocus(.done)
+            }
+        }
+        .buttonStyle(DWButtonStyle(size: .small))
+        .disabled(!editing && !editable)
+        .accessibilityFocused($focus, equals: .done)
+    }
+
+    /// From xLarge text, History and Clear in a ••• (the arithmetic is phoneTop's).
+    static func folds(_ size: DynamicTypeSize) -> Bool {
+        size > .large
+    }
+
+    /// (R3b) History: the songs played before the one playing scrolled into view - the song playing's row at the
+    /// view's foot, what was played before over it - as a swipe down to them would.
+    private func toHistory(_ proxy: ScrollViewProxy) {
+        withAnimation { proxy.scrollTo(Self.card, anchor: .bottom) }
+    }
+
+    /// (R3b) The phone's foot (iQueue's `.f`): Shuffle and Repeat, lit while on (VoiceOver's "selected"), and the time
+    /// left at the right - capped at xxxLarge as a bar is; where the three don't fit on one line (the larger sizes, a
+    /// long "over 1 hr 12 min left"), the time left goes on a line of its own under the two, never pushing them off.
+    private func phoneFoot(_ view: UpNextView) -> some View {
+        ViewThatFits(in: .horizontal) {
+            HStack(spacing: Self.footGap) {
+                modeButtons
+                Spacer(minLength: 0)
+                QueueTimeLeftLine(view: view)
+                    .fixedSize()
+            }
+            VStack(alignment: .leading, spacing: Self.footGap / 2) {
+                HStack(spacing: Self.footGap) {
+                    modeButtons
+                }
+                QueueTimeLeftLine(view: view)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .padding(.vertical, Self.footGap)
+        }
+        .padding(.horizontal, Self.side)
+        .lookHeight(Self.foot)
+        .frame(maxWidth: .infinity)
+        .background(DWPalette.panel)
+        .overlay(alignment: .top) { DWRule(colour: DWPalette.line) }
+        .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
+    }
+
+    /// (R3b) The foot's Shuffle and Repeat: each lit while on, and "selected" to VoiceOver; Shuffle dimmed during a
+    /// library's shuffle, as its chip was.
+    @ViewBuilder private var modeButtons: some View {
+        let mode = player.repeatMode
+        Button(action: toggleShuffle) {
+            Text(UpNextWords.shuffle)
+        }
+        .buttonStyle(DWButtonStyle(kind: player.shuffle ? .on : .normal))
+        .disabled(player.paged != nil)
+        .accessibilityAddTraits(player.shuffle ? .isSelected : [])
+        .accessibilityFocused($focus, equals: .shuffle)
+        Button(action: cycleRepeat) {
+            Text(repeatLabel(mode))
+        }
+        .buttonStyle(DWButtonStyle(kind: mode != .off ? .on : .normal))
+        .accessibilityAddTraits(mode != .off ? .isSelected : [])
+    }
+
+    /// (R3b) The Mac's foot: the time left, in the dock's look - a row's height, under the line's edge, (R3b's review)
+    /// at its left, as the status bar's words are.
+    private func macFoot(_ view: UpNextView) -> some View {
+        HStack(spacing: 0) {
+            QueueTimeLeftLine(view: view)
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, Self.macSide)
+        .lookHeight(DWLook.here.rowHeight)
+        .background(DWPalette.panel)
+        .overlay(alignment: .top) { DWRule(colour: DWPalette.line) }
     }
 
     /// The entry playing, by its key (a plain queue's, its place): what changes when the song playing does - a song's
@@ -405,6 +586,73 @@ struct UpNextScreen: View {
         .modifier(UpNextDownload(songID: playing.id, part: .card))
     }
 
+    /// (R3b) The phone's song playing (iQueue's `.row.tall.on`): the selected row - the selection's ground, edge and
+    /// words - 60 tall at least, its cover 44, its title, "Artist · Album" under it and its length at the right, square.
+    /// One element and a heading, as the card was; marked, never dimmed.
+    private func playingRow(_ playing: QueueTrack) -> some View {
+        let line = UpNextWords.songLine(artist: playing.artist, album: playing.album)
+        return HStack(spacing: Self.footGap + 4) {
+            CoverImage(id: playing.coverArt, size: Self.rowCover)
+                .frame(width: Self.rowCover, height: Self.rowCover)
+                .clipShape(Corners.artShape)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(playing.title)
+                    .font(Typeface.Phone.text(.row).weight(.semibold))
+                    .lineLimit(1)
+                if !line.isEmpty {
+                    Text(line)
+                        .font(Typeface.Phone.text(.small))
+                        .lineLimit(1)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            UpNextSongMark(songID: playing.id)
+            Text(AboutCard.trackTime(playing.duration))
+                .font(Typeface.Phone.mono(.small))
+        }
+        .foregroundStyle(DWPalette.selt)
+        .padding(.horizontal, Self.side)
+        .lookHeight(DWLook.here.tallRowHeight)
+        .background(DWPalette.selbg)
+        .overlay(Rectangle().strokeBorder(DWPalette.selbd, lineWidth: 1))
+        .accessibilityElement(children: .combine)
+        //? (2.1.3) the song playing's title a heading, as the web's: between History and what's to come
+        .accessibilityAddTraits(.isHeader)
+        .modifier(UpNextDownload(songID: playing.id, part: .card))
+        .modifier(QueuePhoneRow(phone: true, rule: false))
+    }
+
+    /// (R3b) A group's heading on the phone (iQueue's `.row.grp`): "Next from …", the list's title - 38 tall at least,
+    /// its words at its foot in the heading's colour; a heading for VoiceOver.
+    private func heading(_ words: String) -> some View {
+        Text(words)
+            .font(Typeface.Phone.text(.row).weight(.semibold))
+            .foregroundStyle(DWPalette.head)
+            .frame(maxWidth: .infinity, minHeight: CGFloat(DWLook.here.groupRowHeight) - Self.headingFoot,
+                   alignment: .bottomLeading)
+            .padding(.leading, Self.side)
+            .padding(.bottom, Self.headingFoot)
+            .accessibilityAddTraits(.isHeader)
+            .modifier(QueuePhoneRow(phone: true, rule: false))
+    }
+
+    /// A line under a group - "And 12 more songs.", Repeat one's, what comes after: the footnote's on the Mac; (R3b) on
+    /// the phone the small words in the second colour, at the rows' side.
+    @ViewBuilder
+    private func note(_ words: String) -> some View {
+        if phone {
+            Text(words)
+                .font(Typeface.Phone.text(.small))
+                .foregroundStyle(DWPalette.t2)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .modifier(QueuePhoneNote(phone: true, side: Self.side))
+        } else {
+            Text(words)
+                .font(Typeface.footnote)
+                .foregroundStyle(Palette.quiet)
+        }
+    }
+
     private var modes: some View {
         let mode = player.repeatMode
         let paged = player.paged != nil
@@ -424,15 +672,16 @@ struct UpNextScreen: View {
     /// Next's last: the list's first; a list row's: Playing Next's head, carried after it). In Edit the List's own drag
     /// handle moves them, a drag staying in its group, and each row's (-) takes it out. No onDelete, in Edit or out:
     /// out of it, it would be a swipe that loses a song; in it, the system's two-step (-).
-    private func rows(_ rows: [UpNextRow], next: @escaping (Int) -> UpNextRow?) -> some View {
+    private func rows(_ rows: [UpNextRow], lines: Bool, next: @escaping (Int) -> UpNextRow?) -> some View {
         ForEach(Array(rows.enumerated()), id: \.element.key) { index, row in
             Group {
                 if editing {
-                    editRow(row, index: index, rows: rows)
+                    editRow(row, index: index, rows: rows, lines: lines)
                 } else {
-                    playRow(row, next: next(index))
+                    playRow(row, next: next(index), lines: lines)
                 }
             }
+            .modifier(QueuePhoneRow(phone: phone))
             .accessibilityFocused($focus, equals: .row(row.key))
             .onAppear { seen.ids.insert(row.key) }
             .onDisappear { seen.ids.remove(row.key) }
@@ -449,14 +698,14 @@ struct UpNextScreen: View {
         }
     }
 
-    private func playRow(_ row: UpNextRow, next: UpNextRow?) -> some View {
+    private func playRow(_ row: UpNextRow, next: UpNextRow?, lines: Bool) -> some View {
         Button {
             //? it plays now, so it leaves the list: focus to what plays next - once the jump took, and only after the
             //? card is back at the top (the song playing's change scrolls there, onChange of playingKey), what plays
             //? next under it in view. A jump that took always changes the entry playing, so the change comes
             if player.jump(to: row.key) { focusAtCard = next.map { .row($0.key) } ?? .done }
         } label: {
-            rowLabel(row.track)
+            rowLabel(row.track, lines: lines)
         }
         .buttonStyle(.plain)
         .accessibilityLabel(UpNextWords.playNow(row.track.title))
@@ -473,11 +722,12 @@ struct UpNextScreen: View {
             guard player.jump(to: row.key) else { return }
             rolledTo(row.track)
         } label: {
-            rowLabel(row.track)
+            rowLabel(row.track, lines: true)
         }
         .buttonStyle(.plain)
         .accessibilityLabel(UpNextWords.playAgain(row.track.title))
         .modifier(UpNextDownload(songID: row.track.id, part: .row))
+        .modifier(QueuePhoneRow(phone: phone))
     }
 
     /// (app 0.8; the web's 2.1.18) An older row - a song played before, above History: rolled back to, everywhere
@@ -493,11 +743,12 @@ struct UpNextScreen: View {
             guard player.rollBack(handed.rows, floor: handed.floor) else { return }
             rolledTo(row.track)
         } label: {
-            rowLabel(row.track)
+            rowLabel(row.track, lines: true)
         }
         .buttonStyle(.plain)
         .accessibilityLabel(UpNextWords.playAgain(row.track.title))
         .modifier(UpNextDownload(songID: row.track.id, part: .row))
+        .modifier(QueuePhoneRow(phone: phone))
     }
 
     /// (the web's 2.1.18 rolledTo) A tap above the card taken: the scroll held (the card where the row was), then - once
@@ -515,21 +766,37 @@ struct UpNextScreen: View {
         }
     }
 
-    private func rowLabel(_ track: QueueTrack) -> some View {
-        HStack(spacing: 12) {
-            CoverImage(id: track.coverArt, size: Self.rowCover)
-                .frame(width: Self.rowCover, height: Self.rowCover)
-                .clipShape(Corners.artShape)
-            text(track)
-            Spacer(minLength: 0)
+    /// A row's look: on the Mac its cover and its words; (R3b) on the phone iQueue's - its words, its length at the
+    /// right in mono, 48 tall at least, no cover.
+    @ViewBuilder
+    private func rowLabel(_ track: QueueTrack, lines: Bool) -> some View {
+        if phone {
+            HStack(spacing: Self.footGap) {
+                text(track, lines: lines)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                Text(AboutCard.trackTime(track.duration))
+                    .font(Typeface.Phone.mono(.small))
+                    .foregroundStyle(DWPalette.t2)
+            }
+            .padding(.horizontal, Self.side)
+            .lookHeight(DWLook.here.rowHeight)
+            .contentShape(Rectangle())
+        } else {
+            HStack(spacing: 12) {
+                CoverImage(id: track.coverArt, size: Self.rowCover)
+                    .frame(width: Self.rowCover, height: Self.rowCover)
+                    .clipShape(Corners.artShape)
+                text(track, lines: true)
+                Spacer(minLength: 0)
+            }
+            .contentShape(Rectangle())
         }
-        .contentShape(Rectangle())
     }
 
     /// A row in Edit: its red (-), which takes it out at once, and its words; the List draws the drag handle. One
     /// VoiceOver element, its words read as they were and its (-) left out of it - Remove is among its actions, and
     /// a double tap on the row does nothing, so VoiceOver can't take a song out by landing on it.
-    private func editRow(_ row: UpNextRow, index: Int, rows: [UpNextRow]) -> some View {
+    private func editRow(_ row: UpNextRow, index: Int, rows: [UpNextRow], lines: Bool) -> some View {
         let title = row.track.title
         let line = UpNextWords.songLine(artist: row.track.artist, album: row.track.album)
         return HStack(spacing: 8) {
@@ -546,10 +813,12 @@ struct UpNextScreen: View {
             .buttonStyle(.borderless)
             .accessibilityHidden(true)
             //? offline, only the words and the mark dim: the minus and the handle stay whole, and work
-            text(row.track)
+            text(row.track, lines: lines)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .modifier(UpNextDownload(songID: row.track.id, part: .look))
         }
+        //? (R3b) the phone's row: 48 tall at least, as out of Edit
+        .modifier(QueueRowHeight(phone: phone))
         .accessibilityElement(children: .ignore)
         .accessibilityLabel([title, line].filter { !$0.isEmpty }.joined(separator: ", "))
         .modifier(UpNextDownload(songID: row.track.id, part: .words))
@@ -566,26 +835,47 @@ struct UpNextScreen: View {
     }
 
     /// The row's title and line, the song's download mark at the line's end - outside its words, so a long line wraps
-    /// before it - or, with no line, after the title (4.3.1).
-    private func text(_ track: QueueTrack) -> some View {
+    /// before it - or, with no line, after the title (4.3.1). (R3b) On the phone iQueue's: the title at the row's 16,
+    /// the line small in the second colour, each on one line; and no line where `lines` is false (an album's rows under
+    /// its heading).
+    private func text(_ track: QueueTrack, lines: Bool) -> some View {
         VStack(alignment: .leading, spacing: 2) {
-            let line = UpNextWords.songLine(artist: track.artist, album: track.album)
+            let line = lines ? UpNextWords.songLine(artist: track.artist, album: track.album) : ""
             if line.isEmpty {
                 HStack(alignment: .firstTextBaseline, spacing: 4) {
-                    Text(track.title)
-                        .foregroundStyle(.primary)
+                    title(track.title)
                     UpNextSongMark(songID: track.id)
                 }
             } else {
-                Text(track.title)
-                    .foregroundStyle(.primary)
+                title(track.title)
                 HStack(alignment: .firstTextBaseline, spacing: 4) {
-                    Text(line)
-                        .font(Typeface.footnote)
-                        .foregroundStyle(Palette.quiet)
+                    if phone {
+                        Text(line)
+                            .font(Typeface.Phone.text(.small))
+                            .foregroundStyle(DWPalette.t2)
+                            .lineLimit(1)
+                    } else {
+                        Text(line)
+                            .font(Typeface.footnote)
+                            .foregroundStyle(Palette.quiet)
+                    }
                     UpNextSongMark(songID: track.id)
                 }
             }
+        }
+    }
+
+    /// A row's title: the Mac's as it was; (R3b) the phone's at the row's 16 in white, on one line.
+    @ViewBuilder
+    private func title(_ words: String) -> some View {
+        if phone {
+            Text(words)
+                .font(Typeface.Phone.text(.row))
+                .foregroundStyle(DWPalette.text)
+                .lineLimit(1)
+        } else {
+            Text(words)
+                .foregroundStyle(.primary)
         }
     }
 
@@ -717,5 +1007,115 @@ private struct Chip: View {
         .buttonStyle(.borderless)
         .disabled(!enabled)
         .accessibilityAddTraits(on ? .isSelected : [])
+    }
+}
+
+/// (R3b) The Queue's list: on the phone iQueue's plain list on the sheet's ground - its own rows, hairlines and
+/// headings, none of the system's - and on the Mac the inset list it was.
+private struct QueueListLook: ViewModifier {
+    let phone: Bool
+
+    @ViewBuilder func body(content: Content) -> some View {
+        if phone {
+            content
+                .listStyle(.plain)
+                .scrollContentBackground(.hidden)
+                .listSectionSpacing(0)
+                .environment(\.defaultMinListRowHeight, 0)
+        } else {
+            content
+                .listStyle(.insetGrouped)
+        }
+    }
+}
+
+/// (R3b) One of the phone's rows in the Queue's list (iQueue's `.row`): edge to edge on the sheet's ground, its own
+/// hairline under it (`.dw.ph .row`'s #1c1b22) - none under a heading or the selected row - and no system separator.
+private struct QueuePhoneRow: ViewModifier {
+    let phone: Bool
+    var rule = true
+
+    @ViewBuilder func body(content: Content) -> some View {
+        if phone {
+            content
+                .overlay(alignment: .bottom) {
+                    if rule { DWRule(colour: DWPalette.rowRule) }
+                }
+                .listRowInsets(EdgeInsets())
+                .listRowSeparator(.hidden)
+                .listRowBackground(DWPalette.panel)
+        } else {
+            content
+        }
+    }
+}
+
+/// (R3b) A row's height in Edit on the phone: 48 at least, as out of Edit (DWLook's rowHeight); the Mac's as it was.
+private struct QueueRowHeight: ViewModifier {
+    let phone: Bool
+
+    @ViewBuilder func body(content: Content) -> some View {
+        if phone {
+            content.lookHeight(DWLook.here.rowHeight)
+        } else {
+            content
+        }
+    }
+}
+
+/// (R3b) A note in the phone's list - a line under a group, History's failure - at the rows' side, with room above and
+/// below; as it was on the Mac.
+private struct QueuePhoneNote: ViewModifier {
+    let phone: Bool
+    let side: CGFloat
+
+    @ViewBuilder func body(content: Content) -> some View {
+        if phone {
+            content
+                .padding(.horizontal, side)
+                .padding(.vertical, side / 2)
+                .listRowInsets(EdgeInsets())
+                .listRowSeparator(.hidden)
+                .listRowBackground(DWPalette.panel)
+        } else {
+            content
+        }
+    }
+}
+
+/// (R3b) The time left (QueueTimeLeft: "8 songs · 33 min left"), in the third colour - the phone's extra-small in mono,
+/// at the page's right; (R3b's review) on the Mac the status bar's 11.5 in its own type, not mono, at the dock's left
+/// (the look's chip role: Typeface.Mac is named only from the Mac's frame). A view of its own, reading the player's
+/// position (twice a second) and speed, so their changes redraw only it, never the list.
+private struct QueueTimeLeftLine: View {
+    let view: UpNextView
+
+    @Environment(PlayerModel.self) private var player
+
+    var body: some View {
+        if let words = QueueTimeLeft.words(view, position: player.shownPosition, speed: player.speed) {
+            Text(words)
+                .font(Platform.mac ? Typeface.Look.text(.chip) : Typeface.Phone.mono(.extraSmall))
+                .foregroundStyle(DWPalette.t3)
+                .multilineTextAlignment(Platform.mac ? .leading : .trailing)
+                .lineLimit(3)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+}
+
+extension View {
+    /// (R3b) The Queue's top: in the sheet over Now Playing the sheet's (`‹ Now Playing`, the strip, and the page's own
+    /// at its right); in the Mac's side panel its title and toolbar, as it was.
+    @ViewBuilder
+    fileprivate func queueTop<Phone: View, Mac: ToolbarContent>(_ sheet: SheetTop?, @ViewBuilder phone: () -> Phone,
+                                                               @ToolbarContentBuilder mac: () -> Mac) -> some View {
+        if let sheet {
+            sheetTop(sheet, trailing: phone)
+        } else {
+            navigationTitle(UpNextWords.title)
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar(content: mac)
+        }
     }
 }
