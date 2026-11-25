@@ -528,3 +528,99 @@ unguarded `audio.get`). No import cycle (store_index imports library at its top)
 - Noticed, not changed: disc_art.py (around 220) takes the first file that has an id, not the commonest; a
   folder whose first file is untagged now gets Library care's bulk Get covers (bulkTargets picks by the scan's
   id, which the art lookup now agrees with).
+
+### The Done row's album (2.1.40)
+
+Manual search's slice S3 (`~/Desktop/Code/deadwax-plans/manual-search.md` 2.5, numbered 2.1.38 there): the
+native app's Requests shows a manual search's finished download, and to open it the app has to get from the job
+to the album. The id bridge found a download's album by its release, and a manual download is filed by its own
+tags with the sharer's ids dropped - usually NO release id - so this is the bridge by job. Nothing on the web
+asks it, and the app's A1 ignores both new fields: README and docs/ are unchanged (the web's Done row still
+looks a download up by its pressing's id, as docs/downloading.md says).
+
+- **`jobs.album_id` for every manual filing.** `store.set_job_album(job_id, album_id)` (an UPDATE, through
+  `_ledger`'s never-raises), called by `poller._organize_if_enabled` with `index_folder`'s id at both sites -
+  filed, and everything already there - BEFORE `grant_job`, only when the id isn't None and the job is manual
+  (`_is_manual`: its stored release's `manual`, which enqueue keeps only when true, or the plan's). Needed
+  because the grant doesn't always write it: **the spec's "with logins off grant_job writes nothing" is wrong
+  in general** - with logins off `local` has a library, so an ordinary filing is ADDED and `set_job_grant` does
+  write album_id (seen: a logins-off filing ends `album_id 1, library_grant 'added'`). What it doesn't write: a
+  flag with logins off (a manual download whose every track was already in the id-less folder it is filed as -
+  the second site), a request whose requesters can't have a library (the break-glass admin's), and requesters
+  who have all cleared it. A grant that does write writes the same id. `grant_job`, `library_grant` and every
+  other job's album_id are untouched.
+- **`/jobs`' `filed_as: {artist, album}`** on a manual row whose job has an album id: the names of the store
+  row it leads to, through ONE `index_follow` for all such rows (none when there are none), so a disc folder
+  merged since names the folder it joined. Only a live row counts - `pins.album_state(row, root) == "present"`,
+  the pins' own rule, so a row of another library root is not live either. A failed read (raised, or the
+  index's None) leaves `filed_as` out, never a 500. `list_jobs` now selects `album_id`.
+- **The id bridge's third key, `job_id`** (`Query(None, ge=1)`): exactly one of the three, else 422 ("ask by
+  exactly one of release_mbid, navidrome_id and job_id"). The release path is the old body moved into
+  `_by_release`, unchanged; `_by_job`:
+  - the job through `download._job_for` (imported - no cycle: store_album already imported two modules that
+    import download, and download imports nothing of store_album): the asker's, or anyone's with Everyone's
+    downloads; 404 "No such download job" otherwise, and for no such job;
+  - its album_id -> `index_follow` -> the row; none, or not live by album_state -> `EMPTY` (`present: []`,
+    every id null, `other_pressings: []`, no `yours`);
+  - a row with a release id by now (Edit album > Release since) -> `_by_release(that id)`, so the answer IS
+    `release_mbid=`'s (the test compares the two JSON bodies);
+  - otherwise the row through `_live` (its folder gone: marked `missing`, and the empty answer) and `_facts`,
+    `yours` as the release path computes it, and `navidrome_id` from **`navidrome_album_by_name(client, artist,
+    album, year, track_count)`** (the row's four): a search3 on the row's album title (albumCount
+    SEARCH_ALBUMS, no artists, no songs) as `client_for(request)`; an album believed only with NO
+    `musicBrainzId` (missing, not a string, or blank), `fold_name(name)` equal to the row's folded album, the
+    row's folded artist in `_album_artists(album)` - navidrome_listing's own helpers, so this and "Not in
+    Navidrome" can't disagree - its `year` the row's (both as four digits: Navidrome's number, the row's date
+    tag's first four) whenever both say one, and its `songCount` the row's `track_count` whenever both are
+    positive. With none believed, a second search3 on "<artist> <title>", the same rules. Exactly one distinct
+    id among what was believed, or None. SignedOut is raised (a 401, as everywhere); any other NavidromeError
+    is None. No by-name answer is kept in `_navidrome_ids` (that cache is keyed on a release). **Cost: up to two
+    search3 per look** (one when the title alone finds it, or Navidrome refuses).
+- **Review (24 Nov), three findings, each fixed with a test seen failing first:**
+  - *Another folder's album.* With title and artist alone, an older id-less "Radiohead/OK Computer (2009)"
+    that Navidrome lists was taken for a manual download just filed as "Radiohead/OK Computer (1997)" and not
+    yet scanned - `present` the new folder, `navidrome_id` the old one's, which the app would then keep. Now
+    the year and the song count must agree wherever both sides say them: the year tells the two copies
+    apart, and the count also refuses an album Navidrome hasn't finished scanning (it's asked again later)
+    and one Navidrome made of two id-less copies at once (▶ would play both). A year or count only one side
+    says doesn't count against an album, so two copies with the same date and track count, or a Navidrome
+    answer without them, still read as one (the review's scratch test, whose Navidrome album had neither,
+    still answers the old copy - by that rule).
+  - *A common title past the first 20.* "Greatest Hits", "Live", "II": the title's answers can be all
+    other artists' albums. Hence the second search on "<artist> <title>". That Navidrome's album full text
+    holds its artists' names as well as its own, so the second search can find what the first cut off, is
+    from Navidrome's source as I recall it (the album's name, sort name and album artist and artist names,
+    every query word matched against them) - NOT read here: the notes cite a shallow clone at 46c4327
+    (notes/player.md) but no copy of it is referenced, and nothing was checked on a real server. Were the
+    artist not in it, the second search would find nothing more, and the answer would stay null.
+  - *No LIBRARY_PATH.* `_filed_as` gave `filed_as` for any present row with no root (album_state counts
+    every row then) while the bridge answers empty without one; it now answers nothing, asking nothing.
+  The review's fourth finding (a Navidrome id the app keeps going stale after Edit album > Release) is the
+  app's, on `ios`.
+- **Decided here:** a job with no album id is never looked up by its typed words (a test puts an album of
+  exactly those words in the store and Navidrome and expects nothing); a row whose folder has gone answers
+  `navidrome_id` null too, not a Navidrome album of its name - there is nothing of the store's to open.
+- No new route: tests/test_logins.py's ROUTES unchanged. tests/test_ios_contract.py passes as it is; the spec's
+  `Routes.storeAlbum` gaining `job_id` is the `ios` branch's (A2), when its copy of the routes changes.
+
+Tests: tests/test_manual_search_album.py (49), through the whole app with step 5's fake Navidrome
+(tests/test_personal_libraries.py's `on`) wired as the player's client too, its search3 as Navidrome's is read
+to search (every query word in the album's name and artist, at most albumCount albums). 40 mutations of the new
+code were put in one at a time and each made at least one of them fail, then restored: no set_job_album, set for every
+job, set after the grant, list_jobs without album_id, filed_as without the live check / without following
+merges / one read per row / errors not caught / on non-manual rows, the bridge without `_job_for` / with the
+requester check alone (an admin 404s) / without the matched-since branch / the live check / `_live` / merges
+followed / `yours` / guessing by the typed words, the by-name lookup as the shared account / on the typed words
+/ believing an album with a release id / treating a left-out musicBrainzId as an id / taking the first of
+several / without the artist check / with the album's `artist` field alone / without the name check / without
+folding / swallowing SignedOut / raising NavidromeError, and the old two-key 422 and an unbounded job_id; and
+for the review's fixes: the year not checked / the count not checked / a year or a count only one side says
+blocking / a year as a string not read / the row's year and count not passed / no second search / the second
+search made always / the second search alone, and `_filed_as` without its root guard.
+
+Not verified: Navidrome's real search3 answer for an album with no MusicBrainz id (shaped from its source:
+musicBrainzId empty or left out - both are handled and tested); what its album `year` is (taken here to be its
+files' date year, as the row's is - a Navidrome answering another year, say the original's, for a reissue's
+files would leave the album null, never the wrong one); what its album full text holds (above); whether Navidrome lists an id-less copy and an
+`[unmatched]` one of the same name and album artist as one album or two (M9, M17 - the "exactly one" rule says
+null when it's two); anything against a real slskd or Navidrome.
