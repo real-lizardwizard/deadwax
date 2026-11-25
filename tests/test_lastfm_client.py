@@ -545,6 +545,10 @@ ECHOES = {
     "answer": lambda request: httpx.Response(200, json={"artist": {"name": "Tame Impala"}}),
     "not known": lambda request: error(6, f"no such artist for {request.url}"),
     "refused 10": lambda request: error(10, f"Invalid API key {KEY}", 403),
+    #? the key quoted back in capitals, or half in them: taken out all the same
+    "refused 10, in capitals": lambda request: error(10, f"Invalid API key {KEY.upper()}", 403),
+    "limited 29, half in capitals": lambda request: error(29, f"Rate limit exceeded for {KEY[:16].upper() + KEY[16:]}",
+                                                          200),
     "refused 26": lambda request: error(26, f"Suspended API key: {request.url}", 403),
     "limited 29": lambda request: error(29, f"Rate limit exceeded for {KEY}", 200),
     "limited 429": lambda request: httpx.Response(429, text=f"slow down {KEY}"),
@@ -577,7 +581,7 @@ def test_the_key_appears_nowhere_whatever_last_fm_answers(client, app, caplog, n
         app.get("/deadwax/settings").text,
         app.get("/deadwax/me").text,
     ]
-    assert not [text for text in captured if KEY in text]
+    assert not [text for text in captured if KEY.lower() in text.lower()]
 
 
 def test_the_settings_row_never_shows_the_key(client):

@@ -10,7 +10,8 @@ in the app) is built.
 
 ## S1 - the setting, the client, the keeping (2.1.36)
 
-Nothing in 2.1.36 asks Last.fm: no route calls the client yet (`/deadwax/lastfm/artist` is S2, 2.1.37 on). What is
+Nothing in 2.1.36 asks Last.fm: no route calls the client yet (`/deadwax/lastfm/artist` is S2, 2.1.41 - the manual
+search took 2.1.37-2.1.40). What is
 here is everything those routes stand on, and the recorder that settles what Last.fm really answers before S2 draws
 anything.
 
@@ -44,8 +45,9 @@ anything.
   An `error` given as a string of digits is read as its number.
 - The outcomes are frozen dataclasses returned, never raised: `Answer`, `NotKnown`, `Refused(error, message, at)`,
   `Limited`, `Unreachable(why)`. `why` is always deadwax's own words.
-- `cleaned()` is how a Last.fm message is kept: the key taken out (should Last.fm ever echo it), control characters
-  out, one line, at most 200 letters.
+- `cleaned()` is how a Last.fm message is kept: the key taken out (should Last.fm ever echo it) in any case -
+  `without()` replaces it case-insensitively since 2.1.41's review, a key being hex Last.fm could quote back in
+  capitals - control characters out, one line, at most 200 letters.
 - **The match keys** (the design's 2.4), with the contract `tests/fixtures/lastfm/match-vectors.json`: 57 titles, 27
   names. `stripped` and `first` are hand-written in `tests/fixtures/lastfm/export-vectors.cjs`; each `key` is what
   the web's own TypeScript answers - songs.ts `titleKey(stripped)`, owned.ts `foldName(name)` - compiled as the sims
@@ -196,3 +198,239 @@ A review of the first commit found seven things, each fixed with a test seen fai
 - **Not verified**: anything about real Last.fm. That error 6 is what an unknown artist answers; that keys are 32 hex;
   how Last.fm sends its errors' HTTP statuses; its cache headers; its real rate limit (5 a second is the older terms'
   figure, remembered). The recorder settles the first four.
+
+## S2 - an artist's listeners and top songs: `GET /deadwax/lastfm/artist` (2.1.41)
+
+For the iPhone and Mac app's artist page (slice A1 draws it). The web app doesn't call it, and nothing on the web
+changes. `src/routes/lastfm.py`, a user's route (tests/test_logins.py ROUTES), included under `/deadwax/lastfm` with
+`current_user`; the pure half in `src/lastfm.py`.
+
+### The answer
+
+    {"enabled": true, "unavailable": false, "why": null,
+     "url": "https://www.last.fm/music/Tame+Impala", "listeners": 4724887,
+     "top_songs": [{"title": "The Less I Know the Better", "playcount": 51995043, "listeners": 2955438,
+                    "url": "https://www.last.fm/music/Tame+Impala/_/The+Less+I+Know+the+Better"}, ...]}
+
+- **Query**: `mbid` (MBID_PATTERN) and/or `name` (1-200, trimmed), at least one, else a 422 in words. Both declared,
+  so neither is dropped; an undeclared `artist=` alone is a 422, as the tests show.
+- **Two parts, asked at once**, each through `kept()`: artist.getInfo (`url`, `listeners`) and artist.getTopTracks
+  (`limit=50`). By mbid first (no autocorrect); a `NotKnown` by mbid asks by name with `autocorrect=1`, kept under the
+  name. With no mbid, by name. **The parameters are exactly record.py's**: the tests' stand-in Last.fm answers only a
+  request whose method and parameters match a recorded file, so a request record.py doesn't record fails the test.
+- **`ARTIST_DEADLINE_S` = 4 s.** A part not in by then is `null` with `unavailable: true`. The part is left running,
+  never cancelled by the page, so its answer is kept when it lands, and so is a by-name ask it still has to make. The
+  tasks are held in a set (asyncio keeps only weak references). `routes/lastfm.stop()` cancels them in the lifespan,
+  before `lastfm_kept.stop()`.
+- **`similar` and `top_albums` are S4's**: until then they aren't in the answer at all. A `null` would say "couldn't
+  be had", which isn't what they are.
+- **`why`** follows Explained's rule: words for whoever runs deadwax, sent to everyone, drawn by the app only for
+  `seesDetail`. With no key it is the design's "No Last.fm API key is set - add LASTFM_API_KEY in Server settings >
+  Connections (a free key from last.fm/api/account/create)." While the client holds a refusal (`lastfm.held()`, or
+  a part that came back Refused) it is "Last.fm refused deadwax's API key (error {n}: {message}) - check
+  LASTFM_API_KEY in Server settings > Connections: it's the API key, not the shared secret." Otherwise `null`: a blip
+  has none.
+- **`url`** is getInfo's, else the top tracks' artist's. Every address passed on is https on last.fm or a host under
+  it (`lastfm.lastfm_url`), and since the review also printable ASCII with no space, no `\` (a browser reads it as
+  `/`, so `https://evil.example\.last.fm/x` is evil.example's page, though urlparse's host ends `.last.fm`) and no
+  `@` (whatever is before it a user name), at most `URL_MAX` = 2048 letters. Last.fm's are percent-encoded: all 1,702
+  addresses in the recordings (every `url` and `href`) pass as they are, the longest 117 letters. That is now the ONE
+  rule: `descriptions.from_navidrome` uses it in place of its own inline check. The behaviour is the same, except
+  that a non-string `lastFmUrl` or an unparseable address no longer raises, and the new letters are refused there too.
+
+### Decided here (the design left these open)
+
+1. **An artist Last.fm doesn't know** has `top_songs: null`, not `[]`: `[]` is "known, but lists nothing" (2.5).
+   `unavailable` stays false, since a `NotKnown` is a definite none. Its `listeners` and `url` are null too.
+2. **Refused with nothing kept**: `enabled: false`, and `unavailable: true`, so the app keeps the answer only a moment
+   and a fixed key shows at the next visit. With something kept, `enabled: true`, the kept parts, and `why` still in
+   refused words.
+3. **A failure by mbid isn't a "not known"**: Unreachable, Limited or Refused by id asks nothing by name, since Last.fm
+   is the trouble, not the id.
+4. **A name that folds to nothing** (`name_key("!!!")` is `""`) is never asked by: every such name would share the one
+   kept row `1|method|name|`. With an mbid, the id is still asked.
+5. **An answer that can't be read** (a 200 without `artist` or `toptracks`) is Unreachable and never kept, logged at
+   info. A fault in parsing is the keeper's warning, and still a part not had. Nothing reaches a 500.
+
+### The kept shapes, and LASTFM_SHAPE
+
+**Not bumped: still 1.** Nothing was kept before 2.1.41 (S1 had no route), so no row has another shape.
+
+- **artist.getInfo**: `{url, listeners, bio: {summary, content}}`, the bio as Last.fm wrote it (HTML). The bio isn't
+  in any answer yet. It is kept now so S3's Last.fm descriptions read this same row, as the design's 2.8 says ("the
+  same kept row as 2.5"), rather than bump the shape. Kept rows, measured over the recordings (the JSON as
+  lastfm_kept writes it, plus its key): **201 bytes to 4.7 KB** - the misspelling's page 201 B (no bio content),
+  Portishead's 1.7 KB, Dance Gavin Dance's 4.3 KB, Tame Impala's 4.7 KB (its content cut from 10,843 letters).
+- **The bio's cuts, and why a getInfo row always fits** (the review): the content at most `BIO_MAX` = 4000 letters
+  and the summary at most `SUMMARY_LETTERS` = 1500 (descriptions.MAX_LETTERS, the most S3 shows) - and each then by
+  what it takes WRITTEN, since a kept row is ASCII JSON, where a letter outside ASCII takes 6 bytes and one outside
+  the BMP 12: `CONTENT_BYTES` = 13 KB and `SUMMARY_BYTES` = 9 KB (1500 letters of any script in the BMP; 768 of one
+  outside it, 1,109 of content). Whole letters only, never half a pair. With the address at most 2 KB and the key at
+  most 6,622 bytes - a name of the route's 200 letters folds to at most 33 bytes a letter (U+FDFA is 18 letters in NFKD;
+  `test_a_getinfo_row_always_fits_the_keeping` tries every letter NFKD changes) - and under 100 bytes of the rest,
+  the largest row there can be is 31,269 bytes (30.5 KB), under ROW_MAX_BYTES' 32 KB. `test_the_largest_info_row_there_can_be_is_kept`
+  runs that row through the route and finds it kept. The first cut, 4000 letters each by letters alone, could have
+  made a row of 96,000 bytes of letters outside the BMP: answered, but never kept.
+- **artist.getTopTracks**: `{artist_url, top_songs}`, **already folded** - the design's "parsed to deadwax's shape
+  (2.5)", and a row of 1.2-1.7 KB instead of Last.fm's 53 KB. So **a change to the fold (TOP_SONGS, match_key, the
+  vectors) is a change of the kept shape, and must bump LASTFM_SHAPE**: src/lastfm.py says so beside each.
+  `test_the_kept_shape_has_not_moved` pins the fields, and **`test_what_is_kept_changes_only_with_lastfm_shape`**
+  pins what they hold: `KEPT_SHAPES` pairs each shape with a digest of what is kept - artist_info and top_tracks over
+  every recording, the fold over a list of titles it has to decide (`FOLD_CASES`), a bio cut by its bytes, TOP_SONGS
+  and the caps. A change to any of them without a bump fails, saying to bump LASTFM_SHAPE and add the new pair. A
+  recording made again changes the digest too, with nothing to bump: the message says to replace that shape's.
+- A kept row is read back as carefully as an answer: counts through `count()`, addresses through `lastfm_url()`.
+
+### The fold: `top_songs()`
+
+Last.fm's order. A track whose name trims empty, or whose `match_key` is empty ("???"), is dropped. A repeat of a
+`match_key` is dropped, the higher rank winning. The first `TOP_SONGS` (10). Titles as Last.fm wrote them, ends
+trimmed. Counts are read loosely by `count()`: an int, an integral float, or a string of ASCII digits (at most 18).
+Never a bool, a negative, a fraction or words, and nothing that makes `int()` raise.
+
+**What it gives for the recordings (2026-11-25), title and playcount** - by mbid and by name alike:
+
+- **Tame Impala**: The Less I Know the Better 51,995,043 · Borderline 31,962,438 · New Person, Same Old Mistakes
+  26,439,766 · Let It Happen 28,648,847 · Feels Like We Only Go Backwards 20,213,973 · Eventually 21,238,581 · Nangs
+  14,543,108 · Elephant 12,610,679 · Yes I'm Changing 13,095,273 · Dracula 14,724,597. **Nothing folded**: the 50
+  have 50 different keys.
+- **Dance Gavin Dance**: We Own the Night 4,457,241 · Uneasy Hearts Weigh The Most 3,868,294 · And I Told Them I
+  Invented Times New Roman 2,696,274 · Lemon Meringue Tie 2,355,705 · Death of a Strawberry 2,189,374 · Blue Dream
+  2,172,176 · It's Safe to Say You Dig the Backseat 1,265,400 · The Backwards Pumpkin Song 1,270,182 · Betrayed by
+  the Game 1,412,033 · Open Your Eyes and Look North 1,004,431. **Nothing folded** either, and no feature credit in
+  the 50: the case the design feared for DGD doesn't arise in its top tracks.
+- **Portishead**, the one recording with repeats: "Glory Box - Live" (#34), "Sour times - Live" (#45) and "All Mine -
+  Live" (#50), 47 songs in its 50. All three are past the ten, so they fall away with the rest and the fold never
+  shows. Its ten: Glory Box, Roads, Sour Times, Mysterons, Wandering Star, Strangers, It Could Be Sweet, Numb, The
+  Rip, All Mine.
+- So **in every recording the ten are Last.fm's first ten tracks as they are**: no recording shows the fold at work.
+  The inline tests do: `test_ten_songs_not_ten_tracks` (12 tracks, #3 a "- Live" take of #1, so #11 is the tenth
+  song - the review found nothing failed when the fold ran over the first ten tracks only), and the case, feature,
+  remix and edit tests.
+
+The plays aren't in order because **Last.fm ranks top tracks by listeners, not plays**: listeners descend down all
+three lists of 50, plays don't (Let It Happen has more plays than New Person, Same Old Mistakes but fewer
+listeners). deadwax keeps Last.fm's order. So the README and docs say "most popular", not "most played".
+
+### What the recordings settled (record.py, 2026-11-25)
+
+James ran the recorder twice. The **first run used a key Last.fm didn't accept**: all 32 answers were **HTTP 403**,
+`{"message": "Invalid API key - You must be granted a valid key by last.fm", "error": 10}`. One is kept as
+`tests/fixtures/lastfm/refused-invalid-key.json`, which the second run's overwrite doesn't touch. The tests hold that
+the client classifies it as Refused, and that the route answers it `enabled: false` with the refused `why`. **The
+second run** (02:25Z, the right key) is `tests/fixtures/lastfm/recorded/`, 32 files, checked to hold no key, committed
+with S2:
+
+- **Every answer is HTTP 200, errors included.** An artist Last.fm doesn't know answers **HTTP 200 with error 6**,
+  `{"error": 6, "message": "The artist you supplied could not be found", "links": []}`. That holds for an unknown name
+  (getInfo, getTopTracks) and an unknown mbid (getTopTracks). So **NotKnown for error 6 is confirmed**. classify()
+  reading the error before the status was right twice over: 6 comes with a 200, 10 with a 403.
+- **No `Cache-Control` or `Expires` at all**, only `Content-Type`. So the design's 7 days fresh stands: the one
+  number allowed to move after recording doesn't move.
+- **Numbers are strings** (`"listeners": "4724887"`), as the design read them.
+- **Sizes**: top tracks about 53 KB raw (50 tracks); getInfo 8.7-18.7 KB (Tame Impala's bio content is 10,843
+  letters); the largest file is 135 KB (track.getSimilar, S5's). All are under the client's 512 KB.
+- **A track's `mbid`** is filled for 49 of Tame Impala's 50, 46 of Dance Gavin Dance's and of Portishead's, and none of
+  the misspelling's 9 (the design's open question; the match stays by title, decision 7).
+- **`autocorrect=1` doesn't correct "Tame Impla"**: Last.fm has a page under the misspelling (9 listeners, no mbid,
+  nine songs scrobbled as typed - "eventually", "let it happen"), and answers it with autocorrect or without. So by
+  name, deadwax gets whatever page Last.fm has under that exact name. The app asks by the MusicBrainz name, so this
+  bites only for a name misspelt there, or an artist with no mbid whose tags are misspelt.
+- **By mbid and by name** gave the same answers for all three artists.
+- **For S3**: a bio's `summary` ends `<a href="https://www.last.fm/music/...">Read more on Last.fm</a>`, and its
+  `content` ends "... Read more on Last.fm</a>. User-contributed text is available under the Creative Commons By-SA
+  License; additional terms may apply." That is the licence sentence as the design remembered it. A content past
+  BIO_MAX is kept without that tail.
+
+### Fixtures
+
+- `tests/fixtures/lastfm/recorded/` (Last.fm's own) is what tests/test_lastfm.py's `ANSWERS` points at, and what the
+  route tests' stand-in Last.fm answers from.
+- **No shaped files are left.** S2 was first built over files shaped from the API pages (`shaped/`). Once the
+  recordings came they were removed, since every case they held is either in a recording now or held inline. What no
+  recording shows is inline, marked `SHAPED` or `shaped_track`:
+  - the fold's own cases: a case variant, an exact repeat, a feature aside or tail, a "with" aside, a remix or an edit
+    kept apart, an empty or punctuation-only name, one track given as an object;
+  - bad fields: counts missing, in words or otherwise odd, and a plain-http address;
+  - Last.fm down (503), limiting (29), answering junk or not JSON, slow;
+  - a refusal that echoes the key;
+  - getInfo for an unknown mbid, which record.py doesn't record. It is given Last.fm's recorded not-known answer for an
+    unknown name (`NOT_KNOWN`).
+- `tests/test_lastfm.py test_the_recorded_answers_fold_to_these_songs` pins the lists above, the one test a new
+  recording changes. The others assert what holds for any answer: first of each key, Last.fm's order, at most ten,
+  counts and addresses read as the parse reads them.
+
+### The app's fixtures: `tests/fixtures/lastfm/answers.py`
+
+The plan's S2 exports the shared answers for the app (`ios/.../Fixtures/lastfm/answers/`). On main nothing is
+written under `ios/`. The exporter lives beside record.py, and **is run on the `ios` branch** after merging main:
+`.venv/bin/python tests/fixtures/lastfm/answers.py` writes
+`ios/DeadwaxKit/Tests/DeadwaxCoreTests/Fixtures/lastfm/answers/artist.json`. `--out DIR` writes elsewhere; `--check`
+compares, exit 1 when it differs. Its nine cases each run the whole app with a fresh store, over the recorded
+answers:
+
+1. Tame Impala by id
+2. Dance Gavin Dance by id
+3. Portishead by id (ten top songs, its three live takes past them)
+4. an unknown id asked again by name
+5. an artist Last.fm doesn't know
+6. getInfo failing
+7. Last.fm down
+8. the real refusal
+9. no key
+
+The file says `"fixtures": "recorded"`. tests/test_lastfm_routes.py checks that it runs, that every case is a 200 in
+the route's shape, and that `--check` passes on what it just wrote and fails on anything else. It holds the app's copy
+byte-equal to a fresh run, a test skipped where the copy is absent, as on main.
+
+### Tests, and the mutations they catch
+
+- tests/test_lastfm.py: the parse and the fold, over the recordings and inline.
+- tests/test_lastfm_routes.py: the route, through start() with a real store and the module's client and keeper.
+- tests/test_logins.py: ROUTES gains the route as `user`, plus a signed-out 401 test with a key set, in which Last.fm
+  is never asked.
+
+The plan's S2 mutations, and a few more, were each put in alone and the Last.fm, logins and describe tests run; all
+are caught:
+
+- **fold**: a duplicate kept; a case variant kept; a feature not folded; a remix folded into its song; an empty name
+  kept; more than 10.
+- **fallback**: mbid's NotKnown not asking by name.
+- **parse**: listeners as a string not read; listeners read with `int()`, crashing on absent or words.
+- **degrade**: one part failing taking the answer down; one part failing being a 502.
+- **deadline**: none (the page waits for every part); 8 s not 4; a late part cancelled. The first run missed the last
+  one: cancelling a part whose by-id ask was still out changed nothing, since that ask is shielded and is kept anyway.
+  `test_a_late_part_goes_on_to_ask_by_name_and_that_is_kept_too` now catches it - what a cancel loses is the by-name
+  ask after a late NotKnown.
+- **no key**: asked anyway; no `why`.
+- **refused**: `enabled` with nothing kept; no `why`.
+- **addresses**: any host passed on.
+
+The review's six (2.1.41, before its commit), each with its test. Their mutations were put in alone, the Last.fm,
+logins and describe tests run, and every one caught:
+
+- **the fold over the first ten tracks** (`for track in tracks[:TOP_SONGS]`), which passed every test before:
+  `test_ten_songs_not_ten_tracks`, and the digest test.
+- **what is kept changed with LASTFM_SHAPE left** - TOP_SONGS 11; a song's plays read from its listeners;
+  `CONTENT_BYTES` 12 KB, which only `test_what_is_kept_changes_only_with_lastfm_shape` catches - each failing that test
+  with its "bump LASTFM_SHAPE in src/lastfm.py, and add 2: '...' to KEPT_SHAPES".
+- **a `\` let through**, and **an `@` let through**: `test_an_address_is_passed_on_only_when_it_is_https_on_last_fm`.
+- **the key taken out in its own case only**: `test_the_key_is_taken_out_in_any_case`, and the client's leak test's
+  new `refused 10, in capitals` (which now looks for the key in any case).
+- **the bio cut by letters only**: `test_a_bio_is_cut_by_what_it_takes_written_too` and
+  `test_a_getinfo_row_always_fits_the_keeping`.
+
+The sixth was CLAUDE.md's map, which now names src/lastfm.py, src/lastfm_kept.py, src/api/lastfm_endpoint.py and
+src/routes/lastfm.py.
+
+### Verified, and not
+
+- **Verified by the tests**: everything above, over Last.fm's recorded answers through httpx's MockTransport. That
+  covers the parse and fold of real answers, the request parameters (exactly the recorded ones), the real 403 refusal
+  and the real error-6 not-known.
+- **Not verified**:
+  - deadwax asking the real Last.fm through this route. No call was made here; only record.py, on James's Mac, has
+    asked it;
+  - how long a cold `/lastfm/artist` takes, which decides how often A1's Top Songs lands below the albums;
+  - Last.fm's real rate limit;
+  - getInfo's answer for an unknown mbid (believed error 6, as its getTopTracks answered).

@@ -1,0 +1,241 @@
+{
+ "recorded": "2026-11-25T02:25:34Z",
+ "method": "artist.getinfo",
+ "params": {
+  "artist": "Dance Gavin Dance",
+  "autocorrect": "1"
+ },
+ "status": 200,
+ "headers": {
+  "Content-Type": "application/json"
+ },
+ "answer": {
+  "artist": {
+   "name": "Dance Gavin Dance",
+   "mbid": "16456fed-c9f2-4adf-b6ea-97b648c474d2",
+   "url": "https://www.last.fm/music/Dance+Gavin+Dance",
+   "image": [
+    {
+     "#text": "https://lastfm-img.freetls.fastly.net/i/u/34s/2a96cbd8b46e442fc41c2b86b821562f.png",
+     "size": "small"
+    },
+    {
+     "#text": "https://lastfm-img.freetls.fastly.net/i/u/64s/2a96cbd8b46e442fc41c2b86b821562f.png",
+     "size": "medium"
+    },
+    {
+     "#text": "https://lastfm-img.freetls.fastly.net/i/u/174s/2a96cbd8b46e442fc41c2b86b821562f.png",
+     "size": "large"
+    },
+    {
+     "#text": "https://lastfm-img.freetls.fastly.net/i/u/300x300/2a96cbd8b46e442fc41c2b86b821562f.png",
+     "size": "extralarge"
+    },
+    {
+     "#text": "https://lastfm-img.freetls.fastly.net/i/u/300x300/2a96cbd8b46e442fc41c2b86b821562f.png",
+     "size": "mega"
+    },
+    {
+     "#text": "https://lastfm-img.freetls.fastly.net/i/u/300x300/2a96cbd8b46e442fc41c2b86b821562f.png",
+     "size": ""
+    }
+   ],
+   "streamable": "0",
+   "ontour": "1",
+   "stats": {
+    "listeners": "884434",
+    "playcount": "99972093"
+   },
+   "similar": {
+    "artist": [
+     {
+      "name": "Royal Coda",
+      "url": "https://www.last.fm/music/Royal+Coda",
+      "image": [
+       {
+        "#text": "https://lastfm-img.freetls.fastly.net/i/u/34s/2a96cbd8b46e442fc41c2b86b821562f.png",
+        "size": "small"
+       },
+       {
+        "#text": "https://lastfm-img.freetls.fastly.net/i/u/64s/2a96cbd8b46e442fc41c2b86b821562f.png",
+        "size": "medium"
+       },
+       {
+        "#text": "https://lastfm-img.freetls.fastly.net/i/u/174s/2a96cbd8b46e442fc41c2b86b821562f.png",
+        "size": "large"
+       },
+       {
+        "#text": "https://lastfm-img.freetls.fastly.net/i/u/300x300/2a96cbd8b46e442fc41c2b86b821562f.png",
+        "size": "extralarge"
+       },
+       {
+        "#text": "https://lastfm-img.freetls.fastly.net/i/u/300x300/2a96cbd8b46e442fc41c2b86b821562f.png",
+        "size": "mega"
+       },
+       {
+        "#text": "https://lastfm-img.freetls.fastly.net/i/u/300x300/2a96cbd8b46e442fc41c2b86b821562f.png",
+        "size": ""
+       }
+      ]
+     },
+     {
+      "name": "Eidola",
+      "url": "https://www.last.fm/music/Eidola",
+      "image": [
+       {
+        "#text": "https://lastfm-img.freetls.fastly.net/i/u/34s/2a96cbd8b46e442fc41c2b86b821562f.png",
+        "size": "small"
+       },
+       {
+        "#text": "https://lastfm-img.freetls.fastly.net/i/u/64s/2a96cbd8b46e442fc41c2b86b821562f.png",
+        "size": "medium"
+       },
+       {
+        "#text": "https://lastfm-img.freetls.fastly.net/i/u/174s/2a96cbd8b46e442fc41c2b86b821562f.png",
+        "size": "large"
+       },
+       {
+        "#text": "https://lastfm-img.freetls.fastly.net/i/u/300x300/2a96cbd8b46e442fc41c2b86b821562f.png",
+        "size": "extralarge"
+       },
+       {
+        "#text": "https://lastfm-img.freetls.fastly.net/i/u/300x300/2a96cbd8b46e442fc41c2b86b821562f.png",
+        "size": "mega"
+       },
+       {
+        "#text": "https://lastfm-img.freetls.fastly.net/i/u/300x300/2a96cbd8b46e442fc41c2b86b821562f.png",
+        "size": ""
+       }
+      ]
+     },
+     {
+      "name": "Secret Band",
+      "url": "https://www.last.fm/music/Secret+Band",
+      "image": [
+       {
+        "#text": "https://lastfm-img.freetls.fastly.net/i/u/34s/2a96cbd8b46e442fc41c2b86b821562f.png",
+        "size": "small"
+       },
+       {
+        "#text": "https://lastfm-img.freetls.fastly.net/i/u/64s/2a96cbd8b46e442fc41c2b86b821562f.png",
+        "size": "medium"
+       },
+       {
+        "#text": "https://lastfm-img.freetls.fastly.net/i/u/174s/2a96cbd8b46e442fc41c2b86b821562f.png",
+        "size": "large"
+       },
+       {
+        "#text": "https://lastfm-img.freetls.fastly.net/i/u/300x300/2a96cbd8b46e442fc41c2b86b821562f.png",
+        "size": "extralarge"
+       },
+       {
+        "#text": "https://lastfm-img.freetls.fastly.net/i/u/300x300/2a96cbd8b46e442fc41c2b86b821562f.png",
+        "size": "mega"
+       },
+       {
+        "#text": "https://lastfm-img.freetls.fastly.net/i/u/300x300/2a96cbd8b46e442fc41c2b86b821562f.png",
+        "size": ""
+       }
+      ]
+     },
+     {
+      "name": "Wolf & Bear",
+      "url": "https://www.last.fm/music/Wolf+&+Bear",
+      "image": [
+       {
+        "#text": "https://lastfm-img.freetls.fastly.net/i/u/34s/2a96cbd8b46e442fc41c2b86b821562f.png",
+        "size": "small"
+       },
+       {
+        "#text": "https://lastfm-img.freetls.fastly.net/i/u/64s/2a96cbd8b46e442fc41c2b86b821562f.png",
+        "size": "medium"
+       },
+       {
+        "#text": "https://lastfm-img.freetls.fastly.net/i/u/174s/2a96cbd8b46e442fc41c2b86b821562f.png",
+        "size": "large"
+       },
+       {
+        "#text": "https://lastfm-img.freetls.fastly.net/i/u/300x300/2a96cbd8b46e442fc41c2b86b821562f.png",
+        "size": "extralarge"
+       },
+       {
+        "#text": "https://lastfm-img.freetls.fastly.net/i/u/300x300/2a96cbd8b46e442fc41c2b86b821562f.png",
+        "size": "mega"
+       },
+       {
+        "#text": "https://lastfm-img.freetls.fastly.net/i/u/300x300/2a96cbd8b46e442fc41c2b86b821562f.png",
+        "size": ""
+       }
+      ]
+     },
+     {
+      "name": "Emarosa",
+      "url": "https://www.last.fm/music/Emarosa",
+      "image": [
+       {
+        "#text": "https://lastfm-img.freetls.fastly.net/i/u/34s/2a96cbd8b46e442fc41c2b86b821562f.png",
+        "size": "small"
+       },
+       {
+        "#text": "https://lastfm-img.freetls.fastly.net/i/u/64s/2a96cbd8b46e442fc41c2b86b821562f.png",
+        "size": "medium"
+       },
+       {
+        "#text": "https://lastfm-img.freetls.fastly.net/i/u/174s/2a96cbd8b46e442fc41c2b86b821562f.png",
+        "size": "large"
+       },
+       {
+        "#text": "https://lastfm-img.freetls.fastly.net/i/u/300x300/2a96cbd8b46e442fc41c2b86b821562f.png",
+        "size": "extralarge"
+       },
+       {
+        "#text": "https://lastfm-img.freetls.fastly.net/i/u/300x300/2a96cbd8b46e442fc41c2b86b821562f.png",
+        "size": "mega"
+       },
+       {
+        "#text": "https://lastfm-img.freetls.fastly.net/i/u/300x300/2a96cbd8b46e442fc41c2b86b821562f.png",
+        "size": ""
+       }
+      ]
+     }
+    ]
+   },
+   "tags": {
+    "tag": [
+     {
+      "name": "post-hardcore",
+      "url": "https://www.last.fm/tag/post-hardcore"
+     },
+     {
+      "name": "experimental",
+      "url": "https://www.last.fm/tag/experimental"
+     },
+     {
+      "name": "screamo",
+      "url": "https://www.last.fm/tag/screamo"
+     },
+     {
+      "name": "emocore",
+      "url": "https://www.last.fm/tag/emocore"
+     },
+     {
+      "name": "hardcore",
+      "url": "https://www.last.fm/tag/hardcore"
+     }
+    ]
+   },
+   "bio": {
+    "links": {
+     "link": {
+      "#text": "",
+      "rel": "original",
+      "href": "https://last.fm/music/Dance+Gavin+Dance/+wiki"
+     }
+    },
+    "published": "05 May 2006, 23:09",
+    "summary": "Dance Gavin Dance is an experimental post-hardcore band formed in Sacramento, California, United States in 2005, out of the ashes of Farewell Unknown and Left Apart.\n\nThe band is well known for their relatively frequent lineup changes, which, most notably, involves a fluctuating lineup of vocalists, both on tour and on record. Dance Gavin Dance incorporates many different musical genres into their palette, such as math rock, progressive rock, funk, and soul on top of its post-hardcore sound. <a href=\"https://www.last.fm/music/Dance+Gavin+Dance\">Read more on Last.fm</a>",
+    "content": "Dance Gavin Dance is an experimental post-hardcore band formed in Sacramento, California, United States in 2005, out of the ashes of Farewell Unknown and Left Apart.\n\nThe band is well known for their relatively frequent lineup changes, which, most notably, involves a fluctuating lineup of vocalists, both on tour and on record. Dance Gavin Dance incorporates many different musical genres into their palette, such as math rock, progressive rock, funk, and soul on top of its post-hardcore sound. Ex-vocalist Jonny Craig also received high marks for contributing to the band's unorthodox soul sound and guitarist Will Swan has been recognized for his intricate, fast-moving guitar licks and riffs.\n\nDiscography:\nNovember 14, 2006 - Whatever I Say Is Royal Ocean\nMay 15, 2007 - Downtown Battle Mountain\nAugust 19, 2008 - Dance Gavin Dance\nJune 9, 2009 - Happiness\nOctober 18, 2010 - Live At Bamboozle 2010 (Live album)\nMarch 8, 2011 - Downtown Battle Mountain II\nMarch 8, 2011 - People You Knew / Perfect (Single)\nOctober 8, 2013 - Acceptance Speech\nSeptember 17, 2014 - Pussy Vultures (Single)\nApril 14, 2015 - Instant Gratification\nMay 13, 2016 - Tree City Sessions (Live album)\nOctober 7, 2016 - Mothership\nJune 15, 2017 - Summertime Gladness (Single)\nJune 8, 2018 - Artificial Selection\nMarch 22, 2019 - Head Hunter (Single)\nAugust 30, 2019 - Acceptance Speech 2.0 (Remastered)\nOctober 11, 2019 - Blood Wolf (Single)\nApril 24, 2020 - Afterburner\nDecember 25, 2020 - Tree City Sessions 2 (Live album)\nJuly 29, 2022 - Jackpot Juicer\nAugust 24, 2023 - The Ghost Of Billy Royalton (Single)\nOctober 24, 2023 - War Machine (Single)\nMay 10, 2024 - Speed Demon / \"Straight From The Heart (Single)\nSeptember 12, 2025 - Pantheon\nMay 22, 2026 - Tree City Sessions 3 (Live album)\n\nAll of Dance Gavin Dance's records have been released on Rise Records.\n\nBand members:\nJonathan Mess - unclean vocals (2005\u20132008; 2010\u2013present), additional clean vocals (2025\u2013present)\nWill Swan - guitars (2005\u2013present); unclean vocals (2008\u20132010), rap vocals (2009\u2013present), bass guitar (2022-present)\nMatt Mingus - drums  (2005\u2013present)\nAndrew Wells - guitars, clean vocals, bass guitar (2021-present; touring 2015-2021),  lead vocals (2022, 2024\u2013present)\n\nTouring members:\nSergio Medina - rhythm guitar, bass guitar (touring 2021-present)\nMartin Bianchini - guitar (session 2015\u2013present; touring 2024\u2013present)\n\nFormer Members:\nJonny Craig \u2013 clean vocals (2005\u20132007; 2010\u20132012; touring 2015, 2016)\nKurt Travis \u2013 clean & unclean vocals (2007\u20132010; touring 2012, 2015, 2016)\nAlvaro Alcala \u2013 guitar (2005-2006)\nSean O'Sullivan \u2013 guitar (2006\u20132007; touring 2010)\nZachary Garren \u2013 guitar (2007\u20132010; touring 2015)\nJosh Benton - guitar (2010-2014)\nEric Lodge \u2013 bass guitar (2005\u20132008; 2010\u20132012)\nJason Ellis \u2013 bass guitar (2008\u20132009)\nTim Feerick \u2013 bass guitar (2009\u20132010; 2012\u20132022; died 2022)\nTilian Pearson - clean vocals (2012\u20132024)\n\nFormer touring members:\nMatt Geise \u2013 clean vocals (2012)\nDan Snook \u2013 guitar (2010)\nAric Garcia - guitar (2014-2015)\nAlex Whitcomb - guitar (2015)\nTony Marks \u2013 bass guitar (2010)\nJordan McCoy \u2013 bass guitar (2011\u20132012) <a href=\"https://www.last.fm/music/Dance+Gavin+Dance\">Read more on Last.fm</a>. User-contributed text is available under the Creative Commons By-SA License; additional terms may apply."
+   }
+  }
+ }
+}

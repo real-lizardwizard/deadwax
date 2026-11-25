@@ -1,0 +1,16 @@
+{
+ "recorded": "2026-11-25T02:17:18Z",
+ "method": "artist.gettoptracks",
+ "params": {
+  "mbid": "63aa26c3-d59b-4da4-84ac-716b54f1ef4d",
+  "limit": "50"
+ },
+ "status": 403,
+ "headers": {
+  "Content-Type": "application/json"
+ },
+ "answer": {
+  "message": "Invalid API key - You must be granted a valid key by last.fm",
+  "error": 10
+ }
+}

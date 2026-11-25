@@ -1,0 +1,314 @@
+{
+ "recorded": "2026-11-25T02:25:46Z",
+ "method": "artist.gettoptracks",
+ "params": {
+  "artist": "Tame Impla",
+  "autocorrect": "1",
+  "limit": "50"
+ },
+ "status": 200,
+ "headers": {
+  "Content-Type": "application/json"
+ },
+ "answer": {
+  "toptracks": {
+   "track": [
+    {
+     "name": "Feels Like We Only Go Backwards",
+     "playcount": "17",
+     "listeners": "4",
+     "url": "https://www.last.fm/music/Tame+Impla/_/Feels+Like+We+Only+Go+Backwards",
+     "streamable": "0",
+     "artist": {
+      "name": "Tame Impla",
+      "url": "https://www.last.fm/music/Tame+Impla"
+     },
+     "image": [
+      {
+       "#text": "",
+       "size": "small"
+      },
+      {
+       "#text": "",
+       "size": "medium"
+      },
+      {
+       "#text": "",
+       "size": "large"
+      },
+      {
+       "#text": "",
+       "size": "extralarge"
+      }
+     ],
+     "@attr": {
+      "rank": "1"
+     }
+    },
+    {
+     "name": "eventually",
+     "playcount": "8",
+     "listeners": "1",
+     "url": "https://www.last.fm/music/Tame+Impla/_/eventually",
+     "streamable": "0",
+     "artist": {
+      "name": "Tame Impla",
+      "url": "https://www.last.fm/music/Tame+Impla"
+     },
+     "image": [
+      {
+       "#text": "",
+       "size": "small"
+      },
+      {
+       "#text": "",
+       "size": "medium"
+      },
+      {
+       "#text": "",
+       "size": "large"
+      },
+      {
+       "#text": "",
+       "size": "extralarge"
+      }
+     ],
+     "@attr": {
+      "rank": "2"
+     }
+    },
+    {
+     "name": "Sundown Syndrome",
+     "playcount": "2",
+     "listeners": "1",
+     "url": "https://www.last.fm/music/Tame+Impla/_/Sundown+Syndrome",
+     "streamable": "0",
+     "artist": {
+      "name": "Tame Impla",
+      "url": "https://www.last.fm/music/Tame+Impla"
+     },
+     "image": [
+      {
+       "#text": "",
+       "size": "small"
+      },
+      {
+       "#text": "",
+       "size": "medium"
+      },
+      {
+       "#text": "",
+       "size": "large"
+      },
+      {
+       "#text": "",
+       "size": "extralarge"
+      }
+     ],
+     "@attr": {
+      "rank": "3"
+     }
+    },
+    {
+     "name": "let it happen",
+     "playcount": "2",
+     "listeners": "1",
+     "url": "https://www.last.fm/music/Tame+Impla/_/let+it+happen",
+     "streamable": "0",
+     "artist": {
+      "name": "Tame Impla",
+      "url": "https://www.last.fm/music/Tame+Impla"
+     },
+     "image": [
+      {
+       "#text": "",
+       "size": "small"
+      },
+      {
+       "#text": "",
+       "size": "medium"
+      },
+      {
+       "#text": "",
+       "size": "large"
+      },
+      {
+       "#text": "",
+       "size": "extralarge"
+      }
+     ],
+     "@attr": {
+      "rank": "4"
+     }
+    },
+    {
+     "name": "Desire Be, Desire Go",
+     "playcount": "1",
+     "listeners": "1",
+     "url": "https://www.last.fm/music/Tame+Impla/_/Desire+Be,+Desire+Go",
+     "streamable": "0",
+     "artist": {
+      "name": "Tame Impla",
+      "url": "https://www.last.fm/music/Tame+Impla"
+     },
+     "image": [
+      {
+       "#text": "",
+       "size": "small"
+      },
+      {
+       "#text": "",
+       "size": "medium"
+      },
+      {
+       "#text": "",
+       "size": "large"
+      },
+      {
+       "#text": "",
+       "size": "extralarge"
+      }
+     ],
+     "@attr": {
+      "rank": "5"
+     }
+    },
+    {
+     "name": "Remember me",
+     "playcount": "1",
+     "listeners": "1",
+     "url": "https://www.last.fm/music/Tame+Impla/_/Remember+me",
+     "streamable": "0",
+     "artist": {
+      "name": "Tame Impla",
+      "url": "https://www.last.fm/music/Tame+Impla"
+     },
+     "image": [
+      {
+       "#text": "",
+       "size": "small"
+      },
+      {
+       "#text": "",
+       "size": "medium"
+      },
+      {
+       "#text": "",
+       "size": "large"
+      },
+      {
+       "#text": "",
+       "size": "extralarge"
+      }
+     ],
+     "@attr": {
+      "rank": "6"
+     }
+    },
+    {
+     "name": "Half Full Glass of Wine",
+     "playcount": "1",
+     "listeners": "1",
+     "url": "https://www.last.fm/music/Tame+Impla/_/Half+Full+Glass+of+Wine",
+     "streamable": "0",
+     "artist": {
+      "name": "Tame Impla",
+      "url": "https://www.last.fm/music/Tame+Impla"
+     },
+     "image": [
+      {
+       "#text": "",
+       "size": "small"
+      },
+      {
+       "#text": "",
+       "size": "medium"
+      },
+      {
+       "#text": "",
+       "size": "large"
+      },
+      {
+       "#text": "",
+       "size": "extralarge"
+      }
+     ],
+     "@attr": {
+      "rank": "7"
+     }
+    },
+    {
+     "name": "Lucidity (Radio Edit)",
+     "playcount": "1",
+     "listeners": "1",
+     "url": "https://www.last.fm/music/Tame+Impla/_/Lucidity+(Radio+Edit)",
+     "streamable": "0",
+     "artist": {
+      "name": "Tame Impla",
+      "url": "https://www.last.fm/music/Tame+Impla"
+     },
+     "image": [
+      {
+       "#text": "",
+       "size": "small"
+      },
+      {
+       "#text": "",
+       "size": "medium"
+      },
+      {
+       "#text": "",
+       "size": "large"
+      },
+      {
+       "#text": "",
+       "size": "extralarge"
+      }
+     ],
+     "@attr": {
+      "rank": "8"
+     }
+    },
+    {
+     "name": "The Less I Know The Better",
+     "playcount": "1",
+     "listeners": "1",
+     "url": "https://www.last.fm/music/Tame+Impla/_/The+Less+I+Know+The+Better",
+     "streamable": "0",
+     "artist": {
+      "name": "Tame Impla",
+      "url": "https://www.last.fm/music/Tame+Impla"
+     },
+     "image": [
+      {
+       "#text": "",
+       "size": "small"
+      },
+      {
+       "#text": "",
+       "size": "medium"
+      },
+      {
+       "#text": "",
+       "size": "large"
+      },
+      {
+       "#text": "",
+       "size": "extralarge"
+      }
+     ],
+     "@attr": {
+      "rank": "9"
+     }
+    }
+   ],
+   "@attr": {
+    "artist": "Tame Impla",
+    "page": "1",
+    "perPage": "50",
+    "totalPages": "1",
+    "total": "9"
+   }
+  }
+ }
+}

@@ -1,0 +1,1614 @@
+{
+ "recorded": "2026-11-25T02:25:33Z",
+ "method": "artist.gettopalbums",
+ "params": {
+  "artist": "Tame Impala",
+  "autocorrect": "1",
+  "limit": "50"
+ },
+ "status": 200,
+ "headers": {
+  "Content-Type": "application/json; charset=UTF-8"
+ },
+ "answer": {
+  "topalbums": {
+   "album": [
+    {
+     "name": "Currents",
+     "playcount": 197990342,
+     "mbid": "031ecbde-35e1-4d3a-917f-f89f31aca1c9",
+     "url": "https://www.last.fm/music/Tame+Impala/Currents",
+     "artist": {
+      "name": "Tame Impala",
+      "mbid": "63aa26c3-d59b-4da4-84ac-716b54f1ef4d",
+      "url": "https://www.last.fm/music/Tame+Impala"
+     },
+     "image": [
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/34s/dd45b0438a315aed98b5830aa2fc43c5.png",
+       "size": "small"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/64s/dd45b0438a315aed98b5830aa2fc43c5.png",
+       "size": "medium"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/174s/dd45b0438a315aed98b5830aa2fc43c5.png",
+       "size": "large"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/300x300/dd45b0438a315aed98b5830aa2fc43c5.png",
+       "size": "extralarge"
+      }
+     ],
+     "@attr": {
+      "rank": "1"
+     }
+    },
+    {
+     "name": "The Slow Rush",
+     "playcount": 75865879,
+     "mbid": "3a12923d-97cd-4e87-8cfd-fb67be970974",
+     "url": "https://www.last.fm/music/Tame+Impala/The+Slow+Rush",
+     "artist": {
+      "name": "Tame Impala",
+      "mbid": "63aa26c3-d59b-4da4-84ac-716b54f1ef4d",
+      "url": "https://www.last.fm/music/Tame+Impala"
+     },
+     "image": [
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/34s/832ade6a35ec2a224ea9a5be326b5de4.png",
+       "size": "small"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/64s/832ade6a35ec2a224ea9a5be326b5de4.png",
+       "size": "medium"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/174s/832ade6a35ec2a224ea9a5be326b5de4.png",
+       "size": "large"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/300x300/832ade6a35ec2a224ea9a5be326b5de4.png",
+       "size": "extralarge"
+      }
+     ],
+     "@attr": {
+      "rank": "2"
+     }
+    },
+    {
+     "name": "Lonerism",
+     "playcount": 65345426,
+     "mbid": "0d2cb66c-3a32-4f81-b977-9231c461c34a",
+     "url": "https://www.last.fm/music/Tame+Impala/Lonerism",
+     "artist": {
+      "name": "Tame Impala",
+      "mbid": "63aa26c3-d59b-4da4-84ac-716b54f1ef4d",
+      "url": "https://www.last.fm/music/Tame+Impala"
+     },
+     "image": [
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/34s/7c9c4d1009514b178c82f2201e3a1fce.png",
+       "size": "small"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/64s/7c9c4d1009514b178c82f2201e3a1fce.png",
+       "size": "medium"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/174s/7c9c4d1009514b178c82f2201e3a1fce.png",
+       "size": "large"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/300x300/7c9c4d1009514b178c82f2201e3a1fce.png",
+       "size": "extralarge"
+      }
+     ],
+     "@attr": {
+      "rank": "3"
+     }
+    },
+    {
+     "name": "Deadbeat",
+     "playcount": 23596438,
+     "mbid": "51f8289e-7379-4c7b-ab50-564e2f875594",
+     "url": "https://www.last.fm/music/Tame+Impala/Deadbeat",
+     "artist": {
+      "name": "Tame Impala",
+      "mbid": "63aa26c3-d59b-4da4-84ac-716b54f1ef4d",
+      "url": "https://www.last.fm/music/Tame+Impala"
+     },
+     "image": [
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/34s/29cd52e0f2ba0d5dcf2b2684cc71ef58.png",
+       "size": "small"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/64s/29cd52e0f2ba0d5dcf2b2684cc71ef58.png",
+       "size": "medium"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/174s/29cd52e0f2ba0d5dcf2b2684cc71ef58.png",
+       "size": "large"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/300x300/29cd52e0f2ba0d5dcf2b2684cc71ef58.png",
+       "size": "extralarge"
+      }
+     ],
+     "@attr": {
+      "rank": "4"
+     }
+    },
+    {
+     "name": "Innerspeaker",
+     "playcount": 29854021,
+     "mbid": "0b18bdeb-8382-4b8f-94a3-b43e3e7ec6a4",
+     "url": "https://www.last.fm/music/Tame+Impala/Innerspeaker",
+     "artist": {
+      "name": "Tame Impala",
+      "mbid": "63aa26c3-d59b-4da4-84ac-716b54f1ef4d",
+      "url": "https://www.last.fm/music/Tame+Impala"
+     },
+     "image": [
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/34s/25baad6ad48e4459a97bd54790cd0026.png",
+       "size": "small"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/64s/25baad6ad48e4459a97bd54790cd0026.png",
+       "size": "medium"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/174s/25baad6ad48e4459a97bd54790cd0026.png",
+       "size": "large"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/300x300/25baad6ad48e4459a97bd54790cd0026.png",
+       "size": "extralarge"
+      }
+     ],
+     "@attr": {
+      "rank": "5"
+     }
+    },
+    {
+     "name": "Dracula (Remix)",
+     "playcount": 7905191,
+     "mbid": "132919b9-60a8-4835-884f-3a943ba587bf",
+     "url": "https://www.last.fm/music/Tame+Impala/Dracula+(Remix)",
+     "artist": {
+      "name": "Tame Impala",
+      "mbid": "63aa26c3-d59b-4da4-84ac-716b54f1ef4d",
+      "url": "https://www.last.fm/music/Tame+Impala"
+     },
+     "image": [
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/34s/998bf48c75ef536e120cca624c7548dd.png",
+       "size": "small"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/64s/998bf48c75ef536e120cca624c7548dd.png",
+       "size": "medium"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/174s/998bf48c75ef536e120cca624c7548dd.png",
+       "size": "large"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/300x300/998bf48c75ef536e120cca624c7548dd.png",
+       "size": "extralarge"
+      }
+     ],
+     "@attr": {
+      "rank": "6"
+     }
+    },
+    {
+     "name": "Dracula",
+     "playcount": 6876079,
+     "mbid": "338c7885-011c-4a4a-b5d1-95e6f3fc2383",
+     "url": "https://www.last.fm/music/Tame+Impala/Dracula",
+     "artist": {
+      "name": "Tame Impala",
+      "mbid": "63aa26c3-d59b-4da4-84ac-716b54f1ef4d",
+      "url": "https://www.last.fm/music/Tame+Impala"
+     },
+     "image": [
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/34s/b54c44fa13530ee2e088e13096becaf2.png",
+       "size": "small"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/64s/b54c44fa13530ee2e088e13096becaf2.png",
+       "size": "medium"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/174s/b54c44fa13530ee2e088e13096becaf2.png",
+       "size": "large"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/300x300/b54c44fa13530ee2e088e13096becaf2.png",
+       "size": "extralarge"
+      }
+     ],
+     "@attr": {
+      "rank": "7"
+     }
+    },
+    {
+     "name": "The Slow Rush B-Sides & Remixes",
+     "playcount": 3788376,
+     "url": "https://www.last.fm/music/Tame+Impala/The+Slow+Rush+B-Sides+&+Remixes",
+     "artist": {
+      "name": "Tame Impala",
+      "mbid": "63aa26c3-d59b-4da4-84ac-716b54f1ef4d",
+      "url": "https://www.last.fm/music/Tame+Impala"
+     },
+     "image": [
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/34s/7402e16dcfa4faf98e80a9eaa93dd337.png",
+       "size": "small"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/64s/7402e16dcfa4faf98e80a9eaa93dd337.png",
+       "size": "medium"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/174s/7402e16dcfa4faf98e80a9eaa93dd337.png",
+       "size": "large"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/300x300/7402e16dcfa4faf98e80a9eaa93dd337.png",
+       "size": "extralarge"
+      }
+     ],
+     "@attr": {
+      "rank": "8"
+     }
+    },
+    {
+     "name": "Currents B-Sides & Remixes",
+     "playcount": 4642033,
+     "mbid": "7b09018d-808f-4a0a-ad71-4b8a580440c9",
+     "url": "https://www.last.fm/music/Tame+Impala/Currents+B-Sides+&+Remixes",
+     "artist": {
+      "name": "Tame Impala",
+      "mbid": "63aa26c3-d59b-4da4-84ac-716b54f1ef4d",
+      "url": "https://www.last.fm/music/Tame+Impala"
+     },
+     "image": [
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/34s/f8e4c3ec6e2eff4da1c9e42ab5f3e2a7.png",
+       "size": "small"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/64s/f8e4c3ec6e2eff4da1c9e42ab5f3e2a7.png",
+       "size": "medium"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/174s/f8e4c3ec6e2eff4da1c9e42ab5f3e2a7.png",
+       "size": "large"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/300x300/f8e4c3ec6e2eff4da1c9e42ab5f3e2a7.png",
+       "size": "extralarge"
+      }
+     ],
+     "@attr": {
+      "rank": "9"
+     }
+    },
+    {
+     "name": "Patience",
+     "playcount": 3083758,
+     "mbid": "ca6d3d5b-8129-4d27-afd1-252e997f22bf",
+     "url": "https://www.last.fm/music/Tame+Impala/Patience",
+     "artist": {
+      "name": "Tame Impala",
+      "mbid": "63aa26c3-d59b-4da4-84ac-716b54f1ef4d",
+      "url": "https://www.last.fm/music/Tame+Impala"
+     },
+     "image": [
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/34s/a170e0af73815b013ad3920ca7dda5f3.png",
+       "size": "small"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/64s/a170e0af73815b013ad3920ca7dda5f3.png",
+       "size": "medium"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/174s/a170e0af73815b013ad3920ca7dda5f3.png",
+       "size": "large"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/300x300/a170e0af73815b013ad3920ca7dda5f3.png",
+       "size": "extralarge"
+      }
+     ],
+     "@attr": {
+      "rank": "10"
+     }
+    },
+    {
+     "name": "Loser",
+     "playcount": 2524930,
+     "mbid": "30b3443f-de5b-4b0b-b2d5-434000817868",
+     "url": "https://www.last.fm/music/Tame+Impala/Loser",
+     "artist": {
+      "name": "Tame Impala",
+      "mbid": "63aa26c3-d59b-4da4-84ac-716b54f1ef4d",
+      "url": "https://www.last.fm/music/Tame+Impala"
+     },
+     "image": [
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/34s/84d932c0e7ea1e64fec52ae5ea25e2ec.png",
+       "size": "small"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/64s/84d932c0e7ea1e64fec52ae5ea25e2ec.png",
+       "size": "medium"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/174s/84d932c0e7ea1e64fec52ae5ea25e2ec.png",
+       "size": "large"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/300x300/84d932c0e7ea1e64fec52ae5ea25e2ec.png",
+       "size": "extralarge"
+      }
+     ],
+     "@attr": {
+      "rank": "11"
+     }
+    },
+    {
+     "name": "Tame Impala",
+     "playcount": 3306141,
+     "mbid": "08a252a8-2daf-4990-bf5d-4601c40757c6",
+     "url": "https://www.last.fm/music/Tame+Impala/Tame+Impala",
+     "artist": {
+      "name": "Tame Impala",
+      "mbid": "63aa26c3-d59b-4da4-84ac-716b54f1ef4d",
+      "url": "https://www.last.fm/music/Tame+Impala"
+     },
+     "image": [
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/34s/8ce16790ef43cfd7f8a962b14dee393a.png",
+       "size": "small"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/64s/8ce16790ef43cfd7f8a962b14dee393a.png",
+       "size": "medium"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/174s/8ce16790ef43cfd7f8a962b14dee393a.png",
+       "size": "large"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/300x300/8ce16790ef43cfd7f8a962b14dee393a.png",
+       "size": "extralarge"
+      }
+     ],
+     "@attr": {
+      "rank": "12"
+     }
+    },
+    {
+     "name": "Sundown Syndrome / Remember Me",
+     "playcount": 1954681,
+     "mbid": "40a99e1e-ebd8-4441-b7b6-51212281cc19",
+     "url": "https://www.last.fm/music/Tame+Impala/Sundown+Syndrome+%2F+Remember+Me",
+     "artist": {
+      "name": "Tame Impala",
+      "mbid": "63aa26c3-d59b-4da4-84ac-716b54f1ef4d",
+      "url": "https://www.last.fm/music/Tame+Impala"
+     },
+     "image": [
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/34s/8a3058bf2f1941edbbe12a9e1c94a871.png",
+       "size": "small"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/64s/8a3058bf2f1941edbbe12a9e1c94a871.png",
+       "size": "medium"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/174s/8a3058bf2f1941edbbe12a9e1c94a871.png",
+       "size": "large"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/300x300/8a3058bf2f1941edbbe12a9e1c94a871.png",
+       "size": "extralarge"
+      }
+     ],
+     "@attr": {
+      "rank": "13"
+     }
+    },
+    {
+     "name": "End of Summer",
+     "playcount": 1320803,
+     "mbid": "d2c47b50-31ed-43f5-86d1-6ecb544d0ebc",
+     "url": "https://www.last.fm/music/Tame+Impala/End+of+Summer",
+     "artist": {
+      "name": "Tame Impala",
+      "mbid": "63aa26c3-d59b-4da4-84ac-716b54f1ef4d",
+      "url": "https://www.last.fm/music/Tame+Impala"
+     },
+     "image": [
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/34s/d8a72c820108aac5d12f0d4002986b03.png",
+       "size": "small"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/64s/d8a72c820108aac5d12f0d4002986b03.png",
+       "size": "medium"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/174s/d8a72c820108aac5d12f0d4002986b03.png",
+       "size": "large"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/300x300/d8a72c820108aac5d12f0d4002986b03.png",
+       "size": "extralarge"
+      }
+     ],
+     "@attr": {
+      "rank": "14"
+     }
+    },
+    {
+     "name": "Borderline",
+     "playcount": 2078721,
+     "mbid": "850ea168-6719-4c1e-9eb6-b8753db75e23",
+     "url": "https://www.last.fm/music/Tame+Impala/Borderline",
+     "artist": {
+      "name": "Tame Impala",
+      "mbid": "63aa26c3-d59b-4da4-84ac-716b54f1ef4d",
+      "url": "https://www.last.fm/music/Tame+Impala"
+     },
+     "image": [
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/34s/bba24bc384723ff8750430f99a0e1ae9.png",
+       "size": "small"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/64s/bba24bc384723ff8750430f99a0e1ae9.png",
+       "size": "medium"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/174s/bba24bc384723ff8750430f99a0e1ae9.png",
+       "size": "large"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/300x300/bba24bc384723ff8750430f99a0e1ae9.png",
+       "size": "extralarge"
+      }
+     ],
+     "@attr": {
+      "rank": "15"
+     }
+    },
+    {
+     "name": "Lonerism B-Sides & Remixes",
+     "playcount": 1198367,
+     "mbid": "cfcdd292-e9eb-4fff-8b68-e3e9197254f5",
+     "url": "https://www.last.fm/music/Tame+Impala/Lonerism+B-Sides+&+Remixes",
+     "artist": {
+      "name": "Tame Impala",
+      "mbid": "63aa26c3-d59b-4da4-84ac-716b54f1ef4d",
+      "url": "https://www.last.fm/music/Tame+Impala"
+     },
+     "image": [
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/34s/9b26609dac2726a52b6f85e7a956c89d.png",
+       "size": "small"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/64s/9b26609dac2726a52b6f85e7a956c89d.png",
+       "size": "medium"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/174s/9b26609dac2726a52b6f85e7a956c89d.png",
+       "size": "large"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/300x300/9b26609dac2726a52b6f85e7a956c89d.png",
+       "size": "extralarge"
+      }
+     ],
+     "@attr": {
+      "rank": "16"
+     }
+    },
+    {
+     "name": "InnerSpeaker (Collector's Edition)",
+     "playcount": 2352157,
+     "url": "https://www.last.fm/music/Tame+Impala/InnerSpeaker+(Collector%27s+Edition)",
+     "artist": {
+      "name": "Tame Impala",
+      "mbid": "63aa26c3-d59b-4da4-84ac-716b54f1ef4d",
+      "url": "https://www.last.fm/music/Tame+Impala"
+     },
+     "image": [
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/34s/f83015fe28d0caeff338abfa06007188.png",
+       "size": "small"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/64s/f83015fe28d0caeff338abfa06007188.png",
+       "size": "medium"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/174s/f83015fe28d0caeff338abfa06007188.png",
+       "size": "large"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/300x300/f83015fe28d0caeff338abfa06007188.png",
+       "size": "extralarge"
+      }
+     ],
+     "@attr": {
+      "rank": "17"
+     }
+    },
+    {
+     "name": "Live Versions",
+     "playcount": 2204094,
+     "mbid": "1de2992e-5d9e-42a1-910b-b307d80c06a4",
+     "url": "https://www.last.fm/music/Tame+Impala/Live+Versions",
+     "artist": {
+      "name": "Tame Impala",
+      "mbid": "63aa26c3-d59b-4da4-84ac-716b54f1ef4d",
+      "url": "https://www.last.fm/music/Tame+Impala"
+     },
+     "image": [
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/34s/ed65c4858023468bc6814069cbf6a06f.png",
+       "size": "small"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/64s/ed65c4858023468bc6814069cbf6a06f.png",
+       "size": "medium"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/174s/ed65c4858023468bc6814069cbf6a06f.png",
+       "size": "large"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/300x300/ed65c4858023468bc6814069cbf6a06f.png",
+       "size": "extralarge"
+      }
+     ],
+     "@attr": {
+      "rank": "18"
+     }
+    },
+    {
+     "name": "Lost in Yesterday",
+     "playcount": 884214,
+     "mbid": "fbbbefca-69ee-42a5-b49c-18974c13e310",
+     "url": "https://www.last.fm/music/Tame+Impala/Lost+in+Yesterday",
+     "artist": {
+      "name": "Tame Impala",
+      "mbid": "63aa26c3-d59b-4da4-84ac-716b54f1ef4d",
+      "url": "https://www.last.fm/music/Tame+Impala"
+     },
+     "image": [
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/34s/152fe1b4dc250901d6dc901ca51fb2b3.png",
+       "size": "small"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/64s/152fe1b4dc250901d6dc901ca51fb2b3.png",
+       "size": "medium"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/174s/152fe1b4dc250901d6dc901ca51fb2b3.png",
+       "size": "large"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/300x300/152fe1b4dc250901d6dc901ca51fb2b3.png",
+       "size": "extralarge"
+      }
+     ],
+     "@attr": {
+      "rank": "19"
+     }
+    },
+    {
+     "name": "It Might Be Time",
+     "playcount": 777811,
+     "mbid": "a43d62c7-5dea-447f-a838-6758e3fb03f0",
+     "url": "https://www.last.fm/music/Tame+Impala/It+Might+Be+Time",
+     "artist": {
+      "name": "Tame Impala",
+      "mbid": "63aa26c3-d59b-4da4-84ac-716b54f1ef4d",
+      "url": "https://www.last.fm/music/Tame+Impala"
+     },
+     "image": [
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/34s/073b42f72b1d26b77133bf3271004f06.png",
+       "size": "small"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/64s/073b42f72b1d26b77133bf3271004f06.png",
+       "size": "medium"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/174s/073b42f72b1d26b77133bf3271004f06.png",
+       "size": "large"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/300x300/073b42f72b1d26b77133bf3271004f06.png",
+       "size": "extralarge"
+      }
+     ],
+     "@attr": {
+      "rank": "20"
+     }
+    },
+    {
+     "name": "Breathe Deeper (Lil Yachty Remix)",
+     "playcount": 949463,
+     "mbid": "109697d2-1915-4b2b-a92a-9b4811f0f2ee",
+     "url": "https://www.last.fm/music/Tame+Impala/Breathe+Deeper+(Lil+Yachty+Remix)",
+     "artist": {
+      "name": "Tame Impala",
+      "mbid": "63aa26c3-d59b-4da4-84ac-716b54f1ef4d",
+      "url": "https://www.last.fm/music/Tame+Impala"
+     },
+     "image": [
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/34s/6cd4e96f82505ee529406c3fb3946535.png",
+       "size": "small"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/64s/6cd4e96f82505ee529406c3fb3946535.png",
+       "size": "medium"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/174s/6cd4e96f82505ee529406c3fb3946535.png",
+       "size": "large"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/300x300/6cd4e96f82505ee529406c3fb3946535.png",
+       "size": "extralarge"
+      }
+     ],
+     "@attr": {
+      "rank": "21"
+     }
+    },
+    {
+     "name": "Journey to the Real World (From Barbie the Album)",
+     "playcount": 426838,
+     "url": "https://www.last.fm/music/Tame+Impala/Journey+to+the+Real+World+(From+Barbie+the+Album)",
+     "artist": {
+      "name": "Tame Impala",
+      "mbid": "63aa26c3-d59b-4da4-84ac-716b54f1ef4d",
+      "url": "https://www.last.fm/music/Tame+Impala"
+     },
+     "image": [
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/34s/fe0b18342e4fa51521ccd4ec64d55579.png",
+       "size": "small"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/64s/fe0b18342e4fa51521ccd4ec64d55579.png",
+       "size": "medium"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/174s/fe0b18342e4fa51521ccd4ec64d55579.png",
+       "size": "large"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/300x300/fe0b18342e4fa51521ccd4ec64d55579.png",
+       "size": "extralarge"
+      }
+     ],
+     "@attr": {
+      "rank": "22"
+     }
+    },
+    {
+     "name": "Dracula (with JENNIE)",
+     "playcount": 562623,
+     "url": "https://www.last.fm/music/Tame+Impala/Dracula+(with+JENNIE)",
+     "artist": {
+      "name": "Tame Impala",
+      "mbid": "63aa26c3-d59b-4da4-84ac-716b54f1ef4d",
+      "url": "https://www.last.fm/music/Tame+Impala"
+     },
+     "image": [
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/34s/3a359696a4bfdd2efc586327039fb770.png",
+       "size": "small"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/64s/3a359696a4bfdd2efc586327039fb770.png",
+       "size": "medium"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/174s/3a359696a4bfdd2efc586327039fb770.png",
+       "size": "large"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/300x300/3a359696a4bfdd2efc586327039fb770.png",
+       "size": "extralarge"
+      }
+     ],
+     "@attr": {
+      "rank": "23"
+     }
+    },
+    {
+     "name": "Posthumous Forgiveness",
+     "playcount": 597397,
+     "mbid": "4e1f7386-858f-49ba-9a48-fcdede81d0ed",
+     "url": "https://www.last.fm/music/Tame+Impala/Posthumous+Forgiveness",
+     "artist": {
+      "name": "Tame Impala",
+      "mbid": "63aa26c3-d59b-4da4-84ac-716b54f1ef4d",
+      "url": "https://www.last.fm/music/Tame+Impala"
+     },
+     "image": [
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/34s/46b286a212a071665f8d58dfcb13f02f.png",
+       "size": "small"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/64s/46b286a212a071665f8d58dfcb13f02f.png",
+       "size": "medium"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/174s/46b286a212a071665f8d58dfcb13f02f.png",
+       "size": "large"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/300x300/46b286a212a071665f8d58dfcb13f02f.png",
+       "size": "extralarge"
+      }
+     ],
+     "@attr": {
+      "rank": "24"
+     }
+    },
+    {
+     "name": "Let It Happen",
+     "playcount": 498361,
+     "mbid": "5040b2d7-1254-4412-84dd-efece7dc185f",
+     "url": "https://www.last.fm/music/Tame+Impala/Let+It+Happen",
+     "artist": {
+      "name": "Tame Impala",
+      "mbid": "63aa26c3-d59b-4da4-84ac-716b54f1ef4d",
+      "url": "https://www.last.fm/music/Tame+Impala"
+     },
+     "image": [
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/34s/39f527f05cd94b1ecb8e53360e6750bf.png",
+       "size": "small"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/64s/39f527f05cd94b1ecb8e53360e6750bf.png",
+       "size": "medium"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/174s/39f527f05cd94b1ecb8e53360e6750bf.png",
+       "size": "large"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/300x300/39f527f05cd94b1ecb8e53360e6750bf.png",
+       "size": "extralarge"
+      }
+     ],
+     "@attr": {
+      "rank": "25"
+     }
+    },
+    {
+     "name": "Elephant",
+     "playcount": 446016,
+     "mbid": "45c146b7-4b49-4857-99d8-dfbc68062a27",
+     "url": "https://www.last.fm/music/Tame+Impala/Elephant",
+     "artist": {
+      "name": "Tame Impala",
+      "mbid": "63aa26c3-d59b-4da4-84ac-716b54f1ef4d",
+      "url": "https://www.last.fm/music/Tame+Impala"
+     },
+     "image": [
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/34s/88a40dbd5f7542b09f3c9fa07a03fbec.png",
+       "size": "small"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/64s/88a40dbd5f7542b09f3c9fa07a03fbec.png",
+       "size": "medium"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/174s/88a40dbd5f7542b09f3c9fa07a03fbec.png",
+       "size": "large"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/300x300/88a40dbd5f7542b09f3c9fa07a03fbec.png",
+       "size": "extralarge"
+      }
+     ],
+     "@attr": {
+      "rank": "26"
+     }
+    },
+    {
+     "name": "Hummer",
+     "playcount": 210600,
+     "mbid": "1abc5d6c-c00b-4948-8486-714b8bc2e8f4",
+     "url": "https://www.last.fm/music/Tame+Impala/Hummer",
+     "artist": {
+      "name": "Tame Impala",
+      "mbid": "63aa26c3-d59b-4da4-84ac-716b54f1ef4d",
+      "url": "https://www.last.fm/music/Tame+Impala"
+     },
+     "image": [
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/34s/a105744bf972ce277072576c754bed91.png",
+       "size": "small"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/64s/a105744bf972ce277072576c754bed91.png",
+       "size": "medium"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/174s/a105744bf972ce277072576c754bed91.png",
+       "size": "large"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/300x300/a105744bf972ce277072576c754bed91.png",
+       "size": "extralarge"
+      }
+     ],
+     "@attr": {
+      "rank": "27"
+     }
+    },
+    {
+     "name": "No Choice",
+     "playcount": 461203,
+     "mbid": "780c194f-9268-4d16-ab22-931da1ac2400",
+     "url": "https://www.last.fm/music/Tame+Impala/No+Choice",
+     "artist": {
+      "name": "Tame Impala",
+      "mbid": "63aa26c3-d59b-4da4-84ac-716b54f1ef4d",
+      "url": "https://www.last.fm/music/Tame+Impala"
+     },
+     "image": [
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/34s/00193cc41251e7f0fc5246efb4154c2a.png",
+       "size": "small"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/64s/00193cc41251e7f0fc5246efb4154c2a.png",
+       "size": "medium"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/174s/00193cc41251e7f0fc5246efb4154c2a.png",
+       "size": "large"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/300x300/00193cc41251e7f0fc5246efb4154c2a.png",
+       "size": "extralarge"
+      }
+     ],
+     "@attr": {
+      "rank": "28"
+     }
+    },
+    {
+     "name": "Wings Of Time (From the Motion Picture Dungeons & Dragons: Honor Among Thieves)",
+     "playcount": 372522,
+     "url": "https://www.last.fm/music/Tame+Impala/Wings+Of+Time+(From+the+Motion+Picture+Dungeons+&+Dragons:+Honor+Among+Thieves)",
+     "artist": {
+      "name": "Tame Impala",
+      "mbid": "63aa26c3-d59b-4da4-84ac-716b54f1ef4d",
+      "url": "https://www.last.fm/music/Tame+Impala"
+     },
+     "image": [
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/34s/a1853955426a886f9f615e8082f89b09.png",
+       "size": "small"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/64s/a1853955426a886f9f615e8082f89b09.png",
+       "size": "medium"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/174s/a1853955426a886f9f615e8082f89b09.png",
+       "size": "large"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/300x300/a1853955426a886f9f615e8082f89b09.png",
+       "size": "extralarge"
+      }
+     ],
+     "@attr": {
+      "rank": "29"
+     }
+    },
+    {
+     "name": "InnerSpeaker (10 Year Anniversary Edition)",
+     "playcount": 941223,
+     "url": "https://www.last.fm/music/Tame+Impala/InnerSpeaker+(10+Year+Anniversary+Edition)",
+     "artist": {
+      "name": "Tame Impala",
+      "mbid": "63aa26c3-d59b-4da4-84ac-716b54f1ef4d",
+      "url": "https://www.last.fm/music/Tame+Impala"
+     },
+     "image": [
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/34s/3961ced544966054d8a83a1e0a2a755d.png",
+       "size": "small"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/64s/3961ced544966054d8a83a1e0a2a755d.png",
+       "size": "medium"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/174s/3961ced544966054d8a83a1e0a2a755d.png",
+       "size": "large"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/300x300/3961ced544966054d8a83a1e0a2a755d.png",
+       "size": "extralarge"
+      }
+     ],
+     "@attr": {
+      "rank": "30"
+     }
+    },
+    {
+     "name": "'Cause I'm A Man",
+     "playcount": 318361,
+     "mbid": "a3d500b7-8dd2-4a66-9e9c-046ad4ce1811",
+     "url": "https://www.last.fm/music/Tame+Impala/%27Cause+I%27m+A+Man",
+     "artist": {
+      "name": "Tame Impala",
+      "mbid": "63aa26c3-d59b-4da4-84ac-716b54f1ef4d",
+      "url": "https://www.last.fm/music/Tame+Impala"
+     },
+     "image": [
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/34s/be4f42efacf733f37fc5b58a8ccc15a4.png",
+       "size": "small"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/64s/be4f42efacf733f37fc5b58a8ccc15a4.png",
+       "size": "medium"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/174s/be4f42efacf733f37fc5b58a8ccc15a4.png",
+       "size": "large"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/300x300/be4f42efacf733f37fc5b58a8ccc15a4.png",
+       "size": "extralarge"
+      }
+     ],
+     "@attr": {
+      "rank": "31"
+     }
+    },
+    {
+     "name": "Is It True (Four Tet Remix)",
+     "playcount": 284036,
+     "mbid": "b048af56-87c9-4276-983d-46bfc0b9b603",
+     "url": "https://www.last.fm/music/Tame+Impala/Is+It+True+(Four+Tet+Remix)",
+     "artist": {
+      "name": "Tame Impala",
+      "mbid": "63aa26c3-d59b-4da4-84ac-716b54f1ef4d",
+      "url": "https://www.last.fm/music/Tame+Impala"
+     },
+     "image": [
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/34s/36ab0b0860dae03c1924624759f1e65d.png",
+       "size": "small"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/64s/36ab0b0860dae03c1924624759f1e65d.png",
+       "size": "medium"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/174s/36ab0b0860dae03c1924624759f1e65d.png",
+       "size": "large"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/300x300/36ab0b0860dae03c1924624759f1e65d.png",
+       "size": "extralarge"
+      }
+     ],
+     "@attr": {
+      "rank": "32"
+     }
+    },
+    {
+     "name": "Borderline (Blood Orange Remix)",
+     "playcount": 324686,
+     "url": "https://www.last.fm/music/Tame+Impala/Borderline+(Blood+Orange+Remix)",
+     "artist": {
+      "name": "Tame Impala",
+      "mbid": "63aa26c3-d59b-4da4-84ac-716b54f1ef4d",
+      "url": "https://www.last.fm/music/Tame+Impala"
+     },
+     "image": [
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/34s/72b4bc3892fb417b3f51f24352c8bd0e.png",
+       "size": "small"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/64s/72b4bc3892fb417b3f51f24352c8bd0e.png",
+       "size": "medium"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/174s/72b4bc3892fb417b3f51f24352c8bd0e.png",
+       "size": "large"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/300x300/72b4bc3892fb417b3f51f24352c8bd0e.png",
+       "size": "extralarge"
+      }
+     ],
+     "@attr": {
+      "rank": "33"
+     }
+    },
+    {
+     "name": "Mind Mischief",
+     "playcount": 224801,
+     "mbid": "b87e03a8-87d6-4a82-be6a-5d91319c8075",
+     "url": "https://www.last.fm/music/Tame+Impala/Mind+Mischief",
+     "artist": {
+      "name": "Tame Impala",
+      "mbid": "63aa26c3-d59b-4da4-84ac-716b54f1ef4d",
+      "url": "https://www.last.fm/music/Tame+Impala"
+     },
+     "image": [
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/34s/4389842aa82d4affcaf66552ffe0f524.png",
+       "size": "small"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/64s/4389842aa82d4affcaf66552ffe0f524.png",
+       "size": "medium"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/174s/4389842aa82d4affcaf66552ffe0f524.png",
+       "size": "large"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/300x300/4389842aa82d4affcaf66552ffe0f524.png",
+       "size": "extralarge"
+      }
+     ],
+     "@attr": {
+      "rank": "34"
+     }
+    },
+    {
+     "name": "Beverly Laurel",
+     "playcount": 274931,
+     "mbid": "798f06fa-b859-4dc5-a460-581460dc49dc",
+     "url": "https://www.last.fm/music/Tame+Impala/Beverly+Laurel",
+     "artist": {
+      "name": "Tame Impala",
+      "mbid": "63aa26c3-d59b-4da4-84ac-716b54f1ef4d",
+      "url": "https://www.last.fm/music/Tame+Impala"
+     },
+     "image": [
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/34s/928d682687dc809c713100019d4ae373.png",
+       "size": "small"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/64s/928d682687dc809c713100019d4ae373.png",
+       "size": "medium"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/174s/928d682687dc809c713100019d4ae373.png",
+       "size": "large"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/300x300/928d682687dc809c713100019d4ae373.png",
+       "size": "extralarge"
+      }
+     ],
+     "@attr": {
+      "rank": "35"
+     }
+    },
+    {
+     "name": "Lonerism (10 Year Anniversary Edition / Unreleased Demos)",
+     "playcount": 313912,
+     "mbid": "9eebadf8-138f-403e-a634-b5cbfc0caf49",
+     "url": "https://www.last.fm/music/Tame+Impala/Lonerism+(10+Year+Anniversary+Edition+%2F+Unreleased+Demos)",
+     "artist": {
+      "name": "Tame Impala",
+      "mbid": "63aa26c3-d59b-4da4-84ac-716b54f1ef4d",
+      "url": "https://www.last.fm/music/Tame+Impala"
+     },
+     "image": [
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/34s/abb5a640c83193ba30e5c213a7ca69f4.png",
+       "size": "small"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/64s/abb5a640c83193ba30e5c213a7ca69f4.png",
+       "size": "medium"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/174s/abb5a640c83193ba30e5c213a7ca69f4.png",
+       "size": "large"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/300x300/abb5a640c83193ba30e5c213a7ca69f4.png",
+       "size": "extralarge"
+      }
+     ],
+     "@attr": {
+      "rank": "36"
+     }
+    },
+    {
+     "name": "Eventually",
+     "playcount": 237712,
+     "mbid": "03142ec8-e896-402f-bdbe-0e52dcc60291",
+     "url": "https://www.last.fm/music/Tame+Impala/Eventually",
+     "artist": {
+      "name": "Tame Impala",
+      "mbid": "63aa26c3-d59b-4da4-84ac-716b54f1ef4d",
+      "url": "https://www.last.fm/music/Tame+Impala"
+     },
+     "image": [
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/34s/d81b137b7988ebaf3a0a9e953e5d981e.png",
+       "size": "small"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/64s/d81b137b7988ebaf3a0a9e953e5d981e.png",
+       "size": "medium"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/174s/d81b137b7988ebaf3a0a9e953e5d981e.png",
+       "size": "large"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/300x300/d81b137b7988ebaf3a0a9e953e5d981e.png",
+       "size": "extralarge"
+      }
+     ],
+     "@attr": {
+      "rank": "37"
+     }
+    },
+    {
+     "name": "InnerSpeaker B-Sides & Remixes",
+     "playcount": 295351,
+     "mbid": "1c710bc2-7f5b-4050-b272-8c048ee6885e",
+     "url": "https://www.last.fm/music/Tame+Impala/InnerSpeaker+B-Sides+&+Remixes",
+     "artist": {
+      "name": "Tame Impala",
+      "mbid": "63aa26c3-d59b-4da4-84ac-716b54f1ef4d",
+      "url": "https://www.last.fm/music/Tame+Impala"
+     },
+     "image": [
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/34s/ee5afa70615903fbd4344d3b6003e265.png",
+       "size": "small"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/64s/ee5afa70615903fbd4344d3b6003e265.png",
+       "size": "medium"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/174s/ee5afa70615903fbd4344d3b6003e265.png",
+       "size": "large"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/300x300/ee5afa70615903fbd4344d3b6003e265.png",
+       "size": "extralarge"
+      }
+     ],
+     "@attr": {
+      "rank": "38"
+     }
+    },
+    {
+     "name": "Feels Like We Only Go Backwards",
+     "playcount": 138151,
+     "mbid": "76f59e63-903b-44dc-a24e-691d6b5fb11b",
+     "url": "https://www.last.fm/music/Tame+Impala/Feels+Like+We+Only+Go+Backwards",
+     "artist": {
+      "name": "Tame Impala",
+      "mbid": "63aa26c3-d59b-4da4-84ac-716b54f1ef4d",
+      "url": "https://www.last.fm/music/Tame+Impala"
+     },
+     "image": [
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/34s/0b3ab56c3fd24cb4b7b3ba06b55a560f.png",
+       "size": "small"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/64s/0b3ab56c3fd24cb4b7b3ba06b55a560f.png",
+       "size": "medium"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/174s/0b3ab56c3fd24cb4b7b3ba06b55a560f.png",
+       "size": "large"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/300x300/0b3ab56c3fd24cb4b7b3ba06b55a560f.png",
+       "size": "extralarge"
+      }
+     ],
+     "@attr": {
+      "rank": "39"
+     }
+    },
+    {
+     "name": "The Less I Know The Better",
+     "playcount": 67790,
+     "mbid": "5e304e61-d964-4ad2-910a-7a1667b183b9",
+     "url": "https://www.last.fm/music/Tame+Impala/The+Less+I+Know+The+Better",
+     "artist": {
+      "name": "Tame Impala",
+      "mbid": "63aa26c3-d59b-4da4-84ac-716b54f1ef4d",
+      "url": "https://www.last.fm/music/Tame+Impala"
+     },
+     "image": [
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/34s/2defe6b025646f31aeeb06550133b9bc.png",
+       "size": "small"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/64s/2defe6b025646f31aeeb06550133b9bc.png",
+       "size": "medium"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/174s/2defe6b025646f31aeeb06550133b9bc.png",
+       "size": "large"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/300x300/2defe6b025646f31aeeb06550133b9bc.png",
+       "size": "extralarge"
+      }
+     ],
+     "@attr": {
+      "rank": "40"
+     }
+    },
+    {
+     "name": "Apocalypse Dreams",
+     "playcount": 144975,
+     "mbid": "091283df-f059-47c8-bb28-7607f276ca50",
+     "url": "https://www.last.fm/music/Tame+Impala/Apocalypse+Dreams",
+     "artist": {
+      "name": "Tame Impala",
+      "mbid": "63aa26c3-d59b-4da4-84ac-716b54f1ef4d",
+      "url": "https://www.last.fm/music/Tame+Impala"
+     },
+     "image": [
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/34s/14fd3979d2fe478f9e94b7c6002c11de.png",
+       "size": "small"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/64s/14fd3979d2fe478f9e94b7c6002c11de.png",
+       "size": "medium"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/174s/14fd3979d2fe478f9e94b7c6002c11de.png",
+       "size": "large"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/300x300/14fd3979d2fe478f9e94b7c6002c11de.png",
+       "size": "extralarge"
+      }
+     ],
+     "@attr": {
+      "rank": "41"
+     }
+    },
+    {
+     "name": "Dracula (JENNIE Remix - Boys Noize Disko Version)",
+     "playcount": 63340,
+     "mbid": "868c255c-368b-4bc7-a544-a852154f8f44",
+     "url": "https://www.last.fm/music/Tame+Impala/Dracula+(JENNIE+Remix+-+Boys+Noize+Disko+Version)",
+     "artist": {
+      "name": "Tame Impala",
+      "mbid": "63aa26c3-d59b-4da4-84ac-716b54f1ef4d",
+      "url": "https://www.last.fm/music/Tame+Impala"
+     },
+     "image": [
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/34s/52a021e953db2b6239834241ec519b9a.png",
+       "size": "small"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/64s/52a021e953db2b6239834241ec519b9a.png",
+       "size": "medium"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/174s/52a021e953db2b6239834241ec519b9a.png",
+       "size": "large"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/300x300/52a021e953db2b6239834241ec519b9a.png",
+       "size": "extralarge"
+      }
+     ],
+     "@attr": {
+      "rank": "42"
+     }
+    },
+    {
+     "name": "Disciples",
+     "playcount": 138764,
+     "mbid": "6af03453-ac2f-464a-8735-9ed3fb184d5c",
+     "url": "https://www.last.fm/music/Tame+Impala/Disciples",
+     "artist": {
+      "name": "Tame Impala",
+      "mbid": "63aa26c3-d59b-4da4-84ac-716b54f1ef4d",
+      "url": "https://www.last.fm/music/Tame+Impala"
+     },
+     "image": [
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/34s/6051081c77ddd0375d029bbad1bb1050.png",
+       "size": "small"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/64s/6051081c77ddd0375d029bbad1bb1050.png",
+       "size": "medium"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/174s/6051081c77ddd0375d029bbad1bb1050.png",
+       "size": "large"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/300x300/6051081c77ddd0375d029bbad1bb1050.png",
+       "size": "extralarge"
+      }
+     ],
+     "@attr": {
+      "rank": "43"
+     }
+    },
+    {
+     "name": "My Old Ways",
+     "playcount": 59416,
+     "url": "https://www.last.fm/music/Tame+Impala/My+Old+Ways",
+     "artist": {
+      "name": "Tame Impala",
+      "mbid": "63aa26c3-d59b-4da4-84ac-716b54f1ef4d",
+      "url": "https://www.last.fm/music/Tame+Impala"
+     },
+     "image": [
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/34s/52208805d430c5032a1bf28bfc24b87f.png",
+       "size": "small"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/64s/52208805d430c5032a1bf28bfc24b87f.png",
+       "size": "medium"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/174s/52208805d430c5032a1bf28bfc24b87f.png",
+       "size": "large"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/300x300/52208805d430c5032a1bf28bfc24b87f.png",
+       "size": "extralarge"
+      }
+     ],
+     "@attr": {
+      "rank": "44"
+     }
+    },
+    {
+     "name": "Nova Tunes 2.7",
+     "playcount": 79603,
+     "url": "https://www.last.fm/music/Tame+Impala/Nova+Tunes+2.7",
+     "artist": {
+      "name": "Tame Impala",
+      "mbid": "63aa26c3-d59b-4da4-84ac-716b54f1ef4d",
+      "url": "https://www.last.fm/music/Tame+Impala"
+     },
+     "image": [
+      {
+       "#text": "",
+       "size": "small"
+      },
+      {
+       "#text": "",
+       "size": "medium"
+      },
+      {
+       "#text": "",
+       "size": "large"
+      },
+      {
+       "#text": "",
+       "size": "extralarge"
+      }
+     ],
+     "@attr": {
+      "rank": "45"
+     }
+    },
+    {
+     "name": "Tame Impala - EP",
+     "playcount": 661512,
+     "url": "https://www.last.fm/music/Tame+Impala/Tame+Impala+-+EP",
+     "artist": {
+      "name": "Tame Impala",
+      "mbid": "63aa26c3-d59b-4da4-84ac-716b54f1ef4d",
+      "url": "https://www.last.fm/music/Tame+Impala"
+     },
+     "image": [
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/34s/80adb1f88cbc7693d8216f010bd8af9b.png",
+       "size": "small"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/64s/80adb1f88cbc7693d8216f010bd8af9b.png",
+       "size": "medium"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/174s/80adb1f88cbc7693d8216f010bd8af9b.png",
+       "size": "large"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/300x300/80adb1f88cbc7693d8216f010bd8af9b.png",
+       "size": "extralarge"
+      }
+     ],
+     "@attr": {
+      "rank": "46"
+     }
+    },
+    {
+     "name": "'Cause I'm A Man (HAIM Remix)",
+     "playcount": 79892,
+     "url": "https://www.last.fm/music/Tame+Impala/%27Cause+I%27m+A+Man+(HAIM+Remix)",
+     "artist": {
+      "name": "Tame Impala",
+      "mbid": "63aa26c3-d59b-4da4-84ac-716b54f1ef4d",
+      "url": "https://www.last.fm/music/Tame+Impala"
+     },
+     "image": [
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/34s/c10fd6d27f05e1b8ed17fb6628571630.png",
+       "size": "small"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/64s/c10fd6d27f05e1b8ed17fb6628571630.png",
+       "size": "medium"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/174s/c10fd6d27f05e1b8ed17fb6628571630.png",
+       "size": "large"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/300x300/c10fd6d27f05e1b8ed17fb6628571630.png",
+       "size": "extralarge"
+      }
+     ],
+     "@attr": {
+      "rank": "47"
+     }
+    },
+    {
+     "name": "Let It Happen (Soulwax Remix)",
+     "playcount": 90984,
+     "mbid": "9bd51784-1163-425a-94af-da3f010796ba",
+     "url": "https://www.last.fm/music/Tame+Impala/Let+It+Happen+(Soulwax+Remix)",
+     "artist": {
+      "name": "Tame Impala",
+      "mbid": "63aa26c3-d59b-4da4-84ac-716b54f1ef4d",
+      "url": "https://www.last.fm/music/Tame+Impala"
+     },
+     "image": [
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/34s/c297d318c9b608579db96bb7a4242e28.png",
+       "size": "small"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/64s/c297d318c9b608579db96bb7a4242e28.png",
+       "size": "medium"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/174s/c297d318c9b608579db96bb7a4242e28.png",
+       "size": "large"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/300x300/c297d318c9b608579db96bb7a4242e28.png",
+       "size": "extralarge"
+      }
+     ],
+     "@attr": {
+      "rank": "48"
+     }
+    },
+    {
+     "name": "Solitude Is Bliss",
+     "playcount": 84582,
+     "mbid": "74b8476b-4353-4202-a49d-dad6737f2616",
+     "url": "https://www.last.fm/music/Tame+Impala/Solitude+Is+Bliss",
+     "artist": {
+      "name": "Tame Impala",
+      "mbid": "63aa26c3-d59b-4da4-84ac-716b54f1ef4d",
+      "url": "https://www.last.fm/music/Tame+Impala"
+     },
+     "image": [
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/34s/7ef049d144b34258a8b00924f7e3645b.png",
+       "size": "small"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/64s/7ef049d144b34258a8b00924f7e3645b.png",
+       "size": "medium"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/174s/7ef049d144b34258a8b00924f7e3645b.png",
+       "size": "large"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/300x300/7ef049d144b34258a8b00924f7e3645b.png",
+       "size": "extralarge"
+      }
+     ],
+     "@attr": {
+      "rank": "49"
+     }
+    },
+    {
+     "name": "Tame Impala EP",
+     "playcount": 195222,
+     "url": "https://www.last.fm/music/Tame+Impala/Tame+Impala+EP",
+     "artist": {
+      "name": "Tame Impala",
+      "mbid": "63aa26c3-d59b-4da4-84ac-716b54f1ef4d",
+      "url": "https://www.last.fm/music/Tame+Impala"
+     },
+     "image": [
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/34s/ccb6a0e370be429691e2cbff7cb96975.png",
+       "size": "small"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/64s/ccb6a0e370be429691e2cbff7cb96975.png",
+       "size": "medium"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/174s/ccb6a0e370be429691e2cbff7cb96975.png",
+       "size": "large"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/300x300/ccb6a0e370be429691e2cbff7cb96975.png",
+       "size": "extralarge"
+      }
+     ],
+     "@attr": {
+      "rank": "50"
+     }
+    }
+   ],
+   "@attr": {
+    "artist": "Tame Impala",
+    "page": "1",
+    "perPage": "50",
+    "totalPages": "572",
+    "total": "28590"
+   }
+  }
+ }
+}

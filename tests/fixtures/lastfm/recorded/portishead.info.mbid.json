@@ -1,0 +1,240 @@
+{
+ "recorded": "2026-11-25T02:25:38Z",
+ "method": "artist.getinfo",
+ "params": {
+  "mbid": "8f6bd1e4-fbe1-4f50-aa9b-94c450ec0f11"
+ },
+ "status": 200,
+ "headers": {
+  "Content-Type": "application/json"
+ },
+ "answer": {
+  "artist": {
+   "name": "Portishead",
+   "mbid": "8f6bd1e4-fbe1-4f50-aa9b-94c450ec0f11",
+   "url": "https://www.last.fm/music/Portishead",
+   "image": [
+    {
+     "#text": "https://lastfm-img.freetls.fastly.net/i/u/34s/2a96cbd8b46e442fc41c2b86b821562f.png",
+     "size": "small"
+    },
+    {
+     "#text": "https://lastfm-img.freetls.fastly.net/i/u/64s/2a96cbd8b46e442fc41c2b86b821562f.png",
+     "size": "medium"
+    },
+    {
+     "#text": "https://lastfm-img.freetls.fastly.net/i/u/174s/2a96cbd8b46e442fc41c2b86b821562f.png",
+     "size": "large"
+    },
+    {
+     "#text": "https://lastfm-img.freetls.fastly.net/i/u/300x300/2a96cbd8b46e442fc41c2b86b821562f.png",
+     "size": "extralarge"
+    },
+    {
+     "#text": "https://lastfm-img.freetls.fastly.net/i/u/300x300/2a96cbd8b46e442fc41c2b86b821562f.png",
+     "size": "mega"
+    },
+    {
+     "#text": "https://lastfm-img.freetls.fastly.net/i/u/300x300/2a96cbd8b46e442fc41c2b86b821562f.png",
+     "size": ""
+    }
+   ],
+   "streamable": "0",
+   "ontour": "0",
+   "stats": {
+    "listeners": "3456254",
+    "playcount": "147605350"
+   },
+   "similar": {
+    "artist": [
+     {
+      "name": "The Funky Lowlives",
+      "url": "https://www.last.fm/music/The+Funky+Lowlives",
+      "image": [
+       {
+        "#text": "https://lastfm-img.freetls.fastly.net/i/u/34s/2a96cbd8b46e442fc41c2b86b821562f.png",
+        "size": "small"
+       },
+       {
+        "#text": "https://lastfm-img.freetls.fastly.net/i/u/64s/2a96cbd8b46e442fc41c2b86b821562f.png",
+        "size": "medium"
+       },
+       {
+        "#text": "https://lastfm-img.freetls.fastly.net/i/u/174s/2a96cbd8b46e442fc41c2b86b821562f.png",
+        "size": "large"
+       },
+       {
+        "#text": "https://lastfm-img.freetls.fastly.net/i/u/300x300/2a96cbd8b46e442fc41c2b86b821562f.png",
+        "size": "extralarge"
+       },
+       {
+        "#text": "https://lastfm-img.freetls.fastly.net/i/u/300x300/2a96cbd8b46e442fc41c2b86b821562f.png",
+        "size": "mega"
+       },
+       {
+        "#text": "https://lastfm-img.freetls.fastly.net/i/u/300x300/2a96cbd8b46e442fc41c2b86b821562f.png",
+        "size": ""
+       }
+      ]
+     },
+     {
+      "name": "Pati Yang",
+      "url": "https://www.last.fm/music/Pati+Yang",
+      "image": [
+       {
+        "#text": "https://lastfm-img.freetls.fastly.net/i/u/34s/2a96cbd8b46e442fc41c2b86b821562f.png",
+        "size": "small"
+       },
+       {
+        "#text": "https://lastfm-img.freetls.fastly.net/i/u/64s/2a96cbd8b46e442fc41c2b86b821562f.png",
+        "size": "medium"
+       },
+       {
+        "#text": "https://lastfm-img.freetls.fastly.net/i/u/174s/2a96cbd8b46e442fc41c2b86b821562f.png",
+        "size": "large"
+       },
+       {
+        "#text": "https://lastfm-img.freetls.fastly.net/i/u/300x300/2a96cbd8b46e442fc41c2b86b821562f.png",
+        "size": "extralarge"
+       },
+       {
+        "#text": "https://lastfm-img.freetls.fastly.net/i/u/300x300/2a96cbd8b46e442fc41c2b86b821562f.png",
+        "size": "mega"
+       },
+       {
+        "#text": "https://lastfm-img.freetls.fastly.net/i/u/300x300/2a96cbd8b46e442fc41c2b86b821562f.png",
+        "size": ""
+       }
+      ]
+     },
+     {
+      "name": "Hird",
+      "url": "https://www.last.fm/music/Hird",
+      "image": [
+       {
+        "#text": "https://lastfm-img.freetls.fastly.net/i/u/34s/2a96cbd8b46e442fc41c2b86b821562f.png",
+        "size": "small"
+       },
+       {
+        "#text": "https://lastfm-img.freetls.fastly.net/i/u/64s/2a96cbd8b46e442fc41c2b86b821562f.png",
+        "size": "medium"
+       },
+       {
+        "#text": "https://lastfm-img.freetls.fastly.net/i/u/174s/2a96cbd8b46e442fc41c2b86b821562f.png",
+        "size": "large"
+       },
+       {
+        "#text": "https://lastfm-img.freetls.fastly.net/i/u/300x300/2a96cbd8b46e442fc41c2b86b821562f.png",
+        "size": "extralarge"
+       },
+       {
+        "#text": "https://lastfm-img.freetls.fastly.net/i/u/300x300/2a96cbd8b46e442fc41c2b86b821562f.png",
+        "size": "mega"
+       },
+       {
+        "#text": "https://lastfm-img.freetls.fastly.net/i/u/300x300/2a96cbd8b46e442fc41c2b86b821562f.png",
+        "size": ""
+       }
+      ]
+     },
+     {
+      "name": "Soma Sonic",
+      "url": "https://www.last.fm/music/Soma+Sonic",
+      "image": [
+       {
+        "#text": "https://lastfm-img.freetls.fastly.net/i/u/34s/2a96cbd8b46e442fc41c2b86b821562f.png",
+        "size": "small"
+       },
+       {
+        "#text": "https://lastfm-img.freetls.fastly.net/i/u/64s/2a96cbd8b46e442fc41c2b86b821562f.png",
+        "size": "medium"
+       },
+       {
+        "#text": "https://lastfm-img.freetls.fastly.net/i/u/174s/2a96cbd8b46e442fc41c2b86b821562f.png",
+        "size": "large"
+       },
+       {
+        "#text": "https://lastfm-img.freetls.fastly.net/i/u/300x300/2a96cbd8b46e442fc41c2b86b821562f.png",
+        "size": "extralarge"
+       },
+       {
+        "#text": "https://lastfm-img.freetls.fastly.net/i/u/300x300/2a96cbd8b46e442fc41c2b86b821562f.png",
+        "size": "mega"
+       },
+       {
+        "#text": "https://lastfm-img.freetls.fastly.net/i/u/300x300/2a96cbd8b46e442fc41c2b86b821562f.png",
+        "size": ""
+       }
+      ]
+     },
+     {
+      "name": "Marsmobil",
+      "url": "https://www.last.fm/music/Marsmobil",
+      "image": [
+       {
+        "#text": "https://lastfm-img.freetls.fastly.net/i/u/34s/2a96cbd8b46e442fc41c2b86b821562f.png",
+        "size": "small"
+       },
+       {
+        "#text": "https://lastfm-img.freetls.fastly.net/i/u/64s/2a96cbd8b46e442fc41c2b86b821562f.png",
+        "size": "medium"
+       },
+       {
+        "#text": "https://lastfm-img.freetls.fastly.net/i/u/174s/2a96cbd8b46e442fc41c2b86b821562f.png",
+        "size": "large"
+       },
+       {
+        "#text": "https://lastfm-img.freetls.fastly.net/i/u/300x300/2a96cbd8b46e442fc41c2b86b821562f.png",
+        "size": "extralarge"
+       },
+       {
+        "#text": "https://lastfm-img.freetls.fastly.net/i/u/300x300/2a96cbd8b46e442fc41c2b86b821562f.png",
+        "size": "mega"
+       },
+       {
+        "#text": "https://lastfm-img.freetls.fastly.net/i/u/300x300/2a96cbd8b46e442fc41c2b86b821562f.png",
+        "size": ""
+       }
+      ]
+     }
+    ]
+   },
+   "tags": {
+    "tag": [
+     {
+      "name": "trip-hop",
+      "url": "https://www.last.fm/tag/trip-hop"
+     },
+     {
+      "name": "electronic",
+      "url": "https://www.last.fm/tag/electronic"
+     },
+     {
+      "name": "female vocalists",
+      "url": "https://www.last.fm/tag/female+vocalists"
+     },
+     {
+      "name": "chillout",
+      "url": "https://www.last.fm/tag/chillout"
+     },
+     {
+      "name": "trip hop",
+      "url": "https://www.last.fm/tag/trip+hop"
+     }
+    ]
+   },
+   "bio": {
+    "links": {
+     "link": {
+      "#text": "",
+      "rel": "original",
+      "href": "https://last.fm/music/Portishead/+wiki"
+     }
+    },
+    "published": "10 Feb 2006, 14:36",
+    "summary": "Portishead is an English band formed in 1991 in Bristol. Portishead are named after Portishead, Somerset, eight miles west of Bristol, along the coast. The band comprises vocalist Beth Gibbons, producer Geoff Barrow and musician Adrian Utley.\n\nPortishead's debut album, Dummy (1994), fused hip hop production with an atmospheric, cinematic style reminiscent of spy film soundtracks. The album was met with commercial and critical acclaim, quickly becoming a landmark album in the emerging trip hop genre. <a href=\"https://www.last.fm/music/Portishead\">Read more on Last.fm</a>",
+    "content": "Portishead is an English band formed in 1991 in Bristol. Portishead are named after Portishead, Somerset, eight miles west of Bristol, along the coast. The band comprises vocalist Beth Gibbons, producer Geoff Barrow and musician Adrian Utley.\n\nPortishead's debut album, Dummy (1994), fused hip hop production with an atmospheric, cinematic style reminiscent of spy film soundtracks. The album was met with commercial and critical acclaim, quickly becoming a landmark album in the emerging trip hop genre. However, the band disliked being associated with the term, and would consciously step away from that sound on later releases. Two other studio albums have been issued: Portishead in 1997 and Third in 2008, both of which received similar acclaim. In 1998, the band released a concert album, Roseland NYC Live. <a href=\"https://www.last.fm/music/Portishead\">Read more on Last.fm</a>. User-contributed text is available under the Creative Commons By-SA License; additional terms may apply."
+   }
+  }
+ }
+}

@@ -1,0 +1,1609 @@
+{
+ "recorded": "2026-11-25T02:25:37Z",
+ "method": "artist.gettopalbums",
+ "params": {
+  "artist": "Dance Gavin Dance",
+  "autocorrect": "1",
+  "limit": "50"
+ },
+ "status": 200,
+ "headers": {
+  "Content-Type": "application/json; charset=UTF-8"
+ },
+ "answer": {
+  "topalbums": {
+   "album": [
+    {
+     "name": "Downtown Battle Mountain",
+     "playcount": 13211300,
+     "mbid": "289cb807-614a-4bb8-809a-256ef3363f3d",
+     "url": "https://www.last.fm/music/Dance+Gavin+Dance/Downtown+Battle+Mountain",
+     "artist": {
+      "name": "Dance Gavin Dance",
+      "mbid": "16456fed-c9f2-4adf-b6ea-97b648c474d2",
+      "url": "https://www.last.fm/music/Dance+Gavin+Dance"
+     },
+     "image": [
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/34s/8790c35bd5678c461d85bbaae9cdcdcf.png",
+       "size": "small"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/64s/8790c35bd5678c461d85bbaae9cdcdcf.png",
+       "size": "medium"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/174s/8790c35bd5678c461d85bbaae9cdcdcf.png",
+       "size": "large"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/300x300/8790c35bd5678c461d85bbaae9cdcdcf.png",
+       "size": "extralarge"
+      }
+     ],
+     "@attr": {
+      "rank": "1"
+     }
+    },
+    {
+     "name": "Instant Gratification",
+     "playcount": 11393457,
+     "mbid": "60e06a18-d1ad-447e-a49e-d6db443fd6f1",
+     "url": "https://www.last.fm/music/Dance+Gavin+Dance/Instant+Gratification",
+     "artist": {
+      "name": "Dance Gavin Dance",
+      "mbid": "16456fed-c9f2-4adf-b6ea-97b648c474d2",
+      "url": "https://www.last.fm/music/Dance+Gavin+Dance"
+     },
+     "image": [
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/34s/bd61967d4cdb118cdd426bd4e793466a.png",
+       "size": "small"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/64s/bd61967d4cdb118cdd426bd4e793466a.png",
+       "size": "medium"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/174s/bd61967d4cdb118cdd426bd4e793466a.png",
+       "size": "large"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/300x300/bd61967d4cdb118cdd426bd4e793466a.png",
+       "size": "extralarge"
+      }
+     ],
+     "@attr": {
+      "rank": "2"
+     }
+    },
+    {
+     "name": "Dance Gavin Dance",
+     "playcount": 10451913,
+     "mbid": "780f5485-2aba-428b-b093-fc7d3abcf53d",
+     "url": "https://www.last.fm/music/Dance+Gavin+Dance/Dance+Gavin+Dance",
+     "artist": {
+      "name": "Dance Gavin Dance",
+      "mbid": "16456fed-c9f2-4adf-b6ea-97b648c474d2",
+      "url": "https://www.last.fm/music/Dance+Gavin+Dance"
+     },
+     "image": [
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/34s/99c845b2fa8f4f17aceb594026ba4c7f.png",
+       "size": "small"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/64s/99c845b2fa8f4f17aceb594026ba4c7f.png",
+       "size": "medium"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/174s/99c845b2fa8f4f17aceb594026ba4c7f.png",
+       "size": "large"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/300x300/99c845b2fa8f4f17aceb594026ba4c7f.png",
+       "size": "extralarge"
+      }
+     ],
+     "@attr": {
+      "rank": "3"
+     }
+    },
+    {
+     "name": "Downtown Battle Mountain II",
+     "playcount": 7845171,
+     "mbid": "300deba2-f296-4192-bca6-0c6868b0144a",
+     "url": "https://www.last.fm/music/Dance+Gavin+Dance/Downtown+Battle+Mountain+II",
+     "artist": {
+      "name": "Dance Gavin Dance",
+      "mbid": "16456fed-c9f2-4adf-b6ea-97b648c474d2",
+      "url": "https://www.last.fm/music/Dance+Gavin+Dance"
+     },
+     "image": [
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/34s/180f13c23d2a441bb5b6a7a8a7ddbe98.png",
+       "size": "small"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/64s/180f13c23d2a441bb5b6a7a8a7ddbe98.png",
+       "size": "medium"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/174s/180f13c23d2a441bb5b6a7a8a7ddbe98.png",
+       "size": "large"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/300x300/180f13c23d2a441bb5b6a7a8a7ddbe98.png",
+       "size": "extralarge"
+      }
+     ],
+     "@attr": {
+      "rank": "4"
+     }
+    },
+    {
+     "name": "Mothership",
+     "playcount": 9297963,
+     "mbid": "25eb276a-5c3f-4503-ac40-94a8c62e85a3",
+     "url": "https://www.last.fm/music/Dance+Gavin+Dance/Mothership",
+     "artist": {
+      "name": "Dance Gavin Dance",
+      "mbid": "16456fed-c9f2-4adf-b6ea-97b648c474d2",
+      "url": "https://www.last.fm/music/Dance+Gavin+Dance"
+     },
+     "image": [
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/34s/f4d498f39ceab69940213c2ca228e17b.png",
+       "size": "small"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/64s/f4d498f39ceab69940213c2ca228e17b.png",
+       "size": "medium"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/174s/f4d498f39ceab69940213c2ca228e17b.png",
+       "size": "large"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/300x300/f4d498f39ceab69940213c2ca228e17b.png",
+       "size": "extralarge"
+      }
+     ],
+     "@attr": {
+      "rank": "5"
+     }
+    },
+    {
+     "name": "Happiness",
+     "playcount": 6949862,
+     "mbid": "41c5ada9-1bc8-3948-8b78-8e356b5ece95",
+     "url": "https://www.last.fm/music/Dance+Gavin+Dance/Happiness",
+     "artist": {
+      "name": "Dance Gavin Dance",
+      "mbid": "16456fed-c9f2-4adf-b6ea-97b648c474d2",
+      "url": "https://www.last.fm/music/Dance+Gavin+Dance"
+     },
+     "image": [
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/34s/409c4fd2fc54400d98810fce53ae58f0.png",
+       "size": "small"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/64s/409c4fd2fc54400d98810fce53ae58f0.png",
+       "size": "medium"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/174s/409c4fd2fc54400d98810fce53ae58f0.png",
+       "size": "large"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/300x300/409c4fd2fc54400d98810fce53ae58f0.png",
+       "size": "extralarge"
+      }
+     ],
+     "@attr": {
+      "rank": "6"
+     }
+    },
+    {
+     "name": "Whatever I Say Is Royal Ocean",
+     "playcount": 3494526,
+     "mbid": "0fd970db-1e9a-45d1-930a-1528da87c92c",
+     "url": "https://www.last.fm/music/Dance+Gavin+Dance/Whatever+I+Say+Is+Royal+Ocean",
+     "artist": {
+      "name": "Dance Gavin Dance",
+      "mbid": "16456fed-c9f2-4adf-b6ea-97b648c474d2",
+      "url": "https://www.last.fm/music/Dance+Gavin+Dance"
+     },
+     "image": [
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/34s/0002df7ea1f12b7db93732bb3a0a1d1a.png",
+       "size": "small"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/64s/0002df7ea1f12b7db93732bb3a0a1d1a.png",
+       "size": "medium"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/174s/0002df7ea1f12b7db93732bb3a0a1d1a.png",
+       "size": "large"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/300x300/0002df7ea1f12b7db93732bb3a0a1d1a.png",
+       "size": "extralarge"
+      }
+     ],
+     "@attr": {
+      "rank": "7"
+     }
+    },
+    {
+     "name": "Artificial Selection",
+     "playcount": 6613888,
+     "mbid": "7bb339a4-4e8e-449f-9891-e2cbe742e4f5",
+     "url": "https://www.last.fm/music/Dance+Gavin+Dance/Artificial+Selection",
+     "artist": {
+      "name": "Dance Gavin Dance",
+      "mbid": "16456fed-c9f2-4adf-b6ea-97b648c474d2",
+      "url": "https://www.last.fm/music/Dance+Gavin+Dance"
+     },
+     "image": [
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/34s/0cbbf38587b35b8a9bf7ca6443e06cbf.png",
+       "size": "small"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/64s/0cbbf38587b35b8a9bf7ca6443e06cbf.png",
+       "size": "medium"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/174s/0cbbf38587b35b8a9bf7ca6443e06cbf.png",
+       "size": "large"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/300x300/0cbbf38587b35b8a9bf7ca6443e06cbf.png",
+       "size": "extralarge"
+      }
+     ],
+     "@attr": {
+      "rank": "8"
+     }
+    },
+    {
+     "name": "Afterburner",
+     "playcount": 5419705,
+     "mbid": "b3ac390d-284e-4193-92ac-9920d5529b55",
+     "url": "https://www.last.fm/music/Dance+Gavin+Dance/Afterburner",
+     "artist": {
+      "name": "Dance Gavin Dance",
+      "mbid": "16456fed-c9f2-4adf-b6ea-97b648c474d2",
+      "url": "https://www.last.fm/music/Dance+Gavin+Dance"
+     },
+     "image": [
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/34s/9be4d06c799dffc41c94a653aa1be97c.png",
+       "size": "small"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/64s/9be4d06c799dffc41c94a653aa1be97c.png",
+       "size": "medium"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/174s/9be4d06c799dffc41c94a653aa1be97c.png",
+       "size": "large"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/300x300/9be4d06c799dffc41c94a653aa1be97c.png",
+       "size": "extralarge"
+      }
+     ],
+     "@attr": {
+      "rank": "9"
+     }
+    },
+    {
+     "name": "Jackpot Juicer",
+     "playcount": 6240836,
+     "mbid": "47236cde-d72d-43f1-834c-8ec61faec8fc",
+     "url": "https://www.last.fm/music/Dance+Gavin+Dance/Jackpot+Juicer",
+     "artist": {
+      "name": "Dance Gavin Dance",
+      "mbid": "16456fed-c9f2-4adf-b6ea-97b648c474d2",
+      "url": "https://www.last.fm/music/Dance+Gavin+Dance"
+     },
+     "image": [
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/34s/d374bfc8feefd1db26042100661cc13a.png",
+       "size": "small"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/64s/d374bfc8feefd1db26042100661cc13a.png",
+       "size": "medium"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/174s/d374bfc8feefd1db26042100661cc13a.png",
+       "size": "large"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/300x300/d374bfc8feefd1db26042100661cc13a.png",
+       "size": "extralarge"
+      }
+     ],
+     "@attr": {
+      "rank": "10"
+     }
+    },
+    {
+     "name": "People You Knew / Perfect",
+     "playcount": 764259,
+     "mbid": "fdc8529e-1fc0-4657-b557-28815e84508a",
+     "url": "https://www.last.fm/music/Dance+Gavin+Dance/People+You+Knew+%2F+Perfect",
+     "artist": {
+      "name": "Dance Gavin Dance",
+      "mbid": "16456fed-c9f2-4adf-b6ea-97b648c474d2",
+      "url": "https://www.last.fm/music/Dance+Gavin+Dance"
+     },
+     "image": [
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/34s/0a48a2572d316a780bca0f1ecbe1b86d.png",
+       "size": "small"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/64s/0a48a2572d316a780bca0f1ecbe1b86d.png",
+       "size": "medium"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/174s/0a48a2572d316a780bca0f1ecbe1b86d.png",
+       "size": "large"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/300x300/0a48a2572d316a780bca0f1ecbe1b86d.png",
+       "size": "extralarge"
+      }
+     ],
+     "@attr": {
+      "rank": "11"
+     }
+    },
+    {
+     "name": "Head Hunter",
+     "playcount": 745166,
+     "mbid": "316a8914-b263-4e1c-84f3-04590675d21f",
+     "url": "https://www.last.fm/music/Dance+Gavin+Dance/Head+Hunter",
+     "artist": {
+      "name": "Dance Gavin Dance",
+      "mbid": "16456fed-c9f2-4adf-b6ea-97b648c474d2",
+      "url": "https://www.last.fm/music/Dance+Gavin+Dance"
+     },
+     "image": [
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/34s/216e4712c5e2eec6e24283bd8df3e170.png",
+       "size": "small"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/64s/216e4712c5e2eec6e24283bd8df3e170.png",
+       "size": "medium"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/174s/216e4712c5e2eec6e24283bd8df3e170.png",
+       "size": "large"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/300x300/216e4712c5e2eec6e24283bd8df3e170.png",
+       "size": "extralarge"
+      }
+     ],
+     "@attr": {
+      "rank": "12"
+     }
+    },
+    {
+     "name": "Acceptance Speech",
+     "playcount": 2874567,
+     "mbid": "9313cbf6-aeb7-4157-955c-64acbf610bfa",
+     "url": "https://www.last.fm/music/Dance+Gavin+Dance/Acceptance+Speech",
+     "artist": {
+      "name": "Dance Gavin Dance",
+      "mbid": "16456fed-c9f2-4adf-b6ea-97b648c474d2",
+      "url": "https://www.last.fm/music/Dance+Gavin+Dance"
+     },
+     "image": [
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/34s/29548e84bd65e215b8db76889e573c15.png",
+       "size": "small"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/64s/29548e84bd65e215b8db76889e573c15.png",
+       "size": "medium"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/174s/29548e84bd65e215b8db76889e573c15.png",
+       "size": "large"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/300x300/29548e84bd65e215b8db76889e573c15.png",
+       "size": "extralarge"
+      }
+     ],
+     "@attr": {
+      "rank": "13"
+     }
+    },
+    {
+     "name": "Summertime Gladness",
+     "playcount": 612548,
+     "mbid": "70040c01-02e8-49bf-bdbc-4a7ee779daa1",
+     "url": "https://www.last.fm/music/Dance+Gavin+Dance/Summertime+Gladness",
+     "artist": {
+      "name": "Dance Gavin Dance",
+      "mbid": "16456fed-c9f2-4adf-b6ea-97b648c474d2",
+      "url": "https://www.last.fm/music/Dance+Gavin+Dance"
+     },
+     "image": [
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/34s/d112aa7096251d865cbe271b49262b68.png",
+       "size": "small"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/64s/d112aa7096251d865cbe271b49262b68.png",
+       "size": "medium"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/174s/d112aa7096251d865cbe271b49262b68.png",
+       "size": "large"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/300x300/d112aa7096251d865cbe271b49262b68.png",
+       "size": "extralarge"
+      }
+     ],
+     "@attr": {
+      "rank": "14"
+     }
+    },
+    {
+     "name": "Pantheon",
+     "playcount": 1912828,
+     "mbid": "479465a3-775b-431f-b6eb-c85ffb7c76c9",
+     "url": "https://www.last.fm/music/Dance+Gavin+Dance/Pantheon",
+     "artist": {
+      "name": "Dance Gavin Dance",
+      "mbid": "16456fed-c9f2-4adf-b6ea-97b648c474d2",
+      "url": "https://www.last.fm/music/Dance+Gavin+Dance"
+     },
+     "image": [
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/34s/f30a4d706d7511a0966382ec80503874.png",
+       "size": "small"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/64s/f30a4d706d7511a0966382ec80503874.png",
+       "size": "medium"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/174s/f30a4d706d7511a0966382ec80503874.png",
+       "size": "large"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/300x300/f30a4d706d7511a0966382ec80503874.png",
+       "size": "extralarge"
+      }
+     ],
+     "@attr": {
+      "rank": "15"
+     }
+    },
+    {
+     "name": "Acceptance Speech 2.0",
+     "playcount": 1855226,
+     "url": "https://www.last.fm/music/Dance+Gavin+Dance/Acceptance+Speech+2.0",
+     "artist": {
+      "name": "Dance Gavin Dance",
+      "mbid": "16456fed-c9f2-4adf-b6ea-97b648c474d2",
+      "url": "https://www.last.fm/music/Dance+Gavin+Dance"
+     },
+     "image": [
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/34s/dae7a2db366e03622fb527c6b5dabca9.png",
+       "size": "small"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/64s/dae7a2db366e03622fb527c6b5dabca9.png",
+       "size": "medium"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/174s/dae7a2db366e03622fb527c6b5dabca9.png",
+       "size": "large"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/300x300/dae7a2db366e03622fb527c6b5dabca9.png",
+       "size": "extralarge"
+      }
+     ],
+     "@attr": {
+      "rank": "16"
+     }
+    },
+    {
+     "name": "The Ghost of Billy Royalton",
+     "playcount": 478668,
+     "mbid": "17aaeedb-f819-4ab6-8ed8-0d07408a6a82",
+     "url": "https://www.last.fm/music/Dance+Gavin+Dance/The+Ghost+of+Billy+Royalton",
+     "artist": {
+      "name": "Dance Gavin Dance",
+      "mbid": "16456fed-c9f2-4adf-b6ea-97b648c474d2",
+      "url": "https://www.last.fm/music/Dance+Gavin+Dance"
+     },
+     "image": [
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/34s/5ca32847654f7635c7f51f20c8828288.png",
+       "size": "small"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/64s/5ca32847654f7635c7f51f20c8828288.png",
+       "size": "medium"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/174s/5ca32847654f7635c7f51f20c8828288.png",
+       "size": "large"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/300x300/5ca32847654f7635c7f51f20c8828288.png",
+       "size": "extralarge"
+      }
+     ],
+     "@attr": {
+      "rank": "17"
+     }
+    },
+    {
+     "name": "Semi-Charmed Life",
+     "playcount": 222896,
+     "url": "https://www.last.fm/music/Dance+Gavin+Dance/Semi-Charmed+Life",
+     "artist": {
+      "name": "Dance Gavin Dance",
+      "mbid": "16456fed-c9f2-4adf-b6ea-97b648c474d2",
+      "url": "https://www.last.fm/music/Dance+Gavin+Dance"
+     },
+     "image": [
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/34s/60ea6fa24a9e40a5cfc6e66c8b6ad95a.png",
+       "size": "small"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/64s/60ea6fa24a9e40a5cfc6e66c8b6ad95a.png",
+       "size": "medium"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/174s/60ea6fa24a9e40a5cfc6e66c8b6ad95a.png",
+       "size": "large"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/300x300/60ea6fa24a9e40a5cfc6e66c8b6ad95a.png",
+       "size": "extralarge"
+      }
+     ],
+     "@attr": {
+      "rank": "18"
+     }
+    },
+    {
+     "name": "Blood Wolf",
+     "playcount": 306758,
+     "mbid": "fb9b4713-5712-4903-ba5b-5a95047f71a2",
+     "url": "https://www.last.fm/music/Dance+Gavin+Dance/Blood+Wolf",
+     "artist": {
+      "name": "Dance Gavin Dance",
+      "mbid": "16456fed-c9f2-4adf-b6ea-97b648c474d2",
+      "url": "https://www.last.fm/music/Dance+Gavin+Dance"
+     },
+     "image": [
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/34s/3d6d6780a863c1fd193fe1c5b830fdd8.png",
+       "size": "small"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/64s/3d6d6780a863c1fd193fe1c5b830fdd8.png",
+       "size": "medium"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/174s/3d6d6780a863c1fd193fe1c5b830fdd8.png",
+       "size": "large"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/300x300/3d6d6780a863c1fd193fe1c5b830fdd8.png",
+       "size": "extralarge"
+      }
+     ],
+     "@attr": {
+      "rank": "19"
+     }
+    },
+    {
+     "name": "Speed Demon",
+     "playcount": 272726,
+     "mbid": "ab863877-e88c-4c04-acba-029ba9d3c5b2",
+     "url": "https://www.last.fm/music/Dance+Gavin+Dance/Speed+Demon",
+     "artist": {
+      "name": "Dance Gavin Dance",
+      "mbid": "16456fed-c9f2-4adf-b6ea-97b648c474d2",
+      "url": "https://www.last.fm/music/Dance+Gavin+Dance"
+     },
+     "image": [
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/34s/833401905ecb54e006c3c4b617245e41.png",
+       "size": "small"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/64s/833401905ecb54e006c3c4b617245e41.png",
+       "size": "medium"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/174s/833401905ecb54e006c3c4b617245e41.png",
+       "size": "large"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/300x300/833401905ecb54e006c3c4b617245e41.png",
+       "size": "extralarge"
+      }
+     ],
+     "@attr": {
+      "rank": "20"
+     }
+    },
+    {
+     "name": "Tree City Sessions 2",
+     "playcount": 903536,
+     "mbid": "13d38774-2a8c-48bb-85e2-6ea1029eae7c",
+     "url": "https://www.last.fm/music/Dance+Gavin+Dance/Tree+City+Sessions+2",
+     "artist": {
+      "name": "Dance Gavin Dance",
+      "mbid": "16456fed-c9f2-4adf-b6ea-97b648c474d2",
+      "url": "https://www.last.fm/music/Dance+Gavin+Dance"
+     },
+     "image": [
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/34s/891d8d2e98563465f54f2653af9ec5d8.png",
+       "size": "small"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/64s/891d8d2e98563465f54f2653af9ec5d8.png",
+       "size": "medium"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/174s/891d8d2e98563465f54f2653af9ec5d8.png",
+       "size": "large"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/300x300/891d8d2e98563465f54f2653af9ec5d8.png",
+       "size": "extralarge"
+      }
+     ],
+     "@attr": {
+      "rank": "21"
+     }
+    },
+    {
+     "name": "Midnight at McGuffy's",
+     "playcount": 213674,
+     "mbid": "e1cb26f4-975c-41db-80d3-368a55d97a8e",
+     "url": "https://www.last.fm/music/Dance+Gavin+Dance/Midnight+at+McGuffy%27s",
+     "artist": {
+      "name": "Dance Gavin Dance",
+      "mbid": "16456fed-c9f2-4adf-b6ea-97b648c474d2",
+      "url": "https://www.last.fm/music/Dance+Gavin+Dance"
+     },
+     "image": [
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/34s/cccfc51892958ef5ee3c65be9a4cffa3.png",
+       "size": "small"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/64s/cccfc51892958ef5ee3c65be9a4cffa3.png",
+       "size": "medium"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/174s/cccfc51892958ef5ee3c65be9a4cffa3.png",
+       "size": "large"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/300x300/cccfc51892958ef5ee3c65be9a4cffa3.png",
+       "size": "extralarge"
+      }
+     ],
+     "@attr": {
+      "rank": "22"
+     }
+    },
+    {
+     "name": "War Machine",
+     "playcount": 297681,
+     "url": "https://www.last.fm/music/Dance+Gavin+Dance/War+Machine",
+     "artist": {
+      "name": "Dance Gavin Dance",
+      "mbid": "16456fed-c9f2-4adf-b6ea-97b648c474d2",
+      "url": "https://www.last.fm/music/Dance+Gavin+Dance"
+     },
+     "image": [
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/34s/27e0cc4740ec41f5a9e3412a5cc94374.png",
+       "size": "small"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/64s/27e0cc4740ec41f5a9e3412a5cc94374.png",
+       "size": "medium"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/174s/27e0cc4740ec41f5a9e3412a5cc94374.png",
+       "size": "large"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/300x300/27e0cc4740ec41f5a9e3412a5cc94374.png",
+       "size": "extralarge"
+      }
+     ],
+     "@attr": {
+      "rank": "23"
+     }
+    },
+    {
+     "name": "Synergy (feat. Rob Damiani)",
+     "playcount": 343205,
+     "url": "https://www.last.fm/music/Dance+Gavin+Dance/Synergy+(feat.+Rob+Damiani)",
+     "artist": {
+      "name": "Dance Gavin Dance",
+      "mbid": "16456fed-c9f2-4adf-b6ea-97b648c474d2",
+      "url": "https://www.last.fm/music/Dance+Gavin+Dance"
+     },
+     "image": [
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/34s/d4b0d44a0b0f3ea7e7f6461dfef70ed2.png",
+       "size": "small"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/64s/d4b0d44a0b0f3ea7e7f6461dfef70ed2.png",
+       "size": "medium"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/174s/d4b0d44a0b0f3ea7e7f6461dfef70ed2.png",
+       "size": "large"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/300x300/d4b0d44a0b0f3ea7e7f6461dfef70ed2.png",
+       "size": "extralarge"
+      }
+     ],
+     "@attr": {
+      "rank": "24"
+     }
+    },
+    {
+     "name": "All the Way Down",
+     "playcount": 231502,
+     "mbid": "79b9b857-3f97-4b04-b9cd-5973d956fdb5",
+     "url": "https://www.last.fm/music/Dance+Gavin+Dance/All+the+Way+Down",
+     "artist": {
+      "name": "Dance Gavin Dance",
+      "mbid": "16456fed-c9f2-4adf-b6ea-97b648c474d2",
+      "url": "https://www.last.fm/music/Dance+Gavin+Dance"
+     },
+     "image": [
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/34s/66bcc7c99d79c1021289184e70d578dc.png",
+       "size": "small"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/64s/66bcc7c99d79c1021289184e70d578dc.png",
+       "size": "medium"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/174s/66bcc7c99d79c1021289184e70d578dc.png",
+       "size": "large"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/300x300/66bcc7c99d79c1021289184e70d578dc.png",
+       "size": "extralarge"
+      }
+     ],
+     "@attr": {
+      "rank": "25"
+     }
+    },
+    {
+     "name": "Tree City Sessions",
+     "playcount": 816890,
+     "mbid": "1c81207b-9c6f-40c3-86b6-0592c71b10c2",
+     "url": "https://www.last.fm/music/Dance+Gavin+Dance/Tree+City+Sessions",
+     "artist": {
+      "name": "Dance Gavin Dance",
+      "mbid": "16456fed-c9f2-4adf-b6ea-97b648c474d2",
+      "url": "https://www.last.fm/music/Dance+Gavin+Dance"
+     },
+     "image": [
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/34s/8812dbdf3c7cd9309b33d9a344752bc9.png",
+       "size": "small"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/64s/8812dbdf3c7cd9309b33d9a344752bc9.png",
+       "size": "medium"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/174s/8812dbdf3c7cd9309b33d9a344752bc9.png",
+       "size": "large"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/300x300/8812dbdf3c7cd9309b33d9a344752bc9.png",
+       "size": "extralarge"
+      }
+     ],
+     "@attr": {
+      "rank": "26"
+     }
+    },
+    {
+     "name": "Straight From The Heart",
+     "playcount": 219231,
+     "mbid": "710ec043-c22a-4b45-82b1-95da1378b8cd",
+     "url": "https://www.last.fm/music/Dance+Gavin+Dance/Straight+From+The+Heart",
+     "artist": {
+      "name": "Dance Gavin Dance",
+      "mbid": "16456fed-c9f2-4adf-b6ea-97b648c474d2",
+      "url": "https://www.last.fm/music/Dance+Gavin+Dance"
+     },
+     "image": [
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/34s/71ddfdd29842b1e2d996bcfe247b8131.png",
+       "size": "small"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/64s/71ddfdd29842b1e2d996bcfe247b8131.png",
+       "size": "medium"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/174s/71ddfdd29842b1e2d996bcfe247b8131.png",
+       "size": "large"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/300x300/71ddfdd29842b1e2d996bcfe247b8131.png",
+       "size": "extralarge"
+      }
+     ],
+     "@attr": {
+      "rank": "27"
+     }
+    },
+    {
+     "name": "Pop Off!",
+     "playcount": 233952,
+     "mbid": "c106ac2d-9080-4681-a8c4-7bfd627d0d9c",
+     "url": "https://www.last.fm/music/Dance+Gavin+Dance/Pop+Off%21",
+     "artist": {
+      "name": "Dance Gavin Dance",
+      "mbid": "16456fed-c9f2-4adf-b6ea-97b648c474d2",
+      "url": "https://www.last.fm/music/Dance+Gavin+Dance"
+     },
+     "image": [
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/34s/bf21eb9d035443bfd17c1723e3d710c3.png",
+       "size": "small"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/64s/bf21eb9d035443bfd17c1723e3d710c3.png",
+       "size": "medium"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/174s/bf21eb9d035443bfd17c1723e3d710c3.png",
+       "size": "large"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/300x300/bf21eb9d035443bfd17c1723e3d710c3.png",
+       "size": "extralarge"
+      }
+     ],
+     "@attr": {
+      "rank": "28"
+     }
+    },
+    {
+     "name": "Tree City Sessions 3",
+     "playcount": 318430,
+     "url": "https://www.last.fm/music/Dance+Gavin+Dance/Tree+City+Sessions+3",
+     "artist": {
+      "name": "Dance Gavin Dance",
+      "mbid": "16456fed-c9f2-4adf-b6ea-97b648c474d2",
+      "url": "https://www.last.fm/music/Dance+Gavin+Dance"
+     },
+     "image": [
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/34s/16173973b8eb2d082a4ed3a82245f3d6.png",
+       "size": "small"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/64s/16173973b8eb2d082a4ed3a82245f3d6.png",
+       "size": "medium"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/174s/16173973b8eb2d082a4ed3a82245f3d6.png",
+       "size": "large"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/300x300/16173973b8eb2d082a4ed3a82245f3d6.png",
+       "size": "extralarge"
+      }
+     ],
+     "@attr": {
+      "rank": "29"
+     }
+    },
+    {
+     "name": "Prisoner",
+     "playcount": 146347,
+     "url": "https://www.last.fm/music/Dance+Gavin+Dance/Prisoner",
+     "artist": {
+      "name": "Dance Gavin Dance",
+      "mbid": "16456fed-c9f2-4adf-b6ea-97b648c474d2",
+      "url": "https://www.last.fm/music/Dance+Gavin+Dance"
+     },
+     "image": [
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/34s/1cfc513d76d2fc4004b5e1efd03f2f23.png",
+       "size": "small"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/64s/1cfc513d76d2fc4004b5e1efd03f2f23.png",
+       "size": "medium"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/174s/1cfc513d76d2fc4004b5e1efd03f2f23.png",
+       "size": "large"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/300x300/1cfc513d76d2fc4004b5e1efd03f2f23.png",
+       "size": "extralarge"
+      }
+     ],
+     "@attr": {
+      "rank": "30"
+     }
+    },
+    {
+     "name": "Strawberry's Wake",
+     "playcount": 131515,
+     "url": "https://www.last.fm/music/Dance+Gavin+Dance/Strawberry%27s+Wake",
+     "artist": {
+      "name": "Dance Gavin Dance",
+      "mbid": "16456fed-c9f2-4adf-b6ea-97b648c474d2",
+      "url": "https://www.last.fm/music/Dance+Gavin+Dance"
+     },
+     "image": [
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/34s/3034f84f3af6ab774a7408aceee3e085.png",
+       "size": "small"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/64s/3034f84f3af6ab774a7408aceee3e085.png",
+       "size": "medium"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/174s/3034f84f3af6ab774a7408aceee3e085.png",
+       "size": "large"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/300x300/3034f84f3af6ab774a7408aceee3e085.png",
+       "size": "extralarge"
+      }
+     ],
+     "@attr": {
+      "rank": "31"
+     }
+    },
+    {
+     "name": "Trap Door",
+     "playcount": 108315,
+     "mbid": "adb2e9a1-a255-4aee-b1da-cc293789721c",
+     "url": "https://www.last.fm/music/Dance+Gavin+Dance/Trap+Door",
+     "artist": {
+      "name": "Dance Gavin Dance",
+      "mbid": "16456fed-c9f2-4adf-b6ea-97b648c474d2",
+      "url": "https://www.last.fm/music/Dance+Gavin+Dance"
+     },
+     "image": [
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/34s/5e3ae1069b34c0fa5551bfb3be687bbb.png",
+       "size": "small"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/64s/5e3ae1069b34c0fa5551bfb3be687bbb.png",
+       "size": "medium"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/174s/5e3ae1069b34c0fa5551bfb3be687bbb.png",
+       "size": "large"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/300x300/5e3ae1069b34c0fa5551bfb3be687bbb.png",
+       "size": "extralarge"
+      }
+     ],
+     "@attr": {
+      "rank": "32"
+     }
+    },
+    {
+     "name": "Need Money (Tree City Sessions)",
+     "playcount": 48919,
+     "mbid": "494c5419-95b1-4c41-8360-d9361d8e0116",
+     "url": "https://www.last.fm/music/Dance+Gavin+Dance/Need+Money+(Tree+City+Sessions)",
+     "artist": {
+      "name": "Dance Gavin Dance",
+      "mbid": "16456fed-c9f2-4adf-b6ea-97b648c474d2",
+      "url": "https://www.last.fm/music/Dance+Gavin+Dance"
+     },
+     "image": [
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/34s/b93654463de8c3467318d62638e7a0bb.png",
+       "size": "small"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/64s/b93654463de8c3467318d62638e7a0bb.png",
+       "size": "medium"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/174s/b93654463de8c3467318d62638e7a0bb.png",
+       "size": "large"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/300x300/b93654463de8c3467318d62638e7a0bb.png",
+       "size": "extralarge"
+      }
+     ],
+     "@attr": {
+      "rank": "33"
+     }
+    },
+    {
+     "name": "Die Another Day",
+     "playcount": 165060,
+     "mbid": "b4c0f67c-167e-48d6-81bb-76b2b341a655",
+     "url": "https://www.last.fm/music/Dance+Gavin+Dance/Die+Another+Day",
+     "artist": {
+      "name": "Dance Gavin Dance",
+      "mbid": "16456fed-c9f2-4adf-b6ea-97b648c474d2",
+      "url": "https://www.last.fm/music/Dance+Gavin+Dance"
+     },
+     "image": [
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/34s/a31cb29aa1a3b8fb2fb1bdde5a22887c.png",
+       "size": "small"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/64s/a31cb29aa1a3b8fb2fb1bdde5a22887c.png",
+       "size": "medium"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/174s/a31cb29aa1a3b8fb2fb1bdde5a22887c.png",
+       "size": "large"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/300x300/a31cb29aa1a3b8fb2fb1bdde5a22887c.png",
+       "size": "extralarge"
+      }
+     ],
+     "@attr": {
+      "rank": "34"
+     }
+    },
+    {
+     "name": "Artificial Selection (Instrumental)",
+     "playcount": 202671,
+     "url": "https://www.last.fm/music/Dance+Gavin+Dance/Artificial+Selection+(Instrumental)",
+     "artist": {
+      "name": "Dance Gavin Dance",
+      "mbid": "16456fed-c9f2-4adf-b6ea-97b648c474d2",
+      "url": "https://www.last.fm/music/Dance+Gavin+Dance"
+     },
+     "image": [
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/34s/ac800e08f52dd6609e30e4789c89a5c1.png",
+       "size": "small"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/64s/ac800e08f52dd6609e30e4789c89a5c1.png",
+       "size": "medium"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/174s/ac800e08f52dd6609e30e4789c89a5c1.png",
+       "size": "large"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/300x300/ac800e08f52dd6609e30e4789c89a5c1.png",
+       "size": "extralarge"
+      }
+     ],
+     "@attr": {
+      "rank": "35"
+     }
+    },
+    {
+     "name": "Pussy Vultures",
+     "playcount": 110347,
+     "mbid": "677151bb-e8fd-4fb2-ad0e-2cec81df50f4",
+     "url": "https://www.last.fm/music/Dance+Gavin+Dance/Pussy+Vultures",
+     "artist": {
+      "name": "Dance Gavin Dance",
+      "mbid": "16456fed-c9f2-4adf-b6ea-97b648c474d2",
+      "url": "https://www.last.fm/music/Dance+Gavin+Dance"
+     },
+     "image": [
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/34s/8cb086b7b86e0850aaeb926d6b0bf618.png",
+       "size": "small"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/64s/8cb086b7b86e0850aaeb926d6b0bf618.png",
+       "size": "medium"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/174s/8cb086b7b86e0850aaeb926d6b0bf618.png",
+       "size": "large"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/300x300/8cb086b7b86e0850aaeb926d6b0bf618.png",
+       "size": "extralarge"
+      }
+     ],
+     "@attr": {
+      "rank": "36"
+     }
+    },
+    {
+     "name": "Jackpot Juicer (Instrumental)",
+     "playcount": 176123,
+     "mbid": "dca69e7c-5d81-4534-992b-429b4c6eab65",
+     "url": "https://www.last.fm/music/Dance+Gavin+Dance/Jackpot+Juicer+(Instrumental)",
+     "artist": {
+      "name": "Dance Gavin Dance",
+      "mbid": "16456fed-c9f2-4adf-b6ea-97b648c474d2",
+      "url": "https://www.last.fm/music/Dance+Gavin+Dance"
+     },
+     "image": [
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/34s/18de62928f0c9833a9abeeab655118f2.png",
+       "size": "small"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/64s/18de62928f0c9833a9abeeab655118f2.png",
+       "size": "medium"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/174s/18de62928f0c9833a9abeeab655118f2.png",
+       "size": "large"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/300x300/18de62928f0c9833a9abeeab655118f2.png",
+       "size": "extralarge"
+      }
+     ],
+     "@attr": {
+      "rank": "37"
+     }
+    },
+    {
+     "name": "Lyrics lie",
+     "playcount": 105816,
+     "url": "https://www.last.fm/music/Dance+Gavin+Dance/Lyrics+lie",
+     "artist": {
+      "name": "Dance Gavin Dance",
+      "mbid": "16456fed-c9f2-4adf-b6ea-97b648c474d2",
+      "url": "https://www.last.fm/music/Dance+Gavin+Dance"
+     },
+     "image": [
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/34s/ef958e213d39bd323dd4087609a75e7d.png",
+       "size": "small"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/64s/ef958e213d39bd323dd4087609a75e7d.png",
+       "size": "medium"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/174s/ef958e213d39bd323dd4087609a75e7d.png",
+       "size": "large"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/300x300/ef958e213d39bd323dd4087609a75e7d.png",
+       "size": "extralarge"
+      }
+     ],
+     "@attr": {
+      "rank": "38"
+     }
+    },
+    {
+     "name": "Space Cow Initiation Ritual (feat. George Clinton)",
+     "playcount": 93758,
+     "url": "https://www.last.fm/music/Dance+Gavin+Dance/Space+Cow+Initiation+Ritual+(feat.+George+Clinton)",
+     "artist": {
+      "name": "Dance Gavin Dance",
+      "mbid": "16456fed-c9f2-4adf-b6ea-97b648c474d2",
+      "url": "https://www.last.fm/music/Dance+Gavin+Dance"
+     },
+     "image": [
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/34s/bac1ef08e7791a4cea25309510b9ec77.png",
+       "size": "small"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/64s/bac1ef08e7791a4cea25309510b9ec77.png",
+       "size": "medium"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/174s/bac1ef08e7791a4cea25309510b9ec77.png",
+       "size": "large"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/300x300/bac1ef08e7791a4cea25309510b9ec77.png",
+       "size": "extralarge"
+      }
+     ],
+     "@attr": {
+      "rank": "39"
+     }
+    },
+    {
+     "name": "Mothership (Instrumental)",
+     "playcount": 161616,
+     "mbid": "0ef3abdf-1e6e-4336-a6b1-002bfc7d5ac6",
+     "url": "https://www.last.fm/music/Dance+Gavin+Dance/Mothership+(Instrumental)",
+     "artist": {
+      "name": "Dance Gavin Dance",
+      "mbid": "16456fed-c9f2-4adf-b6ea-97b648c474d2",
+      "url": "https://www.last.fm/music/Dance+Gavin+Dance"
+     },
+     "image": [
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/34s/6aa685eeeb248a46237aeea71e2b0afe.png",
+       "size": "small"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/64s/6aa685eeeb248a46237aeea71e2b0afe.png",
+       "size": "medium"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/174s/6aa685eeeb248a46237aeea71e2b0afe.png",
+       "size": "large"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/300x300/6aa685eeeb248a46237aeea71e2b0afe.png",
+       "size": "extralarge"
+      }
+     ],
+     "@attr": {
+      "rank": "40"
+     }
+    },
+    {
+     "name": "The Robot With Human Hair Pt. 3 (Tree City Sessions)",
+     "playcount": 34463,
+     "mbid": "8f34ab6f-dab0-4f04-8326-6702a75c9373",
+     "url": "https://www.last.fm/music/Dance+Gavin+Dance/The+Robot+With+Human+Hair+Pt.+3+(Tree+City+Sessions)",
+     "artist": {
+      "name": "Dance Gavin Dance",
+      "mbid": "16456fed-c9f2-4adf-b6ea-97b648c474d2",
+      "url": "https://www.last.fm/music/Dance+Gavin+Dance"
+     },
+     "image": [
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/34s/6b868d0af28468f36803aa85d857ca03.png",
+       "size": "small"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/64s/6b868d0af28468f36803aa85d857ca03.png",
+       "size": "medium"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/174s/6b868d0af28468f36803aa85d857ca03.png",
+       "size": "large"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/300x300/6b868d0af28468f36803aa85d857ca03.png",
+       "size": "extralarge"
+      }
+     ],
+     "@attr": {
+      "rank": "41"
+     }
+    },
+    {
+     "name": "Cream Of The Crop",
+     "playcount": 116608,
+     "mbid": "9017534c-8001-4de3-9971-4a97b5cdf69e",
+     "url": "https://www.last.fm/music/Dance+Gavin+Dance/Cream+Of+The+Crop",
+     "artist": {
+      "name": "Dance Gavin Dance",
+      "mbid": "16456fed-c9f2-4adf-b6ea-97b648c474d2",
+      "url": "https://www.last.fm/music/Dance+Gavin+Dance"
+     },
+     "image": [
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/34s/120592a82f3d9bdaa0b58a3858a08a8a.png",
+       "size": "small"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/64s/120592a82f3d9bdaa0b58a3858a08a8a.png",
+       "size": "medium"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/174s/120592a82f3d9bdaa0b58a3858a08a8a.png",
+       "size": "large"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/300x300/120592a82f3d9bdaa0b58a3858a08a8a.png",
+       "size": "extralarge"
+      }
+     ],
+     "@attr": {
+      "rank": "42"
+     }
+    },
+    {
+     "name": "Midnight Crusade",
+     "playcount": 78519,
+     "url": "https://www.last.fm/music/Dance+Gavin+Dance/Midnight+Crusade",
+     "artist": {
+      "name": "Dance Gavin Dance",
+      "mbid": "16456fed-c9f2-4adf-b6ea-97b648c474d2",
+      "url": "https://www.last.fm/music/Dance+Gavin+Dance"
+     },
+     "image": [
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/34s/102d5e8d7e5621edd629b465b88c441a.png",
+       "size": "small"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/64s/102d5e8d7e5621edd629b465b88c441a.png",
+       "size": "medium"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/174s/102d5e8d7e5621edd629b465b88c441a.png",
+       "size": "large"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/300x300/102d5e8d7e5621edd629b465b88c441a.png",
+       "size": "extralarge"
+      }
+     ],
+     "@attr": {
+      "rank": "43"
+     }
+    },
+    {
+     "name": "Downtown Battle Mountain (Instrumental)",
+     "playcount": 93275,
+     "url": "https://www.last.fm/music/Dance+Gavin+Dance/Downtown+Battle+Mountain+(Instrumental)",
+     "artist": {
+      "name": "Dance Gavin Dance",
+      "mbid": "16456fed-c9f2-4adf-b6ea-97b648c474d2",
+      "url": "https://www.last.fm/music/Dance+Gavin+Dance"
+     },
+     "image": [
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/34s/4a5973ecd301690280fc06aebb98af3c.png",
+       "size": "small"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/64s/4a5973ecd301690280fc06aebb98af3c.png",
+       "size": "medium"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/174s/4a5973ecd301690280fc06aebb98af3c.png",
+       "size": "large"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/300x300/4a5973ecd301690280fc06aebb98af3c.png",
+       "size": "extralarge"
+      }
+     ],
+     "@attr": {
+      "rank": "44"
+     }
+    },
+    {
+     "name": "Three Wishes",
+     "playcount": 81391,
+     "url": "https://www.last.fm/music/Dance+Gavin+Dance/Three+Wishes",
+     "artist": {
+      "name": "Dance Gavin Dance",
+      "mbid": "16456fed-c9f2-4adf-b6ea-97b648c474d2",
+      "url": "https://www.last.fm/music/Dance+Gavin+Dance"
+     },
+     "image": [
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/34s/f31f6e8821dedab995ae2d13270a5a48.png",
+       "size": "small"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/64s/f31f6e8821dedab995ae2d13270a5a48.png",
+       "size": "medium"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/174s/f31f6e8821dedab995ae2d13270a5a48.png",
+       "size": "large"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/300x300/f31f6e8821dedab995ae2d13270a5a48.png",
+       "size": "extralarge"
+      }
+     ],
+     "@attr": {
+      "rank": "45"
+     }
+    },
+    {
+     "name": "Instant Gratification (Instrumental)",
+     "playcount": 108921,
+     "mbid": "c6d90fc1-d720-4de9-a093-e8ce05e5f031",
+     "url": "https://www.last.fm/music/Dance+Gavin+Dance/Instant+Gratification+(Instrumental)",
+     "artist": {
+      "name": "Dance Gavin Dance",
+      "mbid": "16456fed-c9f2-4adf-b6ea-97b648c474d2",
+      "url": "https://www.last.fm/music/Dance+Gavin+Dance"
+     },
+     "image": [
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/34s/fc34aaec88bd58ac2e3193878abfa840.png",
+       "size": "small"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/64s/fc34aaec88bd58ac2e3193878abfa840.png",
+       "size": "medium"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/174s/fc34aaec88bd58ac2e3193878abfa840.png",
+       "size": "large"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/300x300/fc34aaec88bd58ac2e3193878abfa840.png",
+       "size": "extralarge"
+      }
+     ],
+     "@attr": {
+      "rank": "46"
+     }
+    },
+    {
+     "name": "Tree City Sessions (Live)",
+     "playcount": 152807,
+     "url": "https://www.last.fm/music/Dance+Gavin+Dance/Tree+City+Sessions+(Live)",
+     "artist": {
+      "name": "Dance Gavin Dance",
+      "mbid": "16456fed-c9f2-4adf-b6ea-97b648c474d2",
+      "url": "https://www.last.fm/music/Dance+Gavin+Dance"
+     },
+     "image": [
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/34s/94b9e6aaf6ddcd30566117ea61e0f40e.png",
+       "size": "small"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/64s/94b9e6aaf6ddcd30566117ea61e0f40e.png",
+       "size": "medium"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/174s/94b9e6aaf6ddcd30566117ea61e0f40e.png",
+       "size": "large"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/300x300/94b9e6aaf6ddcd30566117ea61e0f40e.png",
+       "size": "extralarge"
+      }
+     ],
+     "@attr": {
+      "rank": "47"
+     }
+    },
+    {
+     "name": "Son of Robot",
+     "playcount": 61419,
+     "url": "https://www.last.fm/music/Dance+Gavin+Dance/Son+of+Robot",
+     "artist": {
+      "name": "Dance Gavin Dance",
+      "mbid": "16456fed-c9f2-4adf-b6ea-97b648c474d2",
+      "url": "https://www.last.fm/music/Dance+Gavin+Dance"
+     },
+     "image": [
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/34s/7ac7ad6781854381eb5a0817e23172be.png",
+       "size": "small"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/64s/7ac7ad6781854381eb5a0817e23172be.png",
+       "size": "medium"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/174s/7ac7ad6781854381eb5a0817e23172be.png",
+       "size": "large"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/300x300/7ac7ad6781854381eb5a0817e23172be.png",
+       "size": "extralarge"
+      }
+     ],
+     "@attr": {
+      "rank": "48"
+     }
+    },
+    {
+     "name": "Punk Goes Pop, Vol. 7",
+     "playcount": 37275,
+     "url": "https://www.last.fm/music/Dance+Gavin+Dance/Punk+Goes+Pop,+Vol.+7",
+     "artist": {
+      "name": "Dance Gavin Dance",
+      "mbid": "16456fed-c9f2-4adf-b6ea-97b648c474d2",
+      "url": "https://www.last.fm/music/Dance+Gavin+Dance"
+     },
+     "image": [
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/34s/9b5889ba002ebd992b30511292218ba7.png",
+       "size": "small"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/64s/9b5889ba002ebd992b30511292218ba7.png",
+       "size": "medium"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/174s/9b5889ba002ebd992b30511292218ba7.png",
+       "size": "large"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/300x300/9b5889ba002ebd992b30511292218ba7.png",
+       "size": "extralarge"
+      }
+     ],
+     "@attr": {
+      "rank": "49"
+     }
+    },
+    {
+     "name": "Demo",
+     "playcount": 71274,
+     "url": "https://www.last.fm/music/Dance+Gavin+Dance/Demo",
+     "artist": {
+      "name": "Dance Gavin Dance",
+      "mbid": "16456fed-c9f2-4adf-b6ea-97b648c474d2",
+      "url": "https://www.last.fm/music/Dance+Gavin+Dance"
+     },
+     "image": [
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/34s/86003c4d46a3d04c40018bd9aebc7bcb.png",
+       "size": "small"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/64s/86003c4d46a3d04c40018bd9aebc7bcb.png",
+       "size": "medium"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/174s/86003c4d46a3d04c40018bd9aebc7bcb.png",
+       "size": "large"
+      },
+      {
+       "#text": "https://lastfm-img.freetls.fastly.net/i/u/300x300/86003c4d46a3d04c40018bd9aebc7bcb.png",
+       "size": "extralarge"
+      }
+     ],
+     "@attr": {
+      "rank": "50"
+     }
+    }
+   ],
+   "@attr": {
+    "artist": "Dance Gavin Dance",
+    "page": "1",
+    "perPage": "50",
+    "totalPages": "109",
+    "total": "5446"
+   }
+  }
+ }
+}

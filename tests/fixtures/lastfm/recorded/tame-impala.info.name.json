@@ -1,0 +1,241 @@
+{
+ "recorded": "2026-11-25T02:25:29Z",
+ "method": "artist.getinfo",
+ "params": {
+  "artist": "Tame Impala",
+  "autocorrect": "1"
+ },
+ "status": 200,
+ "headers": {
+  "Content-Type": "application/json"
+ },
+ "answer": {
+  "artist": {
+   "name": "Tame Impala",
+   "mbid": "63aa26c3-d59b-4da4-84ac-716b54f1ef4d",
+   "url": "https://www.last.fm/music/Tame+Impala",
+   "image": [
+    {
+     "#text": "https://lastfm-img.freetls.fastly.net/i/u/34s/2a96cbd8b46e442fc41c2b86b821562f.png",
+     "size": "small"
+    },
+    {
+     "#text": "https://lastfm-img.freetls.fastly.net/i/u/64s/2a96cbd8b46e442fc41c2b86b821562f.png",
+     "size": "medium"
+    },
+    {
+     "#text": "https://lastfm-img.freetls.fastly.net/i/u/174s/2a96cbd8b46e442fc41c2b86b821562f.png",
+     "size": "large"
+    },
+    {
+     "#text": "https://lastfm-img.freetls.fastly.net/i/u/300x300/2a96cbd8b46e442fc41c2b86b821562f.png",
+     "size": "extralarge"
+    },
+    {
+     "#text": "https://lastfm-img.freetls.fastly.net/i/u/300x300/2a96cbd8b46e442fc41c2b86b821562f.png",
+     "size": "mega"
+    },
+    {
+     "#text": "https://lastfm-img.freetls.fastly.net/i/u/300x300/2a96cbd8b46e442fc41c2b86b821562f.png",
+     "size": ""
+    }
+   ],
+   "streamable": "0",
+   "ontour": "1",
+   "stats": {
+    "listeners": "4724887",
+    "playcount": "457459363"
+   },
+   "similar": {
+    "artist": [
+     {
+      "name": "Pond",
+      "url": "https://www.last.fm/music/Pond",
+      "image": [
+       {
+        "#text": "https://lastfm-img.freetls.fastly.net/i/u/34s/2a96cbd8b46e442fc41c2b86b821562f.png",
+        "size": "small"
+       },
+       {
+        "#text": "https://lastfm-img.freetls.fastly.net/i/u/64s/2a96cbd8b46e442fc41c2b86b821562f.png",
+        "size": "medium"
+       },
+       {
+        "#text": "https://lastfm-img.freetls.fastly.net/i/u/174s/2a96cbd8b46e442fc41c2b86b821562f.png",
+        "size": "large"
+       },
+       {
+        "#text": "https://lastfm-img.freetls.fastly.net/i/u/300x300/2a96cbd8b46e442fc41c2b86b821562f.png",
+        "size": "extralarge"
+       },
+       {
+        "#text": "https://lastfm-img.freetls.fastly.net/i/u/300x300/2a96cbd8b46e442fc41c2b86b821562f.png",
+        "size": "mega"
+       },
+       {
+        "#text": "https://lastfm-img.freetls.fastly.net/i/u/300x300/2a96cbd8b46e442fc41c2b86b821562f.png",
+        "size": ""
+       }
+      ]
+     },
+     {
+      "name": "Melody's Echo Chamber",
+      "url": "https://www.last.fm/music/Melody%27s+Echo+Chamber",
+      "image": [
+       {
+        "#text": "https://lastfm-img.freetls.fastly.net/i/u/34s/2a96cbd8b46e442fc41c2b86b821562f.png",
+        "size": "small"
+       },
+       {
+        "#text": "https://lastfm-img.freetls.fastly.net/i/u/64s/2a96cbd8b46e442fc41c2b86b821562f.png",
+        "size": "medium"
+       },
+       {
+        "#text": "https://lastfm-img.freetls.fastly.net/i/u/174s/2a96cbd8b46e442fc41c2b86b821562f.png",
+        "size": "large"
+       },
+       {
+        "#text": "https://lastfm-img.freetls.fastly.net/i/u/300x300/2a96cbd8b46e442fc41c2b86b821562f.png",
+        "size": "extralarge"
+       },
+       {
+        "#text": "https://lastfm-img.freetls.fastly.net/i/u/300x300/2a96cbd8b46e442fc41c2b86b821562f.png",
+        "size": "mega"
+       },
+       {
+        "#text": "https://lastfm-img.freetls.fastly.net/i/u/300x300/2a96cbd8b46e442fc41c2b86b821562f.png",
+        "size": ""
+       }
+      ]
+     },
+     {
+      "name": "GUM",
+      "url": "https://www.last.fm/music/GUM",
+      "image": [
+       {
+        "#text": "https://lastfm-img.freetls.fastly.net/i/u/34s/2a96cbd8b46e442fc41c2b86b821562f.png",
+        "size": "small"
+       },
+       {
+        "#text": "https://lastfm-img.freetls.fastly.net/i/u/64s/2a96cbd8b46e442fc41c2b86b821562f.png",
+        "size": "medium"
+       },
+       {
+        "#text": "https://lastfm-img.freetls.fastly.net/i/u/174s/2a96cbd8b46e442fc41c2b86b821562f.png",
+        "size": "large"
+       },
+       {
+        "#text": "https://lastfm-img.freetls.fastly.net/i/u/300x300/2a96cbd8b46e442fc41c2b86b821562f.png",
+        "size": "extralarge"
+       },
+       {
+        "#text": "https://lastfm-img.freetls.fastly.net/i/u/300x300/2a96cbd8b46e442fc41c2b86b821562f.png",
+        "size": "mega"
+       },
+       {
+        "#text": "https://lastfm-img.freetls.fastly.net/i/u/300x300/2a96cbd8b46e442fc41c2b86b821562f.png",
+        "size": ""
+       }
+      ]
+     },
+     {
+      "name": "Temples",
+      "url": "https://www.last.fm/music/Temples",
+      "image": [
+       {
+        "#text": "https://lastfm-img.freetls.fastly.net/i/u/34s/2a96cbd8b46e442fc41c2b86b821562f.png",
+        "size": "small"
+       },
+       {
+        "#text": "https://lastfm-img.freetls.fastly.net/i/u/64s/2a96cbd8b46e442fc41c2b86b821562f.png",
+        "size": "medium"
+       },
+       {
+        "#text": "https://lastfm-img.freetls.fastly.net/i/u/174s/2a96cbd8b46e442fc41c2b86b821562f.png",
+        "size": "large"
+       },
+       {
+        "#text": "https://lastfm-img.freetls.fastly.net/i/u/300x300/2a96cbd8b46e442fc41c2b86b821562f.png",
+        "size": "extralarge"
+       },
+       {
+        "#text": "https://lastfm-img.freetls.fastly.net/i/u/300x300/2a96cbd8b46e442fc41c2b86b821562f.png",
+        "size": "mega"
+       },
+       {
+        "#text": "https://lastfm-img.freetls.fastly.net/i/u/300x300/2a96cbd8b46e442fc41c2b86b821562f.png",
+        "size": ""
+       }
+      ]
+     },
+     {
+      "name": "The Holydrug Couple",
+      "url": "https://www.last.fm/music/The+Holydrug+Couple",
+      "image": [
+       {
+        "#text": "https://lastfm-img.freetls.fastly.net/i/u/34s/2a96cbd8b46e442fc41c2b86b821562f.png",
+        "size": "small"
+       },
+       {
+        "#text": "https://lastfm-img.freetls.fastly.net/i/u/64s/2a96cbd8b46e442fc41c2b86b821562f.png",
+        "size": "medium"
+       },
+       {
+        "#text": "https://lastfm-img.freetls.fastly.net/i/u/174s/2a96cbd8b46e442fc41c2b86b821562f.png",
+        "size": "large"
+       },
+       {
+        "#text": "https://lastfm-img.freetls.fastly.net/i/u/300x300/2a96cbd8b46e442fc41c2b86b821562f.png",
+        "size": "extralarge"
+       },
+       {
+        "#text": "https://lastfm-img.freetls.fastly.net/i/u/300x300/2a96cbd8b46e442fc41c2b86b821562f.png",
+        "size": "mega"
+       },
+       {
+        "#text": "https://lastfm-img.freetls.fastly.net/i/u/300x300/2a96cbd8b46e442fc41c2b86b821562f.png",
+        "size": ""
+       }
+      ]
+     }
+    ]
+   },
+   "tags": {
+    "tag": [
+     {
+      "name": "Psychedelic Rock",
+      "url": "https://www.last.fm/tag/Psychedelic+Rock"
+     },
+     {
+      "name": "psychedelic",
+      "url": "https://www.last.fm/tag/psychedelic"
+     },
+     {
+      "name": "indie rock",
+      "url": "https://www.last.fm/tag/indie+rock"
+     },
+     {
+      "name": "australian",
+      "url": "https://www.last.fm/tag/australian"
+     },
+     {
+      "name": "rock",
+      "url": "https://www.last.fm/tag/rock"
+     }
+    ]
+   },
+   "bio": {
+    "links": {
+     "link": {
+      "#text": "",
+      "rel": "original",
+      "href": "https://last.fm/music/Tame+Impala/+wiki"
+     }
+    },
+    "published": "07 Sep 2008, 09:57",
+    "summary": "Tame Impala is the music project of Australian singer and multi-instrumentalist Kevin Parker. In the recording studio, Parker writes, records, performs, and produces the project's music. As a touring act, Tame Impala consists of Parker (vocals, guitar, synthesiser), Dominic Simper (guitar, synthesiser), Jay Watson (synthesiser, vocals, guitar), Cam Avery (bass guitar, vocals, synthesiser), Julien Barbagallo (drums, vocals), and James Ireland (guitar, synthesiser). <a href=\"https://www.last.fm/music/Tame+Impala\">Read more on Last.fm</a>",
+    "content": "Tame Impala is the music project of Australian singer and multi-instrumentalist Kevin Parker. In the recording studio, Parker writes, records, performs, and produces the project's music. As a touring act, Tame Impala consists of Parker (vocals, guitar, synthesiser), Dominic Simper (guitar, synthesiser), Jay Watson (synthesiser, vocals, guitar), Cam Avery (bass guitar, vocals, synthesiser), Julien Barbagallo (drums, vocals), and James Ireland (guitar, synthesiser). The project has a close affiliation with Australian psychedelic rock band Pond, sharing members and collaborators, including Watson, Ireland, and former member Nick Allbrook. Originally signed to Modular Recordings, Tame Impala signed with Interscope Records in the United States and Fiction Records in the United Kingdom in 2015.\n\nParker originally conceived Tame Impala in Perth in 2007. After releasing several singles and EPs, the project's debut studio album, \"Innerspeaker\", was released in 2010. The album was certified gold in Australia and received positive reviews from critics. Parker's follow-up album, \"Lonerism\", was released in 2012 and was certified platinum in Australia. It received a Grammy Award nomination for Best Alternative Music Album. Tame Impala's third album, \"Currents\", was released in July 2015 and won ARIA Awards for Best Rock Album and Album of the Year. Parker received the APRA Award for Song of the Year in 2016 for the album's opening track, \"Let It Happen\". The fourth studio album, \"The Slow Rush\", was released on 14 February 2020 and received positive reviews from music critics. At the 2020 ARIA Music Awards, Tame Impala won five awards. The project's fifth album, \"Deadbeat\", was released in 2025 and received mixed reviews. It included the commercially successful single \"Dracula\", whose remix featuring Jennie became Tame Impala's first top-ten hit on the US Billboard Hot 100.\n\nThe origins of Tame Impala can be traced to the Perth music scene. Parker had previously played in several bands, including the rock duo Dee Dee Dums with Luke Epstein. Tame Impala emerged in 2007 as a home-recording project created by Parker, who uploaded several tracks to Myspace. The recordings attracted interest from record labels, and Parker signed a worldwide deal with independent label Modular Recordings in July 2008. To perform the music live, Parker recruited Dominic Simper and Jay Watson, and the group began performing at local venues. Parker chose the name Tame Impala to reflect the project's musical themes, describing it as representing a balance between uncontrolled creativity and refined artistry.\n\nTame Impala's self-titled EP was released in September 2008 following the signing with Modular Recordings. It reached number one on the Australian Independent Record Labels (AIR) Chart and number ten on the ARIA Physical Singles Chart. The songs \"Desire Be, Desire Go\", \"Half Full Glass of Wine\", and \"Skeleton Tiger\" received national radio airplay on Triple J.\n\nDuring 2008, Tame Impala toured as a support act for You Am I, The Black Keys, Yeasayer, and MGMT, and performed at festivals including Southbound Festival, Meredith Music Festival, and Falls Festival. In 2009, the group completed a national \"Skeleton Tiger\" headline tour, a UK tour, and appearances at V Festival. Tame Impala appeared on Triple J's Hottest 100 list for the first time in 2008, with \"Half Full Glass of Wine\" ranking at number 75. The song was also included on the associated compilation album.\n\nTame Impala's debut single, \"Sundown Syndrome\", was recorded at Toerag Studios in London in March 2009 with recording engineer Liam Watson. It premiered on Triple J in May 2009 and was released in July 2009 as a vinyl and digital single, including a cover of \"Remember Me\" by DJ Blue Boy. The project headlined the first Rottofest festival in August 2009 and later completed a national tour supporting the single. \"Remember Me\" ranked at number 78 in Triple J's Hottest 100 for 2009.\n\n\"Sundown Syndrome\" was included on the soundtrack of the film \"The Kids Are All Right\", while \"Half Full Glass of Wine\" was used in the television series \"Entourage\". In early 2010, Tame Impala performed at the Australian and New Zealand Big Day Out festival alongside acts including Muse, The Mars Volta, Kasabian, and Rise Against.\n\nTame Impala's debut studio album, \"Innerspeaker\", was released on 21 May 2010. The album was released in the United States on 8 June 2010 and received positive reviews from critics, with Pitchfork selecting it as \"Best New Music\". The band toured throughout 2010, beginning with support slots for MGMT's US tour, followed by appearances at Splendour in the Grass, Reading Festival, and headline tours in Australia, Europe, and North America. \"Innerspeaker\" received four ARIA Music Awards nominations, including Album of the Year and Best Rock Album. On 29 November 2010, it won the J Award for Australian Album of the Year.\n\nTame Impala's second studio album, \"Lonerism\", was released in 2012 and was mixed by Dave Fridmann. Parker wrote and recorded most of the album himself, primarily at his home in Perth, with additional recording completed in France. The album incorporated a broader sonic palette, more personal songwriting, and a stronger narrative focus compared with \"Innerspeaker\". During this period, Parker also produced and performed on Melody's Echo Chamber's self-titled album.\n\nThe first single from \"Lonerism\", \"Elephant\", was released in July 2012, followed by \"Feels Like We Only Go Backwards\". The album was released in October 2012 in Australia, the United Kingdom, and the United States. It received widespread critical recognition and was named Album of the Year by several publications and polls, including Rolling Stone and NME. The songs \"Elephant\" and \"Feels Like We Only Go Backwards\" ranked at numbers seven and nine respectively in Triple J's Hottest 100 for 2012. \"Lonerism\" won the 2012 J Award for Australian Album of the Year and received a Grammy Award nomination for Best Alternative Music Album in 2014.\n\nThe band toured internationally in support of \"Lonerism\" during 2012 and 2013, including performances at festivals such as Coachella and appearances on \"Late Night with Jimmy Fallon\". During this period, Watson moved from drums to keyboards, while Julien Barbagallo joined as drummer. In May 2013, Nick Allbrook announced his departure from Tame Impala to focus on other musical projects, and Cam Avery joined the touring lineup.\n\nWork on Tame Impala's third studio album began in 2014. Parker recorded material at the Wave House in Western Australia, where \"Innerspeaker\" had also been recorded. The album's sound moved further towards electronic and pop influences. Parker cited Fleetwood Mac as an influence on the cleaner production style of the album.\n\nThe album, \"Currents\", was announced in January 2015 and released on 17 July 2015. The first single, \"Let It Happen\", was released in March 2015, followed by \"'Cause I'm a Man\", \"Disciples\", and \"Eventually\". \"Currents\" became Tame Impala's best-selling album, selling more than one million copies worldwide. It received critical acclaim and won ARIA Awards for Album of the Year and Best Rock Album.\n\nIn 2017, a collector's edition of \"Currents\" was released, featuring additional tracks and remixes. During 2018, Tame Impala performed at festivals including Mad Cool Festival and Citadel Festival. Parker also collaborated with artists including Travis Scott, Kanye West, Pharrell Williams, The Weeknd, Mike Dean, and Reine Fiske on the song \"Skeletons\", which appeared on Travis Scott's album \"Astroworld\". Tame Impala also collaborated with electronic musician ZHU on the single \"My Life\" and with Theophilus London under the name Theo Impala.\n\nTame Impala began work on their fourth studio album, \"The Slow Rush\", during the late 2010s. The project was announced as a headliner for the 2019 Coachella Valley Music and Arts Festival and released the singles \"Patience\" and \"Borderline\" in 2019. The album title was announced in October 2019, followed by the singles \"It Might Be Time\" and \"Posthumous Forgiveness\". \"The Slow Rush\" was released on 14 February 2020 and contained twelve tracks recorded in Los Angeles and Fremantle, Australia.\n\n\"The Less I Know the Better\" was voted number one in Triple J's Hottest 100 of the Decade countdown in March 2020. In the same year, Parker appeared on The Weeknd's album \"After Hours\", producing and providing background vocals for the song \"Repeat After Me (Interlude)\". At the 2020 ARIA Music Awards, Tame Impala won five awards, including Album of the Year, Best Rock Album, Best Group, Engineer of the Year, and Producer of the Year.\n\nIn 2021 and 2022, Tame Impala released additional material related to \"The Slow Rush\", including the deluxe edition \"The Slow Rush B-Sides and Remixes\". In 2022, the project released \"Turn Up the Sunshine\", a collaboration with Diana Ross, for the soundtrack album of the film \"Minions: The Rise of Gru\". Tame Impala also appeared on Gorillaz's song \"New Gold\".\n\nDuring 2023 and 2024, Tame Impala contributed to several collaborations and soundtracks. The project released \"Wings of Time\" for the soundtrack of the film \"Dungeons & Dragons: Honor Among Thieves\" and collaborated with Thundercat on \"No More Lies\". Tame Impala also released \"Journey to the Real World\" for the soundtrack album of the film \"Barbie\". In 2024, the project collaborated with Justice on the singles \"One Night/All Night\" and \"Neverender\" from the album \"Hyperdrama\". Parker also co-wrote and produced Dua Lipa's album \"Radical Optimism\" and joined Lipa onstage during her 2024 Glastonbury Festival performance.\n\nIn May 2024, Sony Music Publishing acquired the catalog of Tame Impala from Parker, covering previous and future works. Parker also confirmed that work had begun on the project's fifth studio album. In 2025, he continued performing live appearances, including a guest performance during Dua Lipa's \"Radical Optimism Tour\".\n\nThe fifth Tame Impala album, \"Deadbeat\", was announced in September 2025 and released on 17 October 2025. The album incorporated influences from house music and the rave scene of Western Australia and received mixed reviews from critics. The single \"Dracula\" was released in 2025, followed by a remix featuring South Korean singer Jennie in February 2026. The remix became Tame Impala's first song to reach the top ten of the US Billboard Hot 100 and the Billboard Global 200.\n\nFull Wikipedia article: https://en.wikipedia.org/wiki/Tame_Impala\n\nStudio albums\nInnerspeaker (2010)\nLonerism (2012)\nCurrents (2015)\nThe Slow Rush (2020)\nDeadbeat (2025) <a href=\"https://www.last.fm/music/Tame+Impala\">Read more on Last.fm</a>. User-contributed text is available under the Creative Commons By-SA License; additional terms may apply."
+   }
+  }
+ }
+}

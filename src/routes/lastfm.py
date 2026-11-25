@@ -1,0 +1,146 @@
+"""
+Last.fm, for the iPhone and Mac app's artist page (2.1.41, S2 - notes/lastfm.md; the design is deadwax-plans/lastfm.md
+2.5): `GET /deadwax/lastfm/artist`, a user's route (tests/test_logins.py ROUTES). The web app doesn't call it.
+
+Takes `mbid` (the artist's MusicBrainz id, MBID_PATTERN) and/or `name` (1-NAME_MAX letters) - at least one, a 422
+otherwise - and answers, always a 200:
+
+  {"enabled": true, "unavailable": false, "why": null,
+   "url": "https://www.last.fm/music/Tame+Impala", "listeners": 4724887,
+   "top_songs": [{"title": "The Less I Know the Better", "playcount": 51995043, "listeners": 2955438,
+                  "url": "https://www.last.fm/music/Tame+Impala/_/The+Less+I+Know+the+Better"}, ...]}
+
+(Tame Impala as Last.fm answered on 2026-11-25 - tests/fixtures/lastfm/recorded/.)
+
+src/lastfm.py artist_answer() says what each field is. `similar` and `top_albums` are S4's: until then they are not in
+the answer at all (never sent as nulls, which would say "couldn't be had").
+
+TWO PARTS, ASKED AT ONCE - artist.getInfo (url, listeners) and artist.getTopTracks (limit 50) - each through the keeping
+(src/lastfm_kept.py: shared by everyone, a week fresh), by MusicBrainz id first; a "not known" by id (kept 3 days) asks
+again by name with autocorrect=1, kept under the name. With no id, by name. A name that folds to nothing
+(lastfm.name_key: "!!!") is never asked by: it would share one kept row with every other such name.
+
+ANSWERED BY ARTIST_DEADLINE_S: a part not in by then is null, with `unavailable`, and goes on - its answer kept when
+it comes, so the next visit has it. The part's own ask is never cancelled by the page; deadwax's stop cancels it.
+
+NO KEY: `enabled` false and `why` saying where to add one - nothing asked. REFUSED (the client holds Last.fm's 10 or
+26): kept answers are still answered, `why` in refused words; with nothing kept `enabled` is false. `why` is for whoever
+runs deadwax (auth.Explained's rule: the app shows it only to them); a blip - Last.fm down, limiting, slow - has none,
+only `unavailable`. Nothing here raises past the route: whatever goes wrong is a part that couldn't be had.
+"""
+
+import asyncio
+
+from fastapi import APIRouter, HTTPException, Query, Request
+
+from src.api.lastfm_endpoint import lastfm
+from src.config import Config
+from src.lastfm import (Answer, NotKnown, Outcome, Refused, Unreachable, artist_answer, artist_info, name_key,
+                        no_key_answer, top_tracks)
+from src.lastfm_kept import artist_key, kept
+from src.logger import logger
+from src.routes.search_musicbrainz import MBID_PATTERN
+
+router = APIRouter()
+
+NAME_MAX = 200
+#? the page's answer waits this long for its parts at most
+ARTIST_DEADLINE_S = 4.0
+#? how many top tracks are asked for: the fold (lastfm.top_songs) drops repeats, so more than the 10 shown
+TOP_TRACKS_ASKED = "50"
+
+NEEDS_AN_ARTIST = "Give the artist's MusicBrainz id (mbid), their name, or both."
+
+#? each part: its method, what it asks besides the artist, and how its answer is parsed
+INFO = ("artist.getinfo", {}, artist_info)
+TRACKS = ("artist.gettoptracks", {"limit": TOP_TRACKS_ASKED}, top_tracks)
+
+#? the parts under way - held, so none is lost before it ends (asyncio keeps only weak references), and so deadwax's
+#? stop can cancel those the deadline left running
+_running: set[asyncio.Task] = set()
+
+
+def _asking(method: str, params: dict[str, str], parse):
+    """The keeping's ask: Last.fm's answer parsed to deadwax's shape - an answer that can't be read Unreachable (never
+    kept), anything else as the client said it."""
+    async def ask() -> Outcome:
+        outcome = await lastfm.ask(method, params)
+        if not isinstance(outcome, Answer):
+            return outcome
+        parsed = parse(outcome.body)
+        if parsed is None:
+            logger.info(f"Last.fm {method}: an answer deadwax couldn't read, so it isn't kept")
+            return Unreachable("an answer deadwax couldn't read")
+        return Answer(parsed)
+    return ask
+
+
+async def _part(store, part, mbid: str | None, name: str | None) -> Outcome:
+    """One part of the page: by MusicBrainz id, then - Last.fm not knowing the id - by name."""
+    method, extra, parse = part
+    if mbid:
+        outcome = await kept(store, artist_key(method, mbid=mbid), _asking(method, {"mbid": mbid, **extra}, parse))
+        if not isinstance(outcome, NotKnown):
+            return outcome
+    if not name or not name_key(name):
+        return NotKnown()
+    return await kept(store, artist_key(method, name=name),
+                      _asking(method, {"artist": name, "autocorrect": "1", **extra}, parse))
+
+
+def _started(coroutine) -> asyncio.Task:
+    task = asyncio.create_task(coroutine)
+    _running.add(task)
+    task.add_done_callback(_running.discard)
+    task.add_done_callback(_ended)
+    return task
+
+
+def _ended(task: asyncio.Task) -> None:
+    """A part that raised - it never should: the keeping and the client answer failures - said, never lost."""
+    if not task.cancelled() and task.exception() is not None:
+        logger.warning(f"Last.fm: a part of an artist page failed - a fault in deadwax: {type(task.exception()).__name__}")
+
+
+def _result(task: asyncio.Task, done: set) -> Outcome | None:
+    """What a part came to - None when the deadline passed it, Unreachable when it failed."""
+    if task not in done:
+        return None
+    if task.cancelled() or task.exception() is not None:
+        return Unreachable("a fault in deadwax")
+    return task.result()
+
+
+async def stop() -> None:
+    """deadwax is stopping: the parts still under way cancelled."""
+    tasks = list(_running)
+    for task in tasks:
+        task.cancel()
+    for task in tasks:
+        try:
+            await task
+        except (asyncio.CancelledError, Exception):
+            pass
+
+
+@router.get("/artist")
+async def lastfm_artist(
+    request: Request,
+    mbid: str | None = Query(None, pattern=MBID_PATTERN),
+    name: str | None = Query(None, min_length=1, max_length=NAME_MAX),
+):
+    """An artist's Last.fm page, listeners and top songs, for the app's artist page."""
+    name = (name or "").strip() or None
+    if not mbid and not name:
+        raise HTTPException(status_code=422, detail=NEEDS_AN_ARTIST)
+    if not Config.lastfm_key():
+        return no_key_answer()
+    store = getattr(request.app.state, "store", None)
+    info, tracks = (_started(_part(store, part, mbid, name)) for part in (INFO, TRACKS))
+    done, late = await asyncio.wait({info, tracks}, timeout=ARTIST_DEADLINE_S)
+    if late:
+        logger.info(f"Last.fm: {len(late)} part(s) of an artist page not in by {ARTIST_DEADLINE_S:g} s - answered "
+                    f"without, and kept when they come")
+    outcomes = (_result(info, done), _result(tracks, done))
+    refusal = lastfm.held() or next((part for part in outcomes if isinstance(part, Refused)), None)
+    return artist_answer(*outcomes, refusal)
