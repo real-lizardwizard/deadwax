@@ -52,10 +52,16 @@ the shape deadwax keeps (src/lastfm_kept.py) - never Last.fm's own answer:
 AN ALBUM'S WORDS (2.1.42, S3 - the descriptions, src/routes/describe.py): album_info(), album.getInfo as {url, wiki:
 {summary, content}}, cut as a bio is. descriptions.from_lastfm() reads it, and getInfo's bio, as a description.
 
+A RADIO (2.1.44, S5 - GET /deadwax/lastfm/radio, src/routes/lastfm.py): similar_tracks(), track.getSimilar as {tracks},
+each {title, artist}; radio_order(), the radio itself from the scope's songs, those tracks and the similar artists -
+every song once, never the seed, no cover by another artist, widened only when there are fewer than RADIO_ENOUGH, at
+most RADIO_PER_ARTIST by one artist, spread, the same all day; radio_answer(), the route's answer.
+
 Every number Last.fm gives is read loosely (count(): its JSON gives most as strings), and every address passed on is
 an https one on last.fm (lastfm_url(), descriptions.py's rule too).
 """
 
+import hashlib
 import json
 import math
 import re
@@ -725,4 +731,200 @@ def artist_answer(info: Outcome | None, tracks: Outcome | None, similar: Outcome
         "top_songs": _kept_songs(got_tracks.get("top_songs")) if found[1] is not None else None,
         "similar": similar_of(got_similar, mbid, name) if found[2] is not None else None,
         "top_albums": _kept_albums(got_albums.get("top_albums")) if found[3] is not None else None,
+    }
+
+
+# ----- radio (2.1.44, S5 - GET /deadwax/lastfm/radio) ----------------------------------------------------------------
+
+#? how many similar tracks are asked of track.getSimilar (limit=100, as record.py asks) and kept at most. Changing it
+#? changes what is kept: bump LASTFM_SHAPE
+SIMILAR_TRACKS_MAX = 100
+#? a radio's songs at most - the whole answer, which the app holds as its station's one answer and adds 10 at a time
+RADIO_SONGS = 100
+#? fewer than this many from the similar tracks, and the similar artists' songs widen the radio
+RADIO_ENOUGH = 25
+#? each similar artist adds at most this many songs as it widens
+RADIO_WIDEN_EACH = 2
+#? no artist has more than this many songs in one radio
+RADIO_PER_ARTIST = 4
+
+
+def _track_artist(value: Any) -> str:
+    """A similar track's artist: track.getSimilar gives an object ({name, mbid, url}); a string, or XML's `#text`,
+    read too."""
+    if isinstance(value, dict):
+        return _name(value.get("name") if value.get("name") is not None else value.get("#text"))
+    return _name(value)
+
+
+def similar_tracks(body: Any) -> dict | None:
+    """
+    track.getSimilar's answer as deadwax keeps it: {tracks} - Last.fm's list in its order (by match, as it answers),
+    each {title, artist} as Last.fm wrote them, ends trimmed, whole(); one with no title or no artist dropped; the
+    first SIMILAR_TRACKS_MAX, then as many as fit LIST_ROW_BYTES. Nothing else: no ids (deadwax writes no recording
+    id, decision 7), plays or images - radio_order() meets the library by the names alone. None for an answer with no
+    `similartracks` in it (Unreachable: never kept).
+    """
+    top = _object(body).get("similartracks")
+    if not isinstance(top, dict):
+        return None
+    named = ((_name(track.get("name")), _track_artist(track.get("artist"))) for track in _listed(top, "track"))
+    tracks = [{"title": title, "artist": artist} for title, artist in named if title and artist]
+    return _fitted({"tracks": tracks[:SIMILAR_TRACKS_MAX]}, "tracks")
+
+
+def kept_tracks(value: Any) -> list[dict]:
+    """A kept similar tracks row's list, read as carefully as anything read back: titled, credited, whole."""
+    if not isinstance(value, list):
+        return []
+    return [{"title": title, "artist": artist} for track in value
+            if isinstance(track, dict) and isinstance(track.get("title"), str) and isinstance(track.get("artist"), str)
+            and (title := _name(track["title"])) and (artist := _name(track["artist"]))][:SIMILAR_TRACKS_MAX]
+
+
+def radio_title(title: str | None) -> str:
+    """The title a radio asks track.getSimilar by: as match_key reads it - a feature and a dash take dropped
+    (strip_title), and a take's aside ("(Live)", "(2011 Remaster)") - so the pressings that key alike, and share one
+    kept row, are all asked by the same words."""
+    return " ".join(SAME_SONG_ASIDE.sub(" ", strip_title(title)).split())
+
+
+def song_key(title: Any, artist: Any) -> tuple[str, str] | None:
+    """What a radio meets a song by: (the first credit's name_key, the title's match_key) - the artist always part of
+    it, so another band's cover of a title is never the song. None when either folds to nothing ("!!!", "???"), which
+    no Last.fm name can be met by."""
+    if not isinstance(title, str) or not isinstance(artist, str):
+        return None
+    key = (name_key(first_credit(artist)), match_key(title))
+    return key if key[0] and key[1] else None
+
+
+def _spread(picked: list, artist_of) -> list:
+    """`picked` in its order, but each next one by another artist than the one just placed whenever one is left to
+    take (the first such) - else the first left. Greedy: two of one artist side by side only when every song left is
+    theirs, which a better arrangement could sometimes have avoided ([A, B, B] stays A B B)."""
+    left = list(picked)
+    placed: list = []
+    while left:
+        last = artist_of(placed[-1]) if placed else None
+        at = next((n for n, entry in enumerate(left) if artist_of(entry) != last), 0)
+        placed.append(left.pop(at))
+    return placed
+
+
+def _seeded(seed: str, song_id: str) -> bytes:
+    """A song's place in a seeded shuffle: the SHA-256 of the seed and its id - the same for the same seed, always."""
+    return hashlib.sha256(f"{seed}|{song_id}".encode("utf-8", "surrogatepass")).digest()
+
+
+def radio_order(songs: list[dict], tracks: list[dict], similar: list[str], seed_id: str, seed_title: str,
+                seed_artist: str, user: str, day: str) -> list[dict]:
+    """
+    A radio from a song (the design's 2.6): the scope's `songs` (in Navidrome's order, SHUFFLE_FIELDS each), Last.fm's
+    similar `tracks` ({title, artist}, its order) and similar artists' names (its order), the seed - its id and its
+    words - and who asks on which UTC `day`. Pure: the same in, the same out.
+
+      1. The scope's songs indexed by song_key(); the first in Navidrome's order wins a key, so a song on its album
+         and on a compilation (or remastered beside it) is one song. A song with no key isn't indexed.
+      2. Taken from the start: the seed's id, its words' key, and the key of the song with the seed's id - so no
+         pressing of the seed is ever in it.
+      3. Each similar track, in Last.fm's order: the song with its key, if that key isn't taken.
+      4. Fewer than RADIO_ENOUGH, and each similar artist in turn - once, however often their key is listed - adds
+         up to RADIO_WIDEN_EACH of their songs not taken, in a shuffle seeded by SHA-256 of user|seed id|day|artist
+         key - the same all day - until there are RADIO_ENOUGH.
+      5. No artist past RADIO_PER_ARTIST: applied as songs are taken, so step 4's count is of songs the answer holds.
+      6. Spread: each next song is by another artist than the one just placed whenever one is left to take (the
+         first such, in the order so far), else the first left. Greedy, so it can end with one artist's songs side by
+         side where a better arrangement could have parted them ([A, B, B] stays A B B).
+      7. The first RADIO_SONGS.
+    """
+    seed_key = song_key(seed_title, seed_artist)
+    taken_keys: set[tuple[str, str]] = {seed_key} if seed_key else set()
+    taken_ids: set[str] = {seed_id}
+    by_key: dict[tuple[str, str], dict] = {}
+    by_artist: dict[str, list[tuple[tuple[str, str], dict]]] = {}
+    for song in songs:
+        if not isinstance(song, dict) or not isinstance(song.get("id"), str):
+            continue
+        key = song_key(song.get("title"), song.get("artist"))
+        if key is None:
+            continue
+        if song["id"] == seed_id:
+            taken_keys.add(key)
+        if key not in by_key:
+            by_key[key] = song
+            by_artist.setdefault(key[0], []).append((key, song))
+
+    picked: list[tuple[tuple[str, str], dict]] = []
+    per_artist: dict[str, int] = {}
+
+    def take(key: tuple[str, str], song: dict) -> bool:
+        if key in taken_keys or song["id"] in taken_ids or per_artist.get(key[0], 0) >= RADIO_PER_ARTIST:
+            return False
+        taken_keys.add(key)
+        taken_ids.add(song["id"])
+        per_artist[key[0]] = per_artist.get(key[0], 0) + 1
+        picked.append((key, song))
+        return True
+
+    for track in tracks:
+        key = song_key(track.get("title"), track.get("artist")) if isinstance(track, dict) else None
+        if key is not None and key in by_key:
+            take(key, by_key[key])
+    widened: set[str] = set()
+    for name in similar:
+        if len(picked) >= RADIO_ENOUGH:
+            break
+        artist = name_key(first_credit(name)) if isinstance(name, str) else ""
+        #? each artist once: one listed again (or two names that fold alike) would widen by them again, and sort all
+        #? their songs again - 30 times over for an artist listed 30 times
+        if not artist or artist in widened:
+            continue
+        widened.add(artist)
+        seed = f"{user}|{seed_id}|{day}|{artist}"
+        added = 0
+        for key, song in sorted(by_artist.get(artist, ()), key=lambda entry: _seeded(seed, entry[1]["id"])):
+            if added >= RADIO_WIDEN_EACH or len(picked) >= RADIO_ENOUGH:
+                break
+            if take(key, song):
+                added += 1
+    return [song for _, song in _spread(picked, lambda entry: entry[0][0])][:RADIO_SONGS]
+
+
+def too_big_why(most: int) -> str:
+    """The radio's `why` when the scope has more songs than the Library's Shuffle reads (routes/navidrome.py
+    SHUFFLE_MAX)."""
+    return f"Your library is too big to match radio songs against (over {most:,} songs)."
+
+
+def no_key_radio() -> dict:
+    """The radio's answer with no LASTFM_API_KEY: nothing asked - neither Last.fm nor Navidrome."""
+    return {"enabled": False, "unavailable": False, "why": NO_KEY_WHY, "songs": None}
+
+
+def radio_answer(tracks: Outcome | None, similar: Outcome | None, songs: list[dict] | None, refusal: Refused | None,
+                 trouble: str | None = None) -> dict:
+    """
+    GET /deadwax/lastfm/radio's answer from what its two Last.fm parts came to (None for one the deadline passed),
+    the radio's songs (None when they couldn't be made: the similar tracks not had, or the scope's songs not had),
+    the refusal the client holds, and deadwax's own words for anything else whoever runs it must fix (`trouble`):
+
+      - `songs`: the radio in order - [] only for a definite nothing (every part had, and nothing of the scope's
+        similar); None when it couldn't be made, or when it came to nothing while a part couldn't be had (the
+        similar artists failing or late might have widened it) - the app asks again then;
+      - `unavailable`: something couldn't be had just now - a Last.fm part failed or was late, or the scope's songs;
+      - `enabled`: false while Last.fm refuses the key and nothing is kept, with `why` saying so;
+      - `why`: the refusal's words, else `trouble`, else None - a blip has none.
+    """
+    parts = (tracks, similar)
+    had = any(isinstance(part, (Answer, NotKnown)) for part in parts)
+    whole_had = all(isinstance(part, (Answer, NotKnown)) for part in parts)
+    if not songs and not whole_had:
+        #? nothing, with a part not had: no definite nothing - as a part not had is None, never an empty list
+        songs = None
+    return {
+        "enabled": had or refusal is None,
+        "unavailable": songs is None or not whole_had,
+        "why": refused_why(refusal) if refusal is not None else trouble,
+        "songs": songs,
     }

@@ -982,6 +982,25 @@ async def _shuffle_songs(request: Request, user: str, scope: str) -> tuple[str, 
         return ids
 
 
+def shuffle_scope(user: str, scope: str) -> str:
+    """The scope a shuffle of `scope` reads for `user`: `yours` is the asker's library with logins on - with logins off,
+    or for the break-glass admin (who has no library), the store, which is the library then."""
+    return scope if scope == "store" or (Config.logins_on() and library_ledger.has_library(user)) else "store"
+
+
+async def songs_of(request: Request, user: str, scope: str) -> list[dict]:
+    """
+    (2.1.44) Every song of `scope` as the asker sees them - the Library's Shuffle's own list (_shuffle_songs, its
+    SHUFFLE_LIST_TTL_S keep and its scope rule, shuffle_scope), each song in SHUFFLE_FIELDS, in Navidrome's order:
+    what Last.fm's radio (src/routes/lastfm.py) is matched against. Raises what _shuffle_songs raises - a
+    NavidromeError (SignedOut among them), or SHUFFLE_TOO_BIG's 413.
+    """
+    ids = await _shuffle_songs(request, user, shuffle_scope(user, scope))
+    #? the songs read from the table at once, nothing awaited between: a sweep keeps only what a list or order names,
+    #? and a list reused from a while ago may be past its time by the next await
+    return [_shuffle_songs_by_id[song_id] for song_id in ids if song_id in _shuffle_songs_by_id]
+
+
 def _keep_orders(user: str, claimed: bool, kept: int, scope: str | None = None) -> None:
     """The user's orders of one kind (and of one `scope`, if named), the most recently asked-for `kept` of them kept,
     the oldest going first."""
@@ -1032,9 +1051,8 @@ async def shuffle(
     order playing is paged (2.0.0-player.57's review: it went, and its second page was a 404). `claim`: the order
     made now is to play at once (the feed's fresh order), so claimed as it is made.
     """
-    asked = scope if scope == "store" or (Config.logins_on() and library_ledger.has_library(user)) else "store"
     try:
-        songs = await _shuffle_songs(request, user, asked)
+        songs = await _shuffle_songs(request, user, shuffle_scope(user, scope))
     except NavidromeError as e:
         raise _fail(e)
     order = list(songs)

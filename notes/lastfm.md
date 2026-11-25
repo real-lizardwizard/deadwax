@@ -880,3 +880,230 @@ The review's 14, the same way (661 tests), each restored afterwards, all caught:
   - a getTopAlbums answer with listeners and no playcount (the API page's sample; no recording has one);
   - getSimilar and getTopAlbums for an unknown artist (their error 6 is shaped from getTopTracks', recorded);
   - the Swift port against the new vectors (not run: the ios branch wasn't checked out).
+
+## S5 - radio: `GET /deadwax/lastfm/radio` (2.1.44)
+
+The design's 2.6, for the app's Start Radio and Autoplay (slice A3 draws them; its 3.5). From a song, the songs of
+the asker's scope that Last.fm calls similar, in the order the app plays them - the whole list in one answer, so the
+app holds it before the tap and adds ten at a time with nothing asked while it plays. Nothing on the web changes. No
+setting or table is new; the route is a user's (tests/test_logins.py ROUTES).
+
+### The answer
+
+    GET /deadwax/lastfm/radio?song_id=so-seed&title=Let It Happen&artist=Tame Impala&scope=yours
+
+    {"enabled": true, "unavailable": false, "why": null,
+     "songs": [{"id": "so-np", "title": "New Person, Same Old Mistakes", "artist": "Tame Impala", "album": "Currents",
+                "albumId": "al-Currents", "coverArt": "al-Currents", "duration": 240, "contentType": "audio/flac",
+                "suffix": "flac", "samplingRate": 44100, "bitDepth": 16, "channelCount": 2, "track": 13,
+                "discNumber": 1}, ...]}
+
+- **The query, all declared** (pydantic drops the rest): `song_id` (1-ID_MAX), `title` and `artist` (1-`WORDS_MAX`
+  = 500, whole(), and blank after trimming is a 422 "Give the song's id, its title and its artist."), `scope`
+  (`yours` | `store`, as the Shuffle's).
+- **Each song as the Library's Shuffle answers one**: routes/navidrome.py's SHUFFLE_FIELDS, Navidrome's own words, so
+  Core's `Song` decodes it and the app plays it through the paths a shuffle's songs take. At most `RADIO_SONGS` = 100.
+- **`songs`**: `[]` only for a definite nothing - both Last.fm parts had (an answer or a "not known" each) and
+  nothing of the scope's similar (Last.fm doesn't know the song or the artist, or nothing it names is there).
+  `null`, with `unavailable`, when the radio couldn't be made - the similar tracks not had (Last.fm down, limiting,
+  late, refusing with nothing kept, an answer deadwax can't read) or the scope's songs not had - **or when it came to
+  nothing while a part couldn't be had** (the review's: Last.fm not knowing the song while the similar artists, which
+  would have widened it, failed or were late, was `[]` with `unavailable` - which the app would have read as the
+  final "No similar songs" and never asked again). As top_songs is None when it couldn't be had, never []. The app
+  asks again on null.
+- **`unavailable`** also when the songs are there but the similar artists weren't (failed or late): the radio is
+  Last.fm's similar tracks alone, not widened.
+- **`why`**, for whoever runs deadwax (auth.Explained's rule): the refusal's words; else Navidrome's failure in
+  deadwax's words (`NOT_CONFIGURED`, `SUBSONIC_ERRORS`...); else, past SHUFFLE_MAX, "Your library is too big to match
+  radio songs against (over 200,000 songs)."; a blip (Last.fm or Navidrome not answering at all) has none.
+- **`enabled`** false while Last.fm refuses the key with nothing kept, and with no key (`no_key_radio()`, NO_KEY_WHY,
+  `songs` null): **with no key nothing is asked of Last.fm or of Navidrome**.
+- A session Navidrome ended (SignedOut) is a 401, as everywhere; nothing else gets to a 500.
+
+### What is asked
+
+Three things at once:
+
+- **track.getSimilar**(`artist`, `track`, `limit=100`, `autocorrect=1`) - record.py's parameters exactly (the
+  recording is tame-impala.let-it-happen.similar). `artist` is the seed's first credit (`first_credit`), `track` its
+  title as the key reads it (`radio_title()`: strip_title, then SAME_SONG_ASIDE - "Let It Happen - 2015 Remaster",
+  "(Live)", a feature all ask as "Let It Happen"), so the pressings that key alike share one kept row and one ask.
+  Names that fold to nothing ("!!!") are never asked by. Kept under `lastfm_kept.track_key()`.
+- **artist.getSimilar** by the first credit's name - `artist_part(store, SIMILAR, None, name)`, the artist page's own
+  by-name row, so a radio after the artist page (by name) asks it nothing more. A credit past NAME_MAX (200) isn't
+  asked: its key wouldn't leave the row room.
+- **The scope's songs, as the asker**: `songs_of(request, user, scope)` beside `_shuffle_songs` in routes/navidrome.py
+  - the Shuffle's own list, its 10-minute keep (SHUFFLE_LIST_TTL_S) and its scope rule (`shuffle_scope()`, now one
+  function both call: `yours` is the asker's starred albums with logins on, the store with logins off or for the
+  break-glass admin). The songs are read out of `_shuffle_songs_by_id` in the same step the ids come back, nothing
+  awaited between, so a sweep can't drop one. It raises what the Shuffle raises: a NavidromeError, SignedOut among
+  them, or SHUFFLE_TOO_BIG's 413 - the route turns each into an answer.
+
+The Last.fm parts are waited for `RADIO_DEADLINE_S` = 4 s from the start, as the artist page's; a part not in by
+then is left out and goes on, kept when it comes (`started()`). The scope's songs are waited for, as the Shuffle
+waits for them.
+
+### `radio_order()`, pure
+
+`radio_order(songs, tracks, similar, seed_id, seed_title, seed_artist, user, day)`:
+
+1. **Index** the scope's songs by `song_key(title, artist)` = (`name_key(first_credit(artist))`, `match_key(title)`);
+   the first in Navidrome's order (rowid) wins a key, so a song on its album and on a compilation, or remastered on a
+   deluxe, is one song. A song with no key (either folds to nothing) or no id isn't indexed. Each kept song also
+   indexed under its artist key.
+2. **Taken** from the start: the seed's id, its words' key, and the key of the scope's song with the seed's id (so a
+   queue whose words differ from the library's, or a live take as the seed, still keeps every pressing out).
+3. **Similar tracks**, in Last.fm's order (match descending, as answered): the song with the track's key, if its key
+   isn't taken. The artist is always part of the key, so another band's cover of the title is never the song.
+   Last.fm's "Gorillaz, Tame Impala, Bootie Brown" credit isn't split at the comma (first_credit never does), so it
+   meets nothing.
+4. **Widen** while fewer than `RADIO_ENOUGH` = 25: each similar artist in Last.fm's order adds up to
+   `RADIO_WIDEN_EACH` = 2 of their songs not taken, in a shuffle seeded by SHA-256 of
+   `user|seed id|UTC day|artist key` (`_seeded`), until there are 25. The same all day; another the next day, or for
+   another person. **Each artist key once** (the review's): one listed again, or two names that fold alike, would have
+   widened by them again and sorted all their songs again - an artist listed 30 times sorted 30 times, 8 s in the
+   contrived worst case. Last.fm's lists don't repeat a name, so no real order changes
+   (`test_a_similar_artist_listed_again_changes_nothing`).
+5. **Cap**: no artist past `RADIO_PER_ARTIST` = 4, applied as songs are taken - so an artist the tracks gave three
+   widens by one.
+6. **Spread**: each next song is by another artist than the one just placed whenever one is left to take (the first
+   such, in the order so far), else the first left. Last.fm's order otherwise kept. **Greedy, and promising no more
+   than that** (the review's): two by one artist end up side by side only when every song left is theirs, but a
+   better arrangement could sometimes have parted them - [A, B, B] stays A B B, where B A B would do - and the
+   recorded radio ends GUM, GUM. Not changed: the README and the app's fixture names now say what it does.
+7. The first 100.
+
+The day is the route's `today()`, **UTC's day** from `clock` (the tests' to replace), on purpose: one day for
+everyone, whatever the server's TZ. For James, in New York, the radio's widening turns over at 19:00 (20:00 in
+summer), not at midnight. `test_the_same_radio_all_day_and_another_the_next` runs with TZ=America/New_York (the
+`new_york` fixture, tzset and put back), so a `today()` read in local time fails it - CI runs in UTC, where it
+wouldn't (the review's).
+
+**Off the event loop** (the review's): `radio_order()` keys every song of the scope on each ask - 0.54 s at 50,000
+songs, 2.3 s at SHUFFLE_MAX (200,000), measured in review - so the route runs it through `asyncio.to_thread`, as
+download.py runs rank_candidates; synchronous, it stalled every other route meanwhile, streaming included. It is pure
+and the songs it reads are never changed in place (a list built again puts new dicts in the table, never edits one),
+so the thread is safe. `test_the_radio_is_made_off_the_event_loop` holds it.
+
+Over the recording and tests/test_lastfm.py's SHAPED library (34 songs - covers, second pressings, the seed's live
+take, Gorillaz' "New Gold"), Let It Happen gives 25: 20 of Last.fm's 100 similar tracks, widened by Pond (two of its
+three left), Melody's Echo Chamber (its one left) and GUM (two), GUM's two side by side at the end because nothing
+else is left. A song Last.fm doesn't know (SHAPED: error 6) gives 16, two each of Tame Impala's similar artists.
+
+### Kept
+
+- **track.getSimilar's rows**: `{tracks: [{title, artist}]}`, Last.fm's order, ends trimmed and whole(); no title or
+  no artist dropped; the first `SIMILAR_TRACKS_MAX` = 100, then as many as fit LIST_ROW_BYTES (`_fitted`). Nothing
+  else - no ids, plays or images: the library is met by the names alone. Read back by `kept_tracks()` as carefully.
+  Kept by the keeping's standing, as every row is: an answer fresh for 7 days and answered up to 30 (asked again
+  behind), a "not known" for 3.
+- **The key**: `track_key(method, artist, title)` = `2|track.getsimilar|name|{name_key(artist)}|{match_key(title)}`
+  - the folded names, so what keys alike shares a row - and past `TRACK_KEY_MOST` = 1024 bytes,
+  `2|track.getsimilar|digest|{sha256}` of the same: a title and an artist of 500 letters each can fold to as much as
+  33 bytes a letter (U+FDFA), which would leave no room for the row under ROW_MAX_BYTES. The existing track_key test
+  ("2|track.getsimilar|name|tame impala|let it happen") holds.
+- **LASTFM_SHAPE not bumped**: no track.getsimilar row was kept before 2.1.44, at any shape, so none can be read
+  wrongly; putting it in shape 2's KEPT_SHAPES digest would ask for a bump that empties every row 2.1.43 kept for
+  nothing. Pinned beside it instead, as S3 did with albums: tests/test_lastfm.py `KEPT_TRACK_SHAPES = {2: ...}`. A
+  later bump adds an entry to each.
+
+### The app's fixtures
+
+tests/fixtures/lastfm/answers.py writes **radio.json** beside artist.json (artist.json unchanged): ten cases,
+`RADIO_CASES` - the recorded radio (25), a song Last.fm doesn't know (16), an unknown artist ([]), the similar artists
+failing (20, unavailable), a song Last.fm doesn't know while the similar artists fail (null, unavailable - not []),
+Last.fm down (null), Navidrome down (null), the library too big (null, why), the real refusal (off, why), no key
+(off, NO_KEY_WHY). Logins off, the day fixed at 2026-11-25 (route.clock), Navidrome
+tests/test_lastfm_radio.py's `Library` over the SHAPED library - so the file is the same whenever it is made.
+`--check` compares both files. tests/test_lastfm_radio.py holds the app's copy of radio.json to the exporter, skipped
+where there is none (as on main).
+
+**What the app will need (A3)**, from reading the ios branch (`git show`, never checked out):
+- an `Endpoint(method: "GET", path: "/deadwax/lastfm/radio", query: ["song_id", "title", "artist", "scope"])` in
+  Routes.swift (test_ios_contract's ROUTE_COUNT 111 -> 112), with a timeout of its own in `Routes.timeouts`: a cold
+  scope list is read a 2,000-song page at a time, as the Shuffle's (which has none, and so the transport's standard
+  8 s), and Last.fm is waited for 4 s besides - 30 s, as `albumIndex` has;
+- a `LastfmRadio` decode: `enabled`, `unavailable` (Bools), `why` (String?), `songs` ([Song]?) - Core's `Song` reads
+  every field of SHUFFLE_FIELDS (only the id required); `null` and `[]` mean different things (try again; nothing
+  similar);
+- radio.json in FixtureFiles.swift, and LastfmDecodeTests over it (ten cases).
+
+### Tests, and the mutations they catch
+
+- tests/test_lastfm.py, 174 -> 193 (1 the review's): track.getSimilar's parse over the recording (all 100, the first
+  three pinned, Last.fm's order, the three-name Gorillaz credit) and SHAPED junk, the kept read-back, the row and key
+  always fitting (a digest past TRACK_KEY_MOST), KEPT_TRACK_SHAPES, radio_title, and radio_order() over the recording
+  and the SHAPED library (34 songs): the recorded radio pinned (25), the seed (by id, by words, as a live take,
+  outside the scope, its artist widened by), pressings, covers, widening at 24 and 25, a similar artist listed again,
+  the cap, the spread (exact cases, the property, and the [A, B, B] it leaves), the same all day, keyless songs and
+  odd fields, 100 at most, radio_answer's cases (nothing with a part not had is null), and the limit asked being the
+  recorder's.
+- tests/test_lastfm_radio.py, new, 46 (3 the review's): the route with logins off over the stand-in Last.fm and a
+  stand-in Navidrome (`Library`, search3 paged, the shared login's token checked): the answer and its fields, asked at
+  once, kept (a second radio asks nothing, the Shuffle's list reused), the artist page's similar row shared, the
+  seed's words as the key reads them, the same all day (in New York's TZ), radio_order off the event loop, a song or
+  an artist Last.fm doesn't know (SHAPED), nothing while the similar artists failed or were late (null), words that
+  fold to nothing, 500-letter names, Last.fm down / limiting / one part failing / a fault / late, Navidrome down /
+  failing / not set up / too big / a fault, a lone surrogate from Navidrome, no key, refused (with and without kept),
+  the query's 422s (14), undeclared names, and the exporter's radio.json (and the app's copy, skipped on main).
+- tests/test_lastfm_radio_logins.py, new, 5: with logins on over tests/test_navidrome_shuffle.py's Shuffler -
+  `yours` only the asker's starred albums' songs, asked as them; `store` as the asker; the break-glass admin's
+  `yours` the store; a session Navidrome ended a 401, and signed out a 401; one read of the scope between the radio
+  and a Shuffle.
+- tests/test_logins.py: the route in ROUTES as a user's, and a 401 signed out with nothing asked of Last.fm or
+  Navidrome (114 -> 115).
+- The whole suite: 5215 passed, 3 skipped (5211 before the review's fixes). pyflakes is clean.
+
+Each was put in alone (tests/test_lastfm.py, test_lastfm_radio.py, test_lastfm_radio_logins.py,
+test_lastfm_routes.py, test_logins.py and test_navidrome_shuffle.py - 447 tests - run against it), then the file
+restored byte for byte (checked by SHA-256). All 15 were caught:
+
+- **the seed in the answer**, two ways (its words' key and its id's song key not taken; nothing of it taken, not even
+  its id): `test_the_seed_is_never_in_its_radio`.
+- **two pressings of one song** (each pressing indexed, the last winning): `test_one_song_once_never_two_pressings_of_it`,
+  `test_the_recorded_radio`, the seed test and the route's lone-surrogate test.
+- **a cover by another artist matched on title alone**: `test_a_cover_by_another_artist_is_never_the_song`, the
+  recorded radio, and three route tests.
+- **widening when there were already 25**: `test_widening_only_when_there_are_fewer_than_twenty_five`, the recorded
+  radio, the route's first test and the exporter's.
+- **a fifth song by one artist**: `test_no_more_than_four_songs_by_one_artist`.
+- **two adjacent by one artist when another is left to take** (no spread):
+  `test_each_next_song_is_by_another_artist_whenever_one_is_left_to_take` (so named since the review) and the
+  recorded radio.
+- **an order that changes within the day**, two ways (the route's day read to the hour: 14 tests, the same-all-day
+  one among them; a random shuffle in the widening: 18).
+- **`yours` returning the store's songs**: `test_yours_is_only_the_askers_library_asked_as_them`.
+- **no key asking anything**, two ways (no check: the no-key tests and the exporter's; the scope read before the
+  check: 9 tests, the no-key ones among them).
+- **SHUFFLE_TOO_BIG crashing** (the 413 raised): `test_a_library_too_big_to_match_says_so_and_never_crashes` and the
+  exporter's.
+- **the seed's words asked as they are** (no radio_title) and **its whole credit asked** (no first_credit):
+  `test_the_seeds_words_are_asked_as_its_key_reads_them`, and the stand-in's teardown (a request no recording
+  holds).
+
+The review's four, the same way (449 tests), with the fifteen above run again over the fixes - all 19 caught:
+
+- **radio_order on the event loop** (no to_thread): `test_the_radio_is_made_off_the_event_loop`.
+- **a similar artist listed again widened by again** (no dedupe): `test_a_similar_artist_listed_again_changes_nothing`.
+- **[] with a part not had** (no null): both route tests of it, `test_the_radios_answer` and the exporter's.
+- **the day read in local time**: `test_the_same_radio_all_day_and_another_the_next`, now run in New York's TZ.
+
+### Verified, and not
+
+- **Verified by the tests**: everything above, over Last.fm's recorded track.getSimilar and artist.getSimilar answers
+  through httpx's MockTransport, with the request parameters exactly as recorded, and a Navidrome shaped from
+  0.64.2's source (the Shuffle's own stand-in with logins on).
+- **Not verified**:
+  - deadwax asking the real Last.fm for a radio (no call was made here, and no key was looked for);
+  - track.getSimilar for a song Last.fm doesn't know: its error 6 "Track not found" is SHAPED from the API pages'
+    track errors and the recorded artist not-known answers - Last.fm may instead answer an empty list, which the
+    route takes the same way (an Answer of [] widens just as a NotKnown does);
+  - how long a cold radio takes on James's library (the Shuffle's list read whole, as a cold Shuffle reads it);
+  - how well the songs match a real library's tags (the matching is the match vectors' - S2's);
+  - the Swift side (A3): not written here.
+- **Known, and left as they are** (the review's):
+  - the scope's list is keyed per user (`_shuffle_lists[(user, scope)]`), so one person's `yours` is never another's
+    - but that is held only by test_navidrome_shuffle.py's `test_each_users_list_is_their_own`; nothing of the
+    radio's own asks two people in turn;
+  - an album removed from your library can still feed `yours` for up to SHUFFLE_LIST_TTL_S (10 minutes), until the
+    list is built again - the Shuffle's own list's behaviour since 2.0.0-player.57, shared, not the radio's.

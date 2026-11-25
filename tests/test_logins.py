@@ -217,6 +217,9 @@ ROUTES = {
     ("GET", "/deadwax/coverart/{kind}/{mbid}"): "user",
     #? (2.1.41) Last.fm's listeners and top songs for the iPhone app's artist page - tests/test_lastfm_routes.py
     ("GET", "/deadwax/lastfm/artist"): "user",
+    #? (2.1.44) a radio from a song, for the app's Start Radio and Autoplay: songs of the asker's own scope, asked as
+    #? them - tests/test_lastfm_routes.py
+    ("GET", "/deadwax/lastfm/radio"): "user",
     #? each user's own library - their starred albums - and the admin's "held by nobody" (2.0.0-player.51,
     #? step 5 - tests/test_personal_libraries.py)
     ("GET", "/deadwax/me/library"): "user",
@@ -595,6 +598,36 @@ def test_the_lastfm_artist_route_is_refused_signed_out_and_last_fm_never_asked(o
     answer = ethan.get(path)
     assert answer.status_code == 200 and answer.json()["enabled"] is False
     assert asked == []
+
+
+def test_the_lastfm_radio_route_is_refused_signed_out_and_nothing_is_asked(on, monkeypatch):
+    """(2.1.44) GET /deadwax/lastfm/radio with logins on and a key set: a 401 without a session, before anything is
+    asked of Last.fm or Navidrome - and a signed-in person answered (here with no key, so nothing is asked for them
+    either: tests/test_lastfm_routes.py holds the rest)."""
+    from src.api.lastfm_endpoint import lastfm
+
+    asked = []
+
+    def last_fm(request: httpx.Request) -> httpx.Response:
+        asked.append(request.url.host)
+        return httpx.Response(200, json={"similartracks": {"track": []}})
+
+    monkeypatch.setattr(Config, "LASTFM_API_KEY", "5e17e1d0b5e17e1d0b5e17e1d0b5e1ab")
+    monkeypatch.setattr(lastfm, "_client", httpx.AsyncClient(transport=httpx.MockTransport(last_fm),
+                                                             follow_redirects=False))
+    path = "/deadwax/lastfm/radio?song_id=so-1&title=Let%20It%20Happen&artist=Tame%20Impala&scope=yours"
+
+    refused = on.client.get(path)
+    assert refused.status_code == 401
+    assert asked == [] and on.fake.asks() == 0
+
+    ethan = signed_in(on, "ethan")
+    calls = on.fake.asks()
+    monkeypatch.setattr(Config, "LASTFM_API_KEY", None)
+    answer = ethan.get(path)
+    assert answer.status_code == 200 and answer.json()["enabled"] is False and answer.json()["songs"] is None
+    #? nothing of Navidrome's either - neither the scope's songs nor anything else
+    assert asked == [] and on.fake.asks() == calls
 
 
 def test_the_artist_picture_relay_is_edit_albums_and_nothing_is_asked_for_anyone_else(on, monkeypatch):

@@ -216,9 +216,11 @@ src/
                    page's parse - listeners, the bio cut to fit a kept row, the top songs folded (top_songs),
                    and (2.1.43) similar artists (the artist themselves dropped) and top albums (one count, plays
                    or listeners) - addresses only https on last.fm, ids only MusicBrainz's shape - and
-                   LASTFM_SHAPE, bumped with what is kept - notes/lastfm.md.
+                   (2.1.44) the radio: similar tracks, radio_order() (match by song_key, widen, cap, spread,
+                   seeded by the day) - and LASTFM_SHAPE, bumped with what is kept - notes/lastfm.md.
   lastfm_kept.py   Last.fm's answers kept for everyone (store.py lastfm_kept): parsed, by standing (3/7/30 days),
-                   one ask per key, shielded; a kept answer beats Last.fm down; emptied with no key - notes/lastfm.md.
+                   one ask per key, shielded; a kept answer beats Last.fm down; emptied with no key; (2.1.44) a
+                   track's key its folded names, a digest past TRACK_KEY_MOST - notes/lastfm.md.
   api/             musicbrainz_endpoint.py, slskd_endpoint.py, coverart_endpoint.py (and since 2.1.24
                    ArchiveFronts, the relay's: redirects only to the Archive's hosts, a size cap, a deadline),
                    artist_images_endpoint.py (Wikidata/Commons + TheAudioDB),
@@ -267,7 +269,9 @@ src/
                    person started, kept for ever - see notes/play-history.md); lastfm
                    (/deadwax/lastfm/artist, 2.1.41: an artist's listeners and ten top songs for the app's
                    artist page, and since 2.1.43 their similar artists and top albums - four kept parts asked
-                   at once, 4 s at most - see notes/lastfm.md "S2" and "S4")
+                   at once, 4 s at most - see notes/lastfm.md "S2" and "S4"; and /deadwax/lastfm/radio, 2.1.44:
+                   songs of the asker's scope Last.fm calls similar to a song, the whole list at once, matched
+                   against the Shuffle's own list (routes/navidrome.py songs_of) - notes/lastfm.md "S5")
 interface/         the app's pages: player/ (the app, its stylesheets, manifest and icons),
                    player/lab/ (the bench), styles/theme.css and its fonts; `/` (and
                    /index.html) redirects to /player/ (307) - see "The main page retired".
@@ -422,7 +426,7 @@ section of that title in notes/: `grep -rn "### X" notes/` finds it.
 | the native iPhone app (ios/): DeadwaxKit, the audio engine, the project without Xcode, install.sh, ios.yml, the phases; the EQ's AutoEq routes on the server (2.1.7); the Cover Art Archive relay (2.1.24) | `notes/ios.md` |
 | lyrics for listeners: the route by song id, the view on Now Playing, the phone's (design and build) | `notes/app-lyrics.md` |
 | play history that lasts: every song started, per person, kept for ever - the table, the routes, Up Next's list | `notes/play-history.md` |
-| Last.fm: `LASTFM_API_KEY`, the client and its pace, refusals, the kept answers, the match keys and their vectors, the recorder and what it recorded; the artist route (listeners, top songs, similar artists, top albums) and its fold | `notes/lastfm.md` |
+| Last.fm: `LASTFM_API_KEY`, the client and its pace, refusals, the kept answers, the match keys and their vectors, the recorder and what it recorded; the artist route (listeners, top songs, similar artists, top albums) and its fold; the radio route and radio_order | `notes/lastfm.md` |
 
 **A change's write-up goes into its area's notes file** (a new file for a new area, added to the
 table above), never here. Add to this file only a rule that holds everywhere.
