@@ -159,15 +159,17 @@ struct MainTabs: View {
     }
 }
 
-/// The app's tab bar (the squared look; the web's .app-tabbar, app.css): the tabs side by side, each its symbol over its
-/// words - the one shown in the accent, the others --dw-tab-inactive - on --dw-tab-bar, full width, flush to the bottom
-/// edge (its fill runs under the home indicator), a hairline of --dw-border along its top. A tap is AppNavigation's
-/// select: another tab shown, or the tab shown back at its root and then its top.
+/// The app's tab bar (the squared look; since the redesign's slice R4 dw.css's `.dw.ph .tabbar` - notes/ios.md "The
+/// redesign, slice R4: the player bar, the mini player and the tab bar"): the tabs side by side, each its symbol (24)
+/// over its words (11) - the one shown in the accent with the lit line over it, 24 x 2 and square, on the bar's top
+/// edge; the others #8a8a9c - on #121117, full width, flush to the bottom edge (its fill runs under the home
+/// indicator), its #2c2a36 edge along the top, the tabs 6 under it. A tap is AppNavigation's select: another tab shown,
+/// or the tab shown back at its root and then its top.
 ///
 /// With something queued the play bar is its top (15 Nov, James: "merge the play bar with the bottom bar so it doesn't
-/// look like it's floating", "opaque the whole way"): MiniPlayerView, full width and square, then a hairline of
-/// --dw-border, then the tabs, all on the one opaque --dw-tab-bar down through the home indicator. The play bar's seek
-/// line is then the block's top edge, in place of the hairline. Nothing queued: the tabs alone, as before.
+/// look like it's floating", "opaque the whole way"): MiniPlayerView, full width and square on its own ground, then the
+/// tabs' edge, then the tabs, all opaque down through the home indicator. The play bar's seek line is then the block's
+/// top edge. Nothing queued: the tabs alone, as before.
 ///
 /// Lower (15 Nov, James: "there might be a little too much space below the bottom tab bar"): the bar runs to the screen's
 /// edge itself and its tabs come down into the home indicator's room, 20 points off the edge on a Face ID iPhone where
@@ -191,19 +193,17 @@ struct AppTabBar: View {
     @Environment(AppNavigation.self) private var navigation
     @Environment(PlayerModel.self) private var player
     @Environment(RequestsModel.self) private var requests
-    @Environment(\.displayScale) private var displayScale
 
-    /// --dw-tab-pad: above the tabs.
-    private static let pad: CGFloat = 4
-    /// --app-tab-side: either side of them.
-    private static let side: CGFloat = 8
+    /// .tabbar's padding-top: the tabs under its edge, side to side with no room at either end (padding 6px 0 0).
+    private static let pad = CGFloat(PhoneLook.tabBarTop)
 
     var body: some View {
         VStack(spacing: 0) {
             if player.hasQueue {
                 MiniPlayerView()
-                hairline
             }
+            // .tabbar's border-top - under the lit line, which is drawn after it
+            DWRule(colour: DWPalette.tabBarEdge)
             HStack(spacing: 0) {
                 ForEach(AppTab.allCases, id: \.self) { (tab: AppTab) in
                     AppTabButton(tab: tab, shown: navigation.tab == tab, badge: badge(tab), spoken: spoken(tab)) {
@@ -212,7 +212,6 @@ struct AppTabBar: View {
                 }
             }
             .padding(.top, Self.pad)
-            .padding(.horizontal, Self.side)
             .accessibilityElement(children: .contain)
             .accessibilityAddTraits(.isTabBar)
         }
@@ -225,23 +224,12 @@ struct AppTabBar: View {
         .padding(.bottom, CGFloat(TabBarFoot.below(home: home)))
         .frame(maxWidth: .infinity)
         .background {
-            Palette.tabBar
+            DWPalette.tabBarFace
                 .ignoresSafeArea(.container, edges: .bottom)
-        }
-        .overlay(alignment: .top) {
-            // with the play bar, its seek line is the top edge
-            if !player.hasQueue { hairline }
         }
         .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
         // the bar to the screen's edge, its tabs `below` off it
         .ignoresSafeArea(.container, edges: .bottom)
-    }
-
-    /// A hairline of --dw-border: along the top with nothing queued, and between the play bar and the tabs.
-    private var hairline: some View {
-        Palette.border
-            .frame(height: 1 / max(displayScale, 1))
-            .accessibilityHidden(true)
     }
 
     /// The count over a tab's symbol: Requests' "2", "99+" - none at 0, and none on the other tabs.
@@ -255,8 +243,10 @@ struct AppTabBar: View {
     }
 }
 
-/// One tab of the bar: its symbol over its words, a button the bar's height - and Requests' count over its symbol's top
-/// right corner, as the web's .app-tab-badge.
+/// One tab of the bar (`.dw.ph .tabbar > a`): its symbol over its words, a button 49 tall at least - the lit line over it
+/// while it is shown (PhoneLitLine, on the bar's top edge: .tabbar > a.on::before's top -7px) - and Requests' count over
+/// its symbol's top right corner (`.dw.ph .tabbar .count`). The symbols stay the app's own, filled, the Library's its
+/// squared stack (the build plan's section 8), not the drawings' line icons.
 private struct AppTabButton: View {
     let tab: AppTab
     let shown: Bool
@@ -266,30 +256,33 @@ private struct AppTabButton: View {
     let spoken: String
     let action: () -> Void
 
-    /// --dw-tab-item: a tab's height.
-    private static let height: CGFloat = 49
-    /// --app-tab-gap: between the symbol and the words.
-    private static let gap: CGFloat = 3
-
-    /// The symbol's box (--app-tab-icon, 24), one height for every tab's whatever its symbol, growing with the words.
-    @ScaledMetric(relativeTo: .title2) private var symbolBox: CGFloat = 26
+    /// The symbol's box (.tabbar svg's 24), one height for every tab's whatever its symbol, growing with the words.
+    @ScaledMetric(relativeTo: .title2) private var symbolBox = CGFloat(PhoneLook.tabIcon)
 
     var body: some View {
         Button(action: action) {
-            VStack(spacing: Self.gap) {
+            VStack(spacing: CGFloat(PhoneLook.tabGap)) {
                 symbol
                     .symbolVariant(.fill)
                     .font(Typeface.symbol(.title2))
                     .frame(height: symbolBox)
-                    .overlay(alignment: .top) {
-                        if !badge.isEmpty { TabBadge(count: badge) }
-                    }
                 Text(tab.title)
-                    .font(Typeface.caption2.weight(.medium))
+                    .font(Typeface.Phone.text(.tabItem).weight(.medium))
                     .lineLimit(1)
             }
-            .foregroundStyle(shown ? Palette.accent : Palette.tabInactive)
-            .frame(maxWidth: .infinity, minHeight: Self.height)
+            .foregroundStyle(shown ? DWPalette.acc : DWPalette.tabItemText)
+            .frame(maxWidth: .infinity)
+            .lookHeight(PhoneLook.tabItem)
+            .overlay(alignment: .top) {
+                // on the shown tab alone, square: on the bar's top edge, 7 over the tab's top
+                if shown {
+                    PhoneLitLine()
+                        .offset(y: -CGFloat(PhoneLook.litLineLift))
+                }
+            }
+            .overlay(alignment: .top) {
+                if !badge.isEmpty { TabBadge(count: badge) }
+            }
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
@@ -318,36 +311,21 @@ private struct AppTabButton: View {
     }
 }
 
-/// Requests' count over its symbol's top right corner (app.css .app-tab-badge): STYLE.md's purple badge laid over the
-/// bar's own colour, so it is opaque and no stroke of the symbol shows through it - --dw-badge-purple-bg over
-/// --dw-tab-bar, a --dw-hairline (1) of --dw-badge-purple-border, --dw-accent-text words in the tab's size, bold
-/// (--dw-weight-bold), a control's corners. Its left edge 2 right of the symbol's centre and its top 5 above the
-/// symbol's box: the web's 14 and -5 on its 24 icon. It grows with the words; VoiceOver reads it in the button's label,
-/// not on its own.
+/// Requests' count over its symbol's top right corner (`.dw.ph .tabbar .count`): the look's count (DWCount - purple, in
+/// the mono face, square on the phone, growing with the words) laid over the bar's own colour, so it is opaque and no
+/// stroke of the symbol shows through it. Its left edge 9 right of the tab's centre and its top 1 above the tab's
+/// (`left: 50%; margin-left: 9px; top: -1px`). VoiceOver reads it in the button's label, not on its own.
 private struct TabBadge: View {
     let count: String
 
-    /// --app-tab-badge: its height, and its narrowest.
-    @ScaledMetric(relativeTo: .caption2) private var size: CGFloat = 16
-    /// --app-tab-badge-pad: either side of the count.
-    private static let pad: CGFloat = 4
-    /// --app-tab-badge-left 14 on --app-tab-icon 24: its left edge this far right of the symbol's centre.
-    private static let right: CGFloat = 2
-    /// --app-tab-badge-top -5: its top this far above the symbol's.
-    private static let up: CGFloat = 5
+    /// dw.ph: .tabbar .count margin-left - its left edge this far right of the tab's centre.
+    private static let right: CGFloat = 9
+    /// dw.ph: .tabbar .count top - its top this far above the tab's.
+    private static let up: CGFloat = 1
 
     var body: some View {
-        Text(count)
-            .font(Typeface.caption2.weight(.bold))
-            .monospacedDigit()
-            .lineLimit(1)
-            .fixedSize()
-            .foregroundStyle(Palette.accentText)
-            .padding(.horizontal, Self.pad)
-            .frame(minWidth: size, minHeight: size)
-            .background(Palette.badgeFill, in: Corners.controlShape)
-            .background(Palette.tabBar, in: Corners.controlShape)
-            .overlay(Corners.controlShape.strokeBorder(Palette.badgeEdge, lineWidth: 1))
+        DWCount(count: count)
+            .background(DWPalette.tabBarFace, in: DWCorners.chipShape)
             .alignmentGuide(HorizontalAlignment.center) { (box: ViewDimensions) -> CGFloat in box[.leading] - Self.right }
             .alignmentGuide(VerticalAlignment.top) { (box: ViewDimensions) -> CGFloat in box[.top] + Self.up }
             .accessibilityHidden(true)

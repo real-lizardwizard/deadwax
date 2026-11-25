@@ -33,12 +33,10 @@ import Testing
     }
 
     @Test func theWindowHoldsTheSidebarAPageAndTheBar() {
-        // the bar's two sides, its gaps and ends, and the controls between them fit the smallest window
-        let bar = 2 * MacFrame.barSideNarrow + 2 * MacFrame.barGap + 2 * MacFrame.barPad + MacFrame.barMiddleMin
-        #expect(bar <= MacFrame.smallestWidth)
-        // beside the sidebar, a page wider than a phone's (430, the biggest iPhone's)
+        // (R4) the bar's keys, display and tools fitting the smallest window is test_ios_bar_look's, added up from
+        // dw.css's sizes. Beside the sidebar, a page wider than a phone's (430, the biggest iPhone's)
         #expect(MacFrame.smallestWidth - MacFrame.sidebarWidth >= 430)
-        #expect(MacFrame.smallestHeight - MacFrame.barHeight >= 480)
+        #expect(MacFrame.smallestHeight - MacLook.barHeight >= 480)
         // it opens wide enough for a panel beside the page, and never smaller than its smallest
         #expect(MacFrame.panelStyle(width: MacFrame.openingWidth) == .column)
         #expect(MacFrame.openingWidth >= MacFrame.smallestWidth && MacFrame.openingHeight >= MacFrame.smallestHeight)

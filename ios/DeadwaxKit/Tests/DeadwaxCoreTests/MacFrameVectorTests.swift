@@ -49,10 +49,8 @@ import Testing
         let sizes = fixture["sizes"]
         #expect(MacFrame.sidebarWidth == sizes["side"].num)
         #expect(MacFrame.panelWidth == sizes["panel"].num)
-        #expect(MacFrame.barHeight == sizes["bar"].num)
-        #expect(MacFrame.barCover == sizes["barCover"].num)
-        #expect(MacFrame.barSideNarrow == sizes["barSide"].num && MacFrame.barSideWide == sizes["barSideWide"].num)
-        #expect(MacFrame.barPad == sizes["barPad"].num && MacFrame.barGap == sizes["barGap"].num)
+        // (R4) the web's bar sizes (bar, barCover, barSide, barSideWide, barPad, barGap) stay in the fixture, its
+        // record; the Mac's bar is MacLook's now, held to dw.css by test_ios_bar_look
         #expect(MacFrame.tileMin == sizes["tileMin"].num)
         #expect(MacFrame.readableWidth == sizes["contentMax"].num)
     }
@@ -67,8 +65,6 @@ import Testing
             // the Mac's: the web's from DESKTOP_MIN, and below it the desktop's drawer - never a sheet (decision 3)
             let mac = MacFrame.panelStyle(width: width)
             diffs.check("\(width): the Mac's panel", mac, width < MacFrame.desktopMin ? .drawer : frame.panel)
-            diffs.check("\(width): the bar's sides", MacFrame.barSide(width: width),
-                        width < MacFrame.columnMin ? MacFrame.barSideNarrow : MacFrame.barSideWide)
         }
         for row in fixture["panels"]["modal"].list {
             let style = MacFrame.PanelStyle(rawValue: row["panel"].string!)!

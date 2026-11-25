@@ -262,21 +262,59 @@ def palette_rgb(name: str) -> tuple[int, int, int]:
     return int(found.group(1), 16), int(found.group(2), 16), int(found.group(3), 16)
 
 
+def _phone_look():
+    """test_ios_phone_look.py's reading of dw.css's phone rules, loaded when a test asks: it loads this file itself."""
+    import importlib.util
+    spec = importlib.util.spec_from_file_location("_palette_phone_look", Path(__file__).resolve().parent
+                                                  / "test_ios_phone_look.py")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
 def test_the_apps_own_bars_are_the_webs():
-    # the tab bar (.app-tabbar) and the Library's top with its switch (.app-segmented): theme.css's colours
-    assert palette_rgb("tabBar") == hex_colour(token(THEME_CSS, "dw-tab-bar"))[:3]
+    # the iPhone's Palette, still theme.css's colours where the app draws them
     assert palette_rgb("border") == hex_colour(token(THEME_CSS, "dw-border"))[:3]
-    assert palette_rgb("tabInactive") == hex_colour(token(THEME_CSS, "dw-tab-inactive"))[:3]
     assert palette_rgb("text2") == hex_colour(token(THEME_CSS, "dw-text-2"))[:3]
     assert token(THEME_CSS, "dw-well") == "rgba(0, 0, 0, 0.2)"
     palette = (APP / "DeadwaxApp.swift").read_text(encoding="utf-8")
     assert "static let well = Color.black.opacity(0.2)\n" in palette
-    # the tab bar's sizes: --dw-tab-item tall, --dw-tab-pad above, --app-tab-side either side, --app-tab-gap between
+    #? (R4, after its review) the old bars' fills and grey, read by nothing once DWPalette's tabBarFace and tabItemText
+    #? and MacPalette's playerFace drew the bars, are gone rather than kept for this test alone
+    for gone in ("tabBar", "tabInactive", "playerBar"):
+        assert not re.search(rf"\bstatic let {gone}\b", palette), gone
+    #? (the redesign, R4) the tab bar is dw.css's `.dw.ph .tabbar` now, not the web's .app-tabbar: on #121117 under its
+    #? #2c2a36 edge, the tabs 6 under it side to side with no room at either end, each 49 tall at least, its symbol's
+    #? box 24 and 3 over its words, 11 and medium, #8a8a9c - the shown one the accent. DWPalette's lines and PhoneLook's
+    #? sizes say which rule each is (test_ios_phone_look.py holds every one to it); these are the bar's own draws
+    look = _phone_look()
+    lines = look.palette_lines()
+    for name, source, value in (("tabBarFace", "dw.ph: .tabbar background", "#121117"),
+                                ("tabBarEdge", "dw.ph: .tabbar border-top", "#2c2a36"),
+                                ("tabItemText", "dw.ph: .tabbar > a color", "#8a8a9c")):
+        assert lines[name][1] == source, name
+        selector, prop = source[len("dw.ph: "):].rsplit(" ", 1)
+        assert look.css(selector, prop) == value, source
+    assert look.css(".tabbar", "padding-top") == "6px" and look.css(".tabbar", "padding-left") == "0"
+    assert look.css(".tabbar > a", "height") == "49px" and look.css(".tabbar > a", "gap") == "3px"
+    assert look.css(".tabbar svg", "width") == "24px" and look.css(".tabbar > a", "font-size") == "11px"
+    assert look.css(".tabbar > a", "font-weight") == "500" and look.css(".tabbar > a.on", "color") == "#c084fc"
     tabs = (APP / "Root" / "MainTabs.swift").read_text(encoding="utf-8")
-    assert f"private static let height: CGFloat = {px(token(THEME_CSS, 'dw-tab-item')):g}\n" in tabs
-    assert f"private static let pad: CGFloat = {px(token(THEME_CSS, 'dw-tab-pad')):g}\n" in tabs
-    assert f"private static let side: CGFloat = {px(token(APP_CSS, 'app-tab-side')):g}\n" in tabs
-    assert f"private static let gap: CGFloat = {px(token(APP_CSS, 'app-tab-gap')):g}\n" in tabs
+    bar = tabs[tabs.index("struct AppTabBar"):tabs.index("private struct AppTabButton")]
+    for drawn in ("private static let pad = CGFloat(PhoneLook.tabBarTop)\n", ".padding(.top, Self.pad)",
+                  "DWRule(colour: DWPalette.tabBarEdge)",
+                  "DWPalette.tabBarFace\n                .ignoresSafeArea(.container, edges: .bottom)"):
+        assert drawn in bar, drawn
+    assert ".padding(.horizontal" not in bar and not re.search(r"(?<![\w.])Palette\.", bar)
+    # the edge drawn before the tabs, so the lit line over the shown one is drawn over it
+    assert bar.index("DWRule(colour: DWPalette.tabBarEdge)") < bar.index("HStack(spacing: 0) {")
+    button = tabs[tabs.index("private struct AppTabButton"):tabs.index("private struct TabBadge")]
+    for drawn in ("VStack(spacing: CGFloat(PhoneLook.tabGap))",
+                  "@ScaledMetric(relativeTo: .title2) private var symbolBox = CGFloat(PhoneLook.tabIcon)",
+                  ".frame(height: symbolBox)", ".font(Typeface.Phone.text(.tabItem).weight(.medium))",
+                  ".foregroundStyle(shown ? DWPalette.acc : DWPalette.tabItemText)", ".lookHeight(PhoneLook.tabItem)"):
+        assert drawn in button, drawn
+    assert not re.search(r"(?<![\w.])Palette\.", button)
     #? (the redesign, R2) the Library's switch is gone - its pages are the strip's (PhoneStrip, test_ios_phone_look.py)
     # iOS's own bar is hidden on every tab's stack and every page pushed, so it never comes back over the app's
     routes = (APP / "Shared" / "Routes.swift").read_text(encoding="utf-8")
@@ -285,26 +323,29 @@ def test_the_apps_own_bars_are_the_webs():
 
 
 def test_the_requests_badge_is_the_webs():
-    # (Phase 6) Requests' count on the app's tab bar, as app.css's .app-tab-badge: STYLE.md's purple badge laid over the
-    # bar's own colour, the accent's words, a control's corners, the web's sizes and its place over the icon's corner
-    assert token(THEME_CSS, "dw-badge-purple-bg") == "rgba(168, 85, 247, 0.16)"
-    assert token(THEME_CSS, "dw-badge-purple-border") == "rgba(192, 132, 252, 0.4)"
-    palette = (APP / "DeadwaxApp.swift").read_text(encoding="utf-8")
-    assert "static let badgeFill = Color(red: 168 / 255, green: 85 / 255, blue: 247 / 255).opacity(0.16)\n" in palette
-    assert "static let badgeEdge = Color(red: 192 / 255, green: 132 / 255, blue: 252 / 255).opacity(0.4)\n" in palette
-    assert palette_rgb("accentText") == hex_colour(token(THEME_CSS, "dw-accent-text"))[:3]
+    # (Phase 6) Requests' count on the app's tab bar - since the redesign's R4 dw.css's `.dw.ph .tabbar .count`: the
+    # look's count (DWCount - .count's purple, its mono words, square on the phone) laid over the bar's own colour, so
+    # it is opaque, its left edge 9 right of the tab's centre and its top 1 above the tab's
+    look = _phone_look()
+    assert look.css(".count", "background") == "rgba(168, 85, 247, 0.16)"
+    assert look.css(".count", "border") == "rgba(192, 132, 252, 0.4)" and look.css(".count", "border-radius") == "0"
+    assert look.css(".tabbar .count", "position") == "absolute" and look.css(".tabbar .count", "left") == "50%"
     tabs = (APP / "Root" / "MainTabs.swift").read_text(encoding="utf-8")
     badge = tabs[tabs.index("private struct TabBadge"):]
     badge = badge[:badge.index("\n}\n")]
-    assert f"private var size: CGFloat = {px(token(APP_CSS, 'app-tab-badge')):g}\n" in badge
-    assert f"private static let pad: CGFloat = {px(token(APP_CSS, 'app-tab-badge-pad')):g}\n" in badge
-    assert f"private static let up: CGFloat = {-px(token(APP_CSS, 'app-tab-badge-top')):g}\n" in badge
-    icon, left = px(token(APP_CSS, "app-tab-icon")), px(token(APP_CSS, "app-tab-badge-left"))
-    assert f"private static let right: CGFloat = {left - icon / 2:g}\n" in badge
-    for drawn in ("Palette.accentText", "Palette.badgeFill", "Palette.tabBar", "Palette.badgeEdge",
-                  "Corners.controlShape"):
+    assert f"private static let right: CGFloat = {px(look.css('.tabbar .count', 'margin-left')):g}\n" in badge
+    assert f"private static let up: CGFloat = {-px(look.css('.tabbar .count', 'top')):g}\n" in badge
+    for drawn in ("DWCount(count: count)", ".background(DWPalette.tabBarFace, in: DWCorners.chipShape)",
+                  "box[.leading] - Self.right", "box[.top] + Self.up", ".accessibilityHidden(true)"):
         assert drawn in badge, drawn
-    # drawn on Requests' button alone, and read in its label
+    assert not re.search(r"(?<![\w.])(Palette|Corners)\.", badge)
+    count = (APP / "Look" / "DWChip.swift").read_text(encoding="utf-8")
+    count = count[count.index("struct DWCount"):]
+    for drawn in ("DWPalette.acct", "DWPalette.countFill", "DWPalette.countEdge", "DWCorners.chipShape"):
+        assert drawn in count, drawn
+    # over the tab, on Requests' button alone, and read in its label
+    button = tabs[tabs.index("private struct AppTabButton"):tabs.index("private struct TabBadge")]
+    assert ".overlay(alignment: .top) {\n                if !badge.isEmpty { TabBadge(count: badge) }" in button
     assert 'tab == .requests ? RequestWords.badgeText(requests.badgeCount) : ""' in tabs
     assert "tab == .requests ? RequestWords.badgeLabel(tab.title, requests.badgeCount) : tab.title" in tabs
     assert ".accessibilityLabel(spoken)" in tabs
@@ -363,10 +404,14 @@ def test_the_play_bar_is_the_tab_bars_top():
     assert sum(path.read_text(encoding="utf-8").count("MiniPlayerView()") for path in APP.rglob("*.swift")) == 1
     assert "Material" not in mini and "Corners.card" not in mini
     assert "forward.fill" not in mini and "backward.fill" not in mini
-    assert "private static let height: CGFloat = 60\n" in mini
-    assert "private static let button: CGFloat = 48\n" in mini
-    edge = re.search(r"private static let edge: CGFloat = (\d+)\n", mini)
-    assert edge and 12 <= int(edge.group(1)) <= 16
+    # (R4) dw.css's .mini: 60 tall, Play/Pause's target 48 with 12 past it, on the bar's own ground
+    look = _phone_look()
+    assert look.css(".mini", "height") == "60px" and look.css(".mini .key.big", "width") == "48px"
+    assert look.css(".mini", "padding-right") == "12px"
+    assert "private static let height = CGFloat(PhoneLook.mini)\n" in mini
+    assert "private static let button = CGFloat(PhoneLook.miniPlay)\n" in mini
+    assert "private static let edge = CGFloat(PhoneLook.miniTrail)\n" in mini
+    assert ".background { PhoneMiniGround() }" in mini
     assert "Button(PlayerWords.nextSong) { player.next() }" in mini
     assert "Button(PlayerWords.previousSong) { player.songBefore() }" in mini
     # after review: one drag takes the bar, never a touch that hasn't moved, so every tap is the cover's, the title's or
@@ -424,7 +469,7 @@ def test_the_bars_run_smooth_only_while_the_song_plays():
         assert view.index("TimelineView(") < view.index("player.barPosition(")
     # the seek line's timeline holds its fill alone; the scrubber's clocks are redrawn only when their words change
     fill = mini[mini.index("TimelineView("):]
-    assert fill.index("Rectangle().fill(Palette.accent)") < fill.index("}")
+    assert fill.index("Rectangle().fill(DWPalette.seekFill)") < fill.index("}")
     # (review) the scrubber's two hold its fill and its clocks alone - the track and the touch outside them - and it
     # runs only while it can be seen: Now Playing's flag, the turntable's look and the sheets over it
     order = [scrubber.index(part) for part in ("Rectangle().fill(Color.primary.opacity(0.2))", "TimelineView(",

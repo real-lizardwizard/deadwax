@@ -181,33 +181,17 @@ public enum MacFrame {
     public static let sidebarWidth: Double = 232
     /// --app-desk-panel: a side panel.
     public static let panelWidth: Double = 470
-    /// --app-desk-bar: the player bar.
-    public static let barHeight: Double = 72
-    /// --app-desk-bar-cover: the bar's cover.
-    public static let barCover: Double = 48
-    /// --app-desk-bar-side at 1024-1279, and from COLUMN_MIN: the bar's song and its tools, either side of the controls.
-    public static let barSideNarrow: Double = 240
-    public static let barSideWide: Double = 320
-    /// --app-desk-bar-pad: the bar's ends; --app-desk-bar-gap: between its three parts.
-    public static let barPad: Double = 20
-    public static let barGap: Double = 24
     /// --app-desk-tile-min: an album's cover in a grid, as small as a phone's grid draws one.
     public static let tileMin: Double = 150
     /// --app-desk-content-max: a page drawn for a phone, kept readable (the album, the artist, the album you don't have).
     public static let readableWidth: Double = 760
 
-    /// The bar's song and tools, at a window `width` wide.
-    public static func barSide(width: Double) -> Double {
-        width < columnMin ? barSideNarrow : barSideWide
-    }
-
-    /// The window's smallest: the bar's song and tools (240 each), its gaps and ends, and the 300 of controls and
-    /// scrubber between them - 868, made 880; under the bar a page 528 high, under the title bar. The sidebar (232)
+    /// The window's smallest, 880 wide (first the web's bar's two sides, its gaps and ends and its 300 of controls -
+    /// 868, made 880; since the redesign's R4 the bar's keys, display and tools fit it, as test_ios_bar_look adds them
+    /// up) and 600 high: the bar (MacLook.barHeight, 66) leaves 534 for the title bar and the page. The sidebar (232)
     /// leaves the page 648: more than a phone's page.
     public static let smallestWidth: Double = 880
     public static let smallestHeight: Double = 600
-    /// The controls and the scrubber between the bar's two sides, at the smallest.
-    public static let barMiddleMin: Double = 300
     /// The window as it first opens - a column's width, so a panel opens beside the page; macOS remembers it after.
     public static let openingWidth: Double = 1280
     public static let openingHeight: Double = 820

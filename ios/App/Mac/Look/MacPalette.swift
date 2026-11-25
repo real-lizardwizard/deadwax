@@ -46,8 +46,12 @@ enum MacPalette {
     /// (R8's review) A row's cover's edge.
     static let coverEdge = hex(0x34323c)                              // dw: .cover border
 
-    // MARK: the player's keys and display
+    // MARK: the player bar, its keys and display
 
+    /// (R4) The bar's own face, its edge along the top and the sheen just under it.
+    static let playerFace = vertical(hex(0x1d1b25), hex(0x131219))    // dw: .player background
+    static let playerEdge = hex(0x2a2833)                             // dw: .player border-top
+    static let playerSheen = rgba(255, 255, 255, 0.06)                // dw: .player box-shadow
     static let keyEdge = hex(0x4d4959)                                // dw: .key border
     static let keyFace = vertical(hex(0x423e4f), hex(0x1f1d27))       // dw: .key background
     static let keySheen = rgba(255, 255, 255, 0.16)                   // dw: .key box-shadow 1

@@ -3,15 +3,18 @@ import SwiftUI
 
 /// The play bar, on the tab bar whenever something is queued (15 Nov; notes/ios.md "The play bar on the tab bar").
 /// James: "merge the play bar with the bottom bar so it doesn't look like it's floating", "opaque the whole way", "get
-/// rid of the skip forward button". AppTabBar draws it at its top, full width and square, on the bar's own opaque
-/// fill, with a hairline under it: one block with the tabs.
+/// rid of the skip forward button". AppTabBar draws it at its top, full width and square, over the tabs' own edge: one
+/// block with the tabs. Drawn since the redesign's slice R4 as dw.css's .mini (notes/ios.md "The redesign, slice R4: the
+/// player bar, the mini player and the tab bar"): 60 tall at least (PhoneLook.mini) on its own ground (PhoneMiniGround,
+/// #1c1b22 under its top edge).
 ///
-/// - The cover, flush left, the bar's full height.
+/// - The cover, flush left, the bar's full height under its top edge, the line's rule at its right.
 /// - The title, and under it the player's failure words (a skipped song's notice included) or else the artist
-///   (PlayerWords.secondLine).
-/// - Play/Pause, busy while the song loads: a 48 pt target with room past it to the screen's edge, so a thumb finds it.
+///   (PlayerWords.secondLine), 10 short of Play/Pause (.mini's gap, the title's to tap).
+/// - Play/Pause, bare (a sharp glyph, never a round key - James, 25 Nov: "Sharp glyphs"), busy while the song loads: a
+///   48 pt target (PhoneLook.miniPlay) with 12 past it to the screen's edge (PhoneLook.miniTrail), so a thumb finds it.
 ///   There is no Next button.
-/// - Along the top edge, the seek line (SeekLine), drawn only: the bar's drag seeks with it.
+/// - Along the top edge, the seek line (SeekLine), 2 pt in the purple gradient, drawn only: the bar's drag seeks with it.
 ///
 /// One drag takes the whole bar (after its review, 15 Nov), read once as soon as the finger has moved (PlayBar.way and
 /// PlayBar.role, from where it began): across from the bar's top PlayBar.seekReach a seek, across from the title or the
@@ -26,14 +29,14 @@ struct MiniPlayerView: View {
     @Environment(PlayerModel.self) private var player
     @Environment(AppNavigation.self) private var navigation
 
-    /// The bar's height at the standard text size, and its cover's: the cover is the bar's full height.
-    private static let height: CGFloat = 60
-    /// Play/Pause's target, and the room past it to the screen's edge.
-    private static let button: CGFloat = 48
-    private static let edge: CGFloat = 14
+    /// The bar's height at the standard text size (.mini's 60): the cover is its full height under the top edge.
+    private static let height = CGFloat(PhoneLook.mini)
+    /// Play/Pause's target, and the room past it to the screen's edge (.mini .key.big's 48, .mini's padding-right 12).
+    private static let button = CGFloat(PhoneLook.miniPlay)
+    private static let edge = CGFloat(PhoneLook.miniTrail)
 
     /// The bar's height at the text size in use: its two lines' room, growing with them (never under 60).
-    @ScaledMetric(relativeTo: .subheadline) private var scaled: CGFloat = 60
+    @ScaledMetric(relativeTo: .subheadline) private var scaled = CGFloat(PhoneLook.mini)
 
     /// The bar's width: where a finger is along the seek line, and whether a drag began over Play/Pause.
     @State private var width: CGFloat = 0
@@ -73,8 +76,11 @@ struct MiniPlayerView: View {
                             .opacity(player.isLoading ? 0 : 1)
                         if player.isLoading {
                             ProgressView()
+                                .tint(DWPalette.text)
                         }
                     }
+                    // .mini .key: bare - no face, no edge, no shadow - in its white
+                    .foregroundStyle(DWPalette.text)
                     .frame(minWidth: Self.button, maxHeight: .infinity)
                     .contentShape(Rectangle())
                 }
@@ -91,6 +97,7 @@ struct MiniPlayerView: View {
                 .accessibilitySortPriority(2)
             }
             .frame(height: row)
+            .background { PhoneMiniGround() }
             .overlay(alignment: .top) {
                 SeekLine(drag: seek)
                     .accessibilitySortPriority(1)
@@ -220,26 +227,34 @@ private struct BarTitle: View {
     let offset: CGFloat
     let sliding: PlayBar.Skip?
 
-    /// Between the cover and the words.
+    /// Between the cover and the words (the drawing's 12), between the title and its line (its 1), and past the words to
+    /// Play/Pause (.mini's gap of 10) - the title's to tap.
     private static let gap: CGFloat = 12
+    private static let lines: CGFloat = 1
+    private static let end = CGFloat(PhoneLook.miniGap)
     /// A skip's slide.
     private static let slide = Animation.easeOut(duration: 0.22)
 
     var body: some View {
         let track = entry.track
+        // the bar's height under its 1 pt top edge (.mini .cover's 59 of 60), flush left, the line's rule at its right
+        let cover = row - 1
         HStack(spacing: Self.gap) {
-            CoverImage(id: track.coverArt, size: row)
-                .frame(width: row, height: row)
-                .clipShape(Corners.artShape)
+            CoverImage(id: track.coverArt, size: cover)
+                .frame(width: cover, height: cover)
+                .clipped()
+                .overlay(alignment: .trailing) { DWRule(colour: DWPalette.line, vertical: true) }
+                .frame(maxHeight: .infinity, alignment: .bottom)
             ZStack(alignment: .leading) {
-                VStack(alignment: .leading, spacing: 2) {
+                VStack(alignment: .leading, spacing: Self.lines) {
                     Text(track.title)
                         .font(Typeface.subheadline.weight(.semibold))
+                        .foregroundStyle(DWPalette.text)
                         .lineLimit(1)
                     if let line, !line.isEmpty {
                         Text(line)
-                            .font(Typeface.footnote)
-                            .foregroundStyle(Palette.quiet)
+                            .font(Typeface.Phone.text(.small))
+                            .foregroundStyle(DWPalette.t2)
                             .lineLimit(1)
                     }
                 }
@@ -254,6 +269,7 @@ private struct BarTitle: View {
             .clipped()
             .animation(Self.slide, value: entry.key)
         }
+        .padding(.trailing, Self.end)
         .contentShape(Rectangle())
         .onTapGesture { navigation.nowPlayingShown = true }
         .accessibilityElement(children: .ignore)
@@ -282,8 +298,10 @@ private struct BarTitle: View {
 }
 
 /// The seek line along the play bar's top edge (James: "let's put the progress on top of the play bar"): at rest a 2 pt
-/// line of --dw-border, the part played in the accent; under a seek's finger (MiniPlayerView's drag, `drag`) 8 pt
-/// thick, with the time under the finger over it ("1:23 / 4:56"). It is drawn only, taking no touch, so a tap at the
+/// line over the bar's top edge (since R4 .mini > .prog's: #2c2a36, the part played in the purple gradient across it);
+/// under a seek's finger (MiniPlayerView's drag, `drag`) 8 pt thick, with the time under the finger over it ("1:23 /
+/// 4:56"). (R1b's PhoneSeekLine draws the resting line alone; this one grows under the finger and draws its part played
+/// every frame, so it keeps its own, in the same colours.) It is drawn only, taking no touch, so a tap at the
 /// bar's top edge is the cover's, the title's or Play/Pause's, and the page above keeps its own. Every rule of the seek
 /// is Now Playing's scrubber's (Scrub): it follows the finger and seeks once, where it is let go; a drag the system
 /// takes away seeks nowhere; the song changing under it drops it; PlayerModel's `shownPosition` holds the seek's target
@@ -326,12 +344,12 @@ private struct SeekLine: View {
             ZStack(alignment: .leading) {
                 Color.clear
                 ZStack(alignment: .leading) {
-                    Rectangle().fill(Palette.border)
+                    Rectangle().fill(DWPalette.seekTrack)
                     TimelineView(.animation(minimumInterval: PlayClock.frame, paused: !runs)) {
                         (_: TimelineViewDefaultContext) in
                         let position = player.barPosition(at: Monotonic.seconds())
                         let drawn = Scrub.shownTime(held, position: position, length: length)
-                        Rectangle().fill(Palette.accent)
+                        Rectangle().fill(DWPalette.seekFill)
                             .frame(width: width * Self.part(drawn, length: length))
                     }
                 }
@@ -345,7 +363,7 @@ private struct SeekLine: View {
             }
         }
         .frame(height: Self.room)
-        // centred on the line, whose top is the bar's top edge
+        // centred on the line, whose top is the bar's top edge (.prog's top: -1px, over the bar's 1 pt edge)
         .offset(y: Self.rest / 2 - Self.room / 2)
         .allowsHitTesting(false)
         .accessibilityElement(children: .ignore)
@@ -373,11 +391,12 @@ private struct SeekLine: View {
     /// The time over the finger, above the held line, kept on the screen.
     private func tag(_ words: String, at x: CGFloat, width: CGFloat) -> some View {
         Text(words)
-            .font(Typeface.caption.monospacedDigit())
+            .font(Typeface.Phone.mono(.extraSmall))
+            .foregroundStyle(DWPalette.text)
             .padding(.horizontal, 6)
             .padding(.vertical, 3)
-            .background(Palette.tabBar, in: Corners.controlShape)
-            .overlay(Corners.controlShape.strokeBorder(Palette.border, lineWidth: 1 / max(displayScale, 1)))
+            .background(DWPalette.miniFace, in: DWCorners.chipShape)
+            .overlay(DWCorners.chipShape.strokeBorder(DWPalette.line, lineWidth: 1 / max(displayScale, 1)))
             .fixedSize()
             .alignmentGuide(.leading) { (tag: ViewDimensions) -> CGFloat in
                 -min(max(x - tag.width / 2, Self.side), max(width - tag.width - Self.side, Self.side))

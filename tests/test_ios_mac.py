@@ -1041,14 +1041,19 @@ def test_the_bars_actions_are_the_players_own():
     for call in ("player.toggle()", "player.previous()", "player.next()", "player.toggleShuffle()",
                  "player.setRepeat(nextRepeat(mode))", "player.seek(to:", "navigation.openAlbum(route)",
                  "navigation.togglePanel(.lyrics)", "navigation.togglePanel(.upNext)", "navigation.togglePanel(.info)",
-                 "AirPlayButton()", "NowPlayingMenu(hasAlbum: route != nil",
+                 "navigation.togglePanel(.eq)", "MacOutput(named: width == 0 || width >= Self.namedFrom)",
+                 "NowPlayingMenu(hasAlbum: route != nil",
                  "navigation.playlistPick = PlaylistPickRequest(PlaylistPick(playing: track))", "BarScrubber()",
-                 "Text(LyricsWords.nothingPlaying)", "Lyrics.dimmed(lyrics.have, on: lyricsOn)"):
+                 "Text(LyricsWords.nothingPlaying)", "Lyrics.dimmed(lyrics.have, on: lyricsOn)",
+                 #? (R4) the display's Next and its "3 of 11 · FLAC 16/44.1", Core's (BarDisplay) from the queue
+                 "BarDisplay.next(player.queue, repeat: player.repeatMode)", "BarDisplay.readout(player.queue)"):
         assert call in bar, call
     assert not re.search(r"(?i)volume|gain", bar), "no volume of deadwax's own"
     assert "engine" not in bar and "deck" not in bar, "nothing of the engine's, and no turntable"
-    assert ".frame(height: CGFloat(MacFrame.barHeight))" in bar
-    assert "let side = CGFloat(MacFrame.barSide(width: width))" in bar
+    #? (R4) the redesign's 66 (MacLook's, its 1 pt edge on top) and its own 14 either side - the web's bar sizes,
+    #? once MacFrame's, gone after its review
+    assert ".frame(height: CGFloat(MacLook.barHeight) - 1)" in bar and ".padding(.top, 1)" in bar
+    assert ".padding(.horizontal, Self.pad)" in bar and "MacFrame." not in bar
 
 
 def test_the_sidebar_is_mac_sidebars_rows():

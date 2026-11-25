@@ -302,14 +302,21 @@ menus and keys, and these differences.
   what you'd typed or begun, a playlist's Edit included, as the phone's tabs keep them. One thing starts again: All's
   Albums, Artists, Songs and Downloaded each open in place of the last one, so going back to one after another starts
   it at its top.
-- **The player bar**, always there along the foot: the song's cover - click it for the cover full size - its title,
-  and **Artist — Album**, which goes to the album's page; **Shuffle**, **Previous**, **Play/Pause**, **Next** and
-  **Repeat** over the song's progress, with the time played and the time left at its ends (click or drag on it to
-  move in the song); then **Lyrics**, **Queue**, **AirPlay** and **•••** - Now Playing's: Info, Add to a playlist…, Go to
-  album, the song's download items, the EQ. With nothing queued it says **Nothing playing**.
+- **The player bar**, always there along the foot, 66 points tall. At its left the keys in one row: **Shuffle**,
+  **Previous**, **Play/Pause** (the big purple one, with a spinner while a song loads), **Next** and **Repeat** - Shuffle
+  and Repeat light while on. Then the display, the bar's whole height: the song's cover flush at its left - click it for
+  the cover full size - and three lines beside it. The first is the song's title, with **Next** and the song that then
+  plays at its right; the second **Artist — Album**, which goes to the album's page, with a readout like "3 of 11 · FLAC
+  16/44.1" at its right - the song's place in what you queued and its format; the third the time played, the scrubber
+  and the time left (click or drag on it to move in the song). In a narrow window the first line leaves out Next when
+  it has no room for it and the second its readout, each on its own; hold the pointer over a cut-short title or name
+  and it shows whole. Then the tools: **Queue**, **Lyrics** and **Info** as one joined strip, the **EQ**, where the
+  music plays - AirPlay's button and the output's name, the name left out in a window under 1000 points wide (hold the
+  pointer over the button for it) - and **•••**, Now Playing's: Info, Add to a playlist…, Go to album, the song's
+  download items, the EQ. With nothing queued the keys are dimmed and the display says **Nothing playing**.
 - **The side panel**: a strip of tabs along its top - **Queue**, **Lyrics**, **Info** and **EQ** - and the tab's page
-  under them, one at a time, 400 points wide. Open it from the bar's Lyrics and Queue buttons, the •••'s Info and EQ,
-  or **View > Queue** ⌥⌘U, **Lyrics** ⌥⌘L, **Info** ⌘I and **EQ** ⌥⌘E, each ticked while its tab shows; or click a
+  under them, one at a time, 400 points wide. Open it from the bar's Queue, Lyrics, Info and EQ buttons (each lit
+  while its tab shows), the •••'s Info and EQ, or **View > Queue** ⌥⌘U, **Lyrics** ⌥⌘L, **Info** ⌘I and **EQ** ⌥⌘E, each ticked while its tab shows; or click a
   tab to move to it. A tab's key (or menu item) shows its tab - opening the panel if it's shut, switching to it if
   another tab shows - and closes the panel when its tab is the one showing; a tab's **Done** or Escape closes it too.
   With the window 1280 points wide or more the panel is a column of its own and the page narrows beside it; narrower,
@@ -598,7 +605,8 @@ first person's queue stays.
 
 The app has four tabs, **Library**, **Search**, **Requests** and **Settings** (a gear - the web app's tab of that
 name), along a bar at the foot of the screen: square, the full width, flush with the bottom edge, with a thin line
-along its top - as the web app's tab bar is. The tab you're on is purple. Requests carries a small purple count of the
+along its top - as the web app's tab bar is. The tab you're on is purple, with a short purple line over it on the
+bar's top edge; the others are grey. Requests carries a small purple count over its icon's top right corner, of the
 downloads on their way, as on the web app, and none when there are none. Tapping the tab you're on goes back to its
 first screen, or to the top of it. Once something is playing, the mini player is the top of the tab bar: one solid
 block with the tabs, a thin line between them (see [Playing](#playing)). Every screen scrolls far enough for its last
@@ -1838,9 +1846,10 @@ where it was in the list.
 
 ## Playing
 
-**The mini player**, the top of the tab bar while something is playing: the cover at its left edge, the song
-and its artist, and play/pause, with room past it so a thumb finds it. It is solid, the tab bar's own colour, with
-nothing of the page showing through. There's no next button; instead:
+**The mini player**, the top of the tab bar while something is playing, 60 points tall: the cover flush at its left
+edge, the song and its artist, and play/pause - a bare glyph, no circle round it - with room past it so a thumb finds
+it. It is solid, on a ground of its own a shade lighter than the tabs under it, with nothing of the page showing
+through. There's no next button; instead:
 
 - **The line along its top** is how far in the song is. To seek, put your finger on the mini player's top edge,
   on the line or just under it, and drag sideways: the line thickens, with the time under your finger over it
@@ -6312,7 +6321,8 @@ and the Mac (the web app keeps Up Next). Each tab's page is still the one it was
   a shadow. Click each tab: its page shows, and only its.
 - **533 The keys.** **Not done yet.** ⌥⌘U, ⌥⌘L, ⌘I and ⌥⌘E each show their tab - opening the panel if it's shut,
   switching to it if another tab shows - and the View menu ticks it. The same key again closes the panel, as Escape
-  does (with the cursor in a text field, Escape leaves the field first). The bar's Lyrics and Queue buttons do the same.
+  does (with the cursor in a text field, Escape leaves the field first). The bar's Queue, Lyrics, Info and EQ buttons do
+  the same (since the bar's redraw, 546).
 - **534 Info's subject.** **Not done yet.** With nothing selected, Info's heading says **Playing** and the song playing's
   Info is under it. With Lyrics showing and nothing selected, let the last song play out (Repeat off), then click the
   **Info** and **Queue** folder tabs: each says **Nothing playing** under its name, never a blank page. Once the
@@ -6344,6 +6354,45 @@ and the Mac (the web app keeps Up Next). Each tab's page is still the one it was
   then the sheet opens on EQ with the preview. A swipe down from Now Playing's top still closes Now Playing.
 - **538 Both phones.** **Not done yet.** On Green Anole, everything else - every tab, the player, Edit album, Settings'
   EQ - is as before. On Ethan's phone, 536-537, or "not done yet".
+
+#### The player bar, the mini player and the tab bar (543-549)
+
+**Not done yet.** On the Mac the player bar along the window's foot is redrawn: the five keys in one row, a display
+the bar's whole height, and the tools - Queue, Lyrics and Info joined in one strip, then the EQ, where it's playing and
+the **•••**. On the phone the mini player and the tab bar take the new look. Queue an album or two first.
+
+- **543 The bar.** **Not done yet.** On the Mac the display fills the bar's height, its three lines as drawn. (The bar
+  is 66 points tall. The display's cover sits flush at its left, the bar's height, with no gap round it; beside it the
+  title, with **Next** and the song that then plays at the right; under it the artist and album, with a readout like
+  "3 of 11 · FLAC 16/44.1" at its right; then the time played, the scrubber and the time left. Click the artist and
+  album: the album opens. Click the cover: it opens full size. Hold the pointer over a cut-short title: it shows
+  whole. Narrow the window: the first line leaves out Next when it has no room for it, and the second line its
+  readout, each on its own - so either can go first, by how long the names are; nothing runs past the display.)
+- **544 Next.** **Not done yet.** Under shuffle, both repeats and at the last song, it names the song that then plays,
+  or nothing. (With Shuffle on, Next is the song Next on the keys plays. At an album's last song with Repeat off it
+  names nothing; with Repeat all, the album's first song; with Repeat one, nothing - the song plays again. A shuffled
+  album's last song with Repeat all names nothing until the next round is shuffled, a moment later. The readout's "3
+  of 11" is the song's place in what you queued: played in order, its place in the album or playlist; shuffled, in the
+  order they play; a song you added with Play Next has none. Quit and reopen the app some 50 songs or more into a
+  shuffle, in a list of more than 2,000 songs shuffled, or in a library's shuffle you took a song out of: no number
+  until the next time round, never a wrong one. A list played in order keeps its number, however long.)
+- **545 The keys.** **Not done yet.** All five work. Space plays and pauses, except in a field. (Shuffle and Repeat
+  light while on; Repeat goes off, all, one. Play shows a spinner while a song loads. During a library's shuffle,
+  Shuffle is dimmed. With the cursor in the sidebar's search field, Space types a space.)
+- **546 The strip and the output.** **Not done yet.** Each button opens its tab. The output names the route; AirPlay
+  picks another. (Queue, Lyrics, Info and EQ each open their tab of the side panel and light while it shows; the same
+  button again closes the panel. Lyrics is dimmed for a song with none. The **•••**'s Info and EQ show theirs too.
+  The output's name is the one the EQ uses. In a window under 1000 points wide the name is left out, the AirPlay
+  button kept, and the name shows when you hold the pointer over it.)
+- **547 The mini player.** **Not done yet.** On the phone, as drawn. A tap or a drag up opens Now Playing; across the
+  title skips, across the top seeks; VoiceOver offers Next and Previous. (60 points tall, the cover flush at the left,
+  a thin purple line along the top for the time played, and Play and Pause alone at the right with no circle round
+  them. There is no skip button. A drag across the very top seeks, the time shown over your finger.)
+- **548 The tab bar.** **Not done yet.** The lit line over the shown tab, the badge, at the largest text size too.
+  (The shown tab is purple, with a short purple line on the bar's top edge over it; the others grey. Requests' count
+  sits over its icon's top right corner. At the largest text sizes the bar grows only so far; touch and hold a tab to
+  see it bigger.)
+- **549 Both phones.** **Not done yet.** Green Anole: the rest as before. Ethan's: 547-548, or "not done yet".
 
 #### Requests (570-573)
 

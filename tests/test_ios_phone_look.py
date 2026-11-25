@@ -938,15 +938,17 @@ def declared(folder: Path) -> set[str]:
 #? R1b draws none of App/Phone's pieces and puts App/Look's only where the Mac's look already was: each slice that draws
 #? one on a phone screen adds that file here - R2 the Library's top, its pages and their rows; R3: Now Playing's sheet
 #? (PhoneTop, PhoneBack, PhoneStrip) and its bottom row (PhoneTabItem, PhoneLook's sizes, DWPalette's accent for the
-#? output's name); R8: Requests on the phone, its cards (PhoneCard, DWMeter, DWRaised, DWButtonStyle) and its screen
+#? output's name); R8: Requests on the phone, its cards (PhoneCard, DWMeter, DWRaised, DWButtonStyle) and its screen;
+#? R4: the mini player (PhoneMiniGround, PhoneLook's sizes, DWPalette's seek line) and the tab bar (PhoneLitLine, DWCount)
 R2_LIBRARY = {"Library/LibraryTop.swift", "Library/LibraryView.swift", "Library/LibraryTiles.swift",
               "Library/AlbumsScreen.swift", "Library/ArtistsScreen.swift", "Library/SongsScreen.swift",
               "Playlists/PlaylistsScreen.swift"}
+R4_BARS = {"Player/MiniPlayerView.swift", "Root/MainTabs.swift"}
 PHONE_PIECES_DRAWN_IN: set[str] = {"Player/NowPlayingSheet.swift", "Player/NowPlayingView.swift",
-                                   "Requests/RequestCards.swift", "Requests/RequestsScreen.swift"} | R2_LIBRARY
+                                   "Requests/RequestCards.swift", "Requests/RequestsScreen.swift"} | R2_LIBRARY | R4_BARS
 LOOK_PIECES_DRAWN_IN = {"Root/MacSidebarView.swift", "Root/DesktopFrame.swift", "Player/PlayerBar.swift",
                         "Player/MacPanels.swift", "Player/NowPlayingView.swift", "Requests/RequestCards.swift",
-                        "Requests/RequestsScreen.swift"} | R2_LIBRARY
+                        "Requests/RequestsScreen.swift"} | R2_LIBRARY | R4_BARS
 
 
 def test_the_phones_pieces_are_drawn_nowhere_yet():

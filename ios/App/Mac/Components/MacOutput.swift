@@ -8,18 +8,27 @@ import SwiftUI
 struct MacOutput: View {
     @Environment(EQModel.self) private var eq
 
+    /// (R4) Whether the name is drawn beside the button: the bar leaves it out in a narrow window, so the display keeps
+    /// its room (notes/ios.md "The redesign, slice R4: the player bar, the mini player and the tab bar").
+    var named = true
+
     /// The AirPlay button's square, a small button's height.
     private static let picker = CGFloat(MacLook.smallButtonHeight)
 
     var body: some View {
+        let name = eq.settings.setting(for: eq.route).shownName
         HStack(spacing: 4) {
             AirPlayButton()
                 .frame(width: Self.picker, height: Self.picker)
-            Text(eq.settings.setting(for: eq.route).shownName)
-                .font(Typeface.Mac.text(.small))
-                .foregroundStyle(DWPalette.t2)
-                .lineLimit(1)
-                .accessibilityHidden(true)
+            if named {
+                Text(name)
+                    .font(Typeface.Mac.text(.small))
+                    .foregroundStyle(DWPalette.t2)
+                    .lineLimit(1)
+                    .accessibilityHidden(true)
+            }
         }
+        // (R4) truncated past its room in the bar, or left out there: the whole name over it
+        .help(name)
     }
 }

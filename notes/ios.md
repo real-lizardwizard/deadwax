@@ -17784,6 +17784,199 @@ AirPlay and Up Next") - say "(Since R3: …)"; ios/README.md says Queue for Up N
 **Shared test files edited** (unavoidable): test_ios_mac.py's SHEET_ROOTS and the frame's sheets in its frame test
 (`test_the_frame_holds_the_sidebar_the_page_a_panel_and_the_bar`), beside R3's own panels test.
 
+## The redesign, slice R4: the player bar, the mini player and the tab bar (2026-11-25)
+
+The build plan's 3.4 "#### R4" (~/Desktop/Code/deadwax-plans/mac-redesign-build.md), the phone's pieces as its 3.2
+draws them, and James's corrections in mac-redesign.md: the bar 66 tall; the display the bar's whole height, the cover
+flush, three lines; shuffle, previous, play, next and repeat one row of drawn glyphs; less dead space; Queue, Lyrics
+and Info one joined strip, then the EQ and the output. **No new server data**: DeadwaxClient and Core's Routes have no
+diff, and neither do the engine files (DeadwaxAudio, AudioSessionController, Core's QueueController and UpNext). The
+app is still 0.13 (13); `__version__` is untouched. No words fixture changed: the bar's new words ("Next", "3 of 11",
+"Next: Roads") are Core's BarDisplay.Words, the same on both devices, so iphone.json and mac.json have no diff.
+
+### What was built
+
+**Core `BarDisplay`** (BarDisplay.swift) - what the Mac's display says, from the queue the player holds:
+- `next(_:repeat:)`: the song that plays after this one - the queue's own `nextIndex`, so under Shuffle it is the
+  shuffled order's. At the end: nothing with Repeat off; the list's first song with Repeat all (a shuffled list's
+  next round isn't made until it is topped up, a moment before it plays, so it names nothing until then); nothing
+  under Repeat one, or on Repeat One's copy of this song (Repeat just turned off), or during a library's shuffle
+  past what is fetched.
+- `place(_:)`: "3 of 11" - the song's place in its list this time round, out of the round's songs less those taken
+  out (`left`), by one of two rules (after the review - see "After the review" below):
+  - **in the list's own order** (Shuffle off, not a library's shuffle): its index in the list less the songs taken
+    out before it. The list (`source`) and `left` survive a reload whole, so this holds however much of the queue
+    Resume brought back - a 2,100-song playlist reloaded is still "1 of 2,100", and "300 of 2,099" with one taken out.
+  - **shuffled, or a library's shuffle**: counted back from the round's songs still to come, and only while the queue
+    holds every song the round has had (a library's shuffle: has fetched) or has it in `left` - else nil. Resume's
+    window (windowOf: 50 before the song playing, 2,000 in all) can trim a round's front or cut its end, and a
+    library's shuffle comes back without `left` (savedList keeps only the window's places): either way which songs
+    were played can't be told, so there's no number until a round the queue holds whole - never a wrong one.
+
+  So an album from its third song is 3 of 11 as Shuffle's third song is; Repeat all's next round counts afresh; a
+  Repeat One copy is its song's place; a song taken out leaves the others' places as they were; a library's shuffle
+  counts its whole order (Paged's total, "3 of 1,612"), an earlier round its own (`pagedRounds`). A song added with
+  Play Next or Play Last has none. What follows from the rules: a shuffled list or a library's shuffle reloaded more
+  than 50 songs in, or a shuffled list longer than 2,000, shows no number until its next round; under Shuffle a played
+  song taken out (withoutKey records no `left` for one) leaves no number either; and Previous back into a stretch
+  played shuffled, after Shuffle went off, reads that song's place in the list.
+- `format(_:)`: "FLAC 16/44.1" from the song in hand alone (its suffix and type, bit depth and sample rate); with no
+  depth "FLAC 44.1 kHz", with no rate "FLAC 16-bit", with neither "FLAC"; a lossy file its name alone (the queue keeps
+  no bitrate). `formatSpoken` says it for VoiceOver ("FLAC, 16-bit, 44.1 kHz").
+- `readout(_:)`: the two joined by the dot ("3 of 11 · FLAC 16/44.1"), either alone, nil with neither.
+
+**`PlayerBar`** rewritten, as dw.css's `.player` (every size beside it named `// dw:` and held to it): 66 tall
+(MacLook.barHeight), 14 apart and 14 in, on its own face (MacPalette's new `playerFace`, `playerEdge`, `playerSheen` -
+dw.css's `.player` background, border-top and its inset sheen), its edge along the top.
+- **The keys** (`.keys`, 11 apart): Shuffle and Repeat as toggles (DWToggleStyle, 30), Previous and Next as round keys
+  (MacKeyStyle, 34), Play/Pause the big purple one (46), each glyph drawn (SharpSymbol, PlayPauseGlyph). Each key's
+  action is PlayerModel's own call, the first thing in the click, as before.
+- **The display** (`.lcd`, MacDisplay): the bar's height under its 1 pt edge. The cover flush at its left (65, its rule
+  at its right; a click opens it full size); then the title with **Next** and its song at the right; "Artist — Album"
+  (a button to the album) with the readout at the right in the mono face; the clocks either side of the scrubber
+  (BarScrubber, `.meter`'s well, 6 tall, 8 while held). Narrow, each line gives way on its own - the first line's
+  ViewThatFits drops Next, the second's the readout, each when its own line has no room, so which goes first depends on
+  the words, not on an order; each line truncates with its whole words in its tooltip and VoiceOver ("Roads", value
+  "Next: Mysterons").
+- **The tools** (`.tools`, 6 apart): Queue, Lyrics and Info one strip (the new MacStripButtonStyle, App/Mac/Components/
+  MacStrip.swift: .btn's faces, each overlapping the one before by its edge, the corners at the strip's ends alone -
+  MacStripShape - the lit one drawn over its neighbours); a groove; the EQ (a button lit while its tab shows, named
+  with the setting playing); the output (MacOutput, AirPlay's button and the output's name); the •••. Each of the four
+  toggles its tab of the dock (AppNavigation.togglePanel); the •••'s Info and EQ still show theirs (R3).
+- **Nothing queued**: the keys dimmed, "Nothing playing" in the display, the tools still open their tabs.
+- **Space** is the Controls menu's, as it was (MacMenu: `Shortcut(.space)`, never while typing): the bar adds no key.
+
+**`MiniPlayerView`**, as `.dw.ph .mini`: 60 tall (PhoneLook.mini, growing with the text) on PhoneMiniGround (#1c1b22
+under its edge); the cover flush left, the bar's height under the edge (59), its rule at its right; the title in the
+text's white, the artist in t2 (Typeface.Phone's small); Play/Pause bare - the sharp glyph in white, no face or edge -
+in its 48 target with 12 past it; the seek line 2 tall along the top, `.prog`'s track and the purple gradient
+(DWPalette.seekTrack, seekFill). Still no skip button; VoiceOver's Next song and Previous song on the title. **The drag
+is byte for byte as it was** (its code's digest is held, from b6f8dcfa).
+
+**`AppTabBar`**, as `.dw.ph .tabbar`: on DWPalette.tabBarFace (#121117) under its edge (tabBarEdge), the tabs 6 under
+it, each 49 tall, its icon's box 24 and its words 11, medium; the shown tab in `acc`, the others #8a8a9c, and the lit
+line (PhoneLitLine, 24 x 2, square) 7 over the shown tab alone, which is the bar's top edge. Requests' badge is the
+look's count (DWCount) laid over the bar's colour, 9 right of the tab's centre and 1 over its top. The glyphs stay the
+app's (the Library's squared stack), and so do `.isTabBar`, the Large Content Viewer, TabBarFoot's room and the cap at
+xxxLarge.
+
+### Decisions, and where this departs from the plan
+
+- **Next is the app's queue's next** (UpNext's `nextIndex`, which Next on the keys plays), not computed from the web's
+  PlayQueue: they agree everywhere but a shuffled list's end under Repeat all, where the app shuffles the next round
+  only as it tops the queue up; until then it names nothing rather than a guess.
+- **A lossy file's format is its name alone** ("MP3"): QueueTrack carries no bitrate. An MP4 file reads "ALAC" only
+  when its content type says alac, else its suffix's name - "M4A", not "AAC": one song can't tell the two apart
+  (AlbumInfo weighs a whole album's bitrates to). Navidrome's content type comes from the file's suffix, not from the
+  codec, so an ALAC song will most likely always read "M4A" - unverified against a real Navidrome.
+- **The output is R1's MacOutput** (AirPlay's own button and the name), not the drawing's `.btn` with a caret: the
+  picker is macOS's, and can't be opened from a button of ours. Its name is capped at 150 with the button, and **left
+  out below a bar 1000 wide** (MacOutput's new `named`), its tooltip kept: at the smallest window (880) the display
+  then keeps 218 for its text, against 90 with the name - and the third line needs about 160 for an hour-long song's
+  clocks (in test_ios_bar_look's arithmetic: the keys 218, the tools 421 named and 293 without).
+- **The ••• stays**, after the output: it holds Add to a playlist… and Go to album, which the drawing has nowhere else.
+- **Space was already the Controls menu's** (never while typing), so the bar draws no key of its own for it.
+- **The lit strip button's zIndex is set by the bar**, not inside the style: a ButtonStyle's own can't reach the
+  strip's stack.
+- **The mini player's room past Play is 12** (`.mini`'s padding-right), not 14: the drag code is unchanged, but where
+  it reads "on the title" (`width - (button + edge)`) moves 2 pt right with it.
+- **The mini player keeps its own seek line**, not R1b's PhoneSeekLine: it grows to 8 under a finger and draws its
+  part played every frame from the timeline; the colours are PhoneSeekLine's. PhoneSeekLine stays drawn nowhere.
+- **The tab bar is 1 + 6 + 49 + TabBarFoot's room** (76 on a Face ID phone, 1 + 6 + 49 + 6 with none), not the
+  drawing's fixed 83: TabBarFoot's room under the tabs was set with James on the phones (15 Nov) and stays.
+- **The title stays iOS's subheadline** (15, growing with the text): Typeface.Phone has no 15.
+- **The mini player's Play glyph stays at `.title2`** (Typeface.symbol), as it was: about two-thirds of the 32 pt box
+  dw.css draws it in (`.dw.ph .mini .key.big svg`, in the 48 target). Left for James to decide on the phone.
+- **Gone after the review, read by nothing**: MacFrame's web bar sizes (barHeight 72, barCover, barSideNarrow and
+  barSideWide, barPad, barGap, barSide(width:), barMiddleMin) - frame-vectors.json keeps them, the web's record - and
+  Palette's `tabBar`, `tabInactive` and `playerBar` (DWPalette's tabBarFace and tabItemText and MacPalette's
+  playerFace draw those bars now).
+
+### Tests, and the faults they were seen failing on
+
+**Core BarDisplayTests** (30): Next is the queue's next; at the last song nothing (Repeat off) or the first (Repeat
+all, and once topped up); Repeat one and its copies name nothing; under Shuffle the shuffled order at every place; a
+shuffled round's end; a song added is next; nothing playing; 3 of 11; Shuffle's places, and Shuffle turned on midway;
+a song taken out; Repeat all's next round; a Repeat One copy; a song added has none; a trimmed front; a library's
+shuffle (1 of 1,612, and after more is fetched); a plain queue; the formats (an MP4 "M4A", "ALAC" only by its type);
+the readout. After the review, nine more: a list of one under Shuffle and Repeat all; an earlier round of a library's
+shuffle; a song taken out before this one in the list's order; reloads (a 2,100-song list, a shuffled one and a
+60-song shuffled album, a library's shuffle with a song taken out); and the reviewer's three probes made tests,
+seeded - Next names what plays and the place steps by one (3,000 runs of natural ends, Play Next and Last, removals,
+Shuffle and Repeat changes), a library's shuffle fed a page at a time counts every song (500 runs), and Previous and
+History's taps never name a wrong song or place (2,000 runs).
+
+**tests/test_ios_bar_look.py** (16): the bar's sizes are dw.css's `.player`; the keys one row in the drawing's order;
+every key acts in the click (no Task, nothing awaited); the display fills the bar with its three lines; Next and the
+readout are Core's; the strip joined as dw.css joins it, then the groove, EQ and output (its width capped); Space
+plays and pauses except in a field; the bar fits 880 and 1280 (added up from the sizes and the words; MacFrame's web
+bar sizes gone); the mini player is `.mini`; Play bare and no skip button; the title's tap ends where the drag reads
+the title (after the review); the drag as it was (its digest, PlayBar's reach and threshold); the lit line square and
+over the shown tab alone; the tab bar's glyphs, badge and cap kept; no value of their own; "Queue".
+
+**Shared test files edited** (the functions the brief named, and what follows from them): test_ios_palette's
+`test_the_apps_own_bars_are_the_webs`, `test_the_requests_badge_is_the_webs` and `test_the_play_bar_is_the_tab_bars_top`
+(now held to dw.css's `.tabbar`, `.count` and `.mini`, with a `_phone_look()` helper), and one line of
+`test_the_bars_run_smooth_only_while_the_song_plays` (the seek line's fill is DWPalette.seekFill); test_ios_mac's
+`test_the_bars_actions_are_the_players_own`; test_ios_phone_look's drawn-in sets (`R4_BARS`), as that file asks.
+
+The brief's seven mutations, and three more, were each applied alone, run and restored byte for byte. Every one was
+caught:
+- "N of M" off by one (`place`'s number + 1): BarDisplayTests `theAlbumsThirdSongIsThreeOfEleven` and nine more of
+  the place and readout tests;
+- Next from the unshuffled order (the source's song after this one): `underShuffleNextIsTheShuffledOrder`,
+  `aSongAddedIsNext`, `atAShuffledRoundsEndOnlyTheQueueKnowsWhatPlays`;
+- Next at the last song (the first named with Repeat off): `atTheLastSongRepeatOffNamesNothing`;
+- a key's action in a Task (Next's): `test_every_key_acts_in_the_click`;
+- a skip button on the mini player: `test_play_is_bare_and_there_is_no_skip_button`;
+- the drag's seek reach changed - PlayBar.seekReach 14 to 20, and the drag's start read 6 lower:
+  `test_the_mini_players_drag_is_as_it_was`, each;
+- the lit line rounded - PhoneLitLine a Capsule, and clipped to one in the tab: `test_the_lit_line_is_square_and_over_
+  the_shown_tab_alone` and test_ios_palette's `test_every_corner_in_the_app_is_a_token` (the second also
+  `test_the_bars_draw_no_value_of_their_own`); drawn on a tab not shown (`shown || tab == .library`): the lit line's
+  test.
+
+### After the review (2026-11-25)
+
+The review found "3 of 11" could be wrong after a reload, four mutations that passed everything, a stale guide and
+leftovers. Each fix, and what catches it (every mutation applied alone, run and restored byte for byte):
+- **"N of M" after a reload.** Resume's windowOf cuts at Resume.maxEntries (2,000) as well as 50 before the song, so a
+  2,100-song playlist read "101 of 2,100" after a reload (the old rule counted back from songs still to come, and the
+  queue had lost its end); and a library's shuffle with a song taken out read "4 of 1,612" for "3 of 1,611", as
+  savedList keeps no `left` for a paged queue. place() now has the two rules above: the list's own order counted from
+  the front, which survives a reload; a shuffled round counted only while the queue holds it whole, else nil. Caught:
+  the in-order rule turned off (`&& false`, every list counted back) - `aLongListReloadedKeepsItsPlace`,
+  `aTrimmedFrontKeepsThePlace`; the whole-round guard dropped - `aShuffledListReloadedWithoutAllOfItsRoundHasNoPlace`,
+  `aLibrarysShuffleReloadedWithASongTakenOutHasNoPlace`; the songs taken out before this one not subtracted -
+  `inTheListsOrderASongTakenOutBeforeThisOneMovesItUp`, `nextNamesWhatPlaysAndThePlaceStepsByOne`; each rule's
+  number + 1 - twelve tests (in order) and seven (counted back).
+- **The four that passed everything:** `|| state.source.count == 1` dropped from next() -
+  `aListOfOneUnderShuffleAndRepeatAllNamesItself`; an earlier round of a library's shuffle sized by the current
+  round's `paged.total` - `anEarlierRoundOfALibrarysShuffleCountsItsOwnOrder`; MiniPlayerView's
+  `.padding(.trailing, Self.end)` (BarTitle) removed - `test_the_titles_tap_ends_where_the_drag_reads_the_title`;
+  PlayerBar's `.frame(maxWidth: Self.outputMost)` removed -
+  `test_the_strip_is_three_joined_buttons_then_the_groove_eq_and_output`.
+- **The guide** (docs/ios.md): the Mac's player bar as it is now (the keys in one row; the display with Next and "3 of
+  11 · FLAC 16/44.1"; Queue | Lyrics | Info, then the EQ, the output and the •••); the side panel opened from the
+  bar's Queue, Lyrics, Info and EQ (and check 533's sentence too); the mini player on its own ground; the tab bar's
+  lit line and the badge's corner; 543's narrow window (each line on its own) and 544's "3 of 11" after a reload.
+- **The leftovers**, removed (above): a MacFrame bar size put back - `test_the_bar_fits_the_smallest_window_and_the_
+  one_it_opens_at`; Palette's `tabBar` put back - test_ios_palette's `test_the_apps_own_bars_are_the_webs`.
+- **The notes**: M4A as the code has it, and Play's glyph left at `.title2` for James.
+
+### Not verified - checks 543 to 549
+
+- Neither device has seen it: only the builds and the tests. **Mac smoke run: not done** (James's installed app was
+  running).
+- On the Mac: the display's three lines at 1280 and 880, Next and the readout each giving way on its own line; the strip's
+  joins and the lit button's edge; the output's name and AirPlay's picker from the bar; Space from the Controls menu
+  with a key focused under full keyboard access; the bar's face and sheen beside the canvas.
+- On the phones: the mini player as drawn (its ground, the cover's rule, the seek line over the edge); the drag's
+  "on the title" boundary 2 pt further right; the lit line on the bar's edge and the badge at the largest text sizes;
+  Ethan's phone for 547-548.
+- "3 of 11" after a real quit and reopen (a long playlist, a shuffle partway in, a library's shuffle with a song taken
+  out): BarDisplayTests round-trip Resume's own toSave and fromSnapshot, not the app's restore.
+
 ## The redesign, slice R8: Requests (2026-11-25)
 
 Requests in the new look on both devices: mac-redesign-build.md "#### R8 - Requests", drawn in Requests.dc.html (the
