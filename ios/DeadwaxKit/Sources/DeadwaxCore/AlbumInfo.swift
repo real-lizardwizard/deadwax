@@ -842,11 +842,13 @@ public enum AlbumInfo {
     // MARK: the sections
 
     /// What is drawn at once, from the album in hand and this phone: Quality, The album, On this phone.
-    public static func local(album: Album, onPhone: AlbumInfoRow?, device: Device) -> [AlbumInfoSection] {
+    /// (R5, check 555) `played`: the Mac's Played row (MacAlbumFacts.playedRow), last in The album - none on the iPhone.
+    public static func local(album: Album, onPhone: AlbumInfoRow?, device: Device,
+                             played: AlbumInfoRow? = nil) -> [AlbumInfoSection] {
         let songs = album.song ?? []
         return [
             AlbumInfoSection(title: AlbumInfoWords.qualityTitle, rows: quality(songs)),
-            AlbumInfoSection(title: AlbumInfoWords.albumTitle, rows: theAlbum(album)),
+            AlbumInfoSection(title: AlbumInfoWords.albumTitle, rows: theAlbum(album) + (played.map { [$0] } ?? [])),
             AlbumInfoSection(title: AlbumInfoWords.deviceTitle(device), rows: onPhone.map { [$0] } ?? []),
         ].filter { !$0.rows.isEmpty }
     }

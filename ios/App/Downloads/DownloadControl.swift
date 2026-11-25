@@ -132,81 +132,17 @@ struct DownloadBar: View {
     }
 }
 
-/// The album page's download control, in the bar beside its ••• (3.1), drawn from the album's state: the accent arrow
-/// downloads at once - every song not on the phone, as the album; it adds, never takes away. Every other state opens a
-/// menu from the control itself whose title says in words what the mark only shows (and, for a wait a setting causes,
-/// where the setting is), with Remove Download - so a tap meant for the ••• beside it never throws a download away.
-/// Dimmed until the album's songs are in. VoiceOver: "Download", its value the album's line ("Downloading, 40 percent"
-/// while fetching); the Large Content Viewer, as the bar's own items have.
-struct AlbumDownloadControl: View {
-    /// The album with its songs - nil while they aren't in (the control dimmed).
-    let album: Album?
-    /// The album is gone from the collection: there is nothing to fetch, only Remove Download.
-    let gone: Bool
-    /// The page asked for a download from here (its end is announced while the page is on top).
-    let asked: () -> Void
-
-    @Environment(DownloadModel.self) private var downloads
-    @Environment(ServerModel.self) private var server
-    @Environment(PlayerModel.self) private var player
-
-    var body: some View {
-        let songs = album?.song ?? []
-        let state = downloads.album(songs)
-        let arrow = !gone && {
-            switch state {
-            case .none, .partial: return true
-            default: return false
-            }
-        }()
-        Group {
-            if arrow {
-                Button {
-                    guard let album else { return }
-                    downloads.download(album: album)
-                    asked()
-                } label: {
-                    DownloadMark(mark: .control, font: Typeface.symbol(.body), lineWidth: 2, control: true)
-                }
-            } else {
-                Menu {
-                    Section(title(state, songs: songs)) {
-                        ForEach(items(state, songs: songs), id: \.self) { choice in
-                            Button(choice.label, systemImage: choice.symbol, role: choice.isDestructive ? .destructive : nil) {
-                                act(choice, songs: songs)
-                            }
-                        }
-                    }
-                } label: {
-                    DownloadMark(mark: DownloadWords.mark(state, control: true) ?? .control,
-                                 fraction: DownloadWords.Mark.fraction(state), font: Typeface.symbol(.body), lineWidth: 2, control: true)
-                }
-                .menuOrder(.fixed)
-            }
-        }
-        .disabled(album == nil || !downloads.isOpen || (gone && state == .none))
-        .accessibilityLabel(DownloadWords.controlLabel)
-        .accessibilityValue(DownloadWords.controlValue(state, device: Platform.device) ?? "")
-        .accessibilityAddTraits(isFetching(state) ? .updatesFrequently : [])
-        .accessibilityShowsLargeContentViewer {
-            Label(DownloadWords.controlLabel, systemImage: largeSymbol(state))
-        }
-    }
-
-    /// The Large Content Viewer's symbol: the mark, the plain arrow standing in for the ring.
-    private func largeSymbol(_ state: AlbumDownload) -> String {
-        let mark = DownloadWords.mark(state, control: true) ?? .control
-        return mark == .ring ? DownloadWords.Mark.control.rawValue : mark.rawValue
-    }
-
-    private func isFetching(_ state: AlbumDownload) -> Bool {
-        if case .downloading = state { return true }
-        return false
-    }
-
+/// (The redesign, slice R5 - notes/ios.md "The redesign, slice R5: an album, Playlists, a playlist") The album
+/// download's words and items, one rule for the Mac album toolbar's Download and the album's own ••• (the phone's
+/// bar, where since R5 the ••• holds Download in the control's place - James's answer 4 - and the old bar control,
+/// AlbumDownloadControl, is gone: R5's review): the menu title, saying in words what the download's mark only shows,
+/// and its items, a failed album's Download being "Download Again".
+@MainActor
+enum AlbumDownloadMenu {
     /// The menu's title: the album's line, and a second line - the setting a wait is for, the first reason a song
-    /// didn't download, or the size once downloaded.
-    private func title(_ state: AlbumDownload, songs: [Song]) -> String {
+    /// didn't download, or the size once downloaded. Nothing for an album with nothing of it here or on its way.
+    static func title(_ state: AlbumDownload, songs: [Song], album: Album?, downloads: DownloadModel,
+                      server: ServerModel) -> String {
         var first: String?
         if case .failed(_, let failure) = state, let song = songs.first(where: { isFailed(downloads.state($0.id)) }) {
             first = DownloadWords.failure(failure, songID: song.id, server: server.address,
@@ -224,25 +160,13 @@ struct AlbumDownloadControl: View {
     }
 
     /// The menu's items (2.5): a failed album's Download is "Download Again".
-    private func items(_ state: AlbumDownload, songs: [Song]) -> [DownloadChoice] {
+    static func items(_ state: AlbumDownload, songs: [Song], gone: Bool, downloads: DownloadModel) -> [DownloadChoice] {
         let choices = downloads.choices(songs: songs, gone: gone)
         guard case .failed = state else { return choices }
         return choices.map { $0 == .download ? .downloadAgain : $0 }
     }
 
-    private func act(_ choice: DownloadChoice, songs: [Song]) {
-        guard let album else { return }
-        switch choice {
-        case .download, .downloadAgain:
-            downloads.download(album: album)
-            asked()
-        case .remove:
-            downloads.remove(album: album.id)
-            player.say(DownloadWords.removed(album.name ?? "", device: Platform.device))
-        }
-    }
-
-    private func isFailed(_ state: SongDownload) -> Bool {
+    private static func isFailed(_ state: SongDownload) -> Bool {
         if case .failed = state { return true }
         return false
     }
@@ -251,7 +175,9 @@ struct AlbumDownloadControl: View {
 /// A ••• menu's download section (3.4, 4.1): the items of 2.5 for one song or several, each with its symbol, carried
 /// out in the tap through DownloadModel. A failed song's section is headed with why it didn't download. A download
 /// never starts the music, so nothing here is on the gesture rule's allowlist. Nothing at all while this phone's
-/// downloads can't be used (the store couldn't be read).
+/// downloads can't be used (the store couldn't be read). (R5) An album's whole - its own ••• - takes the album
+/// control's items and is headed with its words for the download's state (AlbumDownloadMenu): on the phone the •••
+/// holds Download in the control's place.
 struct DownloadMenuSection: View {
     /// One song (a row's •••, Now Playing's) or an album's songs (the bar's •••).
     let songs: [Song]
@@ -263,6 +189,8 @@ struct DownloadMenuSection: View {
     let name: String
     /// Said after a Download - Now Playing's ("Downloading: Roads"); the album page says nothing.
     var downloaded: ((Song) -> String)?
+    /// (R5) An album's whole downloaded from its page's •••: the page told, so it announces the download's end.
+    var asked: (@MainActor () -> Void)?
 
     @Environment(DownloadModel.self) private var downloads
     @Environment(ServerModel.self) private var server
@@ -270,9 +198,12 @@ struct DownloadMenuSection: View {
 
     var body: some View {
         if downloads.isOpen, !songs.isEmpty {
-            // one song's own items - but a song of an album gone from the collection is offered no Download
-            let choices = songs.count == 1 && album == nil && !gone
-                ? downloads.choices(song: songs[0].id) : downloads.choices(songs: songs, gone: gone, alone: album == nil)
+            // one song's own items - but a song of an album gone from the collection is offered no Download; (R5) an
+            // album's whole, its control's (AlbumDownloadMenu)
+            let state = downloads.album(songs)
+            let choices = album != nil ? AlbumDownloadMenu.items(state, songs: songs, gone: gone, downloads: downloads)
+                : songs.count == 1 && !gone ? downloads.choices(song: songs[0].id)
+                : downloads.choices(songs: songs, gone: gone, alone: true)
             Section {
                 ForEach(choices, id: \.self) { choice in
                     Button(choice.label, systemImage: choice.symbol, role: choice.isDestructive ? .destructive : nil) {
@@ -281,7 +212,13 @@ struct DownloadMenuSection: View {
                 }
             } header: {
                 Group {
-                    if songs.count == 1, case .failed(let failure) = downloads.state(songs[0].id) {
+                    if album != nil {
+                        // (R5) the album's whole: the control's words for its state - "Downloading - 4 of 12", "Waiting
+                        // for Wi-Fi", "Downloaded · 412 MB" - nothing for an album with none of it here or on its way
+                        let title = AlbumDownloadMenu.title(state, songs: songs, album: album, downloads: downloads,
+                                                            server: server)
+                        if !title.isEmpty { Text(title) }
+                    } else if songs.count == 1, case .failed(let failure) = downloads.state(songs[0].id) {
                         Text(DownloadWords.failure(failure, songID: songs[0].id, server: server.address,
                                                    admin: server.access.seesDetail, device: Platform.device).text)
                     } else if let name = downloads.keepingPlaylist(songs, album: album?.id) {
@@ -299,6 +236,7 @@ struct DownloadMenuSection: View {
         case .download, .downloadAgain:
             if let album {
                 downloads.download(album: album)
+                asked?()
             } else if songs.count == 1 {
                 if choice == .downloadAgain { downloads.tryAgain(songs[0].id) } else { downloads.download(songs[0]) }
             } else {
@@ -314,64 +252,15 @@ struct DownloadMenuSection: View {
 
 // MARK: a playlist's (Phase 4, slice 3)
 
-/// A playlist page's download control, in the bar beside its ••• - the album's (AlbumDownloadControl), for the playlist
-/// as one (phase4-library.md 2.5): the accent arrow downloads it at once - kept on this phone, its songs fetched, kept in
-/// step as it changes; once downloaded, a menu from the control itself, titled with the playlist's line, with Download
-/// Again (its songs that didn't download) and Remove Download (its songs downloaded any other way stay). Dimmed until
-/// the playlist's songs are in, and for one gone. None at all for a smart playlist not downloaded (slice 3's review,
-/// James: "No Download for them") - its hero says why. VoiceOver: "Download", its value the playlist's line.
-struct PlaylistDownloadControl: View {
-    /// The playlist with its songs - nil while they aren't in (the control dimmed).
-    let answer: PlaylistWithSongs?
-    let id: String
-    let gone: Bool
-
-    @Environment(DownloadModel.self) private var downloads
-
-    var body: some View {
-        let state = downloads.playlistState(id)
-        Group {
-            if let state {
-                Menu {
-                    PlaylistDownloadMenuSection(answer: answer, id: id, titled: true)
-                } label: {
-                    DownloadMark(mark: DownloadWords.mark(state, control: true) ?? .control,
-                                 fraction: DownloadWords.Mark.fraction(state), font: Typeface.symbol(.body), lineWidth: 2, control: true)
-                }
-                .menuOrder(.fixed)
-            } else if !downloads.playlistIsSmart(id, answer: answer) {
-                Button {
-                    guard let answer else { return }
-                    downloads.download(playlist: answer)
-                } label: {
-                    DownloadMark(mark: .control, font: Typeface.symbol(.body), lineWidth: 2, control: true)
-                }
-                .disabled(answer == nil || gone)
-            }
-        }
-        .disabled(!downloads.isOpen)
-        .accessibilityLabel(DownloadWords.controlLabel)
-        .accessibilityValue(state.flatMap { (shown: AlbumDownload) -> String? in DownloadWords.controlValue(shown, device: Platform.device) } ?? "")
-        .accessibilityAddTraits(isFetching(state) ? .updatesFrequently : [])
-        .accessibilityShowsLargeContentViewer {
-            Label(DownloadWords.controlLabel, systemImage: DownloadWords.Mark.control.rawValue)
-        }
-    }
-
-    private func isFetching(_ state: AlbumDownload?) -> Bool {
-        if case .downloading? = state { return true }
-        return false
-    }
-}
-
-/// A playlist's download items (PlaylistDownloads.choices) - its control's menu (`titled`: the playlist's line over
-/// them) and its bar •••'s second section, carried out in the tap through DownloadModel. A download never starts the
-/// music, so nothing here is on the gesture rule's allowlist. Nothing while this phone's downloads can't be used, nor -
-/// for Download - before the songs are in, nor for a smart playlist (its choices: none until it is downloaded).
+/// A playlist's download items (PlaylistDownloads.choices) - the playlist's ••• (`titled`: the playlist's line over
+/// them; since R5 the ••• holds Download where the bar's control was, and the control is gone - R5's review), the
+/// Mac's Download menu, carried out in the tap through DownloadModel. A download never starts the music, so nothing
+/// here is on the gesture rule's allowlist. Nothing while this phone's downloads can't be used, nor - for Download -
+/// before the songs are in, nor for a smart playlist (its choices: none until it is downloaded).
 struct PlaylistDownloadMenuSection: View {
     let answer: PlaylistWithSongs?
     let id: String
-    /// The control's menu: headed with the playlist's line.
+    /// Headed with the playlist's line, as the old control's menu was.
     var titled = false
 
     @Environment(DownloadModel.self) private var downloads

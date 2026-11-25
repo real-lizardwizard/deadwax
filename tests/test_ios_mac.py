@@ -431,8 +431,11 @@ def test_the_window_comes_back_on_the_page_it_showed():
 # ----------------------------------------------------------------------------- right-click (slice 2)
 
 #? a song's row: its own •••'s request, on a right-click
+#? (R5) the Mac's album page and playlist page: each hero's (the album's or the playlist's own •••, as a tile's), and
+#? SongRightClick, their song rows' (MacColumnList's `menu`)
 SONG_ROWS = {"Album/TrackRow.swift": 1, "Library/SongsScreen.swift": 1, "Playlists/PlaylistView.swift": 1,
-             "Search/SearchScreen.swift": 1, "Artist/TopSongsSection.swift": 1}
+             "Search/SearchScreen.swift": 1, "Artist/TopSongsSection.swift": 1, "Mac/Album/MacAlbumPage.swift": 2,
+             "Mac/Album/MacPlaylistPage.swift": 1}
 #? an album's tile or row: the album page's •••; a playlist's row: its page's
 ALBUM_TILES = {"Library/LibraryTiles.swift": 2, "Search/SearchScreen.swift": 1, "Artist/ArtistView.swift": 1}
 PLAYLIST_ROWS = {"Playlists/PlaylistsScreen.swift": 1}
@@ -716,6 +719,8 @@ SHEET_ROOTS = {
     "Root/DesktopFrame.swift": 2, "Player/MacPanels.swift": 1,
     #? (the redesign, R8) Choose a source, from the Mac's Requests' toolbar
     "Mac/Requests/MacRequestsPage.swift": 1,
+    #? (the redesign, R5) New playlist…, from the Mac's Playlists' toolbar
+    "Mac/Library/MacPlaylistsPage.swift": 1,
 }
 
 

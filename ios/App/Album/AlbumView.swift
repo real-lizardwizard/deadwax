@@ -32,8 +32,22 @@ import SwiftUI
 /// this phone) nothing is drawn and nothing plays (ShuffleCan.page). The pull never refreshes now, as the Library's
 /// doesn't: the bar's •••'s Refresh asks again (offline, whether deadwax is back), and a failure with no album to draw
 /// has Try again.
-struct AlbumView: View {
+///
+/// THE REDESIGN, SLICE R5 (iAlbum.dc.html, Album.dc.html; notes/ios.md "The redesign, slice R5: an album, Playlists, a
+/// playlist"):
+/// - On the phone, the bar holds iOS's back (‹ Library, or whatever opened the page), Edit - for whoever may edit the
+///   album (Managing.albumEdit), while deadwax can be reached and the album is in the collection - and the •••, iOS's own
+///   menu (James's answer 4): Add to Queue, Add to a playlist…, Download - headed with the download control's words for
+///   its state, the control having left the bar - then Album info and Refresh. Edit album is the top row's Edit, so the
+///   bar's ••• leaves it out (`barMenu`); no Play Next or Play Last. The hero and the rows are iAlbum's (AlbumHero,
+///   TrackRow), on the page's ground; the pull and the rows' swipe stay.
+/// - On the Mac (`desk`, from MacAlbum.page(for:)), MacAlbumPage draws the album in the List's place, handed this page's
+///   own model and actions (AlbumDesk): every load, wait, levels warmed and let go, New mark seen and announcement stays
+///   this page's - the Mac draws, nothing more. On the iPhone there is no desk (`init(route:)`).
+struct AlbumView<Desk: View>: View {
     let route: AlbumRoute
+    /// (R5) The Mac's album page, drawn in the List's place - none on the iPhone.
+    private let desk: ((AlbumDesk) -> Desk)?
 
     @Environment(ServerModel.self) private var server
     @Environment(PlayerModel.self) private var player
@@ -54,13 +68,11 @@ struct AlbumView: View {
     @State private var pull = ShufflePull()
     @AccessibilityFocusState private var noteFocused: Bool
 
-    init(route: AlbumRoute) {
+    /// (R5) The Mac's: the album drawn by `desk` (MacAlbumPage).
+    init(route: AlbumRoute, desk: @escaping (AlbumDesk) -> Desk) {
         self.route = route
+        self.desk = desk
         _model = State(initialValue: AlbumModel(route: route))
-    }
-
-    init(id: String, name: String? = nil, artist: String? = nil, coverArt: String? = nil) {
-        self.init(route: AlbumRoute(id: id, name: name, artist: artist, coverArt: coverArt))
     }
 
     /// What your library says of this album on its page, if anything: it waits for room, or you removed its download.
@@ -82,6 +94,69 @@ struct AlbumView: View {
                                      anyHere: download.hasSongsHere, device: Platform.device)
         let playable = self.playable
         let can = pullCan(playable)
+        Group {
+            if let desk, Platform.mac {
+                desk(AlbumDesk(model: model, download: download, playable: playable, offline: offline || model.goneButHere,
+                               note: note, libraryLine: libraryLine, goesToo: downloads.goesWithLibrary(album: route.id),
+                               noteFocused: $noteFocused, menu: albumMenu, edit: editAction, play: { play(at: 0) },
+                               shuffle: { play(at: nil, shuffle: true) }, playFrom: { (song: Song) -> Void in play(song: song) },
+                               row: { (song: Song, album: Album) -> QueueMenuRequest in rowMenu(song, of: album) },
+                               change: { (action: AlbumMine.Action) -> Void in
+                                   Task { await model.change(action, client: server.client, library: library, downloads: downloads) }
+                               },
+                               refresh: { refresh() }, asked: { askedHere = true }))
+            } else {
+                page(download: download, offline: offline, note: note, can: can, playable: playable)
+            }
+        }
+        // (the Mac app, slice 2) ⌘R: the •••'s Refresh, while the page shows; nothing on the iPhone
+        .refreshCommand { refresh() }
+        .navigationTitle(model.name)
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar { bar }
+        .task(id: taskKey) {
+            model.online = reachability.online
+            await model.load(key: taskKey, client: server.client, personal: server.access.hasLibrary, player: player,
+                             downloads: downloads)
+        }
+        .task { await downloads.followProgress() }
+        .onChange(of: reachability.online) { _, online in
+            model.online = online
+            // back: what the page drew from the phone, or couldn't draw, is asked of deadwax now
+            guard online else { return }
+            Task {
+                await model.load(key: taskKey, client: server.client, personal: server.access.hasLibrary, player: player,
+                                 downloads: downloads)
+            }
+        }
+        .appSheet(item: $albumInfo) { album in
+            AlbumInfoSheet(album: album)
+                .macSheet()
+        }
+        .onChange(of: download) { _, now in ended(now) }
+        // (Phase 8, slice 1) Edit album wrote to this album's folder: asked again, as the web's page is after an edit
+        .onChange(of: navigation.albumWrites[route.id]) { _, _ in refresh() }
+        .onChange(of: model.answered) { _, _ in told() }
+        .onAppear {
+            shown = true
+            seen()
+            // shown again (a page over it gone, its tab back): its levels wanted again - its first showing waits for
+            // the album to answer (AlbumModel.load)
+            if let album = model.album { player.albumShown(album) }
+        }
+        .onDisappear {
+            shown = false
+            player.albumLeft(id: route.id)
+        }
+        .onChange(of: library.marks) { _, _ in
+            // your library answered while the page is on top: one opened before deadwax said what is new is cleared too
+            if shown { seen() }
+        }
+    }
+
+    /// The phone's page (and the iPhone's only): the List of the hero, the notes, the songs and the footer.
+    private func page(download: AlbumDownload, offline: Bool, note: String?, can: ShuffleCan,
+                      playable: [Song]) -> some View {
         List {
             AlbumHero(model: model, download: download, playable: !playable.isEmpty,
                       play: { play(at: 0) }, shuffle: { play(at: nil, shuffle: true) })
@@ -93,6 +168,8 @@ struct AlbumView: View {
                         .alignmentGuide(.top) { (drawn: ViewDimensions) -> CGFloat in drawn[.bottom] }
                 }
                 .listRowSeparator(.hidden)
+                .listRowInsets(EdgeInsets())
+                .listRowBackground(Color.clear)
                 .onAppear { setTitleInBar(false) }
                 .onDisappear { setTitleInBar(true) }
 
@@ -155,75 +232,18 @@ struct AlbumView: View {
                         Text(line)
                     }
                 }
-                .font(Typeface.footnote)
-                .foregroundStyle(Palette.quiet)
+                .font(Typeface.Phone.text(.small))
+                .foregroundStyle(DWPalette.t3)
                 .listRowSeparator(.hidden, edges: .bottom)
+                .listRowBackground(Color.clear)
             }
         }
         .listStyle(.plain)
         // the pull shuffles the album (never refreshes), while the page is the one on top
         .pullsToShuffle(PullShuffling(state: pull, can: can, on: shown, start: pulled))
-        // (the Mac app, slice 2) ⌘R: the •••'s Refresh, while the page shows; nothing on the iPhone
-        .refreshCommand { refresh() }
-        .navigationTitle(model.name)
-        .navigationBarTitleDisplayMode(.inline)
-        .toolbar {
-            ToolbarItem(placement: .principal) {
-                Text(model.name)
-                    .font(Typeface.headline)
-                    .lineLimit(1)
-                    .opacity(titleInBar ? 1 : 0)
-                    .accessibilityHidden(!titleInBar)
-            }
-            // before the •••, so the two sit together as Apple Music's download button sits beside its •••
-            ToolbarItem(placement: .topBarTrailing) {
-                AlbumDownloadControl(album: model.album, gone: model.goneButHere) { askedHere = true }
-            }
-            ToolbarItem(placement: .topBarTrailing) {
-                QueueMenu(request: albumMenu) {
-                    Image(systemName: "ellipsis.circle")
-                }
-                .accessibilityLabel(AlbumPageLines.moreForAlbum)
-            }
-        }
-        .task(id: taskKey) {
-            model.online = reachability.online
-            await model.load(key: taskKey, client: server.client, personal: server.access.hasLibrary, player: player,
-                             downloads: downloads)
-        }
-        .task { await downloads.followProgress() }
-        .onChange(of: reachability.online) { _, online in
-            model.online = online
-            // back: what the page drew from the phone, or couldn't draw, is asked of deadwax now
-            guard online else { return }
-            Task {
-                await model.load(key: taskKey, client: server.client, personal: server.access.hasLibrary, player: player,
-                                 downloads: downloads)
-            }
-        }
-        .appSheet(item: $albumInfo) { album in
-            AlbumInfoSheet(album: album)
-                .macSheet()
-        }
-        .onChange(of: download) { _, now in ended(now) }
-        // (Phase 8, slice 1) Edit album wrote to this album's folder: asked again, as the web's page is after an edit
-        .onChange(of: navigation.albumWrites[route.id]) { _, _ in refresh() }
-        .onChange(of: model.answered) { _, _ in told() }
-        .onAppear {
-            shown = true
-            seen()
-            // shown again (a page over it gone, its tab back): its levels wanted again - its first showing waits for
-            // the album to answer (AlbumModel.load)
-            if let album = model.album { player.albumShown(album) }
-        }
-        .onDisappear {
-            shown = false
-            player.albumLeft(id: route.id)
-        }
-        .onChange(of: library.marks) { _, _ in
-            // your library answered while the page is on top: one opened before deadwax said what is new is cleared too
-            if shown { seen() }
-        }
+        // (R5) the page's ground, iAlbum's
+        .scrollContentBackground(.hidden)
+        .background(DWPalette.bg)
     }
 
     /// The page on top is seen (App.tsx's seenAlbum for the page on top): its New mark goes, and deadwax is told.
@@ -243,19 +263,76 @@ struct AlbumView: View {
             if headings.indices.contains(index), let heading = headings[index] {
                 DiscHeadingRow(heading: heading)
                     .listRowSeparator(.hidden)
+                    .listRowInsets(EdgeInsets())
+                    .listRowBackground(Color.clear)
             }
             let state = downloads.state(song.id)
             TrackRow(song: song, albumArtist: album.artist, current: PlayingBars.marks(song, heard: heard),
                      playing: player.isPlaying,
                      play: { play(song: song) },
-                     menu: QueueMenuRequest(pick: .song(song, of: album), album: album, gone: model.goneButHere),
+                     menu: rowMenu(song, of: album),
                      download: state, slot: slot, dimmed: offline && !state.isHere,
                      actions: !downloads.isOpen ? []
                          : model.goneButHere ? downloads.choices(songs: [song], gone: true)
                          : downloads.choices(song: song.id)) { choice in
                 act(choice, on: song)
             }
+            // (R5) iAlbum's .row: edge to edge, on the row's rule
+            .listRowInsets(EdgeInsets())
+            .listRowSeparatorTint(DWPalette.rowRule)
+            .listRowBackground(Color.clear)
         }
+    }
+
+    /// A song's own •••: the one song, as a song - its row's on the phone, its row's right-click and ••• on the Mac.
+    private func rowMenu(_ song: Song, of album: Album) -> QueueMenuRequest {
+        QueueMenuRequest(pick: .song(song, of: album), album: album, gone: model.goneButHere)
+    }
+
+    // MARK: the bar (R5)
+
+    /// The phone's bar (iAlbum's top row): the title once the hero's has scrolled away, Edit for whoever may, and the
+    /// ••• - iOS's back before them. On the Mac, whose toolbar is MacAlbumPage's, (R5's review) the title alone, as a
+    /// playlist's page has it: its place held, unseen, the hero saying the name - so the two pages' bars agree.
+    @ToolbarContentBuilder private var bar: some ToolbarContent {
+        ToolbarItem(placement: .principal) {
+            Text(model.name)
+                .font(Typeface.headline)
+                .lineLimit(1)
+                .opacity(titleInBar ? 1 : 0)
+                .accessibilityHidden(!titleInBar)
+        }
+        if desk == nil || !Platform.mac {
+            if Managing.albumEdit(server.access.permissions).shown {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button(PlaylistWords.edit) { editAction?() }
+                        .disabled(editAction == nil)
+                        .accessibilityLabel(EditWords.menuItem)
+                }
+            }
+            ToolbarItem(placement: .topBarTrailing) {
+                QueueMenu(request: barMenu) {
+                    Image(systemName: "ellipsis")
+                }
+                .accessibilityLabel(AlbumPageLines.moreForAlbum)
+            }
+        }
+    }
+
+    /// (R5) Edit album, for whoever may (Managing.albumEdit, the •••'s Edit album until R5): the top row's Edit on the
+    /// phone, the toolbar's on the Mac - while deadwax can be reached and the album is in the collection, as the item
+    /// was offered; nil (Edit dimmed) until the album's songs are in.
+    private var editAction: (@MainActor () -> Void)? {
+        guard reachability.online, !model.goneButHere else { return nil }
+        return albumMenu?.editAlbum
+    }
+
+    /// (R5) The phone's bar •••: the album's own (`albumMenu`) - Add to Queue, Add to a playlist…, Download headed with
+    /// the control's words, Album info, Refresh - its Edit album the top row's Edit instead.
+    private var barMenu: QueueMenuRequest? {
+        guard var request = albumMenu else { return nil }
+        request.editAlbum = nil
+        return request
     }
 
     /// The bar's •••: the whole album, as an album - nil (the ••• dimmed) until its songs are in. (Phase 8, slice 1)
@@ -267,6 +344,8 @@ struct AlbumView: View {
               var request = QueueMenuRequest.album(album, gone: model.goneButHere, permissions: server.access.permissions,
                                                    navigation: navigation, info: { albumInfo = album }) else { return nil }
         request.refresh = { refresh() }
+        // (R5) Download from the ••• (the control's place on the phone): its end announced, as the control's was
+        request.downloadAsked = { askedHere = true }
         return request
     }
 
@@ -366,6 +445,54 @@ struct AlbumView: View {
         guard titleInBar != shown else { return }
         withAnimation(.easeInOut(duration: 0.2)) { titleInBar = shown }
     }
+}
+
+extension AlbumView where Desk == EmptyView {
+    /// The iPhone's page (and every one but the Mac's own): no desk.
+    init(route: AlbumRoute) {
+        self.route = route
+        desk = nil
+        _model = State(initialValue: AlbumModel(route: route))
+    }
+
+    init(id: String, name: String? = nil, artist: String? = nil, coverArt: String? = nil) {
+        self.init(route: AlbumRoute(id: id, name: name, artist: artist, coverArt: coverArt))
+    }
+}
+
+/// (R5) What the Mac's album page (MacAlbumPage) is handed by AlbumView: the page's own model and its actions - so every
+/// load, wait, levels warmed and let go, New mark seen and announcement stays AlbumView's, and the Mac draws.
+struct AlbumDesk {
+    let model: AlbumModel
+    let download: AlbumDownload
+    /// What Play and Shuffle take: the songs - offline (or the album gone from the collection), those on this Mac.
+    let playable: [Song]
+    /// Songs not on this Mac are dimmed: deadwax out of reach, or the album gone from the collection.
+    let offline: Bool
+    /// The phone's page's quiet lines, said on the Mac's too: the album not on this Mac with deadwax out of reach (or
+    /// gone from the collection with songs here - OfflineAlbum.note), and what your library says of it.
+    let note: String?
+    let libraryLine: String?
+    /// Remove from my library takes the album's download from this Mac too (MineBlock's `goesToo`).
+    let goesToo: Bool
+    /// Whose line takes VoiceOver's focus when an Add or Remove is taken (AlbumView's `told`).
+    let noteFocused: AccessibilityFocusState<Bool>.Binding
+    /// The album's own ••• (QueueMenuRequest.album, with Album info, Edit album and Refresh) - nil until its songs are in.
+    let menu: QueueMenuRequest?
+    /// Edit album for whoever may - nil offline, for an album gone, and until the songs are in.
+    let edit: (@MainActor () -> Void)?
+    /// Play from the first song; Shuffle; a row's double-click or Return - AlbumView's own calls, in the tap.
+    let play: () -> Void
+    let shuffle: () -> Void
+    let playFrom: (Song) -> Void
+    /// A song's own •••, its right-click.
+    let row: (Song, Album) -> QueueMenuRequest
+    /// Add to my library or Remove from my library (the mine block's), AlbumModel.change.
+    let change: (AlbumMine.Action) -> Void
+    /// A failure's Try again: the album asked again (the •••'s Refresh).
+    let refresh: () -> Void
+    /// A download asked for from the page: its end is announced while the page is on top.
+    let asked: () -> Void
 }
 
 /// A page's own quiet line (3.7): a state in words, not a failure - "This album isn't on this phone - it plays once

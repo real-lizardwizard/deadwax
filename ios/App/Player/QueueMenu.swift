@@ -26,6 +26,9 @@ struct QueueMenuRequest {
     /// or, while deadwax can't be reached, whether it is back - as the Library's ••• has it, the page's pull being the
     /// shuffle's now.
     var refresh: (@MainActor () -> Void)?
+    /// (R5) The album page's own •••: a Download asked for from it - the page announces its end, as it did for the
+    /// download control the ••• took the place of.
+    var downloadAsked: (@MainActor () -> Void)?
 }
 
 extension QueueMenuRequest {
@@ -104,6 +107,13 @@ extension QueueMenuRequest {
 /// Refresh (notes/ios.md "Pull to shuffle on an album's and a playlist's page"): an album's and a playlist's bar •••
 /// (`request.refresh`) end that last section with "Refresh", as the Library's ••• ends with it - online and off (off,
 /// it asks whether deadwax is back). It plays nothing.
+///
+/// THE REDESIGN, SLICE R5 (notes/ios.md "The redesign, slice R5: an album, Playlists, a playlist"; James's answer 4,
+/// "iOS's own menu"): on the phone an album's and a playlist's bar ••• hold Download in the download control's place -
+/// the control left the bar - so their download section is headed with the control's own words for the state
+/// (AlbumDownloadMenu, PlaylistDownloadMenuSection's `titled`), its items the control's. Edit album is the top row's
+/// Edit on the phone (the page's bar clears `editAlbum`); the Mac's right-click keeps it here. Add to Queue stays the
+/// one queue item on both: no Play Next or Play Last.
 struct QueueMenu<Label: View>: View {
     let request: QueueMenuRequest?
     @ViewBuilder let label: () -> Label
@@ -146,11 +156,12 @@ struct QueueMenuItems: View {
                 }
             }
             if let playlist = request.playlist {
-                PlaylistDownloadMenuSection(answer: playlist)
+                // (R5) headed as its control's menu is: on the phone the bar's ••• holds Download in the control's place
+                PlaylistDownloadMenuSection(answer: playlist, titled: true)
             } else if request.offersDownload {
                 DownloadMenuSection(songs: request.pick.tracks,
                                     album: request.pick.queuedAs == .album ? request.album : nil,
-                                    gone: request.gone, name: request.pick.title)
+                                    gone: request.gone, name: request.pick.title, asked: request.downloadAsked)
             }
             let editAlbum = reachability.online && !request.gone ? request.editAlbum : nil
             if request.albumInfo != nil || editAlbum != nil || request.refresh != nil {

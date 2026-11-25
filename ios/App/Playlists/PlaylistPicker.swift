@@ -311,6 +311,7 @@ struct NewPlaylistFields: View {
     let cancel: () -> Void
 
     @Environment(ServerModel.self) private var server
+    @Environment(\.dynamicTypeSize) private var typeSize
     @State private var name = ""
     @State private var busy = false
     @State private var failure: (any Error)?
@@ -335,19 +336,38 @@ struct NewPlaylistFields: View {
             if let failure {
                 ErrorNote(failure)
             }
-            HStack {
-                Button(busy ? PlaylistWords.creating : PlaylistWords.create, action: send)
-                    .buttonStyle(PrimaryFace())
-                    .disabled(blank || busy || busyOutside)
-                Spacer()
-                Button(PlaylistWords.cancel, role: .cancel, action: cancel)
-                    .buttonStyle(SecondaryPill())
-                    .escapeCloses(escapes && blank)
+            // (R5) the shared buttons, the layout as it was: Create the purple one, Cancel the plain - (R5's review) one
+            // over the other at the accessibility sizes, each across the row, as the other pages stack theirs, each word
+            // up to three lines there
+            let stacked = typeSize.isAccessibilitySize
+            let layout = stacked ? AnyLayout(VStackLayout(alignment: .leading, spacing: 10)) : AnyLayout(HStackLayout())
+            layout {
+                Button(action: send) {
+                    words(busy ? PlaylistWords.creating : PlaylistWords.create)
+                        .frame(maxWidth: stacked ? .infinity : nil)
+                }
+                .buttonStyle(DWButtonStyle(kind: .pri))
+                .disabled(blank || busy || busyOutside)
+                if !stacked { Spacer() }
+                Button(role: .cancel, action: cancel) {
+                    words(PlaylistWords.cancel)
+                        .frame(maxWidth: stacked ? .infinity : nil)
+                }
+                .buttonStyle(DWButtonStyle())
+                .escapeCloses(escapes && blank)
             }
         }
         .onAppear { focused = true }
         .onChange(of: blank, initial: true) { (_: Bool, now: Bool) -> Void in typed?.wrappedValue = !now }
         .onDisappear { typed?.wrappedValue = false }
+    }
+
+    /// (R5) A button's words: one line, three at the accessibility sizes.
+    private func words(_ text: String) -> some View {
+        Text(text)
+            .lineLimit(typeSize.isAccessibilitySize ? 3 : 1)
+            .multilineTextAlignment(.center)
+            .fixedSize(horizontal: false, vertical: true)
     }
 
     private func send() {

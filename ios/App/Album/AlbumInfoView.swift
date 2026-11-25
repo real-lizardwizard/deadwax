@@ -65,6 +65,8 @@ struct AlbumInfoList: View {
     @State private var copied: String?
     /// A link row iOS wouldn't open.
     @State private var refused: String?
+    /// (R5) Now, for Played's day words - re-read at a day's change, never per row.
+    @State private var now = ArtistTotals.now()
 
     /// The header's cover.
     private static let cover: CGFloat = 60
@@ -82,7 +84,8 @@ struct AlbumInfoList: View {
             }
 
             if let whole {
-                ForEach(AlbumInfo.local(album: whole, onPhone: onPhone(whole), device: Platform.device)) { section in
+                ForEach(AlbumInfo.local(album: whole, onPhone: onPhone(whole), device: Platform.device,
+                                        played: played(whole))) { section in
                     infoSection(section)
                 }
             }
@@ -116,6 +119,16 @@ struct AlbumInfoList: View {
         .navigationBarTitleDisplayMode(.inline)
         .task(id: askKey) { await ask() }
         .task { await downloads.followProgress() }
+        .onReceive(NotificationCenter.default.publisher(for: UIApplication.significantTimeChangeNotification)) { _ in
+            // (R5) a day's change: Played's "yesterday" moves at midnight, as the album page's does
+            now = ArtistTotals.now()
+        }
+    }
+
+    /// (R5, check 555) The Mac's Played row in The album - the album page's own words (MacAlbumFacts.playedRow), so
+    /// Albums' Info and the page agree; none on the iPhone, whose album page says nothing of plays.
+    private func played(_ album: Album) -> AlbumInfoRow? {
+        Platform.mac ? MacAlbumFacts.playedRow(album, now: now) : nil
     }
 
     // MARK: drawing

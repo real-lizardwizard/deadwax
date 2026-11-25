@@ -354,8 +354,9 @@ def test_mac_routes_says_every_route_once_each_to_its_area():
 
 #? The routes R1 leaves as the phone's pages, each exactly as appRoutes draws it. A slice that redraws a page takes its
 #? route off this list.
-PHONES_PAGES = {"album", "downloaded", "downloads", "serverAddress", "debug", "eq", "gettingAlbums", "playback",
-                "account", "thisPhone", "about", "playlist", "downloadedPlaylists", "artist", "allSongs",
+#? R5 took .album and .playlist: the phone's pages still, drawing the Mac's own in their List's place (their `desk`).
+PHONES_PAGES = {"downloaded", "downloads", "serverAddress", "debug", "eq", "gettingAlbums", "playback",
+                "account", "thisPhone", "about", "downloadedPlaylists", "artist", "allSongs",
                 "group", "mbArtist", "topSongs", "chooseFolder", "needsALook", "libraryCare", "heldByNobody",
                 "serverSettings", "serverSettingsGroup", "eventLog", "changePassword", "people", "person"}
 

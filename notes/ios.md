@@ -18225,3 +18225,230 @@ list, the one its buttons and ••• partition, not QueueMenuItems.
   - the fields' Tab and Return;
   - the table's keys;
   - a row is one element.
+
+## The redesign, slice R5: an album, Playlists, a playlist (2026-11-25)
+
+An album's page, Playlists and a playlist's page in the new look on both devices: mac-redesign-build.md "#### R5", drawn
+in Album.dc.html, Playlists.dc.html and Playlist.dc.html (the Mac) and iAlbum.dc.html and iPlaylist.dc.html (the
+phone). **No new server data**: DeadwaxClient and Core's Routes have no diff, and neither do the album's and the
+playlist's models, their asks, the engine files or R3b's and R4's files. The app is still 0.13 (13), and no words
+fixture key changed (iphone.json and mac.json have no diff).
+
+### The Mac: three pages of its own
+
+The Mac pages are the phone's pages' desks (R2's pattern): `AlbumView<Desk>` and `PlaylistView<Desk>` keep their
+model, their asks, their writes and their leaving, and on the Mac draw `desk(...)` in their List's place; on the iPhone
+there is no desk (`init(route:)`, `Desk == EmptyView`), so the phone's page is the one it was, restyled. MacAlbum's
+`page(for:)` hands `MacAlbumPage.init(desk:)` and `MacPlaylistPage.init(desk:)`, and MacLibraryDesk gains `.playlists`
+(LibraryView hands the desk to Playlists whatever the side, playlists being no scope's).
+
+- **`App/Mac/Album/MacAlbumPage.swift`**, given `AlbumDesk` (AlbumView's model, the download, what plays, the offline
+  and gone flags, the note, the library line, its ••• request, Edit, Play, Shuffle, play-from-a-song, a row's request,
+  the mine block's change, Refresh and the download's "asked" for VoiceOver's end word):
+  - **The toolbar** (MacToolbar, `ViewThatFits`): Play (pri, the sharp glyph) and Shuffle, a groove, Add to Queue, Add to
+    a playlist…, Download, then Edit at the right for someone Managing.albumEdit shows it to. It fits every page down
+    to the one beside the side panel's column (R5's review: the first write-up said it folded there - it doesn't);
+    folded, should a long download state in the pop-up ever make it too wide, everything after Shuffle is the album's
+    ••• - QueueMenu on the album's request, the right-click's own items (Download and Edit album among them).
+  - **Download**: the arrow state's `DownloadWords.controlLabel` as a button (`downloads.download(album:)`, then
+    `asked()`); once asked for, a DWPopUp whose section is headed `AlbumDownloadMenu.title` with its items - the
+    phone's control's states in words.
+  - **The hero**: the cover (132), the title (h1), the artist at the Mac's h3 in `acc` (a link while there is one to go
+    to), the meta line, `MacAlbumFacts.played` ("Played yesterday · 12 times", against a `now` re-read at a day's
+    change), the badge and the download chip ("On this Mac" or the album line), the mine block, and the quiet lines.
+    A right-click on it is the album's menu (`.macContextMenu { QueueMenuItems(request: menu) }`).
+  - **The songs**: R2's MacColumnList, columns # 46, Title, Plays 70, Length 66 and ••• 44; the box as tall as its rows
+    while there is room (`.frame(minHeight: least, maxHeight: tall)`, `least` three rows clamped to `tall`,
+    `.layoutPriority(1)`), scrolling inside it after. # is the song's own number (`AlbumPageLines.number`), a ▶ for the
+    song the player has; **a disc's heading row** (`MacTable.Line.group`, MacColumnList's `lines:`, drawn as R2's group
+    rows) above each disc's first song wherever the phone draws one - more than one disc, or a disc with a title -
+    carrying the phone's words ("Disc 2 · Live at the Roundhouse", AlbumModel's `headings`, `MacAlbumFacts.songLines`).
+    Plays is `MacAlbumFacts.plays` (blank for a nil, never 0). Return, a double-click or VoiceOver's action plays from
+    the row (`desk.playFrom`), a right-click is the song's menu (`SongRightClick`).
+  - **Properties** (MacGroupBox on `bg`, two columns): `MacAlbumFacts.properties` - Released, Added, Format, Size (only
+    when every song says its own), and Album info's own folder row - "Folder" or "Folders", by `AlbumInfo.server`'s
+    rule (`folders: server.access.isAdmin`), from the model's bridge answer or, when the model has none (logins off,
+    break-glass: AlbumModel asks the bridge only for a personal library), the same `client.storeAlbum` the page asks
+    itself for an admin.
+  - **The status bar**: `MacAlbumFacts.status` - the songs, the length, the size.
+  - The waiting states as the phone's: nothing yet, a failure with Try again, the note, a spinner.
+- **`App/Mac/Album/MacPlaylistPage.swift`**, given `PlaylistDesk` (now with `canEdit`): the toolbar (Play, Shuffle, the
+  groove, Add to Queue, Add to a playlist…, Download - `PlaylistDownloadMenuSection(titled: true)` in a DWPopUp once
+  asked for, else a button for a playlist that isn't smart - and Edit, dimmed without `canEdit`; folded, the
+  playlist's •••); the hero (the mosaic at 96, the name, `MacAlbumFacts.playlistLine` - whose and when it changed - the
+  read-only words, the comment, chips for the songs, the length and On this Mac, the hero line); the songs edge to edge
+  under a rule, columns # 46, Title, Album 190, Length 66, a row's open being `desk.playRow(index)`. Every waiting
+  state is the phone page's (OpenFailedNote and RefreshFailedNote are internal now for it).
+- **`App/Mac/Library/MacPlaylistsPage.swift`**: columns Playlist, Songs 64, Length 84, Whose 110, Changed 110 and On this
+  Mac 110 (Core's `MacAlbumFacts.playlistColumns` - narrower than the drawing's 80/110/130/140/150, see "After
+  review"), Whose and Changed left out on a page too narrow for Playlist's 160 beside them all; rows yours, then
+  shared, then files (`PlaylistRules.groups` of `found`), offline with no list the downloaded shelf. A selection that
+  rests 200 ms has its playlist asked for as its page asks (a PlaylistPageModel with `stored` and `heard`), so the
+  toolbar's Play and Shuffle play it in the click with its songs in hand (`player.play(playlist:at:shuffle:)`) - only
+  the playlist selected now, and only while its row is listed (the selection let go at the page when it isn't). The toolbar: New playlist… (pri; the phone's sheet in `.macSheet()`, its
+  `PlaylistEdit.made`), the groove, Play, Shuffle, and Find in playlists (230). A row's right-click is
+  `PlaylistRightClick`. The list's failure is said inline (`PlaylistWords.listFailed` - the phone's ListFailedNote is
+  private to PlaylistsScreen). The status bar is `MacAlbumFacts.playlistsStatus` of the rows listed (Find's), nothing
+  while none is.
+
+**Core `MacAlbumFacts.swift`** holds the rules, pure and tested on Linux: `lineID`/`songLines`, `plays`,
+`playedWords`/`played`/`playedRow`, `size`, `properties`, `added`, `status`, `whose`, `changed`, `playlistLine`,
+`playlistsStatus`, `PlaylistColumn`/`playlistWidth`/`playlistLeast`/`playlistDropped`/`playlistColumns`/`fixedWidth`/
+`playlistTitle`, `length`, and the pages' words. The day's words are R2's `ArtistTotals.lastPlayedWords`, never a
+second set. **Album info** gains the Played row on the Mac only: `AlbumInfo.local(..., played:)` puts it last, and
+AlbumInfoView passes `MacAlbumFacts.playedRow` with its own midnight `now` (check 555: the page and Info never
+disagree). On the iPhone Album info is as it was.
+
+### The phone: iAlbum and iPlaylist
+
+- **The top row**: iOS's back, Edit (for those who may - Managing.albumEdit on an album, `model.canBegin` on a
+  playlist), then the •••, iOS's own Menu: Add to Queue, Add to a playlist…, Download (`DownloadMenuSection`, headed with
+  the control's state in words - the control left the bar), Album info and Refresh. No Play Next or Play Last.
+- **The hero** (AlbumPageLook, each number `// drawn:`): the cover 204 (a playlist's 150), the title, the artist in
+  `acc`, the meta line, the chips; Play and Shuffle the shared DWButtonStyle at 48 (AlbumPlayPair: side by side, one
+  over the other when they don't fit).
+- **The rows**: an album's at `DWLook.here.rowHeight` (48), the number from 16 in, the title at 56 (the drawing's
+  46-wide number box is border-box, holding its own 16: so 30 and the title cell's 10, each `@ScaledMetric` relative
+  to footnote, mono .small's style), the time and the •••; a playlist's
+  iPlaylist's `.row.tall` (60 at least), no cover, each song's album under its title, the playing one's title in the
+  accent with the bars before it. Each row is one VoiceOver element, its ••• items its actions.
+- The pull to shuffle and a row's swipe right (Add to Queue) stay. Square everywhere (Corners' 0).
+- `QueueMenuRequest.downloadAsked` carries the page's "asked" into the •••'s Download, so VoiceOver's end word is still
+  said for a download begun from the menu.
+- The Add to a playlist sheet's Create and Cancel take DWButtonStyle (PlaylistPicker's NewPlaylistFields).
+
+### The gate's files outside App/Mac, App/Look and App/Phone
+
+The brief's Touches (AlbumView, AlbumHero, TrackRow, PlaylistView, QueueMenu, DownloadControl), plus:
+- **Core `MacAlbumFacts.swift` and its tests**: the pages' rules, pure.
+- **Core `AlbumInfo.swift`** and **`AlbumInfoView.swift`**: Album info's Played row (check 555) - a defaulted parameter;
+  the iPhone's rows unchanged (tested).
+- **`PlaylistPicker.swift`**: the sheet's shared buttons, which the brief asks for.
+- **`LibraryView.swift`**: one line - the desk handed to Playlists.
+
+### Left out
+
+- **Play next / Play last**: PlayerModel has them, but nothing in the app has offered them since 16 Nov; the Mac's
+  right-click's one queue item is Add to Queue, so the toolbar has Add to Queue in their place.
+- **Other pressings ▾**: the app has no list of an album's other pressings without a route.
+- **The drawing's Pin**, **the Wikipedia description** and **Pressing** in Properties (no pressing's name in hand).
+- **The status bar's format and "Navidrome up to date"** (the build plan's section 4).
+- **A playlist's Add songs…**, and Playlists' toolbar Download, Rename… and Delete… (the right-click and the page's
+  Edit have them).
+- **Rows 40 tall with a 28 cover** on the Mac: R2's MacColumnList is 30 with 20.
+- **The drawing's "2-3"** in the Mac album's #: a departure (R5's review). The Mac draws a disc's heading row instead,
+  as the phone does - so a disc's title survives (the drawing's numbering has nowhere to put it), and # holds only a
+  track number, which its drawn 46 fits, where a disc's and a track's together ("12-14") would crowd it.
+- **The artist at 16**: there's no 16 token on the Mac; it is the Mac's h3 (18).
+
+### Tests
+
+- **Core MacAlbumFactsTests** (10): a nil play count is a blank, never nought; two discs are two heading rows, the
+  titled one with its title, the numbers plain (R5's review - it was "a song's number carries its disc"); the size is
+  every disc's or none; played is the calendar's day across midnight; played is Last played's words and nothing for
+  never; Album info's Played row is the page's words (last on the Mac, none on the iPhone); Properties say what the
+  app has and leave out what it hasn't (Album info's Folder or Folders); the status bar; a playlist's Whose and
+  Changed, and Playlists' status nothing for none; Playlists' columns fit beside the side panel (R5's review).
+- **test_ios_album_look.py** (17): square; tokens only; the drawing's numbers; a song's number scaled and spoken (R5's
+  review); the top row; Download on the page and in the •••; no Play Next or Play Last on the phone; the pull and the
+  row's swipe stay; every play an existing call in the tap; the Mac's pages routed through the phone's; the columns;
+  Playlists' columns fit beside the side panel, the album page's Folder, Playlists plays only a playlist shown (R5's
+  review); the toolbars fold; Played and Changed read a `now` taken again at midnight; the sheet's shared buttons.
+- **Shared test files, the functions the slice names**: test_ios_phone_look's two sets gain R5's pages (PlaylistPicker
+  for the Look pieces); test_ios_mac_reach's PHONES_PAGES loses album and playlist; test_ios_mac's SONG_ROWS gains the
+  two pages (2 and 1) and **SHEET_ROOTS gains MacPlaylistsPage** (its New playlist sheet - a sheet root, which that test
+  counts; the brief didn't name it); test_ios_library_look's desk line, and (R5's review, asked for) its
+  `test_arrow_keys_ask_only_once_the_selection_rests`, which takes MacPlaylistsPage.
+
+**The brief's seven mutations** (eight runs - Download was taken off the phone's ••• and the Mac's toolbar apart) were
+each applied alone, run and restored byte for byte. Every one was caught:
+- a nil play count shown as "0": `aNilPlayCountIsABlankNeverNought`;
+- the size ignoring a song without one (a disc missing from it): `theSizeIsEveryDiscsOrNone`, and Properties' and the
+  status bar's tests;
+- "yesterday" by elapsed hours, not the calendar: `playedIsTheCalendarsDayAcrossMidnight`, and the Played line's and
+  Album info's row's tests;
+- Play inside a `Task { await … }`: `test_every_play_is_an_existing_call_in_the_tap`;
+- `offersDownload = false` on the album's •••, and Download taken off the Mac's toolbar:
+  `test_download_is_on_the_page_and_in_the_dots`, each;
+- a Play Next in QueueMenuItems: `test_no_play_next_or_play_last_on_the_phone`;
+- TrackRow's `.addsToQueue(menu, in: .list)` removed: `test_the_pull_and_the_rows_swipe_stay`.
+
+### Not verified - checks 553 to 558
+
+docs/ios.md's checks 553-558, each **Not done yet.**: 553 an album on the Mac (every toolbar action; Plays against
+Navidrome's; Properties against the folder, logins off too; the toolbar whole at 880 and at 1280 beside the side
+panel - only added up, never measured; a two-disc album's heading rows), 554 Playlists (the columns at 880 and at 1280
+beside the panel; Play and Shuffle dimming as Find hides the selected one; no "0 playlists" offline; Play, Edit's
+order, Rename and Delete), 555 Played (Info and the page agree, and move on at midnight), 556 an album on the phone
+(the ••• and its Download's words, Play, Shuffle, the pull, the swipe; a three-figure number at AX5; VoiceOver
+reading the number first, and Add to Queue offered once), 557 a playlist on the phone (and a gone one's •••
+keeping Remove Download; New playlist's buttons stacked at AX sizes), 558 both phones. Nothing here was run on a
+device or the Mac: the Swift built for both (xcodebuild, unsigned), and the rules are held by the tests above.
+
+### After review (2026-11-25)
+
+The coordinator's review of the first commit, each finding fixed in the same commit (amended), with what holds it:
+
+1. **Playlists' columns didn't fit beside the side panel.** The drawing's fixed 610 left Playlist nothing on the
+   narrowest page (a 1280 window beside the panel's column: 1280 - 220 - 470 - 1 = 589, MacFrame's 470 as R8's table
+   takes it; the dock R3 drew is MacLook's 400, a page of 659). Core's `playlistColumns(width:)` now chooses them from
+   the width a GeometryReader gives the list: Songs 64, Length 84, Whose, Changed and On this Mac 110 each (478),
+   Playlist 160 at least; below 638 Whose and Changed are left out (258 fixed). So all six at 880 (a page of 660) and
+   at 1280 beside the dock (659); four on 589. Held by `playlistsColumnsFitBesideTheSidePanel` (every width from 589
+   to 1400) and `test_playlists_columns_fit_beside_the_side_panel` (the sums against MacFrame's and MacLook's own
+   numbers).
+2. **The Mac album's multi-disc numbers.** "2-3" is gone: `MacAlbumFacts.songLines` puts a `MacTable.Line.group` row,
+   the phone's heading, above each disc's first song wherever the phone draws one (more than one disc, or a titled
+   disc), and # is the plain track number. MacColumnList takes `lines:` (its stripes, keys and selection from them;
+   the rows' own as before when none is given) and draws a group as R2's group row. A departure from the drawing,
+   in "Left out". Held by `twoDiscsAreTwoHeadingRowsTheTitledOneWithItsTitle` and test_the_macs_columns_are_the_drawings.
+3. **The phone's number didn't grow with the text.** TrackRow's number is `@ScaledMetric(relativeTo: .footnote)`
+   (mono .small's style), its width a minimum the number's own `fixedSize` can pass, its gap scaled too. And the title
+   now sits at the drawing's 56, not 62 (finding 17): the 46-wide box is border-box. Held by
+   `test_a_songs_number_grows_with_the_text_and_is_spoken` and the numbers test (16 + 30 + 10 = 56, dw.css's `.row`
+   cell padding and box-sizing read).
+4. **Play and Shuffle could play a playlist Find had hidden.** The page lets the selection go whenever it isn't among
+   the rows (`.onChange(of: rows.map(\.id), initial: true)` with `MacTable.kept` - a list with no rows draws no
+   MacColumnList, whose own keeping never ran), and `playable` asks that its row is listed. Held by
+   `test_playlists_plays_only_a_playlist_shown`.
+5. **Three lines no test held**: the 200 ms rest (test_ios_library_look's
+   `test_arrow_keys_ask_only_once_the_selection_rests` takes MacPlaylistsPage), `chosen.route.id == selected` and
+   `folders: server.access.isAdmin` (`test_playlists_plays_only_a_playlist_shown`,
+   `test_the_macs_album_page_draws_album_infos_folder`).
+6. **The Mac's Folder missing with logins off or break-glass**: see Properties above - `test_the_macs_album_page_draws_album_infos_folder`.
+7. **The songs box's least could pass its most** (an album of one or two songs): `min(..., tall)`.
+8. **New playlist's Create and Cancel** stand one over the other at the accessibility sizes, each across the row.
+9. **A gone or empty playlist's ••• on the phone** had nothing: it holds `PlaylistDownloadMenuSection` (Remove
+   Download while a download is here; dimmed with none), as the bar's control did.
+10. **AlbumDownloadControl and PlaylistDownloadControl** - unused since the control left the bar - are deleted, and
+    the comments that named them say what holds their words now. The test asserts neither name is in the app's code.
+11. **The bar's title**: the album page's principal is outside what only the phone draws, as the playlist's is - the
+    two pages agree on the Mac.
+12. **The fold**: the toolbar fits beside the panel; the guide, check 553 and these notes say so.
+13. **"0 playlists" offline**: `playlistsStatus` is nothing for none, and counts the rows listed (Find's).
+14. **TrackRow's spoken label** starts with the track number again.
+15. **"Folder" against Album info's "Folders"**: Properties take Album info's own row, label and all.
+16. **Add to Queue twice for VoiceOver?** AddToQueueAction was already one modifier with the action inside it;
+    AddToPlaylistAction is now the same (it branched between `content` and `content` with an action). Whether the
+    List's own swipe action also reaches the one-element row as a second "Add to Queue" only a device can say - check
+    556.
+17. **The phone title at 62**: 56 (see 3).
+
+**The review's mutations** (17 runs), each applied alone, run and restored byte for byte - every one caught: the
+drawing's widths back (by test_playlists_columns_fit_beside_the_side_panel, and by Core's fit test), the columns
+never dropped, the page not fitting them, no disc rows (Core) and the rows not handed to the list, the number a
+fixed width and unscaled, the selection kept at the page, `playable` without its row check and without
+`chosen.route.id == selected`, no 200 ms rest, `folders: true`, the bridge's answer never kept, the box's least
+unclamped, "0 playlists" for none (Core), and the number not spoken. (A first try - Songs 64 to 80 alone - wasn't
+caught, rightly: it still fits, so it was replaced by the drawing's widths, which don't.)
+
+### For James: left as they are
+
+- **Play next and Play last on the Mac** - left out, as on the phone (16 Nov: Add to Queue is the one queue item).
+- **The Mac's rows at 30 with a 20 cover**, not the drawing's 40 with 28: R2's MacColumnList, shared by every list.
+- **Edit restarts the Mac playlist page's task**: PlaylistView's modifiers sit on a Group whose one child flips
+  between the desk and the phone's form as Edit opens and closes, so each flip is a disappear and an appear - the
+  load task (no ask while Edit is open; one ask again as it closes), followProgress, `shown` and
+  `navigation.pageGone` run again. Whether pageGone running mid-Edit matters on the Mac (a sidebar row clicked again
+  no longer stopping at the page) wasn't checked; moving the modifiers off the Group would touch the phone's page,
+  which R5 left as it was.

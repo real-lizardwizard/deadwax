@@ -273,7 +273,9 @@ def test_the_macs_albums_and_artists_are_its_own_column_lists():
     assert "case .allSongs: SongsScreen()" in pages
     # the root's Albums and Artists too, in the pager's place - never on the iPhone, whose LibraryView has no desk
     view = bare(source("Library/LibraryView.swift"))
-    assert "let desk = Platform.mac && list != .downloaded && (shownPage == .albums || shownPage == .artists) ? self.desk : nil" in view
+    # (R5) and Playlists, whatever the side
+    assert re.sub(r"\s+", " ", "let desk = Platform.mac && (list != .downloaded && (shownPage == .albums || shownPage == .artists) "
+                  "|| shownPage == .playlists) ? self.desk : nil") in re.sub(r"\s+", " ", view)
     assert re.search(r"extension LibraryView where Desk == EmptyView \{\s*init\(\) \{\s*desk = nil\s*\}", view)
     # the drawings' columns and widths
     albums = bare(source("Mac/Library/MacAlbumsPage.swift"))
@@ -443,8 +445,10 @@ def test_last_played_is_read_against_a_now_that_moves_with_the_day():
 
 
 def test_arrow_keys_ask_only_once_the_selection_rests():
-    # finding 8: the selected row's model once the selection has rested 200 ms; the album it leaves let go
-    for name in ("Mac/Library/MacAlbumsPage.swift", "Mac/Library/MacArtistsPage.swift"):
+    # finding 8: the selected row's model once the selection has rested 200 ms; the album it leaves let go - (R5's
+    # review) and Playlists' selected playlist, asked for Play and Shuffle the same way
+    for name in ("Mac/Library/MacAlbumsPage.swift", "Mac/Library/MacArtistsPage.swift",
+                 "Mac/Library/MacPlaylistsPage.swift"):
         code = bare(source(name))
         assert "private static let rest: UInt64 = 200_000_000" in code, name
         task = flat(body(code, ".task(id: ChosenKey("))

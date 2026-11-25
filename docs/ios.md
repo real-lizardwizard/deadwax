@@ -295,8 +295,33 @@ menus and keys, and these differences.
   in Grid nothing is lit (choosing Grid lets the lit row go), so Play is dimmed there, and holding the pointer over it
   says to select one in List. **Shuffle** shuffles your library (All's, the collection), in Grid as in List. Grid or
   List is kept on this Mac, apart from the phone's. How many albums (or artists) and songs (or albums - each counted
-  once) are listed, and "1 selected", are in the status bar along the foot. The Library's other pages - Playlists, Songs - are still the phone's, under its
-  row of buttons and its •••. An album's page, an artist's and the album you don't have sit in the middle of the page at a readable width (760 points); they scroll with the pointer
+  once) are listed, and "1 selected", are in the status bar along the foot. **Playlists** is a list in columns too:
+  **Playlist**, **Songs**, **Length**, **Whose** ("Yours", the owner's name, or "From a file"), **Changed** (Last
+  played's words) and **On this Mac** (a chip once it's downloaded, else how far its download has got) - yours first,
+  then those shared with you, then those from files. On a page too narrow for them all, Whose and Changed are left
+  out, so the name always has room. Its toolbar has **New playlist…**, **Play** and **Shuffle** for the lit playlist
+  (dimmed until its songs have come - offline, only its songs on this Mac - and only while it's listed: a playlist
+  **Find** hides is let go) and **Find in playlists**; right-click a row for its menu; the status bar counts those
+  listed ("9 playlists · 7 yours · 2 shared with you" - only what Find finds while you type, nothing while there are
+  none). Songs is still the phone's page, under its row of buttons and its •••.
+  **An album's page** is the Mac's own since the new look, across the window: a toolbar of **Play**, **Shuffle**, **Add
+  to Queue**, **Add to a playlist…**, **Download** (once asked for, a menu headed with how far it has got) and **Edit**
+  (for someone who may edit albums). It fits the page at every window size, the side panel open or not; should it
+  ever not fit (a download's long words), all but Play and Shuffle fold into a **•••** (the right-click's items, Edit
+  album among them). Under it the cover, the title, the artist in purple, the meta line and "Played yesterday · 12
+  times" (Last played's words, moving on at midnight - Album info's **Played** says the same), the badge and the
+  download line; then the songs in columns - **#** (the song's own number, a ▶ for the one playing), **Title**,
+  **Plays** (blank for a song never played, never 0), **Length** and a **•••** - with a heading row above each disc's
+  first song where the phone has one ("Disc 2", or "Disc 2 · Live" for a disc with a title); double-click or Return
+  plays from the lit song; then **Properties**: Released, Added, Format, Size (only when every song says its own) and,
+  for an admin, **Folder** (or **Folders**, for an album in more than one), as Album info shows it. The status bar
+  has the songs, their length and the size.
+  **A playlist's page** is drawn the same way: the toolbar (Play, Shuffle, Add to Queue, Add to a playlist…, Download,
+  Edit - dimmed for one you can't change), the mosaic, the name, whose it is and when it changed, its songs and length,
+  then the songs in columns - **#**, **Title**, **Album** and **Length**. Its **Edit** is the phone's form, as before.
+  There's no Play Next or Play Last (the queue's one item is Add to Queue, as on the phone and in the right-click), and
+  no list of the album's other pressings. An artist's page and the album you don't have sit in the middle of the page at a readable
+  width (760 points); they scroll with the pointer
   anywhere across the page, their scroll bar at its right edge. Pages you've opened stay as you left them as you move
   between the sidebar's rows - Library, Search, Requests and Settings each keep their pages, where you'd scrolled to and
   what you'd typed or begun, a playlist's Edit included, as the phone's tabs keep them. One thing starts again: All's
@@ -411,7 +436,7 @@ The rest of the differences:
   and **Share the Correction Alone** hand it to the Mac's Share menu - AirDrop, Mail. The correction alone needs a
   correction, as on the phone (dimmed otherwise). A file saved or shared imports again.
 - **Managing on a big screen.**
-  - **Edit album** is a sheet 760 points wide - the width an album's page reads at - and as tall as the window less 40
+  - **Edit album** is a sheet 760 points wide - the width an artist's page reads at - and as tall as the window less 40
     points above and below, so it always fits inside the window, whatever its size (on macOS 15 or later; on macOS 14
     it's the size macOS gives a sheet). Release, Tags, Artwork, Lyrics and Delete album… open inside it, as on the phone.
   - **Manage's pages** - Edit an album's Choose the folder, Needs a look, Library care, In nobody's library, Server
@@ -777,7 +802,9 @@ Library - see [Set up Navidrome](#set-up-navidrome).
   your library** or only **In the collection**. With logins off, and for the break-glass `deadwax`
   sign-in, every album reads In your library.
 - **Play** plays the album from its first song. **Shuffle** plays it in a random order, with Shuffle
-  on. Play is the web app's purple button, white on purple; Shuffle beside it the web app's grey one.
+  on. Play is the purple button, Shuffle beside it the grey one, both square (at the largest text sizes one over the
+  other).
+- **The top row**: ‹ back, and at the right **Edit** (see below), then the **•••**.
 - **Pull down** at the top of the page, a good way past it, as on the Library's pages (see [Shuffling your
   library](#shuffling-your-library)): the ring over the cover fills, "Pull to shuffle"; at the line a tick and the
   purple disc, "Release to shuffle"; let go and the album plays just as **Shuffle** plays it. While deadwax can't be
@@ -794,12 +821,12 @@ Library - see [Set up Navidrome](#set-up-navidrome).
   **•••** at the top has them for the whole album (see [the Queue](#queue) and [Add to a
   playlist](#add-to-a-playlist)). Each menu opens from the ••• you tapped, and a tap anywhere else
   closes it.
-- **Edit album**, in the last part of the top •••'s menu, for someone who may edit albums (Edit albums or Look after
-  the library - an admin, or everyone with logins off): the album's editor, on a sheet over the tabs - see [Edit
-  album](#edit-album). It isn't there while deadwax can't be reached, or for an album gone from the collection.
-- **Album info**, in the same last part of the top •••'s menu (above Edit album), for everyone: everything
-  known about the album, on a sheet of its own with **Done**. See [Album info](#album-info). **Refresh** ends that
-  part: the album asked for again now.
+- **Edit**, at the top right before the •••, for someone who may edit albums (Edit albums or Look after the library -
+  an admin, or everyone with logins off): the album's editor, on a sheet over the tabs - see [Edit
+  album](#edit-album). It's dimmed while deadwax can't be reached, and for an album gone from the collection. (A
+  right-click on the album elsewhere on the Mac still has **Edit album** in its menu.)
+- **Album info**, in the last part of the top •••'s menu, for everyone: everything known about the album, on a sheet
+  of its own with **Done**. See [Album info](#album-info). **Refresh** ends that part: the album asked for again now.
 - **Add to my library** and **Remove from my library**, with logins on. Removing takes the album out
   of your library only: "it's still in the collection, and nothing was deleted."
 - **The artist's name**, in purple, opens [their page](#artists). An album that names no artist to go to
@@ -810,13 +837,11 @@ Library - see [Set up Navidrome](#set-up-navidrome).
 
 **Downloading it** (see [Downloads](#downloads)):
 
-- **The download button**, at the top right beside the •••: a tap on the arrow downloads every song
-  of the album that isn't on the phone yet. Once it's asked for, the button shows how it's going - a
-  ring filling while it downloads, a dotted arrow while it waits, a filled arrow once it's all here,
-  an amber **!** if a song didn't download - and a tap opens a menu that says so in words ("Waiting
-  for Wi-Fi" with "Download over is Wi-Fi only - in Settings > Downloads." under it, "Downloaded · 412 MB",
-  "2 songs didn't download" and why), with **Remove Download** (and **Download Again** when a song
-  didn't download). So a tap meant for the ••• beside it never throws a download away.
+- **Download**, in the top •••'s menu (where the download button at the top right was until the new look): it
+  downloads every song of the album that isn't on the phone yet. Once it's asked for, that part of the menu is
+  headed with how it's going, in words ("Downloading - 4 of 12", "Waiting for Wi-Fi" with "Download over is Wi-Fi
+  only - in Settings > Downloads." under it, "Downloaded · 412 MB", "2 songs didn't download" and why), with
+  **Remove Download** (and **Download Again** when a song didn't download). VoiceOver says when it has finished.
 - **Under the title**, the same in words: "Downloading - 4 of 12", "Waiting for Wi-Fi", "Downloaded",
   "3 of 12 songs downloaded", "2 songs didn't download".
 - **Each song** has its mark before its time, and its **•••** has **Download** (or **Remove
@@ -824,16 +849,16 @@ Library - see [Set up Navidrome](#set-up-navidrome).
   says "Removed from this phone: Dummy".
 - **Under the songs**: "412 MB on this phone", or "3 of 12 songs on this phone · 92 MB".
 - An album that's gone from the collection, with songs of it still on the phone, says "This album
-  isn't in the collection any more - the songs on this phone still play.", and its button has only
+  isn't in the collection any more - the songs on this phone still play.", and its ••• has only
   Remove Download.
 
 With [Download your library](#your-library-on-this-phone) on:
 
-- An album it downloaded has the same button, its menu headed "Downloaded with your library". **Remove
+- An album it downloaded has the same Download part in the •••, headed "Downloaded with your library". **Remove
   Download** removes it, and your library then leaves it off this phone - the page says "You removed
-  this download - your library leaves it off this phone." - until you download it again with the arrow.
+  this download - your library leaves it off this phone." - until you download it again with **Download**.
 - An album of your library that doesn't fit says, under the title, "Your library doesn't all fit in 20
-  GB - this one waits for room." The arrow downloads it anyway, as yours: first in line, and never
+  GB - this one waits for room." **Download** downloads it anyway, as yours: first in line, and never
   removed to make room.
 - A song your library downloaded has no Remove Download of its own (it would only come back): remove
   its album instead.
@@ -1123,7 +1148,8 @@ open its page. Nothing plays from the list itself.
 **New playlist…** is at the end of the Playlists page's line, under the Library's buttons (it was the **+** at
 the top, then the Library's •••'s), offered while deadwax can be reached: type its name (up
 to 200 letters) and **Create**. It's made in Navidrome, as you, empty, and its page opens - add songs to it
-with **Add to a playlist…**. If it can't be made, the sheet stays open and says why.
+with **Add to a playlist…**. If it can't be made, the sheet stays open and says why. **Create** and **Cancel** sit
+side by side - one over the other at the largest text sizes.
 
 **A playlist's page** is laid out as an album's:
 
@@ -1138,19 +1164,21 @@ with **Add to a playlist…**. If it can't be made, the sheet stays open and say
   shuffle". It shows nothing while the playlist is loading, couldn't be loaded, has gone or is empty, and while
   **Edit** is open. A pull doesn't refresh the page any more: it's asked for as it shows, as before, and ••• >
   **Refresh** (at the end of the top •••'s menu) asks now.
-- **The songs**, each with its own album's cover, and its artist and album under its title; the song
-  playing has moving bars over its cover. A song that's in the playlist twice is there twice. **Swipe a
+- **The songs**, each with its artist and album under its title (no cover of its own since the new look); the song
+  playing has its title in purple, with moving bars before it. A song that's in the playlist twice is there twice. **Swipe a
   song right** to add it to the queue (see [Adding to the queue](#adding-to-the-queue)). Under the songs: how
   many and how long.
 - **•••** at the end of a song's row has **Add to Queue** and **Add to a playlist…** for that song, and
   **Download** (or **Remove Download**, or **Download Again**) for it alone; the **•••** at the top has Add
   to Queue and Add to a playlist… for the whole playlist, and **Download** for the playlist as one (see
-  [Downloading a playlist](#downloading-a-playlist)), as the arrow beside it does.
+  [Downloading a playlist](#downloading-a-playlist)), headed with how far it has got. **Edit** sits before the
+  •••, for a playlist you may change.
 - When Navidrome counts songs it isn't listing just now: "2 songs in this playlist aren't in the
   library just now - deleted, or being moved."
 - A playlist deleted elsewhere says "This playlist isn't on Navidrome any more - deleted in another
   app, maybe." An empty one says "Nothing in this playlist yet. Add songs from a song's or an album's
-  ••• menu - Add to a playlist - or from Now Playing's ••• while a song plays."
+  ••• menu - Add to a playlist - or from Now Playing's ••• while a song plays." Either one's **•••** at the top
+  still has **Remove Download** while a download of it is on the phone.
 - The page shows at once when you go back to it, or open one of the last few again, and is asked for
   again as it shows, and when you come back to the app with it open. If that fails it stays as it was, under "Couldn't update this playlist - showing it
   as it was."; with nothing to show: "Couldn't open this playlist." and why, with **Try again**.
@@ -1217,14 +1245,14 @@ page closes all the same, saying so.
 
 ### Downloading a playlist
 
-**Download** a playlist with the arrow at the top right of its page, beside its •••, or with
-**Download** in that •••. Its songs come as an album's do - each the very file deadwax has - and the
+**Download** a playlist with **Download** in the ••• at the top right of its page (on the Mac, the
+toolbar's **Download**). Its songs come as an album's do - each the very file deadwax has - and the
 whole playlist is planned at once: it waits for room under the storage limit, or for space on the
 phone, as one, never half of it. A song of it already on its way - one you were downloading yourself,
 say - carries on, and the rest wait together. The playlist itself is kept on the phone, so it opens
-and plays with no connection. While its songs come, the arrow is a ring and the page says how far it
+and plays with no connection. While its songs come, the page says how far it
 has got ("Downloading - 4 of 12 songs"); once they're all here, "This playlist is downloaded - it plays
-with no connection." Tap the mark for what it's doing, with **Remove Download** - and **Download
+with no connection." The •••'s Download part says what it's doing, with **Remove Download** - and **Download
 Again** for songs that didn't come.
 
 - **It keeps in step.** Change it anywhere - add a song in the web app or Amperfy - and the phone
@@ -3353,7 +3381,7 @@ removed but by you.
 
 ## Downloads
 
-Download an album from its page (the arrow at the top right), a song from its **•••**, or what's
+Download an album from its page (**Download** in the top •••, or the toolbar's on the Mac), a song from its **•••**, or what's
 still to play from Now Playing's **•••**. A downloaded song is the very file deadwax has - a FLAC as
 FLAC, an MP3 as MP3 (Ogg, Opus and WMA come as MP3, which iOS can play) - and it's what plays from then
 on, online or not, bit for bit as deadwax sent it, through the same seamless joins and the same
@@ -6393,6 +6421,45 @@ the **•••**. On the phone the mini player and the tab bar take the new loo
   sits over its icon's top right corner. At the largest text sizes the bar grows only so far; touch and hold a tab to
   see it bigger.)
 - **549 Both phones.** **Not done yet.** Green Anole: the rest as before. Ethan's: 547-548, or "not done yet".
+
+#### An album, Playlists, a playlist (553-558)
+
+**Not done yet.** On the Mac an album's page, Playlists and a playlist's page become its own: a toolbar, a column list
+of the songs (or the playlists) and the facts in the status bar. On the phone an album's page and a playlist's are
+redrawn: square, the cover at the top, **Play** and **Shuffle** side by side, and the bar's **•••** holding Download
+where the download button was. Nothing is played, added or downloaded any differently.
+
+- **553 An album.** **Not done yet.** On the Mac every toolbar action works. Plays match Navidrome's; Properties matches
+  the folder. (The toolbar: **Play**, **Shuffle**, **Add to Queue**, **Add to a playlist…**, **Download** and, if you
+  may edit the album, **Edit** at its end; it fits a window of 880 and one of 1280 with the side panel open - should it
+  ever not, it folds to Play, Shuffle and a **•••** with the rest. Download downloads at once with nothing of the
+  album on this Mac, otherwise it is a menu saying how far it has got. A song played no times shows no number under
+  **Plays**, never 0. An album of several discs, or with a disc titled, has a heading row above each disc's first
+  song ("Disc 2 · Live"), its songs numbered 1, 2, 3 under it. A double-click or Return plays from a song; a
+  right-click on a song, or on the top of the page, gives its menu. **Properties** shows Released, Added, Format, Size
+  - only when every song gives its size - and, for an admin, the Folder (Folders for more than one) as Album info
+  shows it, with logins off too. Under the album's name: "Played yesterday · 12 times", once it has been played.)
+- **554 Playlists.** **Not done yet.** The columns are right. On a playlist, Play, Edit order, Rename and Delete work.
+  (Playlists' columns: Playlist, Songs, Length, Whose - Yours, the owner's name, or From a file - Changed and On this
+  Mac, the name keeping room in a window of 880 and one of 1280 with the side panel open. Yours come first, then
+  those shared with you, then those from files. **New playlist…** makes one and opens it; Play and Shuffle play the
+  playlist selected once its songs have come - type in Find until it's hidden and they dim. Offline with nothing
+  downloaded, the status bar says nothing, never "0 playlists". A playlist's **Edit** opens the form - drag the songs
+  into order, change the name, **Delete playlist** at its foot - and **Done** saves it.)
+- **555 Played.** **Not done yet.** Albums' Info and the album page agree on when and how often it was played. (Leave
+  the page open past midnight: "today" becomes "yesterday" on both.)
+- **556 An album on the phone.** **Not done yet.** As drawn. The ••• adds to the queue, to a playlist, and downloads,
+  saying the download's state. Play, Shuffle, the pull and a row's swipe work. (The top row: ‹ back, **Edit** if you
+  may edit the album, then the **•••**: Add to Queue, Add to a playlist…, Download - headed with how far it has got -
+  then Album info and Refresh. No Play Next or Play Last. Play and Shuffle are 48 points tall, side by side; at the
+  largest text sizes they stand one over the other. At the largest text size a song's number - even 100 or more - has
+  its room before the title. With VoiceOver a song reads its number first, then its title, and its actions hold
+  **Add to Queue** once.)
+- **557 A playlist on the phone.** **Not done yet.** Edit, Play, Shuffle and Download work. (The •••'s Download items
+  are headed with the playlist's line; each song's album shows under its title. A playlist that has gone, or has no
+  songs, still offers **Remove Download** in the ••• while a download of it is here. **New playlist…**'s Create and
+  Cancel stand one over the other at the largest text sizes.)
+- **558 Both phones.** **Not done yet.** Green Anole: the rest as before. Ethan's: 556-557, or "not done yet".
 
 #### Requests (570-573)
 

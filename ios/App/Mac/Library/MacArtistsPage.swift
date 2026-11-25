@@ -332,7 +332,7 @@ struct MacArtistsPage: View {
 }
 
 /// The Library's root on the Mac (R2): Albums and Artists as the Mac's own pages, in the person's scope - what
-/// LibraryView draws in the pager's place for them (MacLibrary.root()).
+/// LibraryView draws in the pager's place for them (MacLibrary.root()). (R5) And Playlists, the Mac's own list.
 struct MacLibraryDesk: View {
     let page: LibraryPage
     let scope: AlbumScope
@@ -341,6 +341,8 @@ struct MacLibraryDesk: View {
         switch page {
         case .artists:
             MacArtistsPage(scope: scope)
+        case .playlists:
+            MacPlaylistsPage()
         default:
             MacAlbumsPage(scope: scope)
         }

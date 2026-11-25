@@ -311,7 +311,9 @@ struct LibraryView<Desk: View>: View {
         let shownPage = self.shownPage
         // (R2) All's albums are the collection's - (its review) always, Downloaded being Yours' stand-in alone
         let list = side.albums(albums)
-        let desk = Platform.mac && list != .downloaded && (shownPage == .albums || shownPage == .artists) ? self.desk : nil
+        // (R5) and Playlists, the Mac's own list - whatever the side, playlists being no scope's
+        let desk = Platform.mac && (list != .downloaded && (shownPage == .albums || shownPage == .artists)
+            || shownPage == .playlists) ? self.desk : nil
         return VStack(spacing: 0) {
             if desk == nil {
                 LibraryTop(finding: finding, findLabel: findPrompt(shownPage), openFind: { openFind() }) {

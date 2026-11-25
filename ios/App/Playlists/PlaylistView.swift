@@ -3,15 +3,16 @@ import SwiftUI
 
 /// One playlist's page (Phase 4, phase4-library.md 3.3; the web's app/PlaylistPage.tsx), laid out as an album's page:
 /// Navidrome's 2x2 mosaic, the name, whose it is, why there is no Edit (when there is none), its description, the count
-/// and length, Play and Shuffle; the songs not listed just now; the songs, each with its own cover; the footer. The bar's
-/// ••• is the whole playlist's Add to Queue and Add to a playlist….
+/// and length, Play and Shuffle; the songs not listed just now; the songs (each with its own cover until R5, its album
+/// under its title since); the footer. The bar's ••• is the whole playlist's Add to Queue and Add to a playlist….
 ///
 /// PLAYING is PlayerModel.play(playlist:) with the songs in hand - from Play, Shuffle and a row's tap, in the tap,
 /// nothing awaited first (the gesture rule): each song with its own album, at the songs level, the albums its songs are
 /// on remembered first (PlaylistPlay: stubs, an album held whole kept as it is). A row's ••• is the song's own Add to
 /// Queue, Add to a playlist… and its download items (and a row's swipe right, Add to Queue); the bar's has the
-/// playlist's own, as one (slice 3,
-/// question 7) - Download, Download Again, Remove Download - as the control beside it (PlaylistDownloadControl).
+/// playlist's own, as one (slice 3, question 7) - Download, Download Again, Remove Download - headed with its state
+/// since R5, when the control that sat beside it left the bar; for a playlist gone or with no songs, the download items
+/// alone, so a download of it here can still be removed.
 ///
 /// ASKED as it opens (PlaylistPageModel) - drawn at once from the answer kept for it (PlaylistsModel), else the hero
 /// from the row that opened it - and again each time it shows, the app coming back to the front included, and when a
@@ -44,8 +45,20 @@ import SwiftUI
 /// "Nothing on this phone to shuffle"; with no songs to draw (loading, failed, gone, empty) nothing is drawn and
 /// nothing plays (ShuffleCan.page). The pull never refreshes now, as the Library's doesn't: the page is asked as it
 /// shows, as before, and the bar's •••'s Refresh asks now (offline, whether deadwax is back).
-struct PlaylistView: View {
+///
+/// THE REDESIGN, SLICE R5 (iPlaylist.dc.html, Playlist.dc.html; notes/ios.md "The redesign, slice R5: an album,
+/// Playlists, a playlist"):
+/// - On the phone the bar holds iOS's back, Edit (as before) and the •••, iOS's own menu: Add to Queue, Add to a
+///   playlist…, the playlist's Download items headed with its control's words - the control left the bar - and Refresh.
+///   The hero and the rows are iPlaylist's: the cover 150, the name, whose and how long, the shared Play and Shuffle,
+///   the rows 60 tall with each song's album under its title. The pull and the rows' swipe stay.
+/// - On the Mac (`desk`, from MacAlbum.page(for:)), MacPlaylistPage draws the playlist in the List's place while Edit
+///   isn't open, handed this page's own model and actions (PlaylistDesk); Edit - the order, the name, Delete playlist -
+///   is this page's form on both. On the iPhone there is no desk (`init(route:)`).
+struct PlaylistView<Desk: View>: View {
     let route: PlaylistRoute
+    /// (R5) The Mac's playlist page, drawn in the List's place out of Edit - none on the iPhone.
+    private let desk: ((PlaylistDesk) -> Desk)?
 
     @Environment(ServerModel.self) private var server
     @Environment(PlayerModel.self) private var player
@@ -80,8 +93,10 @@ struct PlaylistView: View {
         case top, problem
     }
 
-    init(route: PlaylistRoute) {
+    /// (R5) The Mac's: the playlist drawn by `desk` (MacPlaylistPage) out of Edit.
+    init(route: PlaylistRoute, desk: @escaping (PlaylistDesk) -> Desk) {
         self.route = route
+        self.desk = desk
         _model = State(initialValue: PlaylistPageModel(route: route))
     }
 
@@ -95,43 +110,18 @@ struct PlaylistView: View {
         let playable = self.playable
         let can = pullCan(playable)
         ScrollViewReader { proxy in
-            List {
-                PlaylistHero(model: model, download: model.gone ? nil : downloads.playlistState(route.id),
-                             smart: downloads.playlistIsSmart(route.id, answer: model.answer),
-                             playable: !playable.isEmpty && !editing,
-                             play: { play(at: 0) }, shuffle: { play(at: nil, shuffle: true) })
-                    .overlay(alignment: .top) {
-                        // the pull's graphic, in the room the pull opens above the hero, as the Library's above its
-                        // first row: its foot at the hero's top
-                        PullShuffleGraphic(state: pull, can: can, of: .page)
-                            .fixedSize(horizontal: false, vertical: true)
-                            .alignmentGuide(.top) { (drawn: ViewDimensions) -> CGFloat in drawn[.bottom] }
-                    }
-                    .listRowSeparator(.hidden)
-                    .id(Place.top)
-                    .onAppear { setTitleInBar(false) }
-                    .onDisappear { setTitleInBar(true) }
-
-                // changed in another app while it was being edited: said where the playlist begins
-                if let note = model.note, !editing {
-                    ErrorNote(text: note)
-                        .listRowSeparator(.hidden)
-                        .accessibilityFocused($focus, equals: .top)
-                }
-
-                if editing {
-                    editSections()
+            Group {
+                if let desk, Platform.mac, !editing {
+                    desk(PlaylistDesk(model: model, playable: playable, offline: !online, menu: playlistMenu,
+                                      edit: model.editable ? { beginEdit() } : nil, canEdit: model.canBegin,
+                                      play: { play(at: 0) }, shuffle: { play(at: nil, shuffle: true) },
+                                      playRow: { (row: Int) -> Void in play(row: row) },
+                                      row: { (song: Song) -> QueueMenuRequest in rowMenu(song) },
+                                      retry: { Task { await model.retry(client: server.client, playlists: playlists) } }))
                 } else {
-                    if model.hidden > 0 {
-                        QuietLine(text: PlaylistRules.hiddenWords(model.hidden))
-                            .listRowSeparator(.hidden)
-                    }
-                    pageRows(songs, online: online)
+                    page(proxy, online: online, songs: songs, editing: editing, can: can, playable: playable)
                 }
             }
-            .listStyle(.plain)
-            // the pull shuffles the playlist (never refreshes), while the page is the one on top and Edit isn't open
-            .pullsToShuffle(PullShuffling(state: pull, can: can, on: shown && !editing, start: pulled))
             // (the Mac app, slice 2) ⌘R: the •••'s Refresh, while the page shows; nothing on the iPhone
             .refreshCommand { refresh() }
             .environment(\.editMode, .constant(editing ? .active : .inactive))
@@ -188,6 +178,53 @@ struct PlaylistView: View {
         }
     }
 
+    /// The phone's page (and the Mac's in Edit): the List of the hero, the notes, Edit's form or the songs.
+    private func page(_ proxy: ScrollViewProxy, online: Bool, songs: [Song], editing: Bool, can: ShuffleCan,
+                      playable: [Song]) -> some View {
+            List {
+                PlaylistHero(model: model, download: model.gone ? nil : downloads.playlistState(route.id),
+                             smart: downloads.playlistIsSmart(route.id, answer: model.answer),
+                             playable: !playable.isEmpty && !editing,
+                             play: { play(at: 0) }, shuffle: { play(at: nil, shuffle: true) })
+                    .overlay(alignment: .top) {
+                        // the pull's graphic, in the room the pull opens above the hero, as the Library's above its
+                        // first row: its foot at the hero's top
+                        PullShuffleGraphic(state: pull, can: can, of: .page)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .alignmentGuide(.top) { (drawn: ViewDimensions) -> CGFloat in drawn[.bottom] }
+                    }
+                    .listRowSeparator(.hidden)
+                    .listRowInsets(EdgeInsets())
+                    .listRowBackground(Color.clear)
+                    .id(Place.top)
+                    .onAppear { setTitleInBar(false) }
+                    .onDisappear { setTitleInBar(true) }
+
+                // changed in another app while it was being edited: said where the playlist begins
+                if let note = model.note, !editing {
+                    ErrorNote(text: note)
+                        .listRowSeparator(.hidden)
+                        .accessibilityFocused($focus, equals: .top)
+                }
+
+                if editing {
+                    editSections()
+                } else {
+                    if model.hidden > 0 {
+                        QuietLine(text: PlaylistRules.hiddenWords(model.hidden))
+                            .listRowSeparator(.hidden)
+                    }
+                    pageRows(songs, online: online)
+                }
+            }
+            .listStyle(.plain)
+            // the pull shuffles the playlist (never refreshes), while the page is the one on top and Edit isn't open
+            .pullsToShuffle(PullShuffling(state: pull, can: can, on: shown && !editing, start: pulled))
+            // (R5) the page's ground, iPlaylist's
+            .scrollContentBackground(.hidden)
+            .background(DWPalette.bg)
+    }
+
     /// The page's songs out of Edit: gone, failed, offline, loading, empty, or the rows and their footer.
     @ViewBuilder private func pageRows(_ songs: [Song], online: Bool) -> some View {
         if model.gone {
@@ -219,9 +256,10 @@ struct PlaylistView: View {
             } else {
                 rows(songs, offline: !online)
                 Text(PlaylistRules.songsLine(songs.count, seconds: PlaylistRules.total(songs)))
-                    .font(Typeface.footnote)
-                    .foregroundStyle(Palette.quiet)
+                    .font(Typeface.Phone.text(.small))
+                    .foregroundStyle(DWPalette.t3)
                     .listRowSeparator(.hidden, edges: .bottom)
+                    .listRowBackground(Color.clear)
             }
         }
     }
@@ -258,7 +296,8 @@ struct PlaylistView: View {
                     .disabled(model.busy || model.needsName)
                     .accessibilityFocused($focus, equals: .toggle)
             }
-        } else {
+        } else if desk == nil || !Platform.mac {
+            // (R5, iPlaylist's top row) Edit, then the ••• - iOS's own menu, holding Download in the control's place
             if model.editable {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button(PlaylistWords.edit) { beginEdit() }
@@ -266,15 +305,24 @@ struct PlaylistView: View {
                         .accessibilityFocused($focus, equals: .toggle)
                 }
             }
-            // (slice 3) before the •••, as the album page's download control sits beside its own
             ToolbarItem(placement: .topBarTrailing) {
-                PlaylistDownloadControl(answer: model.gone ? nil : model.answer, id: route.id, gone: model.gone)
-            }
-            ToolbarItem(placement: .topBarTrailing) {
-                QueueMenu(request: playlistMenu) {
-                    Image(systemName: "ellipsis.circle")
+                if let menu = playlistMenu {
+                    QueueMenu(request: menu) {
+                        Image(systemName: "ellipsis")
+                    }
+                    .accessibilityLabel(PlaylistWords.moreForPlaylist)
+                } else {
+                    // (R5's review) gone, or with no songs to queue: the ••• keeps the playlist's download items -
+                    // Remove Download while a download of it is here - as the bar's control beside it did
+                    Menu {
+                        PlaylistDownloadMenuSection(answer: model.gone ? nil : model.answer, id: route.id, titled: true)
+                    } label: {
+                        Image(systemName: "ellipsis")
+                    }
+                    .menuOrder(.fixed)
+                    .disabled(downloads.playlistState(route.id) == nil || !downloads.isOpen)
+                    .accessibilityLabel(PlaylistWords.moreForPlaylist)
                 }
-                .accessibilityLabel(PlaylistWords.moreForPlaylist)
             }
         }
     }
@@ -288,12 +336,21 @@ struct PlaylistView: View {
             let state = downloads.state(song.id)
             PlaylistSongRow(song: song, current: PlayingBars.marks(song, heard: heard), playing: player.isPlaying,
                             play: { play(row: index) },
-                            menu: QueueMenuRequest(pick: PlaylistPlay.pick(song: song), album: nil),
+                            menu: rowMenu(song),
                             download: state, slot: slot, dimmed: offline && !state.isHere,
                             actions: downloads.isOpen ? downloads.choices(song: song.id) : []) { choice in
                 act(choice, on: song)
             }
+            // (R5) iPlaylist's .row.tall: edge to edge, on the row's rule
+            .listRowInsets(EdgeInsets())
+            .listRowSeparatorTint(DWPalette.rowRule)
+            .listRowBackground(Color.clear)
         }
+    }
+
+    /// A song's own •••: the one song, with its own album - its row's on the phone, its right-click on the Mac.
+    private func rowMenu(_ song: Song) -> QueueMenuRequest {
+        QueueMenuRequest(pick: PlaylistPlay.pick(song: song), album: nil)
     }
 
     /// The bar's •••: the whole playlist, as songs, with the playlist's own download items (slice 3) - nil (the •••
@@ -623,6 +680,42 @@ struct PlaylistView: View {
     }
 }
 
+extension PlaylistView where Desk == EmptyView {
+    /// The iPhone's page (and every one but the Mac's own): no desk.
+    init(route: PlaylistRoute) {
+        self.route = route
+        desk = nil
+        _model = State(initialValue: PlaylistPageModel(route: route))
+    }
+}
+
+/// (R5) What the Mac's playlist page (MacPlaylistPage) is handed by PlaylistView: the page's own model and its actions -
+/// every ask, write, Edit and leaving stays PlaylistView's, and the Mac draws.
+struct PlaylistDesk {
+    let model: PlaylistPageModel
+    /// What Play and Shuffle take: the songs - offline, those on this Mac.
+    let playable: [Song]
+    /// deadwax out of reach: the songs not on this Mac are dimmed.
+    let offline: Bool
+    /// The playlist's own ••• (Add to Queue, Add to a playlist…, its Download items, Refresh) - nil until its songs are
+    /// in, once gone, and while Edit is open.
+    let menu: QueueMenuRequest?
+    /// Edit - the order, the name, the description, sharing, Delete playlist: PlaylistView's own form - for a playlist
+    /// that is yours to edit; nil otherwise.
+    let edit: (() -> Void)?
+    /// Edit can open now (PlaylistPageModel.canBegin: this page's own ask answered, deadwax in reach) - dimmed till then,
+    /// as the phone's.
+    let canEdit: Bool
+    /// Play from the first song, Shuffle, a row's double-click or Return - PlaylistView's own calls, in the tap.
+    let play: () -> Void
+    let shuffle: () -> Void
+    let playRow: (Int) -> Void
+    /// A song's own •••, its right-click.
+    let row: (Song) -> QueueMenuRequest
+    /// Nothing drawn and the first ask failed: asked again.
+    let retry: () -> Void
+}
+
 /// The top of a playlist's page (PlaylistPage.tsx's hero): the mosaic at the hero's size - or the playlist mark - the
 /// name (two lines, a step smaller over 60 letters), whose it is, why there is no Edit, the description, the count and
 /// length, and Play and Shuffle, live once there are songs to play. Drawn at once from the row that opened the page.
@@ -641,83 +734,89 @@ private struct PlaylistHero: View {
         let playlist = model.playlist
         let songs = model.songs
         VStack(spacing: 0) {
-            PlaylistCover(id: playlist?.coverArt, side: AlbumHero.coverSide, pixels: CoverSize.hero)
-                .frame(maxWidth: AlbumHero.coverSide)
-                .shadow(color: .black.opacity(0.35), radius: 14, y: 6)
-                .padding(.top, 8)
+            // (R5, iPlaylist.dc.html) the cover 150, square and flat
+            PlaylistCover(id: playlist?.coverArt, side: AlbumPageLook.playlistCover, pixels: CoverSize.hero)
+                .frame(width: AlbumPageLook.playlistCover, height: AlbumPageLook.playlistCover)
+                .padding(.top, AlbumPageLook.heroTop)
 
             Text(model.name)
                 .font(Format.isLongTitle(model.name) ? Typeface.title3.bold() : Typeface.title2.bold())
+                .foregroundStyle(DWPalette.text)
                 .multilineTextAlignment(.center)
                 .lineLimit(2)
-                .padding(.top, 18)
+                .padding(.top, AlbumPageLook.playlistTitleAbove)
                 .accessibilityAddTraits(.isHeader)
 
             if let playlist {
                 Text(PlaylistRules.ownerLine(playlist))
-                    .font(Typeface.title3)
-                    .foregroundStyle(Palette.quiet)
+                    .font(Typeface.Phone.text(.small))
+                    .foregroundStyle(DWPalette.t3)
                     .multilineTextAlignment(.center)
                     .lineLimit(2)
-                    .padding(.top, 2)
+                    .padding(.top, AlbumPageLook.metaAbove)
             }
 
             // why there is no Edit (somebody else's, a file's, too many songs) - known once the songs are in
             if let answer = model.answer, !model.gone,
                let words = PlaylistRules.readOnlyWords(answer.playlist, songs: answer.songs.count) {
                 Text(words)
-                    .font(Typeface.footnote)
-                    .foregroundStyle(Palette.quiet)
+                    .font(Typeface.Phone.text(.small))
+                    .foregroundStyle(DWPalette.t3)
                     .multilineTextAlignment(.center)
                     .fixedSize(horizontal: false, vertical: true)
-                    .padding(.top, 8)
+                    .padding(.top, AlbumPageLook.metaAbove)
             }
 
             if let comment = playlist?.comment, !comment.isEmpty {
                 Text(comment)
-                    .font(Typeface.subheadline)
+                    .font(Typeface.Phone.text(.small))
+                    .foregroundStyle(DWPalette.t2)
                     .multilineTextAlignment(.center)
                     .fixedSize(horizontal: false, vertical: true)
-                    .padding(.top, 8)
+                    .padding(.top, AlbumPageLook.metaAbove)
             }
 
             // the count holds its line while the songs come, so nothing below moves as it fills
             let line = model.answer != nil && !model.gone
                 ? PlaylistRules.songsLine(songs.count, seconds: PlaylistRules.total(songs)) : ""
             Text(line.isEmpty ? " " : line)
-                .font(Typeface.footnote)
-                .foregroundStyle(Palette.quiet)
-                .padding(.top, 6)
+                .font(Typeface.Phone.text(.small))
+                .foregroundStyle(DWPalette.t3)
+                .padding(.top, AlbumPageLook.metaAbove)
                 .accessibilityHidden(line.isEmpty)
 
             // (slice 3) downloaded: the album's line, its own - and, all here, that it plays with no connection (a smart
             // one's, that it stays as it was); a smart one not downloaded: why there is no Download
             if let download, let words = PlaylistDownloadWords.heroLine(download, smart: smart, device: Platform.device) {
                 DownloadLine(download: download, line: words)
-                    .padding(.top, 6)
+                    .padding(.top, AlbumPageLook.chipsAbove)
                     .transition(.opacity)
             } else if !model.gone, let words = PlaylistDownloadWords.heroLine(download, smart: smart, device: Platform.device) {
                 Text(words)
-                    .font(Typeface.footnote)
-                    .foregroundStyle(Palette.quiet)
+                    .font(Typeface.Phone.text(.small))
+                    .foregroundStyle(DWPalette.t3)
                     .multilineTextAlignment(.center)
                     .fixedSize(horizontal: false, vertical: true)
-                    .padding(.top, 6)
+                    .padding(.top, AlbumPageLook.metaAbove)
             }
 
-            PlayButtons(enabled: playable && !model.gone, play: play, shuffle: shuffle)
-                .padding(.top, 16)
+            AlbumPlayPair(enabled: playable && !model.gone, play: play, shuffle: shuffle)
         }
+        .padding(.horizontal, AlbumPageLook.heroSide)
         .frame(maxWidth: .infinity)
     }
 }
 
-/// One song of a playlist (PlaylistPage.tsx's track row): the song's own cover, with the playing bars over it for the
-/// song the player has (still while paused); its title; its artist and album; the download slot (as an album's rows:
-/// on every row where any song has a state); its time; its ••• ("More for Roads"). A tap plays the playlist from it.
-/// VoiceOver reads it as one: "Roads, Portishead · Dummy, Downloaded, 5:04" - "playing" or "paused" for the song the
-/// player has - with the song's download items as its actions, and Add to Queue. Swiped right, the List's own leading
-/// swipe action adds the song to the queue, wherever its ••• offers Add to Queue (AddToQueueSwipe.swift).
+/// One song of a playlist (PlaylistPage.tsx's track row): its title; its artist and album; the download slot (as an
+/// album's rows: on every row where any song has a state); its time; its ••• ("More for Roads"). A tap plays the
+/// playlist from it. VoiceOver reads it as one: "Roads, Portishead · Dummy, Downloaded, 5:04" - "playing" or "paused"
+/// for the song the player has - with the song's download items as its actions, and Add to Queue. Swiped right, the
+/// List's own leading swipe action adds the song to the queue, wherever its ••• offers Add to Queue
+/// (AddToQueueSwipe.swift).
+///
+/// (R5, iPlaylist.dc.html's .row.tall) 60 tall at least, on the row's rule: the title and its line under it 16 in, the
+/// time in the mono face, the ••• in the third colour - no cover of its own, as drawn; the song the player has is its
+/// title in the accent with the playing bars before it. One VoiceOver element, the •••'s items its actions (TrackRow's).
 private struct PlaylistSongRow: View {
     let song: Song
     let current: Bool
@@ -732,74 +831,77 @@ private struct PlaylistSongRow: View {
 
     @Environment(\.dynamicTypeSize) private var typeSize
 
-    /// The cover's side: as the Library's rows.
-    private static let cover: CGFloat = LibraryRow.cover
-
     var body: some View {
         let line = PlaylistRules.songLine(song)
-        HStack(spacing: 4) {
+        HStack(spacing: 0) {
             Button(action: play) {
-                HStack(spacing: 12) {
-                    ZStack {
-                        LibraryCover(id: song.coverArt, pixels: CoverSize.row)
-                            .frame(width: Self.cover, height: Self.cover)
-                            .clipShape(Corners.artShape)
-                        if current {
-                            Corners.artShape
-                                .fill(.black.opacity(0.45))
-                                .frame(width: Self.cover, height: Self.cover)
-                            Image(systemName: "waveform")
-                                .font(Typeface.symbol(.body).weight(.semibold))
-                                .foregroundStyle(Palette.accent)
-                                .symbolEffect(.variableColor.iterative.reversing, options: .repeating, isActive: playing)
-                        }
-                    }
-                    .accessibilityHidden(true)
+                HStack(spacing: 0) {
                     VStack(alignment: .leading, spacing: 1) {
-                        Text(song.title ?? "")
-                            .foregroundStyle(current ? Palette.accent : Color.primary)
-                            .lineLimit(typeSize.isAccessibilitySize ? 3 : 1)
+                        HStack(alignment: .firstTextBaseline, spacing: AlbumPageLook.chipGap) {
+                            if current {
+                                Image(systemName: "waveform")
+                                    .font(Typeface.symbol(.footnote).weight(.semibold))
+                                    .foregroundStyle(DWPalette.acc)
+                                    .symbolEffect(.variableColor.iterative.reversing, options: .repeating, isActive: playing)
+                            }
+                            Text(song.title ?? "")
+                                .font(Typeface.body)
+                                .foregroundStyle(current ? DWPalette.acc : DWPalette.text)
+                                .lineLimit(typeSize.isAccessibilitySize ? 3 : 1)
+                        }
                         if !line.isEmpty {
                             Text(line)
-                                .font(Typeface.footnote)
-                                .foregroundStyle(Palette.quiet)
+                                .font(Typeface.Phone.text(.small))
+                                .foregroundStyle(DWPalette.t3)
                                 .lineLimit(typeSize.isAccessibilitySize ? 2 : 1)
                         }
                     }
                     .alignmentGuide(.listRowSeparatorLeading) { $0[.leading] }
                     Spacer(minLength: 8)
-                    if slot { stateSlot }
+                    if slot {
+                        stateSlot
+                            .padding(.trailing, AlbumPageLook.chipGap)
+                    }
                     Text(Format.trackTime(song.duration))
-                        .font(Typeface.subheadline.monospacedDigit())
-                        .foregroundStyle(Palette.quiet)
+                        .font(Typeface.Phone.mono(.small))
+                        .foregroundStyle(DWPalette.t3)
+                        .padding(.trailing, AlbumPageLook.timeTrail)
                 }
-                .padding(.vertical, 4)
+                .padding(.leading, AlbumPageLook.rowSide)
+                .padding(.vertical, 6)
+                .lookHeight(DWLook.here.tallRowHeight)
                 .contentShape(Rectangle())
-                .opacity(dimmed ? Palette.off : 1)
+                .opacity(dimmed ? DWPalette.off : 1)
             }
             .buttonStyle(.plain)
             .disabled(dimmed)
-            .accessibilityElement(children: .combine)
-            .accessibilityLabel(spoken(line))
-            .accessibilityActions {
-                ForEach(actions, id: \.self) { choice in
-                    Button(choice.label) { act(choice) }
-                }
-            }
-            // on the song's own element, where VoiceOver rests: the swipe's action, said for certain (TrackRow's)
-            .addToQueueAction(menu)
 
             QueueMenu(request: menu) {
                 Image(systemName: "ellipsis")
                     .font(Typeface.symbol(.body).weight(.semibold))
-                    .foregroundStyle(Palette.quiet)
+                    .foregroundStyle(DWPalette.t3)
                     .frame(minWidth: 44, minHeight: 44)
                     .contentShape(Rectangle())
             }
             .menuStyle(.button)
             .buttonStyle(.plain)
-            .accessibilityLabel(AlbumPageLines.moreForSong(song.title ?? ""))
+            // the glyph's own edge 16 from the right (.row's •••): 12 of its 44 target lie beyond it
+            .padding(.trailing, AlbumPageLook.moreTrail - 12)
         }
+        // (R5, wave B's rule) one element: its tap plays, the •••'s items its actions
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(spoken(line))
+        .accessibilityAddTraits(dimmed ? [] : .isButton)
+        .accessibilityAction {
+            if !dimmed { play() }
+        }
+        .accessibilityActions {
+            ForEach(actions, id: \.self) { choice in
+                Button(choice.label) { act(choice) }
+            }
+        }
+        .addToQueueAction(menu)
+        .addToPlaylistAction(menu)
         .addsToQueue(menu, in: .list)
         // (the Mac app, slice 2) the row's ••• on a right-click; nothing on the iPhone
         .macContextMenu { QueueMenuItems(request: menu) }
@@ -846,7 +948,7 @@ private struct QuietLine: View {
 }
 
 /// "Couldn't open this playlist. <why>" and Try again - nothing in hand and the first ask failed.
-private struct OpenFailedNote: View {
+struct OpenFailedNote: View {
     let failure: any Error
     let retry: () -> Void
 
@@ -863,7 +965,7 @@ private struct OpenFailedNote: View {
 }
 
 /// "Couldn't update this playlist - showing it as it was. <why>" - a refresh that failed, what was drawn kept.
-private struct RefreshFailedNote: View {
+struct RefreshFailedNote: View {
     let failure: any Error
 
     @Environment(ServerModel.self) private var server

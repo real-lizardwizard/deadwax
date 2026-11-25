@@ -28,9 +28,13 @@ struct MacListColumn: Equatable {
 ///   (AlbumRightClick, as the tiles' and the rows' before R2 had it): applied to the whole row, its 30 points and every
 ///   column, so a right-click anywhere on it is the row's.
 /// - VoiceOver reads a row as one element, its cells in order, selected when it is; its action opens it.
+/// - (R5's review) `lines`, for a list with headings - an album's discs: each a heading's row (.row.grp, 26 tall, the
+///   label's words 10 in, a header for VoiceOver) or a row by its id, in order; the stripes start again under each
+///   heading (MacTable.stripes), and only the rows are selected, moved through or opened. nil: the rows alone.
 struct MacColumnList<Row: Identifiable, Cell: View, Menu: ViewModifier>: View where Row.ID == String {
     let columns: [MacListColumn]
     let rows: [Row]
+    var lines: [MacTable.Line<String>]? = nil
     @Binding var selected: String?
     /// A row opened - Return, a double-click, VoiceOver's action.
     let open: (Row) -> Void
@@ -42,8 +46,13 @@ struct MacColumnList<Row: Identifiable, Cell: View, Menu: ViewModifier>: View wh
     @FocusState private var focused: Bool
 
     var body: some View {
-        let ids = rows.map { (row: Row) -> String in row.id }
-        let stripes = MacTable.stripes(ids.map { (id: String) -> MacTable.Line<String> in .row(id) })
+        let drawn = lines ?? rows.map { (row: Row) -> MacTable.Line<String> in .row(row.id) }
+        // the keys move through the rows alone, in the order drawn
+        let ids = lines.map { (given: [MacTable.Line<String>]) -> [String] in MacTable.rows(given) }
+            ?? rows.map { (row: Row) -> String in row.id }
+        let stripes = MacTable.stripes(drawn)
+        let byID = Dictionary(rows.map { (row: Row) -> (String, Row) in (row.id, row) },
+                              uniquingKeysWith: { (first: Row, _: Row) -> Row in first })
         GeometryReader { (room: GeometryProxy) in
             let widths = MacTable.widths(columns.map { (column: MacListColumn) -> MacTable.Width in column.width },
                                          total: Double(room.size.width))
@@ -52,10 +61,17 @@ struct MacColumnList<Row: Identifiable, Cell: View, Menu: ViewModifier>: View wh
                 ScrollViewReader { (proxy: ScrollViewProxy) in
                     ScrollView(.vertical) {
                         LazyVStack(spacing: 0) {
-                            ForEach(Array(rows.enumerated()), id: \.element.id) { (at: Int, row: Row) in
-                                line(row, striped: at < stripes.count && stripes[at], widths: widths)
-                                    .modifier(menu(row))
-                                    .id(row.id)
+                            ForEach(Array(drawn.enumerated()), id: \.element) { (at: Int, item: MacTable.Line<String>) in
+                                switch item {
+                                case .group(let title):
+                                    heading(title)
+                                case .row(let id):
+                                    if let row = byID[id] {
+                                        line(row, striped: at < stripes.count && stripes[at], widths: widths)
+                                            .modifier(menu(row))
+                                            .id(row.id)
+                                    }
+                                }
                             }
                         }
                     }
@@ -103,6 +119,24 @@ struct MacColumnList<Row: Identifiable, Cell: View, Menu: ViewModifier>: View wh
         .overlay(alignment: .bottom) { DWRule(colour: DWPalette.frame) }
         .accessibilityElement(children: .combine)
         .accessibilityAddTraits(.isHeader)
+    }
+
+    // MARK: a heading (R5's review)
+
+    /// A heading's row (.row.grp): its words 10 in, the label's colour at 11.5 semibold, on its own ground and the row
+    /// line's rule - never striped, selected or opened; a header for VoiceOver.
+    private func heading(_ title: String) -> some View {
+        Text(title)
+            .font(Typeface.Mac.text(.label).weight(.semibold))
+            .foregroundStyle(DWPalette.label)
+            .lineLimit(1)
+            .truncationMode(.tail)
+            .padding(.horizontal, 10)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .frame(height: CGFloat(MacLook.groupRowHeight))
+            .background(MacPalette.groupRowFace)
+            .overlay(alignment: .bottom) { DWRule(colour: DWPalette.rowline) }
+            .accessibilityAddTraits(.isHeader)
     }
 
     // MARK: a row
