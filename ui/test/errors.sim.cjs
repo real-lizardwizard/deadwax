@@ -282,8 +282,10 @@ console.log('\na download\'s reasons: every one the server writes, in a listener
   const constant = (name) => new RegExp(`^${name} = "(.+)"$`, 'm').exec(poller)?.[1]
   const literals = [
     ...[...poller.matchAll(/_fail\(slskd_client, store, job, "([^"]+)"\)/g)].map((m) => m[1]),
-    ...[...poller.matchAll(/update_status\([^)]*?"(?:complete|failed|cancelled)", "([^"]+)"\)/g)].map((m) => m[1]),
-    ...[...download.matchAll(/update_status\([^)]*?"(?:complete|failed|cancelled)", "([^"]+)"\)/g)].map((m) => m[1]),
+    //? (2.1.46) a call may carry keywords after its words - 2.1.45's cancel passes unless=FINISHED_STATUSES - so the
+    //? closing bracket needn't follow them at once
+    ...[...poller.matchAll(/update_status\([^)]*?"(?:complete|failed|cancelled)", "([^"]+)"(?:, \w+=[^)]*)?\)/g)].map((m) => m[1]),
+    ...[...download.matchAll(/update_status\([^)]*?"(?:complete|failed|cancelled)", "([^"]+)"(?:, \w+=[^)]*)?\)/g)].map((m) => m[1]),
     /failure_reason"\) or "([^"]+)"/.exec(poller)[1],
   ]
   //? (2.1.13) what the server no longer writes, but a row from before can still carry: a dry run's (filing always moves)
