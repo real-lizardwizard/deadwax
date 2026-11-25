@@ -33,6 +33,7 @@ of MusicBrainz's answers leaves it alone.
 """
 
 import asyncio
+import hashlib
 import json
 import time
 from typing import Awaitable, Callable
@@ -85,8 +86,20 @@ def release_group_key(method: str, mbid: str) -> str:
     return f"{lastfm.LASTFM_SHAPE}|{method}|group|{mbid.strip().lower()}"
 
 
+#? (2.1.44) a track's folded names past this many bytes are kept under their SHA-256 instead: the radio asks by a
+#? title and an artist of up to 500 letters each, which can fold to 33 bytes a letter - a key that would leave no
+#? room under ROW_MAX_BYTES for the row, so it would never be kept and be asked again at every radio
+TRACK_KEY_MOST = 1024
+
+
 def track_key(method: str, artist: str, title: str) -> str:
-    return f"{lastfm.LASTFM_SHAPE}|{method}|name|{name_key(artist)}|{match_key(title)}"
+    """A track's method, by its artist's name and its title folded (name_key, match_key) - or, past TRACK_KEY_MOST
+    bytes, by their SHA-256, so the key is never what stops a row being kept."""
+    folded = f"{name_key(artist)}|{match_key(title)}"
+    written = folded.encode("utf-8", "surrogatepass")
+    if len(written) > TRACK_KEY_MOST:
+        return f"{lastfm.LASTFM_SHAPE}|{method}|digest|{hashlib.sha256(written).hexdigest()}"
+    return f"{lastfm.LASTFM_SHAPE}|{method}|name|{folded}"
 
 
 def shape_prefix() -> str:

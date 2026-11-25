@@ -35,19 +35,51 @@ NO KEY: `enabled` false and `why` saying where to add one - nothing asked. REFUS
 26): kept answers are still answered, `why` in refused words; with nothing kept `enabled` is false. `why` is for whoever
 runs deadwax (auth.Explained's rule: the app shows it only to them); a blip - Last.fm down, limiting, slow - has none,
 only `unavailable`. Nothing here raises past the route: whatever goes wrong is a part that couldn't be had.
+
+RADIO (2.1.44, S5 - the design's 2.6): `GET /deadwax/lastfm/radio?song_id=&title=&artist=&scope=`, a user's route too.
+Songs of the asker's scope Last.fm calls similar to the seed, in the order the app plays them, the whole list at once
+(the app holds it and adds ten at a time; nothing is asked while it plays):
+
+  {"enabled": true, "unavailable": false, "why": null,
+   "songs": [{"id": ..., "title": ..., "artist": ..., "album": ..., "albumId": ..., "coverArt": ..., "duration": ...,
+              "contentType": ..., "suffix": ..., "samplingRate": ..., "bitDepth": ..., "channelCount": ...,
+              "track": ..., "discNumber": ...}, ...]}
+
+Each song as the Library's Shuffle answers one (routes/navidrome.py SHUFFLE_FIELDS), so the app plays it as it plays a
+shuffle's. Three things asked at once: track.getSimilar (the seed's first credit and its title as its key reads it -
+lastfm.radio_title - limit 100, autocorrect=1), kept under lastfm_kept.track_key; artist.getSimilar by that name, the
+artist page's own by-name row (artist_part); and the scope's songs AS THE ASKER (routes/navidrome.py songs_of: the
+Shuffle's list, kept ten minutes - `yours` the asker's library, never the store's). lastfm.radio_order() makes the
+radio. The Last.fm parts are waited for RADIO_DEADLINE_S at most from the start, and are kept when they come; the
+scope's songs are waited for, as the Shuffle waits.
+
+`songs` is [] only for a definite nothing - both Last.fm parts had and nothing of the scope's similar - and null when
+the radio couldn't be made - the similar tracks not had (Last.fm down, late, refusing with nothing kept) or the scope's
+songs not had (Navidrome failing as the asker, or more songs than SHUFFLE_MAX, which `why` says) - or came to nothing
+while a part couldn't be had, with `unavailable`, so the app asks again. radio_order() runs in a thread
+(asyncio.to_thread): it keys every song of the scope. The day it is seeded by is UTC's. A session Navidrome ended
+is a 401, as everywhere. No key: nothing asked of Last.fm or Navidrome.
 """
 
 import asyncio
+import time
+from typing import Literal
 
-from fastapi import APIRouter, HTTPException, Query, Request
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 
 from src.api.lastfm_endpoint import lastfm
+from src.api.navidrome_endpoint import NavidromeError, SignedOut
 from src.config import Config
 from src.lastfm import (Answer, NotKnown, Outcome, Refused, Unreachable, answerable, artist_answer, artist_info,
-                        name_key, no_key_answer, similar_artists, top_albums, top_tracks)
-from src.lastfm_kept import artist_key, kept
+                        first_credit, kept_tracks, match_key, name_key, no_key_answer, no_key_radio, radio_answer,
+                        radio_order, radio_title, similar_artists, similar_of, similar_tracks, too_big_why,
+                        top_albums, top_tracks, whole)
+from src.lastfm_kept import artist_key, kept, track_key
 from src.logger import logger
+from src.routes import navidrome as navidrome_routes
+from src.routes.navidrome import ID_MAX
 from src.routes.search_musicbrainz import MBID_PATTERN
+from src.users import current_user
 
 router = APIRouter()
 
@@ -67,6 +99,16 @@ INFO = ("artist.getinfo", {}, artist_info)
 TRACKS = ("artist.gettoptracks", {"limit": TOP_TRACKS_ASKED}, top_tracks)
 SIMILAR = ("artist.getsimilar", {"limit": SIMILAR_ASKED}, similar_artists)
 ALBUMS = ("artist.gettopalbums", {"limit": TOP_ALBUMS_ASKED}, top_albums)
+
+#? (2.1.44) the radio: how many similar tracks are asked for (lastfm.SIMILAR_TRACKS_MAX, as record.py asks), the
+#? most a seed's title or artist may be, and how long the Last.fm parts are waited for
+SIMILAR_TRACKS_ASKED = "100"
+WORDS_MAX = 500
+RADIO_DEADLINE_S = 4.0
+NEEDS_A_SONG = "Give the song's id, its title and its artist."
+TRACK = ("track.getsimilar", {"limit": SIMILAR_TRACKS_ASKED, "autocorrect": "1"}, similar_tracks)
+#? the wall clock the radio's day is read from - the tests' to replace
+clock = time.time
 
 #? the parts under way - held, so none is lost before it ends (asyncio keeps only weak references), and so deadwax's
 #? stop can cancel those the deadline left running. The descriptions' Last.fm side too (src/routes/describe.py, 2.1.42)
@@ -162,3 +204,83 @@ async def lastfm_artist(
     refusal = lastfm.held() or next((part for part in outcomes if isinstance(part, Refused)), None)
     #? answerable(): the last guard - a text the parse let through that UTF-8 can't carry is U+FFFD, never a 500
     return answerable(artist_answer(*outcomes, refusal, mbid=mbid, name=name))
+
+
+# ----- radio (2.1.44, S5) --------------------------------------------------------------------------------------------
+
+async def track_part(store, artist: str, title: str) -> Outcome:
+    """track.getSimilar for the seed - `artist` its first credit, `title` as its key reads it (lastfm.radio_title) -
+    through the keeping. Names that fold to nothing are never asked by: every such pair would share one kept row."""
+    if not name_key(artist) or not match_key(title):
+        return NotKnown()
+    method, extra, parse = TRACK
+    return await kept(store, track_key(method, artist, title),
+                      parsed_ask(method, {"artist": artist, "track": title, **extra}, parse))
+
+
+async def similar_part(store, artist: str) -> Outcome:
+    """artist.getSimilar by the seed's first credit: the artist page's own row by name (artist_part). A name longer
+    than an artist page may ask by (NAME_MAX) isn't asked: its key wouldn't leave the row room to be kept."""
+    if len(artist) > NAME_MAX:
+        return NotKnown()
+    return await artist_part(store, SIMILAR, None, artist)
+
+
+def today() -> str:
+    """The UTC day the radio's widening is seeded by, so it is the same all day - UTC's day, on purpose: one day for
+    everyone, whatever the server's TZ (for James, in New York, it turns over at 19:00, 20:00 in summer)."""
+    return time.strftime("%Y-%m-%d", time.gmtime(clock()))
+
+
+@router.get("/radio")
+async def lastfm_radio(
+    request: Request,
+    song_id: str = Query(..., min_length=1, max_length=ID_MAX),
+    title: str = Query(..., min_length=1, max_length=WORDS_MAX),
+    artist: str = Query(..., min_length=1, max_length=WORDS_MAX),
+    scope: Literal["yours", "store"] = Query(...),
+    user: str = Depends(current_user),
+):
+    """A radio from a song, for the app's Start Radio and Autoplay: songs of your scope Last.fm calls similar."""
+    title, artist = whole(title).strip(), whole(artist).strip()
+    if not title or not artist:
+        raise HTTPException(status_code=422, detail=NEEDS_A_SONG)
+    if not Config.lastfm_key():
+        return no_key_radio()
+    store = getattr(request.app.state, "store", None)
+    credit = first_credit(artist)
+    began = time.monotonic()
+    tasks = [started(track_part(store, credit, radio_title(title))), started(similar_part(store, credit))]
+    songs: list[dict] | None = None
+    trouble: str | None = None
+    try:
+        songs = await navidrome_routes.songs_of(request, user, scope)
+    except SignedOut:
+        raise
+    except NavidromeError as e:
+        #? deadwax's own words for whoever runs it - a Navidrome that didn't answer at all is a blip, with none
+        trouble = None if e.unreachable else str(e)
+    except HTTPException as e:
+        if e.status_code != 413:
+            raise
+        trouble = too_big_why(navidrome_routes.SHUFFLE_MAX)
+    except Exception as e:  # noqa: BLE001 - a fault in deadwax is a radio not had, never a 500
+        logger.warning(f"Last.fm's radio: the scope's songs couldn't be read - a fault in deadwax: {type(e).__name__}")
+    left = max(0.0, RADIO_DEADLINE_S - (time.monotonic() - began))
+    done, late = await asyncio.wait(set(tasks), timeout=left)
+    if late:
+        logger.info(f"Last.fm: {len(late)} part(s) of a radio not in by {RADIO_DEADLINE_S:g} s - answered without, "
+                    f"and kept when they come")
+    tracks, similar = (_result(task, done) for task in tasks)
+    refusal = lastfm.held() or next((part for part in (tracks, similar) if isinstance(part, Refused)), None)
+    ordered = None
+    if songs is not None and isinstance(tracks, (Answer, NotKnown)):
+        listed = kept_tracks(tracks.body.get("tracks")) if isinstance(tracks, Answer) and isinstance(
+            tracks.body, dict) else []
+        names = [entry["name"] for entry in similar_of(similar.body, None, credit)] if isinstance(
+            similar, Answer) and isinstance(similar.body, dict) else []
+        #? off the event loop: it keys every song of the scope (0.5 s at 50,000 songs, 2.3 s at SHUFFLE_MAX), which
+        #? would stall every other route meanwhile - a stream's included. Pure, and the songs never change in place
+        ordered = await asyncio.to_thread(radio_order, songs, listed, names, song_id, title, artist, user, today())
+    #? answerable(): the last guard - a text the parse let through that UTF-8 can't carry is U+FFFD, never a 500
+    return answerable(radio_answer(tracks, similar, ordered, refusal, trouble))

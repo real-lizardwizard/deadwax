@@ -335,6 +335,27 @@ a key of a shape deadwax doesn't expect still gets tried - but it's usually a ke
 copied. A key with a space inside it can't be saved at all: **"a Last.fm API key is one word - letters and digits,
 no spaces"**.
 
+## Radio from a song has no songs, or says the library is too big
+
+Radio (deadwax 2.1.44, for the iPhone and Mac app's Start Radio and Autoplay) asks Last.fm for up to 100 songs
+similar to the one you started it from, and matches each by its title and its artist against the songs of your
+library - or the store's, as the Library's switch says - read the way the Library's Shuffle reads them. With fewer than
+25 found, it adds two songs each of the artists Last.fm calls similar, until there are 25.
+
+- **No songs at all**: none of Last.fm's similar songs, and none by its similar artists, are in that scope, or Last.fm
+  doesn't know the song - a title or artist tag spelt unlike Last.fm's, or a song too new or too rarely played for
+  Last.fm to have similar songs for. (The song itself, and any other copy of it, is never in its own radio.) Try it
+  from the store, or from another of that artist's songs; check the song's title and artist tags.
+- **"Your library is too big to match radio songs against (over 200,000 songs)."** - shown to whoever runs deadwax:
+  radio reads every song of the scope, as the Shuffle does, and stops past 200,000 (where the Shuffle says "Your
+  library is too big to shuffle here"). There's nothing to set.
+- **It didn't start, and the app says to try again**: Last.fm or Navidrome didn't answer (Last.fm is waited for 4
+  seconds). That includes a song Last.fm doesn't know whose artist's similar artists didn't answer either: until
+  they have, deadwax can't say there's nothing similar. Whatever came late is kept for next time; the next try
+  usually works. A Navidrome deadwax can't use says why to whoever runs deadwax, in Navidrome's words - "Navidrome
+  isn't set up - fill in NAVIDROME_URL, …" among them. Without `LASTFM_API_KEY` there's no radio, and nothing is
+  asked.
+
 ## A search fails with "not logged in", or slskd refused it
 
 Searches are refused while slskd isn't signed in to Soulseek; it answers with a `409`, which the

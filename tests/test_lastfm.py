@@ -1041,3 +1041,425 @@ def test_a_kept_row_read_back_carefully():
     assert got["top_albums"] == [{"title": "Currents", "mbid": None, "plays": 12, "counted": "listeners"},
                                  {"title": "Roads", "mbid": None, "plays": 9, "counted": "listeners"}]
     assert artist_answer(INFO, TRACKS, Answer({}), Answer({"top_albums": {}}), None)["top_albums"] == []
+
+
+# ----- radio (2.1.44, S5) --------------------------------------------------------------------------------------------
+#
+# track.getSimilar's answer is Last.fm's own: tame-impala.let-it-happen.similar, recorded 2026-11-25 - 100 tracks, 63
+# artists, two of each at most, Tame Impala's own two first. The similar artists the radio widens by are the artist
+# page's by-name recording (tame-impala.similar.name). The library they are matched against is SHAPED, as Navidrome's
+# search3 answers a song (SHUFFLE_FIELDS - tests/test_navidrome_shuffle.py's Shuffler, from 0.64.2's source): songs of
+# the recording's tracks and artists, in Navidrome's order, with a cover by another band, second pressings, the seed
+# and a live take of it, a song by an artist nothing lists, and Gorillaz' "New Gold" (Last.fm credits it to "Gorillaz,
+# Tame Impala, Bootie Brown", which first_credit never splits at a comma - so it isn't met).
+
+from src.lastfm import (RADIO_ENOUGH, RADIO_PER_ARTIST, RADIO_SONGS, RADIO_WIDEN_EACH, SIMILAR_TRACKS_MAX,  # noqa: E402
+                        kept_tracks, no_key_radio, radio_answer, radio_order, radio_title, similar_tracks,
+                        song_key, too_big_why)
+from src.lastfm_kept import TRACK_KEY_MOST, track_key  # noqa: E402
+
+#? the radio's seed, as the app's queue has it
+SEED = ("so-seed", "Let It Happen", "Tame Impala")
+#? the day every radio here is made on, unless a test says otherwise
+DAY = "2026-11-25"
+USER = "local"
+
+
+def library_song(song_id: str, title: str, artist: str, album: str, n: int = 1) -> dict:
+    """SHAPED: a song as Navidrome's search3 answers it, in the fields the Shuffle keeps (SHUFFLE_FIELDS)."""
+    return {"id": song_id, "title": title, "artist": artist, "album": album, "albumId": f"al-{album}",
+            "coverArt": f"al-{album}", "duration": 240, "contentType": "audio/flac", "suffix": "flac",
+            "samplingRate": 44100, "bitDepth": 16, "channelCount": 2, "track": n, "discNumber": 1}
+
+
+#? SHAPED: a library, in Navidrome's order (by rowid)
+LIBRARY = [library_song(*song) for song in (
+    ("so-seed", "Let It Happen", "Tame Impala", "Currents", 1),
+    ("so-np", "New Person, Same Old Mistakes", "Tame Impala", "Currents", 13),
+    ("so-tlik", "The Less I Know the Better", "Tame Impala", "Currents", 7),
+    ("so-glory", "Glory Box", "Portishead", "Dummy", 11),
+    ("so-kids", "Kids", "MGMT", "Oracular Spectacular", 3),
+    ("so-ttp", "Time to Pretend", "MGMT", "Oracular Spectacular", 1),
+    ("so-kids-cover", "Kids", "The Kids Cover Band", "Covers", 1),
+    ("so-cry", "Cry Baby", "The Neighbourhood", "Wiped Out!", 4),
+    ("so-sweater", "Sweater Weather", "The Neighbourhood", "I Love You.", 2),
+    ("so-multi", "Multi-Love", "Unknown Mortal Orchestra", "Multi-Love", 1),
+    ("so-swim", "Swim and Sleep (Like a Shark)", "Unknown Mortal Orchestra", "II", 2),
+    ("so-jet", "Jet Stream Heart", "Temples", "Hot Motion", 3),
+    ("so-shelter", "Shelter Song", "Temples", "Sun Structures", 1),
+    ("so-heather", "Through the Heather", "Pond", "Man It Feels Like Space Again", 2),
+    ("so-hands", "Two Hands", "Pond", "Tasmania", 4),
+    ("so-silver", "Paint Me Silver", "Pond", "The Weather", 2),
+    ("so-sixteen", "Sixteen Days", "Pond", "The Weather", 6),
+    ("so-elvis", "Elvis' Flaming Star", "Pond", "Man It Feels Like Space Again", 1),
+    ("so-pieces", "Passing Out Pieces", "Mac DeMarco", "Salad Days", 5),
+    ("so-follow", "I Follow You", "Melody's Echo Chamber", "Melody's Echo Chamber", 2),
+    ("so-crystal", "Crystallized", "Melody's Echo Chamber", "Melody's Echo Chamber", 1),
+    ("so-alone", "Some Time Alone, Alone", "Melody's Echo Chamber", "Bon Voyage", 3),
+    ("so-505", "505", "Arctic Monkeys", "Favourite Worst Nightmare", 12),
+    ("so-diwk", "Do I Wanna Know?", "Arctic Monkeys", "AM", 1),
+    ("so-jigsaw", "Jigsaw Falling into Place", "Radiohead", "In Rainbows", 9),
+    ("so-letdown", "Let Down", "Radiohead", "OK Computer", 5),
+    ("so-breathe", "Breathe (In the Air)", "Pink Floyd", "The Dark Side of the Moon", 2),
+    ("so-time", "Time", "Pink Floyd", "The Dark Side of the Moon", 4),
+    ("so-world", "Out in the World", "GUM", "The Underdog", 1),
+    ("so-underdog", "The Underdog", "GUM", "The Underdog", 2),
+    ("so-newgold", "New Gold (feat. Tame Impala and Bootie Brown)", "Gorillaz", "Cracker Island", 4),
+    #? second pressings, after the first: a compilation's, a deluxe's remaster, and a live take of the seed
+    ("so-np-again", "New Person, Same Old Mistakes", "Tame Impala", "Currents B-Sides", 1),
+    ("so-kids-remaster", "Kids (Remastered)", "MGMT", "Oracular Spectacular (Deluxe)", 3),
+    ("so-seed-live", "Let It Happen (Live)", "Tame Impala", "Live Versions", 2),
+)]
+
+
+def recorded_tracks() -> list[dict]:
+    return similar_tracks(answer("tame-impala.let-it-happen.similar"))["tracks"]
+
+
+def recorded_similar() -> list[str]:
+    """Tame Impala's similar artists as the radio reads them: by name, the artist themselves dropped."""
+    return [entry["name"] for entry in similar_of(similar_artists(answer("tame-impala.similar.name")), None,
+                                                  "Tame Impala")]
+
+
+def radio(songs=None, tracks=None, similar=None, seed=SEED, user=USER, day=DAY) -> list[dict]:
+    return radio_order(LIBRARY if songs is None else songs, recorded_tracks() if tracks is None else tracks,
+                       recorded_similar() if similar is None else similar, *seed, user, day)
+
+
+def ids(songs: list[dict]) -> list[str]:
+    return [song["id"] for song in songs]
+
+
+def by(title: str, artist: str) -> dict:
+    """SHAPED: a similar track as kept."""
+    return {"title": title, "artist": artist}
+
+
+def mine(*songs: tuple[str, str]) -> list[dict]:
+    """SHAPED: a library of (title, artist) songs, ids in order."""
+    return [library_song(f"so-{n}", title, artist, f"{artist} album") for n, (title, artist) in enumerate(songs)]
+
+
+def neighbours_only_when_forced(songs: list[dict]) -> bool:
+    """Two side by side by one artist only where every song from there on is theirs."""
+    artists = [song_key(song["title"], song["artist"])[0] for song in songs]
+    return all(artists[n] != artists[n + 1] or set(artists[n:]) == {artists[n]} for n in range(len(artists) - 1))
+
+
+def test_the_recorded_similar_tracks():
+    """Recorded: Last.fm's hundred, in its order (by match), each its title and its artist's name - nothing else."""
+    tracks = recorded_tracks()
+    raw = answer("tame-impala.let-it-happen.similar")["similartracks"]["track"]
+    assert len(tracks) == 100 == SIMILAR_TRACKS_MAX
+    assert tracks == [{"title": track["name"].strip(), "artist": track["artist"]["name"].strip()} for track in raw]
+    assert tracks[:3] == [by("New Person, Same Old Mistakes", "Tame Impala"),
+                          by("The Less I Know the Better", "Tame Impala"), by("Kids", "MGMT")]
+    assert [track["match"] for track in raw] == sorted((track["match"] for track in raw), reverse=True)
+    #? the seed itself isn't among them, and no artist more than twice
+    assert not [track for track in tracks if match_key(track["title"]) == "let it happen"]
+    assert max(sum(1 for t in tracks if t["artist"] == track["artist"]) for track in tracks) == 2
+    #? a credit of three, as Last.fm wrote it
+    assert by("New Gold (feat. Tame Impala and Bootie Brown)", "Gorillaz, Tame Impala, Bootie Brown") in tracks
+    assert set(similar_tracks(answer("tame-impala.let-it-happen.similar"))) == {"tracks"}
+
+
+def test_a_similar_tracks_answer_with_none_or_junk():
+    """SHAPED: what track.getSimilar's parse has to decide beyond the recording."""
+    assert similar_tracks({"error": 6}) is None and similar_tracks("x") is None
+    assert similar_tracks({"similartracks": {"track": []}}) == {"tracks": []}
+    #? one track alone given as an object, as Last.fm's JSON (made from XML) can
+    assert similar_tracks({"similartracks": {"track": {"name": "Kids", "artist": {"name": "MGMT"}}}}) == {
+        "tracks": [by("Kids", "MGMT")]}
+    got = similar_tracks({"similartracks": {"track": [
+        {"name": " Kids ", "artist": {"name": " MGMT "}}, {"name": "", "artist": {"name": "MGMT"}},
+        {"name": "Kids", "artist": {}}, {"name": "Kids"}, "x", {"name": "505", "artist": "Arctic Monkeys"},
+        {"name": "Time", "artist": {"#text": "Pink Floyd"}}, {"name": 1979, "artist": {"name": "Smashing Pumpkins"}},
+        {"name": "Po" + LONE + "nd", "artist": {"name": "Pond"}}]}})
+    assert got == {"tracks": [by("Kids", "MGMT"), by("505", "Arctic Monkeys"), by("Time", "Pink Floyd"),
+                              by("1979", "Smashing Pumpkins"), by("Po" + REPLACEMENT + "nd", "Pond")]}
+    assert sendable(got)
+    #? no more than a hundred
+    many = similar_tracks({"similartracks": {"track": [{"name": f"Song {n}", "artist": {"name": "X"}}
+                                                       for n in range(150)]}})
+    assert len(many["tracks"]) == SIMILAR_TRACKS_MAX and many["tracks"][-1]["title"] == "Song 99"
+
+
+def test_a_kept_tracks_row_read_back_carefully():
+    assert kept_tracks("x") == kept_tracks(None) == []
+    assert kept_tracks([by("Kids", "MGMT"), {"title": "", "artist": "MGMT"}, {"title": "Kids"}, "x",
+                        {"title": 7, "artist": "MGMT"}, by("Po" + LONE + "nd", " Pond ")]) == [
+        by("Kids", "MGMT"), by("Po" + REPLACEMENT + "nd", "Pond")]
+
+
+def test_a_similar_tracks_row_always_fits_the_keeping():
+    """A hundred tracks named in letters outside the BMP are kept as far as they fit LIST_ROW_BYTES, Last.fm's first;
+    and the key - asked by a title and an artist of the route's 500 letters each, which fold to as much as 33 bytes a
+    letter - is past TRACK_KEY_MOST a digest, so a row and its key are always under ROW_MAX_BYTES."""
+    from src.routes.lastfm import WORDS_MAX
+    star = chr(0x1F3B8)
+    titles = [star * 300 + str(n) for n in range(SIMILAR_TRACKS_MAX)]
+    got = similar_tracks({"similartracks": {"track": [{"name": title, "artist": {"name": "X"}} for title in titles]}})
+    assert len(json.dumps(got, ensure_ascii=True, separators=(",", ":"))) <= LIST_ROW_BYTES
+    assert 0 < len(got["tracks"]) < SIMILAR_TRACKS_MAX and [t["title"] for t in got["tracks"]] == titles[
+        :len(got["tracks"])]
+    longest = track_key("track.getsimilar", chr(0xFDFA) * WORDS_MAX, chr(0xFDFA) * WORDS_MAX)
+    assert "|digest|" in longest and len(longest.encode()) < 100
+    assert LIST_ROW_BYTES + len(f"{LASTFM_SHAPE}|track.getsimilar|name|".encode()) + TRACK_KEY_MOST <= ROW_MAX_BYTES
+    #? under it, the names themselves - so the key still says what it holds
+    assert track_key("track.getsimilar", "Tame Impala", "Let It Happen") == (
+        f"{LASTFM_SHAPE}|track.getsimilar|name|tame impala|let it happen")
+    #? a digest of the folded names: alike for what folds alike, apart for what doesn't
+    assert track_key("track.getsimilar", "X" * 600, "Y" * 600) == track_key("track.getsimilar", "x" * 600, "y" * 600)
+    assert track_key("track.getsimilar", "X" * 600, "Y" * 600) != track_key("track.getsimilar", "X" * 600, "Z" * 600)
+
+
+#? what track.getSimilar's rows keep, as track_digest() makes it - pinned beside KEPT_SHAPES, not in it, as
+#? KEPT_ALBUM_SHAPES is: no track.getsimilar row was kept before 2.1.44, at any shape, so none can be read wrongly,
+#? and putting it in shape 2's digest would ask for a bump that empties every row 2.1.43 kept for nothing. A later
+#? bump adds an entry to each
+KEPT_TRACK_SHAPES = {
+    2: "a9766748af0a81a0357a6c5a272bd376f473fa4a41f5e4ef3b0cd6a950cedff1",
+}
+
+
+def track_digest() -> str:
+    """What src/lastfm.py keeps of a track.getSimilar answer, digested: the recording parsed, the shaped cases, a long
+    list fitted, and the limits."""
+    made = {
+        "limits": [SIMILAR_TRACKS_MAX, LIST_ROW_BYTES],
+        "recorded": similar_tracks(answer("tame-impala.let-it-happen.similar")),
+        "cases": similar_tracks({"similartracks": {"track": [
+            {"name": " Kids ", "artist": {"name": " MGMT "}}, {"name": "", "artist": {"name": "MGMT"}},
+            {"name": "505", "artist": "Arctic Monkeys"}, {"name": "Time", "artist": {"#text": "Pink Floyd"}},
+            {"name": 1979, "artist": {"name": "Smashing Pumpkins"}}, {"name": "Po" + LONE + "nd",
+                                                                       "artist": {"name": "Pond"}}]}}),
+        "fitted": similar_tracks({"similartracks": {"track": [
+            {"name": chr(0x1F3B8) * 300 + str(n), "artist": {"name": "X"}} for n in range(SIMILAR_TRACKS_MAX)]}}),
+    }
+    return hashlib.sha256(json.dumps(made, sort_keys=True, ensure_ascii=True).encode()).hexdigest()
+
+
+def test_what_is_kept_of_similar_tracks_changes_only_with_lastfm_shape():
+    made = track_digest()
+    assert LASTFM_SHAPE in KEPT_TRACK_SHAPES, (
+        f"LASTFM_SHAPE is {LASTFM_SHAPE}, which KEPT_TRACK_SHAPES doesn't have: add {LASTFM_SHAPE}: {made!r} to it")
+    assert KEPT_TRACK_SHAPES[LASTFM_SHAPE] == made, (
+        f"what track.getSimilar's answers are kept as has changed and LASTFM_SHAPE is still {LASTFM_SHAPE}: bump "
+        f"LASTFM_SHAPE in src/lastfm.py, and add {LASTFM_SHAPE + 1}: {made!r} to KEPT_TRACK_SHAPES (and the other "
+        f"shapes' tables)")
+
+
+def test_the_radio_asks_by_the_title_as_its_key_reads_it():
+    """Every pressing that keys alike - a remaster, a live take's aside, a feature - is asked of Last.fm by the same
+    words, so the one row they share holds what those words answer."""
+    for title in ("Let It Happen", "Let It Happen - 2015 Remaster", "Let It Happen (Live)",
+                  "Let It Happen (feat. Someone Else)", "  Let It Happen [Remastered 2015] ", "Let It Happen - Live"):
+        assert radio_title(title) == "Let It Happen", title
+        assert match_key(radio_title(title)) == match_key(title), title
+    #? a remix, an edit and a version stay songs of their own
+    for title in ("Let It Happen (Soulwax Remix)", "Let It Happen - Radio Edit", "Roads (Max Cooper remix)"):
+        assert radio_title(title) == title
+    assert radio_title("(Live)") == "" and radio_title(None) == ""
+
+
+def test_the_recorded_radio():
+    """What the radio makes of the recording and the shaped library, pinned - the one test a new recording changes.
+    Twenty songs of the library are among Last.fm's hundred; fewer than RADIO_ENOUGH, so Tame Impala's similar
+    artists widen it - Pond by two of its three left, Melody's Echo Chamber by its one left, GUM by two - to 25.
+    Spread: two of one artist side by side only at the end, where GUM's two are all that's left."""
+    got = radio()
+    assert ids(got) == [
+        "so-np", "so-kids", "so-tlik", "so-ttp", "so-cry", "so-multi", "so-jet", "so-swim", "so-heather", "so-pieces",
+        "so-hands", "so-follow", "so-505", "so-crystal", "so-diwk", "so-jigsaw", "so-sweater", "so-letdown",
+        "so-breathe", "so-sixteen", "so-time", "so-silver", "so-alone", "so-world", "so-underdog"]
+    assert len(got) == RADIO_ENOUGH
+    #? the songs themselves, as the library has them - the app plays them as they are
+    assert all(song is next(mine for mine in LIBRARY if mine["id"] == song["id"]) for song in got)
+    assert neighbours_only_when_forced(got)
+
+
+def test_the_seed_is_never_in_its_radio():
+    """Not by its id, nor any pressing of it: its words' key and the key of the song with its id are taken first.
+    SHAPED: Last.fm listing the seed's own song among its similar tracks, as a live take and as itself."""
+    tracks = [by("Let It Happen - Live", "Tame Impala"), by("Let It Happen", "Tame Impala"), by("Kids", "MGMT")]
+    #? the seed, its first pressing
+    assert ids(radio(tracks=tracks, similar=[])) == ["so-kids"]
+    #? the seed its live take, so-seed-live: Currents' own pressing - the key's first - is the seed's song too
+    assert ids(radio(tracks=tracks, similar=[], seed=("so-seed-live", "Let It Happen (Live)", "Tame Impala"))) == [
+        "so-kids"]
+    #? the seed's words differing from the library's, as a queue's can: its id's song keys it
+    assert ids(radio(tracks=tracks, similar=[], seed=("so-seed-live", "Something Else", "Tame Impala"))) == ["so-kids"]
+    #? a seed not in the scope (another scope's song): its words' key keeps every pressing out
+    assert ids(radio(tracks=tracks, similar=[], seed=("elsewhere", "Let It Happen", "Tame Impala feat. X"))) == [
+        "so-kids"]
+    #? and widening by the seed's own artist (were they ever among the similar ones) never takes it
+    got = radio(tracks=[], similar=["Tame Impala"], seed=("so-np", "New Person, Same Old Mistakes", "Tame Impala"))
+    assert set(ids(got)) == {"so-seed", "so-tlik"} and "so-np" not in ids(got) and "so-np-again" not in ids(got)
+
+
+def test_one_song_once_never_two_pressings_of_it():
+    """A song on its album and on a compilation, or remastered on a deluxe, is one song - the first in Navidrome's
+    order - and a song Last.fm lists twice (SHAPED: as itself and as a live take) is played once."""
+    tracks = [by("New Person, Same Old Mistakes", "Tame Impala"), by("Kids", "MGMT"), by("Kids - Live", "MGMT"),
+              by("Kids (Remastered 2008)", "MGMT"), by("New Person, Same Old Mistakes - Live", "Tame Impala")]
+    got = radio(tracks=tracks, similar=["MGMT", "Tame Impala"])
+    assert ids(got)[:2] == ["so-np", "so-kids"] and len(set(ids(got))) == len(got)
+    assert not {"so-np-again", "so-kids-remaster"} & set(ids(got))
+    #? the recording's whole radio too: each song once, by key and by id
+    whole_radio = radio()
+    keys = [song_key(song["title"], song["artist"]) for song in whole_radio]
+    assert len(set(keys)) == len(keys) == len(set(ids(whole_radio)))
+
+
+def test_a_cover_by_another_artist_is_never_the_song():
+    """The artist is always part of the key: The Kids Cover Band's "Kids" is never MGMT's - with MGMT's in the library
+    or without it. A credit with a feature is its first name's."""
+    tracks = [by("Kids", "MGMT")]
+    covers = mine(("Kids", "The Kids Cover Band"), ("Kids", "MGMT feat. Someone"))
+    assert ids(radio(songs=covers, tracks=tracks, similar=[])) == ["so-1"]
+    assert radio(songs=covers[:1], tracks=tracks, similar=[]) == []
+    assert "so-kids-cover" not in ids(radio())
+    #? nor a credit of three, never split at a comma: Last.fm's "New Gold" isn't the library's Gorillaz one
+    assert "so-newgold" not in ids(radio())
+
+
+def test_widening_only_when_there_are_fewer_than_twenty_five():
+    """Exactly RADIO_ENOUGH from the similar tracks: nothing of the similar artists'. One fewer: one of theirs, and no
+    more - widening stops at RADIO_ENOUGH."""
+    assert RADIO_ENOUGH == 25 and RADIO_WIDEN_EACH == 2
+    songs = mine(*((f"Song {n}", f"Artist {n % 7}") for n in range(25)), ("Widened A", "Similar"),
+                 ("Widened B", "Similar"))
+    tracks = [by(f"Song {n}", f"Artist {n % 7}") for n in range(25)]
+    enough = radio(songs=songs, tracks=tracks, similar=["Similar"])
+    assert len(enough) == 25 and not {"so-25", "so-26"} & set(ids(enough))
+    fewer = radio(songs=songs, tracks=tracks[:24], similar=["Similar"])
+    assert len(fewer) == 25 and len({"so-25", "so-26"} & set(ids(fewer))) == 1
+    #? fewer still: each similar artist adds two at most, in turn
+    few = radio(songs=mine(("Song", "A"), *((f"S{n}", "Similar") for n in range(5)), *((f"T{n}", "Other")
+                                                                                       for n in range(5))),
+                tracks=[by("Song", "A")], similar=["Similar", "Other"])
+    assert len(few) == 5 and sum(1 for song in few if song["artist"] == "Similar") == 2
+    assert sum(1 for song in few if song["artist"] == "Other") == 2
+
+
+def test_no_more_than_four_songs_by_one_artist():
+    """Applied as songs are taken: the similar tracks' fifth and sixth by one artist dropped, and an artist the tracks
+    gave three widens by one."""
+    assert RADIO_PER_ARTIST == 4
+    songs = mine(*((f"A{n}", "A") for n in range(6)), ("B0", "B"), ("B1", "B"), ("B2", "B"), ("B3", "B"))
+    got = radio(songs=songs, tracks=[by(f"A{n}", "A") for n in range(6)] + [by(f"B{n}", "B") for n in range(3)],
+                similar=["B"])
+    assert sum(1 for song in got if song["artist"] == "A") == 4
+    assert {song["title"] for song in got if song["artist"] == "A"} == {"A0", "A1", "A2", "A3"}
+    assert sum(1 for song in got if song["artist"] == "B") == 4
+    #? the recording's: no artist past four, Pond at four exactly (two of the tracks, two widened)
+    per = {}
+    for song in radio():
+        per[song["artist"]] = per.get(song["artist"], 0) + 1
+    assert max(per.values()) <= 4 and per["Pond"] == 4
+
+
+def test_each_next_song_is_by_another_artist_whenever_one_is_left_to_take():
+    """Each time the first song left by another artist than the one just placed: Last.fm's order otherwise kept. Greedy,
+    and it says no more than that: [A, B, B] stays A B B, though B A B would part the two."""
+    songs = mine(("A1", "A"), ("A2", "A"), ("B1", "B"), ("A3", "A"), ("C1", "C"))
+    tracks = [by(title, artist) for title, artist in (("A1", "A"), ("A2", "A"), ("B1", "B"), ("A3", "A"),
+                                                      ("C1", "C"))]
+    got = radio(songs=songs, tracks=tracks, similar=[])
+    assert [song["title"] for song in got] == ["A1", "B1", "A2", "C1", "A3"]
+    #? side by side only when every song left is theirs
+    got = radio(songs=mine(("A1", "A"), ("A2", "A"), ("A3", "A"), ("B1", "B")),
+                tracks=[by("A1", "A"), by("A2", "A"), by("A3", "A"), by("B1", "B")], similar=[])
+    assert [song["title"] for song in got] == ["A1", "B1", "A2", "A3"]
+    assert neighbours_only_when_forced(got) and neighbours_only_when_forced(radio())
+    #? the recording's first two are Tame Impala's, side by side in Last.fm's order: MGMT goes between
+    assert [song["artist"] for song in radio()[:3]] == ["Tame Impala", "MGMT", "Tame Impala"]
+    #? what the greedy spread doesn't promise: a pair it could have parted, left as it is
+    got = radio(songs=mine(("A1", "A"), ("B1", "B"), ("B2", "B")),
+                tracks=[by("A1", "A"), by("B1", "B"), by("B2", "B")], similar=[])
+    assert [song["title"] for song in got] == ["A1", "B1", "B2"]
+
+
+def test_a_similar_artist_listed_again_changes_nothing():
+    """Widened by once, however often their key is listed - again as they are, or as a name that folds alike."""
+    names = recorded_similar()
+    again = [repeated for name in names for repeated in (name, name, name.upper())]
+    assert radio(similar=again) == radio(similar=names) == radio()
+    for day in ("2026-12-01", "2026-12-02", "2026-12-03"):
+        assert radio(similar=again, day=day) == radio(day=day)
+    songs = mine(("Song", "A"), *((f"S{n}", "Similar") for n in range(5)))
+    once = radio(songs=songs, tracks=[by("Song", "A")], similar=["Similar"])
+    assert radio(songs=songs, tracks=[by("Song", "A")], similar=["Similar", "Similar", " similar ", "SIMILAR"]) == once
+    assert sum(1 for song in once if song["artist"] == "Similar") == RADIO_WIDEN_EACH
+
+
+def test_the_same_radio_all_day_and_another_the_next():
+    """Seeded by SHA-256 of user|seed|day|artist: asked again and again, the same - never a new shuffle each ask. The
+    widening is another the next day (or for another person), Last.fm's own order never."""
+    first = ids(radio())
+    assert all(ids(radio()) == first for _ in range(5))
+    days = {tuple(ids(radio(day=f"2026-12-{n:02d}"))) for n in range(1, 11)}
+    assert len(days) > 1
+    #? the similar tracks' twenty every day; only which of Pond's three left widen it moves
+    widened = {"so-sixteen", "so-silver", "so-alone", "so-world", "so-underdog"}
+    for order in days:
+        assert set(first) - widened <= set(order) and set(order) - set(first) <= {"so-elvis"}, order
+    assert ids(radio(user="ethan")) != first or ids(radio(user="sam")) != first
+
+
+def test_songs_with_no_key_or_no_id_are_never_met_and_never_raise():
+    songs = [*mine(("???", "MGMT"), ("Kids", "!!!")), {"title": "Kids", "artist": "MGMT"}, "x", None,
+             {"id": 7, "title": "Kids", "artist": "MGMT"}, {"id": "so-ok", "title": "Kids", "artist": None},
+             {"id": "so-kids", "title": "Kids", "artist": "MGMT"}]
+    tracks = [by("???", "MGMT"), by("Kids", "!!!"), by("Kids", "MGMT"), "x", {"title": None}]
+    assert ids(radio_order(songs, tracks, ["!!!", None, "MGMT"], "so-seed", "", "", USER, DAY)) == ["so-kids"]
+
+
+def test_no_more_than_a_hundred():
+    songs = mine(*((f"Song {n}", f"Artist {n}") for n in range(150)))
+    got = radio(songs=songs, tracks=[by(f"Song {n}", f"Artist {n}") for n in range(150)], similar=[])
+    assert len(got) == RADIO_SONGS == 100 and ids(got) == [f"so-{n}" for n in range(100)]
+
+
+def test_the_radios_answer():
+    songs = radio()
+    tracks = Answer({"tracks": recorded_tracks()})
+    similar = Answer({"artist": "Tame Impala", "similar": []})
+    assert radio_answer(tracks, similar, songs, None) == {"enabled": True, "unavailable": False, "why": None,
+                                                          "songs": songs}
+    #? nothing, while a part couldn't be had - the similar artists failing or late, which might have widened it: no
+    #? definite nothing, so null and unavailable, the app asking again - never [] ("No similar songs") with a retry due
+    for failed in (Unreachable("HTTP 500"), Limited("error 29"), None):
+        for found in (NotKnown(), Answer({"tracks": []}), tracks):
+            assert radio_answer(found, failed, [], None) == {"enabled": True, "unavailable": True, "why": None,
+                                                             "songs": None}
+        assert radio_answer(failed, NotKnown(), [], None)["songs"] is None
+    assert radio_answer(NotKnown(), REFUSAL, [], REFUSAL)["songs"] is None
+    #? a song Last.fm doesn't know, or nothing of yours similar: a definite none, nothing failed
+    assert radio_answer(NotKnown(), NotKnown(), [], None) == {"enabled": True, "unavailable": False, "why": None,
+                                                              "songs": []}
+    #? the similar artists failing or late: the songs the tracks give, and unavailable
+    for failed in (Unreachable("HTTP 500"), Limited("error 29"), None):
+        assert radio_answer(tracks, failed, songs, None) == {"enabled": True, "unavailable": True, "why": None,
+                                                             "songs": songs}
+    #? the radio not made (the tracks not had, or the scope's songs): null, unavailable - and deadwax's words if any
+    assert radio_answer(None, similar, None, None) == {"enabled": True, "unavailable": True, "why": None,
+                                                       "songs": None}
+    assert radio_answer(tracks, similar, None, None, too_big_why(200_000))["why"] == (
+        "Your library is too big to match radio songs against (over 200,000 songs).")
+    #? refused with nothing kept: off, and why; something kept: answered, and still why
+    off = radio_answer(REFUSAL, REFUSAL, None, REFUSAL)
+    assert (off["enabled"], off["unavailable"], off["songs"]) == (False, True, None)
+    assert off["why"].startswith("Last.fm refused deadwax's API key (error 10:")
+    kept = radio_answer(tracks, REFUSAL, songs, REFUSAL)
+    assert kept["enabled"] and kept["songs"] == songs and kept["why"].startswith("Last.fm refused")
+    assert no_key_radio() == {"enabled": False, "unavailable": False, "why": NO_KEY_WHY, "songs": None}
+
+
+def test_the_radios_limit_is_what_the_route_and_the_recorder_ask():
+    from src.routes import lastfm as route
+    asked = {method: params for _, method, params in recorder().recordings()}
+    assert route.SIMILAR_TRACKS_ASKED == str(SIMILAR_TRACKS_MAX) == asked["track.getsimilar"]["limit"]
+    assert route.TRACK[1] == {"limit": asked["track.getsimilar"]["limit"],
+                              "autocorrect": asked["track.getsimilar"]["autocorrect"]}
