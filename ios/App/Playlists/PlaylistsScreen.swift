@@ -34,6 +34,8 @@ struct PlaylistsPage: View {
     let pulling: PullShuffling
     /// New playlist's sheet, while it is up - the bar's + opens it.
     @Binding var newSheet: NewSheet?
+    /// (R2b) Yours | All at the end of its line, where it shows.
+    var sides: LibrarySideChoice? = nil
 
     @Environment(PlaylistsModel.self) private var playlists
     @Environment(ServerModel.self) private var server
@@ -113,15 +115,15 @@ struct PlaylistsPage: View {
     }
 
     /// (R2) The page's meta line (iPlaylists' .meta): the count - "9 playlists", "3 of 9 playlists" while Find finds -
-    /// and New playlist… at its end, a purple link opening its sheet: offered only while deadwax can be reached, as the
-    /// •••'s was.
+    /// and New playlist…, a purple link opening its sheet: offered only while deadwax can be reached, as the •••'s was.
+    /// (R2b) New playlist… follows the count, as each page's order does, and Yours | All is at the line's end where it
+    /// shows (LibraryLineEnd).
     private func meta(online: Bool) -> some View {
         let list = playlists.list ?? []
         let finding = Find.finding(typed.wrappedValue)
         let shown = finding ? PlaylistRules.found(list, typed: typed.wrappedValue).count : list.count
-        return PhoneMeta {
-            Text(LibrarySwitchWords.playlistsCount(total: list.count, shown: shown, finding: finding))
-        } trailing: {
+        let count = LibrarySwitchWords.playlistsCount(total: list.count, shown: shown, finding: finding)
+        return PhoneMeta(count: count) {
             Button {
                 newSheet = NewSheet()
             } label: {
@@ -133,6 +135,8 @@ struct PlaylistsPage: View {
             .buttonStyle(.plain)
             .disabled(!online)
             .opacity(online ? 1 : DWPalette.off)
+        } trailing: {
+            LibraryLineEnd(page: .playlists, sides: sides)
         }
     }
 

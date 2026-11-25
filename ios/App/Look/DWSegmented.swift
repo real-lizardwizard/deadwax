@@ -88,3 +88,33 @@ struct DWSegmented<Value: Hashable>: View {
         return .handled
     }
 }
+
+/// (the redesign, slice R2b - notes/ios.md "The redesign, slice R2b: the Library's top, one row again") What a large
+/// control of `words` needs across with its segments equal, as the phone draws it: the widest words in every segment,
+/// in a segment's face, weight and room either side (DWSegmented's), and the well's edge either side - drawn hidden,
+/// for a layout to measure (the Library's row, whose switch folds under its circles where the row can't hold it).
+/// Nothing in it is seen, touched or heard.
+struct DWSegmentedNeed: View {
+    let words: [String]
+
+    var body: some View {
+        HStack(spacing: 0) {
+            ForEach(words.indices, id: \.self) { (_: Int) in
+                ZStack {
+                    ForEach(words.indices, id: \.self) { (at: Int) in
+                        Text(words[at])
+                            .font(Typeface.Look.text(.largeSegment).weight(.semibold))
+                            .lineLimit(1)
+                            .padding(.horizontal, CGFloat(DWLook.here.largeSegmentPadding))
+                    }
+                }
+            }
+        }
+        // .seg: border 1px round the segments
+        .padding(1)
+        .fixedSize()
+        .hidden()
+        .allowsHitTesting(false)
+        .accessibilityHidden(true)
+    }
+}

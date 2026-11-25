@@ -331,8 +331,9 @@ def test_dwlooks_phone_sizes_are_the_phones_rules():
     assert re.search(r"^\s*target: 44,\n\s*grows: true\)", phone, re.M)
 
 
-#? PhoneLook's sizes the drawings' own inline styles give, not dw.css's rules: iLibrary's titled top
-PHONE_FROM_DRAWINGS = {"titledTop": 50, "titledTopSide": 16, "titledTopTracking": -0.5}
+#? PhoneLook's sizes the drawings' own inline styles give, not dw.css's rules: (R2b) iLibrary's, iArtists' and
+#? iPlaylists' quiet line, `height: 32px; padding-right: 16px` (R2's titled top's three went with it)
+PHONE_FROM_DRAWINGS = {"meta": 32, "metaTrail": 16}
 #? the two that stand above what holds them: dw.css's top is negative (`top: -7px`), PhoneLook's lift positive
 NEGATED = {"litLineLift", "legendLift"}
 
@@ -351,10 +352,11 @@ def test_phonelook_is_the_phones_rules_size_by_size():
         assert float(value) == (-want if name in NEGATED else want), f"PhoneLook.{name} is not .dw.ph {selector}'s {prop}"
     assert {name for name, _, source, _, _ in lines if source == "drawn"} == set(PHONE_FROM_DRAWINGS)
     # the plan's sizes (the build plan's section 2): strip 32, card rows 44/42/46, mini player 60, tab bar 83 (items 49),
-    # foot 68, top 44 (50 with a title), large title 34 - and the lit line 24 x 2
+    # foot 68, top 44, large title 34 - and the lit line 24 x 2; (R2b) the Library's row 52, its circles 34
     numbers = {name: float(value) for name, value, *_ in lines}
-    assert [numbers[n] for n in ("strip", "kvRow", "goRow", "mini", "tabBar", "tabItem", "foot", "top", "titledTop",
-                                 "litLineWidth", "litLineHeight")] == [32, 42, 46, 60, 83, 49, 68, 44, 50, 24, 2]
+    assert [numbers[n] for n in ("strip", "kvRow", "goRow", "mini", "tabBar", "tabItem", "foot", "top", "row", "circle",
+                                 "litLineWidth", "litLineHeight")] == [32, 42, 46, 60, 83, 49, 68, 44, 52, 34, 24, 2]
+    assert px(css(".circ", "height")) == numbers["circle"] and css(".circ", "border-radius") == "50%"
     assert px(css(".big", "font-size")) == 34
 
 
@@ -393,8 +395,8 @@ def test_the_looks_phone_type_is_the_phones_rules_scaled():
     assert ".custom(Mac.monoFamily, size: role.phone.points, relativeTo: role.phone.style)" in look
 
 
-#? Typeface.Phone's one size the drawings' own inline style gives: iLibrary's titled top's 28
-TYPE_FROM_DRAWINGS = {"topTitle": 28}
+#? Typeface.Phone's sizes the drawings' own inline styles give: none since R2b (iLibrary's titled top's 28 went with it)
+TYPE_FROM_DRAWINGS: dict[str, float] = {}
 
 
 def test_the_phones_own_type_is_its_rules_scaled():
@@ -404,7 +406,7 @@ def test_the_phones_own_type_is_its_rules_scaled():
     names = [name for group in sizes for name in group if name]
     scaled = phone[phone.index("var scaled:"):phone.index("static func text")]
     lines = re.findall(r"case \.(\w+): return \(([0-9.]+), \.(\w+)\)\s*// (dw\.ph|drawn): (.+) (font-size)\n", scaled)
-    assert [name for name, *_ in lines] == names and len(names) == 11, (names, lines)
+    assert [name for name, *_ in lines] == names and len(names) == 10, (names, lines)
     for name, points, style, source, selector, _ in lines:
         if source == "drawn":
             assert float(points) == TYPE_FROM_DRAWINGS[name], name
@@ -673,6 +675,8 @@ FIXED = {
     "Phone/PhoneSwitch.swift": ["width: CGFloat(PhoneLook.knob), height: CGFloat(PhoneLook.knob)",
                                 "width: CGFloat(PhoneLook.switchWidth), height: CGFloat(PhoneLook.switchHeight)"],
     "Phone/PhoneFoot.swift": ["height: keyboardUp ? 0 : height"],
+    #? (R2b) the Library's circles: a mark's 34 pt face, R1b's switch's kind, in a finger's 44 pt target round it
+    "Phone/PhoneTop.swift": ["width: face, height: face", "width: target, height: target"],
     #? (R8) a meter: its fill's width the share of its track, and its height DWLook's - on the phone grown with the text
     #? by its own @ScaledMetric, so a minimum would only let it stretch
     "Look/DWMeter.swift": ["width: track.size.width * share", "height: height"],
@@ -793,7 +797,7 @@ def test_the_phones_pieces_read_and_grow_as_the_plan_says():
     # a legend, a title and a large title are headers; a fact's row and a row that goes somewhere are one element
     card = files["Phone/PhoneCard.swift"]
     assert card.count(".accessibilityAddTraits(.isHeader)") == 1
-    assert files["Phone/PhoneTop.swift"].count(".accessibilityAddTraits(.isHeader)") == 3
+    assert files["Phone/PhoneTop.swift"].count(".accessibilityAddTraits(.isHeader)") == 2
     assert ".accessibilityElement(children: .combine)" in card[card.index("struct PhoneKV"):card.index("struct PhoneGo")]
     assert ".accessibilityElement(children: combined ? .combine : .contain)" in card
     # the switch is iOS's switch to VoiceOver
@@ -946,7 +950,7 @@ def declared(folder: Path) -> set[str]:
 #? a playlist sheet's shared buttons (PlaylistPicker's NewPlaylistFields, the Look's alone)
 R2_LIBRARY = {"Library/LibraryTop.swift", "Library/LibraryView.swift", "Library/LibraryTiles.swift",
               "Library/AlbumsScreen.swift", "Library/ArtistsScreen.swift", "Library/SongsScreen.swift",
-              "Playlists/PlaylistsScreen.swift"}
+              "Playlists/PlaylistsScreen.swift", "Library/LibraryLine.swift"}
 R3B_PAGES = {"UpNext/UpNextScreen.swift", "Info/InfoView.swift", "EQ/EQScreen.swift", "EQ/EQSliders.swift",
              "EQ/EQCurveView.swift", "EQ/EQOutputViews.swift", "Player/NowPlayingSheet.swift"}
 R4_BARS = {"Player/MiniPlayerView.swift", "Root/MainTabs.swift"}
@@ -963,7 +967,7 @@ def test_the_phones_pieces_are_drawn_nowhere_yet():
     phone = declared(PHONE_DIR)
     assert {"PhoneStrip", "PhoneTop", "PhoneBack", "PhoneBigTitle", "PhoneTabItem", "PhoneLitLine", "PhoneMiniGround",
             "PhoneSeekLine", "PhoneCard", "PhoneGroup", "PhoneKV", "PhoneGo", "PhoneChevron", "PhoneSwitchStyle",
-            "phoneSwitch", "PhoneFoot", "phoneFoot", "PhoneMeta", "PhoneMetaLink"} <= phone, phone
+            "phoneSwitch", "PhoneFoot", "phoneFoot", "PhoneMeta", "PhoneMetaLink", "PhoneCircleStyle"} <= phone, phone
     look = declared(LOOK_DIR) - {"here"}
     assert {"DWPalette", "DWCorners", "DWRaised", "DWRule", "DWButtonStyle", "DWWell", "DWField", "DWFieldRow", "DWChip",
             "DWCount", "DWSegmented", "DWPopUp", "DWCaret", "DWToggleStyle", "DWTarget", "lookHeight",

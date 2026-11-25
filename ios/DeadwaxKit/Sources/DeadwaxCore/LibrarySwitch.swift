@@ -173,33 +173,99 @@ extension LibraryPages {
     }
 }
 
-/// (R2) One button of the Library's strip under its top: a page of the pager, or Downloaded - last, pushed as the •••'s
-/// Downloaded was, never a page.
-public enum LibraryStripItem: Hashable, Sendable {
-    case page(LibraryPage)
-    case downloaded
-
-    /// The strip's word for it.
-    public var title: String {
-        switch self {
-        case .page(let page): return page.title
-        case .downloaded: return DownloadWords.downloadedTitle
-        }
-    }
-
-    /// (R2's review) It opens a page of its own over the Library rather than showing one of the pager's: a button to
-    /// VoiceOver, never a tab of the pages' tab bar.
-    public var pushes: Bool {
-        self == .downloaded
+/// (the redesign, slice R2b - notes/ios.md "The redesign, slice R2b: the Library's top, one row again") The quiet line
+/// under the Library's one row: each page's count and, where it has one, its order (Albums, Artists) or New playlist…
+/// (Playlists); at its trailing end Grid and List, then Yours | All where it shows (LibraryPages.sides). James, 25 Nov:
+/// "lets put the grid/list next to yours/all".
+public enum LibraryLine {
+    /// Grid and List sit on the line of Albums alone, as they were Albums' own in the old •••: the other pages have no
+    /// layout of their own.
+    public static func layouts(on page: LibraryPage) -> Bool {
+        page == .albums
     }
 }
 
-/// (R2) The strip: the pages shown, in the order kept, then Downloaded - but while the Albums page is Downloaded
-/// itself (deadwax out of reach), where the •••'s way back to the albums stands in its place.
-public enum LibraryStrip {
-    public static func items(_ pages: [LibraryPage], albumsPage: LibraryRootList = .albums) -> [LibraryStripItem] {
-        let shown = pages.map { (page: LibraryPage) -> LibraryStripItem in .page(page) }
-        return albumsPage == .downloaded ? shown : shown + [.downloaded]
+/// (R2b) Whether the Library's one row holds its switch beside its two circles (iLibrary's .ltop: Find's circle 16 in
+/// from the leading edge, the switch filling the room between, 12 from each circle, the ••• 16 in from the trailing
+/// edge). The switch's segments are equal, so it needs its widest page's words in every one of them; where that is
+/// more than the room (four pages - logins off, the break-glass sign-in - at the larger text sizes on a narrow phone),
+/// it folds onto a row of its own under the circles, across the page, rather than cut a word short.
+public enum LibraryTopFit {
+    /// The room the row leaves its switch on a phone `width` points wide: its two sides, its circles and the gaps
+    /// between them taken.
+    public static func room(width: Double) -> Double {
+        width - 2 * (PhoneLook.rowSide + PhoneLook.circle + PhoneLook.rowGap)
+    }
+
+    /// Folded, the switch's room: the page's width, as far in from each edge as the circles are.
+    public static func foldedRoom(width: Double) -> Double {
+        width - 2 * PhoneLook.rowSide
+    }
+
+    /// The switch folds under the circles where what it `needs` across - the widest page's words in each of its equal
+    /// segments, and its well's two edges - is more than the row leaves it.
+    public static func folds(needs: Double, width: Double) -> Bool {
+        needs > room(width: width)
+    }
+
+    /// The row `width` wide - or, asked its own width (nil), as wide as its switch's `needs` beside the circles: whether
+    /// the switch folds, and the room it is offered across.
+    public struct Row: Sendable, Equatable {
+        public let width: Double
+        public let folds: Bool
+        public let room: Double
+    }
+
+    public static func row(needs: Double, width: Double?) -> Row {
+        let wide = width ?? needs + 2 * (PhoneLook.rowSide + PhoneLook.circle + PhoneLook.rowGap)
+        let folds = folds(needs: needs, width: wide)
+        return Row(width: wide, folds: folds, room: folds ? foldedRoom(width: wide) : room(width: wide))
+    }
+
+    /// Where the row's views go, at their sizes (the switch's in the room it was offered), and the row's size.
+    public struct Placed: Sendable, Equatable {
+        public let find: LookBox
+        public let switcher: LookBox
+        public let more: LookBox
+        /// The switch's need, hidden: on the switch, at its own size.
+        public let need: LookBox
+        public let width: Double
+        public let height: Double
+    }
+
+    /// Find's circle centred where its face is drawn, 16 in from the leading edge, and the •••'s as far in from the
+    /// trailing one (each target reaching 5 pt past its face, into the room round it), both in a band 52 tall at least;
+    /// the switch centred in the room between them, 12 from each face - or, folded, across the page under the band, as
+    /// far in from each edge as the circles are, with the room under it the row would give it beside them.
+    public static func place(_ row: Row, find: LookSize, switcher: LookSize, more: LookSize, need: LookSize) -> Placed {
+        let circles = max(find.height, more.height)
+        let band = row.folds ? max(PhoneLook.row, circles) : max(PhoneLook.row, circles, switcher.height)
+        let middle = band / 2
+        let x = row.folds ? row.width / 2 : PhoneLook.rowSide + PhoneLook.circle + PhoneLook.rowGap + row.room / 2
+        let y = row.folds ? band + switcher.height / 2 : middle
+        let under = max(0, (PhoneLook.row - switcher.height) / 2)
+        return Placed(find: LookBox(centredOn: PhoneLook.rowSide + PhoneLook.circle / 2, middle, find),
+                      switcher: LookBox(centredOn: x, y, switcher),
+                      more: LookBox(centredOn: row.width - PhoneLook.rowSide - PhoneLook.circle / 2, middle, more),
+                      need: LookBox(centredOn: x, y, need),
+                      width: row.width, height: row.folds ? band + switcher.height + under : band)
+    }
+
+    /// The row's three controls, as VoiceOver reads them.
+    public enum Part: Sendable, Equatable {
+        case find, switcher, more
+    }
+
+    /// First to last, as they are drawn: Find, the switch, the ••• on one row - folded, the two circles on the row, then
+    /// the switch under them (the review of R2b, 25 Nov).
+    public static func reading(folds: Bool) -> [Part] {
+        folds ? [.find, .more, .switcher] : [.find, .switcher, .more]
+    }
+
+    /// A control's accessibilitySortPriority in the row: the higher, the sooner it is read.
+    public static func priority(_ part: Part, folds: Bool) -> Double {
+        let order = reading(folds: folds)
+        return Double(order.count - (order.firstIndex(of: part) ?? order.count))
     }
 }
 
@@ -233,11 +299,13 @@ public enum ShuffleCan: Sendable, Equatable {
 }
 
 /// One item of the Library's ••• (2.8). (R2's review) Only what the top's ••• holds (LibraryMenu.topSections): the
-/// old menu's order, layout, New playlist, Downloaded and All music (its All artists and All songs) went with it, to the
-/// meta line, the strip and Yours | All.
+/// old menu's order, layout, New playlist and All music (its All artists and All songs) went with it, to the meta line
+/// and Yours | All - and (R2b) Downloaded came back to it from R2's strip.
 public enum LibraryMenuItem: Sendable, Equatable {
     /// the Shuffle, as it can be just now (never `.nothingHere` or `.none`: then there is no item)
     case shuffle(ShuffleCan)
+    /// (R2b) Downloaded, pushed - the old •••'s, and R2's strip's last button between
+    case downloaded
     /// the way back to the albums while the Albums page is Downloaded: the scope's albums, pushed
     case albums(AlbumScope)
     case refresh
@@ -253,6 +321,7 @@ public enum LibraryMenuItem: Sendable, Equatable {
             case .failed(let why): return why
             default: return ShuffleWords.shuffle
             }
+        case .downloaded: return DownloadWords.downloadedTitle
         case .albums(let scope): return LibraryWords.title(scope, personal: personal)
         case .refresh: return LibrarySwitchWords.refresh
         case .editOrder: return LibrarySwitchWords.editOrder
@@ -270,10 +339,11 @@ public enum LibraryMenuItem: Sendable, Equatable {
 
 /// The Library's ••• (2.8): what it holds, in its sections.
 public enum LibraryMenu {
-    /// (R2) The ••• under the Library's new top: the Shuffle; the way back to the albums while the Albums page is
-    /// Downloaded (`scope`'s); Refresh and Edit order. What it held besides has moved: each page's order, Albums' Grid
-    /// and List and Playlists' New playlist to the page's meta line, Downloaded to the strip, All music to the top's
-    /// Yours | All.
+    /// (R2) The ••• under the Library's new top - since R2b (James's drawing of 25 Nov) Shuffle, Downloaded, Refresh and
+    /// Edit order: the Shuffle; Downloaded - or, while the Albums page is Downloaded itself (deadwax out of reach), the
+    /// way back to the albums (`scope`'s) in its place, as the old ••• had them; Refresh and Edit order. What it held
+    /// besides has moved: each page's order, Albums' Grid and List and Playlists' New playlist to the page's quiet line,
+    /// All music to Yours | All.
     public static func topSections(shuffle: ShuffleCan, albumsPage: LibraryRootList,
                                    scope: AlbumScope) -> [[LibraryMenuItem]] {
         var sections: [[LibraryMenuItem]] = []
@@ -281,7 +351,7 @@ public enum LibraryMenu {
         case .nothingHere, .none: break
         default: sections.append([.shuffle(shuffle)])
         }
-        if albumsPage == .downloaded { sections.append([.albums(scope)]) }
+        sections.append([albumsPage == .downloaded ? .albums(scope) : .downloaded])
         sections.append([.refresh, .editOrder])
         return sections
     }
@@ -301,13 +371,13 @@ public enum LibrarySwitchWords {
     public static let orderTitle = "Edit order"
     public static let orderFooter = "Drag the pages into the order you want. The Library opens on the first."
     public static let done = "Done"
-    /// The switch's label to VoiceOver.
+    /// The switch's label to VoiceOver - (R2b) the row's switch of the pages again, as James's of 14 Nov was.
     public static let switchLabel = "Library pages"
     /// (the squared look) Find's own Cancel, beside its field: hides Find and clears its words.
     public static let cancelFind = "Cancel"
     /// Find's placeholder on Playlists.
     public static let findPlaylists = "Find in playlists"
-    /// (R2) The top's Yours | All: its two words, and its name to VoiceOver.
+    /// (R2) Yours | All - (R2b) two words at the end of each page's line: its two words, and its name to VoiceOver.
     public static let yours = "Yours"
     public static let all = "All"
     public static let sidesLabel = "Your library or all music"

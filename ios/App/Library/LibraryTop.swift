@@ -2,14 +2,21 @@ import DeadwaxCore
 import SwiftUI
 import UIKit
 
-/// The Library's top (since the redesign's slice R2, iLibrary's titled top - notes/ios.md "The redesign, slice R2:
-/// Albums and Artists, and the Library's top"): "Library" at its left, 28 and bold, and at its right Yours | All (with a
-/// library of your own - `sides`, LibraryView's), Find's magnifying glass and the ••• - square, small buttons, as the
-/// phone's look draws every button (PhoneTop, DWButtonStyle). James's answer 1 (25 Nov, "Today's behaviour, new look"):
-/// Find stays where it was, a glyph before the •••, and opens its field under the row, with Cancel. Over the phone's own
-/// black ground (`.dw.ph`), running up under the status bar; the strip of the pages and the offline banner under it
-/// (LibraryView). Until R2 (the squared look, 14 Nov - notes/ios.md "The squared look") it was Find's circle, the switch
-/// and the •••'s circle on --dw-tab-bar, a hairline at its foot.
+/// The Library's top - since the redesign's slice R2b (notes/ios.md "The redesign, slice R2b: the Library's top, one
+/// row again") one row again, iLibrary's .ltop. James, 25 Nov: "The top of the library on iOS is actually kinda a
+/// mess, can we streamline it a bit?" So it is his own row from 14 Nov (the squared look - notes/ios.md "The squared
+/// look": "let's put a magnifying glass button on the left side of the slider", "but the search button and options
+/// button at the top can be circles") in the redesign's look: Find's circle 16 in from the leading edge, the switch of
+/// the pages filling the room between - one square well of equal segments, the page shown lit, the pages in the order
+/// kept - 12 from each circle, and the •••'s circle 16 in from the trailing edge (PhoneCircleStyle, the look's raised
+/// face drawn round), 52 tall at least (LibraryTopRow). Where the switch's equal segments need more than the row leaves
+/// them (LibraryTopFit - four pages at the larger text sizes on a narrow phone) it folds onto a row of its own under
+/// the circles rather than cut a word short. Capped at xxxLarge, as the bars are. Find opens its field under the row,
+/// with Cancel, as it always has. Over the phone's own black ground (`.dw.ph`), running up under the status bar; each
+/// page's quiet line (PhoneMeta, LibraryLineEnd) and the offline banner under it. R2 (25 Nov, the same day) had drawn
+/// it as iLibrary's first titled top - "Library", Yours | All, Find and the ••• as small square buttons - with a strip
+/// of the pages and Downloaded under it; the title and the strip went, Yours | All moved to the line, Downloaded back
+/// to the •••.
 ///
 /// The row measures itself (15 Nov, James, a second time: "the library's top still doesn't clear the dynamic island"):
 /// laid out in the safe area its views are given, it still stood in the island's strip on his iPhone 17 Pro, so it
@@ -29,16 +36,19 @@ import UIKit
 /// 117 points above its top edge, came down twice the inset, then settled at the edge with nothing telling the probe. So
 /// a row above its window's top edge keeps the room it has (TopClearance.settled), and every ask is followed by reads
 /// again for a while, whatever is presented, so the row is read once it has settled.
-struct LibraryTop<Find: View, Sides: View, More: View>: View {
+struct LibraryTop<Find: View, Switch: View, More: View>: View {
     /// Find is open: its field drawn under the row.
     let finding: Bool
     /// The magnifying glass's words: the page shown's own Find prompt ("Find in albums").
     let findLabel: String
     /// The magnifying glass: Find opened (or its field focused again).
     let openFind: () -> Void
+    /// The switch's words - the pages shown, in the order kept: what its equal segments need across is measured from
+    /// them (DWSegmentedNeed), so the row knows whether it holds the switch.
+    let pages: [String]
     @ViewBuilder let find: Find
-    /// Yours | All - nothing without a library of your own.
-    @ViewBuilder let sides: Sides
+    /// The switch of the pages (DWSegmented, large).
+    @ViewBuilder let switcher: Switch
     @ViewBuilder let more: More
 
     @Environment(DebugModel.self) private var debug
@@ -49,24 +59,43 @@ struct LibraryTop<Find: View, Sides: View, More: View>: View {
     @State private var eyes = TopProbe.Eyes()
     /// What SwiftUI last said of the row - its top in SwiftUI's global space, its top safe area - for Debug's reading.
     @State private var swiftUI: [CGFloat] = []
+    /// What the switch needs across and the row's width, as last laid out: whether the row folds, for VoiceOver's
+    /// order (LibraryTopRow places by its own measure, never by these).
+    @State private var needs: CGFloat = 0
+    @State private var wide: CGFloat = 0
 
     var body: some View {
         VStack(spacing: 0) {
-            PhoneTop(title: AppTab.library.title) {
-                // iLibrary's .topbar: the seg, then the small buttons, the top's gap between each
-                HStack(spacing: CGFloat(PhoneLook.topGap)) {
-                    sides
-                    Button(action: openFind) {
-                        Image(systemName: "magnifyingglass")
-                    }
-                    .buttonStyle(DWButtonStyle(size: .small))
-                    .accessibilityLabel(findLabel)
-                    .accessibilityShowsLargeContentViewer {
-                        Label(findLabel, systemImage: "magnifyingglass")
-                    }
-                    more
+            // iLibrary's .ltop: Find's circle, the switch, the •••'s circle - and, hidden, what the switch needs
+            LibraryTopRow {
+                Button(action: openFind) {
+                    Image(systemName: "magnifyingglass")
                 }
+                .buttonStyle(PhoneCircleStyle())
+                .accessibilityLabel(findLabel)
+                .accessibilityShowsLargeContentViewer {
+                    Label(findLabel, systemImage: "magnifyingglass")
+                }
+                .accessibilitySortPriority(LibraryTopFit.priority(.find, folds: folds))
+                switcher
+                    .accessibilitySortPriority(LibraryTopFit.priority(.switcher, folds: folds))
+                more
+                    .accessibilitySortPriority(LibraryTopFit.priority(.more, folds: folds))
+                DWSegmentedNeed(words: pages)
+                    .onGeometryChange(for: CGFloat.self) { (need: GeometryProxy) -> CGFloat in
+                        need.size.width
+                    } action: { (width: CGFloat) -> Void in
+                        needs = width
+                    }
             }
+            // VoiceOver reads the row as it is drawn (LibraryTopFit.reading): folded, the circles before the switch
+            .accessibilityElement(children: .contain)
+            .onGeometryChange(for: CGFloat.self) { (row: GeometryProxy) -> CGFloat in
+                row.size.width
+            } action: { (width: CGFloat) -> Void in
+                wide = width
+            }
+            .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
             if finding {
                 find
                     .padding(.horizontal, LibraryLook.side)
@@ -102,6 +131,12 @@ struct LibraryTop<Find: View, Sides: View, More: View>: View {
         .onAppear { eyes.probe?.soon("appear") }
     }
 
+    /// Whether the row folds its switch under its circles, as last laid out (LibraryTopFit.folds) - nothing laid out yet,
+    /// not.
+    private var folds: Bool {
+        wide > 0 && LibraryTopFit.folds(needs: Double(needs), width: Double(wide))
+    }
+
     /// The probe's reading: the room worked out again (TopClearance.room - kept under a presentation, afresh otherwise),
     /// and the reading kept for Debug, each only when it changed.
     private func take(_ sample: TopProbe.Sample) {
@@ -113,6 +148,42 @@ struct LibraryTop<Find: View, Sides: View, More: View>: View {
                                            presented: sample.presented, cause: sample.cause,
                                            swiftTop: said?[0], swiftSafe: said?[1])
         if debug.libraryTop != reading { debug.libraryTop = reading }
+    }
+}
+
+/// (R2b) iLibrary's .ltop laid out where Core puts each view (LibraryTopFit.row and .place): Find's circle 16 in from the
+/// leading edge and the •••'s 16 in from the trailing one, each centred where its 34 pt face is drawn (its 44 pt target
+/// reaching 5 pt past it, into the room round it), and the switch filling the room between, 12 from each face, at its
+/// own width where that is less (the Mac's) - or, where its equal segments need more than that room
+/// (LibraryTopFit.folds), on a row of its own under the circles, as far in from each edge as they are, with the room
+/// under it the row would give it beside them. The row 52 tall at least, what is in it centred in it. Its views, in
+/// order: Find, the switch, the ••• and the switch's need (DWSegmentedNeed, hidden - placed, never seen or heard).
+private struct LibraryTopRow: Layout {
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        guard let row = placed(proposal.width, subviews) else { return .zero }
+        return CGSize(width: row.width, height: row.height)
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        guard let row = placed(bounds.width, subviews) else { return }
+        subviews[0].lookPlace(row.find, in: bounds)
+        subviews[1].lookPlace(row.switcher, in: bounds)
+        subviews[2].lookPlace(row.more, in: bounds)
+        subviews[3].lookPlace(row.need, in: bounds)
+    }
+
+    /// The row in `width` (where none is given, as wide as the switch needs beside its circles): its views measured -
+    /// the switch in the room the row offers it - and placed.
+    private func placed(_ width: CGFloat?, _ subviews: Subviews) -> LibraryTopFit.Placed? {
+        guard subviews.count == 4 else {
+            assertionFailure("LibraryTopRow lays out Find, the switch, the more and the need, not \(subviews.count) views")
+            return nil
+        }
+        let need = LookSize(subviews[3].sizeThatFits(.unspecified))
+        let row = LibraryTopFit.row(needs: need.width, width: width.map { (given: CGFloat) -> Double in Double(given) })
+        let switcher = LookSize(subviews[1].sizeThatFits(ProposedViewSize(width: CGFloat(row.room), height: nil)))
+        return LibraryTopFit.place(row, find: LookSize(subviews[0].sizeThatFits(.unspecified)), switcher: switcher,
+                                   more: LookSize(subviews[2].sizeThatFits(.unspecified)), need: need)
     }
 }
 

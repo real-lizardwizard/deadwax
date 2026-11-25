@@ -303,7 +303,8 @@ menus and keys, and these differences.
   (dimmed until its songs have come - offline, only its songs on this Mac - and only while it's listed: a playlist
   **Find** hides is let go) and **Find in playlists**; right-click a row for its menu; the status bar counts those
   listed ("9 playlists · 7 yours · 2 shared with you" - only what Find finds while you type, nothing while there are
-  none). Songs is still the phone's page, under its row of buttons and its •••.
+  none). Songs is still the phone's page, under the phone's top: the magnifying glass, the switch of the pages and
+  the •••.
   **An album's page** is the Mac's own since the new look, across the window: a toolbar of **Play**, **Shuffle**, **Add
   to Queue**, **Add to a playlist…**, **Download** (once asked for, a menu headed with how far it has got) and **Edit**
   (for someone who may edit albums). It fits the page at every window size, the side panel open or not; should it
@@ -670,29 +671,35 @@ heavier, but not Noto Sans.
 ## The Library
 
 The Library opens on its pages, side by side: **Albums**, **Playlists**, **Artists** and - without a
-library of your own - **Songs**. Its top is one row: **Library** at the left, and at the right - with a library of
-your own - **Yours | All** (below), then a square **magnifying glass** (Find - below) and the square **•••**. Under
-it is a row of buttons, one for each page in the order you keep (Edit order - below), then **Downloaded**; the page
-you're on is lit. Tap a page's button to go to it, or swipe left and right between the pages, the lit button
-following you; **Downloaded** opens what's on this phone (below) over the Library. Where the buttons don't fit
-across, they scroll sideways, the lit one brought into view; their words grow with the text size, up to the tab
-bar's largest. The Library opens on the first page each time the app starts, and when someone else signs in; after
-that it stays on the page you left it on. Tap the Library tab while you're on it, and the page goes back to its top.
+library of your own - **Songs**. Its top is one row: a round **magnifying glass** (Find - below) at the left, a round
+**•••** at the right, and between them a switch with a part for each page, in the order you keep (Edit order -
+below); the page you're on is lit. Tap a page's part to go to it, or swipe left and right between the pages, the lit
+part following you. The switch's words grow with the text size, up to the tab bar's largest; where four pages don't
+fit across beside the two circles (logins off, at the larger text sizes on a narrow phone), the switch moves onto a
+row of its own under them, rather than cut a word short. The Library opens on the first page each time the app
+starts, and when someone else signs in; after that it stays on the page you left it on. Tap the Library tab while
+you're on it, and the page goes back to its top.
 
-Under the buttons each page has its own line: how many there are ("3012 albums"), then - on Albums and Artists - its
-order, in purple (tap it to choose another), and at the end of Albums' line its **grid** and **list** buttons, the one
-showing lit. Playlists' line ends with **New playlist…**.
+Under the top each page has its own quiet line, all words, nothing boxed: how many there are ("3012 albums"), then -
+on Albums and Artists - its order, in purple (tap it to choose another), or on Playlists **New playlist…**. At the
+end of Albums' line are its **grid** and **list** marks, and - with a library of your own - every page's line ends
+with **Yours | All** (below). On the line, white is where you are and purple is what a tap takes you to: the layout
+showing and the side you're on are white, the other of each purple. Where a line is too long for the phone's width
+(a long order, a big count, Find's "12 of 140", a larger text size), the count gives way first - "140 · Recently
+added", the number without its word (VoiceOver still says "140 albums") - and only where even that is too long does
+the line's end move onto a line of its own under the words, at the right, the count saying its word again. The
+order's words are never shortened, and no word is ever cut.
 
 **Find** is hidden until you tap the magnifying glass: then its field comes up under the top, for the page
 you're on ("Find in albums", "Find in playlists"...), with the keyboard up. Each page keeps its own words while
-Find is open - swipe to another page, or tap its button, and the field shows that page's. **Cancel** puts
-Find away and clears the words of every page, so no page is ever left filtered with Find hidden. The keyboard's
+Find is open - swipe to another page, or tap its part of the switch, and the field shows that page's. **Cancel**
+puts Find away and clears the words of every page, so no page is ever left filtered with Find hidden. The keyboard's
 Search key puts the keyboard away and leaves the words. At the larger text sizes, holding a finger on the
 magnifying glass or the ••• shows it large.
 
 With logins on, **Albums** is **Your albums**: the albums in your library, as the web app's Library has them
-([sharing deadwax](sharing.md) says how an album gets there), and **All**, at the top, shows the whole
-collection's instead: its Albums, Artists and Songs as the pages, and **Yours** your own again. Yours | All shows
+([sharing deadwax](sharing.md) says how an album gets there), and **All**, at the end of the page's line, shows the
+whole collection's instead: its Albums, Artists and Songs as the pages, and **Yours** your own again. Yours | All shows
 while the Library is on your albums and deadwax can be reached - and stays while you're on **All** when deadwax drops
 out: All keeps its pages, showing what the app already has, until you tap **Yours**. On Yours it's put away until
 deadwax is back. With logins off, and for the break-glass `deadwax` sign-in, Albums is the whole
@@ -706,6 +713,8 @@ albums.
 
 - **Shuffle**: your whole library, shuffled - see [Shuffling your library](#shuffling-your-library). Until
   it's ready it reads "Getting ready…", dimmed.
+- **Downloaded**: what's on this phone (below), opened over the Library. While deadwax can't be reached the
+  Albums page is Downloaded itself, so this is **Your albums** (or **Albums**) instead, the way back to the list.
 - **Refresh**: your albums, your playlists and the artists asked for again now - and the Songs page, once
   you've opened it, from its top.
 - **Edit order**: the pages as rows - drag them by their handles into the order you want, and **Done**. The
@@ -714,12 +723,13 @@ albums.
   on, Songs isn't a page, so it isn't listed, and keeps its place for a sign-in without a library.
 
 The orders and Grid or list moved into the ••• when Artists joined, and Playlists' **+** became the •••'s New
-playlist when the top got its magnifying glass. In the redesign they came out again, onto each page's line;
-Downloaded became the last of the buttons, and All music became **Yours | All**.
+playlist when the top got its magnifying glass. In the redesign they came out again, onto each page's line, and All
+music became **Yours | All**. For a day the top was "Library" over a row of buttons, Downloaded the last of them;
+now it's the one row again, and Downloaded is back in the •••.
 
 On the Albums page:
 
-- **Grid or list**: the list button at the end of the page's line switches to rows, the grid button back to
+- **Grid or list**: the list mark at the end of the page's line switches to rows, the grid mark back to
   covers. It starts as a grid, and this phone remembers your choice - apart from a Mac's.
 - **The order** (on the page's line): **Artist** (the first time), **Title**, **Recently added**,
   **Year, newest first** or **Year, oldest first**, under headers: the first letter (names that don't
@@ -782,7 +792,7 @@ With **Reduce Motion** on, the mark doesn't grow, turn or spin; the ring still f
 states change at once. **VoiceOver** and Switch Control use ••• > Shuffle; the pull's graphic isn't read.
 On **iOS 17** there's no pull, only ••• > Shuffle.
 
-**Downloaded** (the last of the Library's buttons) is every album with a song on this phone, whoever's library it's in, drawn as
+**Downloaded** (in the Library's •••) is every album with a song on this phone, whoever's library it's in, drawn as
 the other lists are: the same orders, Find, headers and index. An album your library is downloading by
 itself shows there once a song of it is here or downloading, never while it only waits its turn.
 Its **Recently added** means downloaded to this phone, newest first. Each album there has a third
@@ -6352,12 +6362,13 @@ can use them, and makes the phone's own pieces, which are drawn nowhere yet. Not
 #### Albums and Artists, and the Library's top (526-531)
 
 **Not done yet.** The Mac's Albums and Artists become column lists under their own toolbar - Play, Shuffle, Sort,
-Grid | List and Find - with their counts in the status bar. On the phone the Library's top is redrawn: **Library** at
-the left; **Yours | All**, the magnifying glass and the ••• at the right; under it a row of buttons for the pages, in the
-order you keep (Edit order), then **Downloaded**; under that each page's line - how many, its order (tap it to change
-it), and on Albums the grid and list buttons; Playlists' line has **New playlist…**. **All** shows the whole
-collection's albums, artists and songs as the pages, where the •••'s All music used to push them. The ••• keeps
-Shuffle, Refresh and Edit order.
+Grid | List and Find - with their counts in the status bar. On the phone the Library's top is redrawn as one row: the
+round magnifying glass at the left, the round ••• at the right, and between them the switch of the pages, in the order
+you keep (Edit order), the page you're on lit - no "Library" title and no row of buttons under it. Under the row each
+page has one quiet line of words: how many, its order (tap it to change it) or Playlists' **New playlist…**, and at its
+end Albums' grid and list marks, then **Yours | All** with a library of your own - white where you are, purple what a
+tap goes to. **All** shows the whole collection's albums, artists and songs as the pages, where the •••'s All music
+used to push them. The ••• is Shuffle, **Downloaded**, Refresh and Edit order.
 
 - **526 Albums as a list.** **Not done yet.** On the Mac, choose **List** in the Albums toolbar: every other row is
   faintly striped, and a clicked row is lit purple inside a purple edge. ↑ and ↓ move the lit row, ⌘↑ and ⌘↓ to the
@@ -6372,19 +6383,31 @@ Shuffle, Refresh and Edit order.
   An artist on a split album or a compilation whose album artist is someone else counts it in their Albums but not
   in their Songs or Plays - Navidrome's own count against the album's own artist. The status bar's albums count
   each album once. Left open past midnight, "today" becomes "yesterday".
-- **529 The Library's top.** **Not done yet.** On the phone, the Library's top is one row - Library, Yours | All, the
-  magnifying glass and the ••• - clear of the Dynamic Island, and still clear after opening Now Playing and going back.
-  The row of page buttons and the page's line are under it. VoiceOver reads the page buttons as tabs and Downloaded
-  as a button after them. Known: at the largest text size on a narrow phone (375 points) with a library of your own,
-  "Library" is cut short.
-- **530 The pages.** **Not done yet.** Tap each page button: the page moves to it and its button lights. Swipe between
-  the pages: the lit button follows. **Downloaded** opens Downloaded. The order on a page's line changes the order,
-  the grid and list buttons switch Albums, and pulling a page down still shuffles. With a library of your own, **All**
-  shows the whole collection's Albums, Artists and Songs, and **Yours** your own again - Songs never beside your own
-  albums. On All's Songs, turn WireGuard off: All and its Songs stay; tap Yours, and Yours | All goes until deadwax is
+- **529 The Library's top.** **Not done yet.** On the phone, the Library's top is one row - the magnifying glass's
+  circle, the switch of the pages and the •••'s circle, 16 points in from each edge - clear of the Dynamic Island, and
+  still clear after opening Now Playing and going back. The page's quiet line is under it, its words and marks bare,
+  nothing boxed. VoiceOver reads the magnifying glass by the page's Find ("Find in albums"), the switch as "Library
+  pages" with the page you're on selected, then "More for the Library"; on the line, Grid and List with the one
+  showing selected, and Yours | All as "Your library or all music" with the side you're on selected. At the largest
+  text size (and the accessibility sizes) on a narrow phone, nothing is cut short: with four pages (logins off) the
+  switch moves under the circles (VoiceOver then reads the magnifying glass and the ••• before the switch under
+  them), and a line too long for one first drops its count's word ("140 · Recently added"), then goes on to a second.
+- **530 The pages.** **Not done yet.** Tap each page in the switch: the page moves to it and it lights. Swipe between
+  the pages: the lit page follows. **••• > Downloaded** opens Downloaded; turn WireGuard off on Yours and the ••• has
+  **Your albums** in its place instead. The order on a page's line changes the order, the grid and list marks at the
+  end of Albums' line switch it (the one showing white, the other purple), and pulling a page down still shuffles.
+  With a library of your own, **All** at the end of a page's line shows the whole collection's Albums, Artists and
+  Songs, and **Yours** your own again - Songs never beside your own albums; the side you're on is white, the other
+  purple. On All's Songs, turn WireGuard off: All and its Songs stay; tap Yours, and Yours | All goes until deadwax is
   back. The magnifying glass opens Find under the top; Cancel closes it.
 - **531 Both phones.** **Not done yet.** On Green Anole, the rest - the other tabs, the player, Now Playing, an album,
-  Edit album and the EQ - are as before. On Ethan's phone, 529 and 530, or "not done yet".
+  Edit album and the EQ - are as before. On Ethan's phone, 529 and 530, or "not done yet". At the standard text size,
+  Albums' line on Green Anole drops its count's word with a count in the thousands and **Year, newest first**, or
+  while Find finds under a longer order ("12 of 140 · Recently added") - say whether the bare number reads well. Should
+  either be 375 points wide (an SE or a mini), the line keeps to one line for a library's count under any order;
+  Find's count still sends grid, list and Yours | All on to a second line as you type under **Year, newest first**,
+  or under **Recently added** or **Year, oldest first** in a library in the thousands ("12 of 2318") - say whether
+  that reads well.
 
 #### The side panel's tabs, and the Now Playing sheet (532-538)
 

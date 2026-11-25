@@ -172,14 +172,10 @@ public enum PhoneLook {
 
     // MARK: the compact top (.topbar, .big)
 
-    /// The top, and the top with the page's own title in it (the Library's: iLibrary's inline 50).
+    /// The top (R2's titled top, the Library's, went in R2b: its one row is .ltop's, below).
     public static let top: Double = 44                  // dw.ph: .topbar height
-    public static let titledTop: Double = 50            // drawn: iLibrary .topbar height
-    /// Its sides (a titled top's leading side iLibrary's inline 16), and between what it holds.
+    /// Its sides, and between what it holds.
     public static let topSide: Double = 12              // dw.ph: .topbar padding-left
-    public static let titledTopSide: Double = 16        // drawn: iLibrary .topbar padding-left
-    /// A titled top's title drawn closer (iLibrary's inline -0.5px).
-    public static let titledTopTracking: Double = -0.5  // drawn: iLibrary .topbar title letter-spacing
     public static let topGap: Double = 8                // dw.ph: .topbar gap
     /// The large title under it: its room above, either side and below, and its letters drawn closer.
     public static let bigAbove: Double = 2              // dw.ph: .big padding-top
@@ -248,10 +244,158 @@ public enum PhoneLook {
 
     // MARK: the meta line (.meta)
 
-    /// The line, between what it holds, its sides, and between a link's words and its caret.
-    public static let meta: Double = 30                 // dw.ph: .meta height
+    /// The line, between what it holds, its sides, and between a link's words and its caret. (R2b) The Library's
+    /// pages - the only ones drawing it - have it 32 tall and 16 in at the right too (iLibrary's, iArtists' and
+    /// iPlaylists' inline style: `height: 32px; padding-right: 16px`).
+    public static let meta: Double = 32                 // drawn: iLibrary .meta height
     public static let metaGap: Double = 6               // dw.ph: .meta gap
     public static let metaLead: Double = 16             // dw.ph: .meta padding-left
-    public static let metaTrail: Double = 10            // dw.ph: .meta padding-right
+    public static let metaTrail: Double = 16            // drawn: iLibrary .meta padding-right
     public static let linkGap: Double = 5               // dw.ph: .meta .link gap
+    /// (R2b) Grid and List at the line's end, bare glyphs: each one's square, between the two, and the room after them
+    /// before Yours | All.
+    public static let metaGlyph: Double = 28            // dw.ph: .meta .v width
+    public static let metaGlyphGap: Double = 2          // dw.ph: .meta .views gap
+    public static let metaGlyphsAfter: Double = 10      // dw.ph: .meta .views margin-right
+    /// (R2b) Yours | All: between each word and the hairline, and the hairline's height.
+    public static let sidesGap: Double = 10             // dw.ph: .meta .scope gap
+    public static let sidesRule: Double = 12            // dw.ph: .meta .scope > i height
+
+    // MARK: the Library's one row (.ltop, .circ)
+
+    /// (R2b - James, 25 Nov: "The top of the library on iOS is actually kinda a mess, can we streamline it a bit?")
+    /// The row: its height, how far in from each edge, and between Find's circle, the switch and the •••.
+    public static let row: Double = 52                  // dw.ph: .ltop height
+    public static let rowSide: Double = 16              // dw.ph: .ltop padding-left
+    public static let rowGap: Double = 12               // dw.ph: .ltop gap
+    /// A circle - Find's and the •••'s - round, the look's raised face.
+    public static let circle: Double = 34               // dw.ph: .circ width
+}
+
+/// (R2b) A size in points, as SwiftUI measured a view, for the layout rules Core holds so they are tested here
+/// (MetaLine, LibraryTopFit) - the app's own Layouts measure, ask Core where each view goes, and place it there.
+public struct LookSize: Sendable, Equatable {
+    public let width: Double
+    public let height: Double
+
+    public init(width: Double, height: Double) {
+        self.width = width
+        self.height = height
+    }
+}
+
+/// (R2b) Where a view goes in a layout Core lays out: its top leading corner in the layout's own space, and the size it
+/// is given there.
+public struct LookBox: Sendable, Equatable {
+    public let x: Double
+    public let y: Double
+    public let width: Double
+    public let height: Double
+
+    public init(x: Double, y: Double, width: Double, height: Double) {
+        self.x = x
+        self.y = y
+        self.width = width
+        self.height = height
+    }
+
+    /// `size` centred on (`midX`, `midY`).
+    public init(centredOn midX: Double, _ midY: Double, _ size: LookSize) {
+        self.init(x: midX - size.width / 2, y: midY - size.height / 2, width: size.width, height: size.height)
+    }
+
+    public var midX: Double { x + width / 2 }
+    public var midY: Double { y + height / 2 }
+    public var maxX: Double { x + width }
+}
+
+/// (R2b) The Library's quiet line (PhoneMeta): its words - the count, then the order or New playlist… - and its end
+/// (Grid and List, Yours | All). Where all of it doesn't fit on one line, it gives way inside itself first: the count's
+/// noun dropped ("2318 · Year, newest first", "12 of 140 · Recently added" - VoiceOver still hears "2318 albums"). Only
+/// where even that doesn't fit does its end fold onto a line of its own under the words, at the trailing edge - the
+/// count saying its noun again, unless even then the words need more than the line, when they wrap. The order's words
+/// and New playlist… are never shortened, and no word is ever cut. Each way is measured as it is drawn (PhoneMeta's
+/// ViewThatFits, tried in `Fit`'s order), so a face or a text size of its own moves where the line gives way, never
+/// whether it cuts a word. (The review of R2b, 25 Nov: folding at the standard size on every phone James has - "140
+/// albums · Recently added" 351 pt of a 375 pt phone's 343 - a list dropping 32 pt at Find's first keystroke.)
+public enum MetaLine {
+    /// The ways the line is drawn, in the order they are tried: the first whose width fits is drawn, the last where none
+    /// does.
+    public enum Fit: CaseIterable, Sendable, Equatable {
+        /// one line, the count in full
+        case full
+        /// one line, the count's noun dropped
+        case short
+        /// the end on a line of its own, the count in full
+        case folded
+        /// the end on a line of its own, the count's noun dropped, the words wrapping in the line should they need to
+        case foldedShort
+
+        /// The count drawn without its noun.
+        public var short: Bool { self == .short || self == .foldedShort }
+        /// The end on a line of its own.
+        public var folded: Bool { self == .folded || self == .foldedShort }
+    }
+
+    /// The count without its noun - "2318 albums" "2318", "12 of 140 albums" "12 of 140", "1 song" "1": the count as
+    /// Find's countText and filteredCountText say it, numbers first and the noun last. Words with no noun stay as they
+    /// are, "" too.
+    public static func short(_ count: String) -> String {
+        guard let space = count.lastIndex(of: " ") else { return count }
+        return String(count[..<space])
+    }
+
+    /// The count's words as `fit` draws them.
+    public static func count(_ count: String, _ fit: Fit) -> String {
+        fit.short ? short(count) : count
+    }
+
+    /// How wide the line is at its two ends' own widths: on one line, the words, then - with anything at its end - the
+    /// room between and the end; folded, the wider of its two lines.
+    public static func width(words: Double, end: Double, folded: Bool) -> Double {
+        if folded { return max(words, end) }
+        return end > 0 ? words + 2 * PhoneLook.metaGap + end : words
+    }
+
+    /// The way the line is drawn in `room`: its words `full` wide with the count in full and `short` wide without its
+    /// noun, its end `end` wide - the first of `Fit`'s ways whose width fits the room, the last where none does. What
+    /// PhoneMeta's ViewThatFits does with the widths it measures.
+    public static func fit(full: Double, short: Double, end: Double, room: Double) -> Fit {
+        Fit.allCases.first { (each: Fit) -> Bool in
+            width(words: each.short ? short : full, end: end, folded: each.folded) <= room
+        } ?? .foldedShort
+    }
+
+    /// What the words are given across in `room`: the whole line, folded or with nothing at its end; on one line, what
+    /// the end and the room before it leave.
+    public static func wordsRoom(_ room: Double, end: Double, folded: Bool) -> Double {
+        folded || end <= 0 ? room : max(0, room - end - 2 * PhoneLook.metaGap)
+    }
+
+    /// Where the line's words and its end go in `room`, at their sizes (the words' in the room they are given), and the
+    /// line's size.
+    public struct Placed: Sendable, Equatable {
+        public let words: LookBox
+        public let end: LookBox
+        public let width: Double
+        public let height: Double
+    }
+
+    /// On one line, the words at the leading edge and the end at the trailing one, each centred in the line. Folded, the
+    /// words centred in the first line and the end under them at the trailing edge, each line as tall as the line is
+    /// drawn at least (PhoneLook.meta) - and with nothing at the end, no second line.
+    public static func place(words: LookSize, end: LookSize, room: Double, folded: Bool) -> Placed {
+        if folded {
+            let first = max(words.height, PhoneLook.meta)
+            let second = end.width > 0 ? max(end.height, PhoneLook.meta) : 0
+            return Placed(words: LookBox(x: 0, y: (first - words.height) / 2, width: words.width, height: words.height),
+                          end: LookBox(x: room - end.width, y: first + (second - end.height) / 2, width: end.width,
+                                       height: end.height),
+                          width: room, height: first + second)
+        }
+        let height = max(words.height, end.height)
+        return Placed(words: LookBox(x: 0, y: (height - words.height) / 2, width: words.width, height: words.height),
+                      end: LookBox(x: room - end.width, y: (height - end.height) / 2, width: end.width, height: end.height),
+                      width: room, height: height)
+    }
 }

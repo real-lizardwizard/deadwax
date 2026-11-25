@@ -7,8 +7,9 @@ import SwiftUI
 /// is.
 ///
 /// - On the Mac, Shuffle's and Repeat's (.tog): 30, a box's corners, the accent's 4 pt dot 7 under it while on.
-/// - On the phone, the Library's Grid and List (.tog.sm): 28 at least, square, no dot (`.tog.sm.on::after` draws none),
-///   a finger's target of 44 round it.
+/// - On the phone (.tog.sm): 28 at least, square, no dot (`.tog.sm.on::after` draws none), a finger's target of 44
+///   round it. R2's Grid and List on the Library's meta line were these; since R2b (James's drawing of 25 Nov) they are
+///   two bare glyphs (LibraryLineEnd), so the phone's half is drawn nowhere just now.
 struct DWToggleStyle: ButtonStyle {
     let on: Bool
 

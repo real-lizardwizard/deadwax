@@ -230,8 +230,9 @@ extension Typeface {
         }
     }
 
-    /// (R1b) The phone's own pieces' type (ios/App/Phone), the phone's alone: dw.css's `.dw.ph` sizes - two the drawings'
-    /// own inline styles, said so - each scaled `relativeTo:` the text style nearest it, the smaller on a tie. `mono` is
+    /// (R1b) The phone's own pieces' type (ios/App/Phone), the phone's alone: dw.css's `.dw.ph` sizes - each scaled
+    /// `relativeTo:` the text style nearest it, the smaller on a tie (R2's titled top's 28, iLibrary's own, went with it
+    /// in R2b). `mono` is
     /// Noto Sans Mono, the bundled face, scaled the same way: for the readouts a slice redraws in mono ("3 of 11",
     /// "FLAC 16/44.1", "8 songs · 33 min left"). Typeface.mono, the system's, stays wherever a slice hasn't redrawn the
     /// data.
@@ -243,8 +244,8 @@ extension Typeface {
             case back
             /// The large title under the top (.big).
             case big
-            /// The top's own title - the Library's, at its left - and a page's name centred in it (.topbar > .ttl).
-            case topTitle, topName
+            /// A page's name centred in the compact top (.topbar > .ttl).
+            case topName
             /// The meta line, and its purple link (.meta, .meta .link).
             case meta
             /// A tab bar's item's words, and Now Playing's bottom row's (.tabbar > a).
@@ -262,7 +263,6 @@ extension Typeface {
                 case .strip: return (14, .footnote)             // dw.ph: .chips > button font-size
                 case .back: return (17, .headline)              // dw.ph: .back font-size
                 case .big: return (34, .largeTitle)             // dw.ph: .big font-size
-                case .topTitle: return (28, .title)             // drawn: iLibrary .topbar title font-size
                 case .topName: return (17, .headline)           // dw.ph: .dw font-size
                 case .meta: return (13, .footnote)              // dw.ph: .meta font-size
                 case .tabItem: return (11, .caption2)           // dw.ph: .tabbar > a font-size

@@ -115,6 +115,7 @@ enum DWPalette {
     static let rowText = hex(0xffffff)                                // dw.ph: .field > label color
     static let kvLabel = hex(0xffffff)                                // dw.ph: .kv > span:first-child color
     static let rowRule = hex(0x1c1b22)                                // dw.ph: .row border-bottom-color
+    static let metaRule = hex(0x34323c)                               // dw.ph: .meta .scope > i background
 
     // MARK: the phone's pieces: the mini player, the tab bar's items, the foot
 

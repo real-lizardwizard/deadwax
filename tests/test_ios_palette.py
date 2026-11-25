@@ -315,7 +315,8 @@ def test_the_apps_own_bars_are_the_webs():
                   ".foregroundStyle(shown ? DWPalette.acc : DWPalette.tabItemText)", ".lookHeight(PhoneLook.tabItem)"):
         assert drawn in button, drawn
     assert not re.search(r"(?<![\w.])Palette\.", button)
-    #? (the redesign, R2) the Library's switch is gone - its pages are the strip's (PhoneStrip, test_ios_phone_look.py)
+    #? (the redesign, R2) the Library's switch was the strip's (PhoneStrip); (R2b) the row's switch again, DWSegmented's
+    #? (test_ios_library_look.py)
     # iOS's own bar is hidden on every tab's stack and every page pushed, so it never comes back over the app's
     routes = (APP / "Shared" / "Routes.swift").read_text(encoding="utf-8")
     assert tabs.count(".toolbar(.hidden, for: .tabBar)") == 2 and ".toolbar(.hidden, for: .tabBar)" in routes
@@ -497,13 +498,14 @@ def test_the_librarys_top_sits_under_the_status_bar():
     # status bar. The Library is the only page that hides iOS's navigation bar, and every other view that reaches
     # under the status bar is a fill (or keeps its content in the safe area). Since 18 Nov the row's room is read by a
     # UIKit probe in its own window, kept under a presentation and measured afresh otherwise; since 20 Nov kept too while
-    # the row is above its window's edge, and read again after every ask. (The redesign, R2) The top is iLibrary's
-    # titled top over the phone's own black ground (dw.css's `.dw.ph` background, `.dw.ph .topbar`'s none), the strip
-    # under it - the switch and its hairline gone.
+    # the row is above its window's edge, and read again after every ask. (The redesign, R2) The top is over the phone's
+    # own black ground (dw.css's `.dw.ph` background, `.dw.ph .topbar`'s none) - the old tab bar's fill and its hairline
+    # gone; (R2b) it is iLibrary's one row again (.ltop: Find's circle, the switch, the •••), R2's titled top and strip
+    # gone, the offline banner straight under it.
     library = (APP / "Library" / "LibraryView.swift").read_text(encoding="utf-8")
     pager = library[library.index("private func pager(albums: AlbumList)"):library.index("private func pageView(")]
     assert ".safeAreaInset(edge: .top" not in library and ".showsOfflineBanner()" not in pager
-    order = [pager.index(part) for part in ("return VStack(spacing: 0) {", "LibraryTop(", "strip(order, albums: list)",
+    order = [pager.index(part) for part in ("return VStack(spacing: 0) {", "LibraryTop(", "switcher(order)",
                                              "OfflineBanner()", "ScrollView(.horizontal)",
                                              ".containerRelativeFrame([.horizontal, .vertical])",
                                              ".toolbar(.hidden, for: .navigationBar)")]
@@ -526,10 +528,10 @@ def test_the_librarys_top_sits_under_the_status_bar():
     row = top
     body = row[row.index("var body: some View {"):row.index("private func take(")]
     order = [body.index(part) for part in (".padding(.top, clearance)", ".ignoresSafeArea(.container, edges: .top)\n",
-                                           ".background {\n            TopProbe(eyes: eyes) {", ".onGeometryChange(",
-                                           '.onAppear { eyes.probe?.soon("appear") }')]
+                                           ".background {\n            TopProbe(eyes: eyes) {",
+                                           ".onGeometryChange(for: [CGFloat].self)", '.onAppear { eyes.probe?.soon("appear") }')]
     assert order == sorted(order)
-    probe_view = body[body.index("TopProbe(eyes: eyes)"):body.index(".onGeometryChange(")]
+    probe_view = body[body.index("TopProbe(eyes: eyes)"):body.index(".onGeometryChange(for: [CGFloat].self)")]
     assert "ignoresSafeArea" not in probe_view
     probe = row[row.index("private struct TopProbe: UIViewRepresentable {"):]
     assert "guard let window else { return }" in probe

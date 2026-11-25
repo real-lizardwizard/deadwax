@@ -180,8 +180,11 @@ import Testing
         #expect(LibraryMenuItem.albums(.store).words(personal: true) == "All albums")
         #expect(LibraryMenuItem.refresh.words(personal: true) == "Refresh")
         #expect(LibraryMenuItem.editOrder.words(personal: true) == "Edit order")
+        // (R2b) Downloaded is the •••'s again, in the words the old ••• and R2's strip had
+        #expect(LibraryMenuItem.downloaded.words(personal: true) == "Downloaded")
+        #expect(LibraryMenuItem.downloaded.words(personal: false) == DownloadWords.downloadedTitle)
         // (R2's review) the old •••'s items went with it; their words live on where the items went
-        #expect(DownloadWords.downloadedTitle == "Downloaded" && LibraryStripItem.downloaded.title == "Downloaded")
+        #expect(DownloadWords.downloadedTitle == "Downloaded")
         #expect(LibraryWords.allMusic == "All music")
         #expect(ArtistWords.title(.store, personal: true) == "All artists" && ArtistWords.title(.store, personal: false) == "Artists")
         #expect(SongWords.title(personal: true) == "All songs" && SongWords.title(personal: false) == "Songs")
@@ -190,8 +193,8 @@ import Testing
         #expect(PlaylistWords.newPlaylist == "New playlist")
         #expect(LibrarySwitchWords.cancelFind == "Cancel")
         let enabled = [LibraryMenuItem.shuffle(.ready), .shuffle(.downloads), .shuffle(.gettingReady), .shuffle(.failed("x")),
-                       .albums(.yours), .refresh, .editOrder].map(\.enabled)
-        #expect(enabled == [true, true, false, false, true, true, true])
+                       .albums(.yours), .downloaded, .refresh, .editOrder].map(\.enabled)
+        #expect(enabled == [true, true, false, false, true, true, true, true])
         #expect(LibrarySwitchWords.more == "More for the Library")
         #expect(LibrarySwitchWords.orderFooter == "Drag the pages into the order you want. The Library opens on the first.")
     }
@@ -285,34 +288,109 @@ import Testing
         #expect(LibrarySide.all.shuffle.scope(library: .yours) == .store, "All's Shuffle is the collection's")
     }
 
-    @Test func theStripIsThePagesThenDownloaded() {
-        #expect(LibraryStrip.items([.artists, .albums]) == [.page(.artists), .page(.albums), .downloaded])
-        #expect(LibraryStrip.items([]) == [.downloaded])
-        #expect(LibraryStrip.items([.albums, .artists], albumsPage: .downloaded) == [.page(.albums), .page(.artists)],
-                "no Downloaded beside the Albums page that is Downloaded")
-        #expect(LibraryStripItem.downloaded.title == DownloadWords.downloadedTitle)
-        #expect(LibraryStripItem.page(.songs).title == LibraryPage.songs.title)
-        #expect(LibraryStrip.items(LibraryPages.standard).map { (item: LibraryStripItem) -> String in item.title }
-                == ["Albums", "Playlists", ArtistWords.artists, SongWords.songs, "Downloaded"])
-        // (R2's review) Downloaded pushes a page: a button to VoiceOver, never one of the pages' tabs
-        #expect(LibraryStripItem.downloaded.pushes)
-        for page in LibraryPage.allCases { #expect(!LibraryStripItem.page(page).pushes) }
-        let items = LibraryStrip.items(LibraryPages.standard)
-        #expect(items.filter { (item: LibraryStripItem) -> Bool in item.pushes } == [.downloaded])
-    }
-
-    @Test func theTopsMoreHoldsWhatTheMetaLineAndTheStripDont() {
+    /// (R2b) The ••• is Shuffle, Downloaded, Refresh and Edit order (James's drawing of 25 Nov) - Downloaded back from
+    /// R2's strip, and, while the Albums page is Downloaded itself, the way back to the albums in its place, as the old
+    /// ••• had them (5123bab3's "places": `albumsPage == .downloaded ? .albums(scope) : .downloaded`).
+    @Test func theTopsMoreIsShuffleDownloadedRefreshAndEditOrder() {
         #expect(LibraryMenu.topSections(shuffle: .ready, albumsPage: .albums, scope: .yours)
-                == [[.shuffle(.ready)], [.refresh, .editOrder]])
-        #expect(LibraryMenu.topSections(shuffle: .none, albumsPage: .albums, scope: .store) == [[.refresh, .editOrder]])
+                == [[.shuffle(.ready)], [.downloaded], [.refresh, .editOrder]])
+        #expect(LibraryMenu.topSections(shuffle: .none, albumsPage: .albums, scope: .store)
+                == [[.downloaded], [.refresh, .editOrder]])
         #expect(LibraryMenu.topSections(shuffle: .nothingHere, albumsPage: .downloaded, scope: .yours)
                 == [[.albums(.yours)], [.refresh, .editOrder]], "the way back to the albums while they are Downloaded")
         #expect(LibraryMenu.topSections(shuffle: .gettingReady, albumsPage: .downloaded, scope: .store)
                 == [[.shuffle(.gettingReady)], [.albums(.store)], [.refresh, .editOrder]])
-        // no order, layout, New playlist or Downloaded - the meta line's and the strip's: (its review) LibraryMenuItem
-        // has no such items since the old ••• went
+        // Downloaded and the way back are never both there, and one of them always is
+        for shuffle in [ShuffleCan.ready, .none, .downloads] {
+            for list in [LibraryRootList.albums, .downloaded] {
+                let items = LibraryMenu.topSections(shuffle: shuffle, albumsPage: list, scope: .yours).joined()
+                #expect(items.contains(.downloaded) == (list == .albums))
+                #expect(items.contains(.albums(.yours)) == (list == .downloaded))
+            }
+        }
+        // no order, layout or New playlist - each page's line's: (its review) LibraryMenuItem has no such items since
+        // the old ••• went
         #expect(LibrarySwitchWords.grid == "Grid" && LibrarySwitchWords.list == "List")
     }
+
+    /// (R2b) Grid and List are on Albums' line alone, as they were Albums' own in the old •••.
+    @Test func gridAndListAreOnAlbumsLineAlone() {
+        #expect(LibraryPage.allCases.filter { (page: LibraryPage) -> Bool in LibraryLine.layouts(on: page) } == [.albums])
+    }
+
+    /// (R2b) The row holds the switch where its equal segments fit between the circles - 375 pt wide, room for 251 -
+    /// and folds it under them where they don't, into the page's width less the circles' sides.
+    @Test func theRowFoldsTheSwitchOnlyWhereItCantHoldIt() {
+        #expect(LibraryTopFit.room(width: 375) == 375 - 2 * (16 + 34 + 12))
+        #expect(LibraryTopFit.room(width: 375) == 251)
+        #expect(LibraryTopFit.foldedRoom(width: 375) == 343)
+        #expect(!LibraryTopFit.folds(needs: 251, width: 375), "exactly the room: held")
+        #expect(LibraryTopFit.folds(needs: 251.5, width: 375))
+        #expect(!LibraryTopFit.folds(needs: 300, width: 440))
+        #expect(LibraryTopFit.foldedRoom(width: 320) == 288)
+        // the row as LibraryTopRow asks for it: given a width, the switch offered the room beside the circles or the
+        // page's; asked its own, as wide as the switch needs beside them - never folded
+        #expect(LibraryTopFit.row(needs: 240, width: 375) == LibraryTopFit.Row(width: 375, folds: false, room: 251))
+        #expect(LibraryTopFit.row(needs: 251.5, width: 375) == LibraryTopFit.Row(width: 375, folds: true, room: 343))
+        #expect(LibraryTopFit.row(needs: 300, width: nil) == LibraryTopFit.Row(width: 424, folds: false, room: 300))
+    }
+
+    /// (R2b, its review) The row's views where James drew them: Find's circle at the leading edge and the •••'s at the
+    /// trailing one - each centred where its 34 pt face is, 16 in - and the switch between them, or across the page
+    /// under them, folded.
+    @Test func theRowPutsFindLeadingTheMoreTrailingAndTheSwitchBetween() {
+        let target = LookSize(width: 44, height: 44)
+        let well = LookSize(width: 251, height: 38)
+        let need = LookSize(width: 240, height: 38)
+        let row = LibraryTopFit.place(LibraryTopFit.row(needs: 240, width: 375), find: target, switcher: well,
+                                      more: target, need: need)
+        // Find's face 16 in from the leading edge, its target reaching 5 past it; the •••'s as far in from the trailing
+        #expect(row.find == LookBox(x: 11, y: 4, width: 44, height: 44))
+        #expect(row.more == LookBox(x: 320, y: 4, width: 44, height: 44))
+        #expect(row.find.midX == 16 + 17 && row.more.midX == 375 - 16 - 17)
+        // the switch in the room between the faces, 12 from each: 16 + 34 + 12 = 62 to 375 - 62 = 313
+        #expect(row.switcher == LookBox(x: 62, y: 7, width: 251, height: 38))
+        #expect(row.switcher.maxX == 375 - 62)
+        // its need on it, at its own size; all of them centred in the row's 52
+        #expect(row.need == LookBox(x: 67.5, y: 7, width: 240, height: 38))
+        #expect(row.find.midY == 26 && row.switcher.midY == 26 && row.more.midY == 26)
+        #expect(row.width == 375 && row.height == 52)
+        // a switch taller than the row (the larger text sizes) makes the row as tall, everything centred in it
+        let tall = LibraryTopFit.place(LibraryTopFit.row(needs: 240, width: 375), find: target,
+                                       switcher: LookSize(width: 251, height: 60), more: target, need: need)
+        #expect(tall.height == 60 && tall.find.midY == 30 && tall.switcher.y == 0)
+
+        // folded (four pages at xLarge on a 375 pt phone): the circles where they were, the switch under them across the
+        // page less the circles' sides, the room under it the row would give it beside them
+        let wide = LookSize(width: 343, height: 42)
+        let folded = LibraryTopFit.place(LibraryTopFit.row(needs: 300, width: 375), find: target, switcher: wide,
+                                         more: target, need: LookSize(width: 300, height: 42))
+        #expect(folded.find == row.find && folded.more == row.more)
+        #expect(folded.switcher == LookBox(x: 16, y: 52, width: 343, height: 42))
+        #expect(folded.need == LookBox(x: 37.5, y: 52, width: 300, height: 42))
+        #expect(folded.height == 52 + 42 + 5)
+        // on a wider phone the same switch fits beside the circles again, and nothing is under them
+        let roomy = LibraryTopFit.place(LibraryTopFit.row(needs: 300, width: 440), find: target,
+                                        switcher: LookSize(width: 316, height: 42), more: target, need: need)
+        #expect(roomy.switcher.y == 5 && roomy.height == 52 && roomy.more.maxX == 440 - 11)
+    }
+
+    /// (R2b, its review) VoiceOver reads the row as it is drawn: Find, the switch, the ••• on one row - and, folded,
+    /// the two circles on the row before the switch under them.
+    @Test func voiceOverReadsTheRowAsItIsDrawn() {
+        #expect(LibraryTopFit.reading(folds: false) == [.find, .switcher, .more])
+        #expect(LibraryTopFit.reading(folds: true) == [.find, .more, .switcher])
+        let parts: [LibraryTopFit.Part] = [.find, .switcher, .more]
+        for folds in [false, true] {
+            // higher is sooner: the priorities read in the order said
+            let sorted = parts.sorted { (one: LibraryTopFit.Part, other: LibraryTopFit.Part) -> Bool in
+                LibraryTopFit.priority(one, folds: folds) > LibraryTopFit.priority(other, folds: folds)
+            }
+            #expect(sorted == LibraryTopFit.reading(folds: folds))
+        }
+        #expect(LibraryTopFit.priority(.find, folds: true) == 3 && LibraryTopFit.priority(.switcher, folds: true) == 1)
+    }
+
 
     @Test func playlistsMetaLineCountsAsFindDoes() {
         #expect(LibrarySwitchWords.playlistsCount(total: 9, shown: 9, finding: false) == "9 playlists")

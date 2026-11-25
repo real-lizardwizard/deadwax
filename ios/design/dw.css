@@ -295,3 +295,21 @@
 .dw.ph .mini .key.big svg { width: 32px; height: 32px; }
 .dw.ph .key.bare { width: 28px; height: 28px; color: var(--t3); }
 .dw.ph .key.bare svg { width: 14px; height: 14px; }
+
+/* The Library's top on the phone, streamlined (James, 25 Nov: "kinda a mess, can we streamline it a bit?"). It is
+   his own one row from 14 Nov again: Find's circle, the switch filling the room between, the More circle ("the search
+   button and options button at the top can be circles"). Under it, one quiet line of words: the count, the order as
+   a link, and Yours | All. No title, no strip of chips, no boxed buttons in the line. Downloaded and Shuffle are in
+   More. On Albums, Grid and List sit beside Yours | All as two bare glyphs (James, 25 Nov: "lets put the grid/list
+   next to yours/all"). In the line, white is where you are and purple is what a tap goes to. */
+.dw .meta .views { display: inline-flex; align-items: center; gap: 2px; margin-right: 10px; }
+.dw .meta .v { width: 28px; height: 28px; display: inline-flex; align-items: center; justify-content: center; padding: 0; border: 0; background: none; color: var(--acc); }
+.dw .meta .v.on { color: #fff; }
+.dw .meta .v svg { display: block; width: 17px; height: 17px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: square; stroke-linejoin: miter; }
+.dw .ltop { height: 52px; flex: none; display: flex; align-items: center; gap: 12px; padding: 0 16px; }
+.dw .circ { width: 34px; height: 34px; flex: none; display: inline-flex; align-items: center; justify-content: center; padding: 0; border: 1px solid #3d3a49; border-radius: 50%; background: linear-gradient(to bottom, #2e2c38, #201e28); box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08); color: #e8e8f0; }
+.dw .circ.on { border-color: var(--selbd); background: var(--selbg); color: var(--selt); }
+.dw .circ svg { display: block; width: 17px; height: 17px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; }
+.dw .meta .scope { display: inline-flex; align-items: center; gap: 10px; }
+.dw .meta .scope > b { color: #fff; font-weight: 600; }
+.dw .meta .scope > i { width: 1px; height: 12px; background: #34323c; }

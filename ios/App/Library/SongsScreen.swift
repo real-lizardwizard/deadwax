@@ -28,6 +28,8 @@ struct SongsScreen: View {
         /// The page the switch shows.
         let current: Bool
         let pulling: PullShuffling
+        /// (R2b) Yours | All at the end of its line, where it shows.
+        var sides: LibrarySideChoice? = nil
     }
 
     let page: Page?
@@ -130,13 +132,12 @@ struct SongsScreen: View {
 
     private func list(page: Page?) -> some View {
         VStack(spacing: 0) {
-            // (R2) the page's meta line under the Library's strip: its count (Navidrome's order is its one order)
-            if page != nil {
-                PhoneMeta {
-                    Text(songs.paging.countText)
-                } trailing: {
-                    EmptyView()
-                }
+            // (R2) the page's meta line - since R2b under the Library's one row: its count (Navidrome's order is its
+            // one order), and Yours | All where it shows
+            if let page {
+                PhoneMeta(count: songs.paging.countText, trailing: {
+                    LibraryLineEnd(page: .songs, sides: page.sides)
+                })
             }
             ScrollViewReader { proxy in
                 ScrollView {

@@ -4,12 +4,10 @@ import SwiftUI
 /// The compact top (dw.css's .topbar - the redesign, slice R1b, notes/ios.md "The redesign, slice R1b: the shared look,
 /// and the phone's pieces"): a page's own bar, 44 tall at least over no ground of its own (`.dw.ph .topbar`'s none - the
 /// page's shows through), what leads it at the left (the purple Back), what trails it at the right (small buttons, a
-/// •••), and a page's name centred between them, never under either. With the page's own title in it - the Library's
-/// "Library", 28 and bold at its left - it is the titled top, 50 tall at least. Capped at xxxLarge, as the tab bar is.
-/// The large title under it is PhoneBigTitle. Drawn nowhere until its slices (R2 onwards).
+/// •••), and a page's name centred between them, never under either. Capped at xxxLarge, as the tab bar is. The large
+/// title under it is PhoneBigTitle. (R2's titled top - the Library's "Library", 28 and bold at its left - went in R2b:
+/// the Library's top is its one row again, LibraryTop's, with PhoneCircleStyle's two circles.)
 struct PhoneTop<Leading: View, Trailing: View>: View {
-    /// The page's own title at the top's left (the titled top).
-    var title: String?
     /// A page's name, centred.
     var name: String?
     @ViewBuilder let leading: Leading
@@ -21,14 +19,6 @@ struct PhoneTop<Leading: View, Trailing: View>: View {
     var body: some View {
         HStack(spacing: CGFloat(PhoneLook.topGap)) {
             HStack(spacing: CGFloat(PhoneLook.topGap)) {
-                if let title {
-                    Text(title)
-                        .font(Typeface.Phone.text(.topTitle).weight(.bold))
-                        .tracking(CGFloat(PhoneLook.titledTopTracking))
-                        .foregroundStyle(DWPalette.text)
-                        .lineLimit(1)
-                        .accessibilityAddTraits(.isHeader)
-                }
                 leading
             }
             .onGeometryChange(for: CGFloat.self) { (side: GeometryProxy) -> CGFloat in
@@ -44,10 +34,9 @@ struct PhoneTop<Leading: View, Trailing: View>: View {
                     trailingWidth = width
                 }
         }
-        // .topbar: padding 0 12px (the titled top's leading side 16)
-        .padding(.leading, CGFloat(title == nil ? PhoneLook.topSide : PhoneLook.titledTopSide))
-        .padding(.trailing, CGFloat(PhoneLook.topSide))
-        .lookHeight(title == nil ? PhoneLook.top : PhoneLook.titledTop)
+        // .topbar: padding 0 12px
+        .padding(.horizontal, CGFloat(PhoneLook.topSide))
+        .lookHeight(PhoneLook.top)
         .overlay {
             // .topbar > .ttl: centred across the whole top, clear of what leads and trails it
             if let name {
@@ -65,9 +54,47 @@ struct PhoneTop<Leading: View, Trailing: View>: View {
 }
 
 extension PhoneTop where Leading == EmptyView {
-    /// A top with nothing at its left but its title, if any.
-    init(title: String? = nil, name: String? = nil, @ViewBuilder trailing: () -> Trailing) {
-        self.init(title: title, name: name, leading: { EmptyView() }, trailing: trailing)
+    /// A top with nothing at its left.
+    init(name: String? = nil, @ViewBuilder trailing: () -> Trailing) {
+        self.init(name: name, leading: { EmptyView() }, trailing: trailing)
+    }
+}
+
+/// (the redesign, slice R2b - notes/ios.md "The redesign, slice R2b: the Library's top, one row again") The Library's
+/// two circles (dw.css's .circ): Find's magnifying glass and the •••, James's of 14 Nov again ("but the search button
+/// and options button at the top can be circles"). The look's raised face - .btn's gradient, edge, sheen and label
+/// colour, which .circ's are, without .btn's drop - drawn round, 34 pt, in a finger's 44 pt target that reaches 5 pt
+/// past it on every side into the room round it (the row's 12 pt either side, its 9 pt above and below), so it never
+/// reaches a neighbour's; pressed, the gradient turned over, as every raised face presses. For a Menu too
+/// (`.menuStyle(.button)`, whose label takes the button style in use). Its face is a mark drawn at its size, as R1b's
+/// switch is; its glyph grows with the text to the largest standard size the row is capped at, and a long press then
+/// shows it large.
+struct PhoneCircleStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        PhoneCircleFace(label: configuration.label, pressed: configuration.isPressed)
+    }
+}
+
+private struct PhoneCircleFace<Label: View>: View {
+    let label: Label
+    let pressed: Bool
+
+    @Environment(\.isEnabled) private var enabled
+
+    var body: some View {
+        let face = CGFloat(PhoneLook.circle)
+        let target = max(face, CGFloat(DWLook.here.target))
+        label
+            .font(Typeface.symbol(.body).weight(.semibold))
+            .foregroundStyle(DWPalette.buttonText)
+            .frame(width: face, height: face)
+            .background {
+                DWRaised(shape: Circle(), face: DWPalette.buttonFace, sheen: DWPalette.buttonSheen,
+                         edge: DWPalette.buttonEdge, drop: nil, pressed: pressed && enabled)
+            }
+            .opacity(enabled ? 1 : DWPalette.off)
+            .frame(width: target, height: target)
+            .contentShape(Rectangle())
     }
 }
 

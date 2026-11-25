@@ -34,6 +34,8 @@ struct ArtistsScreen: View {
         let pulling: PullShuffling
         /// (R2) The top's All: the collection's artists, in the page's place - nil for the person's scope.
         var scope: AlbumScope?
+        /// (R2b) Yours | All at the end of its line, where it shows.
+        var sides: LibrarySideChoice? = nil
     }
 
     /// The list's scope pushed; nil for the Library's page, whose scope is the person's (LibraryModel.scope).
@@ -177,7 +179,7 @@ struct ArtistsScreen: View {
         let entries = drawn?.view.index ?? []
 
         VStack(spacing: 0) {
-            // (R2) the page's meta line under the Library's strip: the count and the order
+            // (R2) the page's meta line - since R2b under the Library's one row: the count, the order, Yours | All
             if page != nil {
                 meta(drawn)
             }
@@ -223,18 +225,14 @@ struct ArtistsScreen: View {
     }
 
     /// (R2) The page's meta line (iArtists' .meta): the count - "22 artists", "3 of 22 artists" while Find finds - and
-    /// the order, a purple link opening its menu (out of the •••).
+    /// the order, a purple link opening its menu (out of the •••); at its end (R2b) Yours | All where it shows
+    /// (LibraryLineEnd).
     private func meta(_ drawn: DrawnArtists?) -> some View {
         @Bindable var artists = artists
         let count = drawn.map { (drawn: DrawnArtists) -> String in
             drawn.standIn || drawn.artists.isEmpty ? "" : drawn.view.countText
         } ?? ""
-        return PhoneMeta {
-            if !count.isEmpty {
-                Text(count)
-                Text(verbatim: "·")
-                    .accessibilityHidden(true)
-            }
+        return PhoneMeta(count: count) {
             Menu {
                 Picker(ArtistWords.sortLabel, selection: $artists.order) {
                     ForEach(ArtistOrder.allCases, id: \.self) { (order: ArtistOrder) in
@@ -249,7 +247,7 @@ struct ArtistsScreen: View {
             .accessibilityLabel(ArtistWords.sortLabel)
             .accessibilityValue(artists.order.label)
         } trailing: {
-            EmptyView()
+            LibraryLineEnd(page: .artists, sides: page?.sides)
         }
     }
 

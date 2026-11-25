@@ -38,6 +38,8 @@ struct AlbumsScreen: View {
         let shuffle: ShuffleCan
         /// The shuffle, started in the lift that releases the pull.
         let start: () -> Void
+        /// (R2b) Yours | All at the end of its line, where it shows.
+        var sides: LibrarySideChoice? = nil
     }
 
     let list: AlbumList
@@ -144,7 +146,8 @@ struct AlbumsScreen: View {
         let years = ShelfIndex.kind(library.sort) == .decades
 
         VStack(spacing: 0) {
-            // (R2) the page's meta line under the Library's strip: the count, the sort, Grid and List
+            // (R2) the page's meta line - since R2b under the Library's one row: the count, the sort, Grid and List,
+            // Yours | All
             if page != nil {
                 meta(drawn)
             }
@@ -212,19 +215,15 @@ struct AlbumsScreen: View {
     }
 
     /// (R2) The page's meta line (iLibrary's .meta): the count - "140 albums", "12 of 140 albums" while Find finds - the
-    /// sort, a purple link opening its menu (out of the •••, where slice 4 had put it), and Grid and List at its end. The
-    /// layout is LibraryModel's, kept per device as it always was.
+    /// sort, a purple link opening its menu (out of the •••, where slice 4 had put it), and at its end (R2b) Grid and
+    /// List as two bare glyphs, then Yours | All where it shows (LibraryLineEnd). The layout is LibraryModel's, kept per
+    /// device as it always was. Short of room, the count gives way first ("140 · Recently added" - PhoneMeta).
     private func meta(_ drawn: DrawnShelf?) -> some View {
         @Bindable var library = library
         let count = drawn.map { (drawn: DrawnShelf) -> String in
             list == .downloaded && drawn.albums.isEmpty ? "" : drawn.view.countText
         } ?? ""
-        return PhoneMeta {
-            if !count.isEmpty {
-                Text(count)
-                Text(verbatim: "·")
-                    .accessibilityHidden(true)
-            }
+        return PhoneMeta(count: count) {
             Menu {
                 Picker(LibraryWords.sortLabel, selection: $library.sort) {
                     ForEach(AlbumSort.allCases, id: \.self) { (sort: AlbumSort) in
@@ -239,21 +238,8 @@ struct AlbumsScreen: View {
             .accessibilityLabel(LibraryWords.sortLabel)
             .accessibilityValue(library.sort.label)
         } trailing: {
-            layoutToggle(.grid, symbol: "square.grid.2x2", words: LibrarySwitchWords.grid)
-            layoutToggle(.list, symbol: "list.bullet", words: LibrarySwitchWords.list)
+            LibraryLineEnd(page: .albums, sides: page?.sides)
         }
-    }
-
-    /// Grid or List (.tog.sm): lit while it is the layout; a tap makes it the layout, kept per device.
-    private func layoutToggle(_ layout: LibraryLayout, symbol: String, words: String) -> some View {
-        Button {
-            library.layout = layout
-        } label: {
-            Image(systemName: symbol)
-                .font(Typeface.symbol(.footnote).weight(.semibold))
-        }
-        .buttonStyle(DWToggleStyle(on: library.layout == layout))
-        .accessibilityLabel(words)
     }
 
     /// The list drawn: a scope's from the model's kept list, Downloaded from the albums on this phone.

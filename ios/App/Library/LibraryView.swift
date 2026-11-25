@@ -15,15 +15,18 @@ import SwiftUI
 /// shows, and the •••'s Refresh asks now.
 ///
 /// THE TOP (the squared look, 14 Nov - LibraryTop): James, "the search bar is kinda in the way". The navigation bar is
-/// hidden on the pager and the Library draws its own top. Since the redesign's slice R2 (notes/ios.md "The redesign,
-/// slice R2: Albums and Artists, and the Library's top"; James's answer 1, "Today's behaviour, new look") it is
-/// iLibrary's: "Library", Yours | All with a library of your own (All: All music's albums, artists and songs as the
-/// pages, where the •••'s All music pushed them), Find's magnifying glass and the •••, square; under it the strip
-/// (PhoneStrip) - the pages in the order kept, then Downloaded, pushed - and the offline banner. Each page's meta line
-/// is its own: its count, its order (out of the •••), Albums' Grid and List, Playlists' New playlist. Find is shown
-/// only once the magnifying glass is tapped: its field under the top for the page shown, focused, the keyboard up; each
-/// page keeps its own words while it is open, a swipe or a chip showing the next page's; Cancel hides it and clears
-/// every page's words, so a hidden Find never filters a list unseen. A new person closes it too.
+/// hidden on the pager and the Library draws its own top. Since the redesign's slice R2b (notes/ios.md "The redesign,
+/// slice R2b: the Library's top, one row again"; James, 25 Nov: "The top of the library on iOS is actually kinda a
+/// mess, can we streamline it a bit?") it is one row again, iLibrary's .ltop: Find's circle, the switch of the pages
+/// (the pages in the order kept, the page shown lit) and the •••'s circle; the offline banner under it. Each page's
+/// quiet line is its own (PhoneMeta): its count, its order (out of the •••) or Playlists' New playlist…, and at its end
+/// Albums' Grid and List, then Yours | All with a library of your own (LibraryLineEnd - All: All music's albums,
+/// artists and songs as the pages, where the •••'s All music pushed them). Downloaded is the •••'s again. R2 (the same
+/// day) had drawn it as a titled top - "Library", Yours | All, Find and the •••, square - over a strip of the pages
+/// and Downloaded. Find is shown only once the magnifying glass is tapped: its field under the row for the page shown,
+/// focused, the keyboard up; each page keeps its own words while it is open, a swipe or the switch showing the next
+/// page's; Cancel hides it and clears every page's words, so a hidden Find never filters a list unseen. A new person
+/// closes it too.
 ///
 /// (R2) On the Mac its Albums and Artists at the root are the Mac's own column lists (`desk`, from MacLibrary.root());
 /// the iPhone's Library has none.
@@ -242,15 +245,15 @@ struct LibraryView<Desk: View>: View {
         settingUp = false
     }
 
-    // MARK: the strip (slice 3b's switch; since R2 the phone's strip)
+    // MARK: the switch (slice 3b; R2's strip, the row's switch again since R2b)
 
     /// The pages in the order kept.
     private var order: [LibraryPage] { LibraryPages.read(savedOrder) }
 
-    /// (R2) The top shows Yours | All: with a library of your own, on your albums, where the •••'s All music was - while
-    /// deadwax can be reached, or (its review) while All is the side chosen, so deadwax dropping out never turns a
-    /// chosen All back into Yours on screen: All's pages stay, drawing what is in hand. Never on the Mac, whose sidebar
-    /// has All music's lists.
+    /// (R2) Yours | All shows - (R2b) at the end of each page's line: with a library of your own, on your albums, where
+    /// the •••'s All music was - while deadwax can be reached, or (its review) while All is the side chosen, so deadwax
+    /// dropping out never turns a chosen All back into Yours on screen: All's pages stay, drawing what is in hand. Never
+    /// on the Mac, whose sidebar has All music's lists.
     private var sides: Bool {
         !Platform.mac && LibraryPages.sides(personal: server.access.hasLibrary, scope: library.scope,
                                             online: reachability.online, chosen: chosenSide)
@@ -259,13 +262,13 @@ struct LibraryView<Desk: View>: View {
     /// (R2) The side drawn: the one chosen while Yours | All shows, Yours otherwise.
     private var side: LibrarySide { LibraryPages.side(chosenSide, sides: sides) }
 
-    /// (slice 5, question 32; R2) The pages the strip shows, in the order kept: Songs only without a library of your
+    /// (slice 5, question 32; R2) The pages the switch shows, in the order kept: Songs only without a library of your
     /// own - never beside your own albums - and on All, All music's albums, artists and songs.
     private var shownOrder: [LibraryPage] {
         LibraryPages.shown(order, personal: server.access.hasLibrary, side: side)
     }
 
-    /// The page shown - always one the strip shows.
+    /// The page shown - always one the switch shows.
     private var shownPage: LibraryPage { LibraryPages.showing(page, in: shownOrder) }
 
     /// (R2) Whose Shuffle the pulls and the •••'s are: the Library's, or on All the collection's (All songs').
@@ -282,7 +285,7 @@ struct LibraryView<Desk: View>: View {
                              failed: shuffles.failure(which), songsHere: online ? 0 : downloads.songsHere.count)
     }
 
-    /// The page shown set, the pager moved to it with it (a chip's tap, the first draw, a new person).
+    /// The page shown set, the pager moved to it with it (the switch's tap, the first draw, a new person).
     private func show(_ chosen: LibraryPage) {
         page = chosen
         scrolled = chosen
@@ -293,15 +296,14 @@ struct LibraryView<Desk: View>: View {
         if let scrolled, scrolled != page { page = scrolled }
     }
 
-    /// The pages side by side under the Library's own top (since R2 iLibrary's - "Library", Yours | All, Find, the •••),
-    /// the strip of the pages under it, a swipe between them; the navigation bar hidden; the offline banner between the
-    /// strip and the pages.
+    /// The pages side by side under the Library's own top (since R2b iLibrary's one row - Find, the switch, the •••), a
+    /// swipe between them; the navigation bar hidden; the offline banner between the top and the pages.
     ///
     /// One above the other in a VStack (15 Nov, James: "on the app the top bar is obstructed by the Dynamic Island"):
     /// the top, the banner, the pager. A VStack is laid out in the safe area whatever its children do, so the top's row
     /// always starts under the status bar and the Dynamic Island, where an inset on the pager - a scroll view, free to
     /// run under the status bar - put it in the island's strip; only the top's own fill reaches up behind the status bar
-    /// (LibraryTop). The pages end at the strip's foot rather than scrolling under it.
+    /// (LibraryTop). The pages end at the top's foot rather than scrolling under it.
     ///
     /// (R2) On the Mac, Albums and Artists at the root are the Mac's own pages (MacLibrary's - `desk`), drawn in the
     /// pager's place under their own toolbar; its Playlists and Songs are the phone's, borrowed.
@@ -316,14 +318,14 @@ struct LibraryView<Desk: View>: View {
             || shownPage == .playlists) ? self.desk : nil
         return VStack(spacing: 0) {
             if desk == nil {
-                LibraryTop(finding: finding, findLabel: findPrompt(shownPage), openFind: { openFind() }) {
+                LibraryTop(finding: finding, findLabel: findPrompt(shownPage), openFind: { openFind() },
+                           pages: order.map { (each: LibraryPage) -> String in each.title }) {
                     findField(shownPage)
-                } sides: {
-                    sidesControl
+                } switcher: {
+                    switcher(order)
                 } more: {
                     more(albums: list, can: can)
                 }
-                strip(order, albums: list)
             }
             // the banner under the top, not over it: TabStack leaves the Library's to it
             OfflineBanner()
@@ -369,29 +371,32 @@ struct LibraryView<Desk: View>: View {
     @ViewBuilder
     private func pageView(_ each: LibraryPage, albums: AlbumList, can: ShuffleCan, current: Bool) -> some View {
         let pulls = current && onScreen
+        // (R2b) Yours | All at the end of each page's line, where it shows
+        let sides = sideChoice
         switch each {
         case .albums:
             ZStack {
                 AlbumsScreen(list: albums, page: AlbumsScreen.Page(typed: $findAlbums, current: current, pulls: pulls,
-                                                                   pull: albumsPull, shuffle: can, start: shuffleNow))
+                                                                   pull: albumsPull, shuffle: can, start: shuffleNow,
+                                                                   sides: sides))
                     // another scope (or Downloaded) is another list: its own place in it
                     .id(albums)
             }
         case .playlists:
             PlaylistsPage(typed: $findPlaylists, current: current,
                           pulling: PullShuffling(state: playlistsPull, can: can, on: pulls, start: shuffleNow),
-                          newSheet: $newPlaylist)
+                          newSheet: $newPlaylist, sides: sides)
         case .artists:
             // (R2) on All, the collection's artists
             ArtistsScreen(page: ArtistsScreen.Page(
                 typed: $findArtists, current: current,
                 pulling: PullShuffling(state: artistsPull, can: can, on: pulls, start: shuffleNow),
-                scope: side.artistsScope))
+                scope: side.artistsScope, sides: sides))
                 .id(side)
         case .songs:
             SongsScreen(page: SongsScreen.Page(
                 typed: $findSongs, current: current,
-                pulling: PullShuffling(state: songsPull, can: can, on: pulls, start: shuffleNow)))
+                pulling: PullShuffling(state: songsPull, can: can, on: pulls, start: shuffleNow), sides: sides))
         }
     }
 
@@ -484,39 +489,27 @@ struct LibraryView<Desk: View>: View {
         findSongs = ""
     }
 
-    /// (R2) The strip (iLibrary's .chips, PhoneStrip): the pages in the order kept, then Downloaded. A page's chip moves
-    /// the pager to it as the switch's tap did - moving as the Library's swipe does, at once under Reduce Motion - and
-    /// a swipe settling lights its chip; Downloaded is pushed on the tab's path, as the •••'s Downloaded was - so (its
-    /// review) it is a button to VoiceOver, after the tab bar of the pages, never a tab (PhoneStrip's `pushes`).
-    private func strip(_ order: [LibraryPage], albums: AlbumList) -> some View {
+    /// (R2b) The row's switch (iLibrary's .seg.lg, DWSegmented large): the pages in the order kept, each an equal
+    /// segment, the page shown lit. A tap moves the pager to its page - moving as the Library's swipe does, at once under
+    /// Reduce Motion - and a swipe settling lights its segment. "Library pages" to VoiceOver, each page a button, the
+    /// one shown selected.
+    private func switcher(_ order: [LibraryPage]) -> some View {
         let shownPage = self.shownPage
-        let items = LibraryStrip.items(order, albumsPage: albums == .downloaded ? .downloaded : .albums)
-        return PhoneStrip(options: items.filter { (item: LibraryStripItem) -> Bool in !item.pushes },
-                          words: { (item: LibraryStripItem) -> String in item.title },
-                          shown: Binding(get: { LibraryStripItem.page(shownPage) },
-                                         set: { (item: LibraryStripItem) -> Void in chose(item) }),
-                          spoken: LibrarySwitchWords.switchLabel,
-                          pushes: items.filter { (item: LibraryStripItem) -> Bool in item.pushes })
+        return DWSegmented(options: order, words: { (each: LibraryPage) -> String in each.title },
+                           chosen: Binding(get: { shownPage }, set: { (each: LibraryPage) -> Void in chose(each) }),
+                           spoken: LibrarySwitchWords.switchLabel, large: true)
     }
 
-    /// A chip tapped: its page shown, the pager moved to it - or Downloaded pushed.
-    private func chose(_ item: LibraryStripItem) {
-        switch item {
-        case .page(let chosen):
-            withAnimation(reduceMotion ? nil : .snappy) { show(chosen) }
-        case .downloaded:
-            navigation.open(.downloaded)
-        }
+    /// A page's segment tapped: its page shown, the pager moved to it.
+    private func chose(_ chosen: LibraryPage) {
+        withAnimation(reduceMotion ? nil : .snappy) { show(chosen) }
     }
 
-    /// (R2, James's answer 1) Yours | All, with a library of your own: All shows All music's albums, artists and songs
-    /// as the pages, in the •••'s All music's place.
-    @ViewBuilder private var sidesControl: some View {
-        if sides {
-            DWSegmented(options: LibrarySide.allCases, words: { (each: LibrarySide) -> String in each.title },
-                        chosen: Binding(get: { side }, set: { (chosen: LibrarySide) -> Void in choose(chosen) }),
-                        spoken: LibrarySwitchWords.sidesLabel)
-        }
+    /// (R2, James's answer 1; since R2b at the end of each page's line - LibraryLineEnd) Yours | All, with a library of
+    /// your own: All shows All music's albums, artists and songs as the pages, in the •••'s All music's place. nil where
+    /// it isn't shown.
+    private var sideChoice: LibrarySideChoice? {
+        sides ? LibrarySideChoice(side: side, choose: { (chosen: LibrarySide) -> Void in choose(chosen) }) : nil
     }
 
     /// A side chosen: its pages drawn (`.onChange(of: side)` keeps the page where it has it), and on All the
@@ -527,9 +520,9 @@ struct LibraryView<Desk: View>: View {
         if chosen == .all, reachability.online { shuffles.shown(.allSongs, library.scope) }
     }
 
-    /// The Library's ••• (Core's LibraryMenu.topSections since R2): the Shuffle, the way back to the albums while the
-    /// Albums page is Downloaded, Refresh and Edit order - the rest moved to the meta line, the strip and Yours | All. A
-    /// small square button, as the magnifying glass is.
+    /// The Library's ••• (Core's LibraryMenu.topSections since R2): the Shuffle; (R2b) Downloaded - or the way back to
+    /// the albums while the Albums page is Downloaded - as the old ••• had them; Refresh and Edit order - the rest moved to
+    /// each page's line. A circle, as the magnifying glass is (PhoneCircleStyle).
     private func more(albums: AlbumList, can: ShuffleCan) -> some View {
         let personal = server.access.hasLibrary
         let sections = LibraryMenu.topSections(shuffle: can, albumsPage: albums == .downloaded ? .downloaded : .albums,
@@ -545,9 +538,9 @@ struct LibraryView<Desk: View>: View {
         } label: {
             Image(systemName: "ellipsis")
         }
-        // the label takes the button style as a button menu's
+        // a circle, as the magnifying glass is: the label takes the button style as a button menu's
         .menuStyle(.button)
-        .buttonStyle(DWButtonStyle(size: .small))
+        .buttonStyle(PhoneCircleStyle())
         .menuIndicator(.hidden)
         .accessibilityLabel(LibrarySwitchWords.more)
         .accessibilityShowsLargeContentViewer {
@@ -562,6 +555,9 @@ struct LibraryView<Desk: View>: View {
         case .shuffle:
             Button(action: shuffleNow) { Label(words, systemImage: "shuffle") }
                 .disabled(!item.enabled)
+        case .downloaded:
+            // (R2b) pushed on the tab's path, as the old •••'s Downloaded and R2's strip's were
+            Button { navigation.open(.downloaded) } label: { Label(words, systemImage: DownloadWords.downloadSymbol) }
         case .albums(let scope):
             Button { navigation.open(.albums(scope)) } label: { Label(words, systemImage: "square.stack") }
         case .refresh:

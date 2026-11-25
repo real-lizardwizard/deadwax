@@ -73,6 +73,23 @@ extension View {
     }
 }
 
+// MARK: Core's layouts, placed
+
+extension LookSize {
+    /// What SwiftUI measured, for Core's layout rules (MetaLine, LibraryTopFit - R2b).
+    init(_ size: CGSize) {
+        self.init(width: Double(size.width), height: Double(size.height))
+    }
+}
+
+extension LayoutSubview {
+    /// Placed where Core put it - `box`'s top leading corner in the layout's `bounds` - and given the box's size.
+    func lookPlace(_ box: LookBox, in bounds: CGRect) {
+        place(at: CGPoint(x: bounds.minX + CGFloat(box.x), y: bounds.minY + CGFloat(box.y)), anchor: .topLeading,
+              proposal: ProposedViewSize(width: CGFloat(box.width), height: CGFloat(box.height)))
+    }
+}
+
 /// Where a finger or the pointer takes a control: its face - and on the phone, where the face is shorter than a finger's
 /// target (DWLook's 44, the build plan's "a finger's targets at least 44"), that face reaching above and below it to the
 /// target (DWLook's `reach`). Never sideways: a target grown sideways would reach into the control beside it (the

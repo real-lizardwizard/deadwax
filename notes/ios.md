@@ -18883,3 +18883,263 @@ in a 52 row, the album's box at each size and in a short window (the measured he
 page), the selected row kept in view as the size changes - and VoiceOver reading the submenu - only the screen can
 tell. Songs, Search and an artist's page are still
 the phone's pages on the Mac and don't follow Row Size; their slices read `MacRowSize` when they become the Mac's own.
+
+## The redesign, slice R2b: the Library's top, one row again (2026-11-25)
+
+James, the same day R2 landed: **"The top of the library on iOS is actually kinda a mess, can we streamline it a
+bit?"** The design session redrew iLibrary, iArtists and iPlaylists (~/Desktop/Code/deadwax-plans/iphone-redesign.md,
+"Changed 25 Nov: the Library's top is one row again", and a new block at the end of dw.css: `.ltop`, `.circ`, and
+`.meta`'s `.views`, `.v` and `.scope`), James asked for one change to it - **"lets put the grid/list next to
+yours/all"** - and approved it ("Send it").
+
+What is his and what is the design session's:
+- **His**: streamlining it; Grid and List beside Yours | All; and the row itself, which is his of 14 Nov ("let's put a
+  magnifying glass button on the left side of the slider", "but the search button and options button at the top can
+  be circles" - "The squared look").
+- **The design session's**: no "Library" title and no strip of chips; Yours | All as two words with a hairline between
+  them rather than a segmented control; keeping one quiet line under the row rather than putting everything in it;
+  "white is where you are, purple is what a tap goes to"; Downloaded back in the •••.
+
+Built on the ios branch's tip of the day, 8d1e841b (R2 b6f8dcfa, R4 e1e34d79, R5 8d1e841b); the worktree began at main
+(7e26b69d), which has none of the redesign's phone slices. R3b has come onto the ios branch since (b57ded0f), after this
+slice's base, and this slice was not rebased onto it: R3b changes test_ios_phone_look.py's PHONE_PIECES_DRAWN_IN block
+(its R3B_PAGES) beside R2_LIBRARY's line, which this slice adds LibraryLine.swift to, so the merge conflicts there and
+only there - the block wants the union of the two. The app is still 0.13 (13), `__version__` untouched, the word
+fixtures unchanged.
+
+### What was built
+
+**The row** (LibraryTop.swift, iLibrary's `.ltop`): Find's circle 16 in from the leading edge, the •••'s 16 in from the
+trailing one, and between them, 12 from each, the switch of the pages - DWSegmented `large`, one square sunken well of
+equal segments, the page shown lit (`.seg.lg`), the pages in the order kept (Albums, Playlists, Artists on Yours;
+Albums, Artists, Songs on All; all four with logins off). 52 tall at least, capped at xxxLarge as the bars are. Laid out
+by a Layout of its own, `LibraryTopRow`, which measures its four views and places each where Core puts it
+(`LibraryTopFit.row` and `.place`, held frame by frame in LibrarySwitchTests - since R2b's review; `lookPlace`, in
+DWRaised.swift, places a view in Core's box): each circle centred where its 34 pt face is drawn (its 44 pt target
+reaching 5 pt past it, into the 12 between it and the switch - never to it), the switch offered the room between.
+Where the switch's equal segments need more than that room (`LibraryTopFit.folds` - each segment as wide as the widest
+page's words), it goes onto a row of its own under the circles, as far in from each edge as they are: what it needs is
+measured from a hidden `DWSegmentedNeed` of the same words in the same face, weight and room (DWSegmented.swift), placed
+in the layout but never seen, touched or heard. VoiceOver reads the row as it is drawn (`LibraryTopFit.reading`): Find,
+the switch, the •••; folded, Find and the ••• on the row before the switch under them - `accessibilitySortPriority` in a
+container of the row's own, the fold read back from the need's and the row's widths as last laid out.
+
+**The circles** (PhoneTop.swift's `PhoneCircleStyle`, for the Button and for the ••• Menu, whose label takes the
+button style with `.menuStyle(.button)`): the look's raised face - `.btn`'s gradient, edge, sheen and label colour,
+which `.circ`'s are, without `.btn`'s drop - drawn round with DWRaised, 34 pt in a 44 pt target, pressed turned over,
+faded when it can't be used. Its face is a mark drawn at its size (FIXED in test_ios_phone_look.py, R1b's switch's
+kind), its glyph Typeface.symbol(.body), growing to the row's cap.
+
+**The line** (PhoneMeta, under the row on each page, as R2's was under the strip): 32 tall, 16 in at either side
+(iLibrary's, iArtists' and iPlaylists' inline style - PhoneLook's `meta` and `metaTrail` are `drawn:` now), 13 pt, words
+and bare glyphs. Albums: the count, then the order as a purple link with its caret; Artists the same; Playlists the count,
+then New playlist… (it was at the line's end in R2); Songs its count. At its trailing end `LibraryLineEnd`
+(LibraryLine.swift): Grid and List on Albums alone (Core's `LibraryLine.layouts`), two bare glyphs 28 square, 2 apart,
+10 before Yours | All; then Yours | All where it shows - "Yours", a 1 pt hairline 12 tall (grown with the words,
+@ScaledMetric), "All", 10 either side of it, the room inside each word's target.
+
+Where all of it doesn't fit across, the line gives way inside itself first (R2b's review - Core's `MetaLine`): the
+count's noun dropped (`MetaLine.short`: "2318 albums" "2318", "12 of 140 albums" "12 of 140"), VoiceOver still hearing
+it in full (the short Text's label is the full words). Only where even that doesn't fit does its end fold onto a line of
+its own under the words, at the trailing edge, the count in full again - the words wrapping there only should even the
+short count need more than the line. The order's words and New playlist… are never shortened. PhoneMeta is a
+`ViewThatFits(in: .horizontal)` of `MetaLine.Fit`'s four ways in their order (`full`, `short`, `folded`,
+`foldedShort`), each a `PhoneMetaLine` Layout whose ideal width is `MetaLine.width` and whose two ends go where
+`MetaLine.place` puts them: the choice is measured as drawn, in whatever face and size the line is in - Libre Franklin,
+when it comes, moves where the line gives way, never whether it cuts a word. (`PhoneLook.metaFolds` and `PhoneMetaFold`,
+R2b's first fold, went with it.)
+
+**White and purple** - one rule, dw.css's (`.v` the accent, `.v.on` white; `.scope > b` white and semibold, the other
+word a `.link`): the layout shown and the side shown are DWPalette.text (#fff), the other of each DWPalette.acc; the
+side shown is semibold. The count keeps the line's third colour. Both read as selected to VoiceOver.
+
+**The •••**: Shuffle, Downloaded, Refresh, Edit order (Core's `LibraryMenu.topSections`, `LibraryMenuItem.downloaded`).
+
+### What moved, and what went
+
+- The titled top: PhoneTop's `title`, PhoneLook's `titledTop`, `titledTopSide` and `titledTopTracking`, Typeface.Phone's
+  `topTitle` (28, iLibrary's old inline style) - gone; PhoneTop's other users (Now Playing's sheet) never had a title.
+- The strip: `LibraryStrip` and `LibraryStripItem` (Core) gone, and PhoneStrip back to R1b's (5123bab3's) - its
+  `pushes`, R2's review's, was for Downloaded alone; Now Playing's sheet, its one user, never passed it.
+- Downloaded: from the strip's last chip to the •••, where it was before R2 - with, while the Albums page is Downloaded
+  itself, the way back to the albums in its place.
+- Yours | All: from the top's DWSegmented to the end of each page's line, as two words (`LibrarySideChoice`, handed to
+  each page by LibraryView only where `sides` is true).
+- Grid and List: from DWToggleStyle's boxes (`.tog.sm`) to bare glyphs; DWToggleStyle's phone half is drawn nowhere
+  now (the Mac's Shuffle and Repeat keep the style).
+
+**Downloaded, the chip against the old •••.** They behaved the same, so the ••• item is the old one again: each
+`navigation.open(.downloaded)`, pushed on the tab's path; each gone while the Albums page is Downloaded, where the old
+••• (5123bab3's "places" section, `albumsPage == .downloaded ? .albums(scope) : .downloaded`) had the way back to the
+albums and R2's ••• kept that way back. The only differences were the drawing: the old •••'s item had the download
+symbol (DownloadWords.downloadSymbol) and the chip none, and the chip was a button VoiceOver heard after the strip's tab
+bar. The item has the symbol again.
+
+### Kept (today's behaviour)
+
+The pager's swipe and `show`/`scrolled`; a segment's tap moving the pager as the chip's did (`.snappy`, none under
+Reduce Motion); Find's circle opening its field under the row, with Cancel, each page keeping its own words; the pull to
+shuffle; the letter index; TopClearance and its probe, byte for byte; each page's order menu and the layout, kept per
+device; Yours | All's `choose` (the side kept, and on All the collection's Shuffle asked ahead), `LibraryPages.sides`
+with R2's review's offline fix (a chosen All stays All while deadwax is out of reach); Edit order; VoiceOver's words
+("Library pages", "More for the Library", "Your library or all music", Grid, List), and the Large Content Viewer on the
+two circles.
+
+### Fitting, by arithmetic (test_ios_library_look.py)
+
+Measured in the bundled Noto Sans's own advances (the test reads the TTFs' hmtx), at Apple's footnote and body sizes,
+on 375 pt (an SE, a 13 mini) - the row and the line are capped at xxxLarge, so the accessibility sizes draw as it does:
+- **The row** leaves the switch 251 pt (375 - 2 x (16 + 34 + 12)). Three pages need 3 x the widest + 2: 169.5 at the
+  standard size, 246.9 at xxxLarge - never folded. Four pages (logins off, the break-glass sign-in) need 225.4 at the
+  standard size and fold from xLarge (259.8); folded they have 343, and need 328.5 at xxxLarge.
+- **The line** has 343 pt on 375, 361 on 393 (a 16), 370 on James's 402 (a 17 Pro). Songs', Artists' and Playlists'
+  hold one line at the standard size and at xLarge on 375, a four-figure find dropping its noun at xLarge. Albums' with
+  Yours | All is the fullest: "140 albums · Artist" (the default order) is one line on all three; the review's "140
+  albums · Recently added" is 351 of 343 on 375, so it is drawn "140 · Recently added" (302.7). At the standard size -
+  F one line, S the count's noun dropped, f folded, on 375 / 393 / 402:
+
+  | count | Artist | Recently added | Year, newest first |
+  | --- | --- | --- | --- |
+  | 140 albums | F F F | S F F | S S F |
+  | 2318 albums | F F F | S F F | S S S |
+  | 12 of 140 albums | F F F | S S S | f S S |
+  | 12 of 2318 albums | F F F | f S S | f S S |
+  | 1234 of 2318 albums | S F F | f S S | f f f |
+
+  and at xLarge:
+
+  | count | Artist | Recently added | Year, newest first |
+  | --- | --- | --- | --- |
+  | 140 albums | F F F | S S S | S S S |
+  | 2318 albums | F F F | S S S | f S S |
+  | 12 of 140 albums | S F F | f f S | f f f |
+  | 12 of 2318 albums | S S F | f f f | f f f |
+  | 1234 of 2318 albums | S S S | f f f | f f f |
+
+  So at the standard size a library's count never folds the line on any of the three, under any order; on 393 and 402
+  Find's first keystroke folds it only for a four-figure find under the longest order; on 375 it still folds it for a
+  find under "Year, newest first", and in a four-figure library under "Recently added" or "Year, oldest first" (never
+  under "Artist" or "Title") - the 32 pt drop the review saw, left there
+  (dropping Find's "of 2318" too would say less than Find means: James's to choose). Counts are Core's own, without a
+  thousands separator ("2318", not "2,318"). R2b's first write-up said "on James's 402 pt iPhone 17 Pro it fits, 370 of
+  room": it had checked "Recently added" alone - "1,234 albums · Year, newest first" was 374 of 370 - and the line
+  folded at the standard size on all three phones.
+- At xxxLarge every page but Songs folds; folded, each end fits its own line (Albums' 174) and no word of the line is
+  wider than it, so a wrap never cuts one.
+
+### Departures from the drawing
+
+- **List is `list.bullet`**, not the drawing's three bare lines: the app's own List glyph everywhere else
+  (LibraryModel.switchSymbol, R2's toggle, the old •••'s Show as list), and the three lines are Edit order's
+  (`line.3.horizontal`) in the same Library's •••.
+- **No `.circ.on`**: SwiftUI's Menu gives its label no state while its menu is open, and iOS's own menu presentation
+  marks the button it came from.
+- **The folds** - the switch under the circles, a line's end under its words - and the count without its noun are
+  nowhere in the drawing, which is drawn at one width and one text size; they are what "fit 375 pt at every size
+  without clipping" asks.
+- **The circles' face stays 34 pt** at every text size (James's 14 Nov circles were 36 and fixed too); their glyph grows
+  to the row's cap. Grown, three pages would fold under them at xxxLarge.
+- **The side shown is a button** that does nothing (the drawing's `<b>`): so VoiceOver reads the pair as one choice
+  with the side shown selected, as R2's segmented control read.
+- **`.views`' 10 pt margin only before Yours | All**: the drawing always has Yours | All after Grid and List; without a
+  library of your own nothing follows them.
+- The switch's lit segment doesn't slide between pages (James's 14 Nov switch's did, R2's strip didn't).
+
+### Targets
+
+The circles' and the switch's targets end 4 pt above the row's foot. The line's reach 6 pt above it, but the line is at
+the top of the pager, a scroll view, which takes no touch above itself - so nothing meets, and above the line its
+targets are cut to the line's edge, as R2's were under the strip (assumed from UIScrollView's hit-testing; not tried on
+a phone).
+
+### After review (25 Nov)
+
+The review found the line folding at the standard size in ordinary use ("Fitting, by arithmetic"), twelve mutations the
+whole suite passed, VoiceOver's order wrong under a folded row, and two errors in this write-up (the 402 pt claim; R3b
+"unmerged"). James had meanwhile approved a newer design (iphone-redesign.md, "Changed 25 Nov: the phone is flat": the
+circles bare glyphs, the well words over a line), slice R1c, which starts from this one - so the fix touches only what
+survives it: behaviour, layout and tests. The circles' and the well's faces are as R2b drew them.
+- The line gives way inside itself first (`MetaLine`, "What was built").
+- Where each view goes is Core's, not the Layouts': `LibraryTopFit.row`/`.place` and `MetaLine.place`, held frame by
+  frame in LibrarySwitchTests (`theRowPutsFindLeadingTheMoreTrailingAndTheSwitchBetween`) and DWLookTests
+  (`aQuietLinesEndsAreWhereTheyAreDrawn`); the two Layouts measure, ask and place, their bodies held exactly by
+  test_ios_library_look.py. Each guards its count of views with an `assertionFailure` in Debug.
+- VoiceOver's order under a folded row ("What was built"; `voiceOverReadsTheRowAsItIsDrawn`).
+- The other mutations were of behaviour the Python tests held only by a substring: each is held exactly now - the
+  action of each tap on the line, the one line `let sides = sideChoice`, openFind's body, DWSegmentedNeed's whole body,
+  the Artists order Picker's binding - and nothing at the line's end may be `.disabled` or untouchable.
+
+### For R1c
+
+Left for the flat restyle, from the review:
+- The switch's segments have no room inside them: `largeSegmentPadding` is 0 on the phone (dw.ph's `.seg.lg`), so at
+  xxxLarge on 375 pt "Playlists" has 0.7 pt to spare in its segment.
+- No Large Content Viewer on the segments; James's 14 Nov switch had one.
+- No open state on the •••: the flat design draws it in the accent while its menu is open, and SwiftUI's Menu tells its
+  label nothing of that.
+- The Mac's borrowed Songs page now draws DWSegmented's focusable Mac path.
+
+### Tests, and what each was seen catching
+
+- test_ios_library_look.py: the R2 top's, strip's, meta's and Downloaded-after-the-tab-bar tests replaced by the row's
+  (`test_the_librarys_top_is_one_row_with_find_kept`, `test_the_rows_circles_are_the_looks_raised_face_drawn_round`,
+  `test_the_row_is_laid_out_where_core_puts_each_view`, `test_voiceover_reads_the_row_as_it_is_drawn`,
+  `test_the_switch_moves_the_pager_and_downloaded_is_in_the_more`), the line's
+  (`test_each_pages_line_holds_its_own_then_grid_list_and_yours_all`,
+  `test_grid_and_list_are_on_albums_alone_and_yours_all_only_where_it_was`,
+  `test_white_is_where_you_are_and_purple_what_a_tap_goes_to`,
+  `test_each_pages_line_gives_way_inside_itself_before_it_folds`) and the two fits
+  (`test_the_rows_switch_fits_beside_its_circles_or_folds_under_them`,
+  `test_each_pages_line_fits_or_gives_way_without_cutting_a_word` - the tables above, on 375, 393 and 402). The
+  Downloaded-after-the-tab-bar test went with the strip: Downloaded is a menu item, never a tab.
+- test_ios_phone_look.py: PHONE_FROM_DRAWINGS is iLibrary's `.meta` 32 and 16; TYPE_FROM_DRAWINGS empty; the row 52 and
+  the circle 34 among the plan's sizes; PhoneTop's two headers; the circles' fixed frames; PhoneCircleStyle declared;
+  LibraryLine.swift among R2's files. test_ios_palette.py: the top's order is the row's, then the banner; the probe's
+  geometry read is `.onGeometryChange(for: [CGFloat].self)`, the row having two of its own now.
+- Core: LibrarySwitchTests (the •••'s four, Grid and List on Albums alone, the row's fold, its frames, VoiceOver's
+  order), DWLookTests (the row's pieces inside it, the count's short form, the line's ways, its frames).
+
+Each mutated on its own, run, and put back byte for byte (sha256 checked). R2b's own:
+- Downloaded's action pushing the albums instead: `test_the_switch_moves_the_pager_and_downloaded_is_in_the_more`.
+  Downloaded dropped from Core's topSections: that test and `theTopsMoreIsShuffleDownloadedRefreshAndEditOrder`.
+- Grid and List on Artists too (`page == .albums || page == .artists`):
+  `test_grid_and_list_are_on_albums_alone_and_yours_all_only_where_it_was` and `gridAndListAreOnAlbumsLineAlone`.
+- The glyphs' white and purple swapped: `test_white_is_where_you_are_and_purple_what_a_tap_goes_to`.
+- The row's room without its gaps: `test_the_rows_switch_fits_beside_its_circles_or_folds_under_them` and
+  `theRowFoldsTheSwitchOnlyWhereItCantHoldIt`.
+
+The review's twelve, which the whole suite had passed (where the code they mutated moved to Core, the same mutation on
+each side), and three of the line's new rule:
+- A tap on the side shown choosing the other side, and the side shown `.disabled(on)`:
+  `test_grid_and_list_are_on_albums_alone_and_yours_all_only_where_it_was`.
+- `let sides = sideChoice ?? LibrarySideChoice(...)` (Yours | All handed to every page), New playlist… never opening its
+  sheet (`if !online { newSheet = NewSheet() }`), and Artists' order Picker bound to `.constant(artists.order)`:
+  `test_each_pages_line_holds_its_own_then_grid_list_and_yours_all`.
+- The line placed unfolded whatever its way - in the Layout (`folded: folded && false`):
+  `test_each_pages_line_gives_way_inside_itself_before_it_folds`; in Core (`if folded && false`):
+  `aQuietLinesEndsAreWhereTheyAreDrawn`.
+- The row never folding - in Core (`let folds = false && …`): `theRowFoldsTheSwitchOnlyWhereItCantHoldIt` and
+  `theRowPutsFindLeadingTheMoreTrailingAndTheSwitchBetween`; VoiceOver's fold (`false && wide > 0 && …`):
+  `test_voiceover_reads_the_row_as_it_is_drawn`.
+- The need read from `subviews[1]`, the switch, not `subviews[3]`: `test_the_row_is_laid_out_where_core_puts_each_view`.
+- DWSegmentedNeed measuring `words[0]` alone, and drawn without `.hidden()`:
+  `test_the_rows_switch_fits_beside_its_circles_or_folds_under_them`.
+- Find trailing and the ••• leading - in the Layout: `test_the_row_is_laid_out_where_core_puts_each_view`; in Core:
+  `theRowPutsFindLeadingTheMoreTrailingAndTheSwitchBetween`.
+- openFind's `if !finding` as `if finding`: `test_the_librarys_top_is_one_row_with_find_kept`.
+- The count never shortened (`MetaLine.count` the full words always): `theCountsShortFormDropsItsNounAlone`; the short
+  count heard short (its `.accessibilityLabel(count)` gone), and the line's ways tried out of order (folded before
+  short): `test_each_pages_line_gives_way_inside_itself_before_it_folds`.
+
+### Not verified - only a phone can say (checks 529-531, reworded)
+
+- The row and the line on a screen: the circles' faces, the well, the hairline's height beside the words, the glyphs'
+  weight against the words; the folds, at xLarge with four pages and at the larger sizes on a line.
+- Whether the bare number reads well, and Find's fold as you type on a 375 pt phone in a four-figure library (531
+  asks).
+- That ViewThatFits takes the line's ways as Core says - the first whose ideal width fits, the last where none does, as
+  Apple documents it - and that VoiceOver hears only the way drawn.
+- VoiceOver's order (Find, the switch, the •••, then the line - folded, the switch after the •••) and its words; the
+  targets at the row's foot.
+- The Mac: the phone's row draws over the Mac's borrowed Songs page and Downloaded (built for Mac Catalyst, not looked
+  at).
