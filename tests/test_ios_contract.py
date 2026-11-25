@@ -2169,7 +2169,9 @@ def test_mes_word_for_lastfm_is_one_the_app_knows(monkeypatch):
 def test_lastfms_answer_is_what_the_app_decodes(monkeypatch):
     # (server 2.1.41, built on main beside slice A1: this FAILS on the ios branch until main is merged into it)
     # GET /deadwax/lastfm/artist, asked with only what it takes, and every answer it builds - no key, refused,
-    # whole, a part late - holding what LastfmArtist and LastfmTrack read: only a track's title is needed
+    # whole, a part late - holding what LastfmArtist and LastfmTrack read: only a track's title is needed. Since
+    # 2.1.43 the answer also carries `similar` and `top_albums`, which this app doesn't read yet (slice A2 will):
+    # a key it doesn't declare, ignored by its decoder, so the answer holds LastfmArtist's keys and those two
     from src import lastfm as lastfm_rules
     from src.routes import lastfm as lastfm_route
 
@@ -2196,13 +2198,19 @@ def test_lastfms_answer_is_what_the_app_decodes(monkeypatch):
                              "url": "https://www.last.fm/music/Tame+Impala/_/Let+It+Happen"}]}
     info = {"url": "https://www.last.fm/music/Tame+Impala", "listeners": 2345678}
     refusal = lastfm_rules.Refused(10, "Invalid API key", 0.0)
+    similar = {"artist": "Tame Impala", "similar": []}
+    albums = {"top_albums": []}
+    known = lastfm_rules.NotKnown
     answers = [lastfm_rules.no_key_answer(),
-               lastfm_rules.artist_answer(lastfm_rules.Answer(info), lastfm_rules.Answer(tracks), None),
-               lastfm_rules.artist_answer(lastfm_rules.Answer(info), None, None),
-               lastfm_rules.artist_answer(None, None, refusal),
-               lastfm_rules.artist_answer(lastfm_rules.NotKnown(), lastfm_rules.NotKnown(), None)]
+               lastfm_rules.artist_answer(lastfm_rules.Answer(info), lastfm_rules.Answer(tracks),
+                                          lastfm_rules.Answer(similar), lastfm_rules.Answer(albums), None,
+                                          name="Tame Impala"),
+               lastfm_rules.artist_answer(lastfm_rules.Answer(info), None, None, None, None),
+               lastfm_rules.artist_answer(None, None, None, None, refusal),
+               lastfm_rules.artist_answer(known(), known(), known(), known(), None)]
+    later = {"similar", "top_albums"}
     for answer in answers:
-        assert set(answer) == set(fields("LastfmArtist")), answer
+        assert set(answer) == set(fields("LastfmArtist")) | later, answer
         assert_decodes("LastfmArtist", answer)
         for song in answer["top_songs"] or []:
             assert set(song) == set(fields("LastfmTrack")), song
@@ -2235,7 +2243,7 @@ def test_lastfms_answer_is_what_the_app_decodes(monkeypatch):
     for case in exported["cases"]:
         answer = case["answer"]
         assert case["path"] == "/deadwax/lastfm/artist" and case["status"] == 200, case["name"]
-        assert set(answer) == set(fields("LastfmArtist")), case["name"]
+        assert set(answer) == set(fields("LastfmArtist")) | later, case["name"]
         assert_decodes("LastfmArtist", answer)
         for song in answer["top_songs"] or []:
             assert set(song) == set(fields("LastfmTrack")), song

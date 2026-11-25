@@ -1,6 +1,7 @@
 """
-Last.fm, for the iPhone and Mac app's artist page (2.1.41, S2 - notes/lastfm.md; the design is deadwax-plans/lastfm.md
-2.5): `GET /deadwax/lastfm/artist`, a user's route (tests/test_logins.py ROUTES). The web app doesn't call it.
+Last.fm, for the iPhone and Mac app's artist page (2.1.41, S2; 2.1.43, S4 - notes/lastfm.md; the design is
+deadwax-plans/lastfm.md 2.5): `GET /deadwax/lastfm/artist`, a user's route (tests/test_logins.py ROUTES). The web app
+doesn't call it.
 
 Takes `mbid` (the artist's MusicBrainz id, MBID_PATTERN) and/or `name` (1-NAME_MAX letters) - at least one, a 422
 otherwise - and answers, always a 200:
@@ -8,20 +9,27 @@ otherwise - and answers, always a 200:
   {"enabled": true, "unavailable": false, "why": null,
    "url": "https://www.last.fm/music/Tame+Impala", "listeners": 4724887,
    "top_songs": [{"title": "The Less I Know the Better", "playcount": 51995043, "listeners": 2955438,
-                  "url": "https://www.last.fm/music/Tame+Impala/_/The+Less+I+Know+the+Better"}, ...]}
+                  "url": "https://www.last.fm/music/Tame+Impala/_/The+Less+I+Know+the+Better"}, ...],
+   "similar": [{"name": "Pond", "mbid": "69ac44f7-c80d-47b4-9bc8-fcc758d209e6", "match": 1.0,
+                "url": "https://www.last.fm/music/Pond"}, ...],
+   "top_albums": [{"title": "Currents", "mbid": "031ecbde-35e1-4d3a-917f-f89f31aca1c9", "plays": 197990342,
+                   "counted": "plays"}, ...]}
 
 (Tame Impala as Last.fm answered on 2026-11-25 - tests/fixtures/lastfm/recorded/.)
 
-src/lastfm.py artist_answer() says what each field is. `similar` and `top_albums` are S4's: until then they are not in
-the answer at all (never sent as nulls, which would say "couldn't be had").
+src/lastfm.py artist_answer() says what each field is. `similar` and `top_albums` are 2.1.43's (S4): before it they
+weren't in the answer at all, and an app that reads neither decodes it as before.
 
-TWO PARTS, ASKED AT ONCE - artist.getInfo (url, listeners) and artist.getTopTracks (limit 50) - each through the keeping
-(src/lastfm_kept.py: shared by everyone, a week fresh), by MusicBrainz id first; a "not known" by id (kept 3 days) asks
-again by name with autocorrect=1, kept under the name. With no id, by name. A name that folds to nothing
-(lastfm.name_key: "!!!") is never asked by: it would share one kept row with every other such name.
+FOUR PARTS, ASKED AT ONCE - artist.getInfo (url, listeners), artist.getTopTracks (limit 50), artist.getSimilar (limit
+30) and artist.getTopAlbums (limit 50) - each through the keeping (src/lastfm_kept.py: shared by everyone, a week
+fresh), by MusicBrainz id first; a "not known" by id (kept 3 days) asks again by name with autocorrect=1, kept under the
+name. With no id, by name. A name that folds to nothing (lastfm.name_key: "!!!") is never asked by: it would share one
+kept row with every other such name. Each part stands alone: one failing, late or not known leaves the others.
 
 ANSWERED BY ARTIST_DEADLINE_S: a part not in by then is null, with `unavailable`, and goes on - its answer kept when
 it comes, so the next visit has it. The part's own ask is never cancelled by the page; deadwax's stop cancels it.
+Every text in the answer is one UTF-8 can carry (lastfm.answerable, 2.1.43's review): a lone surrogate from Last.fm
+is U+FFFD, never a 500.
 
 NO KEY: `enabled` false and `why` saying where to add one - nothing asked. REFUSED (the client holds Last.fm's 10 or
 26): kept answers are still answered, `why` in refused words; with nothing kept `enabled` is false. `why` is for whoever
@@ -35,8 +43,8 @@ from fastapi import APIRouter, HTTPException, Query, Request
 
 from src.api.lastfm_endpoint import lastfm
 from src.config import Config
-from src.lastfm import (Answer, NotKnown, Outcome, Refused, Unreachable, artist_answer, artist_info, name_key,
-                        no_key_answer, top_tracks)
+from src.lastfm import (Answer, NotKnown, Outcome, Refused, Unreachable, answerable, artist_answer, artist_info,
+                        name_key, no_key_answer, similar_artists, top_albums, top_tracks)
 from src.lastfm_kept import artist_key, kept
 from src.logger import logger
 from src.routes.search_musicbrainz import MBID_PATTERN
@@ -48,12 +56,17 @@ NAME_MAX = 200
 ARTIST_DEADLINE_S = 4.0
 #? how many top tracks are asked for: the fold (lastfm.top_songs) drops repeats, so more than the 10 shown
 TOP_TRACKS_ASKED = "50"
+#? (2.1.43) how many similar artists and top albums: lastfm.SIMILAR_MAX and TOP_ALBUMS_MAX, as record.py asks
+SIMILAR_ASKED = "30"
+TOP_ALBUMS_ASKED = "50"
 
 NEEDS_AN_ARTIST = "Give the artist's MusicBrainz id (mbid), their name, or both."
 
 #? each part: its method, what it asks besides the artist, and how its answer is parsed
 INFO = ("artist.getinfo", {}, artist_info)
 TRACKS = ("artist.gettoptracks", {"limit": TOP_TRACKS_ASKED}, top_tracks)
+SIMILAR = ("artist.getsimilar", {"limit": SIMILAR_ASKED}, similar_artists)
+ALBUMS = ("artist.gettopalbums", {"limit": TOP_ALBUMS_ASKED}, top_albums)
 
 #? the parts under way - held, so none is lost before it ends (asyncio keeps only weak references), and so deadwax's
 #? stop can cancel those the deadline left running. The descriptions' Last.fm side too (src/routes/describe.py, 2.1.42)
@@ -132,18 +145,20 @@ async def lastfm_artist(
     mbid: str | None = Query(None, pattern=MBID_PATTERN),
     name: str | None = Query(None, min_length=1, max_length=NAME_MAX),
 ):
-    """An artist's Last.fm page, listeners and top songs, for the app's artist page."""
+    """An artist's Last.fm page, listeners, top songs, similar artists and top albums, for the app's artist page."""
     name = (name or "").strip() or None
     if not mbid and not name:
         raise HTTPException(status_code=422, detail=NEEDS_AN_ARTIST)
     if not Config.lastfm_key():
         return no_key_answer()
     store = getattr(request.app.state, "store", None)
-    info, tracks = (started(artist_part(store, part, mbid, name)) for part in (INFO, TRACKS))
-    done, late = await asyncio.wait({info, tracks}, timeout=ARTIST_DEADLINE_S)
+    #? the parts read here, at each ask - never a tuple made once, so a part replaced (the tests') is the one asked
+    tasks = [started(artist_part(store, part, mbid, name)) for part in (INFO, TRACKS, SIMILAR, ALBUMS)]
+    done, late = await asyncio.wait(set(tasks), timeout=ARTIST_DEADLINE_S)
     if late:
         logger.info(f"Last.fm: {len(late)} part(s) of an artist page not in by {ARTIST_DEADLINE_S:g} s - answered "
                     f"without, and kept when they come")
-    outcomes = (_result(info, done), _result(tracks, done))
+    outcomes = [_result(task, done) for task in tasks]
     refusal = lastfm.held() or next((part for part in outcomes if isinstance(part, Refused)), None)
-    return artist_answer(*outcomes, refusal)
+    #? answerable(): the last guard - a text the parse let through that UTF-8 can't carry is U+FFFD, never a 500
+    return answerable(artist_answer(*outcomes, refusal, mbid=mbid, name=name))

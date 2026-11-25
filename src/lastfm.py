@@ -41,7 +41,12 @@ the shape deadwax keeps (src/lastfm_kept.py) - never Last.fm's own answer:
     descriptions (S3, 2.1.42) read this same row: one ask serves the artist page and the description;
   - top_tracks(): artist.getTopTracks as {artist_url, top_songs} - top_songs() already folded, so a change to the
     fold (TOP_SONGS, match_key) is a change of the kept shape: bump LASTFM_SHAPE with it;
-  - artist_answer(): the route's answer from the two, `why` in words for whoever runs deadwax (auth.Explained's
+  - similar_artists() (2.1.43, S4): artist.getSimilar as {artist, similar} - Last.fm's list, each {name, mbid, match,
+    url}, Various Artists out, at most SIMILAR_MAX; the asked artist is dropped as the answer is made (similar_of),
+    since the asker's id and name aren't the row's;
+  - top_albums() (2.1.43, S4): artist.getTopAlbums as {top_albums} - each {title, mbid, plays, counted}, the count
+    one kind for the whole list (playcount when any album has it, else listeners);
+  - artist_answer(): the route's answer from the four, `why` in words for whoever runs deadwax (auth.Explained's
     rule: the app shows it only to them).
 
 AN ALBUM'S WORDS (2.1.42, S3 - the descriptions, src/routes/describe.py): album_info(), album.getInfo as {url, wiki:
@@ -61,8 +66,10 @@ from typing import Any
 from urllib.parse import urlparse
 
 #? Bumped whenever a kept answer's parsed shape changes - the SCAN_FORMAT rule: every kept row's key begins with it
-#? (src/lastfm_kept.py), so an answer parsed the old way is never read as the new one
-LASTFM_SHAPE = 1
+#? (src/lastfm_kept.py), so an answer parsed the old way is never read as the new one. 2 (2.1.43): match_key's
+#? titleKey no longer folds a dotted or dotless i into an i, so a top tracks row folded by 1 can hold one song where
+#? 2 makes two - and getSimilar's and getTopAlbums' rows are first kept
+LASTFM_SHAPE = 2
 
 #? Last.fm's error codes (https://www.last.fm/api/errorcodes, read 2026-11-24)
 NOT_KNOWN_ERRORS = frozenset({6})
@@ -210,12 +217,24 @@ _S = f"[{JS_SPACE}]"
 _W = "A-Za-z0-9_" + chr(0x17F) + chr(0x212A)
 #? JavaScript's \b, from that \w
 _B = f"(?:(?<=[{_W}])(?![{_W}])|(?<![{_W}])(?=[{_W}]))"
+#? what JavaScript's /iu folds into an ASCII letter besides its other case: Unicode's simple case folding takes the
+#? long s to s and the Kelvin sign to k, and nothing else to any ASCII letter (read off Node, every code point)
+_JS_FOLDS = {"s": chr(0x17F), "k": chr(0x212A)}
 
-#? songs.ts SAME_SONG_ASIDE: an aside naming the same song in another take or mastering - "(live)", "(Remastered
-#? 2015)", "(mono)"
+
+def _js_iu(word: str) -> str:
+    """`word` (lowercase ASCII) as a pattern that matches what JavaScript's /iu matches: each letter in either case,
+    and the one letter more Unicode's folding gives s and k. Never Python's re.IGNORECASE, which also folds the dotless
+    and dotted i (U+0131, U+0130) into i - in the words, and in \\w - so "Roads (LIVE)" with a dotted I keyed "roads"
+    here and "roads (live)" in the TypeScript and the iPhone app's port (2.1.43)."""
+    return "".join(f"[{c}{c.upper()}{_JS_FOLDS.get(c, '')}]" if c.isalpha() else re.escape(c) for c in word)
+
+
+#? songs.ts SAME_SONG_ASIDE (`/.../giu`): an aside naming the same song in another take or mastering - "(live)",
+#? "(Remastered 2015)", "(mono)". Its case folded as /iu folds it (_js_iu), with _B's \w, never re.IGNORECASE
 SAME_SONG_ASIDE = re.compile(
-    rf"{_S}*[(\[]{_S}*(?:live{_B}[^)\]]*|[^)\]]*{_B}remaster(?:ed)?{_B}[^)\]]*|mono|stereo){_S}*[)\]]",
-    re.IGNORECASE)
+    rf"{_S}*[(\[]{_S}*(?:{_js_iu('live')}{_B}[^)\]]*|[^)\]]*{_B}{_js_iu('remaster')}(?:{_js_iu('ed')})?{_B}[^)\]]*"
+    rf"|{_js_iu('mono')}|{_js_iu('stereo')}){_S}*[)\]]")
 #? owned.ts foldName's bracketed aside, any words in it
 ANY_ASIDE = re.compile(rf"{_S}*[(\[][^)\]]*[)\]]")
 #? the quotes titleKey and foldName read as an apostrophe
@@ -380,10 +399,35 @@ def count(value: Any) -> int | None:
     return None
 
 
-def _name(value: Any) -> str:
-    """A name or title as Last.fm wrote it, its ends trimmed - "" for none."""
+#? (2.1.43's review) a lone surrogate, U+D800-U+DFFF: what JSON's "\ud800" escape gives Python with no pair after it.
+#? The keeping writes it back as it came (ASCII JSON), but no UTF-8 carries it, so the answer's encoder raised on it -
+#? a 500 at every visit for as long as the row was kept, Last.fm never asked again. Each is U+FFFD instead
+LONE_SURROGATE = re.compile("[" + chr(0xD800) + "-" + chr(0xDFFF) + "]")
+REPLACEMENT = chr(0xFFFD)
+
+
+def whole(text: str) -> str:
+    """`text` with each lone surrogate the replacement character, U+FFFD - so UTF-8 can carry it. A letter outside the
+    BMP is one letter in Python (JSON's pair is read as one), so it is never touched."""
+    return LONE_SURROGATE.sub(REPLACEMENT, text)
+
+
+def answerable(value: Any) -> Any:
+    """An answer as JSON in UTF-8 can carry it: every string in it, keys too, whole() - the artist and description
+    routes' last guard, so text the parse missed degrades to U+FFFD rather than a 500 (2.1.43's review)."""
     if isinstance(value, str):
-        return value.strip()
+        return whole(value)
+    if isinstance(value, dict):
+        return {answerable(key): answerable(item) for key, item in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [answerable(item) for item in value]
+    return value
+
+
+def _name(value: Any) -> str:
+    """A name or title as Last.fm wrote it, its ends trimmed, whole() - "" for none."""
+    if isinstance(value, str):
+        return whole(value.strip())
     return str(value) if isinstance(value, int) and not isinstance(value, bool) else ""
 
 
@@ -393,8 +437,8 @@ def written_size(text: str) -> int:
 
 
 def _bio_text(value: Any, letters: int, most_bytes: int) -> str | None:
-    """A bio's text, its ends trimmed, cut to `letters` and then to what fits in `most_bytes` written."""
-    text = (value.strip() if isinstance(value, str) else "")[:letters]
+    """A bio's text, its ends trimmed, whole(), cut to `letters` and then to what fits in `most_bytes` written."""
+    text = (whole(value.strip()) if isinstance(value, str) else "")[:letters]
     if written_size(text) > most_bytes:
         used = end = 0
         for letter in text:
@@ -485,37 +529,193 @@ def top_tracks(body: Any) -> dict | None:
     return {"artist_url": artist_url, "top_songs": top_songs(tracks)}
 
 
+# ----- similar artists and top albums (2.1.43, S4) -------------------------------------------------------------------
+
+#? an artist page's similar artists at most: what is asked of artist.getSimilar (limit=30). Changing it changes what
+#? is kept: bump LASTFM_SHAPE
+SIMILAR_MAX = 30
+#? its top albums at most: what is asked of artist.getTopAlbums (limit=50) - every one, for the app's "Most played"
+#? to meet as many of the page's albums as it can. Bump LASTFM_SHAPE with it
+TOP_ALBUMS_MAX = 50
+#? a MusicBrainz id as GET /deadwax/lastfm/artist takes one (src/routes/search_musicbrainz.py MBID_PATTERN, without
+#? its anchors - this module imports no route): any other shape is passed on as null
+MBID = re.compile(r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}")
+#? never a similar artist: MusicBrainz's Various Artists, by its id or by its name
+VARIOUS_ARTISTS_MBID = "89ad4ac3-39f7-470e-963a-56509c546377"
+VARIOUS_ARTISTS = "various artists"
+#? a similar artist's `match` as Last.fm's JSON writes it: "1", "0.706669" - ASCII digits, never words or "nan"
+MATCH_TEXT = re.compile(r"[0-9]{1,3}(?:\.[0-9]{1,20})?")
+#? the counts an album's plays can be, by the field each is read from
+COUNTED = (("plays", "playcount"), ("listeners", "listeners"))
+#? (2.1.43's review) a similar or top albums row at most this many bytes as kept (ASCII JSON, where a letter outside
+#? the BMP takes 12): thirty long names could pass the keeping's ROW_MAX_BYTES, and a row too big to keep is asked
+#? again at every visit. Entries are dropped from the end until the row fits - 24 KB, and the longest key a name of
+#? the route's NAME_MAX makes (6,827 bytes) still fits under 32 KB
+#? (tests/test_lastfm.py test_a_similar_and_an_albums_row_always_fit_the_keeping)
+LIST_ROW_BYTES = 24 * 1024
+#? the name getSimilar answered for (its @attr) is kept up to the route's NAME_MAX letters - one longer is no name a
+#? page asks by, and is the one field the bound can't drop
+ANSWERED_NAME_MAX = 200
+
+
+def mbid_of(value: Any) -> str | None:
+    """A MusicBrainz id as Last.fm gave it, trimmed and lowercased - else None: absent, empty, or any other shape (a
+    prefix, braces, words), so nothing the app opens a MusicBrainz page by is ever made up."""
+    if not isinstance(value, str):
+        return None
+    text = value.strip().lower()
+    return text if text.isascii() and MBID.fullmatch(text) else None
+
+
+def similarity(value: Any) -> float | None:
+    """A similar artist's `match`: Last.fm's 0 to 1 (a string in its JSON), as a number - else None (absent, words,
+    past 1, below 0, not finite)."""
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, str):
+        text = value.strip()
+        if not MATCH_TEXT.fullmatch(text):
+            return None
+        value = float(text)
+    if isinstance(value, (int, float)) and math.isfinite(value) and 0 <= value <= 1:
+        return float(value)
+    return None
+
+
+def _listed(value: Any, field: str) -> list[dict]:
+    """A list in Last.fm's answer - one alone given as an object too (its JSON is made from XML) - its objects only."""
+    items = _object(value).get(field)
+    if isinstance(items, dict):
+        items = [items]
+    return [item for item in items if isinstance(item, dict)] if isinstance(items, list) else []
+
+
+def _similar_entry(artist: dict) -> dict | None:
+    """One similar artist as passed on: {name, mbid, match, url} - None for one with no name, or Various Artists.
+    Reads Last.fm's fields and a kept row's alike (they are the same names)."""
+    name = _name(artist.get("name"))
+    mbid = mbid_of(artist.get("mbid"))
+    if not name or mbid == VARIOUS_ARTISTS_MBID or name_key(name) == VARIOUS_ARTISTS:
+        return None
+    return {"name": name, "mbid": mbid, "match": similarity(artist.get("match")), "url": lastfm_url(artist.get("url"))}
+
+
+def similar_artists(body: Any) -> dict | None:
+    """
+    artist.getSimilar's answer as deadwax keeps it: {artist, similar} - `artist` the name Last.fm answered for (its
+    `@attr`), `similar` Last.fm's list in its order (by match, as it answers), each {name, mbid, match, url}: a name
+    as Last.fm wrote it, ends trimmed; an id only of MusicBrainz's shape; the match 0-1; the address only https on
+    last.fm. One with no name, and Various Artists, dropped; the first SIMILAR_MAX. No images: Last.fm's terms exclude
+    them, and its are placeholders. None for an answer with no `similarartists` in it (Unreachable: never kept).
+    """
+    top = _object(body).get("similarartists")
+    if not isinstance(top, dict):
+        return None
+    similar = [entry for entry in map(_similar_entry, _listed(top, "artist")) if entry is not None]
+    answered = _name(_object(top.get("@attr")).get("artist"))
+    return _fitted({"artist": answered if 0 < len(answered) <= ANSWERED_NAME_MAX else None,
+                    "similar": similar[:SIMILAR_MAX]}, "similar")
+
+
+def _kept_bytes(value: Any) -> int:
+    """What `value` takes in a kept row: its JSON as src/lastfm_kept.py writes it."""
+    return len(json.dumps(value, ensure_ascii=True, separators=(",", ":")))
+
+
+def _fitted(row: dict, field: str) -> dict:
+    """`row` with its `field`'s entries dropped from the end until it takes at most LIST_ROW_BYTES kept - each
+    entry's size worked out once: a list is its entries, a comma between each, and its brackets."""
+    entries = row[field]
+    sizes = [_kept_bytes(entry) for entry in entries]
+    used = _kept_bytes({**row, field: []}) + sum(sizes) + max(len(sizes) - 1, 0)
+    while entries and used > LIST_ROW_BYTES:
+        used -= sizes.pop() + (1 if sizes else 0)
+        entries.pop()
+    return row
+
+
+def similar_of(kept: dict, mbid: str | None, name: str | None) -> list[dict]:
+    """A kept similar row as the page's list, read as carefully as an answer: the asked artist dropped - one with the
+    page's MusicBrainz id, or whose name folds (name_key) as the name asked by or the name Last.fm answered for. A
+    name that folds to nothing ("!!!") is no one's: it drops nobody."""
+    ids = {mbid_of(mbid)} - {None}
+    names = {name_key(own) for own in (name, kept.get("artist")) if isinstance(own, str)} - {""}
+    rows = kept.get("similar")
+    entries = (_similar_entry(row) for row in rows if isinstance(row, dict)) if isinstance(rows, list) else ()
+    return [entry for entry in entries
+            if entry is not None and entry["mbid"] not in ids and name_key(entry["name"]) not in names][:SIMILAR_MAX]
+
+
+def top_albums(body: Any) -> dict | None:
+    """
+    artist.getTopAlbums' answer as deadwax keeps it: {top_albums} - Last.fm's order, each {title, mbid, plays,
+    counted}: a title as Last.fm wrote it, ends trimmed; an id only of MusicBrainz's shape (Last.fm's album ids are
+    releases', not release groups'); and ONE count for the whole list - each album's playcount, `counted` "plays",
+    when any album carries one (every recording's do, 2026-11-25), else each one's listeners, `counted` "listeners"
+    (getTopAlbums' API page shows only listeners in its sample: the design's fork). An album without the list's count
+    isn't passed on, since it can't be ordered by it - so plays are never set beside listeners. The first
+    TOP_ALBUMS_MAX, then as many as fit LIST_ROW_BYTES. A title that folds to nothing (name_key: "(null)", "( )",
+    "!!!") is no album the app can meet by its title, and is left out (2.1.43's review). None for an answer with no
+    `topalbums` in it (Unreachable: never kept).
+    """
+    top = _object(body).get("topalbums")
+    if not isinstance(top, dict):
+        return None
+    titled = [(title, album) for album in _listed(top, "album") if name_key(title := _name(album.get("name")))]
+    for counted, field in COUNTED:
+        albums = [{"title": title, "mbid": mbid_of(album.get("mbid")), "plays": count(album.get(field)),
+                   "counted": counted} for title, album in titled if count(album.get(field)) is not None]
+        if albums:
+            return _fitted({"top_albums": albums[:TOP_ALBUMS_MAX]}, "top_albums")
+    return {"top_albums": []}
+
+
+def _kept_albums(value: Any) -> list[dict]:
+    """A kept row's top albums, read as carefully as anything read back: titled, counted, of the list's one kind."""
+    albums = [{"title": title, "mbid": mbid_of(album.get("mbid")), "plays": count(album.get("plays")),
+               "counted": album.get("counted")}
+              for album in (value if isinstance(value, list) else [])
+              if isinstance(album, dict) and isinstance(album.get("title"), str)
+              and name_key(title := _name(album["title"]))]
+    albums = [album for album in albums
+              if album["plays"] is not None and album["counted"] in {counted for counted, _ in COUNTED}]
+    return [album for album in albums if album["counted"] == albums[0]["counted"]][:TOP_ALBUMS_MAX]
+
+
 def _kept_songs(value: Any) -> list[dict]:
     """A kept row's top songs, read as carefully as anything read back."""
     if not isinstance(value, list):
         return []
-    return [{"title": song["title"], "playcount": count(song.get("playcount")), "listeners": count(song.get("listeners")),
+    return [{"title": title, "playcount": count(song.get("playcount")), "listeners": count(song.get("listeners")),
              "url": lastfm_url(song.get("url"))}
-            for song in value if isinstance(song, dict) and isinstance(song.get("title"), str) and song["title"]]
+            for song in value if isinstance(song, dict) and isinstance(song.get("title"), str)
+            and (title := _name(song["title"]))]
 
 
 def no_key_answer() -> dict:
     """The artist route's answer with no LASTFM_API_KEY: nothing asked, nothing there."""
     return {"enabled": False, "unavailable": False, "why": NO_KEY_WHY, "url": None, "listeners": None,
-            "top_songs": None}
+            "top_songs": None, "similar": None, "top_albums": None}
 
 
-def artist_answer(info: Outcome | None, tracks: Outcome | None, refusal: Refused | None) -> dict:
+def artist_answer(info: Outcome | None, tracks: Outcome | None, similar: Outcome | None, albums: Outcome | None,
+                  refusal: Refused | None, mbid: str | None = None, name: str | None = None) -> dict:
     """
-    GET /deadwax/lastfm/artist's answer from its two parts - each what its ask came to (a kept answer, or Last.fm's),
-    None for one the deadline passed - and the refusal the client holds, if any:
+    GET /deadwax/lastfm/artist's answer from its four parts - each what its ask came to (a kept answer, or Last.fm's),
+    None for one the deadline passed - the refusal the client holds, if any, and the artist as the page asked for them
+    (its `mbid` and `name`, which similar_of drops):
 
       - `url`: getInfo's, else the top tracks' artist's - https on last.fm only;
       - `listeners`: an integer, or None;
-      - `top_songs`: the folded list - [] when Last.fm lists nothing, None when it couldn't be had (or doesn't know
-        the artist: a definite none, not a failure);
+      - `top_songs`, `similar` and `top_albums` (2.1.43): each a list - [] when Last.fm lists nothing, None when it
+        couldn't be had (or doesn't know the artist: a definite none, not a failure);
       - `unavailable`: a part couldn't be had just now - failed, or late - so the app keeps this a moment only;
       - `enabled`: false while Last.fm refuses the key and nothing is kept, with `why` saying so.
     """
-    parts = (info, tracks)
+    parts = (info, tracks, similar, albums)
     found = [part.body if isinstance(part, Answer) and isinstance(part.body, dict) else None for part in parts]
     had = any(isinstance(part, (Answer, NotKnown)) for part in parts)
-    got_info, got_tracks = (body or {} for body in found)
+    got_info, got_tracks, got_similar, got_albums = (body or {} for body in found)
     return {
         "enabled": had or refusal is None,
         "unavailable": not all(isinstance(part, (Answer, NotKnown)) for part in parts),
@@ -523,4 +723,6 @@ def artist_answer(info: Outcome | None, tracks: Outcome | None, refusal: Refused
         "url": lastfm_url(got_info.get("url")) or lastfm_url(got_tracks.get("artist_url")),
         "listeners": count(got_info.get("listeners")),
         "top_songs": _kept_songs(got_tracks.get("top_songs")) if found[1] is not None else None,
+        "similar": similar_of(got_similar, mbid, name) if found[2] is not None else None,
+        "top_albums": _kept_albums(got_albums.get("top_albums")) if found[3] is not None else None,
     }

@@ -50,7 +50,7 @@ from src.artists import credit_name
 from src.config import Config
 from src.descriptions import (answer_lastfm_first, answer_of, english_description, enwiki_title, found_in,
                               from_lastfm, from_navidrome, from_summary, is_fresh, wikidata_entity, wikipedia_relation)
-from src.lastfm import Answer, NotKnown, album_info
+from src.lastfm import Answer, NotKnown, album_info, answerable
 from src.lastfm_kept import kept, release_group_key
 from src.logger import logger
 from src.routes.lastfm import INFO, NAME_MAX, artist_part, parsed_ask, started
@@ -265,7 +265,8 @@ async def describe_artist(
 ):
     """An artist's description: Navidrome's biography of them, else Wikipedia's by their MusicBrainz id - with a
     Last.fm key, Last.fm's bio of them first and Navidrome's last - and Wikidata's subtitle."""
-    return await describe(request, "artist", mbid, navidrome_id)
+    #? answerable(): a text no UTF-8 carries (a lone surrogate, in any side's words) is U+FFFD, never a 500 (2.1.43)
+    return answerable(await describe(request, "artist", mbid, navidrome_id))
 
 
 @router.get("/album")
@@ -276,4 +277,4 @@ async def describe_album(
 ):
     """An album's description: Navidrome's notes, else Wikipedia's by its release group's MusicBrainz id - with a
     Last.fm key, Last.fm's wiki of it first and Navidrome's last - and Wikidata's subtitle."""
-    return await describe(request, "album", mbid, navidrome_id)
+    return answerable(await describe(request, "album", mbid, navidrome_id))

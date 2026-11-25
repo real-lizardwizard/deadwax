@@ -3,7 +3,7 @@
  "fixtures": "recorded",
  "cases": [
   {
-   "name": "Tame Impala, by MusicBrainz id: listeners, the page, ten top songs",
+   "name": "Tame Impala, by MusicBrainz id: listeners, the page, ten top songs, thirty similar artists, fifty albums",
    "path": "/deadwax/lastfm/artist",
    "query": {
     "mbid": "63aa26c3-d59b-4da4-84ac-716b54f1ef4d",
@@ -77,11 +77,495 @@
       "listeners": 1328255,
       "url": "https://www.last.fm/music/Tame+Impala/_/Dracula"
      }
+    ],
+    "similar": [
+     {
+      "name": "Pond",
+      "mbid": "69ac44f7-c80d-47b4-9bc8-fcc758d209e6",
+      "match": 1.0,
+      "url": "https://www.last.fm/music/Pond"
+     },
+     {
+      "name": "Melody's Echo Chamber",
+      "mbid": null,
+      "match": 0.706669,
+      "url": "https://www.last.fm/music/Melody%27s+Echo+Chamber"
+     },
+     {
+      "name": "GUM",
+      "mbid": "bca076a4-0ff5-43ae-b4c1-27ece7a0ca1c",
+      "match": 0.655327,
+      "url": "https://www.last.fm/music/GUM"
+     },
+     {
+      "name": "Temples",
+      "mbid": "3514578c-402a-4825-bd97-a525f31004e6",
+      "match": 0.581892,
+      "url": "https://www.last.fm/music/Temples"
+     },
+     {
+      "name": "The Holydrug Couple",
+      "mbid": "ab722b70-b4a8-4918-b13d-2a449f23df16",
+      "match": 0.456447,
+      "url": "https://www.last.fm/music/The+Holydrug+Couple"
+     },
+     {
+      "name": "Moses Gunn Collective",
+      "mbid": "324405e8-c264-4077-b3cc-26a5fa1ed713",
+      "match": 0.417631,
+      "url": "https://www.last.fm/music/Moses+Gunn+Collective"
+     },
+     {
+      "name": "Post Animal",
+      "mbid": "40c857d5-6ab0-41f4-aa1d-7614a79a0686",
+      "match": 0.355639,
+      "url": "https://www.last.fm/music/Post+Animal"
+     },
+     {
+      "name": "MGMT",
+      "mbid": "c485632c-b784-4ee9-8ea1-c5fb365681fc",
+      "match": 0.355572,
+      "url": "https://www.last.fm/music/MGMT"
+     },
+     {
+      "name": "Unknown Mortal Orchestra",
+      "mbid": "e2305342-0bde-4a2c-aed0-4b88694834de",
+      "match": 0.341121,
+      "url": "https://www.last.fm/music/Unknown+Mortal+Orchestra"
+     },
+     {
+      "name": "Djo",
+      "mbid": "83cedfd0-a118-48eb-ad71-72f4c2f95fd2",
+      "match": 0.309012,
+      "url": "https://www.last.fm/music/Djo"
+     },
+     {
+      "name": "The Strokes",
+      "mbid": "f181961b-20f7-459e-89de-920ef03c7ed0",
+      "match": 0.305594,
+      "url": "https://www.last.fm/music/The+Strokes"
+     },
+     {
+      "name": "Inner Wave",
+      "mbid": "593f5d0a-ea85-4e07-a8cc-d3a031925638",
+      "match": 0.290958,
+      "url": "https://www.last.fm/music/Inner+Wave"
+     },
+     {
+      "name": "The Voidz",
+      "mbid": "6a93cb2b-d33a-42fc-a41a-542e3a887ba6",
+      "match": 0.290752,
+      "url": "https://www.last.fm/music/The+Voidz"
+     },
+     {
+      "name": "Psychedelic Porn Crumpets",
+      "mbid": "11d94660-1963-4020-8762-4c5907e2ea48",
+      "match": 0.28923,
+      "url": "https://www.last.fm/music/Psychedelic+Porn+Crumpets"
+     },
+     {
+      "name": "Mild High Club",
+      "mbid": "5e9adbe9-5721-4d66-88e4-0e3ff7129f1c",
+      "match": 0.285922,
+      "url": "https://www.last.fm/music/Mild+High+Club"
+     },
+     {
+      "name": "Meltt",
+      "mbid": "780873bc-db63-4803-9fde-a824b5049625",
+      "match": 0.284644,
+      "url": "https://www.last.fm/music/Meltt"
+     },
+     {
+      "name": "King Gizzard & The Lizard Wizard",
+      "mbid": null,
+      "match": 0.281421,
+      "url": "https://www.last.fm/music/King+Gizzard+&+The+Lizard+Wizard"
+     },
+     {
+      "name": "Arctic Monkeys",
+      "mbid": "ada7a83c-e3e1-40f1-93f9-3e73dbc9298a",
+      "match": 0.247916,
+      "url": "https://www.last.fm/music/Arctic+Monkeys"
+     },
+     {
+      "name": "Crumb",
+      "mbid": "b1619173-e106-4515-8e1d-9d2022365459",
+      "match": 0.24018,
+      "url": "https://www.last.fm/music/Crumb"
+     },
+     {
+      "name": "The Lazy Eyes",
+      "mbid": "48b0b244-a822-4f79-9bde-14a88217fe57",
+      "match": 0.235051,
+      "url": "https://www.last.fm/music/The+Lazy+Eyes"
+     },
+     {
+      "name": "Babe Rainbow",
+      "mbid": "41f85de6-c550-4b35-875a-a0049e577e58",
+      "match": 0.221978,
+      "url": "https://www.last.fm/music/Babe+Rainbow"
+     },
+     {
+      "name": "Cage the Elephant",
+      "mbid": "b41b38d4-ef3e-4f37-8c75-cfe9af999696",
+      "match": 0.220354,
+      "url": "https://www.last.fm/music/Cage+the+Elephant"
+     },
+     {
+      "name": "Foxygen",
+      "mbid": "913e6848-6865-4717-ac5e-3bd9c22826be",
+      "match": 0.207826,
+      "url": "https://www.last.fm/music/Foxygen"
+     },
+     {
+      "name": "Empire of the Sun",
+      "mbid": "ac7e838c-3d95-47c2-92a9-81767ad7c217",
+      "match": 0.206142,
+      "url": "https://www.last.fm/music/Empire+of+the+Sun"
+     },
+     {
+      "name": "Dungen",
+      "mbid": "25c76eb2-a92d-4624-9e30-093fc16ed5eb",
+      "match": 0.196425,
+      "url": "https://www.last.fm/music/Dungen"
+     },
+     {
+      "name": "Levitation Room",
+      "mbid": "2cac95ca-5b4d-4864-89a4-fba2e673a843",
+      "match": 0.190861,
+      "url": "https://www.last.fm/music/Levitation+Room"
+     },
+     {
+      "name": "Sunbeam Sound Machine",
+      "mbid": "e109031f-998a-4340-a80d-016b1dc86675",
+      "match": 0.18906,
+      "url": "https://www.last.fm/music/Sunbeam+Sound+Machine"
+     },
+     {
+      "name": "Drugdealer",
+      "mbid": "d3b69dfc-4b20-440c-bd23-6f939d076082",
+      "match": 0.176901,
+      "url": "https://www.last.fm/music/Drugdealer"
+     },
+     {
+      "name": "Spiral Drive",
+      "mbid": "f932104f-c397-4afe-a4c8-2739d0f51dd7",
+      "match": 0.169101,
+      "url": "https://www.last.fm/music/Spiral+Drive"
+     },
+     {
+      "name": "Pink Floyd",
+      "mbid": "83d91898-7763-47d7-b03b-b92132375c47",
+      "match": 0.163433,
+      "url": "https://www.last.fm/music/Pink+Floyd"
+     }
+    ],
+    "top_albums": [
+     {
+      "title": "Currents",
+      "mbid": "031ecbde-35e1-4d3a-917f-f89f31aca1c9",
+      "plays": 197990342,
+      "counted": "plays"
+     },
+     {
+      "title": "The Slow Rush",
+      "mbid": "3a12923d-97cd-4e87-8cfd-fb67be970974",
+      "plays": 75865879,
+      "counted": "plays"
+     },
+     {
+      "title": "Lonerism",
+      "mbid": "0d2cb66c-3a32-4f81-b977-9231c461c34a",
+      "plays": 65345426,
+      "counted": "plays"
+     },
+     {
+      "title": "Deadbeat",
+      "mbid": "51f8289e-7379-4c7b-ab50-564e2f875594",
+      "plays": 23596438,
+      "counted": "plays"
+     },
+     {
+      "title": "Innerspeaker",
+      "mbid": "0b18bdeb-8382-4b8f-94a3-b43e3e7ec6a4",
+      "plays": 29854021,
+      "counted": "plays"
+     },
+     {
+      "title": "Dracula (Remix)",
+      "mbid": "132919b9-60a8-4835-884f-3a943ba587bf",
+      "plays": 7905191,
+      "counted": "plays"
+     },
+     {
+      "title": "Dracula",
+      "mbid": "338c7885-011c-4a4a-b5d1-95e6f3fc2383",
+      "plays": 6876079,
+      "counted": "plays"
+     },
+     {
+      "title": "The Slow Rush B-Sides & Remixes",
+      "mbid": null,
+      "plays": 3788376,
+      "counted": "plays"
+     },
+     {
+      "title": "Currents B-Sides & Remixes",
+      "mbid": "7b09018d-808f-4a0a-ad71-4b8a580440c9",
+      "plays": 4642033,
+      "counted": "plays"
+     },
+     {
+      "title": "Patience",
+      "mbid": "ca6d3d5b-8129-4d27-afd1-252e997f22bf",
+      "plays": 3083758,
+      "counted": "plays"
+     },
+     {
+      "title": "Loser",
+      "mbid": "30b3443f-de5b-4b0b-b2d5-434000817868",
+      "plays": 2524930,
+      "counted": "plays"
+     },
+     {
+      "title": "Tame Impala",
+      "mbid": "08a252a8-2daf-4990-bf5d-4601c40757c6",
+      "plays": 3306141,
+      "counted": "plays"
+     },
+     {
+      "title": "Sundown Syndrome / Remember Me",
+      "mbid": "40a99e1e-ebd8-4441-b7b6-51212281cc19",
+      "plays": 1954681,
+      "counted": "plays"
+     },
+     {
+      "title": "End of Summer",
+      "mbid": "d2c47b50-31ed-43f5-86d1-6ecb544d0ebc",
+      "plays": 1320803,
+      "counted": "plays"
+     },
+     {
+      "title": "Borderline",
+      "mbid": "850ea168-6719-4c1e-9eb6-b8753db75e23",
+      "plays": 2078721,
+      "counted": "plays"
+     },
+     {
+      "title": "Lonerism B-Sides & Remixes",
+      "mbid": "cfcdd292-e9eb-4fff-8b68-e3e9197254f5",
+      "plays": 1198367,
+      "counted": "plays"
+     },
+     {
+      "title": "InnerSpeaker (Collector's Edition)",
+      "mbid": null,
+      "plays": 2352157,
+      "counted": "plays"
+     },
+     {
+      "title": "Live Versions",
+      "mbid": "1de2992e-5d9e-42a1-910b-b307d80c06a4",
+      "plays": 2204094,
+      "counted": "plays"
+     },
+     {
+      "title": "Lost in Yesterday",
+      "mbid": "fbbbefca-69ee-42a5-b49c-18974c13e310",
+      "plays": 884214,
+      "counted": "plays"
+     },
+     {
+      "title": "It Might Be Time",
+      "mbid": "a43d62c7-5dea-447f-a838-6758e3fb03f0",
+      "plays": 777811,
+      "counted": "plays"
+     },
+     {
+      "title": "Breathe Deeper (Lil Yachty Remix)",
+      "mbid": "109697d2-1915-4b2b-a92a-9b4811f0f2ee",
+      "plays": 949463,
+      "counted": "plays"
+     },
+     {
+      "title": "Journey to the Real World (From Barbie the Album)",
+      "mbid": null,
+      "plays": 426838,
+      "counted": "plays"
+     },
+     {
+      "title": "Dracula (with JENNIE)",
+      "mbid": null,
+      "plays": 562623,
+      "counted": "plays"
+     },
+     {
+      "title": "Posthumous Forgiveness",
+      "mbid": "4e1f7386-858f-49ba-9a48-fcdede81d0ed",
+      "plays": 597397,
+      "counted": "plays"
+     },
+     {
+      "title": "Let It Happen",
+      "mbid": "5040b2d7-1254-4412-84dd-efece7dc185f",
+      "plays": 498361,
+      "counted": "plays"
+     },
+     {
+      "title": "Elephant",
+      "mbid": "45c146b7-4b49-4857-99d8-dfbc68062a27",
+      "plays": 446016,
+      "counted": "plays"
+     },
+     {
+      "title": "Hummer",
+      "mbid": "1abc5d6c-c00b-4948-8486-714b8bc2e8f4",
+      "plays": 210600,
+      "counted": "plays"
+     },
+     {
+      "title": "No Choice",
+      "mbid": "780c194f-9268-4d16-ab22-931da1ac2400",
+      "plays": 461203,
+      "counted": "plays"
+     },
+     {
+      "title": "Wings Of Time (From the Motion Picture Dungeons & Dragons: Honor Among Thieves)",
+      "mbid": null,
+      "plays": 372522,
+      "counted": "plays"
+     },
+     {
+      "title": "InnerSpeaker (10 Year Anniversary Edition)",
+      "mbid": null,
+      "plays": 941223,
+      "counted": "plays"
+     },
+     {
+      "title": "'Cause I'm A Man",
+      "mbid": "a3d500b7-8dd2-4a66-9e9c-046ad4ce1811",
+      "plays": 318361,
+      "counted": "plays"
+     },
+     {
+      "title": "Is It True (Four Tet Remix)",
+      "mbid": "b048af56-87c9-4276-983d-46bfc0b9b603",
+      "plays": 284036,
+      "counted": "plays"
+     },
+     {
+      "title": "Borderline (Blood Orange Remix)",
+      "mbid": null,
+      "plays": 324686,
+      "counted": "plays"
+     },
+     {
+      "title": "Mind Mischief",
+      "mbid": "b87e03a8-87d6-4a82-be6a-5d91319c8075",
+      "plays": 224801,
+      "counted": "plays"
+     },
+     {
+      "title": "Beverly Laurel",
+      "mbid": "798f06fa-b859-4dc5-a460-581460dc49dc",
+      "plays": 274931,
+      "counted": "plays"
+     },
+     {
+      "title": "Lonerism (10 Year Anniversary Edition / Unreleased Demos)",
+      "mbid": "9eebadf8-138f-403e-a634-b5cbfc0caf49",
+      "plays": 313912,
+      "counted": "plays"
+     },
+     {
+      "title": "Eventually",
+      "mbid": "03142ec8-e896-402f-bdbe-0e52dcc60291",
+      "plays": 237712,
+      "counted": "plays"
+     },
+     {
+      "title": "InnerSpeaker B-Sides & Remixes",
+      "mbid": "1c710bc2-7f5b-4050-b272-8c048ee6885e",
+      "plays": 295351,
+      "counted": "plays"
+     },
+     {
+      "title": "Feels Like We Only Go Backwards",
+      "mbid": "76f59e63-903b-44dc-a24e-691d6b5fb11b",
+      "plays": 138151,
+      "counted": "plays"
+     },
+     {
+      "title": "The Less I Know The Better",
+      "mbid": "5e304e61-d964-4ad2-910a-7a1667b183b9",
+      "plays": 67790,
+      "counted": "plays"
+     },
+     {
+      "title": "Apocalypse Dreams",
+      "mbid": "091283df-f059-47c8-bb28-7607f276ca50",
+      "plays": 144975,
+      "counted": "plays"
+     },
+     {
+      "title": "Dracula (JENNIE Remix - Boys Noize Disko Version)",
+      "mbid": "868c255c-368b-4bc7-a544-a852154f8f44",
+      "plays": 63340,
+      "counted": "plays"
+     },
+     {
+      "title": "Disciples",
+      "mbid": "6af03453-ac2f-464a-8735-9ed3fb184d5c",
+      "plays": 138764,
+      "counted": "plays"
+     },
+     {
+      "title": "My Old Ways",
+      "mbid": null,
+      "plays": 59416,
+      "counted": "plays"
+     },
+     {
+      "title": "Nova Tunes 2.7",
+      "mbid": null,
+      "plays": 79603,
+      "counted": "plays"
+     },
+     {
+      "title": "Tame Impala - EP",
+      "mbid": null,
+      "plays": 661512,
+      "counted": "plays"
+     },
+     {
+      "title": "'Cause I'm A Man (HAIM Remix)",
+      "mbid": null,
+      "plays": 79892,
+      "counted": "plays"
+     },
+     {
+      "title": "Let It Happen (Soulwax Remix)",
+      "mbid": "9bd51784-1163-425a-94af-da3f010796ba",
+      "plays": 90984,
+      "counted": "plays"
+     },
+     {
+      "title": "Solitude Is Bliss",
+      "mbid": "74b8476b-4353-4202-a49d-dad6737f2616",
+      "plays": 84582,
+      "counted": "plays"
+     },
+     {
+      "title": "Tame Impala EP",
+      "mbid": null,
+      "plays": 195222,
+      "counted": "plays"
+     }
     ]
    }
   },
   {
-   "name": "Dance Gavin Dance, by MusicBrainz id: ten top songs, nothing to fold",
+   "name": "Dance Gavin Dance, by MusicBrainz id: ten top songs, nothing to fold; similar artists and albums",
    "path": "/deadwax/lastfm/artist",
    "query": {
     "mbid": "16456fed-c9f2-4adf-b6ea-97b648c474d2",
@@ -154,6 +638,490 @@
       "playcount": 1004431,
       "listeners": 111833,
       "url": "https://www.last.fm/music/Dance+Gavin+Dance/_/Open+Your+Eyes+and+Look+North"
+     }
+    ],
+    "similar": [
+     {
+      "name": "Royal Coda",
+      "mbid": "24d48e0a-d9f5-4296-83fd-63973b07e837",
+      "match": 1.0,
+      "url": "https://www.last.fm/music/Royal+Coda"
+     },
+     {
+      "name": "Eidola",
+      "mbid": "d9745270-de5c-41f5-9873-a9614fa97541",
+      "match": 0.916765,
+      "url": "https://www.last.fm/music/Eidola"
+     },
+     {
+      "name": "Secret Band",
+      "mbid": "f638337c-61ea-405d-97e6-50f58b4b6426",
+      "match": 0.912888,
+      "url": "https://www.last.fm/music/Secret+Band"
+     },
+     {
+      "name": "Wolf & Bear",
+      "mbid": "fbc5d05d-b4fd-4a27-9fac-dad83ad03ad7",
+      "match": 0.893214,
+      "url": "https://www.last.fm/music/Wolf+&+Bear"
+     },
+     {
+      "name": "Emarosa",
+      "mbid": "4b4b24bb-a553-4726-8c4d-a571a881fe59",
+      "match": 0.717521,
+      "url": "https://www.last.fm/music/Emarosa"
+     },
+     {
+      "name": "A Lot Like Birds",
+      "mbid": "61c01df3-ca06-4a09-8f74-66000831f27d",
+      "match": 0.654214,
+      "url": "https://www.last.fm/music/A+Lot+Like+Birds"
+     },
+     {
+      "name": "Sianvar",
+      "mbid": "5d1a111d-7fc3-41d5-b996-c2ca08ed76fd",
+      "match": 0.644011,
+      "url": "https://www.last.fm/music/Sianvar"
+     },
+     {
+      "name": "Dwellings",
+      "mbid": "a4f7e44d-9dbb-40d8-9c79-1c7f0f0c5e4c",
+      "match": 0.58661,
+      "url": "https://www.last.fm/music/Dwellings"
+     },
+     {
+      "name": "Hail The Sun",
+      "mbid": null,
+      "match": 0.564392,
+      "url": "https://www.last.fm/music/Hail+The+Sun"
+     },
+     {
+      "name": "Tides of Man",
+      "mbid": "b317970f-8624-4e99-b6de-7fdc72b4472f",
+      "match": 0.465372,
+      "url": "https://www.last.fm/music/Tides+of+Man"
+     },
+     {
+      "name": "Coletta",
+      "mbid": "9f1da272-8ba3-403c-b8fd-4dd1dd1ebb7e",
+      "match": 0.459911,
+      "url": "https://www.last.fm/music/Coletta"
+     },
+     {
+      "name": "Amarionette",
+      "mbid": "fe1682ed-415a-4e98-a2a0-bbad3ddd326e",
+      "match": 0.422435,
+      "url": "https://www.last.fm/music/Amarionette"
+     },
+     {
+      "name": "Chiodos",
+      "mbid": "b755836a-0cb6-4577-a678-55a5a6402d70",
+      "match": 0.409618,
+      "url": "https://www.last.fm/music/Chiodos"
+     },
+     {
+      "name": "Isles & Glaciers",
+      "mbid": "f8d7e0b0-807b-4e90-8f93-e2d1deadd727",
+      "match": 0.392469,
+      "url": "https://www.last.fm/music/Isles+&+Glaciers"
+     },
+     {
+      "name": "Circa Survive",
+      "mbid": "a2496a3c-8f42-4b98-b780-6f8d64f56441",
+      "match": 0.38048,
+      "url": "https://www.last.fm/music/Circa+Survive"
+     },
+     {
+      "name": "Stolas",
+      "mbid": "10a98551-26cf-4ce3-b9cb-7dbbca02832b",
+      "match": 0.38028,
+      "url": "https://www.last.fm/music/Stolas"
+     },
+     {
+      "name": "I the Mighty",
+      "mbid": "7ede4d81-056c-4e08-8e5f-bb7165b9c2f2",
+      "match": 0.379137,
+      "url": "https://www.last.fm/music/I+the+Mighty"
+     },
+     {
+      "name": "Lower Definition",
+      "mbid": "9ce03563-c4f4-4de9-9638-62d7aa478a44",
+      "match": 0.360417,
+      "url": "https://www.last.fm/music/Lower+Definition"
+     },
+     {
+      "name": "Ghost Runner On Third",
+      "mbid": null,
+      "match": 0.354658,
+      "url": "https://www.last.fm/music/Ghost+Runner+On+Third"
+     },
+     {
+      "name": "Adventurer",
+      "mbid": "b1404aa3-c0b2-48a2-b95f-2bc54cd6c7fc",
+      "match": 0.352446,
+      "url": "https://www.last.fm/music/Adventurer"
+     },
+     {
+      "name": "The Fall of Troy",
+      "mbid": "8d3ee4ba-be21-470c-bb7c-4c124c3eb989",
+      "match": 0.338896,
+      "url": "https://www.last.fm/music/The+Fall+of+Troy"
+     },
+     {
+      "name": "Nova Charisma",
+      "mbid": "b1fb0426-e853-4cdd-b0c3-46764a452114",
+      "match": 0.331103,
+      "url": "https://www.last.fm/music/Nova+Charisma"
+     },
+     {
+      "name": "Makari",
+      "mbid": "6778a196-70c8-45be-b7c7-00007b452514",
+      "match": 0.322288,
+      "url": "https://www.last.fm/music/Makari"
+     },
+     {
+      "name": "Properties of Nature",
+      "mbid": "14c8ded5-d5e4-4b94-bb43-f60fa58f4bcf",
+      "match": 0.295725,
+      "url": "https://www.last.fm/music/Properties+of+Nature"
+     },
+     {
+      "name": "Cat Company",
+      "mbid": "24d8530e-5267-4bed-ae80-62ba430b2e51",
+      "match": 0.295248,
+      "url": "https://www.last.fm/music/Cat+Company"
+     },
+     {
+      "name": "Galleons",
+      "mbid": "6d66fda8-1dbf-46e8-be6f-0d7dca28cfa6",
+      "match": 0.293165,
+      "url": "https://www.last.fm/music/Galleons"
+     },
+     {
+      "name": "Issues",
+      "mbid": "f5df362b-1536-4285-a723-9217626aec3c",
+      "match": 0.292898,
+      "url": "https://www.last.fm/music/Issues"
+     },
+     {
+      "name": "Sleeping With Sirens",
+      "mbid": "3267d5a3-c72c-4c3b-bafe-ec8a569c0b74",
+      "match": 0.271893,
+      "url": "https://www.last.fm/music/Sleeping+With+Sirens"
+     },
+     {
+      "name": "Saosin",
+      "mbid": "47b8b42a-96e8-46fa-9ea6-70c5136ae971",
+      "match": 0.260214,
+      "url": "https://www.last.fm/music/Saosin"
+     },
+     {
+      "name": "Resilia",
+      "mbid": "a1a42eb4-429d-4250-b151-9db4866db392",
+      "match": 0.257804,
+      "url": "https://www.last.fm/music/Resilia"
+     }
+    ],
+    "top_albums": [
+     {
+      "title": "Downtown Battle Mountain",
+      "mbid": "289cb807-614a-4bb8-809a-256ef3363f3d",
+      "plays": 13211300,
+      "counted": "plays"
+     },
+     {
+      "title": "Instant Gratification",
+      "mbid": "60e06a18-d1ad-447e-a49e-d6db443fd6f1",
+      "plays": 11393457,
+      "counted": "plays"
+     },
+     {
+      "title": "Dance Gavin Dance",
+      "mbid": "780f5485-2aba-428b-b093-fc7d3abcf53d",
+      "plays": 10451913,
+      "counted": "plays"
+     },
+     {
+      "title": "Downtown Battle Mountain II",
+      "mbid": "300deba2-f296-4192-bca6-0c6868b0144a",
+      "plays": 7845171,
+      "counted": "plays"
+     },
+     {
+      "title": "Mothership",
+      "mbid": "25eb276a-5c3f-4503-ac40-94a8c62e85a3",
+      "plays": 9297963,
+      "counted": "plays"
+     },
+     {
+      "title": "Happiness",
+      "mbid": "41c5ada9-1bc8-3948-8b78-8e356b5ece95",
+      "plays": 6949862,
+      "counted": "plays"
+     },
+     {
+      "title": "Whatever I Say Is Royal Ocean",
+      "mbid": "0fd970db-1e9a-45d1-930a-1528da87c92c",
+      "plays": 3494526,
+      "counted": "plays"
+     },
+     {
+      "title": "Artificial Selection",
+      "mbid": "7bb339a4-4e8e-449f-9891-e2cbe742e4f5",
+      "plays": 6613888,
+      "counted": "plays"
+     },
+     {
+      "title": "Afterburner",
+      "mbid": "b3ac390d-284e-4193-92ac-9920d5529b55",
+      "plays": 5419705,
+      "counted": "plays"
+     },
+     {
+      "title": "Jackpot Juicer",
+      "mbid": "47236cde-d72d-43f1-834c-8ec61faec8fc",
+      "plays": 6240836,
+      "counted": "plays"
+     },
+     {
+      "title": "People You Knew / Perfect",
+      "mbid": "fdc8529e-1fc0-4657-b557-28815e84508a",
+      "plays": 764259,
+      "counted": "plays"
+     },
+     {
+      "title": "Head Hunter",
+      "mbid": "316a8914-b263-4e1c-84f3-04590675d21f",
+      "plays": 745166,
+      "counted": "plays"
+     },
+     {
+      "title": "Acceptance Speech",
+      "mbid": "9313cbf6-aeb7-4157-955c-64acbf610bfa",
+      "plays": 2874567,
+      "counted": "plays"
+     },
+     {
+      "title": "Summertime Gladness",
+      "mbid": "70040c01-02e8-49bf-bdbc-4a7ee779daa1",
+      "plays": 612548,
+      "counted": "plays"
+     },
+     {
+      "title": "Pantheon",
+      "mbid": "479465a3-775b-431f-b6eb-c85ffb7c76c9",
+      "plays": 1912828,
+      "counted": "plays"
+     },
+     {
+      "title": "Acceptance Speech 2.0",
+      "mbid": null,
+      "plays": 1855226,
+      "counted": "plays"
+     },
+     {
+      "title": "The Ghost of Billy Royalton",
+      "mbid": "17aaeedb-f819-4ab6-8ed8-0d07408a6a82",
+      "plays": 478668,
+      "counted": "plays"
+     },
+     {
+      "title": "Semi-Charmed Life",
+      "mbid": null,
+      "plays": 222896,
+      "counted": "plays"
+     },
+     {
+      "title": "Blood Wolf",
+      "mbid": "fb9b4713-5712-4903-ba5b-5a95047f71a2",
+      "plays": 306758,
+      "counted": "plays"
+     },
+     {
+      "title": "Speed Demon",
+      "mbid": "ab863877-e88c-4c04-acba-029ba9d3c5b2",
+      "plays": 272726,
+      "counted": "plays"
+     },
+     {
+      "title": "Tree City Sessions 2",
+      "mbid": "13d38774-2a8c-48bb-85e2-6ea1029eae7c",
+      "plays": 903536,
+      "counted": "plays"
+     },
+     {
+      "title": "Midnight at McGuffy's",
+      "mbid": "e1cb26f4-975c-41db-80d3-368a55d97a8e",
+      "plays": 213674,
+      "counted": "plays"
+     },
+     {
+      "title": "War Machine",
+      "mbid": null,
+      "plays": 297681,
+      "counted": "plays"
+     },
+     {
+      "title": "Synergy (feat. Rob Damiani)",
+      "mbid": null,
+      "plays": 343205,
+      "counted": "plays"
+     },
+     {
+      "title": "All the Way Down",
+      "mbid": "79b9b857-3f97-4b04-b9cd-5973d956fdb5",
+      "plays": 231502,
+      "counted": "plays"
+     },
+     {
+      "title": "Tree City Sessions",
+      "mbid": "1c81207b-9c6f-40c3-86b6-0592c71b10c2",
+      "plays": 816890,
+      "counted": "plays"
+     },
+     {
+      "title": "Straight From The Heart",
+      "mbid": "710ec043-c22a-4b45-82b1-95da1378b8cd",
+      "plays": 219231,
+      "counted": "plays"
+     },
+     {
+      "title": "Pop Off!",
+      "mbid": "c106ac2d-9080-4681-a8c4-7bfd627d0d9c",
+      "plays": 233952,
+      "counted": "plays"
+     },
+     {
+      "title": "Tree City Sessions 3",
+      "mbid": null,
+      "plays": 318430,
+      "counted": "plays"
+     },
+     {
+      "title": "Prisoner",
+      "mbid": null,
+      "plays": 146347,
+      "counted": "plays"
+     },
+     {
+      "title": "Strawberry's Wake",
+      "mbid": null,
+      "plays": 131515,
+      "counted": "plays"
+     },
+     {
+      "title": "Trap Door",
+      "mbid": "adb2e9a1-a255-4aee-b1da-cc293789721c",
+      "plays": 108315,
+      "counted": "plays"
+     },
+     {
+      "title": "Need Money (Tree City Sessions)",
+      "mbid": "494c5419-95b1-4c41-8360-d9361d8e0116",
+      "plays": 48919,
+      "counted": "plays"
+     },
+     {
+      "title": "Die Another Day",
+      "mbid": "b4c0f67c-167e-48d6-81bb-76b2b341a655",
+      "plays": 165060,
+      "counted": "plays"
+     },
+     {
+      "title": "Artificial Selection (Instrumental)",
+      "mbid": null,
+      "plays": 202671,
+      "counted": "plays"
+     },
+     {
+      "title": "Pussy Vultures",
+      "mbid": "677151bb-e8fd-4fb2-ad0e-2cec81df50f4",
+      "plays": 110347,
+      "counted": "plays"
+     },
+     {
+      "title": "Jackpot Juicer (Instrumental)",
+      "mbid": "dca69e7c-5d81-4534-992b-429b4c6eab65",
+      "plays": 176123,
+      "counted": "plays"
+     },
+     {
+      "title": "Lyrics lie",
+      "mbid": null,
+      "plays": 105816,
+      "counted": "plays"
+     },
+     {
+      "title": "Space Cow Initiation Ritual (feat. George Clinton)",
+      "mbid": null,
+      "plays": 93758,
+      "counted": "plays"
+     },
+     {
+      "title": "Mothership (Instrumental)",
+      "mbid": "0ef3abdf-1e6e-4336-a6b1-002bfc7d5ac6",
+      "plays": 161616,
+      "counted": "plays"
+     },
+     {
+      "title": "The Robot With Human Hair Pt. 3 (Tree City Sessions)",
+      "mbid": "8f34ab6f-dab0-4f04-8326-6702a75c9373",
+      "plays": 34463,
+      "counted": "plays"
+     },
+     {
+      "title": "Cream Of The Crop",
+      "mbid": "9017534c-8001-4de3-9971-4a97b5cdf69e",
+      "plays": 116608,
+      "counted": "plays"
+     },
+     {
+      "title": "Midnight Crusade",
+      "mbid": null,
+      "plays": 78519,
+      "counted": "plays"
+     },
+     {
+      "title": "Downtown Battle Mountain (Instrumental)",
+      "mbid": null,
+      "plays": 93275,
+      "counted": "plays"
+     },
+     {
+      "title": "Three Wishes",
+      "mbid": null,
+      "plays": 81391,
+      "counted": "plays"
+     },
+     {
+      "title": "Instant Gratification (Instrumental)",
+      "mbid": "c6d90fc1-d720-4de9-a093-e8ce05e5f031",
+      "plays": 108921,
+      "counted": "plays"
+     },
+     {
+      "title": "Tree City Sessions (Live)",
+      "mbid": null,
+      "plays": 152807,
+      "counted": "plays"
+     },
+     {
+      "title": "Son of Robot",
+      "mbid": null,
+      "plays": 61419,
+      "counted": "plays"
+     },
+     {
+      "title": "Punk Goes Pop, Vol. 7",
+      "mbid": null,
+      "plays": 37275,
+      "counted": "plays"
+     },
+     {
+      "title": "Demo",
+      "mbid": null,
+      "plays": 71274,
+      "counted": "plays"
      }
     ]
    }
@@ -233,6 +1201,490 @@
       "listeners": 775571,
       "url": "https://www.last.fm/music/Portishead/_/All+Mine"
      }
+    ],
+    "similar": [
+     {
+      "name": "The Funky Lowlives",
+      "mbid": "7f67cd3c-4fcf-440e-b46d-7960e208ef8b",
+      "match": 1.0,
+      "url": "https://www.last.fm/music/The+Funky+Lowlives"
+     },
+     {
+      "name": "Pati Yang",
+      "mbid": "5a94b7a6-b12f-422f-9817-8c13e87f6369",
+      "match": 0.969213,
+      "url": "https://www.last.fm/music/Pati+Yang"
+     },
+     {
+      "name": "Hird",
+      "mbid": "e80dd805-4d5f-496c-aabe-68dd77d21eb3",
+      "match": 0.967942,
+      "url": "https://www.last.fm/music/Hird"
+     },
+     {
+      "name": "Soma Sonic",
+      "mbid": "0564a595-c2e5-4b74-be62-54d610261786",
+      "match": 0.931464,
+      "url": "https://www.last.fm/music/Soma+Sonic"
+     },
+     {
+      "name": "Marsmobil",
+      "mbid": "3c174d9d-139b-4fa7-8f0b-ae8eceb4271c",
+      "match": 0.922961,
+      "url": "https://www.last.fm/music/Marsmobil"
+     },
+     {
+      "name": "Ursula 1000",
+      "mbid": "75f9a2a2-b76d-490d-8dd2-ab5c172bcd78",
+      "match": 0.921493,
+      "url": "https://www.last.fm/music/Ursula+1000"
+     },
+     {
+      "name": "The Karminsky Experience Inc.",
+      "mbid": "2f8f2764-a2b4-46b2-86e6-912e78a64e37",
+      "match": 0.896332,
+      "url": "https://www.last.fm/music/The+Karminsky+Experience+Inc."
+     },
+     {
+      "name": "Les Gammas",
+      "mbid": "a484da54-e795-4708-a289-f425710d8e53",
+      "match": 0.873869,
+      "url": "https://www.last.fm/music/Les+Gammas"
+     },
+     {
+      "name": "Micatone",
+      "mbid": "ca30be07-e94e-4bd8-a022-1dfbc462905b",
+      "match": 0.872562,
+      "url": "https://www.last.fm/music/Micatone"
+     },
+     {
+      "name": "The Mighty Bop",
+      "mbid": "c381d0eb-d04b-4a17-aacd-a48d64bdee9c",
+      "match": 0.866565,
+      "url": "https://www.last.fm/music/The+Mighty+Bop"
+     },
+     {
+      "name": "Berry Weight",
+      "mbid": "3244d18e-58a2-4233-9a60-c74f20281257",
+      "match": 0.862509,
+      "url": "https://www.last.fm/music/Berry+Weight"
+     },
+     {
+      "name": "Smith & Mighty",
+      "mbid": "47cfcf6b-44d5-4a8d-ad12-47722c88468c",
+      "match": 0.837079,
+      "url": "https://www.last.fm/music/Smith+&+Mighty"
+     },
+     {
+      "name": "A Forest Mighty Black",
+      "mbid": "a7be73b7-7a28-4098-af48-c57d387effcd",
+      "match": 0.828469,
+      "url": "https://www.last.fm/music/A+Forest+Mighty+Black"
+     },
+     {
+      "name": "Beanfield",
+      "mbid": "ad0811ea-e213-451d-b22f-fa1a7f9e0226",
+      "match": 0.826715,
+      "url": "https://www.last.fm/music/Beanfield"
+     },
+     {
+      "name": "Slow Train Soul",
+      "mbid": "52546f37-8b28-4cc8-93e8-c3005a2483d6",
+      "match": 0.818996,
+      "url": "https://www.last.fm/music/Slow+Train+Soul"
+     },
+     {
+      "name": "Sofa Surfers",
+      "mbid": "fc01cdec-f2e3-4d43-a1f7-7945ca43618c",
+      "match": 0.790731,
+      "url": "https://www.last.fm/music/Sofa+Surfers"
+     },
+     {
+      "name": "Bitter:Sweet",
+      "mbid": "dcebc476-b53c-42ee-9251-f946a4c3cea2",
+      "match": 0.774667,
+      "url": "https://www.last.fm/music/Bitter:Sweet"
+     },
+     {
+      "name": "Supreme Beings of Leisure",
+      "mbid": "1b483425-4f02-4599-a31c-9b5c132e0a7a",
+      "match": 0.746927,
+      "url": "https://www.last.fm/music/Supreme+Beings+of+Leisure"
+     },
+     {
+      "name": "Tricky",
+      "mbid": "5bf64d94-efd9-4334-96fd-e6197b0b02b8",
+      "match": 0.733797,
+      "url": "https://www.last.fm/music/Tricky"
+     },
+     {
+      "name": "Peace Orchestra",
+      "mbid": "334cd452-8833-4da4-8f14-90136cb0492f",
+      "match": 0.724645,
+      "url": "https://www.last.fm/music/Peace+Orchestra"
+     },
+     {
+      "name": "Martina Topley-Bird",
+      "mbid": null,
+      "match": 0.703443,
+      "url": "https://www.last.fm/music/Martina+Topley-Bird"
+     },
+     {
+      "name": "Massive Attack",
+      "mbid": "10adbe5e-a2c0-4bf3-8249-2b4cbf6e6ca8",
+      "match": 0.699865,
+      "url": "https://www.last.fm/music/Massive+Attack"
+     },
+     {
+      "name": "Waldeck",
+      "mbid": "8f389bf5-a950-4a2f-a962-daf08151ee33",
+      "match": 0.669578,
+      "url": "https://www.last.fm/music/Waldeck"
+     },
+     {
+      "name": "DJ Vadim",
+      "mbid": "66fce392-d89d-4eaa-a346-c50aa1021f00",
+      "match": 0.635692,
+      "url": "https://www.last.fm/music/DJ+Vadim"
+     },
+     {
+      "name": "Dzihan & Kamien",
+      "mbid": null,
+      "match": 0.598509,
+      "url": "https://www.last.fm/music/Dzihan+&+Kamien"
+     },
+     {
+      "name": "Kid Loco",
+      "mbid": "8027281d-79e4-4ddc-a8a7-6e6bf9254ad3",
+      "match": 0.582912,
+      "url": "https://www.last.fm/music/Kid+Loco"
+     },
+     {
+      "name": "Wax Tailor",
+      "mbid": "c24b47a1-2f52-44f3-a3c6-374dca844731",
+      "match": 0.577189,
+      "url": "https://www.last.fm/music/Wax+Tailor"
+     },
+     {
+      "name": "Koop",
+      "mbid": "f969f986-97df-4fa0-8cef-ffccd098ff50",
+      "match": 0.57214,
+      "url": "https://www.last.fm/music/Koop"
+     },
+     {
+      "name": "The Dining Rooms",
+      "mbid": "76fe6c77-7d7e-419b-96d1-b33d5721f6ce",
+      "match": 0.551782,
+      "url": "https://www.last.fm/music/The+Dining+Rooms"
+     },
+     {
+      "name": "Soulstice",
+      "mbid": "86b66dda-1c6f-419d-8a73-b5b216766151",
+      "match": 0.550441,
+      "url": "https://www.last.fm/music/Soulstice"
+     }
+    ],
+    "top_albums": [
+     {
+      "title": "Dummy",
+      "mbid": "00163fb1-5ab7-4fec-b0dd-a915e2722340",
+      "plays": 64559236,
+      "counted": "plays"
+     },
+     {
+      "title": "Third",
+      "mbid": "064fa38d-810d-4a8a-a6a4-55d6fd1da34b",
+      "plays": 26492622,
+      "counted": "plays"
+     },
+     {
+      "title": "Portishead",
+      "mbid": "10ac58ca-0655-4b16-a6cb-58fdc309de0a",
+      "plays": 21622377,
+      "counted": "plays"
+     },
+     {
+      "title": "Roseland NYC Live",
+      "mbid": "213910e7-279a-3186-81ae-cf330ded96fb",
+      "plays": 6751781,
+      "counted": "plays"
+     },
+     {
+      "title": "Dummy (Non UK Version)",
+      "mbid": null,
+      "plays": 2519948,
+      "counted": "plays"
+     },
+     {
+      "title": "Trip-Hop Reconstruction",
+      "mbid": "b2b8b88f-eb4c-454a-8a02-fae241b89b26",
+      "plays": 958484,
+      "counted": "plays"
+     },
+     {
+      "title": "Glory Box",
+      "mbid": "079dac62-ae9a-410a-b8f9-fc76c14ae0b2",
+      "plays": 518232,
+      "counted": "plays"
+     },
+     {
+      "title": "Numb",
+      "mbid": "172ddda3-1837-4fd2-8d12-ddd1e70b4c57",
+      "plays": 442178,
+      "counted": "plays"
+     },
+     {
+      "title": "Chase the Tear",
+      "mbid": "2fd31328-5600-4fdf-8c73-236ad3499631",
+      "plays": 409978,
+      "counted": "plays"
+     },
+     {
+      "title": "Sour Times",
+      "mbid": null,
+      "plays": 276355,
+      "counted": "plays"
+     },
+     {
+      "title": "triphop reconstruction",
+      "mbid": null,
+      "plays": 92924,
+      "counted": "plays"
+     },
+     {
+      "title": "Mysterious Heads",
+      "mbid": null,
+      "plays": 85757,
+      "counted": "plays"
+     },
+     {
+      "title": "Roseland NYC Live 25 (Remastered 2023)",
+      "mbid": null,
+      "plays": 597627,
+      "counted": "plays"
+     },
+     {
+      "title": "Melody Nelson",
+      "mbid": "8b7b632d-710d-4bb0-b484-33132c964690",
+      "plays": 1153149,
+      "counted": "plays"
+     },
+     {
+      "title": "Glory Times",
+      "mbid": "05159c59-8489-48f8-99c5-73dec763bbbb",
+      "plays": 673599,
+      "counted": "plays"
+     },
+     {
+      "title": "Third (Advance)",
+      "mbid": null,
+      "plays": 1011258,
+      "counted": "plays"
+     },
+     {
+      "title": "Roseland NYC [Live]",
+      "mbid": null,
+      "plays": 653148,
+      "counted": "plays"
+     },
+     {
+      "title": "Only You",
+      "mbid": "93437d42-18a3-458c-972a-c7bc871cf1dc",
+      "plays": 77712,
+      "counted": "plays"
+     },
+     {
+      "title": "Pearl",
+      "mbid": null,
+      "plays": 297673,
+      "counted": "plays"
+     },
+     {
+      "title": "Magic Doors",
+      "mbid": null,
+      "plays": 37515,
+      "counted": "plays"
+     },
+     {
+      "title": "Machine Gun",
+      "mbid": "b71926ec-5813-4fa4-9372-0c07154a07af",
+      "plays": 37529,
+      "counted": "plays"
+     },
+     {
+      "title": "PNYC",
+      "mbid": "3f2a254a-7260-431f-b412-e9195ce81e89",
+      "plays": 295749,
+      "counted": "plays"
+     },
+     {
+      "title": "Third (Non EU Version)",
+      "mbid": null,
+      "plays": 112640,
+      "counted": "plays"
+     },
+     {
+      "title": "Third (Digital Bonus Track Edition)",
+      "mbid": null,
+      "plays": 124586,
+      "counted": "plays"
+     },
+     {
+      "title": "Monsieur Gainsbourg Revisited",
+      "mbid": null,
+      "plays": 41667,
+      "counted": "plays"
+     },
+     {
+      "title": "Glory Times (disc 1: Sour)",
+      "mbid": null,
+      "plays": 18268,
+      "counted": "plays"
+     },
+     {
+      "title": "1998-08-21: Symphony, Bizarre Festival, Cologne, Germany",
+      "mbid": null,
+      "plays": 18210,
+      "counted": "plays"
+     },
+     {
+      "title": "Toy Box (Special Edition)",
+      "mbid": null,
+      "plays": 207521,
+      "counted": "plays"
+     },
+     {
+      "title": "The Rip",
+      "mbid": "0c572f13-75c9-4a33-b52e-e5180e0de157",
+      "plays": 24967,
+      "counted": "plays"
+     },
+     {
+      "title": "All Mine",
+      "mbid": "50f46351-2efa-4633-8fda-af8440f12b9b",
+      "plays": 31710,
+      "counted": "plays"
+     },
+     {
+      "title": "Roseland NYC Live 25",
+      "mbid": "ee9cbd4e-9624-4c2a-ab9a-015e119ba5ff",
+      "plays": 80617,
+      "counted": "plays"
+     },
+     {
+      "title": "Sour Times (Nobody Loves Me)",
+      "mbid": "e962354a-28f2-44b1-9a26-c8092de4d4f3",
+      "plays": 33302,
+      "counted": "plays"
+     },
+     {
+      "title": "Non-Album Tracks",
+      "mbid": null,
+      "plays": 22068,
+      "counted": "plays"
+     },
+     {
+      "title": "Toy Box",
+      "mbid": "cdeb7584-89ff-4f71-838d-74123dbf87ae",
+      "plays": 80664,
+      "counted": "plays"
+     },
+     {
+      "title": "Glory Box Remix",
+      "mbid": null,
+      "plays": 23536,
+      "counted": "plays"
+     },
+     {
+      "title": "B-Sides",
+      "mbid": "2900f421-6ce9-4137-ac11-64b252d939f9",
+      "plays": 56450,
+      "counted": "plays"
+     },
+     {
+      "title": "Over",
+      "mbid": "fc4a931d-f2ee-4c4f-9e49-c56a675986d5",
+      "plays": 28577,
+      "counted": "plays"
+     },
+     {
+      "title": "We Carry On",
+      "mbid": null,
+      "plays": 11542,
+      "counted": "plays"
+     },
+     {
+      "title": "Mysteries",
+      "mbid": "c90f7507-45be-4622-840e-f6aeaf1cbe16",
+      "plays": 50851,
+      "counted": "plays"
+     },
+     {
+      "title": "Wandering Star",
+      "mbid": null,
+      "plays": 11010,
+      "counted": "plays"
+     },
+     {
+      "title": "Glory Times (disc 2: Glory)",
+      "mbid": null,
+      "plays": 10472,
+      "counted": "plays"
+     },
+     {
+      "title": "Palermo Shooting",
+      "mbid": null,
+      "plays": 12108,
+      "counted": "plays"
+     },
+     {
+      "title": "Only the Lonely",
+      "mbid": "1b4bfaff-ab5d-4f42-8e9c-c559cb206d43",
+      "plays": 21198,
+      "counted": "plays"
+     },
+     {
+      "title": "Help",
+      "mbid": null,
+      "plays": 7772,
+      "counted": "plays"
+     },
+     {
+      "title": "Roseland, NYC Live",
+      "mbid": null,
+      "plays": 103274,
+      "counted": "plays"
+     },
+     {
+      "title": "Sour Times (Single)",
+      "mbid": null,
+      "plays": 27107,
+      "counted": "plays"
+     },
+     {
+      "title": "Pitchfork Presents: The 100 Best Tracks of 2008",
+      "mbid": null,
+      "plays": 18109,
+      "counted": "plays"
+     },
+     {
+      "title": "Roads",
+      "mbid": null,
+      "plays": 10482,
+      "counted": "plays"
+     },
+     {
+      "title": "Third (Bonus Track Version)",
+      "mbid": null,
+      "plays": 133892,
+      "counted": "plays"
+     },
+     {
+      "title": "The Rebirth Of Cool, Vol. 3",
+      "mbid": null,
+      "plays": 16821,
+      "counted": "plays"
+     }
     ]
    }
   },
@@ -311,6 +1763,490 @@
       "listeners": 1328255,
       "url": "https://www.last.fm/music/Tame+Impala/_/Dracula"
      }
+    ],
+    "similar": [
+     {
+      "name": "Pond",
+      "mbid": "69ac44f7-c80d-47b4-9bc8-fcc758d209e6",
+      "match": 1.0,
+      "url": "https://www.last.fm/music/Pond"
+     },
+     {
+      "name": "Melody's Echo Chamber",
+      "mbid": null,
+      "match": 0.706669,
+      "url": "https://www.last.fm/music/Melody%27s+Echo+Chamber"
+     },
+     {
+      "name": "GUM",
+      "mbid": "bca076a4-0ff5-43ae-b4c1-27ece7a0ca1c",
+      "match": 0.655327,
+      "url": "https://www.last.fm/music/GUM"
+     },
+     {
+      "name": "Temples",
+      "mbid": "3514578c-402a-4825-bd97-a525f31004e6",
+      "match": 0.581892,
+      "url": "https://www.last.fm/music/Temples"
+     },
+     {
+      "name": "The Holydrug Couple",
+      "mbid": "ab722b70-b4a8-4918-b13d-2a449f23df16",
+      "match": 0.456447,
+      "url": "https://www.last.fm/music/The+Holydrug+Couple"
+     },
+     {
+      "name": "Moses Gunn Collective",
+      "mbid": "324405e8-c264-4077-b3cc-26a5fa1ed713",
+      "match": 0.417631,
+      "url": "https://www.last.fm/music/Moses+Gunn+Collective"
+     },
+     {
+      "name": "Post Animal",
+      "mbid": "40c857d5-6ab0-41f4-aa1d-7614a79a0686",
+      "match": 0.355639,
+      "url": "https://www.last.fm/music/Post+Animal"
+     },
+     {
+      "name": "MGMT",
+      "mbid": "c485632c-b784-4ee9-8ea1-c5fb365681fc",
+      "match": 0.355572,
+      "url": "https://www.last.fm/music/MGMT"
+     },
+     {
+      "name": "Unknown Mortal Orchestra",
+      "mbid": "e2305342-0bde-4a2c-aed0-4b88694834de",
+      "match": 0.341121,
+      "url": "https://www.last.fm/music/Unknown+Mortal+Orchestra"
+     },
+     {
+      "name": "Djo",
+      "mbid": "83cedfd0-a118-48eb-ad71-72f4c2f95fd2",
+      "match": 0.309012,
+      "url": "https://www.last.fm/music/Djo"
+     },
+     {
+      "name": "The Strokes",
+      "mbid": "f181961b-20f7-459e-89de-920ef03c7ed0",
+      "match": 0.305594,
+      "url": "https://www.last.fm/music/The+Strokes"
+     },
+     {
+      "name": "Inner Wave",
+      "mbid": "593f5d0a-ea85-4e07-a8cc-d3a031925638",
+      "match": 0.290958,
+      "url": "https://www.last.fm/music/Inner+Wave"
+     },
+     {
+      "name": "The Voidz",
+      "mbid": "6a93cb2b-d33a-42fc-a41a-542e3a887ba6",
+      "match": 0.290752,
+      "url": "https://www.last.fm/music/The+Voidz"
+     },
+     {
+      "name": "Psychedelic Porn Crumpets",
+      "mbid": "11d94660-1963-4020-8762-4c5907e2ea48",
+      "match": 0.28923,
+      "url": "https://www.last.fm/music/Psychedelic+Porn+Crumpets"
+     },
+     {
+      "name": "Mild High Club",
+      "mbid": "5e9adbe9-5721-4d66-88e4-0e3ff7129f1c",
+      "match": 0.285922,
+      "url": "https://www.last.fm/music/Mild+High+Club"
+     },
+     {
+      "name": "Meltt",
+      "mbid": "780873bc-db63-4803-9fde-a824b5049625",
+      "match": 0.284644,
+      "url": "https://www.last.fm/music/Meltt"
+     },
+     {
+      "name": "King Gizzard & The Lizard Wizard",
+      "mbid": null,
+      "match": 0.281421,
+      "url": "https://www.last.fm/music/King+Gizzard+&+The+Lizard+Wizard"
+     },
+     {
+      "name": "Arctic Monkeys",
+      "mbid": "ada7a83c-e3e1-40f1-93f9-3e73dbc9298a",
+      "match": 0.247916,
+      "url": "https://www.last.fm/music/Arctic+Monkeys"
+     },
+     {
+      "name": "Crumb",
+      "mbid": "b1619173-e106-4515-8e1d-9d2022365459",
+      "match": 0.24018,
+      "url": "https://www.last.fm/music/Crumb"
+     },
+     {
+      "name": "The Lazy Eyes",
+      "mbid": "48b0b244-a822-4f79-9bde-14a88217fe57",
+      "match": 0.235051,
+      "url": "https://www.last.fm/music/The+Lazy+Eyes"
+     },
+     {
+      "name": "Babe Rainbow",
+      "mbid": "41f85de6-c550-4b35-875a-a0049e577e58",
+      "match": 0.221978,
+      "url": "https://www.last.fm/music/Babe+Rainbow"
+     },
+     {
+      "name": "Cage the Elephant",
+      "mbid": "b41b38d4-ef3e-4f37-8c75-cfe9af999696",
+      "match": 0.220354,
+      "url": "https://www.last.fm/music/Cage+the+Elephant"
+     },
+     {
+      "name": "Foxygen",
+      "mbid": "913e6848-6865-4717-ac5e-3bd9c22826be",
+      "match": 0.207826,
+      "url": "https://www.last.fm/music/Foxygen"
+     },
+     {
+      "name": "Empire of the Sun",
+      "mbid": "ac7e838c-3d95-47c2-92a9-81767ad7c217",
+      "match": 0.206142,
+      "url": "https://www.last.fm/music/Empire+of+the+Sun"
+     },
+     {
+      "name": "Dungen",
+      "mbid": "25c76eb2-a92d-4624-9e30-093fc16ed5eb",
+      "match": 0.196425,
+      "url": "https://www.last.fm/music/Dungen"
+     },
+     {
+      "name": "Levitation Room",
+      "mbid": "2cac95ca-5b4d-4864-89a4-fba2e673a843",
+      "match": 0.190861,
+      "url": "https://www.last.fm/music/Levitation+Room"
+     },
+     {
+      "name": "Sunbeam Sound Machine",
+      "mbid": "e109031f-998a-4340-a80d-016b1dc86675",
+      "match": 0.18906,
+      "url": "https://www.last.fm/music/Sunbeam+Sound+Machine"
+     },
+     {
+      "name": "Drugdealer",
+      "mbid": "d3b69dfc-4b20-440c-bd23-6f939d076082",
+      "match": 0.176901,
+      "url": "https://www.last.fm/music/Drugdealer"
+     },
+     {
+      "name": "Spiral Drive",
+      "mbid": "f932104f-c397-4afe-a4c8-2739d0f51dd7",
+      "match": 0.169101,
+      "url": "https://www.last.fm/music/Spiral+Drive"
+     },
+     {
+      "name": "Pink Floyd",
+      "mbid": "83d91898-7763-47d7-b03b-b92132375c47",
+      "match": 0.163433,
+      "url": "https://www.last.fm/music/Pink+Floyd"
+     }
+    ],
+    "top_albums": [
+     {
+      "title": "Currents",
+      "mbid": "031ecbde-35e1-4d3a-917f-f89f31aca1c9",
+      "plays": 197990342,
+      "counted": "plays"
+     },
+     {
+      "title": "The Slow Rush",
+      "mbid": "3a12923d-97cd-4e87-8cfd-fb67be970974",
+      "plays": 75865879,
+      "counted": "plays"
+     },
+     {
+      "title": "Lonerism",
+      "mbid": "0d2cb66c-3a32-4f81-b977-9231c461c34a",
+      "plays": 65345426,
+      "counted": "plays"
+     },
+     {
+      "title": "Deadbeat",
+      "mbid": "51f8289e-7379-4c7b-ab50-564e2f875594",
+      "plays": 23596438,
+      "counted": "plays"
+     },
+     {
+      "title": "Innerspeaker",
+      "mbid": "0b18bdeb-8382-4b8f-94a3-b43e3e7ec6a4",
+      "plays": 29854021,
+      "counted": "plays"
+     },
+     {
+      "title": "Dracula (Remix)",
+      "mbid": "132919b9-60a8-4835-884f-3a943ba587bf",
+      "plays": 7905191,
+      "counted": "plays"
+     },
+     {
+      "title": "Dracula",
+      "mbid": "338c7885-011c-4a4a-b5d1-95e6f3fc2383",
+      "plays": 6876079,
+      "counted": "plays"
+     },
+     {
+      "title": "The Slow Rush B-Sides & Remixes",
+      "mbid": null,
+      "plays": 3788376,
+      "counted": "plays"
+     },
+     {
+      "title": "Currents B-Sides & Remixes",
+      "mbid": "7b09018d-808f-4a0a-ad71-4b8a580440c9",
+      "plays": 4642033,
+      "counted": "plays"
+     },
+     {
+      "title": "Patience",
+      "mbid": "ca6d3d5b-8129-4d27-afd1-252e997f22bf",
+      "plays": 3083758,
+      "counted": "plays"
+     },
+     {
+      "title": "Loser",
+      "mbid": "30b3443f-de5b-4b0b-b2d5-434000817868",
+      "plays": 2524930,
+      "counted": "plays"
+     },
+     {
+      "title": "Tame Impala",
+      "mbid": "08a252a8-2daf-4990-bf5d-4601c40757c6",
+      "plays": 3306141,
+      "counted": "plays"
+     },
+     {
+      "title": "Sundown Syndrome / Remember Me",
+      "mbid": "40a99e1e-ebd8-4441-b7b6-51212281cc19",
+      "plays": 1954681,
+      "counted": "plays"
+     },
+     {
+      "title": "End of Summer",
+      "mbid": "d2c47b50-31ed-43f5-86d1-6ecb544d0ebc",
+      "plays": 1320803,
+      "counted": "plays"
+     },
+     {
+      "title": "Borderline",
+      "mbid": "850ea168-6719-4c1e-9eb6-b8753db75e23",
+      "plays": 2078721,
+      "counted": "plays"
+     },
+     {
+      "title": "Lonerism B-Sides & Remixes",
+      "mbid": "cfcdd292-e9eb-4fff-8b68-e3e9197254f5",
+      "plays": 1198367,
+      "counted": "plays"
+     },
+     {
+      "title": "InnerSpeaker (Collector's Edition)",
+      "mbid": null,
+      "plays": 2352157,
+      "counted": "plays"
+     },
+     {
+      "title": "Live Versions",
+      "mbid": "1de2992e-5d9e-42a1-910b-b307d80c06a4",
+      "plays": 2204094,
+      "counted": "plays"
+     },
+     {
+      "title": "Lost in Yesterday",
+      "mbid": "fbbbefca-69ee-42a5-b49c-18974c13e310",
+      "plays": 884214,
+      "counted": "plays"
+     },
+     {
+      "title": "It Might Be Time",
+      "mbid": "a43d62c7-5dea-447f-a838-6758e3fb03f0",
+      "plays": 777811,
+      "counted": "plays"
+     },
+     {
+      "title": "Breathe Deeper (Lil Yachty Remix)",
+      "mbid": "109697d2-1915-4b2b-a92a-9b4811f0f2ee",
+      "plays": 949463,
+      "counted": "plays"
+     },
+     {
+      "title": "Journey to the Real World (From Barbie the Album)",
+      "mbid": null,
+      "plays": 426838,
+      "counted": "plays"
+     },
+     {
+      "title": "Dracula (with JENNIE)",
+      "mbid": null,
+      "plays": 562623,
+      "counted": "plays"
+     },
+     {
+      "title": "Posthumous Forgiveness",
+      "mbid": "4e1f7386-858f-49ba-9a48-fcdede81d0ed",
+      "plays": 597397,
+      "counted": "plays"
+     },
+     {
+      "title": "Let It Happen",
+      "mbid": "5040b2d7-1254-4412-84dd-efece7dc185f",
+      "plays": 498361,
+      "counted": "plays"
+     },
+     {
+      "title": "Elephant",
+      "mbid": "45c146b7-4b49-4857-99d8-dfbc68062a27",
+      "plays": 446016,
+      "counted": "plays"
+     },
+     {
+      "title": "Hummer",
+      "mbid": "1abc5d6c-c00b-4948-8486-714b8bc2e8f4",
+      "plays": 210600,
+      "counted": "plays"
+     },
+     {
+      "title": "No Choice",
+      "mbid": "780c194f-9268-4d16-ab22-931da1ac2400",
+      "plays": 461203,
+      "counted": "plays"
+     },
+     {
+      "title": "Wings Of Time (From the Motion Picture Dungeons & Dragons: Honor Among Thieves)",
+      "mbid": null,
+      "plays": 372522,
+      "counted": "plays"
+     },
+     {
+      "title": "InnerSpeaker (10 Year Anniversary Edition)",
+      "mbid": null,
+      "plays": 941223,
+      "counted": "plays"
+     },
+     {
+      "title": "'Cause I'm A Man",
+      "mbid": "a3d500b7-8dd2-4a66-9e9c-046ad4ce1811",
+      "plays": 318361,
+      "counted": "plays"
+     },
+     {
+      "title": "Is It True (Four Tet Remix)",
+      "mbid": "b048af56-87c9-4276-983d-46bfc0b9b603",
+      "plays": 284036,
+      "counted": "plays"
+     },
+     {
+      "title": "Borderline (Blood Orange Remix)",
+      "mbid": null,
+      "plays": 324686,
+      "counted": "plays"
+     },
+     {
+      "title": "Mind Mischief",
+      "mbid": "b87e03a8-87d6-4a82-be6a-5d91319c8075",
+      "plays": 224801,
+      "counted": "plays"
+     },
+     {
+      "title": "Beverly Laurel",
+      "mbid": "798f06fa-b859-4dc5-a460-581460dc49dc",
+      "plays": 274931,
+      "counted": "plays"
+     },
+     {
+      "title": "Lonerism (10 Year Anniversary Edition / Unreleased Demos)",
+      "mbid": "9eebadf8-138f-403e-a634-b5cbfc0caf49",
+      "plays": 313912,
+      "counted": "plays"
+     },
+     {
+      "title": "Eventually",
+      "mbid": "03142ec8-e896-402f-bdbe-0e52dcc60291",
+      "plays": 237712,
+      "counted": "plays"
+     },
+     {
+      "title": "InnerSpeaker B-Sides & Remixes",
+      "mbid": "1c710bc2-7f5b-4050-b272-8c048ee6885e",
+      "plays": 295351,
+      "counted": "plays"
+     },
+     {
+      "title": "Feels Like We Only Go Backwards",
+      "mbid": "76f59e63-903b-44dc-a24e-691d6b5fb11b",
+      "plays": 138151,
+      "counted": "plays"
+     },
+     {
+      "title": "The Less I Know The Better",
+      "mbid": "5e304e61-d964-4ad2-910a-7a1667b183b9",
+      "plays": 67790,
+      "counted": "plays"
+     },
+     {
+      "title": "Apocalypse Dreams",
+      "mbid": "091283df-f059-47c8-bb28-7607f276ca50",
+      "plays": 144975,
+      "counted": "plays"
+     },
+     {
+      "title": "Dracula (JENNIE Remix - Boys Noize Disko Version)",
+      "mbid": "868c255c-368b-4bc7-a544-a852154f8f44",
+      "plays": 63340,
+      "counted": "plays"
+     },
+     {
+      "title": "Disciples",
+      "mbid": "6af03453-ac2f-464a-8735-9ed3fb184d5c",
+      "plays": 138764,
+      "counted": "plays"
+     },
+     {
+      "title": "My Old Ways",
+      "mbid": null,
+      "plays": 59416,
+      "counted": "plays"
+     },
+     {
+      "title": "Nova Tunes 2.7",
+      "mbid": null,
+      "plays": 79603,
+      "counted": "plays"
+     },
+     {
+      "title": "Tame Impala - EP",
+      "mbid": null,
+      "plays": 661512,
+      "counted": "plays"
+     },
+     {
+      "title": "'Cause I'm A Man (HAIM Remix)",
+      "mbid": null,
+      "plays": 79892,
+      "counted": "plays"
+     },
+     {
+      "title": "Let It Happen (Soulwax Remix)",
+      "mbid": "9bd51784-1163-425a-94af-da3f010796ba",
+      "plays": 90984,
+      "counted": "plays"
+     },
+     {
+      "title": "Solitude Is Bliss",
+      "mbid": "74b8476b-4353-4202-a49d-dad6737f2616",
+      "plays": 84582,
+      "counted": "plays"
+     },
+     {
+      "title": "Tame Impala EP",
+      "mbid": null,
+      "plays": 195222,
+      "counted": "plays"
+     }
     ]
    }
   },
@@ -327,7 +2263,9 @@
     "why": null,
     "url": null,
     "listeners": null,
-    "top_songs": null
+    "top_songs": null,
+    "similar": null,
+    "top_albums": null
    }
   },
   {
@@ -404,6 +2342,490 @@
       "listeners": 1328255,
       "url": "https://www.last.fm/music/Tame+Impala/_/Dracula"
      }
+    ],
+    "similar": [
+     {
+      "name": "Pond",
+      "mbid": "69ac44f7-c80d-47b4-9bc8-fcc758d209e6",
+      "match": 1.0,
+      "url": "https://www.last.fm/music/Pond"
+     },
+     {
+      "name": "Melody's Echo Chamber",
+      "mbid": null,
+      "match": 0.706669,
+      "url": "https://www.last.fm/music/Melody%27s+Echo+Chamber"
+     },
+     {
+      "name": "GUM",
+      "mbid": "bca076a4-0ff5-43ae-b4c1-27ece7a0ca1c",
+      "match": 0.655327,
+      "url": "https://www.last.fm/music/GUM"
+     },
+     {
+      "name": "Temples",
+      "mbid": "3514578c-402a-4825-bd97-a525f31004e6",
+      "match": 0.581892,
+      "url": "https://www.last.fm/music/Temples"
+     },
+     {
+      "name": "The Holydrug Couple",
+      "mbid": "ab722b70-b4a8-4918-b13d-2a449f23df16",
+      "match": 0.456447,
+      "url": "https://www.last.fm/music/The+Holydrug+Couple"
+     },
+     {
+      "name": "Moses Gunn Collective",
+      "mbid": "324405e8-c264-4077-b3cc-26a5fa1ed713",
+      "match": 0.417631,
+      "url": "https://www.last.fm/music/Moses+Gunn+Collective"
+     },
+     {
+      "name": "Post Animal",
+      "mbid": "40c857d5-6ab0-41f4-aa1d-7614a79a0686",
+      "match": 0.355639,
+      "url": "https://www.last.fm/music/Post+Animal"
+     },
+     {
+      "name": "MGMT",
+      "mbid": "c485632c-b784-4ee9-8ea1-c5fb365681fc",
+      "match": 0.355572,
+      "url": "https://www.last.fm/music/MGMT"
+     },
+     {
+      "name": "Unknown Mortal Orchestra",
+      "mbid": "e2305342-0bde-4a2c-aed0-4b88694834de",
+      "match": 0.341121,
+      "url": "https://www.last.fm/music/Unknown+Mortal+Orchestra"
+     },
+     {
+      "name": "Djo",
+      "mbid": "83cedfd0-a118-48eb-ad71-72f4c2f95fd2",
+      "match": 0.309012,
+      "url": "https://www.last.fm/music/Djo"
+     },
+     {
+      "name": "The Strokes",
+      "mbid": "f181961b-20f7-459e-89de-920ef03c7ed0",
+      "match": 0.305594,
+      "url": "https://www.last.fm/music/The+Strokes"
+     },
+     {
+      "name": "Inner Wave",
+      "mbid": "593f5d0a-ea85-4e07-a8cc-d3a031925638",
+      "match": 0.290958,
+      "url": "https://www.last.fm/music/Inner+Wave"
+     },
+     {
+      "name": "The Voidz",
+      "mbid": "6a93cb2b-d33a-42fc-a41a-542e3a887ba6",
+      "match": 0.290752,
+      "url": "https://www.last.fm/music/The+Voidz"
+     },
+     {
+      "name": "Psychedelic Porn Crumpets",
+      "mbid": "11d94660-1963-4020-8762-4c5907e2ea48",
+      "match": 0.28923,
+      "url": "https://www.last.fm/music/Psychedelic+Porn+Crumpets"
+     },
+     {
+      "name": "Mild High Club",
+      "mbid": "5e9adbe9-5721-4d66-88e4-0e3ff7129f1c",
+      "match": 0.285922,
+      "url": "https://www.last.fm/music/Mild+High+Club"
+     },
+     {
+      "name": "Meltt",
+      "mbid": "780873bc-db63-4803-9fde-a824b5049625",
+      "match": 0.284644,
+      "url": "https://www.last.fm/music/Meltt"
+     },
+     {
+      "name": "King Gizzard & The Lizard Wizard",
+      "mbid": null,
+      "match": 0.281421,
+      "url": "https://www.last.fm/music/King+Gizzard+&+The+Lizard+Wizard"
+     },
+     {
+      "name": "Arctic Monkeys",
+      "mbid": "ada7a83c-e3e1-40f1-93f9-3e73dbc9298a",
+      "match": 0.247916,
+      "url": "https://www.last.fm/music/Arctic+Monkeys"
+     },
+     {
+      "name": "Crumb",
+      "mbid": "b1619173-e106-4515-8e1d-9d2022365459",
+      "match": 0.24018,
+      "url": "https://www.last.fm/music/Crumb"
+     },
+     {
+      "name": "The Lazy Eyes",
+      "mbid": "48b0b244-a822-4f79-9bde-14a88217fe57",
+      "match": 0.235051,
+      "url": "https://www.last.fm/music/The+Lazy+Eyes"
+     },
+     {
+      "name": "Babe Rainbow",
+      "mbid": "41f85de6-c550-4b35-875a-a0049e577e58",
+      "match": 0.221978,
+      "url": "https://www.last.fm/music/Babe+Rainbow"
+     },
+     {
+      "name": "Cage the Elephant",
+      "mbid": "b41b38d4-ef3e-4f37-8c75-cfe9af999696",
+      "match": 0.220354,
+      "url": "https://www.last.fm/music/Cage+the+Elephant"
+     },
+     {
+      "name": "Foxygen",
+      "mbid": "913e6848-6865-4717-ac5e-3bd9c22826be",
+      "match": 0.207826,
+      "url": "https://www.last.fm/music/Foxygen"
+     },
+     {
+      "name": "Empire of the Sun",
+      "mbid": "ac7e838c-3d95-47c2-92a9-81767ad7c217",
+      "match": 0.206142,
+      "url": "https://www.last.fm/music/Empire+of+the+Sun"
+     },
+     {
+      "name": "Dungen",
+      "mbid": "25c76eb2-a92d-4624-9e30-093fc16ed5eb",
+      "match": 0.196425,
+      "url": "https://www.last.fm/music/Dungen"
+     },
+     {
+      "name": "Levitation Room",
+      "mbid": "2cac95ca-5b4d-4864-89a4-fba2e673a843",
+      "match": 0.190861,
+      "url": "https://www.last.fm/music/Levitation+Room"
+     },
+     {
+      "name": "Sunbeam Sound Machine",
+      "mbid": "e109031f-998a-4340-a80d-016b1dc86675",
+      "match": 0.18906,
+      "url": "https://www.last.fm/music/Sunbeam+Sound+Machine"
+     },
+     {
+      "name": "Drugdealer",
+      "mbid": "d3b69dfc-4b20-440c-bd23-6f939d076082",
+      "match": 0.176901,
+      "url": "https://www.last.fm/music/Drugdealer"
+     },
+     {
+      "name": "Spiral Drive",
+      "mbid": "f932104f-c397-4afe-a4c8-2739d0f51dd7",
+      "match": 0.169101,
+      "url": "https://www.last.fm/music/Spiral+Drive"
+     },
+     {
+      "name": "Pink Floyd",
+      "mbid": "83d91898-7763-47d7-b03b-b92132375c47",
+      "match": 0.163433,
+      "url": "https://www.last.fm/music/Pink+Floyd"
+     }
+    ],
+    "top_albums": [
+     {
+      "title": "Currents",
+      "mbid": "031ecbde-35e1-4d3a-917f-f89f31aca1c9",
+      "plays": 197990342,
+      "counted": "plays"
+     },
+     {
+      "title": "The Slow Rush",
+      "mbid": "3a12923d-97cd-4e87-8cfd-fb67be970974",
+      "plays": 75865879,
+      "counted": "plays"
+     },
+     {
+      "title": "Lonerism",
+      "mbid": "0d2cb66c-3a32-4f81-b977-9231c461c34a",
+      "plays": 65345426,
+      "counted": "plays"
+     },
+     {
+      "title": "Deadbeat",
+      "mbid": "51f8289e-7379-4c7b-ab50-564e2f875594",
+      "plays": 23596438,
+      "counted": "plays"
+     },
+     {
+      "title": "Innerspeaker",
+      "mbid": "0b18bdeb-8382-4b8f-94a3-b43e3e7ec6a4",
+      "plays": 29854021,
+      "counted": "plays"
+     },
+     {
+      "title": "Dracula (Remix)",
+      "mbid": "132919b9-60a8-4835-884f-3a943ba587bf",
+      "plays": 7905191,
+      "counted": "plays"
+     },
+     {
+      "title": "Dracula",
+      "mbid": "338c7885-011c-4a4a-b5d1-95e6f3fc2383",
+      "plays": 6876079,
+      "counted": "plays"
+     },
+     {
+      "title": "The Slow Rush B-Sides & Remixes",
+      "mbid": null,
+      "plays": 3788376,
+      "counted": "plays"
+     },
+     {
+      "title": "Currents B-Sides & Remixes",
+      "mbid": "7b09018d-808f-4a0a-ad71-4b8a580440c9",
+      "plays": 4642033,
+      "counted": "plays"
+     },
+     {
+      "title": "Patience",
+      "mbid": "ca6d3d5b-8129-4d27-afd1-252e997f22bf",
+      "plays": 3083758,
+      "counted": "plays"
+     },
+     {
+      "title": "Loser",
+      "mbid": "30b3443f-de5b-4b0b-b2d5-434000817868",
+      "plays": 2524930,
+      "counted": "plays"
+     },
+     {
+      "title": "Tame Impala",
+      "mbid": "08a252a8-2daf-4990-bf5d-4601c40757c6",
+      "plays": 3306141,
+      "counted": "plays"
+     },
+     {
+      "title": "Sundown Syndrome / Remember Me",
+      "mbid": "40a99e1e-ebd8-4441-b7b6-51212281cc19",
+      "plays": 1954681,
+      "counted": "plays"
+     },
+     {
+      "title": "End of Summer",
+      "mbid": "d2c47b50-31ed-43f5-86d1-6ecb544d0ebc",
+      "plays": 1320803,
+      "counted": "plays"
+     },
+     {
+      "title": "Borderline",
+      "mbid": "850ea168-6719-4c1e-9eb6-b8753db75e23",
+      "plays": 2078721,
+      "counted": "plays"
+     },
+     {
+      "title": "Lonerism B-Sides & Remixes",
+      "mbid": "cfcdd292-e9eb-4fff-8b68-e3e9197254f5",
+      "plays": 1198367,
+      "counted": "plays"
+     },
+     {
+      "title": "InnerSpeaker (Collector's Edition)",
+      "mbid": null,
+      "plays": 2352157,
+      "counted": "plays"
+     },
+     {
+      "title": "Live Versions",
+      "mbid": "1de2992e-5d9e-42a1-910b-b307d80c06a4",
+      "plays": 2204094,
+      "counted": "plays"
+     },
+     {
+      "title": "Lost in Yesterday",
+      "mbid": "fbbbefca-69ee-42a5-b49c-18974c13e310",
+      "plays": 884214,
+      "counted": "plays"
+     },
+     {
+      "title": "It Might Be Time",
+      "mbid": "a43d62c7-5dea-447f-a838-6758e3fb03f0",
+      "plays": 777811,
+      "counted": "plays"
+     },
+     {
+      "title": "Breathe Deeper (Lil Yachty Remix)",
+      "mbid": "109697d2-1915-4b2b-a92a-9b4811f0f2ee",
+      "plays": 949463,
+      "counted": "plays"
+     },
+     {
+      "title": "Journey to the Real World (From Barbie the Album)",
+      "mbid": null,
+      "plays": 426838,
+      "counted": "plays"
+     },
+     {
+      "title": "Dracula (with JENNIE)",
+      "mbid": null,
+      "plays": 562623,
+      "counted": "plays"
+     },
+     {
+      "title": "Posthumous Forgiveness",
+      "mbid": "4e1f7386-858f-49ba-9a48-fcdede81d0ed",
+      "plays": 597397,
+      "counted": "plays"
+     },
+     {
+      "title": "Let It Happen",
+      "mbid": "5040b2d7-1254-4412-84dd-efece7dc185f",
+      "plays": 498361,
+      "counted": "plays"
+     },
+     {
+      "title": "Elephant",
+      "mbid": "45c146b7-4b49-4857-99d8-dfbc68062a27",
+      "plays": 446016,
+      "counted": "plays"
+     },
+     {
+      "title": "Hummer",
+      "mbid": "1abc5d6c-c00b-4948-8486-714b8bc2e8f4",
+      "plays": 210600,
+      "counted": "plays"
+     },
+     {
+      "title": "No Choice",
+      "mbid": "780c194f-9268-4d16-ab22-931da1ac2400",
+      "plays": 461203,
+      "counted": "plays"
+     },
+     {
+      "title": "Wings Of Time (From the Motion Picture Dungeons & Dragons: Honor Among Thieves)",
+      "mbid": null,
+      "plays": 372522,
+      "counted": "plays"
+     },
+     {
+      "title": "InnerSpeaker (10 Year Anniversary Edition)",
+      "mbid": null,
+      "plays": 941223,
+      "counted": "plays"
+     },
+     {
+      "title": "'Cause I'm A Man",
+      "mbid": "a3d500b7-8dd2-4a66-9e9c-046ad4ce1811",
+      "plays": 318361,
+      "counted": "plays"
+     },
+     {
+      "title": "Is It True (Four Tet Remix)",
+      "mbid": "b048af56-87c9-4276-983d-46bfc0b9b603",
+      "plays": 284036,
+      "counted": "plays"
+     },
+     {
+      "title": "Borderline (Blood Orange Remix)",
+      "mbid": null,
+      "plays": 324686,
+      "counted": "plays"
+     },
+     {
+      "title": "Mind Mischief",
+      "mbid": "b87e03a8-87d6-4a82-be6a-5d91319c8075",
+      "plays": 224801,
+      "counted": "plays"
+     },
+     {
+      "title": "Beverly Laurel",
+      "mbid": "798f06fa-b859-4dc5-a460-581460dc49dc",
+      "plays": 274931,
+      "counted": "plays"
+     },
+     {
+      "title": "Lonerism (10 Year Anniversary Edition / Unreleased Demos)",
+      "mbid": "9eebadf8-138f-403e-a634-b5cbfc0caf49",
+      "plays": 313912,
+      "counted": "plays"
+     },
+     {
+      "title": "Eventually",
+      "mbid": "03142ec8-e896-402f-bdbe-0e52dcc60291",
+      "plays": 237712,
+      "counted": "plays"
+     },
+     {
+      "title": "InnerSpeaker B-Sides & Remixes",
+      "mbid": "1c710bc2-7f5b-4050-b272-8c048ee6885e",
+      "plays": 295351,
+      "counted": "plays"
+     },
+     {
+      "title": "Feels Like We Only Go Backwards",
+      "mbid": "76f59e63-903b-44dc-a24e-691d6b5fb11b",
+      "plays": 138151,
+      "counted": "plays"
+     },
+     {
+      "title": "The Less I Know The Better",
+      "mbid": "5e304e61-d964-4ad2-910a-7a1667b183b9",
+      "plays": 67790,
+      "counted": "plays"
+     },
+     {
+      "title": "Apocalypse Dreams",
+      "mbid": "091283df-f059-47c8-bb28-7607f276ca50",
+      "plays": 144975,
+      "counted": "plays"
+     },
+     {
+      "title": "Dracula (JENNIE Remix - Boys Noize Disko Version)",
+      "mbid": "868c255c-368b-4bc7-a544-a852154f8f44",
+      "plays": 63340,
+      "counted": "plays"
+     },
+     {
+      "title": "Disciples",
+      "mbid": "6af03453-ac2f-464a-8735-9ed3fb184d5c",
+      "plays": 138764,
+      "counted": "plays"
+     },
+     {
+      "title": "My Old Ways",
+      "mbid": null,
+      "plays": 59416,
+      "counted": "plays"
+     },
+     {
+      "title": "Nova Tunes 2.7",
+      "mbid": null,
+      "plays": 79603,
+      "counted": "plays"
+     },
+     {
+      "title": "Tame Impala - EP",
+      "mbid": null,
+      "plays": 661512,
+      "counted": "plays"
+     },
+     {
+      "title": "'Cause I'm A Man (HAIM Remix)",
+      "mbid": null,
+      "plays": 79892,
+      "counted": "plays"
+     },
+     {
+      "title": "Let It Happen (Soulwax Remix)",
+      "mbid": "9bd51784-1163-425a-94af-da3f010796ba",
+      "plays": 90984,
+      "counted": "plays"
+     },
+     {
+      "title": "Solitude Is Bliss",
+      "mbid": "74b8476b-4353-4202-a49d-dad6737f2616",
+      "plays": 84582,
+      "counted": "plays"
+     },
+     {
+      "title": "Tame Impala EP",
+      "mbid": null,
+      "plays": 195222,
+      "counted": "plays"
+     }
     ]
    }
   },
@@ -420,7 +2842,9 @@
     "why": null,
     "url": null,
     "listeners": null,
-    "top_songs": null
+    "top_songs": null,
+    "similar": null,
+    "top_albums": null
    }
   },
   {
@@ -436,7 +2860,9 @@
     "why": "Last.fm refused deadwax's API key (error 10: Invalid API key - You must be granted a valid key by last.fm) - check LASTFM_API_KEY in Server settings > Connections: it's the API key, not the shared secret.",
     "url": null,
     "listeners": null,
-    "top_songs": null
+    "top_songs": null,
+    "similar": null,
+    "top_albums": null
    }
   },
   {
@@ -453,7 +2879,9 @@
     "why": "No Last.fm API key is set - add LASTFM_API_KEY in Server settings > Connections (a free key from last.fm/api/account/create).",
     "url": null,
     "listeners": null,
-    "top_songs": null
+    "top_songs": null,
+    "similar": null,
+    "top_albums": null
    }
   }
  ]

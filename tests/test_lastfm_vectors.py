@@ -53,6 +53,11 @@ def test_the_folds_that_matter_most():
     #? a credit is never split at & or a comma
     assert first_credit("Simon & Garfunkel") == "Simon & Garfunkel"
     assert name_key("The Beatles") == name_key("Beatles")
+    #? (2.1.43) titleKey's /iu folds no dotted or dotless i into an i, as Python's re.IGNORECASE does: the aside stays
+    assert match_key("Roads (L" + chr(0x130) + "VE)") == "roads (live)" != match_key("Roads")
+    assert match_key("Roads (l" + chr(0x131) + "ve)") != match_key("Roads")
+    #? but the long s is an s to it
+    assert match_key("Mysterons (Rema" + chr(0x17F) + "tered)") == match_key("Mysterons")
 
 
 def test_the_app_s_copy_is_this_one():

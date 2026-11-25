@@ -28,6 +28,9 @@ from src.lastfm_kept import (DAY, ROW_MAX_BYTES, TRIM_EVERY, Keeper, album_key, 
                              track_key)
 from src.store import JobStore
 
+#? the kept rows' shape now (src/lastfm.py LASTFM_SHAPE): 2 since 2.1.43
+SHAPE = lastfm_module.LASTFM_SHAPE
+
 NOW = 2_000_000_000.0
 TAME = "63aa26c3-d59b-4da4-84ac-716b54f1ef4d"
 KEY = "5e17e1d0b5e17e1d0b5e17e1d0b5e1ab"
@@ -128,7 +131,7 @@ def test_an_answer_is_kept_and_answered_again_without_asking(store, keeper):
     assert first == second == Answer({"listeners": 5})
     assert asks.calls == 1
     [row] = rows(store)
-    assert row["key"] == f"1|artist.getinfo|mbid|{TAME}" and json.loads(row["body"]) == {"listeners": 5}
+    assert row["key"] == f"{SHAPE}|artist.getinfo|mbid|{TAME}" and json.loads(row["body"]) == {"listeners": 5}
 
 
 def test_not_known_is_kept_as_none_for_3_days(store, keeper):
@@ -413,20 +416,20 @@ def test_a_key_removed_while_an_answer_is_written_leaves_nothing_kept(store, kee
 # ----- the keys ------------------------------------------------------------------------------------------------------
 
 def test_the_keys():
-    assert artist_key("artist.getinfo", mbid=TAME.upper()) == f"1|artist.getinfo|mbid|{TAME}"
-    assert artist_key("artist.getinfo", name="The Beatles") == "1|artist.getinfo|name|beatles"
-    assert album_key("album.getinfo", "Portishead", "Dummy") == "1|album.getinfo|name|portishead|dummy"
+    assert artist_key("artist.getinfo", mbid=TAME.upper()) == f"{SHAPE}|artist.getinfo|mbid|{TAME}"
+    assert artist_key("artist.getinfo", name="The Beatles") == f"{SHAPE}|artist.getinfo|name|beatles"
+    assert album_key("album.getinfo", "Portishead", "Dummy") == f"{SHAPE}|album.getinfo|name|portishead|dummy"
     assert (track_key("track.getsimilar", "Tame Impala", "Let It Happen - 2015 Remaster")
-            == "1|track.getsimilar|name|tame impala|let it happen")
+            == f"{SHAPE}|track.getsimilar|name|tame impala|let it happen")
 
 
 def test_a_shape_bumped_never_serves_an_old_row(store, keeper, monkeypatch):
     keep(store, artist_key("artist.getinfo", mbid=TAME), {"listeners": 1}, NOW)
-    monkeypatch.setattr(lastfm_module, "LASTFM_SHAPE", 2)
-    asks = Asks(Answer({"listeners": 2, "shape": 2}))
+    monkeypatch.setattr(lastfm_module, "LASTFM_SHAPE", SHAPE + 1)
+    asks = Asks(Answer({"listeners": 2, "shape": SHAPE + 1}))
 
     assert asyncio.run(keeper.kept(store, artist_key("artist.getinfo", mbid=TAME), asks)) == Answer(
-        {"listeners": 2, "shape": 2})
+        {"listeners": 2, "shape": SHAPE + 1})
     assert asks.calls == 1
 
 
@@ -498,24 +501,26 @@ def test_a_start_trims_the_table_past_its_cap(store, monkeypatch):
     monkeypatch.setattr(lastfm_kept, "LASTFM_KEPT_BYTES", 1500)
     monkeypatch.setattr(lastfm_kept, "TRIM_TO_BYTES", 1000)
     for n in range(100):
-        keep(store, f"1|m|name|{n:03}", {"n": n}, NOW + n)
+        keep(store, f"{SHAPE}|m|name|{n:03}", {"n": n}, NOW + n)
     assert sum(row["size"] for row in rows(store)) > 1500
 
     asyncio.run(at_start(store, key_set=True))
 
-    kept = rows(store)
-    assert sum(row["size"] for row in kept) <= 1000
-    assert "1|m|name|099" in [row["key"] for row in kept] and "1|m|name|000" not in [row["key"] for row in kept]
+    kept = [row["key"] for row in rows(store)]
+    assert sum(row["size"] for row in rows(store)) <= 1000
+    assert f"{SHAPE}|m|name|099" in kept and f"{SHAPE}|m|name|000" not in kept
 
 
 def test_a_start_with_a_key_drops_only_older_shapes(store):
-    keep(store, "1|artist.getinfo|name|a", {}, NOW)
+    keep(store, f"{SHAPE}|artist.getinfo|name|a", {}, NOW)
+    keep(store, f"{SHAPE - 1}|artist.getinfo|name|a", {}, NOW)
     keep(store, "0|artist.getinfo|name|a", {}, NOW)
-    keep(store, "11|artist.getinfo|name|a", {}, NOW)
+    #? a shape that only begins with this one's digits
+    keep(store, f"{SHAPE}{SHAPE}|artist.getinfo|name|a", {}, NOW)
 
     asyncio.run(at_start(store, key_set=True))
 
-    assert [row["key"] for row in rows(store)] == ["1|artist.getinfo|name|a"]
+    assert [row["key"] for row in rows(store)] == [f"{SHAPE}|artist.getinfo|name|a"]
 
 
 @pytest.fixture

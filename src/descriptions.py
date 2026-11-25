@@ -40,7 +40,7 @@ import re
 from html.parser import HTMLParser
 from urllib.parse import quote, unquote, urlparse
 
-from src.lastfm import lastfm_url
+from src.lastfm import lastfm_url, whole
 
 #? What a description answer is: the paragraph, whose words they are, and the page they came from (the link
 #? that credits them - Wikipedia's CC BY-SA asks for it), and Wikidata's one-line subtitle. `source` is
@@ -195,7 +195,8 @@ def english_description(payload: dict | None, entity_id: str) -> str | None:
     entity = _item(payload, entity_id)
     found = ((entity or {}).get("descriptions") or {}).get("en") if entity else None
     value = found.get("value") if isinstance(found, dict) else None
-    text = trimmed(_SPACES.sub(" ", _CONTROL.sub("", value)).strip(), SUBTITLE_LETTERS) if isinstance(value, str) else ""
+    text = (trimmed(_SPACES.sub(" ", _CONTROL.sub("", whole(value))).strip(), SUBTITLE_LETTERS)
+            if isinstance(value, str) else "")
     return text or None
 
 
@@ -272,10 +273,11 @@ def _unmarked(fragment: str | None) -> str:
 
 
 def clean_text(text) -> str:
-    """One line of words: control characters out, every run of spaces one, cut at MAX_LETTERS."""
+    """One line of words: control characters out, a lone surrogate U+FFFD (lastfm.whole: no UTF-8 carries one -
+    2.1.43's review), every run of spaces one, cut at MAX_LETTERS."""
     if not isinstance(text, str):
         return ""
-    return trimmed(_SPACES.sub(" ", _CONTROL.sub("", text)).strip())
+    return trimmed(_SPACES.sub(" ", _CONTROL.sub("", whole(text))).strip())
 
 
 def trimmed(text: str, limit: int = MAX_LETTERS) -> str:

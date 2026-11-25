@@ -92,6 +92,19 @@ const TITLES = [
   ['  Spaced   Out  ', 'Spaced   Out'],
   ['Untitled #3', 'Untitled #3'],
   ['Song (Live UK 1998)', 'Song (Live UK 1998)'],
+  //? (2.1.43) the dotted and the dotless i: titleKey's /iu folds neither into an i - in a take word, or as a word
+  //? letter beside one - so neither aside is dropped. Python's re.IGNORECASE folded both, and keyed these apart
+  ['Roads (L' + String.fromCharCode(0x130) + 'VE)', 'Roads (L' + String.fromCharCode(0x130) + 'VE)'],
+  ['Roads (l' + String.fromCharCode(0x131) + 've)', 'Roads (l' + String.fromCharCode(0x131) + 've)'],
+  ['Glory Box (L' + String.fromCharCode(0x130) + 've at Roseland)', 'Glory Box (L' + String.fromCharCode(0x130) + 've at Roseland)'],
+  ['Numb (Remastered' + String.fromCharCode(0x130) + ')', 'Numb (Remastered' + String.fromCharCode(0x130) + ')'],
+  ['Numb (Remastered' + String.fromCharCode(0x131) + ')', 'Numb (Remastered' + String.fromCharCode(0x131) + ')'],
+  //? what /iu does fold: the long s into an s, and the Kelvin sign, a word letter, beside a take word
+  ['Mysterons (Rema' + String.fromCharCode(0x17f) + 'tered)', 'Mysterons (Rema' + String.fromCharCode(0x17f) + 'tered)'],
+  ['Roads (Live' + String.fromCharCode(0x212a) + ')', 'Roads (Live' + String.fromCharCode(0x212a) + ')'],
+  //? steps 1-3 are Python's own, as the app's port has them: there re.IGNORECASE's dotted and dotless i are an i
+  ['Roads - L' + String.fromCharCode(0x130) + 've', 'Roads'],
+  ['Glory Box (Featur' + String.fromCharCode(0x131) + 'ng Someone Else)', 'Glory Box'],
 ]
 
 //? [an artist credit as Last.fm might write it, its first name]
