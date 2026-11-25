@@ -9,7 +9,10 @@ import UIKit
 /// (⌘I), the three side panels ticked while theirs shows - (R3) the side panel's tabs, Queue, Lyrics, Info and EQ (⌥⌘E),
 /// each ticked while its tab shows - and (slice 6, EQ files) File's Import EQ File… (⌘O), the Open
 /// panel, at the top of File where New Window was - and (slice 7, managing on a big screen) File's Save changes (⌘S),
-/// Server settings' own, while one of its pages is the one in front. Drawn from Core's MacMenu and nothing else: each item's words, key, dimming and tick are MacMenu's, read
+/// Server settings' own, while one of its pages is the one in front - and (the Mac's Row Size) View's Row Size: Small,
+/// Medium and Large ticked, Make Bigger (⌘+, and ⌘= - RowSizeAlternateKey) and Make Smaller (⌘−), kept on this Mac
+/// (MacRowSizeStore) and read by every list (DesktopFrame hands it down).
+/// Drawn from Core's MacMenu and nothing else: each item's words, key, dimming and tick are MacMenu's, read
 /// from the player and the window each time the menus are drawn; this only carries the click out, through the very
 /// calls the player's own buttons make. The system's menus stay - About, Hide, Quit (⌘Q), Undo to Select All, Close
 /// Window (⌘W), Enter Full Screen, the Window menu; File > New Window and Help go (Platform's `macWindow`), and Format
@@ -40,7 +43,9 @@ struct MacCommands: Commands {
                              sheet: MacRefresh.shared.sheetUp, sidebarShown: navigation.macSidebarShown,
                              panel: navigation.macPanel, selected: navigation.macSelected, lyrics: lyrics.have,
                              serverSettings: MacRefresh.shared.settingsInFront,
-                             saveOpen: serverSettings.saveOpen(online: reachability.online))
+                             saveOpen: serverSettings.saveOpen(online: reachability.online),
+                             // (the Mac's Row Size) the size kept now, from the store the lists' frame reads too
+                             rowSize: MacRowSizeStore.shared.size)
     }
 
     var body: some Commands {
@@ -62,6 +67,11 @@ struct MacCommands: Commands {
         CommandGroup(replacing: .textFormatting) {}
         CommandGroup(after: .toolbar) {
             item(.refresh, state)
+            // (the Mac's Row Size) under Refresh: the lists' rows Small, Medium or Large, a size at a time by ⌘+ and ⌘−
+            Divider()
+            Menu(MacMenu.Words.rowSize) {
+                rowSizes(state)
+            }
         }
         // (slice 3) the frame's: the sidebar, then the side panel's tabs (R3's four) - in View's sidebar place. Replacing it,
         // never beside it (slice 3's review, smoke-run): kept, the system's own Show Sidebar has ⌃⌘S too, and UIKit
@@ -107,6 +117,22 @@ struct MacCommands: Commands {
                 tick(each)
             } else {
                 button(each)
+            }
+        }
+    }
+
+    /// (The Mac's Row Size) View > Row Size: Small, Medium and Large each a tick, the one chosen ticked; then Make
+    /// Bigger and Make Smaller, buttons dimmed at their ends.
+    @ViewBuilder private func rowSizes(_ state: MacMenu.State) -> some View {
+        let sections = MacMenu.rowSize(state)
+        ForEach(Array(sections.enumerated()), id: \.offset) { (index: Int, section: [MacMenu.Item]) in
+            if index > 0 { Divider() }
+            ForEach(section, id: \.command) { (each: MacMenu.Item) in
+                if each.command.rowSize != nil {
+                    tick(each)
+                } else {
+                    button(each)
+                }
             }
         }
     }
@@ -161,6 +187,9 @@ struct MacCommands: Commands {
             if let panel = command.panel { navigation.togglePanel(panel) }
         case .importEQFile:
             navigation.openEQFile()
+        // (the Mac's Row Size) the size chosen, or a step from the size kept now - kept on this Mac, every list redrawn
+        case .smallRows, .mediumRows, .largeRows, .biggerRows, .smallerRows:
+            MacRowSizeStore.shared.perform(command)
         // (slice 7) the save bar's own call: every draft at once, as they are now
         case .saveChanges:
             serverSettings.save()
@@ -485,5 +514,66 @@ struct FindFocus: ViewModifier {
                 focused.wrappedValue = true
                 navigation.findTaken()
             }
+    }
+}
+
+/// (The Mac's Row Size) How tall every Mac list's rows are, as this Mac keeps it - the one place it is read and
+/// changed. View > Row Size's ticks and steps (MacCommands' state and `perform`), the hidden ⌘= (RowSizeAlternateKey)
+/// and the desktop frame, which hands `size` down to every list (the environment's `macRowSize`), all read it here, the
+/// way the menus read TextEditing's and MacRefresh's: observed, so a change by any of them - the menu, ⌘+, ⌘= or ⌘− -
+/// redraws the menu's tick and every list at once. Kept in UserDefaults under MacRowSize.storageKey: what this Mac
+/// kept is read as it opens (nothing kept, or a value this build doesn't know, reads as Small - MacRowSize(saved:)),
+/// and each choice is kept as it is made (MacMenu.choose). The iPhone never asks it.
+@MainActor
+@Observable
+final class MacRowSizeStore {
+    static let shared = MacRowSizeStore()
+
+    /// The size every list draws its rows at now.
+    private(set) var size: MacRowSize
+
+    @ObservationIgnored private let defaults: UserDefaults
+
+    init(defaults: UserDefaults = .standard) {
+        self.defaults = defaults
+        size = MacRowSize(saved: defaults.string(forKey: MacRowSize.storageKey))
+    }
+
+    /// A Row Size item chosen - Small, Medium or Large by name, or a step from the size kept now - kept on this Mac and
+    /// drawn: nothing at all for a step with no further to go.
+    func perform(_ command: MacMenu.Command) {
+        guard let chosen = MacMenu.choose(command, saved: defaults.string(forKey: MacRowSize.storageKey)) else { return }
+        defaults.set(chosen.keep, forKey: MacRowSize.storageKey)
+        size = chosen.size
+    }
+}
+
+/// (The Mac's Row Size) Make Bigger's second key, ⌘= - drawn nowhere. View > Row Size's Make Bigger is drawn ⌘+ (MacMenu's
+/// key), as Finder draws its own, and a US keyboard types that + as ⇧⌘=; this takes ⌘= - the same key without ⇧ - to
+/// the same step (MacMenu.alternateKey), so the rows grow however ⌘+ is typed. A button the window holds but never shows
+/// (none of its own words, nothing to see, nothing VoiceOver reads: the menu's item is what's read, and never a Tab
+/// stop with the Mac's keyboard navigation on), on DesktopFrame - the main window's, so it answers while that window is
+/// the key one; ⌘+ and ⌘− themselves are the menu's, and answer wherever the menu does. Dimmed at Large as the item is,
+/// so the key does nothing there either. The same step as the item's own, through the same store.
+struct RowSizeAlternateKey: ViewModifier {
+    func body(content: Content) -> some View {
+        let state = MacMenu.State(rowSize: MacRowSizeStore.shared.size)
+        return content
+            .background {
+                Button(action: bigger) {
+                    Color.clear
+                }
+                .keyboardShortcut(MacCommands.shortcut(MacMenu.alternateKey(.biggerRows)))
+                .disabled(!MacMenu.item(.biggerRows, state).enabled)
+                .focusable(false)
+                .frame(width: 0, height: 0)
+                .opacity(0)
+                .accessibilityHidden(true)
+            }
+    }
+
+    /// Make Bigger's step from the size kept now: nothing at Large.
+    private func bigger() {
+        MacRowSizeStore.shared.perform(.biggerRows)
     }
 }

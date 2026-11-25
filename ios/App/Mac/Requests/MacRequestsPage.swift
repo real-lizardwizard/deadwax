@@ -15,7 +15,10 @@ import SwiftUI
 ///   over rows. Progress is a download's meter and its files, a place in the queue, why it stopped (in red), or how it
 ///   ended in a chip's few words (the whole sentence its help, and what VoiceOver hears) and when; nothing in it draws
 ///   past its cell. Speed is the rate as measured here, a dash for none. A click selects a row; ↑ ↓ Home End move the
-///   selection; a double click or Return opens one done. In a window as it first opens the table fits its page.
+///   selection; a double click or Return opens one done. In a window as it first opens the table fits its page. (The
+///   Mac's Row Size) Its rows are View > Row Size's - Small its drawing's 34 with a 22 cover, Medium and Large every
+///   list's 40 with 28 and 52 with 40 (MacRowSize.requestRowHeight and requestCover) - the meter as it is, centred;
+///   the album's least grows with the cover (RequestColumns.albumLeast(_:)), so its title keeps its room.
 /// - **The buttons** (RequestAction.buttons): a row's main one - Cancel (asking first with Confirm before cancelling on,
 ///   as the phone's ✕ does, and then cancelling only the row as it is by then), Another source - and a done row's Play
 ///   (its album from the first song, in the click, when its songs are in hand, else Open's) and Open. A refused row's
@@ -34,6 +37,8 @@ struct MacRequestsPage: View {
     @Environment(ServerModel.self) private var server
     @Environment(Reachability.self) private var reachability
     @Environment(PlayerModel.self) private var player
+    /// (The Mac's Row Size) The rows' height and their cover, and the album's least - View > Row Size's.
+    @Environment(\.macRowSize) private var rowSize
 
     @State private var filter: RequestFilter = .all
     @State private var selected: String?
@@ -289,7 +294,7 @@ struct MacRequestsPage: View {
         let keys = MacTable.rows(lines)
         return GeometryReader { (page: GeometryProxy) in
             let total = Double(page.size.width)
-            let widths = RequestColumns.widths(total).map { CGFloat($0) }
+            let widths = RequestColumns.widths(total, size: rowSize).map { CGFloat($0) }
             ScrollView(.horizontal) {
                 VStack(spacing: 0) {
                     header(widths)
@@ -317,11 +322,16 @@ struct MacRequestsPage: View {
                             // a row the keys moved to, brought into view
                             if let now { proxy.scrollTo(MacTable.Line<String>.row(now)) }
                         }
+                        // (the Mac's Row Size, after review) and the row selected, brought back into view as the rows
+                        // grow or shrink under it
+                        .onChange(of: rowSize) { (_: MacRowSize, _: MacRowSize) -> Void in
+                            if let selected { proxy.scrollTo(MacTable.Line<String>.row(selected)) }
+                        }
                     }
                 }
-                .frame(width: CGFloat(RequestColumns.width(total)), height: page.size.height)
+                .frame(width: CGFloat(RequestColumns.width(total, size: rowSize)), height: page.size.height)
             }
-            .scrollDisabled(RequestColumns.width(total) <= total)
+            .scrollDisabled(RequestColumns.width(total, size: rowSize) <= total)
         }
         // the table takes the keyboard once a row is clicked: ↑ ↓ Home End move the selection, Return opens a done row
         .focusable()
@@ -396,8 +406,9 @@ struct MacRequestsPage: View {
             .accessibilityAddTraits(.isHeader)
     }
 
-    /// A row (.row, 34 tall here): its cells at the columns' widths, striped every other one, selected in the
-    /// selection's colours - one element for VoiceOver, everything it shows its label, its actions its buttons'.
+    /// A row (.row, as tall as View > Row Size says - 34 at Small, its drawing's): its cells at the columns' widths,
+    /// striped every other one, selected in the selection's colours - one element for VoiceOver, everything it shows its
+    /// label, its actions its buttons'.
     private func rowLine(_ row: RequestRow, widths: [CGFloat], striped: Bool) -> some View {
         let on = selected == row.key
         let offered = RequestAction.offered(row, gets: server.access.can(.request), online: reachability.online)
@@ -419,7 +430,7 @@ struct MacRequestsPage: View {
             cell(widths[4]) { speedCell(row) }
             cell(widths[5], alignment: .trailing) { buttons(row) }
         }
-        .frame(height: CGFloat(RequestColumns.rowHeight))
+        .frame(height: CGFloat(rowSize.requestRowHeight))
         .foregroundStyle(on ? DWPalette.selt : DWPalette.head)
         .background {
             if on {
@@ -475,7 +486,7 @@ struct MacRequestsPage: View {
         HStack(spacing: 8) {
             let addresses = row.cover.map { [ArchiveCoverID(.release, $0.lowercased())] } ?? []
             ArchiveCover(addresses: addresses, size: ArchiveCoverSize.row)
-                .frame(width: CGFloat(RequestColumns.cover), height: CGFloat(RequestColumns.cover))
+                .frame(width: CGFloat(rowSize.requestCover), height: CGFloat(rowSize.requestCover))
                 .clipShape(DWCorners.chipShape)
                 .overlay(DWCorners.chipShape.strokeBorder(MacPalette.coverEdge, lineWidth: 1))
                 .accessibilityHidden(true)

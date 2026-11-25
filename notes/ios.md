@@ -18683,3 +18683,203 @@ caught, rightly: it still fits, so it was replaced by the drawing's widths, whic
   `navigation.pageGone` run again. Whether pageGone running mid-Edit matters on the Mac (a sidebar row clicked again
   no longer stopping at the page) wasn't checked; moving the modifiers off the Group would touch the phone's page,
   which R5 left as it was.
+
+## The Mac's Row Size (2026-11-25)
+
+James, after R5 left the Mac's rows at R2's 30 with a 20 cover ("For James: left as they are" above): "I need
+something on mac to resize the row height". Still app 0.13 (13); no server change, no new route, nothing on the phone.
+
+**His two choices.**
+
+1. **Where: View > Row Size**, as Music and Finder do it - a submenu of **Small**, **Medium** and **Large**, the one in
+   use ticked, and **⌘+** / **⌘−** a size at a time, stopping at the ends with the item that can't step dimmed. ⌘+ is
+   drawn as Finder draws Make Bigger, and works typed as ⌘⇧= or ⌘= on a US keyboard. Kept on this Mac alone, as the
+   Mac keeps its sidebar's side and Grid or List.
+2. **The sizes**: Small 30 with a 20 cover (today's, and the default), Medium 40 with 28 (the drawings'), Large 52 with
+   40. The words keep their size, centred in the row; the header strip (24) and a heading's row (26) never change.
+   Requests: Small its drawing's 34 (a cover and a meter in it), Medium 40, Large 52; its cover 22, 28, 40.
+
+### Core: `MacRowSize` (`DeadwaxCore/MacRowSize.swift`, beside MacLook)
+
+- `small`, `medium`, `large`; `standard` (Small) and `init(saved:)` - an unknown or missing saved value reads as Small;
+  `storageKey` `deadwax-mac-row-size`.
+- `rowHeight` (Small is `MacLook.rowHeight`, never a copy of it; 40, 52) and `cover` (20, 28, 40);
+  `requestRowHeight` and `requestCover` (Small is `RequestColumns.rowHeight` 34 and `.cover` 22, Medium and Large
+  every list's own).
+- `bigger` and `smaller`, nil at their ends.
+- `boxHeight(rows:headings:)` and `boxLeast(rows:headings:)`: the album page's songs box as R5 added it up - the header,
+  each row at this size, each heading at its own 26, the edge's 2; at least the header and three rows, or the whole
+  box when that is shorter. (After review) `boxLeast(rows:headings:room:)` holds that least to the room the page has
+  left (never below 0; nil, unmeasured, leaves it as it is), and `boxRoom(page:around:)` is that room - the page's
+  height less what's around the box, nil while the page is unmeasured (0).
+- `coverGrowth` and `requestCoverGrowth`: how much wider the cover is than Small's. Playlists' Playlist and Requests'
+  Album keep that on top of their least (`MacAlbumFacts.playlistLeast(_:)` 160/168/180,
+  `RequestColumns.albumLeast(_:)` 160/166/178), so the name keeps the room it has at Small.
+  `MacAlbumFacts.playlistColumns(width:size:)` and `RequestColumns.width/widths(_:size:)` take the size, defaulting to
+  Small, so R5's and R8's callers and tests read as before.
+- **The menu, in MacMenu**: `Command`'s `smallRows`, `mediumRows`, `largeRows`, `biggerRows` and `smallerRows`;
+  `Command.rowSizes` and `Command.rowSize`; `State.rowSize`; `MacMenu.rowSize(_:)`, the submenu's two sections;
+  `MacMenu.rowSize(after:from:)`, the size an item leaves the rows at; `Words.rowSize` "Row Size", "Small", "Medium",
+  "Large", "Make Bigger", "Make Smaller"; `key` ⌘+ (`.character("+")`) and ⌘- (`.character("-")`), the three sizes
+  none; `alternateKey`, ⌘= for Make Bigger alone. A size is always enabled and ticked while it's the size; a step is
+  enabled while there is a size to step to. **The menu's items are never dimmed for a sheet, the sign-in or Now
+  Playing**: they change only how tall rows are, and act on nothing under a sheet. (After review) `MacMenu.choose(_:saved:)`:
+  an item's click from what's kept - the size it leaves the rows at and the value to keep, nil for a step with no
+  further to go or another menu's command; a garbage kept value steps from Small.
+
+### The App
+
+- **`App/Mac/Components/MacRowSizing.swift`**: the environment's `macRowSize` (default Small). **DesktopFrame** hands
+  the kept choice down once, `.environment(\.macRowSize, MacRowSizeStore.shared.size)`, so every list under the frame
+  changes together. A sheet is a window of its own on the Mac, outside the frame, so it reads the key's default,
+  Small (no sheet draws a Mac list today, so nothing shows it).
+- **`MacRowSizeStore`** (after review; at MacCommands' end, beside TextEditing and MacRefresh): the one place the size is
+  read and changed - `@MainActor @Observable`, `shared`, `size`, reading UserDefaults under `MacRowSize.storageKey` as
+  it opens (`MacRowSize(saved:)`: unknown reads as Small) and keeping each choice as it is made
+  (`perform(_:)`, through `MacMenu.choose`). The frame, the menus' state and `perform`, and the hidden ⌘= key all read
+  it, so a change by any of them redraws the menu's tick and every list at once. It replaced three `@AppStorage`s
+  (the frame's, the Commands', the key's): a `Commands` reading `@AppStorage` was the one menu state not observed the
+  way the others are, and the review asked whether the tick would follow a change made by ⌘+ or ⌘=.
+- **The readers**: MacColumnList's row (`.frame(height: CGFloat(rowSize.rowHeight))`) - Albums and Artists in List, an
+  album's songs, Playlists, a playlist's songs; MacAlbumsPage's cover, MacArtistsPage's round picture and
+  MacPlaylistsPage's cover (`rowSize.cover`); MacPlaylistsPage's columns (`playlistColumns(width:size:)`); MacAlbumPage's
+  songs box (`rowSize.boxHeight` / `boxLeast`); MacRequestsPage's row, cover and table width
+  (`requestRowHeight`, `requestCover`, `width/widths(_:size:)`). Requests' meter keeps its 6 and its words, centred
+  in the taller row. MacPlaylistPage needed no change: its songs are MacColumnList's. The headings' rows, the header
+  strip and the phone's `DWLook.here.rowHeight` are untouched.
+- **(After review) The album page in a short window.** At 600 tall the page is 442 (600 less the title bar 28, the
+  player bar 66, the toolbar 40 and the status bar 24); with its edges (20 + 16 + 18), the hero (132) and Properties
+  (about 100-112), Large's least of 180 overflowed by 24 to 36, pushing Properties off the page. The least now shrinks
+  to what's left: the page, the hero and Properties are measured (`onGeometryChange`, the page through the same
+  `frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)` MacPage already gives it, so nothing
+  moves) and `boxLeast(..., room: boxRoom)` holds the least to the room. None of the three depends on the box, so
+  there's no loop. At normal heights (the opening window's 820, a 662 page) the room is above every least and the
+  page is as drawn. Shrinking the least was chosen over letting the page scroll: inside a page's scroll the box would
+  be offered all the height it asks for, so a long album would scroll the whole page, not its box, at every height.
+  MacRowSizeTests adds it up.
+- **No Page Up/Down to add up**: MacColumnList and `Platform.listKeys` move by row (↑ ↓ Home End, ⌘↑ ⌘↓) and bring the
+  selected row into view by its id, so nothing else counted rows. (After review) A size change moves the selected
+  row too, so MacColumnList and Requests' table each bring it back (`onChange(of: rowSize)` beside their
+  `onChange(of: selected)`, `proxy.scrollTo` by the same ids).
+- **The menu** (`App/Shared/MacCommands.swift`): `CommandGroup(after: .toolbar)` - under Refresh, a Divider, then
+  `Menu(MacMenu.Words.rowSize)`: the three as ticks (`tick`), a Divider, the two steps as buttons (`button`), all
+  through MacMenu's items as every other item is. `perform` hands the click to `MacRowSizeStore.shared.perform` (the
+  case sits before Save changes, which slice 7's test holds last). The menus' state reads `MacRowSizeStore.shared.size`.
+- **⌘= (`RowSizeAlternateKey`, at MacCommands' end)**: a Mac menu item has one key, and the menu draws ⌘+, so ⌘= -
+  the same key without ⇧ - is a hidden button on DesktopFrame: `keyboardShortcut(MacCommands.shortcut(MacMenu.alternateKey(.biggerRows)))`,
+  dimmed at Large as the item is, (after review) `focusable(false)` so it's never a Tab stop with keyboard navigation
+  on, 0 by 0, `opacity(0)` and `accessibilityHidden(true)` (VoiceOver reads the menu's item, never this). It's
+  MacCommands' third key, the one file besides Platform allowed `keyboardShortcut`. **What answers where**: ⌘+ (⌘⇧=)
+  and ⌘− are the menu's, and answer wherever the menu does; ⌘= is the main window's button, so it answers while that
+  window is key. Whether ⌘= answers with a sheet up or before sign-in is unseen.
+- **The keys were free.** No MacMenu item and nothing in Platform has +, - or =. The system's own ⌘+ and ⌘- are
+  Format > Font > Bigger and Smaller (UIKitMacHelper's MainMenu.nib, read with `strings`), gone with Format's
+  `CommandGroup(replacing: .textFormatting) {}` - the same evidence that let Info take Italic's ⌘I (slice 3). Catalyst's
+  View has no zoom of its own. ⌘= is in no menu.
+- **The words fixtures** (Fixtures/words, iphone.json and mac.json) are unchanged: DeviceWordsTests holds only words
+  that say phone or iPhone and the words made from them, and MacMenu.Words has none.
+
+### Large still fits
+
+At Large Playlists' fixed columns (478) and Playlist's least (180) are 658: every column in the smallest window's page
+(880 - 220 = 660) and beside the side panel R3 drew in a 1280 window (1280 - 220 - 400 - 1 = 659); beside the web's
+panel (589) Whose and Changed go, as at Small (258 + 180). Requests' least is 842 + 178 = 1020, inside a window as
+it first opens (1060); narrower, it scrolls sideways as it already does at Small (1002).
+
+### Tests, and the faults they were seen failing on
+
+- **DeadwaxKit `MacRowSizeTests`** (9): the three sizes and their covers, Small MacLook's own and Requests' own; the
+  default Small, and nil or garbage saved reading as Small; each step one size, stopping at both ends; the menu's two
+  sections, the one tick, the steps' dimming at each size, never dimmed under a sheet; each item's resulting size and
+  no other command's; ⌘+, ⌘- and ⌘= each once, ⌘= no item's own key; the album box added up at each size; Large's fit
+  for Playlists at every page width from 589 to 1400, and Requests at 1060, 660, 659 and 589. `MacMenuTests`' keys
+  table gains ⌘+ and ⌘-.
+- **`tests/test_ios_mac_rows.py`** (8): the sizes read from Core's switches; every list's reader, line for line; no row
+  height of its own left anywhere in App/Mac (no 30 or 34, no `MacLook.rowHeight`, `RequestColumns.rowHeight` or
+  `.cover`; no 20 or 22 cover in the lists' pages), with planted lines caught; the one `.environment` and who may name
+  it (App/Mac, DesktopFrame, MacCommands - never a phone file); the menu's words, sections, keys, ticks and dimming;
+  the submenu under Refresh, `perform` and the state; the hidden ⌘= key; Large's fit, summed from MacLook's, MacFrame's
+  and the columns' own numbers. R5's, R8's and slice 2's tests (test_ios_album_look, test_ios_requests_look,
+  test_ios_mac) now pin the size-reading lines where they pinned the fixed ones.
+- **Mutations**, each applied alone, run, and restored byte for byte (`cmp` against a copy) - every one caught:
+  the default `.medium` (MacRowSizeTests' default, Requests' fit, RequestFilterTests' two width tests, and
+  test_three_sizes_small_the_default); Large's `bigger` `.large` instead of nil (the steps, the sizes' order, Make
+  Bigger's dimming, and the Python sizes test); MacColumnList's row back to `MacLook.rowHeight` (test_every_mac_list_reads_the_size_chosen
+  and test_no_row_height_of_its_own_left_on_the_mac); Make Bigger's key `=` (MacRowSizeTests' keys, MacMenuTests'
+  theKeysAsThePlanHasThem, test_view_row_size_is_three_ticks_and_two_keys); and three more - the album box at Small's
+  height whatever the size (test_every_mac_list_reads_the_size_chosen, test_the_macs_columns_are_the_drawings), Requests'
+  row a literal 34 (both rows tests and test_the_macs_table_is_the_drawings), and the hidden key never dimmed
+  (test_command_equals_is_make_biggers_second_key).
+
+### After review
+
+The review confirmed no bug, but six of its eleven mutations passed every test: M1 and M2 (MacColumnList's cell and
+Requests' `cell()` pinned to the row's top), M5 (MacColumnList's header at `rowSize.rowHeight`), M7 (a second cover
+frame at Small's size after MacAlbumsPage's), M8 (the ticks' setter doing nothing) and M11 (a second row frame at
+Small's height after the reader's). M3 (Requests' meter at the row's top) had been caught only by text that happened
+to sit next to it. It also asked for the menu state's one mechanism, `focusable(false)` on the hidden key, the album
+page in a short window, the selection kept in view, and the sheet sentence. All of these are above. The tests that now
+catch them:
+
+- **`tests/test_ios_mac_rows.py`** (8 tests, now 17). `calls()` reads each `.frame(`'s (or a stack's) arguments to
+  their own closing parenthesis, `heights()` keeps the frames that set a height, and `off_centre()` finds a frame or a
+  stack aligned `.top` or `.bottom` (an overlay's own alignment, such as the row line's rule, is allowed).
+  - `test_a_row_is_one_height_the_size_chosen`: MacColumnList's row and Requests' row each have exactly one height
+    frame, the chosen size's. Requests' `cell()` has its one frame, and no page's cell sets a height except its cover.
+  - `test_each_lists_cover_is_one_size_the_size_chosen`: each cover's whole chain has exactly its one frame (Artists'
+    picture none, sized by `side:`), with the next view right after it.
+  - `test_the_header_and_a_headings_row_keep_their_heights_at_every_size`: both headers at `MacLook.headerHeight`,
+    both headings' rows at their 26, with no `rowSize` in any of them.
+  - `test_a_rows_words_sit_in_its_middle`: nothing off-centre in the rows, their stacks, Requests' six `cell(...)`
+    calls, or any page's cell.
+  - `test_a_downloads_meter_sits_in_the_rows_middle`: the downloading case has exactly one frame (its least width), one
+    stack, and no alignment.
+  - `test_every_tick_carries_its_click_out`: `tick()` pinned whole, the file's one Toggle and one Binding, each tick
+    drawn through it, and each click reaching its call.
+  - `test_row_size_is_kept_in_one_store`: the store's read, write and readers; the key named only there; no
+    `@AppStorage` of it.
+  - `test_a_short_window_keeps_properties_on_the_page`.
+  - `test_the_row_selected_stays_in_view_as_the_size_changes`.
+  - `test_no_row_height_of_its_own_left_on_the_mac` now also refuses `MacRowSize.small/medium/large/standard` named
+    anywhere in App/Mac.
+- **`MacRowSizeTests`** (9, now 11):
+  - `choosingASizeByNameKeepsThatSize`: `MacMenu.choose` for nothing kept, empty, garbage and each size.
+  - `aShortWindowNeverPushesPropertiesOffThePage`: the 442 page at every size with Properties up to 250, and the 662
+    page as drawn.
+
+Every mutation, re-run by the reviewer's runner, each applied alone to the worktree and restored byte for byte
+(`filecmp`), against the eleven look and Mac test files (all their failures, not the first):
+
+| | mutation | caught by |
+| --- | --- | --- |
+| M1 | MacColumnList's cell `.frame(maxHeight: .infinity, alignment: .top)` | a_row_is_one_height, a_rows_words_sit_in_its_middle |
+| M2 | Requests' `cell()` the same | a_row_is_one_height, a_rows_words_sit_in_its_middle |
+| M3 | the meter `.frame(maxHeight: .infinity, alignment: .top)` | a_row_is_one_height, a_rows_words_sit, a_downloads_meter_sits_in_the_rows_middle, test_ios_requests_look's nothing_in_the_macs_progress_column_draws_past_it |
+| M4 | the tick's `get` always false | test_ios_mac's the_menus_are_mac_menus_and_nothing_else, every_tick_carries_its_click_out |
+| M5 | MacColumnList's header at `rowSize.rowHeight` | the_header_and_a_headings_row_keep_their_heights |
+| M6 | Requests' header at `rowSize.requestRowHeight` | the_header_and_a_headings_row_keep_their_heights, test_ios_requests_look's the_macs_table_is_the_drawings |
+| M7 | a second Albums cover frame at `MacRowSize.standard.cover` | no_row_height_of_its_own_left, a_row_is_one_height, each_lists_cover_is_one_size |
+| M8 | the tick's `set` doing nothing | every_tick_carries_its_click_out |
+| M9 | the frame's `RowSizeAlternateKey()` gone | the_frame_hands_the_one_choice_down, command_equals_is_make_biggers_second_key |
+| M10 | Medium's cover 30 | three_sizes_small_the_default, and swift test (rc 1) |
+| M11 | a second row frame at `MacRowSize.small.rowHeight` | no_row_height_of_its_own_left, a_row_is_one_height, a_rows_words_sit_in_its_middle |
+| M12 | the meter's whole stack `.frame(maxHeight: .infinity, alignment: .top)` (added here) | a_row_is_one_height, a_rows_words_sit, a_downloads_meter_sits_in_the_rows_middle |
+
+After the fixes:
+- swift test: 2499 tests in three runs (12, 2329, 158), all passing.
+- The unsigned iOS Debug and Mac Catalyst Release builds both succeeded, with no warnings in the files touched.
+- check_project.py and pyflakes are clean.
+- pytest of `tests/test_ios_*.py` and `tests/test_source_bytes.py`: 789 passed, 1 skipped.
+
+### Not verified - checks 608 and 609
+
+Nothing here has run on a Mac (James's app was running: no smoke run). The first launch says whether Format's Bigger
+and Smaller really went with Format - were they still there, UIKit would throw at launch over two ⌘+ - and the Mac
+says whether the menu draws ⌘+ and ⌘-, whether ⌘⇧= and ⌘= both step, whether the hidden button's key fires and stays
+off at Large (and what it does with a sheet up, or before sign-in), whether `focusable(false)` keeps it off the Tab
+order, whether the tick follows at once (MacRowSizeStore observed from a `Commands`, as TextEditing's typing already
+is), and whether the size is there after a quit. Whether a 40 cover sits well in a 52 row, Requests' meter and chips
+in a 52 row, the album's box at each size and in a short window (the measured heights, and Properties kept on the
+page), the selected row kept in view as the size changes - and VoiceOver reading the submenu - only the screen can
+tell. Songs, Search and an artist's page are still
+the phone's pages on the Mac and don't follow Row Size; their slices read `MacRowSize` when they become the Mac's own.

@@ -27,6 +27,12 @@ import Foundation
 // the one in front, as deep as the deepest sheet (so Set up Navidrome's sheet, which is one, counts, and any other sheet
 // over the page dims it), and never under the sign-in. And Tab in a page's fields (`tab`): the next field in the order
 // the page draws them.
+//
+// (The Mac's Row Size, notes/ios.md "The Mac's Row Size (2026-11-25)") And View's Row Size: a submenu of Small, Medium
+// and Large, the one chosen ticked, then Make Bigger (⌘+) and Make Smaller (⌘−), each a size at a time and dimmed at
+// its end (MacRowSize's sizes, kept on this Mac). ⌘+ is drawn as Finder draws Make Bigger - the + itself, which a US
+// keyboard types as ⇧⌘= - and ⌘= is the same item's hidden second key (`alternateKey`), so either way it's typed works.
+// Never dimmed for a sheet or the sign-in: it only changes how tall the rows are, kept for when they show.
 
 public enum MacMenu {
     /// What the menus are drawn from - read by the App each time it draws them.
@@ -74,12 +80,15 @@ public enum MacMenu {
         /// (Slice 7) Its Save changes can be pressed now - the button's own rule (ServerSettingsModel.saveOpen: changes
         /// unsaved, none saving, deadwax in reach, the permission).
         public var saveOpen: Bool
+        /// (The Mac's Row Size) How tall the lists' rows are, as this Mac keeps it: its item ticked, the steps from it.
+        public var rowSize: MacRowSize
 
         public init(queued: Bool = false, playing: Bool = false, shuffle: Bool = false, paged: PagedScope? = nil,
                     repeatMode: Repeat = .off, length: Double = 0, hasAlbum: Bool = false, typing: Bool = false,
                     tabs: Bool = true, refresh: Refresh = .none, nowPlaying: Bool = false, sheet: Bool = false,
                     sidebarShown: Bool = true, panel: MacDock.Tab? = nil, selected: Bool = false,
-                    lyrics: LyricsHave = .unknown, serverSettings: Bool = false, saveOpen: Bool = false) {
+                    lyrics: LyricsHave = .unknown, serverSettings: Bool = false, saveOpen: Bool = false,
+                    rowSize: MacRowSize = .standard) {
             self.queued = queued
             self.playing = playing
             self.shuffle = shuffle
@@ -98,6 +107,7 @@ public enum MacMenu {
             self.lyrics = lyrics
             self.serverSettings = serverSettings
             self.saveOpen = saveOpen
+            self.rowSize = rowSize
         }
     }
 
@@ -116,6 +126,9 @@ public enum MacMenu {
         // (slice 6) File's - and (slice 7) Server settings' Save changes
         case importEQFile
         case saveChanges
+        // (the Mac's Row Size) View > Row Size's three, then its two steps
+        case smallRows, mediumRows, largeRows
+        case biggerRows, smallerRows
 
         /// (Slice 3) The View menu's side panel - (R3) the dock's four tabs, in the dock's order: Queue, Lyrics, Info, EQ.
         /// Sources is the Get page's own, and has no item.
@@ -134,6 +147,20 @@ public enum MacMenu {
 
         /// Repeat's three, in Up Next's order (off, all, one).
         public static let repeats: [Command] = [.repeatOff, .repeatAll, .repeatOne]
+
+        /// (The Mac's Row Size) Row Size's three, smallest first.
+        public static let rowSizes: [Command] = [.smallRows, .mediumRows, .largeRows]
+
+        /// The size this Row Size item chooses - nil for every other (the steps included: theirs depends on the size
+        /// now, `MacMenu.rowSize(after:from:)`).
+        public var rowSize: MacRowSize? {
+            switch self {
+            case .smallRows: return .small
+            case .mediumRows: return .medium
+            case .largeRows: return .large
+            default: return nil
+            }
+        }
 
         /// The Repeat this item sets - nil for every other.
         public var repeatMode: Repeat? {
@@ -227,6 +254,13 @@ public enum MacMenu {
         public static let hideSidebar = "Hide Sidebar"
         /// (Slice 6) File's: the Open panel, for an EQ file - an ellipsis, as the Mac writes an item that opens a panel.
         public static let importEQFile = "Import EQ File\u{2026}"
+        /// (The Mac's Row Size) View's submenu, its three sizes and its two steps.
+        public static let rowSize = "Row Size"
+        public static let smallRows = "Small"
+        public static let mediumRows = "Medium"
+        public static let largeRows = "Large"
+        public static let biggerRows = "Make Bigger"
+        public static let smallerRows = "Make Smaller"
     }
 
     /// How far Forward and Back move, in seconds.
@@ -251,8 +285,18 @@ public enum MacMenu {
         case .eq: return Shortcut(.character("e"), [.option, .command])
         case .importEQFile: return Shortcut(.character("o"), .command)
         case .saveChanges: return Shortcut(.character("s"), .command)
+        //? (the Mac's Row Size) drawn ⌘+ and ⌘−, as Finder's Make Bigger and Make Smaller are
+        case .biggerRows: return Shortcut(.character("+"), .command)
+        case .smallerRows: return Shortcut(.character("-"), .command)
         case .shuffle, .repeatOff, .repeatAll, .repeatOne: return nil
+        case .smallRows, .mediumRows, .largeRows: return nil
         }
+    }
+
+    /// (The Mac's Row Size) An item's second key, drawn nowhere: ⌘= for Make Bigger - the key a US keyboard's ⌘+ is
+    /// typed on without ⇧, which Finder takes too. nil for every other item.
+    public static func alternateKey(_ command: Command) -> Shortcut? {
+        command == .biggerRows ? Shortcut(.character("="), .command) : nil
     }
 
     /// (Slice 7) Tab in a page's text fields: the field after `from` in `order` (the order the page draws them) - the one
@@ -289,6 +333,32 @@ public enum MacMenu {
         [[.sidebar], Command.panels].map { $0.map { item($0, state) } }
     }
 
+    /// (The Mac's Row Size) View > Row Size, its sections in order: Small, Medium and Large (the one chosen ticked); Make
+    /// Bigger and Make Smaller.
+    public static func rowSize(_ state: State) -> [[Item]] {
+        [Command.rowSizes, [.biggerRows, .smallerRows]].map { $0.map { item($0, state) } }
+    }
+
+    /// (The Mac's Row Size) The size a Row Size item leaves the rows at, from `size`: the one it names, or a step up
+    /// or down - nil where a step has no further to go (Large's Make Bigger, Small's Make Smaller), and for every
+    /// other item.
+    public static func rowSize(after command: Command, from size: MacRowSize) -> MacRowSize? {
+        switch command {
+        case .biggerRows: return size.bigger
+        case .smallerRows: return size.smaller
+        default: return command.rowSize
+        }
+    }
+
+    /// (The Mac's Row Size, after review) A Row Size item chosen, from the value this Mac keeps now (`saved`, as
+    /// UserDefaults holds it under MacRowSize.storageKey - nothing, or one this build doesn't know, read as Small): the
+    /// size it leaves the rows at and the value to keep for it. nil - and nothing to keep - for a step with no further
+    /// to go, and for every other item. The App's MacRowSizeStore keeps what this answers.
+    public static func choose(_ command: Command, saved: String?) -> (size: MacRowSize, keep: String)? {
+        guard let to = rowSize(after: command, from: MacRowSize(saved: saved)) else { return nil }
+        return (to, to.rawValue)
+    }
+
     /// Where Forward or Back goes from `from` in a song `length` long: kept within the song - nil for any other
     /// command, and with no length known.
     public static func skip(_ command: Command, from: Double, length: Double) -> Double? {
@@ -320,6 +390,11 @@ public enum MacMenu {
         case .eq: return EQWords.nowPlaying
         case .importEQFile: return Words.importEQFile
         case .saveChanges: return ServerSettings.save
+        case .smallRows: return Words.smallRows
+        case .mediumRows: return Words.mediumRows
+        case .largeRows: return Words.largeRows
+        case .biggerRows: return Words.biggerRows
+        case .smallerRows: return Words.smallerRows
         }
     }
 
@@ -349,6 +424,10 @@ public enum MacMenu {
         //? (slice 7) Server settings' Save changes, pressed: its page in front - not under Now Playing or another sheet
         //? (`serverSettings` says the page is the one in front, sheet or none) - and the button's own rule
         case .saveChanges: return state.tabs && !state.nowPlaying && state.serverSettings && state.saveOpen
+        //? (the Mac's Row Size) a size can always be chosen - it only changes how tall the rows are - and a step only
+        //? while there is a size to step to: Make Bigger dimmed at Large, Make Smaller at Small
+        case .smallRows, .mediumRows, .largeRows: return true
+        case .biggerRows, .smallerRows: return rowSize(after: command, from: state.rowSize) != nil
         }
     }
 
@@ -357,6 +436,7 @@ public enum MacMenu {
         case .shuffle: return state.queued && state.shuffle
         case .repeatOff, .repeatAll, .repeatOne: return state.queued && command.repeatMode == state.repeatMode
         case .upNext, .lyrics, .info, .eq: return state.panel == command.panel
+        case .smallRows, .mediumRows, .largeRows: return state.rowSize == command.rowSize
         default: return false
         }
     }

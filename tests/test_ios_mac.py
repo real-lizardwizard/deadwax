@@ -308,6 +308,8 @@ def test_the_menus_are_mac_menus_and_nothing_else():
     # no words of its own: no string literal in the menus at all (a literal reads "" once its contents are blanked)
     assert '"' not in commands, "a string literal in the menus: their words are MacMenu's"
     assert re.findall(r"\b(Button|Toggle|Menu|CommandMenu)\(([^,){]*)", commands) == [
+        #? (the Mac's Row Size) View > Row Size, a submenu of MacMenu's words (test_ios_mac_rows)
+        ("Menu", "MacMenu.Words.rowSize"),
         ("CommandMenu", "MacMenu.Words.controls"), ("Menu", "MacMenu.Words.repeatMenu"),
         ("Button", "item.words"), ("Toggle", "item.words"),
     ]
@@ -361,7 +363,9 @@ def test_the_menus_are_mac_menus_and_nothing_else():
     assert every == ["settings", "find", "refresh", "playPause", "next", "previous", "forward", "back", "shuffle",
                      "repeatOff", "repeatAll", "repeatOne", "goToCurrentSong", "sidebar", "upNext", "lyrics", "info",
                      #? (R3) View > EQ (⌥⌘E), the side panel's EQ tab
-                     "eq", "importEQFile", "saveChanges"]
+                     "eq", "importEQFile", "saveChanges",
+                     #? (the Mac's Row Size) View > Row Size's three and its two steps
+                     "smallRows", "mediumRows", "largeRows", "biggerRows", "smallerRows"]
     for name in every:
         assert f"case .{name}" in perform or f".{name}," in perform or f", .{name}" in perform, name
 

@@ -341,7 +341,9 @@ def test_the_macs_columns_are_the_drawings():
     # (test_playlists_columns_fit_beside_the_side_panel) - each cell by its column, never by its place
     assert re.search(r"case playlist, songs, length, whose, changed, onDevice\n", words)
     lists = flat(bare(source(MAC_PLAYLISTS)))
-    assert "GeometryReader { (room: GeometryProxy) in let shown = MacAlbumFacts.playlistColumns(width: Double(room.size.width))" in lists
+    # (the Mac's Row Size) at the rows' size: Playlist's least grows with its cover
+    assert ("GeometryReader { (room: GeometryProxy) in let shown = MacAlbumFacts.playlistColumns(width: Double(room.size.width), size: rowSize)"
+            in lists)
     assert "MacColumnList(columns: Self.columns(shown), rows: rows, selected: $selected," in lists
     assert "if shown.indices.contains(column) { cell(playlist, shown[column]) }" in lists
     assert "MacListColumn(title: MacAlbumFacts.playlistTitle(column, device: Platform.device), width: MacAlbumFacts.playlistWidth(column))" in lists
@@ -366,9 +368,15 @@ def test_the_macs_columns_are_the_drawings():
     assert "case .group(let title): heading(title)" in columns
     heading = flat(body(bare(source("Mac/Components/MacColumnList.swift")), "private func heading("))
     assert "MacLook.groupRowHeight" in heading and ".accessibilityAddTraits(.isHeader)" in heading
-    # the box as tall as its rows and its headings; never asked to be taller at least than at most
-    assert "+ MacLook.groupRowHeight * Double(headings)) + 2" in songs
-    assert "let least = min(CGFloat(MacLook.headerHeight + MacLook.rowHeight * 3), tall)" in songs
+    # the box as tall as its rows and its headings; never asked to be taller at least than at most - (the Mac's Row
+    # Size) its rows added up at the size the list draws them, Core's MacRowSize (MacRowSizeTests adds them up) - and
+    # its least never more than the page has left (test_ios_mac_rows' test_a_short_window_keeps_properties_on_the_page)
+    assert "let tall = CGFloat(rowSize.boxHeight(rows: rows.count, headings: headings))" in songs
+    assert "let least = CGFloat(rowSize.boxLeast(rows: rows.count, headings: headings, room: boxRoom))" in songs
+    sizes = (CORE / "MacRowSize.swift").read_text(encoding="utf-8")
+    assert ("MacLook.headerHeight + rowHeight * Double(max(rows, 0)) + MacLook.groupRowHeight * Double(max(headings, 0)) + 2"
+            in sizes)
+    assert "min(MacLook.headerHeight + rowHeight * 3, boxHeight(rows: rows, headings: headings))" in sizes
     assert ".frame(minHeight: least, maxHeight: tall)" in songs
 
 
@@ -400,8 +408,9 @@ def test_playlists_columns_fit_beside_the_side_panel():
     assert every + least <= smallest - sidebar, (every, least)
     assert every + least <= column - sidebar - dock - 1, (every, least)
     # and the rule is the width the list is given, all or the dropped left out (MacAlbumFactsTests runs it)
-    choose = flat(body(facts, "public static func playlistColumns(width: Double) -> [PlaylistColumn] {"))
-    assert "if width - fixedWidth(all) >= playlistLeast { return all }" in choose
+    # - (the Mac's Row Size) Playlist's least the rows' size's (test_ios_mac_rows checks Large still fits)
+    choose = flat(body(facts, "public static func playlistColumns(width: Double, size: MacRowSize = .standard) -> [PlaylistColumn] {"))
+    assert "if width - fixedWidth(all) >= playlistLeast(size) { return all }" in choose
     assert "!playlistDropped.contains(column)" in choose
 
 

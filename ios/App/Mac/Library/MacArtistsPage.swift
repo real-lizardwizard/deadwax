@@ -9,7 +9,8 @@ import UIKit
 ///
 /// - The toolbar: Play, Shuffle, the groove, Sort and its pop-up (ArtistsModel.order, shared with the phone's page),
 ///   Grid | List, and Find in artists at its end.
-/// - The list (MacColumnList): Artist (their round 20 pt picture and their name), Albums (Navidrome's count, as the
+/// - The list (MacColumnList): Artist (their round picture - 20, 28 or 40 by View > Row Size, the rows 30, 40 or 52 -
+///   and their name), Albums (Navidrome's count, as the
 ///   phone's row says it), and Songs, Plays and Last played - each summed from the scope's album index by Core's
 ///   ArtistTotals (its albums whose album artist is theirs), made once per answer, never in the body; nothing is asked
 ///   for them. A click selects, a double-click or Return opens their page. Last played's words are read against a
@@ -34,6 +35,8 @@ struct MacArtistsPage: View {
     @Environment(PlayerModel.self) private var player
     @Environment(DownloadModel.self) private var downloads
     @Environment(ShuffleModel.self) private var shuffles
+    /// (The Mac's Row Size) The rows' size: the picture's, the list's own row.
+    @Environment(\.macRowSize) private var rowSize
     /// Find's words - the page's own.
     @State private var typed = ""
     /// The row selected, by artist id - in List alone.
@@ -203,7 +206,7 @@ struct MacArtistsPage: View {
         switch column {
         case 0:
             HStack(spacing: 8) {
-                ArtistPicture(id: artist.coverArt, side: 20, pixels: CoverSize.row)
+                ArtistPicture(id: artist.coverArt, side: CGFloat(rowSize.cover), pixels: CoverSize.row)
                     .accessibilityHidden(true)
                 Text(artist.name ?? "")
             }

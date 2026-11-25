@@ -23,7 +23,8 @@ import SwiftUI
 ///   its #. (R5's review) A disc's heading row above its first song wherever the phone's page draws one - more than one
 ///   disc, or a disc with a title - carrying its title (MacAlbumFacts.songLines); # is the song's own track number. A
 ///   nil play count is a blank, never 0. While deadwax can't be reached (or the album is gone), a song not on this Mac
-///   is dimmed. The box is as tall as its rows, scrolling inside once there isn't room.
+///   is dimmed. The box is as tall as its rows, scrolling inside once there isn't room - (the Mac's Row Size) its rows
+///   added up at View > Row Size's height (30, 40 or 52), as the list draws them.
 /// - Properties (.group): Released, Added, Format, Size (every disc's, or none), and Album info's Folder or Folders -
 ///   whenever Album info would show it (AlbumInfo.server, for whoever may see folders): the id bridge's answer, asked
 ///   here when the page's model hasn't it (with logins off, or break-glass, the model asks it for nobody's library).
@@ -37,12 +38,19 @@ struct MacAlbumPage: View {
     @Environment(DownloadModel.self) private var downloads
     @Environment(Reachability.self) private var reachability
     @Environment(AppNavigation.self) private var navigation
+    /// (The Mac's Row Size) The rows' height, which the songs' box adds up as MacColumnList draws them.
+    @Environment(\.macRowSize) private var rowSize
     /// The song row selected, by its place and id.
     @State private var selected: String?
     /// The day "Played yesterday" is read against: taken again at a day's change (midnight crossed).
     @State private var now = ArtistTotals.now()
     /// (R5's review) The id bridge's answer for Properties' folder, asked here when the page's model asked none.
     @State private var bridged: StoreAlbum?
+    /// (The Mac's Row Size, after review) The page as tall as the window gives it, the hero and Properties as drawn:
+    /// what the songs' box has left (`boxRoom`). 0 until measured.
+    @State private var pageTall: Double = 0
+    @State private var heroTall: Double = 0
+    @State private var propertiesTall: Double = 0
 
     /// The columns (Album.dc.html's .cols): Title takes what the others leave.
     static let columns = [
@@ -89,6 +97,13 @@ struct MacAlbumPage: View {
         case full, folded
     }
 
+    /// (The Mac's Row Size, after review) What the songs' box has left on the page: the page's height less its edges,
+    /// the gap above the box, the hero and Properties, as they are drawn now (MacRowSize.boxRoom) - nil until measured.
+    private var boxRoom: Double? {
+        MacRowSize.boxRoom(page: pageTall,
+                           around: Double(Drawn.top + Drawn.bottom + Drawn.boxAbove) + heroTall + propertiesTall)
+    }
+
     var body: some View {
         let model = desk.model
         MacPage {
@@ -99,17 +114,35 @@ struct MacAlbumPage: View {
         } content: {
             VStack(alignment: .leading, spacing: 0) {
                 hero
+                    .onGeometryChange(for: Double.self) { (frame: GeometryProxy) -> Double in
+                        Double(frame.size.height)
+                    } action: { (now: Double) -> Void in
+                        heroTall = now
+                    }
                 if let album = model.album {
                     songs(album)
                         .padding(.top, Drawn.boxAbove)
                         .layoutPriority(1)
                     properties(album)
+                        .onGeometryChange(for: Double.self) { (frame: GeometryProxy) -> Double in
+                            Double(frame.size.height)
+                        } action: { (now: Double) -> Void in
+                            propertiesTall = now
+                        }
                 } else {
                     waiting
                         .padding(.top, Drawn.boxAbove)
                 }
             }
             .padding(EdgeInsets(top: Drawn.top, leading: Drawn.side, bottom: Drawn.bottom, trailing: Drawn.side))
+            // (the Mac's Row Size, after review) the whole page the window gives it - MacPage's own frame, so nothing
+            // moves - measured for what the songs' box has left
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+            .onGeometryChange(for: Double.self) { (frame: GeometryProxy) -> Double in
+                Double(frame.size.height)
+            } action: { (now: Double) -> Void in
+                pageTall = now
+            }
         }
         .macStatus(MacStatusItems.Items(leading: MacAlbumFacts.status(model.songs)))
         .onReceive(NotificationCenter.default.publisher(for: UIApplication.significantTimeChangeNotification)) { _ in
@@ -437,10 +470,12 @@ struct MacAlbumPage: View {
         let headings = drawn.count - rows.count
         let heard = player.current?.track
         // the box as tall as its rows, its headings and its edge while there is room, scrolling within it once there
-        // isn't - never asked to be shorter than three rows unless it is shorter still
-        let tall = CGFloat(MacLook.headerHeight + MacLook.rowHeight * Double(rows.count)
-                           + MacLook.groupRowHeight * Double(headings)) + 2
-        let least = min(CGFloat(MacLook.headerHeight + MacLook.rowHeight * 3), tall)
+        // isn't - never asked to be shorter than three rows unless it is shorter still. (The Mac's Row Size) Each row at
+        // the height the list draws it (MacRowSize.boxHeight), the headings' and the header's as they are - and (after
+        // review) its least never more than the page has left for it, so a short window at Large keeps Properties on
+        // the page
+        let tall = CGFloat(rowSize.boxHeight(rows: rows.count, headings: headings))
+        let least = CGFloat(rowSize.boxLeast(rows: rows.count, headings: headings, room: boxRoom))
         return MacColumnList(columns: Self.columns, rows: rows, lines: drawn, selected: $selected,
                              open: { (line: Line) -> Void in open(line) },
                              menu: { (line: Line) -> SongRightClick in SongRightClick(menu: desk.row(line.song, album)) }

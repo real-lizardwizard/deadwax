@@ -14,8 +14,10 @@ struct MacListColumn: Equatable {
 ///
 /// - The header strip (.cols): 24 tall, its gradient, the label colour at 11.5 semibold, each column's cell 10 in from
 ///   its edges with a rule between, the frame's rule under it.
-/// - Each row (.row) 30 tall on the row line's rule, its cells as the header's, every other row striped (.row.alt, Core's
-///   MacTable.stripes); the selected one (.row.on) in the selection's fill, its purple edge inset and its words.
+/// - Each row (.row) on the row line's rule, its cells as the header's, every other row striped (.row.alt, Core's
+///   MacTable.stripes); the selected one (.row.on) in the selection's fill, its purple edge inset and its words. (The
+///   Mac's Row Size) As tall as View > Row Size says - 30, 40 or 52 (MacRowSize.rowHeight, the environment's
+///   `macRowSize`) - its words centred in it at their own size; the header (24) and a heading's row (26) never change.
 /// - Widths from Core's MacTable.widths over the list's own width. Catalyst can't resize or reorder a column (the build
 ///   plan's section 4).
 /// - A click selects a row; a double-click opens it (MacTable.clicked). With the list focused (a click gives it the
@@ -25,8 +27,8 @@ struct MacListColumn: Equatable {
 ///   in its place; brought into view as it moves. (Its review) ⌘↑ and ⌘↓ go to the ends; another modified key isn't
 ///   the list's.
 /// - (Its review) What the page hangs on each row, `menu` - Albums' right-click, the album page's •••'s items
-///   (AlbumRightClick, as the tiles' and the rows' before R2 had it): applied to the whole row, its 30 points and every
-///   column, so a right-click anywhere on it is the row's.
+///   (AlbumRightClick, as the tiles' and the rows' before R2 had it): applied to the whole row, its whole height and
+///   every column, so a right-click anywhere on it is the row's.
 /// - VoiceOver reads a row as one element, its cells in order, selected when it is; its action opens it.
 /// - (R5's review) `lines`, for a list with headings - an album's discs: each a heading's row (.row.grp, 26 tall, the
 ///   label's words 10 in, a header for VoiceOver) or a row by its id, in order; the stripes start again under each
@@ -44,6 +46,8 @@ struct MacColumnList<Row: Identifiable, Cell: View, Menu: ViewModifier>: View wh
     @ViewBuilder let cell: (Row, Int) -> Cell
 
     @FocusState private var focused: Bool
+    /// (The Mac's Row Size) How tall each row is: View > Row Size's, as this Mac keeps it.
+    @Environment(\.macRowSize) private var rowSize
 
     var body: some View {
         let drawn = lines ?? rows.map { (row: Row) -> MacTable.Line<String> in .row(row.id) }
@@ -78,6 +82,12 @@ struct MacColumnList<Row: Identifiable, Cell: View, Menu: ViewModifier>: View wh
                     .onChange(of: selected) { (_: String?, now: String?) -> Void in
                         guard let now else { return }
                         proxy.scrollTo(now)
+                    }
+                    // (the Mac's Row Size, after review) rows taller or shorter move the one selected: brought back
+                    // into view
+                    .onChange(of: rowSize) { (_: MacRowSize, _: MacRowSize) -> Void in
+                        guard let selected else { return }
+                        proxy.scrollTo(selected)
                     }
                 }
             }
@@ -155,7 +165,7 @@ struct MacColumnList<Row: Identifiable, Cell: View, Menu: ViewModifier>: View wh
         }
         .font(Typeface.Mac.text(.base))
         .foregroundStyle(on ? DWPalette.selt : DWPalette.head)
-        .frame(height: CGFloat(MacLook.rowHeight))
+        .frame(height: CGFloat(rowSize.rowHeight))
         .frame(maxWidth: .infinity, alignment: .leading)
         .background {
             if on {

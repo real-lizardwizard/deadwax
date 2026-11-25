@@ -15,7 +15,9 @@ import SwiftUI
 ///   a 1280 window beside the side panel's column - Whose and Changed are left out. Yours first, then those shared
 ///   with you, then those from files - each in Navidrome's order (PlaylistRules.groups). A click selects, a double-click
 ///   or Return opens the playlist's page; a right-click is its page's •••'s items (PlaylistRightClick). The drawing's
-///   rows are 40 tall with a 28 cover; MacColumnList's rows are the frame's 30, the cover 20 (Albums').
+///   rows are 40 tall with a 28 cover - (the Mac's Row Size) View > Row Size's Medium; Small (30 with 20) is the
+///   default, and Large 52 with 40. Playlist's least grows with the cover (MacAlbumFacts.playlistLeast(_:)), so its
+///   name keeps its room.
 /// - Play and Shuffle play the playlist selected once its songs are in hand: asked once the selection has rested (200
 ///   ms), as its page asks them (PlaylistPageModel), Play and Shuffle dimmed until they come - the tap calls the player
 ///   with them, nothing awaited (PlayerModel.play(playlist:)). (R5's review) Only a playlist listed: the selection lets
@@ -33,6 +35,8 @@ struct MacPlaylistsPage: View {
     @Environment(AppNavigation.self) private var navigation
     @Environment(PlayerModel.self) private var player
     @Environment(\.scenePhase) private var scenePhase
+    /// (The Mac's Row Size) The rows' size: the cover's, the list's own row, and Playlist's least beside the columns.
+    @Environment(\.macRowSize) private var rowSize
     /// Find's words.
     @State private var typed = ""
     /// The row selected, by playlist id.
@@ -186,7 +190,7 @@ struct MacPlaylistsPage: View {
             } else {
                 // (R5's review) the columns that fit the page: Whose and Changed left out beside the side panel
                 GeometryReader { (room: GeometryProxy) in
-                    let shown = MacAlbumFacts.playlistColumns(width: Double(room.size.width))
+                    let shown = MacAlbumFacts.playlistColumns(width: Double(room.size.width), size: rowSize)
                     MacColumnList(columns: Self.columns(shown), rows: rows, selected: $selected,
                                   open: { (playlist: Playlist) -> Void in open(playlist) },
                                   menu: { (playlist: Playlist) -> PlaylistRightClick in
@@ -231,8 +235,8 @@ struct MacPlaylistsPage: View {
             switch column {
             case .playlist:
                 HStack(spacing: 8) {
-                    PlaylistCover(id: playlist.coverArt, side: 20, pixels: CoverSize.row)
-                        .frame(width: 20, height: 20)
+                    PlaylistCover(id: playlist.coverArt, side: CGFloat(rowSize.cover), pixels: CoverSize.row)
+                        .frame(width: CGFloat(rowSize.cover), height: CGFloat(rowSize.cover))
                         .clipShape(DWCorners.chipShape)
                         .overlay(DWCorners.chipShape.strokeBorder(MacPalette.coverEdge, lineWidth: 1))
                         .accessibilityHidden(true)

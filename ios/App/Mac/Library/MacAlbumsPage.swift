@@ -7,10 +7,11 @@ import SwiftUI
 ///
 /// - The toolbar (.bar): Play, Shuffle, the groove, Sort and its pop-up (LibraryModel.sort, shared with the phone's
 ///   page), Grid | List, and Find in albums at its end, 230 wide.
-/// - The list (MacColumnList): Album (its 20 pt cover, its title, the New mark and - the album playing - the accent's
-///   ▶), Artist (with the album's download mark, as the rows before R2 had it), Year and Songs - the album index's own
+/// - The list (MacColumnList): Album (its cover, its title, the New mark and - the album playing - the accent's ▶),
+///   Artist (with the album's download mark, as the rows before R2 had it), Year and Songs - the album index's own
 ///   facts, nothing asked for them. A click selects, a double-click or Return opens the album's page; a right-click is
-///   the album page's •••'s items (AlbumRightClick), as the tiles' is.
+///   the album page's •••'s items (AlbumRightClick), as the tiles' is. (The Mac's Row Size) The rows and their covers
+///   are View > Row Size's: 30 with a 20 cover, 40 with 28, 52 with 40.
 /// - A selection is the list's alone (R2's review): Grid shows none, so choosing Grid lets it go - nothing unseen is
 ///   Info's, the status bar's or Play's.
 /// - Play plays the album selected once its songs are in hand: they are asked once the selection has rested (200 ms -
@@ -34,6 +35,8 @@ struct MacAlbumsPage: View {
     @Environment(PlayerModel.self) private var player
     @Environment(DownloadModel.self) private var downloads
     @Environment(ShuffleModel.self) private var shuffles
+    /// (The Mac's Row Size) The rows' size: the cover's, the list's own row.
+    @Environment(\.macRowSize) private var rowSize
     /// Find's words - the page's own.
     @State private var typed = ""
     /// The row selected, by album id - in List alone.
@@ -182,7 +185,7 @@ struct MacAlbumsPage: View {
             case 0:
                 HStack(spacing: 8) {
                     LibraryCover(id: album.coverArt, pixels: CoverSize.row)
-                        .frame(width: 20, height: 20)
+                        .frame(width: CGFloat(rowSize.cover), height: CGFloat(rowSize.cover))
                         .clipShape(DWCorners.chipShape)
                         .overlay(DWCorners.chipShape.strokeBorder(MacPalette.coverEdge, lineWidth: 1))
                         .accessibilityHidden(true)

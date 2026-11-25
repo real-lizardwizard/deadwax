@@ -204,21 +204,29 @@ public enum RequestColumns {
     /// in a window as it first opens (1280, the page 1060 beside the sidebar) it never does: 842 and 160 are 1002.
     public static let albumLeast: Double = 160
 
-    /// The table's width in a page `total` wide: the page's, or the least the columns take where the page is narrower.
-    public static func width(_ total: Double) -> Double {
+    /// (The Mac's Row Size) The album's least at a row size: its cover's growth on top of the 160, so the title keeps
+    /// the room it has at Small - 166 at Medium, 178 at Large, whose 1020 still fits a window as it first opens (1060).
+    public static func albumLeast(_ size: MacRowSize) -> Double {
+        albumLeast + size.requestCoverGrowth
+    }
+
+    /// The table's width in a page `total` wide: the page's, or the least the columns take where the page is narrower -
+    /// (the Mac's Row Size) its album's least at the rows' size.
+    public static func width(_ total: Double, size: MacRowSize = .standard) -> Double {
         let fixed = widths.reduce(0.0) { (sum: Double, width: MacTable.Width) -> Double in
             if case .fixed(let points) = width { return sum + points }
             return sum
         }
-        return max(total, fixed + albumLeast)
+        return max(total, fixed + albumLeast(size))
     }
 
-    /// The columns' widths in a page `total` wide.
-    public static func widths(_ total: Double) -> [Double] {
-        MacTable.widths(widths, total: width(total))
+    /// The columns' widths in a page `total` wide, at the rows' size.
+    public static func widths(_ total: Double, size: MacRowSize = .standard) -> [Double] {
+        MacTable.widths(widths, total: width(total, size: size))
     }
 
-    /// A row (the drawing's 34, over dw.css's .row 30: a cover and a meter in it) and its cover.
+    /// A row (the drawing's 34, over dw.css's .row 30: a cover and a meter in it) and its cover - (the Mac's Row Size)
+    /// Small's: the page draws MacRowSize's `requestRowHeight` and `requestCover`, these at Small.
     public static let rowHeight: Double = 34        // drawn: Requests .row height
     public static let cover: Double = 22            // drawn: Requests .cover width
 

@@ -244,7 +244,7 @@ for ([404-415](#the-mac-apps-checks-404-415),
 [416-423](#the-mac-apps-menus-keys-and-window-checks-416-423), [424-433](#the-mac-apps-desktop-frame-checks-424-433),
 [434-438](#the-mac-apps-words-checks-434-438), [439-446](#the-mac-apps-sleep-power-and-downloads-checks-439-446),
 [447-451](#the-mac-apps-eq-files-checks-447-451), [452-458](#the-mac-apps-managing-checks-452-458) and
-[518-525 and 532-540](#the-mac-redesigns-checks-518-607)).
+[518-525, 532-540 and 608-609](#the-mac-redesigns-checks-518-609)).
 
 **What it is today.** The window is laid out as the web app's desktop is, whatever its size: the **sidebar** at the
 left, the **page** you're on beside it, the **side panel** at the right when you open it - Queue, Lyrics, Info or EQ - and the
@@ -366,7 +366,7 @@ and adds deadwax's:
 | **deadwax** | About deadwax, **Settings…** ⌘, (the Settings tab), Hide deadwax ⌘H, Quit deadwax ⌘Q |
 | **File** | **Import EQ File…** ⌘O: the Mac's Open panel, for an EQ setting's `.txt` (see EQ files below); **Save changes** ⌘S: Server settings' Save changes, while one of its pages is in front (see Managing below); Close Window ⌘W - and no New Window: there is only ever one window |
 | **Edit** | **Find** ⌘F: the cursor in the sidebar's search field, the sidebar shown if it was hidden. The Mac's own **Copy** ⌘C and **Select All** ⌘A also copy and select the event log's lines (see Managing below) |
-| **View** | **Show Sidebar** or **Hide Sidebar** ⌃⌘S; **Queue** ⌥⌘U, **Lyrics** ⌥⌘L, **Info** ⌘I, **EQ** ⌥⌘E - each shows its tab of the side panel, or closes the panel when its tab is showing, ticked while it shows; **Refresh** ⌘R: the page you're on, asked again (see below) |
+| **View** | **Show Sidebar** or **Hide Sidebar** ⌃⌘S; **Queue** ⌥⌘U, **Lyrics** ⌥⌘L, **Info** ⌘I, **EQ** ⌥⌘E - each shows its tab of the side panel, or closes the panel when its tab is showing, ticked while it shows; **Refresh** ⌘R: the page you're on, asked again (see below); **Row Size** - **Small**, **Medium** or **Large**, the one in use ticked, then **Make Bigger** ⌘+ and **Make Smaller** ⌘−: how tall every list's rows are (see below) |
 | **Controls** | **Play** or **Pause** (Space), **Next** ⌘→, **Previous** ⌘←, **Forward 10 Seconds** ⌥⌘→, **Back 10 Seconds** ⌥⌘←, **Shuffle**, **Repeat** (Repeat off, Repeat all, Repeat one - the one that's on is ticked), **Go to Current Song** ⌘L (the album of the song playing) |
 
 Format has nothing of deadwax's in it (there's nothing to format), and there's no deadwax Help (no Mac help book:
@@ -400,6 +400,20 @@ The rest of the differences:
   that's downloaded on this Mac has its page's menu - Add to Queue and Album info, no Add to a playlist, Edit album or
   download items. Artists have no right-click menu, as their rows have no •••. The EQ's correction and the event log's
   lines keep their long-press menus, as a right-click.
+- **Row Size.** **View > Row Size** sets how tall the rows are in every list the Mac draws as its own: **Small** - as
+  they've always been, rows 30 points tall with a cover 20 across - **Medium** (40, with a cover of 28) or **Large**
+  (52, with a cover of 40). The one in use is ticked. **Make Bigger** ⌘+ and **Make Smaller** ⌘− go one size at a time
+  and stop at the ends: Make Bigger is dimmed at Large, Make Smaller at Small. ⌘+ (typed ⌘⇧= on a US keyboard) and ⌘−
+  are the menu's keys, so they work wherever the menu does. ⌘= - the same key without Shift, as Finder takes it - works
+  too while deadwax's main window is the one in front. All of them change together: Albums and Artists as a list, an
+  album's songs, Playlists, a playlist's songs and Requests (whose rows are 34 at Small, with room for a meter). Only
+  the rows and their covers grow: the words stay their size, in the middle of the row, and the column headings and a
+  disc's heading row keep theirs. The row you've selected stays in view as the rows grow or shrink. A bigger cover
+  leaves a playlist's or a request's name the room it had, so at Large Playlists still shows every column in the
+  smallest window and beside the side panel, and Requests still fits a window as it first opens. In a short window an
+  album's songs box gives way first, scrolling inside, so Properties stays on the page at Large too. Row Size is kept
+  on this Mac, as Grid or List is, and is as you left it after you quit; the phone has no Row Size, and its rows don't
+  change. All songs, Search and an artist's page are still the phone's pages, so they don't follow it yet.
 - **Escape** closes the sheet in front - its Close, Cancel or Done, so where Close asks before throwing away what you
   typed (Edit album, Artist images, a playlist's Edit), Escape asks too. Where Close doesn't ask, Escape does nothing
   while you've typed something Close would throw away - Add a person's passwords, Reset password's, Which artist is
@@ -6291,7 +6305,7 @@ Ethan's phone as a listener (the one that sees no foot line). Say "pass", or wha
 - **487 [key] VoiceOver.** A top song reads its title and line ("Let It Happen, Currents · 2015"); a missing one
   "…, Not in your library"; "From Last.fm" reads as a link; the listeners line is read under the name.
 
-### The Mac redesign's checks (518-607)
+### The Mac redesign's checks (518-609)
 
 The new look, drawn on the design canvas and built a slice at a time (still app 0.13 (13)): the Mac's first, and the
 phones' from the slices after 524-525, each screen redrawn in its own slice. No server change is needed. Until a slice
@@ -6556,6 +6570,31 @@ so something is downloading, waiting and done.
   meter reads like "3 of 11 files · 244 KB/s". Next peer is **Another source**; Search Soulseek… is the first row.
   At the largest text sizes a card's two buttons stand one over the other, their words on more than one line.)
 - **573 Both phones.** **Not done yet.** Green Anole: the rest as before. Ethan's: 572, or "not done yet".
+
+#### Row Size (608-609)
+
+**Not done yet.** On the Mac, **View > Row Size** makes every list's rows Small, Medium or Large, and ⌘+ and ⌘− step
+between them. Nothing on the phone changes. Have a few albums, a playlist and a request or two to look at.
+
+- **608 View > Row Size and the keys.** **Not done yet.** Each size works, the tick follows it, the ends dim, and it's
+  kept after a quit. (The submenu, under View's **Refresh**: **Small**, **Medium** and **Large**, the one in use
+  ticked, then **Make Bigger** ⌘+ and **Make Smaller** ⌘−. A new install starts at Small, the rows as they were. ⌘+
+  grows the rows one size - typed as ⌘⇧=, or as ⌘= in the main window - and ⌘− shrinks them one; at Large Make Bigger
+  is dimmed and ⌘+ and ⌘= do nothing, at Small Make Smaller is dimmed and ⌘− does nothing. After each key the tick
+  has moved to the new size. Choose Large, quit with ⌘Q, open deadwax again: still Large, still ticked. Tab through
+  the main window with keyboard navigation on: nothing invisible takes a stop. Say what ⌘+, ⌘− and ⌘= do with a sheet
+  open, and before you sign in. With VoiceOver the submenu and its items read as any Mac menu's.)
+- **609 Every list follows it.** **Not done yet.** Albums, Artists, an album, Playlists, a playlist and Requests all
+  change together, and Large still fits at the smallest window with the side panel open. (Albums and Artists in
+  List, an album's songs, Playlists, a playlist's songs and Requests: at each size the rows and their covers grow and
+  shrink, the words stay their size in the middle of the row, and the column headings and a disc's heading row don't
+  change. An album's songs box is as tall as its songs at each size, scrolling inside only when the window is too
+  short. Requests' meters stay readable, nothing in a cell touches its edge. At Large, with the window at its
+  smallest (880) and the side panel open over the page, Playlists shows every column with the names readable, and
+  Requests scrolls sideways as it does at Small; in a window as it first opens (1280) Requests fits without
+  scrolling. An album with many songs in a window made short (about 600 tall) at Large: Properties is still on the
+  page, the songs scrolling inside their box. Select a row far down a long list, then change the size: the row is
+  still in view. Rows still select, open and right-click as before, and VoiceOver reads each as before.)
 
 ## What it can't do yet
 

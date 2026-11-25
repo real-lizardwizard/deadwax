@@ -112,7 +112,9 @@ import Testing
                          // (R3) the dock's EQ tab
                          .eq: "\u{2325}\u{2318}E",
                          // (slice 6) File's - and (slice 7) Server settings' Save changes
-                         .importEQFile: "\u{2318}O", .saveChanges: "\u{2318}S"])
+                         .importEQFile: "\u{2318}O", .saveChanges: "\u{2318}S",
+                         // (the Mac's Row Size) View > Row Size's two steps
+                         .biggerRows: "\u{2318}+", .smallerRows: "\u{2318}-"])
         // no two items share a key
         let keys = MacMenu.Command.allCases.compactMap(MacMenu.key)
         for (i, key) in keys.enumerated() {

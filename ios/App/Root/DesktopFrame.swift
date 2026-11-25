@@ -23,6 +23,9 @@ import SwiftUI
 ///   edge below that (MacFrame.panelStyle); drawn in one place either way, so crossing 1280 keeps it as it is. Never modal: a drawer lies over the page's edge, the rest of the page and the
 ///   sidebar still answer. Opening an album from the player puts a drawer away (AppNavigation.openAlbum).
 /// - The player bar along the foot (PlayerBar), always: "Nothing playing" while nothing is queued.
+/// - (The Mac's Row Size) Every list's rows as tall as View > Row Size says (Small, Medium or Large, kept on this Mac -
+///   MacRowSizeStore): the one choice handed down to all of them (the environment's `macRowSize`), so they change
+///   together; and Make Bigger's second key, ⌘=, held here (RowSizeAlternateKey), so it answers in the main window.
 ///
 /// Now Playing never opens here (MacFrame.opensNowPlaying, decision 5): nothing in the frame opens it, and should
 /// anything ask, it is put back at once. The sheets MainTabs presents over the tabs are presented over the frame: Add to
@@ -102,6 +105,10 @@ struct DesktopFrame: View {
         }
         .environment(status)
         .environment(selection)
+        // (the Mac's Row Size) every list's rows at View > Row Size's height, as this Mac keeps it (MacRowSizeStore,
+        // which the menus read too) - and Make Bigger's second key, ⌘= (MacCommands' menu draws ⌘+)
+        .environment(\.macRowSize, MacRowSizeStore.shared.size)
+        .modifier(RowSizeAlternateKey())
         .onGeometryChange(for: Double.self) { (frame: GeometryProxy) -> Double in
             Double(frame.size.width)
         } action: { (now: Double) -> Void in

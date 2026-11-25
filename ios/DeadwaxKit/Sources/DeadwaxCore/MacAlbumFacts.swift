@@ -245,11 +245,19 @@ public enum MacAlbumFacts {
     /// Changed.
     public static let playlistDropped: Set<PlaylistColumn> = [.whose, .changed]
 
+    /// (The Mac's Row Size) Playlist's least at a row size: its cover's growth on top of the 160, so the name keeps the
+    /// room it has at Small - 168 at Medium, 180 at Large (whose 658 beside every other column still fits the smallest
+    /// window's page, 660, and a 1280 window's beside the side panel, 659).
+    public static func playlistLeast(_ size: MacRowSize) -> Double {
+        playlistLeast + size.coverGrowth
+    }
+
     /// The columns a list `width` wide draws: all six while Playlist keeps its least beside them, else all but Whose
-    /// and Changed - so the fixed ones never reach past the page, as R2's lists keep theirs within it.
-    public static func playlistColumns(width: Double) -> [PlaylistColumn] {
+    /// and Changed - so the fixed ones never reach past the page, as R2's lists keep theirs within it. (The Mac's Row
+    /// Size) Playlist's least is the rows' size's.
+    public static func playlistColumns(width: Double, size: MacRowSize = .standard) -> [PlaylistColumn] {
         let all = PlaylistColumn.allCases
-        if width - fixedWidth(all) >= playlistLeast { return all }
+        if width - fixedWidth(all) >= playlistLeast(size) { return all }
         return all.filter { (column: PlaylistColumn) -> Bool in !playlistDropped.contains(column) }
     }
 

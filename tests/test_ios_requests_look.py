@@ -321,7 +321,8 @@ def test_the_macs_table_is_the_drawings():
     # the selection's colours, the row line under it)
     assert ".frame(height: CGFloat(DWLook.here.groupRowHeight)) .background(MacPalette.groupRowFace)" in page
     assert "let stripes = MacTable.stripes(lines)" in page and "MacPalette.rowStripe" in page
-    assert ".frame(height: CGFloat(RequestColumns.rowHeight))" in page
+    #? (the Mac's Row Size) 34 at Small, its drawing's - MacRowSize.requestRowHeight, View > Row Size's (test_ios_mac_rows)
+    assert ".frame(height: CGFloat(rowSize.requestRowHeight))" in page
     assert ("Rectangle() .fill(DWPalette.selbg) .overlay(Rectangle().strokeBorder(DWPalette.selbd, lineWidth: 1))"
             in page)
     palette = (APP / "Mac" / "Look" / "MacPalette.swift").read_text(encoding="utf-8")
