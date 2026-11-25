@@ -572,7 +572,9 @@ JOB_COLUMNS = {
     #? (2.0.0-player.51) the store_album row a filing ended in, and what it meant for the libraries of
     #? those who asked (src/library_ledger.py grant_for): 'added', 'incomplete', 'flagged' - or NULL
     #? (nothing given: still going, failed, a dry run, nothing filed). A 'flagged' one becomes 'added'
-    #? when an admin adds it for them, 'looked' when they put the flag away (routes/held.py).
+    #? when an admin adds it for them, 'looked' when they put the flag away (routes/held.py). Since 2.1.40 a
+    #? MANUAL search's filing writes album_id itself as well (set_job_album), whatever its grant: the Done
+    #? row's way to its album, which has no release id to be found by.
     "album_id": "INTEGER",
     "library_grant": "TEXT",
 }
@@ -940,7 +942,7 @@ class JobStore:
                 rows = connection.execute(
                     """
                     SELECT id, release_mbid, artist, album, year, username, directory, files_json,
-                           status, error, created_at, updated_at, tried_json, library_grant,
+                           status, error, created_at, updated_at, tried_json, library_grant, album_id,
                            CASE WHEN json_valid(release_json) THEN
                                json_extract(release_json, '$.release_group_mbid')
                            END AS release_group_mbid,
@@ -3079,6 +3081,17 @@ class JobStore:
                                        (album_id, grant, job_id, was))
 
         await self._ledger(write, f"record what job {job_id} gave its requesters")
+
+    async def set_job_album(self, job_id: int, album_id: int) -> None:
+        """(2.1.40) The store_album row a MANUAL search's filing ended in (jobs.album_id), whatever it gave
+        anyone: the Done row's way to its album (the id bridge's `job_id`, /jobs' `filed_as`) - a manual
+        download has no release id to be found by. Any other job's album_id is still written by its grant
+        alone (set_job_grant). Never raises: the album is filed either way."""
+        def write():
+            with self._connect() as connection:
+                connection.execute("UPDATE jobs SET album_id = ? WHERE id = ?", (album_id, job_id))
+
+        await self._ledger(write, f"record which album job {job_id} was filed as")
 
     # ----- each user's credential (SYNCHRONOUS: src/auth.py runs them in the thread pool; they raise)
 

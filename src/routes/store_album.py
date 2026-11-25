@@ -1,6 +1,6 @@
 """
-The id bridge (2.0.0-player.17): `GET /deadwax/store/album?release_mbid=...|navidrome_id=...` - one
-album as the store index has it, and as Navidrome has it.
+The id bridge (2.0.0-player.17): `GET /deadwax/store/album?release_mbid=...|navidrome_id=...|job_id=...` -
+one album as the store index has it, and as Navidrome has it.
 
 An album has three ids, and the app needs to get from any one to the others: Navidrome's album id
 (what plays), the store index's row id (`store_album.id`, which stays put through a re-file or a
@@ -32,10 +32,23 @@ holds one of its present folders - library_ledger.yours_paths), and each other p
 the album page's "In your library" or "In the store" with Add to my library reads. Left out with logins off,
 for the break-glass admin, and when the ledger can't be read.
 
-Exactly one of the two is taken (anything else is a 422): a release id as MusicBrainz writes one,
-or a Navidrome id of at most 256 characters, which is only ever Navidrome's `id` parameter, never
-part of a path. A GET that writes nothing but a tombstone for a folder that has gone - the
-same-origin guard has nothing to guard.
+(2.1.40) Given `job_id`, the album a download was filed as - the native app's Done row of a MANUAL
+search (Search Soulseek), which is filed by its own tags, usually with no release id to be found by. The
+job must be the asker's, or the asker has Everyone's downloads (download._job_for's rule - a 404
+otherwise, as for no download at all). Its `album_id` (store.set_job_album, the poller's for every
+manual filing) leads through index_follow, merges followed, to the live row:
+  - none (not filed yet, nothing filed, the row deleted or missing) - the answer with `present: []`;
+  - a row matched to a release since (Edit album > Release) - EXACTLY the answer for `release_mbid`
+    that release;
+  - otherwise `present` is that one row (its folder gone, it is marked `missing` and not listed),
+    `other_pressings` none, `release_mbid` and `release_group_mbid` null, `yours` as above, and
+    `navidrome_id` Navidrome's album of that name by that artist with NO release id of its own, and the
+    row's year and track count wherever both say them (navidrome_album_by_name) - only when exactly one is.
+
+Exactly one of the three is taken (anything else is a 422): a release id as MusicBrainz writes one,
+a Navidrome id of at most 256 characters, which is only ever Navidrome's `id` parameter, never
+part of a path, or a job id (a whole number from 1). A GET that writes nothing but a tombstone for a
+folder that has gone - the same-origin guard has nothing to guard.
 """
 
 import asyncio
@@ -50,10 +63,13 @@ from src import library_ledger
 from src.config import Config
 from src.library import cached_album
 from src.logger import logger
+from src.navidrome_listing import _album_artists, fold_name
 from src.organizer import is_within
+from src.pins import album_state
 #? the library route's own loader of the saved scan, once per process - so the facts below are there
 #? after a restart, before anyone has opened the library
 from src.routes.library import _ensure_cache_loaded
+from src.routes.download import _job_for
 from src.routes.navidrome import ID_MAX
 from src.routes.search_musicbrainz import MBID_PATTERN
 from src.users import current_user
@@ -204,6 +220,92 @@ async def navidrome_release(client: NavidromeClient, album_id: str) -> str | Non
         return None
 
 
+def _without_release(album: dict) -> bool:
+    found = album.get("musicBrainzId")
+    return not (isinstance(found, str) and found.strip())
+
+
+def _year(value) -> str:
+    """A year as four digits - Navidrome's `year` is a number, the store row's the date tag's first four
+    characters - or '' for none (0, blank, not a year)."""
+    if isinstance(value, bool):
+        return ""
+    if isinstance(value, int):
+        return f"{value:04d}" if 0 < value < 10000 else ""
+    if isinstance(value, str):
+        text = value.strip()[:4]
+        return text if len(text) == 4 and text.isdigit() and text != "0000" else ""
+    return ""
+
+
+def _count(value) -> int:
+    """A song or track count, 0 for none (missing, not a whole number, not positive)."""
+    if isinstance(value, bool):
+        return 0
+    if isinstance(value, int):
+        return max(value, 0)
+    if isinstance(value, str) and value.strip().isdigit():
+        return int(value.strip())
+    return 0
+
+
+def _is_that_folder(album: dict, name: str, credited: str, year: str, tracks: int) -> bool:
+    """Whether a search3 album is the store's id-less folder: see navidrome_album_by_name."""
+    if not (isinstance(album, dict) and album.get("id") and _without_release(album)):
+        return False
+    if not (isinstance(album.get("name"), str) and fold_name(album["name"].strip()) == name):
+        return False
+    if credited not in _album_artists(album):
+        return False
+    #? (review) title and artist alone took ANOTHER folder's album - an older id-less copy of the album -
+    #? for a download Navidrome hadn't scanned yet. Each is checked only where both sides say it.
+    their_year = _year(album.get("year"))
+    if year and their_year and their_year != year:
+        return False
+    songs = _count(album.get("songCount"))
+    return not (tracks and songs and songs != tracks)
+
+
+async def navidrome_album_by_name(client: NavidromeClient, artist: str | None, title: str | None,
+                                  year: str | None = None, track_count: int | None = None) -> str | None:
+    """
+    (2.1.40) Navidrome's album id for an album the store holds with NO release id - a manual search's
+    download, filed by its own tags - or None. `year` and `track_count` are the store row's.
+
+    search3 on the album's title, as `client` (the asker's: client_for), and an album believed only when
+    it has no `musicBrainzId` of its own (one that has is some matched pressing, never this folder), its
+    name folds to the title, the artist is among those Navidrome credits it to - navidrome_listing's own
+    fold_name and _album_artists, so this and "Not in Navidrome" can't disagree - and, wherever both sides
+    say them, its `year` is the row's and its `songCount` the row's track count. The year and the count are
+    what tell this folder from another id-less copy of the album already listed; the count also refuses an
+    album Navidrome is still scanning (asked again later) and one it made of two id-less copies at once (playing it
+    would play both). With none believed - a common title ("Greatest Hits", "Live") can fill the first
+    SEARCH_ALBUMS answers with others' - a second search3 on "<artist> <title>", under the same rules.
+    EXACTLY ONE such album gives its id: none, or several, give None, rather than open the wrong one.
+    Navidrome unset or down is None; a refused login (SignedOut) is raised, as navidrome_album does.
+    """
+    name, credited = fold_name((title or "").strip()), fold_name((artist or "").strip())
+    if not name or not credited:
+        return None
+    wanted_year, tracks = _year(year), _count(track_count)
+    found: set[str] = set()
+    for query in dict.fromkeys(((title or "").strip(), f"{(artist or '').strip()} {(title or '').strip()}")):
+        try:
+            body = await client.call("search3", {
+                "query": query, "albumCount": SEARCH_ALBUMS, "artistCount": 0, "songCount": 0,
+            })
+        except SignedOut:
+            raise
+        except NavidromeError as e:
+            logger.debug(f"no Navidrome album for {artist} - {title}: {e}")
+            return None
+        found = {str(album["id"]) for album in (body.get("searchResult3") or {}).get("album") or []
+                 if _is_that_folder(album, name, credited, wanted_year, tracks)}
+        if found:
+            break
+    return found.pop() if len(found) == 1 else None
+
+
 def _usable(store) -> bool:
     return store is not None and bool(getattr(store, "available", False))
 
@@ -276,18 +378,27 @@ async def store_album(
     request: Request,
     release_mbid: str | None = Query(None, pattern=MBID_PATTERN),
     navidrome_id: str | None = Query(None, min_length=1, max_length=ID_MAX),
+    job_id: int | None = Query(None, ge=1),
     user: str = Depends(current_user),
 ):
     """
     One album, across the three ids: the store's rows of the release, its other pressings, and
-    Navidrome's album id for each - see the module's note. Exactly one of `release_mbid` and
-    `navidrome_id`.
+    Navidrome's album id for each - see the module's note. Exactly one of `release_mbid`,
+    `navidrome_id` and `job_id`.
     """
-    if (release_mbid is None) == (navidrome_id is None):
-        raise HTTPException(status_code=422, detail="ask by exactly one of release_mbid and navidrome_id")
+    if sum(key is not None for key in (release_mbid, navidrome_id, job_id)) != 1:
+        raise HTTPException(status_code=422, detail="ask by exactly one of release_mbid, navidrome_id and job_id")
 
     client = client_for(request)
+    if job_id is not None:
+        return await _by_job(request, client, job_id, user)
     release = release_mbid or await navidrome_release(client, navidrome_id)
+    return await _by_release(request, client, release, navidrome_id, user)
+
+
+async def _by_release(request: Request, client: NavidromeClient, release: str | None, navidrome_id: str | None,
+                      user: str) -> dict:
+    """The answer for a release (asked by its id, or read from Navidrome's album `navidrome_id`)."""
     answer = {"release_mbid": release, "release_group_mbid": None, "navidrome_id": navidrome_id,
               "present": [], "other_pressings": []}
     if not release:
@@ -335,4 +446,57 @@ async def store_album(
         answer["yours"] = any(row["path"] in yours for row in present)
         for pressing in answer["other_pressings"]:
             pressing["yours"] = pressing["path"] in yours
+    return answer
+
+
+async def _by_job(request: Request, client: NavidromeClient, job_id: int, user: str) -> dict:
+    """
+    (2.1.40) The album a download was filed as - a manual search's Done row - see the module's note. The
+    job is the asker's or they have Everyone's downloads (a 404 otherwise); the rest degrades to an empty
+    answer, never an error.
+    """
+    job = await _job_for(request, job_id, user)
+    answer = {"release_mbid": None, "release_group_mbid": None, "navidrome_id": None,
+              "present": [], "other_pressings": []}
+    store = getattr(request.app.state, "store", None)
+    root = Config.LIBRARY_PATH or ""
+    album_id = job.get("album_id")
+    if not album_id or not _usable(store) or not root:
+        return answer
+    try:
+        followed = await store.index_follow([album_id])
+    except Exception as e:
+        logger.warning(f"could not read the store for download {job_id}: {e}")
+        followed = None
+    row = (followed or {}).get(album_id)
+    if album_state(row, root) != "present":
+        #? nothing to open: deleted, missing, of another library root, or no row at all
+        return answer
+    release = (row.get("release_mbid") or "").strip()
+    if release:
+        #? matched to a release since it was filed (Edit album > Release): the album as that release is
+        return await _by_release(request, client, release, None, user)
+
+    present: list[dict] = []
+    facts: dict[str, dict] = {}
+    try:
+        present = await _live(store, root, [row])
+    except Exception as e:
+        logger.warning(f"could not check the folder download {job_id} was filed in: {e}")
+        present = []
+    if not present:
+        #? its folder has gone since (now marked `missing`): nothing to open
+        return answer
+    try:
+        facts = await _facts(request, store, root, present)
+    except Exception as e:
+        logger.warning(f"could not read what the scan says of download {job_id}'s album: {e}")
+        facts = {}
+    answer["present"] = [{**_row(row), **facts.get(row["path"], {})} for row in present]
+    answer["navidrome_id"] = await navidrome_album_by_name(client, row.get("artist"), row.get("album"),
+                                                           row.get("year"), row.get("track_count"))
+    #? (2.0.0-player.52) with logins on: whether it is in the asker's own library
+    yours = await library_ledger.yours_paths(store, root, user)
+    if yours is not None:
+        answer["yours"] = any(entry["path"] in yours for entry in present)
     return answer

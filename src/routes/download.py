@@ -18,6 +18,7 @@ from src.store_index import (FILING_STATUSES, already_have, coming_now, describe
                              in_flight, is_whole, other_pressings, release_lock)
 from src import library_ledger
 from src.auth import BREAK_GLASS_USER
+from src.pins import album_state
 from src.users import can, current_user, require
 
 router = APIRouter()
@@ -771,6 +772,8 @@ async def jobs(request: Request, user: str = Depends(current_user)):
             return None
 
         positions = await asyncio.gather(*(position(j, sm) for j, sm in zip(stored, summaries)))
+        #? (2.1.40) what each manual search's download was filed as, its store row's names
+        filed = await _filed_as(store, stored)
 
         merged = []
         for job, summary, queue_position in zip(stored, summaries, positions):
@@ -794,6 +797,10 @@ async def jobs(request: Request, user: str = Depends(current_user)):
                 #? (2.1.38) a manual search's download, read by SQLite like the edition - only when true, so
                 #? every other row is as it was
                 **({"manual": True} if job.get("manual") else {}),
+                #? (2.1.40) and, once filed, what it was filed as - the artist and album its own tags gave
+                #? it, which are the Done row's title (not the words typed to find it)
+                **({"filed_as": filed[job["album_id"]]} if job.get("manual") and job.get("album_id") in filed
+                   else {}),
                 #? how it ended, from the status and poller.py's named messages - None while going (and,
                 #? with logins on, 2.0.0-player.51, `not_filed` for one nothing of could be filed)
                 "outcome": job_outcome(job["status"], job["error"], not_filed=logins),
@@ -815,6 +822,31 @@ async def jobs(request: Request, user: str = Depends(current_user)):
     except Exception as e:
         logger.error(f"Exception in /jobs endpoint: {e}")
         raise HTTPException(status_code=500, detail=f"Error fetching download jobs: {e}")
+
+
+async def _filed_as(store, jobs: list[dict]) -> dict[int, dict]:
+    """
+    (2.1.40) The artist and album each manual search's download was filed as, keyed on its job's album_id
+    (store.set_job_album): the names of the store index row it leads to, merges followed - ONE index_follow
+    for every such row, and none when there are none. Only a live row in this library counts (pins'
+    album_state): an album deleted, gone missing or of another library root says nothing - and with no
+    LIBRARY_PATH nothing is live (album_state would count every row; the id bridge answers nothing then
+    too). A read that fails says nothing either - the rows are answered without it, never a 500.
+    """
+    root = Config.LIBRARY_PATH or ""
+    ids = [job["album_id"] for job in jobs if job.get("manual") and job.get("album_id")]
+    if not ids or not root:
+        return {}
+    try:
+        followed = await store.index_follow(ids)
+    except Exception as e:
+        logger.warning(f"could not read what the manual downloads were filed as: {e}")
+        return {}
+    return {
+        album_id: {"artist": row.get("artist") or "", "album": row.get("album") or ""}
+        for album_id, row in (followed or {}).items()
+        if album_state(row, root) == "present"
+    }
 
 
 async def _first_queue_position(slskd_client, job: dict, transfers_by_user: dict) -> int | None:

@@ -219,6 +219,12 @@ REFUSED_FILING = (READ_ONLY_DOWNLOADS, FOLDERS_OVERLAP)
 NOT_FILED_PATTERNS = (NOTHING_ORGANIZED, f"{ORGANIZE_FAILED}%", f"%, {NO_TRACK_FILED}")
 
 
+def _is_manual(job: dict, plan: dict) -> bool:
+    """(2.1.40) Whether a job is a manual search's download - its stored release says so (`manual`, kept
+    only when true - routes/download.py enqueue), and so does the plan filed from it (organizer)."""
+    return bool((job.get("release") or {}).get("manual") or plan.get("manual"))
+
+
 async def _organize_if_enabled(job: dict, store) -> None:
     """
     Hand a finished download to the organizer.
@@ -270,6 +276,11 @@ async def _organize_if_enabled(job: dict, store) -> None:
         elif results.get("skipped") and plan.get("album_dir"):
             #? nothing filed, everything already there: the folder it was all in, for the grant below
             album_id = await index_folder(store, Config.LIBRARY_PATH, plan.get("album_dir"))
+        if album_id is not None and _is_manual(job, plan):
+            #? (2.1.40) a manual search's download is found by its job, never by a release it hasn't got: the
+            #? album it ended in is recorded whatever the grant below gives - which writes nothing for a flag
+            #? with logins off, or a break-glass request (the id bridge's `job_id`, /jobs' `filed_as`)
+            await store.set_job_album(job["id"], album_id)
         #? (2.0.0-player.51) what it gives those who asked, before the status says how it ended - so the
         #? row never reads "filed" a poll before it says it's in their library
         await grant_job(store, job, results, album_id, bool(plan.get("same_release")), _filed_path(results))
