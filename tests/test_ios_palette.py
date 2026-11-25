@@ -198,9 +198,10 @@ def test_every_corner_in_the_app_is_a_token():
     for name, number, code in app_code():
         if "TurntableFace.lookRadius" in code or "squareIcon.radius" in code:
             left.append(f"{name}:{number} the turntable's radius")
-        #? (the Mac redesign, R1) the Mac's rounded corners - James: "Rounded on Mac only" - are MacCorners' alone, held to
-        #? dw.css by test_ios_mac_look.py; the phone's stay Corners', every one 0
-        if name in ("Shared/Corners.swift", "Mac/Look/MacCorners.swift"):
+        #? (the Mac redesign, R1; R1b) the Mac's rounded corners - James: "Rounded on Mac only" - are DWCorners' Mac half's
+        #? alone, held to dw.css by test_ios_mac_look.py; the phone's stay Corners', every one 0 (DWCorners' phone half
+        #? names them, below), and round stays round: DWCorners' round shape is the switch's
+        if name in ("Shared/Corners.swift", "Look/DWCorners.swift"):
             continue
         if re.search(r"cornerRadius:\s*[0-9]", code):
             left.append(f"{name}:{number} a radius of its own")
@@ -221,6 +222,22 @@ def test_every_corner_in_the_app_is_a_token():
         assert "let radius = Corners.control" in face
     # the look button's highlight kept where it is square: its band down to the line's foot
     assert "Rectangle().frame(height: max(radius, line))" in look
+
+
+def test_the_looks_phone_corners_are_corners():
+    # (the redesign, R1b) James, 25 Nov: "keep the phone square as well" - the shared look's corners on the phone are
+    # Corners' own (every one 0), never a number of the look's; on the Mac dw.css's (test_ios_mac_look.py)
+    text = (APP / "Look" / "DWCorners.swift").read_text(encoding="utf-8")
+    phone = text[text.index("    enum Phone {"):text.index("    /// This device's.")]
+    assert re.findall(r"static let (\w+): CGFloat = (\S+)", phone) == [
+        ("button", "Corners.control"), ("box", "Corners.card"), ("chip", "Corners.control")]
+    assert (corner("control"), corner("card")) == (0, 0)
+    for name in ("button", "box", "chip"):
+        assert f"static var {name}: CGFloat {{ Platform.mac ? Mac.{name} : Phone.{name} }}" in text
+    # the one round shape is a capsule, the switch's - nothing else in the app is one
+    assert re.findall(r"Capsule\(", text) == ["Capsule("] and "static var roundShape: Capsule" in text
+    uses = [name for name, _, code in app_code() if "roundShape" in code and name != "Look/DWCorners.swift"]
+    assert sorted(set(uses)) == ["Phone/PhoneSwitch.swift"], uses
 
 
 def test_every_system_bordered_button_is_squared():

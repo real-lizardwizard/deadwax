@@ -21,15 +21,15 @@ struct MacTitleStrip: View {
     var body: some View {
         Text(title)
             .font(Typeface.Mac.text(.small).weight(.medium))
-            .foregroundStyle(MacPalette.t2)
+            .foregroundStyle(DWPalette.t2)
             .lineLimit(1)
             .truncationMode(.middle)
             .padding(.horizontal, Self.lights)
             .frame(maxWidth: .infinity)
             .frame(height: height)
             .background(MacPalette.titleFace)
-            .overlay(alignment: .top) { MacRule(colour: MacPalette.titleSheen) }
-            .overlay(alignment: .bottom) { MacRule(colour: MacPalette.titleEdge) }
+            .overlay(alignment: .top) { DWRule(colour: MacPalette.titleSheen) }
+            .overlay(alignment: .bottom) { DWRule(colour: MacPalette.titleEdge) }
             .allowsHitTesting(false)
             .accessibilityHidden(true)
     }

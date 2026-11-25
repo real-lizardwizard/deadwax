@@ -12,7 +12,7 @@ import SwiftUI
 ///   web's field does - the words are Search's own (SearchModel), so Search's page draws no field of its own on the Mac.
 ///   Edit > Find (⌘F) shows the sidebar and puts the cursor here.
 /// - Requests, with its count - the downloads on their way (the web's top list, less Home: the Mac has none).
-/// - Library, and - with a library of your own - its switch, Yours | All (MacSegmented): Yours' rows are the Library
+/// - Library, and - with a library of your own - its switch, Yours | All (DWSegmented): Yours' rows are the Library
 ///   switch's pages in the person's order (Playlists aside, the group below), All's the collection's three; Downloaded on
 ///   either. The side follows where you are, and is kept on the Mac (MacSidebar.sideKey, the web's key); turning it with
 ///   a view showing opens the same kind of view on the other side (MacSidebar.sideFlip).
@@ -54,7 +54,7 @@ struct MacSidebarView: View {
             Text(MacSidebar.Words.brand)
                 .font(Typeface.Mac.text(.brand).weight(.bold))
                 .kerning(-0.2)
-                .foregroundStyle(MacPalette.text)
+                .foregroundStyle(DWPalette.text)
                 .padding(.horizontal, 8)
                 .padding(.bottom, 10)
             // .side > .find: margin-bottom 8px
@@ -72,16 +72,16 @@ struct MacSidebarView: View {
             }
             .frame(maxHeight: .infinity, alignment: .top)
             // the foot: the frame's rule, 5 above Settings
-            MacRule(colour: MacPalette.frame)
+            DWRule(colour: DWPalette.frame)
                 .padding(.top, 7)
                 .padding(.bottom, 5)
             row(.settings, current: current, at: at)
         }
         .padding(EdgeInsets(top: 12, leading: 10, bottom: 8, trailing: 10))
         .frame(maxHeight: .infinity, alignment: .top)
-        .background(MacPalette.side)
+        .background(DWPalette.side)
         // .side: border-right 1px solid var(--frame)
-        .overlay(alignment: .trailing) { MacRule(colour: MacPalette.frame, vertical: true) }
+        .overlay(alignment: .trailing) { DWRule(colour: DWPalette.frame, vertical: true) }
         .accessibilityElement(children: .contain)
         .accessibilityLabel(MacSidebar.Words.sections)
         // (slice 3's review) asked again for each person: the sidebar stays on screen while someone else signs in over
@@ -106,7 +106,7 @@ struct MacSidebarView: View {
                 Spacer(minLength: 0)
                 if personal {
                     // the switch in the heading, at its right (.navh .seg)
-                    MacSegmented(options: MacSidebar.Side.allCases, words: { (one: MacSidebar.Side) -> String in one.label },
+                    DWSegmented(options: MacSidebar.Side.allCases, words: { (one: MacSidebar.Side) -> String in one.label },
                                  chosen: Binding(get: { side }, set: { (to: MacSidebar.Side) -> Void in
                                      guard to != side else { return }
                                      savedSide = to.rawValue
@@ -159,7 +159,7 @@ struct MacSidebarView: View {
     private func heading(_ words: String) -> some View {
         Text(words)
             .font(Typeface.Mac.text(.label).weight(.semibold))
-            .foregroundStyle(MacPalette.label)
+            .foregroundStyle(DWPalette.label)
             .accessibilityAddTraits(.isHeader)
     }
 
@@ -177,13 +177,13 @@ struct MacSidebarView: View {
                 Text(words)
                     .font(Typeface.Mac.text(.label).weight(.semibold))
                     .frame(maxWidth: .infinity, alignment: .leading)
-                if !count.isEmpty { MacCount(count: count) }
+                if !count.isEmpty { DWCount(count: count) }
                 Image(systemName: "chevron.down")
                     .font(Typeface.symbol(size: 8, weight: .bold))
                     .rotationEffect(.degrees(folded ? -90 : 0))
                     .accessibilityHidden(true)
             }
-            .foregroundStyle(lit ? MacPalette.selt : MacPalette.label)
+            .foregroundStyle(lit ? DWPalette.selt : DWPalette.label)
             // .navh: padding 13px 8px 4px - lit, it sits in the selection's colours, a row's height
             .padding(EdgeInsets(top: lit ? 0 : 13, leading: 8, bottom: lit ? 0 : 4, trailing: 8))
             .frame(minHeight: lit ? CGFloat(MacLook.navRowHeight) : nil)
@@ -213,9 +213,9 @@ struct MacSidebarView: View {
                     .font(Typeface.Mac.text(.base).weight(lit ? .semibold : .regular))
                     .lineLimit(1)
                     .frame(maxWidth: .infinity, alignment: .leading)
-                if !badge.isEmpty { MacCount(count: badge) }
+                if !badge.isEmpty { DWCount(count: badge) }
             }
-            .foregroundStyle(lit ? MacPalette.selt : (sub ? MacPalette.t2 : MacPalette.head))
+            .foregroundStyle(lit ? DWPalette.selt : (sub ? DWPalette.t2 : DWPalette.head))
             // .nav: padding 0 8px (.nav.sub: 20 at its left), 26 tall
             .padding(.leading, sub ? 20 : 8)
             .padding(.trailing, 8)
@@ -250,9 +250,9 @@ struct MacSidebarView: View {
 /// Where you are (.nav.on): the selection's fill in its edge, a button's corners.
 private struct SelectedFill: View {
     var body: some View {
-        MacCorners.buttonShape
-            .fill(MacPalette.selbg)
-            .overlay(MacCorners.buttonShape.strokeBorder(MacPalette.selbd, lineWidth: 1))
+        DWCorners.buttonShape
+            .fill(DWPalette.selbg)
+            .overlay(DWCorners.buttonShape.strokeBorder(DWPalette.selbd, lineWidth: 1))
     }
 }
 
@@ -272,14 +272,14 @@ private struct SidebarSearchField: View {
         HStack(spacing: 7) {
             Image(systemName: "magnifyingglass")
                 .font(Typeface.symbol(size: 11, weight: .medium))
-                .foregroundStyle(MacPalette.t3)
+                .foregroundStyle(DWPalette.t3)
                 .accessibilityHidden(true)
             TextField(MacSidebar.Words.searchPlaceholder, text: Binding(get: { search.text }, set: { (typed: String) -> Void in
                 search.type(typed)
                 if !typed.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { navigation.showSearch() }
-            }), prompt: Text(MacSidebar.Words.searchPlaceholder).foregroundStyle(MacPalette.t3))
+            }), prompt: Text(MacSidebar.Words.searchPlaceholder).foregroundStyle(DWPalette.t3))
             .font(Typeface.Mac.text(.control))
-            .foregroundStyle(MacPalette.fieldText)
+            .foregroundStyle(DWPalette.fieldText)
             .textFieldStyle(.plain)
             .autocorrectionDisabled()
             .textInputAutocapitalization(.never)
@@ -299,7 +299,7 @@ private struct SidebarSearchField: View {
                 } label: {
                     Image(systemName: "xmark.circle.fill")
                         .font(Typeface.symbol(size: 11, weight: .regular))
-                        .foregroundStyle(MacPalette.t3)
+                        .foregroundStyle(DWPalette.t3)
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel(MacSidebar.Words.clearSearch)
@@ -309,6 +309,6 @@ private struct SidebarSearchField: View {
         }
         .padding(.horizontal, 8)
         .frame(height: CGFloat(MacLook.findHeight))
-        .background { MacWell(focused: focused) }
+        .background { DWWell(focused: focused) }
     }
 }

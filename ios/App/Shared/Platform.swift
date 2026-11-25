@@ -461,7 +461,7 @@ extension View {
         keyboardShortcut(.defaultAction)
     }
 
-    /// (The Mac redesign, R1) A redesigned dialog's one action, drawn purple (MacButtonStyle's `.pri`): Return presses
+    /// (The Mac redesign, R1) A redesigned dialog's one action, drawn purple (DWButtonStyle's `.pri`): Return presses
     /// it. Never a toolbar's button over a list, whose Return opens the row selected.
     func returnPresses() -> some View {
         keyboardShortcut(.defaultAction)
@@ -542,7 +542,7 @@ extension View {
     }
 
     /// (The Mac redesign, R1) ← and → on a control the Mac draws for itself while it has the keyboard's focus (a
-    /// segmented control, MacSegmented): `move` with -1 or 1, which says whether it took the key.
+    /// segmented control, DWSegmented): `move` with -1 or 1, which says whether it took the key.
     func arrowKeys(_ move: @escaping (Int) -> KeyPress.Result) -> some View {
         onKeyPress(keys: [.leftArrow, .rightArrow]) { (press: KeyPress) -> KeyPress.Result in
             move(press.key == .leftArrow ? -1 : 1)

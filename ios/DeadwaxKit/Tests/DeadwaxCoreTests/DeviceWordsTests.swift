@@ -5,7 +5,11 @@ import Testing
 /// The Mac app's words (notes/ios.md "The Mac app, slice 4: the Mac's words"): every word the app shows that says
 /// phone or iPhone - and every word made from one of them - by name, with the arguments that reach each way it can be
 /// said. Fixtures/words/iphone.json is what each said on the iPhone at c97a824, before the Mac's words were made: the
-/// phones' words don't change (check 438), and this holds them to it, word for word.
+/// phones' words don't change but on purpose (check 438), and this holds them to it, word for word. Since the redesign
+/// (the build plan's 3.3; notes/ios.md "The redesign, slice R1b: the shared look, and the phone's pieces") iphone.json
+/// changes by hand only: a slice that changes a phone's word on purpose edits that key in the same commit and names it
+/// in its notes, a word newly made device-aware is added to it, `DEADWAX_WORDS_WRITE=iphone` is never run, and the
+/// slice's reviewer reads the fixture's diff.
 ///
 /// The App's own literals that became Core's words (Debug's, the downloads log's, the address screen's) are listed
 /// under `App.`: at c97a824 their values copied from the App's source as it was, and since then Core's word for each
@@ -430,7 +434,8 @@ enum DeviceWords {
 @Suite struct DeviceWordsTests {
     /// Check 438: every word an iPhone shows, as it was. Each name once; the fixture's every name said still, and
     /// said the same. `DEADWAX_WORDS_WRITE=iphone` wrote the fixture once, at c97a824 - never again: a word of the
-    /// phone's changes only when a change asks for it, and then by hand here.
+    /// phone's changes only when a change asks for it, and then by hand in words/iphone.json, in that change's own
+    /// commit, named in its notes and read in its review (the redesign's rule, the build plan's 3.3).
     @Test func theIPhonesWordsAreAsTheyWere() throws {
         let words = DeviceWords.all(.iPhone)
         let names = words.map(\.0)

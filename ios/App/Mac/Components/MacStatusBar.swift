@@ -22,8 +22,8 @@ struct MacStatusBar: View {
         .background(MacPalette.statusFace)
         .overlay(alignment: .top) {
             VStack(spacing: 0) {
-                MacRule(colour: MacPalette.frame)
-                MacRule(colour: MacPalette.statusSheen)
+                DWRule(colour: DWPalette.frame)
+                DWRule(colour: MacPalette.statusSheen)
             }
         }
         .accessibilityElement(children: .combine)
@@ -33,12 +33,12 @@ struct MacStatusBar: View {
         ForEach(Array(facts.enumerated()), id: \.offset) { (index: Int, fact: String) in
             Text(fact)
                 .font(Typeface.Mac.text(.label))
-                .foregroundStyle(MacPalette.t3)
+                .foregroundStyle(DWPalette.t3)
                 .lineLimit(1)
                 .padding(.horizontal, 10)
             // .status > div: border-right 1px solid #262430, 14 tall - none after the last of a side
             if index < facts.count - 1 {
-                MacRule(colour: MacPalette.divider, vertical: true)
+                DWRule(colour: MacPalette.divider, vertical: true)
                     .frame(height: 14)
             }
         }

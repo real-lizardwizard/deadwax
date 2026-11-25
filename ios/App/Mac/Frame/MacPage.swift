@@ -15,7 +15,7 @@ struct MacPage<Tools: View, Content: View>: View {
             content
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         }
-        .background(MacPalette.bg)
+        .background(DWPalette.bg)
     }
 }
 

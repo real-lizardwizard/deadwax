@@ -1004,12 +1004,12 @@ def test_the_sidebar_is_mac_sidebars_rows():
     #? tall, in the selection's colours where you are - the counts' badges, the Library's switch a segmented control
     for drawn in ("Text(MacSidebar.Words.brand)", ".font(Typeface.Mac.text(.brand).weight(.bold))",
                   ".frame(height: CGFloat(MacLook.navRowHeight))", ".frame(height: CGFloat(MacLook.findHeight))",
-                  ".background { MacWell(focused: focused) }", "MacCount(count: badge)",
-                  "MacSegmented(options: MacSidebar.Side.allCases", ".background(MacPalette.side)",
-                  ".overlay(alignment: .trailing) { MacRule(colour: MacPalette.frame, vertical: true) }"):
+                  ".background { DWWell(focused: focused) }", "DWCount(count: badge)",
+                  "DWSegmented(options: MacSidebar.Side.allCases", ".background(DWPalette.side)",
+                  ".overlay(alignment: .trailing) { DWRule(colour: DWPalette.frame, vertical: true) }"):
         assert drawn in sidebar, drawn
     assert "MacSidebar.symbol(" not in sidebar and "Image(systemName: symbol)" not in sidebar, "no glyph on a row"
-    assert "Palette." not in sidebar.replace("MacPalette.", ""), "the redesign's colours alone"
+    assert "Palette." not in sidebar.replace("MacPalette.", "").replace("DWPalette.", ""), "the redesign's colours alone"
     assert "case sidebar" in bare(app_sources()["Manage/QueueCountModel.swift"])
     routes = bare(app_sources()["Shared/Routes.swift"])
     move = routes[routes.index("func macMove(_ move: MacSidebar.Move) {"):]

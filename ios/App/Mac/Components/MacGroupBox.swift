@@ -8,7 +8,7 @@ import SwiftUI
 /// group's heading.
 struct MacGroupBox<Content: View>: View {
     let legend: String
-    var ground: Color = MacPalette.panel
+    var ground: Color = DWPalette.panel
     @ViewBuilder let content: Content
 
     var body: some View {
@@ -18,12 +18,12 @@ struct MacGroupBox<Content: View>: View {
         // .group: padding 14px 12px 12px
         .padding(EdgeInsets(top: 14, leading: 12, bottom: 12, trailing: 12))
         .frame(maxWidth: .infinity, alignment: .leading)
-        .overlay(MacCorners.boxShape.strokeBorder(MacPalette.line, lineWidth: 1))
+        .overlay(DWCorners.boxShape.strokeBorder(DWPalette.line, lineWidth: 1))
         .overlay(alignment: .topLeading) {
             // .legend: top -9px, left 9px inside the 1 pt edge, padding 0 6px, 16 tall
             Text(legend)
                 .font(Typeface.Mac.text(.label).weight(.semibold))
-                .foregroundStyle(MacPalette.label)
+                .foregroundStyle(DWPalette.label)
                 .lineLimit(1)
                 .padding(.horizontal, 6)
                 .frame(height: 16)

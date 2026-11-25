@@ -17045,3 +17045,259 @@ restored byte for byte - every one caught:
 
 Still not seen on a screen: James's own deadwax was running again, so no smoke run - the list above stands, with the
 renamed window on a sign-out and after a playlist's rename added to it.
+
+## The redesign, slice R1b: the shared look, and the phone's pieces (2026-11-25)
+
+James decided on 25 Nov that the iPhone takes the new look too ("Both together"). The plan was re-written for both
+devices: ~/Desktop/Code/deadwax-plans/mac-redesign-build.md, section 3. Its sections 3.8 and 7 are binding:
+- the word is "Queue", not Up Next;
+- Lyrics stays in the cover's place and is not a sheet tab;
+- the phone is square;
+- Play and skip stay sharp glyphs.
+
+R1 made the shared parts Mac-only. **R1b** moves them to `App/Look/` under DW names, and each one takes its device's
+sizes, corners and type. It also makes the phone's own pieces in `App/Phone/`. **No screen the phone draws today
+changes.** The App/Look parts are still drawn only from the Mac's frame. The App/Phone pieces are drawn nowhere until
+their slices.
+
+The gate is `git status --porcelain -- ios ':!ios/App/Mac' ':!ios/App/Look' ':!ios/App/Phone'`. It names:
+- the three frame-side files:
+  - Platform.swift (two comments);
+  - Typeface.swift (additive);
+  - MacSidebarView.swift (renames);
+- Core's DWLook.swift and DWLookTests.swift (both new);
+- DeviceWordsTests.swift (its comment).
+
+The following have no diff:
+- ios/Deadwax.xcodeproj (App/ is a synchronized folder);
+- ios/Config and `Fixtures/words/iphone.json`;
+- the engine files, DeadwaxClient and Core's Routes;
+- the turntable, src/ and ui/.
+
+The app is still 0.13 (13).
+
+### What moved
+
+These moved from App/Mac to App/Look. Nothing in R1's drawing changed except the names.
+
+| R1's (App/Mac) | now (App/Look) |
+| --- | --- |
+| MacPalette's tokens, and the faces of its buttons, wells, fields, chips and counts | DWPalette (the phone's parts added) |
+| Mac/Look/MacCorners | DWCorners: `Mac` (4/5/3) and `Phone` (Corners', 0), chosen by `Platform.mac` |
+| MacRaised, MacRule | DWRaised, DWRule (`drop` optional, for the strip's flat buttons) |
+| MacButtonStyle | DWButtonStyle (`.large` added: .btn.lg; `fills` for .btn.lg.grow) |
+| MacWell, MacField, MacFieldRow | DWWell, DWField, DWFieldRow (the label trails on the Mac, as R1's did; it leads on the phone, 88 at least, over a hairline) |
+| MacChip, MacCount | DWChip, DWCount |
+| MacSegmented | DWSegmented (`large`: .seg.lg; it fills the row on the phone; the focus and the arrow keys are Mac-only) |
+| MacPopUp, MacCaret | DWPopUp, DWCaret |
+| MacToggleStyle (it was in MacKeys.swift) | DWToggleStyle (its dot is Mac-only: the phone's .tog.sm is a square) |
+
+What stays in App/Mac:
+- MacPalette keeps the title strip, toolbar, groove, checkbox fill, folder tabs, status bar, keys and the lcd;
+- MacKeys keeps MacKeyStyle and MacDisplay (the phone has no key and no lcd, because its glyphs are sharp);
+- so do the strip, toolbar, group box, status bar, output, frame and checkbox.
+
+App/Mac's files and MacSidebarView were renamed by script, with no other change.
+
+**Sizes.** Core `DWLook` holds each shared part's sizes per device, and `DWLook.of(device)` picks one:
+- `onMac` is MacLook's values exactly (DWLookTests holds this).
+- `onPhone` is `.dw.ph`'s: buttons 36/32/48, field 36, rows 44, label 88, chip 22, segments 28 and 38. A finger's
+  target is 44, and every height is a minimum (`grows`).
+
+Core `PhoneLook` holds the phone pieces' sizes. Each one is commented with its `// dw.ph:` rule. Five of them come from
+the drawings' own inline styles and are commented `// drawn:` instead (the Library's titled top: 50, 16, -0.5, and its
+title of 28).
+
+**Type.** `Typeface.Look.text(role)` and `.mono(role)` take the Mac's fixed size or the phone's `.dw.ph` size. The phone's
+size is scaled `relativeTo:` the nearest text style, the smaller on a tie. `Typeface.Phone` holds the phone pieces' sizes,
+scaled in the same way.
+
+### What was made (App/Phone, drawn nowhere yet)
+
+- **PhoneStrip** (`.chips`): a one-tap strip.
+  - The shown button is in the selection's fill and edge, with no drop.
+  - It starts at the leading edge. It scrolls sideways when it won't fit (`ViewThatFits`) and never wraps; the shown
+    button is brought into view whenever it changes (after review, below).
+  - It is `.isTabBar`, and each button is selected when shown.
+- **PhoneTop** (`.topbar`): 44 tall, or 50 with a title.
+  - It carries a leading part, a trailing part and the page's name centred clear of both.
+  - **PhoneBack** is the purple "‹ Back" link, read as "Library, Back" (Core's `PhonePieceWords.back(to:)`).
+  - **PhoneBigTitle** (`.big`) is 34 and a header.
+- **PhoneTabItem** and **PhoneLitLine**: an item of the tab bar or of Now Playing's bottom row.
+  - The lit line is 24 x 2 on the top edge, in `acc`.
+  - The item has the Large Content Viewer.
+- **PhoneMiniGround** and **PhoneSeekLine** are the restyled mini player's parts. The restyle itself is R4's.
+- **PhoneCard**, **PhoneGroup** (its legend is a header), **PhoneKV** (one element), **PhoneGo** and **PhoneChevron**.
+- **PhoneSwitchStyle** (`.phoneSwitch`): a ToggleStyle.
+  - It is drawn as `.sw`, square, with the purple from PrimaryButton.
+  - VoiceOver reads it as a switch and its value, through `accessibilityRepresentation`.
+  - It fades while it can't be used (`DWPalette.off`).
+- **PhoneFoot** and `.phoneFoot { }` (`.foot2`): 68 tall at least.
+  - It sits above the home indicator, with its ground run into it.
+  - It stays under the keyboard and doesn't ride up on it. The page keeps its room above the foot, and has none while
+    the keyboard is up.
+- **PhoneMeta** and **PhoneMetaLink** (`.meta`).
+
+Every bar caps at xxxLarge, as the tab bar does. Everything else grows.
+
+### Decisions, and where this departs from the plan
+
+- **No NowPlayingSheet.** The sheet's tabs (Queue, Info, EQ) need R3's Core work, so the sheet waits for R3. R1b
+  gives it PhoneStrip.
+- **No ••• piece.** It is iOS's own Menu (plan 3.2).
+- **The phone's purple is Core PrimaryButton's.** It is read through `deck(PrimaryButton.x)`, never retyped. Pressed,
+  it is PrimaryFace's reviewed press (after review, below), not DWRaised's turned-over gradient.
+- **DWPalette holds colours later slices draw**: the tab bar, the row rule, the mini player, and (after review) the
+  checkbox's fill and the meter's. App/Look gains only new files after R1b (plan 3.5).
+- **The phone's field label (88) and the KV label (116) are minimums**, so they grow with the text size. The Mac's
+  label stays R1's exact 84.
+- **The reach test is stricter than the plan.** App/Look may name neither the Mac zone nor the phone zone, so a shared
+  part never depends on one device's pieces.
+- test_ios_mac.py is not in R1b's Touches list. It was touched for the renames only.
+- dw.css was "copied again", and the copy is byte-identical to the canvas's.
+
+### Tests, and the faults they were seen failing on
+
+**tests/test_ios_phone_look.py** (19 tests) reads dw.css by the cascade.
+- The cascade works like this:
+  - it takes the `.dw.ph` rules a piece's element matches, right to left;
+  - specificity decides first, then order, with `!important` above both;
+  - shorthands are expanded and `var()` is substituted.
+- Its self-tests: a later phone rule wins, specificity beats order, and the Mac reads as R1's reader did.
+- It holds these to that cascade:
+  - DWLook's phone sizes, PhoneLook, `Typeface.Look`'s phone half and `Typeface.Phone`;
+  - the phone's colours, with every shared part the phone draws differently having its twin;
+  - the purple, as PrimaryButton's, and DWCorners' phone half, as Corners' 0.
+- It also holds these rules:
+  - no colour, radius or font of their own in App/Look or App/Phone;
+  - every fixed frame is on an allowlist, and every other height is `lookHeight`;
+  - every button's target is DWTarget (44 at least);
+  - VoiceOver, the text size cap and the keyboard;
+  - the pieces are drawn nowhere yet.
+
+**test_ios_mac_look.py** now reads the Mac's values from App/Look. It reads both palettes, with each colour's layer and
+direction, and checks that DWLook's Mac half and Typeface.Look's Mac half are R1's.
+
+**test_ios_mac_reach.py** has the three zones:
+- **Mac:** App/Mac's names, MacLook, MacTable, MacInFront, `Typeface.Mac` and `DWCorners.Mac`. Named only from App/Mac,
+  the four frame files and Platform's Mac half.
+- **Phone:** App/Phone's names, PhoneLook, `Typeface.Phone` and `DWCorners.Phone`. Never named from App/Mac, the frame
+  files, Platform's Mac half or App/Look.
+- **Look:** named from anywhere.
+
+**test_ios_palette.py**: DWCorners is the corner test's one Look exemption, and only PhoneSwitch takes `roundShape`.
+
+**Core DWLookTests** (4 tests).
+
+R1b's six faults and R1's seven were each applied alone, run, and restored byte for byte. Every one was caught:
+- a phone value from an overridden `.dw.ph` rule (DWLook's phone `rowHeight` 44, the earlier `.row`):
+  `test_dwlooks_phone_sizes_are_the_phones_rules`;
+- a phone corner of 4 (DWCorners.Phone.button): `test_the_phones_corners_are_corners_square` and test_ios_palette's
+  `test_the_looks_phone_corners_are_corners`;
+- `PhoneChevron()` in MacToolbar: `test_the_phones_pieces_are_drawn_nowhere_yet`, and the reach's
+  `test_app_mac_is_named_only_from_the_macs_frame` and `test_the_reach_catches_each_zone_out_of_place`;
+- `MacPalette.titleEdge` in DWChip: `test_nothing_in_app_look_or_app_phone_draws_a_value_of_its_own` and the same two
+  reach tests;
+- the phone's primary edge as `hex(0x7c3aed)`, PrimaryButton's own value retyped: `test_the_phones_purple_is_primarybuttons`;
+- `.frame(height:)` in place of PhoneGo's `lookHeight`: `test_every_height_on_the_phone_is_a_minimum`;
+- R1's, adapted to the new homes:
+  - `acc` 0xc084fd: `test_every_colour_in_the_palette_is_one_dw_css_names`;
+  - `Color.red` in DWChip: both no-value-of-its-own tests (the Mac's and the phone's);
+  - MacTabStack's `.appRoutes()`: `test_the_frame_stacks_are_the_macs_with_its_own_routes`;
+  - MacPalette named from Typeface.swift: `test_app_mac_is_named_only_from_the_macs_frame`;
+  - the iPhone half's `returnPresses()` given `keyboardShortcut(.defaultAction)`:
+    `test_platforms_iphone_half_does_nothing_new` and test_ios_mac's
+    `test_platform_is_the_iphones_exactly_as_before_on_the_iphone`;
+  - the stripes not starting again under a heading: MacTableTests `theStripesStartAgainUnderEveryHeading`;
+  - a vanished row's selection kept: MacTableTests `aVanishedRowsSelectionBecomesNone` and
+    `aClickSelectsAndADoubleClickOrReturnOpens` (MacTable itself is unchanged in R1b).
+
+### Not verified - checks 524 and 525
+
+- No App/Look part or App/Phone piece has been seen on a screen.
+- R1's Mac (524) is as R1 left it only by the builds and the tests.
+- That the phones are unchanged (525) is only the iPhone build's word and the gate's.
+- PhoneFoot's keyboard handling is untried on a device: whether the layer taking the keyboard's room keeps the foot at
+  the foot of the screen under the keyboard is only how SwiftUI's safe areas are documented to work.
+- PhoneStrip's sideways scroll and its scroll into view, and whether the field's well takes a tap just outside it, are
+  untried until a slice draws them.
+
+### After review (2026-11-25)
+
+One review found nothing broken today: the Mac draws what R1 drew, and the phone draws nothing new. It found one
+problem that would have forced R2 to rework a piece, plus test gaps and nits. All of them are fixed; nothing is
+committed.
+
+1. **The strip brings the shown button into view.**
+   - The Library's five buttons measure 450 pt at the default text size, so the strip scrolls on every iPhone (375-430
+     wide). Before the fix, after a swipe to Downloaded its lit button stayed off the screen.
+   - The scrolling half is now in a ScrollViewReader. It scrolls the shown button to the centre as it opens, and
+     whenever the button changes, by a tap or by the page's own swipe. It moves as the Library's swipe does
+     (LibrarySwitchControl's `.snappy`, none with Reduce Motion).
+   - **The targets were clipped.** A scroll view takes no touch outside itself, so the 44 pt targets were cut to its
+     32 pt height. The row is now padded by the target's reach (6) above and below, so the scroll view holds the whole
+     targets. The strip is then drawn as tall as its faces again (`.padding(.vertical, -reach)`), so its layout doesn't
+     change.
+   - Where the strip fits, it now starts at the leading edge, as `.chips` does, rather than being centred by its parent.
+2. **Each device's half of every shared piece is held by a test.**
+   - Before the fix, `if !Platform.mac` in DWFieldRow and `fixedSize(horizontal: false…)` in DWButtonStyle both passed
+     every test.
+   - `test_each_shared_piece_parts_by_device_only_where_said` holds every `Platform.` line in App/Look, line by line.
+     App/Phone has none.
+   - `test_each_device_half_of_the_shared_pieces_draws_its_own` holds what each half draws: DWFieldRow (R1's trailing
+     label on the Mac, the card's row on the phone), DWButtonStyle's `fixedSize`/`fills`, DWSegmented's halves, and
+     DWToggleStyle's dot.
+3. **The self-tests now hold something.**
+   - `.count`'s font check had read as `(A and B) or C`. It now asserts 11px, weight 600 and the substituted
+     `"Noto Sans Mono"` family. A synthetic `font` shorthand with `var()` is checked too.
+   - Core DWLook has `reach(_ height:)`: half what a face lacks of the target, and DWTarget draws it. DWLookTests now
+     asserts each piece's real target (36→44, 32→44, 48→48, 28→44, 38→44) and the Mac's reach of 0, in place of the
+     always-true `max(face, target) >= 44`.
+   - DWField had no target, so a phone field's real target was its 36 pt well. Its well now takes a 44 target, and a
+     tap there focuses the field. The well sits under the field, which takes taps on itself first.
+4. **DWTarget reaches up and down only** (`rect.insetBy(dx: 0, dy: -reach)`), as SegmentReach does. Grid and List (28
+   wide, 6 apart) no longer get overlapping targets. The test refuses any width or x change.
+5. **The phone's primary pressed is PrimaryFace's.**
+   - It uses `phonePrimaryPressedFace` and `phonePrimaryPressedEdge`, made from PrimaryButton's
+     `pressedTop/Bottom/Edge` (brightness 0.92, held to theme.css by test_ios_palette).
+   - The highlight is kept and nothing is turned over, so an album's Play keeps its press when it moves to DWButtonStyle.
+   - The two pressed lines are sourced `web: --dw-primary-pressed`. The palette reader accepts that source only for
+     these colours, only in DWPalette, and refuses it in four other forms.
+6. **DWPalette has everything ahead of its slices.**
+   - New: the checkbox's fill (moved from MacPalette, for R11's DWCheckbox) and the meter's shade and three fills
+     (`meterFill`, `meterMarked`, `meterGood`; `.meter`, `.pur`, `.grn`, for R8's DWMeter). All are held to dw.css.
+   - `test_the_palette_holds_what_later_slices_draw` checks that they are there.
+7. **Nits.**
+   - PhoneBack reads "Library, Back" (Core `PhonePieceWords.back(to:)`, in the phone's reach zone).
+   - PhoneSwitch fades by `DWPalette.off` while disabled; it reads `isEnabled` in a view of its own.
+   - PhoneFoot's `.ignoresSafeArea(.keyboard)` is now on the layer the foot sits in (a VStack the page's height, with
+     a Spacer over the foot), not on the 68 pt foot. That keeps the plan's "under the keyboard", but it is **untried
+     on a device**.
+
+**Mutations.** 23 more faults were each applied alone, run, and restored byte for byte. Every one was caught:
+- **The strip:**
+  - no scroll on a change, the reach padding dropped, the leading frame dropped: all three caught by
+    `test_the_phones_pieces_read_and_grow_as_the_plan_says`.
+- **The device halves:**
+  - DWField's and DWSegmented's `if !Platform.mac`: both branch tests (DWSegmented also `test_the_segmented_control_is_dw_css_seg`);
+  - `fixedSize(horizontal: false)`: `test_each_device_half_of_the_shared_pieces_draws_its_own`;
+  - the toggle's dot on the phone: both branch tests and the read-and-grow test;
+  - the large weight on the Mac: the parts-by-device test;
+  - the purple's words swapped, and its face's condition inverted: the parts-by-device test and
+    `test_the_phones_purple_is_primarybuttons`.
+- **The self-tests and targets:**
+  - the cascade reading no `var()`: `test_the_cascade_is_specificity_then_order`;
+  - DWField without its target, and DWTarget grown sideways: `test_a_fingers_target_is_44_at_least`;
+  - Core's reach a quarter of what a face lacks: DWLookTests `thePhonesGrowAndTakeAFinger`.
+- **The pressed primary:**
+  - turned over, or not darkened: `test_the_phones_purple_is_primarybuttons`;
+  - its edge retyped as `hex`: that test and three palette tests.
+- **The palette:**
+  - the meter fill off dw.css: `test_every_colour_in_the_palette_is_one_dw_css_names`;
+  - checkFill back in MacPalette: that test and `test_the_palette_holds_what_later_slices_draw`.
+- **The nits:**
+  - the back link read as the page alone, the switch not faded, the keyboard ignored by the foot alone: each caught by
+    `test_the_phones_pieces_read_and_grow_as_the_plan_says`;
+  - the Core back words without "Back": DWLookTests `theBackLinkIsReadAsIOSsOwn`.
+
+Tests after review: test_ios_phone_look 22 (from 19), DWLookTests 5 (from 4).

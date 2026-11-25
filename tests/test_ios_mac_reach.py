@@ -1,12 +1,19 @@
 """
-The Mac redesign keeps the iPhone as it is (slice R1, the build plan's section 1; notes/ios.md "The Mac redesign, slice
-R1: the frame and the shared pieces"). James, 24 Nov: "Mac only: the iPhone looks and works exactly as it does now."
-App/Mac's views compile into the iPhone's build too (one target), so what keeps them off the phone is who names them:
+The Mac redesign keeps each device to its own drawing (slice R1, the build plan's section 1; notes/ios.md "The Mac
+redesign, slice R1: the frame and the shared pieces", and since R1b "The redesign, slice R1b: the shared look, and the
+phone's pieces"). App/Mac's, App/Look's and App/Phone's views all compile into both builds (one target), so what keeps
+each device's look on its own device is who names them - three zones (the build plan's section 1, from R1b):
 
-  - The reach: App/Mac's types, and the modifiers it declares, are named only from App/Mac and the Mac's frame files -
+  - The Mac's: App/Mac's types, and the modifiers it declares, are named only from App/Mac and the Mac's frame files -
     DesktopFrame, MacSidebarView, PlayerBar, MacPanels, and Platform's Mac half. A phone file that named one would put
-    the Mac's look on the phone. So are the redesign's pieces declared elsewhere: Typeface's Mac namespace, and Core's
-    MacLook (the sizes), MacTable (the lists) and MacInFront (the page in front).
+    the Mac's look on the phone. So are the redesign's Mac pieces declared elsewhere: Typeface's Mac namespace,
+    DWCorners' Mac half, and Core's MacLook (the sizes), MacTable (the lists) and MacInFront (the page in front).
+    App/Look, both devices', names none of them either: what it draws on the phone would be the Mac's.
+  - The phone's: App/Phone's types and modifiers - and Typeface's Phone namespace, DWCorners' phone half and Core's
+    PhoneLook and PhonePieceWords - are never named from App/Mac, the Mac's frame files, Platform's Mac half or
+    App/Look.
+  - The look's: App/Look's types (and Core's DWLook, Typeface's Look namespace) may be named from anywhere: each draws
+    its own device's sizes, corners and type.
   - Platform's iPhone half is `self` or nothing in every helper but the few that were the iPhone's own before the Mac
     (pull to refresh, Search's field, the dialogs' Cancel, the battery, the idle timer): a helper given a body there
     would change the phone.
@@ -47,9 +54,9 @@ def app_sources() -> dict[str, str]:
     return {path.relative_to(APP).as_posix(): path.read_text(encoding="utf-8") for path in sorted(APP.rglob("*.swift"))}
 
 
-def halves() -> tuple[str, str]:
+def halves(code: str | None = None) -> tuple[str, str]:
     """Platform.swift's Mac half and iPhone half."""
-    code = bare(app_sources()[PLATFORM])
+    code = bare(app_sources()[PLATFORM]) if code is None else code
     mac = code.split("\n#if targetEnvironment(macCatalyst)\n", 1)[1].split("\n#else\n")[0]
     return mac, code.split("\n#else\n", 1)[1].split("\n#endif\n")[0]
 
@@ -66,10 +73,15 @@ def body(code: str, start: str) -> str:
     raise AssertionError(f"unclosed: {start}")
 
 
-def mac_names() -> set[str]:
-    """What App/Mac declares that another file could name: its types, and the View modifiers it adds."""
+LOOK = APP / "Look"
+PHONE = APP / "Phone"
+
+
+def mac_names(folder: Path = MAC) -> set[str]:
+    """What a folder (App/Mac, unless said) declares that another file could name: its types, and the modifiers and
+    styles it adds in its extensions."""
     names = set()
-    for path in sorted(MAC.rglob("*.swift")):
+    for path in sorted(folder.rglob("*.swift")):
         code = bare(path.read_text(encoding="utf-8"))
         names |= set(re.findall(r"^(?:@MainActor\s+)?(?:final\s+)?(?:struct|enum|class|protocol|typealias)\s+(\w+)",
                                 code, re.M))
@@ -78,38 +90,83 @@ def mac_names() -> set[str]:
     return names
 
 
-#? the redesign's own pieces declared outside App/Mac: Core's sizes, lists and page in front - and Typeface's namespace,
-#? matched as `Typeface.Mac` (Typeface itself is the phone's too)
+#? the redesign's own Mac pieces declared outside App/Mac: Core's sizes, lists and page in front - and Typeface's and
+#? DWCorners' Mac halves, matched as `Typeface.Mac` and `DWCorners.Mac` (Typeface and DWCorners are the phone's too)
 REDESIGN_ELSEWHERE = {"MacLook", "MacTable", "MacInFront"}
+#? the phone's own pieces declared outside App/Phone: Core's sizes - and Typeface's and DWCorners' phone halves
+PHONE_ELSEWHERE = {"PhoneLook", "PhonePieceWords"}
 
 
 def reach_pattern(names: set[str]) -> re.Pattern:
-    """A use of one of the redesign's names: App/Mac's, the Core pieces', or Typeface.Mac."""
+    """A use of one of the redesign's Mac names: App/Mac's, the Core pieces', Typeface.Mac or DWCorners.Mac."""
     every = sorted(names | REDESIGN_ELSEWHERE, key=len, reverse=True)
-    return re.compile(r"\bTypeface\.Mac\b|\b(" + "|".join(every) + r")\b")
+    return re.compile(r"\bTypeface\.Mac\b|\bDWCorners\.Mac\b|\b(" + "|".join(every) + r")\b")
+
+
+def phone_pattern(names: set[str]) -> re.Pattern:
+    """A use of one of the phone's own names: App/Phone's, PhoneLook, PhonePieceWords, Typeface.Phone or
+    DWCorners.Phone."""
+    every = sorted(names | PHONE_ELSEWHERE, key=len, reverse=True)
+    return re.compile(r"\bTypeface\.Phone\b|\bDWCorners\.Phone\b|\b(" + "|".join(every) + r")\b")
+
+
+def the_macs(name: str) -> bool:
+    """Whether a file is the Mac's own: App/Mac's, or a frame file."""
+    return name.startswith("Mac/") or name in FRAME_FILES
+
+
+def reach_problems(sources: dict[str, str]) -> list[str]:
+    """Every name used outside its zone: a Mac name anywhere but the Mac's own files (and Platform's Mac half) - App/Look
+    included; a phone name in the Mac's own files, Platform's Mac half or App/Look."""
+    mac, phone = reach_pattern(mac_names()), phone_pattern(mac_names(PHONE))
+    left = []
+    for name, text in sources.items():
+        code = bare(text)
+        if name == PLATFORM:
+            outside, mac_half = code.split("\n#if targetEnvironment(macCatalyst)\n", 1)[0] + halves(code)[1], halves(code)[0]
+            left += [f"{name}: {found.group(0)}" for found in mac.finditer(outside)]
+            left += [f"{name} (its Mac half): {found.group(0)}" for found in phone.finditer(mac_half)]
+            continue
+        if not the_macs(name):
+            left += [f"{name}: {found.group(0)}" for found in mac.finditer(code)]
+        if the_macs(name) or name.startswith("Look/"):
+            left += [f"{name}: {found.group(0)}" for found in phone.finditer(code)]
+    return left
 
 
 def test_app_mac_is_named_only_from_the_macs_frame():
     names = mac_names()
-    # what R1 declares, read: the look, the components, the frame's parts, the areas - and the modifiers
-    for name in ("MacPalette", "MacCorners", "MacButtonStyle", "MacTitleStrip", "MacToolbar", "MacField", "MacSegmented",
-                 "MacCheckbox", "MacPopUp", "MacFolderTabs", "MacGroupBox", "MacStatusBar", "MacKeyStyle", "MacOutput",
-                 "MacTabStack", "MacRoutes", "MacPage", "MacTitle", "MacSelection", "MacStatusItems", "MacLibrary",
-                 "MacAlbum", "MacArtist", "MacSearch", "MacRequests", "MacSettings", "MacEdit", "MacManage",
-                 "macRoutes", "macStatus", "macSelects"):
+    # what R1 declares, read: the look, the components, the frame's parts, the areas - and the modifiers (since R1b
+    # the shared look's are App/Look's, below)
+    for name in ("MacPalette", "MacTitleStrip", "MacToolbar", "MacCheckbox", "MacFolderTabs", "MacGroupBox",
+                 "MacStatusBar", "MacKeyStyle", "MacDisplay", "MacOutput", "MacTabStack", "MacRoutes", "MacPage",
+                 "MacTitle", "MacSelection", "MacStatusItems", "MacLibrary", "MacAlbum", "MacArtist", "MacSearch",
+                 "MacRequests", "MacSettings", "MacEdit", "MacManage", "macRoutes", "macStatus", "macSelects"):
         assert name in names, name
-    pattern = reach_pattern(names)
-    left = []
-    for name, text in app_sources().items():
-        if name.startswith("Mac/") or name in FRAME_FILES:
-            continue
-        code = bare(text)
-        if name == PLATFORM:
-            # its Mac half may: the iPhone half, and what is outside the switch, may not
-            code = code.split("\n#if targetEnvironment(macCatalyst)\n", 1)[0] + halves()[1]
-        for found in pattern.finditer(code):
-            left.append(f"{name}: {found.group(0)}")
+    # R1's shared pieces left App/Mac in R1b, for App/Look under DW names
+    for gone in ("MacCorners", "MacButtonStyle", "MacField", "MacSegmented", "MacPopUp", "MacRaised", "MacRule",
+                 "MacWell", "MacFieldRow", "MacChip", "MacCount", "MacCaret", "MacToggleStyle"):
+        assert gone not in names, gone
+    left = reach_problems(app_sources())
     assert not left, left
+
+
+def test_the_three_zones_are_read():
+    look, phone = mac_names(LOOK), mac_names(PHONE)
+    assert {"DWPalette", "DWCorners", "DWRaised", "DWRule", "DWButtonStyle", "DWWell", "DWField", "DWFieldRow", "DWChip",
+            "DWCount", "DWSegmented", "DWPopUp", "DWCaret", "DWToggleStyle", "DWTarget", "lookHeight",
+            "lookSquare"} <= look, look
+    assert {"PhoneStrip", "PhoneTop", "PhoneBack", "PhoneBigTitle", "PhoneTabItem", "PhoneLitLine", "PhoneMiniGround",
+            "PhoneSeekLine", "PhoneCard", "PhoneGroup", "PhoneKV", "PhoneGo", "PhoneChevron", "PhoneSwitchStyle",
+            "phoneSwitch", "PhoneFoot", "phoneFoot", "PhoneMeta", "PhoneMetaLink"} <= phone, phone
+    # no name in two zones
+    assert not (look & phone) and not (look & mac_names()) and not (phone & mac_names())
+    # the look's pieces may be named from anywhere: the Mac's patterns and the phone's take none of them
+    for planted in ("Text(x).foregroundStyle(DWPalette.t2)", "Button(x) { }.buttonStyle(DWButtonStyle(kind: .pri))",
+                    "DWChip(words: w)", "view.lookHeight(DWLook.here.rowHeight)", "Text(x).font(Typeface.Look.text(.chip))",
+                    "DWCorners.buttonShape"):
+        code = bare(planted + "\n")
+        assert not reach_pattern(mac_names()).search(code) and not phone_pattern(phone).search(code), planted
 
 
 def test_the_reach_matcher_catches_a_phone_file_naming_the_mac():
@@ -131,6 +188,35 @@ def test_the_reach_matcher_catches_a_phone_file_naming_the_mac():
     assert not pattern.search(bare('// MacPalette\nlet s = "MacToolbar"\n'))
     # the iPhone's own names that only start alike are not the Mac's
     assert not pattern.search(bare("MacFrame.sidebarWidth\nMacSidebar.label(row)\nMacPanel(panel: p)\n"))
+    # DWCorners' Mac half is the Mac's; the corners the look takes on either device are not
+    assert pattern.search(bare("let r = DWCorners.Mac.button\n")) and not pattern.search(bare("DWCorners.button\n"))
+
+
+def test_the_reach_catches_each_zone_out_of_place():
+    sources = app_sources()
+    assert not reach_problems(sources)
+    phone = phone_pattern(mac_names(PHONE))
+    for planted in ("PhoneStrip(options: o, words: w, shown: $s, spoken: x)", "Text(x).font(Typeface.Phone.text(.strip))",
+                    ".frame(minHeight: CGFloat(PhoneLook.strip))", "let r = DWCorners.Phone.button",
+                    "Toggle(isOn: $on) { }.toggleStyle(.phoneSwitch)", "page.phoneFoot { }"):
+        assert phone.search(bare(planted + "\n")), planted
+    # a phone piece in App/Mac, in a frame file, in Platform's Mac half or in App/Look; a Mac piece in App/Look
+    for name, planted in (("Mac/Components/MacToolbar.swift", "PhoneChevron()"),
+                          ("Root/MacSidebarView.swift", "PhoneLook.strip"),
+                          ("Look/DWChip.swift", "PhoneLook.strip"),
+                          ("Look/DWChip.swift", "MacPalette.titleFace"),
+                          ("Look/DWButtonStyle.swift", "Typeface.Mac.text(.base)"),
+                          ("Look/DWSegmented.swift", "MacLook.segmentHeight")):
+        planted_sources = dict(sources)
+        planted_sources[name] = sources[name] + f"\nlet planted = {planted}\n"
+        assert reach_problems(planted_sources), (name, planted)
+    mac_half = sources[PLATFORM].replace("\n#else\n", "\n    let planted = PhoneLook.strip\n#else\n", 1)
+    assert reach_problems({**sources, PLATFORM: mac_half})
+    # a phone piece on a phone screen, or the look anywhere, is no problem of the reach's (drawn nowhere yet is
+    # test_ios_phone_look.py's)
+    for name, planted in (("Player/NowPlayingView.swift", "PhoneLook.strip"), ("Library/LibraryView.swift", "DWPalette.t2"),
+                          ("Mac/Components/MacToolbar.swift", "DWChip(words: w)")):
+        assert not reach_problems({**sources, name: sources[name] + f"\nlet planted = {planted}\n"}), (name, planted)
 
 
 #? Platform's iPhone half: the helpers that were the iPhone's own before the Mac, each with its body as it was

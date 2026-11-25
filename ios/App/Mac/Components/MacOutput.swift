@@ -17,7 +17,7 @@ struct MacOutput: View {
                 .frame(width: Self.picker, height: Self.picker)
             Text(eq.settings.setting(for: eq.route).shownName)
                 .font(Typeface.Mac.text(.small))
-                .foregroundStyle(MacPalette.t2)
+                .foregroundStyle(DWPalette.t2)
                 .lineLimit(1)
                 .accessibilityHidden(true)
         }

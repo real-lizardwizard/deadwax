@@ -244,7 +244,7 @@ for ([404-415](#the-mac-apps-checks-404-415),
 [416-423](#the-mac-apps-menus-keys-and-window-checks-416-423), [424-433](#the-mac-apps-desktop-frame-checks-424-433),
 [434-438](#the-mac-apps-words-checks-434-438), [439-446](#the-mac-apps-sleep-power-and-downloads-checks-439-446),
 [447-451](#the-mac-apps-eq-files-checks-447-451), [452-458](#the-mac-apps-managing-checks-452-458) and
-[518-523](#the-mac-redesigns-checks-518-578)).
+[518-525](#the-mac-redesigns-checks-518-607)).
 
 **What it is today.** The window is laid out as the web app's desktop is, whatever its size: the **sidebar** at the
 left, the **page** you're on beside it, **Up Next, Lyrics or Info** in a panel at the right when you open one, and the
@@ -6173,10 +6173,11 @@ Ethan's phone as a listener (the one that sees no foot line). Say "pass", or wha
 - **487 [key] VoiceOver.** A top song reads its title and line ("Let It Happen, Currents · 2015"); a missing one
   "…, Not in your library"; "From Last.fm" reads as a link; the listeners line is read under the name.
 
-### The Mac redesign's checks (518-578)
+### The Mac redesign's checks (518-607)
 
-The Mac's own look, drawn on the design canvas and built a slice at a time (still app 0.13 (13)). No server change is
-needed, and the phones should look and work exactly as before - each slice's last check is the phones'. As for
+The new look, drawn on the design canvas and built a slice at a time (still app 0.13 (13)): the Mac's first, and the
+phones' from the slices after 524-525, each screen redrawn in its own slice. No server change is needed. Until a slice
+redraws a phone screen it should look and work exactly as before - each slice's last check is the phones'. As for
 404-458: deadwax's plain `http://` address, the home Wi-Fi, signed in as an admin with logins on, installed with
 `ios/scripts/install-mac.sh`. Say "pass", or what you saw.
 
@@ -6204,6 +6205,16 @@ every later slice builds its pages from. The pages themselves are still the phon
   album, an artist, a playlist, Search, Requests, Settings and each of its pages, Manage's pages and Edit album. Make
   the window as small as it goes (880 x 600): the strip, the sidebar, the page and the bar all fit, nothing cut off.
 - **523 The phones.** **Not done yet.** On Green Anole, every tab, the player, Now Playing, Edit album and the EQ are
+  as before. The same on Ethan's phone, or "not done yet".
+
+#### The shared look, and the phone's pieces (524-525)
+
+**Not done yet.** The second slice moves the Mac's buttons, fields, chips, switches and colours to where both devices
+can use them, and makes the phone's own pieces, which are drawn nowhere yet. Nothing on either screen should change.
+
+- **524 The Mac as R1 left it.** **Not done yet.** The title strip, the sidebar, the colours and the buttons are as
+  518-521 found them.
+- **525 Both phones.** **Not done yet.** On Green Anole, every tab, the player, Now Playing, Edit album and the EQ are
   as before. The same on Ethan's phone, or "not done yet".
 
 ## What it can't do yet

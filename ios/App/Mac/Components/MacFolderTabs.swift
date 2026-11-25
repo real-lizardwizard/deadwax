@@ -15,7 +15,7 @@ struct MacFolderTabs<Tab: Hashable>: View {
     /// What VoiceOver calls the strip.
     let spoken: String
     /// The chosen tab's ground: the panel's, else the page's (.tabs.onbg .tab.on).
-    var ground: Color = MacPalette.panel
+    var ground: Color = DWPalette.panel
 
     var body: some View {
         VStack(spacing: 0) {
@@ -29,7 +29,7 @@ struct MacFolderTabs<Tab: Hashable>: View {
             .frame(height: CGFloat(MacLook.tabStripHeight) - 1, alignment: .bottom)
             // the chosen tab's foot lies over the line under the strip
             .zIndex(1)
-            MacRule(colour: MacPalette.line)
+            DWRule(colour: DWPalette.line)
         }
         .background(MacPalette.tabStripFace)
         .accessibilityElement(children: .contain)
@@ -43,31 +43,31 @@ struct MacFolderTabs<Tab: Hashable>: View {
         } label: {
             Text(words(tab))
                 .font(Typeface.Mac.text(.control).weight(on ? .semibold : .regular))
-                .foregroundStyle(on ? MacPalette.chosenTabText : MacPalette.t2)
+                .foregroundStyle(on ? MacPalette.chosenTabText : DWPalette.t2)
                 .lineLimit(1)
                 // .tab: padding 0 13px
                 .padding(.horizontal, 13)
                 .frame(height: CGFloat(on ? MacLook.chosenTabHeight : MacLook.tabHeight))
                 .background {
                     if on {
-                        MacCorners.tabShape.fill(ground)
+                        DWCorners.tabShape.fill(ground)
                     } else {
-                        MacCorners.tabShape.fill(MacPalette.tabFace)
+                        DWCorners.tabShape.fill(MacPalette.tabFace)
                     }
                 }
                 // .tab.on: box-shadow inset 0 2px 0 var(--acc) - 2 pt of the accent inside its top edge
                 .overlay(alignment: .top) {
                     if on {
-                        MacPalette.acc
+                        DWPalette.acc
                             .frame(height: 2)
                             .padding(.top, 1)
-                            .clipShape(MacCorners.tabShape)
+                            .clipShape(DWCorners.tabShape)
                     }
                 }
                 // its edge on three sides: no edge along its foot (border-bottom: 0)
                 .overlay {
-                    MacCorners.tabShape
-                        .strokeBorder(on ? MacPalette.chosenTabEdge : MacPalette.line, lineWidth: 1)
+                    DWCorners.tabShape
+                        .strokeBorder(on ? MacPalette.chosenTabEdge : DWPalette.line, lineWidth: 1)
                         .padding(.bottom, -1)
                         .clipped()
                 }

@@ -19,20 +19,20 @@ struct MacCheckbox: View {
             HStack(spacing: 6) {
                 ZStack {
                     if on {
-                        MacCorners.chipShape.fill(MacPalette.checkFill)
+                        DWCorners.chipShape.fill(DWPalette.checkFill)
                         Image(systemName: "checkmark")
                             .font(Typeface.symbol(size: 8, weight: .heavy))
-                            .foregroundStyle(MacPalette.text)
+                            .foregroundStyle(DWPalette.text)
                     } else {
-                        MacCorners.chipShape
-                            .fill(MacPalette.well.shadow(.inner(color: MacPalette.wellShade, radius: 1, x: 0, y: 1)))
-                            .overlay(MacCorners.chipShape.strokeBorder(MacPalette.line, lineWidth: 1))
+                        DWCorners.chipShape
+                            .fill(DWPalette.well.shadow(.inner(color: DWPalette.wellShade, radius: 1, x: 0, y: 1)))
+                            .overlay(DWCorners.chipShape.strokeBorder(DWPalette.line, lineWidth: 1))
                     }
                 }
                 .frame(width: Self.box, height: Self.box)
                 Text(words)
                     .font(Typeface.Mac.text(.base))
-                    .foregroundStyle(MacPalette.head)
+                    .foregroundStyle(DWPalette.head)
             }
             .contentShape(Rectangle())
         }
