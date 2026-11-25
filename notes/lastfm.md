@@ -434,3 +434,185 @@ src/routes/lastfm.py.
   - how long a cold `/lastfm/artist` takes, which decides how often A1's Top Songs lands below the albums;
   - Last.fm's real rate limit;
   - getInfo's answer for an unknown mbid (believed error 6, as its getTopTracks answered).
+
+## S3 - descriptions, Last.fm first (2.1.42)
+
+The web's artist page, album page and album you don't have: with `LASTFM_API_KEY` set, their description is
+Last.fm's own words first, then Wikipedia's, then Navidrome's - James's order of 2026-10-24 ("Last.fm FIRST, Wikipedia
+(via MusicBrainz) as the fallback"), which 2.0.13 could only meet through Navidrome's agents. The subtitle is
+Wikidata's, as ever. **Without a key nothing changes**: `describe()` takes the very path it took before (the two sides,
+`answer_of`, the same lookups), and tests/test_describe.py passes unchanged - its file has no diff. **ui/ has no diff**
+either: `source` is "lastfm" for Last.fm's own words as for Navidrome's, so the link still reads "More on Last.fm" and
+the answer's shape is the same.
+
+### The route: src/routes/describe.py
+
+- `describe()` asks `Config.lastfm_key()` first. With none it is 2.1.41's code, line for line. With one,
+  `_described_lastfm_first()` gathers three sides at once - Navidrome's and the Wikipedia side as before, and
+  `lastfm_side()` - and answers `descriptions.answer_lastfm_first(heard, row, said)`.
+- **`unavailable`** is true if any side failed, Last.fm's included: down, limiting, refusing the key, or MusicBrainz
+  failing the lookup the names come from. A "not known" (error 6), Last.fm's empty page, or an album with no names to
+  ask by is a definite none, not a failure. None of them takes the description down: the others' words are said.
+- **An artist**: S2's own `artist_part(store, INFO, mbid, None)` - the kept getInfo row the app's artist page uses, by
+  id (no autocorrect), so one ask serves both, either way round (tested). A "not known" by id asks by the name
+  `get_artist` gives - the Wikipedia side's own lookup, asked only then - with `autocorrect=1`, kept under the name.
+- **An album**: album.getInfo by the release group's `title` and its artist credit as `artists.credit_name()` says it,
+  `autocorrect=1` - exactly record.py's parameters - kept in `lastfm_kept` **under the release group's id**,
+  `release_group_key("album.getinfo", mbid)` (`1|album.getinfo|group|<mbid>`; 7 days, a "not known" 3). **Fixed after
+  review**: it was first kept under `album_key(...)`, the names folded by `name_key` - which drops a bracketed aside
+  and a leading "The", so "Fearless" and "Fearless (Taylor's Version)", "Live" and "Live [Bonus]", "The Wall" and
+  "Wall" shared one row: the first asked was shown for both for a week, and before a right Wikipedia paragraph. The
+  album side always has its group's id, so the names are only what Last.fm is asked by. A title or artist that is
+  empty, or longer than S2's `NAME_MAX` (200), isn't asked; one that folds to nothing ("!!!") now is - it shares no
+  row any more. (Albums one artist gave one title - a band's self-titled ones - still get Last.fm's one page for
+  it: that is Last.fm's page, asked by the same names.)
+- **A deadline**: the Last.fm side is waited for `LASTFM_DEADLINE_S` (4 s, S2's `ARTIST_DEADLINE_S`) at most
+  (`by_the_deadline`). **Added after review**: a Last.fm that takes the connection and doesn't answer held the whole
+  description back 16-20 s, while Wikipedia's words were long ready. Past the deadline the side answers none and
+  `unavailable`, and goes on: it is started through src/routes/lastfm.py's `started()` (S2's `_started`, made public,
+  its log line made "a part of a page"), held in the same set and stopped with S2's late parts as deadwax stops - so
+  it is never cancelled by the page, and what Last.fm answers is kept when it comes (the keeper's ask is shielded
+  too). The next visit has it.
+- **One MusicBrainz lookup** between the Wikipedia and Last.fm sides (`_once`): the first side that needs it starts it,
+  the other awaits the same task. `request_with_retries` doesn't join two identical requests in flight, so without
+  this a cold album asked both at once - two turns of the limiter for one answer (the test makes MusicBrainz take
+  0.2 s, so a doubled ask can't hide behind the memory cache). With a key the album's lookup is
+  `get_release_group_urls(mbid, credits=True)`, `inc=url-rels+artist-credits`: one lookup, a new cache key, so each
+  album is asked once more, then kept a month as every lookup is. **Decided here**: the design has the inc change for
+  everyone; it is asked only with a key, because without one "nothing changes" - and tests/test_describe.py pins
+  `inc=url-rels` (`test_an_album_s_is_its_release_group_s_with_url_rels_alone`).
+- An id of Navidrome's alone has no Last.fm side (artist or album): nothing to ask Last.fm by without MusicBrainz.
+- `_asking` and `_part` in src/routes/lastfm.py are now `parsed_ask` and `artist_part`, the descriptions' too. No
+  change to what they do.
+
+### The words: descriptions.from_lastfm(body, kind), pure
+
+Reads the kept shape: an artist's `bio`, an album's `wiki`; its `content`, else its `summary` (the first that has
+words). Each field: cut at the **last "Read more on Last.fm" link** (descriptions.READ_MORE) - what follows it is
+Last.fm's footer; the licence sentence dropped wherever it is anyway (`LICENCE`, any case, any spaces); read as text
+(`_unmarked`, plain_text's own reading, split out of it with no change to plain_text); its prose only (`_prose`); a
+field the keeping cut short ended at a sentence (`an_end`); `clean_text`, cut at MAX_LETTERS. None for no words, or a
+disambiguation page. `url` is the answer's own page through `lastfm_url`.
+
+**What the recordings show** (tests/fixtures/lastfm/recorded/, 2026-11-25 - all three artists by id and by name, the
+misspelling twice, Dummy):
+
+- **The licence sentence is as the design remembered it**, word for word: every content ends `... <a
+  href="https://www.last.fm/music/...">Read more on Last.fm</a>. User-contributed text is available under the
+  Creative Commons By-SA License; additional terms may apply.` - once, at the end. Every summary ends at the link: an
+  artist's ` <a ...>Read more on Last.fm</a>`, an album's (Dummy's) with a full stop after it, `</a>.`; no summary has
+  the licence. READ_MORE's existing `\.?` already took the album's full stop.
+- **The link is Last.fm's plain `<a href="...">`**, never Navidrome's `target='_blank'` form, and the only tag in any
+  of them.
+- **The summary isn't 300 letters** (the design's 0.2, as read): 541-576 letters with its link (Dummy's 561). Each
+  artist's is a whole-sentence prefix of their content; Dummy's is all of its content's words (a paragraph break
+  made a space). Content first, as designed: the same start, longer.
+- **The misspelling's page has no words**: summary ` <a ...>Read more on Last.fm</a>`, content `""`. from_lastfm
+  says None, so Wikipedia's (or Navidrome's) words are said.
+- **Dance Gavin Dance's content is two paragraphs of prose, then lists**: "Discography:" (a release a line),
+  "All of Dance Gavin Dance's records...", "Band members:", "Touring members:", "Former Members:", "Former touring
+  members:". Made one line and cut at 1500, as the design's rule has it, that read "... guitar licks and riffs.
+  Discography: November 14, 2006 - Whatever I Say Is Royal Ocean May 15, 2007 - ... Tree City Sessions 2 (Live…".
+  **Decided here, beyond the design**: `_prose` keeps the paragraphs (Last.fm parts them with a blank line) up to the
+  first list that follows a real amount of prose, so DGD's says its two paragraphs (696 letters). **A list** (`_a_list`)
+  is a paragraph of `LIST_LINES` (3) lines or more, two in three of them short (`LIST_LINE_LETTERS`, 80) and ending no
+  sentence - DGD's discography is 26 such lines of at most 62 letters, its line-ups 3 to 11 ending in ")" - and it
+  ends the words only after `PROSE_BEFORE_A_LIST` (200) letters. **Fixed after review**: as first written, any line
+  break in any later paragraph stopped the words, so "Mogwai.\n\nMogwai are a Scottish post-rock band ...\nThey
+  released ..." was said as "Mogwai." alone - and, Last.fm first, that beat Wikipedia's paragraph. A line break inside
+  prose is no list now, and a list after a line or two doesn't end the words (they go on past it). A field whose FIRST
+  paragraph is a list is said as it is. Tame Impala's (22 paragraphs, all prose) and Portishead's (two) aren't touched.
+- **What is said**: Tame Impala 1,464 letters (its first paragraph and as much of the second as ends a sentence,
+  from the content kept at BIO_MAX), Dance Gavin Dance 696, Portishead 812 (all of it), Dummy 482 (all of it).
+- **No recording is a disambiguation page.** The rule is the design's and the review's, unverified against a real
+  page. **Fixed after review**: as first written (`there (are|is|were) (at least X|multiple|...|N) (artist|band|act)s?`)
+  it dropped real bios - "There were two band members in the first line-up" (`band\b` before " members"), "There are
+  18 artists on this compilation", "There are many acts of kindness" - and missed "There are several different
+  artists with this name: 1) ..." and a page that starts "1) ... 2) ...". Now (`DISAMBIGUATION`, `NUMBERED`), either:
+  first words `there (are|is|were|have been)`, then artists, bands, acts, groups, musicians, singers, rappers or
+  projects - plural, or "more than one" of them - **sharing a name**: `with / by / of / under / sharing / using /
+  going by` + `this / that / the same / one / a` + `name`, or `named`, or `called`; OR numbered from its start, read
+  with its lines before they are made one: `1)` (or `1.`) first, after one heading line ending ":" at most, then a
+  `2)` (the same mark) after a space or a line break. Its tests are inline, marked WRITTEN FROM THE DESIGN and
+  WRITTEN FROM THE REVIEW.
+- **Last.fm's album mbid isn't the release group's**: Dummy's is `00163fb1-5ab7-4fec-b0dd-a915e2722340`, the group
+  `48140466-cff6-3222-bd55-63c27e43190d` - so asking by names, as designed, was right. (Whether it is a release's id
+  isn't checked: nothing here asked MusicBrainz.)
+- **MusicBrainz takes `inc=url-rels+artist-credits`** on a release group: the review's one live GET for Dummy answered
+  its `artist-credit` and all 9 of its relations (2026-11-25). The tests' credit is still SHAPED from the documented
+  `artist-credit`, not recorded.
+- **Album wikis come**: Dummy's has `wiki` (published, summary, content), which the API page's sample lacked.
+
+**A field the keeping cut short**: S2 keeps a content's first BIO_MAX (4000) letters, or what fits CONTENT_BYTES
+(1,109 letters outside the BMP), with no tail. Such a field has no link, so it may end mid-sentence or inside a tag;
+its words would stop there whenever they are under MAX_LETTERS (an HTML-heavy content, or one outside the BMP).
+`an_end` ends them at their last whole sentence in the second half (else the last word and "…" - trimmed()'s rule),
+after `_HALF_A_TAG` drops a tag the cut went through. (Python 3.12.13's and 3.14.7's html.parser drop such a tag
+themselves, so on them that line changes nothing - its mutation isn't caught there; it is kept so the words don't
+rest on the parser's reading of a broken tag.)
+A field with its link is whole: never cut back.
+
+### Kept shapes
+
+- **The artist side needs nothing more than S2 keeps**: the content's first 4000 letters give at least the 1500
+  said for every recording (Tame Impala's 10,843-letter content is the only one cut). `artist_info` is untouched;
+  LASTFM_SHAPE stays 1 and KEPT_SHAPES' digest is unchanged.
+- **`lastfm.album_info()`** is new: `{url, wiki: {summary, content}}`, each field cut as a bio is (`_bio_text`,
+  the same caps). **Not bumped**: no album.getinfo row was ever kept before 2.1.42, at any shape, so none can be read
+  wrongly. It is pinned from here like the rest: tests/test_lastfm.py `KEPT_ALBUM_SHAPES` (`{1: digest}`) and
+  `test_what_is_kept_of_an_album_changes_only_with_lastfm_shape`, beside KEPT_SHAPES rather than in it - put in it,
+  shape 1's digest would change and the rule says to bump, which would have emptied every row 2.1.41 kept for
+  nothing. A later bump adds an entry to both.
+- **An album row's size**: the same 24.1 KB of fields at most, plus a key of under 100 bytes (its release group's
+  id - below), so it always fits the keeping's 32 KB.
+
+### Tests, and the mutations they catch
+
+- tests/test_describe_lastfm.py (70): the recordings' tails, from_lastfm over every recorded bio and wiki and inline
+  (summary fallback, licence in capitals, a content the keeping cut inside its licence, links, a cut field, a half
+  tag, lists and line breaks, the disambiguation wording, pages that only begin like one), the order, and the routes
+  with a key through the whole app - test_describe.py's MusicBrainz (made slow, giving an artist credit only when
+  asked for one), Wikidata, Wikipedia and Navidrome, beside test_lastfm_routes.py's Last.fm answering only
+  record.py's requests - and without one. After review: the three pairs that fold alike (album.getInfo's answers
+  for them WRITTEN FROM THE REVIEW: Dummy's recorded answer, its names and words replaced), "!!!" asked, Mogwai and a
+  soft line break, the review's five disambiguation cases, the deadline (a held answer; a lookup outlasting it), a
+  side that raises, and the review's gap - a kept Wikipedia side with MusicBrainz down is `unavailable`.
+- tests/test_lastfm.py (4 new): album_info over Dummy, sparse and junk answers, its cuts, its kept-shape digest
+  (KEPT_ALBUM_SHAPES: the recorded wiki, a wiki at the byte caps, one at the letter caps, a sparse one).
+- tests/test_describe.py: unchanged, all passing.
+
+S3's mutations, each put in alone, the Last.fm, describe, logins and player-as-you tests run, and reverted - 38
+after review, 37 caught:
+
+- **The order** (Navidrome's or Wikipedia's before Last.fm's; the subtitle not Wikidata's): the order tests.
+- **The words**: the licence kept (no LICENCE.sub) - the recordings' tails; the licence kept with no cut at the link -
+  only the content the keeping cut inside its licence (". User-contributed text is avail"), since LICENCE and the
+  link's own removal cover every recording; "Read more on Last.fm" kept; DISAMBIGUATION off, or put back as first
+  written (the review's cases both ways); NUMBERED off (the numbered pages); an address off last.fm; the prose rule
+  off (DGD's lists said); the prose rule as first written, a list after any amount of prose, a list line that ends a
+  sentence (Mogwai, the soft break); a cut field not ended at a sentence; the summary read first.
+- **The asking**: an album asked by its group's mbid (the stand-in answers only record.py's names); **an album kept
+  under its names again** (the folding pairs, "!!!"); the lookup not shared, or the Wikipedia side doing its own
+  (SlowMusicBrainz counts one release-group ask); an unknown id not asked by name; an artist name past NAME_MAX
+  asked; an empty album name asked.
+- **Failing**: unavailable false when Last.fm failed; unavailable false when the lookup failed for the Last.fm side
+  alone (the review's gap); a refused Last.fm raising, with the deadline's wrapper letting a raise through (the two
+  together: the wrapper alone makes any raise a failure) - and the wrapper letting a raise through alone (a side that
+  raises).
+- **The deadline**: none (the held answer, and the lookup outlasting it); the late side cancelled (the lookup
+  outlasting it - the cancel reaches the lookup the Wikipedia side shares); a deadline other than S2's.
+- **Without a key** (the Last.fm path taken, Last.fm's order, artist credits asked, the shared lookup): the no-key
+  tests here and test_describe.py, unchanged.
+- **The album's kept shape** (a summary cap, a content cap, a field renamed, none bumped): the album digest.
+- **Not caught: the half tag kept** (`_HALF_A_TAG` not stripped). Python 3.12.13's and 3.14.7's html.parser drop a
+  tag cut off at the end of the input themselves, so on them the line changes nothing; it is kept so the words don't
+  rest on that parser behaviour.
+
+### Verified, and not
+
+- **Verified by the tests**: everything above over Last.fm's recorded answers, through httpx's MockTransport.
+- **Not verified**: deadwax asking the real Last.fm for a description (no call was made here); a real disambiguation
+  page's wording; a real album Last.fm doesn't know (its error 6 for an album is shaped from the errors page:
+  record.py recorded none); that deadwax reads a real `artist-credit` as the fake's (MusicBrainz's taking the inc
+  is verified above, by the review; its credit here is shaped from the documented one); a description page drawn in a browser with Last.fm's words
+  (ui/ didn't change, so only its words differ); how many artists' bios put a list straight after one paragraph.

@@ -340,8 +340,9 @@ what you already have of that pressing, if anything ("Already in your library", 
 downloading", "You have 9 of 10 tracks of this pressing…", "You also have another pressing…" - or,
 with logins on, "The collection also has another pressing…" for one that isn't yours -
 asked of deadwax without searching Soulseek, for the pressing chosen, and again as you come back to
-the page); then a **short description** of the album, from Wikipedia, and Wikidata's one line over it ("1994 studio album
-by Portishead"), when they have one ([descriptions](player.md#descriptions)); and then **that pressing's tracklist**.
+the page); then a **short description** of the album - Last.fm's when deadwax has a Last.fm key, else Wikipedia's - and
+Wikidata's one line over it ("1994 studio album by Portishead"), when they have one
+([descriptions](player.md#descriptions)); and then **that pressing's tracklist**.
 
 ![Dummy, an album you don't have, on its 2017 vinyl: the Pressing list open, each pressing saying what it changes about the tracklist twelve of its twenty share](../assets/images/search.png)
 

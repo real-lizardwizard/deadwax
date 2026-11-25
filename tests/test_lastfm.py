@@ -20,9 +20,9 @@ from pathlib import Path
 import pytest
 
 from src.lastfm import (BIO_MAX, CONTENT_BYTES, COUNT_DIGITS, LASTFM_SHAPE, NO_KEY_WHY, SUMMARY_BYTES, SUMMARY_LETTERS,
-                        TOP_SONGS, URL_MAX, Answer, Limited, NotKnown, Refused, Unreachable, artist_answer, artist_info,
-                        classify, cleaned, count, lastfm_url, match_key, name_key, no_key_answer, top_songs, top_tracks,
-                        tracks_of, without, written_size)
+                        TOP_SONGS, URL_MAX, Answer, Limited, NotKnown, Refused, Unreachable, album_info, artist_answer,
+                        artist_info, classify, cleaned, count, lastfm_url, match_key, name_key, no_key_answer,
+                        top_songs, top_tracks, tracks_of, without, written_size)
 from src.lastfm_kept import ROW_MAX_BYTES, artist_key
 from src.routes.lastfm import NAME_MAX
 
@@ -454,6 +454,70 @@ def test_what_is_kept_changes_only_with_lastfm_shape():
         f"KEPT_SHAPES. (Only if nothing in src/lastfm.py changed - the recordings were made again - put this digest "
         f"in place of {LASTFM_SHAPE}'s.)")
     assert max(KEPT_SHAPES) == LASTFM_SHAPE
+
+
+# ----- album.getInfo (2.1.42, S3 - the descriptions) ----------------------------------------------------------------
+
+def test_an_albums_info_is_its_address_and_its_wiki():
+    """Recorded: Dummy by Portishead, asked by its names with autocorrect - what descriptions.from_lastfm reads."""
+    raw = answer("portishead.dummy.album-info")["album"]
+    parsed = album_info(answer("portishead.dummy.album-info"))
+    assert parsed == {"url": "https://www.last.fm/music/Portishead/Dummy",
+                      "wiki": {"summary": raw["wiki"]["summary"].strip(), "content": raw["wiki"]["content"].strip()}}
+    #? Last.fm's own mbid for it is not the release group's (48140466-cff6-3222-bd55-63c27e43190d): deadwax asks by
+    #? names, and keeps no mbid
+    assert raw["mbid"] == "00163fb1-5ab7-4fec-b0dd-a915e2722340"
+
+
+def test_an_album_answer_with_no_album_in_it_is_none_and_a_sparse_one_is_nulls():
+    for body in ({}, {"album": "Dummy"}, {"album": []}, [], "x", None):
+        assert album_info(body) is None
+    assert album_info({"album": {}}) == {"url": None, "wiki": {"summary": None, "content": None}}
+    #? SHAPED: album.getInfo's page shows no `wiki` in its sample - an album with none is nulls, not a fault
+    assert album_info({"album": {"name": "X", "url": "https://www.last.fm/music/A/X"}})["wiki"] == {
+        "summary": None, "content": None}
+    assert album_info({"album": {"url": "http://www.last.fm/music/A/X", "wiki": "x"}}) == {
+        "url": None, "wiki": {"summary": None, "content": None}}
+
+
+def test_an_albums_wiki_is_cut_as_a_bio_is():
+    for letter, size in (("x", 1), (chr(0x4E2D), 6), (chr(0x1F3B8), 12)):
+        wiki = album_info({"album": {"wiki": {"summary": letter * 20_000, "content": letter * 20_000}}})["wiki"]
+        assert wiki == artist_info({"artist": {"bio": {"summary": letter * 20_000, "content": letter * 20_000}}})["bio"]
+        assert written_size(wiki["summary"]) <= SUMMARY_BYTES and written_size(wiki["content"]) <= CONTENT_BYTES
+
+
+#? what album_info keeps at each LASTFM_SHAPE, as album_digest() makes it - beside KEPT_SHAPES, not in it: album.getInfo
+#? was first kept in 2.1.42, so no row of it was ever written before, at shape 1 or any other, and adding it bumps
+#? nothing. From here it is held as the rest are: a change to it without a bump fails
+KEPT_ALBUM_SHAPES = {
+    1: "93640a62260d88063307bc86be90b2cd9f3e3bf904dec6861135a645c6a13de3",
+}
+
+
+def album_digest() -> str:
+    """What src/lastfm.py keeps of album.getInfo, digested: the recorded answer, a wiki cut by its bytes and by its
+    letters, and junk."""
+    made = {
+        "recorded": album_info(answer("portishead.dummy.album-info")),
+        "wiki": album_info({"album": {"wiki": {"summary": chr(0x1F3B8) * 2000, "content": chr(0x416) * 5000}}}),
+        "long": album_info({"album": {"wiki": {"summary": "x" * 2000, "content": "y" * 5000}}}),
+        "sparse": [album_info(body) for body in ({"album": {}}, {"album": []}, {})],
+    }
+    return hashlib.sha256(json.dumps(made, sort_keys=True, ensure_ascii=True).encode()).hexdigest()
+
+
+def test_what_is_kept_of_an_album_changes_only_with_lastfm_shape():
+    """test_what_is_kept_changes_only_with_lastfm_shape's rule, for album.getInfo's rows."""
+    made = album_digest()
+    assert LASTFM_SHAPE in KEPT_ALBUM_SHAPES, (
+        f"LASTFM_SHAPE is {LASTFM_SHAPE}, which KEPT_ALBUM_SHAPES doesn't have: add {LASTFM_SHAPE}: {made!r} to it")
+    assert KEPT_ALBUM_SHAPES[LASTFM_SHAPE] == made, (
+        f"what album.getInfo's answers are kept as has changed (album_info or a cap) and LASTFM_SHAPE is still "
+        f"{LASTFM_SHAPE}: bump LASTFM_SHAPE in src/lastfm.py, and add {LASTFM_SHAPE + 1}: {made!r} to KEPT_ALBUM_SHAPES "
+        f"(and KEPT_SHAPES its own). (Only if nothing in src/lastfm.py changed - the recording was made again - put "
+        f"this digest in place of {LASTFM_SHAPE}'s.)")
+    assert max(KEPT_ALBUM_SHAPES) == LASTFM_SHAPE
 
 
 # ----- the answer ----------------------------------------------------------------------------------------------------

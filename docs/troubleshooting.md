@@ -668,15 +668,25 @@ disc number. A track's **Pictures in this file** (open it from **Edit → Tags**
 
 ## An artist or album has no description, or it's at the foot of the page
 
-The short description ([descriptions](player.md#descriptions)) comes from Navidrome first, else from the English
-Wikipedia article that MusicBrainz links to (through Wikidata); its one-line subtitle from Wikidata. Nothing is
-said when there's none, so if a page has no description:
+The short description ([descriptions](player.md#descriptions)) comes, with a Last.fm key (`LASTFM_API_KEY`), from
+Last.fm first, then from the English Wikipedia article that MusicBrainz links to (through Wikidata), then from
+Navidrome; without one, from Navidrome first, then Wikipedia. Its one-line subtitle is Wikidata's. Nothing is said
+when there's none, so if a page has no description:
 
-- **Nobody has written one** deadwax can find: Navidrome has nothing - its agents (`ND_AGENTS`, Deezer, Last.fm
-  and ListenBrainz by default; only Deezer and Last.fm write descriptions, Deezer only an artist's, and Last.fm
-  only with `ND_LASTFM_APIKEY` and `ND_LASTFM_SECRET` set) found no biography or album notes - and the artist or
-  album has no Wikidata link on MusicBrainz, the Wikidata item has no English article, or the article is a
-  disambiguation page. An album you don't have only ever has Wikipedia's.
+- **Nobody has written one** deadwax can find: Last.fm has no biography or album wiki for them (or only a page
+  listing several artists of that name), Navidrome has nothing - its agents (`ND_AGENTS`, Deezer, Last.fm and
+  ListenBrainz by default; only Deezer and Last.fm write descriptions, Deezer only an artist's, and Last.fm only
+  with `ND_LASTFM_APIKEY` and `ND_LASTFM_SECRET` set) found no biography or album notes - and the artist or album
+  has no Wikidata link on MusicBrainz, the Wikidata item has no English article, or the article is a disambiguation
+  page. An album you don't have never has Navidrome's.
+- **Last.fm's is about someone else**: Last.fm is asked for an album by its title and its artist's name as
+  MusicBrainz has them, and for an artist by MusicBrainz's id (then by name, if Last.fm doesn't know the id) - so
+  an artist sharing a name with another can get the other's page, and albums one artist gave the same title (a
+  band's self-titled albums) all get Last.fm's one page for that title. deadwax keeps what Last.fm said of each
+  album under that album's own MusicBrainz id, so what one album was given is never shown for another, however
+  alike their titles (*Fearless* and *Fearless (Taylor's Version)*). Last.fm's own page for them (**More on
+  Last.fm**) shows which; correcting it is Last.fm's to do. Removing the key goes back to Navidrome's and
+  Wikipedia's.
 - **A link added on MusicBrainz isn't showing yet**: deadwax keeps MusicBrainz's answers for a month, so a
   Wikidata link you add there (on the page's **Edit relationships**) shows once deadwax asks MusicBrainz about
   that artist or album again - which can take up to a month. **Clear MusicBrainz's saved answers** (Server
@@ -684,8 +694,9 @@ said when there's none, so if a page has no description:
   out. An English article written on Wikipedia for an item MusicBrainz already links shows within three days.
 - **No MusicBrainz id**: an artist or album whose files carry no MusicBrainz ids has only Navidrome's words, and
   no subtitle. Applying a release in **Edit → Release** writes the ids.
-- **Navidrome, Wikipedia, Wikidata or MusicBrainz didn't answer** just then: deadwax keeps nothing of a failure,
-  and the app asks again when the page next opens, from a minute on. deadwax's own log (the container's output) has a line saying which
+- **Last.fm, Navidrome, Wikipedia, Wikidata or MusicBrainz didn't answer** just then (or Last.fm refused the key -
+  [above](#settings-says-lastfm-refused-the-key) - or took longer than four seconds, when its answer is kept as it
+  comes, for the next visit): deadwax keeps nothing of a failure, the page has what the others said, and the app asks again when the page next opens, from a minute on. deadwax's own log (the container's output) has a line saying which
   of the Wikipedia side didn't answer ("no description for that artist just now - …").
 
 A description at the **foot** of the page came after what is under its place was drawn - the artist's albums, the

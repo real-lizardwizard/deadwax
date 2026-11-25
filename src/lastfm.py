@@ -37,12 +37,15 @@ them) are spelled out rather than left to Python's, which differ.
 AN ARTIST PAGE'S PARTS (2.1.41, S2 - GET /deadwax/lastfm/artist, src/routes/lastfm.py): each method's answer parsed to
 the shape deadwax keeps (src/lastfm_kept.py) - never Last.fm's own answer:
 
-  - artist_info(): artist.getInfo as {url, listeners, bio: {summary, content}} - the bio kept now, though nothing
-    answers it yet, so the descriptions (S3) read this same row rather than bump LASTFM_SHAPE;
+  - artist_info(): artist.getInfo as {url, listeners, bio: {summary, content}} - the bio kept with it, so the
+    descriptions (S3, 2.1.42) read this same row: one ask serves the artist page and the description;
   - top_tracks(): artist.getTopTracks as {artist_url, top_songs} - top_songs() already folded, so a change to the
     fold (TOP_SONGS, match_key) is a change of the kept shape: bump LASTFM_SHAPE with it;
   - artist_answer(): the route's answer from the two, `why` in words for whoever runs deadwax (auth.Explained's
     rule: the app shows it only to them).
+
+AN ALBUM'S WORDS (2.1.42, S3 - the descriptions, src/routes/describe.py): album_info(), album.getInfo as {url, wiki:
+{summary, content}}, cut as a bio is. descriptions.from_lastfm() reads it, and getInfo's bio, as a description.
 
 Every number Last.fm gives is read loosely (count(): its JSON gives most as strings), and every address passed on is
 an https one on last.fm (lastfm_url(), descriptions.py's rule too).
@@ -318,7 +321,8 @@ TOP_SONGS = 10
 #? whatever the script: 13 KB of content, 9 KB of summary, 2 KB of address (URL_MAX), at most 6.5 KB of key (a name
 #? of the route's 200 letters folds to at most 6,600 bytes - U+FDFA is 18 letters in NFKD) and under 100 bytes of the
 #? rest - 30.5 KB at most. Changing one changes what is kept: bump LASTFM_SHAPE. tests/test_lastfm.py
-#? test_a_getinfo_row_always_fits_the_keeping holds it
+#? test_a_getinfo_row_always_fits_the_keeping holds it. An album's wiki (album_info, 2.1.42) is cut the same way, and
+#? its key is its release group's id (src/lastfm_kept.py release_group_key, under 100 bytes), so its row fits too
 BIO_MAX = 4000
 SUMMARY_LETTERS = 1500
 CONTENT_BYTES = 13 * 1024
@@ -418,6 +422,21 @@ def artist_info(body: Any) -> dict | None:
         "listeners": count(_object(artist.get("stats")).get("listeners")),
         "bio": {"summary": _bio_text(bio.get("summary"), SUMMARY_LETTERS, SUMMARY_BYTES),
                 "content": _bio_text(bio.get("content"), BIO_MAX, CONTENT_BYTES)},
+    }
+
+
+def album_info(body: Any) -> dict | None:
+    """album.getInfo's answer as deadwax keeps it (2.1.42, S3 - the descriptions): {url, wiki: {summary, content}}, the
+    wiki as Last.fm wrote it (HTML), each field cut as an artist's bio is - None for an answer with no album in it
+    (Unreachable: never kept). Nothing else of it is kept: S3 reads only the words and the page they credit."""
+    album = _object(body).get("album")
+    if not isinstance(album, dict):
+        return None
+    wiki = _object(album.get("wiki"))
+    return {
+        "url": lastfm_url(album.get("url")),
+        "wiki": {"summary": _bio_text(wiki.get("summary"), SUMMARY_LETTERS, SUMMARY_BYTES),
+                 "content": _bio_text(wiki.get("content"), BIO_MAX, CONTENT_BYTES)},
     }
 
 

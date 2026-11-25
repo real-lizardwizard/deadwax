@@ -836,14 +836,20 @@ class MusicBrainzClient:
             f"artist/{artist_mbid}", {"inc": self.ARTIST_INC, "fmt": "json"}
         )
 
-    async def get_release_group_urls(self, release_group_mbid: str) -> dict:
+    async def get_release_group_urls(self, release_group_mbid: str, credits: bool = False) -> dict:
         """
         One release group with its url relations and nothing else (2.0.13) - its `wikidata` link (or a
         `wikipedia` one), which is how an album's description is found (src/descriptions.py). The least that
         answers: no releases, no tags; a lookup, so kept on disk for a month like the others.
+
+        `credits` (2.1.42) adds its artist credit, for Last.fm's album.getInfo, asked by the album's title and
+        its artist's name: with a LASTFM_API_KEY the description route asks this, still one lookup (and one
+        cache entry of its own, so each album is asked once more). Without a key it isn't asked, so nothing
+        of the request changes.
         """
+        inc = "url-rels+artist-credits" if credits else "url-rels"
         return await self.request_with_retries(
-            f"release-group/{release_group_mbid}", {"inc": "url-rels", "fmt": "json"}
+            f"release-group/{release_group_mbid}", {"inc": inc, "fmt": "json"}
         )
 
     async def _browse(self, endpoint: str, params: dict, items: str, count: str, stop_at: int | None = None,

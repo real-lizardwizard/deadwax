@@ -56,13 +56,13 @@ INFO = ("artist.getinfo", {}, artist_info)
 TRACKS = ("artist.gettoptracks", {"limit": TOP_TRACKS_ASKED}, top_tracks)
 
 #? the parts under way - held, so none is lost before it ends (asyncio keeps only weak references), and so deadwax's
-#? stop can cancel those the deadline left running
+#? stop can cancel those the deadline left running. The descriptions' Last.fm side too (src/routes/describe.py, 2.1.42)
 _running: set[asyncio.Task] = set()
 
 
-def _asking(method: str, params: dict[str, str], parse):
+def parsed_ask(method: str, params: dict[str, str], parse):
     """The keeping's ask: Last.fm's answer parsed to deadwax's shape - an answer that can't be read Unreachable (never
-    kept), anything else as the client said it."""
+    kept), anything else as the client said it. The descriptions' too (src/routes/describe.py, 2.1.42)."""
     async def ask() -> Outcome:
         outcome = await lastfm.ask(method, params)
         if not isinstance(outcome, Answer):
@@ -75,20 +75,23 @@ def _asking(method: str, params: dict[str, str], parse):
     return ask
 
 
-async def _part(store, part, mbid: str | None, name: str | None) -> Outcome:
-    """One part of the page: by MusicBrainz id, then - Last.fm not knowing the id - by name."""
+async def artist_part(store, part, mbid: str | None, name: str | None) -> Outcome:
+    """One part of the page: by MusicBrainz id, then - Last.fm not knowing the id - by name. With no name, a "not
+    known" by id is answered as it is: the descriptions (src/routes/describe.py) ask for the name only then."""
     method, extra, parse = part
     if mbid:
-        outcome = await kept(store, artist_key(method, mbid=mbid), _asking(method, {"mbid": mbid, **extra}, parse))
+        outcome = await kept(store, artist_key(method, mbid=mbid), parsed_ask(method, {"mbid": mbid, **extra}, parse))
         if not isinstance(outcome, NotKnown):
             return outcome
     if not name or not name_key(name):
         return NotKnown()
     return await kept(store, artist_key(method, name=name),
-                      _asking(method, {"artist": name, "autocorrect": "1", **extra}, parse))
+                      parsed_ask(method, {"artist": name, "autocorrect": "1", **extra}, parse))
 
 
-def _started(coroutine) -> asyncio.Task:
+def started(coroutine) -> asyncio.Task:
+    """`coroutine` under way, held until it ends and stopped as deadwax stops - so a page's deadline can stop waiting
+    for it without cancelling it."""
     task = asyncio.create_task(coroutine)
     _running.add(task)
     task.add_done_callback(_running.discard)
@@ -99,7 +102,7 @@ def _started(coroutine) -> asyncio.Task:
 def _ended(task: asyncio.Task) -> None:
     """A part that raised - it never should: the keeping and the client answer failures - said, never lost."""
     if not task.cancelled() and task.exception() is not None:
-        logger.warning(f"Last.fm: a part of an artist page failed - a fault in deadwax: {type(task.exception()).__name__}")
+        logger.warning(f"Last.fm: a part of a page failed - a fault in deadwax: {type(task.exception()).__name__}")
 
 
 def _result(task: asyncio.Task, done: set) -> Outcome | None:
@@ -136,7 +139,7 @@ async def lastfm_artist(
     if not Config.lastfm_key():
         return no_key_answer()
     store = getattr(request.app.state, "store", None)
-    info, tracks = (_started(_part(store, part, mbid, name)) for part in (INFO, TRACKS))
+    info, tracks = (started(artist_part(store, part, mbid, name)) for part in (INFO, TRACKS))
     done, late = await asyncio.wait({info, tracks}, timeout=ARTIST_DEADLINE_S)
     if late:
         logger.info(f"Last.fm: {len(late)} part(s) of an artist page not in by {ARTIST_DEADLINE_S:g} s - answered "

@@ -114,7 +114,8 @@ src/
   descriptions.py  PURE. An artist's or an album's short description (2.0.13): Navidrome's own read as
                    text first, else Wikipedia's summary by MusicBrainz -> Wikidata -> enwiki; Wikidata's
                    one-line subtitle; kept 30 days (none 3) - see "Descriptions on the artist and album
-                   pages".
+                   pages". With LASTFM_API_KEY (2.1.42), Last.fm's own words first (from_lastfm: a getInfo
+                   bio, an album.getInfo wiki), then Wikipedia's, then Navidrome's - notes/lastfm.md "S3".
   autoeq.py        PURE. AutoEq's corrections for the iPhone app's EQ (2.1.7): results/INDEX.md parsed
                    (its paths decoded once), folded and searched, one row per headphone in SOURCE_ORDER,
                    each result's id and its profile's address (each segment encoded once) - see "The EQ's
