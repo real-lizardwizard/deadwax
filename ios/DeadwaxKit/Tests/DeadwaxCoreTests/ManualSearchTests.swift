@@ -165,9 +165,11 @@ import Testing
 
     // MARK: Requests
 
-    static func job(_ id: Int, _ status: String, outcome: String? = nil, manual: Bool? = true) -> DownloadJob {
+    static func job(_ id: Int, _ status: String, outcome: String? = nil, manual: Bool? = true, release: String? = nil,
+                    filedAs: FiledAs? = nil) -> DownloadJob {
         DownloadJob(id: id, status: status, artist: "radiohead", album: "ok computer", username: "mellotron",
-                    updatedAt: "2026-11-24T10:00:00+00:00", edition: "1997 CD", outcome: outcome, progress: 0, manual: manual)
+                    updatedAt: "2026-11-24T10:00:00+00:00", releaseMbid: release, edition: "1997 CD", outcome: outcome,
+                    progress: 0, manual: manual, filedAs: filedAs)
     }
 
     @Test func aManualDownloadIsMarkedUnderEveryHeading() throws {
@@ -181,9 +183,11 @@ import Testing
             #expect(row?.manual == true && row?.cover == nil, "\(section)")
         }
         #expect(board.rows(.waiting).first?.line == "radiohead \u{00B7} from mellotron \u{00B7} starting")
-        // done: as any other's line, and filed by its own tags; it doesn't open yet (no release id - slice A2's)
+        // done: as any other's line, and filed by its own tags; with no `filed_as` (a server before 2.1.40, or an album
+        // the store no longer has) it opens nothing - such a server can't be asked by job
         let done = try #require(board.rows(.done).first)
         #expect(done.line == "In your library \u{00B7} 12 minutes ago" && done.ownTags && done.release == nil && !done.plays)
+        #expect(done.opens == nil)
         #expect(ManualSearch.doneLine(done, edits: true) == "Filed by its own tags. Edit album > Release can match it to a pressing.")
         #expect(ManualSearch.doneLine(done, edits: false) == "Filed by its own tags, not matched to a pressing.")
     }
@@ -207,6 +211,77 @@ import Testing
         #expect(usual.flatMap { ManualSearch.doneLine($0, edits: true) } == nil)
         let unsaid = done(Self.job(8, "organized", outcome: "filed", manual: false))
         #expect(unsaid?.title == "ok computer \u{00B7} 1997 CD" && unsaid?.ownTags == false)
+    }
+
+    // MARK: slice A2 - the Done row's album
+
+    @Test func aFiledManualDownloadIsTitledAsItsTagsNameItAndOpensByItsJob() throws {
+        func done(_ job: DownloadJob) throws -> RequestRow {
+            try #require(RequestsView.make(RequestsInput(jobs: [job]), now: 0).rows(.done).first)
+        }
+        let filed = FiledAs(artist: "Radiohead", album: "OK Computer OKNOTOK 1997 2017")
+        // filed: what its tags called it, which may not be the words typed - and it opens, and plays, by its job
+        let row = try done(Self.job(21, "organized", outcome: "filed", filedAs: filed))
+        #expect(row.title == "OK Computer OKNOTOK 1997 2017 \u{00B7} manual search")
+        #expect(row.artist == "Radiohead" && row.album == "OK Computer OKNOTOK 1997 2017")
+        #expect(row.opens == .job(21) && row.release == nil && row.plays && row.ownTags)
+        #expect(try done(Self.job(22, "complete", outcome: "partly_filed", filedAs: filed)).plays)
+        // everything already there: it opens the album it found, with no ▶ (this download filed nothing)
+        let there = try done(Self.job(23, "organized", outcome: "already_there", filedAs: filed))
+        #expect(there.opens == .job(23) && !there.plays)
+        // not in the library: it opens nothing, whatever it was filed as
+        let stopped = try done(Self.job(24, "complete", outcome: "interrupted", filedAs: filed))
+        #expect(stopped.opens == nil && !stopped.plays)
+        // a release id by now: the release, as any other row
+        let matched = try done(Self.job(25, "organized", outcome: "filed", release: "7f2a", filedAs: filed))
+        #expect(matched.opens == .release("7f2a") && matched.release == "7f2a" && matched.plays)
+        // names with no album: the typed words, and nothing to open by
+        let blank = try done(Self.job(26, "organized", outcome: "filed", filedAs: .init(artist: "Radiohead", album: "  ")))
+        #expect(blank.title == "ok computer \u{00B7} manual search" && blank.artist == "radiohead" && blank.opens == nil)
+        // an album with no artist named: the typed artist stands
+        let unnamed = try done(Self.job(27, "organized", outcome: "filed", filedAs: .init(artist: " ", album: "OK Computer")))
+        #expect(unnamed.title == "OK Computer \u{00B7} manual search" && unnamed.artist == "radiohead")
+        #expect(unnamed.opens == .job(27))
+        // any other download never reads it
+        let usual = try done(Self.job(28, "organized", outcome: "filed", manual: nil, filedAs: filed))
+        #expect(usual.title == "ok computer \u{00B7} 1997 CD" && usual.opens == nil)
+        // under its other headings, once named, the same title
+        let filing = RequestsView.make(RequestsInput(jobs: [Self.job(29, "organizing", filedAs: filed)]), now: 0)
+        #expect(filing.rows(.downloading).first?.title == "OK Computer OKNOTOK 1997 2017 \u{00B7} manual search")
+    }
+
+    @Test func aDoneRowsAlbumIsKeptByItsReleaseOrItsJob() {
+        #expect(DoneAlbum.release("7f2a").key == "7f2a")
+        #expect(DoneAlbum.job(12).key == "job-12" && DoneAlbum.job(12).key == RequestRow.key(job: 12))
+        #expect(DoneAlbum.job(12) != DoneAlbum.release("job-12"))
+    }
+
+    @Test func filedAsIsReadAsJobsSendsIt() throws {
+        //? /download/jobs (2.1.40): `filed_as` only on a manual row whose album the store still has
+        let json = #"""
+        {"jobs":[{"id":31,"status":"organized","album":"ok computer","manual":true,"outcome":"filed",
+        "filed_as":{"artist":"Radiohead","album":"OK Computer"}},
+        {"id":32,"status":"organized","manual":true,"outcome":"filed","filed_as":"OK Computer"},
+        {"id":33,"status":"organized","manual":true,"outcome":"filed","filed_as":{"artist":7,"album":"Kid A"}},
+        {"id":34,"status":"organized","manual":true,"outcome":"filed"}],"tracking_enabled":true}
+        """#
+        let answer = try JSONDecoder().decode(JobsAnswer.self, from: Data(json.utf8))
+        #expect(answer.jobs.map(\.filedAs) == [.init(artist: "Radiohead", album: "OK Computer"), nil,
+                                               .init(artist: "", album: "Kid A"), nil])
+        let rows = RequestsView.make(RequestsInput(jobs: answer.jobs), now: 0).rows(.done)
+        let opens = Dictionary(uniqueKeysWithValues: rows.map { ($0.jobId ?? 0, $0.opens) })
+        #expect(opens == [31: .job(31), 32: nil, 33: .job(33), 34: nil])
+    }
+
+    @Test func aManualDoneRowsAlbumIsAskedOfTheIdBridgeByItsJob() async throws {
+        let (deadwax, transport) = client(session: "s.1")
+        transport.answer("/deadwax/store/album", 200,
+                         #"{"release_mbid":null,"release_group_mbid":null,"navidrome_id":"al-9","present":[{"id":4,"path":"Radiohead/OK Computer (1997) [unmatched]"}],"other_pressings":[]}"#)
+        let answer: StoreAlbum = try await deadwax.storeAlbum(DoneAlbum.job(12))
+        #expect(transport.last?.method == "GET" && transport.last?.url.query == "job_id=12")
+        #expect(answer.navidromeId == "al-9" && answer.present.count == 1 && answer.releaseMbid == nil)
+        _ = try await deadwax.storeAlbum(DoneAlbum.release("7f2a"))
+        #expect(transport.last?.url.query == "release_mbid=7f2a")
     }
 
     @Test func aManualGetIsMarkedFromTheTap() {

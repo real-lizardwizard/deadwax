@@ -447,9 +447,13 @@ def test_the_id_bridge_answers_what_the_app_decodes(monkeypatch):
     assert answer.status_code == 200, answer.text
     body = answer.json()
     assert required_fields("StoreAlbum") <= set(body), body
-    # `yours` only with logins on and a folder held - read from the route
-    source = inspect.getsource(store_album.store_album)
-    assert 'answer["yours"]' in source
+    # `yours` only with logins on and a folder held - read from the route (since 2.1.40 its two halves: by a release,
+    # and by a job - a manual search's download, which the app's Done row asks by - whose answer has the same keys)
+    by_job = inspect.getsource(store_album._by_job)
+    source = inspect.getsource(store_album.store_album) + inspect.getsource(store_album._by_release) + by_job
+    assert 'answer["yours"]' in source and 'answer["yours"]' in by_job
+    job_answer = re.search(r"answer = (\{.*?\})\n", by_job, re.S)
+    assert job_answer and set(re.findall(r'"(\w+)":', job_answer.group(1))) == set(body), "a job's answer is the same shape"
     assert set(fields("StoreAlbum")) <= set(body) | {"yours"}
     # a row: _row's keys, the present rows' facts, another pressing's Navidrome id and whether it is yours
     row = set(store_album._row({}))
@@ -1494,7 +1498,9 @@ def _jobs_row_keys() -> tuple[set[str], set[str]]:
     assert '**({"requested_by": others} if admin else {})' in inspect.getsource(download_route._per_person)
     #? (2.1.38, manual search slice A1) a manual search's download is marked - only when it is one
     assert '**({"manual": True} if job.get("manual") else {})' in source
-    return always | summary | person | {"alternatives_left", "library", "requested_by", "manual"}, always
+    #? (2.1.40, slice A2) and, once filed, what it was filed as - only on a manual row the store still has
+    assert '**({"filed_as": filed[job["album_id"]]} if job.get("manual") and job.get("album_id") in filed' in source
+    return always | summary | person | {"alternatives_left", "library", "requested_by", "manual", "filed_as"}, always
 
 
 def test_a_download_is_read_as_the_jobs_route_sends_it():
@@ -1518,6 +1524,9 @@ def test_the_jobs_route_answers_what_the_app_decodes(monkeypatch, tmp_path):
     # one failed with a runner-up left - every field the phone reads is in one of them, but who asked and the library
     # grant, which are sent only with logins on (the source test above holds those)
     monkeypatch.setattr(Config, "AUTH_MODE", None)
+    #? (slice A2) the library the manual one was filed into, so its store row is live
+    root = str(tmp_path / "library")
+    monkeypatch.setattr(Config, "LIBRARY_PATH", root)
     files = [{"filename": f"share\\Dummy\\0{n}.flac", "size": 10} for n in (1, 2)]
     release = {"artist": "Portishead", "album": "Dummy", "year": "1994", "release_mbid": "rel-dummy",
                "release_group_mbid": "rg-dummy", "disambiguation": "2014 vinyl", "tracks": []}
@@ -1538,6 +1547,12 @@ def test_the_jobs_route_answers_what_the_app_decodes(monkeypatch, tmp_path):
         await store.create_job("bob", "share\\Dummy", files, release, [])
         #? (manual search, slice A1) the filed one a manual search's, as /enqueue stores it: marked on its release
         filed = await store.create_job("dave", "share\\Dummy", files, {**release, "manual": True}, [])
+        #? (slice A2, 2.1.40) filed by its own tags into a folder the store knows, which /jobs names as `filed_as`
+        album_id = await store.index_upsert(root, {
+            "path": "Portishead/Dummy (1994) [unmatched]", "release_mbid": None, "release_group_mbid": None,
+            "artist": "Portishead", "album": "Dummy", "year": "1994", "edition": "", "track_count": 2,
+            "formats": ["flac"]})
+        await store.set_job_album(filed, album_id)
         await store.update_status(filed, "organized")
         failed = await store.create_job("erin", "share\\Dummy", files, release,
                                         [{"username": "carol", "directory": "x", "files": files}])
@@ -1564,6 +1579,8 @@ def test_the_jobs_route_answers_what_the_app_decodes(monkeypatch, tmp_path):
     # the manual one marked, and only it: every other row as it always was, without the key
     assert [row["status"] for row in rows if "manual" in row] == ["organized"]
     assert next(row for row in rows if row["status"] == "organized")["manual"] is True
+    # and what it was filed as, on it alone
+    assert [row["filed_as"] for row in rows if "filed_as" in row] == [{"artist": "Portishead", "album": "Dummy"}]
 
 
 def test_the_four_writes_answer_what_the_app_decodes():

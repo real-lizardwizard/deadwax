@@ -200,7 +200,7 @@ struct RequestsScreen: View {
             }
         case .done:
             DoneRowView(row: row, opening: requests.opening == row.key,
-                        note: row.release.flatMap { requests.notes[$0] },
+                        note: row.opens.flatMap { requests.notes[$0.key] },
                         filed: ManualSearch.doneLine(row, edits: server.access.can(.edit)), runs: server.access.seesDetail,
                         onOpen: { requests.open(row) }, onPlay: { play(row) })
         }

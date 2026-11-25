@@ -294,14 +294,14 @@ struct DoneRowView: View {
 
     var body: some View {
         HStack(alignment: .center, spacing: 8) {
-            if row.release != nil {
+            if row.opens != nil {
                 Button(action: onOpen) { face }
                     .buttonStyle(.plain)
                     .opacity(opening ? Palette.dimmed : 1)
             } else {
                 face
             }
-            if row.release != nil && row.plays {
+            if row.opens != nil && row.plays {
                 Button(action: onPlay) {
                     SharpSymbol(.play)
                         .font(Typeface.symbol(.footnote).weight(.semibold))

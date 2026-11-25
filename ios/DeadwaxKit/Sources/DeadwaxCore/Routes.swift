@@ -55,8 +55,9 @@ public enum Routes {
 
     // Phase 1's: the id bridge and your library (logins on)
     /// One album across its ids - asked by Navidrome's (`StoreAlbum`), only when there is a library (Access.hasLibrary);
-    /// and (Phase 5, slice 2) by a release you hold, for Navidrome's album of it - a held album Search found opening yours.
-    public static let storeAlbum = Endpoint(method: "GET", path: "/deadwax/store/album", query: ["navidrome_id", "release_mbid"])
+    /// and (Phase 5, slice 2) by a release you hold, for Navidrome's album of it - a held album Search found opening yours;
+    /// and (manual search, slice A2, server 2.1.40) by a download, for a manual search's Done row.
+    public static let storeAlbum = Endpoint(method: "GET", path: "/deadwax/store/album", query: ["job_id", "navidrome_id", "release_mbid"])
     public static let myLibrary = Endpoint(method: "GET", path: "/deadwax/me/library", query: [])
     public static let libraryAdd = Endpoint(method: "POST", path: "/deadwax/me/library/add", query: [])
     public static let libraryRemove = Endpoint(method: "POST", path: "/deadwax/me/library/remove", query: [])

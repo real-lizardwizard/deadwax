@@ -1701,7 +1701,9 @@ your two fields as you left them. **Get** on a card closes it all, and the downl
 Computer · manual search". It's filed by the files' own tags, never into a pressing you've matched (see
 [Organizing](organizing.md#filed-by-its-own-tags)), and its Done row says so: "Filed by its own tags. Edit album >
 Release can match it to a pressing." - or, without **Edit albums**, "Filed by its own tags, not matched to a
-pressing." It doesn't open from Requests yet: find it in the Library. **It needs deadwax 2.1.38 or later**: on an
+pressing." Once it's filed, the row is titled as the tags name the album - "OK Computer OKNOTOK 1997 2017 · manual
+search", say, whatever you typed - and, as any Done row, a tap opens the album and ▶ plays it from its first song
+(with **deadwax 2.1.40 or later**; before that, find it in the Library). **It needs deadwax 2.1.38 or later**: on an
 older server the cards' Gets are off and the page says "This needs a newer deadwax - ask whoever runs it." (whoever
 runs deadwax reads "This needs deadwax 2.1.38 or later on the server."). On the Mac, Tab and Shift-Tab move between
 the two fields, and Escape closes the form while both are empty.
@@ -6028,12 +6030,13 @@ you saw.
   Library care: Get covers counts only the albums still without a cover. Was the album it was on when you quit given
   its cover?
 
-### Manual search's checks (459-474)
+### Manual search's checks (459-475)
 
-**Not done yet.** These come with manual search's first slice - [Search Soulseek…](#requests) in Requests (still app
-0.13 (13)); opening its Done row, and ▶ on it, come with the next. They need **deadwax 2.1.38 or later** on the server
-(main's `:experimental` has it): an older one answers the search but keeps every Get off. On the phone and on the Mac,
-deadwax's plain `http://` address, signed in as an admin with logins on. Use one album MusicBrainz has (Portishead
+**Not done yet.** These come with manual search's two slices - [Search Soulseek…](#requests) in Requests (still app
+0.13 (13)); 475, opening its Done row and ▶ on it, with the second. They need **deadwax 2.1.38 or later** on the
+server (main's `:experimental` has it), and 475 needs **2.1.40**: an older one answers the search but keeps every Get
+off. On the phone and on the Mac, deadwax's plain `http://` address, signed in as an admin with logins on. Use one
+album MusicBrainz has (Portishead
 "Dummy", for comparing), one it may not (a bootleg or a self-released record you know is shared), and one you already
 have matched. Say "pass", or what you saw.
 
@@ -6073,6 +6076,11 @@ have matched. Say "pass", or what you saw.
   between the fields; Return in Album searches. Escape closes the form while both fields are empty - with words
   typed it does nothing, and Cancel closes it. Then the results, a Get, and the row in Requests.
 - **474 VoiceOver.** "Search Soulseek, button"; the two fields by name; the outcome said as the results land.
+- **475 The Done row opens.** Get one whose tags differ from your typing (type it in lowercase, or a shorter title).
+  Once it's done, is the row titled as the tags name it, "… · manual search", with the tags' artist under it? Tap it:
+  its album opens. Back, then ▶: it plays from its first song. Then one with no ▶ (everything already there): a tap
+  still opens it. On the Mac too. If a tap says "Can't find this album to open it…", say what's under it - and is the
+  album in the Library under the same name?
 
 ## What it can't do yet
 

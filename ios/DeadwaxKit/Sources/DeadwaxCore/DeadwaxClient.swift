@@ -616,6 +616,21 @@ public struct DeadwaxClient: Sendable {
         try await call(Routes.storeAlbum, query: [("release_mbid", releaseMbid)])
     }
 
+    /// (Manual search, slice A2) The id bridge by a download (`Routes.storeAlbum` with `job_id`, server 2.1.40): the
+    /// album the store filed it as - a manual search's, filed by its own tags with no release id to ask by - and
+    /// Navidrome's album for it. Only your own download, or anyone's with Everyone's downloads (404 otherwise).
+    public func storeAlbum(jobId: Int) async throws -> StoreAlbum {
+        try await call(Routes.storeAlbum, query: [("job_id", String(jobId))])
+    }
+
+    /// A Done row's album asked of the id bridge, by its release or by its job.
+    public func storeAlbum(_ album: DoneAlbum) async throws -> StoreAlbum {
+        switch album {
+        case .release(let id): return try await storeAlbum(releaseMbid: id)
+        case .job(let id): return try await storeAlbum(jobId: id)
+        }
+    }
+
     // MARK: the turntable's window (turntable.md 4.5)
 
     /// `/scrub`'s request: `at` and `seconds` (`DeckScrub.ask`) and nothing else.

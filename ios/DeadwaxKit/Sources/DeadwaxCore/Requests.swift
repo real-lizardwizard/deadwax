@@ -61,6 +61,9 @@ public struct DownloadJob: Decodable, Sendable, Equatable, Identifiable {
     /// (Manual search, slice A1) A download from Requests' Search Soulseek (server 2.1.38: sent only when true): filed by
     /// its files' own tags, its artist and album the words typed.
     public let manual: Bool?
+    /// (Manual search, slice A2) What a manual search's download was filed as - the album and artist its files' tags name,
+    /// which may not be the words typed (server 2.1.40: sent only for a manual row whose album the store still has).
+    public let filedAs: FiledAs?
 
     enum CodingKeys: String, CodingKey {
         case id, artist, album, year, username, directory, status, error
@@ -81,6 +84,7 @@ public struct DownloadJob: Decodable, Sendable, Equatable, Identifiable {
         case attempt, mine, shared
         case requestedBy = "requested_by"
         case library, manual
+        case filedAs = "filed_as"
     }
 
     public init(id: Int, status: String, artist: String? = nil, album: String? = nil, year: String? = nil,
@@ -90,7 +94,8 @@ public struct DownloadJob: Decodable, Sendable, Equatable, Identifiable {
                 state: String? = nil, speed: Double? = nil, bytesTransferred: Double? = nil, filesDone: Int? = nil,
                 filesTotal: Int? = nil, filesFailed: Int? = nil, failureReason: String? = nil, matched: Bool? = nil,
                 alternativesLeft: Int? = nil, attempt: Int? = nil, mine: Bool? = nil, shared: Bool? = nil,
-                requestedBy: [String]? = nil, library: String? = nil, manual: Bool? = nil) {
+                requestedBy: [String]? = nil, library: String? = nil, manual: Bool? = nil,
+                filedAs: FiledAs? = nil) {
         self.id = id
         self.status = status
         self.artist = artist
@@ -122,6 +127,7 @@ public struct DownloadJob: Decodable, Sendable, Equatable, Identifiable {
         self.requestedBy = requestedBy
         self.library = library
         self.manual = manual
+        self.filedAs = filedAs
     }
 
     /// Read leniently but for the id and the status: a field of a shape this app doesn't know is none, so one odd value
@@ -159,12 +165,34 @@ public struct DownloadJob: Decodable, Sendable, Equatable, Identifiable {
         requestedBy = c.looseList(String.self, .requestedBy)
         library = c.looseField(String.self, .library)
         manual = c.looseField(Bool.self, .manual)
+        filedAs = c.looseField(FiledAs.self, .filedAs)
     }
 
     /// Work is outstanding (lib/jobs.ts ACTIVE_STATUSES): queued, downloading or being filed.
     public var isActive: Bool { DownloadJob.activeStatuses.contains(status) }
 
     public static let activeStatuses: Set<String> = ["queued", "downloading", "organizing"]
+}
+
+/// (Manual search, slice A2) `filed_as` on a manual search's row of `/download/jobs` (server 2.1.40): the store's names
+/// for the album its download went into - what its files' tags call it.
+public struct FiledAs: Decodable, Sendable, Equatable {
+    public let artist: String
+    public let album: String
+
+    public init(artist: String, album: String) {
+        self.artist = artist
+        self.album = album
+    }
+
+    /// Leniently, as the row is read: a name of another shape is none.
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        artist = c.looseField(String.self, .artist) ?? ""
+        album = c.looseField(String.self, .album) ?? ""
+    }
+
+    enum CodingKeys: String, CodingKey { case artist, album }
 }
 
 /// `GET /deadwax/download/jobs`: the rows, and whether deadwax can keep track of downloads at all (false: its database
@@ -279,7 +307,14 @@ public struct RequestRow: Sendable, Equatable, Identifiable {
     public var dimmed: Bool
     public var arriving: Bool
     public var album: String
-    public var release: String?
+    /// The album a Done row opens - its tap, its ▶ and its note - or nil for a row that opens nothing.
+    public var opens: DoneAlbum?
+    /// The release it brought, where the row opens one (requestsView.ts's `release`): nil for one that opens nothing, and
+    /// for a manual search's download, opened by its job.
+    public var release: String? {
+        if case .release(let id) = opens { return id }
+        return nil
+    }
     public var plays: Bool
     public var askedBy: String?
     public var cancelWords: CancelWords
@@ -315,12 +350,29 @@ public struct RequestRow: Sendable, Equatable, Identifiable {
         dimmed = false
         arriving = false
         self.album = album
-        release = nil
+        opens = nil
         plays = false
         askedBy = nil
         cancelWords = PerPerson.cancelDefault
         manual = false
         ownTags = false
+    }
+}
+
+/// (Manual search, slice A2) What a Done row's album is looked up by: the release it brought - or, for a manual search's
+/// download, filed by its own tags (most often with no release id), its job, which the id bridge follows to the album the
+/// store filed it as (`GET /store/album?job_id=`, server 2.1.40).
+public enum DoneAlbum: Sendable, Equatable, Hashable {
+    case release(String)
+    case job(Int)
+
+    /// What the Done rows' looks, their notes and the songs in hand are kept under: the release id, or "job-<id>" - which
+    /// no release id can be (MusicBrainz's are UUIDs).
+    public var key: String {
+        switch self {
+        case .release(let id): return id
+        case .job(let id): return RequestRow.key(job: id)
+        }
     }
 }
 
@@ -672,10 +724,14 @@ public enum RequestWords {
     static func jobRow(_ job: DownloadJob, _ input: RequestsInput, now: Int64) -> RequestRow {
         let section = self.section(job)
         let manual = job.manual == true
+        //? (manual search, A2) once filed, what its tags called it - which may not be the words typed
+        let filedAs = manual ? ManualSearch.filedAs(job) : nil
+        let album = filedAs?.album ?? job.album
         //? (manual search) "OK Computer · manual search": no pressing, so no edition - the words say where it came from
         var row = RequestRow(key: RequestRow.key(job: job.id), jobId: job.id, section: section,
-                             title: titleOf(job.album, manual ? ManualSearch.mark : job.edition), artist: job.artist ?? "",
-                             album: job.album ?? "")
+                             title: titleOf(album, manual ? ManualSearch.mark : job.edition),
+                             artist: filedAs.flatMap { $0.artist.isEmpty ? nil : $0.artist } ?? job.artist ?? "",
+                             album: album ?? "")
         row.manual = manual
         row.cover = said(job.releaseMbid)
         row.askedBy = PerPerson.askedByText(mine: job.mine, shared: job.shared, requestedBy: job.requestedBy)
@@ -747,9 +803,15 @@ public enum RequestWords {
             row.progress = 100
             //? the album it brought, where the library has it: the row opens it, and plays what was filed
             let release = JSText.trim(job.releaseMbid ?? "")
-            if !release.isEmpty, let ending = job.outcome, inTheLibrary.contains(ending) {
-                row.release = release
-                row.plays = filed.contains(ending)
+            if let ending = job.outcome, inTheLibrary.contains(ending) {
+                //? (manual search, A2) one with no release id opens by its job - once deadwax says what it was filed as
+                //? (2.1.40), so an older server, which can't be asked by job, is never asked
+                if !release.isEmpty {
+                    row.opens = .release(release)
+                } else if filedAs != nil {
+                    row.opens = .job(job.id)
+                }
+                row.plays = row.opens != nil && filed.contains(ending)
             }
             //? (manual search) what this download filed went by its files' own tags: said under the row
             row.ownTags = manual && job.outcome.map { filed.contains($0) } == true

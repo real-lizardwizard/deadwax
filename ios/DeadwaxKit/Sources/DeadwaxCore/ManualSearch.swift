@@ -65,6 +65,13 @@ public enum ManualSearch {
             : "Filed by its own tags, not matched to a pressing."
     }
 
+    /// (Slice A2) What a manual search's download was filed as (`filed_as`, server 2.1.40), when it names an album: the
+    /// row's title and artist, and the sign it can be opened by its job. Nil for no album - the typed words stand.
+    public static func filedAs(_ job: DownloadJob) -> FiledAs? {
+        guard let filed = job.filedAs, !JSText.trim(filed.album).isEmpty else { return nil }
+        return FiledAs(artist: JSText.trim(filed.artist), album: JSText.trim(filed.album))
+    }
+
     /// A Done row's quiet line: `doneFiled` under a manual search's download this filed (RequestRow.ownTags), else nil.
     public static func doneLine(_ row: RequestRow, edits: Bool) -> String? {
         row.ownTags ? doneFiled(edits: edits) : nil

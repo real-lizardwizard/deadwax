@@ -42,7 +42,8 @@ final class RequestsModel {
     private(set) var trackingEnabled = true
     /// Why the last look failed - nil once one answers, and once deadwax is back after being out of reach.
     private(set) var failure: (any Error)?
-    /// Why a tapped Done row couldn't open, by release - gone once a later look finds its album.
+    /// Why a tapped Done row couldn't open, by its album's key (DoneAlbum.key: the release, or a manual search's job) -
+    /// gone once a later look finds its album. Every Done row's look below is kept by that key too.
     private(set) var notes: [String: String] = [:]
     /// The Done row whose album is being looked up for its tap, by key.
     private(set) var opening: String?
@@ -86,12 +87,12 @@ final class RequestsModel {
     /// When each Done row first showed as done, by this phone's clock (ms) - 0 for one done in deadwax's first answer.
     @ObservationIgnored private var doneSince: [String: Double] = [:]
     @ObservationIgnored private var baseline = false
-    /// Navidrome's album id for a release, once the id bridge found it.
+    /// Navidrome's album id for a Done row's album (by DoneAlbum.key), once the id bridge found it.
     @ObservationIgnored private var albumIds: [String: String] = [:]
     /// An album's songs in hand, and when they were asked for - what a ▶ plays.
     @ObservationIgnored private var ready: [String: (album: Album, at: Double)] = [:]
     @ObservationIgnored private var misses: [String: DoneLooks.Miss] = [:]
-    /// The asks out, by release, each with its ticket: every way an ask ends takes it out.
+    /// The asks out, by DoneAlbum.key, each with its ticket: every way an ask ends takes it out.
     @ObservationIgnored private var inFlight = DoneLooks.InFlight()
     /// When Requests' root last came into view (ms).
     @ObservationIgnored private var activeSince: Double = 0
@@ -125,7 +126,7 @@ final class RequestsModel {
 
     /// A Done row's album with its songs in hand - what its ▶ plays in the tap; nil: the row's tap is done instead.
     func plays(_ row: RequestRow) -> (songs: [Song], album: Album)? {
-        guard row.plays, let release = row.release, let held = ready[release], let songs = held.album.song,
+        guard row.plays, let key = row.opens?.key, let held = ready[key], let songs = held.album.song,
               !songs.isEmpty else { return nil }
         return (songs, held.album)
     }
@@ -508,10 +509,14 @@ final class RequestsModel {
         dueClock?.cancel()
         dueClock = nil
         guard watching == .requests, reachability.online, let client = server.client else { return }
+        //? (manual search, A2) DoneLooks keeps its rows by a string it never reads - here DoneAlbum.key, the release or
+        //? "job-<id>" - and each due one is asked of the bridge by what it is
+        var albums: [String: DoneAlbum] = [:]
         let ahead = board.rows(.done)
             .compactMap { (row: RequestRow) -> DoneLooks.Row? in
-                guard row.plays, let release = row.release else { return nil }
-                return DoneLooks.Row(release: release, since: doneSince[row.key] ?? 0)
+                guard row.plays, let opens = row.opens else { return nil }
+                albums[opens.key] = opens
+                return DoneLooks.Row(release: opens.key, since: doneSince[row.key] ?? 0)
             }
             .prefix(DoneLooks.prefetched)
         guard !ahead.isEmpty else { return }
@@ -521,11 +526,12 @@ final class RequestsModel {
         let epoch = self.epoch
         let period = self.period
         for release in due.look {
+            guard let album = albums[release] else { continue }
             let ticket = inFlight.begin(release)
             let task = Task { [weak self] in
                 let result: Result<StoreAlbum, any Error>
                 do {
-                    result = .success(try await client.storeAlbum(releaseMbid: release))
+                    result = .success(try await client.storeAlbum(album))
                 } catch {
                     result = .failure(error)
                 }
@@ -633,7 +639,9 @@ final class RequestsModel {
     /// row plays, so the next ▶ does), and opened only while Requests' root is still what shows. A second tap
     /// supersedes the first.
     func open(_ row: RequestRow) {
-        guard let release = row.release else { return }
+        //? `release`: what its looks are kept under (DoneAlbum.key) - the release, or a manual search's job
+        guard let album = row.opens else { return }
+        let release = album.key
         let name = row.album.isEmpty ? row.title : row.album
         let artist: String? = row.artist.isEmpty ? nil : row.artist
         if let known = albumIds[release] {
@@ -652,7 +660,7 @@ final class RequestsModel {
         let plays = row.plays
         openTask = Task { [weak self] in
             do {
-                let answer = try await client.storeAlbum(releaseMbid: release)
+                let answer = try await client.storeAlbum(album)
                 guard !Task.isCancelled, let self, self.live(epoch, period), self.opening == key else { return }
                 self.opening = nil
                 guard let id = answer.navidromeId, !id.isEmpty else {

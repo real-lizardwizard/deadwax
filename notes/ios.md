@@ -16558,3 +16558,80 @@ alone:
 - VoiceOver: the row, the two fields by name, the outcome and the gate's line said together.
 - The ranking against real Soulseek folders (the server's 0.80/0.65 weights, 461), and every filing check
   (464-468) - the server's half, run only against fakes.
+
+## Manual search, slice A2: the Done row opens its album (2026-11-24)
+
+James, 24 Nov, to "Go on with manual search's slice A2?": "Yes". The last piece of the spec's table
+(~/Desktop/Code/deadwax-plans/manual-search.md 3.1's "From A2", 3.2-3.3's A2 parts). A manual search's download is
+filed by its own tags with the sharer's ids dropped, so its Done row had no release to open by: A1 drew it without a
+tap. Its server half is main's 2.1.40 (notes/downloads.md "The Done row's album (2.1.40)"): /jobs' `filed_as` and the
+id bridge by `job_id`, merged here.
+
+### What changed
+
+- **Core, `Requests.swift`**: `FiledAs` (top level: tests/test_ios_contract.py reads DownloadJob's whole body, so a
+  struct nested in it would be counted as its fields) and `DownloadJob.filedAs`, read leniently - a name of another
+  shape is "", a `filed_as` of another shape none. **`DoneAlbum`** - `.release(id)` or `.job(id)` - and its `key`, the
+  release or "job-<id>" (no MusicBrainz id can be that). **`RequestRow.opens: DoneAlbum?`** is now what a Done row
+  opens; `release` is computed from it (`.release`'s id, else nil), so the web's vectors, which compare `release`, hold
+  as they were.
+- `jobRow`: a manual row with a `filed_as` naming an album (`ManualSearch.filedAs`: trimmed, nil for a blank album) is
+  titled by it - "<its album> · manual search" - with its artist (the typed one when it names none), under every
+  heading it reaches. In Done, in the library (filed, partly_filed, already_there): `.release` when the job has a
+  release id, else `.job` **only when `filed_as` is there**; `plays` as before, for filed and partly_filed.
+- **Why `filed_as` gates `.job`**: it is sent only by a 2.1.40 server, and only for an album the store still has
+  live. A 2.1.38/2.1.39 server answers `job_id` with a 422 (exactly one of its two keys), so without the gate a tap
+  would say "Can't find this album…" for every manual row; with it the row is as A1 drew it, and docs/ios.md says to
+  find it in the Library.
+- `Routes.storeAlbum` gains `job_id`; `DeadwaxClient.storeAlbum(jobId:)` and `storeAlbum(_: DoneAlbum)`.
+- **App, `Models/RequestsModel.swift`**: every Done-row state - `albumIds`, `ready`, `misses`, `notes`, `inFlight`,
+  the look tasks - is keyed by `DoneAlbum.key` where it was keyed by the release; `DoneLooks` is untouched (it keeps
+  its rows by a string it never reads, and stays the web's to the vector). `runLooks` keeps a key -> DoneAlbum map of
+  the drawn rows and asks each due one of the bridge by what it is; `open` the same; `plays` by the key.
+  `RequestCards`' DoneRowView and RequestsScreen's note read `opens`.
+- No `#if`; nothing Mac-only. No new words (the row's note is the Done rows' own).
+- docs/ios.md: the Requests paragraph (the title from the tags, the tap and ▶, 2.1.40) and check **475**; the
+  Last.fm plan's checks move to 476-504.
+
+### Tests, and the faults they were seen failing on
+
+- ManualSearchTests.swift (+4, 17): `aFiledManualDownloadIsTitledAsItsTagsNameItAndOpensByItsJob` (filed, partly
+  filed, already there with no ▶, interrupted opening nothing, a release id by now opening `.release`, a blank album
+  keeping the typed words and opening nothing, a blank artist keeping the typed one, a non-manual row ignoring it, the
+  title under Downloading too), `aDoneRowsAlbumIsKeptByItsReleaseOrItsJob`, `filedAsIsReadAsJobsSendsIt` (odd shapes
+  read leniently) and `aManualDoneRowsAlbumIsAskedOfTheIdBridgeByItsJob` (FakeTransport: `job_id=12`, and a release
+  still `release_mbid=`). A1's `aManualDownloadIsMarkedUnderEveryHeading` now also holds that a row without
+  `filed_as` opens nothing. Five faults, each applied alone and the suite run, then restored - every one caught: no
+  `filed_as` gate (three tests), the title not from `filed_as`, a job asked of the bridge by release, a blank album
+  believed, the job's key as the bare id.
+- tests/test_ios_contract.py: `filed_as` among what /jobs can send (its source line asserted), and the jobs route
+  through the real app with the manual row filed into a live store row - `filed_as` on it alone; the route test
+  now holds `job_id` among the bridge's declared parameters (it failed here before main's 2.1.40 was merged: "the app
+  sends ['job_id'], which the server ignores"). The bridge's shape test reads the route's two halves since 2.1.40
+  (`_by_release`, `_by_job`) and holds a job's answer to the same keys.
+
+### The review (one, of S3 and A2 together)
+
+- **Important, fixed on main before 2.1.40 was committed**: the by-name lookup took an older id-less copy of the album
+  (another folder, already listed) for a download Navidrome hadn't scanned yet - title and artist only - and the app
+  would have kept that id in `albumIds["job-N"]` while its songs kept loading. Now the year and the song count must
+  agree wherever both sides say them (notes/downloads.md).
+- Nits fixed there too: a common title past the first 20 answers (a second search3 by artist and title), and
+  `filed_as` sent with no LIBRARY_PATH.
+- **Kept, known**: after Edit album > Release on such an album - what its Done row's line suggests - Navidrome
+  probably gives it a new id (its album identity moves to the release id), and the app's kept `albumIds`/`ready` for
+  "job-N" are then stale: a tap opens a dead id, ▶ plays song ids Navidrome no longer has, until the next songs ask
+  fails and forgets them (DoneLooks' own refresh). A release row has the same shape but far less exposure. Not
+  fixed: it heals itself, and the usual path after a match is the album page, not Requests' ▶.
+- Looked at and found sound: access (`_job_for`, the same rule as cancel and retry, before Navidrome is asked); a
+  `.job` row can't turn into `.release` (jobs.release_mbid is never updated after the job is made - the server answers
+  a match made since); every keyed map in RequestsModel; an older server never asked by job; `filed_as` and the bridge
+  agreeing on "live" (pins.album_state); the poller's order (set_job_album, grant_job, the status).
+
+### Not verified - only James's phone and Mac can say (475)
+
+- Everything on a device: the title from the tags, the tap, ▶ from the first song, a "You already had it" row opening
+  with no ▶, the Mac's Requests.
+- Navidrome's real search3 answer for an album with no MusicBrainz id, its `year` and `songCount` for one, and whether
+  it lists an id-less copy and an "[unmatched]" one of the same name as one album or two (M9, 467) - "exactly one"
+  answers null when it's two, and the row says "Not ready to play yet…".
