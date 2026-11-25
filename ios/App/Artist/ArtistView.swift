@@ -55,6 +55,7 @@ struct ArtistView: View {
     @Environment(Reachability.self) private var reachability
     @Environment(AppNavigation.self) private var navigation
     @Environment(SearchModel.self) private var search
+    @Environment(\.dynamicTypeSize) private var typeSize
     @State private var model: ArtistPageModel
     /// The hero's name has scrolled away: the bar shows it.
     @State private var nameInBar = false
@@ -68,6 +69,12 @@ struct ArtistView: View {
 
     /// The picture's side, in points (CoverImage asks the nearest step for the screen's scale: 1024 on an iPhone).
     private static let pictureSide: CGFloat = 200
+    /// (R1c) The phone's top, iArtist's: the round picture beside the name, between the two, the name's letters drawn
+    /// closer, and the room above it.
+    private static let phonePictureSide: CGFloat = 84    // drawn: iArtist .cover width
+    private static let phoneHeroGap: CGFloat = 14        // drawn: iArtist's top .f gap
+    private static let phoneNameTracking: CGFloat = -0.4 // drawn: iArtist's name letter-spacing
+    private static let phoneHeroAbove: CGFloat = 8       // drawn: iArtist's top .f padding-top
     private static let edge: CGFloat = 16
 
     init(route: ArtistRoute) {
@@ -264,8 +271,71 @@ struct ArtistView: View {
 
     /// Their picture and name - (Phase 8, slice 5) the square from their folder once Artist images wrote to it while the
     /// app runs, or where Navidrome has none (the web's `square`: Navidrome keeps its own copy of the picture it had);
-    /// and, who they are chosen here, that it was.
+    /// and, who they are chosen here, that it was. On the Mac the 200 pt picture centred over the name; on the phone
+    /// (phoneHero) iArtist's top.
+    @ViewBuilder
     private func hero(_ managing: ArtistManaged, lastfm: LastfmPage.Shown) -> some View {
+        if Platform.mac {
+            macHero(managing, lastfm: lastfm)
+        } else {
+            phoneHero(managing, lastfm: lastfm)
+        }
+    }
+
+    /// (R1c - notes/ios.md "The redesign, slice R1c: the phone is flat (2026-11-25)"; iArtist) The phone's top, with no
+    /// band behind it: the round picture, 84, beside the name (28, bold) and its lines under it - their listeners, and
+    /// who they are chosen here - 14 between; at the accessibility sizes the picture over the name, so the name keeps
+    /// its room. No shadow under the picture: it sits on the page.
+    private func phoneHero(_ managing: ArtistManaged, lastfm: LastfmPage.Shown) -> some View {
+        let stacked = typeSize.isAccessibilitySize
+        let layout = stacked ? AnyLayout(VStackLayout(alignment: .leading, spacing: Self.phoneHeroGap))
+            : AnyLayout(HStackLayout(alignment: .center, spacing: Self.phoneHeroGap))
+        return layout {
+            picture(managing, side: Self.phonePictureSide, pixels: CoverSize.tile)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(model.name)
+                    .font(Typeface.title.bold())
+                    .tracking(Self.phoneNameTracking)
+                    .lineLimit(3)
+                    .accessibilityAddTraits(.isHeader)
+                // (Last.fm) "2.3M listeners": its line there from the first frame whenever it can be drawn, blank until
+                // (and unless) the answer says - so nothing under it moves
+                if lastfm.heroLine {
+                    Text(lastfm.listeners ?? " ")
+                        .font(Typeface.footnote)
+                        .foregroundStyle(Palette.quiet)
+                        .lineLimit(1)
+                        .accessibilityHidden(lastfm.listeners == nil)
+                }
+                if byChoice {
+                    Text(ArtistManageWords.chosen)
+                        .font(Typeface.footnote)
+                        .foregroundStyle(Palette.quiet)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .padding(.top, Self.phoneHeroAbove)
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    /// Their picture, round, at `side`: the square from their folder, or Navidrome's.
+    @ViewBuilder
+    private func picture(_ managing: ArtistManaged, side: CGFloat, pixels: Int) -> some View {
+        if let square = managing.square(navidrome: model.coverArt, written: { (path: String) -> Int in
+            server.client.map { ArtistFolderVersions.shared.version($0, path: path) } ?? 0
+        }) {
+            ArtistFolderPicture(path: square, kind: "thumb", square: true, round: true)
+                .frame(width: side, height: side)
+                .clipShape(Circle())
+        } else {
+            ArtistPicture(id: model.coverArt, side: side, pixels: pixels)
+        }
+    }
+
+    /// The Mac's: the 200 pt picture centred over the name, as before R1c.
+    private func macHero(_ managing: ArtistManaged, lastfm: LastfmPage.Shown) -> some View {
         VStack(spacing: 0) {
             Group {
                 if let square = managing.square(navidrome: model.coverArt, written: { (path: String) -> Int in

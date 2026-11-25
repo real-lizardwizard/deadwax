@@ -50,10 +50,15 @@ def test_the_artist_page_draws_only_what_lastfm_page_shown_says():
     assert artist.count("LastfmPage.shown(") == 1
     assert ("online: online, answer: model.lastfm, seesDetail: server.access.seesDetail,\n"
             "                                      reserved: model.lineKept(page: taskKey))") in artist
-    # the hero's line, there from the first frame whenever it can be drawn, blank until the answer says
+    # the hero's line, there from the first frame whenever it can be drawn, blank until the answer says - (R1c) in
+    # both tops, the Mac's under its centred name and the phone's beside its round picture
     hero = block(artist, "private func hero(")
-    assert "if lastfm.heroLine {\n                Text(lastfm.listeners ?? \" \")" in hero
-    assert ".accessibilityHidden(lastfm.listeners == nil)" in hero
+    assert re.sub(r"\s+", " ", hero).strip() == ("if Platform.mac { macHero(managing, lastfm: lastfm) } else { "
+                                                 "phoneHero(managing, lastfm: lastfm) }")
+    for top in ("private func macHero(", "private func phoneHero("):
+        drawn = re.sub(r"\s+", " ", block(artist, top))
+        assert 'if lastfm.heroLine { Text(lastfm.listeners ?? " ")' in drawn, top
+        assert ".accessibilityHidden(lastfm.listeners == nil)" in drawn, top
     # Top Songs only with Last.fm on and an answer to draw, below Play - waiting on the arrival
     body = block(artist, "var body: some View {")
     held = block(body, "if !arrival.holding {")

@@ -211,9 +211,11 @@ struct LibraryRow: View {
 
 /// The New mark: "New", the accent's chip (.chip.purple) on the window's ground - legible whatever the cover behind it -
 /// read as "New in your library" (the tile's own label says it, for VoiceOver).
+/// (R1c's review) Faced on the phone too, as R1b drew it (DWChip's `keepsFace`): a mark on a picture, as the count
+/// badge is, not a flat chip's dot and words over a cover.
 struct LibraryNewMark: View {
     var body: some View {
-        DWChip(words: LibraryWords.newMark, tone: .marked)
+        DWChip(words: LibraryWords.newMark, tone: .marked, keepsFace: true)
             .background(DWPalette.bg, in: DWCorners.chipShape)
             .accessibilityLabel(LibraryWords.newMarkSpoken)
     }

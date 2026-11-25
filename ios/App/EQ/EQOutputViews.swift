@@ -77,12 +77,12 @@ struct EQOtherOutputRow: View {
 }
 
 /// (R3b) The output at the top of the phone's EQ page (iEQ's `.btn` across the page): "Output" in the second colour, the
-/// page's output's name - and "Not connected" after it, for one that isn't - and a caret, in a button's face 44 tall at
-/// least; under the face AirPlay's own button (AVRoutePickerView, its glyph clear), so a tap there is AirPlay's - the
-/// system's output picker - as Now Playing's output column is (OutputItem). The face is drawn only: VoiceOver reaches
-/// AirPlay's button, which (R3b's review) says the page's output as the old header did - "James's AirPods Pro",
-/// "Connected now" or "Not connected" - and, as its hint, that a double tap opens AirPlay and where the music plays now.
-/// The name crossfades when the page follows the route.
+/// page's output's name - and "Not connected" after it, for one that isn't - and a caret, (R1c) in the accent with no
+/// face, 44 tall at least; under it AirPlay's own button (AVRoutePickerView, its glyph clear), so a tap there is
+/// AirPlay's - the system's output picker - as Now Playing's output column is (OutputItem). It is drawn only:
+/// VoiceOver reaches AirPlay's button, which (R3b's review) says the page's output as the old header did - "James's
+/// AirPods Pro", "Connected now" or "Not connected" - and, as its hint, that a double tap opens AirPlay and where the
+/// music plays now. The name crossfades when the page follows the route.
 struct EQOutputButton: View {
     let output: EQOutput
     let connected: Bool
@@ -102,23 +102,21 @@ struct EQOutputButton: View {
         HStack(spacing: CGFloat(PhoneLook.goGap)) {
             Text(EQWords.Screen.output)
                 .foregroundStyle(DWPalette.t2)
+            // (R1c - notes/ios.md "The redesign, slice R1c: the phone is flat (2026-11-25)") a flat button's: the
+            // output's name and the caret in the accent, no face (`.dw.ph .btn`)
             Text(connected ? output.name : output.name + " · " + EQWords.Screen.notConnected)
-                .foregroundStyle(DWPalette.buttonText)
+                .foregroundStyle(DWPalette.acc)
                 .lineLimit(typeSize.isAccessibilitySize ? 3 : 1)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .contentTransition(.opacity)
                 .animation(reduceMotion ? nil : .easeInOut(duration: 0.2), value: output.key)
-            DWCaret(colour: DWPalette.buttonText)
+            DWCaret(colour: DWPalette.acc)
         }
         .font(Typeface.Look.text(.button).weight(.medium))
         .padding(.horizontal, CGFloat(DWLook.here.buttonPadding))
         .padding(.vertical, typeSize.isAccessibilitySize ? CGFloat(PhoneLook.groupEnds) * 3 : 0)
         .frame(maxWidth: .infinity)
         .lookHeight(DWLook.here.target)
-        .background {
-            DWRaised(shape: DWCorners.buttonShape, face: DWPalette.buttonFace, sheen: DWPalette.buttonSheen,
-                     edge: DWPalette.buttonEdge, drop: DWPalette.buttonDrop)
-        }
         .allowsHitTesting(false)
         .accessibilityHidden(true)
         .background {

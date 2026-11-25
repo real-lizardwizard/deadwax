@@ -6,7 +6,7 @@ import SwiftUI
 /// page's shows through), what leads it at the left (the purple Back), what trails it at the right (small buttons, a
 /// •••), and a page's name centred between them, never under either. Capped at xxxLarge, as the tab bar is. The large
 /// title under it is PhoneBigTitle. (R2's titled top - the Library's "Library", 28 and bold at its left - went in R2b:
-/// the Library's top is its one row again, LibraryTop's, with PhoneCircleStyle's two circles.)
+/// the Library's top is its one row again, LibraryTop's, with PhoneCircleStyle's two glyphs.)
 struct PhoneTop<Leading: View, Trailing: View>: View {
     /// A page's name, centred.
     var name: String?
@@ -62,13 +62,17 @@ extension PhoneTop where Leading == EmptyView {
 
 /// (the redesign, slice R2b - notes/ios.md "The redesign, slice R2b: the Library's top, one row again") The Library's
 /// two circles (dw.css's .circ): Find's magnifying glass and the •••, James's of 14 Nov again ("but the search button
-/// and options button at the top can be circles"). The look's raised face - .btn's gradient, edge, sheen and label
-/// colour, which .circ's are, without .btn's drop - drawn round, 34 pt, in a finger's 44 pt target that reaches 5 pt
-/// past it on every side into the room round it (the row's 12 pt either side, its 9 pt above and below), so it never
-/// reaches a neighbour's; pressed, the gradient turned over, as every raised face presses. For a Menu too
-/// (`.menuStyle(.button)`, whose label takes the button style in use). Its face is a mark drawn at its size, as R1b's
-/// switch is; its glyph grows with the text to the largest standard size the row is capped at, and a long press then
-/// shows it large.
+/// and options button at the top can be circles"). (R1c - notes/ios.md "The redesign, slice R1c: the phone is flat
+/// (2026-11-25)") **Bare glyphs now, with no face**: white (`.dw.ph .circ`'s #fff), at the text style nearest 21 pt
+/// (`.circ svg`'s 21 - title3's 20), centred in the 36 x 34 box the circle was (`.circ`), in a finger's 44 pt target
+/// that reaches 4 pt past it either side into the row's 12 and 5 above and below it, so it never reaches a neighbour's;
+/// faded while held, as a toggle is, and while it can't be used. For a Menu too (`.menuStyle(.button)`, whose label
+/// takes the button style in use). Its glyph grows with the text to the largest standard size the row is capped at,
+/// and a long press then shows it large.
+///
+/// The ••• isn't drawn in the accent while its menu is open (the drawing's `.circ.on`): SwiftUI's Menu tells its label
+/// nothing of whether it is open, and the one documented way to know - UIKit's context-menu interaction, a UIButton of
+/// our own with its menu rebuilt as a UIMenu - would rebuild the menu itself, which this slice keeps as it is.
 struct PhoneCircleStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         PhoneCircleFace(label: configuration.label, pressed: configuration.isPressed)
@@ -83,16 +87,13 @@ private struct PhoneCircleFace<Label: View>: View {
 
     var body: some View {
         let face = CGFloat(PhoneLook.circle)
+        let tall = CGFloat(PhoneLook.circleHeight)
         let target = max(face, CGFloat(DWLook.here.target))
         label
-            .font(Typeface.symbol(.body).weight(.semibold))
-            .foregroundStyle(DWPalette.buttonText)
-            .frame(width: face, height: face)
-            .background {
-                DWRaised(shape: Circle(), face: DWPalette.buttonFace, sheen: DWPalette.buttonSheen,
-                         edge: DWPalette.buttonEdge, drop: nil, pressed: pressed && enabled)
-            }
-            .opacity(enabled ? 1 : DWPalette.off)
+            .font(Typeface.symbol(.title3))
+            .foregroundStyle(DWPalette.text)
+            .frame(width: face, height: tall)
+            .opacity(enabled && !pressed ? 1 : DWPalette.off)
             .frame(width: target, height: target)
             .contentShape(Rectangle())
     }

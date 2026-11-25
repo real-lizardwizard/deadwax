@@ -9,7 +9,9 @@ Since slice R2b (notes/ios.md "The redesign, slice R2b: the Library's top, one r
 the library on iOS is actually kinda a mess, can we streamline it a bit?", "lets put the grid/list next to yours/all")
 the top is one row - Find's circle, the switch of the pages, the •••'s circle - over one quiet line per page: its count,
 its order or New playlist…, then Grid and List (Albums alone) and Yours | All, white where you are and purple what a
-tap goes to; Downloaded is the •••'s again. The row and the line fit a 375 pt phone at every text size - the line
+tap goes to; Downloaded is the •••'s again. (R1c, notes/ios.md "The redesign, slice R1c: the phone is flat
+(2026-11-25)") Find and the ••• are bare white glyphs now, and the switch words over a hairline, the chosen one over the
+accent's line. The row and the line fit a 375 pt phone at every text size - the line
 giving way inside itself first, its count's noun dropped, then folding - rather than cutting a word short, by the
 arithmetic below; where each view goes is Core's (LibraryTopFit, MetaLine), tested in LibrarySwitchTests and
 DWLookTests.
@@ -182,22 +184,27 @@ def test_the_librarys_top_is_one_row_with_find_kept():
     assert "DWButtonStyle" not in more and "CircleFace" not in view + top
 
 
-def test_the_rows_circles_are_the_looks_raised_face_drawn_round():
-    # .circ's colours are .btn's - the look's raised face, no new one - without .btn's drop, round, 34 in a 44 target
-    for prop in ("border", "background", "color"):
-        assert css(".circ", prop) == css(".btn", prop), prop
-    assert css(".circ", "box-shadow") == "inset 0 1px 0 rgba(255, 255, 255, 0.08)", "the sheen alone: no drop"
-    assert css(".btn", "box-shadow").startswith("inset 0 1px 0 rgba(255, 255, 255, 0.08), ")
+def test_the_rows_circles_are_bare_white_glyphs():
+    # (R1c; James, 25 Nov: "get rid of all the grey boxes") .circ has no face: no edge, no fill, no sheen - its glyph
+    # white (`.dw.ph .circ`'s #fff), 21 (`.circ svg`), centred in the 36 x 34 the circle was, in a 44 target
+    assert phone_look.resolved(".circ")["border-top-width"] == "0" and css(".circ", "background") == "none"
+    assert css(".circ", "box-shadow") == "none" and css(".circ", "color") == "#fff"
+    assert px(css(".circ svg", "width")) == 21 == px(css(".circ svg", "height"))
     face = flat(body(bare(source("Phone/PhoneTop.swift")), "private struct PhoneCircleFace<"))
-    assert ("DWRaised(shape: Circle(), face: DWPalette.buttonFace, sheen: DWPalette.buttonSheen, "
-            "edge: DWPalette.buttonEdge, drop: nil, pressed: pressed && enabled)") in face
-    assert ".foregroundStyle(DWPalette.buttonText)" in face and ".opacity(enabled ? 1 : DWPalette.off)" in face
-    assert "let face = CGFloat(PhoneLook.circle) let target = max(face, CGFloat(DWLook.here.target))" in face
-    order = [face.index(part) for part in (".frame(width: face, height: face)", ".background {",
-                                           ".frame(width: target, height: target)", ".contentShape(Rectangle())")]
+    assert "DWRaised" not in face and ".background" not in face and ".fill(" not in face
+    assert ".foregroundStyle(DWPalette.text)" in face and ".opacity(enabled && !pressed ? 1 : DWPalette.off)" in face
+    assert ("let face = CGFloat(PhoneLook.circle) let tall = CGFloat(PhoneLook.circleHeight) "
+            "let target = max(face, CGFloat(DWLook.here.target))") in face
+    order = [face.index(part) for part in (".frame(width: face, height: tall)", ".frame(width: target, height: target)",
+                                           ".contentShape(Rectangle())")]
     assert order == sorted(order)
-    # the glyph grows with the text (to the row's cap), the face is a mark drawn at its size
-    assert ".font(Typeface.symbol(.body).weight(.semibold))" in face
+    # the glyph grows with the text (to the row's cap) - 21 scales with title3, the nearest of iOS's styles (20) - in the
+    # box drawn at its size
+    assert phone_look.nearest(21) == "title3" and ".font(Typeface.symbol(.title3))" in face
+    # the ••• isn't drawn in the accent while open (`.circ.on`): SwiftUI's Menu tells its label nothing of it - said
+    top = source("Phone/PhoneTop.swift")
+    assert "The ••• isn't drawn in the accent while its menu is open" in top
+    assert css(".circ.on", "color") == "#c084fc"
 
 
 def test_the_row_is_laid_out_where_core_puts_each_view():
@@ -416,6 +423,8 @@ def test_white_is_where_you_are_and_purple_what_a_tap_goes_to():
 #? Dynamic Type's footnote and body at each size (Apple's table): the row and the line are capped at xxxLarge, so every
 #? accessibility size draws them as xxxLarge does
 FOOTNOTE = {"xSmall": 12, "small": 12, "medium": 12, "large": 13, "xLarge": 15, "xxLarge": 17, "xxxLarge": 19}
+#? (R1c) iOS's subheadline at each standard size, as FOOTNOTE: what the flat switch's 15 pt words scale with
+SUBHEADLINE = {"xSmall": 12, "small": 13, "medium": 14, "large": 15, "xLarge": 17, "xxLarge": 19, "xxxLarge": 21}
 BODY = {"xSmall": 14, "small": 15, "medium": 16, "large": 17, "xLarge": 19, "xxLarge": 21, "xxxLarge": 23}
 #? an SF Symbol's width at its size, taken wide (square.grid.2x2 and list.bullet are about 1.1-1.2 of it)
 SYMBOL = 1.3
@@ -445,39 +454,58 @@ def test_the_rows_switch_fits_beside_its_circles_or_folds_under_them():
     side, circle, gap = (phone_number(n) for n in ("rowSide", "circle", "rowGap"))
     room = NARROW - 2 * (side + circle + gap)
     folded = NARROW - 2 * side
-    assert (room, folded) == (251, 343)
-    # what the switch needs: the widest page's words in each equal segment (DWSegmented's 14 semibold, scaled with the
-    # footnote; .seg.lg's padding 0 on the phone), and its well's edge either side - DWSegmentedNeed's very parts
+    # (R1c) the glyphs' boxes 36 wide (`.dw.ph .circ`), the circles' 34 before
+    assert (room, folded) == (247, 343)
+    # what the switch needs: the widest page's words in each equal segment (DWSegmented's 15 semibold since R1c, scaled
+    # with the subheadline; .seg.lg's padding 0 on the phone), DWFlat's room of 6 either side of them (R1c: with no well
+    # between them, so two neighbours never come closer than 12 beside the circles), and the 1 pt either end -
+    # DWSegmentedNeed's very parts
     need = flat(body(bare(source("Look/DWSegmented.swift")), "struct DWSegmentedNeed: View {"))
-    seg = flat(body(bare(source("Look/DWSegmented.swift")), "private func segment("))
+    seg = flat(body(bare(source("Look/DWSegmented.swift")), "private func phoneSegment("))
     # (R2b's review) every segment as wide as the widest word - a ZStack of every word in each - and the whole of it
     # hidden, untouchable and unheard, at its own size
     assert need == ("struct DWSegmentedNeed: View { let words: [String] var body: some View { HStack(spacing: 0) { "
                     "ForEach(words.indices, id: \\.self) { (_: Int) in ZStack { ForEach(words.indices, id: \\.self) { "
                     "(at: Int) in Text(words[at]) .font(Typeface.Look.text(.largeSegment).weight(.semibold)) .lineLimit(1) "
-                    ".padding(.horizontal, CGFloat(DWLook.here.largeSegmentPadding)) } } } } .padding(1) .fixedSize() "
+                    ".padding(.horizontal, CGFloat(DWLook.here.largeSegmentPadding)) } } "
+                    ".padding(.horizontal, CGFloat(DWFlat.segmentRoom)) } } .padding(1) .fixedSize() "
                     ".hidden() .allowsHitTesting(false) .accessibilityHidden(true) } }"), need
     assert ".font(Typeface.Look.text(.largeSegment).weight(.semibold))" in need
     assert ".font(Typeface.Look.text(large ? .largeSegment : .segment).weight(.semibold))" in seg
     assert ".padding(.horizontal, CGFloat(DWLook.here.largeSegmentPadding))" in need and ".padding(1)" in need
     assert re.search(r"largeSegmentPadding: 0,\s+// dw\.ph: \.seg\.lg button padding-left",
                      (CORE / "DWLook.swift").read_text(encoding="utf-8"))
+    assert re.search(r"case \.largeSegment: return \(15, \.subheadline\)", source("Shared/Typeface.swift"))
+    inside = phone_number("segmentRoom")
+    assert inside == 6
     titles = {"albums": "Albums", "playlists": "Playlists", "artists": "Artists", "songs": "Songs"}
     orders = {"yours": ["albums", "playlists", "artists"], "all": ["albums", "artists", "songs"],
               "no library of your own": ["albums", "playlists", "artists", "songs"]}
-    found = {}
-    for size, footnote in FOOTNOTE.items():
-        points = 14 * footnote / 13
+    found, closest = {}, {}
+    for size, subheadline in SUBHEADLINE.items():
+        points = 15 * subheadline / 15
         for whose, pages in orders.items():
-            needs = len(pages) * max(words_width(titles[p], points, "SemiBold") for p in pages) + 2
+            widths = [words_width(titles[p], points, "SemiBold") for p in pages]
+            needs = len(pages) * (max(widths) + 2 * inside) + 2
             folds = needs > room
             found[(whose, size)] = folds
-            # folded, it fits the page's width less the circles' sides at every size
-            assert needs <= (folded if folds else room), (whose, size, needs)
-    # three pages never fold, up to the row's cap - the four of logins off and the break-glass sign-in fold from xLarge
-    assert not [key for key, folds in found.items() if folds and key[0] != "no library of your own"]
+            # beside the circles with its room; folded, its words alone fit the page's width less its sides at every
+            # size, the room between them what the width leaves
+            assert needs <= room or len(pages) * max(widths) + 2 <= folded, (whose, size, needs)
+            segment = ((folded if folds else room) - 2) / len(pages)
+            closest[(whose, size)] = min(segment - (a + b) / 2 for a, b in zip(widths, widths[1:]))
+    # in Libre Franklin (25 Nov): Yours' three pages fold from xxLarge, All's at xxxLarge alone (245.8 of 247 at
+    # xxLarge); the four of logins off and the break-glass sign-in fold from small (the standard size, large, among
+    # them) - the room either side of each word R1c's, the 15 pt type the flat block's
+    assert [size for (whose, size), folds in found.items() if folds and whose == "yours"] == ["xxLarge", "xxxLarge"]
+    assert [size for (whose, size), folds in found.items() if folds and whose == "all"] == ["xxxLarge"]
     assert [size for (whose, size), folds in found.items() if folds and whose == "no library of your own"] == [
-        "xLarge", "xxLarge", "xxxLarge"]
+        "small", "medium", "large", "xLarge", "xxLarge", "xxxLarge"]
+    # beside the circles two neighbours' words never come closer than 12; folded, never touch - the four at xxxLarge
+    # the closest, 4.4 apart
+    assert min(gap for key, gap in closest.items() if not found[key]) >= 2 * inside
+    assert min(closest.values()) == closest[("no library of your own", "xxxLarge")]
+    assert round(closest[("no library of your own", "xxxLarge")], 1) == 4.4
     # the cap the arithmetic takes is the row's (an accessibility size draws as xxxLarge)
     top = flat(bare(source("Library/LibraryTop.swift")))
     assert re.search(r"LibraryTopRow \{.*DWSegmentedNeed\(words: pages\).*\} \.dynamicTypeSize\(\.\.\.DynamicTypeSize\.xxxLarge\) "

@@ -2,13 +2,20 @@ import DeadwaxCore
 import SwiftUI
 
 /// The one-tap strip (dw.css's .chips - the redesign, slice R1b, notes/ios.md "The redesign, slice R1b: the shared look,
-/// and the phone's pieces"): a page's parts in a row of buttons under its top, the one shown in the selection's fill and
-/// edge - the Library's Albums | Artists | Songs (R2), Now Playing's sheet's Queue | Info | EQ (R3). Drawn nowhere until
-/// those slices.
+/// and the phone's pieces"): a page's parts in a row under its top - Now Playing's sheet's Queue | Info | EQ (R3), and
+/// the strips later slices draw (Edit album's, Search's, Server settings', the Event log's, an artist's). (R1c -
+/// notes/ios.md "The redesign, slice R1c: the phone is flat (2026-11-25)") Words, with no face: at 15 in the second
+/// colour, 22 apart, over a hairline under the whole strip; the one shown white and semibold over the accent's 2 pt
+/// line, as wide as its words (`.dw.ph .chips`, `.chips > .on`).
 ///
-/// - Each button's face is 32 tall at least, growing with the text; a finger's target round it is 44 (DWTarget), and
-///   the row is padded by the target's reach above and below - and the strip drawn as tall as its faces again - so the
-///   scroll view, which takes no touch outside itself, holds the whole target.
+/// - Each button is 40 tall at least, growing with the text; a finger's target round it is 44 (DWTarget), and the row
+///   is padded by the target's reach above and below - and the strip drawn as tall as its words again - so the scroll
+///   view, which takes no touch outside itself, holds the whole target. The hairline is the row's foot, under the
+///   words, the shown one's line over it.
+/// - (R1c's review) Sideways, a button's target is its words and half the gap either side - the buttons touch, 22
+///   between their words as .chips' gap, and the row's sides are the strip's 16 less that half - and 44 wide at least
+///   (DWLook's target: Queue's EQ is 21 wide in words, 43 with its room). The shown one's line stays as wide as its
+///   words, under them, not under the room.
 /// - It starts at the leading edge (.chips) and never wraps: where its buttons don't fit the width, the strip scrolls
 ///   sideways, and the shown button is brought into view whenever it changes - by a tap or by the page's own swipe -
 ///   moving as the Library's swipe does (`.snappy`, none with Reduce Motion).
@@ -42,9 +49,11 @@ struct PhoneStrip<Part: Hashable>: View {
         }
         // .chips starts at its leading edge, where it fits as where it scrolls
         .frame(maxWidth: .infinity, alignment: .leading)
-        // drawn as tall as its faces: the targets' reach (the row's padding) laid over what is above and below it
+        // drawn as tall as its words: the targets' reach (the row's padding) laid over what is above and below it
         .padding(.vertical, -reach)
-        // .chips: padding 0 16px 10px
+        // .dw.ph .chips: box-shadow inset 0 -1px 0 #1c1b22 - the hairline at the words' foot, under the shown one's line
+        .background(alignment: .bottom) { DWRule(colour: DWPalette.stripRule) }
+        // .dw.ph .chips: margin-bottom 10px, under the hairline
         .padding(.bottom, CGFloat(PhoneLook.stripFoot))
         .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
         .accessibilityElement(children: .contain)
@@ -53,18 +62,25 @@ struct PhoneStrip<Part: Hashable>: View {
     }
 
     private var row: some View {
-        HStack(spacing: CGFloat(PhoneLook.stripGap)) {
+        // the gap is the buttons' own room (`room`), so the buttons touch and a finger's target reaches the next one's
+        HStack(spacing: 0) {
             ForEach(options, id: \.self) { (option: Part) in
                 button(option)
                     .id(option)
             }
         }
-        .padding(.horizontal, CGFloat(PhoneLook.stripSide))
+        // .chips padding 0 16px, less the first button's room before its words and the last's after
+        .padding(.horizontal, CGFloat(PhoneLook.stripSide) - room)
         // room for each button's whole target inside the scroll view
         .padding(.vertical, reach)
     }
 
-    /// How far a button's target reaches above and below its 32 pt face: 6 on the phone.
+    /// A button's room either side of its words: half the gap between two buttons' words, 11.
+    private var room: CGFloat {
+        CGFloat(PhoneLook.stripGap) / 2
+    }
+
+    /// How far a button's target reaches above and below its 40 pt height: 2 on the phone.
     private var reach: CGFloat {
         CGFloat(DWLook.here.reach(PhoneLook.strip))
     }
@@ -75,23 +91,25 @@ struct PhoneStrip<Part: Hashable>: View {
             shown = option
         } label: {
             Text(words(option))
-                // .chips > button: 500; .chips > .on 600
+                // .chips > button: 500 in the second colour; .chips > .on 600, white
                 .font(Typeface.Phone.text(.strip).weight(on ? .semibold : .medium))
-                .foregroundStyle(on ? DWPalette.selt : DWPalette.stripText)
+                .foregroundStyle(on ? DWPalette.text : DWPalette.t2)
                 .lineLimit(1)
                 .fixedSize()
                 .padding(.horizontal, CGFloat(PhoneLook.stripPadding))
                 .lookHeight(PhoneLook.strip)
-                .background {
-                    // .chips > button's face, sheen and edge, no drop; .chips > .on the selection's fill and edge
+                .overlay(alignment: .bottom) {
+                    // .chips > .on: box-shadow inset 0 -2px 0 var(--acc) - as wide as its words, at their foot
                     if on {
-                        DWRaised(shape: DWCorners.buttonShape, face: DWPalette.selbg, sheen: DWPalette.stripSheen,
-                                 edge: DWPalette.selbd, drop: nil)
-                    } else {
-                        DWRaised(shape: DWCorners.buttonShape, face: DWPalette.stripFace, sheen: DWPalette.stripSheen,
-                                 edge: DWPalette.stripEdge, drop: nil)
+                        Rectangle()
+                            .fill(DWPalette.acc)
+                            .frame(height: CGFloat(DWFlat.chosenLine))
+                            .accessibilityHidden(true)
                     }
                 }
+                // (R1c's review) a finger's target sideways: the words' room either side, 44 wide at least
+                .padding(.horizontal, room)
+                .frame(minWidth: CGFloat(DWLook.here.target))
                 .contentShape(DWTarget(face: DWCorners.buttonShape))
         }
         .buttonStyle(.plain)

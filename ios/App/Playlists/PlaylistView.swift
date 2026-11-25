@@ -79,6 +79,14 @@ struct PlaylistView<Desk: View>: View {
     /// On screen - the page on top of its tab: it pulls only then.
     @State private var shown = false
     @AccessibilityFocusState private var focus: EditFocus?
+    /// (R1c's review) Which of Edit's fields has the cursor - each field's own `.focused`: the phone draws each on the
+    /// look's well (DWWellField), its edge the accent's while it has the cursor. On the Mac nothing reads it.
+    @FocusState private var typing: EditField?
+
+    /// Edit's two fields.
+    private enum EditField: Hashable {
+        case name, description
+    }
 
     /// Where VoiceOver's focus goes after a change in Edit - never dropped to the page's top.
     enum EditFocus: Hashable {
@@ -220,9 +228,10 @@ struct PlaylistView<Desk: View>: View {
             .listStyle(.plain)
             // the pull shuffles the playlist (never refreshes), while the page is the one on top and Edit isn't open
             .pullsToShuffle(PullShuffling(state: pull, can: can, on: shown && !editing, start: pulled))
-            // (R5) the page's ground, iPlaylist's
+            // (R5) the page's ground - (R1c's review) on the phone `.dw.ph`'s black, iPlaylist's, so the mini player and
+            // the tab bar sit on it with no seam; the Mac's (Edit, drawn here) --bg, as R5 drew it
             .scrollContentBackground(.hidden)
-            .background(DWPalette.bg)
+            .background(Platform.mac ? DWPalette.bg : DWPalette.page)
     }
 
     /// The page's songs out of Edit: gone, failed, offline, loading, empty, or the rows and their footer.
@@ -446,12 +455,15 @@ struct PlaylistView<Desk: View>: View {
                     .textInputAutocapitalization(.sentences)
                     .autocorrectionDisabled()
                     .submitLabel(.done)
+                    .focused($typing, equals: .name)
                     .accessibilityLabel(PlaylistWords.nameField)
                     .onChange(of: model.edit?.name) { (was: String?, typed: String?) -> Void in
                         guard let was, let typed else { return }
                         let kept = PlaylistEdit.typed(typed, was: was, max: PlaylistRules.nameMax)
                         if kept != typed { model.edit?.name = kept }
                     }
+                    // (R1c's review) on the phone a box, as every place you type is: the look's well
+                    .modifier(DWWellField(focus: $typing, field: .name))
                 if model.needsName {
                     Text(PlaylistWords.needsAName)
                         .font(Typeface.footnote)
@@ -459,12 +471,14 @@ struct PlaylistView<Desk: View>: View {
                 }
                 TextField(PlaylistWords.descriptionField, text: commentBinding, axis: .vertical)
                     .lineLimit(2...6)
+                    .focused($typing, equals: .description)
                     .accessibilityLabel(PlaylistWords.descriptionField)
                     .onChange(of: model.edit?.comment) { (was: String?, typed: String?) -> Void in
                         guard let was, let typed else { return }
                         let kept = PlaylistEdit.typed(typed, was: was, max: PlaylistRules.commentMax)
                         if kept != typed { model.edit?.comment = kept }
                     }
+                    .modifier(DWWellField(focus: $typing, field: .description, lines: true))
                 VStack(alignment: .leading, spacing: 6) {
                     Toggle(PlaylistWords.sharedWithEveryone, isOn: publicBinding)
                     Text(PlaylistWords.sharedNote)

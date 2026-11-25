@@ -144,22 +144,30 @@ def test_the_meters_height_and_corners_are_each_devices():
 
 # ----------------------------------------------------------------------------- the phone's cards
 
-def test_round_stays_round_and_the_rest_is_square():
+def test_the_cards_are_flat_and_square():
     cards = bare(source(CARDS))
-    # the ✕: a round face 32 across (.btn.sm's 32 on the phone) raised as a button is, in a finger's 44
+    # (R1c, notes/ios.md "The redesign, slice R1c: the phone is flat (2026-11-25)") the ✕: a bare glyph in the accent
+    # with no face (iRequests' `.btn.sm` ✕ on the flat phone: `.dw.ph .btn`), in a finger's 44
     cancel = flat(body(cards, "private struct CancelButton: View {"))
-    assert ("DWRaised(shape: Circle(), face: DWPalette.buttonFace, sheen: DWPalette.buttonSheen, "
-            "edge: DWPalette.buttonEdge, drop: DWPalette.buttonDrop)") in cancel
-    assert phone_look.px(phone_look.css(".btn.sm", "height")) == 32
-    assert "static let face: CGFloat = 32" in cards
-    assert ".frame(width: CardSizes.face, height: CardSizes.face)" in cancel
+    assert "DWRaised" not in cancel and ".background" not in cancel and ".foregroundStyle(DWPalette.acc)" in cancel
+    assert phone_look.resolved(".btn.sm")["border-top-width"] == "0" and phone_look.css(".btn.sm", "background") == "none"
+    assert phone_look.css(".btn.sm", "color") == "#c084fc"
+    assert "static let face" not in cards and "CardSizes.face" not in cards
     assert ".frame(minWidth: CGFloat(DWLook.here.target), minHeight: CGFloat(DWLook.here.target))" in cancel
-    # the ▶: round, the phone's purple, the sharp glyph
+    # the ▶: a bare accent glyph, 18 (`.dw.ph .row .key:not(.bare)`) - the sharp glyph, at the text style nearest it -
+    # in a finger's 44
     done = flat(body(cards, "struct DoneRowView: View {"))
-    assert "SharpSymbol(.play)" in done and ".background(DWPalette.phonePrimaryFace, in: Circle())" in done
-    # nothing else round: the two circles are the ✕'s and the ▶'s, every cover Corners' art (square), every card
-    # PhoneCard's (square) - and no corner of their own
-    assert cards.count("Circle()") == 2
+    assert "SharpSymbol(.play) .font(Typeface.symbol(.body).weight(.semibold))" in done
+    play = done[done.index("SharpSymbol(.play)"):done.index(".contentShape(Rectangle())", done.index("SharpSymbol(.play)"))]
+    assert ".foregroundStyle(DWPalette.acc)" in play and ".background" not in play
+    assert ".frame(minWidth: CGFloat(DWLook.here.target), minHeight: CGFloat(DWLook.here.target))" in play
+    key = phone_look.resolved(".row .key")
+    assert (key["background"], key["box-shadow"], key["color"]) == ("none", "none", "#c084fc")
+    assert phone_look.px(phone_look.css(".row .key svg", "width")) == 18
+    assert phone_look.nearest(18) == "headline", "18 is nearest headline's 17 (and body's): body's glyph, semibold"
+    # nothing round now - every cover Corners' art (square), every card PhoneCard's (no face, its hairline) - and no
+    # corner of their own
+    assert cards.count("Circle()") == 0
     assert not re.search(r"cornerRadius|RoundedRectangle\(|\bCapsule\b|\.capsule\b", cards)
     assert ".clipShape(Corners.artShape)" in cards
     assert cards.count("PhoneCard {") == 2, "a download's card and a refused one's"

@@ -463,15 +463,16 @@ def test_the_looks_mac_type_is_r1s():
     sizes = dict(re.findall(r"case (\w+) = ([0-9.]+)\n", mac[mac.index("enum Size"):mac.index("static func text")]))
     look = text[text.index("    enum Look {"):text.index("    enum Phone {")]
     lines = re.findall(r"case \.(\w+): return \.(\w+)\s*// dw: (.+) (font-size|font)\n", look[look.index("var mac:"):])
-    assert len(lines) == 9, lines
+    assert len(lines) == 10, lines
     for role, size, selector, prop in lines:
         css = rule(selector)[prop]
         assert float(sizes[size]) == px(css.split()[1] if prop == "font" else css), f"Typeface.Look.{role}"
     # R1's components' own: a button .control (small .small), a field .base, a label .control, a chip and a segment
-    # .label (large .control), a count .count
+    # .label (large .control), a count .count - and (R1c's review) the phone's faced chip a chip's, which the Mac never
+    # asks for (its chip's own `.chip`, test_ios_mac_halves.py)
     assert {role: size for role, size, _, _ in lines} == {
         "button": "control", "smallButton": "small", "largeButton": "control", "field": "base", "fieldLabel": "control",
-        "chip": "label", "count": "count", "segment": "label", "largeSegment": "control"}
+        "chip": "label", "count": "count", "segment": "label", "largeSegment": "control", "facedChip": "label"}
 
 
 #? Typeface.Mac's sizes: each a dw.css rule's own font size - or, for two, the drawings' own (inline styles)
@@ -548,7 +549,8 @@ MAC_FONT = re.compile(r"Typeface\.(Mac\.(text|mono)|Look\.(text|mono)|symbol)\("
 
 def test_nothing_in_the_macs_views_draws_a_value_of_its_own():
     files = drawn_in_the_look()
-    assert len(files) > 30 and len([name for name in files if name.startswith("Look/")]) == 10, "App/Mac and App/Look"
+    # (R1c's review) eleven with DWWellField
+    assert len(files) > 30 and len([name for name in files if name.startswith("Look/")]) == 11, "App/Mac and App/Look"
     left = []
     for name, text in files.items():
         code = bare(text)

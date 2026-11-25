@@ -12,11 +12,13 @@ import SwiftUI
 ///   and the property it comes from (`dw: .btn background`), which tests/test_ios_mac_look.py reads and holds the
 ///   colour to. Where the property holds more than one colour - a box-shadow's layers - the line names which, counting
 ///   from 1 (`dw: .btn box-shadow 2`), and is held to that one alone.
-/// - **The phone's own** (`dw.ph: .card background`): where the phone's rules draw a part in another colour (the primary
-///   button) and the phone's own pieces (App/Phone), each held by tests/test_ios_phone_look.py to the phone's rule as
-///   the cascade resolves it - the later of two `.dw.ph` rules winning. The phone's purple - its primary button and
-///   the switch - is the app's own, PrimaryButton's (Core, held to theme.css by tests/test_ios_palette.py), made from
-///   it here: `.dw.ph .btn.pri` and `.sw` are that same colour.
+/// - **The phone's own** (`dw.ph: .card border-bottom`): where the phone's rules draw a part in another colour (the
+///   primary button) and the phone's own pieces (App/Phone), each held by tests/test_ios_phone_look.py to the phone's
+///   rule as the cascade resolves it - the later of two `.dw.ph` rules winning. The phone's purple - its primary button
+///   and the switch - is the app's own, PrimaryButton's (Core, held to theme.css by tests/test_ios_palette.py), made
+///   from it here: `.dw.ph .btn.pri` and `.sw` are that same colour. (R1c - notes/ios.md "The redesign, slice R1c: the
+///   phone is flat (2026-11-25)") The phone is flat: its own lines are hairlines and grounds now, no card, group or
+///   strip face - and the shared parts it draws no face for (a secondary button's, the tinted chips') it draws nowhere.
 /// - **The web's** (`web: --dw-primary-pressed`): the phone's primary pressed, PrimaryButton's own darkened press
 ///   (PrimaryFace's, held to theme.css by tests/test_ios_palette.py) - dw.css draws no pressed state - and `off`, the
 ///   faded opacity.
@@ -105,12 +107,15 @@ enum DWPalette {
 
     // MARK: the phone's pieces: the strip, the cards and groups, a list's rows
 
-    static let stripEdge = hex(0x3d3a49)                              // dw.ph: .chips > button border
-    static let stripFace = vertical(hex(0x2e2c38), hex(0x201e28))     // dw.ph: .chips > button background
-    static let stripSheen = rgba(255, 255, 255, 0.08)                 // dw.ph: .chips > button box-shadow
-    static let stripText = hex(0xe8e8f0)                              // dw.ph: .chips > button color
-    static let cardFace = hex(0x1c1b22)                               // dw.ph: .card background
-    static let groupFace = hex(0x17161d)                              // dw.ph: .group background
+    // (R1c - James, 25 Nov: "get rid of all the grey boxes") The phone is flat: no strip, card or group has a face, and
+    // the hairlines under them are these. A switch's and a strip's chosen line is the accent's (--acc).
+    static let stripRule = hex(0x1c1b22)                              // dw.ph: .chips box-shadow
+    static let segRule = hex(0x1c1b22)                                // dw.ph: .seg box-shadow
+    static let cardRule = hex(0x1c1b22)                               // dw.ph: .card border-bottom
+    // (R1c's review) The Mac's own: R2's card face, as R1b's phone drew its card (`.dw.ph .card`'s #1c1b22 before the
+    // flat block) - the one face still drawn in it, the Mac's (RefreshProblemNote on the Mac's Downloaded and Songs
+    // pages). Read from the rules before the flat block, so no change to the flat phone moves it: the Mac doesn't change.
+    static let macCardFace = hex(0x1c1b22)                            // dw.ph: .card background (R1b)
     static let groupRule = hex(0x23212b)                              // dw.ph: .field border-bottom
     static let rowText = hex(0xffffff)                                // dw.ph: .field > label color
     static let kvLabel = hex(0xffffff)                                // dw.ph: .kv > span:first-child color
@@ -119,15 +124,24 @@ enum DWPalette {
 
     // MARK: the phone's pieces: the mini player, the tab bar's items, the foot
 
-    static let miniFace = hex(0x1c1b22)                               // dw.ph: .mini background
-    static let miniEdge = hex(0x2a2833)                               // dw.ph: .mini border-top
+    // (R1c) The mini player, the tab bar and the foot are the page's black under (or over) a hairline - (R1c's review)
+    // the very colour of every page they sit on: `page`, `.dw.ph`'s own ground, which the album's and the playlist's
+    // pages draw on the phone now too (R5 drew them on --bg, #0b0a10, a seam against the bars' black).
+    static let page = hex(0x000000)                                   // dw.ph: .dw background
+    static let miniFace = hex(0x000000)                               // dw.ph: .mini background
+    // (R1c's review) The scrub's time tag over the mini player keeps the face it had, R1b's mini player's ground: on
+    // the flat black bar a tag of the bar's own black would be its edge alone.
+    static let scrubTagFace = hex(0x1c1b22)                           // dw.ph: .mini background (R1b)
+    static let miniEdge = hex(0x1c1b22)                               // dw.ph: .mini border-top
     static let seekTrack = hex(0x2c2a36)                              // dw.ph: .mini > .prog background
     static let seekFill = horizontal(hex(0x9333ea), hex(0xc084fc))    // dw.ph: .mini > .prog > i background
-    static let tabBarFace = hex(0x121117)                             // dw.ph: .tabbar background
-    static let tabBarEdge = hex(0x2c2a36)                             // dw.ph: .tabbar border-top
+    static let tabBarFace = hex(0x000000)                             // dw.ph: .tabbar background
+    static let tabBarEdge = hex(0x1c1b22)                             // dw.ph: .tabbar border-top
     static let tabItemText = hex(0x8a8a9c)                            // dw.ph: .tabbar > a color
-    static let footFace = hex(0x121117)                               // dw.ph: .foot2 background
-    static let footEdge = hex(0x2c2a36)                               // dw.ph: .foot2 border-top
+    // (R1c) .foot2 has no fill (`background: none`): drawn in the page's own black, so what scrolls under it
+    // doesn't show through - the same black as the page's
+    static let footFace = hex(0x000000)                               // dw.ph: .dw background
+    static let footEdge = hex(0x1c1b22)                               // dw.ph: .foot2 border-top
 
     // MARK: the phone's pieces: the switch - on in the app's own purple
 

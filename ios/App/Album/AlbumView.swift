@@ -241,9 +241,10 @@ struct AlbumView<Desk: View>: View {
         .listStyle(.plain)
         // the pull shuffles the album (never refreshes), while the page is the one on top
         .pullsToShuffle(PullShuffling(state: pull, can: can, on: shown, start: pulled))
-        // (R5) the page's ground, iAlbum's
+        // (R5) the page's ground - (R1c's review) on the phone `.dw.ph`'s black, iAlbum's, so the mini player and the tab
+        // bar sit on it with no seam; the Mac's --bg, as R5 drew it
         .scrollContentBackground(.hidden)
-        .background(DWPalette.bg)
+        .background(Platform.mac ? DWPalette.bg : DWPalette.page)
     }
 
     /// The page on top is seen (App.tsx's seenAlbum for the page on top): its New mark goes, and deadwax is told.

@@ -10,6 +10,11 @@ import SwiftUI
 /// Each segment is a button VoiceOver reads as selected when chosen (`.isSelected`). On the Mac, with the control
 /// focused, ← and → choose the one beside it - at either end the key does nothing. The phone's takes no focus: a
 /// finger's segment is its target, 44 tall at least round a smaller face.
+///
+/// (R1c - notes/ios.md "The redesign, slice R1c: the phone is flat (2026-11-25)") **On the phone it is words, with no
+/// well**: a hairline under the whole control, the chosen segment's words white over the accent's 2 pt line as wide as
+/// its segment, the others' in the second colour (`.dw.ph .seg`); and, at the accessibility sizes, each segment's words
+/// in iOS's Large Content Viewer under a held finger (R2b's review: James's 14 Nov switch had one). The Mac's is R1's.
 struct DWSegmented<Value: Hashable>: View {
     let options: [Value]
     let words: (Value) -> String
@@ -31,10 +36,58 @@ struct DWSegmented<Value: Hashable>: View {
                 .accessibilityElement(children: .contain)
                 .accessibilityLabel(spoken)
         } else {
-            segments
+            phoneSegments
                 .fixedSize(horizontal: !large, vertical: true)
                 .accessibilityElement(children: .contain)
                 .accessibilityLabel(spoken)
+        }
+    }
+
+    /// (R1c) The phone's: the segments side by side, 1 pt in from either end (where the well's edge was, so
+    /// DWSegmentedNeed measures what is drawn), over the hairline under the whole control - each chosen line over it.
+    private var phoneSegments: some View {
+        HStack(spacing: 0) {
+            ForEach(options, id: \.self) { (option: Value) in
+                phoneSegment(option)
+            }
+        }
+        .padding(.horizontal, 1)
+        .background(alignment: .bottom) {
+            // .dw.ph .seg: box-shadow inset 0 -1px 0 #1c1b22 - under the whole control, the chosen line over it
+            DWRule(colour: DWPalette.segRule)
+        }
+    }
+
+    /// (R1c) A phone segment: its words semibold (`.seg button`), white over the accent's line when chosen, else in the
+    /// second colour - the line as wide as the segment, at its foot (`.seg button.on`'s inset 0 -2px 0 var(--acc)).
+    private func phoneSegment(_ option: Value) -> some View {
+        let on = option == chosen
+        let look = DWLook.here
+        return Button {
+            chosen = option
+        } label: {
+            Text(words(option))
+                .font(Typeface.Look.text(large ? .largeSegment : .segment).weight(.semibold))
+                .foregroundStyle(on ? DWPalette.text : DWPalette.t2)
+                .lineLimit(1)
+                // .seg button: padding 0 12px; .seg.lg 0, each an equal part of the control
+                .padding(.horizontal, CGFloat(large ? look.largeSegmentPadding : look.segmentPadding))
+                .frame(maxWidth: large ? .infinity : nil)
+                .lookHeight(large ? look.largeSegmentHeight : look.segmentHeight)
+                .overlay(alignment: .bottom) {
+                    if on {
+                        Rectangle()
+                            .fill(DWPalette.acc)
+                            .frame(height: CGFloat(DWFlat.chosenLine))
+                            .accessibilityHidden(true)
+                    }
+                }
+                .contentShape(DWTarget(face: Rectangle()))
+        }
+        .buttonStyle(.plain)
+        .accessibilityAddTraits(on ? .isSelected : [])
+        .accessibilityShowsLargeContentViewer {
+            Text(words(option))
         }
     }
 
@@ -91,9 +144,11 @@ struct DWSegmented<Value: Hashable>: View {
 
 /// (the redesign, slice R2b - notes/ios.md "The redesign, slice R2b: the Library's top, one row again") What a large
 /// control of `words` needs across with its segments equal, as the phone draws it: the widest words in every segment,
-/// in a segment's face, weight and room either side (DWSegmented's), and the well's edge either side - drawn hidden,
-/// for a layout to measure (the Library's row, whose switch folds under its circles where the row can't hold it).
-/// Nothing in it is seen, touched or heard.
+/// in a segment's face, weight and room either side (DWSegmented's), and the 1 pt either end - drawn hidden, for a
+/// layout to measure (the Library's row, whose switch folds under its circles where the row can't hold it). Nothing in
+/// it is seen, touched or heard. (R1c) With no well between them a segment's words keep DWFlat's room either side
+/// (6) before the row holds them: so two neighbours' words never come closer than 12 beside the circles - folded, the
+/// control takes the page's width, and the words what room it has (R2b's review: "Playlists" had 0.7 pt to spare).
 struct DWSegmentedNeed: View {
     let words: [String]
 
@@ -108,9 +163,10 @@ struct DWSegmentedNeed: View {
                             .padding(.horizontal, CGFloat(DWLook.here.largeSegmentPadding))
                     }
                 }
+                .padding(.horizontal, CGFloat(DWFlat.segmentRoom))
             }
         }
-        // .seg: border 1px round the segments
+        // the 1 pt either end, the segments' own (R2b's well edge)
         .padding(1)
         .fixedSize()
         .hidden()

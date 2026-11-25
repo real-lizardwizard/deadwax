@@ -15,6 +15,10 @@ resolves it - each rule's selectors matched against the element a comment names,
   - Tokens only: nothing in App/Look or App/Phone writes a colour, a radius, a font or a fixed height of its own; on the
     phone a height is a minimum, grown with the text, and a finger's target is 44 at least.
   - Drawn nowhere yet: App/Phone's pieces are named only in App/Phone, and App/Look's only where the Mac's look was.
+  - (R1c, notes/ios.md "The redesign, slice R1c: the phone is flat (2026-11-25)") Flat: on the phone no shared piece
+    draws a fill or an edge but the purple and the red button, a track, a text input's well - and the pieces the slice
+    leaves as they were (the toggle, the switch, the count) and the marks (hairlines, the chosen line, a chip's dot);
+    and every place you type on the phone is still a box.
 
 The Mac's half of the same pieces is held by test_ios_mac_look.py, and who may name what by test_ios_mac_reach.py.
 """
@@ -49,6 +53,7 @@ def _load(name: str):
 reader = _load("test_ios_no_web_app")
 mac_look = _load("test_ios_mac_look")
 ios_palette = _load("test_ios_palette")
+fonts = _load("ios_fonts")
 
 
 def bare(text: str) -> str:
@@ -66,17 +71,27 @@ class Compound:
         assert found, f"not a compound selector: {text}"
         self.tag = None if found.group(1) in (None, "*") else found.group(1)
         parts = re.findall(r"\.[\w-]+|\[[^\]]*\]|::?[\w-]+(?:\([^)]*\))?", found.group(2))
-        assert not [p for p in parts if p.startswith(":not")], f"{text}: :not() is not read"
+        # :not(x) (R1c's flat block: div.well:not(.sfield), .key:not(.bare)) - one compound inside, never a list
+        nots = [p for p in parts if p.startswith(":not(")]
+        assert not [n for n in nots if "," in n or " " in n.strip()], f"{text}: only :not(<one compound>) is read"
+        self.nots = tuple(Compound(n[len(":not("):-1]) for n in nots)
         self.classes = frozenset(p[1:] for p in parts if p.startswith("."))
         self.attrs = frozenset(p for p in parts if p.startswith("["))
-        self.pseudo = frozenset(p[1:] for p in parts if p.startswith(":") and not p.startswith("::"))
+        self.pseudo = frozenset(p[1:] for p in parts if p.startswith(":") and not p.startswith("::")
+                                and not p.startswith(":not("))
         elements = [p[2:] for p in parts if p.startswith("::")]
         self.element = elements[0] if elements else None
 
     def takes(self, element: "Compound") -> bool:
         """Whether this compound, as a rule's, matches `element`."""
         return ((self.tag is None or self.tag == element.tag) and self.classes <= element.classes
-                and self.attrs <= element.attrs and self.pseudo <= element.pseudo and self.element == element.element)
+                and self.attrs <= element.attrs and self.pseudo <= element.pseudo and self.element == element.element
+                and not any(inner.names(element) for inner in self.nots))
+
+    def names(self, element: "Compound") -> bool:
+        """Whether this compound, as a :not()'s inside, names `element` - its pseudo-element aside."""
+        return ((self.tag is None or self.tag == element.tag) and self.classes <= element.classes
+                and self.attrs <= element.attrs and self.pseudo <= element.pseudo)
 
 
 def parse_selector(text: str) -> list[tuple[str | None, Compound]]:
@@ -92,8 +107,10 @@ def parse_selector(text: str) -> list[tuple[str | None, Compound]]:
 
 
 def specificity(chain: list[tuple[str | None, Compound]]) -> tuple[int, int, int]:
-    classes = sum(len(c.classes) + len(c.attrs) + len(c.pseudo) for _, c in chain)
-    tags = sum((c.tag is not None) + (c.element is not None) for _, c in chain)
+    # a :not() counts as what it holds
+    compounds = [c for _, c in chain] + [inner for _, c in chain for inner in c.nots]
+    classes = sum(len(c.classes) + len(c.attrs) + len(c.pseudo) for c in compounds)
+    tags = sum((c.tag is not None) + (c.element is not None) for c in compounds)
     return (0, classes, tags)
 
 
@@ -197,6 +214,10 @@ def css_rules(text: str) -> list[tuple[int, list[str], list[tuple[str, str]]]]:
 
 
 RULES = css_rules(DW.read_text(encoding="utf-8"))
+#? (R1c's review) the rules as R1b drew the phone: dw.css before its flat block - what a line marked `(R1b)` is read
+#? against (the Mac's own card face, the scrub tag's), so no change to the flat phone can move it
+FLAT_BLOCK = "/* The phone, flat"
+R1B_RULES = css_rules(DW.read_text(encoding="utf-8").partition(FLAT_BLOCK)[0])
 PHONE_ROOT = Compound(".dw.ph")
 MAC_ROOT = Compound(".dw")
 
@@ -241,8 +262,8 @@ LONGHAND = {"border": "border-top-color", "border-color": "border-top-color", "b
             "border-bottom": "border-bottom-color", "font": "font-size"}
 
 
-def css(selector: str, prop: str, root: Compound = PHONE_ROOT) -> str:
-    found = resolved(selector, root)
+def css(selector: str, prop: str, root: Compound = PHONE_ROOT, rules=None) -> str:
+    found = resolved(selector, root, rules)
     longhand = LONGHAND.get(prop, prop)
     assert longhand in found, f"dw.css gives {selector} no {prop} ({sorted(found)})"
     return found[longhand]
@@ -280,10 +301,13 @@ def test_the_cascade_is_specificity_then_order():
     # a child's rule only under its parent, a pseudo-element's only on it
     assert "top" not in resolved(".x", PHONE_ROOT, rules) and resolved(".p > .x", PHONE_ROOT, rules)["top"] == "6px"
     assert resolved(".x::after", PHONE_ROOT, rules)["top"] == "7px"
-    # shorthands into their longhands, a later longhand over an earlier shorthand
-    found = resolved(".chips > button.on")
+    # shorthands into their longhands, a later longhand over an earlier shorthand - on the Mac's root, where R1c's
+    # flat block (`.dw.ph .chips > .on { border: 0 }`) doesn't reach; on the phone's, that later shorthand over both
+    found = resolved(".chips > button.on", MAC_ROOT)
     assert found["border-top-color"] == "rgba(192, 132, 252, 0.5)" and found["border-top-width"] == "1px"
-    assert resolved(".chips")["padding-left"] == "16px" and resolved(".chips")["padding-bottom"] == "10px"
+    assert resolved(".chips > button.on")["border-top-width"] == "0"
+    assert resolved(".chips", MAC_ROOT)["padding-left"] == "16px" and resolved(".chips", MAC_ROOT)["padding-bottom"] == "10px"
+    assert resolved(".chips")["padding-bottom"] == "0" and resolved(".chips")["margin-bottom"] == "10px"
     # a font shorthand as its size, weight and family, `var()` read from the root's own: .count's 600 11px var(--mono)
     count = resolved(".count")
     assert (count["font-size"], count["font-weight"]) == ("11px", "600"), count
@@ -326,9 +350,17 @@ def test_dwlooks_phone_sizes_are_the_phones_rules():
     assert set(fields) - {name for name, _, _, _ in lines} == {"target", "grows"}, fields
     assert [name for name, _, _, _ in lines] == [f for f in fields if f not in ("target", "grows")], "in its order"
     for name, value, selector, prop in lines:
-        assert float(value) == px(css(selector, prop)), f"DWLook.onPhone.{name} is not .dw.ph {selector}'s {prop}"
+        found = css(selector, prop)
+        want = 0 if found == "auto" and name in AUTO_HEIGHTS else px(found)
+        assert float(value) == want, f"DWLook.onPhone.{name} is not .dw.ph {selector}'s {prop}"
+    assert {name for name, _, selector, prop in lines if css(selector, prop) == "auto"} == AUTO_HEIGHTS
     # a finger's target and the growing aren't dw.css's: iOS's 44, the build plan's "each height a minimum"
     assert re.search(r"^\s*target: 44,\n\s*grows: true\)", phone, re.M)
+
+
+#? (R1c) a height dw.css leaves to the words (`height: auto` - the flat chip's, `.dw.ph .chip`): 0 in DWLook, lookHeight's
+#? minimum of nothing, so the chip is its words' own height
+AUTO_HEIGHTS = {"chipHeight"}
 
 
 #? PhoneLook's sizes the drawings' own inline styles give, not dw.css's rules: (R2b) iLibrary's, iArtists' and
@@ -351,13 +383,59 @@ def test_phonelook_is_the_phones_rules_size_by_size():
         want = px(css(selector, prop))
         assert float(value) == (-want if name in NEGATED else want), f"PhoneLook.{name} is not .dw.ph {selector}'s {prop}"
     assert {name for name, _, source, _, _ in lines if source == "drawn"} == set(PHONE_FROM_DRAWINGS)
-    # the plan's sizes (the build plan's section 2): strip 32, card rows 44/42/46, mini player 60, tab bar 83 (items 49),
-    # foot 68, top 44, large title 34 - and the lit line 24 x 2; (R2b) the Library's row 52, its circles 34
+    # the plan's sizes (the build plan's section 2): card rows 44/42/46, mini player 60, tab bar 83 (items 49), foot 68,
+    # top 44, large title 34 - and the lit line 24 x 2; (R2b) the Library's row 52; (R1c) the strip's words 40 tall and
+    # 22 apart, and Find's and the •••'s box 36 x 34 (bare glyphs now: `.dw.ph .circ`)
     numbers = {name: float(value) for name, value, *_ in lines}
-    assert [numbers[n] for n in ("strip", "kvRow", "goRow", "mini", "tabBar", "tabItem", "foot", "top", "row", "circle",
-                                 "litLineWidth", "litLineHeight")] == [32, 42, 46, 60, 83, 49, 68, 44, 52, 34, 24, 2]
-    assert px(css(".circ", "height")) == numbers["circle"] and css(".circ", "border-radius") == "50%"
+    assert [numbers[n] for n in ("strip", "stripGap", "kvRow", "goRow", "mini", "tabBar", "tabItem", "foot", "top", "row",
+                                 "circle", "circleHeight", "litLineWidth", "litLineHeight")] == [
+        40, 22, 42, 46, 60, 83, 49, 68, 44, 52, 36, 34, 24, 2]
+    assert px(css(".circ", "width")) == numbers["circle"] and px(css(".circ", "height")) == numbers["circleHeight"]
+    assert css(".circ", "border-radius") == "50%" and px(css(".circ svg", "width")) == 21
     assert px(css(".big", "font-size")) == 34
+
+
+def test_dwflat_is_the_flat_phones_rules():
+    # (R1c) the flat phone's sizes App/Look's shared pieces draw on the phone alone, each its `.dw.ph` rule's
+    text = DWLOOK.read_text(encoding="utf-8")
+    flat_sizes = between(text, "public enum DWFlat", "public enum PhonePieceWords")
+    declared = re.findall(r"public static let (\w+)", flat_sizes)
+    lines = re.findall(r"public static let (\w+): Double = (-?[0-9.]+)\s*// dw\.ph: (.+?) ([a-z-]+)( \(R1b\))?\n",
+                       flat_sizes)
+    # (R1c's review) and one of R1c's own, said so - no dw.css rule's: the switch's room either side of its words
+    own = re.findall(r"public static let (\w+): Double = (-?[0-9.]+)\s*// own: (.+)\n", flat_sizes)
+    assert own == [("segmentRoom", "6", "the switch's room, R1c's")], own
+    assert sorted([name for name, *_ in lines] + ["segmentRoom"]) == sorted(declared) and len(declared) == 9, declared
+    # (R1c's review) and one as R1b drew the phone, read from the rules before the flat block: the New mark's face
+    assert [name for name, *_, r1b in lines if r1b] == ["facedChipHeight"]
+    assert px(css(".chip", "height", rules=R1B_RULES)) == 22 and css(".chip", "height") == "auto"
+    # the drawing's large segment has no room of its own, so the 6 is the slice's - as much as a flat button's
+    assert px(css(".seg.lg button", "padding-left")) == 0 and px(css(".btn", "padding-left")) == 6
+    assert "R1c's own room, no rule of dw.css's" in flat_sizes and "fold under the glyphs at the standard size" in flat_sizes
+    for name, value, selector, prop, r1b in lines:
+        found = css(selector, prop, rules=R1B_RULES if r1b else None)
+        if prop == "box-shadow":
+            # a line drawn as an inset shadow at the foot - `inset 0 -2px 0 <colour>` - is its thickness
+            line = re.fullmatch(r"inset 0 -(\d+)px 0 \S+", found)
+            assert line, f"DWFlat.{name}: {selector}'s box-shadow is {found}"
+            want = float(line.group(1))
+        else:
+            want = px(found)
+        assert float(value) == want, f"DWFlat.{name} is not .dw.ph {selector}'s {prop}"
+    # the faced two's room is the purple's and the red's alike; the chosen line is the switch's and the strip's
+    assert px(css(".btn.red", "padding-left")) == px(css(".btn.pri", "padding-left")) == 16
+    for selector in (".seg button.on", ".seg.lg button.on", ".chips > button.on"):
+        assert css(selector, "box-shadow") == "inset 0 -2px 0 #c084fc", selector
+    # the dot: a 6 pt round mark in the words' own colour, before the four tones' chips and never a plain one's
+    for tone in ("green", "amber", "red", "purple"):
+        dot = resolved(f".chip.{tone}::before")
+        assert (dot["width"], dot["height"], dot["border-radius"], dot["background"]) == ("6px", "6px", "50%",
+                                                                                         "currentColor"), tone
+    assert "content" not in resolved(".chip::before")
+    # the Mac draws none of them
+    mac = [path.relative_to(APP).as_posix() for path in sorted((APP / "Mac").rglob("*.swift"))
+           if "DWFlat" in bare(path.read_text(encoding="utf-8"))]
+    assert not mac, mac
 
 
 #? iOS's text styles at the standard size (test_ios_palette's), in SwiftUI's order: a size scales with the nearest,
@@ -385,10 +463,15 @@ def test_the_looks_phone_type_is_the_phones_rules_scaled():
     roles = re.findall(r"case (\w+)(?:, (\w+))?(?:, (\w+))?\n", look[look.index("enum Role"):look.index("var mac:")])
     names = [name for group in roles for name in group if name]
     phone = look[look.index("var phone:"):look.index("static func text")]
-    lines = re.findall(r"case \.(\w+): return \(([0-9.]+), \.(\w+)\)\s*// dw\.ph: (.+) (font-size|font)\n", phone)
-    assert [name for name, *_ in lines] == names and len(names) == 9, (names, lines)
-    for name, points, style, selector, prop in lines:
-        assert float(points) == px(css(selector, prop)), f"Typeface.Look {name} is not .dw.ph {selector}'s size"
+    lines = re.findall(r"case \.(\w+): return \(([0-9.]+), \.(\w+)\)\s*// dw\.ph: (.+?) (font-size|font)( \(R1b\))?\n",
+                       phone)
+    assert [name for name, *_ in lines] == names and len(names) == 10, (names, lines)
+    # (R1c's review) the New mark's faced chip, as R1b drew a chip - the rules before the flat block, 12.5 (a flat
+    # chip's is 13)
+    assert [name for name, *_, r1b in lines if r1b] == ["facedChip"]
+    for name, points, style, selector, prop, r1b in lines:
+        size = px(css(selector, prop, rules=R1B_RULES if r1b else None))
+        assert float(points) == size, f"Typeface.Look {name} is not .dw.ph {selector}'s size"
         assert style == nearest(float(points)), f"{name}: {points} scales with .{nearest(float(points))}, not .{style}"
     # the Mac's fixed, as R1's; the phone's scaled, Libre Franklin and Courier Prime
     assert "Platform.mac ? Mac.text(role.mac) : .custom(family, size: role.phone.points, relativeTo: role.phone.style)" in look
@@ -445,7 +528,7 @@ def made_colours(expression: str) -> list[tuple[int, int, int, float]]:
     return found
 
 
-PHONE_SOURCE = re.compile(r"dw\.ph: (.+?) ([a-z-]+)(?: (\d+))?")
+PHONE_SOURCE = re.compile(r"dw\.ph: (.+?) ([a-z-]+)(?: (\d+))?( \(R1b\))?")
 
 
 def palette_lines() -> dict[str, tuple[str, str]]:
@@ -463,8 +546,8 @@ def test_the_phones_colours_are_the_phones_rules():
     for name, (expression, source) in lines.items():
         found = PHONE_SOURCE.fullmatch(source)
         assert found, f"{name}: say `dw.ph: <selector> <property>` - {source}"
-        selector, prop, position = found.groups()
-        value = css(selector, prop)
+        selector, prop, position, r1b = found.groups()
+        value = css(selector, prop, rules=R1B_RULES if r1b else None)
         wanted = mac_look.colours(value)
         made = made_colours(expression)
         if expression.startswith(("vertical(", "horizontal(")):
@@ -482,8 +565,13 @@ def test_the_phones_colours_are_the_phones_rules():
         assert made == [wanted[at - 1]], f"{name}: {made} is not colour {at} of .dw.ph {selector}'s {prop} {wanted}"
         if prop == "box-shadow":
             layer = mac_look.layers(value)[at - 1]
-            kinds = [kind for kind in mac_look.SHADOW_PARTS if name.endswith(kind)]
-            assert kinds and mac_look.SHADOW_PARTS[kinds[0]](layer, made[0]), f"{name}: {layer} is no {kinds}"
+            kinds = [kind for kind in SHADOW_PARTS if name.endswith(kind)]
+            assert kinds and SHADOW_PARTS[kinds[0]](layer, made[0]), f"{name}: {layer} is no {kinds}"
+
+
+#? a box-shadow's parts, R1's - and (R1c) a Rule: the flat strip's and switch's hairline at their foot, drawn by dw.css
+#? as a 1 pt inset shadow (`inset 0 -1px 0 #1c1b22`)
+SHADOW_PARTS = {**mac_look.SHADOW_PARTS, "Rule": lambda layer, colour: bool(re.fullmatch(r"inset 0 -1px 0 \S+", layer))}
 
 
 def test_every_shared_part_the_phone_draws_otherwise_has_its_twin():
@@ -496,15 +584,33 @@ def test_every_shared_part_the_phone_draws_otherwise_has_its_twin():
         selector, prop, position = mac_look.SOURCE.fullmatch(source).groups()
         mac, phone = css(selector, prop, MAC_ROOT), css(selector, prop)
         if position:
-            # a box-shadow's layer: that layer alone
-            mac, phone = mac_look.layers(mac)[int(position) - 1], mac_look.layers(phone)[int(position) - 1]
+            # a box-shadow's layer: that layer alone - none on the phone where its shadow has fewer
+            at = int(position) - 1
+            phone_layers = mac_look.layers(phone)
+            mac, phone = mac_look.layers(mac)[at], phone_layers[at] if at < len(phone_layers) else "none"
         if mac != phone:
             differ.append(name)
+            if name in FLAT:
+                # (R1c) a part the flat phone has none of: no fill, no edge, no shadow - a flat button's words the accent
+                if name == "buttonText":
+                    assert phone == resolved(".dw")["--acc"], f"{name}: {phone}"
+                elif prop.startswith("border"):
+                    assert resolved(selector)["border-top-width"] == "0", f"{name}: .dw.ph {selector} keeps an edge"
+                else:
+                    assert phone == "none", f"{name}: .dw.ph {selector}'s {prop} is {phone}"
+                continue
             assert source[len("dw: "):] in twins, f"{name}: .dw.ph {selector}'s {prop} is {phone}, not {mac} - no twin"
-    assert sorted(differ) == ["primaryEdge", "primaryFace", "primarySheen"], differ
+    assert sorted(set(differ) - FLAT) == ["primaryEdge", "primaryFace", "primarySheen"], differ
+    assert FLAT <= set(differ), FLAT - set(differ)
     # and no phone rule redefines a token: one set for both
     assert not [n for _, selectors, declarations in RULES if any(s.startswith(".dw.ph") for s in selectors)
                 for n, _ in declarations if n.startswith("--")]
+
+
+#? (R1c) the Mac's parts the flat phone draws nowhere - a secondary button's face, edge, sheen, drop and words, and the
+#? tinted chips' fills and edges - its pieces drawing no face there (test_the_phone_is_flat)
+FLAT = {"buttonEdge", "buttonFace", "buttonSheen", "buttonDrop", "buttonText", "amberEdge", "amberFill", "greenEdge",
+        "greenFill", "redChipEdge", "redChipFill"}
 
 
 #? the phone's purple: the app's own (PrimaryButton, held to theme.css by test_ios_palette.py), made from it - never
@@ -625,7 +731,7 @@ def test_app_look_and_app_phone_hold_their_files():
     files = look_and_phone()
     assert sorted(name for name in files if name.startswith("Look/")) == [
         f"Look/DW{n}.swift" for n in sorted(("Palette", "Corners", "Raised", "ButtonStyle", "Field", "Chip", "Segmented",
-                                             "PopUp", "ToggleStyle", "Meter"))]
+                                             "PopUp", "ToggleStyle", "Meter", "WellField"))]
     assert sorted(name for name in files if name.startswith("Phone/")) == [
         f"Phone/Phone{n}.swift" for n in sorted(("Strip", "Top", "TabItem", "Mini", "Card", "Switch", "Foot", "Meta"))]
 
@@ -675,8 +781,14 @@ FIXED = {
     "Phone/PhoneSwitch.swift": ["width: CGFloat(PhoneLook.knob), height: CGFloat(PhoneLook.knob)",
                                 "width: CGFloat(PhoneLook.switchWidth), height: CGFloat(PhoneLook.switchHeight)"],
     "Phone/PhoneFoot.swift": ["height: keyboardUp ? 0 : height"],
-    #? (R2b) the Library's circles: a mark's 34 pt face, R1b's switch's kind, in a finger's 44 pt target round it
-    "Phone/PhoneTop.swift": ["width: face, height: face", "width: target, height: target"],
+    #? (R2b) the Library's circles, R1b's switch's kind, in a finger's 44 pt target round them - (R1c) bare glyphs now,
+    #? centred in the 36 x 34 box the circle was
+    "Phone/PhoneTop.swift": ["width: face, height: tall", "width: target, height: target"],
+    #? (R1c) the chosen one's 2 pt accent line - a mark, drawn at its size whatever the text's - and a chip's dot, grown
+    #? with the text by its own @ScaledMetric
+    "Phone/PhoneStrip.swift": ["height: CGFloat(DWFlat.chosenLine)"],
+    "Look/DWSegmented.swift": ["height: CGFloat(DWFlat.chosenLine)"],
+    "Look/DWChip.swift": ["width: dot, height: dot"],
     #? (R8) a meter: its fill's width the share of its track, and its height DWLook's - on the phone grown with the text
     #? by its own @ScaledMetric, so a minimum would only let it stretch
     "Look/DWMeter.swift": ["width: track.size.width * share", "height: height"],
@@ -747,6 +859,7 @@ def test_a_fingers_target_is_44_at_least():
     files = {name: bare(text) for name, text in look_and_phone().items()}
     for name, wanted in (("Look/DWButtonStyle.swift", ".contentShape(DWTarget(face: DWCorners.buttonShape))"),
                          ("Look/DWField.swift", ".contentShape(DWTarget(face: DWCorners.buttonShape))"),
+                         ("Look/DWWellField.swift", ".contentShape(DWTarget(face: DWCorners.buttonShape))"),
                          ("Look/DWSegmented.swift", ".contentShape(DWTarget(face: Rectangle()))"),
                          ("Look/DWToggleStyle.swift", ".contentShape(DWTarget(face: DWCorners.boxShape))"),
                          ("Phone/PhoneStrip.swift", ".contentShape(DWTarget(face: DWCorners.buttonShape))"),
@@ -755,15 +868,38 @@ def test_a_fingers_target_is_44_at_least():
                          ("Phone/PhoneTabItem.swift", ".lookHeight(PhoneLook.tabItem)"),
                          ("Phone/PhoneSwitch.swift", ".lookHeight(DWLook.here.target)")):
         assert wanted in files[name], f"{name}: {wanted}"
+    # (R1c) a flat button's target is a faced one's: both bodies' shape the same DWTarget
+    assert files["Look/DWButtonStyle.swift"].count(".contentShape(DWTarget(face: DWCorners.buttonShape))") == 2
+    # (R1c's review) and 44 wide at least, as a faced one's face is: a flat button's words alone can be narrower than a
+    # finger - Up Next's Edit, 37.5 with its room (Libre Franklin's "Edit" at .btn.sm's 13.5, and 6 either side) - so
+    # its frame is a target wide: drawn that wide, never reached past sideways
+    style = files["Look/DWButtonStyle.swift"]
+    flat_body = re.sub(r"\s+", " ", style[style.index("private struct DWFlatButtonBody"):style.index("private struct DWButtonBody")])
+    assert re.search(r"let look = DWLook\.here .*\.frame\(minWidth: CGFloat\(look\.target\), maxWidth: fills \? \.infinity : nil\) "
+                     r"\.lookHeight\([^()]*\) \.contentShape\(DWTarget\(face: DWCorners\.buttonShape\)\)", flat_body), flat_body
+    assert fonts.words("Edit", 13.5, "medium") + 2 * 6 < 44
+    # the strip's buttons touch: each one's target is its words and half the gap either side (the gap theirs, the
+    # HStack's spacing none, the row's sides the strip's 16 less that half), 44 wide at least - Queue | Info | EQ's EQ,
+    # at 15, is 43 with its room - and the shown one's line is drawn before that room, as wide as the words
+    strip = re.sub(r"\s+", " ", files["Phone/PhoneStrip.swift"])
+    assert "HStack(spacing: 0) {" in strip and "HStack(spacing: CGFloat" not in strip
+    assert "private var room: CGFloat { CGFloat(PhoneLook.stripGap) / 2 }" in strip
+    assert ".padding(.horizontal, CGFloat(PhoneLook.stripSide) - room)" in strip
+    line = strip.index(".overlay(alignment: .bottom) {")
+    room = strip.index(".padding(.horizontal, room) .frame(minWidth: CGFloat(DWLook.here.target)) "
+                       ".contentShape(DWTarget(face: DWCorners.buttonShape))")
+    assert line < room and "DWFlat.chosenLine" in strip[line:room] and strip.count(".padding(.horizontal, room)") == 1
+    assert px(css(".chips", "gap")) / 2 < px(css(".chips", "padding-left"))
+    assert fonts.words("EQ", 15, "medium") + px(css(".chips", "gap")) < 44
     # a field's target is its well's, under the field, and a tap there puts the cursor in it
     field = files["Look/DWField.swift"]
     well = re.sub(r"\s+", " ", field[field.index(".background {", field.index("struct DWField")):field.index("struct DWFieldRow")])
     assert ("DWWell(focused: focused) .contentShape(DWTarget(face: DWCorners.buttonShape)) .onTapGesture { focused = true }"
             in well), well
-    # and no other button is drawn in them
+    # and no other button is drawn in them - (R1c) DWSegmented's two its devices' segments, the Mac's and the phone's
     buttons = {name: len(re.findall(r"\bButton\s*(\{|\(action:)", code)) for name, code in files.items()}
     assert {name: count for name, count in buttons.items() if count} == {
-        "Look/DWSegmented.swift": 1, "Phone/PhoneStrip.swift": 1, "Phone/PhoneTop.swift": 1,
+        "Look/DWSegmented.swift": 2, "Phone/PhoneStrip.swift": 1, "Phone/PhoneTop.swift": 1,
         "Phone/PhoneTabItem.swift": 1, "Phone/PhoneSwitch.swift": 1}, buttons
 
 
@@ -790,9 +926,11 @@ def test_the_phones_pieces_read_and_grow_as_the_plan_says():
     chips = resolved(".chips")
     assert chips["display"] == "flex" and chips.get("justify-content", "normal") in ("normal", "flex-start", "start")
     # the scroll view takes no touch outside itself: the row is padded by the target's reach, so the scroll view holds
-    # every button's whole 44, and the strip is drawn as tall as its faces again
-    assert ".padding(.horizontal, CGFloat(PhoneLook.stripSide)) .padding(.vertical, reach)" in flat
-    assert ".padding(.vertical, -reach) .padding(.bottom, CGFloat(PhoneLook.stripFoot))" in flat
+    # every button's whole 44, and the strip is drawn as tall as its words again - (R1c) its hairline at their foot, the
+    # strip's 10 under it
+    assert ".padding(.horizontal, CGFloat(PhoneLook.stripSide) - room) .padding(.vertical, reach)" in flat
+    assert (".padding(.vertical, -reach) .background(alignment: .bottom) { DWRule(colour: DWPalette.stripRule) } "
+            ".padding(.bottom, CGFloat(PhoneLook.stripFoot))") in flat
     assert "CGFloat(DWLook.here.reach(PhoneLook.strip))" in flat
     # a legend, a title and a large title are headers; a fact's row and a row that goes somewhere are one element
     card = files["Phone/PhoneCard.swift"]
@@ -840,6 +978,9 @@ def test_the_phones_pieces_read_and_grow_as_the_plan_says():
     seg = files["Look/DWSegmented.swift"]
     phone = seg[seg.index("} else {"):seg.index("private var segments")]
     assert ".focusable()" not in phone and ".arrowKeys" not in phone
+    # (R1c; R2b's review) a phone segment's words in iOS's Large Content Viewer under a held finger, as the tab bar's
+    segment = re.sub(r"\s+", " ", phone[phone.index("private func phoneSegment("):])
+    assert ".accessibilityShowsLargeContentViewer { Text(words(option)) }" in segment
     # the Mac's toggle keeps its dot; the phone's .tog.sm draws none
     assert "if on, Platform.mac {" in files["Look/DWToggleStyle.swift"]
     assert resolved(".tog.sm.on::after")["display"] == "none"
@@ -850,16 +991,28 @@ def test_the_phones_pieces_read_and_grow_as_the_plan_says():
 #? every place App/Look's shared pieces part by device, line by line - a half swapped (`!Platform.mac`), added or
 #? dropped is a change here. App/Phone parts by none: it is the phone's alone.
 BRANCHES = {
+    #? (R1c) on the phone the flat body for every kind but the purple and the red, and the faced two's room of 16
     "Look/DWButtonStyle.swift": [
+        "if Platform.mac || kind == .pri || kind == .danger {",
+        "if !Platform.mac {",
         "case .normal, .on: return size == .large && !Platform.mac ? .semibold : .medium",
         "case .pri: return Platform.mac ? DWPalette.primaryText : DWPalette.phonePrimaryText",
         "if Platform.mac {"],
+    #? (R1c) the Mac's chip faced, the phone's words after a dot - (R1c's review) but for a chip that keeps its face (the
+    #? New mark), drawn as R1b drew a chip on the phone: its type and its height the phone's own there
+    "Look/DWChip.swift": ["if Platform.mac || keepsFace {",
+                          ".font(Typeface.Look.text(Platform.mac ? .chip : .facedChip).weight(.semibold))",
+                          ".lookHeight(Platform.mac ? DWLook.here.chipHeight : DWFlat.facedChipHeight)"],
     "Look/DWCorners.swift": [f"static var {n}: CGFloat {{ Platform.mac ? Mac.{n} : Phone.{n} }}"
                              for n in ("button", "box", "chip", "meter", "meterFill")],
     "Look/DWField.swift": ["if Platform.mac {"],
+    #? (R1c) the caret after a pop-up's words: the Mac's button words' colour, the phone's flat button's accent
+    "Look/DWPopUp.swift": ["DWCaret(colour: Platform.mac ? DWPalette.buttonText : DWPalette.acc)"],
     "Look/DWRaised.swift": ["static var here: DWLook { .of(Platform.device) }"],
     "Look/DWSegmented.swift": ["if Platform.mac {", ".frame(maxWidth: large && !Platform.mac ? .infinity : nil)"],
     "Look/DWToggleStyle.swift": ["if on, Platform.mac {"],
+    #? (R1c's review) a page's own field on the look's well on the phone; on the Mac the field as its page drew it
+    "Look/DWWellField.swift": ["if Platform.mac {"],
 }
 
 
@@ -906,7 +1059,50 @@ def test_each_device_half_of_the_shared_pieces_draws_its_own():
     button = re.sub(r"\s+", " ", files["Look/DWButtonStyle.swift"])
     assert "var fills = false" in button
     assert ".fixedSize(horizontal: !fills, vertical: false)" in button and ".frame(maxWidth: fills ? .infinity : nil)" in button
-    assert button.count("fixedSize") == 1
+    # (R1c) in both bodies, the faced one's and the flat one's
+    assert button.count("fixedSize") == 2 and button.count(".fixedSize(horizontal: !fills, vertical: false)") == 2
+    # (R1c) a button's body by device and kind: the Mac's every kind and the phone's purple and red faced, as R1b drew
+    # them; the phone's others flat - the accent's words, medium (semibold when on or large), faded while held
+    dispatch = button[button.index("@ViewBuilder func makeBody("):button.index("struct DWFlatButtonBody")]
+    assert ("if Platform.mac || kind == .pri || kind == .danger { DWButtonBody(configuration: configuration, kind: kind, "
+            "size: size, fills: fills) } else { DWFlatButtonBody(configuration: configuration, on: kind == .on, "
+            "size: size, fills: fills) }") in dispatch
+    flat_button = button[button.index("struct DWFlatButtonBody"):button.index("struct DWButtonBody")]
+    for part in (".font(Typeface.Look.text(role).weight(on || size == .large ? .semibold : .medium))",
+                 ".foregroundStyle(DWPalette.acc)", ".lookHeight(size == .small ? look.smallButtonHeight "
+                 ": size == .large ? look.largeButtonHeight : look.buttonHeight)",
+                 ".opacity(enabled && !configuration.isPressed ? 1 : DWPalette.off)"):
+        assert part in flat_button, part
+    # its room either side, a flat button's, DWLook's; the faced two's DWFlat's on the phone, R1's on the Mac
+    padding = button[button.index("private var padding: Double {"):button.index("private var weight")]
+    assert re.match(r"private var padding: Double \{ if !Platform\.mac \{ switch size \{ case \.standard: return "
+                    r"DWFlat\.facedPadding case \.small: return DWFlat\.smallFacedPadding case \.large: return "
+                    r"DWFlat\.largeFacedPadding \} \} let look = DWLook\.here", padding), padding
+    # a chip: on the Mac R1's face; on the phone its words after a dot, which only a tone that means something draws
+    chip = files["Look/DWChip.swift"]
+    mac, phone = halves(chip, "if Platform.mac || keepsFace {")
+    assert (mac, phone) == (" faced ", " flat "), (mac, phone)
+    faced = re.sub(r"\s+", " ", chip[chip.index("private var faced"):chip.index("private var text")])
+    assert ".background(fill, in: DWCorners.chipShape) .overlay(DWCorners.chipShape.strokeBorder(edge, lineWidth: 1))" in faced
+    # (R1c's review) a chip that keeps its face is the New mark alone, on the phone as R1b drew it: 12.5 semibold, 22
+    # tall at least, 7 either side, its tone's fill and edge - the purple's (`.chip.purple`), on the window's ground
+    assert ("Text(words) .font(Typeface.Look.text(Platform.mac ? .chip : .facedChip).weight(.semibold)) "
+            ".foregroundStyle(text) .lineLimit(1) .fixedSize() .padding(.horizontal, 7) "
+            ".lookHeight(Platform.mac ? DWLook.here.chipHeight : DWFlat.facedChipHeight)") in faced, faced
+    assert "var keepsFace = false" in chip
+    keeping = {path.relative_to(APP).as_posix(): len(re.findall(r"keepsFace: true", bare(path.read_text(encoding="utf-8"))))
+               for path in sorted(APP.rglob("*.swift"))}
+    assert {name: count for name, count in keeping.items() if count} == {"Library/LibraryTiles.swift": 1}
+    tiles = re.sub(r"\s+", " ", bare((APP / "Library" / "LibraryTiles.swift").read_text(encoding="utf-8")))
+    assert ("struct LibraryNewMark: View { var body: some View { DWChip(words: LibraryWords.newMark, tone: .marked, "
+            "keepsFace: true) .background(DWPalette.bg, in: DWCorners.chipShape)") in tiles
+    assert (resolved(".chip", rules=R1B_RULES)["padding-left"], resolved(".chip", rules=R1B_RULES)["font-size"]) == (
+        "7px", "12.5px")
+    flat_chip = re.sub(r"\s+", " ", chip[chip.index("private var flat"):chip.index("private var faced")])
+    assert ("HStack(spacing: CGFloat(DWFlat.dotGap)) { if tone != .plain { Circle() .fill(text) "
+            ".frame(width: dot, height: dot) .accessibilityHidden(true) }") in flat_chip, flat_chip
+    assert ".background" not in flat_chip and "strokeBorder" not in flat_chip
+    assert "@ScaledMetric(relativeTo: .footnote) private var dot = CGFloat(DWFlat.dot)" in chip
     # the segmented control: on the Mac R1's - its own width, the keyboard's focus, ← and →; on the phone its own width
     # (`large` across the page) and no focus
     seg = files["Look/DWSegmented.swift"]
@@ -914,14 +1110,461 @@ def test_each_device_half_of_the_shared_pieces_draws_its_own():
     for part in ("segments .fixedSize() .focusable() .focused($focused) .focusEffectDisabled() .arrowKeys",
                  ".accessibilityElement(children: .contain) .accessibilityLabel(spoken)"):
         assert part in mac, part
-    assert phone == (" segments .fixedSize(horizontal: !large, vertical: true) .accessibilityElement(children: .contain) "
-                     ".accessibilityLabel(spoken) "), phone
+    assert phone == (" phoneSegments .fixedSize(horizontal: !large, vertical: true) "
+                     ".accessibilityElement(children: .contain) .accessibilityLabel(spoken) "), phone
     # the toggle's dot is the Mac's (.tog.on::after); the phone's .tog.sm draws none
     mac, phone = halves(files["Look/DWToggleStyle.swift"], "if on, Platform.mac {")
     assert "Circle() .fill(DWPalette.acc) .frame(width: 4, height: 4) .offset(y: 7)" in mac and phone == ""
     assert px(css(".tog.on::after", "bottom", MAC_ROOT)) == -7 and px(css(".tog.on::after", "width", MAC_ROOT)) == 4
     # and nothing in App/Phone parts by device at all
     assert not [name for name, code in files.items() if name.startswith("Phone/") and "Platform." in code]
+
+
+# ----------------------------------------------------------------------------- flat (R1c)
+
+def phone_path(code: str) -> str:
+    """The code as the phone runs it: each `if Platform.mac { A } else { B }` (or `if <x>, Platform.mac {`) as B, and
+    as nothing where there is no else - and (R1c's review) `if Platform.mac || <x> {` as `if <x> {`, both halves kept."""
+    while True:
+        either = re.search(r"\bif Platform\.mac \|\| ([^{]+)\{", code)
+        if either:
+            code = code[:either.start()] + f"if {either.group(1)}{{" + code[either.end():]
+            continue
+        found = re.search(r"\bif (?:\w+, )?Platform\.mac \{", code)
+        if not found:
+            return code
+        opened = code.index("{", found.start())
+        end = reader.closing(code, opened)
+        rest = code[end + 1:]
+        if re.match(r"\s*else \{", rest):
+            start = end + 1 + rest.index("{")
+            close = reader.closing(code, start)
+            code = code[:found.start()] + code[start + 1:close] + code[close + 1:]
+        else:
+            code = code[:found.start()] + code[end + 1:]
+
+
+def cut(code: str, start: str, opener: str = "{") -> str:
+    """The code without the declaration (or the call) that starts at the pattern `start`: up to its brace's (or its
+    parenthesis') close."""
+    found = re.search(start, code)
+    assert found, start
+    opened = code.index(opener, found.start())
+    return code[:found.start()] + code[reader.closing(code, opened) + 1:]
+
+
+#? what the phone never runs of App/Look's shared pieces, though it is not inside an `if Platform.mac`: the Mac's
+#? segments (named from their Mac half alone - held below), and the faced button body's .normal and .on faces (the
+#? phone sends only the purple and the red to that body - DWButtonStyle's dispatch, held by
+#? test_each_device_half_of_the_shared_pieces_draws_its_own). (R1c's review) The chip's face is no longer here: the
+#? phone draws it for the New mark (`keepsFace`)
+MAC_ONLY = {
+    "Look/DWSegmented.swift": [(r"private var segments: some View \{", "{"),
+                               (r"private func segment\(_ option: Value\) -> some View \{", "{")],
+    "Look/DWButtonStyle.swift": [(r"case \.normal:\s*DWRaised\(", "("), (r"case \.on:\s*DWRaised\(", "(")],
+}
+
+#? a fill, a face or an edge, or a hairline - each drawing call, with the colours it names
+DRAWS = re.compile(r"(\.fill|\.background|\.strokeBorder|\.stroke|\bDWRaised|\bDWWell|\bDWRule)\(")
+
+
+def drawn(code: str) -> list[str]:
+    """Each fill, face, edge and rule the code draws: the call, then the colours it is given."""
+    found = []
+    for match in DRAWS.finditer(code):
+        opened = match.end() - 1
+        arguments = re.sub(r"\s+", " ", code[opened + 1:reader.closing(code, opened)]).strip()
+        colours = re.findall(r"\bDWPalette\.\w+", arguments)
+        call = match.group(1).lstrip(".")
+        if call == "background" and not colours and not re.match(r"\w+(,|$)", arguments):
+            continue  # a background's alignment, its content drawn by the calls inside it
+        found.append(f"{call}: {', '.join(colours) or arguments}")
+    return found
+
+
+#? everything App/Look's and App/Phone's pieces draw on the phone that has a fill or an edge, in each file's order.
+#? James, 25 Nov: "get rid of all the grey boxes" - so only these, each for the reason beside it:
+#?   the primary and the destructive button (the purple, the red); a sunken track (the meter's, the seek line's); a
+#?   text input's well (DWField's, DWWell, DWWellField's); what the slice leaves as it was (the toggle, the switch, the
+#?   count badge and the New mark's face - the brief's "unchanged"); the marks (a hairline, the chosen line in the
+#?   accent, a chip's dot, the lit line, the pop-up's caret); and DWRaised itself, which draws only what a caller gives it
+FLAT_DRAWS = {
+    "Look/DWButtonStyle.swift": [
+        # the purple, PrimaryButton's own, and the red
+        "DWRaised: DWPalette.phonePrimaryPressedFace, DWPalette.phonePrimaryFace, DWPalette.phonePrimarySheen, "
+        "DWPalette.phonePrimaryPressedEdge, DWPalette.phonePrimaryEdge, DWPalette.phonePrimaryDrop",
+        "DWRaised: DWPalette.redFace, DWPalette.buttonSheen, DWPalette.redEdge, DWPalette.buttonDrop"],
+    # the dot (in its words' colour); (R1c's review) a chip that keeps its face, the New mark's on a cover, as R1b's -
+    # the only caller is LibraryNewMark (held by test_each_device_half_of_the_shared_pieces_draws_its_own); the count
+    # badge, unchanged
+    "Look/DWChip.swift": ["fill: text", "background: fill, in: DWCorners.chipShape", "strokeBorder: edge, lineWidth: 1",
+                          "background: DWPalette.countFill", "strokeBorder: DWPalette.countEdge"],
+    # a text input's well - and a field's row's hairline
+    "Look/DWField.swift": ["fill: DWPalette.well, DWPalette.wellShade", "strokeBorder: DWPalette.acc, DWPalette.line",
+                           "DWWell: focused: focused", "DWRule: DWPalette.groupRule"],
+    # the meter: a sunken track and its fill, unchanged
+    "Look/DWMeter.swift": ["fill: DWPalette.well, DWPalette.meterShade", "strokeBorder: DWPalette.line", "fill: fill"],
+    "Look/DWPopUp.swift": ["fill: colour"],
+    "Look/DWRaised.swift": ["fill: face", "fill: face", "fill: face.shadow(.inner(color: sheen, radius: 0, x: 0, y: 1))",
+                            "strokeBorder: edge, lineWidth: 1"],
+    # the hairline under the switch, the chosen one's line in the accent
+    "Look/DWSegmented.swift": ["DWRule: DWPalette.segRule", "fill: DWPalette.acc"],
+    # the toggle, unchanged (drawn on no phone screen since R2b)
+    "Look/DWToggleStyle.swift": ["fill: DWPalette.selbg", "strokeBorder: DWPalette.selbd"],
+    # (R1c's review) a page's own field on the look's well: a text input's box
+    "Look/DWWellField.swift": ["DWWell: focused: focus.wrappedValue == field"],
+    # a card's hairline under it, a group's rows' under each
+    "Phone/PhoneCard.swift": ["DWRule: DWPalette.cardRule", "DWRule: DWPalette.groupRule", "DWRule: DWPalette.groupRule"],
+    "Phone/PhoneFoot.swift": ["DWRule: DWPalette.footEdge"],
+    # the hairline over the mini player, and its seek line's played part (the scrubber, unchanged)
+    "Phone/PhoneMini.swift": ["DWRule: DWPalette.miniEdge", "fill: DWPalette.seekFill"],
+    "Phone/PhoneStrip.swift": ["DWRule: DWPalette.stripRule", "fill: DWPalette.acc"],
+    # the switch, unchanged: on in the app's purple, off sunken, its knob
+    "Phone/PhoneSwitch.swift": ["fill: DWPalette.switchFace, DWPalette.switchShade", "strokeBorder: DWPalette.switchEdge",
+                                "fill: DWPalette.switchOffFace, DWPalette.switchShade",
+                                "strokeBorder: DWPalette.switchOffEdge", "fill: DWPalette.switchKnob, DWPalette.switchOffKnob"],
+    # the lit line over the tab shown
+    "Phone/PhoneTabItem.swift": ["fill: DWPalette.acc"],
+}
+
+
+def test_the_phone_is_flat():
+    found = {}
+    for name, text in look_and_phone().items():
+        code = phone_path(bare(text))
+        for start, opener in MAC_ONLY.get(name, []):
+            code = cut(code, start, opener)
+        draws = drawn(code)
+        if draws:
+            found[name] = draws
+    assert found == FLAT_DRAWS, {name: draws for name, draws in found.items() if draws != FLAT_DRAWS.get(name)}
+    # what MAC_ONLY takes out is the Mac's alone: the Mac's segments named from their Mac half - and (R1c's review) the
+    # faced chip reached on the phone only by a chip that keeps its face
+    files = {name: bare(text) for name, text in look_and_phone().items()}
+    chip, seg = files["Look/DWChip.swift"], files["Look/DWSegmented.swift"]
+    assert len(re.findall(r"\bfaced\b", chip)) == 2 and halves(chip, "if Platform.mac || keepsFace {")[0] == " faced "
+    assert len(re.findall(r"\bsegments\b", seg)) == 2 and halves(seg, "if Platform.mac {")[0].startswith(" segments ")
+    assert len(re.findall(r"\bsegment\(", seg)) == 2 and "segment(option)" in seg[seg.index("private var segments"):
+                                                                                     seg.index("private func segment(")]
+    # and the matcher finds a face planted on the phone's path, and none on the Mac's
+    planted = bare("if Platform.mac { x.background(DWPalette.buttonFace) } else { x.background(DWPalette.cardRule) }")
+    assert drawn(phone_path(planted)) == ["background: DWPalette.cardRule"]
+    # and both halves of an `if Platform.mac || <x>`, which the phone runs either way <x> says
+    planted = bare("if Platform.mac || keep { x.background(DWPalette.buttonFace) } else { x.background(DWPalette.line) }")
+    assert drawn(phone_path(planted)) == ["background: DWPalette.buttonFace", "background: DWPalette.line"]
+    # the grounds the phone's bars stand on are the page's own black (`.dw.ph .mini`, `.tabbar`), never a grey bar's
+    lines = palette_lines()
+    black = mac_look.colours(css(".mini", "background"))
+    assert black == [(0, 0, 0, 1.0)] == mac_look.colours(css(".tabbar", "background"))
+    for ground in ("page", "miniFace", "tabBarFace", "footFace"):
+        assert made_colours(lines[ground][0]) == black, ground
+    assert re.search(r"var body: some View \{\s*DWPalette\.miniFace", files["Phone/PhoneMini.swift"])
+    # (R1c's review) and the very colour of every page they sit on: `.dw.ph`'s own ground, which the album's and the
+    # playlist's pages draw on the phone too now (R5 drew them on --bg, #0b0a10 - a seam against the bars); every other
+    # phone page is iOS's own black under the app's dark scheme
+    assert lines["page"][1] == "dw.ph: .dw background" and css(".dw", "background") == "#000"
+    for page in ("Album/AlbumView.swift", "Playlists/PlaylistView.swift"):
+        code = bare((APP / page).read_text(encoding="utf-8"))
+        assert code.count(".background(Platform.mac ? DWPalette.bg : DWPalette.page)") == 1, page
+        assert ".background(DWPalette.bg)" not in code, page
+    # the two colours read from the rules as R1b drew the phone, each where the flat phone no longer draws it: the Mac's
+    # own card face (RefreshProblemNote's Mac half) and the scrub's time tag over the mini player
+    r1b = {name: source for name, (_, source) in lines.items() if source.endswith(" (R1b)")}
+    assert r1b == {"macCardFace": "dw.ph: .card background (R1b)",
+                   "scrubTagFace": "dw.ph: .mini background (R1b)"}, r1b
+    assert css(".card", "background", rules=R1B_RULES) == css(".mini", "background", rules=R1B_RULES) == "#1c1b22"
+    assert css(".card", "background") == "none" and css(".mini", "background") == "#000"
+    uses = {name: [path.relative_to(APP).as_posix() for path in sorted(APP.rglob("*.swift"))
+                   if re.search(rf"\bDWPalette\.{name}\b", bare(path.read_text(encoding="utf-8")))]
+            for name in r1b}
+    assert uses == {"macCardFace": ["Library/AlbumsScreen.swift"], "scrubTagFace": ["Player/MiniPlayerView.swift"]}, uses
+    albums = re.sub(r"\s+", " ", bare((APP / "Library" / "AlbumsScreen.swift").read_text(encoding="utf-8")))
+    note = albums[albums.index("struct RefreshProblemNote"):]
+    assert halves(note, "if Platform.mac {")[0].strip().endswith(".background(DWPalette.macCardFace, in: DWCorners.boxShape)")
+    # (R1c's review) the two other Library one-offs, flat on the phone: Downloaded's first ask a PhoneCard with Not Now a
+    # flat button (its toggled fill and SecondaryPill the Mac's halves alone), and an empty library's See All music a
+    # flat button (`.bordered`, the system's grey, the Mac's alone) - each Mac half pinned in test_ios_mac_halves.py
+    first = albums[albums.index("struct FirstAskCard"):albums.index("private var ask: some View")]
+    mac, phone = halves(first, "if Platform.mac {")
+    assert phone == " PhoneCard { ask } .accessibilityElement(children: .contain) .padding(.bottom, 12) ", phone
+    assert "Palette.toggledFill" in mac and "toggledFill" not in phone
+    buttons = albums[albums.index("private var buttons: some View"):]
+    mac, phone = halves(buttons, "if Platform.mac {")
+    assert phone == " Button(AutoDownloadWords.notNow) { asked = true } .buttonStyle(DWButtonStyle()) ", phone
+    assert ".buttonStyle(SecondaryPill())" in mac
+    empty = albums[albums.index("struct EmptyLibraryNote"):]
+    mac, phone = halves(empty, "if Platform.mac {")
+    assert phone == " StoreAlbumsLink { Text(LibraryWords.seeAllMusic) } .buttonStyle(DWButtonStyle()) ", phone
+    assert ".buttonStyle(.bordered)" in mac
+    mini = re.sub(r"\s+", " ", bare((APP / "Player" / "MiniPlayerView.swift").read_text(encoding="utf-8")))
+    assert (".padding(.vertical, 3) .background(DWPalette.scrubTagFace, in: DWCorners.chipShape) "
+            ".overlay(DWCorners.chipShape.strokeBorder(DWPalette.line,") in mini
+
+
+#? (R1c; James, 25 Nov: "actually any place you can input text should be a box") every place you type on the phone, by
+#? file in the order it draws them, and the box each is in - read from the field itself (R1c's review: a file-wide
+#? look passed a field with its box taken away, another box in the file answering for it):
+#?   the look's sunken well - DWWell drawn under the field by its own chain (DWField's), by a modifier it names
+#?   (DWWellField's: a playlist's Edit, the manual search) or by the stack it shares with its glyph (the Library's Find);
+#?   the app's own box - a fill and an edge in the field's own chain or a modifier it names (sign-in's FieldLook, Sources'
+#?   query);
+#?   iOS's own box - no plain style taking it away, and every way the field is reached held in a Form, a List that
+#?   isn't plain, an alert or a .searchable (Platform's searchField on the phone): walked out from the field through its
+#?   blocks, and on through each use of the view or the helper it is declared in (TYPING_HOPS at most).
+#? R1c left iOS's own as they were: Settings', People's, the editors' and the EQ's are wave D's slices.
+WELL, OWN, SYSTEM = "the look's well", "the app's own box", "iOS's own box"
+TEXT_INPUTS = {
+    "Artist/ArtistImagesSheet.swift": [SYSTEM], "Artist/ArtistMoveSheet.swift": [SYSTEM],
+    "EQ/EQCorrectionScreen.swift": [SYSTEM], "EQ/EQFilterEditor.swift": [SYSTEM], "EQ/EQNameAlert.swift": [SYSTEM],
+    "Edit/ChooseFolderView.swift": [SYSTEM], "Edit/ReleasePage.swift": [SYSTEM, SYSTEM], "Edit/TagsPages.swift": [SYSTEM],
+    # (R1c's review) Artist and Album on the look's wells, in a flat sheet
+    "Get/ManualSearchSheet.swift": [WELL, WELL], "Get/SourcesSheet.swift": [OWN],
+    "Library/AlbumsScreen.swift": [SYSTEM], "Library/ArtistsScreen.swift": [SYSTEM], "Library/LibraryView.swift": [WELL],
+    "Library/SongsScreen.swift": [SYSTEM], "Look/DWField.swift": [WELL],
+    "Manage/LibraryCareScreen.swift": [SYSTEM], "Manage/PeopleScreen.swift": [SYSTEM],
+    "Manage/PeopleSheets.swift": [SYSTEM] * 7, "Manage/ServerSettingsGroupScreen.swift": [SYSTEM, SYSTEM],
+    "Playlists/PlaylistPicker.swift": [SYSTEM],
+    # (R1c's review) Edit's name and description: a plain List's rows draw no box, so the look's wells
+    "Playlists/PlaylistView.swift": [WELL, WELL],
+    "Root/ServerAddressView.swift": [SYSTEM], "Root/SignInView.swift": [OWN, OWN],
+    "Search/PressingPickerSheet.swift": [SYSTEM],
+    # Search's field: Platform's searchField - on the phone .searchable's, held below
+    "Search/SearchScreen.swift": [SYSTEM],
+    "You/ChangePasswordScreen.swift": [SYSTEM] * 3,
+}
+TYPING = re.compile(r"\b(?:TextField|SecureField|TextEditor)\(|\.searchable\(|\.searchField\(")
+TYPING_HOPS = 3
+#? a block whose head is a presentation's root: what is in it is held by nothing further out
+PRESENTED = re.compile(r"(\.sheet\(|\.fullScreenCover\(|\.popover\(|\bNavigationStack\s*)[^{}]*$")
+#? iOS's own boxes, as the walk names them
+SYSTEM_HOLDERS = {"Form", "List", "alert", "searchable"}
+
+
+def typing_files() -> dict[str, str]:
+    """Every phone file's code alone (the Mac's own pages aside: R1's fields, held by test_ios_mac_look.py)."""
+    files = {}
+    for path in sorted(APP.rglob("*.swift")):
+        name = path.relative_to(APP).as_posix()
+        if not (name.startswith("Mac/") or name == "Root/MacSidebarView.swift"):
+            files[name] = bare(path.read_text(encoding="utf-8"))
+    return files
+
+
+def chain(code: str, at: int) -> str:
+    """The modifiers chained on from `at` (just past a call or a block): each `.name`, its arguments and a closure on its
+    own line."""
+    start = at
+    while True:
+        found = re.match(r"\s*\.(\w+)", code[at:])
+        if not found:
+            return code[start:at]
+        at += found.end()
+        while True:
+            follow = re.match(r"\s*(<[^<>]*>)?\s*([({])", code[at:])
+            if not follow or (follow.group(2) == "{" and code[at:at + follow.end()].count("\n") > 1):
+                break
+            at = reader.closing(code, at + follow.end() - 1) + 1
+
+
+def past_call(code: str, at: int) -> int:
+    """Past the call that starts at `at` (`TextField(`...`)`), and a closure trailing it."""
+    end = reader.closing(code, code.index("(", at)) + 1
+    follow = re.match(r"\s*\{", code[end:])
+    return reader.closing(code, end + follow.end() - 1) + 1 if follow else end
+
+
+def blocks_around(code: str, at: int) -> list[tuple[int, str]]:
+    """Each `{` holding `at`, innermost first: where it is, and its head (back to the brace before it)."""
+    found, depth = [], 0
+    for i in range(at - 1, -1, -1):
+        if code[i] == "}":
+            depth += 1
+        elif code[i] == "{":
+            if depth:
+                depth -= 1
+            else:
+                found.append((i, code[max(code.rfind("{", 0, i), code.rfind("}", 0, i)) + 1:i]))
+    return found
+
+
+def modifiers_named(files: dict[str, str], text: str) -> str:
+    """The bodies of the ViewModifiers `text` names (`.modifier(FieldLook())`, `.modifier(DWWellField(`...)."""
+    bodies = []
+    for modifier in re.findall(r"\.modifier\((\w+)\(", text):
+        found = [re.search(rf"\bstruct {modifier}\b[^{{]*: ViewModifier \{{", other) for other in files.values()]
+        found = [(other, match) for other, match in zip(files.values(), found) if match]
+        assert len(found) == 1, f"the modifier {modifier}"
+        other, match = found[0]
+        bodies.append(other[match.start():reader.closing(other, match.end() - 1) + 1])
+    return " ".join(bodies)
+
+
+def dressed(files: dict[str, str], name: str, at: int) -> str:
+    """What the field at `at` is drawn in: its own chain and the bodies of the modifiers that chain names."""
+    own = chain(files[name], past_call(files[name], at))
+    return own + " " + modifiers_named(files, own)
+
+
+def held_by(files: dict[str, str], name: str, at: int, hops: int = 0) -> list[str]:
+    """What holds the place you type at `at`: one word for each way it is reached - "Form", "List", "List .plain",
+    "alert", "searchable", or "nothing (why)" - walking out through its blocks, then to each use of the view or helper
+    it is declared in."""
+    code = files[name]
+    if re.match(r"\.(searchable|searchField)\(", code[at:]):
+        return ["searchable"]
+    for brace, head in blocks_around(code, at):
+        if re.search(r"\bForm\s*(\([^()]*\))?\s*$", head):
+            return ["Form"]
+        if re.search(r"\bList\s*(\([^()]*\))?\s*$", head):
+            return ["List .plain" if ".listStyle(.plain)" in chain(code, reader.closing(code, brace) + 1) else "List"]
+        if re.search(r"\.alert\([^{}]*\)\s*$", head):
+            return ["alert"]
+        if PRESENTED.search(head):
+            return [f"nothing ({name}: a presentation's root)"]
+        # what the block declares: the last func, struct or computed var in its head (a `var x = ...` before it, as
+        # `@Bindable var model = model` in a helper's body, is a value, not the block's)
+        declarations = [found for found in re.finditer(r"\b(func|var|struct)\s+(\w+)", head)
+                        if not (found.group(1) == "var" and re.match(r"\s*(?::[^=\n]*)?=", head[found.end():]))]
+        if not declarations:
+            continue
+        kind, what = declarations[-1].groups()
+        if kind == "var" and what == "body":
+            continue
+        if hops >= TYPING_HOPS:
+            return [f"nothing ({name}: {what}, too far)"]
+        if kind == "struct":
+            uses = [(other, use.start()) for other, text in files.items() for use in re.finditer(rf"\b{what}\(", text)]
+        else:
+            pattern = rf"\b{what}\(" if kind == "func" else rf"\b{what}\b(?!\s*:)"
+            uses = [(name, use.start()) for use in re.finditer(pattern, code)
+                    if not brace - len(head) <= use.start() < brace]
+        return [way for other, use in uses for way in held_by(files, other, use, hops + 1)] or [
+            f"nothing ({name}: {what} unused on the phone)"]
+    return [f"nothing ({name})"]
+
+
+def boxes(files: dict[str, str], name: str) -> list[tuple[int, str, list[str]]]:
+    """Each place you type in `name`: its line, what it is drawn in, and what holds it."""
+    code = files[name]
+    found = []
+    for match in TYPING.finditer(code):
+        dress = "" if match.group(0).startswith(".") else dressed(files, name, match.start())
+        around = blocks_around(code, match.start())
+        if around and re.search(r"\bHStack\s*(\([^()]*\))?\s*$", around[0][1]):
+            # the stack it shares with a glyph (the Library's Find: the magnifying glass and the field on one well)
+            dress += " " + chain(code, reader.closing(code, around[0][0]) + 1)
+        found.append((code.count("\n", 0, match.start()) + 1, dress, held_by(files, name, match.start())))
+    return found
+
+
+def box_of(dress: str, holders: list[str]) -> str | None:
+    """Which box a place you type is in, from what it is drawn in and what holds it - None for none."""
+    flat = re.sub(r"\s+", " ", dress)
+    if "DWWell(" in flat and ".textFieldStyle(.plain)" in flat:
+        return WELL
+    if re.search(r"\.background\((?!alignment)[^)]", flat) and ".strokeBorder(" in flat:
+        return OWN
+    if ".textFieldStyle(" not in flat and holders and set(holders) <= SYSTEM_HOLDERS:
+        return SYSTEM
+    return None
+
+
+def test_every_place_you_type_on_the_phone_is_still_a_box():
+    files = typing_files()
+    found = {}
+    for name in files:
+        for line, dress, holders in boxes(files, name):
+            found.setdefault(name, []).append((line, box_of(dress, holders), holders))
+    assert {name: [box for _, box, _ in places] for name, places in found.items()} == TEXT_INPUTS, {
+        name: places for name, places in found.items()
+        if [box for _, box, _ in places] != TEXT_INPUTS.get(name)}
+    # the look's well, under the field: DWField's and the Library's Find - a plain field on DWWell's sunken box - and
+    # (R1c's review) DWWellField's, on the phone alone: the Mac draws the field as its page did
+    field = re.sub(r"\s+", " ", files["Look/DWField.swift"])
+    assert ".textFieldStyle(.plain)" in field and "DWWell(focused: focused)" in field
+    library = re.sub(r"\s+", " ", files["Library/LibraryView.swift"])
+    assert ".textFieldStyle(.plain)" in library and "DWWell(focused: findFocused)" in library
+    well_field = re.sub(r"\s+", " ", files["Look/DWWellField.swift"])
+    mac, phone = halves(well_field, "if Platform.mac {")
+    assert mac == " content ", mac
+    # its focus is the page's - the field's own `.focused`, both devices' (the Mac's Tab and a sheet's first cursor need
+    # it there): DWWellField reads it for the edge and sets it from a tap, and never binds it again
+    assert ".focused(" not in well_field
+    assert re.match(r" content \.textFieldStyle\(\.plain\) \.font\(Typeface\.Look\.text\(\.field\)\) "
+                    r"\.foregroundStyle\(DWPalette\.fieldText\) \.focusEffectDisabled\(\) "
+                    r"\.padding\(\.horizontal, 8\) \.padding\(\.vertical, lines \? 8 : 0\) "
+                    r"\.lookHeight\(DWLook\.here\.fieldHeight\) \.background \{ DWWell\(focused: focus\.wrappedValue == field\) "
+                    r"\.contentShape\(DWTarget\(face: DWCorners\.buttonShape\)\) \.onTapGesture \{ focus\.wrappedValue = field \} \} $",
+                    phone), phone
+    # a playlist's Edit: its two fields each on a well of its own, the description's growing a line at a time
+    playlist = re.sub(r"\s+", " ", files["Playlists/PlaylistView.swift"])
+    assert ".modifier(DWWellField(focus: $typing, field: .name))" in playlist
+    assert ".modifier(DWWellField(focus: $typing, field: .description, lines: true))" in playlist
+    # each its own focus, which the well reads: the name's, then the description's, once each
+    assert re.findall(r"\.focused\(\$typing, equals: \.(\w+)\)", playlist) == ["name", "description"]
+    for kind, call in (("name", "TextField(PlaylistWords.nameField"),
+                       ("description", "TextField(PlaylistWords.descriptionField")):
+        own = playlist[playlist.index(call):playlist.index(f"field: .{kind}")]
+        assert f".focused($typing, equals: .{kind})" in own, kind
+    # the manual search: flat - no Form (so no grey cells), on the page's black under its bar and as the sheet's ground
+    # - its two fields the look's wells, each prompt in the third colour, the footer in the second, the purple Search
+    manual = re.sub(r"\s+", " ", files["Get/ManualSearchSheet.swift"])
+    assert not re.search(r"\b(Form|Section|List)\b|listRowBackground", manual)
+    assert "NavigationStack { ScrollView { VStack(alignment: .leading, spacing: 0) {" in manual
+    assert ".background(DWPalette.page.ignoresSafeArea())" in manual and ".presentationBackground(DWPalette.page)" in manual
+    for kind in ("artist", "album"):
+        assert f".modifier(DWWellField(focus: $focused, field: .{kind}))" in manual, kind
+        # its focus the sheet's own, as A1 made it, right before its Tab (test_ios_mac's): the well reads it
+        assert manual.count(f".focused($focused, equals: .{kind})") == 1, kind
+        assert f".focused($focused, equals: .{kind}) .tabs($focused, in: Self.order)" in manual, kind
+    assert manual.count("prompt: Text(ManualSearch.") == 2 and manual.count(".foregroundStyle(DWPalette.t3)") == 2
+    assert "Text(ManualSearch.footer) .font(Typeface.footnote) .foregroundStyle(DWPalette.t2)" in manual
+    assert "Button(ManualSearch.search, action: search) .buttonStyle(PrimaryFace())" in manual
+    # Search's field on the phone is iOS's own search field in the navigation bar (Platform's phone half), as before
+    platform = re.sub(r"\s+", " ", bare((APP / "Shared" / "Platform.swift").read_text(encoding="utf-8")))
+    assert ("func searchField(text: Binding<String>, prompt: String) -> some View { searchable(text: text, "
+            "placement: .navigationBarDrawer(displayMode: .always), prompt: Text(prompt)) }") in platform
+    # the well itself is a box: the well's fill, its inner shadow and an edge (the accent's while focused) - dw.css's
+    # .in on the phone, unchanged by the flat block
+    well = re.sub(r"\s+", " ", files_well())
+    assert ".fill(DWPalette.well.shadow(.inner(color: DWPalette.wellShade" in well, well
+    assert ".strokeBorder(focused ? DWPalette.acc : DWPalette.line, lineWidth: 1)" in well, well
+    entry = resolved(".in")
+    assert (entry["background"], entry["border-top-width"], entry["border-top-color"]) == ("#09080d", "1px", "#2c2a36")
+    assert entry["box-shadow"] == "inset 0 1px 2px rgba(0, 0, 0, 0.7)"
+    assert resolved("div.well.sfield")["background"] == "#09080d" and px(css("div.well.sfield", "height")) == 40
+    # and Requests' Search Soulseek… is flat: a row in the accent on its hairline, no face
+    requests = re.sub(r"\s+", " ", bare((APP / "Requests" / "RequestsScreen.swift").read_text(encoding="utf-8")))
+    row = requests[requests.index("private var manualSearch: some View {"):requests.index("private func notice(")]
+    assert ".foregroundStyle(DWPalette.acc)" in row and ".buttonStyle(.plain)" in row
+    assert "DWRule(colour: DWPalette.rowRule)" in row and not re.search(r"DWRaised|\.background\(|\.fill\(", row)
+
+
+def test_the_walk_finds_each_box_from_the_field_itself():
+    # the walk reads each field's own box, not its file's: another box in the file never answers for it
+    files = {
+        "A.swift": bare("struct A: View {\n var body: some View {\n VStack {\n Text(x)\n .background(Color.red)\n"
+                        " .overlay(Rectangle().strokeBorder(Color.blue))\n TextField(a, text: $a)\n } } }\n"),
+        "B.swift": bare("struct B: View {\n var body: some View {\n NavigationStack {\n Form {\n Section {\n"
+                        " field\n } } } }\n private var field: some View {\n TextField(b, text: $b)\n } }\n"),
+        "C.swift": bare("struct C: View {\n var body: some View {\n List {\n TextField(c, text: $c)\n"
+                        " .modifier(Boxed())\n }\n .listStyle(.plain)\n } }\n"
+                        "private struct Boxed: ViewModifier {\n func body(content: Content) -> some View {\n content\n"
+                        " .background(Color.gray, in: Rectangle())\n .overlay(Rectangle().strokeBorder(Color.white))\n"
+                        " } }\n"),
+        "D.swift": bare("struct D: View {\n var body: some View {\n List {\n TextField(d, text: $d)\n }\n"
+                        " .listStyle(.plain)\n .sheet(isPresented: $e) {\n TextField(e, text: $e)\n } } }\n"),
+    }
+    found = {name: [box_of(dress, holders) for _, dress, holders in boxes(files, name)] for name in files}
+    assert found == {"A.swift": [None], "B.swift": [SYSTEM], "C.swift": [OWN], "D.swift": [None, None]}, found
+    assert boxes(files, "B.swift")[0][2] == ["Form"] and boxes(files, "D.swift")[0][2] == ["List .plain"]
+
+
+def files_well() -> str:
+    """DWWell's body: the look's sunken box."""
+    code = bare((LOOK_DIR / "DWField.swift").read_text(encoding="utf-8"))
+    at = code.index("struct DWWell")
+    return code[at:reader.closing(code, code.index("{", at)) + 1]
 
 
 # ----------------------------------------------------------------------------- drawn nowhere yet
@@ -947,7 +1590,8 @@ def declared(folder: Path) -> set[str]:
 #? (its groups, the switch, the output's button, the curve's well, the sliders' faces), and the sheet's ground (DWPalette)
 #? R4: the mini player (PhoneMiniGround, PhoneLook's sizes, DWPalette's seek line) and the tab bar (PhoneLitLine, DWCount)
 #? R5: an album's page and a playlist's on the phone (iAlbum, iPlaylist - their heroes, rows and ground), and the Add to
-#? a playlist sheet's shared buttons (PlaylistPicker's NewPlaylistFields, the Look's alone)
+#? a playlist sheet's shared buttons (PlaylistPicker's NewPlaylistFields, the Look's alone); (R1c's review) Requests'
+#? manual search sheet (its two wells, DWWellField, and the page's black)
 R2_LIBRARY = {"Library/LibraryTop.swift", "Library/LibraryView.swift", "Library/LibraryTiles.swift",
               "Library/AlbumsScreen.swift", "Library/ArtistsScreen.swift", "Library/SongsScreen.swift",
               "Playlists/PlaylistsScreen.swift", "Library/LibraryLine.swift"}
@@ -960,7 +1604,8 @@ PHONE_PIECES_DRAWN_IN: set[str] = {"Player/NowPlayingSheet.swift", "Player/NowPl
                                    "Requests/RequestCards.swift", "Requests/RequestsScreen.swift"} | SLICES
 LOOK_PIECES_DRAWN_IN = {"Root/MacSidebarView.swift", "Root/DesktopFrame.swift", "Player/PlayerBar.swift",
                         "Player/MacPanels.swift", "Player/NowPlayingView.swift", "Requests/RequestCards.swift",
-                        "Requests/RequestsScreen.swift"} | SLICES | {"Playlists/PlaylistPicker.swift"}
+                        "Requests/RequestsScreen.swift"} | SLICES | {"Playlists/PlaylistPicker.swift",
+                                                                     "Get/ManualSearchSheet.swift"}
 
 
 def test_the_phones_pieces_are_drawn_nowhere_yet():
@@ -971,7 +1616,7 @@ def test_the_phones_pieces_are_drawn_nowhere_yet():
     look = declared(LOOK_DIR) - {"here"}
     assert {"DWPalette", "DWCorners", "DWRaised", "DWRule", "DWButtonStyle", "DWWell", "DWField", "DWFieldRow", "DWChip",
             "DWCount", "DWSegmented", "DWPopUp", "DWCaret", "DWToggleStyle", "DWTarget", "lookHeight",
-            "lookSquare", "DWMeter"} <= look, look
+            "lookSquare", "DWMeter", "DWWellField"} <= look, look
     phone_use = re.compile(r"\bTypeface\.Phone\b|\bPhoneLook\b|\bPhonePieceWords\b|\b(" + "|".join(sorted(phone, key=len, reverse=True)) + r")\b")
     look_use = re.compile(r"\bTypeface\.Look\b|\bDWLook\b|\bDWLook\.here\b|\b(" + "|".join(sorted(look, key=len, reverse=True))
                           + r")\b")

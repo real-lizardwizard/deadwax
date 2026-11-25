@@ -531,9 +531,9 @@ struct EQScreen: View {
 
     // MARK: the phone's groups (R3b, iEQ)
 
-    /// iEQ: the output, the curve in its well and the line under it, then the groups - Correction, Tone, Preamp (in
-    /// Advanced), Other outputs, Advanced - and Forget This Output, on the panel's ground. The same sections as the List,
-    /// each control the same call.
+    /// iEQ: the output, the curve and the line under it, then the groups - Correction, Tone, Preamp (in Advanced), Other
+    /// outputs, Advanced - and Forget This Output, on the panel's ground. The same sections as the List, each control
+    /// the same call.
     private func cardsPage(_ page: EQPage, output: EQOutput, setting: EQOutputSetting, connected: Bool,
                            advanced: Bool) -> some View {
         let key = output.key
@@ -591,9 +591,10 @@ struct EQScreen: View {
         }
     }
 
-    /// The curve in a well (iEQ's `.well`), "Not connected: …" above it for an output that isn't, and the line under it
-    /// - with, for an admin, the engine's own words when its unit couldn't be made. In Advanced 220 pt with the
-    /// correction's handles, as the List's.
+    /// The curve (R1c - notes/ios.md "The redesign, slice R1c: the phone is flat (2026-11-25)": on the page, no well -
+    /// `.dw.ph div.well:not(.sfield)`), "Not connected: …" above it for an output that isn't, and the line under it -
+    /// with, for an admin, the engine's own words when its unit couldn't be made. In Advanced 220 pt with the
+    /// correction's handles, as the List's. Its lines keep the well's colours (`well: true`), the drawing's own.
     private func curveWell(_ output: EQOutput, setting: EQOutputSetting, connected: Bool, held: Bool,
                            advanced: Bool) -> some View {
         let key = output.key
@@ -605,7 +606,6 @@ struct EQScreen: View {
             EQCurveView(drawing: eq.drawing(key), name: output.name, animated: !held,
                         height: advanced ? 220 : EQCurveView.height,
                         handles: advanced ? handles(output, correction: setting.correction) : nil, well: true)
-                .background { DWWell() }
             cardNote(line.text, colour: Self.cardColour(line.tone), above: 0)
             if line.tone == .danger, server.access.seesDetail, let problem = eq.unitProblem {
                 Text(problem)

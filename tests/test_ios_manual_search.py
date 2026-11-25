@@ -112,7 +112,7 @@ def test_return_in_search_soulseek_moves_on_or_searches_and_nothing_else():
     artist = sheet[sheet.index("TextField(ManualSearch.artistField"):sheet.index("TextField(ManualSearch.albumField")]
     assert ".onSubmit { focused = .album }" in artist and ".submitLabel(.next)" in artist
     album = sheet[sheet.index("TextField(ManualSearch.albumField"):]
-    assert album.index(".onSubmit { search() }") < album.index("} footer: {") and ".submitLabel(.search)" in album
+    assert album.index(".onSubmit { search() }") < album.index("Text(ManualSearch.footer)") and ".submitLabel(.search)" in album
     # Search is the words as typed, a new search each time - the Get is a card's, never the form's
     search = _body(sheet, "private func search() {")
     assert search.split("\n", 1)[1].lstrip().startswith("guard searchable, !showing else { return }")

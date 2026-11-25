@@ -464,32 +464,49 @@ struct LibraryLayoutSwitch: View {
 /// app opens to music. Its title, its line with the storage limit, Turn On (the
 /// accent) and Not Now; either answer puts it away for good (AutoDownload.askedKey). Not shown while downloads can't be
 /// used, or with the switch already on. The setting is in You > Downloads either way.
+///
+/// (R1c's review - notes/ios.md "The redesign, slice R1c: the phone is flat (2026-11-25)") On the phone no face: a card
+/// of the page's (PhoneCard - 14 above and below, a hairline under it), Turn On the purple and Not Now a flat button's
+/// words in the accent. On the Mac's Downloaded page, which borrows it, the card as it was (its fill, the pill).
 struct FirstAskCard: View {
     @Environment(DownloadModel.self) private var downloads
     @AppStorage(AutoDownload.askedKey) private var asked = false
 
     var body: some View {
         if !asked, downloads.isOpen, !downloads.follower.on {
-            let scope = downloads.libraryScope
-            VStack(alignment: .leading, spacing: 10) {
-                Text(AutoDownloadWords.askTitle(scope, device: Platform.device))
-                    .font(Typeface.headline)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .accessibilityAddTraits(.isHeader)
-                Text(AutoDownloadWords.askLine(scope, limit: downloads.storageLimit, device: Platform.device))
-                    .font(Typeface.subheadline)
-                    .foregroundStyle(Palette.quiet)
-                    .fixedSize(horizontal: false, vertical: true)
-                ViewThatFits(in: .horizontal) {
-                    HStack(spacing: 12) { buttons }
-                    VStack(alignment: .leading, spacing: 10) { buttons }
+            if Platform.mac {
+                ask
+                    .padding(14)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(Corners.cardShape.fill(Palette.toggledFill))
+                    .accessibilityElement(children: .contain)
+                    .padding(.bottom, 12)
+            } else {
+                PhoneCard {
+                    ask
                 }
+                .accessibilityElement(children: .contain)
+                .padding(.bottom, 12)
             }
-            .padding(14)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(Corners.cardShape.fill(Palette.toggledFill))
-            .accessibilityElement(children: .contain)
-            .padding(.bottom, 12)
+        }
+    }
+
+    /// The ask itself: its title, its line, its two buttons - side by side where they fit.
+    private var ask: some View {
+        let scope = downloads.libraryScope
+        return VStack(alignment: .leading, spacing: 10) {
+            Text(AutoDownloadWords.askTitle(scope, device: Platform.device))
+                .font(Typeface.headline)
+                .fixedSize(horizontal: false, vertical: true)
+                .accessibilityAddTraits(.isHeader)
+            Text(AutoDownloadWords.askLine(scope, limit: downloads.storageLimit, device: Platform.device))
+                .font(Typeface.subheadline)
+                .foregroundStyle(Palette.quiet)
+                .fixedSize(horizontal: false, vertical: true)
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: 12) { buttons }
+                VStack(alignment: .leading, spacing: 10) { buttons }
+            }
         }
     }
 
@@ -500,8 +517,14 @@ struct FirstAskCard: View {
             downloads.follower.on = true
         }
         .buttonStyle(PrimaryFace())
-        Button(AutoDownloadWords.notNow) { asked = true }
-            .buttonStyle(SecondaryPill())
+        if Platform.mac {
+            Button(AutoDownloadWords.notNow) { asked = true }
+                .buttonStyle(SecondaryPill())
+        } else {
+            // (R1c's review) a flat button: its words in the accent, no face
+            Button(AutoDownloadWords.notNow) { asked = true }
+                .buttonStyle(DWButtonStyle())
+        }
     }
 }
 
@@ -589,7 +612,8 @@ private struct StoreAlbumsLink<Content: View>: View {
 }
 
 /// Your library empty (EmptyLibrary): what is empty - `lead`, your albums' or (slice 4) your artists' - how to fill it,
-/// and See All music.
+/// and See All music. (R1c's review) On the phone See All music is a flat button's words in the accent, no face (it was
+/// the system's bordered grey); on the Mac, should it ever be drawn there, the bordered button as before.
 struct EmptyLibraryNote: View {
     var lead = LibraryWords.emptyLibrary
 
@@ -598,23 +622,45 @@ struct EmptyLibraryNote: View {
             Text(lead)
             Text(LibraryWords.emptyLibraryHow)
                 .foregroundStyle(Palette.quiet)
-            StoreAlbumsLink {
-                Text(LibraryWords.seeAllMusic)
+            if Platform.mac {
+                StoreAlbumsLink {
+                    Text(LibraryWords.seeAllMusic)
+                }
+                .buttonStyle(.bordered)
+                .buttonBorderShape(Corners.controlBorder)
+            } else {
+                StoreAlbumsLink {
+                    Text(LibraryWords.seeAllMusic)
+                }
+                .buttonStyle(DWButtonStyle())
             }
-            .buttonStyle(.bordered)
-            .buttonBorderShape(Corners.controlBorder)
         }
         .fixedSize(horizontal: false, vertical: true)
         .padding(.top, 8)
     }
 }
 
-/// A list that couldn't be asked again, drawn as it was (COULDNT_REFRESH), with the error and Try again.
+/// A list that couldn't be asked again, drawn as it was (COULDNT_REFRESH), with the error and Try again. (R1c - notes/ios.md
+/// "The redesign, slice R1c: the phone is flat (2026-11-25)") On the phone a card with no face (PhoneCard: 14 above and
+/// below, a hairline under it); on the Mac's Downloaded and Songs pages, which borrow it, R2's card as it was.
 struct RefreshProblemNote: View {
     let failure: any Error
     let retry: () -> Void
 
     var body: some View {
+        if Platform.mac {
+            words
+                .padding(12)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(DWPalette.macCardFace, in: DWCorners.boxShape)
+        } else {
+            PhoneCard {
+                words
+            }
+        }
+    }
+
+    private var words: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text(LibraryWords.couldntRefresh)
                 .font(Typeface.callout.weight(.medium))
@@ -622,9 +668,6 @@ struct RefreshProblemNote: View {
             ErrorNote(failure, retry: true)
             Button(LibraryWords.tryAgain, action: retry)
         }
-        .padding(12)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(DWPalette.cardFace, in: DWCorners.boxShape)
     }
 }
 

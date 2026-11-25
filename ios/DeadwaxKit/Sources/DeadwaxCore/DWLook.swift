@@ -24,7 +24,8 @@ public struct DWLook: Equatable, Sendable {
     public let buttonHeight: Double
     public let smallButtonHeight: Double
     public let largeButtonHeight: Double
-    /// The room either side of a button's words (.btn's padding), a small one's and a large one's.
+    /// The room either side of a button's words (.btn's padding), a small one's and a large one's - on the phone a flat
+    /// button's (R1c; the faced ones' are DWFlat's).
     public let buttonPadding: Double
     public let smallButtonPadding: Double
     public let largeButtonPadding: Double
@@ -40,7 +41,7 @@ public struct DWLook: Equatable, Sendable {
 
     // MARK: chips, counts, segments, the toggle
 
-    /// .chip and .count.
+    /// .chip and .count. (R1c) The phone's chip is words with no face (`height: auto`): 0, its words' own height.
     public let chipHeight: Double
     public let countHeight: Double
     /// .seg button and .seg.lg button: a segment and a large one, and the room either side of their words.
@@ -123,22 +124,23 @@ public struct DWLook: Equatable, Sendable {
         target: 0,
         grows: false)
 
-    /// The phone's: dw.css's `.dw.ph` rules, the later winning.
+    /// The phone's: dw.css's `.dw.ph` rules, the later winning. (R1c) The phone is flat: a button's room either side
+    /// is a flat one's, words with no face (`.dw.ph .btn`); the faced two, the purple and the red, keep DWFlat's.
     static let onPhone = DWLook(
         buttonHeight: 36,                               // dw.ph: .btn height
         smallButtonHeight: 32,                          // dw.ph: .btn.sm height
         largeButtonHeight: 48,                          // dw.ph: .btn.lg height
-        buttonPadding: 13,                              // dw.ph: .btn padding-left
-        smallButtonPadding: 11,                         // dw.ph: .btn.sm padding-left
-        largeButtonPadding: 13,                         // dw.ph: .btn.lg padding-left
+        buttonPadding: 6,                               // dw.ph: .btn padding-left
+        smallButtonPadding: 6,                          // dw.ph: .btn.sm padding-left
+        largeButtonPadding: 6,                          // dw.ph: .btn.lg padding-left
         fieldHeight: 36,                                // dw.ph: .in height
         fieldRowHeight: 44,                             // dw.ph: .field min-height
         labelWidth: 88,                                 // dw.ph: .field > label width
-        chipHeight: 22,                                 // dw.ph: .chip height
+        chipHeight: 0,                                  // dw.ph: .chip height
         countHeight: 17,                                // dw.ph: .count height
         segmentHeight: 28,                              // dw.ph: .seg button height
         segmentPadding: 12,                             // dw.ph: .seg button padding-left
-        largeSegmentHeight: 38,                         // dw.ph: .seg.lg button height
+        largeSegmentHeight: 40,                         // dw.ph: .seg.lg button height
         largeSegmentPadding: 0,                         // dw.ph: .seg.lg button padding-left
         toggleSize: 28,                                 // dw.ph: .tog.sm width
         rowHeight: 48,                                  // dw.ph: .row height
@@ -147,6 +149,34 @@ public struct DWLook: Equatable, Sendable {
         meterHeight: 8,                                 // dw.ph: .meter height
         target: 44,
         grows: true)
+}
+
+/// (The redesign, slice R1c - notes/ios.md "The redesign, slice R1c: the phone is flat (2026-11-25)"; James, 25 Nov: "on
+/// ios, I want to try to get rid of all the grey boxes") The flat phone's sizes that App/Look's shared pieces draw on the
+/// phone alone, each a `.dw.ph` rule's - kept apart from DWLook, whose parts both devices hold. The Mac draws none of
+/// them.
+public enum DWFlat {
+    /// The faced buttons' room either side of their words, every size (`.btn.pri`, and `.btn.red` as much): a flat
+    /// button's is DWLook's.
+    public static let facedPadding: Double = 16         // dw.ph: .btn.pri padding-left
+    public static let smallFacedPadding: Double = 16    // dw.ph: .btn.sm.pri padding-left
+    public static let largeFacedPadding: Double = 16    // dw.ph: .btn.lg.pri padding-left
+    /// The accent's line under the chosen one - a switch's segment, a strip's words.
+    public static let chosenLine: Double = 2            // dw.ph: .seg button.on box-shadow
+    /// The least room a large switch keeps either side of its words before it folds (DWSegmentedNeed), so two
+    /// neighbouring words never come closer than twice it. (R1c's review) **R1c's own room, no rule of dw.css's**: the
+    /// drawing's `.seg.lg button` has none (padding 0), so the slice chose 6, as much as a flat button's (`.dw.ph .btn`'s,
+    /// DWLook's buttonPadding). It is what
+    /// makes the four pages' switch (logins off, the break-glass sign-in) fold under the glyphs at the standard size
+    /// (notes/ios.md R1c's departures).
+    public static let segmentRoom: Double = 6           // own: the switch's room, R1c's
+    /// A status chip: the dot before its words, between the two, and the room either side of it.
+    public static let dot: Double = 6                   // dw.ph: .chip.green::before width
+    public static let dotGap: Double = 6                // dw.ph: .chip gap
+    public static let chipSide: Double = 5              // dw.ph: .chip margin-left
+    /// (R1c's review) A chip that keeps R1b's face on the phone (the New mark - DWChip's `keepsFace`): 22 tall at least,
+    /// R1b's `.dw.ph .chip`, as it was before the flat block made a chip as tall as its words.
+    public static let facedChipHeight: Double = 22      // dw.ph: .chip height (R1b)
 }
 
 /// The phone's own pieces' words (App/Phone), the phone's alone.
@@ -162,13 +192,13 @@ public enum PhonePieceWords {
 public enum PhoneLook {
     // MARK: the one-tap strip (.chips)
 
-    /// A strip's button, and the room either side of its words.
-    public static let strip: Double = 32                // dw.ph: .chips > button height
-    public static let stripPadding: Double = 12         // dw.ph: .chips > button padding-left
-    /// Between the buttons, the strip's sides and its foot.
-    public static let stripGap: Double = 6              // dw.ph: .chips gap
+    /// A strip's words (R1c: no face), and the room either side of them - none: the gap between them is the room.
+    public static let strip: Double = 40                // dw.ph: .chips > button height
+    public static let stripPadding: Double = 0          // dw.ph: .chips > button padding-left
+    /// Between the words, the strip's sides, and under its hairline.
+    public static let stripGap: Double = 22             // dw.ph: .chips gap
     public static let stripSide: Double = 16            // dw.ph: .chips padding-left
-    public static let stripFoot: Double = 10            // dw.ph: .chips padding-bottom
+    public static let stripFoot: Double = 10            // dw.ph: .chips margin-bottom
 
     // MARK: the compact top (.topbar, .big)
 
@@ -209,15 +239,16 @@ public enum PhoneLook {
 
     // MARK: cards and groups (.card, .group, .kv, .go)
 
-    /// Inside a card.
-    public static let cardPadding: Double = 12          // dw.ph: .card padding-top
-    /// A group: the room above it (its legend's), inside its edge either side and at its ends.
+    /// (R1c) Above and below a card's words, which sit on the page over its hairline - none at its sides.
+    public static let cardPadding: Double = 14          // dw.ph: .card padding-top
+    /// A group: the room above it (its heading's), either side (R1c: none - no edge) and at its ends.
     public static let groupAbove: Double = 28           // dw.ph: .group margin-top
-    public static let groupSide: Double = 12            // dw.ph: .group padding-left
+    public static let groupSide: Double = 0             // dw.ph: .group padding-left
     public static let groupEnds: Double = 2             // dw.ph: .group padding-top
-    /// The legend: how far above the group it stands, in from its side, and its line.
+    /// The heading (R1c: the legend, with no panel under it): how far above the group it stands, in from its side,
+    /// and its line.
     public static let legendLift: Double = 23           // dw.ph: .group > .legend top
-    public static let legendSide: Double = 2            // dw.ph: .group > .legend left
+    public static let legendSide: Double = 0            // dw.ph: .group > .legend left
     public static let legendLine: Double = 16           // dw.ph: .group > .legend line-height
     /// A fact's row: its height, its label's width and between the two.
     public static let kvRow: Double = 42                // dw.ph: .kv min-height
@@ -268,8 +299,10 @@ public enum PhoneLook {
     public static let row: Double = 52                  // dw.ph: .ltop height
     public static let rowSide: Double = 16              // dw.ph: .ltop padding-left
     public static let rowGap: Double = 12               // dw.ph: .ltop gap
-    /// A circle - Find's and the •••'s - round, the look's raised face.
-    public static let circle: Double = 34               // dw.ph: .circ width
+    /// Find's and the •••'s (R1c: bare glyphs, no face - the circle in name only): the box each glyph is centred in,
+    /// inside a finger's target.
+    public static let circle: Double = 36               // dw.ph: .circ width
+    public static let circleHeight: Double = 34         // dw.ph: .circ height
 }
 
 /// (R2b) A size in points, as SwiftUI measured a view, for the layout rules Core holds so they are tested here

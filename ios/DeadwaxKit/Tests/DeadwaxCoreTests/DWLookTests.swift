@@ -29,9 +29,10 @@ import Testing
     @Test func thePhonesGrowAndTakeAFinger() {
         let phone = DWLook.of(.iPhone)
         #expect(phone.grows && phone.target == 44)
-        // the build plan's sizes: button 36, small 32, large 48, field 36, chip 22, segment 28, rows 48/60, heading 38
+        // the build plan's sizes: button 36, small 32, large 48, field 36, segment 28, rows 48/60, heading 38 - and
+        // (R1c) the chip's 0: coloured words with no face, as tall as its words
         #expect([phone.buttonHeight, phone.smallButtonHeight, phone.largeButtonHeight] == [36, 32, 48])
-        #expect([phone.fieldHeight, phone.chipHeight, phone.segmentHeight] == [36, 22, 28])
+        #expect([phone.fieldHeight, phone.chipHeight, phone.segmentHeight] == [36, 0, 28])
         #expect([phone.rowHeight, phone.tallRowHeight, phone.groupRowHeight] == [48, 60, 38])
         // each piece a finger takes, its target as DWTarget draws it - the face, reaching `reach` above and below:
         // 44 tall exactly where the face is smaller, the face itself where it isn't (the large button's 48)
@@ -53,13 +54,15 @@ import Testing
         #expect(phone.largeButtonHeight < PhoneLook.foot)
         // the large title's room is the strip's sides'
         #expect(PhoneLook.bigSide == PhoneLook.stripSide)
-        // (R2b) the Library's row: its circles and the large switch's well (its segments and their 1 pt edges) inside
-        // it, the circles' targets too; as far in from each edge as the pages are, and the line under it as far in
-        #expect(PhoneLook.circle < PhoneLook.row && phone.largeSegmentHeight + 2 < PhoneLook.row)
+        // (R2b) the Library's row: its glyphs' boxes and the large switch (R1c: its words over its hairline, 1 pt in
+        // at either end) inside it, the glyphs' targets too; as far in from each edge as the pages are, and the line
+        // under it as far in
+        #expect(PhoneLook.circle < PhoneLook.row && PhoneLook.circleHeight < PhoneLook.circle)
+        #expect(phone.largeSegmentHeight + 2 < PhoneLook.row)
         #expect(phone.target < PhoneLook.row && PhoneLook.circle < phone.target)
         #expect(PhoneLook.rowSide == PhoneLook.stripSide && PhoneLook.rowSide == PhoneLook.metaLead)
         #expect(PhoneLook.metaTrail == PhoneLook.metaLead, "iLibrary's line is 16 in at either side")
-        // a circle's target reaches 5 past its face sideways, into the 12 between it and the switch - never to it
+        // a glyph's target reaches 4 past its box sideways, into the 12 between it and the switch - never to it
         #expect((phone.target - PhoneLook.circle) / 2 < PhoneLook.rowGap)
         // the line's glyphs fit the line, their targets reaching above and below it as every target does
         #expect(PhoneLook.metaGlyph < PhoneLook.meta && PhoneLook.sidesRule < PhoneLook.meta)
@@ -73,6 +76,23 @@ import Testing
         // a field's well fits its row; the legend stands in the room above its group, over the group's edge
         #expect(phone.fieldHeight < phone.fieldRowHeight)
         #expect(PhoneLook.legendLift < PhoneLook.groupAbove && PhoneLook.legendLine < PhoneLook.legendLift)
+    }
+
+    /// (R1c) The flat phone's own sizes: the faced buttons' room either side more than a flat one's, every size; the
+    /// chosen line under its words inside a strip's and a switch's height, and the strip taller than its words' line;
+    /// a chip's dot no taller than its words' gap from it.
+    @Test func theFlatPhonesSizesFitTogether() {
+        let phone = DWLook.of(.iPhone)
+        #expect([DWFlat.facedPadding, DWFlat.smallFacedPadding, DWFlat.largeFacedPadding] == [16, 16, 16])
+        #expect([phone.buttonPadding, phone.smallButtonPadding, phone.largeButtonPadding] == [6, 6, 6])
+        #expect(DWFlat.facedPadding > phone.buttonPadding && DWFlat.segmentRoom == phone.buttonPadding)
+        #expect(DWFlat.chosenLine < PhoneLook.strip && DWFlat.chosenLine < phone.segmentHeight)
+        #expect(PhoneLook.stripPadding == 0 && PhoneLook.stripGap > 2 * DWFlat.segmentRoom)
+        #expect(DWFlat.dot == DWFlat.dotGap && DWFlat.chipSide < DWFlat.dot)
+        // the Mac's are untouched: R1's
+        let mac = DWLook.of(.mac)
+        #expect([mac.buttonPadding, mac.smallButtonPadding, mac.largeButtonPadding] == [11, 8, 11])
+        #expect(mac.chipHeight == MacLook.chipHeight)
     }
 
     /// (R2b, its review) The count gives way first: its noun dropped, the numbers kept - as Find's own words say them.

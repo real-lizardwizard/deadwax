@@ -283,14 +283,15 @@ def test_the_apps_own_bars_are_the_webs():
     #? and MacPalette's playerFace drew the bars, are gone rather than kept for this test alone
     for gone in ("tabBar", "tabInactive", "playerBar"):
         assert not re.search(rf"\bstatic let {gone}\b", palette), gone
-    #? (the redesign, R4) the tab bar is dw.css's `.dw.ph .tabbar` now, not the web's .app-tabbar: on #121117 under its
-    #? #2c2a36 edge, the tabs 6 under it side to side with no room at either end, each 49 tall at least, its symbol's
-    #? box 24 and 3 over its words, 11 and medium, #8a8a9c - the shown one the accent. DWPalette's lines and PhoneLook's
-    #? sizes say which rule each is (test_ios_phone_look.py holds every one to it); these are the bar's own draws
+    #? (the redesign, R4) the tab bar is dw.css's `.dw.ph .tabbar` now, not the web's .app-tabbar: (R1c, the phone flat)
+    #? on the page's black under a #1c1b22 hairline, the tabs 6 under it side to side with no room at either end, each
+    #? 49 tall at least, its symbol's box 24 and 3 over its words, 11 and medium, #8a8a9c - the shown one the accent.
+    #? DWPalette's lines and PhoneLook's sizes say which rule each is (test_ios_phone_look.py holds every one to it);
+    #? these are the bar's own draws
     look = _phone_look()
     lines = look.palette_lines()
-    for name, source, value in (("tabBarFace", "dw.ph: .tabbar background", "#121117"),
-                                ("tabBarEdge", "dw.ph: .tabbar border-top", "#2c2a36"),
+    for name, source, value in (("tabBarFace", "dw.ph: .tabbar background", "#000"),
+                                ("tabBarEdge", "dw.ph: .tabbar border-top", "#1c1b22"),
                                 ("tabItemText", "dw.ph: .tabbar > a color", "#8a8a9c")):
         assert lines[name][1] == source, name
         selector, prop = source[len("dw.ph: "):].rsplit(" ", 1)
@@ -604,9 +605,14 @@ def test_the_librarys_top_sits_under_the_status_bar():
     # picture and its Close keep to the safe area.
     # (The Mac redesign, R1) The Mac's desktop frame, laid under the window's title bar for its title strip - the Mac's
     # alone (the iPhone draws MainTabs, never the frame), and its content below the strip.
+    # (The redesign, slice R1c's review) The manual search's black, a fill behind its scroll view - under its bar too,
+    # so no sheet's grey shows there; its fields keep to the safe area.
     assert reaching == {"Library/LibraryTop.swift": 1, "Root/RootView.swift": 1, "Player/NowPlayingView.swift": 2,
                         "Root/MainTabs.swift": 1, "Player/CoverViewer.swift": 2, "Edit/ReleasePage.swift": 1,
-                        "Root/DesktopFrame.swift": 1}
+                        "Root/DesktopFrame.swift": 1, "Get/ManualSearchSheet.swift": 1}
+    manual = sources["Get/ManualSearchSheet.swift"]
+    assert [line.strip() for line in manual.splitlines() if "ignoresSafeArea" in line] == [
+        ".background(DWPalette.page.ignoresSafeArea())"]
     full = sources["Edit/ReleasePage.swift"]
     full = full[full.index("struct FullCoverView"):]
     assert "ZStack {\n            Color.black.ignoresSafeArea()\n" in full and full.count("ignoresSafeArea") == 1

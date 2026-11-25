@@ -5,7 +5,8 @@ import SwiftUI
 /// shared look, and the phone's pieces"; R1's MacPopUp, moved here for both): SwiftUI's Menu, its items the caller's,
 /// with the look's button for its face - the words and dw.css's caret after them (.btn's gap of 6). The menu that opens
 /// is the system's own, on either device. Should Catalyst draw its own pop-up face over ours, that is accepted (the build
-/// plan's section 2).
+/// plan's section 2). (R1c - notes/ios.md "The redesign, slice R1c: the phone is flat (2026-11-25)") On the phone a flat
+/// button's - the words and the caret in the accent, no face; drawn on no phone screen yet.
 struct DWPopUp<Items: View>: View {
     let words: String
     var size: DWButtonStyle.Size = .standard
@@ -17,7 +18,7 @@ struct DWPopUp<Items: View>: View {
         } label: {
             HStack(spacing: 6) {
                 Text(words)
-                DWCaret(colour: DWPalette.buttonText)
+                DWCaret(colour: Platform.mac ? DWPalette.buttonText : DWPalette.acc)
             }
         }
         .menuStyle(.button)

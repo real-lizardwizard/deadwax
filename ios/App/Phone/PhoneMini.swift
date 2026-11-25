@@ -2,10 +2,10 @@ import DeadwaxCore
 import SwiftUI
 
 /// The mini player's ground and its seek line (dw.css's .mini - the redesign, slice R1b, notes/ios.md "The redesign,
-/// slice R1b: the shared look, and the phone's pieces"): the parts R4 restyles the mini player with - its ground on
-/// #1c1b22 under its #2a2833 top edge, 60 tall at least with the cover flush left (PhoneLook's sizes), and the 2 pt seek
-/// line along that edge, the part played in the purple gradient. MiniPlayerView itself - its one drag, its bare Play in
-/// a 48 target, its words - is R4's and keeps no diff here.
+/// slice R1b: the shared look, and the phone's pieces"): the parts R4 restyles the mini player with - (R1c, notes/ios.md
+/// "The redesign, slice R1c: the phone is flat (2026-11-25)") its ground the page's black under a #1c1b22 hairline, 60
+/// tall at least with the cover flush left (PhoneLook's sizes), and the 2 pt seek line along that edge, the part played
+/// in the purple gradient. MiniPlayerView itself - its one drag, its bare Play in a 48 target, its words - is R4's.
 struct PhoneMiniGround: View {
     var body: some View {
         DWPalette.miniFace

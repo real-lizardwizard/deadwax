@@ -244,7 +244,7 @@ for ([404-415](#the-mac-apps-checks-404-415),
 [416-423](#the-mac-apps-menus-keys-and-window-checks-416-423), [424-433](#the-mac-apps-desktop-frame-checks-424-433),
 [434-438](#the-mac-apps-words-checks-434-438), [439-446](#the-mac-apps-sleep-power-and-downloads-checks-439-446),
 [447-451](#the-mac-apps-eq-files-checks-447-451), [452-458](#the-mac-apps-managing-checks-452-458) and
-[518-525, 532-540 and 608-609](#the-mac-redesigns-checks-518-611)).
+[518-525, 532-540 and 608-609](#the-mac-redesigns-checks-518-614)).
 
 **What it is today.** The window is laid out as the web app's desktop is, whatever its size: the **sidebar** at the
 left, the **page** you're on beside it, the **side panel** at the right when you open it - Queue, Lyrics, Info or EQ - and the
@@ -644,8 +644,8 @@ the same person carries on where you were. Signing in as someone else starts afr
 first person's queue stays.
 
 The app has four tabs, **Library**, **Search**, **Requests** and **Settings** (a gear - the web app's tab of that
-name), along a bar at the foot of the screen: square, the full width, flush with the bottom edge, with a thin line
-along its top - as the web app's tab bar is. The tab you're on is purple, with a short purple line over it on the
+name), along a bar at the foot of the screen: square, the full width, flush with the bottom edge, black with a thin
+line along its top. The tab you're on is purple, with a short purple line over it on the
 bar's top edge; the others are grey. Requests carries a small purple count over its icon's top right corner, of the
 downloads on their way, as on the web app, and none when there are none. Tapping the tab you're on goes back to its
 first screen, or to the top of it. Once something is playing, the mini player is the top of the tab bar: one solid
@@ -656,8 +656,20 @@ arriving"); at the largest text sizes its words stop growing, and holding a fing
 
 Everything is squarer since the build after app 0.11's Search (still 0.11): album covers have the smallest of
 corners, everywhere they're drawn - the album page, Now Playing, the tiles and the rows - and the notices, cards,
-buttons and chips small square ones. The mini player is square, as the tab bar it sits on. Artists' pictures,
-the avatar, and the two buttons at the top of the Library stay round.
+buttons and chips small square ones. The mini player is square, as the tab bar it sits on. Artists' pictures and
+the avatar stay round.
+
+**The phone is flat** since the build after the Library's one-row top (still 0.13): it is drawn as Now Playing is,
+words and glyphs straight on the page with thin lines between things, and nothing grey laid on top. Four kinds of
+thing keep a face: the purple button (and the red ones, **Cancel download** and **Forget This Output**), a sunken
+track (the EQ's sliders, a download's meter), a picture, and anywhere you type - every field is still a box. Any
+other button is its words or its glyph in purple, as tall as before, fading while your finger is on it. A card (a
+download on Requests) has no panel, a thin line under it; a group (Info's This song, the EQ's Correction) is a grey
+heading over its rows. A switch or a strip of choices (the Library's pages, the Now Playing sheet's Queue, Info and
+EQ) is words over a thin line, the chosen one white over a short purple line. A chip (an album's In your library) is
+coloured words, a dot before the green, amber, red and purple ones. The mini player and the tab bar are black under a
+thin line. Menus, toggles, the count on Requests' tab, covers, the scrubber and Now Playing are as they were, and the
+Mac's look is unchanged.
 
 The app's words are in **Libre Franklin**, on the iPhone and the Mac, since the build after the Mac redesign's
 slices (still 0.13): every screen's titles, rows, buttons and notes, the navigation bars' titles, and the search
@@ -681,14 +693,16 @@ makes iOS's face heavier, but not Libre Franklin or Courier Prime.
 ## The Library
 
 The Library opens on its pages, side by side: **Albums**, **Playlists**, **Artists** and - without a
-library of your own - **Songs**. Its top is one row: a round **magnifying glass** (Find - below) at the left, a round
-**•••** at the right, and between them a switch with a part for each page, in the order you keep (Edit order -
-below); the page you're on is lit. Tap a page's part to go to it, or swipe left and right between the pages, the lit
-part following you. The switch's words grow with the text size, up to the tab bar's largest; where four pages don't
-fit across beside the two circles (logins off, at the larger text sizes on a narrow phone), the switch moves onto a
-row of its own under them, rather than cut a word short. The Library opens on the first page each time the app
-starts, and when someone else signs in; after that it stays on the page you left it on. Tap the Library tab while
-you're on it, and the page goes back to its top.
+library of your own - **Songs**. Its top is one row: the **magnifying glass** (Find - below) at the left, the
+**•••** at the right - two bare white glyphs - and between them a switch with a word for each page, in the order you
+keep (Edit order - below), a thin line under them; the page you're on is white over a short purple line, the others
+grey. Tap a page's word to go to it, or swipe left and right between the pages, the purple line following you. The
+switch's words grow with the text size, up to the tab bar's largest; where the pages don't fit across beside the two
+glyphs with room between their words (four pages - logins off - on most phones at the standard text size; on a
+narrow phone, Yours' three at the two largest standard sizes and All's at the largest), the switch moves onto a row of
+its own under them, rather than cut a word short. The Library opens on the first page each time the app starts,
+and when someone else signs in; after that it stays on the page you left it on. Tap the Library tab while you're on
+it, and the page goes back to its top.
 
 Under the top each page has its own quiet line, all words, nothing boxed: how many there are ("3012 albums"), then -
 on Albums and Artists - its order, in purple (tap it to choose another), or on Playlists **New playlist…**. At the
@@ -836,8 +850,8 @@ Library - see [Set up Navidrome](#set-up-navidrome).
   your library** or only **In the collection**. With logins off, and for the break-glass `deadwax`
   sign-in, every album reads In your library.
 - **Play** plays the album from its first song. **Shuffle** plays it in a random order, with Shuffle
-  on. Play is the purple button, Shuffle beside it the grey one, both square (at the largest text sizes one over the
-  other).
+  on. Play is the purple button, square, and Shuffle beside it its word in purple with no face (at the largest text
+  sizes one over the other).
 - **The top row**: ‹ back, and at the right **Edit** (see below), then the **•••**.
 - **Pull down** at the top of the page, a good way past it, as on the Library's pages (see [Shuffling your
   library](#shuffling-your-library)): the ring over the cover fills, "Pull to shuffle"; at the line a tick and the
@@ -1823,7 +1837,9 @@ lines rather than cut short.
 
 The **Requests** tab, between Search and Settings, lists every download you asked for - on this phone (see [Getting an
 album](#getting-an-album)), in the web app, or on another phone - under the web app's four headings, in the web
-app's words. A heading shows only when it has something under it.
+app's words. A heading shows only when it has something under it. Each download is a card with no grey face - its
+cover, its words and its meter on the page, a thin line under it - and its ✕, and a Done row's ▶, are bare purple
+glyphs.
 
 **Search Soulseek…**, the first row - above the headings, and there with nothing requested yet - gets an album by
 its name rather than by MusicBrainz's pressing: one MusicBrainz doesn't have, or one you'd rather find by name. It's
@@ -1910,7 +1926,7 @@ where it was in the list.
 
 **The mini player**, the top of the tab bar while something is playing, 60 points tall: the cover flush at its left
 edge, the song and its artist, and play/pause - a bare glyph, no circle round it - with room past it so a thumb finds
-it. It is solid, on a ground of its own a shade lighter than the tabs under it, with nothing of the page showing
+it. It is solid, black as the tabs under it are, with a thin line along its top and nothing of the page showing
 through. There's no next button; instead:
 
 - **The line along its top** is how far in the song is. To seek, put your finger on the mini player's top edge,
@@ -4723,7 +4739,7 @@ one on the phone is checked from 180.
   Playing; wait a few seconds and close it. Without opening Requests, the badge still counts as the download moves,
   and goes once it's filed. The same with Now Playing opened from Search, and opened twice in a row.
 - **179 The largest text** (the iPhone's Settings > Accessibility > Display & Text Size > Larger Text, all the way up). On
-  Requests the covers stay small and each title reads, on up to three lines; the ✕ and ▶ stay small circles. A
+  Requests the covers stay small and each title reads, on up to three lines; the ✕ and ▶ stay small. A
   card's question puts **Keep it** over **Cancel download**, and Needs attention puts **Another source · 2 left**
   over **Same source again**, each read whole. Nothing overlaps, and the last card clears the whole bar at the
   foot, the mini player included; the badge sits clear of the mini player above it. Tap a Done row below the first
@@ -4882,9 +4898,9 @@ not 166: Phase 6's checks are being written at the same time and take the number
   keyboard). Scroll the results to the end: the last row clears the keyboard, with no gap the bar's height above
   it. Put the keyboard away: the bar and the mini player are back where they were. The same with the Library's
   Find and Settings > This phone > Change address.
-- **203 The Library's top.** On Albums: the round magnifying glass, the switch, the round •••, evenly spaced -
-  the switch filling the room - and no Find field. Swipe to Playlists and Artists: the same top, no **+**.
-  The switch's purple slides as you swipe and as you tap. Does the top look complete?
+- **203 The Library's top.** On Albums: the magnifying glass, the switch, the •••, evenly spaced - the switch
+  filling the room - and no Find field. Swipe to Playlists and Artists: the same top, no **+**. The switch's
+  purple line moves to the page as you swipe and as you tap. Does the top look complete?
 - **204 Find.** Tap the magnifying glass: the field under the switch, "Find in albums", the keyboard up. Type:
   the albums found. Swipe to Playlists: the field empty, "Find in playlists"; type there; swipe back: the albums'
   words again. **Cancel**: the field goes, and every page shows everything (look at Playlists too). Open it again
@@ -5133,13 +5149,12 @@ when the app opened. On it, James, after Now Playing: "Right height now".
 and the Library's icon sharp (still app 0.13 (13)).
 
 - **251 Square corners.** Look for any rounding left on what was squared: covers (an album's page, Now Playing, the
-  Library's tiles, the rows, the play bar's), the album page's Play and Shuffle, the chips and pills, the badges (In
-  your library, New, Requests' count), the Library's switch and its chosen segment, Find's field, the notice, the
-  first ask, the sign-in's fields, the EQ's buttons and Paste, Settings > Downloads' bars, and on Now Playing the look
-  button at the top right (and its square glyph, on the turntable) and the speed chip on the cover off 1x. Every
-  corner is a point. Say if any reads badly square - the switch's chosen segment inside its well, Play's light line
-  along its top, a badge over the Requests icon. Still round, as they should be: the dots, your avatar, artists'
-  pictures, the rings, the sliders' knobs, the Library's search and ••• circles, Requests' round ▶. Still slightly
+  Library's tiles, the rows, the play bar's), the album page's Play, the pills, the badges (New, Requests' count),
+  Find's field, the notice, the first ask, the sign-in's fields, the EQ's Paste, Settings > Downloads' bars, and on
+  Now Playing the look button at the top right (and its square glyph, on the turntable) and the speed chip on the
+  cover off 1x. Every corner is a point. Say if any reads badly square - Play's light line along its top, a badge
+  over the Requests icon. Still round, as they should be: the dots, your avatar, artists' pictures, the rings, the
+  sliders' knobs. Still slightly
   rounded, as hardware: the turntable's plinth and the speed readout's well at its bottom right - say if you'd rather
   they were square too.
 - **252 Sharp glyphs, and the Library icon.** Play, pause, next and previous have sharp points and square bars,
@@ -6325,7 +6340,7 @@ Ethan's phone as a listener (the one that sees no foot line). Say "pass", or wha
 - **487 [key] VoiceOver.** A top song reads its title and line ("Let It Happen, Currents · 2015"); a missing one
   "…, Not in your library"; "From Last.fm" reads as a link; the listeners line is read under the name.
 
-### The Mac redesign's checks (518-611)
+### The Mac redesign's checks (518-614)
 
 The new look, drawn on the design canvas and built a slice at a time (still app 0.13 (13)): the Mac's first, and the
 phones' from the slices after 524-525, each screen redrawn in its own slice. No server change is needed. Until a slice
@@ -6373,8 +6388,9 @@ can use them, and makes the phone's own pieces, which are drawn nowhere yet. Not
 
 **Not done yet.** The Mac's Albums and Artists become column lists under their own toolbar - Play, Shuffle, Sort,
 Grid | List and Find - with their counts in the status bar. On the phone the Library's top is redrawn as one row: the
-round magnifying glass at the left, the round ••• at the right, and between them the switch of the pages, in the order
-you keep (Edit order), the page you're on lit - no "Library" title and no row of buttons under it. Under the row each
+magnifying glass at the left, the ••• at the right - bare white glyphs (612) - and between them the switch of the
+pages, in the order you keep (Edit order), the page you're on white over a purple line - no "Library" title and no
+row of buttons under it. Under the row each
 page has one quiet line of words: how many, its order (tap it to change it) or Playlists' **New playlist…**, and at its
 end Albums' grid and list marks, then **Yours | All** with a library of your own - white where you are, purple what a
 tap goes to. **All** shows the whole collection's albums, artists and songs as the pages, where the •••'s All music
@@ -6393,15 +6409,16 @@ used to push them. The ••• is Shuffle, **Downloaded**, Refresh and Edit or
   An artist on a split album or a compilation whose album artist is someone else counts it in their Albums but not
   in their Songs or Plays - Navidrome's own count against the album's own artist. The status bar's albums count
   each album once. Left open past midnight, "today" becomes "yesterday".
-- **529 The Library's top.** **Not done yet.** On the phone, the Library's top is one row - the magnifying glass's
-  circle, the switch of the pages and the •••'s circle, 16 points in from each edge - clear of the Dynamic Island, and
-  still clear after opening Now Playing and going back. The page's quiet line is under it, its words and marks bare,
-  nothing boxed. VoiceOver reads the magnifying glass by the page's Find ("Find in albums"), the switch as "Library
-  pages" with the page you're on selected, then "More for the Library"; on the line, Grid and List with the one
-  showing selected, and Yours | All as "Your library or all music" with the side you're on selected. At the largest
-  text size (and the accessibility sizes) on a narrow phone, nothing is cut short: with four pages (logins off) the
-  switch moves under the circles (VoiceOver then reads the magnifying glass and the ••• before the switch under
-  them), and a line too long for one first drops its count's word ("140 · Recently added"), then goes on to a second.
+- **529 The Library's top.** **Not done yet.** On the phone, the Library's top is one row - the magnifying glass, the
+  switch of the pages and the •••, 16 points in from each edge - clear of the Dynamic Island, and still clear after
+  opening Now Playing and going back. The page's quiet line is under it, its words and marks bare, nothing boxed.
+  VoiceOver reads the magnifying glass by the page's Find ("Find in albums"), the switch as "Library pages" with the
+  page you're on selected, then "More for the Library"; on the line, Grid and List with the one showing selected, and
+  Yours | All as "Your library or all music" with the side you're on selected. At the largest text size (and the
+  accessibility sizes) on a narrow phone, nothing is cut short: with four pages (logins off) the switch moves under
+  the glyphs - at the standard text size too, on most phones - and Yours' three pages at the two largest standard
+  sizes, All's at the largest (VoiceOver then reads the magnifying glass and the ••• before the switch under them), and
+  a line too long for one first drops its count's word ("140 · Recently added"), then goes on to a second.
 - **530 The pages.** **Not done yet.** Tap each page in the switch: the page moves to it and it lights. Swipe between
   the pages: the lit page follows. **••• > Downloaded** opens Downloaded; turn WireGuard off on Yours and the ••• has
   **Your albums** in its place instead. The order on a page's line changes the order, the grid and list marks at the
@@ -6493,15 +6510,16 @@ time left and Played. Play an album with songs still to come, and add a song or 
   top right is a purple switch, and VoiceOver reads it as a switch, "EQ for" the output, on or off - at the largest
   text size the switch alone, nothing cut off. Touch and hold a filter in Advanced: **Delete**; an output under Other
   outputs: **Rename** and **Forget**; Correction, after changing an AutoEq correction in Advanced: **Back to
-  AutoEq's** - none of them opens the filter or the output first. The filters' switches are purple. The curve sits in
-  a well; Correction, Tone and Advanced are groups; the sliders' knobs are round. Every control does what it did, and
-  the sound is as before: the switch, Preset, the sliders, Correction, AutoEq's suggestion and its **Not now**, Other
-  outputs, Advanced and its filters. Connect other headphones with the EQ up: the page follows the output - but not
-  with Preset's list or a filter's page open over it, and it catches up when you come back. In Advanced, open a
-  filter, type a frequency and go **Back** without tapping elsewhere: the new frequency is kept. Again with the
-  strip, and with the sheet swiped away. From Settings > Playback > EQ the page is the same, with the switch under
-  the output's button. On the Mac, the panel's EQ tab in Advanced: each filter's row in the List's own type, its
-  switch in the app's colour, as before.
+  AutoEq's** - none of them opens the filter or the output first. The filters' switches are purple. The curve sits on
+  the page, with no well; Correction, Tone and Advanced are groups, each a grey heading over its rows with no panel;
+  the output's name and its caret are purple, with no face; the sliders' tracks are sunken and their knobs round.
+  Every control does what it did, and the sound is as before: the switch, Preset, the sliders, Correction, AutoEq's
+  suggestion and its **Not now**, Other outputs, Advanced and its filters. Connect other headphones with the EQ up:
+  the page follows the output - but not with Preset's list or a filter's page open over it, and it catches up when
+  you come back. In Advanced, open a filter, type a frequency and go **Back** without tapping elsewhere: the new
+  frequency is kept. Again with the strip, and with the sheet swiped away. From Settings > Playback > EQ the page is
+  the same, with the switch under the output's button. On the Mac, the panel's EQ tab in Advanced: each filter's row
+  in the List's own type, its switch in the app's colour, as before.
 - **542 Both phones.** **Not done yet.** On Green Anole, everything else - every tab, the player, Now Playing, Edit
   album, the EQ from Settings - is as before. On Ethan's phone, 539-541, or "not done yet".
 
@@ -6535,13 +6553,14 @@ the **•••**. On the phone the mini player and the tab bar take the new loo
   The output's name is the one the EQ uses. In a window under 1000 points wide the name is left out, the AirPlay
   button kept, and the name shows when you hold the pointer over it.)
 - **547 The mini player.** **Not done yet.** On the phone, as drawn. A tap or a drag up opens Now Playing; across the
-  title skips, across the top seeks; VoiceOver offers Next and Previous. (60 points tall, the cover flush at the left,
-  a thin purple line along the top for the time played, and Play and Pause alone at the right with no circle round
-  them. There is no skip button. A drag across the very top seeks, the time shown over your finger.)
+  title skips, across the top seeks; VoiceOver offers Next and Previous. (60 points tall, black under a thin line,
+  the cover flush at the left with no line at its right, a thin purple line along the top for the time played, and
+  Play and Pause alone at the right with no circle round them. There is no skip button. A drag across the very top
+  seeks, the time shown over your finger.)
 - **548 The tab bar.** **Not done yet.** The lit line over the shown tab, the badge, at the largest text size too.
-  (The shown tab is purple, with a short purple line on the bar's top edge over it; the others grey. Requests' count
-  sits over its icon's top right corner. At the largest text sizes the bar grows only so far; touch and hold a tab to
-  see it bigger.)
+  (The bar is black under a thin line. The shown tab is purple, with a short purple line on the bar's top edge over
+  it; the others grey. Requests' count sits over its icon's top right corner. At the largest text sizes the bar
+  grows only so far; touch and hold a tab to see it bigger.)
 - **549 Both phones.** **Not done yet.** Green Anole: the rest as before. Ethan's: 547-548, or "not done yet".
 
 #### An album, Playlists, a playlist (553-558)
@@ -6573,7 +6592,8 @@ where the download button was. Nothing is played, added or downloaded any differ
 - **556 An album on the phone.** **Not done yet.** As drawn. The ••• adds to the queue, to a playlist, and downloads,
   saying the download's state. Play, Shuffle, the pull and a row's swipe work. (The top row: ‹ back, **Edit** if you
   may edit the album, then the **•••**: Add to Queue, Add to a playlist…, Download - headed with how far it has got -
-  then Album info and Refresh. No Play Next or Play Last. Play and Shuffle are 48 points tall, side by side; at the
+  then Album info and Refresh. No Play Next or Play Last. Play and Shuffle are 48 points tall, side by side - Play
+  the purple button, Shuffle its word in purple with no face; at the
   largest text sizes they stand one over the other. At the largest text size a song's number - even 100 or more - has
   its room before the title. With VoiceOver a song reads its number first, then its title, and its actions hold
   **Add to Queue** once.)
@@ -6599,8 +6619,9 @@ so something is downloading, waiting and done.
   **Search** open Choose a source - Return in Artist goes to Album, Return in Album searches; a Get from it shows in
   the table. A done row's **Open**, a double click or Return opens the album; **Play** plays it.)
 - **572 Requests on the phone.** **Not done yet.** As drawn. Meters and speeds match slskd; Cancel, Next peer and the
-  manual search work; a Done row's ▶ plays. (The ✕ and the ▶ are round, everything else square; the line under a
-  meter reads like "3 of 11 files · 244 KB/s". Next peer is **Another source**; Search Soulseek… is the first row.
+  manual search work; a Done row's ▶ plays. (A card has no grey face, a thin line under it, the cards one under
+  the other; the ✕ and the ▶ are bare purple glyphs; everything is square; the line under a meter reads like "3 of 11
+  files · 244 KB/s". Next peer is **Another source**; Search Soulseek… is the first row.
   At the largest text sizes a card's two buttons stand one over the other, their words on more than one line.)
 - **573 Both phones.** **Not done yet.** Green Anole: the rest as before. Ethan's: 572, or "not done yet".
 
@@ -6656,6 +6677,53 @@ place of Noto Sans. Nothing else should have moved: the same sizes, the same lay
   Then find an artist or album with a Greek name and one with a Cyrillic name (in Search, if the library has none):
   every letter draws - none is a box or a question mark - though a Greek name, and Cyrillic in a readout, is in iOS's
   own face.)
+
+#### The phone, flat (612-614)
+
+**Not done yet.** The phone is redrawn flat, as Now Playing is drawn (James: "get rid of all the grey boxes"): words
+and glyphs on the page, thin lines between things. Only the purple button (and the red ones), a sunken
+track, a picture and anywhere you type keep a face. Nothing works any differently, and the Mac doesn't change. Have a
+download or two on Requests and something queued.
+
+**Not flat yet**, each until the slice that redraws it: Settings and its pages, Sign in and the server address (R9);
+Search, an album's Get and Choose a source's cards (R7); the rest of an artist's page below its top, and its Artist
+images and Move albums sheets (R6); Edit album's pages (R10 and R11); Needs a look (R12); Library care and the Event
+log (R13); People and Server settings (R14); and the EQ's own pages - Correction's search and a filter's editor -
+which no slice has taken yet. Those keep iOS's grouped lists and their grey rows for now: don't count them in 612.
+
+- **612 The flat look.** **Not done yet.** Go through the Library (Albums, Artists, Songs, Playlists and Downloaded),
+  Requests, an album, a playlist, an artist's top, Now Playing's sheet and Search Soulseek…'s sheet - not the screens
+  above that aren't flat yet: is anything still a grey box laid on top? Is every button still plainly a button, and
+  does a tap show? (Any button that isn't purple is its words or its glyph in purple, as tall as before, faded while
+  your finger is on it - an album's Shuffle, **Same source again**, a card's ✕, the EQ's output, Downloaded's **Not
+  Now**, an empty library's **See All music**. A group - Info's This song, the EQ's Correction - is a grey heading
+  over its rows, with no panel; a download's card, and Downloaded's question about downloading your library, are words
+  on the page with a thin line under them. The Library's magnifying glass and ••• are bare white glyphs; its switch,
+  and the sheet's Queue, Info and EQ, are words over a thin line, the chosen one white over a short purple line as
+  wide as it. **In your library** is green words after a green dot; the **New** mark on a cover keeps its small
+  purple box, as the count on Requests' tab keeps its own. The mini player and the tab bar are black under a thin
+  line, the same black as the page under them - an album's and a playlist's page too, with no seam where they meet -
+  and the mini player's cover has no line at its right; drag along its line and the time over your finger is in a
+  small dark box. A Done row's ▶ is a bare purple glyph. An artist's page opens on their round picture beside their
+  name.) A tap a little beside a small button still takes: between two of the sheet's Queue, Info and EQ, the nearer
+  one opens; just beside the Queue's Edit or its •••, that button. With four pages (logins off), the Library's switch
+  sits under the glyphs at the standard text size on a narrow phone: say whether that's all right. On the Queue,
+  Shuffle and Repeat are purple words, bold while on: can you tell on from off? With the •••'s menu open, the •••
+  stays white (the drawing has it purple): say if you miss it. VoiceOver reads every button, switch and strip as
+  before; at the accessibility sizes, touch and hold a page's word in the Library's switch: it shows large.
+- **613 Every place you type is still a box.** **Not done yet.** None of them has gone flat: the Library's Find (a dark
+  sunken box, its edge purple while it has the cursor), Search's field, Requests' **Search Soulseek…** sheet's Artist
+  and Album, a playlist's Edit name and description, Edit album's fields, Server settings' values, sign-in's two,
+  People's and Change password's. (The manual search's two and a playlist's Edit two are now dark sunken boxes like
+  Find's, square, the edge purple while you type in one, and a tap on the box or just above or below it puts the
+  cursor there; a playlist's description grows a line at a time as before. Apart from those and Find, each is drawn as
+  it was before this build.) Requests' **Search Soulseek…** row itself is purple words on a thin line, with no box -
+  James's rule is about where you type - and its sheet is black with no grey rows: the two boxes, the note under them
+  in grey words, and the purple **Search**. Return in Artist still goes to Album, and Return in Album searches.
+- **614 Both phones.** **Not done yet.** On Green Anole, 612-613, and the menus, toggles, covers, the scrubber, the
+  meters, Now Playing and the turntable as before. On Ethan's phone, 612-613, or "not done yet". On the Mac nothing
+  has changed: the buttons glossy and raised, the chips tinted, the segmented controls in their wells - say if
+  anything looks different.
 
 ## What it can't do yet
 

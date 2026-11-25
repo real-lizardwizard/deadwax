@@ -5,10 +5,11 @@ import SwiftUI
 /// James: "merge the play bar with the bottom bar so it doesn't look like it's floating", "opaque the whole way", "get
 /// rid of the skip forward button". AppTabBar draws it at its top, full width and square, over the tabs' own edge: one
 /// block with the tabs. Drawn since the redesign's slice R4 as dw.css's .mini (notes/ios.md "The redesign, slice R4: the
-/// player bar, the mini player and the tab bar"): 60 tall at least (PhoneLook.mini) on its own ground (PhoneMiniGround,
-/// #1c1b22 under its top edge).
+/// player bar, the mini player and the tab bar"): 60 tall at least (PhoneLook.mini) on its own ground (PhoneMiniGround -
+/// since R1c, notes/ios.md "The redesign, slice R1c: the phone is flat (2026-11-25)", the page's black under a #1c1b22
+/// hairline).
 ///
-/// - The cover, flush left, the bar's full height under its top edge, the line's rule at its right.
+/// - The cover, flush left, the bar's full height under its top edge - (R1c) no rule at its right.
 /// - The title, and under it the player's failure words (a skipped song's notice included) or else the artist
 ///   (PlayerWords.secondLine), 10 short of Play/Pause (.mini's gap, the title's to tap).
 /// - Play/Pause, bare (a sharp glyph, never a round key - James, 25 Nov: "Sharp glyphs"), busy while the song loads: a
@@ -237,13 +238,13 @@ private struct BarTitle: View {
 
     var body: some View {
         let track = entry.track
-        // the bar's height under its 1 pt top edge (.mini .cover's 59 of 60), flush left, the line's rule at its right
+        // the bar's height under its 1 pt top edge (.mini .cover's 59 of 60), flush left - (R1c) no rule at its right
+        // (`.dw.ph .mini .cover { border-right: 0 }`): the cover meets the black bar as the page's pictures do
         let cover = row - 1
         HStack(spacing: Self.gap) {
             CoverImage(id: track.coverArt, size: cover)
                 .frame(width: cover, height: cover)
                 .clipped()
-                .overlay(alignment: .trailing) { DWRule(colour: DWPalette.line, vertical: true) }
                 .frame(maxHeight: .infinity, alignment: .bottom)
             ZStack(alignment: .leading) {
                 VStack(alignment: .leading, spacing: Self.lines) {
@@ -395,7 +396,7 @@ private struct SeekLine: View {
             .foregroundStyle(DWPalette.text)
             .padding(.horizontal, 6)
             .padding(.vertical, 3)
-            .background(DWPalette.miniFace, in: DWCorners.chipShape)
+            .background(DWPalette.scrubTagFace, in: DWCorners.chipShape)
             .overlay(DWCorners.chipShape.strokeBorder(DWPalette.line, lineWidth: 1 / max(displayScale, 1)))
             .fixedSize()
             .alignmentGuide(.leading) { (tag: ViewDimensions) -> CGFloat in

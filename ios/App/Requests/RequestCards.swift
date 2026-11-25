@@ -6,13 +6,15 @@ import SwiftUI
 // (PhoneCard, square) for a download on its way or needing attention, a plain row for one done. Every word comes from
 // the row (Core's RequestsView); these only lay it out and hand a tap to the screen. A line that changes as answers land
 // - the data line, "3 of 11 files · 244 KB/s" in mono - is one line high, drawn whether or not a speed is in it; the
-// meter's height is DWLook's, grown with the text. The covers (the cards' 48, a done row's 44 - the drawing's) and the
-// ✕'s and ▶'s 32-point round faces are fixed, as the app's rows' covers are, their glyphs growing to the largest
-// standard size and holding there: at the accessibility sizes the words take the room - a title on up to 3 lines, and a
-// card's two buttons one over the other when they don't fit side by side (slice 1's review, finding 4), each then
-// across the card on up to 3 lines (R8's review: ButtonWords). Round stays round - the ✕ and the ▶ - and everything else
-// is square. Each card is one element for VoiceOver (R8's review): everything it shows (RequestSpoken.card), and its
-// actions named as its buttons are (RequestAction) - a cancel's question, while it asks, its own group under it.
+// meter's height is DWLook's, grown with the text. The covers (the cards' 48, a done row's 44 - the drawing's) are
+// fixed, as the app's rows' covers are; (R1c - notes/ios.md "The redesign, slice R1c: the phone is flat (2026-11-25)")
+// the ✕ and the ▶ are bare glyphs in the accent with no face - the ✕ a flat small button's (`.btn.sm`), the ▶ a row's
+// key (`.dw.ph .row .key`, 18) - each in a 44-point target, their glyphs growing to the largest standard size and
+// holding there: at the accessibility sizes the words take the room - a title on up to 3 lines, and a card's two buttons
+// one over the other when they don't fit side by side (slice 1's review, finding 4), each then across the card on up to
+// 3 lines (R8's review: ButtonWords). Everything is square. Each card is one element for VoiceOver (R8's review):
+// everything it shows (RequestSpoken.card), and its actions named as its buttons are (RequestAction) - a cancel's
+// question, while it asks, its own group under it.
 
 /// The pressing's front through deadwax's relay (question 9), or the plain tile without one.
 struct RequestCover: View {
@@ -34,8 +36,6 @@ private enum CardSizes {
     static let cover: CGFloat = 48
     /// A done row's (iRequests' .row.tall .cover).
     static let doneCover: CGFloat = 44
-    /// The ✕'s and the ▶'s round face, inside a 44-point target.
-    static let face: CGFloat = 32
     /// A title's lines at the accessibility sizes (one otherwise).
     static let titleLines = 3
     /// A card's words, one under the other (.col's gap 3), and the meter's room above it (its margin-top 5).
@@ -173,9 +173,9 @@ struct JobCardView: View {
     }
 }
 
-/// ✕ - a tap target 44 points square, its 32-point round face drawn inside it, raised as a button is (.btn's colours;
-/// round stays round). It opens the card's question (a second tap closes it); while its cancel is on its way it waits.
-/// Named for what it does: "Leave …" on a download somebody else waits for too.
+/// ✕ - a tap target 44 points square, (R1c) its glyph bare in the accent at its middle, as every button but the purple
+/// and the red is on the phone (iRequests' `.btn.sm` ✕). It opens the card's question (a second tap closes it); while
+/// its cancel is on its way it waits. Named for what it does: "Leave …" on a download somebody else waits for too.
 private struct CancelButton: View {
     let row: RequestRow
     let action: () -> Void
@@ -185,12 +185,7 @@ private struct CancelButton: View {
             Image(systemName: "xmark")
                 .font(Typeface.symbol(.footnote).weight(.semibold))
                 .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
-                .foregroundStyle(DWPalette.buttonText)
-                .frame(width: CardSizes.face, height: CardSizes.face)
-                .background {
-                    DWRaised(shape: Circle(), face: DWPalette.buttonFace, sheen: DWPalette.buttonSheen,
-                             edge: DWPalette.buttonEdge, drop: DWPalette.buttonDrop)
-                }
+                .foregroundStyle(DWPalette.acc)
                 .frame(minWidth: CGFloat(DWLook.here.target), minHeight: CGFloat(DWLook.here.target))
                 .contentShape(Rectangle())
         }
@@ -335,10 +330,10 @@ private struct ReasonLine: View {
 }
 
 /// Done (.row.tall): how it ended and how long ago, on the row's hairline. A download whose album is in the library
-/// opens it - the row is a button - and one this download filed has the round ▶, which plays it (the screen decides, in
-/// the tap, whether its songs are in hand). `note`: why a tapped row couldn't open; `opening` while it looks, faded so
-/// the tap shows it was taken. `filed`: (manual search) how a manual search's download was filed, quietly under how it
-/// ended.
+/// opens it - the row is a button - and one this download filed has the ▶ (R1c: a bare accent glyph), which plays it
+/// (the screen decides, in the tap, whether its songs are in hand). `note`: why a tapped row couldn't open; `opening`
+/// while it looks, faded so the tap shows it was taken. `filed`: (manual search) how a manual search's download was
+/// filed, quietly under how it ended.
 struct DoneRowView: View {
     let row: RequestRow
     let opening: Bool
@@ -361,12 +356,11 @@ struct DoneRowView: View {
             }
             if row.opens != nil && row.plays {
                 Button(action: onPlay) {
+                    // (R1c) a bare accent play glyph, 18 (`.dw.ph .row .key:not(.bare) svg`): the text style nearest it
                     SharpSymbol(.play)
-                        .font(Typeface.symbol(.footnote).weight(.semibold))
+                        .font(Typeface.symbol(.body).weight(.semibold))
                         .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
-                        .foregroundStyle(DWPalette.phonePrimaryText)
-                        .frame(width: CardSizes.face, height: CardSizes.face)
-                        .background(DWPalette.phonePrimaryFace, in: Circle())
+                        .foregroundStyle(DWPalette.acc)
                         .frame(minWidth: CGFloat(DWLook.here.target), minHeight: CGFloat(DWLook.here.target))
                         .contentShape(Rectangle())
                 }

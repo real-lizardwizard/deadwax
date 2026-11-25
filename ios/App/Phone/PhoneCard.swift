@@ -2,23 +2,28 @@ import DeadwaxCore
 import SwiftUI
 
 /// A card (dw.css's .card - the redesign, slice R1b, notes/ios.md "The redesign, slice R1b: the shared look, and the
-/// phone's pieces"): what it holds 12 in, on #1c1b22, square - Settings' account card, a song's on its album. Drawn
-/// nowhere until its slices.
+/// phone's pieces"): a download on its way and a notice on Requests (R8), the Library's refresh problem (R1c) - the
+/// drawing's Sources and sign-in cards are their own slices'. (R1c - notes/ios.md "The redesign, slice R1c: the phone
+/// is flat (2026-11-25)"; James, 25 Nov: "everything should just look like it's part of the interface, not laid on
+/// top") No face: what it holds sits on the page, 14 above and below and none at its sides,
+/// over a hairline (#1c1b22) under the whole card - a row of the page, as `.dw.ph .card` draws it.
 struct PhoneCard<Content: View>: View {
     @ViewBuilder let content: Content
 
     var body: some View {
         content
-            .padding(CGFloat(PhoneLook.cardPadding))
+            // .dw.ph .card: padding 14px 0, border-bottom 1px solid #1c1b22, background none
+            .padding(.vertical, CGFloat(PhoneLook.cardPadding))
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(DWPalette.cardFace, in: DWCorners.boxShape)
+            .overlay(alignment: .bottom) { DWRule(colour: DWPalette.cardRule) }
     }
 }
 
-/// A group (.group, .group > .legend): its rows on #17161d inside the line's edge, 12 in either side, square - its legend
-/// standing above it in the 28 of room it keeps above itself, at 13 in the second colour, a header for VoiceOver. Its
-/// rows (DWFieldRow's, PhoneKV, PhoneGo) each draw their hairline under them; the last one's falls under the group's foot,
-/// clipped, as `.field:last-child` draws none.
+/// A group (.group, .group > .legend): (R1c) no face and no edge - its heading over its rows, at 13 and semibold in the
+/// second colour at the group's leading edge, a header for VoiceOver, standing in the 28 of room the group keeps above
+/// itself; the rows at the page's own sides. Its rows (DWFieldRow's, PhoneKV, PhoneGo) each draw their hairline under
+/// them, which separate them as the panel did; the last one's falls under the group's foot, clipped, as
+/// `.field:last-child` draws none.
 struct PhoneGroup<Content: View>: View {
     var legend: String?
     @ViewBuilder let content: Content
@@ -27,7 +32,8 @@ struct PhoneGroup<Content: View>: View {
         VStack(alignment: .leading, spacing: CGFloat(PhoneLook.legendLift - PhoneLook.legendLine)) {
             if let legend {
                 Text(legend)
-                    .font(Typeface.Phone.text(.legend).weight(.medium))
+                    // .dw.ph .group > .legend: font-weight 600, left 0
+                    .font(Typeface.Phone.text(.legend).weight(.semibold))
                     .foregroundStyle(DWPalette.t2)
                     .lookHeight(PhoneLook.legendLine)
                     .padding(.leading, CGFloat(PhoneLook.legendSide))
@@ -39,12 +45,10 @@ struct PhoneGroup<Content: View>: View {
             // the last row's hairline under the foot, clipped
             .padding(.bottom, -1)
             .clipped()
-            // .group: padding 2px 12px, inside its 1 pt edge
-            .padding(.horizontal, CGFloat(PhoneLook.groupSide) + 1)
-            .padding(.vertical, CGFloat(PhoneLook.groupEnds) + 1)
+            // .dw.ph .group: padding 2px 0, no border, no background
+            .padding(.horizontal, CGFloat(PhoneLook.groupSide))
+            .padding(.vertical, CGFloat(PhoneLook.groupEnds))
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(DWPalette.groupFace, in: DWCorners.boxShape)
-            .overlay(DWCorners.boxShape.strokeBorder(DWPalette.line, lineWidth: 1))
         }
         // .group: margin-top 28px, the legend standing in it
         .padding(.top, CGFloat(legend == nil ? PhoneLook.groupAbove

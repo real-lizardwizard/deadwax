@@ -224,8 +224,9 @@ extension Typeface {
             case button, smallButton, largeButton
             /// .in, and a field's label (.field > label).
             case field, fieldLabel
-            /// .chip, and .count's - drawn in the mono face.
-            case chip, count
+            /// .chip, and .count's - drawn in the mono face; (R1c's review) and the phone's faced chip, R1b's .chip (the
+            /// New mark's: DWChip's `keepsFace`).
+            case chip, count, facedChip
             /// .seg button and .seg.lg button.
             case segment, largeSegment
 
@@ -239,6 +240,7 @@ extension Typeface {
                 case .fieldLabel: return .control               // dw: .field > label font-size
                 case .chip: return .label                       // dw: .chip font-size
                 case .count: return .count                      // dw: .count font
+                case .facedChip: return .label                  // dw: .chip font-size
                 case .segment: return .label                    // dw: .seg button font-size
                 case .largeSegment: return .control             // dw: .seg.lg button font-size
                 }
@@ -252,10 +254,11 @@ extension Typeface {
                 case .largeButton: return (17, .headline)       // dw.ph: .btn.lg font-size
                 case .field: return (16, .callout)              // dw.ph: .in font-size
                 case .fieldLabel: return (16, .callout)         // dw.ph: .field > label font-size
-                case .chip: return (12.5, .caption)             // dw.ph: .chip font-size
+                case .chip: return (13, .footnote)              // dw.ph: .chip font-size
                 case .count: return (11, .caption2)             // dw.ph: .count font
+                case .facedChip: return (12.5, .caption)        // dw.ph: .chip font-size (R1b)
                 case .segment: return (13, .footnote)           // dw.ph: .seg button font-size
-                case .largeSegment: return (14, .footnote)      // dw.ph: .seg.lg button font-size
+                case .largeSegment: return (15, .subheadline)   // dw.ph: .seg.lg button font-size
                 }
             }
         }
@@ -301,7 +304,7 @@ extension Typeface {
             /// Its size, and the text style it scales with.
             var scaled: (points: CGFloat, style: Font.TextStyle) {
                 switch self {
-                case .strip: return (14, .footnote)             // dw.ph: .chips > button font-size
+                case .strip: return (15, .subheadline)          // dw.ph: .chips > button font-size
                 case .back: return (17, .headline)              // dw.ph: .back font-size
                 case .big: return (34, .largeTitle)             // dw.ph: .big font-size
                 case .topName: return (17, .headline)           // dw.ph: .dw font-size

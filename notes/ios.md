@@ -19402,3 +19402,332 @@ licence page of its own.
 - R2b's row in Libre Franklin at xxxLarge on a 375 pt phone: three pages hold the switch beside the circles by 0.2 pt
   of arithmetic (1.8 kerned) - SwiftUI's own measure of DWSegmentedNeed decides it on the phone, and a fold there
   would be the switch under the circles, not a cut word. Row Size's rows in the new faces on a Mac's screen.
+
+## The redesign, slice R1c: the phone is flat (2026-11-25)
+
+James, the same day, in order: **"on ios, I want to try to get rid of all the grey boxes. everything should just look
+like it's part of the interface, not laid on top. I really like the play screen design, it feels very well
+integrated"**; shown the design session's drawing, **"I like that better. The manual search in requests should be boxes
+though. They're an exception"**; then **"actually any place you can input text should be a box"**; and **"Send it"**.
+The design is ~/Desktop/Code/deadwax-plans/iphone-redesign.md's "Changed 25 Nov: the phone is flat, with no grey boxes"
+(which overrules every older section that draws a grey face), dw.css's last block (every rule `.dw.ph`; copied into
+ios/design/dw.css as the canvas has it, with the fonts block before it, whose classes no board here wears), and the
+iArtist, iEdit and iRequests boards.
+
+**The rule**: the phone is drawn as Now Playing is - words and glyphs straight on the page, hairlines (#1c1b22) between
+things. Only four kinds of thing keep a face: **the primary button** (and the red one), **a sunken track**, **a
+picture**, and **anywhere you type**. Menus (iOS's own), the count badge, the toggles, covers, the scrubber and the
+meters, and Now Playing itself are unchanged. The Mac doesn't change.
+
+What is his and what is the design session's (its own words, in the plan): no grey boxes, the play screen as the
+model, and boxes wherever you type are **his**; which parts count as a grey box and what each became - the underlined
+words, the dots, the hairlines, the accent for buttons, the round artist picture beside the name - are **the design
+session's** reading of it, all of which he saw before "Send it". Two answers it went back on, said to him before he
+sent it: the Library's top changes again (R2b's faces - only the faces; its layout stands), and Requests' round ▶
+("Round stays round", 15 Nov) is a bare glyph now. That Requests' **Search Soulseek…** row is flat is the design
+session's too: it boxed that button for one round, told him when it unboxed it, and he sent the drawing on - his rule
+is about where you type.
+
+Built on c3c461cd (the fonts, Libre Franklin and Courier Prime, on R2b's 75ea812e): begun on 75ea812e and rebased onto
+it, the one conflict docs/ios.md's (the checks' heading and its anchor take 614; 610-611 then 612-614), and the switch's
+fit re-measured in Libre Franklin. The app is still 0.13 (13); `__version__` and the word fixtures untouched.
+
+### What each shared piece became
+
+All of it on the phone's path alone - each piece's `if Platform.mac` (or a part only the phone's half names); the Mac's
+half of every one is pinned (tests/test_ios_mac_halves.py, below).
+
+- **Core** (DWLook.swift): DWLook.onPhone's button room is a flat button's, 6 either side at every size (`.dw.ph .btn`,
+  `.btn.sm`; 13, 11 and 13 before), its chip 0 tall (`height: auto` - as tall as its words), the large segment 40
+  (`.seg.lg button`; 38). **DWFlat**, a new enum, holds the flat phone's sizes that App/Look's shared pieces draw on the
+  phone alone (DWLook's 22 fields are what both devices hold, so it stays apart): the faced buttons' room, 16 every size
+  (`.btn.pri`); the chosen line, 2 (`.seg button.on`'s box-shadow); the switch's least room either side of its words
+  before it folds, 6 (`segmentRoom` - below; the review: **R1c's own room, no rule's** - `.seg.lg button` has no
+  padding - said so as `// own:`, and what folds the four pages at the standard size); a chip's dot 6, its gap 6 and its
+  sides 5; and (the review) `facedChipHeight`, 22, the New mark's (below). PhoneLook: the strip 40 tall,
+  no padding of its own, 22 apart (`.chips`); the card 14 above and below; the group and its heading 0 in from the
+  sides; Find's and the •••'s box 36 x 34 (`.dw.ph .circ`'s width over `.circ`'s height).
+- **DWButtonStyle**: on the phone only the purple and the red go to the faced body (DWButtonBody, its room 16);
+  `.normal` and `.on` go to **DWFlatButtonBody** - the label in the accent, medium (semibold when on, or large:
+  `.btn.lg` 17), one line, at a button's heights (36, small 32, large 48 - `lookHeight`, growing with the text), 6
+  either side, its target a faced button's (DWTarget, 44 tall at least), faded while held (DWPalette.off, as a toggle
+  fades) and while it can't be used. The press shows only as that fade. (The review) **44 wide at least** too
+  (`.frame(minWidth: look.target)`), its words or glyph centred: a faced button's face takes a finger, a flat one's
+  words may not - Up Next's Edit was 37.5 with its room (Libre Franklin's "Edit" at `.btn.sm`'s 13.5, and 6 either
+  side), its ••• about 29. Drawn that wide rather than reached past sideways (DWTarget never reaches sideways: Grid and
+  List, 28 wide and 6 apart, would reach into each other), so a short flat button now takes 44 of its row - a glyph at
+  a row's end sits up to 7.5 further in than its words alone would.
+- **DWChip**: on the phone `flat` - its words at 13 medium in its tone's colour (`.chip`, (13, .footnote) in
+  Typeface.Look now; 12.5 before), with a dot of that colour before them for good, caution, bad and marked (green,
+  amber, red, purple: `.chip.green::before`...), 6 at the standard size and growing with the words (`@ScaledMetric`
+  relative to footnote), hidden from VoiceOver; a plain chip is its words alone. The Mac's is `faced`, R1's, moved
+  into a property of its own unchanged. The count badge (`countFill`) is unchanged on both. (The review) **A chip that
+  `keepsFace`** is faced on the phone too, as R1b drew a chip there - 12.5 semibold (`Typeface.Look.facedChip`, read
+  as `.dw.ph .chip font-size (R1b)`), 22 tall at least (`DWFlat.facedChipHeight`), 7 either side, its tone's fill and
+  edge, square: the Library's New mark alone (LibraryNewMark, on a cover and at a list row's end), a mark on a picture
+  like the count badge - so "kept as it was" (below) is true. The Mac's half reads the same as before (`Platform.mac ?
+  .chip : .facedChip` and the height's ternary are the old code on the Mac: its pin didn't move).
+- **DWSegmented**: on the phone `phoneSegments` - the segments side by side 1 pt in from either end (where the well's
+  edge was, so DWSegmentedNeed measures what's drawn), a hairline under the whole control (`segRule`), each segment's
+  words semibold, the chosen one white over the accent's 2 pt line as wide as its segment, the others in the second
+  colour (`.dw.ph .seg`, `.seg button.on`); the Library's large one 40 tall at 15 (`.seg.lg`, (15, .subheadline); 14
+  before). Each segment keeps its 44 pt target, its Button and its selected trait, and now shows its words in iOS's
+  **Large Content Viewer** under a held finger at the accessibility sizes (R2b's review - James's 14 Nov switch had
+  one). The Mac's `segments` and `segment(_:)`, its well, are R1's.
+- **DWSegmentedNeed** (the Library row's hidden measure): each segment's words keep DWFlat's 6 either side before the
+  row holds them - with no well's edges between them, two neighbours' words never come closer than 12 beside the
+  glyphs (R2b's "For R1c": "Playlists" had 0.7 pt to spare in its segment). Folded, the switch takes the page's width
+  less its sides, and the words what room that leaves.
+- **DWPopUp**: on the phone a flat button's caret, in the accent. Drawn on no phone screen yet.
+- **DWPalette**: the strip's, the card's and the group's faces gone (`stripFace`, `stripEdge`, `stripSheen`,
+  `stripText`, `groupFace`); `stripRule`, `segRule` and `cardRule` the hairline (#1c1b22); the mini player's, the tab
+  bar's and the foot's grounds black (#000), their edges the hairline. Every shared colour the phone draws no face for
+  (a secondary button's, the tinted chips') is drawn nowhere on the phone: held. (The review) `cardFace` is
+  **`macCardFace`** now, the Mac's own (RefreshProblemNote on the Mac's Downloaded and Songs pages): the same #1c1b22,
+  but read as `.dw.ph .card background (R1b)` - from dw.css's rules before its flat block (the test's R1B_RULES) - where
+  it was tied to the card's hairline, so a change to the flat phone can't move the Mac's card. **`page`**, `.dw.ph`'s
+  own ground (#000), is what the bars are the colour of (below); **`scrubTagFace`**, `.dw.ph .mini background (R1b)`
+  (#1c1b22), the scrub's time tag over the mini player, which had ridden on `miniFace` to black.
+- **Typeface.Look**: chip (13, .footnote), largeSegment (15, .subheadline), strip (15, .subheadline); (the review)
+  facedChip (12.5, .caption), R1b's chip, the New mark's - on the Mac a chip's `.label`, never asked for there.
+- **PhoneCard**: no face - what it holds on the page, 14 above and below and none at its sides, over a hairline under
+  the whole card (`.dw.ph .card`). **PhoneGroup**: no face and no edge; its legend a heading at the group's leading
+  edge, 13 and semibold in the second colour (`.group > .legend`, 600; 500 before), still a header for VoiceOver; its
+  rows at the page's own sides, each on its hairline as before (PhoneKV keeps the fonts' first-baseline row).
+- **PhoneStrip**: words at 15 in the second colour, 22 apart, 40 tall, a hairline under the whole strip; the one shown
+  white and semibold over the accent's 2 pt line as wide as its words (`.chips`, `.chips > .on`). The target still
+  reaches 44 (2 above and below the 40 now), inside the scroll view. (The review) Sideways, each button's target is
+  its words and half the gap either side - 11, the HStack's spacing 0, the row's sides 16 less 11 - so the buttons
+  touch and a tap between two words goes to the nearer; and 44 wide at least (the Queue | Info | EQ strip's EQ is 21 in
+  words, 43 with its room). The chosen line is drawn before that room: still as wide as its words.
+- **PhoneTop**'s PhoneCircleStyle (Find and the •••): bare white glyphs (`.circ`'s #fff), at title3 - the text style
+  nearest `.circ svg`'s 21 (20) - centred in the 36 x 34 box, in a 44 pt target that reaches 4 past it sideways (into
+  the row's 12) and 5 above and below; faded while held and while it can't be used. No face.
+- **PhoneFoot**: no fill of its own, a hairline over it - drawn in the page's black (below). Drawn nowhere yet (R9,
+  R10).
+- **PhoneMini**: its ground the page's black under the hairline (`.dw.ph .mini`).
+- **DWWellField** (the review, App/Look's eleventh file): a ViewModifier that draws a field a page already has - its
+  own words, keyboard, Return and focus - on the look's well, as DWField draws its own: on the phone the plain field in
+  the field's type and white, the system's ring off, 8 either side, 36 tall at least (`lines`: 8 above and below too,
+  for a field that grows - this session's own room, dw.css draws no field of more than a line), on DWWell with the
+  accent's edge while it has the cursor and a tap on the well (or a finger's 44 round it) putting the cursor in it.
+  Its focus stays the page's: the field keeps its own `.focused` on both devices, and DWWellField only reads that
+  binding (`focus`, `field`) for the edge and sets it from a tap - it never binds it again. (It did, first: with the
+  manual search's own `.focused` lines moved into it, the Mac half - `content` - would have dropped the fields' focus,
+  and test_ios_mac's Tab test, which wants each `.tabs` right after its field's own `.focused`, failed on it.) On the
+  Mac it is nothing - the field as its page drew it (pinned: its Mac half is `content`). A playlist's Edit and the
+  manual search use it (below).
+
+### The one-offs (screens that draw a face of their own)
+
+- **The mini player** (MiniPlayerView): the cover's rule at its right gone (`.mini .cover { border-right: 0 }`). (The
+  review) The scrub's time tag keeps its face, `scrubTagFace` (#1c1b22, the mini player's R1b ground): on the flat
+  bar a tag of the bar's own black would have been its edge alone.
+- **The tab bar** (MainTabs): its colours are the palette's (black under the hairline); its doc said so.
+- **Requests** (RequestCards, RequestsScreen): the ✕ a bare accent glyph (a flat small button's, iRequests' `.btn.sm`),
+  no round face, in its 44 pt target; a Done row's ▶ a bare accent play glyph (`.row .key:not(.bare)`, 18 - the body
+  style's glyph, semibold, 18 being nearest headline's and body's 17), in its 44; the cards stacked with no gap between
+  them, a card's hairline all that separates it from the next (iRequests'). Nothing on the cards is round now.
+- **The Library's refresh problem** (AlbumsScreen's RefreshProblemNote): on the phone a PhoneCard; on the Mac's
+  Downloaded and Songs pages, which borrow it, R2's card as it was (its face `macCardFace`, the review's).
+- (The review) **Downloaded's first ask** (FirstAskCard - its toggled fill and its SecondaryPill were left grey): on
+  the phone a PhoneCard, Turn On the purple, Not Now a flat button (DWButtonStyle); on the Mac's Downloaded page,
+  which borrows it, the card as it was (its words moved into `ask`, then each device's dress - pinned).
+- (The review) **The empty library's See All music** (EmptyLibraryNote, Albums' and Artists'; it was `.bordered`, the
+  system's grey): on the phone a flat button; in an `if Platform.mac` the bordered button as before (pinned).
+- (The review) **An album's and a playlist's page** (AlbumView, PlaylistView): their ground on the phone `page`, the
+  bars' black - R5 drew them on --bg (#0b0a10), which left a seam where the mini player and the tab bar meet them; the
+  Mac's --bg as before (`Platform.mac ? DWPalette.bg : DWPalette.page`; the Mac draws PlaylistView's Edit).
+- (The review) **A playlist's Edit**: its name and description on the look's wells (DWWellField; the description's
+  `lines`) - a `.plain` List's rows with their ground hidden drew no box round them. Each field has a `.focused` of its
+  own now (`typing`), which the well's edge reads; the Mac, which draws Edit too, gets the binding and nothing reads
+  it there - the one line of R1c's that the Mac's code path runs and its look doesn't (the fields unpinned there).
+- (The review) **The manual search** (ManualSearchSheet): flat, no Form - so no grey cells - on the page's black
+  (behind the scroll view, under its bar, and as the sheet's own ground: `.presentationBackground`): the offline note,
+  Artist and Album on the look's wells 8 apart (iRequests' `.in`s; each prompt in the third colour, each focus the
+  sheet's own as A1 made it), the footer under them in the second colour, the purple Search 20 under that, the
+  page's sides 16. Its Return, Tab, Escape, focus as it opens, Back and Cancel are as A1 made them.
+- **The EQ** (EQScreen, EQOutputViews): the curve on the page with no well (`.dw.ph div.well:not(.sfield)`; its lines
+  keep the well's colours, `well: true`, as the drawing's do); the output's button a flat button's - the name and its
+  caret in the accent, no face, AirPlay's own button still under it. The groups are PhoneGroup's; the sliders' tracks
+  stay sunken; Forget This Output is the red button.
+- **An artist's top** (ArtistView): on the phone `phoneHero` (iArtist) - their round picture, 84, beside the name (the
+  title style, bold, letters 0.4 closer, up to 3 lines, a header) and its lines under it (the Last.fm listeners, "chosen
+  here"), 14 between, 8 above; at the accessibility sizes the picture over the name, so the name keeps its room. No band
+  behind it and no shadow under the picture. The Mac's `macHero` is the 200 pt picture centred over the name, as before
+  (moved, not changed - pinned).
+
+### R2b's "For R1c", answered
+
+- The switch's room inside its segments: DWFlat.segmentRoom, 6 either side of each word before the row holds the
+  switch (DWSegmentedNeed) - "Playlists" at xxxLarge on 375 no longer has 0.04 pt to spare: that switch folds.
+- The Large Content Viewer on each segment: built (phoneSegment).
+- The •••'s open state: not built - the first departure below.
+- The Mac's borrowed Songs page draws DWSegmented's focusable Mac path: left as it is, as asked.
+
+### Departures, each said
+
+- **The •••'s open state isn't drawn** (the drawing has it in the accent while its menu is open, `.circ.on`). SwiftUI's
+  Menu tells its label nothing of whether it is open; the one documented way to know - UIKit's context-menu
+  interaction, a UIButton of the app's own with its menu as a UIMenu - would rebuild the menu itself, which this slice
+  keeps as it is. Check 612 asks whether it's missed.
+- **The red keeps its sheen and its drop.** The flat block's `.dw.ph .btn { box-shadow: none }` reaches `.btn.red` too,
+  so the drawing's red is flat-shaded; the plan's table and the brief both say Delete permanently is unchanged, so it
+  is DWButtonBody's red as before (Cancel download, Forget This Output). Held in test_ios_phone_look.py.
+- **The foot draws the page's black, not nothing.** `.dw.ph .foot2 { background: none }` shows the drawing's page
+  through it, which has nothing scrolling under its foot; the app's foot stands over a scroll view, so a clear foot
+  would show the rows passing under its buttons.
+- **The cards are stacked with no gap** (iRequests'), R8's 8 between them gone with their faces.
+- **The four pages' switch folds at the standard size** (logins off, and the break-glass sign-in), on 375, 393 and 402
+  pt phones alike: with room between their words (DWFlat's 6 either side) four don't fit beside the glyphs. In Libre
+  Franklin's SemiBold at 15, by the sums of advances (tests/ios_fonts.py; kerning only narrows): four pages need 293.2
+  where the row has 247 on 375 (265 on 393, 274 on 402), holding only at xSmall on 375 and to small on the others. Three
+  pages: Yours' (Albums, Playlists, Artists) fold at xxLarge and xxxLarge on 375 (269.0 and 293.3 of 247), All's
+  (Albums, Artists, Songs) at xxxLarge alone (245.8 of 247 at xxLarge - 1.2 to spare). Beside the glyphs two
+  neighbours' words are never closer than 12 (15.1 at the closest, the four at xSmall on 375); folded, the four at
+  xxxLarge come closest, 4.4 apart (4.8 in Noto Sans). This supersedes the fonts' note on R2b's row (three pages
+  holding by 0.2 pt at xxxLarge): the flat switch's 15 pt words, the 36 pt boxes and the room either side fold it
+  there. Check 612 asks whether the four pages under the glyphs read well.
+- **Shuffle and Repeat, on the Queue, tell on from off by weight alone** - `.btn.on` in the flat block is the accent and
+  600, with no face; they were the selection's fill before. Check 612 asks.
+- **Requests' manual search is a sheet, not inline** (rewritten by the review): Artist and Album are the look's boxes
+  (DWWellField's wells, square), in the flat sheet its Search Soulseek… row opens (A1's), not inline at the top of
+  Requests beside a flat Search as iRequests draws them. Its Search is the purple PrimaryFace, as before. Every other
+  place you type keeps the box it had (below).
+- **DWPopUp's caret** takes the accent on the phone though no phone screen draws a pop-up yet - so whichever slice first
+  does gets a flat button's.
+- **Kept as they were**, not grey boxes by the rule: the count badge and the Library's New mark on a cover (a mark on a
+  picture - the New mark R1b's face on the phone since the review, DWChip's `keepsFace`; before it, R1c had made it a
+  dot and words over the cover), the toggles (DWToggleStyle, PhoneSwitch), the meters and the seek line (sunken
+  tracks), the scrub's time tag (its own face since the review), the lit line over the tab shown, the Now Playing
+  sheet's own ground (--panel, as drawn) and the Queue's playing row in the selection's tint (Now Playing's,
+  unchanged).
+- **Not flat yet** (the review: "nothing grey" was promised, and grey is left): each keeps iOS's grouped lists or the
+  old faces until the slice that redraws it - Settings' inset-grouped pages, Change password, Sign in and the server
+  address (R9); Search's rows, the pressing picker, an album's Get and Choose a source's cards (R7); an artist's page
+  below its top, and its Artist images and Move albums sheets (R6); Edit album's pages (R10, R11); Needs a look (R12);
+  Library care and the Event log (R13); People and Server settings (R14); and the EQ's own pages, Correction's search
+  and a filter's editor, which no slice has yet. docs/ios.md says so over checks 612-614, and 612 names what to look
+  at instead.
+- **The bars are the page's black** (the review): the mini player, the tab bar and the foot are `page` (#000,
+  `.dw.ph`'s ground) - the colour of every phone page they sit on: iOS's own black under the app's dark scheme, and
+  the album's and the playlist's pages, drawn on `page` now (above).
+
+### Every place you type is still a box
+
+Held by `test_every_place_you_type_on_the_phone_is_still_a_box`: every place you type on the phone - each TextField,
+SecureField, TextEditor, `.searchable` and Platform's `.searchField`, 41 of them in 26 files - named file by file in
+order with the box it is in. (The review) **Read from the field itself, not its file**: R1c's first check looked for a
+box anywhere in the file, so sign-in's fields passed with FieldLook's fill and edge taken away - the amber notice in
+the same file answered for them - and a playlist's Edit name and description passed as iOS's own though their `.plain`
+List draws no box. Now:
+- **the look's well** - DWWell drawn under the field by its own modifier chain (DWField's), by a ViewModifier that
+  chain names (DWWellField's: a playlist's Edit, the manual search), or by the HStack it shares with its glyph (the
+  Library's Find), a plain field on it;
+- **the app's own box** - a fill and an edge in the field's own chain or a ViewModifier it names (sign-in's
+  FieldLook's body, Sources' query's chain);
+- **iOS's own box** - no `.textFieldStyle` taking it away, and every way the field is reached held in a Form, a List
+  that isn't `.plain`, an alert or a `.searchable`: walked out from the field through the blocks around it, and on
+  through each use of the view, helper or computed property it is declared in (3 hops at most; a `var x = ...` in a
+  helper's body is a value, not a declaration to follow - Artist images' search field was misread through
+  `@Bindable var model = model` until that was said). `test_the_walk_finds_each_box_from_the_field_itself` holds the
+  walk on four planted files: another box in the file never answers for a field, a helper's field is found in its
+  caller's Form, a modifier's fill and edge count, a plain List's and a sheet's root don't.
+
+Also held: DWWell's fill, inner shadow and edge (the accent's while focused) as dw.css's `.in`; DWWellField's two halves
+(the Mac's `content`; the phone's chain, exactly); a playlist's Edit's two wells (the description's `lines`); the
+manual search flat - no Form, Section or List, the page's black under its bar and as its sheet's ground, its two
+fields' focus the sheet's own right before its Tab, once each, the prompts in the third colour, the footer in the
+second, the purple Search; a playlist's Edit's focus each field's own, once;
+Search's field iOS's own in the navigation bar (Platform's phone half); and Requests' Search Soulseek… row flat -
+accent words on its hairline, no face. A new place you type fails it until it is named.
+
+### Tests
+
+- **test_ios_phone_look.py**: the cascade now reads `:not()`; every PhoneLook and DWLook number against the flat block
+  (the chip's `auto` as 0); `test_dwflat_is_the_flat_phones_rules` (DWFlat's eight lines, the red's and the purple's
+  16, the chosen line on `.seg button.on`, `.seg.lg button.on` and `.chips > .on`, the dot's four tones and none on a
+  plain chip, no DWFlat on the Mac); the twin test's FLAT set (a secondary button's and the tinted chips' colours drawn
+  nowhere on the phone: none, 0 wide, or the accent); the fixed frames, targets, branches and each device's half as
+  they are now; the Large Content Viewer. Two new: **`test_the_phone_is_flat`** - every fill, face, edge and hairline
+  each App/Look and App/Phone file draws on the phone's path (each `if Platform.mac` read as its else, and the parts
+  only the Mac's halves name taken out), listed exactly, each with its reason (FLAT_DRAWS: the purple and the red, the
+  dot and the count, the wells, the meter, the caret, the hairlines and chosen lines, the toggle and the switch, the
+  lit line, and DWRaised, which draws only what it's given) - a face added to any of them fails it; and
+  `test_every_place_you_type_on_the_phone_is_still_a_box` (above).
+- **test_ios_mac_halves.py** (new): what the Mac runs of each App/Look piece (DWPalette aside - its colours are
+  test_ios_mac_look.py's), and of RefreshProblemNote and the artist's macHero, read from the source as the Mac runs it
+  (each `if Platform.mac` as its then, `!Platform.mac` dropped, the ternaries resolved, the phone's own parts taken out)
+  and digested, pinned as R1c left it - R2b's code as the Mac ran it, but for R1c's moves (the chip's face into `faced`,
+  RefreshProblemNote's words into `words`, the artist's top renamed). Written because the existing Mac look tests
+  passed a Mac button with its drop taken away (mutation 6, below); they are unchanged.
+- (The review) test_ios_phone_look.py: the cascade also reads dw.css **as R1b drew the phone** (R1B_RULES, the rules
+  before its flat block), for the lines marked `(R1b)` - `macCardFace`, `scrubTagFace`, `facedChipHeight` and
+  `Typeface.Look.facedChip` - each held to it and the R1b colours to their one use each; `segmentRoom` held as the
+  slice's own (`// own:`, `.seg.lg button`'s padding 0); a flat button's 44 wide and the strip's room either side, its
+  chosen line inside it, in `test_a_fingers_target_is_44_at_least`; the bars, `page`, the album's and the playlist's
+  grounds all one black; the New mark's face (LibraryNewMark the only `keepsFace: true`, R1b's 7, 12.5 and 22);
+  `phone_path` reads `if Platform.mac || x` as both halves, the chip's face no longer cut out as the Mac's; the first
+  ask's and See All music's phone halves, exactly (a PhoneCard, flat buttons; the toggled fill, SecondaryPill and
+  `.bordered` in the Mac's halves alone); each well's focus the page's own (`.focused` once per field, the manual
+  search's right before its Tab, none in DWWellField). test_ios_palette.py's list of what reaches the top edge takes
+  the manual search's black, held to be a fill alone. And
+  test_ios_mac_halves.py pins the artist's top with its dispatcher, `hero()`, and the statics it reads (its 200), and
+  three new parts - DWWellField, the first ask and See All music; RefreshProblemNote's pin moved for `macCardFace` alone
+  (its digest with the old name is the old pin), macHero alone still digests to its old pin, and DWChip's didn't move.
+- test_ios_library_look.py (the glyphs bare and white, 21 at title3, in the 36 x 34 box; the fit above, in Libre
+  Franklin), test_ios_requests_look.py (`test_the_cards_are_flat_and_square`), test_ios_palette.py (the tab bar black
+  under the hairline), test_ios_nowplaying_pages_look.py (the EQ's curve with no well), test_ios_lastfm.py (the
+  listeners line in both tops). Core: DWLookTests (`theFlatPhonesSizesFitTogether`, the chip's 0) and
+  LibrarySwitchTests (the row's frames with the 36 pt boxes, room 247).
+
+Each mutated alone, the look tests run (fourteen files, the Mac's among them), and put back byte for byte (sha256
+checked):
+- A secondary button's face back (DWFlatButtonBody given `.btn`'s DWRaised): `test_the_phone_is_flat` (and, since the
+  review, `test_a_fingers_target_is_44_at_least`, which reads that chain).
+- A group's panel back (PhoneGroup on `macCardFace`): `test_the_phone_is_flat`.
+- A text field losing its box (DWField's DWWell a clear colour):
+  `test_every_place_you_type_on_the_phone_is_still_a_box`, `test_the_phone_is_flat`,
+  `test_a_fingers_target_is_44_at_least`, and the Mac's pin (DWField is both devices').
+- The strip's chosen line gone: `test_the_phone_is_flat`, `test_every_height_on_the_phone_is_a_minimum` (FIXED) and
+  `test_a_fingers_target_is_44_at_least`.
+- A dot on a plain chip (`if tone != .plain` as `if true`): `test_each_device_half_of_the_shared_pieces_draws_its_own`.
+- The Mac's button losing its drop (`.normal`'s `drop: nil`): `test_the_macs_half_of_each_shared_piece_is_pinned`
+  alone - before it was written, every Mac look test passed it.
+
+The review's, the same way (sixteen files now: test_ios_manual_search.py and test_ios_lastfm.py added), each caught:
+- Sign-in's FieldLook losing its fill and edge, the amber notice still in the file - which the first round's typing
+  test passed - and Sources' query losing its: the typing test.
+- The Mac's artist picture 200 -> 84 (a static macHero reads): the Mac's pin and the phone-only test. The Mac sent to
+  the phone's top in `hero()`: the Mac's pin, the phone-only test and test_ios_lastfm's artist page test.
+- A strip button's room gone, and a flat button's 44 wide gone: `test_a_fingers_target_is_44_at_least`.
+- The New mark's face lost on the phone (`keepsFace` dropped): the each-half test.
+- A playlist's name losing its well, the manual search's Artist losing its, DWWellField's well a clear colour: the
+  typing test (the last the flat test too).
+- DWWellField binding the page's focus again: the typing test; the manual search's Artist losing its own `.focused`
+  (which the Mac's half, `content`, would drop): test_ios_mac's Tab test and the typing test.
+- An album's page back on --bg on the phone, the scrub tag back on the bar's black, `macCardFace` read from the flat
+  hairline again: the flat test.
+- The first ask's toggled fill back on the phone - NOT caught at first (nothing read the first ask's phone half);
+  the flat test's one-offs now read it, and See All music's, exactly - then caught by the flat test, as are its Not
+  Now back on SecondaryPill and See All music back on `.bordered` (the latter test_ios_palette's squared-border test
+  too).
+
+### Not verified - only a phone can say (checks 612-614, and the reworded 179, 203, 251, 529, 541, 547, 548, 556, 572)
+
+- Anything on a screen: no Simulator, phone or Mac run. Whether every button still reads as a button (its words in the
+  accent, no face), whether the fade reads as a press, and whether Shuffle and Repeat read on from off by weight.
+- The hairlines' #1c1b22 on black - visible, or too faint - and the chosen line's 2 pt under 15 pt words.
+- The four pages folded under the glyphs at the standard size, and the Large Content Viewer on a segment (iOS shows it
+  only at the accessibility sizes, under a held finger).
+- The round 84 pt artist picture beside the name, and stacked at the accessibility sizes.
+- The ••• staying white with its menu open.
+- (The review) A tap between two strip words, or just beside a short flat button, going where it should - the room is
+  in code, not seen; and a short flat button at a row's end now 44 wide, its glyph up to 7.5 further in.
+- The wells of a playlist's Edit and the manual search: the cursor on a tap of the well, the accent's edge while
+  typing, the description growing inside its well; the manual search's sheet black with no grey above or below its
+  bar; Return, Tab and the first cursor as A1 left them.
+- The New mark's R1b face on a cover; the scrub tag's face over the black bar; no seam between an album's or a
+  playlist's page and the bars.
+- The Mac: built for Mac Catalyst; its halves pinned in code; not looked at. A playlist's Edit fields carry a
+  `.focused` binding there now that nothing reads.

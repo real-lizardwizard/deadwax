@@ -19,6 +19,11 @@ import SwiftUI
 /// tests/test_ios_mac_look.py, as SwiftUI's own colours.)
 ///
 /// SwiftUI's own `.bordered` would be the system's capsule: none of the new look's views use it.
+///
+/// (R1c - notes/ios.md "The redesign, slice R1c: the phone is flat (2026-11-25)"; James, 25 Nov: "get rid of all the
+/// grey boxes") **On the phone only the purple and the red keep a face**: `.normal` and `.on` are their words or glyph
+/// in the accent with no face (`.dw.ph .btn`, DWFlatButtonBody) - medium, semibold when on or large - at the same
+/// heights and the same target. The Mac's are R1's, every kind.
 struct DWButtonStyle: ButtonStyle {
     enum Kind: Sendable {
         case normal, pri, danger, on
@@ -34,8 +39,51 @@ struct DWButtonStyle: ButtonStyle {
     /// .grow: the button takes the room it's given, its words centred (a foot's main action, an album's Play).
     var fills = false
 
-    func makeBody(configuration: Configuration) -> some View {
-        DWButtonBody(configuration: configuration, kind: kind, size: size, fills: fills)
+    @ViewBuilder func makeBody(configuration: Configuration) -> some View {
+        if Platform.mac || kind == .pri || kind == .danger {
+            DWButtonBody(configuration: configuration, kind: kind, size: size, fills: fills)
+        } else {
+            DWFlatButtonBody(configuration: configuration, on: kind == .on, size: size, fills: fills)
+        }
+    }
+}
+
+/// (R1c) A button on the phone with no face (`.dw.ph .btn`, `.btn.on`): its words or glyph in the accent - semibold
+/// when on (`.btn.on`) or large (`.btn.lg`, 17), medium otherwise - one line, at a button's heights (36, small 32, large
+/// 48), a flat button's room of 6 either side; faded while held, as DWToggleStyle's toggle is, and while it can't be
+/// used. Its target is a faced button's: 44 tall at least round its height - and (R1c's review) 44 wide at least, its
+/// words or glyph centred in that: a faced button's face is wide enough to take a finger, a flat one's words may not be
+/// (Up Next's Edit is 37.5 with its room, its ••• about 29), so a short one is drawn as wide as a target, not reached past.
+private struct DWFlatButtonBody: View {
+    let configuration: ButtonStyleConfiguration
+    let on: Bool
+    let size: DWButtonStyle.Size
+    let fills: Bool
+    @Environment(\.isEnabled) private var enabled
+
+    var body: some View {
+        let look = DWLook.here
+        configuration.label
+            .font(Typeface.Look.text(role).weight(on || size == .large ? .semibold : .medium))
+            .foregroundStyle(DWPalette.acc)
+            .lineLimit(1)
+            .fixedSize(horizontal: !fills, vertical: false)
+            // .dw.ph .btn: padding 0 6px, every size; the gap of 6 between a glyph and the words is the label's own
+            .padding(.horizontal, CGFloat(size == .small ? look.smallButtonPadding
+                                          : size == .large ? look.largeButtonPadding : look.buttonPadding))
+            .frame(minWidth: CGFloat(look.target), maxWidth: fills ? .infinity : nil)
+            .lookHeight(size == .small ? look.smallButtonHeight
+                        : size == .large ? look.largeButtonHeight : look.buttonHeight)
+            .contentShape(DWTarget(face: DWCorners.buttonShape))
+            .opacity(enabled && !configuration.isPressed ? 1 : DWPalette.off)
+    }
+
+    private var role: Typeface.Look.Role {
+        switch size {
+        case .standard: return .button
+        case .small: return .smallButton
+        case .large: return .largeButton
+        }
     }
 }
 
@@ -53,7 +101,7 @@ private struct DWButtonBody: View {
             .foregroundStyle(words)
             .lineLimit(1)
             .fixedSize(horizontal: !fills, vertical: false)
-            // .btn: padding 0 11px on the Mac (.btn.sm 0 8px), 0 13px on the phone (.btn.sm 0 11px); the gap of 6
+            // .btn: padding 0 11px on the Mac (.btn.sm 0 8px), 0 16px on the phone's faced two (R1c); the gap of 6
             // between a glyph and the words is the label's own HStack
             .padding(.horizontal, CGFloat(padding))
             .frame(maxWidth: fills ? .infinity : nil)
@@ -81,6 +129,15 @@ private struct DWButtonBody: View {
     }
 
     private var padding: Double {
+        if !Platform.mac {
+            // (R1c) the phone draws only its faced two here, the purple and the red: their room either side, 16
+            // (`.dw.ph .btn.pri`, `.btn.red`) - a flat button's is DWFlatButtonBody's
+            switch size {
+            case .standard: return DWFlat.facedPadding
+            case .small: return DWFlat.smallFacedPadding
+            case .large: return DWFlat.largeFacedPadding
+            }
+        }
         let look = DWLook.here
         switch size {
         case .standard: return look.buttonPadding
@@ -128,7 +185,8 @@ private struct DWButtonBody: View {
                          drop: DWPalette.phonePrimaryDrop)
             }
         case .danger:
-            // .btn.red keeps .btn's sheen and drop
+            // .btn.red keeps .btn's sheen and drop - on the phone too (R1c: "Delete permanently" unchanged; the flat
+            // block's `.dw.ph .btn { box-shadow: none }` would take them, a departure said in notes/ios.md)
             DWRaised(shape: DWCorners.buttonShape, face: DWPalette.redFace, sheen: DWPalette.buttonSheen,
                      edge: DWPalette.redEdge, drop: DWPalette.buttonDrop, pressed: pressed)
         case .on:

@@ -318,46 +318,47 @@ import Testing
         #expect(LibraryPage.allCases.filter { (page: LibraryPage) -> Bool in LibraryLine.layouts(on: page) } == [.albums])
     }
 
-    /// (R2b) The row holds the switch where its equal segments fit between the circles - 375 pt wide, room for 251 -
-    /// and folds it under them where they don't, into the page's width less the circles' sides.
+    /// (R2b) The row holds the switch where its equal segments fit between the circles - 375 pt wide, room for 247
+    /// since R1c's 36 pt glyph boxes (R2b's 34 pt faces left 251) - and folds it under them where they don't, into the
+    /// page's width less the circles' sides.
     @Test func theRowFoldsTheSwitchOnlyWhereItCantHoldIt() {
-        #expect(LibraryTopFit.room(width: 375) == 375 - 2 * (16 + 34 + 12))
-        #expect(LibraryTopFit.room(width: 375) == 251)
+        #expect(LibraryTopFit.room(width: 375) == 375 - 2 * (16 + 36 + 12))
+        #expect(LibraryTopFit.room(width: 375) == 247)
         #expect(LibraryTopFit.foldedRoom(width: 375) == 343)
-        #expect(!LibraryTopFit.folds(needs: 251, width: 375), "exactly the room: held")
-        #expect(LibraryTopFit.folds(needs: 251.5, width: 375))
+        #expect(!LibraryTopFit.folds(needs: 247, width: 375), "exactly the room: held")
+        #expect(LibraryTopFit.folds(needs: 247.5, width: 375))
         #expect(!LibraryTopFit.folds(needs: 300, width: 440))
         #expect(LibraryTopFit.foldedRoom(width: 320) == 288)
         // the row as LibraryTopRow asks for it: given a width, the switch offered the room beside the circles or the
         // page's; asked its own, as wide as the switch needs beside them - never folded
-        #expect(LibraryTopFit.row(needs: 240, width: 375) == LibraryTopFit.Row(width: 375, folds: false, room: 251))
-        #expect(LibraryTopFit.row(needs: 251.5, width: 375) == LibraryTopFit.Row(width: 375, folds: true, room: 343))
-        #expect(LibraryTopFit.row(needs: 300, width: nil) == LibraryTopFit.Row(width: 424, folds: false, room: 300))
+        #expect(LibraryTopFit.row(needs: 240, width: 375) == LibraryTopFit.Row(width: 375, folds: false, room: 247))
+        #expect(LibraryTopFit.row(needs: 247.5, width: 375) == LibraryTopFit.Row(width: 375, folds: true, room: 343))
+        #expect(LibraryTopFit.row(needs: 300, width: nil) == LibraryTopFit.Row(width: 428, folds: false, room: 300))
     }
 
-    /// (R2b, its review) The row's views where James drew them: Find's circle at the leading edge and the •••'s at the
-    /// trailing one - each centred where its 34 pt face is, 16 in - and the switch between them, or across the page
-    /// under them, folded.
+    /// (R2b, its review) The row's views where James drew them: Find's glyph at the leading edge and the •••'s at the
+    /// trailing one - each centred where its 36 pt box is (R1c; R2b's faces were 34), 16 in - and the switch between
+    /// them, or across the page under them, folded.
     @Test func theRowPutsFindLeadingTheMoreTrailingAndTheSwitchBetween() {
         let target = LookSize(width: 44, height: 44)
-        let well = LookSize(width: 251, height: 38)
-        let need = LookSize(width: 240, height: 38)
+        let well = LookSize(width: 247, height: 40)
+        let need = LookSize(width: 240, height: 40)
         let row = LibraryTopFit.place(LibraryTopFit.row(needs: 240, width: 375), find: target, switcher: well,
                                       more: target, need: need)
-        // Find's face 16 in from the leading edge, its target reaching 5 past it; the •••'s as far in from the trailing
-        #expect(row.find == LookBox(x: 11, y: 4, width: 44, height: 44))
-        #expect(row.more == LookBox(x: 320, y: 4, width: 44, height: 44))
-        #expect(row.find.midX == 16 + 17 && row.more.midX == 375 - 16 - 17)
-        // the switch in the room between the faces, 12 from each: 16 + 34 + 12 = 62 to 375 - 62 = 313
-        #expect(row.switcher == LookBox(x: 62, y: 7, width: 251, height: 38))
-        #expect(row.switcher.maxX == 375 - 62)
+        // Find's box 16 in from the leading edge, its target reaching 4 past it; the •••'s as far in from the trailing
+        #expect(row.find == LookBox(x: 12, y: 4, width: 44, height: 44))
+        #expect(row.more == LookBox(x: 319, y: 4, width: 44, height: 44))
+        #expect(row.find.midX == 16 + 18 && row.more.midX == 375 - 16 - 18)
+        // the switch in the room between the boxes, 12 from each: 16 + 36 + 12 = 64 to 375 - 64 = 311
+        #expect(row.switcher == LookBox(x: 64, y: 6, width: 247, height: 40))
+        #expect(row.switcher.maxX == 375 - 64)
         // its need on it, at its own size; all of them centred in the row's 52
-        #expect(row.need == LookBox(x: 67.5, y: 7, width: 240, height: 38))
+        #expect(row.need == LookBox(x: 67.5, y: 6, width: 240, height: 40))
         #expect(row.find.midY == 26 && row.switcher.midY == 26 && row.more.midY == 26)
         #expect(row.width == 375 && row.height == 52)
         // a switch taller than the row (the larger text sizes) makes the row as tall, everything centred in it
         let tall = LibraryTopFit.place(LibraryTopFit.row(needs: 240, width: 375), find: target,
-                                       switcher: LookSize(width: 251, height: 60), more: target, need: need)
+                                       switcher: LookSize(width: 247, height: 60), more: target, need: need)
         #expect(tall.height == 60 && tall.find.midY == 30 && tall.switcher.y == 0)
 
         // folded (four pages at xLarge on a 375 pt phone): the circles where they were, the switch under them across the
@@ -371,8 +372,8 @@ import Testing
         #expect(folded.height == 52 + 42 + 5)
         // on a wider phone the same switch fits beside the circles again, and nothing is under them
         let roomy = LibraryTopFit.place(LibraryTopFit.row(needs: 300, width: 440), find: target,
-                                        switcher: LookSize(width: 316, height: 42), more: target, need: need)
-        #expect(roomy.switcher.y == 5 && roomy.height == 52 && roomy.more.maxX == 440 - 11)
+                                        switcher: LookSize(width: 312, height: 42), more: target, need: need)
+        #expect(roomy.switcher.y == 5 && roomy.height == 52 && roomy.more.maxX == 440 - 12)
     }
 
     /// (R2b, its review) VoiceOver reads the row as it is drawn: Find, the switch, the ••• on one row - and, folded,

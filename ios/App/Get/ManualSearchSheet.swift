@@ -19,6 +19,11 @@ import SwiftUI
 ///   an album's (its cards dimmed, its Gets off).
 /// - Cancel, a swipe let go, or a Get lets the search on the results go. Escape is Cancel (the Mac app, slice 2) only
 ///   with nothing typed: Cancel throws the words away without asking.
+/// - (The redesign, slice R1c's review - notes/ios.md "The redesign, slice R1c: the phone is flat (2026-11-25)") THE
+///   LOOK: flat, on the page's black - no Form, so no grey cells - with the two fields the look's boxes (DWWellField:
+///   iRequests' `.in`s, square, 8 apart, each prompt in the third colour), the footer under them in the second colour
+///   and the purple Search under that, as before. iRequests draws the fields inline at the top of Requests, beside a
+///   flat Search; here they stay in the sheet its Search Soulseek… row opens (A1's), with the behaviour above.
 struct ManualSearchSheet: View {
     /// A download asked for from the results: the sheet goes - Requests is already showing.
     let onQueued: () -> Void
@@ -47,51 +52,63 @@ struct ManualSearchSheet: View {
 
     var body: some View {
         NavigationStack {
-            Form {
-                if !online {
-                    // nothing can be searched until deadwax is back
-                    Section {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 0) {
+                    if !online {
+                        // nothing can be searched until deadwax is back
                         ShelfNote(ManualSearch.offline)
+                            .padding(.bottom, 12)
                     }
-                }
-                Section {
-                    TextField(ManualSearch.artistField, text: $artist)
-                        .textInputAutocapitalization(.words)
-                        .autocorrectionDisabled()
-                        .submitLabel(.next)
-                        .focused($focused, equals: .artist)
-                        .tabs($focused, in: Self.order)
-                        .onSubmit { focused = .album }
-                        .accessibilityLabel(ManualSearch.artistField)
-                        .task {
-                            // the cursor once it is drawn (a focus asked before the field exists is lost), only as the
-                            // sheet opens
-                            guard !opened else { return }
-                            opened = true
-                            focused = .artist
-                        }
-                    TextField(ManualSearch.albumField, text: $album)
-                        .textInputAutocapitalization(.words)
-                        .autocorrectionDisabled()
-                        .submitLabel(.search)
-                        .focused($focused, equals: .album)
-                        .tabs($focused, in: Self.order)
-                        .onSubmit { search() }
-                        .accessibilityLabel(ManualSearch.albumField)
-                } footer: {
+                    // (R1c's review) the look's boxes, iRequests' two `.in`s 8 apart - each field's focus still the
+                    // sheet's own (`focused`), as A1 made it; DWWellField reads it for the edge
+                    VStack(spacing: 8) {
+                        TextField(ManualSearch.artistField, text: $artist,
+                                  prompt: Text(ManualSearch.artistField).foregroundStyle(DWPalette.t3))
+                            .textInputAutocapitalization(.words)
+                            .autocorrectionDisabled()
+                            .submitLabel(.next)
+                            .focused($focused, equals: .artist)
+                            .tabs($focused, in: Self.order)
+                            .onSubmit { focused = .album }
+                            .accessibilityLabel(ManualSearch.artistField)
+                            .task {
+                                // the cursor once it is drawn (a focus asked before the field exists is lost), only as
+                                // the sheet opens
+                                guard !opened else { return }
+                                opened = true
+                                focused = .artist
+                            }
+                            .modifier(DWWellField(focus: $focused, field: .artist))
+                        TextField(ManualSearch.albumField, text: $album,
+                                  prompt: Text(ManualSearch.albumField).foregroundStyle(DWPalette.t3))
+                            .textInputAutocapitalization(.words)
+                            .autocorrectionDisabled()
+                            .submitLabel(.search)
+                            .focused($focused, equals: .album)
+                            .tabs($focused, in: Self.order)
+                            .onSubmit { search() }
+                            .accessibilityLabel(ManualSearch.albumField)
+                            .modifier(DWWellField(focus: $focused, field: .album))
+                    }
+                    // what the Form's footer said, under the fields on the page
                     Text(ManualSearch.footer)
                         .font(Typeface.footnote)
+                        .foregroundStyle(DWPalette.t2)
                         .fixedSize(horizontal: false, vertical: true)
-                }
-                Section {
+                        .padding(.top, 8)
                     Button(ManualSearch.search, action: search)
                         .buttonStyle(PrimaryFace())
                         .disabled(!searchable)
                         .frame(maxWidth: .infinity)
+                        .padding(.top, 20)
                 }
-                .listRowBackground(Color.clear)
+                // the page's sides, 16 (.f's padding 0 16px)
+                .padding(.horizontal, 16)
+                .padding(.vertical, 12)
             }
             .scrollDismissesKeyboard(.interactively)
+            // (R1c's review) the page's black, under the bar too: no sheet's grey behind it
+            .background(DWPalette.page.ignoresSafeArea())
             // the sheet going for good - a swipe let go, Cancel, a Get: the results' search goes with it, there and then
             .background(SheetGoing { results?.search.close() })
             .navigationTitle(ManualSearch.title)
@@ -119,6 +136,8 @@ struct ManualSearchSheet: View {
         // never as a back-swipe starts, which could be let go and cancelled, leaving the page up with its search shut
         // (slice A1's review). And however the sheet went, the search goes with it:
         .onDisappear { results?.search.close() }
+        // (R1c's review) the sheet's own ground the page's black, as the Now Playing sheet's is its own
+        .presentationBackground(DWPalette.page)
     }
 
     /// Search, from the button or Return in Album: the words as typed, a new search on a page of its own. Nothing while

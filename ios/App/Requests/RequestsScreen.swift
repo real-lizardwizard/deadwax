@@ -48,8 +48,6 @@ struct RequestsScreen: View {
         static let side: CGFloat = 16          // drawn: iRequests .list padding-left
         /// .row.grp: its words at its foot.
         static let headingFoot: CGFloat = 6    // dw.ph: .row.grp padding-bottom
-        /// Between two cards under one heading (the drawing has one under each): a card's own gap, its buttons'.
-        static let cardGap: CGFloat = 8        // drawn: iRequests .card .f gap
     }
 
     var body: some View {
@@ -136,7 +134,9 @@ struct RequestsScreen: View {
             } else {
                 ForEach(RequestFilter.all.shown(board), id: \.self) { (section: RequestSection) in
                     Section {
-                        VStack(alignment: .leading, spacing: section == .done ? 0 : Sizes.cardGap) {
+                        // (R1c) the cards one under the other, as iRequests stacks its: a card's hairline is all
+                        // between it and the next, as between two done rows
+                        VStack(alignment: .leading, spacing: 0) {
                             ForEach(board.rows(section)) { (row: RequestRow) in
                                 card(section, row)
                                     .id(row.key)
@@ -198,7 +198,6 @@ struct RequestsScreen: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
         }
-        .padding(.top, Sizes.cardGap)
     }
 
     /// A look that failed: what went wrong in a listener's words - no "try again", it asks again by itself, as the line
@@ -218,7 +217,6 @@ struct RequestsScreen: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
         }
-        .padding(.top, Sizes.cardGap)
     }
 
     @ViewBuilder private func card(_ section: RequestSection, _ row: RequestRow) -> some View {

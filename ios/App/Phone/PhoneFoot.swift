@@ -4,8 +4,11 @@ import UIKit
 
 /// The fixed bottom action (dw.css's .foot2 - the redesign, slice R1b, notes/ios.md "The redesign, slice R1b: the shared
 /// look, and the phone's pieces"): a page's one or two actions at its foot - Edit album's Save, a person's Save
-/// permissions - 68 tall at least on #121117 under its #2c2a36 edge, 10 apart and 16 in, its ground run on down into the
-/// home indicator's room. Capped at xxxLarge, as the tab bar is. Drawn nowhere until its slices (R9, R10).
+/// permissions - 68 tall at least, 10 apart and 16 in, its ground run on down into the home indicator's room. Capped at
+/// xxxLarge, as the tab bar is. Drawn nowhere until its slices (R9, R10). (R1c - notes/ios.md "The redesign, slice R1c:
+/// the phone is flat (2026-11-25)") No fill of its own, a hairline (#1c1b22) over it: its ground is the page's own black,
+/// so it reads as the page while what scrolls under it doesn't show through (`.dw.ph .foot2`'s `background: none` draws
+/// the drawing's page through it, which has nothing under its foot).
 struct PhoneFoot<Actions: View>: View {
     @ViewBuilder let actions: Actions
 

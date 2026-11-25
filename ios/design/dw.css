@@ -313,3 +313,56 @@
 .dw .meta .scope { display: inline-flex; align-items: center; gap: 10px; }
 .dw .meta .scope > b { color: #fff; font-weight: 600; }
 .dw .meta .scope > i { width: 1px; height: 12px; background: #34323c; }
+
+/* Fonts to try (James, 25 Nov: "let's try some different fonts as well, give me some choices"). Each is a class on
+   a board's root (the f*.dc.html boards): the words' face, and --mono for the readouts. On 15 Nov he chose Noto Sans
+   from six set side by side (with SF Pro, Space Grotesk, Inter, IBM Plex Sans and Archivo), so none of those five is
+   here. Every face is under the OFL, so the app could bundle it. .hd marks a title: only the slab choice restyles it.
+   Chosen, 25 Nov ("libre franklin", then "Adopt it"): Libre Franklin for the words and Courier Prime for the readouts,
+   on both apps. They are .dw's own faces now (the top of this file); .fx-noto keeps the two boards that show the
+   face from before. */
+.dw.fx-noto { font-family: "Noto Sans", system-ui, sans-serif; --mono: "Noto Sans Mono", ui-monospace, monospace; }
+.dw.fx-franklin { font-family: "Libre Franklin", system-ui, sans-serif; --mono: "Courier Prime", ui-monospace, monospace; }
+.dw.fx-chakra { font-family: "Chakra Petch", system-ui, sans-serif; --mono: "Share Tech Mono", ui-monospace, monospace; }
+.dw.fx-barlow { font-family: "Barlow", system-ui, sans-serif; --mono: "Overpass Mono", ui-monospace, monospace; }
+.dw.fx-jost { font-family: "Jost", system-ui, sans-serif; --mono: "DM Mono", ui-monospace, monospace; }
+.dw.fx-slab .hd { font-family: "Zilla Slab", Georgia, serif; letter-spacing: 0 !important; }
+
+/* The phone, flat (James, 25 Nov: "on ios, I want to try to get rid of all the grey boxes. everything should just
+   look like it's part of the interface, not laid on top. I really like the play screen design, it feels very well
+   integrated"). So the phone is drawn as Now Playing is: words and glyphs straight on the page, hairlines between
+   things, and only three kinds of filled thing left - the primary button, a sunken track, and a picture.
+   - A card and a group are no longer panels: a group is a heading over rows, a card is a row with a hairline under.
+   - A button that isn't the primary is its words or its glyph in the accent, with no face. Delete stays filled red.
+   - A strip of choices, the Library's switch and a small switch are words: the chosen one white over a lit line.
+   - Anywhere you type stays a sunken box (James: "actually any place you can input text should be a box"): every
+     field, and Search's. A status chip is coloured words after a dot.
+   - The mini player and the tab bar are the page's own black under a hairline.
+   The Mac is untouched: every rule here starts .dw.ph. */
+.dw.ph .card { padding: 14px 0; background: none; border-bottom: 1px solid #1c1b22; }
+.dw.ph .group, .dw.ph .group.pad { padding-left: 0; padding-right: 0; border: 0; background: none; }
+.dw.ph .group > .legend { left: 0; font-weight: 600; }
+.dw.ph .btn { padding: 0 6px; border: 0; background: none; box-shadow: none; color: var(--acc); }
+.dw.ph .btn.sm { padding: 0 6px; }
+.dw.ph .btn.on { border: 0; background: none; color: var(--acc); font-weight: 600; }
+.dw.ph .btn.pri { padding: 0 16px; border: 1px solid #7c3aed; background: linear-gradient(to bottom, #a24ef2, #8a2ee0); box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.22), 0 1px 1px rgba(0, 0, 0, 0.5); color: #fff; }
+.dw.ph .btn.red { padding: 0 16px; border: 1px solid #991b1b; background: linear-gradient(to bottom, #dc4a4a, #b91c1c); color: #fff; }
+.dw.ph .circ { width: 36px; border: 0; background: none; box-shadow: none; color: #fff; }
+.dw.ph .circ.on { border: 0; background: none; color: var(--acc); }
+.dw.ph .circ svg { width: 21px; height: 21px; }
+.dw.ph .seg { border: 0; background: none; box-shadow: inset 0 -1px 0 #1c1b22; overflow: visible; }
+.dw.ph .seg button.on, .dw.ph .seg.lg .on { background: none; box-shadow: inset 0 -2px 0 var(--acc); color: #fff; }
+.dw.ph .seg.lg button, .dw.ph .seg.lg a { height: 40px; font-size: 15px; }
+.dw.ph .chips { gap: 22px; margin-bottom: 10px; padding: 0 16px; box-shadow: inset 0 -1px 0 #1c1b22; }
+.dw.ph .chips > button, .dw.ph .chips > a { height: 40px; padding: 0; border: 0; background: none; box-shadow: none; color: var(--t2); font-size: 15px; }
+.dw.ph .chips > .on { border: 0; background: none; box-shadow: inset 0 -2px 0 var(--acc); color: #fff; font-weight: 600; }
+.dw.ph div.well:not(.sfield) { border: 0; background: none; box-shadow: none; }
+.dw.ph .chip { height: auto; gap: 6px; margin: 0 5px; padding: 0; border: 0; background: none; font-size: 13px; font-weight: 500; }
+.dw.ph .chip.green::before, .dw.ph .chip.amber::before, .dw.ph .chip.red::before, .dw.ph .chip.purple::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+.dw.ph .row .key:not(.bare) { border: 0; background: none; box-shadow: none; color: var(--acc); }
+.dw.ph .row .key:not(.bare) svg { width: 18px; height: 18px; stroke: none; }
+.dw.ph .mini { background: #000; border-top-color: #1c1b22; }
+.dw.ph .mini .cover { border-right: 0; }
+.dw.ph .tabbar { background: #000; border-top-color: #1c1b22; }
+.dw.ph .foot2, .dw.ph .home { background: none; }
+.dw.ph .foot2 { border-top-color: #1c1b22; }

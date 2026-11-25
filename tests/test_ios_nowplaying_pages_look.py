@@ -397,9 +397,10 @@ def test_the_phones_groups_make_the_lists_calls_and_no_others():
     assert ".accessibilityAction(named: EQWords.Correction.notNow) { eq.mark(.notNow, for: output) }" in groups
     assert "Button(EQWords.Outputs.rename) { askRename(other.key) }" in groups
     assert "Button(EQWords.Outputs.forget) { askForget(other.key, isPage: false) }" in groups
-    #? the phone's page is iEQ's: the output's button over AirPlay's picker, the curve in a well
+    #? the phone's page is iEQ's: the output's button over AirPlay's picker, the curve - (R1c: no well under it, `.dw.ph
+    #? div.well:not(.sfield)`; its lines the well's colours still)
     assert "EQOutputButton(output: output, connected: connected, playsTo: eq.settings.setting(for: eq.route).shownName)" in groups
-    assert "well: true)\n                .background { DWWell() }" in groups
+    assert "well: true)\n            cardNote(line.text" in groups and "DWWell" not in groups
     button = member(code(OUTPUTS), "struct EQOutputButton: View")
     assert button.index(".allowsHitTesting(false)") < button.index("AirPlayButton(glyph: false, playsTo: playsTo, said: said)")
 
