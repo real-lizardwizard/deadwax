@@ -226,7 +226,7 @@ happens in `~/Library/Caches/deadwax-build`, and the last build's whole log is `
 The same app runs on a Mac too, built from the same code through Apple's Mac Catalyst - not the web app in a window,
 and not a second app. It's the same version as the phone's (app 0.13 (13) now), it talks only to deadwax as the phone
 does, and it plays through the same audio engine: seamless joins, normalization, the EQ, downloads. **This is its
-seventh build** - the first ran and played (the Mac app's slice 1), the second added the Mac's menus, keyboard shortcuts
+eighth build** - the first ran and played (the Mac app's slice 1), the second added the Mac's menus, keyboard shortcuts
 and right-click menus, and a window you can close while the music plays (slice 2), the third laid the window out as the
 web app's desktop is laid out - a sidebar, the page, side panels and a player bar (slice 3), the fourth gave it the
 Mac's own words - **This Mac** where the phone says This phone (slice 4), the fifth pauses for sleep and for headphones
@@ -235,21 +235,28 @@ window hidden, and says the Mac's words for Download over (slice 5), the sixth b
 **File > Import EQ File…** ⌘O, Export…'s Save panel, Finder's Open With and a file dropped on the window or the Dock
 (slice 6); this one is looking after deadwax on a big screen - Edit album sized by the window, Manage's pages at a
 readable width, **File > Save changes** ⌘S for Server settings, Tab between the editor's fields, and the event log's
-lines selected and copied with ⌘C (slice 7). **Most of it is still unchecked on a Mac** - it
+lines selected and copied with ⌘C (slice 7); this one begins the Mac's own look, the redesign drawn for it - a title
+strip along the top naming the page, and the sidebar as drawn: words without glyphs, in the Mac's colours, corners
+and type (the redesign's first slice; the pages themselves are still the phone's, and follow in the slices after).
+**Most of it is still unchecked on a Mac** - it
 has been opened and used on one since the first build (17 Nov), but what only a Mac can tell is what its checks are
 for ([404-415](#the-mac-apps-checks-404-415),
 [416-423](#the-mac-apps-menus-keys-and-window-checks-416-423), [424-433](#the-mac-apps-desktop-frame-checks-424-433),
 [434-438](#the-mac-apps-words-checks-434-438), [439-446](#the-mac-apps-sleep-power-and-downloads-checks-439-446),
-[447-451](#the-mac-apps-eq-files-checks-447-451) and [452-458](#the-mac-apps-managing-checks-452-458)).
+[447-451](#the-mac-apps-eq-files-checks-447-451), [452-458](#the-mac-apps-managing-checks-452-458) and
+[518-523](#the-mac-redesigns-checks-518-578)).
 
 **What it is today.** The window is laid out as the web app's desktop is, whatever its size: the **sidebar** at the
 left, the **page** you're on beside it, **Up Next, Lyrics or Info** in a panel at the right when you open one, and the
-**player bar** along the foot. Every page is the phone's own page, in macOS's sizes and controls (the Mac idiom). The
+**player bar** along the foot, under a **title strip** along the top - the window's traffic lights at its left and
+the page you're on named in its middle, as the **Window** menu names the window. Every page is the phone's own page,
+in macOS's sizes and controls (the Mac idiom), until the redesign's later slices draw each one the Mac's way. The
 window is at least 880 x 600 points - room for the sidebar, a page and the bar - as large as you like above that, and
 opens at 1280 x 820; macOS remembers its size and place after that. What the phone does, the Mac does, with the Mac's
 menus and keys, and these differences.
 
-- **The sidebar** (232 points wide; **View > Hide Sidebar** ⌃⌘S puts it away and brings it back), from the top:
+- **The sidebar** (220 points wide; **View > Hide Sidebar** ⌃⌘S puts it away and brings it back), from the top:
+  - **deadwax**, the app's name.
   - **The search field.** Type in it and Search's results fill the page - the same results as the phone's Search,
     which has no field of its own on the Mac. Return searches at once (MusicBrainz too), as the phone keyboard's
     Search does. Escape empties it while the cursor's in it. **Edit > Find** ⌘F shows the sidebar and puts the cursor
@@ -260,7 +267,7 @@ menus and keys, and these differences.
     All lists all of deadwax's Albums, Artists and Songs. **Downloaded** follows on either. The switch follows where you
     are, and stays as you left it otherwise (kept on this Mac); turned with a page of the other side showing, it opens
     the same kind of page on this side - your Albums for All's Albums, All's Artists for your Artists. With logins off,
-    the Library's pages and Downloaded, no switch.
+    the Library's pages and Downloaded, no switch. With the switch picked out by Tab, ← and → turn it.
   - **Playlists**: All playlists, then yours and those shared with you, by name - twenty at most.
   - **Manage** (only what you're allowed): Edit an album, Needs a look with its count, Library care, Server settings,
     Event log, People - the rows of Settings > Manage.
@@ -272,8 +279,8 @@ menus and keys, and these differences.
   on Requests, Settings or a Library page of Yours, clicking it there goes to the top of its list, as tapping the tab
   you're on does on the phone. A playlist's row or a Manage row opens its page over what's there, in place of another
   playlist's or Manage page rather than piling them up - except a playlist you're editing, or a Change password or
-  People change still under way: the new page opens over that one, which waits under it (Back) as you left it. Every
-  row has its glyph.
+  People change still under way: the new page opens over that one, which waits under it (Back) as you left it. The
+  rows are words alone, with no glyphs, and the lit one is drawn in the selection's purple with its edge.
 - **The page.** The Library's switch and its **•••** stay at the top of the Library, as on the phone. The Library's
   album grid has as many covers in a row as fit, none under 150 points across. An album's page, an artist's and the
   album you don't have sit in the middle of the page at a readable width (760 points); they scroll with the pointer
@@ -5911,7 +5918,8 @@ home Wi-Fi, signed in as an admin with logins on, installed with `ios/scripts/in
 saw.
 
 - **424 The sidebar.** At the top the search field, then Requests (with its count while something's arriving),
-  Library with **Yours | All**, Playlists, Manage, and Settings at the foot - each row with its glyph. Yours lists your
+  Library with **Yours | All**, Playlists, Manage, and Settings at the foot - each row with its glyph (words alone since
+  the redesign's first slice, check 519). Yours lists your
   Library pages in the order you keep for the Library's switch, then Downloaded; All lists Albums, Artists, Songs, then
   Downloaded. Click each row: its page fills the window beside it, and the row is lit. On All's Albums, turn the switch
   to Yours: your Albums open. Open an album from All's Albums, then turn the switch: the album stays, only the rows
@@ -6164,6 +6172,39 @@ Ethan's phone as a listener (the one that sees no foot line). Say "pass", or wha
   ••• (no Start Radio yet - that's a later slice). See All opens the list; From Last.fm opens last.fm in the browser.
 - **487 [key] VoiceOver.** A top song reads its title and line ("Let It Happen, Currents · 2015"); a missing one
   "…, Not in your library"; "From Last.fm" reads as a link; the listeners line is read under the name.
+
+### The Mac redesign's checks (518-578)
+
+The Mac's own look, drawn on the design canvas and built a slice at a time (still app 0.13 (13)). No server change is
+needed, and the phones should look and work exactly as before - each slice's last check is the phones'. As for
+404-458: deadwax's plain `http://` address, the home Wi-Fi, signed in as an admin with logins on, installed with
+`ios/scripts/install-mac.sh`. Say "pass", or what you saw.
+
+#### The frame and the shared pieces (518-523)
+
+**Not done yet.** The first slice: the title strip, the sidebar as drawn, and the colours, corners, type and controls
+every later slice builds its pages from. The pages themselves are still the phone's.
+
+- **518 The title strip.** **Not done yet.** Along the top of the window, 28 points tall with a gradient: the traffic
+  lights at its left and the page's name in its middle (Albums, an album's name, Settings, ...). Drag the window by
+  the strip: it moves. Open a few pages: does the **Window** menu name each one? Rename a playlist in its Edit: the
+  strip and the Window menu take the new name. Sign out: the Window menu says Sign in.
+- **519 The sidebar.** **Not done yet.** At its top **deadwax**, then the search field, then text rows with no glyphs.
+  Click every row: each opens its page, and the row is lit in purple with its edge. ⌘F puts the cursor in the search
+  field; the field's edge turns purple while it has the cursor.
+- **520 The look.** **Not done yet.** Open the canvas's Albums beside the Mac app: do the sidebar's colours, the title
+  strip's and the purple of the lit row match it?
+- **521 Buttons and fields.** **Not done yet.** So far only the sidebar has the Mac's own controls. The search field
+  is sunken, and its edge turns purple while it has the cursor. **Yours | All** is drawn as the canvas draws a
+  segmented control: a dark well with a thin grey edge, the words grey, the chosen one in light purple on a faint purple
+  fill inside its own purple edge - flat, nothing raised. Tab to the switch: its edge turns purple, and ← and → turn
+  it. (The raised buttons - glossy, pressed in while held, faded while they can't be used - and the purple one that
+  takes Return come with the first page that has them.)
+- **522 Everything still works.** **Not done yet.** Every page opens from the sidebar and goes back as before - an
+  album, an artist, a playlist, Search, Requests, Settings and each of its pages, Manage's pages and Edit album. Make
+  the window as small as it goes (880 x 600): the strip, the sidebar, the page and the bar all fit, nothing cut off.
+- **523 The phones.** **Not done yet.** On Green Anole, every tab, the player, Now Playing, Edit album and the EQ are
+  as before. The same on Ethan's phone, or "not done yet".
 
 ## What it can't do yet
 

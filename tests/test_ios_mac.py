@@ -127,6 +127,11 @@ def test_platform_is_the_iphones_exactly_as_before_on_the_iphone():
                    r"macContextMenu<Items: View>\(@ViewBuilder _ items: \(\) -> Items\)",
                    r"albumRightClick\(_ route: AlbumRoute\)", r"playlistRightClick\(_ route: PlaylistRoute\)",
                    r"escapeCloses\(_ on: @autoclosure \(\) -> Bool = true\)", r"returnCancels\(\)",
+                   # (the Mac redesign, R1) Return on a redesigned dialog's one action, ← and → on the Mac's own
+                   # controls
+                   r"returnPresses\(\)", r"arrowKeys\(_ move: @escaping \(Int\) -> KeyPress\.Result\)",
+                   # (R1's review) a launch screen's name for the window
+                   r"namesWindow\(_ name: String\?\)",
                    r"findField\(_ focused: FocusState<Bool>\.Binding\)",
                    r"oneWindow\(\)", r"macSheet\(\)", r"keepsWindowOpen\(_ on: @autoclosure \(\) -> Bool\)",
                    r"readableOnMac\(\)", r"shapesWindow\(\)",
@@ -893,24 +898,37 @@ def test_the_frame_holds_the_sidebar_the_page_a_panel_and_the_bar():
     #? (slice 3's review) the panel drawn in one place, a drawer's or a column's - crossing 1280 never draws it afresh
     assert frame.count("MacPanel(") == 1 and "if MacFrame.liesOver(style, panel) {" not in frame
     assert "MacFrame.liesOver(style, panel) ? Palette.well : Color.clear" in body
-    assert ".frame(width: CGFloat(MacFrame.sidebarWidth))" in body
+    #? (the Mac redesign, R1) the redesign's sidebar, 220 (MacLook's - the web-held 232 stays MacFrame's, unread here)
+    assert ".frame(width: CGFloat(MacLook.sidebarWidth))" in body and "MacFrame.sidebarWidth" not in frame
     assert "private var style: MacFrame.PanelStyle { MacFrame.panelStyle(width: width) }" in frame
     assert ("navigation.macPanelStyle = now" in frame
             and ".onChange(of: style, initial: true) { (_: MacFrame.PanelStyle, now: MacFrame.PanelStyle) -> Void in" in frame)
     #? the page: the tab the sidebar leads to, as its stack stands - (slice 3's review) in the iPhone's TabView, its
-    #? bar hidden, so every tab's pages are kept as the tabs keep them and only the one showing is on screen
-    page = frame[frame.index("private var page: some View {"):frame.index("private var watching: Watching {")]
+    #? bar hidden, so every tab's pages are kept as the tabs keep them and only the one showing is on screen - (the Mac
+    #? redesign, R1) each stack the Mac's own, on the Mac's routes, its root its area's (test_ios_mac_reach.py)
+    page = frame[frame.index("private var page: some View {"):frame.index("private var strip: CGFloat {")]
     assert ("TabView(selection: Binding(get: { navigation.tab }, set: { (tab: AppTab) -> Void in navigation.select(tab) })) {"
             in page)
-    for tab, tag in (("TabStack(path: paths.library, ownTop: true) { LibraryView() }", "library"),
-                     ("TabStack(path: paths.search) { SearchScreen() }", "search"),
-                     ("TabStack(path: paths.requests) { RequestsScreen() }", "requests"),
-                     ("TabStack(path: paths.you) { YouView() }", "you")):
+    for tab, tag in (("MacTabStack(path: paths.library, ownTop: true) { MacLibrary.root() }", "library"),
+                     ("MacTabStack(path: paths.search) { MacSearch.root() }", "search"),
+                     ("MacTabStack(path: paths.requests) { MacRequests.root() }", "requests"),
+                     ("MacTabStack(path: paths.you) { MacSettings.root() }", "you")):
         assert re.search(re.escape(tab) + r"\s*\.tag\(AppTab\." + tag + r"\)", page), tab
-    assert "switch navigation.tab {" not in page and page.count("TabStack(") == 4
-    tabs = bare(app_sources()["Root/MainTabs.swift"])
-    stack = tabs[tabs.index("struct TabStack"):]
+    assert "switch navigation.tab {" not in page and page.count("MacTabStack(") == 4
+    tabs = bare(app_sources()["Mac/Frame/MacTabStack.swift"])
+    stack = tabs[tabs.index("struct MacTabStack"):]
     assert stack.count(".toolbar(.hidden, for: .tabBar)") == 2, "the system's bar hidden on every stack, root and pages"
+    #? (R1) the title strip over it all, the frame laid under the title bar for it, and the status bar under the page
+    order = [body.index(part) for part in ("MacTitleStrip(title: title, height: strip)", "if navigation.macSidebarShown {",
+                                           "page\n", "if let items = status.shown {", "MacStatusBar(items: items)",
+                                           "PlayerBar()", ".ignoresSafeArea(.container, edges: .top)")]
+    assert order == sorted(order)
+    assert "frame.safeAreaInsets.top" in body and "titleBar = now" in body
+    assert "max(CGFloat(MacLook.titleHeight), titleBar)" in frame
+    assert ".onChange(of: title, initial: true) { (_: String, now: String) -> Void in\n            Platform.nameWindow(now)" in body
+    assert ".environment(status)" in body and ".environment(selection)" in body
+    assert "MacTitle.title(navigation, personal: server.access.hasLibrary, savedOrder: savedOrder, playlists: playlists.list)" \
+        in frame
     #? Search's own stand-down hears the tab change (SearchScreen), as on the iPhone: the frame's own went with the switch
     assert "standDown" not in frame
     # what MainTabs watches, this watches
@@ -982,6 +1000,16 @@ def test_the_sidebar_is_mac_sidebars_rows():
                  ".onChange(of: server.person) { (_: Int, _: Int) -> Void in queueCount.shows(.sidebar) }",
                  "row(.settings, current: current, at: at)"):
         assert rule in sidebar, rule
+    #? (the Mac redesign, R1) drawn as the canvas draws it: the wordmark, the well's field, text rows with no glyphs - 26
+    #? tall, in the selection's colours where you are - the counts' badges, the Library's switch a segmented control
+    for drawn in ("Text(MacSidebar.Words.brand)", ".font(Typeface.Mac.text(.brand).weight(.bold))",
+                  ".frame(height: CGFloat(MacLook.navRowHeight))", ".frame(height: CGFloat(MacLook.findHeight))",
+                  ".background { MacWell(focused: focused) }", "MacCount(count: badge)",
+                  "MacSegmented(options: MacSidebar.Side.allCases", ".background(MacPalette.side)",
+                  ".overlay(alignment: .trailing) { MacRule(colour: MacPalette.frame, vertical: true) }"):
+        assert drawn in sidebar, drawn
+    assert "MacSidebar.symbol(" not in sidebar and "Image(systemName: symbol)" not in sidebar, "no glyph on a row"
+    assert "Palette." not in sidebar.replace("MacPalette.", ""), "the redesign's colours alone"
     assert "case sidebar" in bare(app_sources()["Manage/QueueCountModel.swift"])
     routes = bare(app_sources()["Shared/Routes.swift"])
     move = routes[routes.index("func macMove(_ move: MacSidebar.Move) {"):]
@@ -1645,8 +1673,10 @@ def test_edit_albums_sheet_is_sized_by_the_window_and_managings_pages_are_readab
     assert re.search(r"EditAlbumSheet\(request: request\)\s*\.macSheet\(\)\s*\.sizedSheet\(MacFrame\.sheetSize\(width: width, "
                      r"height: height\)\)$", edit.strip())
     assert "@State private var height: Double = MacFrame.openingHeight" in frame
+    #? (the Mac redesign, R1) the frame is laid under the title bar: the height under it is the frame's less the strip's
     assert re.search(r"\.onGeometryChange\(for: Double\.self\) \{ \(frame: GeometryProxy\) -> Double in\s*"
-                     r"Double\(frame\.size\.height\)\s*\} action: \{ \(now: Double\) -> Void in\s*height = now\s*\}", frame)
+                     r"Double\(frame\.size\.height - max\(CGFloat\(MacLook\.titleHeight\), frame\.safeAreaInsets\.top\)\)"
+                     r"\s*\} action: \{ \(now: Double\) -> Void in\s*height = now\s*\}", frame)
     # only Edit album's: the other sheets keep the system's own size
     assert sum(bare(text).count(".sizedSheet(") for name, text in app.items() if name != PLATFORM) == 1
     mac, phone = _halves()

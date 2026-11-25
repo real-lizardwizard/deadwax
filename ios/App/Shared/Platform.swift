@@ -103,12 +103,27 @@ extension Platform {
         shape(scene)
     }
 
-    /// The window's limits, and its title bar: one with the toolbar, no title shown (each page has its own).
+    /// The window's limits, and its title bar: one with the toolbar, no title shown (each page has its own) - and (the
+    /// Mac redesign, R1) the window named for the page in front, as last asked (`nameWindow`).
     @MainActor private static func shape(_ scene: UIWindowScene) {
         scene.sizeRestrictions?.minimumSize = Window.smallest
         scene.sizeRestrictions?.maximumSize = CGSize(width: Window.widest, height: CGFloat.greatestFiniteMagnitude)
         scene.titlebar?.titleVisibility = .hidden
         scene.titlebar?.toolbarStyle = .unified
+        if !windowName.isEmpty { scene.title = windowName }
+    }
+
+    /// (The Mac redesign, R1) The window's name as last asked.
+    @MainActor private static var windowName = ""
+
+    /// (The Mac redesign, R1) The app's window named for the page in front (DesktopFrame - MacTitle, the title strip's own
+    /// words): the Window menu's item and Mission Control's label. The title bar still shows none
+    /// (`titleVisibility = .hidden`): the title strip draws it. Kept, so a window shaped after this is named too.
+    @MainActor static func nameWindow(_ name: String) {
+        windowName = name
+        for scene in mainScenes.allObjects {
+            scene.title = name
+        }
     }
 }
 
@@ -446,6 +461,21 @@ extension View {
         keyboardShortcut(.defaultAction)
     }
 
+    /// (The Mac redesign, R1) A redesigned dialog's one action, drawn purple (MacButtonStyle's `.pri`): Return presses
+    /// it. Never a toolbar's button over a list, whose Return opens the row selected.
+    func returnPresses() -> some View {
+        keyboardShortcut(.defaultAction)
+    }
+
+    /// (The Mac redesign, R1's review) The window named `name` while this is drawn and as it changes - RootView's, for
+    /// a launch screen up in place of the app (Sign in, after a sign-out): the desktop frame names it for its page
+    /// otherwise, and nil leaves the name to it.
+    func namesWindow(_ name: String?) -> some View {
+        onChange(of: name, initial: true) { (_: String?, now: String?) -> Void in
+            if let now { Platform.nameWindow(now) }
+        }
+    }
+
     /// (Slice 2) Search's field takes the cursor at Edit > Find (⌘F, AppNavigation.find) - (slice 3) the sidebar's, its
     /// focus the field's own (`focused`), so the field knows when it has the cursor.
     func findField(_ focused: FocusState<Bool>.Binding) -> some View {
@@ -508,6 +538,14 @@ extension View {
             guard let next = MacMenu.tab(order, from: focused.wrappedValue, back: back) else { return .ignored }
             focused.wrappedValue = next
             return .handled
+        }
+    }
+
+    /// (The Mac redesign, R1) ← and → on a control the Mac draws for itself while it has the keyboard's focus (a
+    /// segmented control, MacSegmented): `move` with -1 or 1, which says whether it took the key.
+    func arrowKeys(_ move: @escaping (Int) -> KeyPress.Result) -> some View {
+        onKeyPress(keys: [.leftArrow, .rightArrow]) { (press: KeyPress) -> KeyPress.Result in
+            move(press.key == .leftArrow ? -1 : 1)
         }
     }
 
@@ -707,6 +745,9 @@ extension Platform {
 
     /// The Mac's alone: beginBackgroundTask stays as it is.
     @MainActor static func keepWorking(_ work: Work, _ on: Bool) {}
+
+    /// The Mac's alone: the iPhone's window has no name to show.
+    @MainActor static func nameWindow(_ name: String) {}
 }
 
 // (slice 6) EQ files
@@ -781,6 +822,16 @@ extension View {
         self
     }
 
+    /// The Mac's alone: the iPhone draws no redesigned dialog.
+    func returnPresses() -> some View {
+        self
+    }
+
+    /// The Mac's alone: the iPhone's window has no name to show.
+    func namesWindow(_ name: String?) -> some View {
+        self
+    }
+
     /// The Mac's alone: Search's field as before.
     func findField(_ focused: FocusState<Bool>.Binding) -> some View {
         self
@@ -823,6 +874,11 @@ extension View {
 
     /// The Mac's alone: a field's keys as before.
     func tabs<Field: Hashable>(_ focused: FocusState<Field?>.Binding, in order: [Field]) -> some View {
+        self
+    }
+
+    /// The Mac's alone: the iPhone draws none of the Mac's controls.
+    func arrowKeys(_ move: @escaping (Int) -> KeyPress.Result) -> some View {
         self
     }
 

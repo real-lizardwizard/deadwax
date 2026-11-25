@@ -16848,3 +16848,200 @@ albums not read; online, rows met before every album settled; the raw title sear
 reservation ignored (Core, the view not passing it, the model not keeping it); a percent-encoded host decoded; strip's
 result normalised (the scalar comparison); an unknown row not dimmed; topRows not passing `unknown`; the page's
 Last.fm failure unsaid; a kept failure waited out; the wall clock.
+
+## The Mac redesign, slice R1: the frame and the shared pieces (2026-11-25)
+
+James, 24 Nov: the whole Mac app redrawn on the design canvas (the web's look, more vintage), built a slice at a time.
+The plan is ~/Desktop/Code/deadwax-plans/mac-redesign-build.md - its section 7, "James's answers (24 Nov)", binding over
+the rest - and the drawings mac-redesign.md, dw.css, Main.dc.html and Albums.dc.html. This is **R1**: the frame and every
+piece the later slices build their pages from; the pages themselves are still the phone's. What it leaves alone:
+- **The iPhone looks and works exactly as before.** The gate is `git status --porcelain -- ios ':!ios/App/Mac'` - a
+  `git diff --stat` misses the untracked files and reads nothing of ios/Config unless told to. It names:
+  - App: DesktopFrame.swift and MacSidebarView.swift (drawn only on the Mac); Platform.swift (its Mac half, and an
+    iPhone half of `self` and `{}`); Typeface.swift (additive: the `Mac` namespace); RootView.swift (one Platform
+    helper, `.namesWindow(gateName)`, whose iPhone half is `self` - the review's finding 6); and the three
+    `App/Fonts/NotoSansMono-*.ttf`.
+  - Config: Info.plist and Info-Mac.plist, each with the three mono files added to UIAppFonts.
+  - Core: MacLook, MacTable and MacInFront with their tests (pure, new), and MacSidebar's `Words.brand` (additive).
+  - ios/scripts/make-fonts.py (the mono family) and ios/design/dw.css (never bundled).
+  MainTabs, TabStack and `appRoutes()` have no diff; nor do the engine files, DeadwaxAudio,
+  `Fixtures/words/iphone.json`, DeadwaxClient or Core's Routes.
+- **The mono faces ship in the phone's bundle too** - one target, one bundle: three TTFs, 440,592 bytes in all (about
+  440 KB), registered in Info.plist as in Info-Mac.plist. James chose it ("Bundle Noto Sans Mono", 24 Nov); the phone
+  never draws them (Typeface.Mac alone reads them, and the reach test keeps Typeface.Mac off the phone's files).
+- **ios/Deadwax.xcodeproj is untouched**: App/Mac and the fonts are in the synchronized folder; the Core files and
+  tests in the package. src/ and ui/ are untouched; the app is still 0.13 (13).
+
+### What was built
+
+**The look, as tokens** (each held to dw.css by tests/test_ios_mac_look.py):
+- `ios/design/dw.css`: the canvas's stylesheet, copied outside App/ so it is never bundled - the tests' source of truth.
+- `App/Mac/Look/MacPalette.swift`: dw.css's colours under their own names (`bg`, `side`, `panel` ... `acc`, `selt`,
+  `selbg`, `well`), each line commented `// --name`; and the parts' faces, edges, sheens and drops, each commented
+  `// dw: <selector> <property>`, gradients stop for stop. `off` is app.css's `--app-pin-off`, 0.45.
+- `App/Mac/Look/MacCorners.swift`: buttons 4, boxes 5, chips 3 (James's answer 1: rounded on the Mac only - the phone's
+  `Corners` stay 0, and test_ios_palette's square-corners test skips this one file).
+- Core `MacLook.swift`: every size the drawings give (sidebar 220, panel 400, bar 66, title 28, toolbar 40, status 24,
+  rows 30/26, buttons 26/22, field 24, label 84, segments 20/24, chip 19, count 17, tabs 35/26/29, keys 34/46...).
+  MacFrame's web-held 232/470/72 and their vectors stay as they were, unread by the new frame except its 1280 and its
+  880 x 600 (the panel is still MacFrame's 470 until its slice).
+- Type: `Typeface.Mac.text(_:)` and `.mono(_:)` at fixed sizes (`Size`: h1 28, h2 20, brand 19, h3 18, lcd 14, base 13,
+  control 12.5, small 12, label 11.5, count 11). **Noto Sans Mono** is bundled (James's answer 3): Regular, Medium and
+  SemiBold TTFs made by ios/scripts/make-fonts.py from interface/styles/font/noto-sans-mono/*.woff2 - the web's own
+  subset, the same characters - with fonttools from the venv already here; registered in both plists' UIAppFonts and
+  read only through `Typeface.Mac`.
+
+**Components** (`App/Mac/Components/`): MacRaised (a face, a sheen on the inset shape, a 1 pt edge, a drop; pressed
+turns the gradient over and drops the sheen) and MacRule; MacButtonStyle (normal, primary, red, on; small); MacTitleStrip;
+MacToolbar and MacGroove; MacWell, MacField and MacFieldRow; MacSegmented (dw.css's .seg exactly: a well, flat
+segments, the chosen one the selection's fill and edge - nothing raised); MacCheckbox; MacPopUp and MacCaret;
+MacFolderTabs; MacGroupBox; MacStatusBar; MacKeyStyle, MacToggleStyle and MacDisplay (the lcd); MacChip and MacCount;
+MacOutput (AirPlayButton with the EQ's route name). Only MacTitleStrip, MacWell, MacSegmented and MacCount are drawn
+yet (the frame and the sidebar); the rest wait for their pages.
+
+**The frame** (`App/Mac/Frame/`):
+- **MacTabStack** - TabStack's copy with `.macRoutes()`; **MacRoutes** - the one switch over all 30 `AppRoute` cases,
+  each sent to its area's `Mac<Area>.page(for:)` (Library, Album, Artist, Search, Requests, Settings, Edit, Manage),
+  which returns the phone's page exactly as appRoutes draws it until that area's slice swaps it.
+- **MacPage** - a toolbar over a page on `bg`, for the slices; **MacTitle** - the strip's and the Window menu's name:
+  the sidebar's lit row (`MacSidebar.at`, so the two can't disagree), or the page on top's own name (an album, an
+  artist, a playlist, a search group).
+- **MacStatusItems** and **MacSelection** - what the page in front says in the status bar, and what it has selected
+  (an album or an artist), for the panels and the later toolbars. Both keep their pages through Core's **MacInFront**:
+  the pages on screen, the last to come on in front; a page changes what it says where it is, and a page off the
+  screen changes nothing.
+
+**DesktopFrame**: the title strip on top, laid under the title bar (`.ignoresSafeArea(.container, edges: .top)`), as
+tall as the bar's inset and 28 at least; the sidebar at MacLook's 220; the status bar under the page and the panel
+while the page in front has said something (nothing does yet); the four stacks MacTabStacks over the area roots; and
+`Platform.nameWindow(title)` on every change of title - the scene's title, kept in Platform's Mac half for the windows
+`shape()` meets later, while `titleVisibility` stays hidden. **MacSidebarView** restyled as drawn: `deadwax` at 19 bold,
+the search field in a MacWell (its edge `acc` while it has the cursor), headings at 11.5 semibold in `label`, rows 26 tall
+of words alone at 13 (the lit one `selt`, semibold, on `selbg` with `selbd`'s edge), playlists indented 20 in `t2`,
+counts as MacCount, Yours | All a MacSegmented, on `side` with `frame`'s rule at its right. Every MacSidebar call
+(rows, lit, fold, counts, the switch's moves) is as it was.
+
+**Platform** (Mac half; the iPhone half `self` or `{}`): `nameWindow(_:)`; `returnPresses()` (`.keyboardShortcut
+(.defaultAction)`); `arrowKeys(_:)` (`onKeyPress` for ← and →, Platform being the one file the tests let hold it).
+
+### Decisions, and where this departs from the plan
+
+- **Observed stores, not preferences**, for the status items and the selection: the pages are inside the frame's TabView
+  and NavigationStacks, each a UIKit controller on Catalyst, and a preference isn't carried up out of them. Each page
+  registers under its own UUID; the one that appeared last is in front. Read from an optional environment, so a sheet
+  (none there) says nothing.
+- **The type sizes are named h2, h3 and base**, not the CSS's title/body: test_ios_palette bans iOS text-style names
+  (`.body`, `.title`...) inside `.font(...)`. **count is 11** (dw.css .count's 600 11px), a size the plan's list left out.
+- **The purple primary takes Return only where asked** (`.returnPresses()`), not by being primary: a toolbar's Play over
+  a list must leave Return to the list's selection (MacTable.returned).
+- **`MacButtonStyle(kind:small:)` by name**, with no `.mac` static: test_the_app_hands_core_the_device_for_its_words bans
+  `.mac` as a value. Its kinds are `.normal`, `.pri` (.btn.pri), `.danger` (.btn.red) and `.on`, and MacChip's tones
+  `.plain`, `.caution`, `.good`, `.marked` and `.bad` (.chip, .amber, .green, .purple, .red): named for what they do,
+  since the colour matcher reads a bare `.red` or `.primary` as SwiftUI's own colour (the review's finding 1).
+- **Focus is drawn as `acc`'s edge**, the web's `:focus-visible` outline, on the well and the segmented control.
+- **The folding headings keep a small chevron** (Playlists, Manage): without it nothing says they fold. Drawn in `label`.
+- **Words.brand ("deadwax") is in Core's MacSidebar**, beside the sidebar's other words. MacSidebar.symbol is now read by
+  nothing in the app (rows have no glyphs; test_ios_mac holds that the sidebar doesn't) - kept, with MacSidebarTests'
+  checks of it, rather than removed from Core in a slice whose rule is MacSidebar's rows unchanged.
+- **The panel's hairline is unchanged** (Palette's, its slice restyles the panel); the sidebar's rule is now its own.
+- **MacPopUp is SwiftUI's Menu** with our face; if Catalyst draws its own pop-up over it, that is accepted (section 2).
+
+### Tests, and the faults they were seen failing on
+
+- `tests/test_ios_mac_look.py` (8, 12 after review): MacPalette's tokens and parts against dw.css by name, property and gradient stop,
+  every colour line commented; every token present, `--mono` Noto Sans Mono; `off` against app.css; MacLook against the
+  CSS (and the two drawn sizes, panel 400 and folder list 398, against the drawings); MacCorners against the radii and
+  the phone's Corners all 0; Typeface.Mac's sizes; no colour, radius or font of its own in App/Mac or MacSidebarView;
+  a self-test of the matchers.
+- `tests/test_ios_mac_reach.py` (6, 8 after review): App/Mac's names used only in App/Mac, the four frame files and Platform's Mac half;
+  Platform's iPhone half all `self`/`{}` (five known phone bodies aside); MacTabStack with `.macRoutes()`, DesktopFrame's
+  four stacks; MacRoutes over every case once, no `default`; every area page the phone's, as appRoutes draws it.
+- Core `MacTableTests` (6): widths, stripes restarting under each heading, ↑↓ Home End, a vanished selection none,
+  clicks, Return; and MacLook's sizes fitting MacFrame's least window.
+- test_ios_mac.py: the frame and sidebar tests moved to MacLook, MacTabStack, the strip, the status slot, nameWindow and
+  the restyle; the helper list gained returnPresses and arrowKeys. test_ios_palette.py: the radii skip MacCorners; the
+  fonts test holds the mono files, both plists, the OFL's three copies equal and the mono cmaps to the web's.
+
+The plan's seven faults, each applied alone, run, restored byte for byte - every one caught:
+- a palette colour off dw.css (`acc` 0xc084fd): test_ios_mac_look `test_every_colour_in_the_palette_is_one_dw_css_names`;
+- a raw colour (`Color.red` in MacChip): test_ios_mac_look `test_nothing_in_the_macs_views_draws_a_value_of_its_own`;
+- MacTabStack calling `.appRoutes()`: test_ios_mac_reach `test_the_frame_stacks_are_the_macs_with_its_own_routes`
+  (test_ios_mac doesn't look at MacTabStack's routes);
+- `MacCorners` named from Typeface.swift: test_ios_mac_reach `test_app_mac_is_named_only_from_the_macs_frame`;
+- the iPhone half's `returnPresses()` given `keyboardShortcut(.defaultAction)`: test_ios_mac_reach
+  `test_platforms_iphone_half_does_nothing_new` and test_ios_mac
+  `test_platform_is_the_iphones_exactly_as_before_on_the_iphone`;
+- stripes not starting again under a heading: MacTableTests `theStripesStartAgainUnderEveryHeading`;
+- a vanished row's selection kept: MacTableTests `aVanishedRowsSelectionBecomesNone` and
+  `aClickSelectsAndADoubleClickOrReturnOpens` (Return).
+
+### Not verified - only James's Mac can say (518-523)
+
+No smoke run: James's own deadwax (~/Applications/deadwax.app) was running each time it was looked for, so the scratch
+Mac build was never opened. Nothing of R1 has been seen on a screen:
+- whether the window drags by the strip (the strip is drawn under the title bar with hit-testing off; if it won't drag,
+  the plan's fallback is the system title), and whether the title bar's inset is what `safeAreaInsets.top` reads;
+- whether the Window menu names the page (`scene.title`);
+- the look beside the canvas - the colours, the gradients, the mono font's weights, the corners;
+- the segmented switch taking the focus by Tab and ← →; the field's focus edge;
+- VoiceOver over the sidebar (the switch's segments as selected, the brand, the counts);
+- that the iPhone builds unchanged is only the builds' and the gate's word - not seen on either phone (523).
+
+### After review (2026-11-25)
+
+One review, no important bugs, nine nits - all fixed, none committed. James has since decided the iPhone takes the new
+look too ("Both together"); the re-plan is being written apart, and none of it is here.
+
+1. **Colours in every form.** test_ios_mac_look's matcher missed `return .red`, `.foregroundStyle(.secondary)` and
+   `.tint(.purple)`. It now refuses Color's own (`Color.x`, Color.clear aside), any colour or SwiftUI style by its bare
+   name where a ShapeStyle goes (the hierarchy, the accent, `.tint`, `.foreground`, `.background`, separators,
+   selection, links, placeholders, `.multicolor`, `.bar`) - a modifier of the same name (`.tint(`, `.background {`)
+   aside - the system's (`.systemRed`), materials and the style types; its self-test plants each and the clean forms
+   the views write. MacCaret takes its colour (MacPalette.buttonText) rather than `.fill(.foreground)`, and the kinds
+   and tones were renamed (above).
+2. **A part held to its layer.** A part from a property with more than one colour says which, counting from 1
+   (`dw: .btn box-shadow 2`), and is held to that one alone; one-colour properties name none. A box-shadow's part says
+   what it is by its name, and the layer must be that: a Sheen white, a Drop dark and outside, a Shade dark and inset, a
+   Ring a spread ring (`0 0 0 Npx`).
+3. **MacPalette is dw.css's colours and nothing else.** Every line of the enum before its makings is a comment or a
+   colour line with its source, made only as `hex(0x...)`, `rgba(...)` or `vertical(...)` of those (the one Double,
+   `off`, the web's); after the makings, only the four private makings; no file extends MacPalette. Its self-test
+   plants `Color.purple` with and without a comment, a `.opacity` on a dw.css colour, a bare Double, a `static var`,
+   and a colour or a func after the makings.
+4. **The reach** covers what the redesign declares outside App/Mac: `Typeface.Mac`, and Core's MacLook, MacTable and
+   MacInFront. Planted in Player/NowPlayingView.swift, `Typeface.Mac.text(.base)` and `MacLook.rowHeight` are caught.
+5. **The selection's owner.** `select(Y, by: A)` from a list off the screen (under a pushed page B) made A the owner.
+   Both stores are now Core's MacInFront (MacInFrontTests: the reviewer's sequence step by step), and the reach test
+   holds that `select` and `change` go through its `changed`.
+6. **Stale titles.** A playlist's page is named from PlaylistsModel's list as it is now (asked again after every
+   write), its route's preview only until the list has it - a rename in Edit renames the strip and the Window menu.
+   And RootView names the window for a launch screen in place of the app (`.namesWindow(gateName)`, Platform's: Sign
+   in after a sign-out, deadwax for the address, checking and can't-reach screens; none while the app is up, the frame
+   naming it - a sign-in over the app keeps the page's name).
+7. **Check 521** said the switch was glossy and pressed. It isn't, and neither is dw.css's .seg: a well with the line's
+   edge, flat segments, the chosen one `selbg` inside a `selbd` edge. MacSegmented already drew that; a test now holds
+   it to .seg rule by rule, and the check says what's drawn.
+8. **The gate** is stated as `git status --porcelain` over ios/ outside App/Mac (above), and the mono TTFs' place in
+   the phone's bundle is recorded.
+9. **dw.css recopied** from the canvas (~/Desktop/Code/deadwax-plans/mac-redesign/dw.css): it gained the phone's own
+   `.dw.ph` blocks (every corner 0; Now Playing's and the mini player's transport as bare glyphs). The test drops every
+   `.dw.ph` selector before reading a rule, and holds that the copy has them and that none of the Mac's values moved
+   (the chip still 19 tall though the phone's is 22).
+
+Tests after review: test_ios_mac_look 12, test_ios_mac_reach 8, MacInFrontTests 4 (Swift's run 2217 tests, from
+2213). The first seven faults were run again, each still caught, and one more for each fix, each applied alone, run and
+restored byte for byte - every one caught:
+- a bare `.red` in MacChip's switch, and a `.tint(.purple)` on MacPopUp: `test_nothing_in_the_macs_views_draws_a_value_of_its_own`;
+- buttonSheen given the drop's colour (layer 1 named), the same with layer 2 named (the Sheen must be white), and
+  keyRing given the drop's colour: `test_every_colour_in_the_palette_is_one_dw_css_names`;
+- `static let extra = Color.purple` with no comment: `test_macpalette_is_dw_css_colours_and_nothing_else`;
+- `Typeface.Mac.text(.base)`, and `MacLook.rowHeight`, planted in NowPlayingView.swift:
+  `test_app_mac_is_named_only_from_the_macs_frame`;
+- MacInFront's `changed` putting a page off the screen in front: MacInFrontTests `aPageOffTheScreenIsNeverPutInFront`;
+  MacSelection's `select` through `appeared`: `test_the_frames_stores_keep_the_page_in_front_by_core`;
+- a playlist named by its preview, and RootView without `.namesWindow(gateName)`: `test_the_window_is_named_for_what_is_up`;
+- the segments given MacButtonStyle: `test_the_segmented_control_is_dw_css_seg`;
+- dw.css cut back to before the phone's blocks: `test_dw_css_is_the_canvas_copy_read_without_the_phones_rules`.
+
+Still not seen on a screen: James's own deadwax was running again, so no smoke run - the list above stands, with the
+renamed window on a sign-out and after a playlist's rename added to it.

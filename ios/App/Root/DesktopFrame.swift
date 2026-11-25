@@ -4,12 +4,20 @@ import SwiftUI
 /// The Mac's window, always (the Mac app, slice 3 - the Mac app's plan 1.2 and decision 3; notes/ios.md "The Mac app,
 /// slice 3: the desktop frame"): the web's desktop frame (app-desktop.css, 2.1.35) in place of the iPhone's tabs.
 ///
-/// - The sidebar at the left (MacSidebarView), MacFrame.sidebarWidth wide, put away and back by View > Hide Sidebar
-///   (⌃⌘S); a rule at its right.
+/// - (The Mac redesign, R1 - notes/ios.md "The Mac redesign, slice R1: the frame and the shared pieces") The title
+///   strip across the top (MacTitleStrip), under the window's traffic lights: the page in front's name (MacTitle), which
+///   names the window too (Platform.nameWindow). The frame is laid under the title bar for it - the strip as tall as the
+///   bar is, 28 at least (MacLook.titleHeight).
+/// - The sidebar at the left (MacSidebarView), MacLook.sidebarWidth (220, the redesign's) wide, put away and back by
+///   View > Hide Sidebar (⌃⌘S); its rule at its right its own.
 /// - The page: the tab the sidebar's rows lead to, as its stack stands (AppNavigation's four stacks, the iPhone's), in
 ///   the iPhone's TabView with its bar hidden - every tab's pages kept as the tabs keep them, only the one showing on
 ///   screen, so each page appears and goes as it does under the tab bar (⌘R's page, the counts, the event log's stream
-///   all go by it). The Library's own top - its switch and its ••• - stays at the top of its page.
+///   all go by it). The Library's own top - its switch and its ••• - stays at the top of its page. (R1) Each stack is
+///   the Mac's own (MacTabStack, the Mac's routes - MacRoutes), each tab's root its area's (MacLibrary, MacSearch,
+///   MacRequests, MacSettings): the phone's pages until each slice redraws its own.
+/// - (R1) The status bar under the page and its panel (MacStatusBar), while the page in front says something
+///   (MacStatusItems); what a list on it selects is MacSelection's, for Info.
 /// - The side panel - Up Next, Lyrics or Info, one at a time (MacPanel) - a third column 470 wide in a window 1280 wide
 ///   or more, a drawer over the page's right edge below that (MacFrame.panelStyle); drawn in one place either way, so
 ///   crossing 1280 keeps it as it is. Never modal: a drawer lies over the page's edge, the rest of the page and the
@@ -26,6 +34,7 @@ struct DesktopFrame: View {
     @Environment(RequestsModel.self) private var requests
     @Environment(ServerModel.self) private var server
     @Environment(QueueCountModel.self) private var queueCount
+    @Environment(PlaylistsModel.self) private var playlists
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.displayScale) private var displayScale
 
@@ -33,6 +42,13 @@ struct DesktopFrame: View {
     @State private var width: Double = MacFrame.openingWidth
     /// (Slice 7) And its height, under the title bar: with the width, Edit album's sheet's size (MacFrame.sheetSize).
     @State private var height: Double = MacFrame.openingHeight
+    /// (The Mac redesign, R1) The window's title bar's height, the frame laid under it: the title strip's.
+    @State private var titleBar: CGFloat = 0
+    /// (R1) The page in front's facts for the status bar, and what its list selects.
+    @State private var status = MacStatusItems()
+    @State private var selection = MacSelection()
+    /// (R1) The Library switch's order, as this Mac keeps it (LibraryView's own): where the app is, for the title.
+    @AppStorage(LibraryPages.storageKey) private var savedOrder = ""
 
     private var style: MacFrame.PanelStyle { MacFrame.panelStyle(width: width) }
 
@@ -40,39 +56,58 @@ struct DesktopFrame: View {
         @Bindable var navigation = navigation
         let panel = navigation.macPanel
         VStack(spacing: 0) {
+            MacTitleStrip(title: title, height: strip)
             HStack(spacing: 0) {
                 if navigation.macSidebarShown {
                     MacSidebarView()
-                        .frame(width: CGFloat(MacFrame.sidebarWidth))
-                    rule
+                        .frame(width: CGFloat(MacLook.sidebarWidth))
                 }
                 // (slice 3's review) the panel in one place whichever way it's drawn - over the page's edge or in a
                 // column the page makes room for - so a window crossing 1280 keeps it as it was (Up Next's Edit, the
                 // lyrics followed), never draws it afresh
-                page
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .padding(.trailing, MacFrame.makesRoom(style, panel) ? CGFloat(MacFrame.panelWidth) + hairline : 0)
-                    .overlay(alignment: .trailing) {
-                        if panel != .none {
-                            HStack(spacing: 0) {
-                                rule
-                                MacPanel(panel: panel)
+                VStack(spacing: 0) {
+                    page
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .padding(.trailing, MacFrame.makesRoom(style, panel) ? CGFloat(MacFrame.panelWidth) + hairline : 0)
+                        .overlay(alignment: .trailing) {
+                            if panel != .none {
+                                HStack(spacing: 0) {
+                                    rule
+                                    MacPanel(panel: panel)
+                                }
+                                .shadow(color: MacFrame.liesOver(style, panel) ? Palette.well : Color.clear,
+                                        radius: MacFrame.liesOver(style, panel) ? 16 : 0)
                             }
-                            .shadow(color: MacFrame.liesOver(style, panel) ? Palette.well : Color.clear,
-                                    radius: MacFrame.liesOver(style, panel) ? 16 : 0)
                         }
+                    // (R1) the status bar under the page and the panel, while the page in front says something
+                    if let items = status.shown {
+                        MacStatusBar(items: items)
                     }
+                }
             }
             .frame(maxHeight: .infinity)
             PlayerBar()
         }
+        // (R1) under the title bar, the strip where its gradient can't be: the bar's height read, the strip as tall
+        .ignoresSafeArea(.container, edges: .top)
+        .onGeometryChange(for: CGFloat.self) { (frame: GeometryProxy) -> CGFloat in
+            frame.safeAreaInsets.top
+        } action: { (now: CGFloat) -> Void in
+            titleBar = now
+        }
+        .onChange(of: title, initial: true) { (_: String, now: String) -> Void in
+            Platform.nameWindow(now)
+        }
+        .environment(status)
+        .environment(selection)
         .onGeometryChange(for: Double.self) { (frame: GeometryProxy) -> Double in
             Double(frame.size.width)
         } action: { (now: Double) -> Void in
             width = now
         }
         .onGeometryChange(for: Double.self) { (frame: GeometryProxy) -> Double in
-            Double(frame.size.height)
+            // (R1) the frame is laid under the title bar now: its height under it is what it is less the strip's
+            Double(frame.size.height - max(CGFloat(MacLook.titleHeight), frame.safeAreaInsets.top))
         } action: { (now: Double) -> Void in
             height = now
         }
@@ -123,15 +158,25 @@ struct DesktopFrame: View {
     private var page: some View {
         let paths = Bindable(navigation)
         return TabView(selection: Binding(get: { navigation.tab }, set: { (tab: AppTab) -> Void in navigation.select(tab) })) {
-            TabStack(path: paths.library, ownTop: true) { LibraryView() }
+            MacTabStack(path: paths.library, ownTop: true) { MacLibrary.root() }
                 .tag(AppTab.library)
-            TabStack(path: paths.search) { SearchScreen() }
+            MacTabStack(path: paths.search) { MacSearch.root() }
                 .tag(AppTab.search)
-            TabStack(path: paths.requests) { RequestsScreen() }
+            MacTabStack(path: paths.requests) { MacRequests.root() }
                 .tag(AppTab.requests)
-            TabStack(path: paths.you) { YouView() }
+            MacTabStack(path: paths.you) { MacSettings.root() }
                 .tag(AppTab.you)
         }
+    }
+
+    /// (The Mac redesign, R1) The title strip's height: the title bar's, 28 at least (dw.css's .titlebar).
+    private var strip: CGFloat {
+        max(CGFloat(MacLook.titleHeight), titleBar)
+    }
+
+    /// (The Mac redesign, R1) The title strip's words and the window's name: the page in front's (MacTitle).
+    private var title: String {
+        MacTitle.title(navigation, personal: server.access.hasLibrary, savedOrder: savedOrder, playlists: playlists.list)
     }
 
     /// What the app is looking at, as far as downloads go (MainTabs' own): nothing in the background or under the
@@ -148,7 +193,7 @@ struct DesktopFrame: View {
                                       depth: navigation.shownStack.count, sheetOpen: false)
     }
 
-    /// --dw-frame-border, a hairline down the sidebar's edge and the panel's.
+    /// --dw-frame-border, a hairline down the panel's edge.
     private var rule: some View {
         Palette.frameBorder
             .frame(width: hairline)

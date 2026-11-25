@@ -28,6 +28,9 @@ struct RootView: View {
         .animation(.default, value: server.signInOver)
         // (the Mac app, slice 3) the window this is drawn in is the app's own: the one scene Platform shapes
         .shapesWindow()
+        // (the Mac redesign, R1's review) and named for the launch screen up in place of the app - Sign in after a
+        // sign-out - as the desktop frame names it for its page. Nothing on the iPhone
+        .namesWindow(gateName)
         .task { await server.start() }
         .onChange(of: scenePhase) { _, phase in
             // (Phase 8, slice 7) a Library care run stops after the album out as the app goes, its screen let sleep - and
@@ -94,6 +97,17 @@ struct RootView: View {
         Task.detached(priority: .userInitiated) { () async -> Void in
             let item = EQImportReading.file(url, forKey: nil)
             await MainActor.run { navigation.share(item) }
+        }
+    }
+
+    /// (The Mac redesign) The window's name while a launch screen stands in place of the app: Sign in, or deadwax for
+    /// the others (the address, can't reach, checking); none with the app up - the desktop frame names it for its page,
+    /// a sign-in over the app included.
+    private var gateName: String? {
+        switch server.launch {
+        case .ready: return nil
+        case .signedOut: return SignInWords.signIn
+        case .needsAddress, .checking, .unreachable: return SignInWords.title
         }
     }
 

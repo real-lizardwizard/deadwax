@@ -378,6 +378,9 @@ public enum MacSidebar {
 
     /// The sidebar's words - the web's where it says them (app/Sidebar.tsx, lib/appFrame.ts), the app's own elsewhere.
     public enum Words {
+        /// (The Mac redesign, R1) The wordmark at the sidebar's top, as the design canvas draws it: the app's name,
+        /// lowercase as the project always writes it.
+        public static let brand = "deadwax"
         /// The groups' headings.
         public static let library = "Library"
         public static let playlists = "Playlists"

@@ -14,7 +14,7 @@ import UIKit
 /// - Noto Sans's figures are tabular as they are (every digit 572 thousandths wide), so a time or a track number
 ///   holds still with or without `.monospacedDigit()`, kept where it was.
 /// - `mono`: data - ids, paths, versions, an error's detail - in the system's monospace, as before (the web's
-///   Noto Sans Mono isn't bundled).
+///   Noto Sans Mono is bundled since the Mac redesign's R1, for the Mac's views alone: `Typeface.Mac.mono`, below).
 /// - `symbol`: what sizes an SF Symbol drawn alone (an Image) - iOS's own text style, as before, so every symbol is
 ///   the size and weight it was. A symbol inside a Label takes the Label's font, as any text beside it.
 ///
@@ -107,5 +107,62 @@ enum Typeface {
         let segmented = UISegmentedControl.appearance()
         segmented.setTitleTextAttributes([.font: uiFont(.regular, size: 13, style: .footnote)], for: .normal)
         segmented.setTitleTextAttributes([.font: uiFont(.semibold, size: 13, style: .footnote)], for: .selected)
+    }
+}
+
+// MARK: the Mac's
+
+extension Typeface {
+    /// (The Mac redesign, slice R1 - notes/ios.md "The Mac redesign, slice R1: the frame and the shared pieces") The
+    /// Mac's type as James approved it on the design canvas (ios/design/dw.css): Noto Sans for words and Noto Sans Mono for
+    /// data - numbers, lengths, paths, formats ("Bundle Noto Sans Mono", 24 Nov: the web's own, made for the app by
+    /// ios/scripts/make-fonts.py - Regular, Medium and SemiBold) - at the drawings' fixed sizes, as a Mac's own windows
+    /// draw theirs. Only the Mac's views (ios/App/Mac) use it; the iPhone's sizes above are as they were.
+    /// `.weight()` picks the face, as for the iPhone's.
+    enum Mac {
+        /// The family the three mono faces share (their name table's, and SwiftUI's lookup).
+        static let monoFamily = "Noto Sans Mono"
+
+        /// The drawings' sizes, in points (dw.css's px; tests/test_ios_mac_look.py holds each to it).
+        enum Size: Double, CaseIterable {
+            /// .h1: a page's own heading.
+            case h1 = 28
+            /// A page's second heading: Edit an album's album over its tabs, Needs a look's and People's.
+            case h2 = 20
+            /// .brand: the wordmark at the sidebar's top.
+            case brand = 19
+            /// A third: Info's album, beside its cover.
+            case h3 = 18
+            /// .lcd .b: the song's title in the player's display.
+            case lcd = 14
+            /// The window's words (.dw's font). Named apart from iOS's text styles (`.body`, `.title`), which the Mac's
+            /// type never takes.
+            case base = 13
+            /// .btn, .find, .tab, a field's label, a large segment.
+            case control = 12.5
+            /// .s, .btn.sm, the title strip.
+            case small = 12
+            /// .xs, a group's heading, a column's header, the status bar, a segment, a chip, a box's legend.
+            case label = 11.5
+            /// .count: a sidebar row's count, in the mono face.
+            case count = 11
+        }
+
+        /// Words at a size.
+        static func text(_ size: Size) -> Font {
+            .custom(family, fixedSize: CGFloat(size.rawValue))
+        }
+
+        /// Data at a size, in Noto Sans Mono.
+        static func mono(_ size: Size) -> Font {
+            .custom(monoFamily, fixedSize: CGFloat(size.rawValue))
+        }
+
+        /// The mono faces by their PostScript names (each file's name table; test_ios_palette.py checks them).
+        enum MonoFace: String, CaseIterable {
+            case regular = "NotoSansMono-Regular"
+            case medium = "NotoSansMono-Medium"
+            case semibold = "NotoSansMono-SemiBold"
+        }
     }
 }

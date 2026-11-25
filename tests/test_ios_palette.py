@@ -198,7 +198,9 @@ def test_every_corner_in_the_app_is_a_token():
     for name, number, code in app_code():
         if "TurntableFace.lookRadius" in code or "squareIcon.radius" in code:
             left.append(f"{name}:{number} the turntable's radius")
-        if name == "Shared/Corners.swift":
+        #? (the Mac redesign, R1) the Mac's rounded corners - James: "Rounded on Mac only" - are MacCorners' alone, held to
+        #? dw.css by test_ios_mac_look.py; the phone's stay Corners', every one 0
+        if name in ("Shared/Corners.swift", "Mac/Look/MacCorners.swift"):
             continue
         if re.search(r"cornerRadius:\s*[0-9]", code):
             left.append(f"{name}:{number} a radius of its own")
@@ -530,8 +532,11 @@ def test_the_librarys_top_sits_under_the_status_bar():
     # picture, edge to edge as Photos' is, with the status bar hidden - its ✕ keeps to the safe area.
     # Edit album's cover full screen, from Compare covers (Phase 8, slice 1): its black ground alone, a fill - the
     # picture and its Close keep to the safe area.
+    # (The Mac redesign, R1) The Mac's desktop frame, laid under the window's title bar for its title strip - the Mac's
+    # alone (the iPhone draws MainTabs, never the frame), and its content below the strip.
     assert reaching == {"Library/LibraryTop.swift": 1, "Root/RootView.swift": 1, "Player/NowPlayingView.swift": 2,
-                        "Root/MainTabs.swift": 1, "Player/CoverViewer.swift": 2, "Edit/ReleasePage.swift": 1}
+                        "Root/MainTabs.swift": 1, "Player/CoverViewer.swift": 2, "Edit/ReleasePage.swift": 1,
+                        "Root/DesktopFrame.swift": 1}
     full = sources["Edit/ReleasePage.swift"]
     full = full[full.index("struct FullCoverView"):]
     assert "ZStack {\n            Color.black.ignoresSafeArea()\n" in full and full.count("ignoresSafeArea") == 1
@@ -626,7 +631,10 @@ def test_the_transport_and_the_librarys_icon_have_actual_corners():
 TYPEFACE = APP / "Shared" / "Typeface.swift"
 FONTS = APP / "Fonts"
 WEB_FONTS = REPO / "interface" / "styles" / "font" / "noto-sans"
+#? (the Mac redesign, R1) James, 24 Nov: "Bundle Noto Sans Mono" - the Mac's data face, made from the web's own
+WEB_MONO = REPO / "interface" / "styles" / "font" / "noto-sans-mono"
 INFO_PLIST = REPO / "ios" / "Config" / "Info.plist"
+INFO_MAC_PLIST = REPO / "ios" / "Config" / "Info-Mac.plist"
 STYLES = ("largeTitle", "title", "title2", "title3", "headline", "body", "callout", "subheadline", "footnote", "caption",
           "caption2")
 # each text style's size at iOS's standard text size (Large) - what SwiftUI's .body and the rest were
@@ -692,36 +700,61 @@ def font_characters(path: Path) -> set:
     raise AssertionError(f"{path.name} has no (3, 1) cmap")
 
 
-def test_the_fonts_are_the_webs_own_noto_sans():
+def web_characters(folder: str) -> set:
+    """Every character the web's files of a family claim (tests/fixtures/font_cmaps.json, read from the woff2s)."""
     import json
+    web = json.loads((REPO / "tests" / "fixtures" / "font_cmaps.json").read_text(encoding="utf-8"))
+    wanted = set()
+    for key, entry in web.items():
+        if key.startswith(folder + "/"):
+            for part in entry["cmap"].split(","):
+                low, _, high = part.strip()[2:].partition("-")
+                wanted |= set(range(int(low, 16), int(high or low, 16) + 1))
+    return wanted
+
+
+def test_the_fonts_are_the_webs_own_noto_sans():
     import plistlib
     files = sorted(path.name for path in FONTS.glob("*.ttf"))
-    assert files == ["NotoSans-Bold.ttf", "NotoSans-Medium.ttf", "NotoSans-Regular.ttf", "NotoSans-SemiBold.ttf"]
-    # Info.plist names each (the synchronized folder copies them to the bundle's root, where UIAppFonts looks)
-    assert sorted(plistlib.loads(INFO_PLIST.read_bytes())["UIAppFonts"]) == files
-    # the licence goes with them: the web's own
-    assert (FONTS / "OFL.txt").read_bytes() == (WEB_FONTS / "OFL.txt").read_bytes()
+    words = ["NotoSans-Bold.ttf", "NotoSans-Medium.ttf", "NotoSans-Regular.ttf", "NotoSans-SemiBold.ttf"]
+    #? (the Mac redesign, R1) and Noto Sans Mono's three, the drawings' 400, 500 and 600
+    mono = ["NotoSansMono-Medium.ttf", "NotoSansMono-Regular.ttf", "NotoSansMono-SemiBold.ttf"]
+    assert files == sorted(words + mono)
+    # Info.plist names each (the synchronized folder copies them to the bundle's root, where UIAppFonts looks) - and
+    # Info-Mac.plist the same (check_project.py holds the two plists in step)
+    for plist in (INFO_PLIST, INFO_MAC_PLIST):
+        assert sorted(plistlib.loads(plist.read_bytes())["UIAppFonts"]) == files, plist.name
+    # the licence goes with them: the web's own - the same file beside both families
+    assert (FONTS / "OFL.txt").read_bytes() == (WEB_FONTS / "OFL.txt").read_bytes() == (WEB_MONO / "OFL.txt").read_bytes()
     # each face is of the family Typeface asks for, under the PostScript name Typeface gives UIKit
     source = TYPEFACE.read_text(encoding="utf-8")
     assert re.search(r'static let family = "([^"]+)"', source).group(1) == "Noto Sans"
     faces = sorted(re.findall(r'case \w+ = "(NotoSans-\w+)"', source))
     assert len(faces) == 4
     named = []
-    for name in files:
+    for name in words:
         table = font_names(FONTS / name)
         assert table.get(16, table[1]) == "Noto Sans", name
         named.append(table[6])
     assert sorted(named) == faces
+    # (R1) the mono faces: of the family Typeface.Mac asks for, under Typeface.Mac.MonoFace's names
+    assert re.search(r'static let monoFamily = "([^"]+)"', source).group(1) == "Noto Sans Mono"
+    mono_faces = sorted(re.findall(r'case \w+ = "(NotoSansMono-\w+)"', source))
+    assert len(mono_faces) == 3
+    named = []
+    for name in mono:
+        table = font_names(FONTS / name)
+        assert table.get(16, table[1]) == "Noto Sans Mono", name
+        named.append(table[6])
+    assert sorted(named) == mono_faces
     # every character of the web's seven files, in every face: one font per weight, the web's whole range
-    web = json.loads((REPO / "tests" / "fixtures" / "font_cmaps.json").read_text(encoding="utf-8"))
-    wanted = set()
-    for key, entry in web.items():
-        if key.startswith("noto-sans/"):
-            for part in entry["cmap"].split(","):
-                low, _, high = part.strip()[2:].partition("-")
-                wanted |= set(range(int(low, 16), int(high or low, 16) + 1))
+    wanted = web_characters("noto-sans")
     assert len(wanted) > 1600
-    for name in files:
+    for name in words:
+        assert font_characters(FONTS / name) == wanted, name
+    wanted = web_characters("noto-sans-mono")
+    assert len(wanted) > 1600
+    for name in mono:
         assert font_characters(FONTS / name) == wanted, name
 
 

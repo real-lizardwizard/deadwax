@@ -2,25 +2,29 @@ import DeadwaxCore
 import SwiftUI
 
 /// The desktop frame's sidebar (the Mac app, slice 3 - the Mac app's plan 1.2; the web's app/Sidebar.tsx as its 2.1.35
-/// drew it), MacFrame.sidebarWidth (232) wide, on --dw-sidebar with a rule at its right; View > Hide Sidebar (⌃⌘S) puts
-/// it away. Every row and rule is Core's MacSidebar, its vectors the web's own lib/appFrame.ts (MacFrameVectorTests):
+/// drew it), redrawn (the Mac redesign, slice R1 - notes/ios.md "The Mac redesign, slice R1: the frame and the shared
+/// pieces") as James approved it on the design canvas: 220 wide (MacLook.sidebarWidth) on dw.css's --side with the
+/// frame's rule at its right, the wordmark at its top, and text rows with no glyphs. View > Hide Sidebar (⌃⌘S) puts it
+/// away. Every row and rule is Core's MacSidebar, as before, its vectors the web's own lib/appFrame.ts
+/// (MacFrameVectorTests):
 ///
-/// - The search field at its top: typing there (or Return) shows Search's results in the page, as the web's field does
-///   - the words are Search's own (SearchModel), so Search's page draws no field of its own on the Mac. Edit > Find
-///   (⌘F) shows the sidebar and puts the cursor here.
-/// - Requests, with its badge - the count of downloads on their way (the web's top list, less Home: the Mac has none).
-/// - Library, and - with a library of your own - its switch, Yours | All: Yours' rows are the Library switch's pages in
-///   the person's order (Playlists aside, the group below), All's the collection's three; Downloaded on either. The side
-///   follows where you are, and is kept on the Mac (MacSidebar.sideKey, the web's key); turning it with a view showing
-///   opens the same kind of view on the other side (MacSidebar.sideFlip).
-/// - Playlists, which folds: All playlists, then yours and those shared with you, by name - at most twenty.
+/// - The search field in its well under the wordmark: typing there (or Return) shows Search's results in the page, as the
+///   web's field does - the words are Search's own (SearchModel), so Search's page draws no field of its own on the Mac.
+///   Edit > Find (⌘F) shows the sidebar and puts the cursor here.
+/// - Requests, with its count - the downloads on their way (the web's top list, less Home: the Mac has none).
+/// - Library, and - with a library of your own - its switch, Yours | All (MacSegmented): Yours' rows are the Library
+///   switch's pages in the person's order (Playlists aside, the group below), All's the collection's three; Downloaded on
+///   either. The side follows where you are, and is kept on the Mac (MacSidebar.sideKey, the web's key); turning it with
+///   a view showing opens the same kind of view on the other side (MacSidebar.sideFlip).
+/// - Playlists, which folds: All playlists, then yours and those shared with you, by name - at most twenty - set in.
 /// - Manage, which folds, by permission (Settings > Manage's rows): Needs a look with its count - said on the heading
 ///   while folded.
-/// - Settings at the foot, under a rule, in view however far the groups scroll.
+/// - Settings at the foot, under the frame's rule, in view however far the groups scroll.
 ///
 /// The row where you are is drawn in the selection's colours (MacSidebar.current) - a folded group's heading when its
 /// page is the one showing. A row's click is MacSidebar.move: its tab's button, a Library page at the root, a section, a
-/// playlist's or a Manage page put on its stack (AppNavigation.macMove). Every row carries its glyph, as the web's.
+/// playlist's or a Manage page put on its stack (AppNavigation.macMove). A heading that folds keeps a small chevron at
+/// its right - the canvas draws none, but a fold with no mark would be a heading that hides its rows unseen.
 struct MacSidebarView: View {
     @Environment(AppNavigation.self) private var navigation
     @Environment(ServerModel.self) private var server
@@ -28,21 +32,11 @@ struct MacSidebarView: View {
     @Environment(RequestsModel.self) private var requests
     @Environment(QueueCountModel.self) private var queueCount
     @Environment(PlaylistsModel.self) private var playlists
-    @Environment(\.displayScale) private var displayScale
     /// The Library switch's order, as this Mac keeps it (LibraryView's own).
     @AppStorage(LibraryPages.storageKey) private var savedOrder = ""
     /// The switch's side last shown, and the folded groups (the web's keys and values).
     @AppStorage(MacSidebar.sideKey) private var savedSide = ""
     @AppStorage(MacSidebar.foldedKey) private var savedFolds = ""
-
-    /// --app-desk-side-pad-x and -y, --app-desk-side-gap, --app-desk-item-gap, --app-desk-label-pad.
-    private static let padX: CGFloat = 12
-    private static let padY: CGFloat = 20
-    private static let groupGap: CGFloat = 18
-    private static let itemGap: CGFloat = 2
-    private static let labelPad: CGFloat = 6
-    /// --app-desk-you: Settings' row at the foot.
-    private static let foot: CGFloat = 44
 
     var body: some View {
         let personal = server.access.hasLibrary
@@ -54,35 +48,40 @@ struct MacSidebarView: View {
         let side = MacSidebar.sideShown(current, remembered: MacSidebar.side(saved: savedSide), over: over)
         let folds = MacSidebar.folds(saved: savedFolds)
         let manage = MacSidebar.manageRows(server.access)
-        VStack(spacing: 0) {
+        // .side: a column, 1 apart, padding 12px 10px 8px
+        VStack(alignment: .leading, spacing: 1) {
+            // .brand: padding 0 8px 10px, 19 bold
+            Text(MacSidebar.Words.brand)
+                .font(Typeface.Mac.text(.brand).weight(.bold))
+                .kerning(-0.2)
+                .foregroundStyle(MacPalette.text)
+                .padding(.horizontal, 8)
+                .padding(.bottom, 10)
+            // .side > .find: margin-bottom 8px
             SidebarSearchField()
-                .padding(.horizontal, Self.padX)
-                .padding(.top, Self.padY)
-                .padding(.bottom, Self.groupGap)
+                .padding(.bottom, 8)
             ScrollView {
-                VStack(alignment: .leading, spacing: Self.groupGap) {
-                    VStack(spacing: Self.itemGap) {
-                        row(.requests, current: current, at: at)
-                    }
+                VStack(alignment: .leading, spacing: 1) {
+                    row(.requests, current: current, at: at)
                     library(side: side, personal: personal, order: order, current: current, over: over, at: at)
                     playlistsGroup(listed, folds: folds, current: current, at: at)
                     if !manage.isEmpty {
                         manageGroup(manage, folds: folds, current: current, at: at)
                     }
                 }
-                .padding(.horizontal, Self.padX)
-                .padding(.bottom, Self.padY)
             }
-            VStack(spacing: 0) {
-                rule
-                row(.settings, current: current, at: at)
-                    .frame(height: Self.foot)
-            }
-            .padding(.horizontal, Self.padX)
-            .padding(.bottom, Self.padY / 2)
+            .frame(maxHeight: .infinity, alignment: .top)
+            // the foot: the frame's rule, 5 above Settings
+            MacRule(colour: MacPalette.frame)
+                .padding(.top, 7)
+                .padding(.bottom, 5)
+            row(.settings, current: current, at: at)
         }
+        .padding(EdgeInsets(top: 12, leading: 10, bottom: 8, trailing: 10))
         .frame(maxHeight: .infinity, alignment: .top)
-        .background(Palette.sidebar)
+        .background(MacPalette.side)
+        // .side: border-right 1px solid var(--frame)
+        .overlay(alignment: .trailing) { MacRule(colour: MacPalette.frame, vertical: true) }
         .accessibilityElement(children: .contain)
         .accessibilityLabel(MacSidebar.Words.sections)
         // (slice 3's review) asked again for each person: the sidebar stays on screen while someone else signs in over
@@ -101,20 +100,23 @@ struct MacSidebarView: View {
 
     private func library(side: MacSidebar.Side, personal: Bool, order: [LibraryPage], current: MacSidebar.Row?,
                          over: Bool, at: MacSidebar.Where) -> some View {
-        VStack(alignment: .leading, spacing: Self.itemGap) {
+        VStack(alignment: .leading, spacing: 1) {
             HStack(spacing: 8) {
-                label(MacSidebar.Words.library)
+                heading(MacSidebar.Words.library)
                 Spacer(minLength: 0)
                 if personal {
-                    SideSwitch(side: side) { (to: MacSidebar.Side) -> Void in
-                        savedSide = to.rawValue
-                        if let row = MacSidebar.sideFlip(current, to: to, over: over) {
-                            navigation.macMove(MacSidebar.move(row, at))
-                        }
-                    }
+                    // the switch in the heading, at its right (.navh .seg)
+                    MacSegmented(options: MacSidebar.Side.allCases, words: { (one: MacSidebar.Side) -> String in one.label },
+                                 chosen: Binding(get: { side }, set: { (to: MacSidebar.Side) -> Void in
+                                     guard to != side else { return }
+                                     savedSide = to.rawValue
+                                     if let row = MacSidebar.sideFlip(current, to: to, over: over) {
+                                         navigation.macMove(MacSidebar.move(row, at))
+                                     }
+                                 }), spoken: MacSidebar.Words.library)
                 }
             }
-            .padding(.bottom, Self.labelPad)
+            .padding(EdgeInsets(top: 13, leading: 8, bottom: 4, trailing: 8))
             ForEach(MacSidebar.rows(side, order: order, personal: personal), id: \.self) { (each: MacSidebar.Row) in
                 row(each, current: current, at: at)
             }
@@ -123,7 +125,7 @@ struct MacSidebarView: View {
 
     private func playlistsGroup(_ listed: [Playlist], folds: MacSidebar.Folds, current: MacSidebar.Row?,
                                 at: MacSidebar.Where) -> some View {
-        VStack(alignment: .leading, spacing: Self.itemGap) {
+        VStack(alignment: .leading, spacing: 1) {
             foldHead(.playlists, words: MacSidebar.Words.playlists, spoken: MacSidebar.Words.playlists, count: "",
                      folds: folds, current: current)
             if !folds.playlists {
@@ -140,7 +142,7 @@ struct MacSidebarView: View {
         let queue = rows.contains(.manage(.queue))
         let count = folds.manage && queue ? queueCount.count.value : ""
         let spoken = MacSidebar.manageHeadLabel(folded: folds.manage, needsLook: queue ? queueCount.count.server : nil)
-        return VStack(alignment: .leading, spacing: Self.itemGap) {
+        return VStack(alignment: .leading, spacing: 1) {
             foldHead(.manage, words: MacSidebar.Words.manage, spoken: spoken, count: count, folds: folds,
                      current: current)
             if !folds.manage {
@@ -153,16 +155,17 @@ struct MacSidebarView: View {
 
     // MARK: the parts
 
-    /// A group's label (Library's): the web's .app-side-label.
-    private func label(_ words: String) -> some View {
+    /// A group's heading's words (.navh): 11.5 semibold in the label's colour.
+    private func heading(_ words: String) -> some View {
         Text(words)
-            .font(Typeface.footnote.weight(.semibold))
-            .foregroundStyle(Palette.quiet)
+            .font(Typeface.Mac.text(.label).weight(.semibold))
+            .foregroundStyle(MacPalette.label)
             .accessibilityAddTraits(.isHeader)
     }
 
-    /// A heading that folds its group (the web's foldHead): the label's words, a count while folded (Manage's), and a
-    /// chevron pointing at the words while it is folded - drawn current when folded over the page showing.
+    /// A heading that folds its group (the web's foldHead): the heading's words, a count while folded (Manage's), and a
+    /// small chevron at its right pointing at the words while it is folded - drawn current when folded over the page
+    /// showing.
     private func foldHead(_ fold: MacSidebar.Fold, words: String, spoken: String, count: String,
                           folds: MacSidebar.Folds, current: MacSidebar.Row?) -> some View {
         let folded = folds[fold]
@@ -170,59 +173,53 @@ struct MacSidebarView: View {
         return Button {
             savedFolds = MacSidebar.saved(folds.toggled(fold))
         } label: {
-            HStack(spacing: 10) {
+            HStack(spacing: 8) {
                 Text(words)
-                    .font(Typeface.footnote.weight(.semibold))
+                    .font(Typeface.Mac.text(.label).weight(.semibold))
                     .frame(maxWidth: .infinity, alignment: .leading)
-                if !count.isEmpty { SidebarBadge(count: count) }
+                if !count.isEmpty { MacCount(count: count) }
                 Image(systemName: "chevron.down")
-                    .font(Typeface.symbol(.caption2).weight(.semibold))
+                    .font(Typeface.symbol(size: 8, weight: .bold))
                     .rotationEffect(.degrees(folded ? -90 : 0))
                     .accessibilityHidden(true)
             }
-            .foregroundStyle(lit ? Palette.selectedText : Palette.quiet)
-            .padding(.horizontal, 10)
-            .frame(minHeight: 24)
+            .foregroundStyle(lit ? MacPalette.selt : MacPalette.label)
+            // .navh: padding 13px 8px 4px - lit, it sits in the selection's colours, a row's height
+            .padding(EdgeInsets(top: lit ? 0 : 13, leading: 8, bottom: lit ? 0 : 4, trailing: 8))
+            .frame(minHeight: lit ? CGFloat(MacLook.navRowHeight) : nil)
             .background { if lit { SelectedFill() } }
+            .padding(.top, lit ? 9 : 0)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .padding(.bottom, Self.labelPad)
         .accessibilityLabel(spoken)
         .accessibilityAddTraits(.isHeader)
         .accessibilityValue(folded ? MacSidebar.Words.collapsed : MacSidebar.Words.expanded)
     }
 
-    /// A row: its glyph and words, a badge at its right (Requests' arriving, Needs a look's count) - drawn current where
-    /// you are; a click is its move from where the app is.
+    /// A row (.nav): its words, a count at its right (Requests' arriving, Needs a look's) - a playlist's set in (.nav.sub)
+    /// - drawn current where you are (.nav.on); a click is its move from where the app is.
     private func row(_ each: MacSidebar.Row, words: String? = nil, current: MacSidebar.Row?,
                      at: MacSidebar.Where) -> some View {
         let lit = each == current
         let badge = self.badge(each)
+        let sub: Bool
+        if case .playlist = each { sub = true } else { sub = false }
         return Button {
             navigation.macMove(MacSidebar.move(each, at))
         } label: {
-            HStack(spacing: 10) {
-                if let symbol = MacSidebar.symbol(each) {
-                    Image(systemName: symbol)
-                        .font(Typeface.symbol(.body))
-                        .frame(width: 18, height: 18)
-                        .accessibilityHidden(true)
-                } else {
-                    // a playlist's name, set in under All playlists' words (the web's .app-side-playlist)
-                    Color.clear
-                        .frame(width: 18, height: 18)
-                        .accessibilityHidden(true)
-                }
+            HStack(spacing: 8) {
                 Text(words ?? MacSidebar.label(each))
-                    .font(Typeface.subheadline)
+                    .font(Typeface.Mac.text(.base).weight(lit ? .semibold : .regular))
                     .lineLimit(1)
                     .frame(maxWidth: .infinity, alignment: .leading)
-                if !badge.isEmpty { SidebarBadge(count: badge) }
+                if !badge.isEmpty { MacCount(count: badge) }
             }
-            .foregroundStyle(lit ? Palette.selectedText : Color.primary)
-            .padding(.horizontal, 10)
-            .frame(minHeight: 32)
+            .foregroundStyle(lit ? MacPalette.selt : (sub ? MacPalette.t2 : MacPalette.head))
+            // .nav: padding 0 8px (.nav.sub: 20 at its left), 26 tall
+            .padding(.leading, sub ? 20 : 8)
+            .padding(.trailing, 8)
+            .frame(height: CGFloat(MacLook.navRowHeight))
             .background { if lit { SelectedFill() } }
             .contentShape(Rectangle())
         }
@@ -248,83 +245,22 @@ struct MacSidebarView: View {
         default: return words
         }
     }
-
-    /// --dw-frame-border, a hairline.
-    private var rule: some View {
-        Palette.frameBorder
-            .frame(height: 1 / max(displayScale, 1))
-            .accessibilityHidden(true)
-    }
 }
 
-/// Where you are: Explorer's selection, as the web draws it (--dw-selection-bg, a hairline of --dw-selection-border).
+/// Where you are (.nav.on): the selection's fill in its edge, a button's corners.
 private struct SelectedFill: View {
     var body: some View {
-        Corners.controlShape
-            .fill(Palette.selectionFill)
-            .overlay(Corners.controlShape.strokeBorder(Palette.selectionEdge, lineWidth: 1))
+        MacCorners.buttonShape
+            .fill(MacPalette.selbg)
+            .overlay(MacCorners.buttonShape.strokeBorder(MacPalette.selbd, lineWidth: 1))
     }
 }
 
-/// A count at a row's right (the web's .app-side-badge): STYLE.md's purple badge, the tab bar's on the iPhone.
-private struct SidebarBadge: View {
-    let count: String
-
-    var body: some View {
-        Text(count)
-            .font(Typeface.caption2.weight(.bold))
-            .monospacedDigit()
-            .lineLimit(1)
-            .fixedSize()
-            .foregroundStyle(Palette.accentText)
-            .padding(.horizontal, 4)
-            .frame(minWidth: 20, minHeight: 20)
-            .background(Palette.badgeFill, in: Corners.controlShape)
-            .overlay(Corners.controlShape.strokeBorder(Palette.badgeEdge, lineWidth: 1))
-            .accessibilityHidden(true)
-    }
-}
-
-/// Library's switch, Yours | All (the web's .app-side-switch): the side shown checked; a click turns it.
-private struct SideSwitch: View {
-    let side: MacSidebar.Side
-    let turn: (MacSidebar.Side) -> Void
-
-    var body: some View {
-        HStack(spacing: 2) {
-            ForEach(MacSidebar.Side.allCases, id: \.self) { (one: MacSidebar.Side) in
-                let on = one == side
-                Button {
-                    if !on { turn(one) }
-                } label: {
-                    Text(one.label)
-                        .font(Typeface.caption.weight(.semibold))
-                        .foregroundStyle(on ? Palette.accentText : Palette.quiet)
-                        .padding(.horizontal, 8)
-                        .frame(minHeight: 22)
-                        .background {
-                            if on {
-                                Corners.controlShape
-                                    .fill(Palette.badgeFill)
-                                    .overlay(Corners.controlShape.strokeBorder(Palette.badgeEdge, lineWidth: 1))
-                            }
-                        }
-                        .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
-                .accessibilityAddTraits(on ? .isSelected : [])
-            }
-        }
-        .accessibilityElement(children: .contain)
-        .accessibilityLabel(MacSidebar.Words.library)
-    }
-}
-
-/// The sidebar's search field (the web's .app-side-search): Search's own words (SearchModel), "Search" in it while
-/// empty and Search's name to VoiceOver. Typing words - or Return - shows Search's results in the page
-/// (AppNavigation.showSearch); Return asks now, as the keyboard's Search does. A clear button while it has words -
-/// Escape presses it while the field has the cursor, as Escape empties the web's search field. Edit > Find puts the
-/// cursor here (`findField`).
+/// The sidebar's search field (the web's .app-side-search, drawn as the canvas's .well.find): Search's own words
+/// (SearchModel), "Search" in it while empty and Search's name to VoiceOver - 28 tall in its well, the accent's edge
+/// while it has the cursor. Typing words - or Return - shows Search's results in the page (AppNavigation.showSearch);
+/// Return asks now, as the keyboard's Search does. A clear button while it has words - Escape presses it while the field
+/// has the cursor, as Escape empties the web's search field. Edit > Find puts the cursor here (`findField`).
 private struct SidebarSearchField: View {
     @Environment(AppNavigation.self) private var navigation
     @Environment(SearchModel.self) private var search
@@ -332,16 +268,18 @@ private struct SidebarSearchField: View {
     @FocusState private var focused: Bool
 
     var body: some View {
-        HStack(spacing: 8) {
+        // .find: gap 7px, padding 0 8px, 12.5 in the third colour
+        HStack(spacing: 7) {
             Image(systemName: "magnifyingglass")
-                .font(Typeface.symbol(.footnote))
-                .foregroundStyle(Palette.quiet)
+                .font(Typeface.symbol(size: 11, weight: .medium))
+                .foregroundStyle(MacPalette.t3)
                 .accessibilityHidden(true)
             TextField(MacSidebar.Words.searchPlaceholder, text: Binding(get: { search.text }, set: { (typed: String) -> Void in
                 search.type(typed)
                 if !typed.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { navigation.showSearch() }
-            }))
-            .font(Typeface.subheadline)
+            }), prompt: Text(MacSidebar.Words.searchPlaceholder).foregroundStyle(MacPalette.t3))
+            .font(Typeface.Mac.text(.control))
+            .foregroundStyle(MacPalette.fieldText)
             .textFieldStyle(.plain)
             .autocorrectionDisabled()
             .textInputAutocapitalization(.never)
@@ -352,6 +290,7 @@ private struct SidebarSearchField: View {
                 search.submitted()
             }
             .accessibilityLabel(MacSidebar.Words.searchLabel)
+            .focusEffectDisabled()
             // (the Mac app, slices 2 and 3) Edit > Find (⌘F) puts the cursor here
             .findField($focused)
             if !search.text.isEmpty {
@@ -359,8 +298,8 @@ private struct SidebarSearchField: View {
                     search.type("")
                 } label: {
                     Image(systemName: "xmark.circle.fill")
-                        .font(Typeface.symbol(.footnote))
-                        .foregroundStyle(Palette.quiet)
+                        .font(Typeface.symbol(size: 11, weight: .regular))
+                        .foregroundStyle(MacPalette.t3)
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel(MacSidebar.Words.clearSearch)
@@ -368,9 +307,8 @@ private struct SidebarSearchField: View {
                 .escapeCloses(focused)
             }
         }
-        .padding(.horizontal, 10)
-        .frame(minHeight: 32)
-        .background(Palette.well, in: Corners.controlShape)
-        .overlay(Corners.controlShape.strokeBorder(Palette.frameBorder, lineWidth: 1))
+        .padding(.horizontal, 8)
+        .frame(height: CGFloat(MacLook.findHeight))
+        .background { MacWell(focused: focused) }
     }
 }
