@@ -930,10 +930,11 @@ def declared(folder: Path) -> set[str]:
 
 
 #? R1b draws none of App/Phone's pieces and puts App/Look's only where the Mac's look already was: each slice that draws
-#? one on a phone screen adds that file here
-PHONE_PIECES_DRAWN_IN: set[str] = set()
+#? one on a phone screen adds that file here - R3: Now Playing's sheet (PhoneTop, PhoneBack, PhoneStrip) and its bottom
+#? row (PhoneTabItem, PhoneLook's sizes, DWPalette's accent for the output's name)
+PHONE_PIECES_DRAWN_IN: set[str] = {"Player/NowPlayingSheet.swift", "Player/NowPlayingView.swift"}
 LOOK_PIECES_DRAWN_IN = {"Root/MacSidebarView.swift", "Root/DesktopFrame.swift", "Player/PlayerBar.swift",
-                        "Player/MacPanels.swift"}
+                        "Player/MacPanels.swift", "Player/NowPlayingView.swift"}
 
 
 def test_the_phones_pieces_are_drawn_nowhere_yet():

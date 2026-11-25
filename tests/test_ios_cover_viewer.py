@@ -131,7 +131,8 @@ def test_the_viewer_is_presented_from_now_playings_root():
     body = body_of(source)
     root = body[body.index(".offset(y: dragY)"):]
     assert ".coverViewer($viewing, onDismiss: eqAfterSheet)" in root
-    assert root.index(".appSheet(isPresented: $showsUpNext") < root.index(".coverViewer($viewing")
+    #? (R3) beside its one sheet - the Queue, Info and the EQ's
+    assert root.index(".appSheet(isPresented: $sheetUp") < root.index(".coverViewer($viewing")
     # once, and nowhere inside the content the cover lives in
     assert source.count(".coverViewer(") == 1 and ".appCover(" not in source and "fullScreenCover(" not in source
     assert ".coverViewer(" not in func(source, "content")
@@ -147,9 +148,12 @@ def test_the_viewer_is_presented_from_now_playings_root():
 
 def test_a_shared_eq_file_waits_for_the_viewer_too():
     shared = func(code(NOW_PLAYING), "shared")
-    assert "if showsUpNext || showsInfo || viewing != nil {" in shared
+    #? (R3) the sheet up moves to EQ in place; the cover full screen closes first, and the sheet opens once it has gone
+    #? (NowPlayingTabs.shared - NowPlayingTabsTests)
+    assert "switch NowPlayingTabs.shared(sheet: sheetUp ? sheetTab : nil, coverUp: viewing != nil) {" in shared
+    assert "case .show(let tab):\n            open(tab)" in shared
     assert "eqWaits = true" in shared and "CoverViewing.put(nil, into: $viewing)" in shared
-    # its going opens the EQ the file waited for, as Up Next's and Info's do
+    # its going opens the EQ the file waited for
     assert ".coverViewer($viewing, onDismiss: eqAfterSheet)" in code(NOW_PLAYING)
 
 

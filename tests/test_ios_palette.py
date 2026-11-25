@@ -439,8 +439,8 @@ def test_the_bars_run_smooth_only_while_the_song_plays():
     assert "let visible: Bool" in scrubber
     now_playing = (APP / "Player" / "NowPlayingView.swift").read_text(encoding="utf-8")
     assert "ScrubberView(visible: !turntable && !sheetOver)" in now_playing
-    assert ("private var sheetOver: Bool { showsUpNext || showsInfo || showsEQ || playlistPick != nil || viewing != nil }"
-            in now_playing)
+    #? (R3) the one sheet (the Queue, Info, the EQ), Add to a playlist and the cover full screen
+    assert "private var sheetOver: Bool { sheetUp || playlistPick != nil || viewing != nil }" in now_playing
     assert "private struct ScrubberClocks: View, Equatable" in scrubber and ".equatable()" in scrubber
     assert "PlayerWords.elapsed(shown: time)" in scrubber and "PlayerWords.remaining(shown: time, length: length)" in scrubber
     # the lyrics keep their own clock

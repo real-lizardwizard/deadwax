@@ -58,7 +58,7 @@ import Testing
             #expect(MacFrame.escape(typing: false, panel: panel) == .panel, "\(panel)")
         }
         // and only with neither, the page's Edit Cancel
-        #expect(MacFrame.escape(typing: false, panel: .none) == .page)
+        #expect(MacFrame.escape(typing: false, panel: MacFrame.Panel.none) == .page)
     }
 
     @Test func aReadablePageKeepsItsScrollViewAcrossThePage() {

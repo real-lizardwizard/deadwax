@@ -5,7 +5,7 @@ import SwiftUI
 /// redesign, slice R1b: the shared look, and the phone's pieces"): its icon over its words, 49 tall at least, the
 /// accent's while shown, #8a8a9c otherwise - and lit, the lit line over it on the bar's top edge. The icons are the
 /// caller's, the app's own (filled SF Symbols and the squared Library stack - the build plan's section 8), 24 at least.
-/// The bar is R4's and the row R3's: drawn nowhere until then.
+/// The bar is R4's, drawn nowhere until then; the row is R3's, Now Playing's.
 ///
 /// One element for VoiceOver - its words, selected while shown - with the Large Content Viewer's icon and words when the
 /// text is large, as the tab bar's own are. Capped at xxxLarge, as the tab bar is.
@@ -15,6 +15,9 @@ struct PhoneTabItem<Icon: View>: View {
     let shown: Bool
     /// Whether the lit line stands over it: the tab bar's shown tab. Now Playing's row lights none.
     var lit = false
+    /// (R3) What VoiceOver calls it, where that says more than its words: Now Playing's Queue names what is on
+    /// ("Queue - Shuffle on"), its Lyrics what the song has. Its words otherwise.
+    var spoken: String?
     let action: () -> Void
     @ViewBuilder let icon: Icon
 
@@ -41,7 +44,7 @@ struct PhoneTabItem<Icon: View>: View {
         }
         .buttonStyle(.plain)
         .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
-        .accessibilityLabel(words)
+        .accessibilityLabel(spoken ?? words)
         .accessibilityAddTraits(shown ? .isSelected : [])
         .accessibilityShowsLargeContentViewer {
             Label {

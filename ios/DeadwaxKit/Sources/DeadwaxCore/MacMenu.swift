@@ -12,8 +12,10 @@ import Foundation
 // Song are the Mac's own, as Music names them.
 //
 // (Slice 3, notes/ios.md "The Mac app, slice 3: the desktop frame") And the View menu's frame: Show Sidebar or Hide
-// Sidebar (⌃⌘S, the Mac's own words for it), and the three side panels - Up Next (⌥⌘U), Lyrics (⌥⌘L) and Info (⌘I),
-// each ticked while it shows, one at a time (MacFrame.toggled) - named as the panels are.
+// Sidebar (⌃⌘S, the Mac's own words for it), and the side panel's tabs - (the Mac redesign, R3, notes/ios.md "The
+// redesign, slice R3: the side panel's tabs; the Now Playing sheet") Queue (⌥⌘U), Lyrics (⌥⌘L), Info (⌘I) and EQ (⌥⌘E),
+// each ticked while its tab shows, one at a time (MacDock.toggled) - named as the tabs are. Queue is Up Next's own word
+// since R3 (James, 25 Nov: "Queue on both").
 //
 // (Slice 6, notes/ios.md "The Mac app, slice 6: EQ files") And File's Import EQ File… (⌘O): the Mac's Open panel, a
 // plain-text file whose EQ shows in its preview - the way a file opened with deadwax comes. From the pages alone, as
@@ -58,8 +60,11 @@ public enum MacMenu {
         public var sheet: Bool
         /// (Slice 3) The sidebar is shown: the View menu's item says Hide Sidebar.
         public var sidebarShown: Bool
-        /// (Slice 3) The side panel showing.
-        public var panel: MacFrame.Panel
+        /// (Slice 3) The side panel showing - (R3) the dock's tab, nil while it's closed.
+        public var panel: MacDock.Tab?
+        /// (R3) A list on the page in front has a row selected: Info, which is about it then (MacDock.infoSubject), opens
+        /// with nothing queued.
+        public var selected: Bool
         /// (Slice 3) What is known of the song playing's lyrics: Lyrics is dimmed while it is known there are none to
         /// open, as the bar's button is (Lyrics.dimmed).
         public var lyrics: LyricsHave
@@ -73,8 +78,8 @@ public enum MacMenu {
         public init(queued: Bool = false, playing: Bool = false, shuffle: Bool = false, paged: PagedScope? = nil,
                     repeatMode: Repeat = .off, length: Double = 0, hasAlbum: Bool = false, typing: Bool = false,
                     tabs: Bool = true, refresh: Refresh = .none, nowPlaying: Bool = false, sheet: Bool = false,
-                    sidebarShown: Bool = true, panel: MacFrame.Panel = .none, lyrics: LyricsHave = .unknown,
-                    serverSettings: Bool = false, saveOpen: Bool = false) {
+                    sidebarShown: Bool = true, panel: MacDock.Tab? = nil, selected: Bool = false,
+                    lyrics: LyricsHave = .unknown, serverSettings: Bool = false, saveOpen: Bool = false) {
             self.queued = queued
             self.playing = playing
             self.shuffle = shuffle
@@ -89,6 +94,7 @@ public enum MacMenu {
             self.sheet = sheet
             self.sidebarShown = sidebarShown
             self.panel = panel
+            self.selected = selected
             self.lyrics = lyrics
             self.serverSettings = serverSettings
             self.saveOpen = saveOpen
@@ -106,20 +112,22 @@ public enum MacMenu {
         case playPause, next, previous, forward, back
         case shuffle, repeatOff, repeatAll, repeatOne
         case goToCurrentSong
-        case sidebar, upNext, lyrics, info
+        case sidebar, upNext, lyrics, info, eq
         // (slice 6) File's - and (slice 7) Server settings' Save changes
         case importEQFile
         case saveChanges
 
-        /// (Slice 3) The View menu's three panels, in the bar's order (Lyrics, Up Next, then Info from its •••).
-        public static let panels: [Command] = [.upNext, .lyrics, .info]
+        /// (Slice 3) The View menu's side panel - (R3) the dock's four tabs, in the dock's order: Queue, Lyrics, Info, EQ.
+        /// Sources is the Get page's own, and has no item.
+        public static let panels: [Command] = [.upNext, .lyrics, .info, .eq]
 
-        /// The panel this item shows - nil for every other.
-        public var panel: MacFrame.Panel? {
+        /// The dock's tab this item shows - nil for every other.
+        public var panel: MacDock.Tab? {
             switch self {
             case .upNext: return .upNext
             case .lyrics: return .lyrics
             case .info: return .info
+            case .eq: return .eq
             default: return nil
             }
         }
@@ -240,6 +248,7 @@ public enum MacMenu {
         case .upNext: return Shortcut(.character("u"), [.option, .command])
         case .lyrics: return Shortcut(.character("l"), [.option, .command])
         case .info: return Shortcut(.character("i"), .command)
+        case .eq: return Shortcut(.character("e"), [.option, .command])
         case .importEQFile: return Shortcut(.character("o"), .command)
         case .saveChanges: return Shortcut(.character("s"), .command)
         case .shuffle, .repeatOff, .repeatAll, .repeatOne: return nil
@@ -275,7 +284,7 @@ public enum MacMenu {
             .map { $0.map { item($0, state) } }
     }
 
-    /// (Slice 3) The View menu's frame, its sections in order: the sidebar; the three panels.
+    /// (Slice 3) The View menu's frame, its sections in order: the sidebar; the side panel's four tabs.
     public static func view(_ state: State) -> [[Item]] {
         [[.sidebar], Command.panels].map { $0.map { item($0, state) } }
     }
@@ -308,6 +317,7 @@ public enum MacMenu {
         case .upNext: return UpNextWords.title
         case .lyrics: return LyricsWords.lyrics
         case .info: return InfoWords.title
+        case .eq: return EQWords.nowPlaying
         case .importEQFile: return Words.importEQFile
         case .saveChanges: return ServerSettings.save
         }
@@ -324,9 +334,12 @@ public enum MacMenu {
         case .repeatOff, .repeatAll, .repeatOne: return state.queued
         case .goToCurrentSong: return state.tabs && !state.sheet && state.queued && state.hasAlbum
         //? (slice 3) the frame's: with the tabs drawn and no sheet over them - a panel open can always be put away, and
-        //? one closed opens with something queued (Lyrics not while it is known the song has none)
+        //? one closed opens with something queued (Lyrics not while it is known the song has none) - (R3) Info with a
+        //? row selected too, which it is about then; the EQ whatever is queued, as it is the output's
         case .sidebar: return state.tabs && !state.sheet
-        case .upNext, .info: return state.tabs && !state.sheet && (state.queued || state.panel == command.panel)
+        case .upNext: return state.tabs && !state.sheet && (state.queued || state.panel == command.panel)
+        case .info: return state.tabs && !state.sheet && (state.queued || state.selected || state.panel == command.panel)
+        case .eq: return state.tabs && !state.sheet
         case .lyrics:
             return state.tabs && !state.sheet
                 && (state.panel == .lyrics || (state.queued && !Lyrics.dimmed(state.lyrics, on: false)))
@@ -343,7 +356,7 @@ public enum MacMenu {
         switch command {
         case .shuffle: return state.queued && state.shuffle
         case .repeatOff, .repeatAll, .repeatOne: return state.queued && command.repeatMode == state.repeatMode
-        case .upNext, .lyrics, .info: return state.panel == command.panel
+        case .upNext, .lyrics, .info, .eq: return state.panel == command.panel
         default: return false
         }
     }

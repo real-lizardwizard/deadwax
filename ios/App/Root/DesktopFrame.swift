@@ -18,16 +18,17 @@ import SwiftUI
 ///   MacRequests, MacSettings): the phone's pages until each slice redraws its own.
 /// - (R1) The status bar under the page and its panel (MacStatusBar), while the page in front says something
 ///   (MacStatusItems); what a list on it selects is MacSelection's, for Info.
-/// - The side panel - Up Next, Lyrics or Info, one at a time (MacPanel) - a third column 470 wide in a window 1280 wide
-///   or more, a drawer over the page's right edge below that (MacFrame.panelStyle); drawn in one place either way, so
-///   crossing 1280 keeps it as it is. Never modal: a drawer lies over the page's edge, the rest of the page and the
+/// - The side panel - (R3) a dock of tabs, Queue, Lyrics, Info and EQ (Sources with a Get page), one at a time
+///   (MacPanel, MacDock) - a third column 400 wide in a window 1280 wide or more, a drawer over the page's right
+///   edge below that (MacFrame.panelStyle); drawn in one place either way, so crossing 1280 keeps it as it is. Never modal: a drawer lies over the page's edge, the rest of the page and the
 ///   sidebar still answer. Opening an album from the player puts a drawer away (AppNavigation.openAlbum).
 /// - The player bar along the foot (PlayerBar), always: "Nothing playing" while nothing is queued.
 ///
 /// Now Playing never opens here (MacFrame.opensNowPlaying, decision 5): nothing in the frame opens it, and should
-/// anything ask, it is put back at once. The sheets MainTabs presents over the tabs are presented over the frame:
-/// the EQ (a shared file's, and the bar's ••• - one sheet), Add to a playlist and Edit album. What MainTabs watches,
-/// this watches: the downloads RequestsModel paces its poll by, Needs a look's count after a managing write.
+/// anything ask, it is put back at once. The sheets MainTabs presents over the tabs are presented over the frame: Add to
+/// a playlist and Edit album - and not the EQ (R3's review), which is the dock's EQ tab here, a shared file's preview
+/// over it. What MainTabs watches, this watches: the downloads RequestsModel paces its poll by, Needs a look's count
+/// after a managing write.
 struct DesktopFrame: View {
     @Environment(PlayerModel.self) private var player
     @Environment(AppNavigation.self) private var navigation
@@ -68,15 +69,16 @@ struct DesktopFrame: View {
                 VStack(spacing: 0) {
                     page
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
-                        .padding(.trailing, MacFrame.makesRoom(style, panel) ? CGFloat(MacFrame.panelWidth) + hairline : 0)
+                        // (R3) the dock, MacLook.panelWidth (400) wide, whichever of its tabs shows
+                        .padding(.trailing, MacDock.makesRoom(style, panel) ? CGFloat(MacLook.panelWidth) + hairline : 0)
                         .overlay(alignment: .trailing) {
-                            if panel != .none {
+                            if let panel {
                                 HStack(spacing: 0) {
                                     rule
-                                    MacPanel(panel: panel)
+                                    MacPanel(tab: panel)
                                 }
-                                .shadow(color: MacFrame.liesOver(style, panel) ? Palette.well : Color.clear,
-                                        radius: MacFrame.liesOver(style, panel) ? 16 : 0)
+                                .shadow(color: MacDock.liesOver(style, panel) ? Palette.well : Color.clear,
+                                        radius: MacDock.liesOver(style, panel) ? 16 : 0)
                             }
                         }
                     // (R1) the status bar under the page and the panel, while the page in front says something
@@ -114,12 +116,8 @@ struct DesktopFrame: View {
         .onChange(of: style, initial: true) { (_: MacFrame.PanelStyle, now: MacFrame.PanelStyle) -> Void in
             navigation.macPanelStyle = now
         }
-        // a shared file's EQ, Add to a playlist and Edit album, over the frame as they are over the tabs (MainTabs) -
-        // and (slice 3's review) the bar's EQ the same sheet, so a shared file shows over the one that's up, never a second
-        .appSheet(isPresented: $navigation.eqImportSheet) {
-            EQSheet()
-                .macSheet()
-        }
+        // Add to a playlist and Edit album, over the frame as they are over the tabs (MainTabs). (R3's review) No EQ sheet:
+        // a shared file's EQ is the dock's EQ tab, its preview over it (SharedEQFile, DockEQ) - one EQ, never a second
         .appSheet(item: $navigation.playlistPick) { (request: PlaylistPickRequest) in
             PlaylistPicker(request: request)
                 .macSheet()
@@ -135,8 +133,13 @@ struct DesktopFrame: View {
             if shown && !MacFrame.opensNowPlaying(Platform.device) { navigation.nowPlayingShown = false }
         }
         .onChange(of: player.hasQueue) { (_: Bool, queued: Bool) -> Void in
-            // nothing queued: Up Next and Info go with the queue, Lyrics stays (MacFrame.afterQueueEnds)
+            // nothing queued: the Queue and Info go with the queue, Lyrics and the EQ stay - (R3) and Info stays about a
+            // row selected (MacDock.afterQueueEnds)
             if !queued { navigation.queueEnded() }
+        }
+        .onChange(of: selection.subject != nil, initial: true) { (_: Bool, selected: Bool) -> Void in
+            // (R3) what the menus read: Info opens about a row selected with nothing queued (MacMenu)
+            navigation.macSelected = selected
         }
         .onChange(of: watching, initial: true) { (_: Watching, now: Watching) -> Void in requests.watch(now) }
         .onAppear { requests.watch(watching) }

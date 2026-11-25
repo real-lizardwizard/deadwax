@@ -234,7 +234,7 @@ struct DebugView: View {
                 Text("Nothing playing").foregroundStyle(Palette.quiet)
             }
             if player.holdsAnEdit {
-                LabeledContent("Up Next", value: "An edit held for the next song")
+                LabeledContent(UpNextWords.title, value: "An edit held for the next song")
             }
             if let words = player.lastFailure {
                 LabeledContent("Last failure") {

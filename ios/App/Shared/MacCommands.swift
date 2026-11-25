@@ -6,7 +6,8 @@ import UIKit
 /// the window"): deadwax > Settings… (⌘,), Edit > Find (⌘F), View > Refresh (⌘R) and the Controls menu - Play/Pause
 /// (Space), Next (⌘→), Previous (⌘←), Forward and Back 10 Seconds (⌥⌘→, ⌥⌘←), Shuffle, Repeat's three and Go to Current
 /// Song (⌘L) - and (slice 3, the desktop frame) View's Show/Hide Sidebar (⌃⌘S), Up Next (⌥⌘U), Lyrics (⌥⌘L) and Info
-/// (⌘I), the three side panels ticked while theirs shows - and (slice 6, EQ files) File's Import EQ File… (⌘O), the Open
+/// (⌘I), the three side panels ticked while theirs shows - (R3) the side panel's tabs, Queue, Lyrics, Info and EQ (⌥⌘E),
+/// each ticked while its tab shows - and (slice 6, EQ files) File's Import EQ File… (⌘O), the Open
 /// panel, at the top of File where New Window was - and (slice 7, managing on a big screen) File's Save changes (⌘S),
 /// Server settings' own, while one of its pages is the one in front. Drawn from Core's MacMenu and nothing else: each item's words, key, dimming and tick are MacMenu's, read
 /// from the player and the window each time the menus are drawn; this only carries the click out, through the very
@@ -37,7 +38,7 @@ struct MacCommands: Commands {
                              tabs: server.launch == .ready && server.signInOver == nil,
                              refresh: MacRefresh.shared.state, nowPlaying: navigation.nowPlayingShown,
                              sheet: MacRefresh.shared.sheetUp, sidebarShown: navigation.macSidebarShown,
-                             panel: navigation.macPanel, lyrics: lyrics.have,
+                             panel: navigation.macPanel, selected: navigation.macSelected, lyrics: lyrics.have,
                              serverSettings: MacRefresh.shared.settingsInFront,
                              saveOpen: serverSettings.saveOpen(online: reachability.online))
     }
@@ -62,7 +63,7 @@ struct MacCommands: Commands {
         CommandGroup(after: .toolbar) {
             item(.refresh, state)
         }
-        // (slice 3) the frame's: the sidebar, then the three panels - in the View menu's sidebar place. Replacing it,
+        // (slice 3) the frame's: the sidebar, then the side panel's tabs (R3's four) - in View's sidebar place. Replacing it,
         // never beside it (slice 3's review, smoke-run): kept, the system's own Show Sidebar has ⌃⌘S too, and UIKit
         // throws at launch over the two. Enter Full Screen is a place of its own and stays (fn-F, and ⌃⌘F).
         CommandGroup(replacing: .sidebar) {
@@ -155,7 +156,8 @@ struct MacCommands: Commands {
             }
         case .sidebar:
             navigation.macSidebarShown.toggle()
-        case .upNext, .lyrics, .info:
+        // (R3) the side panel's tabs, the EQ's too: that tab shown closes the panel, another switches to it
+        case .upNext, .lyrics, .info, .eq:
             if let panel = command.panel { navigation.togglePanel(panel) }
         case .importEQFile:
             navigation.openEQFile()

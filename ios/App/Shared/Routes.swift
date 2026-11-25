@@ -294,8 +294,8 @@ final class AppNavigation {
     /// The EQ page whose own preview shows it (its import from Files or Paste) - nil: the EQ sheet's, for a shared
     /// file.
     private(set) var eqImportPage: UUID?
-    /// The EQ sheet over the tabs, opened for a shared file - over Now Playing, Now Playing opens its own. (The Mac app,
-    /// slice 3's review) On the Mac, the player bar's EQ too: one EQ sheet, so a file shared while it is up shows in it.
+    /// The EQ sheet over the tabs, opened for a shared file - over Now Playing, Now Playing opens its own. The phone's
+    /// alone since R3's review: on the Mac a shared file shows in the dock's EQ tab (SharedEQFile), the one EQ there.
     var eqImportSheet = false
     /// A preview is drawn (EQImportSheetContent says so).
     var eqPreviewUp = false
@@ -342,20 +342,34 @@ final class AppNavigation {
     /// (The Mac app, slice 3) The desktop frame's sidebar is shown: View > Hide Sidebar (⌃⌘S) puts it away, Find brings
     /// it back. Never read on the iPhone.
     var macSidebarShown = true
-    /// (The Mac app, slice 3) The side panel showing - Up Next, Lyrics or Info, one at a time (MacFrame.toggled). Always
-    /// none on the iPhone, where they are Now Playing's sheets and its face.
-    private(set) var macPanel: MacFrame.Panel = .none
+    /// (The Mac app, slice 3) The side panel showing - (the Mac redesign, R3) the dock's tab: Queue, Lyrics, Info, the EQ,
+    /// or Sources while a Get page is open, one at a time (MacDock.toggled); nil while it's closed. Always nil on the
+    /// iPhone, where they are Now Playing's sheet and its face.
+    private(set) var macPanel: MacDock.Tab?
+    /// (R3) A Get page is open, so the dock draws Sources (MacDock.tabs): said by the Get page's Sources (R7's) - false
+    /// until then. Its going takes Sources with it (MacDock.kept).
+    var macGetOpen = false {
+        didSet { macPanel = MacDock.kept(macPanel, getOpen: macGetOpen) }
+    }
+    /// (R3) A list on the page in front has a row selected (MacSelection, mirrored by DesktopFrame): Info is about it
+    /// then, so View > Info opens with nothing queued, and it stays as the queue ends (MacDock.afterQueueEnds).
+    var macSelected = false
     /// (The Mac app, slice 3) How the panel is drawn at the window's width (MacFrame.panelStyle): a drawer over the page's
     /// edge closes as an album is opened from the player (`openAlbum`). DesktopFrame keeps it.
     var macPanelStyle: MacFrame.PanelStyle = .column
 
-    /// A file shared to deadwax (`.onOpenURL`): shown by the preview that is up, in place - else by the EQ sheet,
-    /// opened over Now Playing (by Now Playing) or over the tabs (here).
+    /// A file shared to deadwax (`.onOpenURL`): shown by the preview that is up, in place - else (SharedEQFile) on the
+    /// phone by the EQ sheet, opened over Now Playing (by Now Playing) or over the tabs (here), and (R3's review) on the
+    /// Mac by the dock's EQ tab, shown whatever was showing, its preview over it (DockEQ) - one EQ, never a second.
     func share(_ item: EQImportItem) {
         eqImport = item
         guard !eqPreviewUp else { return }
         eqImportPage = nil
-        if !nowPlayingShown { eqImportSheet = true }
+        switch SharedEQFile.shows(device: Platform.device, nowPlayingShown: nowPlayingShown) {
+        case .dock: showPanel(.eq)
+        case .sheet: eqImportSheet = true
+        case .nowPlaying: break
+        }
     }
 
     /// (The Mac app, slice 6) File > Import EQ File… (⌘O): the Open panel, over the pages (MacMenu dims it over a sheet
@@ -427,20 +441,26 @@ final class AppNavigation {
         if !search.isEmpty { backToRoot(&search) }
     }
 
-    /// (The Mac app, slice 3) A panel's button in the bar, or its View menu item: it, or none when it was showing - one
-    /// at a time.
-    func togglePanel(_ panel: MacFrame.Panel) {
-        macPanel = MacFrame.toggled(macPanel, panel)
+    /// (The Mac app, slice 3) A panel's button in the bar, or its View menu item - (R3) a tab's key: the panel closed
+    /// when that tab is showing, else switched to it - one at a time (MacDock.toggled).
+    func togglePanel(_ tab: MacDock.Tab) {
+        macPanel = MacDock.toggled(macPanel, tab, getOpen: macGetOpen)
+    }
+
+    /// (R3) A folder tab clicked, the bar's ••• Info or EQ, Settings > Playback's EQ row: that tab, whatever was showing.
+    func showPanel(_ tab: MacDock.Tab) {
+        macPanel = MacDock.shown(macPanel, asked: tab, getOpen: macGetOpen)
     }
 
     /// (The Mac app, slice 3) A panel's Done (or Escape): put away.
     func closePanel() {
-        macPanel = .none
+        macPanel = nil
     }
 
     /// (The Mac app, slice 3) Nothing queued any more: Up Next and Info go with the queue (their sheets did); Lyrics stays.
+    /// (R3) Info stays while a row is selected, which it is about; the EQ and Sources aren't the queue's.
     func queueEnded() {
-        macPanel = MacFrame.afterQueueEnds(macPanel)
+        macPanel = MacDock.afterQueueEnds(macPanel, selected: macSelected)
     }
 
     /// (The Mac app, slice 3) A sidebar row's move (MacSidebar.move): the tab's own button, a page of the Library at its
@@ -660,7 +680,7 @@ final class AppNavigation {
         nowPlayingShown = false
         // (the Mac app, slice 3) a panel lying over the page's edge would lie over the album asked for: put away. A third
         // column stays beside it. Never on the iPhone, whose panel is always none.
-        if MacFrame.liesOver(macPanelStyle, macPanel) { macPanel = .none }
+        if MacDock.liesOver(macPanelStyle, macPanel) { macPanel = nil }
         guard case .album(let album) = followed(.album(album)) else { return }
         let top = shownStack.last
         if case .album(let shown)? = top, shown.id == album.id { return }
@@ -800,7 +820,7 @@ final class AppNavigation {
         tab = .library
         findWanted = false
         macLibraryPage = nil
-        macPanel = .none
+        macPanel = nil
         // (slice 6's review) Needs a look's session over - once the session has moved on, so nothing is noted, read or
         // asked for the next person
         editor?.queue?.editorClosed()

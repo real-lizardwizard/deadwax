@@ -4,7 +4,7 @@ deadwax is getting a native iPhone app, built with SwiftUI and its own audio eng
 well: seamless joins and normalization done on the phone, downloads to play offline, and a song's start never lost on
 AirPods. It's built in phases. Phase 0, "Hello, iPhone", was a single test screen that proved the tools, the
 connection and the audio engine. Phase 1, the player (app 0.2), was the first version meant for playing your music day
-to day: your library, album pages, Up Next, Now Playing, normalization, the lock screen, plays counted, and picking up
+to day: your library, album pages, the Queue, Now Playing, normalization, the lock screen, plays counted, and picking up
 where you left off. Phase 2, downloads (app 0.3), followed: an album, or a song, downloaded to the phone plays from
 there, bit for bit as deadwax has it - and goes on playing when deadwax can't be reached (see [Downloads](#downloads)
 and [Offline](#offline)). App 0.4 added lyrics on Now Playing, as the web app shows them (see [Lyrics](#lyrics)). App
@@ -14,9 +14,9 @@ and - under Advanced - filters and a preamp of your own and Equalizer APO files 
 added the turntable: Now Playing's second look, as the web app has it - a record you can turn by hand and hear as you
 turn it, with the album's CD art on its face (see [The turntable](#the-turntable)). App 0.7 added the turntable's
 speed fader: the song faster or slower, its pitch moving with it, as a record deck's does - and at 1x the song exactly
-as it is (see [The speed](#the-speed)). App 0.8 added play history: scroll up in Up Next, past the song playing, and
+as it is (see [The speed](#the-speed)). App 0.8 added play history: scroll up in the Queue, past the song playing, and
 it goes on back through every song you've played - on the phone and in the web app, one list, as the web app's Up Next
-has it - and the phone's own plays go into the web app's too (see [Up Next](#up-next) and [What you've
+has it - and the phone's own plays go into the web app's too (see [the Queue](#queue) and [What you've
 played](#what-youve-played)). App 0.9 added your library downloaded by itself, as much as fits your storage limit,
 kept in step with what you star and unstar anywhere - only while the phone is charging if you choose, and with the app
 in the background when iOS allows (see [Your library on this phone](#your-library-on-this-phone)). App 0.10 added
@@ -244,10 +244,10 @@ for ([404-415](#the-mac-apps-checks-404-415),
 [416-423](#the-mac-apps-menus-keys-and-window-checks-416-423), [424-433](#the-mac-apps-desktop-frame-checks-424-433),
 [434-438](#the-mac-apps-words-checks-434-438), [439-446](#the-mac-apps-sleep-power-and-downloads-checks-439-446),
 [447-451](#the-mac-apps-eq-files-checks-447-451), [452-458](#the-mac-apps-managing-checks-452-458) and
-[518-525](#the-mac-redesigns-checks-518-607)).
+[518-525 and 532-538](#the-mac-redesigns-checks-518-607)).
 
 **What it is today.** The window is laid out as the web app's desktop is, whatever its size: the **sidebar** at the
-left, the **page** you're on beside it, **Up Next, Lyrics or Info** in a panel at the right when you open one, and the
+left, the **page** you're on beside it, the **side panel** at the right when you open it - Queue, Lyrics, Info or EQ - and the
 **player bar** along the foot, under a **title strip** along the top - the window's traffic lights at its left and
 the page you're on named in its middle, as the **Window** menu names the window. Every page is the phone's own page,
 in macOS's sizes and controls (the Mac idiom), until the redesign's later slices draw each one the Mac's way. The
@@ -292,18 +292,26 @@ menus and keys, and these differences.
 - **The player bar**, always there along the foot: the song's cover - click it for the cover full size - its title,
   and **Artist — Album**, which goes to the album's page; **Shuffle**, **Previous**, **Play/Pause**, **Next** and
   **Repeat** over the song's progress, with the time played and the time left at its ends (click or drag on it to
-  move in the song); then **Lyrics**, **Up Next**, **AirPlay** and **•••** - Now Playing's: Info, Add to a playlist…, Go to
+  move in the song); then **Lyrics**, **Queue**, **AirPlay** and **•••** - Now Playing's: Info, Add to a playlist…, Go to
   album, the song's download items, the EQ. With nothing queued it says **Nothing playing**.
-- **The panels**: Up Next, Lyrics and Info open beside the page - the bar's Lyrics and Up Next buttons, the •••'s
-  Info, or **View > Up Next** ⌥⌘U, **Lyrics** ⌥⌘L and **Info** ⌘I, each ticked while its panel shows. One at a time:
-  opening one closes the other; its button (or menu item) again, its **Done** or Escape closes it. With the window
-  1280 points wide or more the panel is a column of its own (470 points) and the page narrows beside it; narrower, it
-  lies over the page's right edge. Either way the page, the sidebar and the bar still answer. Up Next and Info are
-  the phone's, Lyrics the lines Now Playing shows on the phone, lit as they're sung. When the queue ends Up Next and
-  Info close; Lyrics stays, saying Nothing playing. Going to an album from the bar, Info or ⌘L closes a panel lying
-  over the page, so it doesn't cover the album.
+- **The side panel**: a strip of tabs along its top - **Queue**, **Lyrics**, **Info** and **EQ** - and the tab's page
+  under them, one at a time, 400 points wide. Open it from the bar's Lyrics and Queue buttons, the •••'s Info and EQ,
+  or **View > Queue** ⌥⌘U, **Lyrics** ⌥⌘L, **Info** ⌘I and **EQ** ⌥⌘E, each ticked while its tab shows; or click a
+  tab to move to it. A tab's key (or menu item) shows its tab - opening the panel if it's shut, switching to it if
+  another tab shows - and closes the panel when its tab is the one showing; a tab's **Done** or Escape closes it too.
+  With the window 1280 points wide or more the panel is a column of its own and the page narrows beside it; narrower,
+  it lies over the page's right edge. Either way the page, the sidebar and the bar still answer. The Queue is the
+  phone's, Lyrics the lines Now Playing shows on the phone, lit as they're sung, and the EQ the phone's EQ page for
+  the output playing now, every control working there; its Import… opens its preview over the window, and a shared
+  or opened EQ file (File > Import EQ File…, Open With, a file dropped on the window) shows the EQ tab with its preview
+  over it - the Mac has one EQ. **Info** is about what you've selected - an album's row selected in a list shows its
+  Album info, an artist's their name and Go to artist, headed **Selected album** or **Selected artist** - and with
+  nothing selected about the song playing, headed **Playing**. When the queue ends the Queue closes, and Info unless
+  something is selected; Lyrics stays, saying Nothing playing. With nothing playing, the Queue tab - and Info, with
+  nothing selected either - says **Nothing playing** too. Settings > Playback's **EQ** row opens the EQ tab. Going to an album from
+  the bar, Info or ⌘L closes a panel lying over the page, so it doesn't cover the album.
 - **No Now Playing.** The Mac has no Now Playing screen, and so no turntable: everything Now Playing has is in the bar
-  and the panels.
+  and the side panel.
 
 **The menu bar** keeps the Mac's own menus - Undo to Select All, Close Window ⌘W, Enter Full Screen, the Window menu -
 and adds deadwax's:
@@ -313,17 +321,17 @@ and adds deadwax's:
 | **deadwax** | About deadwax, **Settings…** ⌘, (the Settings tab), Hide deadwax ⌘H, Quit deadwax ⌘Q |
 | **File** | **Import EQ File…** ⌘O: the Mac's Open panel, for an EQ setting's `.txt` (see EQ files below); **Save changes** ⌘S: Server settings' Save changes, while one of its pages is in front (see Managing below); Close Window ⌘W - and no New Window: there is only ever one window |
 | **Edit** | **Find** ⌘F: the cursor in the sidebar's search field, the sidebar shown if it was hidden. The Mac's own **Copy** ⌘C and **Select All** ⌘A also copy and select the event log's lines (see Managing below) |
-| **View** | **Show Sidebar** or **Hide Sidebar** ⌃⌘S; **Up Next** ⌥⌘U, **Lyrics** ⌥⌘L, **Info** ⌘I - each opens its panel, or closes it, ticked while it shows; **Refresh** ⌘R: the page you're on, asked again (see below) |
+| **View** | **Show Sidebar** or **Hide Sidebar** ⌃⌘S; **Queue** ⌥⌘U, **Lyrics** ⌥⌘L, **Info** ⌘I, **EQ** ⌥⌘E - each shows its tab of the side panel, or closes the panel when its tab is showing, ticked while it shows; **Refresh** ⌘R: the page you're on, asked again (see below) |
 | **Controls** | **Play** or **Pause** (Space), **Next** ⌘→, **Previous** ⌘←, **Forward 10 Seconds** ⌥⌘→, **Back 10 Seconds** ⌥⌘←, **Shuffle**, **Repeat** (Repeat off, Repeat all, Repeat one - the one that's on is ticked), **Go to Current Song** ⌘L (the album of the song playing) |
 
 Format has nothing of deadwax's in it (there's nothing to format), and there's no deadwax Help (no Mac help book:
 this guide is the help). Every Controls item is dimmed while nothing is queued. Shuffle is named as Now Playing's
 Shuffle button is: during the Library's Shuffle it reads **Shuffle - shuffling your whole library** (**Shuffle -
 shuffling all music** for all of deadwax's), ticked and dimmed, as Now Playing's is - that order is the shuffle. The
-Repeat submenu's three items are the words Up Next says to VoiceOver as Repeat changes: Repeat off, Repeat all, Repeat
-one. Up Next and Info are dimmed with nothing queued (unless open: then they close it), and Lyrics too, and for a song
-known to have none. **While a sheet is up** (Edit album, Add to a playlist, the EQ, a cover full size - any of them)
-Settings…, Import EQ File…, Find, Refresh, Go to Current Song, the sidebar and the panels are dimmed: they'd act on the
+Repeat submenu's three items are the words the Queue says to VoiceOver as Repeat changes: Repeat off, Repeat all, Repeat
+one. Queue is dimmed with nothing queued (unless its tab is showing: then it closes the panel), and Info too unless a
+row is selected, and Lyrics with nothing queued or for a song known to have none. **While a sheet is up** (Edit album, Add to a playlist, the EQ, a cover full size - any of them)
+Settings…, Import EQ File…, Find, Refresh, Go to Current Song, the sidebar and the side panel's tabs are dimmed: they'd act on the
 window under the sheet - and Save changes is, unless the sheet is Server settings' own page (the Library's Set up
 Navidrome) - and all of them until you're signed in. **While a text field has the
 cursor** - Search, Find in the Library, a name - Space types a space and ⌘→ and ⌘← move along the line: they don't
@@ -352,8 +360,8 @@ The rest of the differences:
   while you've typed something Close would throw away - Add a person's passwords, Reset password's, Which artist is
   this?'s and Artist images' searches, Choose a source's search words, a new playlist's name: click Close or Cancel
   then. It closes a cover shown full size. In the window itself Escape goes to one thing at a time, in this order: a
-  text field with the cursor (the sidebar's search field's Escape empties it), then the panel that's open - Up Next,
-  Lyrics or Info - then a playlist's Edit, as its Cancel. **Return never confirms a delete or a write** in a question
+  text field with the cursor (the sidebar's search field's Escape empties it), then the side panel, whichever tab
+  shows - then a playlist's Edit, as its Cancel. **Return never confirms a delete or a write** in a question
   deadwax asks: Return is the question's Cancel (Keep editing, Keep it, Keep as it is, Cancel). A text field's own
   Return is as on the phone - New playlist's name field creates the playlist.
 - **Closing the window** (⌘W, or its red button) leaves the music playing, as Music's does. Click deadwax in the Dock
@@ -689,7 +697,7 @@ playlist's pull the same way, shuffling that album or playlist (see [An album's 
 It's deadwax's shuffle, the web app's Library > Shuffle: every song of your library (of the collection,
 without a library of your own) once, in an order deadwax makes, played from the first. Its first 200
 songs are fetched before you ask - as the Library comes into view, and again when that was more than ten
-minutes ago - so the music starts the moment you let go. More are added to the end of Up Next as it plays,
+minutes ago - so the music starts the moment you let go. More are added to the end of the Queue as it plays,
 whenever fewer than 50 of its songs are left after the one playing, until every song is in. With Repeat
 All, once they've all played, a new order begins, never with the song that just ended. If deadwax no
 longer has the order (it restarted, or a day went by), a new one carries on and the app says "Your
@@ -758,7 +766,7 @@ Library - see [Set up Navidrome](#set-up-navidrome).
   number. **Tap a song** to play the album from it. **Swipe a song right** to add it to the queue (see [Adding
   to the queue](#adding-to-the-queue)). Under the songs: how many and how long ("10 songs, 42 min").
 - **•••** at the end of a song's row has **Add to Queue** and **Add to a playlist…** for that song; the
-  **•••** at the top has them for the whole album (see [Up Next](#up-next) and [Add to a
+  **•••** at the top has them for the whole album (see [the Queue](#queue) and [Add to a
   playlist](#add-to-a-playlist)). Each menu opens from the ••• you tapped, and a tap anywhere else
   closes it.
 - **Edit album**, in the last part of the top •••'s menu, for someone who may edit albums (Edit albums or Look after
@@ -1161,7 +1169,7 @@ once the page has been brought up to date. In Edit:
   it. A name or description made longer in another app is kept as it is: it can be shortened here,
   not lengthened.
 - **The songs**: drag one by its handle to move it, and tap its red minus to take it out - one tap,
-  as in Up Next. With VoiceOver, each song has Move up, Move down and Remove. Edit only takes songs
+  as in the Queue. With VoiceOver, each song has Move up, Move down and Remove. Edit only takes songs
   out and reorders them; add them with Add to a playlist.
 - **Cancel** leaves it as it was (asking "Discard your changes?" first, if you'd changed anything).
   **Done** saves it ("Saving…"), and the page then shows it as Navidrome has it. Nothing is saved
@@ -1298,7 +1306,7 @@ for all ten. Under them, **From Last.fm** opens their page on last.fm in the bro
 
 - **A song you have** shows its cover and "{album} · {year}" ("Currents · 2015"), of the earliest of your albums it is
   on - so the studio take, not a later live album's. Tap it: it plays, with the other top songs you have after it in
-  Up Next, in Last.fm's order. Its **•••** (on the Mac, a right-click) is a song's, as on an album's page, and a swipe
+  the Queue, in Last.fm's order. Its **•••** (on the Mac, a right-click) is a song's, as on an album's page, and a swipe
   right adds it to the queue.
 - **A song you don't have** says "Not in your library". Tap it: it spins while MusicBrainz is asked for the song
   (by its title without a "- 2015 Remaster" or a "(feat. …)", as it's matched), then the album you don't have opens,
@@ -1534,7 +1542,7 @@ results in, it stops: "That's all for this search - add a word to narrow it." In
 MusicBrainz's rows, and rows that come after something was drawn go below it. New words let a More still asking
 go.
 
-- **A song**: tap it to play it, with its album's songs after it in Up Next. The phone fetches the albums
+- **A song**: tap it to play it, with its album's songs after it in the Queue. The phone fetches the albums
   of the first songs found as the list comes in, so a song with **▶** after it plays the moment you tap.
   One without (its album not fetched yet) opens its album's page instead. Its **•••** is the song's own
   menu: Add to Queue, Add to a playlist… and Download. **Swipe it right** to add it to the queue (see [Adding
@@ -1842,18 +1850,26 @@ bar does.
 - **Shuffle, previous, play/pause, next, Repeat.** Previous goes back to the song before in a song's
   first 3 seconds; after that, or on the first song, it starts the song again. Repeat goes from off to
   **Repeat all** to **Repeat one** and back to off, and this phone remembers it.
-- **Lyrics**, **AirPlay**, **Up Next**, and **•••** along the bottom. **Lyrics** (the speech bubble) shows
-  the song's lyrics in the cover's place (see [Lyrics](#lyrics)). The **•••** menu has **Info**, **Add
-  to a playlist…** for the song playing (while deadwax can be reached), **Go to album**, **Download** (or
-  Remove Download) for the song playing, **Download Up Next** - every song still to play that
-  isn't on the phone, when that's two or more - and last **EQ**, with the output's setting under it
-  ("Off", "Bass Boost"), which opens the [EQ](#eq) over Now Playing. Go to album closes Now Playing
-  and opens the album's page on the tab you're on. What a download item did is said for a moment at
-  the top of Now Playing ("Downloading: Roads", "Downloading 23 songs from Up Next").
-- **The speed**, when it isn't 1x: a purple `1.25x` between AirPlay and Up Next - tap it to go back to
-  1x. At the largest text sizes it isn't drawn; the **•••** menu's first line says it instead ("Speed
+- **Five buttons along the bottom**, each an icon over its name: **Queue**, **Lyrics**, the output, **Info** and
+  **EQ**. **Lyrics** (the speech bubble) shows the song's lyrics in the cover's place, and again puts the cover back
+  (see [Lyrics](#lyrics)). The output is AirPlay's button - a tap anywhere on it, its name too, opens AirPlay's list -
+  with the name of where the music is playing under it, the name the EQ gives it ("iPhone Speaker", or what you
+  renamed it); VoiceOver reads it as AirPlay, playing to that name. **Queue**, **Info** and **EQ** open one sheet over
+  Now Playing on their page: **‹ Now Playing** at its top puts it away, and under that a strip - **Queue**, **Info**,
+  **EQ** - moves between its three pages without closing it. There is no Lyrics in the sheet: they take the cover's
+  place. VoiceOver reads the EQ button with the output's setting ("EQ, Bass Boost"), and the Queue with what's on
+  ("Queue - Shuffle on").
+- **•••**, at the top right beside the look button, has **Info**, **Add to a playlist…** for the song playing (while
+  deadwax can be reached), **Go to album**, **Download** (or Remove Download) for the song playing and **Download the
+  Queue** - every song still to play that isn't on the phone, when that's two or more. Go to album closes Now Playing
+  and opens the album's page on the tab you're on. What a download item did is said for a moment at the top of Now
+  Playing ("Downloading: Roads", "Downloading 23 songs from the Queue"), between the arrow and the buttons opposite it,
+  never over them.
+- **The speed**, when it isn't 1x: a purple `1.25x` just above the bottom row, over the gap between the output and
+  Info, clear of every button - tap it to go back to 1x. At the largest text sizes it isn't drawn; the **•••** menu's first line says it instead ("Speed
   1.25x - back to normal speed"), and does the same. The speed is set on [the turntable](#the-speed).
-- **The button at the top right** shows Now Playing as [a turntable](#the-turntable) instead, and back.
+- **The button at the top right**, beside the •••, shows Now Playing as [a turntable](#the-turntable) instead, and
+  back.
 - The chevron at the top, or a swipe down, closes it.
 
 **Tap the cover** to see it full screen, on black, as large as Navidrome has it: the cover Now Playing shows comes at
@@ -1958,7 +1974,8 @@ of the hand is still 1.8 seconds of the song.
   while it isn't 1x. **Tap it** to go straight back to 1x. It stays above a line laid over the
   turntable's foot. At the largest text sizes its words stop growing at what its corner can hold; a
   long press shows them large.
-- **The cover** says the speed too, between AirPlay and Up Next (see [Playing](#playing)). The mini
+- **The cover** says the speed too, just above the bottom row between the output and Info (see
+  [Playing](#playing)). The mini
   player doesn't show it.
 - **At 1x the song is played exactly as it is**, sample for sample, as it was before the fader existed.
   Leaving 1x, and letting go of the fader at 1x (or tapping back to it), each make a very short gap - a
@@ -1982,12 +1999,12 @@ of the hand is still 1.8 seconds of the song.
 waiting straight after the song playing, still ahead of the rest of the album, playlist or shuffle that's
 playing. So with nothing added yet, the first song you add plays next, the second after it, and so on, in
 the order you added them; once they've played, the next one you add plays next again. A line above the mini
-player says so ("Added to Up Next: Roads") for 5 seconds, and VoiceOver reads it. With nothing playing, it
+player says so ("Added to Queue: Roads") for 5 seconds, and VoiceOver reads it. With nothing playing, it
 just plays.
 
 Two times the order isn't that simple (the web app's Play Last works the same way after going back):
 
-- **After going back.** Previous, or a song tapped in Up Next's history, leaves the songs you'd added where
+- **After going back.** Previous, or a song tapped in the Queue's history, leaves the songs you'd added where
   they were - after the song you went back from. A song you add now goes straight after the one playing,
   ahead of them. Say you play an album of six to song 5, add **a** then **b**, and press Previous: song 4
   plays, then 5, a, b, 6. Add **c** now and it plays next: c, 5, a, b, 6.
@@ -2013,20 +2030,21 @@ song. Album and playlist pages swipe on iOS 17 too.
   field, the Library's pages - and it closes, the purple shrinking back with the row. With **Reduce Motion**
   on, the row on the Library's Songs and All songs and in Search opens and closes at once, without sliding.
 - It does just what the song's **•••** > Add to Queue does, and it's on every song row whose ••• has Add to
-  Queue: while deadwax can't be reached, only on the songs on the phone (as the ••• offers it). Up Next's
-  own rows, the Library's grids and a song you don't have (Search's MusicBrainz songs) have no swipe.
+  Queue: while deadwax can't be reached, only on the songs on the phone (as the ••• offers it). The
+  Queue's own rows, the Library's grids and a song you don't have (Search's MusicBrainz songs) have no swipe.
 - **VoiceOver**: on the song itself (not its •••), the actions (swipe up or down) include **Add to Queue**.
 - A swipe that starts at the very left edge of the screen still goes back, on a page you opened - and on the
   Library's Songs page, turns back to the page before (a swipe right that starts on a song adds it there).
 
-### Up Next
+### Queue
 
-**Up Next** on Now Playing opens what plays after the song playing - and, above it, what you've
-already played:
+**Queue** along the bottom of Now Playing opens what plays after the song playing - and, above it, what you've
+already played - in Now Playing's sheet, its first page (the strip at its top moves to Info and the EQ; **‹ Now
+Playing** puts it away). The web app calls it Up Next:
 
 - **What you've played**, above the song playing (app 0.8, as the web app's Up Next since deadwax
   2.1.15): one list, the newest nearest the song playing, with no headings, dates or times - scroll up
-  and it keeps going, back through every song you've started, on the phone and in the web app. Up Next
+  and it keeps going, back through every song you've started, on the phone and in the web app. The Queue
   opens at the song playing, even with only a song or two left after it; scroll up for the rest.
   Nearest the song playing is what has played since you started the album, list or shuffle - songs a
   tap skipped past included, where they are on the album; above that, everything you played before it,
@@ -2036,7 +2054,7 @@ already played:
   list while they do (VoiceOver: "Loading earlier songs") - and nothing you're looking at moves when
   they land. If they can't come, the top of the list says "Couldn't load the songs you played before.",
   with **Try again**. **Tap any of them to go back to it** (as the web app does since deadwax 2.1.18):
-  it plays now, from its start, and everything played after it moves back down into Up Next, in the
+  it plays now, from its start, and everything played after it moves back down into the Queue, in the
   order you see it - the songs between, the song that was playing (from its start, when it comes round),
   then Playing Next and the rest of the album or list, as they were. The song you tapped is where your
   finger was. Nothing is lost or reshuffled: songs you added (Add to Queue) that were still waiting keep
@@ -2050,12 +2068,12 @@ already played:
   it (from one from before the album or list, the song again). VoiceOver calls each row "play again",
   says "Playing" and its title once it starts, and moves to the song that plays next. It reads the songs
   as one list with no heading, then the song playing's title as a heading. With a deadwax before 2.1.18,
-  which refuses Up Next's account of a queue you went back in, the app saves that queue as just its
+  which refuses the Queue's account of a queue you went back in, the app saves that queue as just its
   songs, the one playing and the second (it used to try again every 30 seconds and keep nothing):
   [picked up](#picking-up-where-you-left-off) it comes back as that plain list, every song in order,
   without Playing Next or the Shuffle chip.
   What goes in it, and where it's kept: [What you've played](#what-youve-played).
-- **The song playing**, where Up Next opens - and with Repeat One on, "Repeat one: this song plays again
+- **The song playing**, where the Queue opens - and with Repeat One on, "Repeat one: this song plays again
   until you skip it." Under it, **Shuffle** and **Repeat**, the same settings as on Now Playing.
 - **Playing Next**: the songs you've added, in the order they'll play, with **Clear** to take them all
   out. It's there only when you've added some.
@@ -2066,11 +2084,11 @@ already played:
 - **Tap a song** to play it now, even from a pause. Nothing is taken out: tap a song further down the
   album and the songs between stay where they are, behind it - playing song 5, tap song 8, and Previous
   plays 7, then 6, as on the album - and Playing Next stays next, after it. Tap one in Playing Next and
-  the songs added above it are behind it the same way. Up Next puts the song playing back at the top
+  the songs added above it are behind it the same way. The Queue puts the song playing back at the top
   whenever it changes - a tap, a song ending, Next or Previous - and when Edit starts or ends; Shuffle,
   Repeat, Clear and Edit's changes leave the list where you've scrolled it.
 - **After Previous**, a song you'd added that was still waiting stays where it was - after the song you
-  went back from - so Up Next lists it there, in the album's group, rather than under Playing Next;
+  went back from - so the Queue lists it there, in the album's group, rather than under Playing Next;
   **Clear** takes only the songs under Playing Next.
 - **Edit** gives each row a handle to drag it by and a red minus button that takes it out at once,
   one tap a song. A song moves within its own group (Playing Next, or the album's), and each change is
@@ -2082,8 +2100,8 @@ already played:
 - It closes by itself once nothing is queued.
 - **Downloads**: a song asked for shows the same mark as on its album's page, at the end of its line -
   grey filled for on the phone, dotted while waiting, a ring while it downloads, amber when it didn't
-  (VoiceOver reads it after the song: "Roads, play now, Downloaded"). Up Next has no download button
-  of its own: Now Playing's **•••** > **Download Up Next** is it. While deadwax can't be reached, songs
+  (VoiceOver reads it after the song: "Roads, play now, Downloaded"). The Queue has no download button
+  of its own: Now Playing's **•••** > **Download the Queue** is it. While deadwax can't be reached, songs
   not on the phone are dimmed and a tap on one does nothing; in Edit you can still move or take them
   out. The song playing is never dimmed.
 
@@ -2094,7 +2112,7 @@ the rest.
 
 ### Lyrics
 
-**Lyrics**, at the left of Now Playing's bottom row, shows the song's lyrics in the cover's place, as
+**Lyrics**, second in Now Playing's bottom row, shows the song's lyrics in the cover's place, as
 Apple Music does: the title, the scrubber and the buttons stay where they are. The speech bubble is
 filled and purple while lyrics are on. Tap it again for the cover. Lyrics stay on from song to song,
 and each time you open Now Playing, until you tap **Lyrics** again or quit the app.
@@ -2138,7 +2156,8 @@ takes away their soft top and bottom edges. Nothing about lyrics is on the lock 
 
 ### Info
 
-**Info** (Now Playing's **•••**) has an **About** tab:
+**Info** (Now Playing's bottom row, or its **•••**) opens in Now Playing's sheet, on its Info page, and has an
+**About** tab (on the Mac, the side panel's Info tab - see [The Mac app](#the-mac-app)):
 
 - **The song**: its title and artist, a line like "Track 4 of 10 · 7:05 · played 12 times", its disc,
   and who wrote it, when Navidrome says.
@@ -2910,8 +2929,10 @@ headphones, the iPhone's speaker, the car, an AirPlay speaker each keep their ow
 switches to the right one by itself whenever the output changes - AirPods connecting mid-song have
 their own EQ from the first sound in them. An output the phone hasn't met before starts **Off**.
 
-Open it from **Settings > Playback > EQ**, or from Now Playing's **•••** > **EQ**, which opens it over Now
-Playing (**Done** closes it). Either way it opens on the output playing now.
+Open it from **Settings > Playback > EQ**, or from **EQ** at the right of Now Playing's bottom row, which opens
+it in Now Playing's sheet, on its EQ page (**Done**, or **‹ Now Playing**, puts the sheet away; the strip at its top
+moves to the Queue or Info). Either way it opens on the output playing now. On the Mac it's the side panel's EQ tab
+(**View > EQ** ⌥⌘E), and Settings > Playback's **EQ** row opens that tab.
 
 **The EQ page**, top to bottom:
 
@@ -3154,7 +3175,8 @@ yours takes away less than the curve's highest boost, it says "Loud songs may cl
 - **Paste**, iOS's own button, for an Equalizer APO setting copied as text - iOS doesn't ask first.
 - **From another app**: share a `.txt` file to deadwax - AirDrop it from your Mac, or save it from
   Safari, Mail or Files and choose **deadwax** among the apps. The app opens with the file's preview
-  over whatever was showing. deadwax gets a copy, and deletes it once read.
+  over whatever was showing - over Now Playing, in its sheet on the EQ page: the sheet moves there from the Queue or
+  Info, and with a cover full screen that closes first. deadwax gets a copy, and deletes it once read.
 
 Each shows a **preview** first: where it's from ("From "HD650 ParametricEQ.txt"" or "From the
 clipboard"), **For** - which output it goes on, the one playing first (from an output's own page,
@@ -3221,18 +3243,18 @@ sent once deadwax answers again (see [The first time you open it](#the-first-tim
 
 ## What you've played
 
-Every song that starts playing on the phone goes into your play history on deadwax - the one Up Next
-scrolls back through, here and in the web app (see [Up Next](#up-next)). It goes in at the song's first
+Every song that starts playing on the phone goes into your play history on deadwax - the one the Queue
+scrolls back through, here and in the web app (see [the Queue](#queue)). It goes in at the song's first
 sound, the moment Navidrome is told "now playing", skips included:
 
 - **Not a new song**: pausing and playing again, seeking (the arm or the record on the turntable too),
   a wait for the network, a song tried again from where it stopped, or a change of
-  [speed](#the-speed). The next song, Previous, Repeat One playing a song again and a tap in Up Next
+  [speed](#the-speed). The next song, Previous, Repeat One playing a song again and a tap in the Queue
   are each a new one - though a song started again straight after itself shows as one row.
 - **Picked up where you left off**: a queue put back paused in the middle of a song carries on that
   song's play - it was already in the list when it began, on whichever device began it - so it isn't
   added again. Put back at a song's start, it's a new one.
-- **Offline**: a song started with deadwax out of reach shows in Up Next at once, and is kept on the
+- **Offline**: a song started with deadwax out of reach shows in the Queue at once, and is kept on the
   phone (in your own downloads' store, so closing the app doesn't lose it) until deadwax answers - then
   sent, oldest first, before the [plays](#plays) waiting with it, up to 500 at a time. A week away is
   sent in one go of several batches. If deadwax answers but can't take them just then, the phone tries
@@ -3240,13 +3262,13 @@ sound, the moment Navidrome is told "now playing", skips included:
   Signed out, they wait for you to sign in again as the same person; they're never sent for anyone
   else. If the phone can't read that store ("This phone couldn't read its downloads"), the songs you
   start are held while the app is open and sent from there.
-- **The newest 100** are also kept on the phone each time they come, so Up Next shows what you played
+- **The newest 100** are also kept on the phone each time they come, so the Queue shows what you played
   lately with deadwax out of reach. Older ones need deadwax.
 - **Kept by deadwax, for ever** - with logins on, each person's own; with logins off, one list for
   everyone who uses this deadwax. There's no Clear, here or in the web app. Removing someone in People,
   or Forget, takes theirs with the rest of what deadwax kept for them.
 
-Up Next asks deadwax for the newest songs each time it opens, again when you come back to the app with
+The Queue asks deadwax for the newest songs each time it opens, again when you come back to the app with
 it open, and again when the network comes back with it open, so what you played in the web app meanwhile
 shows. Offline it doesn't ask: it shows what the phone kept, with no "couldn't load" line unless you
 scroll past that for older songs.
@@ -3267,7 +3289,7 @@ iPhone", or "Picked up from an iPhone" with logins off).
 A whole library's shuffle comes back however many songs in it is - its order, and its next songs
 coming as before (until this build, one some 750 songs in came back as the songs fetched so far, which
 then stopped). A queue you went back in comes back with every song you'd played on to still to come,
-going back a second time included (until this build, going back again after changing Up Next while
+going back a second time included (until this build, going back again after changing the Queue while
 the furthest song you'd got to played could come back without the songs played since).
 
 Coming back to the app while paused, it looks again (at most every 15 seconds). With logins on, it
@@ -3459,7 +3481,7 @@ answering, **Try again**. It goes by itself once deadwax answers.
   list, dimmed but for what's here; ••• > Refresh checks whether deadwax is back; ••• > **Shuffle
   downloads**, or a pull, shuffles the songs on the phone (see [Shuffling your
   library](#shuffling-your-library)).
-- **Up Next** dims the songs that aren't on the phone; a tap on one does nothing (see [Up Next](#up-next)).
+- **The Queue** dims the songs that aren't on the phone; a tap on one does nothing (see [the Queue](#queue)).
 - **An album's page** shows what's on the phone, dims the rest, and Play, Shuffle and a pull down play only
   the songs here ("Pull to shuffle the songs on this phone"). An album with nothing here says "This album isn't on
   this phone - it plays once deadwax is back."
@@ -3481,7 +3503,7 @@ answering, **Try again**. It goes by itself once deadwax answers.
   [Picking up where you left off](#picking-up-where-you-left-off)).
 - **Lyrics**: a downloaded song's are on the phone and show as online. For a song with none kept,
   **Lyrics** is dimmed: "Lyrics - not on this phone" (see [Lyrics](#lyrics)).
-- **Up Next** still shows what you've played: the newest 100 the phone kept, and every song started
+- **The Queue** still shows what you've played: the newest 100 the phone kept, and every song started
   since, here at once (see [What you've played](#what-youve-played)). Scrolling further up asks deadwax
   for more, and says it couldn't.
 - Plays, and the songs you started, are kept and sent later; downloads waiting carry on once the phone,
@@ -3622,7 +3644,8 @@ timings, an instrumental, and Five Finger Death Punch's "American Capitalist". K
 hand: several of these ask how it compares.
 
 - **P1 The button.** Now Playing's bottom row is Lyrics, AirPlay, Up Next, •••. Lyrics is a speech
-  bubble, filled and purple while on.
+  bubble, filled and purple while on. (Since R3 the row is Queue, Lyrics, AirPlay, Info and EQ, each a
+  word under its icon, the ••• beside the look button at the top: checks 532-538.)
 - **P2 Opening.** Play "Roads", open Now Playing, tap Lyrics: the lyrics take the cover's place, the
   title and the buttons don't move, the line being sung is white and about a third of the way down,
   and the lyrics move up smoothly as each line comes. Tap Lyrics again: the cover. Scroll the lyrics
@@ -3891,7 +3914,8 @@ check says; the numbers carry on from the turntable's.
   handle beside it takes the arm.
 - **26 The readout.** Off 1x, tap the readout: straight back to 1x.
 - **27 The cover.** Off 1x, switch to the cover: `1.25x` between AirPlay and Up Next, nothing in that
-  row moved; tap it - 1x, and it's gone. The mini player shows nothing.
+  row moved; tap it - 1x, and it's gone. The mini player shows nothing. (Since R3 the chip sits just
+  above the bottom row, over the gap between AirPlay and Info, clear of every button: check 536.)
 - **28 1x as before.** At 1x everything sounds as it did before the fader existed: Test sounds 9 and
   10 unbroken.
 - **29 At 2x and 0.5x.** Test sounds 9 and 10 still unbroken at each; lock the phone - the lock
@@ -6216,6 +6240,52 @@ can use them, and makes the phone's own pieces, which are drawn nowhere yet. Not
   518-521 found them.
 - **525 Both phones.** **Not done yet.** On Green Anole, every tab, the player, Now Playing, Edit album and the EQ are
   as before. The same on Ethan's phone, or "not done yet".
+
+#### The side panel's tabs, and the Now Playing sheet (532-538)
+
+**Not done yet.** The third slice: on the Mac the side panel becomes one panel with tabs along its top - Queue, Lyrics,
+Info and EQ - and on the phone Now Playing's Queue, Info and the EQ become one sheet with a strip of its own, opened
+from a new row of five buttons along Now Playing's foot. Every word that said Up Next says **Queue** now, on the phone
+and the Mac (the web app keeps Up Next). Each tab's page is still the one it was until a later slice redraws it.
+
+- **532 The tabs.** **Not done yet.** On the Mac, open the side panel (**View > Queue**): along its top four tabs,
+  **Queue**, **Lyrics**, **Info** and **EQ**, the one showing lit, and the panel 400 points wide. With the window 1280
+  points wide or more it sits beside the page, which narrows for it; narrower, it lies over the page's right edge with
+  a shadow. Click each tab: its page shows, and only its.
+- **533 The keys.** **Not done yet.** ⌥⌘U, ⌥⌘L, ⌘I and ⌥⌘E each show their tab - opening the panel if it's shut,
+  switching to it if another tab shows - and the View menu ticks it. The same key again closes the panel, as Escape
+  does (with the cursor in a text field, Escape leaves the field first). The bar's Lyrics and Queue buttons do the same.
+- **534 Info's subject.** **Not done yet.** With nothing selected, Info's heading says **Playing** and the song playing's
+  Info is under it. With Lyrics showing and nothing selected, let the last song play out (Repeat off), then click the
+  **Info** and **Queue** folder tabs: each says **Nothing playing** under its name, never a blank page. Once the
+  Library's lists select a row on a click (the next slice), select an album: the heading says **Selected album**, with
+  the album's Album info under it - and an artist: **Selected artist**, their name and **Go to artist**. Until then,
+  "not done yet".
+- **535 The EQ in the panel.** **Not done yet.** On the EQ tab, every control works as on the EQ page: the switch,
+  Preset, the sliders, Correction, Other outputs, Advanced. Settings > Playback's **EQ** row opens the tab. **Import…**
+  on it opens its preview as a sheet over the window. With the panel shut, or on Lyrics, choose a file in **File >
+  Import EQ File…**: the panel shows the EQ tab and the preview comes up over the window, as before - one EQ, never a
+  second EQ page over the tab. Again by dropping a `.txt` on the window, and with Finder's **Open With**. Import and
+  Cancel each put the preview away and leave the tab showing.
+- **536 The bottom row.** **Not done yet.** On the phone, Now Playing's foot has five, each an icon over its name:
+  **Queue**, **Lyrics**, the output (AirPlay, the name of where it's playing under it), **Info** and **EQ**. Each opens
+  what it names. **Lyrics** shows the lyrics in the cover's place, and again puts the cover back - it never opens the
+  sheet. The **•••** is at the top right beside the look button. Tap the output's name, not its icon: AirPlay's list
+  opens. With VoiceOver, the output reads "AirPlay", then where it's playing. Set a speed off 1x on the turntable:
+  back on the cover, the chip shows just above the row, over the gap between the output and Info. Tap the very left
+  and right of Info and the output's right edge, close beside the chip: each opens what it should and the speed stays;
+  only a tap on the chip goes back to 1x. Is the band it sits in a gap that looks meant, with the chip off 1x and at
+  1x? On the phone with the smaller screen, is the cover (and the turntable) still a comfortable size? Download the
+  Queue from the •••: "Downloading 23 songs from the Queue" stays between the arrow and the look button, and the look
+  button works while it shows. With Shuffle on, VoiceOver reads the Queue as "Queue - Shuffle on" and the EQ as "EQ,"
+  and its setting.
+- **537 The sheet.** **Not done yet.** **Queue**, **Info** or **EQ** opens one sheet: **‹ Now Playing** at its top,
+  then the strip - **Queue**, **Info**, **EQ** - and the page. Tap the strip: the sheet moves between its pages without
+  closing. The EQ works there as on its own page. Share an EQ `.txt` file to deadwax while Now Playing is up, with the
+  sheet on the Queue: it moves to EQ, the file's preview over it. Again with the cover full screen: the cover closes,
+  then the sheet opens on EQ with the preview. A swipe down from Now Playing's top still closes Now Playing.
+- **538 Both phones.** **Not done yet.** On Green Anole, everything else - every tab, the player, Edit album, Settings'
+  EQ - is as before. On Ethan's phone, 536-537, or "not done yet".
 
 ## What it can't do yet
 

@@ -57,16 +57,22 @@ final class EQSheetStack {
     }
 }
 
-/// A link to an EQ page, on whichever stack the page is on.
+/// A link to an EQ page, on whichever stack the page is on - (the Mac redesign, R3) the side panel's EQ's own stack
+/// too. On the Mac, Settings > Playback's EQ row shows the panel's EQ tab (check 535): the EQ is the panel's there, never a
+/// page pushed over Settings.
 struct EQLink<Label: View>: View {
     let route: EQRoute
     @ViewBuilder let label: () -> Label
 
     @Environment(\.eqDone) private var done
+    @Environment(\.inSidePanel) private var inSidePanel
+    @Environment(AppNavigation.self) private var navigation
 
     var body: some View {
-        if done != nil {
+        if done != nil || inSidePanel {
             NavigationLink(value: route, label: label)
+        } else if MacFrame.drawsDesktop(Platform.device) {
+            Button { navigation.showPanel(.eq) } label: { label() }
         } else {
             NavigationLink(value: AppRoute.eq(route), label: label)
         }
@@ -130,7 +136,8 @@ struct EQSheet: View {
 }
 
 extension View {
-    /// "Done" at the top right of an EQ page in the sheet (3.2) - nothing on You's stack.
+    /// "Done" at the top right of an EQ page in the sheet (3.2) - and (R3) in the Mac's side panel - nothing on You's
+    /// stack.
     func eqDoneButton() -> some View {
         modifier(EQDoneButton())
     }
@@ -138,10 +145,16 @@ extension View {
 
 private struct EQDoneButton: ViewModifier {
     @Environment(\.eqDone) private var done
+    @Environment(\.inSidePanel) private var inSidePanel
 
     func body(content: Content) -> some View {
         content.toolbar {
-            if let done {
+            if inSidePanel {
+                // (R3) in the side panel's EQ: the panel put away, and Escape its (DockDone, MacFrame.escape)
+                ToolbarItem(placement: .confirmationAction) {
+                    DockDone(words: EQWords.Screen.done)
+                }
+            } else if let done {
                 ToolbarItem(placement: .confirmationAction) {
                     Button(EQWords.Screen.done) { done() }
                         .escapeCloses()

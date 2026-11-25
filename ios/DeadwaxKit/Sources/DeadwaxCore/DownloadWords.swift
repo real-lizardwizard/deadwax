@@ -11,7 +11,8 @@ public enum DownloadWords {
     public static let download = "Download"
     public static let removeDownload = "Remove Download"
     public static let downloadAgain = "Download Again"
-    public static let downloadUpNext = "Download Up Next"
+    /// (R3) "Download the Queue": the Queue is Up Next's word on the phone and the Mac ("Queue on both").
+    public static let downloadUpNext = "Download the \(UpNextWords.title)"
     /// The control's, the download items' and Download Up Next's mark.
     public static let downloadSymbol = "arrow.down.circle"
     /// Play Next's and Play Last's (iOS 16.0), Info's and Go to album's (iOS 13.0) - every menu item carries one (3.4).
@@ -209,8 +210,8 @@ public enum DownloadWords {
     public static func removed(_ name: String, device: Device) -> String { "Removed from this \(device.noun): \(name)" }
     /// Now Playing's: "Downloading: Roads".
     public static func downloadingSong(_ title: String) -> String { "Downloading: \(title)" }
-    /// "Downloading 23 songs from Up Next", "Downloading 1 song from Up Next".
-    public static func downloadingUpNext(_ count: Int) -> String { "Downloading \(songs(count)) from Up Next" }
+    /// "Downloading 23 songs from the Queue", "Downloading 1 song from the Queue" - (R3) the Queue's word.
+    public static func downloadingUpNext(_ count: Int) -> String { "Downloading \(songs(count)) from the \(UpNextWords.title)" }
     /// What VoiceOver hears as a download asked for from an album page ends while the page is on top.
     public static func ended(_ album: String, failed: Int) -> String {
         failed > 0 ? "\(album): \(didntDownload(failed))" : "Downloaded \(album)"

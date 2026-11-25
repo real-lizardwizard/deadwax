@@ -30,8 +30,9 @@ public struct QueuePick<Track: Sendable>: Sendable {
         self.queuedAs = queuedAs
     }
 
-    /// The menu's title (its accessibility name): the label, or "Up Next" with none.
-    public var title: String { label.isEmpty ? "Up Next" : label }
+    /// The menu's title (its accessibility name): the label, or with none the Queue's name - (R3) "Queue", where the
+    /// web says "Up Next" (James, 25 Nov: "Queue on both").
+    public var title: String { label.isEmpty ? UpNextWords.title : label }
 
     /// Play Next or Play Last chosen, under the player's Normalization `setting` - nil with no songs (nothing happens,
     /// and the menu stays). Every song is queued at `level` (loudness.ts levelFor: the album's level for an album's
@@ -51,7 +52,7 @@ public struct QueuePick<Track: Sendable>: Sendable {
     }
 
     /// The line said when the music didn't start from the choice (upNext.ts queuedWords): "Playing next: Dummy", "Added
-    /// to Up Next: Dummy" - nil when it did start, the mini player being the notice then.
+    /// to the Queue: Dummy" - nil when it did start, the mini player being the notice then.
     public func notice(_ choice: QueueChoice, started: Bool) -> String? {
         started ? nil : queuedWords(choice, label: label)
     }

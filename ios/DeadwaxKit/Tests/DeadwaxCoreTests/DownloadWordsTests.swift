@@ -93,8 +93,8 @@ import Testing
         #expect(DownloadWords.footer(here: 0, of: 12, bytes: 0, device: .iPhone) == nil)
         #expect(DownloadWords.removed("Dummy", device: .iPhone) == "Removed from this phone: Dummy")
         #expect(DownloadWords.downloadingSong("Roads") == "Downloading: Roads")
-        #expect(DownloadWords.downloadingUpNext(23) == "Downloading 23 songs from Up Next")
-        #expect(DownloadWords.downloadingUpNext(1) == "Downloading 1 song from Up Next")
+        #expect(DownloadWords.downloadingUpNext(23) == "Downloading 23 songs from the Queue")
+        #expect(DownloadWords.downloadingUpNext(1) == "Downloading 1 song from the Queue")
         #expect(DownloadWords.ended("Dummy", failed: 0) == "Downloaded Dummy")
         #expect(DownloadWords.ended("Dummy", failed: 2) == "Dummy: 2 songs didn't download")
     }

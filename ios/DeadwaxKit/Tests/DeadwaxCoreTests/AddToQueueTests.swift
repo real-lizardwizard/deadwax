@@ -28,7 +28,7 @@ import Testing
         let whole = QueuePick.album(Self.album)
         #expect(whole?.choose(AddToQueue.choice, setting: .auto)?.level == .album, "an album's ••• as the album")
         //? the menu's notice for it, unchanged: the web's Play Last's line
-        #expect(one.notice(AddToQueue.choice, started: false) == "Added to Up Next: Sour Times")
+        #expect(one.notice(AddToQueue.choice, started: false) == "Added to Queue: Sour Times")
         #expect(one.notice(AddToQueue.choice, started: true) == nil, "the music started: the mini player says so")
     }
 

@@ -69,7 +69,7 @@ final class PlayerModel {
     /// The song's failure words, in a listener's words (PlayerWords.words / skipped) - the second line of the mini
     /// player and Now Playing (PlayerWords.secondLine(error:artist:)). Nil while all is well.
     private(set) var errorLine: String?
-    /// The notice capsule's words (D11): "Playing next: …", "Added to Up Next: …", "Picked up from …" - shown for
+    /// The notice capsule's words (D11): "Playing next: …", "Added to Queue: …", "Picked up from …" - shown for
     /// `Notice.seconds`.
     private(set) var notice: String?
     /// The device's Normalization (levels.md 4.2; UserDefaults `Normalization.storageKey`), read at each play's tap.

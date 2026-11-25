@@ -358,7 +358,8 @@ def test_the_menus_are_mac_menus_and_nothing_else():
     every = [name.strip() for line in cases for name in line.split(",")]
     assert every == ["settings", "find", "refresh", "playPause", "next", "previous", "forward", "back", "shuffle",
                      "repeatOff", "repeatAll", "repeatOne", "goToCurrentSong", "sidebar", "upNext", "lyrics", "info",
-                     "importEQFile", "saveChanges"]
+                     #? (R3) View > EQ (⌥⌘E), the side panel's EQ tab
+                     "eq", "importEQFile", "saveChanges"]
     for name in every:
         assert f"case .{name}" in perform or f".{name}," in perform or f", .{name}" in perform, name
 
@@ -694,12 +695,14 @@ SHEET_ROOTS = {
     "Album/AlbumView.swift": 1, "Artist/ArtistView.swift": 1, "EQ/EQImport.swift": 1, "EQ/EQRoute.swift": 1,
     "Edit/ArtworkLyricsPages.swift": 1, "Edit/ReleasePage.swift": 1, "Edit/TagsPages.swift": 1,
     "Library/LibraryView.swift": 2, "Manage/PeopleScreen.swift": 3, "Player/CoverViewer.swift": 1,
-    "Player/NowPlayingView.swift": 4, "Playlists/PlaylistsScreen.swift": 1, "Root/MainTabs.swift": 3,
+    #? (R3) Now Playing's one sheet (its Queue, Info and EQ) and Add to a playlist - its three sheets were one each
+    "Player/NowPlayingView.swift": 2, "Playlists/PlaylistsScreen.swift": 1, "Root/MainTabs.swift": 3,
     "Search/GroupView.swift": 2, "Shared/MacRightClick.swift": 1,
     #? (manual search, slice A1) Search Soulseek, from Requests' first row
     "Requests/RequestsScreen.swift": 1,
-    #? (slice 3) the desktop frame's: MainTabs' three over the frame - (its review) the EQ the bar's too, never a second
-    "Root/DesktopFrame.swift": 3,
+    #? (slice 3) the desktop frame's: MainTabs' three over the frame - (its review) the EQ the bar's too, never a second.
+    #? (R3's review) Two: the EQ is the dock's EQ tab now, a shared file's preview over it (MacPanels' one)
+    "Root/DesktopFrame.swift": 2, "Player/MacPanels.swift": 1,
 }
 
 
@@ -890,14 +893,19 @@ def test_the_frame_holds_the_sidebar_the_page_a_panel_and_the_bar():
     frame = bare(app_sources()["Root/DesktopFrame.swift"])
     body = frame[frame.index("var body: some View {"):frame.index("private var page: some View {")]
     order = [body.index(part) for part in ("if navigation.macSidebarShown {", "MacSidebarView()", "page\n",
-                                           ".padding(.trailing, MacFrame.makesRoom(style, panel) ? "
-                                           "CGFloat(MacFrame.panelWidth) + hairline : 0)",
-                                           ".overlay(alignment: .trailing) {", "if panel != .none {",
-                                           "MacPanel(panel: panel)", "PlayerBar()")]
+                                           #? (R3) the dock, MacLook's 400 wide, whichever of its tabs shows
+                                           ".padding(.trailing, MacDock.makesRoom(style, panel) ? "
+                                           "CGFloat(MacLook.panelWidth) + hairline : 0)",
+                                           ".overlay(alignment: .trailing) {", "if let panel {",
+                                           "MacPanel(tab: panel)", "PlayerBar()")]
     assert order == sorted(order)
     #? (slice 3's review) the panel drawn in one place, a drawer's or a column's - crossing 1280 never draws it afresh
-    assert frame.count("MacPanel(") == 1 and "if MacFrame.liesOver(style, panel) {" not in frame
-    assert "MacFrame.liesOver(style, panel) ? Palette.well : Color.clear" in body
+    assert frame.count("MacPanel(") == 1 and "if MacDock.liesOver(style, panel) {" not in frame
+    assert "MacDock.liesOver(style, panel) ? Palette.well : Color.clear" in body
+    assert "MacFrame.panelWidth" not in frame, "the web's 470 is MacFrame's, unread here"
+    #? (R3) what a list on the page in front selects, for the menus: Info opens about it with nothing queued
+    assert ("navigation.macSelected = selected" in frame
+            and ".onChange(of: selection.subject != nil, initial: true) { (_: Bool, selected: Bool) -> Void in" in frame)
     #? (the Mac redesign, R1) the redesign's sidebar, 220 (MacLook's - the web-held 232 stays MacFrame's, unread here)
     assert ".frame(width: CGFloat(MacLook.sidebarWidth))" in body and "MacFrame.sidebarWidth" not in frame
     assert "private var style: MacFrame.PanelStyle { MacFrame.panelStyle(width: width) }" in frame
@@ -936,37 +944,82 @@ def test_the_frame_holds_the_sidebar_the_page_a_panel_and_the_bar():
                  ".onDisappear { requests.watch(.hidden) }", "queueCount.changed()", "queueCount.scene(phase)",
                  "if !queued { navigation.queueEnded() }", "sheetOpen: false)"):
         assert line in frame, line
-    # MainTabs' sheets, over the frame
-    for sheet in (".appSheet(isPresented: $navigation.eqImportSheet) {", ".appSheet(item: $navigation.playlistPick) {",
+    # MainTabs' sheets, over the frame - (R3's review) but the EQ's: the dock's EQ tab is the Mac's one EQ
+    for sheet in (".appSheet(item: $navigation.playlistPick) {",
                   ".appSheet(item: $navigation.albumEdit, onDismiss: { navigation.editorDismissed() }) {"):
         assert sheet in frame, sheet
+    assert "eqImportSheet" not in frame
 
 
 def test_the_panels_are_one_at_a_time_and_never_modal():
+    """(R3) The side panel is a dock of folder tabs (MacPanels.swift, notes/ios.md "The redesign, slice R3: the side
+    panel's tabs; the Now Playing sheet"): one tab's page at a time, never modal, 400 wide; Core's MacDock decides which
+    (MacDockTests)."""
     app = app_sources()
     panels = bare(app["Player/MacPanels.swift"])
     panel = panels[panels.index("struct MacPanel: View {"):panels.index("extension EnvironmentValues")]
-    for page in ("case .upNext:\n                UpNextScreen()", "case .lyrics:\n                LyricsPanel()",
-                 "case .info:\n                InfoView()"):
+    #? the strip: MacFolderTabs over MacDock's tabs (Sources only with a Get page), a click showing its tab
+    assert ("MacFolderTabs(tabs: MacDock.tabs(getOpen: navigation.macGetOpen), words: MacDock.Words.tab," in panel
+            and "navigation.showPanel(chosen)" in panel and "spoken: MacDock.Words.spoken)" in panel)
+    #? one tab's page, the tab chosen's: a switch on it, each page once
+    assert panel.count("switch tab {") == 1
+    for page in ("case .upNext:\n            UpNextScreen()", "case .lyrics:\n            LyricsPanel()",
+                 "case .info:\n            DockInfo()", "case .eq:\n            DockEQ()",
+                 "case .sources:"):
         assert page in panel, page
-    assert ".environment(\\.inSidePanel, true)" in panel and ".frame(width: CGFloat(MacFrame.panelWidth))" in panel
+    for page in ("UpNextScreen()", "LyricsPanel()", "DockInfo()", "DockEQ()"):
+        assert panels.count(page) == 1, f"{page}: one tab at a time, drawn once"
+    assert ".environment(\\.inSidePanel, true)" in panel and ".frame(width: CGFloat(MacLook.panelWidth))" in panel
+    assert "MacFrame.panelWidth" not in panels
     assert "@Entry var inSidePanel = false" in panels
-    assert "isModal" not in panels and "appSheet" not in panels
+    #? (R3's review) one sheet, a shared file's EQ preview over the dock's EQ tab - the panel itself never modal
+    assert "isModal" not in panels and panels.count(".appSheet(") == 1
+    assert panels.index("private struct DockEQ") < panels.index(".appSheet(") < panels.index("struct LyricsPanel: View {")
     lyrics = panels[panels.index("struct LyricsPanel: View {"):]
     assert ".onAppear {\n            lyrics.showing = true" in lyrics and ".onDisappear { lyrics.showing = false }" in lyrics
     assert "LyricsView(lyrics: shown, covered: false)" in lyrics and "LyricsWords.nothingPlaying" in lyrics
+    #? the dock's Done: the panel put away, Escape's through the one rule - Lyrics', the selection's Info, the EQ's
+    done = panels[panels.index("struct DockDone: View {"):panels.index("private struct DockInfo")]
+    assert "navigation.closePanel()" in done
+    assert "DockDone()" in lyrics
+    eq = bare(app["EQ/EQRoute.swift"])
+    assert "if inSidePanel {" in eq and "DockDone(words: EQWords.Screen.done)" in eq
+    #? Info: about the selection, else the song playing, its heading saying which (MacDock's)
+    info = panels[panels.index("private struct DockInfo"):panels.index("private struct DockEQ")]
+    assert "MacDock.infoSubject(selected: selected.map(Self.kind), playing: player.current != nil)" in info
+    assert "MacDock.Words.heading(subject)" in info and "@Environment(MacSelection.self)" in info
+    assert "case nil:\n                InfoView()" in info and "AlbumInfoList(album:" in info
+    #? the EQ: the EQ page of the output now on the dock's own stack, its pages pushed on it
+    dock_eq = panels[panels.index("private struct DockEQ"):panels.index("struct LyricsPanel: View {")]
+    assert "NavigationStack(path: $stack.path) {" in dock_eq and "EQScreen(opened: .now)" in dock_eq
+    assert ".environment(stack)" in dock_eq and "EQDestination(route: route)" in dock_eq
+    #? an EQ link pushes on the dock's stack there; on the Mac elsewhere it shows the tab (Settings > Playback's EQ row)
+    link = eq[eq.index("struct EQLink"):eq.index("struct EQDestination")]
+    assert "if done != nil || inSidePanel {" in link and "navigation.showPanel(.eq)" in link
+    assert "MacFrame.drawsDesktop(Platform.device)" in link
     # Up Next's and Info's Done put the panel away there, and dismiss their sheet as before on the iPhone
     for name in ("UpNext/UpNextScreen.swift", "Info/InfoView.swift"):
         code = bare(app[name])
         assert "@Environment(\\.inSidePanel) private var inSidePanel" in code, name
         assert "if inSidePanel { navigation.closePanel() } else { dismiss() }" in code, name
     routes = bare(app["Shared/Routes.swift"])
-    assert "private(set) var macPanel: MacFrame.Panel = .none" in routes
-    assert "macPanel = MacFrame.toggled(macPanel, panel)" in routes and "macPanel = MacFrame.afterQueueEnds(macPanel)" in routes
+    assert "private(set) var macPanel: MacDock.Tab?" in routes
+    for rule in ("macPanel = MacDock.toggled(macPanel, tab, getOpen: macGetOpen)",
+                 "macPanel = MacDock.shown(macPanel, asked: tab, getOpen: macGetOpen)",
+                 "macPanel = MacDock.afterQueueEnds(macPanel, selected: macSelected)",
+                 "didSet { macPanel = MacDock.kept(macPanel, getOpen: macGetOpen) }"):
+        assert rule in routes, rule
     album = routes[routes.index("func openAlbum(_ album: AlbumRoute) {"):]
-    assert "if MacFrame.liesOver(macPanelStyle, macPanel) { macPanel = .none }" in album[:album.index("\n    }\n")]
+    assert "if MacDock.liesOver(macPanelStyle, macPanel) { macPanel = nil }" in album[:album.index("\n    }\n")]
     reset = routes[routes.index("func reset() {"):]
-    assert "macPanel = .none" in reset[:reset.index("\n    }\n")]
+    assert "macPanel = nil" in reset[:reset.index("\n    }\n")]
+    #? View's four: a tab's key closes its own and switches from another; ⌥⌘E is the EQ's (MacMenuTests)
+    commands = bare(app["Shared/MacCommands.swift"])
+    assert "case .upNext, .lyrics, .info, .eq:\n            if let panel = command.panel { navigation.togglePanel(panel) }" in commands
+    assert "selected: navigation.macSelected" in commands
+    #? the bar's ••• Info and EQ show their tab
+    bar = bare(app["Player/PlayerBar.swift"])
+    assert "onEQ: { navigation.showPanel(.eq) }" in bar and "navigation.eqImportSheet = true" not in bar
 
 
 def test_the_bars_actions_are_the_players_own():

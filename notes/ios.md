@@ -17301,3 +17301,255 @@ committed.
   - the Core back words without "Back": DWLookTests `theBackLinkIsReadAsIOSsOwn`.
 
 Tests after review: test_ios_phone_look 22 (from 19), DWLookTests 5 (from 4).
+
+## The redesign, slice R3: the side panel's tabs; the Now Playing sheet (2026-11-25)
+
+The build plan's 3.4 "R3" (~/Desktop/Code/deadwax-plans/mac-redesign-build.md), with James's answers 2 and 3 in its 3.8
+binding:
+- **"The cover's place"**: the lyrics stay where the cover is. The bottom row's Lyrics turns them on and off. The phone's
+  sheet has no Lyrics tab; the Mac's dock has one.
+- **"Queue on both"**: every word the app shows that said "Up Next" says Queue, on the phone and the Mac. The types and
+  files keep Up Next's name (UpNextScreen, UpNextWords, `upNext` cases), and the web keeps its word.
+
+Each tab's page is still today's: R3b redraws them. The app is still 0.13 (13); `__version__` is untouched.
+
+### What was built
+
+**Core `MacDock`** (MacDock.swift) - the side panel's rules:
+- `Tab`: Sources, Queue (`upNext`), Lyrics, Info, EQ. `tabs(getOpen:)` puts Sources first only while a Get page is
+  open. Nothing opens a Get page yet (R7's), so `AppNavigation.macGetOpen` stays false and the dock draws an empty page
+  for Sources.
+- `toggled`: a tab's key or bar button closes the panel when its tab shows, and switches to it otherwise. `shown`: a
+  folder tab clicked, the •••'s Info or EQ, Settings > Playback's EQ row - that tab, whatever showed. `kept`: Sources
+  goes when its Get page does.
+- `afterQueueEnds`: the Queue closes, and Info unless something is selected; Lyrics stays.
+- `makesRoom` / `liesOver`: beside the page from 1280 wide, over it below (MacFrame's rule, for a tab).
+- `escape(typing:shown:)`, and `MacFrame.escape(typing:panel:)` over a tab, so the call sites that read it
+  (UpNextScreen, InfoView, PlaylistView) are unchanged.
+- `infoSubject(selected:playing:)`: the selection, else the song playing, else nothing - and `Words.heading`:
+  "Selected album", "Selected artist", "Playing".
+
+**Core `NowPlayingTabs`** (NowPlayingTabs.swift) - the phone's sheet and row:
+- `strip`: Queue, Info, EQ. `row`: Queue, Lyrics, the output, Info, EQ.
+- `opens(_:)`: Queue, Info and EQ open the sheet on their tab (`.tab`); Lyrics is `.lyrics`, never the sheet; the
+  output is AirPlay's own.
+- `chipBetween`: the output and Info.
+- `shared(sheet:coverUp:)`: a shared EQ file always shows EQ - the sheet up on any tab moves to it in place, and with
+  the cover full screen up it waits for the cover to close (eq.md 3.9's wait, as before).
+- `symbol(_:on:)` and `Words`: "Now Playing" (the back link), "Now Playing's pages" (the strip, for VoiceOver),
+  `eq(setting:)` ("EQ, Bass Boost").
+
+**Core `MacMenu`**: View > EQ (⌥⌘E, `.eq`), after Info. `State.panel` is a `MacDock.Tab?`, and `State.selected` lets
+Info be used with a row selected and nothing queued. The Queue item is dimmed with nothing queued unless its tab shows.
+
+**The Mac (MacPanels.swift)**: `MacPanel(tab:)` is the dock: MacFolderTabs over `MacDock.tabs`, then one tab's page in
+a `switch` - UpNextScreen, LyricsPanel, DockInfo, DockEQ - 400 wide (`MacLook.panelWidth`; MacFrame's 470 is the web's
+and is no longer read here). `DockDone` is the dock's one Done and its one Escape (through `MacFrame.escape`).
+- **DockInfo**: the heading from MacDock, then for an album selected `AlbumInfoList` on a stub of the row's album (it
+  asks for the rest itself), for an artist selected their name, album count and Go to artist, else InfoView.
+- **DockEQ**: EQScreen(opened: .now) on its own EQSheetStack. EQScreen reads `inSidePanel` for one thing, its inline
+  title. EQLink pushes on that stack in the dock; on the Mac anywhere else (Settings > Playback's EQ row) it shows the
+  EQ tab. EQDoneButton puts the panel away in the dock.
+- **AppNavigation** (App/Shared/Routes.swift): `macPanel` is a `MacDock.Tab?`, set only through MacDock's rules
+  (`togglePanel`, `showPanel`, `closePanel`, `queueEnded`); `macSelected` mirrors MacSelection (DesktopFrame) for the
+  menus; `macGetOpen` for Sources.
+- **DesktopFrame** draws `MacPanel(tab:)` once, beside or over the page by MacDock. **PlayerBar**'s ••• EQ shows the EQ
+  tab. A shared or opened EQ file shows the dock's EQ tab, its preview over it (since the review - see "After review";
+  as first built it opened the frame's EQ sheet over the window).
+
+**The phone (NowPlayingSheet.swift, NowPlayingView.swift)**:
+- **NowPlayingSheet**: PhoneTop with PhoneBack ("‹ Now Playing", the sheet's own dismiss), PhoneStrip over
+  `NowPlayingTabs.strip`, then the tab's page - UpNextScreen, InfoView or EQSheet (its own stack, Done and the preview's
+  wait), one at a time.
+- **NowPlayingView**: one `appSheet(isPresented: $sheetUp)` in place of the three; `open(_:)` sets the tab and puts the
+  sheet up, so a button tapped or a shared file moves the sheet already up in place. `sheetOver` (the scrubber's) is
+  the sheet, Add to a playlist or the cover viewer.
+- **The bottom row** in the footer's place: PhoneTabItem for Queue (spoken `upNextLabel`), Lyrics (lit while on,
+  spoken `LyricsWords.label`, dimmed as before), Info and EQ (spoken "EQ, <setting>"); the output is AirPlay's glyph and
+  the route's name (EQ's `shownName`) in `DWPalette.acc`, over AirPlayButton (as first built, the picker in the icon's
+  place with a 44 target; since the review, under the whole column - "After review").
+- **The speed chip** sits over the gap between the output and Info - since the review in a band of its own above the
+  row (as first built, level with the icons, placed by anchors on them).
+- **The •••** moved up beside the look button; its EQ left it (`onEQ: nil`). The Mac's bar keeps its EQ.
+- The grip, the drag down and the cover viewer are untouched.
+- PhoneTabItem gained `spoken` (VoiceOver's name where it says more than the words) - additive.
+
+### The words ("Queue on both")
+
+Changed (Core unless named):
+- `UpNextWords.title`: "Up Next" → **"Queue"**. It is the Queue page's title, the sheet's and the dock's tab, the bottom
+  row's and the bar's button, View > Queue, QueuePick's title with no label, and Debug's row label (DebugView, which
+  had its own "Up Next").
+- `upNextLabel` (VoiceOver): **"Queue"**, **"Queue - Shuffle on"**, **"Queue - Repeat all"**, **"Queue - Shuffle and
+  Repeat all"**.
+- `queuedWords`: **"Added to Queue: Roads"** ("Playing next: Roads" unchanged) - first "Added to the Queue", made
+  "Added to Queue" in the review to say back the swipe's and the •••'s "Add to Queue". No fixture key held it.
+- `DownloadWords.downloadUpNext`: **"Download the Queue"**.
+- `DownloadWords.downloadingUpNext`: **"Downloading 23 songs from the Queue"**, **"Downloading 1 song from the Queue"**.
+
+New: "Side panel", "Selected album", "Selected artist", "Playing", "Go to artist", "Sources" (MacDock); "Now Playing",
+"Now Playing's pages", "EQ, Bass Boost" (NowPlayingTabs); View > **EQ** (EQWords.nowPlaying).
+
+**Fixture keys changed by hand** (`DEADWAX_WORDS_WRITE` never run), the same two in both
+`Fixtures/words/iphone.json` and `Fixtures/words/mac.json`:
+- `DownloadWords.everyLine[3]`: "Download Up Next" → "Download the Queue";
+- `DownloadWords.everyLine[58]`: "Downloading 23 songs from Up Next" → "Downloading 23 songs from the Queue".
+
+The web's vectors (screens/queue.json, upnext/scenarios.json) keep "Up Next": the tests read the app's word back
+through `QueueWord.web` (QueueWordTests.swift) - UpNextTests, ScreenQueueTests, UpNextTraceTests, AddToQueueTests and
+DownloadWordsTests. Comments quoting the old notice were brought up to date (Notice, PlayerModel, QueueMenu,
+AddToQueueSwipe). No word in R2's or R8's files said Up Next.
+
+### Decisions, and where this departs from the plan
+
+- **Opens' case is `.tab`, not `.sheet`.** test_ios_mac's carrying-wrappers test refuses any `sheet(` in App code, and a
+  `case .sheet(let tab):` read as one.
+- **The Mac's shared EQ file** first kept the frame's sheet, as slice 6 made it; the review made it the dock's EQ tab
+  (one EQ). Import… on the dock's EQ page is still a sheet over the window (check 535).
+- **Info's selection** is MacSelection's, which nothing sets until R2's lists call `.macSelects`. Until then Info is the
+  song playing's (check 534 says so).
+- **The artist's Info is small** - name, album count, Go to artist - since there is no artist Info page to reuse;
+  R3b's Info redraws it.
+- **Files outside the Touches list**: MacCommands (the EQ command, the selection), DesktopFrame (the dock drawn once,
+  the selection mirrored), PlayerBar (the ••• EQ), EQRoute (the dock's stack and Done), DebugView (the word),
+  PhoneTabItem (`spoken`, additive), Core UpNextView, DownloadWords and QueuePick (the words), four comment-only files,
+  and MacSidebarTests (`MacFrame.Panel.none` spelled out once the overload made `.none` ambiguous).
+- **EQScreen's header comment** still says Now Playing's •••; it is left for R3b, which redraws the page, so EQScreen
+  changes only where it reads `inSidePanel`.
+
+### Tests, and the faults they were seen failing on
+
+- **Core MacDockTests** (new), **NowPlayingTabsTests** (new), **QueueWordTests** (new), and MacMenuTests
+  (`theEQsKeyIsFreeOfTheSystems`, the View list, the dimming).
+- **tests/test_ios_panels_look.py** (new, 9 tests): one sheet; the sheet's one tab under its back link and strip, no
+  Lyrics; the bottom row and the chip's anchors; each button opening what it names, Lyrics never the sheet, the ••• by
+  the look button; a shared EQ file on EQ; the drag down; EQScreen's digest outside `inSidePanel` (R3b sets it
+  afresh); the dock's and the sheet's tokens; and no "Up Next" left in App or Core sources or the words fixtures.
+- **test_ios_mac.py**: the panels test (R3's own); the menus list, the frame test and SHEET_ROOTS for the change.
+- **test_ios_cover_viewer.py**, **test_ios_palette.py**, **test_ios_phone_look.py**: their Now Playing strings, and the
+  phone pieces now drawn in NowPlayingSheet and NowPlayingView.
+
+**Mutations.** Eleven faults were each applied alone, run, and restored byte for byte. Every one was caught:
+- **two tabs at once** (LyricsPanel drawn under the Queue in the dock): test_ios_mac
+  `test_the_panels_are_one_at_a_time_and_never_modal`;
+- **two sheets at once** (Info's own sheet back over Now Playing): `test_now_playing_has_one_sheet_for_the_queue_info_and_the_eq`
+  and test_ios_mac's `test_a_sheet_keeps_the_page_under_it_out_of_the_menus_reach`;
+- **Sources with no Get page**: MacDockTests `sourcesOnlyWithAGetPageOpen` and `theTabsAndTheirWords`;
+- **the EQ's key the system's** (⌘E): MacMenuTests `theEQsKeyIsFreeOfTheSystems` and `theKeysAsThePlanHasThem`;
+- **EQScreen changed outside `inSidePanel`** (`appeared` starting true): `test_eq_screen_changes_only_where_it_reads_in_side_panel`;
+- **Lyrics opening the sheet**, in the row's tap: `test_each_button_opens_what_it_names_and_lyrics_never_the_sheet`; in
+  Core's rule: NowPlayingTabsTests `whichButtonOpensWhich` and that test;
+- **a shared EQ file lost under the Queue**, in Core's rule: NowPlayingTabsTests `aSharedEQFileOpensTheSheetOnEQ` and
+  `test_a_shared_eq_file_opens_the_sheet_on_eq`; Now Playing returning with the sheet up: that test;
+- **the drag down no longer closing Now Playing**: `test_the_drag_down_still_closes_now_playing`;
+- **an "Up Next" word left on screen** (Debug's row): `test_no_word_the_app_shows_says_up_next`.
+
+### Not verified - only the Mac and the phones can say (532-538)
+
+- Nothing of R3 has been seen on a screen: the builds and the tests only.
+- **The speed chip's band** (since the review): whether a 44-point gap between the transport and the row reads as
+  meant, and whether the cover (and the turntable's plinth) are still a comfortable size on a small phone, 32 points
+  shorter than before. Check 536 asks.
+- Each tab's page keeps its own navigation bar under the strip until R3b, so the sheet shows `‹ Now Playing`, the
+  strip, then the page's own title and Done.
+- Moving between the sheet's tabs makes each page afresh (one `switch`), so the Queue opens at the song playing again,
+  as it does each time it opens, and the EQ at its top; whether that reads as wanted is the phone's to say.
+- Whether a shared file's preview shows over the sheet moved to EQ (EQSheet's own 400 ms wait, from its appear) is only
+  how EQSheet behaves when opened, untried with the sheet already up.
+- The Mac's dock: the folder tabs' look at 400 wide, the shadow below 1280, ⌥⌘E reaching the app (MacMenuTests holds
+  it off the system's keys, not the system), and Escape's order.
+
+### After review (2026-11-25)
+
+One review, all of it fixed in R3's one commit. Each fix with what catches it - every fault below was applied alone,
+run and restored byte for byte, and each was caught (with the eleven above: 33 in all).
+
+**1. The speed chip stole taps.** Level with the row's icons, the chip (about 55 points, 67 at xxLarge) covered about
+28 points of Info's column and 15 of AirPlay's 44-point target on a 390-point phone: at 1.25x a tap on the left of Info
+reset the speed and opened nothing.
+- Now it has a band of its own, **SpeedChipBand**, between the transport and the row: as tall as the chip's target
+  (TurntableFace.hit, 44), drawn whether the chip shows or not, so nothing moves as it comes and goes (5.1). The
+  transport keeps its 12 above it and loses the 12 below, so the band costs the cover (or the plinth) 32 points.
+- The chip is centred in it on the line between the output's column and Info's: Core's **`NowPlayingTabs.chipAt`**
+  (3/5 across, worked out from `row` and `chipBetween`). FooterGap, its key and SpeedChipPlace are gone.
+- **tests/test_ios_nowplaying_row.py** `test_the_speed_chip_overlaps_no_buttons_target` works the frames out from the
+  code's own numbers - Now Playing's 24 inset, the transport's five (44, 56, 72, 56, 44) and its spacers, the band's
+  frame, SpeedChipFace's padding and outer frame, the widest label ("0.25x", five monospaced characters at 0.62 em),
+  Dynamic Type's footnote from xSmall to xxxLarge (capped at xxLarge's 17), PhoneLook's 49 - at 375 and 390 points,
+  and finds the chip's frame overlapping no target, over the gap, inside the column. It also works out the old place
+  and finds it lapping AirPlay's and Info's. `test_the_chip_has_a_band_of_its_own_between_the_transport_and_the_row`
+  holds the stacking and the chip drawn only there. Caught: the band only the chip's face tall (its target spills onto
+  the row); the chip laid over the row again; `chipAt` on the wrong line (also NowPlayingTabsTests).
+- Check 536 asks for taps close beside the chip, and whether the band reads as meant.
+
+**2. A notice covered the look button.** Laid over the whole top row with 48 points either side, a notice wider than
+about 150 points ("Downloading 23 songs from the Queue") covered the look button for its 5 seconds.
+- Now it is the row's middle: the Spacer between the chevron and the look button and the ••• carries it as an overlay,
+  so it is as wide as they leave it (about 171 points on a 375-point phone) and wraps; `fixedSize(vertical:)` lets it
+  be as tall as its lines, and `allowsHitTesting(false)` means even a tall one takes no touch.
+- `test_the_notice_clears_the_chevron_the_look_button_and_the_menu`. Caught: the notice over the whole row again; the
+  notice taking touches.
+
+**3. The row's VoiceOver**, now held part by part (each fault alone caught by its own test):
+`test_the_queue_says_what_is_on` (the Queue's spoken name nil), `test_the_eq_says_the_outputs_setting` (the EQ's nil),
+`test_lyrics_dimmed_does_nothing_and_says_why` (Lyrics' `.disabled(dimmed)` gone),
+`test_the_output_is_airplays_picker_alone_saying_where_it_plays` (the output's drawing not hidden),
+`test_a_tab_item_says_spoken_before_its_words` (PhoneTabItem saying `words`).
+
+**4. Now Playing redrew on every EQ change.** It read EQModel itself. The row's EQ and its output are views of their
+own now, **EQRowItem** and **OutputItem**, the only readers of the EQ in the file. `test_only_the_rows_eq_and_output_read_the_eq`
+finds no `eq.` and no EQModel in NowPlayingView's own code. Caught: Now Playing reading the EQ again.
+
+**5. The Mac opened a second EQ page.** A shared file (or File > Import EQ File…, Open With, a drop) opened the frame's
+EQ sheet over the dock's EQ tab - undoing slice 3's review decision of one EQ.
+- Core's **`SharedEQFile.shows(device:nowPlayingShown:)`** (MacDock.swift): the Mac's is `.dock`; the phone's is
+  `.nowPlaying` or `.sheet`, exactly as before. `AppNavigation.share` switches on it: the dock's EQ tab shown on the
+  Mac.
+- **DockEQ** presents the preview as EQSheet does - after the same 400 ms, while `eqImport` is set for no page, swiped
+  away as Cancel - so it shows "preview and all". DesktopFrame presents no EQ sheet now; MainTabs, EQSheet and the
+  phone's whole path are unchanged. The window's own drop (RootView) covers the dock, so DockEQ has no drop of its own.
+- MacDockTests `aSharedEQFileShowsInTheOneEQ`; test_ios_panels_look
+  `test_a_shared_eq_file_on_the_mac_shows_in_the_docks_eq` (share's lines, the frame's no sheet, DockEQ's preview, the
+  phone's sheet and EQSheet's wait as they were); test_ios_mac's SHEET_ROOTS (DesktopFrame 2, MacPanels 1), its frame
+  test and its panels test. Caught: share opening the sheet on the Mac; Core's rule sending the Mac the phone's way;
+  the frame's EQ sheet back; DockEQ never showing the preview.
+
+**6. Mac nits.** A tab with nothing to be about says so: Core's **`MacDock.empty(_:playing:selected:)`** - the Queue
+with nothing playing, and Info with nothing selected and nothing playing (exactly when Info has no heading), say
+"Nothing playing" (`Words.nothingPlaying`, Lyrics' and the bar's words). MacPanel draws **DockEmpty** in the page's
+place: the tab's name as its title, the words quiet and centred, the dock's Done. So a folder tab clicked to Queue or
+Info with nothing queued, or Info's selection gone, never shows a blank page. MacDockTests `aTabWithNothingToBeAboutSaysSo`;
+`test_a_dock_tab_with_nothing_to_be_about_says_so`. Caught: MacPanel skipping the rule; the Queue never empty; Info empty
+with a row selected.
+
+**7. Phone nits.**
+- **AirPlay says where it plays**: AirPlayButton takes `playsTo`, set as the picker's `accessibilityValue` (the
+  output's name as the EQ names it), and `glyph`.
+- **The output's target is its whole column**: the picker is laid under the column (`.background`, after its frame
+  and `lookHeight`), its own glyph hidden (`glyph: false`: clear in both tints), and the row draws AirPlay's audio glyph
+  (`NowPlayingTabs.symbol(.output)`: "airplayaudio", the one the picker drew) and the name over it in the accent,
+  taking no touch and hidden from VoiceOver. The glyph is the accent always now (the design draws the output's whole
+  link in it); the picker's own glyph used to be white, tinted only while playing elsewhere. The Mac's bar and output
+  keep the picker's glyph and no value.
+- `test_the_output_is_airplays_picker_alone_saying_where_it_plays`. Caught: no value; the drawing taking the touch; the
+  picker its icon's size again.
+- **The ••• stays inside the grip**, as the review asked: it is in the top row, which is the drag-down grip; a tap
+  opens the menu and a drag past `dragStartDistance` still drags Now Playing.
+- Not verified: that AVRoutePickerView takes a tap across all its bounds when sized to the column, and that clear
+  tints hide its glyph on iOS 26 - check 536 asks for a tap on the name.
+
+**8. Words.** The notice reads **"Added to Queue: Roads"** (UpNextView's `queuedWords`), saying back "Add to Queue" on
+the swipe and the menu; QueueWordTests holds the two together, and UpNextTests, ScreenQueueTests and AddToQueueTests
+expect it. No words fixture key held it (`DEADWAX_WORDS_WRITE` never run). Caught: "Added to the Queue" again
+(QueueWordTests). The old checklists that describe the old layout - P1 (the bottom row) and 27 (the chip "between
+AirPlay and Up Next") - say "(Since R3: …)"; ios/README.md says Queue for Up Next.
+
+**9. Known, left for R3b** (no worse than the separate sheets before R3):
+- The sheet's tabs are made afresh on each switch (one `switch tab`), so a typed but unapplied EQ filter value, a page
+  pushed on the EQ's stack, and Info's About/Debug choice are lost on one tap of the strip. R3b, which redraws these
+  pages, should commit the filter editor's value as it disappears.
+- `NowPlayingTabs.shared` while Add to a playlist is up over Now Playing (pre-existing): a shared EQ file opens the
+  sheet on EQ under the picker.
+
+**Shared test files edited** (unavoidable): test_ios_mac.py's SHEET_ROOTS and the frame's sheets in its frame test
+(`test_the_frame_holds_the_sidebar_the_page_a_panel_and_the_bar`), beside R3's own panels test.

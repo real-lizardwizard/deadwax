@@ -61,7 +61,7 @@ extension QueueMenuRequest {
 /// Menu on the button, as Apple's own ••• are. It was a confirmationDialog on the album page until James's check of 0.2
 /// (2): since iOS 26 a confirmation dialog is a popover from the view it is attached to, here the page, so it came up
 /// away from the ••• (notes/ios.md, "The ••• menus open from the •••"). Titled with what it queues (QueuePick.title -
-/// the song's or the album's name, or "Up Next"), as the dialog was. There is no Cancel row: a menu closes with a tap
+/// the song's or the album's name, or "Queue"), as the dialog was. There is no Cancel row: a menu closes with a tap
 /// anywhere else (QueuePickWords.cancel stays, the web's word, held to its fixture). The order is fixed
 /// (`menuOrder(.fixed)`), so Add to Queue is first whichever way the menu opens.
 ///
@@ -73,7 +73,7 @@ extension QueueMenuRequest {
 ///
 /// It is carried out in its tap, nothing awaited first (the gesture rule - with nothing playing it starts the music):
 /// `PlayerModel.addToQueue`, which queues the songs at the level QueuePick.choose says (an album's ••• as an album, a
-/// song's as a song), remembers the album, and says the notice (D11, "Added to Up Next: Roads") only when the music
+/// song's as a song), remembers the album, and says the notice (D11, "Added to Queue: Roads") only when the music
 /// didn't start from it - when it did, the mini player says so. The menu closes either way.
 ///
 /// Phase 4, slice 2: "Add to a playlist…", after Add to Queue (the web's third, after its two) - the same songs into

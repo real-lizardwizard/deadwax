@@ -109,6 +109,8 @@ import Testing
                          // (slice 3) the View menu's frame
                          .sidebar: "\u{2303}\u{2318}S", .upNext: "\u{2325}\u{2318}U", .lyrics: "\u{2325}\u{2318}L",
                          .info: "\u{2318}I",
+                         // (R3) the dock's EQ tab
+                         .eq: "\u{2325}\u{2318}E",
                          // (slice 6) File's - and (slice 7) Server settings' Save changes
                          .importEQFile: "\u{2318}O", .saveChanges: "\u{2318}S"])
         // no two items share a key
@@ -124,6 +126,25 @@ import Testing
             #expect(!keys.contains(MacMenu.Shortcut(.character(Character(taken)), .command)), "\(taken)")
         }
         #expect(!keys.contains(MacMenu.Shortcut(.character("f"), [.control, .command])))
+    }
+
+    // MARK: (R3) the dock's EQ tab: its key, free of the system's
+
+    @Test func theEQsKeyIsFreeOfTheSystems() {
+        #expect(MacMenu.key(.eq) == MacMenu.Shortcut(.character("e"), [.option, .command]))
+        #expect(MacMenu.key(.eq)?.said == "\u{2325}\u{2318}E")
+        // the keys a Catalyst window or macOS keeps whatever the app asks: Command-E (Use Selection for Find), and with
+        // Option-Command, H (Hide Others), M (Minimize All), W (Close All), D (the Dock), T (View > Show Toolbar), Space
+        // (Finder's search) and Escape (Force Quit) - none of them any item's
+        let keys = MacMenu.Command.allCases.compactMap(MacMenu.key)
+        let taken: [MacMenu.Shortcut] = [MacMenu.Shortcut(.character("e"), .command)]
+            + ["h", "m", "w", "d", "t"].map { MacMenu.Shortcut(.character(Character($0)), [.option, .command]) }
+            + [MacMenu.Shortcut(.space, [.option, .command]), MacMenu.Shortcut(.character("\u{1B}"), [.option, .command])]
+        for key in taken {
+            #expect(!keys.contains(key), "\(key.said) is the system's")
+        }
+        // and a field with the cursor keeps it from nothing: it types nothing
+        #expect(!MacMenu.yieldsToTyping(.eq))
     }
 
     @Test func theWordsAreTheAppsOwn() {
@@ -236,30 +257,38 @@ import Testing
 
     @Test func thePanelsOneAtATimeEachTickedWhileItShows() {
         let words = MacMenu.Command.panels.map { MacMenu.item($0, Self.playing).words }
-        #expect(words == [UpNextWords.title, LyricsWords.lyrics, InfoWords.title])
-        #expect(words == ["Up Next", "Lyrics", "Info"])
-        #expect(MacMenu.Command.panels.compactMap(\.panel) == [.upNext, .lyrics, .info])
+        #expect(words == [UpNextWords.title, LyricsWords.lyrics, InfoWords.title, EQWords.nowPlaying])
+        // (R3) Queue, Up Next's word on the phone and the Mac since James's "Queue on both"
+        #expect(words == ["Queue", "Lyrics", "Info", "EQ"])
+        #expect(words == MacDock.tabs(getOpen: false).map(MacDock.Words.tab), "the dock's tabs' own words")
+        #expect(MacMenu.Command.panels.compactMap(\.panel) == [.upNext, .lyrics, .info, .eq])
+        #expect(MacMenu.Command.panels.compactMap(\.panel) == MacDock.tabs(getOpen: false), "every tab but Sources")
         #expect(MacMenu.Command.allCases.filter { $0.panel != nil } == MacMenu.Command.panels)
-        for panel in MacFrame.Panel.allCases {
+        for panel in [nil] + MacDock.Tab.allCases {
             var state = Self.playing
             state.panel = panel
             let ticked = MacMenu.Command.panels.filter { MacMenu.item($0, state).ticked }
-            #expect(ticked.compactMap(\.panel) == (panel == .none ? [] : [panel]), "\(panel): its own item ticked alone")
-            #expect(MacMenu.Command.panels.allSatisfy { MacMenu.item($0, state).enabled }, "\(panel)")
+            // Sources, the Get page's own, has no item: none ticked while it shows
+            let own: [MacDock.Tab] = panel.map { $0 == .sources ? [] : [$0] } ?? []
+            #expect(ticked.compactMap(\.panel) == own, "\(String(describing: panel)): its own item ticked alone")
+            #expect(MacMenu.Command.panels.allSatisfy { MacMenu.item($0, state).enabled }, "\(String(describing: panel))")
         }
         let sections = MacMenu.view(Self.playing).map { $0.map(\.command) }
-        #expect(sections == [[.sidebar], [.upNext, .lyrics, .info]])
+        #expect(sections == [[.sidebar], [.upNext, .lyrics, .info, .eq]])
     }
 
     @Test func aPanelOpensWithSomethingQueuedAndAlwaysCloses() {
-        // nothing queued: none opens - but one left open (Lyrics saying Nothing playing) can be put away
+        // nothing queued: none of the queue's three opens - but one left open (Lyrics saying Nothing playing) can be put
+        // away; (R3) the EQ, the output's, opens whatever is queued, and Info with a row selected, which it is about
         let none = MacMenu.State()
         for command in MacMenu.Command.panels {
-            #expect(!MacMenu.item(command, none).enabled, "\(command) with nothing queued")
+            #expect(MacMenu.item(command, none).enabled == (command == .eq), "\(command) with nothing queued")
             var open = none
-            open.panel = command.panel ?? .none
+            open.panel = command.panel
             #expect(MacMenu.item(command, open).enabled && MacMenu.item(command, open).ticked, "\(command) open")
         }
+        #expect(MacMenu.item(.info, MacMenu.State(selected: true)).enabled, "Info about the row selected")
+        #expect(!MacMenu.item(.upNext, MacMenu.State(selected: true)).enabled, "a selection queues nothing")
         // Lyrics dimmed while it is known the song has none (or none kept here offline), as the bar's button is
         for have in LyricsHave.allCases {
             var state = Self.playing
@@ -271,7 +300,7 @@ import Testing
         // a sheet up or the sign-in over the app: no panel is opened or closed under it
         for command in MacMenu.Command.panels + [.sidebar] {
             var state = Self.playing
-            state.panel = command.panel ?? .none
+            state.panel = command.panel
             state.sheet = true
             #expect(!MacMenu.item(command, state).enabled, "\(command) under a sheet")
             state.sheet = false

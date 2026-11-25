@@ -29,7 +29,8 @@ import Testing
             let choice = QueueChoice(rawValue: menu["how"].string!)!
             let started = menu["started"].bool!
             let label = "\(menu["name"].string ?? "?") / \(setting) / \(choice) / started \(started)"
-            diffs.text("\(label): title", pick.title, menu["title"])
+            //? (R3) the app says Queue where the web says Up Next: read back as the web says it (QueueWord)
+            diffs.text("\(label): title", QueueWord.web(pick.title), menu["title"])
             let queued = pick.choose(choice, setting: setting)
             let calls = menu["calls"].list
             diffs.check("\(label): a call", queued != nil, !calls.isEmpty)
@@ -39,7 +40,7 @@ import Testing
             diffs.check("\(label): songs queued", queued.tracks.count, call[1].list.count)
             for level in call[1].list { diffs.text("\(label): level", queued.level?.rawValue, level) }
             diffs.check("\(label): remembered", queued.remember, menu["remembered"][0].list.compactMap(\.string))
-            diffs.text("\(label): notice", pick.notice(choice, started: started), menu["notice"])
+            diffs.text("\(label): notice", QueueWord.web(pick.notice(choice, started: started)), menu["notice"])
         }
         diffs.done()
     }
@@ -70,7 +71,7 @@ import Testing
             diffs.check("\(label): the web's call", "playLast", call[0].string ?? "")
             for level in call[1].list { diffs.text("\(label): level", queued.level?.rawValue, level) }
             diffs.check("\(label): remembered", queued.remember, menu["remembered"][0].list.compactMap(\.string))
-            diffs.text("\(label): notice", pick.notice(AddToQueue.choice, started: started), menu["notice"])
+            diffs.text("\(label): notice", QueueWord.web(pick.notice(AddToQueue.choice, started: started)), menu["notice"])
         }
         diffs.done()
         #expect(driven > 0, "the fixture drives the web's Play Last")
@@ -98,7 +99,7 @@ import Testing
         #expect(whole?.choose(.last, setting: .auto)?.level == .album)
         #expect(QueuePickWords.playLevel(.auto) == .album && QueuePickWords.playLevel(.song) == .track && QueuePickWords.playLevel(.off) == nil)
         #expect(one.notice(.next, started: false) == "Playing next: Sour Times")
-        #expect(one.notice(.last, started: false) == "Added to Up Next: Sour Times")
+        #expect(one.notice(.last, started: false) == "Added to Queue: Sour Times")
         #expect(one.notice(.last, started: true) == nil)
     }
 }

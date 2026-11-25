@@ -364,14 +364,15 @@ import Testing
         #expect(listTitle([simTrack("1", albumId: nil)], again: false) == "Still to play")
         #expect(listTitle([simTrack("1", albumId: "")], again: false) == "Still to play")
         #expect(queuedWords(.next, label: "Roads") == "Playing next: Roads")
-        #expect(queuedWords(.last, label: "Dummy") == "Added to Up Next: Dummy")
+        // (R3) the Queue's word, where the web says Up Next ("Queue on both")
+        #expect(queuedWords(.last, label: "Dummy") == "Added to Queue: Dummy")
         #expect(Repeat.allCases.map(repeatLabel) == ["Repeat", "Repeat all", "Repeat one"])
         #expect(shuffleLabel(nil) == "Shuffle")
         #expect(shuffleLabel(.store) == "Shuffle - shuffling all music")
         #expect(shuffleLabel(.yours) == "Shuffle - shuffling your whole library")
         #expect([upNextLabel(shuffle: false, repeat: .off), upNextLabel(shuffle: true, repeat: .off), upNextLabel(shuffle: false, repeat: .all),
                  upNextLabel(shuffle: false, repeat: .one), upNextLabel(shuffle: true, repeat: .all)]
-                == ["Up Next", "Up Next - Shuffle on", "Up Next - Repeat all", "Up Next - Repeat one", "Up Next - Shuffle and Repeat all"])
+                == ["Queue", "Queue - Shuffle on", "Queue - Repeat all", "Queue - Repeat one", "Queue - Shuffle and Repeat all"])
     }
 
     @Test func theSheetsOwnWords() { // UpNext.tsx

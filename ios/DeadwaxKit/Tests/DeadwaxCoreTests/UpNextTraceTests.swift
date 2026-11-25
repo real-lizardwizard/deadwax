@@ -82,7 +82,8 @@ import Testing
             case "shuffleLabel": said = shuffleLabel(word["scope"]?.string.flatMap(PagedScope.init(rawValue:)))
             default: said = nil
             }
-            #expect(said != nil && said == expected, "\(word["fn"]?.string ?? "?"): \(said ?? "nothing"), the web's \(expected ?? "nothing")")
+            //? (R3) the app says Queue where the web says Up Next: read back as the web says it (QueueWord)
+            #expect(said != nil && QueueWord.web(said) == expected, "\(word["fn"]?.string ?? "?"): \(said ?? "nothing"), the web's \(expected ?? "nothing")")
         }
     }
 }

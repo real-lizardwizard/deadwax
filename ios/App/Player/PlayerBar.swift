@@ -14,8 +14,8 @@ import SwiftUI
 ///   call from the click, as Now Playing's buttons make them; Shuffle dimmed during a library's shuffle (its order is
 ///   the shuffle). Under it the scrubber, a clock at each end (BarScrubber).
 /// - The tools: Lyrics, Up Next, AirPlay and the •••. Lyrics and Up Next open their side panel, or close it (one panel at
-///   a time, AppNavigation.togglePanel), lit while theirs shows; the •••'s Info opens Info's. Its EQ opens the EQ as a
-///   sheet - the frame's own, a shared file's too (AppNavigation.eqImportSheet); Add to a playlist… the picker
+///   a time, AppNavigation.togglePanel), lit while theirs shows; the •••'s Info opens Info's. Its EQ opens (R3) the
+///   side panel's EQ tab (AppNavigation.showPanel); Add to a playlist… the picker
 ///   (AppNavigation.playlistPick, the frame's sheet); Go to album the album's page.
 ///
 /// Nothing queued: "Nothing playing" across the bar, in the place the song would be - the bar never comes and goes.
@@ -208,9 +208,9 @@ struct PlayerBar: View {
                 .frame(width: 32, height: 32)
             NowPlayingMenu(hasAlbum: route != nil, saysSpeed: player.speed != PlaySpeed.normal,
                            onInfo: { if navigation.macPanel != .info { navigation.togglePanel(.info) } },
-                           // (slice 3's review) the frame's one EQ sheet, a shared file's too (DesktopFrame) - never a
-                           // second over it, and an EQ page on Settings' stack knows it's covered (EQScreen.onTop)
-                           onEQ: { navigation.eqImportSheet = true },
+                           // (R3) the side panel's EQ tab, whatever was showing - a shared file's EQ stays the frame's
+                           // one sheet (DesktopFrame), the tab's page covered under it (EQScreen.onTop)
+                           onEQ: { navigation.showPanel(.eq) },
                            onPlaylist: reachability.online ? {
                                navigation.playlistPick = PlaylistPickRequest(PlaylistPick(playing: track))
                            } : nil) {

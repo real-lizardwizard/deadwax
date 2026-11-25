@@ -27,6 +27,8 @@ struct EQScreen: View {
     @Environment(Reachability.self) private var reachability
     @Environment(AppNavigation.self) private var navigation
     @Environment(\.eqDone) private var done
+    /// (The Mac redesign, R3) In the Mac's side panel, the dock's EQ tab: its title inline, as in the sheet.
+    @Environment(\.inSidePanel) private var inSidePanel
     @Environment(\.dismiss) private var dismiss
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     /// The sheet's stack, in the sheet over Now Playing; nil on You's.
@@ -99,7 +101,7 @@ struct EQScreen: View {
         }
         .listStyle(.insetGrouped)
         .navigationTitle(EQWords.Screen.title)
-        .navigationBarTitleDisplayMode(done == nil ? .large : .inline)
+        .navigationBarTitleDisplayMode(done == nil && !inSidePanel ? .large : .inline)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 Menu {

@@ -6,7 +6,7 @@ import UIKit.UIGestureRecognizerSubclass
 /// A song row's swipe to Add to Queue (notes/ios.md "Add to Queue: the swipe, and the menus' one item"; 16 Nov, James:
 /// "Can we also add swiping to add to queue"). Swipe a song row right, from its leading edge as Apple Music's are: a
 /// full swipe adds the song, a partial one leaves one button, Add to Queue, standing; a light success haptic, and the
-/// notice the •••'s Add to Queue says ("Added to Up Next: Roads" - none when the music starts from it, the mini player
+/// notice the •••'s Add to Queue says ("Added to Queue: Roads" - none when the music starts from it, the mini player
 /// saying so), which VoiceOver reads. On every row whose ••• offers Add to Queue, by the same rule (Core's
 /// AddToQueue.pick of the row's own •••'s request) and through the same call (PlayerModel.addToQueue) - never on Up
 /// Next's rows, a grid's tiles, or a row whose ••• leaves it out (offline, a song not on this phone).

@@ -110,9 +110,10 @@ public enum QueuedHow: String, Sendable, CaseIterable {
     }
 }
 
-/// The app's notice for what Play Next or Play Last did.
+/// The app's notice for what Play Next or Play Last did - (R3) "Added to Queue: Roads", saying back the swipe's and the
+/// •••'s "Add to Queue", where the web says "Added to Up Next: Roads" (James, 25 Nov: "Queue on both").
 public func queuedWords(_ how: QueuedHow, label: String) -> String {
-    how == .next ? "Playing next: \(label)" : "Added to Up Next: \(label)"
+    how == .next ? "Playing next: \(label)" : "Added to \(UpNextWords.title): \(label)"
 }
 
 /// What the Repeat chip and Now Playing's Repeat button say.
@@ -138,17 +139,22 @@ public func nextRepeat(_ mode: Repeat) -> Repeat {
     return cycle[(at + 1) % cycle.count]
 }
 
-/// Now Playing's Up Next button, named with what is on: "Up Next - Shuffle and Repeat all".
+/// Now Playing's Up Next button, named with what is on: "Queue - Shuffle and Repeat all" - (R3) the web's "Up Next - ..."
+/// under the app's word.
 public func upNextLabel(shuffle: Bool, repeat mode: Repeat) -> String {
-    if shuffle && mode != .off { return "Up Next - Shuffle and \(repeatLabel(mode))" }
-    if shuffle { return "Up Next - Shuffle on" }
-    if mode != .off { return "Up Next - \(repeatLabel(mode))" }
-    return "Up Next"
+    let title = UpNextWords.title
+    if shuffle && mode != .off { return "\(title) - Shuffle and \(repeatLabel(mode))" }
+    if shuffle { return "\(title) - Shuffle on" }
+    if mode != .off { return "\(title) - \(repeatLabel(mode))" }
+    return title
 }
 
-/// The Up Next sheet's own words (ui/src/app/UpNext.tsx), each as the web says it.
+/// The Up Next sheet's own words (ui/src/app/UpNext.tsx), each as the web says it - but its name.
 public enum UpNextWords {
-    public static let title = "Up Next"
+    /// (R3) The page's name, and every word the app says for it: "Queue" on the phone and the Mac, where the web says
+    /// "Up Next" (James, 25 Nov, the build plan's 3.8, answer 3: "Queue on both"). The types and files keep Up Next's
+    /// name; the web's vectors keep its word, and the tests read them through QueueWord.
+    public static let title = "Queue"
     public static let playingNext = "Playing Next"
     /// History's heading (2.1.3) - drawn nowhere since play history (app 0.8: one list with no headings, James's call),
     /// not even for VoiceOver: there a played row says what it is by its own name ("{title}, play again", `playAgain`),

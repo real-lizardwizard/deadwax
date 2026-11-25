@@ -3,11 +3,11 @@
 The native iPhone app: a SwiftUI app over the `DeadwaxKit` Swift package (its `DeadwaxCore` logic,
 tested on Linux, its `DeadwaxAudio` engine and its `DeadwaxTurntable` drawing), built on a Mac with
 Xcode and a free Apple account. It is early: app 0.13 - Phase 1's player (your library, album pages,
-Up Next, Now Playing, normalization on the phone, the lock screen, plays and picking up where you
+the Queue, Now Playing, normalization on the phone, the lock screen, plays and picking up where you
 left off), Phase 2's albums and songs downloaded to play offline, lyrics on Now Playing, the EQ (ten
 sliders, nine presets and AutoEq's corrections, kept per output) and the turntable on Now Playing (a
 record you can scrub by hand, heard as you turn it, and its speed fader, 0.25x to 2x), and play history
-in Up Next (every song you played, here and on the web, scrolled up past the song playing), and
+in the Queue (every song you played, here and on the web, scrolled up past the song playing), and
 Phase 3's library downloaded by itself, as much as fits - only while charging if you like, and in the
 background when iOS allows - and Phase 4's Library: your playlists read and played, made, added
 to, edited, deleted and downloaded, the Library's switch between its pages (Albums, Playlists and
