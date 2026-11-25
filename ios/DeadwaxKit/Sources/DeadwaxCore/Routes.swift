@@ -127,6 +127,10 @@ public enum Routes {
     public static let searchSongs = Endpoint(method: "GET", path: "/deadwax/search_musicbrainz/songs", query: ["query", "limit", "offset"])
     public static let artistFacts = Endpoint(method: "GET", path: "/deadwax/search_musicbrainz/artist", query: ["mbid"])
     public static let discography = Endpoint(method: "GET", path: "/deadwax/search_musicbrainz/discography", query: ["artist_mbid", "types", "studio_only"])
+    // (Last.fm, slice A1 - deadwax-plans/lastfm.md 2.5, server 2.1.41) An artist's page on Last.fm, their listeners and
+    // top songs, asked by their MusicBrainz id and/or their name - a user's route, answered by 4 s (inside the
+    // transport's 8)
+    public static let lastfmArtist = Endpoint(method: "GET", path: "/deadwax/lastfm/artist", query: ["mbid", "name"])
     // Phase 5, slice 4's (phase5-search.md 6.4): what MusicBrainz's answers saved on deadwax hold matching the words
     // (`SavedSearchAnswer`, server 2.0.0-player.56) - asked beside the library as the words settle, given up after
     // `SearchSaved.waitMs`; the three searches above take `offset` for More from MusicBrainz
@@ -267,6 +271,7 @@ public enum Routes {
         libraryOwned,
         fullySearch, releaseGroup, archiveCover,
         searchArtists, searchSongs, artistFacts, discography,
+        lastfmArtist,
         savedSearch,
         jobs, cancelJob, retryJob, retryJobSame, clearJobs,
         storeState, findCandidates, enqueue, preferences,

@@ -1,0 +1,427 @@
+{
+ "_note": "Written by tests/fixtures/lastfm/export-vectors.cjs - never by hand. `stripped` and `first` are its hand-written cases; `key` is the web TypeScript's own: songs.ts titleKey of `stripped`, owned.ts foldName of the name. src/lastfm.py match_key, name_key and first_credit are held to it by tests/test_lastfm_vectors.py.",
+ "titles": [
+  {
+   "title": "Let It Happen",
+   "stripped": "Let It Happen",
+   "key": "let it happen"
+  },
+  {
+   "title": "Let It Happen - 2015 Remaster",
+   "stripped": "Let It Happen",
+   "key": "let it happen"
+  },
+  {
+   "title": "The Less I Know the Better",
+   "stripped": "The Less I Know the Better",
+   "key": "the less i know the better"
+  },
+  {
+   "title": "Roads - Live",
+   "stripped": "Roads",
+   "key": "roads"
+  },
+  {
+   "title": "Roads (Live)",
+   "stripped": "Roads (Live)",
+   "key": "roads"
+  },
+  {
+   "title": "Roads (live version)",
+   "stripped": "Roads (live version)",
+   "key": "roads"
+  },
+  {
+   "title": "Roads [Live]",
+   "stripped": "Roads [Live]",
+   "key": "roads"
+  },
+  {
+   "title": "Roads (Max Cooper remix)",
+   "stripped": "Roads (Max Cooper remix)",
+   "key": "roads (max cooper remix)"
+  },
+  {
+   "title": "Sour Times - Radio Edit",
+   "stripped": "Sour Times - Radio Edit",
+   "key": "sour times radio edit"
+  },
+  {
+   "title": "Glory Box - Acoustic",
+   "stripped": "Glory Box - Acoustic",
+   "key": "glory box acoustic"
+  },
+  {
+   "title": "Mysterons - Demo",
+   "stripped": "Mysterons - Demo",
+   "key": "mysterons demo"
+  },
+  {
+   "title": "Glory Box (Remastered 2015)",
+   "stripped": "Glory Box (Remastered 2015)",
+   "key": "glory box"
+  },
+  {
+   "title": "Lost in Yesterday (feat. Someone Else)",
+   "stripped": "Lost in Yesterday",
+   "key": "lost in yesterday"
+  },
+  {
+   "title": "Borderline [feat. Someone Else]",
+   "stripped": "Borderline",
+   "key": "borderline"
+  },
+  {
+   "title": "Is It True (with Thundercat)",
+   "stripped": "Is It True",
+   "key": "is it true"
+  },
+  {
+   "title": "Dancing with Myself",
+   "stripped": "Dancing with Myself",
+   "key": "dancing with myself"
+  },
+  {
+   "title": "Song with Strings",
+   "stripped": "Song with Strings",
+   "key": "song with strings"
+  },
+  {
+   "title": "One More Hour feat. Another Band",
+   "stripped": "One More Hour",
+   "key": "one more hour"
+  },
+  {
+   "title": "One More Hour ft. Another Band",
+   "stripped": "One More Hour",
+   "key": "one more hour"
+  },
+  {
+   "title": "One More Hour featuring Another Band",
+   "stripped": "One More Hour",
+   "key": "one more hour"
+  },
+  {
+   "title": "One More Hour Feat. Another Band",
+   "stripped": "One More Hour",
+   "key": "one more hour"
+  },
+  {
+   "title": "One More Hour (Ft. Another Band)",
+   "stripped": "One More Hour",
+   "key": "one more hour"
+  },
+  {
+   "title": "One More Hour (FEATURING Another Band)",
+   "stripped": "One More Hour",
+   "key": "one more hour"
+  },
+  {
+   "title": "One More Hour (feat.Another Band)",
+   "stripped": "One More Hour",
+   "key": "one more hour"
+  },
+  {
+   "title": "One More Hour [ft Another Band]",
+   "stripped": "One More Hour",
+   "key": "one more hour"
+  },
+  {
+   "title": "Hey Jude - Remastered 2009",
+   "stripped": "Hey Jude",
+   "key": "hey jude"
+  },
+  {
+   "title": "Hey Jude - 2015 Mix",
+   "stripped": "Hey Jude - 2015 Mix",
+   "key": "hey jude 2015 mix"
+  },
+  {
+   "title": "Paperback Writer - Mono",
+   "stripped": "Paperback Writer",
+   "key": "paperback writer"
+  },
+  {
+   "title": "Paperback Writer - Stereo Mix",
+   "stripped": "Paperback Writer",
+   "key": "paperback writer"
+  },
+  {
+   "title": "Live Forever - Remastered",
+   "stripped": "Live Forever",
+   "key": "live forever"
+  },
+  {
+   "title": "Live Forever",
+   "stripped": "Live Forever",
+   "key": "live forever"
+  },
+  {
+   "title": "Mono",
+   "stripped": "Mono",
+   "key": "mono"
+  },
+  {
+   "title": "Stereo - Love",
+   "stripped": "Stereo - Love",
+   "key": "stereo love"
+  },
+  {
+   "title": "Deliver - Deliverance",
+   "stripped": "Deliver - Deliverance",
+   "key": "deliver deliverance"
+  },
+  {
+   "title": "Elephant - Live at Wembley - 2011 Remaster",
+   "stripped": "Elephant",
+   "key": "elephant"
+  },
+  {
+   "title": "Elephant - Part 2 - Live",
+   "stripped": "Elephant - Part 2",
+   "key": "elephant part 2"
+  },
+  {
+   "title": "Elephant \u2013 Live",
+   "stripped": "Elephant",
+   "key": "elephant"
+  },
+  {
+   "title": "Elephant\u2014Live",
+   "stripped": "Elephant\u2014Live",
+   "key": "elephant live"
+  },
+  {
+   "title": "Elephant - Live Version",
+   "stripped": "Elephant",
+   "key": "elephant"
+  },
+  {
+   "title": "Elephant - Recorded Live from KEXP",
+   "stripped": "Elephant",
+   "key": "elephant"
+  },
+  {
+   "title": "Elephant (Live) (feat. Someone Else)",
+   "stripped": "Elephant (Live)",
+   "key": "elephant"
+  },
+  {
+   "title": "Elephant (feat. Someone Else) - Live",
+   "stripped": "Elephant",
+   "key": "elephant"
+  },
+  {
+   "title": "Elephant (Remix feat. Someone Else)",
+   "stripped": "Elephant (Remix feat. Someone Else)",
+   "key": "elephant (remix feat someone else)"
+  },
+  {
+   "title": "Elephant (Edit)",
+   "stripped": "Elephant (Edit)",
+   "key": "elephant (edit)"
+  },
+  {
+   "title": "Elephant (A - Live)",
+   "stripped": "Elephant (A - Live)",
+   "key": "elephant (a live)"
+  },
+  {
+   "title": "Feels Like We Only Go Backwards feat. Someone (Live)",
+   "stripped": "Feels Like We Only Go Backwards",
+   "key": "feels like we only go backwards"
+  },
+  {
+   "title": "Feels Like We Only Go Backwards (feat. A & B) [Remastered]",
+   "stripped": "Feels Like We Only Go Backwards [Remastered]",
+   "key": "feels like we only go backwards"
+  },
+  {
+   "title": "1979 - Remastered 2012",
+   "stripped": "1979",
+   "key": "1979"
+  },
+  {
+   "title": "Bohemian Rhapsody - Remastered 2011",
+   "stripped": "Bohemian Rhapsody",
+   "key": "bohemian rhapsody"
+  },
+  {
+   "title": "Caf\u00e9 del Mar",
+   "stripped": "Caf\u00e9 del Mar",
+   "key": "cafe del mar"
+  },
+  {
+   "title": "Don\u2019t Stop Me Now",
+   "stripped": "Don\u2019t Stop Me Now",
+   "key": "don't stop me now"
+  },
+  {
+   "title": "Ain't No Sunshine",
+   "stripped": "Ain't No Sunshine",
+   "key": "ain't no sunshine"
+  },
+  {
+   "title": "Rhythm & Blues",
+   "stripped": "Rhythm & Blues",
+   "key": "rhythm and blues"
+  },
+  {
+   "title": "\u00dcn\u00efc\u00f6d\u00e9 Song!",
+   "stripped": "\u00dcn\u00efc\u00f6d\u00e9 Song!",
+   "key": "unicode song"
+  },
+  {
+   "title": "  Spaced   Out  ",
+   "stripped": "Spaced   Out",
+   "key": "spaced out"
+  },
+  {
+   "title": "Untitled #3",
+   "stripped": "Untitled #3",
+   "key": "untitled 3"
+  },
+  {
+   "title": "Song (Live UK 1998)",
+   "stripped": "Song (Live UK 1998)",
+   "key": "song"
+  }
+ ],
+ "names": [
+  {
+   "name": "Tame Impala",
+   "key": "tame impala",
+   "first": "Tame Impala"
+  },
+  {
+   "name": "The Beatles",
+   "key": "beatles",
+   "first": "The Beatles"
+  },
+  {
+   "name": "Beatles",
+   "key": "beatles",
+   "first": "Beatles"
+  },
+  {
+   "name": "The The",
+   "key": "the",
+   "first": "The The"
+  },
+  {
+   "name": "Theatre of Tragedy",
+   "key": "theatre of tragedy",
+   "first": "Theatre of Tragedy"
+  },
+  {
+   "name": "Simon & Garfunkel",
+   "key": "simon and garfunkel",
+   "first": "Simon & Garfunkel"
+  },
+  {
+   "name": "Simon and Garfunkel",
+   "key": "simon and garfunkel",
+   "first": "Simon and Garfunkel"
+  },
+  {
+   "name": "Earth, Wind & Fire",
+   "key": "earth wind and fire",
+   "first": "Earth, Wind & Fire"
+  },
+  {
+   "name": "Crosby, Stills, Nash & Young",
+   "key": "crosby stills nash and young",
+   "first": "Crosby, Stills, Nash & Young"
+  },
+  {
+   "name": "Tame Impala feat. Kanye West",
+   "key": "tame impala feat kanye west",
+   "first": "Tame Impala"
+  },
+  {
+   "name": "Portishead ft. Someone Else",
+   "key": "portishead ft someone else",
+   "first": "Portishead"
+  },
+  {
+   "name": "Mumford & Sons ft. Baaba Maal",
+   "key": "mumford and sons ft baaba maal",
+   "first": "Mumford & Sons"
+  },
+  {
+   "name": "Kendrick Lamar FEATURING SZA",
+   "key": "kendrick lamar featuring sza",
+   "first": "Kendrick Lamar"
+  },
+  {
+   "name": "Beyonc\u00e9 Feat. JAY-Z",
+   "key": "beyonce feat jay z",
+   "first": "Beyonc\u00e9"
+  },
+  {
+   "name": "Daft Punk \u2022 Pharrell Williams",
+   "key": "daft punk pharrell williams",
+   "first": "Daft Punk"
+  },
+  {
+   "name": "Bj\u00f6rk",
+   "key": "bjork",
+   "first": "Bj\u00f6rk"
+  },
+  {
+   "name": "Sigur R\u00f3s",
+   "key": "sigur ros",
+   "first": "Sigur R\u00f3s"
+  },
+  {
+   "name": "Mot\u00f6rhead",
+   "key": "motorhead",
+   "first": "Mot\u00f6rhead"
+  },
+  {
+   "name": "Guns N\u2019 Roses",
+   "key": "guns n roses",
+   "first": "Guns N\u2019 Roses"
+  },
+  {
+   "name": "Wu-Tang Clan",
+   "key": "wu tang clan",
+   "first": "Wu-Tang Clan"
+  },
+  {
+   "name": "AC/DC",
+   "key": "ac dc",
+   "first": "AC/DC"
+  },
+  {
+   "name": "Florence + the Machine",
+   "key": "florence the machine",
+   "first": "Florence + the Machine"
+  },
+  {
+   "name": "Portishead (UK band)",
+   "key": "portishead",
+   "first": "Portishead (UK band)"
+  },
+  {
+   "name": "Dance Gavin Dance",
+   "key": "dance gavin dance",
+   "first": "Dance Gavin Dance"
+  },
+  {
+   "name": "Various Artists",
+   "key": "various artists",
+   "first": "Various Artists"
+  },
+  {
+   "name": "  Tame   Impala  ",
+   "key": "tame impala",
+   "first": "Tame   Impala"
+  },
+  {
+   "name": "Featherweight",
+   "key": "featherweight",
+   "first": "Featherweight"
+  }
+ ]
+}

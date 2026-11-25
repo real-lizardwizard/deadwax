@@ -49,6 +49,9 @@ ALLOWED = {
         "the EQ's AutoEq on GitHub, under a correction's profile",
     ("Manage/PeopleScreen.swift", "URL(string: People.sharingDoc)"):
         "People's Sharing deadwax guide on GitHub, shown when logins are turned off on deadwax with the app open",
+    ("Artist/TopSongsSection.swift", "LastfmLink.url(lastfmPage)"):
+        "Top Songs' From Last.fm - the artist's page on last.fm (LastfmLink: https on last.fm only, as deadwax "
+        "passes it on)",
 }
 
 #? what the app shares (ShareLink's item), the same way: each a file or words made on the phone, none an address
@@ -666,6 +669,13 @@ def test_each_way_out_goes_to_a_site_that_isnt_deadwax():
     assert len(re.findall(r"let url = page\(\"release(?:-group)?\", (?:release|group)\)", code)) == 2
     # a row's link is set only by AlbumInfoRow's init (and refusals() refuses one set anywhere else)
     assert len(re.findall(r"\.link\s*=(?!=)", bare)) == 1 and "self.link = link" in bare
+    # Top Songs' From Last.fm is LastfmLink.url's alone: an https address on last.fm or a host under it
+    code, _ = views((CORE / "Lastfm.swift").read_text(encoding="utf-8"))
+    link = code[code.index("public enum LastfmLink {"):]
+    link = link[:link.index("\n}\n")]
+    assert 'text.hasPrefix("https://")' in link and '!text.contains("@")' in link
+    assert 'return host == "last.fm" || host.hasSuffix(".last.fm") ? text : nil' in link
+    assert "checked(link).flatMap { URL(string: $0) }" in link
 
 
 def test_the_web_apps_way_out_is_gone():

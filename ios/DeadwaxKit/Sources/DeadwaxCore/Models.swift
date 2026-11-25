@@ -18,6 +18,8 @@ public struct Health: Codable, Sendable, Equatable {
 /// off the user is `local`, the shared account, an admin. `permissions` (2.0.0-player.61) are the names an
 /// admin gave this person - every one for an admin - and `permissions_unverified` says some of them are off
 /// until they sign in again; both absent from a server before then (`Access` reads them as the web does).
+/// `lastfm` (server 2.1.36) is "on", "off" or "refused" - read leniently, as `lastfmState`: absent (an older
+/// deadwax) or anything else is `.absent`, and nothing of Last.fm's is drawn.
 public struct Me: Codable, Sendable, Equatable {
     public let user: String
     public let admin: Bool
@@ -25,21 +27,39 @@ public struct Me: Codable, Sendable, Equatable {
     public let version: String?
     public let permissions: [String]?
     public let permissionsUnverified: Bool?
+    public let lastfm: String?
 
     enum CodingKeys: String, CodingKey {
-        case user, admin, auth, version, permissions
+        case user, admin, auth, version, permissions, lastfm
         case permissionsUnverified = "permissions_unverified"
     }
 
     public init(user: String, admin: Bool, auth: String, version: String? = nil, permissions: [String]? = nil,
-                permissionsUnverified: Bool? = nil) {
+                permissionsUnverified: Bool? = nil, lastfm: String? = nil) {
         self.user = user
         self.admin = admin
         self.auth = auth
         self.version = version
         self.permissions = permissions
         self.permissionsUnverified = permissionsUnverified
+        self.lastfm = lastfm
     }
+
+    /// Decoded as the synthesized decoder did, but `lastfm` leniently: a word of another type is none, never a
+    /// failed /me. (Encoding is still synthesized - ServerModel keeps the answer as me.json.)
+    public init(from decoder: any Decoder) throws {
+        let fields = try decoder.container(keyedBy: CodingKeys.self)
+        user = try fields.decode(String.self, forKey: .user)
+        admin = try fields.decode(Bool.self, forKey: .admin)
+        auth = try fields.decode(String.self, forKey: .auth)
+        version = try fields.decodeIfPresent(String.self, forKey: .version)
+        permissions = try fields.decodeIfPresent([String].self, forKey: .permissions)
+        permissionsUnverified = try fields.decodeIfPresent(Bool.self, forKey: .permissionsUnverified)
+        lastfm = fields.looseField(String.self, .lastfm)
+    }
+
+    /// What deadwax says of Last.fm.
+    public var lastfmState: LastfmState { LastfmState(said: lastfm) }
 
     public var loginsOn: Bool { auth == "on" }
     /// The answer's own name for `permissionsUnverified`.

@@ -17,6 +17,12 @@ import Observation
 /// And (15 Nov, the albums you don't have) their albums on MusicBrainz, once who they are there is known
 /// (ArtistJoin.mbid): asked and kept by a MusicBrainz artist's page's own model, so the session's answers, Studio only and
 /// a row's id bridge are that page's - `theirAlbums`.
+///
+/// And (Last.fm, slice A1 - deadwax-plans/lastfm.md 3.1-3.3, notes/ios.md "Last.fm, slice A1") their Last.fm answer:
+/// the session's kept one (ArtistsModel, beside their own) drawn at once, else asked once their own answer is in hand,
+/// under the page and artist and who they are (`askLastfm`); what lies below Play waiting for it `LastfmPage.waitMs` at
+/// most (`arrival`), Top Songs going where Core's LastfmPage.placeOf puts it; and its rows met with the albums' songs
+/// (`topRows`). A top song you don't have opens its album through `opener`.
 @MainActor
 @Observable
 final class ArtistPageModel {
@@ -46,6 +52,28 @@ final class ArtistPageModel {
     @ObservationIgnored private var mbidMade: (answer: ArtistWithAlbums?, owned: Int, mbid: String?)?
     @ObservationIgnored private var rowsMade: (albums: [Album], groups: [ReleaseGroup]?, owned: Int, rows: [ArtistJoin.Row])?
 
+    /// (Last.fm, slice A1) Last.fm's answer for the artist - the session's kept one at once, then deadwax's; nil before
+    /// either.
+    private(set) var lastfm: LastfmArtist?
+    /// What lies below Play waiting for it, and where Top Songs went - for one page and artist (`page`, the view's
+    /// taskKey).
+    private(set) var arrival: LastfmArrival?
+    /// A top song you don't have, opening its album.
+    let opener = TopSongOpener()
+    /// Who the answer in hand (or a failure the session keeps) was asked about (LastfmPage.Ask.key): asked again only
+    /// for someone else, or with `again`.
+    @ObservationIgnored private var lastfmAsked: String?
+    @ObservationIgnored private var lastfmAsks = 0
+    /// The page and artist whose wait has begun (their own answer in hand).
+    @ObservationIgnored private var waitBegun: String?
+    /// Top Songs' rows as last made, with what they were made from (the page is drawn again as each album lands).
+    @ObservationIgnored private var topMade: (top: [LastfmTrack], albums: [Album]?, unknown: Bool, rows: [TopSongs.Row])?
+    /// Why Last.fm's answer didn't come, with nothing of it drawn - for the Top Songs page's own ask (TopSongsScreen).
+    private(set) var lastfmFailure: (any Error)?
+    /// The page and artist whose hero has drawn Last.fm's line (LastfmPage.drawsLine): its height kept for the page's
+    /// life, so Play never moves (`LastfmPage.shown`'s `reserved` - the review of A1).
+    @ObservationIgnored private var lineKeptFor: String?
+
     init(route: ArtistRoute) {
         self.route = route
     }
@@ -71,6 +99,16 @@ final class ArtistPageModel {
         let rows = ArtistJoin.rows(albums: albums, groups: groups, index: index)
         rowsMade = (albums, groups, version, rows)
         return rows
+    }
+
+    /// Their albums: the answer's - or, while deadwax can't be reached, the answer in hand, else the albums on this phone
+    /// naming them (ArtistOffline.albums).
+    func albums(online: Bool, downloads: DownloadModel) -> [Album] {
+        if online || answer != nil { return answer?.album ?? [] }
+        let downloaded = downloads.downloadedAlbums.compactMap { (album: IndexAlbum) -> Album? in
+            downloads.keptAlbum(album.id)
+        }
+        return ArtistOffline.albums(answer: nil, artistId: route.id, downloaded: downloaded)
     }
 
     /// What Navidrome has said of their albums, for the line under the buttons (playsLine's `library`).
@@ -200,4 +238,128 @@ final class ArtistPageModel {
             }
         }
     }
+
+    // MARK: Last.fm (slice A1)
+
+    /// The arrival for the page and artist `page`: the model's once begun - else what it begins as, so the first frame
+    /// draws as the begun page will (`kept`, the session's answer for the artist: with one there is no wait).
+    func arrival(page: String, state: LastfmState, online: Bool, kept: LastfmPage.Kept.Entry?) -> LastfmPage.Arrival {
+        if let arrival, arrival.page == page { return arrival.value }
+        return Self.firstArrival(state: state, online: online, kept: kept)
+    }
+
+    private static func firstArrival(state: LastfmState, online: Bool,
+                                     kept: LastfmPage.Kept.Entry?) -> LastfmPage.Arrival {
+        LastfmPage.Arrival(state: state, online: online, kept: kept.map { LastfmPage.present($0.held.answer) })
+    }
+
+    /// A page and artist begun (once): the session's answer drawn, the arrival as its first frame drew it.
+    private func beginLastfm(page: String, state: LastfmState, online: Bool, artists: ArtistsModel) {
+        guard arrival?.page != page else { return }
+        let kept = artists.keptLastfm(route.id)
+        arrival = LastfmArrival(page: page, value: Self.firstArrival(state: state, online: online, kept: kept))
+        lastfm = kept?.held.answer
+        lastfmAsked = kept?.asked
+        lastfmAsks += 1
+        lastfmFailure = nil
+        waitBegun = nil
+        topMade = nil
+        opener.forget()
+    }
+
+    /// Whether the page has drawn the hero's Last.fm line (`keepLine`) - the hero keeps its height from then on.
+    func lineKept(page: String) -> Bool { lineKeptFor == page }
+
+    /// The hero's line drawn for the page as things are now (the same rule the page draws by): kept for its life.
+    private func keepLine(page: String, state: LastfmState, online: Bool) {
+        if LastfmPage.drawsLine(state: LastfmPage.state(me: state, answer: lastfm), online: online, answer: lastfm) {
+            lineKeptFor = page
+        }
+    }
+
+    /// Last.fm's answer for who they are now - `ask` nil while nothing says (their answer isn't in hand: `inHand`).
+    /// Never while /me says Last.fm isn't on or deadwax can't be reached: the page waits no more. Asked again only for
+    /// someone else, or with `again` (a pull) - the answer in hand drawn meanwhile. Their own answer in hand starts the
+    /// wait. The ask is an unstructured task, as the albums' songs are: a page covered by another keeps asking, and only
+    /// the newest answer for the page lands; one that fails keeps what is drawn (the session keeps the failure a minute
+    /// only while nothing is).
+    ///
+    /// `retryFailed` (the Top Songs page's own): a failure the session keeps, with nothing drawn, is asked again at once
+    /// rather than waited out - that page has nothing else to show.
+    func askLastfm(page: String, ask: LastfmPage.Ask?, inHand: Bool, state: LastfmState, client: DeadwaxClient?,
+                   online: Bool, artists: ArtistsModel, again: Bool = false, retryFailed: Bool = false) {
+        beginLastfm(page: page, state: state, online: online, artists: artists)
+        keepLine(page: page, state: state, online: online)
+        guard state == .on, online, let client else {
+            arrival?.value.release()
+            return
+        }
+        if inHand { wait(page: page) }
+        let again = again || (retryFailed && lastfm == nil)
+        guard let ask, again || ask.key != lastfmAsked else { return }
+        lastfmAsks += 1
+        let asked = lastfmAsks
+        let id = route.id
+        if again { lastfmFailure = nil }
+        Task { [weak self] in
+            let found: LastfmArtist?
+            var failure: (any Error)?
+            do {
+                found = try await client.lastfmArtist(mbid: ask.mbid, name: ask.name)
+            } catch {
+                if APIFailure.isCancellation(error) { return }
+                found = nil
+                failure = error
+            }
+            guard let self, asked == self.lastfmAsks, self.arrival?.page == page else { return }
+            if let found {
+                self.lastfm = found
+                self.lastfmAsked = ask.key
+                self.lastfmFailure = nil
+                artists.keepLastfm(id, found, asked: ask.key)
+            } else if self.lastfm == nil {
+                self.lastfmFailure = failure
+                artists.keepLastfm(id, nil, asked: ask.key)
+            }
+            self.keepLine(page: page, state: state, online: true)
+            self.arrival?.value.answered(present: LastfmPage.present(self.lastfm))
+        }
+    }
+
+    /// Their own answer in hand: what lies below Play waits `LastfmPage.waitMs` more at most.
+    private func wait(page: String) {
+        guard waitBegun != page, arrival?.value.holding == true else { return }
+        waitBegun = page
+        Task { [weak self] in
+            try? await Task.sleep(nanoseconds: UInt64(LastfmPage.waitMs) * 1_000_000)
+            guard let self, self.arrival?.page == page else { return }
+            self.arrival?.value.release()
+        }
+    }
+
+    /// Top Songs' rows (TopSongs.rows): the answer's songs met with the page's albums' songs (`mine`, the page's rows of
+    /// its albums) - once every album's songs have come or failed; while deadwax can't be reached, with what is in hand
+    /// of them (the page's, or this phone's). Before then each row waits; an album of theirs whose songs aren't in hand
+    /// (TopSongs.library) makes a song no album in hand has `.unknown`, never "Not in your library". Made once for what
+    /// they are made from: the page is drawn again as each album lands.
+    func topRows(_ mine: [ArtistPage.Row], online: Bool, downloads: DownloadModel) -> [TopSongs.Row] {
+        let order = ArtistPage.playOrder(mine)
+        let library = online && answer == nil ? nil
+            : TopSongs.library(order: order, asks: asks, online: online) { (id: String) -> Album? in
+                downloads.keptAlbum(id)
+            }
+        let top = lastfm?.topSongs ?? []
+        let albums = library?.albums
+        let unknown = library?.unknown ?? false
+        if let made = topMade, made.top == top, made.albums == albums, made.unknown == unknown { return made.rows }
+        let rows = TopSongs.rows(top, albums: albums, unknown: unknown)
+        topMade = (top, albums, unknown, rows)
+        return rows
+    }
+}
+
+/// An artist page's Last.fm arrival (LastfmPage.Arrival), for the page and artist it began for.
+struct LastfmArrival {
+    let page: String
+    var value: LastfmPage.Arrival
 }

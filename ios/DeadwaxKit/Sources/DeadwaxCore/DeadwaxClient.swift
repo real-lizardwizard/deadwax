@@ -444,6 +444,20 @@ public struct DeadwaxClient: Sendable {
         try await call(Routes.artistFacts, as: MBArtistFacts.self, query: [("mbid", mbid)])
     }
 
+    /// (Last.fm, slice A1) An artist's Last.fm answer (`Routes.lastfmArtist`): asked by their MusicBrainz id and their
+    /// name, each sent only as the route takes it (LastfmPage.Ask: an id that is one, a name trimmed and not too long)
+    /// - always answered while deadwax is in reach: Last.fm off, refused or away is said in the answer, never as a
+    /// failure. With neither to send, nothing is asked: `APIFailure.other`.
+    public func lastfmArtist(mbid: String?, name: String?) async throws -> LastfmArtist {
+        guard let ask = LastfmPage.Ask(mbid: mbid, name: name) else {
+            throw APIFailure.other("an artist with neither a MusicBrainz id nor a name")
+        }
+        var query: [(String, String)] = []
+        if let mbid = ask.mbid { query.append(("mbid", mbid)) }
+        if let name = ask.name { query.append(("name", name)) }
+        return try await call(Routes.lastfmArtist, as: LastfmArtist.self, query: query)
+    }
+
     /// A MusicBrainz artist's albums (`Routes.discography`), as the web's artist page asks them: their albums
     /// (`types=album`), the studio ones alone with `studioOnly` - `problem` when MusicBrainz broke the list off.
     public func discography(mbid: String, studioOnly: Bool) async throws -> DiscographyAnswer {

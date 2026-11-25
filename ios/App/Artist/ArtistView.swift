@@ -36,6 +36,15 @@ import SwiftUI
 /// folders deadwax is asked about (ArtistToolsModel) - only for someone the ••• has something for. Who they are is
 /// chosen for the visit (ArtistsModel.choose), the page saying so under their name; a save draws the square from their
 /// folder; a move asks the page again, now and once Navidrome has scanned.
+///
+/// LAST.FM (slice A1 - deadwax-plans/lastfm.md 3.1-3.3; notes/ios.md "Last.fm, slice A1"; James, 24 Nov: "can we add in
+/// a list of the 10 most popular songs for the artist page?"): with deadwax's Last.fm on, "2.3M listeners" under their
+/// name - its line kept from the first frame, so Play never moves as it fills - and Top Songs (TopSongsSection) between
+/// Play and the albums: its first five, See All for the ten, "From Last.fm" under them. Asked once their own answer is in
+/// hand (ArtistPageModel.askLastfm), everything below Play waits for it `LastfmPage.waitMs` at most, with no spinner; an
+/// answer later than that puts Top Songs after the albums for the page's life (LastfmPage.placeOf); the session's answer
+/// draws at once, in place. With Last.fm off or refused nothing of it is drawn - and for whoever runs deadwax the page's
+/// foot says so, with Server settings to open its Connections.
 struct ArtistView: View {
     let route: ArtistRoute
 
@@ -76,6 +85,25 @@ struct ArtistView: View {
     /// Who they are was chosen here, and nothing else says (the web's `byChoice`).
     private var byChoice: Bool { said == nil && artists.chosen[route.id] != nil }
 
+    /// (Last.fm) Who Last.fm is asked about - their MusicBrainz id, when known, and their name - once their answer is in
+    /// hand.
+    private var lastfmAsk: LastfmPage.Ask? {
+        guard let answer = model.answer else { return nil }
+        return LastfmPage.Ask(mbid: mbid, name: answer.name)
+    }
+
+    /// (Last.fm) Last.fm asked (or the page told it won't be) for the page, who they are, whether deadwax says Last.fm is
+    /// on, and whether it can be reached - so only the newest ask's answer draws.
+    private var lastfmKey: String {
+        "\(taskKey)|\(lastfmAsk?.key ?? "")|\(model.answer != nil)|\(server.access.lastfm)|\(reachability.online)"
+    }
+
+    /// (Last.fm) Last.fm's answer asked for now - or, with `again`, asked again (a pull).
+    private func askLastfm(again: Bool = false) {
+        model.askLastfm(page: taskKey, ask: lastfmAsk, inHand: model.answer != nil, state: server.access.lastfm,
+                        client: server.client, online: reachability.online, artists: artists, again: again)
+    }
+
     /// MusicBrainz's albums of theirs to draw: online, once `/library/owned` has answered or been waited for, the answer
     /// for the question asked now - or, while Studio only is asked again, the last one, kept on screen.
     private func theirGroups(online: Bool) -> [ReleaseGroup]? {
@@ -93,9 +121,15 @@ struct ArtistView: View {
                               version: search.ownedVersion)
         let managing = self.managing()
         let offered = self.offered(managing, online: online)
+        // (Last.fm) what of it the page draws, and whether what lies below Play waits for it
+        let lastfm = LastfmPage.shown(state: LastfmPage.state(me: server.access.lastfm, answer: model.lastfm),
+                                      online: online, answer: model.lastfm, seesDetail: server.access.seesDetail,
+                                      reserved: model.lineKept(page: taskKey))
+        let arrival = model.arrival(page: taskKey, state: server.access.lastfm, online: online,
+                                    kept: artists.keptLastfm(route.id))
         ScrollView {
             LazyVStack(alignment: .leading, spacing: 0) {
-                hero(managing)
+                hero(managing, lastfm: lastfm)
                     .onAppear { nameInBar = false }
                     .onDisappear { nameInBar = true }
                 if model.answer == nil && !online && mine.isEmpty {
@@ -112,7 +146,14 @@ struct ArtistView: View {
                     .padding(.top, 8)
                 } else {
                     plays(rows: mine, online: online, personal: personal)
-                    albumsList(rows, albums: albums, online: online, personal: personal)
+                    if !arrival.holding {
+                        let top = lastfm.topSongs ? topRows(mine, online: online) : []
+                        if !top.isEmpty && arrival.place == .inPlace { topSongs(top) }
+                        albumsList(rows, albums: albums, online: online, personal: personal)
+                        // an answer that came once the albums were drawn: after them, for the page's life
+                        if !top.isEmpty && arrival.place != .inPlace { topSongs(top) }
+                    }
+                    if let foot = lastfm.foot { lastfmFoot(foot) }
                 }
             }
             .padding(.horizontal, Self.edge)
@@ -164,6 +205,10 @@ struct ArtistView: View {
             if !Task.isCancelled { ownedWaited = true }
         }
         .task { await downloads.followProgress() }
+        // (Last.fm) asked once their answer is in hand, for who they are now; the page shown is the one its Top Songs
+        // page reads
+        .task(id: lastfmKey) { askLastfm() }
+        .onAppear { artists.showing(model) }
         .pullToRefresh {
             // deadwax out of reach: a pull asks whether it is back (the banner says why nothing changes)
             guard reachability.online else {
@@ -174,6 +219,7 @@ struct ArtistView: View {
             if model.asks.someMissing { model.again(client: server.client) }
             model.theirAlbums(mbid: mbid, client: server.client, online: true, retry: true)
             summaryAsks += 1
+            askLastfm(again: true)
         }
         .onChange(of: reachability.online) { _, online in
             // back: what the page couldn't ask is asked of deadwax now - the songs that didn't come with it
@@ -186,6 +232,12 @@ struct ArtistView: View {
             if shown { model.discography?.standDown() }
         }
         .onDisappear { model.discography?.standDown() }
+        // (Last.fm) and a top song's row asking for its album, the same way
+        .onChange(of: navigation.tab) { _, _ in model.opener.standDown() }
+        .onChange(of: navigation.nowPlayingShown) { _, shown in
+            if shown { model.opener.standDown() }
+        }
+        .onDisappear { model.opener.standDown() }
     }
 
     /// The artist asked again (Try again, deadwax back) - and the albums whose songs didn't come, and their albums on
@@ -205,11 +257,7 @@ struct ArtistView: View {
     /// Their albums: the answer's - or, while deadwax can't be reached, the answer in hand, else the albums on this phone
     /// naming them (ArtistOffline.albums).
     private func albums(online: Bool) -> [Album] {
-        if online || model.answer != nil { return model.answer?.album ?? [] }
-        let downloaded = downloads.downloadedAlbums.compactMap { (album: IndexAlbum) -> Album? in
-            downloads.keptAlbum(album.id)
-        }
-        return ArtistOffline.albums(answer: nil, artistId: route.id, downloaded: downloaded)
+        model.albums(online: online, downloads: downloads)
     }
 
     // MARK: the hero
@@ -217,7 +265,7 @@ struct ArtistView: View {
     /// Their picture and name - (Phase 8, slice 5) the square from their folder once Artist images wrote to it while the
     /// app runs, or where Navidrome has none (the web's `square`: Navidrome keeps its own copy of the picture it had);
     /// and, who they are chosen here, that it was.
-    private func hero(_ managing: ArtistManaged) -> some View {
+    private func hero(_ managing: ArtistManaged, lastfm: LastfmPage.Shown) -> some View {
         VStack(spacing: 0) {
             Group {
                 if let square = managing.square(navidrome: model.coverArt, written: { (path: String) -> Int in
@@ -238,6 +286,16 @@ struct ArtistView: View {
                 .lineLimit(3)
                 .padding(.top, 18)
                 .accessibilityAddTraits(.isHeader)
+            // (Last.fm) "2.3M listeners": its line there from the first frame whenever it can be drawn, blank until (and
+            // unless) the answer says - so nothing under it moves
+            if lastfm.heroLine {
+                Text(lastfm.listeners ?? " ")
+                    .font(Typeface.footnote)
+                    .foregroundStyle(Palette.quiet)
+                    .lineLimit(1)
+                    .padding(.top, 4)
+                    .accessibilityHidden(lastfm.listeners == nil)
+            }
             if byChoice {
                 Text(ArtistManageWords.chosen)
                     .font(Typeface.footnote)
@@ -247,6 +305,36 @@ struct ArtistView: View {
             }
         }
         .frame(maxWidth: .infinity)
+    }
+
+    // MARK: Last.fm (slice A1)
+
+    /// Top Songs' rows, met with the page's albums' songs (ArtistPageModel.topRows).
+    private func topRows(_ mine: [ArtistPage.Row], online: Bool) -> [TopSongs.Row] {
+        model.topRows(mine, online: online, downloads: downloads)
+    }
+
+    /// Top Songs: the heading with See All, the first five, and the credit.
+    private func topSongs(_ rows: [TopSongs.Row]) -> some View {
+        TopSongsSection(rows: rows, route: route, name: model.name, mbid: mbid, credit: model.lastfm?.url,
+                        opener: model.opener)
+    }
+
+    /// The foot line, for whoever runs deadwax while Last.fm is off or refused - and Server settings, to its Connections,
+    /// where LASTFM_API_KEY is.
+    private func lastfmFoot(_ words: String) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(words)
+                .font(Typeface.footnote)
+                .foregroundStyle(Palette.quiet)
+                .fixedSize(horizontal: false, vertical: true)
+            Button(LastfmWords.serverSettings) {
+                navigation.open(.serverSettingsGroup(ServerSettings.connectionsGroup))
+            }
+            .font(Typeface.footnote)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.top, 28)
     }
 
     // MARK: the artist tools (Phase 8, slice 5)

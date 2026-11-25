@@ -91,6 +91,8 @@ enum AppRoute: Hashable {
     /// (Phase 5, slice 3) A MusicBrainz artist's page (question 9): their albums, by their MusicBrainz id - from Search's
     /// MusicBrainz artists and the album you don't have's credit.
     case mbArtist(MBArtistRoute)
+    /// (Last.fm, slice A1) An artist's Top Songs (TopSongsScreen): all of Last.fm's ten - from their page's See All.
+    case topSongs(ArtistRoute)
     /// (Phase 8, slice 1) Settings > Manage > Edit an album: Choose the folder - any folder of the library, its Edit
     /// album opened over the tabs.
     case chooseFolder
@@ -836,6 +838,7 @@ extension View {
                 case .allSongs: SongsScreen()
                 case .group(let group): GroupView(route: group).readableOnMac()
                 case .mbArtist(let artist): MBArtistView(route: artist).readableOnMac()
+                case .topSongs(let artist): TopSongsScreen(route: artist).readableOnMac()
                 // (the Mac app, slice 7) Manage's pages at the same readable width - the web's desktop draws Needs a
                 // look, Server settings, the event log and Library care so - their lists' rows never a window wide
                 case .chooseFolder: ChooseFolderScreen().readableOnMac()

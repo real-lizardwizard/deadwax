@@ -121,7 +121,7 @@ from src.store import JobStore  # noqa: E402
 
 CORE = Path(__file__).resolve().parent.parent / "ios" / "DeadwaxKit" / "Sources" / "DeadwaxCore"
 ENDPOINT = re.compile(r'Endpoint\(method: "(\w+)", path: "([^"]+)", query: \[([^\]]*)\]\)')
-ROUTE_COUNT = 110
+ROUTE_COUNT = 111
 RAW_OPENING = re.compile(r'#+"')
 HASHES = re.compile(r"#*")
 
@@ -430,7 +430,7 @@ def test_what_the_app_reads_is_what_it_names():
     assert required_fields("Health") == {"status"}
     assert required_fields("Me") == {"user", "admin", "auth"}
     # what /me says since 2.0.0-player.61 is read when there, and an older server's answer still reads
-    assert {"version", "permissions", "permissions_unverified"} <= {name for name, optional in fields("Me").items() if optional}
+    assert {"version", "permissions", "permissions_unverified", "lastfm"} <= {name for name, optional in fields("Me").items() if optional}
     assert required_fields("SearchResult") == {"albums", "songs"}
     # Navidrome's answers pass through deadwax as they are: the app needs only the id, and reads the rest leniently
     assert required_fields("Album") == {"id"}
@@ -2148,3 +2148,121 @@ def test_the_app_waits_for_an_albums_files_as_long_as_the_route_takes():
     assert timeouts["libraryTracks"] > settle
     # and only two folders are read at once (a box set's ten folders never all spin a disk together)
     assert re.search(r"public static let foldersAtOnce = 2\n", album_info)
+
+
+# ---------------------------------------------------------------------------- Last.fm, slice A1: Top Songs
+
+def test_mes_word_for_lastfm_is_one_the_app_knows(monkeypatch):
+    # /me's `lastfm` (server 2.1.36): the three words LastfmState reads, and nothing else - anything else is `absent`
+    # on the phone, which draws nothing of Last.fm's
+    from src.api import lastfm_endpoint
+
+    said = set(re.findall(r'return "(\w+)"', inspect.getsource(lastfm_endpoint.LastfmClient.state)))
+    said |= set(re.findall(r'else "(\w+)"', inspect.getsource(lastfm_endpoint.LastfmClient.state)))
+    assert said == {"off", "refused", "on"}
+    state = _code((CORE / "Lastfm.swift").read_text(encoding="utf-8"))
+    for word in said:
+        assert f'case "{word}": self = .{word}' in state
+    assert fields("Me")["lastfm"] is True
+
+
+def test_lastfms_answer_is_what_the_app_decodes(monkeypatch):
+    # (server 2.1.41, built on main beside slice A1: this FAILS on the ios branch until main is merged into it)
+    # GET /deadwax/lastfm/artist, asked with only what it takes, and every answer it builds - no key, refused,
+    # whole, a part late - holding what LastfmArtist and LastfmTrack read: only a track's title is needed
+    from src import lastfm as lastfm_rules
+    from src.routes import lastfm as lastfm_route
+
+    route = app_routes()[("GET", "/deadwax/lastfm/artist")]
+    params = {field.alias: field for field in route.dependant.query_params}
+    assert set(params) == {"mbid", "name"}
+    assert declared_query("lastfmArtist") == ["mbid", "name"]
+    # the name: 1-200 letters - the app's nameMax - and an id the route's pattern takes (MBID.of: lowercase)
+    assert lastfm_route.NAME_MAX == int(re.search(r"public static let nameMax = (\d+)\n",
+                                                  (CORE / "LastfmPage.swift").read_text(encoding="utf-8")).group(1))
+    assert "mbid: str | None = Query(None, pattern=MBID_PATTERN)" in inspect.getsource(lastfm_route.lastfm_artist)
+    assert lastfm_route.MBID_PATTERN == search_musicbrainz.MBID_PATTERN
+    assert "name = (name or \"\").strip() or None" in inspect.getsource(lastfm_route.lastfm_artist)
+    body = swift_function("DeadwaxClient.swift", "lastfmArtist")
+    assert 'if let mbid = ask.mbid { query.append(("mbid", mbid)) }' in body
+    assert 'if let name = ask.name { query.append(("name", name)) }' in body
+    # what the app reads
+    assert fields("LastfmArtist") == {"enabled": False, "unavailable": False, "why": True, "url": True,
+                                      "listeners": True, "top_songs": True}
+    assert fields("LastfmTrack") == {"title": False, "playcount": True, "listeners": True, "url": True}
+    # the answers the route builds
+    tracks = {"artist_url": "https://www.last.fm/music/Tame+Impala",
+              "top_songs": [{"title": "Let It Happen", "playcount": 12, "listeners": 3,
+                             "url": "https://www.last.fm/music/Tame+Impala/_/Let+It+Happen"}]}
+    info = {"url": "https://www.last.fm/music/Tame+Impala", "listeners": 2345678}
+    refusal = lastfm_rules.Refused(10, "Invalid API key", 0.0)
+    answers = [lastfm_rules.no_key_answer(),
+               lastfm_rules.artist_answer(lastfm_rules.Answer(info), lastfm_rules.Answer(tracks), None),
+               lastfm_rules.artist_answer(lastfm_rules.Answer(info), None, None),
+               lastfm_rules.artist_answer(None, None, refusal),
+               lastfm_rules.artist_answer(lastfm_rules.NotKnown(), lastfm_rules.NotKnown(), None)]
+    for answer in answers:
+        assert set(answer) == set(fields("LastfmArtist")), answer
+        assert_decodes("LastfmArtist", answer)
+        for song in answer["top_songs"] or []:
+            assert set(song) == set(fields("LastfmTrack")), song
+            assert_decodes("LastfmTrack", song)
+    whole = answers[1]
+    assert whole["enabled"] and not whole["unavailable"] and whole["listeners"] == 2345678
+    assert whole["top_songs"][0]["title"] == "Let It Happen"
+    # refused with nothing kept: not enabled, and unavailable - the app's `refused` (LastfmPage.state); no key: off
+    assert not answers[3]["enabled"] and answers[3]["unavailable"]
+    assert not answers[0]["enabled"] and not answers[0]["unavailable"]
+    # a part the deadline passed: unavailable, so the app keeps the answer a moment only
+    assert answers[2]["unavailable"] and answers[2]["top_songs"] is None
+    # the list's length is the app's: TopSongs.most, TopSongs.shown on the page
+    top = (CORE / "TopSongs.swift").read_text(encoding="utf-8")
+    assert f"public static let most = {lastfm_rules.TOP_SONGS}\n" in top
+    # the route answers within its own deadline, inside the transport's 8 s: no timeout of its own
+    text = (CORE / "Routes.swift").read_text(encoding="utf-8")
+    literal = re.search(r"public static let timeouts: \[Endpoint: Double\] = \[([^\]]*)\]", text)
+    assert "lastfmArtist" not in literal.group(1)
+    transport = (Path(__file__).resolve().parent.parent / "ios" / "App" / "URLSessionTransport.swift").read_text(
+        encoding="utf-8")
+    standard = float(re.search(r"static let standardTimeout: Double = ([\d.]+)\n", transport).group(1))
+    assert lastfm_route.ARTIST_DEADLINE_S < standard
+    # the route's own answers as exported for the app's tests (tests/fixtures/lastfm/answers.py; tests/test_lastfm_routes.py
+    # holds the copy to the route): each read whole, each asked as the app asks - an id the route's pattern takes, a
+    # name it takes, never an empty part
+    exported = json.loads((CORE.parent.parent / "Tests" / "DeadwaxCoreTests" / "Fixtures" / "lastfm" / "answers"
+                           / "artist.json").read_text(encoding="utf-8"))
+    assert exported["fixtures"] == "recorded" and len(exported["cases"]) >= 9
+    for case in exported["cases"]:
+        answer = case["answer"]
+        assert case["path"] == "/deadwax/lastfm/artist" and case["status"] == 200, case["name"]
+        assert set(answer) == set(fields("LastfmArtist")), case["name"]
+        assert_decodes("LastfmArtist", answer)
+        for song in answer["top_songs"] or []:
+            assert set(song) == set(fields("LastfmTrack")), song
+            assert_decodes("LastfmTrack", song)
+            assert song["url"] is None or lastfm_rules.lastfm_url(song["url"]) == song["url"]
+        assert set(case["query"]) <= {"mbid", "name"} and case["query"]
+        if "mbid" in case["query"]:
+            assert re.fullmatch(search_musicbrainz.MBID_PATTERN, case["query"]["mbid"])
+        if "name" in case["query"]:
+            assert 1 <= len(case["query"]["name"]) <= lastfm_route.NAME_MAX
+            assert case["query"]["name"] == case["query"]["name"].strip()
+    # the links: the route passes on only an https address on last.fm, as LastfmLink takes it
+    assert lastfm_rules.URL_MAX == int(re.search(r"public static let most = (\d+)\n",
+                                                 (CORE / "Lastfm.swift").read_text(encoding="utf-8")).group(1))
+    taken = {"https://www.last.fm/x", "https://www.last.fm:443/music/X", "https://www.last.fm/music/Sigur+R%C3%B3s"}
+    for link in [*taken, "http://www.last.fm/x", "https://notlast.fm/x", "https://a@last.fm/x",
+                 "https://evil.example\\.last.fm/x", "https://evil.com%2elast.fm/", "https://%6Cast.fm/x"]:
+        assert (lastfm_rules.lastfm_url(link) is None) == (link not in taken), link
+    # and LastfmLink reads the host as written, as urlparse does (a percent in it refused)
+    assert "URLComponents(string: text)?.percentEncodedHost, !written.contains(\"%\")" in _code(
+        (CORE / "Lastfm.swift").read_text(encoding="utf-8"))
+
+
+def declared_query(name: str) -> list[str]:
+    """The query an Endpoint of Routes.swift is declared with, by its name."""
+    text = (CORE / "Routes.swift").read_text(encoding="utf-8")
+    found = re.search(r"public static let " + name + r' = Endpoint\(method: "\w+", path: "[^"]+", query: \[([^\]]*)\]\)',
+                      text)
+    assert found, name
+    return re.findall(r'"(\w+)"', found.group(1))

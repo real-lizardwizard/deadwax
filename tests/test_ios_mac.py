@@ -424,7 +424,7 @@ def test_the_window_comes_back_on_the_page_it_showed():
 
 #? a song's row: its own •••'s request, on a right-click
 SONG_ROWS = {"Album/TrackRow.swift": 1, "Library/SongsScreen.swift": 1, "Playlists/PlaylistView.swift": 1,
-             "Search/SearchScreen.swift": 1}
+             "Search/SearchScreen.swift": 1, "Artist/TopSongsSection.swift": 1}
 #? an album's tile or row: the album page's •••; a playlist's row: its page's
 ALBUM_TILES = {"Library/LibraryTiles.swift": 2, "Search/SearchScreen.swift": 1, "Artist/ArtistView.swift": 1}
 PLAYLIST_ROWS = {"Playlists/PlaylistsScreen.swift": 1}
@@ -1015,7 +1015,7 @@ def test_the_grids_and_the_readable_pages():
     routes = bare(app["Shared/Routes.swift"])
     destinations = routes[routes.index("func appRoutes() -> some View {"):]
     readable = re.findall(r"case \.(\w+)\(let \w+\): [^\n]*\.readableOnMac\(\)", destinations)
-    assert readable == ["album", "artist", "group", "mbArtist", "serverSettingsGroup", "person"]
+    assert readable == ["album", "artist", "group", "mbArtist", "topSongs", "serverSettingsGroup", "person"]
     mac = bare(app[PLATFORM]).split("\n#else\n")[0]
     #? (slice 3's review) the room either side given to the page's scroll view as its content's margins, never the
     #? scroll view narrowed: the page scrolls anywhere across it, its scroll bar at the page's edge

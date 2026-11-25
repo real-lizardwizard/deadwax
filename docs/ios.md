@@ -25,7 +25,8 @@ to, edited and deleted on the phone as in the web app, and downloaded to play wi
 change (see [Playlists](#playlists)); the Library's switch - Albums | Playlists | Artists, and Songs with logins off
 (with them on, every song is under All music > All songs), swiped between, in the order you choose - and a pull down
 that shuffles your whole library (see [The Library](#the-library)); **artists** - your artists, and an artist's page
-with their albums, Play and Shuffle (see [Artists](#artists)); and **songs** - every song, a page at a time, each
+with their albums, Play and Shuffle, and (with a Last.fm key on deadwax) their listeners and Top Songs (see
+[Artists](#artists)); and **songs** - every song, a page at a time, each
 opening its album (see [Songs](#songs)). **This is app 0.11, Phase 5's Search**: your library and MusicBrainz searched
 as the web app's Search searches them, in one list - Top results, then artists, albums and songs, yours first - a song
 playing from its tap; the albums, artists and songs you don't have yet, each opening its page (an album's pressings
@@ -1282,6 +1283,42 @@ the rest). With logins off every album is ticked. **Tap an album** to open its p
   or deleted."
 - Not on the phone yet: the description, the facts and pins. Their pictures and the names their albums
   are filed under are [managed from the page's •••](#managing-an-artist).
+
+**From Last.fm** (with `LASTFM_API_KEY` set on deadwax - see [configuration](configuration.md) - and **deadwax
+2.1.41 or later**): under the name, how many people listen to them on Last.fm ("2.3M listeners"), and **Top Songs**
+between Play and Albums - their five most played songs on Last.fm, of all time, with **See All** at the heading's end
+for all ten. Under them, **From Last.fm** opens their page on last.fm in the browser, beside the app.
+
+- **A song you have** shows its cover and "{album} · {year}" ("Currents · 2015"), of the earliest of your albums it is
+  on - so the studio take, not a later live album's. Tap it: it plays, with the other top songs you have after it in
+  Up Next, in Last.fm's order. Its **•••** (on the Mac, a right-click) is a song's, as on an album's page, and a swipe
+  right adds it to the queue.
+- **A song you don't have** says "Not in your library". Tap it: it spins while MusicBrainz is asked for the song
+  (by its title without a "- 2015 Remaster" or a "(feat. …)", as it's matched), then the album you don't have opens,
+  the song marked in its tracklist. If none is found the row says "Couldn't find its album on MusicBrainz." - and
+  "MusicBrainz isn't answering - try again in a few minutes." while MusicBrainz is away - until you leave the page.
+- **A song that may be on an album whose songs didn't load** (the line under Play says "the rest didn't load") is
+  never called "Not in your library": it's dimmed, with no line under its title, and does nothing until Try again
+  brings that album's songs.
+- Last.fm's "Let It Happen - 2015 Remaster" and "Lost in Yesterday (feat. X)" are your "Let It Happen" and "Lost in
+  Yesterday"; a remix, an edit, a demo or a live take Last.fm names as one is a song of its own.
+- Until the songs of your albums are in, the rows show their titles and do nothing. The first time an artist is
+  opened, what's below Play waits a moment (0.8 s at most) for Last.fm, so nothing jumps; an answer later than that
+  puts Top Songs under the albums instead, for as long as the page is open. Last.fm's answer is kept while the app
+  runs, so an artist opened again draws it at once (one deadwax could only partly get, or not at all, is asked for
+  again when the artist is opened a minute or more later). Pulling the page down asks Last.fm again. Once the
+  listeners line has its place under the name it keeps it, blank if need be, for as long as the page is open - if
+  deadwax then says Last.fm is off, or can't be reached - so Play never moves.
+- An artist Last.fm doesn't know has no Top Songs and no listeners line - nothing empty.
+- With no key on deadwax, or a key Last.fm refuses, the page has none of it. Whoever runs deadwax sees a line at the
+  page's foot saying so - "Top songs, similar artists and radio come from Last.fm - add a Last.fm API key in Server
+  settings to see them." or "Last.fm refused deadwax's API key - check LASTFM_API_KEY in Server settings. It's the API
+  key, not the shared secret." - with **Server settings**, which opens its Connections, where `LASTFM_API_KEY` is.
+  Nobody else sees a line.
+- **Offline**, an artist whose Last.fm answer the app has from this time it's been open keeps their Top Songs, a song
+  not on this phone dimmed (it plays nothing, and one you don't have opens nothing). A song that may be on one of
+  their albums the phone hasn't the songs of (one not downloaded, on a page opened since deadwax went away) is
+  dimmed with no line under it, never "Not in your library". Any other artist has nothing of Last.fm's, and no gap.
 
 **Offline**, the Artists page lists what it last listed, an artist with nothing on this phone dimmed (it
 opens nothing). With no list in hand it lists the artists of the albums on the phone, under "Only the
@@ -6081,6 +6118,52 @@ have matched. Say "pass", or what you saw.
   its album opens. Back, then ▶: it plays from its first song. Then one with no ▶ (everything already there): a tap
   still opens it. On the Mac too. If a tap says "Can't find this album to open it…", say what's under it - and is the
   album in the Library under the same name?
+
+### Last.fm's checks (476-487)
+
+**Not done yet.** These come with Last.fm's first slice on the app - [the listeners line and Top Songs](#artists) on
+an artist's page (still app 0.13 (13)). They need **deadwax 2.1.41 or later** on the server (main's `:experimental`
+once it's out). On 2.1.36-2.1.40, which say Last.fm is on but have no route for it, the page shows a blank line
+under the name and no Top Songs; before 2.1.36, nothing of Last.fm's at all.
+Marked **[key]** where `LASTFM_API_KEY` must be set on deadwax, **[no key]** where it must not. Run them on both
+phones and the Mac, over deadwax's plain `http://` address with logins on: James's phone and the Mac as an admin,
+Ethan's phone as a listener (the one that sees no foot line). Say "pass", or what you saw.
+
+- **476 [no key] Nothing there.** On the web and in the app, artist pages are as before. Server settings >
+  Connections shows LASTFM_API_KEY unset, with its words. As an admin, the foot of an artist page in the app says "Top
+  songs, similar artists and radio come from Last.fm - add a Last.fm API key in Server settings to see them.", and
+  its Server settings button opens Connections. On Ethan's phone, no such line.
+- **477 [key] The key in.** Paste the key into Server settings in the app and save. The row says set; the web's says
+  set too. Leave the app and come back: artist pages now have Last.fm's line and Top Songs, and no foot line.
+- **478 [key] Tame Impala.** Under the name, "x.xM listeners". Then Play, then Top Songs: 5 rows, and See All shows
+  10 on a page titled Top Songs. Is the order the one Last.fm's own page for them gives (all time)? Is any song there
+  twice, or a feature listed as a song of its own?
+- **479 [key] A song you have.** Its row shows its album and year, and the studio album's cover rather than a live
+  one's. Tap it: it plays, and Up Next holds the other top songs you have after it, in Last.fm's order. Swipe one
+  right: added to the queue.
+- **480 [key] A song you don't have.** "Not in your library". Tap it: the row spins, then the album you don't have
+  opens, the song marked in its tracklist. Is it the right album (the studio one, not a compilation)? Tap it, and
+  before it opens switch tab: nothing opens over the other tab.
+- **481 [key] Dance Gavin Dance.** 478-480 again, for the artist with feature credits: no song doubled, and a
+  "(feat. …)" title matched to your song without it.
+- **482 [key] Nothing jumps.** Over WireGuard, open an artist you haven't opened in the app this week (deadwax keeps
+  Last.fm's answers a week, so it asks Last.fm itself). Does Play move as the listeners line fills? Does Albums jump
+  down as Top Songs arrives, or does Top Songs come in below the albums instead? Go back and open the artist again:
+  all in place at once.
+- **483 [key] An artist Last.fm doesn't know** (a small Soulseek find): no Top Songs, no listeners figure, nothing
+  empty; their albums as before.
+- **484 [key] Offline.** With Tame Impala open, turn on Airplane Mode (and WireGuard off). Top Songs stays; rows not
+  downloaded are dimmed and do nothing, and one you don't have does nothing; the listeners line keeps its place. Go
+  back and open Tame Impala again: a top song you have on an album that isn't downloaded is dimmed with no line,
+  never "Not in your library". Open an artist not opened yet: nothing of Last.fm's, and no gap.
+- **485 [key] A wrong key.** In Server settings, paste the shared secret instead. Leave the app and come back, then
+  open an artist page: nothing of Last.fm's for anyone. As an admin, the foot says "Last.fm refused deadwax's API key
+  - check LASTFM_API_KEY in Server settings. It's the API key, not the shared secret." The row says refused with the
+  time; the event log says so once. Put the real key back, leave the app and come back: it works at once.
+- **486 [key] The Mac.** The same page at the readable width. Right-click a top song you have: the same menu as its
+  ••• (no Start Radio yet - that's a later slice). See All opens the list; From Last.fm opens last.fm in the browser.
+- **487 [key] VoiceOver.** A top song reads its title and line ("Let It Happen, Currents · 2015"); a missing one
+  "…, Not in your library"; "From Last.fm" reads as a link; the listeners line is read under the name.
 
 ## What it can't do yet
 

@@ -1,0 +1,460 @@
+{
+ "made_from": "src/routes/lastfm.py over tests/test_lastfm_routes.py's Last.fm (tests/fixtures/lastfm/answers.py)",
+ "fixtures": "recorded",
+ "cases": [
+  {
+   "name": "Tame Impala, by MusicBrainz id: listeners, the page, ten top songs",
+   "path": "/deadwax/lastfm/artist",
+   "query": {
+    "mbid": "63aa26c3-d59b-4da4-84ac-716b54f1ef4d",
+    "name": "Tame Impala"
+   },
+   "status": 200,
+   "answer": {
+    "enabled": true,
+    "unavailable": false,
+    "why": null,
+    "url": "https://www.last.fm/music/Tame+Impala",
+    "listeners": 4724887,
+    "top_songs": [
+     {
+      "title": "The Less I Know the Better",
+      "playcount": 51995043,
+      "listeners": 2955438,
+      "url": "https://www.last.fm/music/Tame+Impala/_/The+Less+I+Know+the+Better"
+     },
+     {
+      "title": "Borderline",
+      "playcount": 31962438,
+      "listeners": 2124977,
+      "url": "https://www.last.fm/music/Tame+Impala/_/Borderline"
+     },
+     {
+      "title": "New Person, Same Old Mistakes",
+      "playcount": 26439766,
+      "listeners": 1972893,
+      "url": "https://www.last.fm/music/Tame+Impala/_/New+Person,+Same+Old+Mistakes"
+     },
+     {
+      "title": "Let It Happen",
+      "playcount": 28648847,
+      "listeners": 1942587,
+      "url": "https://www.last.fm/music/Tame+Impala/_/Let+It+Happen"
+     },
+     {
+      "title": "Feels Like We Only Go Backwards",
+      "playcount": 20213973,
+      "listeners": 1893914,
+      "url": "https://www.last.fm/music/Tame+Impala/_/Feels+Like+We+Only+Go+Backwards"
+     },
+     {
+      "title": "Eventually",
+      "playcount": 21238581,
+      "listeners": 1763057,
+      "url": "https://www.last.fm/music/Tame+Impala/_/Eventually"
+     },
+     {
+      "title": "Nangs",
+      "playcount": 14543108,
+      "listeners": 1464548,
+      "url": "https://www.last.fm/music/Tame+Impala/_/Nangs"
+     },
+     {
+      "title": "Elephant",
+      "playcount": 12610679,
+      "listeners": 1397896,
+      "url": "https://www.last.fm/music/Tame+Impala/_/Elephant"
+     },
+     {
+      "title": "Yes I'm Changing",
+      "playcount": 13095273,
+      "listeners": 1332853,
+      "url": "https://www.last.fm/music/Tame+Impala/_/Yes+I%27m+Changing"
+     },
+     {
+      "title": "Dracula",
+      "playcount": 14724597,
+      "listeners": 1328255,
+      "url": "https://www.last.fm/music/Tame+Impala/_/Dracula"
+     }
+    ]
+   }
+  },
+  {
+   "name": "Dance Gavin Dance, by MusicBrainz id: ten top songs, nothing to fold",
+   "path": "/deadwax/lastfm/artist",
+   "query": {
+    "mbid": "16456fed-c9f2-4adf-b6ea-97b648c474d2",
+    "name": "Dance Gavin Dance"
+   },
+   "status": 200,
+   "answer": {
+    "enabled": true,
+    "unavailable": false,
+    "why": null,
+    "url": "https://www.last.fm/music/Dance+Gavin+Dance",
+    "listeners": 884434,
+    "top_songs": [
+     {
+      "title": "We Own the Night",
+      "playcount": 4457241,
+      "listeners": 329326,
+      "url": "https://www.last.fm/music/Dance+Gavin+Dance/_/We+Own+the+Night"
+     },
+     {
+      "title": "Uneasy Hearts Weigh The Most",
+      "playcount": 3868294,
+      "listeners": 285396,
+      "url": "https://www.last.fm/music/Dance+Gavin+Dance/_/Uneasy+Hearts+Weigh+The+Most"
+     },
+     {
+      "title": "And I Told Them I Invented Times New Roman",
+      "playcount": 2696274,
+      "listeners": 255587,
+      "url": "https://www.last.fm/music/Dance+Gavin+Dance/_/And+I+Told+Them+I+Invented+Times+New+Roman"
+     },
+     {
+      "title": "Lemon Meringue Tie",
+      "playcount": 2355705,
+      "listeners": 219600,
+      "url": "https://www.last.fm/music/Dance+Gavin+Dance/_/Lemon+Meringue+Tie"
+     },
+     {
+      "title": "Death of a Strawberry",
+      "playcount": 2189374,
+      "listeners": 193188,
+      "url": "https://www.last.fm/music/Dance+Gavin+Dance/_/Death+of+a+Strawberry"
+     },
+     {
+      "title": "Blue Dream",
+      "playcount": 2172176,
+      "listeners": 177087,
+      "url": "https://www.last.fm/music/Dance+Gavin+Dance/_/Blue+Dream"
+     },
+     {
+      "title": "It's Safe to Say You Dig the Backseat",
+      "playcount": 1265400,
+      "listeners": 134905,
+      "url": "https://www.last.fm/music/Dance+Gavin+Dance/_/It%27s+Safe+to+Say+You+Dig+the+Backseat"
+     },
+     {
+      "title": "The Backwards Pumpkin Song",
+      "playcount": 1270182,
+      "listeners": 134218,
+      "url": "https://www.last.fm/music/Dance+Gavin+Dance/_/The+Backwards+Pumpkin+Song"
+     },
+     {
+      "title": "Betrayed by the Game",
+      "playcount": 1412033,
+      "listeners": 123003,
+      "url": "https://www.last.fm/music/Dance+Gavin+Dance/_/Betrayed+by+the+Game"
+     },
+     {
+      "title": "Open Your Eyes and Look North",
+      "playcount": 1004431,
+      "listeners": 111833,
+      "url": "https://www.last.fm/music/Dance+Gavin+Dance/_/Open+Your+Eyes+and+Look+North"
+     }
+    ]
+   }
+  },
+  {
+   "name": "Portishead, by MusicBrainz id: ten top songs, its three live takes (#34, #45, #50) past them",
+   "path": "/deadwax/lastfm/artist",
+   "query": {
+    "mbid": "8f6bd1e4-fbe1-4f50-aa9b-94c450ec0f11",
+    "name": "Portishead"
+   },
+   "status": 200,
+   "answer": {
+    "enabled": true,
+    "unavailable": false,
+    "why": null,
+    "url": "https://www.last.fm/music/Portishead",
+    "listeners": 3456254,
+    "top_songs": [
+     {
+      "title": "Glory Box",
+      "playcount": 16121469,
+      "listeners": 1864927,
+      "url": "https://www.last.fm/music/Portishead/_/Glory+Box"
+     },
+     {
+      "title": "Roads",
+      "playcount": 10304082,
+      "listeners": 1308596,
+      "url": "https://www.last.fm/music/Portishead/_/Roads"
+     },
+     {
+      "title": "Sour Times",
+      "playcount": 9431696,
+      "listeners": 1300434,
+      "url": "https://www.last.fm/music/Portishead/_/Sour+Times"
+     },
+     {
+      "title": "Mysterons",
+      "playcount": 6558993,
+      "listeners": 1023585,
+      "url": "https://www.last.fm/music/Portishead/_/Mysterons"
+     },
+     {
+      "title": "Wandering Star",
+      "playcount": 6189195,
+      "listeners": 963582,
+      "url": "https://www.last.fm/music/Portishead/_/Wandering+Star"
+     },
+     {
+      "title": "Strangers",
+      "playcount": 5938980,
+      "listeners": 952622,
+      "url": "https://www.last.fm/music/Portishead/_/Strangers"
+     },
+     {
+      "title": "It Could Be Sweet",
+      "playcount": 5573610,
+      "listeners": 941160,
+      "url": "https://www.last.fm/music/Portishead/_/It+Could+Be+Sweet"
+     },
+     {
+      "title": "Numb",
+      "playcount": 5342725,
+      "listeners": 920684,
+      "url": "https://www.last.fm/music/Portishead/_/Numb"
+     },
+     {
+      "title": "The Rip",
+      "playcount": 5911666,
+      "listeners": 799491,
+      "url": "https://www.last.fm/music/Portishead/_/The+Rip"
+     },
+     {
+      "title": "All Mine",
+      "playcount": 4478040,
+      "listeners": 775571,
+      "url": "https://www.last.fm/music/Portishead/_/All+Mine"
+     }
+    ]
+   }
+  },
+  {
+   "name": "an id Last.fm doesn't know, asked again by name",
+   "path": "/deadwax/lastfm/artist",
+   "query": {
+    "mbid": "00000000-0000-4000-8000-000000000000",
+    "name": "Tame Impala"
+   },
+   "status": 200,
+   "answer": {
+    "enabled": true,
+    "unavailable": false,
+    "why": null,
+    "url": "https://www.last.fm/music/Tame+Impala",
+    "listeners": 4724887,
+    "top_songs": [
+     {
+      "title": "The Less I Know the Better",
+      "playcount": 51995043,
+      "listeners": 2955438,
+      "url": "https://www.last.fm/music/Tame+Impala/_/The+Less+I+Know+the+Better"
+     },
+     {
+      "title": "Borderline",
+      "playcount": 31962438,
+      "listeners": 2124977,
+      "url": "https://www.last.fm/music/Tame+Impala/_/Borderline"
+     },
+     {
+      "title": "New Person, Same Old Mistakes",
+      "playcount": 26439766,
+      "listeners": 1972893,
+      "url": "https://www.last.fm/music/Tame+Impala/_/New+Person,+Same+Old+Mistakes"
+     },
+     {
+      "title": "Let It Happen",
+      "playcount": 28648847,
+      "listeners": 1942587,
+      "url": "https://www.last.fm/music/Tame+Impala/_/Let+It+Happen"
+     },
+     {
+      "title": "Feels Like We Only Go Backwards",
+      "playcount": 20213973,
+      "listeners": 1893914,
+      "url": "https://www.last.fm/music/Tame+Impala/_/Feels+Like+We+Only+Go+Backwards"
+     },
+     {
+      "title": "Eventually",
+      "playcount": 21238581,
+      "listeners": 1763057,
+      "url": "https://www.last.fm/music/Tame+Impala/_/Eventually"
+     },
+     {
+      "title": "Nangs",
+      "playcount": 14543108,
+      "listeners": 1464548,
+      "url": "https://www.last.fm/music/Tame+Impala/_/Nangs"
+     },
+     {
+      "title": "Elephant",
+      "playcount": 12610679,
+      "listeners": 1397896,
+      "url": "https://www.last.fm/music/Tame+Impala/_/Elephant"
+     },
+     {
+      "title": "Yes I'm Changing",
+      "playcount": 13095273,
+      "listeners": 1332853,
+      "url": "https://www.last.fm/music/Tame+Impala/_/Yes+I%27m+Changing"
+     },
+     {
+      "title": "Dracula",
+      "playcount": 14724597,
+      "listeners": 1328255,
+      "url": "https://www.last.fm/music/Tame+Impala/_/Dracula"
+     }
+    ]
+   }
+  },
+  {
+   "name": "an artist Last.fm doesn't know: nothing, and nothing failed",
+   "path": "/deadwax/lastfm/artist",
+   "query": {
+    "name": "Qzxvwy Nonexistent Ensemble 7731"
+   },
+   "status": 200,
+   "answer": {
+    "enabled": true,
+    "unavailable": false,
+    "why": null,
+    "url": null,
+    "listeners": null,
+    "top_songs": null
+   }
+  },
+  {
+   "name": "getInfo failing: no listeners, the page from the top tracks, unavailable",
+   "path": "/deadwax/lastfm/artist",
+   "query": {
+    "mbid": "63aa26c3-d59b-4da4-84ac-716b54f1ef4d"
+   },
+   "status": 200,
+   "answer": {
+    "enabled": true,
+    "unavailable": true,
+    "why": null,
+    "url": "https://www.last.fm/music/Tame+Impala",
+    "listeners": null,
+    "top_songs": [
+     {
+      "title": "The Less I Know the Better",
+      "playcount": 51995043,
+      "listeners": 2955438,
+      "url": "https://www.last.fm/music/Tame+Impala/_/The+Less+I+Know+the+Better"
+     },
+     {
+      "title": "Borderline",
+      "playcount": 31962438,
+      "listeners": 2124977,
+      "url": "https://www.last.fm/music/Tame+Impala/_/Borderline"
+     },
+     {
+      "title": "New Person, Same Old Mistakes",
+      "playcount": 26439766,
+      "listeners": 1972893,
+      "url": "https://www.last.fm/music/Tame+Impala/_/New+Person,+Same+Old+Mistakes"
+     },
+     {
+      "title": "Let It Happen",
+      "playcount": 28648847,
+      "listeners": 1942587,
+      "url": "https://www.last.fm/music/Tame+Impala/_/Let+It+Happen"
+     },
+     {
+      "title": "Feels Like We Only Go Backwards",
+      "playcount": 20213973,
+      "listeners": 1893914,
+      "url": "https://www.last.fm/music/Tame+Impala/_/Feels+Like+We+Only+Go+Backwards"
+     },
+     {
+      "title": "Eventually",
+      "playcount": 21238581,
+      "listeners": 1763057,
+      "url": "https://www.last.fm/music/Tame+Impala/_/Eventually"
+     },
+     {
+      "title": "Nangs",
+      "playcount": 14543108,
+      "listeners": 1464548,
+      "url": "https://www.last.fm/music/Tame+Impala/_/Nangs"
+     },
+     {
+      "title": "Elephant",
+      "playcount": 12610679,
+      "listeners": 1397896,
+      "url": "https://www.last.fm/music/Tame+Impala/_/Elephant"
+     },
+     {
+      "title": "Yes I'm Changing",
+      "playcount": 13095273,
+      "listeners": 1332853,
+      "url": "https://www.last.fm/music/Tame+Impala/_/Yes+I%27m+Changing"
+     },
+     {
+      "title": "Dracula",
+      "playcount": 14724597,
+      "listeners": 1328255,
+      "url": "https://www.last.fm/music/Tame+Impala/_/Dracula"
+     }
+    ]
+   }
+  },
+  {
+   "name": "Last.fm down with nothing kept: every part null, unavailable, no why",
+   "path": "/deadwax/lastfm/artist",
+   "query": {
+    "mbid": "63aa26c3-d59b-4da4-84ac-716b54f1ef4d"
+   },
+   "status": 200,
+   "answer": {
+    "enabled": true,
+    "unavailable": true,
+    "why": null,
+    "url": null,
+    "listeners": null,
+    "top_songs": null
+   }
+  },
+  {
+   "name": "Last.fm refusing the key (its real answer, 403 with error 10) with nothing kept: off, and why",
+   "path": "/deadwax/lastfm/artist",
+   "query": {
+    "mbid": "63aa26c3-d59b-4da4-84ac-716b54f1ef4d"
+   },
+   "status": 200,
+   "answer": {
+    "enabled": false,
+    "unavailable": true,
+    "why": "Last.fm refused deadwax's API key (error 10: Invalid API key - You must be granted a valid key by last.fm) - check LASTFM_API_KEY in Server settings > Connections: it's the API key, not the shared secret.",
+    "url": null,
+    "listeners": null,
+    "top_songs": null
+   }
+  },
+  {
+   "name": "no key: off, and where to add one",
+   "path": "/deadwax/lastfm/artist",
+   "query": {
+    "mbid": "63aa26c3-d59b-4da4-84ac-716b54f1ef4d",
+    "name": "Tame Impala"
+   },
+   "status": 200,
+   "answer": {
+    "enabled": false,
+    "unavailable": false,
+    "why": "No Last.fm API key is set - add LASTFM_API_KEY in Server settings > Connections (a free key from last.fm/api/account/create).",
+    "url": null,
+    "listeners": null,
+    "top_songs": null
+   }
+  }
+ ]
+}

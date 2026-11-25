@@ -363,6 +363,21 @@ enum DeviceWords {
         add("ManualSearch.tooOld", ManualSearch.tooOld(runs: false))
         add("Sources.nameMatch", "\(Sources.nameMatch.label) | \(Sources.nameMatch.meaning)")
 
+        // MARK: (Last.fm, slice A1) Top Songs and listeners - the same words on both: none names the device
+
+        add("LastfmWords.topSongs", LastfmWords.topSongs)
+        add("LastfmWords.seeAll", LastfmWords.seeAll)
+        add("LastfmWords.credit", LastfmWords.credit)
+        add("LastfmWords.notInLibrary", LastfmWords.notInLibrary)
+        add("LastfmWords.notFound", LastfmWords.notFound)
+        add("LastfmWords.away", LastfmWords.away)
+        add("LastfmWords.albumLine", LastfmWords.albumLine("Currents", year: 2015))
+        add("LastfmWords.listeners(1)", LastfmWords.listeners(1))
+        add("LastfmWords.listeners(2345678)", LastfmWords.listeners(2_345_678))
+        add("LastfmWords.footOff", LastfmWords.footOff)
+        add("LastfmWords.footRefused", LastfmWords.footRefused)
+        add("LastfmWords.serverSettings", LastfmWords.serverSettings)
+
         // MARK: Debug
 
         let utc = TimeZone(identifier: "UTC")!

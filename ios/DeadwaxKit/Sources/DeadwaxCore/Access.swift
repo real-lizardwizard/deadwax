@@ -24,19 +24,24 @@ public struct Access: Sendable, Equatable {
     /// /me's `admin` - a Navidrome admin, break-glass, or everyone with logins off.
     public let admin: Bool
 
-    public init(user: String, permissions: Set<Permission>, on: Bool, unverified: Bool, admin: Bool) {
+    /// (Last.fm, slice A1) What deadwax says of Last.fm (`Me.lastfmState`) - `.absent` for an older deadwax.
+    public let lastfm: LastfmState
+
+    public init(user: String, permissions: Set<Permission>, on: Bool, unverified: Bool, admin: Bool,
+                lastfm: LastfmState = .absent) {
         self.user = user
         self.permissions = permissions
         self.on = on
         self.unverified = unverified
         self.admin = admin
+        self.lastfm = lastfm
     }
 
     /// What a /me answer says (access.ts accessOf): with logins off everyone has everything and is the admin.
     public init(me: Me) {
         let off = me.auth == "off"
         self.init(user: me.user, permissions: off ? Self.all : Self.permissions(of: me), on: me.auth == "on",
-                  unverified: me.permissionsUnverified == true, admin: off || me.admin)
+                  unverified: me.permissionsUnverified == true, admin: off || me.admin, lastfm: me.lastfmState)
     }
 
     public static let all = Set(Permission.allCases)

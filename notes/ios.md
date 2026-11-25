@@ -16635,3 +16635,216 @@ id bridge by `job_id`, merged here.
 - Navidrome's real search3 answer for an album with no MusicBrainz id, its `year` and `songCount` for one, and whether
   it lists an id-less copy and an "[unmatched]" one of the same name as one album or two (M9, 467) - "exactly one"
   answers null when it's two, and the row says "Not ready to play yet…".
+
+## Last.fm, slice A1 (2026-11-24)
+
+James, 24 Nov: the 10 most popular songs on an artist's page, from Last.fm, all time. The design is
+~/Desktop/Code/deadwax-plans/lastfm.md; this is its app slice **A1** (2.4, 2.5, 2.7, 3.1, 3.2, 3.3's listeners, 3.6-3.8,
+section 4's A1): the listeners line and Top Songs, on the iPhone and the Mac alike. Not in it: the Albums order menu
+and Most played, Similar Artists (A2), Start Radio and Autoplay (A3 - Start Radio is left out of a top song's •••), About
+(A4). The server's half is `GET /deadwax/lastfm/artist`, main's **2.1.41** (S2, notes/lastfm.md), built beside this
+slice against 2.5's shape and merged into `ios` at 825e099f before the slice was done; its real answers are
+Fixtures/lastfm/answers/artist.json. What it leaves alone:
+- src/ and ui/ are untouched; the app is still 0.13 (13). **ios/Deadwax.xcodeproj is untouched** (the three new App files
+  are in the synchronized folder, the Core files and tests in the package, found by folder).
+- **The engine files have no diff**, nor does anything of DeadwaxAudio's; a top song plays through
+  `PlayerModel.play(playlist:at:)`, as an album's song does.
+- No `#if` in any App file; no word differs between the iPhone and the Mac.
+
+### What was built
+
+**Core (pure, tested on Linux and macOS):**
+- `Lastfm.swift`: `LastfmState` (/me's `lastfm`: on, off, refused - and **absent**, see below); `LastfmTrack` and
+  `LastfmArtist`, the route's answer, read loosely (`looseField`/`looseList`: a part absent or malformed is nil; a
+  track with no title, or a blank one, is dropped; an answer that doesn't say it's enabled is not, one that doesn't
+  say it's whole is unavailable); `LastfmLink` - lastfm.py `lastfm_url`'s rule exactly: https, printable ASCII with no
+  space, `\` or `@`, at most 2048 letters, host last.fm or under it; `LastfmMatch.key` - lastfm.py `match_key`, a feature
+  aside, a feature tail and a dash take dropped (`strip`), then `SongTitle.key`. `strip` is Python's regexes ported by
+  hand onto unicode scalars: `PyText` holds `str.isspace`'s 29 characters, `\w` as `re` reads it (a letter of any L
+  category, anything with a numeric value, `_`) and the IGNORECASE folds `re` makes (ſ for s, İ/ı for i, K for k).
+- `TopSongs.swift`: `rows(_:albums:)` - each top song met with a song of the page's albums by `LastfmMatch.key`, the
+  candidates ordered earliest first (the album's year, undated last; the page's play order; disc; track; the album's
+  own order), each library song used once, greedily in Last.fm's order; with the albums' songs not all in (`nil`)
+  every row waits. `play(_:from:playable:)` - the playable top songs you have, in Last.fm's order, from this one.
+  `album(_:title:mbid:name:)` - the album a song you don't have opens: the first song of MusicBrainz's search that is
+  this one (`LastfmMatch.key`) and theirs (their id among its artists when the page knows it, else its credit their
+  `Fold.key`), its first album as `sortAlbums` has them. `trouble(_:admin:)` - MusicBrainz's 503 in the spec's words,
+  anything else through ErrorWords.
+- `LastfmPage.swift`: `waitMs` 800, `kept` 64, `unsureKeptMs` 60 s; `placeOf` (judged once, as describe.ts);
+  `Arrival` - a page waits only with Last.fm on, deadwax in reach and nothing kept, until an answer or the wait
+  releases it, and an answer that lands after the albums were drawn is placed after them for the page's life;
+  `shown(state:online:answer:seesDetail:)` - the hero line (kept whenever Last.fm is on and the page is online, or an
+  answer is in hand), the listeners, whether Top Songs draws, the foot line; `state(me:answer:)`; `present`; `Ask` -
+  what the route takes (an id that is one, a name trimmed, 1-200 letters); `Kept` - the session's answers by artist,
+  the last 64, an unsure one (unavailable, not enabled, or a failure) a minute.
+- `LastfmWords.swift`: every word of the slice, the spec's exactly; `listeners(_:)` rounded down at every boundary
+  (integer tenths: "9.9K" for 9,999, "999K" for 999,999, "2.3M" for 2,399,999, never ".0"); 0 or none is no line.
+- `Me.lastfm` (read loosely in a hand-written `init(from:)`, the other fields exactly as strictly as before) and
+  `Access.lastfm`; `Routes.lastfmArtist` (the route count 110 -> **111**, no timeout of its own: the route answers
+  within 4 s); `DeadwaxClient.lastfmArtist(mbid:name:)`, sending only the parts the route takes - never one empty (the
+  route answers a 422 for `mbid=` or `name=`), nothing at all with neither.
+
+**App:**
+- `Artist/ArtistView.swift`: the hero's line under the name ("2.3M listeners", footnote, quiet; there from the first
+  frame whenever `shown.heroLine`, blank until the answer says, hidden from VoiceOver while blank); Top Songs between
+  Play and Albums, or after the albums for a late answer; everything below Play waiting on the arrival; the foot line
+  for `seesDetail` with **Server settings**, which pushes Server settings > Connections. Last.fm is asked once the
+  artist's answer is in hand (`.task(id:)` on who they are, /me's word and reachability), again on a pull.
+- `Artist/TopSongsSection.swift`: the heading with See All (more than five), five `TopSongRow`s, `LastfmCredit`
+  ("From Last.fm", a `Link` to the answer's page, the words alone without one). `TopSongRow`, shared with the page: a
+  song you have plays in the tap (`TopSongs.play` -> `player.play(playlist:at:)`), dimmed and inert offline when it
+  isn't on the device, swiped right to add it, its ••• QueueMenu's song items (`QueuePick.song(song, of: album)`), a
+  right-click on the Mac the same; a song you don't have spins while `TopSongOpener` asks, says its trouble for the
+  visit, does nothing offline; a waiting row is drawn and nothing more.
+- `Artist/TopSongsScreen.swift`: See All's page, `.topSongs(ArtistRoute)`, at the readable width on the Mac.
+- `Models/TopSongOpener.swift`: a song you don't have's album - MusicBrainz's song search with
+  `SongSearch.fieldedQuery`, read with `SongSearch.group`, picked by `TopSongs.album`, opened as
+  `GroupRoute(SongAlbum)` with the song marked - only where it was tapped (the same tab, the same pages, Now Playing
+  away), let go on a tab change, Now Playing and leaving, as a MusicBrainz artist's row's bridge is. An album found is
+  kept for the session.
+- `Models/ArtistPageModel.swift`: `lastfm`, the arrival, the opener, `askLastfm`, the 800 ms wait, `topRows` (the
+  answer's songs met with `asks.answers` once every album's songs are in or failed and in the page's play order;
+  offline, with what is in hand of each album, the page's or this phone's), and `albums(online:downloads:)` moved here
+  from the view. `Models/ArtistsModel.swift`: the session's `LastfmPage.Kept`, and which artist page is showing for an
+  artist (weakly), for the Top Songs page.
+
+### Decisions, and where this departs from the spec
+
+- **`absent` is not `off`** (the spec, 2.7: "absent as off"). An older deadwax has no `lastfm` in /me and no
+  LASTFM_API_KEY to point anyone at, so the page draws nothing of Last.fm's and no foot line either. A word this app
+  doesn't know is absent too.
+- **An answer saying Last.fm isn't enabled is believed over an older /me** (`LastfmPage.state`): refused if it's also
+  unavailable, else off - so a key Last.fm starts refusing mid-session draws the foot line at once, not at the next
+  /me (check 485 still says to leave the app and come back, for the case of a kept answer, which the server answers
+  while refused).
+- **The foot line's button pushes Server settings > Connections on the tab you're on**, not the You tab: switching tabs
+  under someone reading an artist's page is the bigger surprise, and Server settings is a page any tab can push.
+- **The session's answers are kept by artist id**, with what they were asked as, so the first frame knows there's an
+  answer before the artist's own answer (and so their MusicBrainz id) is in hand. A failure is kept a minute only while
+  nothing is drawn: one that fails after an answer was drawn keeps that answer.
+- **Last.fm's ask and the wait are unstructured tasks**, as the albums' songs are: a page covered by another (See All)
+  keeps its ask, and only the newest answer for the page lands (a counter, and the page's key).
+- **The Top Songs page reads the artist page's own model** (the `ArtistsModel` registry, weak): its rows are the very
+  rows of the page under it, nothing asked again, a song's album asked through the same opener. With that page gone
+  it is its own, asking as the page asks.
+- **The client's signature is `lastfmArtist(mbid:name:)`**, both optional, each sent only when the route takes it.
+- **A song you don't have's album is the first matching song's** in MusicBrainz's order (`SongSearch.group`), its
+  first album as `sortAlbums` has them. A "Borderline (Live)" has the same key as "Borderline" (SongTitle.key drops a
+  bracketed aside), so if MusicBrainz lists the live take's song first, its live album is the one opened - the spec's
+  rule, kept; 480 asks whether it's the studio album in practice.
+- **The check numbers are the spec's 476-487**, adjusted to what was built: 478 compares with Last.fm's own page; 482
+  opens an artist not opened this week (deadwax keeps Last.fm's answers a week, so a restart doesn't make one cold);
+  485 leaves and comes back; 486 has no Start Radio.
+
+### Tests, and the faults they were seen failing on
+
+- Swift (`swift test`, macOS): **LastfmMatchTests** - every vector of `Fixtures/lastfm/match-vectors.json`, a byte copy
+  of tests/fixtures/lastfm/match-vectors.json (tests/test_lastfm_vectors.py `test_the_app_s_copy_is_this_one` holds
+  them equal), names through `Fold.key`, and Python's own edges; **LastfmWordsTests** - every listeners boundary, the
+  album line, the sentences; **LastfmPageTests** - the place, the arrival, what's shown with each state and
+  `seesDetail`, the state an answer says, what's present, the session's 64 and its minute, the ask's bounds;
+  **LastfmDecodeTests** - 2.5's sample answer **as the spec wrote it** (marked so: written before the route existed
+  on this branch), and **the route's own nine answers** (Fixtures/lastfm/answers/artist.json, exported by
+  tests/fixtures/lastfm/answers.py from Last.fm's recordings of 2026-11-25 and held to the route by
+  tests/test_lastfm_routes.py - never edited by hand): Tame Impala's ten met with Currents and Lonerism, Dance Gavin
+  Dance's and Portishead's keys all different, what each of not known, getInfo failing, Last.fm down, refused and no
+  key draws and how long it's kept, and each asked exactly as its case's query; loose fields, the link's host and
+  letters, /me and Access, the client's query (an absent or empty part left out, nothing asked with neither); **TopSongsTests** - the earliest
+  album's take, another title never a match, each library song once, ties by play order then disc then track, rows
+  waiting, the first ten, a tap's playlist, the album pick, a failure's words. **DeviceWordsTests**: twelve of
+  LastfmWords' keys in both snapshots (`iphone.json` by hand, `mac.json` written with `DEADWAX_WORDS_WRITE=mac`).
+  ClientTests' route count is 111.
+- Python: **tests/test_ios_lastfm.py** (new) holds the views to Core's rules - only `LastfmPage.shown`'s flags draw
+  (with `seesDetail` passed on the artist page, `false` on the Top Songs page), Top Songs before the albums only in
+  place and after them otherwise, both inside `!arrival.holding`, the foot's button to Connections, a waiting row with
+  nothing to tap, the tap playing with nothing awaited, a missing row disabled offline, the opener opening only where
+  tapped and let go by both pages, no `#if`, no AnyView, no literal words. **test_ios_contract.py**: ROUTE_COUNT 111;
+  /me's three words are LastfmState's; `test_lastfms_answer_is_what_the_app_decodes` - the route's parameters and
+  bounds, the client's query, LastfmArtist's and LastfmTrack's fields exactly the answers' keys for no key, whole, a
+  part late, refused and not known, TOP_SONGS and URL_MAX the app's, the deadline inside the transport's 8 s, and
+  `lastfm_url`'s rule, and every exported answer read whole and asked as the app asks. It and the route's parameter
+  test (`test_every_route_the_app_calls_is_the_servers_with_its_parameters[GET /deadwax/lastfm/artist]`) failed here
+  until main's 2.1.41 was merged ("cannot import name 'lastfm' from 'src.routes'"); before that both were run against
+  main-wt's uncommitted server (a scratch tree of its src and this branch's ios/ and test file) and passed, and they
+  pass here since the merge. test_ios_mac.py: `topSongs` among the readable pages, TopSongsSection among
+  the song rows with a right-click; test_ios_no_web_app.py: From Last.fm on ALLOWED, and LastfmLink's rule pinned.
+- Faults, each applied alone and its tests run, then restored - every one caught:
+  - **Matching** - a top song matched to another title (by a shared prefix): `anotherTitleIsNeverAMatch`; a dash
+    take always dropped ("- Radio Edit" the song): LastfmMatchTests' vectors and Python's edges; the live album's take
+    over the studio's (the year order reversed): `aSongYouHaveIsTheEarliestAlbumsTake` and two more; one library song
+    used for two rows: `eachLibrarySongMeetsOneTopSongAtMost`, `tiesGoByPlayOrderThenDiscThenTrack`.
+  - **Before it's ready** - rows with no songs in drawn as missing, so tappable: `rowsWaitUntilEveryAlbumsSongsAreIn`;
+    a waiting row given a tap (the view): test_ios_lastfm.py `test_a_row_does_only_what_its_kind_allows`.
+  - **Words** - 1,000 said as "1000", rounding to nearest (9,999 as "10K", 2,399,999 as "2.4M"), a decimal past 10K
+    ("230.4K"), 1,000,000 as "1000K": each `theListenersLineNeverSaysMoreThanLastfmDid`.
+  - **Arrival** - a late answer drawn above Albums: `placeOf` always in place - three LastfmPageTests; the view's
+    first Top Songs drawn whatever the place - test_ios_lastfm.py. An unavailable answer kept for the session:
+    `theSessionKeepsTheLast64AndAnUnsureAnswerAMinute`.
+  - **Absent and foot** - the hero line, and the section, drawn with Last.fm off (in `shown`):
+    `nothingOfLastfmsIsDrawnUnlessItIsOn`; the same in the view (`if true`, Top Songs ungated): test_ios_lastfm.py. The
+    foot line without `seesDetail` (in `shown`): two LastfmPageTests; the view passing `true`: test_ios_lastfm.py.
+  - **The album pick** - a song by another artist's album: `theAlbumIsTheFirstOfTheirSong`.
+  - Beyond the spec's list: a link to any https host (`aLinkGoesOnlyToLastfm`, `aPartAbsentOrMalformedIsNone`); a
+    top song played after an await, and a missing song's album opened on another tab (test_ios_lastfm.py).
+- Two faults the builds and the suite found on the way, before any mutation: `RetagFlow.musicBrainzAway` (it's
+  `RetagWords`'), and test_ios_no_web_app.py refusing the credit's `link:` and then `address` (each a word its rules
+  read as deadwax's own) - the parameter is `lastfmPage`.
+
+### Not verified - only James's phone, Ethan's and the Mac can say (476-487)
+
+- **Against a real deadwax with a real key**: the route's answers here are its own over Last.fm's recordings, never
+  a live Last.fm; a cold answer's time, and what Last.fm says of artists outside the recordings, are unseen.
+- Whether 800 ms is right: it rests on kept answers coming back in about 100 ms; a cold one takes Last.fm's own time,
+  unmeasured on this network (482 asks).
+- Whether a top song's match picks what James would call the song: the vectors are the server's, but real libraries'
+  titles (and Last.fm's) are only seen on his.
+- That MusicBrainz's song search finds the studio album for a song you don't have (480), and the Mac's right-click,
+  See All and the credit opening the browser (486); VoiceOver's reading of the rows (487).
+- Nothing was run in a simulator (none is used here): the drawing - the hero line's height, the rows' alignment with
+  the album rows, the spinner - is unseen.
+
+### After review (2026-11-24)
+
+One review of A1; every finding below fixed in the slice, before any commit.
+- **Important: a song you have could read "Not in your library".** `topRows` met the top songs with only the albums
+  whose songs were in hand. Offline that was the page's asks or `downloads.keptAlbum` (downloaded albums only), so
+  Tame Impala opened online, then again offline (a new page, no asks, Last.fm's answer the session's), drew "The Less I
+  Know the Better" on an un-downloaded Currents as missing - a note cover, and a tap that would open MusicBrainz's page
+  for an album you have. Online, an album whose songs failed (`unsent`) did the same. Now **`TopSongs.library`** says
+  which albums are in hand - online the asks' answers once every album has answered or failed; offline the asks' or
+  this device's - and whether any of theirs isn't (`unknown`). With one not in hand, a song no album in hand has is
+  **`.unknown`**: drawn as a waiting row, dimmed, inert, never "Not in your library". Matched songs stay matched with
+  the albums in hand (an earlier take on an album not in hand can't be seen: the row may show a later album's take
+  until it is).
+- A song you don't have is searched for by **`TopSongs.searchQuery`**: `LastfmMatch.strip`'s title ("Let It Happen -
+  2015 Remaster" asks for "Let It Happen"), the title as written when that strips to nothing.
+- **The hero's line keeps its height once drawn for the page** (`LastfmPage.drawsLine`, and `shown`'s `reserved`):
+  the model notes the page (`keepLine`) as each ask begins and as each answer lands. Before, an answer saying Last.fm
+  isn't enabled after /me said on, or the page going offline before any answer, dropped the line and moved Play.
+- **The Top Songs page on its own** (no artist page under it registered - after `ArtistsModel.reset()`, a new person, say) spun
+  for ever when its ask failed. It now says the artist's failure as their page does (ErrorNote, `ErrorWords.artistGone`,
+  Try again: load again and the missing albums' songs) and Last.fm's the same way (the model's `lastfmFailure`, Try
+  again asking again), and its own ask asks a failure the session keeps again at once (`retryFailed`) rather than
+  waiting out its minute.
+- **`LastfmLink` reads the host as written** (`percentEncodedHost`, any `%` refused): `URLComponents.host` decodes, so
+  `https://evil.com%2elast.fm/` and `https://%6Cast.fm/x` passed, which Python's `urlparse` - and `lastfm_url` - refuse.
+  test_ios_contract.py now holds both rules to the same links.
+- The session's kept answers are timed by **`Monotonic`**, not `Date()`, as SearchModel's are.
+- LastfmMatchTests compared Strings with `==` (canonical equivalence: "é" equals "e" and a combining acute); they now
+  compare unicode scalars, and a check proves a decomposed letter is a difference.
+- docs/ios.md: an older deadwax said exactly - 2.1.36-2.1.40 draw a blank line under the name and no Top Songs, before
+  2.1.36 nothing; the rows that may be yours, the search's title, the line keeping its place, check 484's re-open.
+- **Known, not fixed**: on a split album (another performer's song beside theirs), a top song can match the other
+  performer's song of the same title - the candidates are every song of the page's albums, by title alone.
+- **The server's, not the app's**: Python's `re.IGNORECASE` folds ı and İ in a take aside where the app's port doesn't
+  (the review's finding 2); it's being fixed on main. The app follows `match-vectors.json`, as the server will.
+
+Tests: TopSongsTests +4 (an album not in hand never "not in your library"; offline, the page's or this device's albums,
+any other unknown; online, an album that didn't load; the search's title), LastfmPageTests +1 (the line kept),
+LastfmDecodeTests (the two percent-encoded hosts, a path's percents, a port), test_ios_lastfm.py +1 (the page's
+troubles, `retryFailed`, Monotonic) and the rules above pinned. Faults, each applied alone, run, restored - every one
+caught: an unknown row said missing (three TopSongsTests); an album not in hand ignored (two); offline, this device's
+albums not read; online, rows met before every album settled; the raw title searched (Core and the opener); the
+reservation ignored (Core, the view not passing it, the model not keeping it); a percent-encoded host decoded; strip's
+result normalised (the scalar comparison); an unknown row not dimmed; topRows not passing `unknown`; the page's
+Last.fm failure unsaid; a kept failure waited out; the wall clock.

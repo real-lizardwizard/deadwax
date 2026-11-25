@@ -34,6 +34,7 @@ struct DrawnArtists {
 /// - The artist order, per device, under the web's own key (ArtistOrder.storageKey).
 /// - The last `ArtistPage.kept` artists' answers (ARTISTS_KEPT): an artist page opened again draws at once, and while
 ///   deadwax can't be reached, from what was in hand.
+/// - (Last.fm, slice A1) Their Last.fm answers beside them (LastfmPage.Kept), and the artist pages showing, for Top Songs.
 ///
 /// `reset()` - a new person - drops everything in memory, and nothing asked before it lands after it.
 @MainActor
@@ -179,6 +180,33 @@ final class ArtistsModel {
         keptOrder.removeAll { (kept: String) -> Bool in kept == id }
     }
 
+    // MARK: Last.fm (slice A1 - notes/ios.md "Last.fm, slice A1")
+
+    /// Each artist's Last.fm answer kept for the session, beside their own answer (LastfmPage.Kept: the last 64, an
+    /// answer not had whole a minute) - an artist page opened again draws Top Songs at once, in place.
+    @ObservationIgnored private var lastfm = LastfmPage.Kept()
+    /// The artist pages showing, by artist id - their Top Songs page draws the very rows the page has.
+    @ObservationIgnored private var pages: [String: ShownArtistPage] = [:]
+
+    func keptLastfm(_ id: String) -> LastfmPage.Kept.Entry? { lastfm.entry(id, now: Self.now) }
+
+    /// An artist's Last.fm answer kept - nil for an ask that failed (kept a minute).
+    func keepLastfm(_ id: String, _ answer: LastfmArtist?, asked: String) {
+        lastfm.keep(id, answer, asked: asked, now: Self.now)
+    }
+
+    /// The clock the kept answers are timed by, in ms: one that only goes forward and counts the phone asleep
+    /// (Monotonic, as SearchModel's kept answers are timed) - never the wall clock, which can be set back.
+    private static var now: Double { Monotonic.seconds() * 1000 }
+
+    /// An artist page showing: its model is the one their Top Songs page reads.
+    func showing(_ page: ArtistPageModel) {
+        pages[page.route.id] = ShownArtistPage(page)
+    }
+
+    /// The artist page showing for the artist, if one still is.
+    func page(_ id: String) -> ArtistPageModel? { pages[id]?.page }
+
     // MARK: who an artist is, chosen (Phase 8, slice 5)
 
     /// Who an artist page's artist is on MusicBrainz, chosen with Which artist is this? - by the page's artist id, for
@@ -204,5 +232,16 @@ final class ArtistsModel {
         kept = [:]
         keptOrder = []
         chosen = [:]
+        lastfm = LastfmPage.Kept()
+        pages = [:]
+    }
+}
+
+/// An artist page's model, held no longer than its page holds it.
+private final class ShownArtistPage {
+    weak var page: ArtistPageModel?
+
+    init(_ page: ArtistPageModel) {
+        self.page = page
     }
 }
