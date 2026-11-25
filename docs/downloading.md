@@ -381,6 +381,10 @@ at once, its cover and title faded, and the transfers are removed from slskd's o
 `SLSKD_INCOMPLETE_PATH` is set, the half-finished file slskd was writing is deleted as well;
 otherwise slskd keeps it, which is its normal behaviour.
 
+A download that has finished can't be cancelled, even from a question left open while its last file arrived: once
+it is being added to your library, or is there, deadwax refuses the cancel ("This download has finished and is
+being added to your library, or already is: there's nothing to cancel.") and the album is filed as usual.
+
 ## With logins on: downloads per person
 
 With logins on ([sharing deadwax](sharing.md)), a download is the person's who asked for it. With

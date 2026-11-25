@@ -12,7 +12,7 @@ from src.matching import rank_candidates
 from src.organizer import remove_incomplete_downloads
 from src.poller import (NOT_FILED_PATTERNS, job_lock_key, job_outcome, retry_next_peer, retry_same_peer, retryable,
                         tidy_cancelled_later, tidy_cancelled_transfers, untried_alternatives)
-from src.store import (CLEARABLE_STATUSES, OPEN_STATUSES, RETRYABLE_STATUSES,
+from src.store import (CLEARABLE_STATUSES, FINISHED_STATUSES, OPEN_STATUSES, RETRYABLE_STATUSES,
                        index_transfers_by_user, summarize_transfers)
 from src.store_index import (FILING_STATUSES, already_have, coming_now, describe_job, filing_folder, held_copy,
                              in_flight, is_whole, other_pressings, release_lock)
@@ -872,6 +872,10 @@ async def _job_for(request: Request, job_id: int, user: str) -> dict:
     return job
 
 
+#? (2.1.45) the cancel route's refusal of a download that has finished
+ALREADY_FINISHED = "This download has finished and is being added to your library, or already is: there's nothing to cancel."
+
+
 @router.post("/jobs/{job_id}/cancel")
 async def cancel_job(request: Request, job_id: int, user: str = Depends(current_user)):
     """
@@ -889,6 +893,11 @@ async def cancel_job(request: Request, job_id: int, user: str = Depends(current_
     removed, only when the last one waiting leaves - or an admin cancels, which is for everyone.
     Decided under the job's lock (poller.job_lock_key), so a join or a retry is never half-way
     through as the last request goes. With logins off the one user is the admin: as it always was.
+
+    A download that has finished - being filed, or filed - is never cancelled (2.1.45): a 409, decided on the
+    job as it is now, and again in the status's own write, since the poller starts a filing without this lock.
+    The apps never offer a cancel then; this keeps a cancel asked a moment earlier (a confirmation left open
+    while the last file arrived) from cancelling a filing half-way or calling a filed album cancelled.
     """
     user = _asker(user)
     try:
@@ -896,6 +905,9 @@ async def cancel_job(request: Request, job_id: int, user: str = Depends(current_
         job = await _job_for(request, job_id, user)
 
         async with release_lock(job_lock_key(job)):
+            job = await store.get_job(job_id) or job
+            if job.get("status") in FINISHED_STATUSES:
+                raise HTTPException(status_code=409, detail=ALREADY_FINISHED)
             if not await _everyone(request, user):
                 outcome = await store.leave_job(job_id, user)
                 if outcome == "none":
@@ -933,7 +945,11 @@ async def _cancel_download(request: Request, job: dict) -> dict:
             if await slskd_client.cancel_download(job["username"], transfer["id"]):
                 cancelled += 1
 
-    await store.update_status(job_id, "cancelled", "cancelled from deadwax")
+    if not await store.update_status(job_id, "cancelled", "cancelled from deadwax", unless=FINISHED_STATUSES):
+        #? it finished while slskd was being asked - every file had arrived, so the cancels touched nothing it needs
+        logger.info(f"{job['artist']} - {job['album']} finished as it was cancelled; it is being added to the library",
+                    extra={"frontend": True, "src": "slskd"})
+        raise HTTPException(status_code=409, detail=ALREADY_FINISHED)
 
     #? slskd removes a transfer from its list only once the cancel has SETTLED, which is a
     #? moment after this - so the removal is asked for again when it has (see poller.py)

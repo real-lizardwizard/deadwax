@@ -648,6 +648,10 @@ OPEN_STATUSES = ("queued", "downloading")
 CLEARABLE_STATUSES = ("complete", "organized", "failed", "cancelled")
 #? what "try the next peer" can start again - anything still moving is left to finish
 RETRYABLE_STATUSES = ("failed", "cancelled")
+#? (2.1.45) what a cancel never touches: a download that finished - on its way into the library, or there. Marking one
+#? `cancelled` would cancel a filing half-way or call a filed album cancelled (its Done row turned Needs attention);
+#? anything filed stays, as cancel_job always said. routes/download.py cancel_job refuses them.
+FINISHED_STATUSES = ("complete", "organizing", "organized")
 
 #? How long a job in `organizing` still counts as on its way into the library (step 2). A job a
 #? stop caught mid-filing is settled when the poller starts (poller.settle_interrupted_filing,
@@ -1093,22 +1097,29 @@ class JobStore:
             logger.error(f"failed to read {status} jobs by their error")
             return []
 
-    async def update_status(self, job_id: int, status: str, error: str | None = None) -> None:
+    async def update_status(self, job_id: int, status: str, error: str | None = None,
+                            unless: tuple[str, ...] = ()) -> bool:
+        """The job's status (and error) written - not while it is in one of `unless`, checked in the same
+        statement (2.1.45: a cancel never overwrites a filing the poller started a moment ago). Whether it was
+        written."""
         if not self.available:
-            return
+            return False
 
-        def write():
+        def write() -> bool:
+            guard = f" AND status NOT IN ({', '.join('?' * len(unless))})" if unless else ""
             with self._connect() as connection:
-                connection.execute(
-                    "UPDATE jobs SET status = ?, error = ?, updated_at = ? WHERE id = ?",
-                    (status, error, _now(), job_id),
+                cursor = connection.execute(
+                    f"UPDATE jobs SET status = ?, error = ?, updated_at = ? WHERE id = ?{guard}",
+                    (status, error, _now(), job_id, *unless),
                 )
+                return cursor.rowcount > 0
 
         try:
-            await asyncio.to_thread(write)
+            return await asyncio.to_thread(write)
 
         except Exception:
             logger.error(f"failed to update job {job_id} to {status}")
+            return False
 
 
     async def delete_jobs(self, statuses: tuple[str, ...]) -> int:

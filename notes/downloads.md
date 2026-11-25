@@ -624,3 +624,25 @@ files' date year, as the row's is - a Navidrome answering another year, say the 
 files would leave the album null, never the wrong one); what its album full text holds (above); whether Navidrome lists an id-less copy and an
 `[unmatched]` one of the same name and album artist as one album or two (M9, M17 - the "exactly one" rule says
 null when it's two); anything against a real slskd or Navidrome.
+
+### A finished download is never cancelled (2.1.45)
+
+Found reviewing the Mac app's Requests table (redesign slice R8, 25 Nov). Its Cancel confirmation held the row as it was
+when Cancel was clicked, and `POST /deadwax/jobs/{id}/cancel` checked nothing. So a download whose last file arrived
+while the question was open was marked `cancelled`. That either cancelled a filing half-way, or called a filed album
+cancelled, and its Done row turned into Needs attention. The web app and the phone never offer a cancel once a download
+is being filed (`row.cancel` is null while `organizing`), but nothing held the server to it.
+
+- **The route refuses** a job in `store.FINISHED_STATUSES` (`complete`, `organizing`, `organized`) with a 409 whose
+  detail is `ALREADY_FINISHED`. It decides on the job as it is now, read again under the job's lock, before a user's
+  leave or the cancel itself.
+- **The status's own write is guarded too**: `update_status(..., unless=FINISHED_STATUSES)` adds
+  `AND status NOT IN (...)` to its one UPDATE and says whether it wrote. The guard is needed because the poller starts a
+  filing (`complete`, then `organizing`) without the job's lock. A cancel that loses that race has already asked slskd
+  to cancel transfers that had all arrived, which touches nothing a filing needs. It then answers the same 409 and
+  removes no partials.
+- **Left as it was:** the other direction. The poller writes `complete` over a `cancelled` it didn't see, if a cancel
+  lands between the poller's read and its write. That was there before, and the cancelled transfers make it rare.
+- **Also left:** a user's last leave that loses the race has left, though the 409 says nothing was cancelled. The
+  filing then grants the album to whoever else still waits, and to nobody if no one does.
+- **Tests:** `tests/test_cancel_finished.py`.
