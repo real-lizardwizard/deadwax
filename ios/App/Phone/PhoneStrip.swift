@@ -12,7 +12,9 @@ import SwiftUI
 /// - It starts at the leading edge (.chips) and never wraps: where its buttons don't fit the width, the strip scrolls
 ///   sideways, and the shown button is brought into view whenever it changes - by a tap or by the page's own swipe -
 ///   moving as the Library's swipe does (`.snappy`, none with Reduce Motion).
-/// - VoiceOver hears a tab bar: each button a tab, the one shown selected.
+/// - VoiceOver hears a tab bar: each button a tab, the one shown selected. A button that opens a page of its own (R2's
+///   review: the Library's Downloaded, `pushes`) follows the tab bar in the same row, a button to VoiceOver, never a
+///   tab and never selected.
 /// - Capped at xxxLarge, as the tab bar is.
 struct PhoneStrip<Part: Hashable>: View {
     let options: [Part]
@@ -20,6 +22,9 @@ struct PhoneStrip<Part: Hashable>: View {
     @Binding var shown: Part
     /// What VoiceOver calls the strip.
     let spoken: String
+    /// (R2's review) The buttons after the tabs that open a page of their own: a tap sets `shown` to one (the page's
+    /// owner opens it), and it is drawn as the others, never lit.
+    var pushes: [Part] = []
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
@@ -47,14 +52,20 @@ struct PhoneStrip<Part: Hashable>: View {
         // .chips: padding 0 16px 10px
         .padding(.bottom, CGFloat(PhoneLook.stripFoot))
         .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
-        .accessibilityElement(children: .contain)
-        .accessibilityAddTraits(.isTabBar)
-        .accessibilityLabel(spoken)
     }
 
     private var row: some View {
         HStack(spacing: CGFloat(PhoneLook.stripGap)) {
-            ForEach(options, id: \.self) { (option: Part) in
+            HStack(spacing: CGFloat(PhoneLook.stripGap)) {
+                ForEach(options, id: \.self) { (option: Part) in
+                    button(option)
+                        .id(option)
+                }
+            }
+            .accessibilityElement(children: .contain)
+            .accessibilityAddTraits(.isTabBar)
+            .accessibilityLabel(spoken)
+            ForEach(pushes, id: \.self) { (option: Part) in
                 button(option)
                     .id(option)
             }

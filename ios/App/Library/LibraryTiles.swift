@@ -1,8 +1,30 @@
 import DeadwaxCore
 import SwiftUI
 
-/// One album's tile (app/AlbumTile.tsx): the cover, the title, the artist and - with a library of your own - the New
-/// mark of an album new in your library until you open it. It opens its album; nothing here plays.
+/// The Library's lists as the redesign draws them (slice R2 - notes/ios.md "The redesign, slice R2: Albums and Artists,
+/// and the Library's top"): iLibrary.dc.html's tiles and iArtists.dc.html's rows, each size from dw.css's phone rules or
+/// the drawing itself, as its comment says (tests/test_ios_library_look.py holds each to its source).
+enum LibraryLook {
+    /// .tiles: two columns 14 apart, rows 16 apart, 12 under the meta line.
+    static let tileColumnGap: CGFloat = 14      // dw.ph: .tiles gap 2
+    static let tileRowGap: CGFloat = 16         // dw.ph: .tiles gap 1
+    static let tilesTop: CGFloat = 12           // dw.ph: .tiles padding-top
+    /// .tile > .t: the title 7 under the cover.
+    static let tileTitleAbove: CGFloat = 7      // dw.ph: .tile > .t margin-top
+    /// A list's tall row: the cover 44, 16 in; its words 10 either side; the chevron 16 from the right.
+    static let rowCover: CGFloat = 44           // drawn: iArtists .row .cover width
+    static let rowSide: CGFloat = 16            // drawn: iArtists .row padding-left
+    static let rowTextSide: CGFloat = 10        // dw.ph: .row > div padding-left
+    static let rowTrail: CGFloat = 16           // drawn: iArtists .row chevron padding-right
+    /// The list's sides - the meta line's and the strip's 16.
+    static let side: CGFloat = 16               // dw.ph: .tiles padding-left
+    /// Find's field under the top, 8 above the strip (drawn nowhere in dw.css: the field the top opens is the app's).
+    static let findBelow: CGFloat = 8
+}
+
+/// One album's tile (app/AlbumTile.tsx; since R2 iLibrary's .tile): the cover, the title (15, semibold, white), the
+/// artist (13, the second colour) and - with a library of your own - the New mark of an album new in your library until
+/// you open it. It opens its album; nothing here plays.
 ///
 /// Phase 2 (phase2-downloads.md 5.1, 5.3): an album with a download state carries its mark at the end of its artist
 /// line - never on the cover, whose top left is the New mark's - outside the artist's words, so a long artist
@@ -19,28 +41,29 @@ struct LibraryTile: View {
 
     var body: some View {
         Button(action: open) {
-            VStack(alignment: .leading, spacing: 6) {
+            VStack(alignment: .leading, spacing: 0) {
                 LibraryCover(id: album.coverArt, pixels: CoverSize.tile)
-                    .clipShape(Corners.artShape)
+                    .clipShape(DWCorners.chipShape)
                     .overlay(alignment: .topLeading) {
                         if isNew { LibraryNewMark().padding(6) }
                     }
                 VStack(alignment: .leading, spacing: 1) {
                     Text(album.name ?? "")
-                        .font(Typeface.footnote.weight(.medium))
-                        .foregroundStyle(.primary)
-                    ArtistLine(artist: album.artist ?? "", download: download, font: Typeface.footnote)
+                        .font(Typeface.subheadline.weight(.semibold))
+                        .foregroundStyle(DWPalette.text)
+                    ArtistLine(artist: album.artist ?? "", download: download)
                     if let line {
                         Text(line)
-                            .font(Typeface.footnote)
-                            .foregroundStyle(download.isFailed ? Palette.amber : Palette.quiet)
+                            .font(Typeface.Phone.text(.small))
+                            .foregroundStyle(download.isFailed ? DWPalette.amberText : DWPalette.t2)
                     }
                 }
                 .lineLimit(1)
+                .padding(.top, LibraryLook.tileTitleAbove)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .contentShape(Rectangle())
-            .opacity(dimmed ? Palette.off : 1)
+            .opacity(dimmed ? DWPalette.off : 1)
         }
         .buttonStyle(.plain)
         .disabled(dimmed)
@@ -60,18 +83,17 @@ struct LibraryTile: View {
     }
 }
 
-/// A tile's or a row's artist line with the album's download mark at its end (5.3): the mark outside the words, fixed,
-/// so a long artist truncates before it rather than taking it with it.
+/// A tile's or a row's artist line (.a, .s: 13, the second colour) with the album's download mark at its end (5.3): the
+/// mark outside the words, fixed, so a long artist truncates before it rather than taking it with it.
 private struct ArtistLine: View {
     let artist: String
     let download: AlbumDownload
-    let font: Font
 
     var body: some View {
         HStack(alignment: .firstTextBaseline, spacing: 4) {
             Text(artist)
-                .font(font)
-                .foregroundStyle(Palette.quiet)
+                .font(Typeface.Phone.text(.small))
+                .foregroundStyle(DWPalette.t2)
                 .lineLimit(1)
             if let mark = DownloadWords.mark(download) {
                 DownloadMark(mark: mark, fraction: DownloadWords.Mark.fraction(download), font: Typeface.symbol(.caption2))
@@ -89,8 +111,56 @@ extension AlbumDownload {
     }
 }
 
-/// One album's row in the list layout (library.md Open question 3): the cover at the rows' size, the title, the
-/// artist under it, and the New mark - the same headers, Find, index and marks as the tiles, the download's too.
+/// A list's tall row as the redesign draws it (iArtists.dc.html's .row.tall, slice R2): the cover 44 at 16 in, the
+/// name (17, white) and its line (13, the second colour) 10 from either side, what trails it - the chevron, or a song's
+/// ••• - and the row's rule under it; 60 tall at least, growing with the text. The rule spans the row within the list's
+/// own 16 pt sides (the drawing's runs edge to edge: the lists keep their sides, for the letter index's room).
+struct LibraryListRow<Cover: View, Trailing: View>: View {
+    let title: String
+    let line: String
+    var lineColour = DWPalette.t2
+    /// (R2's review) How many lines the name and its line may each take: one, as drawn - a playlist's two at the
+    /// accessibility sizes, as its row had before R2, so a long name isn't cut.
+    var lines = 1
+    @ViewBuilder let cover: Cover
+    @ViewBuilder let trailing: Trailing
+
+    var body: some View {
+        HStack(spacing: 0) {
+            cover
+                .frame(width: LibraryLook.rowCover, height: LibraryLook.rowCover)
+            VStack(alignment: .leading, spacing: 1) {
+                Text(title)
+                    .font(Typeface.body)
+                    .foregroundStyle(DWPalette.text)
+                if !line.isEmpty {
+                    Text(line)
+                        .font(Typeface.Phone.text(.small))
+                        .foregroundStyle(lineColour)
+                }
+            }
+            .lineLimit(lines)
+            .padding(.horizontal, LibraryLook.rowTextSide)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            trailing
+        }
+        .lookHeight(DWLook.here.tallRowHeight)
+        .overlay(alignment: .bottom) { DWRule(colour: DWPalette.rowRule) }
+    }
+}
+
+/// The row's chevron (the drawing's ›, in the third colour): its page is pushed.
+struct LibraryChevron: View {
+    var body: some View {
+        Image(systemName: "chevron.right")
+            .font(Typeface.symbol(.footnote).weight(.semibold))
+            .foregroundStyle(DWPalette.t3)
+            .accessibilityHidden(true)
+    }
+}
+
+/// One album's row in the list layout (library.md Open question 3; since R2 iArtists' tall row): the cover, the title,
+/// the artist under it, and the New mark - the same headers, Find, index and marks as the tiles, the download's too.
 struct LibraryRow: View {
     let album: IndexAlbum
     let isNew: Bool
@@ -99,33 +169,37 @@ struct LibraryRow: View {
     var dimmed = false
     let open: () -> Void
 
-    /// The cover's side, and where the text (and the line under a row) begins.
+    /// The cover's side, and where the text (and the line under a row) begins - the rows of the lists R2 doesn't redraw
+    /// (a playlist's songs, the playlist picker) still read these.
     static let cover: CGFloat = 48
     static let textInset: CGFloat = cover + 12
 
     var body: some View {
         Button(action: open) {
-            HStack(spacing: 12) {
+            HStack(spacing: 0) {
                 LibraryCover(id: album.coverArt, pixels: CoverSize.row)
-                    .frame(width: Self.cover, height: Self.cover)
-                    .clipShape(Corners.artShape)
-                VStack(alignment: .leading, spacing: 2) {
+                    .frame(width: LibraryLook.rowCover, height: LibraryLook.rowCover)
+                    .clipShape(DWCorners.chipShape)
+                VStack(alignment: .leading, spacing: 1) {
                     Text(album.name ?? "")
-                        .foregroundStyle(.primary)
-                    ArtistLine(artist: album.artist ?? "", download: download, font: Typeface.subheadline)
+                        .font(Typeface.body)
+                        .foregroundStyle(DWPalette.text)
+                    ArtistLine(artist: album.artist ?? "", download: download)
                     if let line {
                         Text(line)
-                            .font(Typeface.footnote)
-                            .foregroundStyle(download.isFailed ? Palette.amber : Palette.quiet)
+                            .font(Typeface.Phone.text(.small))
+                            .foregroundStyle(download.isFailed ? DWPalette.amberText : DWPalette.t2)
                     }
                 }
                 .lineLimit(1)
-                Spacer(minLength: 8)
+                .padding(.horizontal, LibraryLook.rowTextSide)
+                .frame(maxWidth: .infinity, alignment: .leading)
                 if isNew { LibraryNewMark() }
             }
-            .padding(.vertical, 8)
+            .lookHeight(DWLook.here.tallRowHeight)
+            .overlay(alignment: .bottom) { DWRule(colour: DWPalette.rowRule) }
             .contentShape(Rectangle())
-            .opacity(dimmed ? Palette.off : 1)
+            .opacity(dimmed ? DWPalette.off : 1)
         }
         .buttonStyle(.plain)
         .disabled(dimmed)
@@ -135,21 +209,12 @@ struct LibraryRow: View {
     }
 }
 
-/// The New mark: "New", read as "New in your library" (the tile's own label says it, for VoiceOver).
+/// The New mark: "New", the accent's chip (.chip.purple) on the window's ground - legible whatever the cover behind it -
+/// read as "New in your library" (the tile's own label says it, for VoiceOver).
 struct LibraryNewMark: View {
     var body: some View {
-        Text(LibraryWords.newMark)
-            .font(Typeface.caption2.weight(.semibold))
-            .foregroundStyle(Palette.accent)
-            .padding(.horizontal, 6)
-            .padding(.vertical, 2)
-            .background {
-                // the card's own colour under the badge's tint: legible whatever the cover behind it
-                Corners.controlShape
-                    .fill(Color(white: 0.08))
-                    .overlay(Corners.controlShape.fill(Palette.accent.opacity(0.18)))
-            }
-            .overlay(Corners.controlShape.strokeBorder(Palette.accent.opacity(0.55)))
+        DWChip(words: LibraryWords.newMark, tone: .marked)
+            .background(DWPalette.bg, in: DWCorners.chipShape)
             .accessibilityLabel(LibraryWords.newMarkSpoken)
     }
 }
@@ -162,6 +227,7 @@ struct LibraryHeader: View {
     var body: some View {
         Text(label)
             .font(Typeface.title3.weight(.semibold))
+            .foregroundStyle(DWPalette.head)
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.top, 14)
             .padding(.bottom, 2)

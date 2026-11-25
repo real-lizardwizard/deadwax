@@ -17302,6 +17302,236 @@ committed.
 
 Tests after review: test_ios_phone_look 22 (from 19), DWLookTests 5 (from 4).
 
+## The redesign, slice R2: Albums and Artists, and the Library's top (2026-11-25)
+
+R2 of ~/Desktop/Code/deadwax-plans/mac-redesign-build.md (section 3.4, "#### R2"), built to wave-b-common.md and to
+James's answer 1, which binds the phone: **"Today's behaviour, new look"**. So the phone's Library does what it did, in
+iLibrary's, iArtists' and iPlaylists' look:
+- Find is kept, its square magnifying glass before the •••;
+- the strip is the pages in the order kept, then Downloaded (pushed, as the •••'s Downloaded was);
+- Songs is a page only where it was one - never beside your own albums;
+- Yours | All shows only with a library of your own, in place of the •••'s All music;
+- the meta line holds the count, the sort (out of the •••), and Grid and List on Albums;
+- the pager's swipe, Find's field, the pull to shuffle, the letter index and TopClearance work as before.
+
+The Mac's Albums and Artists become its own pages: column lists (or tiles) under a toolbar. R3 and R8 were built at the
+same time in their own worktrees; none of their files is touched here. The app is still 0.13 (13), `__version__` is
+untouched, and the word fixtures are unchanged (no key changed).
+
+The gate, `git diff 5123bab3 --stat -- ios ':!ios/App/Mac' ':!ios/App/Look' ':!ios/App/Phone'`, names:
+- App/Library's six (LibraryTop, LibraryView, LibraryTiles, AlbumsScreen, ArtistsScreen, SongsScreen) and
+  App/Playlists/PlaylistsScreen - the slice's Touches;
+- App/Shared/Platform.swift: `listKeys`, a Mac half and a phone half that does nothing (the Mac's list hears its keys
+  in one place, as `returnPresses` does);
+- Core's LibrarySwitch.swift (added to - and, since the review, the old •••'s `LibraryMenu.sections` taken out) and
+  LibrarySwitchTests, ArtistTotals.swift and ArtistTotalsTests (new);
+- since the review, three that only named the old •••: a comment each in App/Models/LibraryModel.swift and Core's
+  MacSidebar.swift, and ShuffleVectorTests' All music check (After review, 9).
+
+The following have no diff: ios/Deadwax.xcodeproj (App/ is a synchronized folder), ios/Config, the words fixtures, the
+engine files (DeadwaxAudio, AudioSessionController, Core's QueueController and UpNext), DeadwaxClient and Core's Routes,
+App/Look, src/ and ui/ - and App/Phone, but for PhoneStrip's `pushes` since the review (After review, 9).
+
+### What was built
+
+**Core.**
+- **ArtistTotals.swift** (new). `ArtistTotals.of(albums)` adds up each artist's songs, plays and last played
+  from the album index the app already has - keyed by the album's `artistId`, never its name, so two artists of one
+  name stay two; an album with no id counts for nobody; a negative count counts as none. `playedAt` is nil for an album
+  never played, for Navidrome's zero time and for a value that isn't a date. `lastPlayedWords` is Artists.dc.html's
+  column: "today", "yesterday", "3 days ago", "last week", then "12 Nov" (with its year when it isn't this one), by the
+  calendar's days in the device's zone; a time after now (a clock set wrong) is today; nil is "" - never a date. The
+  counts' words ("1,612 songs", "1 artist", `number`, `plays`, "1 selected"), the phone's artist row line ("6 albums ·
+  59 songs", the old words while no songs are in hand) and LibraryColumnWords, the Mac's column heads.
+- **LibrarySwitch.swift**, added to:
+  - `LibrarySide` (Yours, All) and its scope; `LibraryPages.allMusic`, `shown(_:personal:side:)` (All's pages are
+    Albums, Artists and Songs in the order kept), `sides` (Yours | All shows with a library of your own, the Library on
+    your albums, deadwax reachable - just where All music was offered) and `side`;
+  - `LibraryStripItem` and `LibraryStrip.items`: the pages, then Downloaded - none while the Albums page is Downloaded
+    (offline), which is already it;
+  - `LibraryMenu.topSections`: the top's ••• - Shuffle, the way back to the albums while the Albums page is
+    Downloaded, then Refresh and Edit order;
+  - LibrarySwitchWords' yours, all, sidesLabel, grid, list and playlistsCount.
+
+**The phone.**
+- **LibraryTop** is iLibrary's top: PhoneTop's "Library", and at its trailing end Yours | All (DWSegmented, when
+  `sides`), the magnifying glass and the ••• (DWButtonStyle small, square). Find's field comes up under it. The
+  clearance (TopClearance), the fill behind the status bar (Palette.page, black) and the TopProbe are as they were. The
+  old switch (LibrarySwitchControl, its segment reach and its hairline) is gone.
+- **LibraryView** draws the strip (PhoneStrip) under the top. A chip runs the switch's old tap - `show(chosen)` under
+  `.snappy`, none with Reduce Motion - so the pager moves to the page; a swipe settling lights the page's chip; the
+  Downloaded chip pushes `.downloaded` on the tab's path. On All the pages are the collection's (AlbumList
+  `.scope(.store)`, ArtistsScreen's scope), the pull and the ••• shuffle All songs, and Refresh refreshes that side.
+  LibraryView is now generic over a `Desk`, so the Mac can pass its own pages in (below); the phone's is `EmptyView`.
+- **Each page's meta line** (PhoneMeta) under the strip: Albums' count, its sort as a purple link opening the sort's
+  menu, and Grid and List (DWToggleStyle) at the end; Artists' count and order; Playlists' count ("3 of 9 playlists"
+  while Find finds) and New playlist… (only while deadwax can be reached); Songs' count. The pushed lists (All albums
+  from See All music, Downloaded) keep their navigation bar, its sort and their counts in the list, as before.
+- **LibraryTiles**: LibraryLook holds dw.css's sizes (tiles 14 and 16 apart, 12 from the top, 7 over the title; tall
+  rows 60 with 44 covers, 16 at the sides, 10 between). The tile, the rows (iArtists' tall row, LibraryListRow, with
+  LibraryChevron), the New mark and the headers are drawn from it and from DWPalette, square.
+- **ArtistsScreen**'s row says the artist's songs once the scope's albums have come (`ArtistTotals.rowLine`), made once
+  per answer (`ArtistTotalsKey`: the scope and the shelf's serial).
+- **SongsScreen** and **PlaylistsScreen**' rows are the same tall rows.
+
+**The Mac.**
+- **MacColumnList** (App/Mac/Components): the header strip (.cols), 30-point rows striped by MacTable.stripes, the
+  selected row in the selection's fill and edge; widths from MacTable.widths; click selects, double-click or Return
+  opens, ↑ ↓ Home End move (MacTable.moved/returned/kept); one VoiceOver element per row.
+- **MacAlbumsPage**: the toolbar - Play (primary, a SharpSymbol play), Shuffle, the groove, Sort and its pop-up
+  (LibraryModel.sort), Grid | List (LibraryModel.layout, kept on this Mac as the phone keeps its own), Find in albums
+  (230) - over the list (Album with its 20-point cover, Artist 150, Year 54, Songs 58) or MacFrame.tileMin tiles. The
+  status bar: albums and songs listed, "1 selected"; the selection is Info's (MacSelection).
+- **MacArtistsPage**: the same toolbar over Artist, Albums 76, Songs 76, Plays 70, Last played 124. Albums is
+  Navidrome's albumCount; Songs, Plays and Last played are ArtistTotals over the scope's album index. Status: artists
+  and albums listed.
+- **Play** on either plays only once the songs are in hand. They are asked as the row is selected (an AlbumModel or an
+  ArtistPageModel, as the pages ask), and Play is dimmed until they come. The tap calls `player.play(songs:album:at:)`
+  or `player.play(artist:shuffle:)` with nothing awaited. Shuffle is the Library's (ShuffleModel, All songs' for the
+  collection's pages with a library of your own).
+- **MacLibraryDesk** chooses the page. `MacLibrary.root()` passes it to LibraryView as its desk: at the root, with
+  Albums or Artists showing, the desk is drawn in the top's, the strip's and the pager's place. `MacLibrary.page(for:)`
+  sends the sidebar's All Albums and All Artists to the Mac's pages too.
+- **MacPalette**: columnsFace, columnsRule, rowStripe and coverEdge, each from dw.css - since the review, R8's
+  block byte for byte (groupRowFace with them, which R2 doesn't draw).
+
+### Decisions, and where this departs from the plan
+
+- **A desk closure, not a Mac page named from the Library.** App/Library may not name App/Mac
+  (test_ios_mac_reach.py), so LibraryView takes the Mac's pages as a generic closure from MacLibrary.
+- **Yours | All is the phone's alone.** The Mac's sidebar has its own (slice 3); on the Mac the top's is never shown.
+- **The Mac pages' Find has no ⌘F.** test_ios_mac counts `.findField(` once app-wide, and ⌘F stays the sidebar's
+  search, as slice 3 settled.
+- **Edit order edits Yours' pages.** All shows Albums, Artists and Songs in the kept order; there is no order of its
+  own.
+- **Left out, as no data the app has can draw it:** the Albums list's Format column, the library's size and
+  "Navidrome up to date" in the status bar - the album index carries none of them, and a route would be new server
+  data.
+- **Left out for now:** the header's sort caret (Sort is the toolbar's pop-up, the order the phone shares - a header
+  that sorts would be a second way); group headings in the Mac's lists; Play on the Mac's Artists while offline (an artist's songs come
+  from deadwax); the phone cover's 1-point edge. The Mac's Playlists, Songs and Downloaded are still the phone's pages, under the strip,
+  and a swipe from Playlists onto Albums there brings the desk in.
+
+### Tests, and the faults they were seen failing on
+
+- **Core ArtistTotalsTests** (8 tests, new) and **LibrarySwitchTests** (5 added: songs never beside your own albums,
+  Yours | All where All music was, the strip, the top's •••, Playlists' count).
+- **tests/test_ios_library_look.py** (12, new): the tiles and rows against dw.css; the phone's Library square; tokens
+  only in the redrawn files; the top as iLibrary's with Find kept; the top clearing the island; a chip moving the pager
+  and Downloaded pushed; Songs never beside your own albums; the meta lines; the layout kept per device and bound on
+  both; every play in the tap with the songs in hand; the Mac's column lists; the totals made once per answer.
+- **Edited:** test_ios_palette.py's Library-top test (the new pager order, the fill, dw.css's top), and three lines of
+  its bars test that held the switch's constants (now a note that the switch's pages are the strip's);
+  test_ios_phone_look.py (the seven R2 files may draw the phone's and the Look's pieces; the animation is the chip's);
+  test_ios_mac_reach.py (the Library's root passes the desk; Albums and Artists are no longer the phone's pages on the
+  Mac).
+
+Each fault was applied alone, run, and restored byte for byte. Every one was caught:
+- the totals keyed by the artist's name, not its id: ArtistTotalsTests `eachAlbumCountsUnderItsOwnArtistAlone` (and
+  two more);
+- a nil played drawn as a date (`ms ?? 0`): `aNilPlayedIsNeverADate`;
+- Songs beside your own albums, in Core (`shown` not filtering): LibrarySwitchTests `songsAreNeverBesideYourOwnAlbums`
+  and three more; and in LibraryView (`personal: false`): `test_songs_is_never_beside_your_own_albums`;
+- the layout not kept per device (LibraryModel's `didSet` emptied):
+  `test_the_layout_is_kept_on_each_device_and_bound_on_both`;
+- an `await` before the Mac's Play: `test_every_play_is_in_the_tap_with_the_songs_in_hand`;
+- a chip that doesn't move the pager (`page = chosen`): `test_a_chip_moves_the_pager_and_downloaded_is_pushed` and
+  test_ios_phone_look's `test_the_phones_pieces_read_and_grow_as_the_plan_says`;
+- Find gone (its button removed): `test_the_librarys_top_is_ilibrarys_with_find_kept`;
+- TopClearance unread (`.padding(.top, clearance)` removed): `test_the_top_still_clears_the_dynamic_island` and
+  test_ios_palette's `test_the_librarys_top_sits_under_the_status_bar`.
+
+### Not verified - checks 526-531
+
+- Nothing of R2 has been seen on a screen: no Simulator, no install. The builds, the tests and the drawings are its
+  only word.
+- The Mac's list keys (526: whether a click gives the list the keyboard, and Return reaching it with the
+  toolbar's field beside it) are as SwiftUI documents `focusable` and `onKeyPress`, untried on Catalyst.
+- That Plays and Last played agree with Navidrome's own pages (528) rests on the album index's playCount and played
+  being the album's, summed - Navidrome's artist page may count plays its own way.
+- The strip's scroll into view at the larger text sizes, Yours | All's fit beside Find and the ••• on the narrowest
+  phone at the largest text size, and the meta line's links' targets are untried on a phone.
+- That the rest of the phone is as before (531) is the iPhone build's and the gate's word.
+
+### After review (2026-11-25)
+
+The review's findings, each fixed in the same commit (R2 stays one), with what catches it. Every mutation below was
+applied alone, run, and restored byte for byte; each was caught by the test named, on its own.
+
+1. **All flipped back to Yours when deadwax dropped out** (`sides` needed `online`, so `side` became Yours, and All's
+   Songs went to Albums through `.onChange(of: side)`). Now `LibraryPages.sides(personal:scope:online:chosen:)` is
+   `personal && scope == .yours && (online || chosen == .all)`: Yours | All is put away offline only while Yours is
+   the side shown, so a chosen All never turns into Yours on screen - its pages draw what is in hand. And All's
+   Albums is `LibrarySide.albums(root)`: always `.scope(.store)`, never the root's Downloaded (Yours' stand-in) - the
+   edge where the Albums page was Downloaded and deadwax came back. Caught by: Core `aChosenAllStaysAllWhenDeadwaxDropsOut`
+   and `yoursOrAllShowsWhereAllMusicWas` (the Core `sides` without `chosen`); `test_a_chosen_all_stays_all_when_deadwax_drops_out`
+   (LibraryView passing `.yours`, `let list = albums`, the `.onChange(of: side)` made a no-op).
+2. **The Mac's Grid acted on an unseen row.** Choosing Grid sets `selected` to nil; `selectedAlbum`, `selectedArtist`
+   and both `playable`s answer nothing outside List. Play is dimmed in Grid, its help `LibraryColumnWords.playHelp`
+   ("Select an album in List to play it."; in List with nothing selected "Select an album to play it."); Shuffle is
+   as it was. Caught by: `test_the_macs_grid_selects_nothing` (each page's clear removed, Albums' layout guard,
+   Artists' Play guard, the help told it's List); Core `playSaysHowToHaveSomethingToPlay` (the help never saying List).
+3. **Right-click on the Mac's rows.** MacColumnList is generic over `Menu: ViewModifier` and puts `menu(row)` on each
+   row (no AnyView). MacAlbumsPage passes `AlbumRightClick(route: AlbumRoute(album))`, the modifier `.albumRightClick`
+   is, so a row's menu is the tiles'; MacArtistsPage passes `EmptyModifier()`, as an artist's row had no right-click
+   before R2 (ArtistsScreen at 5123bab3 has none, and the guide says so). Caught by:
+   `test_the_macs_rows_keep_their_right_click` (the `.modifier` dropped, Albums passing EmptyModifier).
+4. **The All side's wiring had no test of its own.** `LibrarySide.albums`, `artistsScope` and `shuffle` (Core) are
+   what LibraryView reads. Caught by: `test_all_is_wired_to_the_collections_albums_artists_and_shuffle` (`let list =
+   albums`, `scope: nil`, `shuffleOf { .library }`) and `test_a_chosen_all_stays_all_when_deadwax_drops_out` (the
+   `.onChange(of: side)` no-op) in the App; Core `eachSidesAlbumsArtistsAndShuffle` (each of the three in Core).
+5. **For the merge with R8** (its c861764b): MacPalette's column-list block is R8's byte for byte (`git diff` against
+   its file prints nothing) - `columnsRule`, not columnRule, and `coverEdge` with R8's comment. `Platform.listKeys` is
+   R8's name, signature (`(ListKey) -> KeyPress.Result`), doc and phone half, with R8's `ListKey` enum after the
+   `#endif` - plus finding 9's ⌘ rule (three doc lines and nine code lines), which R8's call sites take unchanged:
+   ⌘↑ and ⌘↓ arrive as `.home` and `.end`, which they already handle. test_ios_mac.py's iPhone-half list gains
+   R8's two lines exactly. MacColumnList's `pressed` takes a ListKey.
+6. **Artists' counts.** The Albums column stays Navidrome's albumCount. The status bar's albums are
+   `ArtistTotals.albumCount(of:in:)`: the index's albums whose artistId is one of the artists listed, each id once,
+   none nobody's. `ArtistTotal.albums` is gone (unused). The caveat, in the guide and in check 528: a split album or a
+   compilation counts in B's Albums (Navidrome counts it under each artist) but not B's Songs or Plays (the index puts
+   it under one artistId). Caught by: `test_the_status_bar_counts_each_album_once` (the status summing albumCount);
+   Core `theStatusBarCountsEachAlbumOnce` (an album counted twice, an album nobody's counted).
+7. **"Last played" said today after midnight.** The cells read `now`, a state set by `ArtistTotals.now()` as the page
+   appears and on `UIApplication.significantTimeChangeNotification` (midnight, a clock or zone change) - no `Date()`
+   per cell. Caught by: `test_last_played_is_read_against_a_now_that_moves_with_the_day` (`Date()` back in the cell,
+   another notification); Core `nowIsTheClocksInMilliseconds` (now in seconds).
+8. **↑↓ asked for every row passed.** Both pages' ChosenKey task sleeps 200 ms (`rest`) before choosing, a new
+   selection cancelling it, so a row passed is never asked for. MacAlbumsPage pairs PlayerModel's `albumShown` (made by
+   AlbumModel when its answer comes) with `albumLeft`: `leave()` lets go of the album the selection leaves (another
+   album, or none), `onDisappear` lets go of the one chosen and `onAppear` wants it again, as AlbumView does; and an
+   answer that came only after the selection had left its album (`chosen !== model` after the load) is let go then.
+   `book.leavePage` is a set's remove, so a second leave is harmless. Caught by:
+   `test_arrow_keys_ask_only_once_the_selection_rests` (either page's rest removed, `leave()` keeping the levels, the
+   late answer kept).
+9. **Smaller ones.**
+   - PlaylistRow's tall row takes two lines at the accessibility sizes (`LibraryListRow.lines`), as its row had
+     before R2. Caught by: `test_a_playlists_row_takes_two_lines_at_the_accessibility_sizes` (`lines: 1`, the row's
+     `.lineLimit(1)`).
+   - Downloaded is a button to VoiceOver, not a tab: `LibraryStripItem.pushes`, and PhoneStrip draws its `pushes`
+     after an inner HStack that alone carries `.isTabBar` and the strip's label. Caught by:
+     `test_downloaded_is_a_button_after_the_tab_bar` (all the items as tabs, the pushes given `.isTabBar`); Core
+     `theStripIsThePagesThenDownloaded` (`pushes` false). PhoneStrip is R1b's and R3's strip too (Now Playing's
+     Queue | Info | EQ passes no `pushes`, so it draws as before) - a merge with any R3 change to PhoneStrip's `row`
+     needs a look.
+   - `Platform.listKeys` ignores a press with ⇧, ⌥ or ⌃ held, and maps ⌘↑/⌘↓ to Home/End: ⌘↓ is never ↓. Caught by:
+     `test_command_arrows_are_the_lists_ends_never_an_arrow` (the rule bypassed).
+   - The Mac's Albums rows: the accent's ▶ (SharpSymbol, VoiceOver "Playing") after the title of the album playing,
+     read once per draw from `player.current?.track.albumId` - never a play; the New mark (`library.marks.isNew`, with
+     a library of your own) and the download mark at the artist's end, as LibraryRow had them; a row with nothing
+     here dimmed offline. Caught by: `test_the_macs_album_rows_mark_playing_new_and_downloaded` (each mark removed).
+   - Dead code: `LibraryMenu.sections`, `LibraryMenu.allMusic` and the menu items only they made (order, layout,
+     newPlaylist, downloaded, allMusic, artists, allSongs) are gone; LibraryMenuItem is the top's four (shuffle,
+     albums, refresh, editOrder). LibrarySwitchTests' `theLibrarysMenu` went with them, `theMenusWords` keeps the
+     remaining items' words and checks the moved items' words where they live now; ShuffleVectorTests' All music
+     check reads `LibraryWords.title`, `ArtistWords.title` and `SongWords.title` against the web's `browse`. The words
+     themselves (showAsList, sortLabel, allMusic...) stay: the meta line, LibraryModel and the vectors use them.
+10. **Known, not fixed:** at xxxLarge on a 375-point-wide phone with a library of your own, "Library" in the top
+    truncates beside Yours | All, the magnifying glass and the •••. Check 529 says so.
+
+The words fixtures are still unchanged: no key was added or changed (the help and "Playing" are Core's
+LibraryColumnWords, the same on every device).
+
 ## The redesign, slice R3: the side panel's tabs; the Now Playing sheet (2026-11-25)
 
 The build plan's 3.4 "R3" (~/Desktop/Code/deadwax-plans/mac-redesign-build.md), with James's answers 2 and 3 in its 3.8

@@ -774,13 +774,13 @@ def test_the_phones_pieces_read_and_grow_as_the_plan_says():
     assert ("ViewThatFits(in: .horizontal) { row ScrollViewReader { (proxy: ScrollViewProxy) in "
             "ScrollView(.horizontal, showsIndicators: false) { row }") in flat and ".lineLimit(1)" in strip
     # where it scrolls, the shown button is brought into view - as it opens, and whenever it changes (a tap, the page's
-    # swipe) - moving as the Library's swipe does (LibrarySwitchControl's .snappy, none with Reduce Motion)
+    # swipe) - moving as the Library's swipe does (its chip's tap, LibraryView's .snappy, none with Reduce Motion)
     assert ".onAppear { proxy.scrollTo(shown, anchor: .center) }" in flat
     assert (".onChange(of: shown) { (_: Part, now: Part) in withAnimation(reduceMotion ? nil : .snappy) { "
             "proxy.scrollTo(now, anchor: .center) } }") in flat
     assert "button(option) .id(option)" in flat and "@Environment(\\.accessibilityReduceMotion) private var reduceMotion" in strip
-    library = bare((APP / "Library" / "LibraryTop.swift").read_text(encoding="utf-8"))
-    assert ".animation(reduceMotion ? nil : .snappy, value: shown)" in library
+    library = bare((APP / "Library" / "LibraryView.swift").read_text(encoding="utf-8"))
+    assert "withAnimation(reduceMotion ? nil : .snappy) { show(chosen) }" in library
     # it starts at the leading edge (.chips), where it fits as where it scrolls
     assert ".frame(maxWidth: .infinity, alignment: .leading)" in flat
     chips = resolved(".chips")
@@ -936,14 +936,17 @@ def declared(folder: Path) -> set[str]:
 
 
 #? R1b draws none of App/Phone's pieces and puts App/Look's only where the Mac's look already was: each slice that draws
-#? one on a phone screen adds that file here - R3: Now Playing's sheet (PhoneTop, PhoneBack, PhoneStrip) and its bottom
-#? row (PhoneTabItem, PhoneLook's sizes, DWPalette's accent for the output's name); R8: Requests on the phone, its cards
-#? (PhoneCard, DWMeter, DWRaised, DWButtonStyle) and its screen (PhoneCard)
+#? one on a phone screen adds that file here - R2 the Library's top, its pages and their rows; R3: Now Playing's sheet
+#? (PhoneTop, PhoneBack, PhoneStrip) and its bottom row (PhoneTabItem, PhoneLook's sizes, DWPalette's accent for the
+#? output's name); R8: Requests on the phone, its cards (PhoneCard, DWMeter, DWRaised, DWButtonStyle) and its screen
+R2_LIBRARY = {"Library/LibraryTop.swift", "Library/LibraryView.swift", "Library/LibraryTiles.swift",
+              "Library/AlbumsScreen.swift", "Library/ArtistsScreen.swift", "Library/SongsScreen.swift",
+              "Playlists/PlaylistsScreen.swift"}
 PHONE_PIECES_DRAWN_IN: set[str] = {"Player/NowPlayingSheet.swift", "Player/NowPlayingView.swift",
-                                   "Requests/RequestCards.swift", "Requests/RequestsScreen.swift"}
+                                   "Requests/RequestCards.swift", "Requests/RequestsScreen.swift"} | R2_LIBRARY
 LOOK_PIECES_DRAWN_IN = {"Root/MacSidebarView.swift", "Root/DesktopFrame.swift", "Player/PlayerBar.swift",
                         "Player/MacPanels.swift", "Player/NowPlayingView.swift", "Requests/RequestCards.swift",
-                        "Requests/RequestsScreen.swift"}
+                        "Requests/RequestsScreen.swift"} | R2_LIBRARY
 
 
 def test_the_phones_pieces_are_drawn_nowhere_yet():

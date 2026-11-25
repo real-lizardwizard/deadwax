@@ -143,64 +143,117 @@ struct AlbumsScreen: View {
         let entries = drawn?.view.index ?? []
         let years = ShelfIndex.kind(library.sort) == .decades
 
-        ScrollViewReader { proxy in
-            ScrollView {
-                VStack(alignment: .leading, spacing: 12) {
-                    Color.clear
-                        .frame(height: 0)
-                        .id(ShelfAnchor.top)
-                        .overlay(alignment: .bottom) {
-                            // the pull's graphic, in the room the pull opens above the first row (3.5)
-                            if let page {
-                                PullShuffleGraphic(state: page.pull, can: page.shuffle)
-                                    .fixedSize(horizontal: false, vertical: true)
+        VStack(spacing: 0) {
+            // (R2) the page's meta line under the Library's strip: the count, the sort, Grid and List
+            if page != nil {
+                meta(drawn)
+            }
+            ScrollViewReader { proxy in
+                ScrollView {
+                    VStack(alignment: .leading, spacing: LibraryLook.tilesTop) {
+                        Color.clear
+                            .frame(height: 0)
+                            .id(ShelfAnchor.top)
+                            .overlay(alignment: .bottom) {
+                                // the pull's graphic, in the room the pull opens above the first row (3.5)
+                                if let page {
+                                    PullShuffleGraphic(state: page.pull, can: page.shuffle)
+                                        .fixedSize(horizontal: false, vertical: true)
+                                }
                             }
+                        // Downloaded's own top (slice 3: its downloaded playlists; 3b: the first ask's card)
+                        if list == .downloaded && !finding {
+                            downloadedTop(page: page, online: online)
                         }
-                    // Downloaded's own top (slice 3: its downloaded playlists; 3b: the first ask's card)
-                    if list == .downloaded && !finding {
-                        downloadedTop(page: page, online: online)
+                        // a pushed list's count, in its flow - a page's is its meta line's
+                        if page == nil, let drawn, !drawn.view.countText.isEmpty,
+                           !(list == .downloaded && drawn.albums.isEmpty) {
+                            Text(drawn.view.countText)
+                                .font(Typeface.footnote)
+                                .foregroundStyle(DWPalette.t3)
+                        }
+                        if online, drawn != nil, let failure, let scope {
+                            RefreshProblemNote(failure: failure) { Task { await library.load(scope) } }
+                        }
+                        if drawn?.truncated == true {
+                            Text(LibraryWords.truncated)
+                                .font(Typeface.footnote)
+                                .foregroundStyle(DWPalette.t3)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                        content(drawn, failure: failure, personal: personal, online: online)
                     }
-                    if let drawn, !drawn.view.countText.isEmpty, !(list == .downloaded && drawn.albums.isEmpty) {
-                        Text(drawn.view.countText)
-                            .font(Typeface.footnote)
-                            .foregroundStyle(Palette.quiet)
-                    }
-                    if online, drawn != nil, let failure, let scope {
-                        RefreshProblemNote(failure: failure) { Task { await library.load(scope) } }
-                    }
-                    if drawn?.truncated == true {
-                        Text(LibraryWords.truncated)
-                            .font(Typeface.footnote)
-                            .foregroundStyle(Palette.quiet)
-                            .fixedSize(horizontal: false, vertical: true)
-                    }
-                    content(drawn, failure: failure, personal: personal, online: online)
+                    .stopsMomentum(momentum)
+                    .padding(.leading, Self.edge)
+                    .padding(.trailing, entries.isEmpty ? Self.edge : ShelfIndexStrip.width(years: years) + 4)
+                    .padding(.bottom, 24)
                 }
-                .stopsMomentum(momentum)
-                .padding(.leading, Self.edge)
-                .padding(.trailing, entries.isEmpty ? Self.edge : ShelfIndexStrip.width(years: years) + 4)
-                .padding(.bottom, 24)
-            }
-            .scrollIndicators(entries.isEmpty ? .automatic : .hidden)
-            .pullsToShuffle(page.map { (page: Page) -> PullShuffling in
-                PullShuffling(state: page.pull, can: page.shuffle, on: page.pulls, start: page.start)
-            })
-            .overlay(alignment: .trailing) {
-                if !entries.isEmpty {
-                    ShelfIndexStrip(entries: entries, years: years, momentum: momentum) { group in
-                        jump(proxy, to: .group(group))
+                .scrollIndicators(entries.isEmpty ? .automatic : .hidden)
+                .pullsToShuffle(page.map { (page: Page) -> PullShuffling in
+                    PullShuffling(state: page.pull, can: page.shuffle, on: page.pulls, start: page.start)
+                })
+                .overlay(alignment: .trailing) {
+                    if !entries.isEmpty {
+                        ShelfIndexStrip(entries: entries, years: years, momentum: momentum) { group in
+                            jump(proxy, to: .group(group))
+                        }
+                        .dynamicTypeSize(...DynamicTypeSize.accessibility1)
                     }
-                    .dynamicTypeSize(...DynamicTypeSize.accessibility1)
                 }
-            }
-            .onChange(of: typed) { _, _ in jump(proxy, to: .top) }
-            .onChange(of: library.sort) { _, _ in jump(proxy, to: .top) }
-            .onChange(of: navigation.libraryScrollToTop) { _, _ in
-                // the Library tab tapped at its root: the page shown goes to its top
-                guard shown, page?.current == true else { return }
-                jump(proxy, to: .top, animated: true)
+                .onChange(of: typed) { _, _ in jump(proxy, to: .top) }
+                .onChange(of: library.sort) { _, _ in jump(proxy, to: .top) }
+                .onChange(of: navigation.libraryScrollToTop) { _, _ in
+                    // the Library tab tapped at its root: the page shown goes to its top
+                    guard shown, page?.current == true else { return }
+                    jump(proxy, to: .top, animated: true)
+                }
             }
         }
+    }
+
+    /// (R2) The page's meta line (iLibrary's .meta): the count - "140 albums", "12 of 140 albums" while Find finds - the
+    /// sort, a purple link opening its menu (out of the •••, where slice 4 had put it), and Grid and List at its end. The
+    /// layout is LibraryModel's, kept per device as it always was.
+    private func meta(_ drawn: DrawnShelf?) -> some View {
+        @Bindable var library = library
+        let count = drawn.map { (drawn: DrawnShelf) -> String in
+            list == .downloaded && drawn.albums.isEmpty ? "" : drawn.view.countText
+        } ?? ""
+        return PhoneMeta {
+            if !count.isEmpty {
+                Text(count)
+                Text(verbatim: "·")
+                    .accessibilityHidden(true)
+            }
+            Menu {
+                Picker(LibraryWords.sortLabel, selection: $library.sort) {
+                    ForEach(AlbumSort.allCases, id: \.self) { (sort: AlbumSort) in
+                        Text(sort.label).tag(sort)
+                    }
+                }
+                .pickerStyle(.inline)
+            } label: {
+                PhoneMetaLink(words: library.sort.label)
+            }
+            .menuIndicator(.hidden)
+            .accessibilityLabel(LibraryWords.sortLabel)
+            .accessibilityValue(library.sort.label)
+        } trailing: {
+            layoutToggle(.grid, symbol: "square.grid.2x2", words: LibrarySwitchWords.grid)
+            layoutToggle(.list, symbol: "list.bullet", words: LibrarySwitchWords.list)
+        }
+    }
+
+    /// Grid or List (.tog.sm): lit while it is the layout; a tap makes it the layout, kept per device.
+    private func layoutToggle(_ layout: LibraryLayout, symbol: String, words: String) -> some View {
+        Button {
+            library.layout = layout
+        } label: {
+            Image(systemName: symbol)
+                .font(Typeface.symbol(.footnote).weight(.semibold))
+        }
+        .buttonStyle(DWToggleStyle(on: library.layout == layout))
+        .accessibilityLabel(words)
     }
 
     /// The list drawn: a scope's from the model's kept list, Downloaded from the albums on this phone.
@@ -308,7 +361,7 @@ struct AlbumsScreen: View {
         let lines = list == .downloaded
         switch library.layout {
         case .grid:
-            LazyVGrid(columns: Self.columns, alignment: .leading, spacing: 18) {
+            LazyVGrid(columns: Self.columns, alignment: .leading, spacing: LibraryLook.tileRowGap) {
                 ForEach(drawn.groups) { group in
                     Section {
                         ForEach(group.albums) { album in
@@ -334,7 +387,6 @@ struct AlbumsScreen: View {
                             LibraryRow(album: album, isNew: personal && marks.isNew(album), download: download,
                                        line: lines ? line(album, download) : nil,
                                        dimmed: !online && !download.hasSongsHere) { open(album) }
-                            Divider().padding(.leading, LibraryRow.textInset)
                         }
                     } header: {
                         Group {
@@ -511,7 +563,7 @@ struct PlaceRow: View {
                     }
                     Image(systemName: "chevron.right")
                         .font(Typeface.symbol(.footnote).weight(.semibold))
-                        .foregroundStyle(.tertiary)
+                        .foregroundStyle(DWPalette.t3)
                         .accessibilityHidden(true)
                 }
                 .padding(.vertical, 10)
@@ -587,7 +639,7 @@ struct RefreshProblemNote: View {
         }
         .padding(12)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color(white: 0.12), in: Corners.cardShape)
+        .background(DWPalette.cardFace, in: DWCorners.boxShape)
     }
 }
 

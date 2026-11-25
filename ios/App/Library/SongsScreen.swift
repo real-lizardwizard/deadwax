@@ -129,36 +129,46 @@ struct SongsScreen: View {
     }
 
     private func list(page: Page?) -> some View {
-        ScrollViewReader { proxy in
-            ScrollView {
-                LazyVStack(alignment: .leading, spacing: 0) {
-                    Color.clear
-                        .frame(height: 0)
-                        .id(ShelfAnchor.top)
-                        .overlay(alignment: .bottom) {
-                            // the pull's graphic, in the room the pull opens above the first row (3.5)
-                            if let page {
-                                PullShuffleGraphic(state: page.pulling.state, can: page.pulling.can)
-                                    .fixedSize(horizontal: false, vertical: true)
-                            }
-                        }
-                    if page == nil {
-                        shuffleButton
-                    }
-                    content
+        VStack(spacing: 0) {
+            // (R2) the page's meta line under the Library's strip: its count (Navidrome's order is its one order)
+            if page != nil {
+                PhoneMeta {
+                    Text(songs.paging.countText)
+                } trailing: {
+                    EmptyView()
                 }
-                .padding(.horizontal, 16)
-                .padding(.bottom, 24)
             }
-            .pullsToShuffle(page?.pulling)
-            // a row's Add to Queue swipe standing open shuts when the songs change (a refresh, a page landing, Find)
-            .shutsQueueSwipes(on: songs.paging.items.map(\.id))
-            .onChange(of: typed) { _, _ in jump(proxy) }
-            .onChange(of: songs.landed) { _, _ in jump(proxy) }
-            .onChange(of: navigation.libraryScrollToTop) { _, _ in
-                // the Library tab tapped at its root: the page shown goes to its top
-                guard shown, page?.current == true else { return }
-                jump(proxy, animated: true)
+            ScrollViewReader { proxy in
+                ScrollView {
+                    LazyVStack(alignment: .leading, spacing: 0) {
+                        Color.clear
+                            .frame(height: 0)
+                            .id(ShelfAnchor.top)
+                            .overlay(alignment: .bottom) {
+                                // the pull's graphic, in the room the pull opens above the first row (3.5)
+                                if let page {
+                                    PullShuffleGraphic(state: page.pulling.state, can: page.pulling.can)
+                                        .fixedSize(horizontal: false, vertical: true)
+                                }
+                            }
+                        if page == nil {
+                            shuffleButton
+                        }
+                        content
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.bottom, 24)
+                }
+                .pullsToShuffle(page?.pulling)
+                // a row's Add to Queue swipe standing open shuts when the songs change (a refresh, a page landing, Find)
+                .shutsQueueSwipes(on: songs.paging.items.map(\.id))
+                .onChange(of: typed) { _, _ in jump(proxy) }
+                .onChange(of: songs.landed) { _, _ in jump(proxy) }
+                .onChange(of: navigation.libraryScrollToTop) { _, _ in
+                    // the Library tab tapped at its root: the page shown goes to its top
+                    guard shown, page?.current == true else { return }
+                    jump(proxy, animated: true)
+                }
             }
         }
     }
@@ -247,7 +257,8 @@ struct SongsScreen: View {
                     if reachability.online { songs.retry() } else { reachability.tryNow() }
                 }
                     .padding(.vertical, 8)
-            } else if !paging.countText.isEmpty {
+            } else if page == nil, !paging.countText.isEmpty {
+                // a pushed list's count, in its flow - a page's is its meta line's
                 Text(paging.countText)
                     .font(Typeface.footnote)
                     .foregroundStyle(Palette.quiet)
@@ -316,8 +327,8 @@ struct SongsScreen: View {
     }
 }
 
-/// One song's row (SongsView's): its cover at the rows' size, its title, its artist and album, opening its album on the
-/// tab's path - and its ••• beside it, the song's own menu. Read as one: "Roads, Portishead · Dummy, opens its album".
+/// One song's row (SongsView's; since R2 drawn as iArtists' tall row): its cover, its title, its artist and album,
+/// opening its album on the tab's path - and its ••• beside it, the song's own menu. Read as one: "Roads, Portishead · Dummy, opens its album".
 /// Dimmed, and opening nothing, while deadwax can't be reached and the song isn't on this phone; a song with no album
 /// opens nothing. Swiped right it adds the song to the queue, wherever its ••• offers Add to Queue - the swipe drawn by
 /// hand, the list being a stack (AddToQueueSwipe.swift), with Add to Queue as the row's VoiceOver action.
@@ -333,23 +344,23 @@ struct SongRow: View {
     }
 
     var body: some View {
-        VStack(spacing: 0) {
-            HStack(spacing: 4) {
-                opener
-                    .addToQueueAction(menu)
-                QueueMenu(request: menu) {
-                    Image(systemName: "ellipsis")
-                        .font(Typeface.symbol(.body).weight(.semibold))
-                        .foregroundStyle(Palette.quiet)
-                        .frame(minWidth: 44, minHeight: 44)
-                        .contentShape(Rectangle())
-                }
-                .menuStyle(.button)
-                .buttonStyle(.plain)
-                .accessibilityLabel(AlbumPageLines.moreForSong(song.title ?? ""))
+        HStack(spacing: 4) {
+            opener
+                .addToQueueAction(menu)
+            QueueMenu(request: menu) {
+                Image(systemName: "ellipsis")
+                    .font(Typeface.symbol(.body).weight(.semibold))
+                    .foregroundStyle(DWPalette.t3)
+                    .frame(minWidth: 44, minHeight: 44)
+                    .contentShape(Rectangle())
             }
-            Divider().padding(.leading, LibraryRow.textInset)
+            .menuStyle(.button)
+            .buttonStyle(.plain)
+            .accessibilityLabel(AlbumPageLines.moreForSong(song.title ?? ""))
         }
+        // iArtists' tall row: 60 at least, its rule under it
+        .lookHeight(DWLook.here.tallRowHeight)
+        .overlay(alignment: .bottom) { DWRule(colour: DWPalette.rowRule) }
         // the list's own padding (`list(page:)`): the purple runs out to the screen's edge
         .addsToQueue(menu, in: .stack(inset: 16))
         // (the Mac app, slice 2) the row's ••• on a right-click; nothing on the iPhone
@@ -377,26 +388,28 @@ struct SongRow: View {
 
     private var face: some View {
         let line = PlaylistRules.songLine(song)
-        return HStack(spacing: 12) {
+        return HStack(spacing: 0) {
             LibraryCover(id: song.coverArt, pixels: CoverSize.row)
-                .frame(width: LibraryRow.cover, height: LibraryRow.cover)
-                .clipShape(Corners.artShape)
+                .frame(width: LibraryLook.rowCover, height: LibraryLook.rowCover)
+                .clipShape(DWCorners.chipShape)
                 .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 1) {
                 Text(song.title ?? "")
-                    .foregroundStyle(.primary)
+                    .font(Typeface.body)
+                    .foregroundStyle(DWPalette.text)
                     .lineLimit(typeSize.isAccessibilitySize ? 3 : 1)
                 if !line.isEmpty {
                     Text(line)
-                        .font(Typeface.footnote)
-                        .foregroundStyle(Palette.quiet)
+                        .font(Typeface.Phone.text(.small))
+                        .foregroundStyle(DWPalette.t2)
                         .lineLimit(typeSize.isAccessibilitySize ? 2 : 1)
                 }
             }
-            Spacer(minLength: 8)
+            .padding(.horizontal, LibraryLook.rowTextSide)
+            Spacer(minLength: 0)
         }
         .padding(.vertical, 8)
         .contentShape(Rectangle())
-        .opacity(dimmed ? Palette.off : 1)
+        .opacity(dimmed ? DWPalette.off : 1)
     }
 }

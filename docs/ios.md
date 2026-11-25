@@ -281,9 +281,22 @@ menus and keys, and these differences.
   playlist's or Manage page rather than piling them up - except a playlist you're editing, or a Change password or
   People change still under way: the new page opens over that one, which waits under it (Back) as you left it. The
   rows are words alone, with no glyphs, and the lit one is drawn in the selection's purple with its edge.
-- **The page.** The Library's switch and its **•••** stay at the top of the Library, as on the phone. The Library's
-  album grid has as many covers in a row as fit, none under 150 points across. An album's page, an artist's and the
-  album you don't have sit in the middle of the page at a readable width (760 points); they scroll with the pointer
+- **The page.** The Library's **Albums** and **Artists** - yours and All's - are the Mac's own: a toolbar along the
+  top - **Play**, **Shuffle**, **Sort** and its pop-up (the phone's orders), **Grid | List** and a **Find** field -
+  over the albums or artists as covers, as many in a row as fit and none under 150 points across, or as a list in
+  columns: Albums' **Album** (a small cover and its title, then **New** for an album new in your library and a purple
+  **▶** for the one playing), **Artist** (with the album's download mark at its end), **Year** and **Songs**; Artists'
+  **Artist**, **Albums** (Navidrome's count), **Songs**, **Plays** and **Last played** ("today", "yesterday", "3 days
+  ago", "last week", then the day - moving on at midnight with the list left open) added up from that artist's albums
+  there. A split album or a compilation counts in the Albums of each artist on it, but its songs and plays only under
+  the album's own artist. Every other row is faintly striped; click a row to light it, ↑ and ↓ move it, ⌘↑ and ⌘↓ go to
+  the first and the last, Return or a double-click opens it, and right-clicking an album's row gives the album's menu,
+  as a cover's does. **Play** plays the lit album, or the lit artist's songs, once they've come - dimmed until then;
+  in Grid nothing is lit (choosing Grid lets the lit row go), so Play is dimmed there, and holding the pointer over it
+  says to select one in List. **Shuffle** shuffles your library (All's, the collection), in Grid as in List. Grid or
+  List is kept on this Mac, apart from the phone's. How many albums (or artists) and songs (or albums - each counted
+  once) are listed, and "1 selected", are in the status bar along the foot. The Library's other pages - Playlists, Songs - are still the phone's, under its
+  row of buttons and its •••. An album's page, an artist's and the album you don't have sit in the middle of the page at a readable width (760 points); they scroll with the pointer
   anywhere across the page, their scroll bar at its right edge. Pages you've opened stay as you left them as you move
   between the sidebar's rows - Library, Search, Requests and Settings each keep their pages, where you'd scrolled to and
   what you'd typed or begun, a playlist's Edit included, as the phone's tabs keep them. One thing starts again: All's
@@ -610,39 +623,42 @@ heavier, but not Noto Sans.
 ## The Library
 
 The Library opens on its pages, side by side: **Albums**, **Playlists**, **Artists** and - without a
-library of your own - **Songs**. Along its top, evenly spaced: a round **magnifying glass** (Find - below), the
-switch - Albums | Playlists | Artists, and Songs where it's a page - filling the room between, and the round
-**•••**. The switch is square-cornered, the page you're on picked out in purple; tap a page to go to it,
-or swipe left and right between them, the switch moving with you. The Library opens on the first page each time the app
-starts, and when someone else signs in; after that it stays on the page you left it on. Tap the Library
-tab while you're on it, and the page goes back to its top. Nothing sits above the albums but their count.
+library of your own - **Songs**. Its top is one row: **Library** at the left, and at the right - with a library of
+your own - **Yours | All** (below), then a square **magnifying glass** (Find - below) and the square **•••**. Under
+it is a row of buttons, one for each page in the order you keep (Edit order - below), then **Downloaded**; the page
+you're on is lit. Tap a page's button to go to it, or swipe left and right between the pages, the lit button
+following you; **Downloaded** opens what's on this phone (below) over the Library. Where the buttons don't fit
+across, they scroll sideways, the lit one brought into view; their words grow with the text size, up to the tab
+bar's largest. The Library opens on the first page each time the app starts, and when someone else signs in; after
+that it stays on the page you left it on. Tap the Library tab while you're on it, and the page goes back to its top.
 
-**Find** is hidden until you tap the magnifying glass: then its field comes up under the switch, for the page
+Under the buttons each page has its own line: how many there are ("3012 albums"), then - on Albums and Artists - its
+order, in purple (tap it to choose another), and at the end of Albums' line its **grid** and **list** buttons, the one
+showing lit. Playlists' line ends with **New playlist…**.
+
+**Find** is hidden until you tap the magnifying glass: then its field comes up under the top, for the page
 you're on ("Find in albums", "Find in playlists"...), with the keyboard up. Each page keeps its own words while
-Find is open - swipe to another page, or tap it on the switch, and the field shows that page's. **Cancel** puts
+Find is open - swipe to another page, or tap its button, and the field shows that page's. **Cancel** puts
 Find away and clears the words of every page, so no page is ever left filtered with Find hidden. The keyboard's
-Search key puts the keyboard away and leaves the words. At the larger text sizes the switch's words grow up to a
-point and then hold; a page's name too long for its segment shrinks a little, then ends in "…", and holding a
-finger on it shows it large.
+Search key puts the keyboard away and leaves the words. At the larger text sizes, holding a finger on the
+magnifying glass or the ••• shows it large.
 
 With logins on, **Albums** is **Your albums**: the albums in your library, as the web app's Library has them
-([sharing deadwax](sharing.md) says how an album gets there), and ••• > **All music** > **All albums** is
-the whole collection's. With logins off, and for the break-glass `deadwax` sign-in, Albums is the whole
+([sharing deadwax](sharing.md) says how an album gets there), and **All**, at the top, shows the whole
+collection's instead: its Albums, Artists and Songs as the pages, and **Yours** your own again. Yours | All shows
+while the Library is on your albums and deadwax can be reached - and stays while you're on **All** when deadwax drops
+out: All keeps its pages, showing what the app already has, until you tap **Yours**. On Yours it's put away until
+deadwax is back. With logins off, and for the break-glass `deadwax` sign-in, Albums is the whole
 collection. **Playlists** is your playlists (see [Playlists](#playlists)), **Artists** the artists of
 your albums (see [Artists](#artists)), and **Songs**, with logins off and for the break-glass sign-in, every
 song in the collection (see [Songs](#songs)). With logins on there's no Songs page: Navidrome can't list
-your library's songs alone, so every song is the collection's, under ••• > **All music** > **All songs**.
+your library's songs alone, so every song is the collection's: Songs is a page of **All**, never beside your own
+albums.
 
 **The •••** at the top's right (VoiceOver reads it "More for the Library"):
 
 - **Shuffle**: your whole library, shuffled - see [Shuffling your library](#shuffling-your-library). Until
   it's ready it reads "Getting ready…", dimmed.
-- **The page's own**: on Albums, **Album order** (showing the one chosen - below) and **Show as list**
-  (or **Show as grid**); on Artists, **Artist order**; on Playlists, **New playlist** (dimmed while deadwax
-  can't be reached). Songs has none.
-- **Downloaded**: what's on this phone (below).
-- **All music**, with a library of your own: **All albums**, **All artists** and **All songs**, the whole
-  collection's.
 - **Refresh**: your albums, your playlists and the artists asked for again now - and the Songs page, once
   you've opened it, from its top.
 - **Edit order**: the pages as rows - drag them by their handles into the order you want, and **Done**. The
@@ -650,15 +666,15 @@ your library's songs alone, so every song is the collection's, under ••• >
   arranged them (Artists and Songs, for an order arranged before they came) joins at the end. With logins
   on, Songs isn't a page, so it isn't listed, and keeps its place for a sign-in without a library.
 
-The orders and Grid or list moved into the ••• when Artists joined, so the four pages fit beside it; and
-Playlists' **+** became the •••'s [New playlist](#playlists) when the top got its magnifying glass, so the top
-is the same on every page.
+The orders and Grid or list moved into the ••• when Artists joined, and Playlists' **+** became the •••'s New
+playlist when the top got its magnifying glass. In the redesign they came out again, onto each page's line;
+Downloaded became the last of the buttons, and All music became **Yours | All**.
 
 On the Albums page:
 
-- **Grid or list**: ••• > **Show as list** switches to rows, **Show as grid** back to covers. It starts as
-  a grid, and this phone remembers your choice.
-- **The order** (••• > **Album order**): **Artist** (the first time), **Title**, **Recently added**,
+- **Grid or list**: the list button at the end of the page's line switches to rows, the grid button back to
+  covers. It starts as a grid, and this phone remembers your choice - apart from a Mac's.
+- **The order** (on the page's line): **Artist** (the first time), **Title**, **Recently added**,
   **Year, newest first** or **Year, oldest first**, under headers: the first letter (names that don't
   start with a letter come last, under #), the month it was added ("Date unknown" when deadwax
   doesn't know), or the year ("No year"). In Your albums, Recently added means when the album came
@@ -690,8 +706,9 @@ you pull, the mark growing and turning, "Pull to shuffle" under it. At the line 
 becomes a purple disc, and it says "Release to shuffle" - let go then, and your library plays shuffled
 ("Shuffling"). Push back up a little before you let go and it's the ring again (pull down again for
 another tick); let go before the line and nothing plays. A pull never refreshes the Library now: it asks
-for itself as it comes into view, and ••• > Refresh asks now. The lists opened from the ••• - All albums,
-All artists, All songs, Downloaded, Downloaded playlists - still refresh when pulled. An album's page and a
+for itself as it comes into view, and ••• > Refresh asks now. **All**'s pages shuffle the whole collection. The
+lists opened over the Library - Downloaded, Downloaded playlists, and All albums from See All music - still refresh
+when pulled. An album's page and a
 playlist's pull the same way, shuffling that album or playlist (see [An album's page](#an-albums-page)).
 
 It's deadwax's shuffle, the web app's Library > Shuffle: every song of your library (of the collection,
@@ -718,7 +735,7 @@ With **Reduce Motion** on, the mark doesn't grow, turn or spin; the ring still f
 states change at once. **VoiceOver** and Switch Control use ••• > Shuffle; the pull's graphic isn't read.
 On **iOS 17** there's no pull, only ••• > Shuffle.
 
-**Downloaded** (in the •••) is every album with a song on this phone, whoever's library it's in, drawn as
+**Downloaded** (the last of the Library's buttons) is every album with a song on this phone, whoever's library it's in, drawn as
 the other lists are: the same orders, Find, headers and index. An album your library is downloading by
 itself shows there once a song of it is here or downloading, never while it only waits its turn.
 Its **Recently added** means downloaded to this phone, newest first. Each album there has a third
@@ -1074,7 +1091,7 @@ Current and its track count, and the header as a heading. Every word grows with 
 
 ## Playlists
 
-**The Library's Playlists page** (the switch's) lists your playlists as Navidrome keeps them - the same ones the web app,
+**The Library's Playlists page** lists your playlists as Navidrome keeps them - the same ones the web app,
 Amperfy and Navidrome show you. With logins on they're read as you, so someone else's private
 playlist never shows; with logins off (and for the break-glass `deadwax` sign-in), they're those of
 the Navidrome account deadwax uses:
@@ -1095,7 +1112,8 @@ playlists." and why - over the list as it was, or with **Try again** when there'
 With none at all: "No playlists yet.", how to make one, and **New playlist**. **Tap a playlist** to
 open its page. Nothing plays from the list itself.
 
-**New playlist** is in the Library's **•••** on Playlists (it was the **+** at the top): type its name (up
+**New playlist…** is at the end of the Playlists page's line, under the Library's buttons (it was the **+** at
+the top, then the Library's •••'s), offered while deadwax can be reached: type its name (up
 to 200 letters) and **Create**. It's made in Navidrome, as you, empty, and its page opens - add songs to it
 with **Add to a playlist…**. If it can't be made, the sheet stays open and says why.
 
@@ -1246,15 +1264,16 @@ changed from any app, and a change sent later could land on one that has changed
 
 ## Artists
 
-**The Artists page** is a page of the Library's switch. With logins on it's **Your artists**: the artists of
+**The Artists page** is a page of the Library. With logins on it's **Your artists**: the artists of
 the albums in your library, each with how many of your albums are theirs ("2 albums"), as the web app's
-Library > Artists has them. ••• > **All music** > **All artists** is every artist in the collection, each
-with how many albums the collection has of theirs ("12 albums in the collection"). With logins off, and
+Library > Artists has them - and how many songs, once your albums have come ("2 albums · 21 songs"). **All**, at
+the Library's top, makes it every artist in the collection, each with how many albums the collection has of theirs
+("12 albums · 140 songs in the collection"). With logins off, and
 for the break-glass `deadwax` sign-in, the page is **Artists**, the whole collection's.
 
 - **A row** is the artist's round picture (Navidrome's, as the web app shows it), their name and their
-  count. **Tap it** to open their page. Nothing plays from the list but the pull.
-- **The order** (••• > **Artist order**): **Name** (the first time) or **Most albums**. Name sorts by
+  count, with an arrow at its end. **Tap it** to open their page. Nothing plays from the list but the pull.
+- **The order** (on the page's line): **Name** (the first time) or **Most albums**. Name sorts by
   deadwax's own spelling of a name - "The" at the start, accents and case set aside - under letter headers,
   with names that don't start with a letter under # at the end. Most albums has no headers. This phone
   remembers the order.
@@ -1265,8 +1284,7 @@ for the break-glass `deadwax` sign-in, the page is **Artists**, the whole collec
 The list is asked for each time the page comes into view, and with ••• > Refresh; until it comes, what was
 last listed shows. If deadwax can't be asked, the list stays as it was, under "Couldn't update this list -
 showing it as it was." An empty Your artists says "No artists in your library yet.", with **See All
-music**. All artists, pushed from the •••, refreshes when pulled; the page in the switch shuffles, as the
-others do.
+music**. A pull shuffles, as on the other pages.
 
 **An artist's page**: their picture and name, **Play** and **Shuffle**, and **Albums** - their albums in
 the collection, newest first (undated ones last), each with its cover, its title, and a line like "1994 ·
@@ -1432,22 +1450,23 @@ Artist images, and Close asks first.
 
 **Songs** is every song in the collection, as the web app's Library > Songs has it: in Navidrome's order,
 100 at a time, the next 100 fetched as you scroll near the end of them. With logins off, and for the
-break-glass `deadwax` sign-in, it's the switch's fourth page. With logins on, Navidrome can't list the songs
-of your library alone, so they're the collection's: ••• > **All music** > **All songs**, beside All albums
-and All artists, rather than a page among your own albums and artists.
+break-glass `deadwax` sign-in, it's the Library's fourth page. With logins on, Navidrome can't list the songs
+of your library alone, so they're the collection's: a page of **All**, beside its Albums and Artists, rather than
+a page among your own albums and artists.
 
 - **A row** is the song's cover, its title, and its artist and album ("Portishead · Dummy"). **Tap it** to
   open its album's page, and play it from there - nothing plays from the list but the pull and Shuffle. Its
   **•••** is the song's own menu, as on an album's page: Add to Queue, Add to a playlist…, and Download. **Swipe
   it right** to add it to the queue (see [Adding to the queue](#adding-to-the-queue)) - on the Library's Songs
   page too, where a swipe right that starts on a song adds it rather than turning back a page: start it at the
-  very left edge of the screen (or tap the switch) to go to the page before. A swipe left still turns the page.
+  very left edge of the screen (or tap the page's button) to go to the page before. A swipe left still turns the page.
   The swipe needs iOS 18; on iOS 17 the ••• adds.
 - **Find** (the magnifying glass, or All songs' own field), asks Navidrome for the songs that match what you type -
   by title, artist or album, as Navidrome's own search matches them - a moment after you stop typing. The
   songs come 100 at a time, so the phone can't look through the ones it hasn't fetched; Find here is
   Navidrome's search, not the other pages' filter. Nothing found says "No songs match “…”."
-- **The count**, "12480 songs" at the top, shows once every song has been fetched, as the web app's does.
+- **The count**, "12480 songs" on the page's line (at the top of All songs), shows once every song has been
+  fetched, as the web app's does.
 - **All songs' Shuffle**, at its top: every song of the collection once, in an order deadwax makes, played
   as the Library's Shuffle plays your library (see [Shuffling your library](#shuffling-your-library)) -
   its first songs fetched as All songs opens, so it plays the moment you tap. Until then it reads "Getting
@@ -3473,7 +3492,9 @@ says so in an amber strip at the top of each page - "Offline - showing what's on
 "Can't reach deadwax - showing what's on this phone". Tap it for more, and, when deadwax isn't
 answering, **Try again**. It goes by itself once deadwax answers.
 
-- **The Library's Albums page is Downloaded**, under the same switch: headed Downloaded, with
+- **The Library's Albums page is Downloaded**, under the same buttons (Downloaded's own goes, the Albums page being
+  it, and Yours | All is put away until deadwax is back - on **All**, All stays as it was, showing what's in hand,
+  with Yours | All to come back by): headed Downloaded, with
   Downloaded playlists and "Only downloaded albums play until deadwax is back." at its top. It changes
   only when you're not looking at it (another tab, an album open over it, the app in the background), so
   it never moves under your finger; until then the list you were on stays, with every album not on the
@@ -6240,6 +6261,43 @@ can use them, and makes the phone's own pieces, which are drawn nowhere yet. Not
   518-521 found them.
 - **525 Both phones.** **Not done yet.** On Green Anole, every tab, the player, Now Playing, Edit album and the EQ are
   as before. The same on Ethan's phone, or "not done yet".
+
+#### Albums and Artists, and the Library's top (526-531)
+
+**Not done yet.** The Mac's Albums and Artists become column lists under their own toolbar - Play, Shuffle, Sort,
+Grid | List and Find - with their counts in the status bar. On the phone the Library's top is redrawn: **Library** at
+the left; **Yours | All**, the magnifying glass and the ••• at the right; under it a row of buttons for the pages, in the
+order you keep (Edit order), then **Downloaded**; under that each page's line - how many, its order (tap it to change
+it), and on Albums the grid and list buttons; Playlists' line has **New playlist…**. **All** shows the whole
+collection's albums, artists and songs as the pages, where the •••'s All music used to push them. The ••• keeps
+Shuffle, Refresh and Edit order.
+
+- **526 Albums as a list.** **Not done yet.** On the Mac, choose **List** in the Albums toolbar: every other row is
+  faintly striped, and a clicked row is lit purple inside a purple edge. ↑ and ↓ move the lit row, ⌘↑ and ⌘↓ to the
+  first and the last; Return, or a double-click, opens the album; a right-click gives the album's menu. Play is
+  dimmed until the lit album's songs have come, then plays it - and the playing album has a purple ▶ after its
+  title. Hold ↓ down a long list: the lit row runs down it, and Play wakes only once it stops. Choose **Grid**:
+  nothing is lit, Play is dimmed and its tooltip says "Select an album in List to play it.", Shuffle still shuffles.
+- **527 Grid and List.** **Not done yet.** On the Mac, choose Grid or List, quit the app and open it again: it is as
+  you left it. The phone keeps its own choice: changing one doesn't change the other.
+- **528 Artists.** **Not done yet.** On the Mac's Artists, as a list, pick an artist: their Songs, Plays and Last played
+  agree with Navidrome's own pages for them (Last played says today, yesterday, "3 days ago", "last week" or a date).
+  An artist on a split album or a compilation whose album artist is someone else counts it in their Albums but not
+  in their Songs or Plays - Navidrome's own count against the album's own artist. The status bar's albums count
+  each album once. Left open past midnight, "today" becomes "yesterday".
+- **529 The Library's top.** **Not done yet.** On the phone, the Library's top is one row - Library, Yours | All, the
+  magnifying glass and the ••• - clear of the Dynamic Island, and still clear after opening Now Playing and going back.
+  The row of page buttons and the page's line are under it. VoiceOver reads the page buttons as tabs and Downloaded
+  as a button after them. Known: at the largest text size on a narrow phone (375 points) with a library of your own,
+  "Library" is cut short.
+- **530 The pages.** **Not done yet.** Tap each page button: the page moves to it and its button lights. Swipe between
+  the pages: the lit button follows. **Downloaded** opens Downloaded. The order on a page's line changes the order,
+  the grid and list buttons switch Albums, and pulling a page down still shuffles. With a library of your own, **All**
+  shows the whole collection's Albums, Artists and Songs, and **Yours** your own again - Songs never beside your own
+  albums. On All's Songs, turn WireGuard off: All and its Songs stay; tap Yours, and Yours | All goes until deadwax is
+  back. The magnifying glass opens Find under the top; Cancel closes it.
+- **531 Both phones.** **Not done yet.** On Green Anole, the rest - the other tabs, the player, Now Playing, an album,
+  Edit album and the EQ - are as before. On Ethan's phone, 529 and 530, or "not done yet".
 
 #### The side panel's tabs, and the Now Playing sheet (532-538)
 

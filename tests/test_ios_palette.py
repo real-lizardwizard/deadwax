@@ -277,11 +277,7 @@ def test_the_apps_own_bars_are_the_webs():
     assert f"private static let pad: CGFloat = {px(token(THEME_CSS, 'dw-tab-pad')):g}\n" in tabs
     assert f"private static let side: CGFloat = {px(token(APP_CSS, 'app-tab-side')):g}\n" in tabs
     assert f"private static let gap: CGFloat = {px(token(APP_CSS, 'app-tab-gap')):g}\n" in tabs
-    # the switch's well, the gap between its segments and their reach past it
-    top = (APP / "Library" / "LibraryTop.swift").read_text(encoding="utf-8")
-    assert f"private static let well: CGFloat = {px(token(THEME_CSS, 'dw-segmented')):g}\n" in top
-    assert f"private static let gap: CGFloat = {px(token(APP_CSS, 'app-segment-gap')):g}\n" in top
-    assert f"private static let reach: CGFloat = {px(token(APP_CSS, 'app-segment-reach')):g}\n" in top
+    #? (the redesign, R2) the Library's switch is gone - its pages are the strip's (PhoneStrip, test_ios_phone_look.py)
     # iOS's own bar is hidden on every tab's stack and every page pushed, so it never comes back over the app's
     routes = (APP / "Shared" / "Routes.swift").read_text(encoding="utf-8")
     assert tabs.count(".toolbar(.hidden, for: .tabBar)") == 2 and ".toolbar(.hidden, for: .tabBar)" in routes
@@ -456,17 +452,25 @@ def test_the_librarys_top_sits_under_the_status_bar():
     # status bar. The Library is the only page that hides iOS's navigation bar, and every other view that reaches
     # under the status bar is a fill (or keeps its content in the safe area). Since 18 Nov the row's room is read by a
     # UIKit probe in its own window, kept under a presentation and measured afresh otherwise; since 20 Nov kept too while
-    # the row is above its window's edge, and read again after every ask.
+    # the row is above its window's edge, and read again after every ask. (The redesign, R2) The top is iLibrary's
+    # titled top over the phone's own black ground (dw.css's `.dw.ph` background, `.dw.ph .topbar`'s none), the strip
+    # under it - the switch and its hairline gone.
     library = (APP / "Library" / "LibraryView.swift").read_text(encoding="utf-8")
     pager = library[library.index("private func pager(albums: AlbumList)"):library.index("private func pageView(")]
     assert ".safeAreaInset(edge: .top" not in library and ".showsOfflineBanner()" not in pager
-    order = [pager.index(part) for part in ("return VStack(spacing: 0) {", "LibraryTop(", "OfflineBanner()",
-                                             "ScrollView(.horizontal)", ".containerRelativeFrame([.horizontal, .vertical])",
+    order = [pager.index(part) for part in ("return VStack(spacing: 0) {", "LibraryTop(", "strip(order, albums: list)",
+                                             "OfflineBanner()", "ScrollView(.horizontal)",
+                                             ".containerRelativeFrame([.horizontal, .vertical])",
                                              ".toolbar(.hidden, for: .navigationBar)")]
     assert order == sorted(order)
     top = (APP / "Library" / "LibraryTop.swift").read_text(encoding="utf-8")
     assert top.count("ignoresSafeArea") == 1
-    assert ".background {\n            Palette.tabBar\n                .ignoresSafeArea(.container, edges: .top)\n" in top
+    assert ".background {\n            Palette.page\n                .ignoresSafeArea(.container, edges: .top)\n" in top
+    design = (REPO / "ios" / "design" / "dw.css").read_text(encoding="utf-8")
+    assert re.search(r"^\.dw\.ph \{ background: #000;", design, re.M)
+    assert re.search(r"^\.dw\.ph \.topbar \{[^}]*background: none;", design, re.M)
+    assert palette_rgb("page") == (0, 0, 0)
+    assert "Palette.tabBar" not in top and "Palette.border" not in top and "LibrarySwitchControl" not in top
     # the second time (15 Nov, "the library's top still doesn't clear the dynamic island"): the row measures where its
     # own top is and comes down by what of its window's top safe area that doesn't clear (TopClearance), its padding
     # inside what it measures so coming down never moves it
@@ -474,13 +478,13 @@ def test_the_librarys_top_sits_under_the_status_bar():
     # the third (18 Nov, "after pulling up the play screen and going back to library, the top bar is back inside the
     # Dynamic Island"): read by a UIKit probe of the row's own frame - a background after the padding, the fill's
     # ignore not on it - in ITS OWN window's coordinates, with that window's inset, nothing out of a window
-    row = top[:top.index("struct LibrarySwitchControl")]
+    row = top
     body = row[row.index("var body: some View {"):row.index("private func take(")]
     order = [body.index(part) for part in (".padding(.top, clearance)", ".ignoresSafeArea(.container, edges: .top)\n",
                                            ".background {\n            TopProbe(eyes: eyes) {", ".onGeometryChange(",
                                            '.onAppear { eyes.probe?.soon("appear") }')]
     assert order == sorted(order)
-    probe_view = body[body.index("TopProbe(eyes: eyes)"):body.index(".overlay(alignment: .bottom)")]
+    probe_view = body[body.index("TopProbe(eyes: eyes)"):body.index(".onGeometryChange(")]
     assert "ignoresSafeArea" not in probe_view
     probe = row[row.index("private struct TopProbe: UIViewRepresentable {"):]
     assert "guard let window else { return }" in probe

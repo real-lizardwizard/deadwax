@@ -56,27 +56,31 @@ struct PlaylistsPage: View {
 
     var body: some View {
         let online = reachability.online
-        ScrollViewReader { proxy in
-            ScrollView {
-                LazyVStack(alignment: .leading, spacing: 0) {
-                    Color.clear
-                        .frame(height: 0)
-                        .id(ShelfAnchor.top)
-                        .overlay(alignment: .bottom) {
-                            PullShuffleGraphic(state: pulling.state, can: pulling.can)
-                                .fixedSize(horizontal: false, vertical: true)
-                        }
-                    content(online: online)
+        VStack(spacing: 0) {
+            // (R2) the page's meta line under the Library's strip: the count, and New playlist… (the •••'s until R2)
+            meta(online: online)
+            ScrollViewReader { proxy in
+                ScrollView {
+                    LazyVStack(alignment: .leading, spacing: 0) {
+                        Color.clear
+                            .frame(height: 0)
+                            .id(ShelfAnchor.top)
+                            .overlay(alignment: .bottom) {
+                                PullShuffleGraphic(state: pulling.state, can: pulling.can)
+                                    .fixedSize(horizontal: false, vertical: true)
+                            }
+                        content(online: online)
+                    }
+                    .padding(.horizontal, Self.edge)
+                    .padding(.bottom, 24)
                 }
-                .padding(.horizontal, Self.edge)
-                .padding(.bottom, 24)
-            }
-            .pullsToShuffle(pulling)
-            .onChange(of: typed.wrappedValue) { _, _ in jump(proxy) }
-            .onChange(of: navigation.libraryScrollToTop) { _, _ in
-                // the Library tab tapped at its root: the page shown goes to its top
-                guard showing else { return }
-                withAnimation { proxy.scrollTo(ShelfAnchor.top, anchor: .top) }
+                .pullsToShuffle(pulling)
+                .onChange(of: typed.wrappedValue) { _, _ in jump(proxy) }
+                .onChange(of: navigation.libraryScrollToTop) { _, _ in
+                    // the Library tab tapped at its root: the page shown goes to its top
+                    guard showing else { return }
+                    withAnimation { proxy.scrollTo(ShelfAnchor.top, anchor: .top) }
+                }
             }
         }
         .appSheet(item: $newSheet, onDismiss: openMade) { (sheet: NewSheet) in
@@ -105,6 +109,30 @@ struct PlaylistsPage: View {
             // the app back in front is the page shown again (the web's): asked afresh
             guard phase == .active, current, reachability.online else { return }
             Task { await playlists.ask(fresh: true) }
+        }
+    }
+
+    /// (R2) The page's meta line (iPlaylists' .meta): the count - "9 playlists", "3 of 9 playlists" while Find finds -
+    /// and New playlist… at its end, a purple link opening its sheet: offered only while deadwax can be reached, as the
+    /// •••'s was.
+    private func meta(online: Bool) -> some View {
+        let list = playlists.list ?? []
+        let finding = Find.finding(typed.wrappedValue)
+        let shown = finding ? PlaylistRules.found(list, typed: typed.wrappedValue).count : list.count
+        return PhoneMeta {
+            Text(LibrarySwitchWords.playlistsCount(total: list.count, shown: shown, finding: finding))
+        } trailing: {
+            Button {
+                newSheet = NewSheet()
+            } label: {
+                Text(PlaylistWords.newPlaylistRow)
+                    .font(Typeface.Phone.text(.meta))
+                    .foregroundStyle(DWPalette.acc)
+                    .contentShape(DWTarget(face: Rectangle()))
+            }
+            .buttonStyle(.plain)
+            .disabled(!online)
+            .opacity(online ? 1 : DWPalette.off)
         }
     }
 
@@ -210,7 +238,7 @@ struct PlaylistsPage: View {
             } label: {
                 Text(PlaylistWords.files(groups.files.count))
                     .font(Typeface.title3.weight(.semibold))
-                    .foregroundStyle(.primary)
+                    .foregroundStyle(DWPalette.head)
                     .accessibilityAddTraits(.isHeader)
             }
             .padding(.top, 12)
@@ -279,49 +307,52 @@ struct DownloadedPlaylistsScreen: View {
 /// for one with none - the name, its line, and the chevron; a page pushed on the tab's path. Read as one: "Late night,
 /// 12 songs · 48 min". Dimmed, and opening nothing, while deadwax can't be reached and nothing of it plays here. In a
 /// List (Downloaded playlists) the List draws its chevron and separator; on the Library's Playlists page, a scroll view
-/// since slice 3b, the row draws its own, at the same height.
+/// since slice 3b, the row draws its own - since R2 iPlaylists' tall row (LibraryListRow).
 struct PlaylistRow: View {
     let playlist: Playlist
     var dimmed = false
     /// In a List, which draws the chevron, the separator and the row's padding.
     var inList = true
 
+    @Environment(\.dynamicTypeSize) private var typeSize
+
     var body: some View {
         if inList {
             link
         } else {
-            VStack(spacing: 0) {
-                link
-                    .buttonStyle(.plain)
-                    .padding(.vertical, 8)
-                Divider().padding(.leading, LibraryRow.textInset)
-            }
+            link
+                .buttonStyle(.plain)
         }
     }
 
     private var link: some View {
         NavigationLink(value: AppRoute.playlist(PlaylistRoute(playlist))) {
-            HStack(spacing: 12) {
-                PlaylistCover(id: playlist.coverArt, side: LibraryRow.cover, pixels: CoverSize.row)
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(playlist.name)
-                        .foregroundStyle(.primary)
-                    Text(PlaylistRules.rowLine(playlist))
-                        .font(Typeface.subheadline)
-                        .foregroundStyle(Palette.quiet)
-                }
-                .lineLimit(2)
-                if !inList {
-                    Spacer(minLength: 8)
-                    Image(systemName: "chevron.right")
-                        .font(Typeface.symbol(.footnote).weight(.semibold))
-                        .foregroundStyle(.tertiary)
-                        .accessibilityHidden(true)
+            Group {
+                if inList {
+                    HStack(spacing: 12) {
+                        PlaylistCover(id: playlist.coverArt, side: LibraryRow.cover, pixels: CoverSize.row)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(playlist.name)
+                                .foregroundStyle(DWPalette.text)
+                            Text(PlaylistRules.rowLine(playlist))
+                                .font(Typeface.subheadline)
+                                .foregroundStyle(Palette.quiet)
+                        }
+                        .lineLimit(2)
+                    }
+                    .padding(.vertical, 4)
+                } else {
+                    // (R2's review) two lines at the accessibility sizes, as the row had before R2: a long name not cut
+                    LibraryListRow(title: playlist.name, line: PlaylistRules.rowLine(playlist),
+                                   lines: typeSize.isAccessibilitySize ? 2 : 1) {
+                        PlaylistCover(id: playlist.coverArt, side: LibraryLook.rowCover, pixels: CoverSize.row)
+                    } trailing: {
+                        LibraryChevron()
+                    }
                 }
             }
-            .padding(.vertical, 4)
             .contentShape(Rectangle())
-            .opacity(dimmed ? Palette.off : 1)
+            .opacity(dimmed ? DWPalette.off : 1)
         }
         .disabled(dimmed)
         .accessibilityElement(children: .combine)

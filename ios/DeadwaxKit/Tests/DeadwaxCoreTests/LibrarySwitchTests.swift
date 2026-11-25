@@ -169,75 +169,29 @@ import Testing
 
     // MARK: the •••
 
-    @Test func theLibrarysMenu() {
-        let yours = LibraryMenu.sections(shuffle: .ready, page: .albums, grid: true, albumsPage: .albums, scope: .yours,
-                                         personal: true, online: true)
-        #expect(yours == [[.shuffle(.ready)], [.order(.albums), .layout(grid: true)], [.downloaded, .allMusic],
-                          [.refresh, .editOrder]])
-        let store = LibraryMenu.sections(shuffle: .gettingReady, page: .albums, grid: false, albumsPage: .albums,
-                                         scope: .store, personal: false, online: true)
-        #expect(store == [[.shuffle(.gettingReady)], [.order(.albums), .layout(grid: false)], [.downloaded],
-                          [.refresh, .editOrder]], "no All music without a library")
-        let offline = LibraryMenu.sections(shuffle: .downloads, page: .albums, grid: true, albumsPage: .downloaded,
-                                           scope: .yours, personal: true, online: false)
-        #expect(offline == [[.shuffle(.downloads)], [.order(.albums), .layout(grid: true)], [.albums(.yours)],
-                            [.refresh, .editOrder]], "offline: the way back in Downloaded's place, no All music")
-        let back = LibraryMenu.sections(shuffle: .ready, page: .albums, grid: true, albumsPage: .downloaded, scope: .yours,
-                                        personal: true, online: true)
-        #expect(back[2] == [.albums(.yours), .allMusic], "back online with the page still Downloaded")
-        for nothing in [ShuffleCan.nothingHere, .none] {
-            let sections = LibraryMenu.sections(shuffle: nothing, page: .albums, grid: true, albumsPage: .albums,
-                                                scope: .yours, personal: true, online: true)
-            #expect(sections.first == [.order(.albums), .layout(grid: true)], "nothing to shuffle: no Shuffle item")
-        }
-        // (slice 4, question 26) each page's own: Artists' order alone - and (the squared look) Playlists' New playlist,
-        // the bar's + until then, chosen only while deadwax can be reached
-        let artists = LibraryMenu.sections(shuffle: .ready, page: .artists, grid: true, albumsPage: .albums,
-                                           scope: .yours, personal: true, online: true)
-        #expect(artists == [[.shuffle(.ready)], [.order(.artists)], [.downloaded, .allMusic], [.refresh, .editOrder]])
-        let playlists = LibraryMenu.sections(shuffle: .ready, page: .playlists, grid: true, albumsPage: .albums,
-                                             scope: .yours, personal: true, online: true)
-        #expect(playlists == [[.shuffle(.ready)], [.newPlaylist(online: true)], [.downloaded, .allMusic],
-                              [.refresh, .editOrder]])
-        let away = LibraryMenu.sections(shuffle: .downloads, page: .playlists, grid: true, albumsPage: .downloaded,
-                                        scope: .yours, personal: true, online: false)
-        #expect(away[1] == [.newPlaylist(online: false)], "offline: New playlist there, dimmed")
-        // (slice 5) Songs has neither an order nor a layout: Navidrome's order is its one order
-        let songs = LibraryMenu.sections(shuffle: .ready, page: .songs, grid: true, albumsPage: .albums,
-                                         scope: .store, personal: false, online: true)
-        #expect(songs == [[.shuffle(.ready)], [.downloaded], [.refresh, .editOrder]])
-        #expect(LibraryMenu.allMusic == [.albums(.store), .artists(.store), .allSongs])
-    }
-
     @Test func theMenusWords() {
         #expect(LibraryMenuItem.shuffle(.ready).words(personal: true) == "Shuffle")
         #expect(LibraryMenuItem.shuffle(.gettingReady).words(personal: true) == "Getting ready\u{2026}")
         #expect(LibraryMenuItem.shuffle(.failed("Your library is too big to shuffle here")).words(personal: true)
                 == "Your library is too big to shuffle here")
         #expect(LibraryMenuItem.shuffle(.downloads).words(personal: true) == "Shuffle downloads")
-        #expect(LibraryMenuItem.downloaded.words(personal: true) == "Downloaded")
         #expect(LibraryMenuItem.albums(.yours).words(personal: true) == "Your albums")
         #expect(LibraryMenuItem.albums(.store).words(personal: false) == "Albums")
-        #expect(LibraryMenuItem.allMusic.words(personal: true) == "All music")
         #expect(LibraryMenuItem.albums(.store).words(personal: true) == "All albums")
-        #expect(LibraryMenuItem.artists(.store).words(personal: true) == "All artists")
-        #expect(LibraryMenuItem.artists(.store).words(personal: false) == "Artists")
-        #expect(LibraryMenuItem.allSongs.words(personal: true) == "All songs")
-        #expect(LibraryMenuItem.allSongs.words(personal: false) == "Songs")
-        #expect(LibraryMenuItem.order(.albums).words(personal: true) == "Album order")
-        #expect(LibraryMenuItem.order(.artists).words(personal: true) == "Artist order")
-        #expect(LibraryMenuItem.layout(grid: true).words(personal: true) == "Show as list")
-        #expect(LibraryMenuItem.layout(grid: false).words(personal: true) == "Show as grid")
         #expect(LibraryMenuItem.refresh.words(personal: true) == "Refresh")
         #expect(LibraryMenuItem.editOrder.words(personal: true) == "Edit order")
-        #expect(LibraryMenuItem.newPlaylist(online: true).words(personal: true) == "New playlist")
-        #expect(LibraryMenuItem.newPlaylist(online: false).words(personal: false) == PlaylistWords.newPlaylist)
-        #expect(LibraryMenuItem.newPlaylist(online: true).enabled)
-        #expect(!LibraryMenuItem.newPlaylist(online: false).enabled, "not while deadwax can't be reached")
+        // (R2's review) the old •••'s items went with it; their words live on where the items went
+        #expect(DownloadWords.downloadedTitle == "Downloaded" && LibraryStripItem.downloaded.title == "Downloaded")
+        #expect(LibraryWords.allMusic == "All music")
+        #expect(ArtistWords.title(.store, personal: true) == "All artists" && ArtistWords.title(.store, personal: false) == "Artists")
+        #expect(SongWords.title(personal: true) == "All songs" && SongWords.title(personal: false) == "Songs")
+        #expect(LibraryWords.sortLabel == "Album order" && ArtistWords.sortLabel == "Artist order")
+        #expect(LibrarySwitchWords.showAsList == "Show as list" && LibrarySwitchWords.showAsGrid == "Show as grid")
+        #expect(PlaylistWords.newPlaylist == "New playlist")
         #expect(LibrarySwitchWords.cancelFind == "Cancel")
         let enabled = [LibraryMenuItem.shuffle(.ready), .shuffle(.downloads), .shuffle(.gettingReady), .shuffle(.failed("x")),
-                       .downloaded, .refresh, .order(.artists), .layout(grid: true), .artists(.store), .allSongs].map(\.enabled)
-        #expect(enabled == [true, true, false, false, true, true, true, true, true, true])
+                       .albums(.yours), .refresh, .editOrder].map(\.enabled)
+        #expect(enabled == [true, true, false, false, true, true, true])
         #expect(LibrarySwitchWords.more == "More for the Library")
         #expect(LibrarySwitchWords.orderFooter == "Drag the pages into the order you want. The Library opens on the first.")
     }
@@ -255,5 +209,116 @@ import Testing
         #expect(Self.ids(PlaylistRules.found(list, typed: "eat")) == ["4"], "anywhere in a word")
         #expect(PlaylistRules.found(list, typed: "dumy").isEmpty)
         #expect(LibrarySwitchWords.noPlaylistMatch(" dumy ") == "No playlists match \u{201C}dumy\u{201D}.")
+    }
+
+    // MARK: the redesign's top (slice R2, James's answer 1 of 25 Nov)
+
+    @Test func songsAreNeverBesideYourOwnAlbums() {
+        let standard = LibraryPages.standard
+        let kept: [LibraryPage] = [.songs, .playlists, .artists, .albums]
+        for order in [standard, kept] {
+            // Yours, and with no library of your own: the pages as they were
+            #expect(LibraryPages.shown(order, personal: true, side: .yours) == LibraryPages.shown(order, personal: true))
+            #expect(!LibraryPages.shown(order, personal: true, side: .yours).contains(.songs))
+            for side in LibrarySide.allCases {
+                #expect(LibraryPages.shown(order, personal: false, side: side) == order, "one side, every page")
+            }
+            // All: All music's pages, in the order kept - Songs among them, no Playlists
+            let all = LibraryPages.shown(order, personal: true, side: .all)
+            #expect(all == order.filter { (page: LibraryPage) -> Bool in page != .playlists })
+            #expect(!all.contains(.playlists) && all.contains(.songs))
+        }
+        #expect(LibraryPages.allMusic == [.albums, .artists, .songs])
+        #expect(LibraryPages.shown(kept, personal: true, side: .all) == [.songs, .artists, .albums])
+    }
+
+    @Test func yoursOrAllShowsWhereAllMusicWas() {
+        for chosen in LibrarySide.allCases {
+            #expect(LibraryPages.sides(personal: true, scope: .yours, online: true, chosen: chosen))
+            #expect(!LibraryPages.sides(personal: false, scope: .store, online: true, chosen: chosen),
+                    "no library of your own: no switch")
+            #expect(!LibraryPages.sides(personal: true, scope: .store, online: true, chosen: chosen))
+            #expect(!LibraryPages.sides(personal: false, scope: .store, online: false, chosen: chosen))
+        }
+        #expect(LibraryPages.side(.all, sides: true) == .all)
+        #expect(LibraryPages.side(.all, sides: false) == .yours, "no switch: Yours")
+        #expect(LibraryPages.side(.yours, sides: true) == .yours)
+        #expect(LibrarySide.yours.scope == .yours && LibrarySide.all.scope == .store)
+        #expect(LibrarySide.allCases.map { (side: LibrarySide) -> String in side.title } == ["Yours", "All"])
+        // the •••'s All music is the switch's now: the top's ••• has none
+        for scope in [AlbumScope.yours, .store] {
+            for list in [LibraryRootList.albums, .downloaded] {
+                let items = LibraryMenu.topSections(shuffle: .ready, albumsPage: list, scope: scope).joined()
+                #expect(!items.contains(.albums(.store)) || scope == .store, "All albums is All's Albums page")
+            }
+        }
+    }
+
+    /// (R2's review, finding 1) deadwax dropping out never turns a chosen All back into Yours on screen: the switch is
+    /// put away offline only while Yours is the side shown.
+    @Test func aChosenAllStaysAllWhenDeadwaxDropsOut() {
+        let away = LibraryPages.sides(personal: true, scope: .yours, online: false, chosen: .all)
+        #expect(away, "offline on All: the switch stays, and All with it")
+        #expect(LibraryPages.side(.all, sides: away) == .all)
+        let yours = LibraryPages.sides(personal: true, scope: .yours, online: false, chosen: .yours)
+        #expect(!yours, "offline on Yours: no switch, nothing to offer that can't be asked for")
+        #expect(LibraryPages.side(.yours, sides: yours) == .yours)
+        // and the pages shown don't move under him: All's pages, Songs among them, offline as online
+        let order = LibraryPages.standard
+        #expect(LibraryPages.shown(order, personal: true, side: LibraryPages.side(.all, sides: away))
+                == LibraryPages.shown(order, personal: true, side: .all))
+        #expect(LibraryPages.showing(.songs, in: LibraryPages.shown(order, personal: true, side: .all)) == .songs,
+                "All's Songs stays Songs")
+    }
+
+    /// (R2's review, findings 1 and 4) Each side's Albums list, Artists scope and Shuffle: All's are the collection's,
+    /// whatever Yours' root is - never Downloaded, which stands in for Yours' albums alone.
+    @Test func eachSidesAlbumsArtistsAndShuffle() {
+        for root in [AlbumList.scope(.yours), .scope(.store), .downloaded] {
+            #expect(LibrarySide.yours.albums(root) == root, "Yours: the root's list, Downloaded included")
+            #expect(LibrarySide.all.albums(root) == .scope(.store), "All: the collection's, never Downloaded")
+        }
+        #expect(LibrarySide.yours.artistsScope == nil, "Yours: the page's own scope")
+        #expect(LibrarySide.all.artistsScope == .store)
+        #expect(LibrarySide.yours.shuffle == .library)
+        #expect(LibrarySide.all.shuffle == .allSongs)
+        #expect(LibrarySide.all.shuffle.scope(library: .yours) == .store, "All's Shuffle is the collection's")
+    }
+
+    @Test func theStripIsThePagesThenDownloaded() {
+        #expect(LibraryStrip.items([.artists, .albums]) == [.page(.artists), .page(.albums), .downloaded])
+        #expect(LibraryStrip.items([]) == [.downloaded])
+        #expect(LibraryStrip.items([.albums, .artists], albumsPage: .downloaded) == [.page(.albums), .page(.artists)],
+                "no Downloaded beside the Albums page that is Downloaded")
+        #expect(LibraryStripItem.downloaded.title == DownloadWords.downloadedTitle)
+        #expect(LibraryStripItem.page(.songs).title == LibraryPage.songs.title)
+        #expect(LibraryStrip.items(LibraryPages.standard).map { (item: LibraryStripItem) -> String in item.title }
+                == ["Albums", "Playlists", ArtistWords.artists, SongWords.songs, "Downloaded"])
+        // (R2's review) Downloaded pushes a page: a button to VoiceOver, never one of the pages' tabs
+        #expect(LibraryStripItem.downloaded.pushes)
+        for page in LibraryPage.allCases { #expect(!LibraryStripItem.page(page).pushes) }
+        let items = LibraryStrip.items(LibraryPages.standard)
+        #expect(items.filter { (item: LibraryStripItem) -> Bool in item.pushes } == [.downloaded])
+    }
+
+    @Test func theTopsMoreHoldsWhatTheMetaLineAndTheStripDont() {
+        #expect(LibraryMenu.topSections(shuffle: .ready, albumsPage: .albums, scope: .yours)
+                == [[.shuffle(.ready)], [.refresh, .editOrder]])
+        #expect(LibraryMenu.topSections(shuffle: .none, albumsPage: .albums, scope: .store) == [[.refresh, .editOrder]])
+        #expect(LibraryMenu.topSections(shuffle: .nothingHere, albumsPage: .downloaded, scope: .yours)
+                == [[.albums(.yours)], [.refresh, .editOrder]], "the way back to the albums while they are Downloaded")
+        #expect(LibraryMenu.topSections(shuffle: .gettingReady, albumsPage: .downloaded, scope: .store)
+                == [[.shuffle(.gettingReady)], [.albums(.store)], [.refresh, .editOrder]])
+        // no order, layout, New playlist or Downloaded - the meta line's and the strip's: (its review) LibraryMenuItem
+        // has no such items since the old ••• went
+        #expect(LibrarySwitchWords.grid == "Grid" && LibrarySwitchWords.list == "List")
+    }
+
+    @Test func playlistsMetaLineCountsAsFindDoes() {
+        #expect(LibrarySwitchWords.playlistsCount(total: 9, shown: 9, finding: false) == "9 playlists")
+        #expect(LibrarySwitchWords.playlistsCount(total: 1, shown: 1, finding: false) == "1 playlist")
+        #expect(LibrarySwitchWords.playlistsCount(total: 9, shown: 3, finding: true) == "3 of 9 playlists")
+        #expect(LibrarySwitchWords.playlistsCount(total: 0, shown: 0, finding: false) == "", "none: nothing said")
+        #expect(LibrarySwitchWords.playlistsCount(total: 0, shown: 0, finding: true) == "")
     }
 }

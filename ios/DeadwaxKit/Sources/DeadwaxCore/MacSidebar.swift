@@ -5,7 +5,7 @@ import Foundation
 // one LIBRARY group, a Yours | All switch in its heading with a library of your own; PLAYLISTS and MANAGE, each folding
 // away; Settings at the foot - every row with its glyph. Built from what the app has: the Library's rows are its own
 // switch's pages in the person's order (LibraryPages, Edit order reorders them), All's the Library •••'s All music
-// (LibraryMenu.allMusic), Manage's Settings > Manage's (Managing.tools, by permission), the playlists the web's
+// (LibraryPages.allMusic), Manage's Settings > Manage's (Managing.tools, by permission), the playlists the web's
 // sidebarPlaylists.
 //
 // Held to the web by Fixtures/frame/frame-vectors.json (ios/scripts/export-frame-vectors.cjs): the switch's words and

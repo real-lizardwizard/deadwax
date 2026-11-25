@@ -171,7 +171,9 @@ private final class Draws {
         #expect(SongWords.title(personal: false) == words.titles.songs)
         #expect(SongWords.title(personal: true) == words.titles.allSongs && SongWords.allSongs == words.titles.allSongs)
         #expect(words.browse.last == SongWords.allSongs, "All music's last list")
-        #expect(LibraryMenu.allMusic.map { (item: LibraryMenuItem) -> String in item.words(personal: true) } == words.browse)
+        // (R2) All music's lists, Yours | All's All pages now
+        #expect([LibraryWords.title(.store, personal: true), ArtistWords.title(.store, personal: true),
+                 SongWords.title(personal: true)] == words.browse)
         #expect(", " + SongWords.opensItsAlbum == words.hidden)
         for each in words.lines {
             let song = Song(id: "x", title: "Roads", album: each.song.album, artist: each.song.artist)

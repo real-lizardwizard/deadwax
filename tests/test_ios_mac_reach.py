@@ -320,10 +320,15 @@ def test_the_frame_stacks_are_the_macs_with_its_own_routes():
                       ("requests", "MacRequests.root()"), ("you", "MacSettings.root()")):
         assert re.search(r"MacTabStack\(path: paths\." + tab + r"(, ownTop: true)?\) \{ " + re.escape(root) +
                          r" \}\s*\.tag\(AppTab\." + tab + r"\)", page), tab
-    # each root the phone's own, as MainTabs draws it - but Requests', since R8 the Mac's own table (MacRequestsPage)
-    for area, view in (("Library/MacLibrary.swift", "LibraryView()"), ("Search/MacSearch.swift", "SearchScreen()"),
+    # each root the phone's own, as MainTabs draws it - but Requests', since R8 the Mac's own table (MacRequestsPage), and
+    # (R2) the Library's, with the Mac's own Albums and Artists in it (asserted below)
+    for area, view in (("Search/MacSearch.swift", "SearchScreen()"),
                        ("Requests/MacRequests.swift", "MacRequestsPage()"), ("Settings/MacSettings.swift", "YouView()")):
         assert re.search(r"static func root\(\) -> some View \{\s*" + re.escape(view) + r"\s*\}", bare(app["Mac/" + area]))
+    assert re.search(r"static func root\(\) -> some View \{\s*LibraryView\(desk: \{ \(page: LibraryPage, scope: AlbumScope\) "
+                     r"-> MacLibraryDesk in\s*MacLibraryDesk\(page: page, scope: scope\)\s*\}\)\s*\}",
+                     bare(app["Mac/Library/MacLibrary.swift"]))
+    assert "TabStack(path: paths.library, ownTop: true) { LibraryView() }" in bare(app["Root/MainTabs.swift"])
     # macRoutes: what appRoutes gives every page - the room for the notice, the offline banner, iOS's tab bar hidden
     routes = bare(app["Mac/Frame/MacRoutes.swift"])
     assert re.search(r"navigationDestination\(for: AppRoute\.self\) \{ \(route: AppRoute\) in\s*MacRoutes\.page\(for: route\)"
@@ -349,8 +354,8 @@ def test_mac_routes_says_every_route_once_each_to_its_area():
 
 #? The routes R1 leaves as the phone's pages, each exactly as appRoutes draws it. A slice that redraws a page takes its
 #? route off this list.
-PHONES_PAGES = {"album", "albums", "downloaded", "downloads", "serverAddress", "debug", "eq", "gettingAlbums", "playback",
-                "account", "thisPhone", "about", "playlist", "downloadedPlaylists", "artist", "artists", "allSongs",
+PHONES_PAGES = {"album", "downloaded", "downloads", "serverAddress", "debug", "eq", "gettingAlbums", "playback",
+                "account", "thisPhone", "about", "playlist", "downloadedPlaylists", "artist", "allSongs",
                 "group", "mbArtist", "topSongs", "chooseFolder", "needsALook", "libraryCare", "heldByNobody",
                 "serverSettings", "serverSettingsGroup", "eventLog", "changePassword", "people", "person"}
 

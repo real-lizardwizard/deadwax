@@ -103,6 +103,106 @@ public enum LibraryPages {
     }
 }
 
+/// (the redesign, slice R2 - James's answer 1 of 25 Nov, "Today's behaviour, new look") The Library's top's Yours | All,
+/// with a library of your own: Yours, the pages as they were (`LibraryPages.shown(order, personal: true)`); All, All
+/// music's - the collection's albums, artists and songs, in the pages' place rather than pushed from the •••'s All music,
+/// which the top's switch replaces.
+public enum LibrarySide: String, CaseIterable, Sendable, Hashable {
+    case yours
+    case all
+
+    /// The switch's word for the side.
+    public var title: String {
+        switch self {
+        case .yours: return LibrarySwitchWords.yours
+        case .all: return LibrarySwitchWords.all
+        }
+    }
+
+    /// The albums' and the artists' scope on this side.
+    public var scope: AlbumScope {
+        switch self {
+        case .yours: return .yours
+        case .all: return .store
+        }
+    }
+
+    /// (R2's review) The Albums page's list on this side, given the root's (`root`: the scope's albums, or Downloaded
+    /// while deadwax was out of reach as the Library was last drawn - LibraryRoot): Yours' is the root's; All's is always
+    /// the collection's, drawn from what is in hand while deadwax is away - never Downloaded, which is Yours' stand-in.
+    public func albums(_ root: AlbumList) -> AlbumList {
+        self == .all ? .scope(.store) : root
+    }
+
+    /// (R2's review) The Artists page's scope: the page's own (the person's, nil) on Yours, the collection's on All.
+    public var artistsScope: AlbumScope? {
+        self == .all ? .store : nil
+    }
+
+    /// (R2's review) Whose Shuffle the pulls and the •••'s are: the Library's on Yours, the collection's (All songs') on
+    /// All.
+    public var shuffle: ShuffleOf {
+        self == .all ? .allSongs : .library
+    }
+}
+
+extension LibraryPages {
+    /// (R2) All music's pages, as its submenu listed them: albums, artists, songs.
+    public static let allMusic: [LibraryPage] = [.albums, .artists, .songs]
+
+    /// (R2) The pages the strip shows on a side, in the order kept. Without a library of your own, or on Yours, the
+    /// pages `shown(order, personal:)` gives - so Songs is never beside your own albums (question 32); on All, All
+    /// music's pages (Songs among them, where All songs was) and no Playlists, which are nobody's collection.
+    public static func shown(_ order: [LibraryPage], personal: Bool, side: LibrarySide) -> [LibraryPage] {
+        guard personal, side == .all else { return shown(order, personal: personal) }
+        return order.filter { (page: LibraryPage) -> Bool in allMusic.contains(page) }
+    }
+
+    /// (R2) Whether the top shows Yours | All: with a library of your own and the Library on your albums - just where
+    /// the •••'s All music was offered - while deadwax can be reached, or (its review) while All is the side `chosen`.
+    /// It is put away offline only while Yours is the side shown: a chosen All never turns back into Yours on screen
+    /// when deadwax drops out (All's pages draw what is in hand, as All music's pushed pages stayed put), and it never
+    /// comes up offline to offer a side that can't be asked for.
+    public static func sides(personal: Bool, scope: AlbumScope, online: Bool, chosen: LibrarySide) -> Bool {
+        personal && scope == .yours && (online || chosen == .all)
+    }
+
+    /// (R2) The side drawn: the one chosen while the switch shows, else Yours.
+    public static func side(_ chosen: LibrarySide, sides: Bool) -> LibrarySide {
+        sides ? chosen : .yours
+    }
+}
+
+/// (R2) One button of the Library's strip under its top: a page of the pager, or Downloaded - last, pushed as the •••'s
+/// Downloaded was, never a page.
+public enum LibraryStripItem: Hashable, Sendable {
+    case page(LibraryPage)
+    case downloaded
+
+    /// The strip's word for it.
+    public var title: String {
+        switch self {
+        case .page(let page): return page.title
+        case .downloaded: return DownloadWords.downloadedTitle
+        }
+    }
+
+    /// (R2's review) It opens a page of its own over the Library rather than showing one of the pager's: a button to
+    /// VoiceOver, never a tab of the pages' tab bar.
+    public var pushes: Bool {
+        self == .downloaded
+    }
+}
+
+/// (R2) The strip: the pages shown, in the order kept, then Downloaded - but while the Albums page is Downloaded
+/// itself (deadwax out of reach), where the •••'s way back to the albums stands in its place.
+public enum LibraryStrip {
+    public static func items(_ pages: [LibraryPage], albumsPage: LibraryRootList = .albums) -> [LibraryStripItem] {
+        let shown = pages.map { (page: LibraryPage) -> LibraryStripItem in .page(page) }
+        return albumsPage == .downloaded ? shown : shown + [.downloaded]
+    }
+}
+
 /// What the Library's Shuffle can do just now (2.8) - what its ••• item and the pull's graphic say.
 public enum ShuffleCan: Sendable, Equatable {
     /// deadwax's order's first page is in hand: a tap plays it
@@ -132,28 +232,14 @@ public enum ShuffleCan: Sendable, Equatable {
     public var starts: Bool { self == .ready || self == .downloads }
 }
 
-/// One item of the Library's ••• (2.8).
+/// One item of the Library's ••• (2.8). (R2's review) Only what the top's ••• holds (LibraryMenu.topSections): the
+/// old menu's order, layout, New playlist, Downloaded and All music (its All artists and All songs) went with it, to the
+/// meta line, the strip and Yours | All.
 public enum LibraryMenuItem: Sendable, Equatable {
     /// the Shuffle, as it can be just now (never `.nothingHere` or `.none`: then there is no item)
     case shuffle(ShuffleCan)
-    /// (slice 4, question 26) the page's order - Albums' or Artists': a submenu of its orders
-    case order(LibraryPage)
-    /// (slice 4, question 26) Albums' tiles or rows: `grid` while it is tiles
-    case layout(grid: Bool)
-    /// (the squared look, 14 Nov) Playlists' New playlist - the bar's + until then: chosen only while deadwax can be
-    /// reached (`online`), as the + was
-    case newPlaylist(online: Bool)
-    /// Downloaded, pushed
-    case downloaded
-    /// the way back to the albums while the Albums page is Downloaded: the scope's albums, pushed - and All music's
-    /// All albums (the store's)
+    /// the way back to the albums while the Albums page is Downloaded: the scope's albums, pushed
     case albums(AlbumScope)
-    /// All music: a submenu of the collection's lists (`LibraryMenu.allMusic`) since slice 4
-    case allMusic
-    /// (slice 4) All music's All artists: the store's artists, pushed
-    case artists(AlbumScope)
-    /// (slice 5) All music's All songs: every song of the collection, pushed - with the collection's own Shuffle
-    case allSongs
     case refresh
     case editOrder
 
@@ -167,57 +253,35 @@ public enum LibraryMenuItem: Sendable, Equatable {
             case .failed(let why): return why
             default: return ShuffleWords.shuffle
             }
-        case .order(let page): return page == .artists ? ArtistWords.sortLabel : LibraryWords.sortLabel
-        case .layout(let grid): return grid ? LibrarySwitchWords.showAsList : LibrarySwitchWords.showAsGrid
-        case .newPlaylist: return PlaylistWords.newPlaylist
-        case .downloaded: return DownloadWords.downloadedTitle
         case .albums(let scope): return LibraryWords.title(scope, personal: personal)
-        case .allMusic: return LibraryWords.allMusic
-        case .artists(let scope): return ArtistWords.title(scope, personal: personal)
-        case .allSongs: return SongWords.title(personal: personal)
         case .refresh: return LibrarySwitchWords.refresh
         case .editOrder: return LibrarySwitchWords.editOrder
         }
     }
 
-    /// It can be chosen (Getting ready… and why it failed are drawn dimmed; New playlist while deadwax can't be reached).
+    /// It can be chosen (Getting ready… and why it failed are drawn dimmed).
     public var enabled: Bool {
         switch self {
         case .shuffle(let can): return can.starts
-        case .newPlaylist(let online): return online
         default: return true
         }
     }
 }
 
-/// The Library's ••• (2.8): what it holds, in its sections. Since slice 4 (question 26: three pages and their buttons
-/// crowd the bar) the page's own order and Albums' Grid or list are its second section - and, since the squared look
-/// (14 Nov: the bar's top is the Library's Find, the switch and the ••• alone), Playlists' New playlist, the bar's +
-/// until then; Songs has none (Navidrome's order is its one order) - and All music is a submenu of the collection's
-/// albums, artists and (slice 5) songs.
+/// The Library's ••• (2.8): what it holds, in its sections.
 public enum LibraryMenu {
-    /// All music's submenu: the collection's albums, artists and songs, each pushed.
-    public static let allMusic: [LibraryMenuItem] = [.albums(.store), .artists(.store), .allSongs]
-
-    /// `shuffle`: what the Shuffle can do; `page`: the page shown, `grid`: Albums drawn as tiles; `albumsPage`: the list
-    /// the Albums page is (Downloaded while deadwax couldn't be reached as it was last drawn); `scope`, `personal`,
-    /// `online`: the person's and the connection's.
-    public static func sections(shuffle: ShuffleCan, page: LibraryPage, grid: Bool, albumsPage: LibraryRootList,
-                                scope: AlbumScope, personal: Bool, online: Bool) -> [[LibraryMenuItem]] {
+    /// (R2) The ••• under the Library's new top: the Shuffle; the way back to the albums while the Albums page is
+    /// Downloaded (`scope`'s); Refresh and Edit order. What it held besides has moved: each page's order, Albums' Grid
+    /// and List and Playlists' New playlist to the page's meta line, Downloaded to the strip, All music to the top's
+    /// Yours | All.
+    public static func topSections(shuffle: ShuffleCan, albumsPage: LibraryRootList,
+                                   scope: AlbumScope) -> [[LibraryMenuItem]] {
         var sections: [[LibraryMenuItem]] = []
         switch shuffle {
         case .nothingHere, .none: break
         default: sections.append([.shuffle(shuffle)])
         }
-        switch page {
-        case .albums: sections.append([.order(.albums), .layout(grid: grid)])
-        case .artists: sections.append([.order(.artists)])
-        case .playlists: sections.append([.newPlaylist(online: online)])
-        case .songs: break
-        }
-        var places: [LibraryMenuItem] = [albumsPage == .downloaded ? .albums(scope) : .downloaded]
-        if online && personal && scope == .yours { places.append(.allMusic) }
-        sections.append(places)
+        if albumsPage == .downloaded { sections.append([.albums(scope)]) }
         sections.append([.refresh, .editOrder])
         return sections
     }
@@ -243,6 +307,20 @@ public enum LibrarySwitchWords {
     public static let cancelFind = "Cancel"
     /// Find's placeholder on Playlists.
     public static let findPlaylists = "Find in playlists"
+    /// (R2) The top's Yours | All: its two words, and its name to VoiceOver.
+    public static let yours = "Yours"
+    public static let all = "All"
+    public static let sidesLabel = "Your library or all music"
+    /// (R2) Albums' Grid and List on the meta line, to VoiceOver - and the Mac's toolbar's words.
+    public static let grid = "Grid"
+    public static let list = "List"
+    /// (R2) Playlists' meta line: "9 playlists", "3 of 9 playlists" while Find finds (Find's own counts, as Albums' and
+    /// Artists' say theirs); nothing while there are none.
+    public static func playlistsCount(total: Int, shown: Int, finding: Bool) -> String {
+        guard total > 0 else { return "" }
+        return finding ? Find.filteredCountText(shown: shown, total: total, one: "playlist", many: "playlists")
+            : Find.countText(total, one: "playlist", many: "playlists")
+    }
     /// "No playlists match “late”."
     public static func noPlaylistMatch(_ typed: String) -> String { Find.noMatchText("playlists", typed: typed) }
 }

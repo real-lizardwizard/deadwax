@@ -32,6 +32,8 @@ struct ArtistsScreen: View {
         /// The page the switch shows.
         let current: Bool
         let pulling: PullShuffling
+        /// (R2) The top's All: the collection's artists, in the page's place - nil for the person's scope.
+        var scope: AlbumScope?
     }
 
     /// The list's scope pushed; nil for the Library's page, whose scope is the person's (LibraryModel.scope).
@@ -63,6 +65,8 @@ struct ArtistsScreen: View {
     @State private var shown = false
     /// The list's momentum, stopped by the index before it jumps (notes/ios.md "The letter bar beats momentum").
     @State private var momentum = MomentumStop()
+    /// (R2) Each artist's totals over the scope's album index, made once per answer (ArtistTotals) - the rows' songs.
+    @State private var totals: [String: ArtistTotal] = [:]
 
     private static let edge: CGFloat = 16
 
@@ -74,7 +78,7 @@ struct ArtistsScreen: View {
         let generation: Int
     }
 
-    private var shownScope: AlbumScope { scope ?? library.scope }
+    private var shownScope: AlbumScope { scope ?? page?.scope ?? library.scope }
     /// The list is Your artists: a library of your own, and its scope.
     private var yours: Bool { server.access.hasLibrary && shownScope == .yours }
     private var typed: String { page?.typed.wrappedValue ?? ownTyped }
@@ -116,6 +120,10 @@ struct ArtistsScreen: View {
             if yours, reachability.online { library.refreshIfOld(.yours) }
         }
         .onDisappear { shown = false }
+        .task(id: ArtistTotalsKey(scope: shownScope, serial: library.shelves[shownScope]?.serial)) {
+            // (R2) the rows' songs: the scope's album index summed once per answer, never in the body
+            totals = ArtistTotals.of(library.albums(shownScope)?.albums ?? [])
+        }
     }
 
     /// The artists asked - and, for Your artists, your albums with them (the web's Promise.all of the two).
@@ -168,43 +176,80 @@ struct ArtistsScreen: View {
         let drawn = self.drawn(online: online)
         let entries = drawn?.view.index ?? []
 
-        ScrollViewReader { proxy in
-            ScrollView {
-                LazyVStack(alignment: .leading, spacing: 0) {
-                    Color.clear
-                        .frame(height: 0)
-                        .id(ShelfAnchor.top)
-                        .overlay(alignment: .bottom) {
-                            // the pull's graphic, in the room the pull opens above the first row (3.5)
-                            if let page {
-                                PullShuffleGraphic(state: page.pulling.state, can: page.pulling.can)
-                                    .fixedSize(horizontal: false, vertical: true)
+        VStack(spacing: 0) {
+            // (R2) the page's meta line under the Library's strip: the count and the order
+            if page != nil {
+                meta(drawn)
+            }
+            ScrollViewReader { proxy in
+                ScrollView {
+                    LazyVStack(alignment: .leading, spacing: 0) {
+                        Color.clear
+                            .frame(height: 0)
+                            .id(ShelfAnchor.top)
+                            .overlay(alignment: .bottom) {
+                                // the pull's graphic, in the room the pull opens above the first row (3.5)
+                                if let page {
+                                    PullShuffleGraphic(state: page.pulling.state, can: page.pulling.can)
+                                        .fixedSize(horizontal: false, vertical: true)
+                                }
                             }
-                        }
-                    content(drawn, personal: personal, online: online)
-                }
-                .stopsMomentum(momentum)
-                .padding(.leading, Self.edge)
-                .padding(.trailing, entries.isEmpty ? Self.edge : ShelfIndexStrip.width(years: false) + 4)
-                .padding(.bottom, 24)
-            }
-            .scrollIndicators(entries.isEmpty ? .automatic : .hidden)
-            .pullsToShuffle(page?.pulling)
-            .overlay(alignment: .trailing) {
-                if !entries.isEmpty {
-                    ShelfIndexStrip(entries: entries, years: false, momentum: momentum) { (group: Int) -> Void in
-                        jump(proxy, to: .group(group))
+                        content(drawn, personal: personal, online: online)
                     }
-                    .dynamicTypeSize(...DynamicTypeSize.accessibility1)
+                    .stopsMomentum(momentum)
+                    .padding(.leading, Self.edge)
+                    .padding(.trailing, entries.isEmpty ? Self.edge : ShelfIndexStrip.width(years: false) + 4)
+                    .padding(.bottom, 24)
+                }
+                .scrollIndicators(entries.isEmpty ? .automatic : .hidden)
+                .pullsToShuffle(page?.pulling)
+                .overlay(alignment: .trailing) {
+                    if !entries.isEmpty {
+                        ShelfIndexStrip(entries: entries, years: false, momentum: momentum) { (group: Int) -> Void in
+                            jump(proxy, to: .group(group))
+                        }
+                        .dynamicTypeSize(...DynamicTypeSize.accessibility1)
+                    }
+                }
+                .onChange(of: typed) { _, _ in jump(proxy, to: .top) }
+                .onChange(of: artists.order) { _, _ in jump(proxy, to: .top) }
+                .onChange(of: navigation.libraryScrollToTop) { _, _ in
+                    // the Library tab tapped at its root: the page shown goes to its top
+                    guard shown, page?.current == true else { return }
+                    jump(proxy, to: .top, animated: true)
                 }
             }
-            .onChange(of: typed) { _, _ in jump(proxy, to: .top) }
-            .onChange(of: artists.order) { _, _ in jump(proxy, to: .top) }
-            .onChange(of: navigation.libraryScrollToTop) { _, _ in
-                // the Library tab tapped at its root: the page shown goes to its top
-                guard shown, page?.current == true else { return }
-                jump(proxy, to: .top, animated: true)
+        }
+    }
+
+    /// (R2) The page's meta line (iArtists' .meta): the count - "22 artists", "3 of 22 artists" while Find finds - and
+    /// the order, a purple link opening its menu (out of the •••).
+    private func meta(_ drawn: DrawnArtists?) -> some View {
+        @Bindable var artists = artists
+        let count = drawn.map { (drawn: DrawnArtists) -> String in
+            drawn.standIn || drawn.artists.isEmpty ? "" : drawn.view.countText
+        } ?? ""
+        return PhoneMeta {
+            if !count.isEmpty {
+                Text(count)
+                Text(verbatim: "·")
+                    .accessibilityHidden(true)
             }
+            Menu {
+                Picker(ArtistWords.sortLabel, selection: $artists.order) {
+                    ForEach(ArtistOrder.allCases, id: \.self) { (order: ArtistOrder) in
+                        Text(order.label).tag(order)
+                    }
+                }
+                .pickerStyle(.inline)
+            } label: {
+                PhoneMetaLink(words: artists.order.label)
+            }
+            .menuIndicator(.hidden)
+            .accessibilityLabel(ArtistWords.sortLabel)
+            .accessibilityValue(artists.order.label)
+        } trailing: {
+            EmptyView()
         }
     }
 
@@ -217,7 +262,8 @@ struct ArtistsScreen: View {
                     .foregroundStyle(Palette.quiet)
                     .fixedSize(horizontal: false, vertical: true)
                     .padding(.vertical, 8)
-            } else if !drawn.artists.isEmpty, !drawn.view.countText.isEmpty {
+            } else if page == nil, !drawn.artists.isEmpty, !drawn.view.countText.isEmpty {
+                // a pushed list's count, in its flow - a page's is its meta line's
                 Text(drawn.view.countText)
                     .font(Typeface.footnote)
                     .foregroundStyle(Palette.quiet)
@@ -276,7 +322,8 @@ struct ArtistsScreen: View {
                     .id(ShelfAnchor.group(group.id))
             }
             ForEach(group.artists) { (artist: Artist) in
-                ArtistRow(artist: artist, line: ArtistWords.albumCountLine(artist.albumCount, place: place),
+                ArtistRow(artist: artist,
+                          line: ArtistTotals.rowLine(albums: artist.albumCount, songs: totals[artist.id]?.songs, place: place),
                           dimmed: here.map { (ids: Set<String>) -> Bool in !ids.contains(artist.id) } ?? false)
             }
         }
@@ -293,48 +340,38 @@ struct ArtistsScreen: View {
     }
 }
 
-/// One artist's row (LibraryViews.tsx ArtistRow): their round picture at the rows' size, their name and how many albums
-/// of theirs, and the chevron - their page pushed on the tab's path. Read as one: "Portishead, 2 albums". Dimmed, and
-/// opening nothing, while deadwax can't be reached and nothing of theirs is on this phone.
+/// One artist's row (LibraryViews.tsx ArtistRow; since R2 iArtists' tall row, LibraryListRow): their round picture,
+/// their name and the line under it - how many albums of theirs and (R2) the songs on them, once the album index has
+/// them ("6 albums · 59 songs") - and the chevron: their page pushed on the tab's path. Read as one: "Portishead, 2
+/// albums · 23 songs". Dimmed, and opening nothing, while deadwax can't be reached and nothing of theirs is on this phone.
 struct ArtistRow: View {
     let artist: Artist
     let line: String
     var dimmed = false
 
     var body: some View {
-        VStack(spacing: 0) {
-            NavigationLink(value: AppRoute.artist(ArtistRoute(artist))) {
-                HStack(spacing: 12) {
-                    ArtistPicture(id: artist.coverArt, side: LibraryRow.cover, pixels: CoverSize.row)
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(artist.name ?? "")
-                            .foregroundStyle(.primary)
-                        if !line.isEmpty {
-                            Text(line)
-                                .font(Typeface.subheadline)
-                                .foregroundStyle(Palette.quiet)
-                        }
-                    }
-                    .lineLimit(1)
-                    Spacer(minLength: 8)
-                    Image(systemName: "chevron.right")
-                        .font(Typeface.symbol(.footnote).weight(.semibold))
-                        .foregroundStyle(.tertiary)
-                        .accessibilityHidden(true)
-                }
-                .padding(.vertical, 8)
-                .contentShape(Rectangle())
-                .opacity(dimmed ? Palette.off : 1)
+        NavigationLink(value: AppRoute.artist(ArtistRoute(artist))) {
+            LibraryListRow(title: artist.name ?? "", line: line) {
+                ArtistPicture(id: artist.coverArt, side: LibraryLook.rowCover, pixels: CoverSize.row)
+            } trailing: {
+                LibraryChevron()
             }
-            .buttonStyle(.plain)
-            .disabled(dimmed)
-            .accessibilityElement(children: .combine)
-            .accessibilityLabel([artist.name ?? "", line].filter { (part: String) -> Bool in !part.isEmpty }
-                .joined(separator: ", "))
-            .accessibilityValue(dimmed ? DownloadWords.notOnDevice(Platform.device) : "")
-            Divider().padding(.leading, LibraryRow.textInset)
+            .contentShape(Rectangle())
+            .opacity(dimmed ? DWPalette.off : 1)
         }
+        .buttonStyle(.plain)
+        .disabled(dimmed)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel([artist.name ?? "", line].filter { (part: String) -> Bool in !part.isEmpty }
+            .joined(separator: ", "))
+        .accessibilityValue(dimmed ? DownloadWords.notOnDevice(Platform.device) : "")
     }
+}
+
+/// (R2) What the artists' totals are made again on: the scope, and its album index's answer (LibraryModel's serial).
+struct ArtistTotalsKey: Equatable {
+    let scope: AlbumScope
+    let serial: Int?
 }
 
 /// An artist's picture, round: Navidrome's artist image (the `artist.*` deadwax writes) at exactly `pixels`

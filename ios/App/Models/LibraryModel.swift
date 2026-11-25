@@ -17,7 +17,7 @@ enum LibraryLayout: String, CaseIterable, Sendable {
     }
 
     /// The switch's words, which say what it switches TO - the phone's own (the web has no switch); the Library's •••
-    /// says the same (LibraryMenuItem.layout, slice 4).
+    /// said the same from slice 4 until R2 moved Grid | List to the meta line.
     var switchLabel: String { self == .grid ? LibrarySwitchWords.showAsList : LibrarySwitchWords.showAsGrid }
     var switchSymbol: String { self == .grid ? "list.bullet" : "square.grid.2x2" }
 }

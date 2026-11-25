@@ -1,0 +1,181 @@
+import DeadwaxCore
+import SwiftUI
+
+/// A column of a list (MacColumnList): its header's words and its width - a fixed number of points, or a share of what
+/// the fixed ones leave (Core's MacTable.Width, the drawings' `grow`).
+struct MacListColumn: Equatable {
+    let title: String
+    let width: MacTable.Width
+}
+
+/// A column list (dw.css's .cols and .row - the redesign, slice R2, notes/ios.md "The redesign, slice R2: Albums and
+/// Artists, and the Library's top"): the Albums and Artists pages' rows, as the design's Albums.dc.html and
+/// Artists.dc.html draw them.
+///
+/// - The header strip (.cols): 24 tall, its gradient, the label colour at 11.5 semibold, each column's cell 10 in from
+///   its edges with a rule between, the frame's rule under it.
+/// - Each row (.row) 30 tall on the row line's rule, its cells as the header's, every other row striped (.row.alt, Core's
+///   MacTable.stripes); the selected one (.row.on) in the selection's fill, its purple edge inset and its words.
+/// - Widths from Core's MacTable.widths over the list's own width. Catalyst can't resize or reorder a column (the build
+///   plan's section 4).
+/// - A click selects a row; a double-click opens it (MacTable.clicked). With the list focused (a click gives it the
+///   keyboard), ↑ and ↓ move the selection, Home and End go to either end (MacTable.moved), and Return opens the row
+///   selected (MacTable.returned) - Platform's `listKeys`, the one place the list hears a key. Space is never the
+///   list's. The selection follows the rows: kept while its row is listed, else none (MacTable.kept), never another row
+///   in its place; brought into view as it moves. (Its review) ⌘↑ and ⌘↓ go to the ends; another modified key isn't
+///   the list's.
+/// - (Its review) What the page hangs on each row, `menu` - Albums' right-click, the album page's •••'s items
+///   (AlbumRightClick, as the tiles' and the rows' before R2 had it): applied to the whole row, its 30 points and every
+///   column, so a right-click anywhere on it is the row's.
+/// - VoiceOver reads a row as one element, its cells in order, selected when it is; its action opens it.
+struct MacColumnList<Row: Identifiable, Cell: View, Menu: ViewModifier>: View where Row.ID == String {
+    let columns: [MacListColumn]
+    let rows: [Row]
+    @Binding var selected: String?
+    /// A row opened - Return, a double-click, VoiceOver's action.
+    let open: (Row) -> Void
+    /// (Its review) What the page hangs on a row: its right-click (AlbumRightClick), or nothing (EmptyModifier).
+    let menu: (Row) -> Menu
+    /// Each row's cell in the column at that index.
+    @ViewBuilder let cell: (Row, Int) -> Cell
+
+    @FocusState private var focused: Bool
+
+    var body: some View {
+        let ids = rows.map { (row: Row) -> String in row.id }
+        let stripes = MacTable.stripes(ids.map { (id: String) -> MacTable.Line<String> in .row(id) })
+        GeometryReader { (room: GeometryProxy) in
+            let widths = MacTable.widths(columns.map { (column: MacListColumn) -> MacTable.Width in column.width },
+                                         total: Double(room.size.width))
+            VStack(spacing: 0) {
+                header(widths)
+                ScrollViewReader { (proxy: ScrollViewProxy) in
+                    ScrollView(.vertical) {
+                        LazyVStack(spacing: 0) {
+                            ForEach(Array(rows.enumerated()), id: \.element.id) { (at: Int, row: Row) in
+                                line(row, striped: at < stripes.count && stripes[at], widths: widths)
+                                    .modifier(menu(row))
+                                    .id(row.id)
+                            }
+                        }
+                    }
+                    .onChange(of: selected) { (_: String?, now: String?) -> Void in
+                        guard let now else { return }
+                        proxy.scrollTo(now)
+                    }
+                }
+            }
+        }
+        .focusable()
+        .focused($focused)
+        .focusEffectDisabled()
+        .listKeys { (key: ListKey) -> KeyPress.Result in pressed(key, ids: ids) }
+        .onChange(of: ids) { (_: [String], now: [String]) -> Void in
+            let kept = MacTable.kept(selected, in: now)
+            if kept != selected { selected = kept }
+        }
+    }
+
+    // MARK: the header
+
+    private func header(_ widths: [Double]) -> some View {
+        HStack(spacing: 0) {
+            ForEach(columns.indices, id: \.self) { (index: Int) in
+                Text(columns[index].title)
+                    .lineLimit(1)
+                    // .cols > div: padding 0 10px
+                    .padding(.horizontal, 10)
+                    .frame(width: CGFloat(index < widths.count ? widths[index] : 0), alignment: .leading)
+                    .frame(maxHeight: .infinity)
+                    .overlay(alignment: .trailing) {
+                        // .cols > div's rule, none after the last (:last-child)
+                        if index < columns.count - 1 {
+                            DWRule(colour: MacPalette.columnsRule, vertical: true)
+                        }
+                    }
+            }
+        }
+        .font(Typeface.Mac.text(.label).weight(.semibold))
+        .foregroundStyle(DWPalette.label)
+        .frame(height: CGFloat(MacLook.headerHeight))
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(MacPalette.columnsFace)
+        .overlay(alignment: .bottom) { DWRule(colour: DWPalette.frame) }
+        .accessibilityElement(children: .combine)
+        .accessibilityAddTraits(.isHeader)
+    }
+
+    // MARK: a row
+
+    private func line(_ row: Row, striped: Bool, widths: [Double]) -> some View {
+        let on = row.id == selected
+        return HStack(spacing: 0) {
+            ForEach(columns.indices, id: \.self) { (index: Int) in
+                cell(row, index)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+                    // .row > div: padding 0 10px
+                    .padding(.horizontal, 10)
+                    .frame(width: CGFloat(index < widths.count ? widths[index] : 0), alignment: .leading)
+            }
+        }
+        .font(Typeface.Mac.text(.base))
+        .foregroundStyle(on ? DWPalette.selt : DWPalette.head)
+        .frame(height: CGFloat(MacLook.rowHeight))
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background {
+            if on {
+                // .row.on: the selection's fill, its edge inset (box-shadow: inset 0 0 0 1px var(--selbd))
+                Rectangle()
+                    .fill(DWPalette.selbg)
+                    .overlay(Rectangle().strokeBorder(DWPalette.selbd, lineWidth: 1))
+            } else if striped {
+                MacPalette.rowStripe
+            }
+        }
+        .overlay(alignment: .bottom) { DWRule(colour: DWPalette.rowline) }
+        .contentShape(Rectangle())
+        .onTapGesture {
+            click(MacTable.clicked(row.id, count: 1), row: row)
+        }
+        .simultaneousGesture(TapGesture(count: 2).onEnded {
+            click(MacTable.clicked(row.id, count: 2), row: row)
+        })
+        .accessibilityElement(children: .combine)
+        .accessibilityAddTraits(on ? [.isButton, .isSelected] : .isButton)
+        .accessibilityAction { open(row) }
+    }
+
+    // MARK: doing
+
+    /// A click: the row selected and the keyboard the list's - and, a double-click, the row opened.
+    private func click(_ click: MacTable.Click<String>, row: Row) {
+        focused = true
+        switch click {
+        case .select(let id):
+            selected = id
+        case .open(let id):
+            selected = id
+            open(row)
+        }
+    }
+
+    /// A key on the focused list (Platform's ListKey, as Requests' table takes it): ↑ ↓ Home End move the selection,
+    /// Return opens it.
+    private func pressed(_ key: ListKey, ids: [String]) -> KeyPress.Result {
+        let move: MacTable.Key
+        switch key {
+        case .up: move = .up
+        case .down: move = .down
+        case .home: move = .home
+        case .end: move = .end
+        case .open:
+            guard let id = MacTable.returned(selected, in: ids),
+                  let row = rows.first(where: { (row: Row) -> Bool in row.id == id }) else { return .ignored }
+            open(row)
+            return .handled
+        }
+        selected = MacTable.moved(selected, move, in: ids)
+        return .handled
+    }
+}

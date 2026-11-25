@@ -551,8 +551,20 @@ extension View {
 
     /// (The redesign, R8's review) ↑ and ↓, Home and End, and Return on a list the Mac draws for itself while it has the
     /// keyboard's focus (Requests' table, MacTable's rules): `press` with the key, which says whether it took it.
+    /// (R2's review, for R2's column lists too) ⌘↑ and ⌘↓ are the list's ends, Home and End, as the Finder's are; any
+    /// other press with a modifier held - ⇧, ⌥, ⌃, or ⌘ on another key - isn't the list's, so ⌘↓ is never ↓. An arrow
+    /// key's own flags (the numeric pad's, the function key's) are not a modifier held.
     func listKeys(_ press: @escaping (ListKey) -> KeyPress.Result) -> some View {
         onKeyPress(keys: [.upArrow, .downArrow, .home, .end, .return]) { (key: KeyPress) -> KeyPress.Result in
+            let held = key.modifiers.intersection([.command, .shift, .option, .control])
+            if !held.isEmpty {
+                guard held == .command else { return .ignored }
+                switch key.key {
+                case .upArrow: return press(.home)
+                case .downArrow: return press(.end)
+                default: return .ignored
+                }
+            }
             switch key.key {
             case .upArrow: return press(.up)
             case .downArrow: return press(.down)
