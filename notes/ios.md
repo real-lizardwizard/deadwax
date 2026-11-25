@@ -17553,3 +17553,252 @@ AirPlay and Up Next") - say "(Since R3: …)"; ios/README.md says Queue for Up N
 
 **Shared test files edited** (unavoidable): test_ios_mac.py's SHEET_ROOTS and the frame's sheets in its frame test
 (`test_the_frame_holds_the_sidebar_the_page_a_panel_and_the_bar`), beside R3's own panels test.
+
+## The redesign, slice R8: Requests (2026-11-25)
+
+Requests in the new look on both devices: mac-redesign-build.md "#### R8 - Requests", drawn in Requests.dc.html (the
+Mac) and iRequests.dc.html (the phone). **No new server data**: DeadwaxClient and Core's Routes have no diff, and
+neither do RequestsModel, its polling, the overlays or the engine files. The app is still 0.13 (13), and no words
+fixture key changed (iphone.json and mac.json have no diff).
+
+### The Mac: a table of its own (`App/Mac/Requests/MacRequestsPage.swift`)
+
+`MacRequests.root()` draws MacRequestsPage now, not the phone's RequestsScreen. It is a MacPage:
+- **The toolbar**, with Get albums: "Search Soulseek", the Artist and Album fields (Tab between them; Return in Artist
+  moves to Album, Return in Album searches), Search, a groove; then **All | Active | Done** (DWSegmented, large), and
+  **Clear done** at the right. It folds to fit its page (below, "After review"). Search opens Choose a
+  source (SourcesSheet) over the page for a `GetRelease.manual` - the phone's ManualSearchSheet's own request, its
+  `ManualSearch.canSearch` and subtitle - so a Get from it is a manual search's download as on the phone.
+- **The table** (MacTable's rules): the header strip in the columns' face, then each heading (a group line, read as a
+  header) and its rows, striped again under every heading. Columns Album (22 pt cover), Artist, From, Progress, Speed
+  and the row's buttons. A click selects; a double click opens a done row (MacTable.clicked), and so does Return (MacTable.returned);
+  ↑ ↓ Home End move the selection (MacTable.moved); the selection is kept by key and lets go when its row goes, or when
+  the filter hides it (MacTable.kept). It scrolls sideways under 1002 pt and not otherwise.
+- **Progress**: a download's DWMeter and its line ("3 of 11 files", or going / organizing's words); a waiting row's
+  place, in amber when it warns; why one needs attention, in red, the detail as its help; a done row's chip (good, or
+  caution - a few words, `RequestRow.chip`) and when it ended. Every word in it is one line, cut short in the cell, its
+  whole the cell's help and in what VoiceOver hears.
+- **Speed**: the rate measured here (`RequestWords.speed`, "244 KB/s"), a dash for none.
+- **The buttons**: Cancel / Leave (Confirm before cancelling on asks first, in a dialog whose Keep it takes Return, so
+  Return never cancels a download); Another source, or Same source again when there's no other (with Get albums), and
+  the rest in a ••• beside it; a done row's Play and Open. Every action of a row is in its right-click and its
+  VoiceOver actions too (Core's `RequestAction`). Play is `player.play(songs:album:at: 0)` in the click with nothing
+  awaited, when `requests.plays(row)` has its songs, else Open's `requests.open(row)` - the phone's ▶ exactly.
+- **The status bar**: "1 downloading", "2 waiting", "1 needs attention", "3 done" (each only when it is not 0) and the
+  speed summed, while deadwax is reachable. "3 done" is a departure: the drawing counts the other three only.
+- The edges as the phone has them: out of reach, a look that failed (the last rows still under it), downloads not
+  kept track of, a spinner until the first answer, nothing yet.
+
+**Core `RequestFilter.swift`** holds the rules, pure and tested on Linux:
+- `RequestFilter` (all | active | done): each one's headings (Active is Downloading, Waiting and Needs attention -
+  never Done), `shown(board)` (only the headings with rows), `lines(board)` (MacTable's lines), `count`, its empty
+  words, and the status bar's words.
+- `RequestFilter.rate(row)` is a row's speed only while it is downloading and not being cancelled; `speed(board)` sums
+  those, so a finished job's last speed is never counted.
+- `RequestCounts`, and `RequestColumns` (the drawing's widths, the album's least, the meter's least, the row and
+  cover sizes, the buttons' words).
+- (R8's review) `cancellable(key, in:)`, `RequestAction` (a row's actions: offered, its buttons, the •••'s rest),
+  `RequestSpoken` (a row's and a card's words for VoiceOver, and the Mac's help), and `RequestTools` (the toolbar's
+  three fits).
+
+**Core `Requests.swift`**: RequestRow gains `from` (the peer, from the job's or the pending row's username), `speed`
+(the measured rate, nil for 0), `progressWords` (what the Progress column says for a row that has no meter line of its
+own) and `when` (a done row's age); and since the review `tries` ("2nd try") and `chip` (a done row's few words).
+They come from what jobRow and pendingRow already read; nothing new is asked of deadwax. The phone draws none of them
+(VoiceOver reads `tries`).
+
+**MacPalette** gains the column list's four (`columnsFace`, `columnsRule`, `rowStripe`, `groupRowFace`), and since
+the review the cover's edge (`coverEdge`, dw.css's `.cover` border), each with its `// dw:` rule.
+
+### The phone: the drawing's cards (`RequestsScreen`, `RequestCards`)
+
+- iOS's own bar, with Clear done in it over the large title "Requests" - not the app's PhoneTop (below).
+- Search Soulseek… (A1's row) first, in the accent's colour on its hairline, only with Get albums and dimmed while
+  deadwax is out of reach.
+- The headings (.row.grp: 38 tall at least, the words at the foot, semibold, a header for VoiceOver), each only over
+  rows (`RequestFilter.all.shown`).
+- Downloading and Waiting are PhoneCards: cover, title, line, the **DWMeter** and the progress line in mono ("3 of 11
+  files · 244 KB/s", the row's own `data`), beside the round ✕ (DWRaised on a Circle, 32 pt face in a 44 pt target).
+  The ✕ asks first in its card with Confirm before cancelling on, as before.
+- Needs attention's cards keep their two ways (Another source · N left, Same source again), as DWButtonStyle buttons
+  that fill the card, and the reason in red with its detail folded under it. A pair of buttons stands side by side
+  while both fit, and one over the other otherwise, each then across the card on up to 3 lines at the accessibility
+  sizes (`ButtonWords`).
+- Done rows: cover, title, line and chip, the round ▶ (`SharpSymbol(.play)` on the purple circle) and the row's tap
+  opening the album, on the row rule. The ▶ plays in the tap as before; a manual search's Done row still opens its
+  album (A2).
+- Everything else is square (DWCorners' phone half is Corners' 0, the meter's included); the ✕ and the ▶ are the only
+  round things.
+
+### DWMeter (`App/Look/DWMeter.swift`)
+
+dw.css's `.meter`, on both devices: a sunken track (the well, its inner shade, a 1 pt line) with the fill inside its
+1 pt edge, in plain, marked (the default, the accent) or good. Its fill is `DWLook.meterShare(fraction)` of the track -
+0 to 1, 0 for NaN - so it never passes it. Its height is DWLook's `meterHeight` (6 on the Mac, 8 on the phone), grown
+with the text size on the phone. Its corners are `DWCorners.meter` / `meterFill`: 2 and 1 on the Mac, Corners' track
+and fill (0) on the phone. It animates only without Reduce Motion, and VoiceOver skips it (the line beside it is read).
+
+### Decisions, and where this departs from the plan
+
+- **DWCorners gained `meter` and `meterFill`** (and their shapes), though plan 3.5 says App/Look gains only new files
+  after R1b: the meter's Mac corners (2, 1) aren't any of the three R1 made, and the phone's must be Corners' like the
+  rest. The edit is additive; test_ios_mac_look, test_ios_phone_look and test_ios_palette's
+  `test_the_looks_phone_corners_are_corners` count five now.
+- **The phone keeps iOS's navigation bar.** The drawing's large title is PhoneTop/PhoneBigTitle's, which needs iOS's
+  bar hidden, and test_ios_palette's `test_the_librarys_top_sits_under_the_status_bar` (R2's) allows that only on the
+  Library. The title and Clear done are iOS's large title and bar button for now.
+- **The app's words, not the drawing's**: "Another source · N left" and "Same source again" (the web's, held by
+  RequestsVectorTests) rather than "Next peer · 2 left" and "Ask again". The buttons column is the drawn 240 since the
+  review, holding one of them and a ••• (below).
+- **The phone's manual search is A1's row**, as the plan says, not the drawing's inline Artist and Album fields.
+- **The ▶ stays purple** (phonePrimaryFace): the drawing's grey `.key` would need the key colours, which only
+  MacPalette has.
+- The phone's heading is `Typeface.subheadline` (15), since `Typeface.Phone` has no 15; a done row's title is 16, not
+  the drawing's inherited 17.
+- "Up Next" was in no string literal of RequestCards or RequestsScreen (a comment only), so nothing changed for the
+  Queue rule.
+- The "Requests bar test" the brief named isn't in test_ios_palette.py: the old card drew the Downloads screen's
+  `DownloadBar`, which no palette test covered, and which Downloads still draws (R9's). The palette function edited
+  is the look's phone corners test, for the two new corners.
+- test_ios_mac.py's `SHEET_ROOTS` (a constant, not a function) names MacRequestsPage's one sheet, and
+  test_ios_manual_search's builds name its one `GetRelease.manual`.
+
+### Left out
+
+- Other sources on a downloading row (James: "just leave it out").
+- The drawing's Files, Other sources and Log tabs: no route gives what they show.
+- "slskd connected" in the status bar: nothing tells the app.
+- A done row's speed: deadwax keeps none once a job ends.
+
+### Tests, and the faults they were seen failing on
+
+**Core RequestFilterTests** (12): the filters' headings, a heading only over rows, the table's lines and stripes, the
+counts, the speed (downloading rows alone), a row's speed words, the status bar, From / progress / when, the columns,
+the buttons' words, the meter's share and its heights.
+
+**tests/test_ios_requests_look.py** (12): DWMeter is dw.css's `.meter` (track, fill, edge, heights, corners per
+device); its fill never passes its track; round stays round (two Circles: the ✕ and the ▶) and the rest is square; the
+cards say what the drawing says; every heading has rows; every play is in the tap; the Mac's table, toolbar and status
+bar are the drawing's; what no route gives is left out; no value of Requests' own; "Up Next" is the Queue.
+
+Also touched: test_ios_phone_look (DWMeter among the look's parts, its fixed frames, the corners, Requests as the
+first screens drawing the look's and the phone's pieces), test_ios_mac_look (the corners and DWLook's field count),
+test_ios_mac_reach (the Requests root), test_ios_manual_search, test_ios_mac's SHEET_ROOTS, test_ios_palette's corners.
+
+The plan's five mutations, and two more, were each applied alone, run and restored byte for byte. Every one was caught:
+- Active including Done: RequestFilterTests `allShowsEveryHeadingActiveNeverDoneAndDoneAlone`,
+  `theCountsAreEachHeadingsAndEachFiltersRows`, `theTablesLinesAreEachHeadingThenItsRows`;
+- a finished job's speed counted: `theSpeedIsTheDownloadingRowsAloneNeverAFinishedOnes`,
+  `aRowsSpeedIsTheDataLinesRateOrADash`, `theStatusBarSaysEachHeadingsCountThenTheSpeed`;
+- a heading over an empty group (Core's `shown`): `aHeadingIsShownOnlyOverRows`; and the phone's list drawn from
+  `sections` instead: `test_every_heading_has_rows_under_it`;
+- a fill past its track (DWMeter's share unclamped): `test_a_meters_fill_never_passes_its_track`; and Core's
+  `meterShare` with no ceiling: `aMetersFillNeverPassesItsTrack`;
+- the ✕ squared (its DWRaised on a Rectangle): `test_round_stays_round_and_the_rest_is_square`.
+
+### Not verified - checks 570 to 573
+
+- Neither half has been seen on a screen: only the builds and the tests.
+- Whether the meters, the files and the speeds match slskd's own as a download runs.
+- On the Mac: the table's sideways scroll on a narrow window, a double click on a done row, the Cancel dialog's Return keeping the download,
+  and Choose a source opening from the toolbar.
+- On the phone: the large title and Clear done over the new cards, the meter growing with the text size, and
+  Needs attention's and the cancel question's buttons stacking and wrapping at AX5. The page's ground is the dark
+  system background, as on the other tabs, not the drawing's `--bg`.
+- On the Mac (the review's): the toolbar's three fits at 1280, 880 and with a side panel open; the table with no
+  sideways scroll at 1280; ↑ ↓ and Return in the table; the right-click and the •••; VoiceOver reading a row as one,
+  with its actions; the cut words' help.
+
+### After review (2026-11-25)
+
+The review found seven things; each is fixed, with a test or a mutation that was seen to catch it.
+
+1. **The Mac's Cancel dialog acted on a stale row.** The dialog kept the row it asked over and cancelled that, after
+   the download might have moved on to being filed. Now the confirm passes the row's key, `confirmed(key)` looks the
+   live row up with Core's `RequestFilter.cancellable(key, in: board)` (a job downloading or waiting whose cancel is
+   `.ready`, else nil) and cancels only that. `onChange(of: board)` lets the question go once its row isn't ready. The
+   phone's `cancelNow` does the same. deadwax's route takes any job, so the guard is the app's; the server's own is
+   being fixed on main separately.
+2. **The phone at the accessibility sizes.** DWButtonStyle's `.lineLimit(1)` cut "Another source · 2 left" at AX5,
+   and the cancel question's small buttons, not filling, ran past the card. Card buttons now take their words through
+   `ButtonWords`, whose own limit is `isAccessibilitySize ? 3 : 1` (the innermost limit wins over the style's).
+   `ButtonPair` draws its buttons as `buttons(stacked)`, so stacked ones fill (`fills: stacked`, or `fills: true` for
+   Needs attention as before). DWButtonStyle is unchanged.
+3. **The Progress column spilled** past its 206 (226 less the cell's 10 either side): "12 of 12 files · adding to your
+   library…" (a meter's line had `.fixedSize()`) and a done row's whole sentence in a chip. Every word there is
+   `.lineLimit(1)`, giving way before the meter (which keeps `RequestColumns.meterLeast`, 48) or the chip. Each kind of
+   row's whole words are the cell's `.help` and in its VoiceOver label. A done row's chip is Core's
+   `RequestWords.chipWords`: "In your library", "Added to their library", "Partly in your library", "Not added", "You
+   already had it", "Stopped" and the like, the longest about 159 pt.
+4. **The page didn't fit.** At 320 the buttons column made the table's least 1082, wider than 1060 (a 1280 window, less
+   the sidebar's 220), and the toolbar's 862 or so overran an 880 window's 660.
+   - **The buttons column is the drawn 240**: the row's main action alone (Cancel / Leave; Another source, else Same
+     source again; Play and Open), and a ••• pop-up with the rest (Same source again beside Another source). The
+     table's least is 1002, so it fits 1060.
+     - This was chosen over narrower words because the app's words stay: "Another source · 99 left" with the ••• is
+       about 236 by the test's estimate.
+     - It was chosen over dropping the second way on because both stay a click away, in the ••• and the right-click.
+   - **The toolbar is a `ViewThatFits` of three** (Core's `RequestTools.Fit`):
+     - **full** (about 862): the label, 170 and 210 fields;
+     - **compact** (about 637, inside 880's 660): no label, 120 and 140 fields;
+     - **folded** (about 448, inside the 589 a 1280 window leaves beside the side panel's column): the filter and Clear
+       done in one pop-up named "Show" for VoiceOver, its value the filter.
+     - Every control is in each. Under 1280 the side panel is a drawer lying over the page (DesktopFrame's, not
+       changed here), so the page keeps its width and its toolbar.
+5. **A row wasn't one VoiceOver element.** Each Mac row, and each phone card (a download's, a refused one's, a done
+   row), is `.accessibilityElement(children: .ignore)` now.
+   - Its label is Core's `RequestSpoken` (everything it shows: title, artist, from, progress, speed or the reason, who
+     asked, which try). For whoever runs deadwax the error's own words are in it, and "tell whoever runs deadwax" for
+     everyone else.
+   - Its actions are its buttons', named in the app's words (Cancel or Leave, Another source, Same source again, Play,
+     Open). They use `.accessibilityActions { ForEach }`, the looping form of `accessibilityAction(named:)`.
+   - A done row's default action opens it. The phone's cancel question, while it asks, stays its own group under the
+     card.
+6. **The nits.**
+   - The Mac's table takes ↑ ↓ Home End and Return through Platform's new `listKeys` (the Mac's half
+     `onKeyPress(keys:)`, the iPhone's `self`), into R1's `MacTable.moved` and `MacTable.returned`. Return opens a done
+     row, as a double click does.
+   - A filter that hides the selected row lets it go.
+   - Who asked and which try are the album cell's help (and VoiceOver's). Leave's help is its label and who asked ("Asked by you
+     and Ethan"), the reason it leaves rather than cancels.
+   - The cover has `.cover`'s 1 px border (`MacPalette.coverEdge`, on a chip's 3 pt corners).
+   - The toolbar's fields have an order (`.tabs($focused, in: Self.order)`), and Return in Artist moves to Album.
+   - "N done" in the status bar is named a departure (above).
+7. **For R9, left as is:** You > Getting albums' `RequestWords.confirmCancelNote`, "The ✕ on a download in Requests
+   asks first", is wrong on the Mac now, where the table's button says Cancel. Its words are R9's Settings'.
+
+**New words, none in the fixtures:**
+- the chip's, listed in 3;
+- `RequestRow.tries` (Core's existing `tryText`);
+- the spoken joins.
+
+They're Core's and reach no words fixture (DeviceWordsTests lists its keys), so iphone.json and mac.json still have no
+diff.
+
+**Platform** gained `listKeys` and `ListKey` (the gate's one file outside App/Mac besides the Requests ones).
+
+**Two shared test functions were edited:**
+- test_ios_mac's `test_platform_is_the_iphones_exactly_as_before_on_the_iphone` lists the new helper.
+- `test_tab_moves_between_the_fields_and_return_in_one_never_applies`'s TABS names the page.
+
+`test_a_right_click_is_the_menus_own_items` gained `REQUEST_ROWS`: the Requests row's right-click is RequestAction's
+list, the one its buttons and ••• partition, not QueueMenuItems.
+
+**Tests since the review:**
+- **Core RequestFilterTests** (19) adds:
+  - the table fits the window as it opens;
+  - the toolbar's fits;
+  - a cancel that asked acts on the row as it is now;
+  - each row offers what its buttons do, in the app's words;
+  - a row is read as one;
+  - a refusal's "tell whoever runs deadwax" only for everyone else;
+  - the done chip's few words.
+- **test_ios_requests_look.py** (19) adds:
+  - a card's buttons at the accessibility sizes;
+  - a cancel that asked acts on the live row;
+  - nothing in the Progress column draws past it;
+  - the table and the toolbar's widths, added up from Core's numbers and the words' lengths at 0.55 em, an
+    estimate from above;
+  - the fields' Tab and Return;
+  - the table's keys;
+  - a row is one element.

@@ -323,6 +323,25 @@ public struct RequestRow: Sendable, Equatable, Identifiable {
     /// (Manual search, slice A1) A manual search's download this filed (in the library, all or part): filed by its own
     /// tags, which its Done row says under it (ManualSearch.doneLine).
     public var ownTags: Bool
+    /// (The redesign, slice R8 - notes/ios.md "The redesign, slice R8: Requests") The peer it comes from, as `line` names
+    /// it after "from": the Mac's From column. Nil where none is named.
+    public var from: String?
+    /// (R8) The job's rate as measured here (bytes a second, SpeedSamples' - never slskd's average), nil for none: what
+    /// the data line says while it downloads, and the Mac's Speed column. Which rates count - a downloading row's alone
+    /// - is RequestFilter's to say.
+    public var speed: Double?
+    /// (R8) What it's doing, in a few words, without who or how fast: "3 of 11 files", "4th in their queue",
+    /// "cancelling\u{2026}" - and for one done, how it ended ("In your library"): the Mac's Progress column. Nil where a
+    /// row says it otherwise (a refusal's reason).
+    public var progressWords: String?
+    /// (R8) How long ago one done ended ("13 minutes ago"), beside how it ended on the Mac; nil for none.
+    public var when: String?
+    /// (R8's review) Which try this is, past the first ("2nd try") - in `line` already; said apart for the Mac's help and
+    /// what VoiceOver hears of its row. Nil for a first try.
+    public var tries: String?
+    /// (R8's review) How one done ended, in a chip's few words (RequestWords.chipWords) - the Mac's Progress column, where
+    /// the whole of `progressWords` won't fit. Nil but for one done.
+    public var chip: String?
 
     public var id: String { key }
 
@@ -356,6 +375,10 @@ public struct RequestRow: Sendable, Equatable, Identifiable {
         cancelWords = PerPerson.cancelDefault
         manual = false
         ownTags = false
+        from = nil
+        speed = nil
+        progressWords = nil
+        when = nil
     }
 }
 
@@ -637,6 +660,29 @@ public enum RequestWords {
         }
     }
 
+    /// (The redesign, R8's review - notes/ios.md "The redesign, slice R8: Requests") How a done download ended, in a
+    /// chip's few words: the Mac's Progress column, 206 points across, where a warning's whole sentence ("Downloaded, but
+    /// not added to your library") won't fit and its end, cut off, would be the part that mattered. What it means comes
+    /// first - in the library, partly, not added, stopped - and `outcome`'s sentence is the row's help and what VoiceOver
+    /// hears. Each mirrors `outcome` and PerPerson.grantWords: "their" exactly where they say "their".
+    public static func chipWords(_ job: DownloadJob) -> String {
+        let theirs = job.mine == false
+        switch job.outcome {
+        case "filed":
+            return theirs && job.library == "added" ? "In their library" : "In your library"
+        case "already_there":
+            if job.library == "added" { return theirs ? "Added to their library" : "Added to your library" }
+            if job.library == "flagged" || job.library == "looked" { return "Not added" }
+            return "You already had it"
+        case "partly_filed":
+            return theirs && job.library == "incomplete" ? "Partly in their library" : "Partly in your library"
+        case "interrupted":
+            return "Stopped"
+        default:
+            return "Not added"
+        }
+    }
+
     /// The badge's number: none at zero, and "99+" past 99.
     public static func badgeText(_ count: Int) -> String {
         guard count > 0 else { return "" }
@@ -734,8 +780,13 @@ public enum RequestWords {
                              album: album ?? "")
         row.manual = manual
         row.cover = said(job.releaseMbid)
+        //? (R8) who it comes from, and its rate as measured - the very one the data line says
+        row.from = said(job.username)
+        let measured = input.speeds[job.id]
+        row.speed = (measured ?? 0) != 0 ? measured : nil
         row.askedBy = PerPerson.askedByText(mine: job.mine, shared: job.shared, requestedBy: job.requestedBy)
         row.cancelWords = PerPerson.cancelWords(mine: job.mine, shared: job.shared, requestedBy: job.requestedBy)
+        row.tries = tryText(job)
         let cancelling = input.cancelling.contains(job.id)
         //? a cancel that only withdraws your request says so while it is out
         let going = row.cancelWords.leaves ? "leaving\u{2026}" : "cancelling\u{2026}"
@@ -750,12 +801,15 @@ public enum RequestWords {
             row.progress = organizing ? 100 : JSMath.min(100, JSMath.max(0, job.progress ?? 0))
             if cancelling {
                 row.data = going
+                row.progressWords = going
             } else if organizing {
                 row.data = "\(files(done, total)) \u{00B7} adding to your library\u{2026}"
+                row.progressWords = row.data
             } else {
                 let failed = (job.filesFailed ?? 0) != 0 ? "\(job.filesFailed ?? 0) failed" : nil
                 let rate = (speed ?? 0) != 0 ? self.speed(speed) : nil
                 row.data = [files(done, total), failed, rate].compactMap { $0 }.joined(separator: " \u{00B7} ")
+                row.progressWords = [files(done, total), failed].compactMap { $0 }.joined(separator: " \u{00B7} ")
             }
             row.brief = cancelling ? going : organizing ? "adding\u{2026}" : "\(done) of \(total)"
             //? nothing in slskd is left to cancel once it is being filed, and the filing can't be stopped
@@ -768,6 +822,7 @@ public enum RequestWords {
             //? files the peer already refused while the rest wait in its queue, said now, in amber
             let failed = !cancelling && (job.filesFailed ?? 0) != 0 ? "\(job.filesFailed ?? 0) failed" : nil
             row.line = who(row.artist, job.username, state, failed, tryText(job))
+            row.progressWords = [state, failed].compactMap { $0 }.joined(separator: " \u{00B7} ")
             if failed != nil { row.lineTone = .warning }
             row.brief = cancelling ? going : place.map { "\(ordinal($0)) in line" } ?? "starting"
             row.cancel = cancelling ? .cancelling : .ready
@@ -798,6 +853,10 @@ public enum RequestWords {
             let age = self.age(job.updatedAt, now: now)
             row.line = age.isEmpty ? outcome.text : "\(outcome.text) \u{00B7} \(age)"
             row.lineTone = outcome.tone
+            //? (R8) the line's two halves, apart: the Mac draws how it ended as a chip, and how long ago beside it
+            row.progressWords = outcome.text
+            row.chip = chipWords(job)
+            row.when = age.isEmpty ? nil : age
             row.reasonTell = outcome.tell
             row.reasonDetail = outcome.detail
             row.progress = 100
@@ -826,6 +885,7 @@ public enum RequestWords {
                              title: titleOf(pending.album, manual ? ManualSearch.mark : nil), artist: pending.artist,
                              album: pending.album)
         row.manual = manual
+        row.from = said(pending.username)
         if pending.mayHaveStarted {
             //? the phone's own: no answer, not a refusal - so not said as one (RequestOverlays.gaveUp)
             row.line = who(row.artist, pending.username, RequestWords.noAnswer)
@@ -841,6 +901,7 @@ public enum RequestWords {
             return row
         }
         row.line = who(row.artist, pending.username, "starting\u{2026}")
+        row.progressWords = "starting\u{2026}"
         row.brief = "starting\u{2026}"
         row.arriving = true
         return row

@@ -130,6 +130,8 @@ def test_platform_is_the_iphones_exactly_as_before_on_the_iphone():
                    # (the Mac redesign, R1) Return on a redesigned dialog's one action, ← and → on the Mac's own
                    # controls
                    r"returnPresses\(\)", r"arrowKeys\(_ move: @escaping \(Int\) -> KeyPress\.Result\)",
+                   # (R8's review) a table's ↑ ↓ Home End and Return, the Mac's alone
+                   r"listKeys\(_ press: @escaping \(ListKey\) -> KeyPress\.Result\)",
                    # (R1's review) a launch screen's name for the window
                    r"namesWindow\(_ name: String\?\)",
                    r"findField\(_ focused: FocusState<Bool>\.Binding\)",
@@ -434,6 +436,8 @@ SONG_ROWS = {"Album/TrackRow.swift": 1, "Library/SongsScreen.swift": 1, "Playlis
 #? an album's tile or row: the album page's •••; a playlist's row: its page's
 ALBUM_TILES = {"Library/LibraryTiles.swift": 2, "Search/SearchScreen.swift": 1, "Artist/ArtistView.swift": 1}
 PLAYLIST_ROWS = {"Playlists/PlaylistsScreen.swift": 1}
+#? (R8's review) a request's row on the Mac: RequestAction's, the list its buttons and its ••• are
+REQUEST_ROWS = "Mac/Requests/MacRequestsPage.swift"
 #? the phone's own long presses, from before: the EQ's Back to AutoEq and the event log's Copy - a right-click there too
 PHONE_LONG_PRESSES = {"EQ/EQScreen.swift": 1, "Manage/EventLogScreen.swift": 1}
 
@@ -462,6 +466,13 @@ def test_a_right_click_is_the_menus_own_items():
         if name == PLATFORM:
             continue
         code = bare(text)
+        if name == REQUEST_ROWS:
+            # (R8's review) a request's row: its own list, RequestAction's - what its buttons, its ••• and VoiceOver
+            # offer, never a second one (tests/test_ios_requests_look.py holds the three to it)
+            assert code.count(".macContextMenu") == 1
+            assert (".macContextMenu { ForEach(offered, id: \\.self) { (action: RequestAction) in "
+                    "Button(action.words(row)) { act(action, row) } } }") in re.sub(r"\s+", " ", code)
+            continue
         uses = re.findall(r"\.macContextMenu \{ ([^}]*) \}", code)
         assert len(uses) == code.count(".macContextMenu"), name
         if uses:
@@ -703,6 +714,8 @@ SHEET_ROOTS = {
     #? (slice 3) the desktop frame's: MainTabs' three over the frame - (its review) the EQ the bar's too, never a second.
     #? (R3's review) Two: the EQ is the dock's EQ tab now, a shared file's preview over it (MacPanels' one)
     "Root/DesktopFrame.swift": 2, "Player/MacPanels.swift": 1,
+    #? (the redesign, R8) Choose a source, from the Mac's Requests' toolbar
+    "Mac/Requests/MacRequestsPage.swift": 1,
 }
 
 
@@ -1753,7 +1766,9 @@ def test_tab_moves_between_the_fields_and_return_in_one_never_applies():
     #? helper (MacMenu.tab), each field's own
     TABS = {"Edit/ReleasePage.swift": 1, "Edit/TagsPages.swift": 1, "Manage/PeopleSheets.swift": 6,
             #? (manual search, slice A1) Search Soulseek's Artist and Album
-            "Get/ManualSearchSheet.swift": 2}
+            "Get/ManualSearchSheet.swift": 2,
+            #? (R8's review) the Mac's Requests' toolbar: Artist, then Album
+            "Mac/Requests/MacRequestsPage.swift": 1}
     found = {}
     for name, text in app.items():
         if name == PLATFORM:

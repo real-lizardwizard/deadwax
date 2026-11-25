@@ -320,9 +320,9 @@ def test_the_frame_stacks_are_the_macs_with_its_own_routes():
                       ("requests", "MacRequests.root()"), ("you", "MacSettings.root()")):
         assert re.search(r"MacTabStack\(path: paths\." + tab + r"(, ownTop: true)?\) \{ " + re.escape(root) +
                          r" \}\s*\.tag\(AppTab\." + tab + r"\)", page), tab
-    # each root the phone's own, as MainTabs draws it
+    # each root the phone's own, as MainTabs draws it - but Requests', since R8 the Mac's own table (MacRequestsPage)
     for area, view in (("Library/MacLibrary.swift", "LibraryView()"), ("Search/MacSearch.swift", "SearchScreen()"),
-                       ("Requests/MacRequests.swift", "RequestsScreen()"), ("Settings/MacSettings.swift", "YouView()")):
+                       ("Requests/MacRequests.swift", "MacRequestsPage()"), ("Settings/MacSettings.swift", "YouView()")):
         assert re.search(r"static func root\(\) -> some View \{\s*" + re.escape(view) + r"\s*\}", bare(app["Mac/" + area]))
     # macRoutes: what appRoutes gives every page - the room for the notice, the offline banner, iOS's tab bar hidden
     routes = bare(app["Mac/Frame/MacRoutes.swift"])

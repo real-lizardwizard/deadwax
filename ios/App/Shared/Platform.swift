@@ -549,6 +549,20 @@ extension View {
         }
     }
 
+    /// (The redesign, R8's review) ↑ and ↓, Home and End, and Return on a list the Mac draws for itself while it has the
+    /// keyboard's focus (Requests' table, MacTable's rules): `press` with the key, which says whether it took it.
+    func listKeys(_ press: @escaping (ListKey) -> KeyPress.Result) -> some View {
+        onKeyPress(keys: [.upArrow, .downArrow, .home, .end, .return]) { (key: KeyPress) -> KeyPress.Result in
+            switch key.key {
+            case .upArrow: return press(.up)
+            case .downArrow: return press(.down)
+            case .home: return press(.home)
+            case .end: return press(.end)
+            default: return press(.open)
+            }
+        }
+    }
+
     /// (Slice 7) The rows selected in a SelectingList: Edit > Copy (⌘C) copies them and Select All (⌘A) selects every
     /// row of `ids` - the system's own two items, never a second ⌘C of deadwax's - `text` what Copy puts on the
     /// clipboard for a selection (nil: Copy dimmed - as it is with no selected row still among `ids`). A view drawing
@@ -882,6 +896,11 @@ extension View {
         self
     }
 
+    /// The Mac's alone: the iPhone draws none of the Mac's lists.
+    func listKeys(_ press: @escaping (ListKey) -> KeyPress.Result) -> some View {
+        self
+    }
+
     /// The Mac's alone: a line's long press Copy is the iPhone's, as before.
     func copiesSelection<ID: Hashable>(_ selection: Binding<Set<ID>>, of ids: [ID],
                                        text: @escaping (Set<ID>) -> String?) -> some View {
@@ -900,3 +919,9 @@ struct SelectingList<ID: Hashable, Content: View>: View {
 }
 
 #endif
+
+/// (The redesign, R8's review) A key a list the Mac draws takes (Platform's `listKeys`): ↑, ↓, Home and End move the
+/// selection, Return opens the row selected. Named apart from MacTable's own keys, which the iPhone's half never names.
+enum ListKey: Sendable, Hashable {
+    case up, down, home, end, open
+}

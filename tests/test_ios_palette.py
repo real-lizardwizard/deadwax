@@ -229,10 +229,12 @@ def test_the_looks_phone_corners_are_corners():
     # Corners' own (every one 0), never a number of the look's; on the Mac dw.css's (test_ios_mac_look.py)
     text = (APP / "Look" / "DWCorners.swift").read_text(encoding="utf-8")
     phone = text[text.index("    enum Phone {"):text.index("    /// This device's.")]
+    #? (R8) and the meter's track and fill (DWMeter): Corners' own track and fill
     assert re.findall(r"static let (\w+): CGFloat = (\S+)", phone) == [
-        ("button", "Corners.control"), ("box", "Corners.card"), ("chip", "Corners.control")]
-    assert (corner("control"), corner("card")) == (0, 0)
-    for name in ("button", "box", "chip"):
+        ("button", "Corners.control"), ("box", "Corners.card"), ("chip", "Corners.control"), ("meter", "Corners.track"),
+        ("meterFill", "Corners.fill")]
+    assert (corner("control"), corner("card"), corner("track"), corner("fill")) == (0, 0, 0, 0)
+    for name in ("button", "box", "chip", "meter", "meterFill"):
         assert f"static var {name}: CGFloat {{ Platform.mac ? Mac.{name} : Phone.{name} }}" in text
     # the one round shape is a capsule, the switch's - nothing else in the app is one
     assert re.findall(r"Capsule\(", text) == ["Capsule("] and "static var roundShape: Capsule" in text

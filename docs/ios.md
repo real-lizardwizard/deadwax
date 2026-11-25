@@ -6287,6 +6287,27 @@ and the Mac (the web app keeps Up Next). Each tab's page is still the one it was
 - **538 Both phones.** **Not done yet.** On Green Anole, everything else - every tab, the player, Edit album, Settings'
   EQ - is as before. On Ethan's phone, 536-537, or "not done yet".
 
+#### Requests (570-573)
+
+**Not done yet.** Requests in the new look: on the Mac a table of its own, with Search Soulseek in the toolbar and the
+counts and speed in the status bar; on the phone the drawing's cards with their meters. Start a download or two first,
+so something is downloading, waiting and done.
+
+- **570 The table.** **Not done yet.** On the Mac the groups, the progress and the speeds match slskd. Cancel and Next
+  peer work. (The groups are Downloading, Waiting, Needs attention and Done, each only with rows; All | Active | Done
+  narrows them; the status bar counts each and sums the speed. Next peer is the row's **Another source**; **Same source
+  again** is in its **•••** and its right-click. ↑ and ↓ move between rows. A word cut short in Progress shows whole
+  when you hold the pointer over it. In a narrow window the toolbar's fields narrow, and beside a side panel All,
+  Active, Done and Clear done fold into one pop-up.)
+- **571 Manual search.** **Not done yet.** Search from the toolbar; a Done row opens its album. (Artist, Album and
+  **Search** open Choose a source - Return in Artist goes to Album, Return in Album searches; a Get from it shows in
+  the table. A done row's **Open**, a double click or Return opens the album; **Play** plays it.)
+- **572 Requests on the phone.** **Not done yet.** As drawn. Meters and speeds match slskd; Cancel, Next peer and the
+  manual search work; a Done row's ▶ plays. (The ✕ and the ▶ are round, everything else square; the line under a
+  meter reads like "3 of 11 files · 244 KB/s". Next peer is **Another source**; Search Soulseek… is the first row.
+  At the largest text sizes a card's two buttons stand one over the other, their words on more than one line.)
+- **573 Both phones.** **Not done yet.** Green Anole: the rest as before. Ethan's: 572, or "not done yet".
+
 ## What it can't do yet
 
 These are the web app's for now - open deadwax's address in a browser for them, since nothing in the app takes you

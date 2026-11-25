@@ -397,12 +397,14 @@ def test_mac_look_is_dw_css_size_by_size():
 def test_mac_corners_are_dw_css_radii():
     text = CORNERS.read_text(encoding="utf-8")
     mac = text[text.index("    enum Mac {"):text.index("    enum Phone {")]
-    found = re.findall(r"static let (\w+): CGFloat = ([0-9.]+)\s*// dw: (\S+) border-radius", mac)
-    assert len(re.findall(r"static let", mac)) == 3, "the Mac's half: dw.css's three"
-    assert {name for name, _, _ in found} == {"button", "box", "chip"}, found
+    found = re.findall(r"static let (\w+): CGFloat = ([0-9.]+)\s*// dw: (.+?) border-radius", mac)
+    #? (R8) and the meter's: .meter's 2, its fill's (.meter > i) 1
+    assert len(re.findall(r"static let", mac)) == 5, "the Mac's half: dw.css's five"
+    assert {name for name, _, _ in found} == {"button", "box", "chip", "meter", "meterFill"}, found
     for name, value, selector in found:
         assert float(value) == px(rule(selector)["border-radius"]), name
-    assert [(n, float(v)) for n, v, _ in found] == [("button", 4), ("box", 5), ("chip", 3)]
+    assert [(n, float(v)) for n, v, _ in found] == [("button", 4), ("box", 5), ("chip", 3), ("meter", 2),
+                                                    ("meterFill", 1)]
     # a folder tab's top is a box's: .tab's 5px 5px 0 0
     assert rule(".tab")["border-radius"] == "5px 5px 0 0"
     assert "UnevenRoundedRectangle(topLeadingRadius: box, topTrailingRadius: box, style: .circular)" in text
@@ -432,7 +434,7 @@ def test_dwlooks_mac_sizes_are_r1s():
     # the shared parts' sizes on the Mac (Core DWLook.onMac): MacLook's own, or the rule's number - R1's, unchanged
     maclook = dict(re.findall(r"public static let (\w+): Double = ([0-9.]+)\n", LOOK.read_text(encoding="utf-8")))
     fields = lookfields("static let onMac = DWLook(")
-    assert [name for name, _, _ in fields][-2:] == ["target", "grows"] and len(fields) == 21, fields
+    assert [name for name, _, _ in fields][-2:] == ["target", "grows"] and len(fields) == 22, fields
     for name, value, source in fields[:-2]:
         found = re.fullmatch(r"dw: (.+) ([a-z-]+)", source)
         assert found, f"DWLook.onMac.{name}: say `dw: <selector> <property>` - {source}"
@@ -543,7 +545,7 @@ MAC_FONT = re.compile(r"Typeface\.(Mac\.(text|mono)|Look\.(text|mono)|symbol)\("
 
 def test_nothing_in_the_macs_views_draws_a_value_of_its_own():
     files = drawn_in_the_look()
-    assert len(files) > 30 and len([name for name in files if name.startswith("Look/")]) == 9, "App/Mac and App/Look"
+    assert len(files) > 30 and len([name for name in files if name.startswith("Look/")]) == 10, "App/Mac and App/Look"
     left = []
     for name, text in files.items():
         code = bare(text)

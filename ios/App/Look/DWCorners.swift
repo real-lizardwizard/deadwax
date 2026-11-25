@@ -7,6 +7,8 @@ import SwiftUI
 /// - `button`: buttons, fields, wells, a segmented control, a strip's button, a sidebar row - .btn's 4 on the Mac.
 /// - `box`: a group box, a card, a folder tab's top, a toggle - .group's 5 on the Mac.
 /// - `chip`: chips, a count, a small cover, the checkbox - .chip's 3 on the Mac.
+/// - `meter` and `meterFill`: a download's bar (DWMeter, slice R8), its track and the fill inside it - .meter's 2 and
+///   its `i`'s 1 on the Mac.
 ///
 /// On the phone each is Corners' (every one 0 since 15 Nov's "Actual corners"), as dw.css's last block draws the phone
 /// (`.dw.ph .btn, .dw.ph .seg, ... { border-radius: 0; }`). tests/test_ios_mac_look.py holds the Mac's to dw.css;
@@ -18,6 +20,8 @@ enum DWCorners {
         static let button: CGFloat = 4              // dw: .btn border-radius
         static let box: CGFloat = 5                 // dw: .group border-radius
         static let chip: CGFloat = 3                // dw: .chip border-radius
+        static let meter: CGFloat = 2               // dw: .meter border-radius
+        static let meterFill: CGFloat = 1           // dw: .meter > i border-radius
     }
 
     /// The phone's: Corners', square.
@@ -25,17 +29,23 @@ enum DWCorners {
         static let button: CGFloat = Corners.control    // dw.ph: .btn border-radius
         static let box: CGFloat = Corners.card          // dw.ph: .group border-radius
         static let chip: CGFloat = Corners.control      // dw.ph: .chip border-radius
+        static let meter: CGFloat = Corners.track       // dw.ph: .meter border-radius
+        static let meterFill: CGFloat = Corners.fill    // dw.ph: .meter > i border-radius
     }
 
     /// This device's.
     static var button: CGFloat { Platform.mac ? Mac.button : Phone.button }
     static var box: CGFloat { Platform.mac ? Mac.box : Phone.box }
     static var chip: CGFloat { Platform.mac ? Mac.chip : Phone.chip }
+    static var meter: CGFloat { Platform.mac ? Mac.meter : Phone.meter }
+    static var meterFill: CGFloat { Platform.mac ? Mac.meterFill : Phone.meterFill }
 
     /// The shapes, as CSS rounds a corner (a circle's quarter, not the continuous curve).
     static var buttonShape: RoundedRectangle { RoundedRectangle(cornerRadius: button, style: .circular) }
     static var boxShape: RoundedRectangle { RoundedRectangle(cornerRadius: box, style: .circular) }
     static var chipShape: RoundedRectangle { RoundedRectangle(cornerRadius: chip, style: .circular) }
+    static var meterShape: RoundedRectangle { RoundedRectangle(cornerRadius: meter, style: .circular) }
+    static var meterFillShape: RoundedRectangle { RoundedRectangle(cornerRadius: meterFill, style: .circular) }
 
     /// A folder tab (the Mac's): a box's corners at its top, its foot square on the strip (.tab's 5px 5px 0 0).
     static var tabShape: UnevenRoundedRectangle {

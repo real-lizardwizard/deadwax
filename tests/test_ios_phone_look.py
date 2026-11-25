@@ -587,14 +587,17 @@ def test_the_palettes_makings_and_lines():
 def test_the_phones_corners_are_corners_square():
     text = CORNERS.read_text(encoding="utf-8")
     phone = between(text, "    enum Phone {", "    /// This device's.")
-    found = re.findall(r"static let (\w+): CGFloat = Corners\.(\w+)\s*// dw\.ph: (\S+) border-radius", phone)
-    assert {name for name, _, _ in found} == {"button", "box", "chip"}, phone
-    assert len(re.findall(r"static let", phone)) == 3, "every one Corners'"
+    #? (R8) and the meter's track and its fill (.meter, .meter > i), Corners' track and fill
+    found = re.findall(r"static let (\w+): CGFloat = Corners\.(\w+)\s*// dw\.ph: (.+?) border-radius", phone)
+    assert {name for name, _, _ in found} == {"button", "box", "chip", "meter", "meterFill"}, phone
+    assert len(re.findall(r"static let", phone)) == 5, "every one Corners'"
+    assert [(name, corner) for name, corner, _ in found if name.startswith("meter")] == [("meter", "track"),
+                                                                                          ("meterFill", "fill")]
     shared = dict(re.findall(r"static let (\w+): CGFloat = (\d+)", SHARED_CORNERS.read_text(encoding="utf-8")))
     for name, corner, selector in found:
         assert px(css(selector, "border-radius")) == 0 == float(shared[corner]), name
     # each device's: the Mac's own, the phone's Corners' - by the device's one flag
-    for name in ("button", "box", "chip"):
+    for name in ("button", "box", "chip", "meter", "meterFill"):
         assert f"static var {name}: CGFloat {{ Platform.mac ? Mac.{name} : Phone.{name} }}" in text
     # every corner of what the phone's pieces draw is 0 (dw.css's last block); round stays round: the switch
     for selector in (".btn", ".btn.sm", ".btn.lg", ".btn.pri", ".seg", ".chip", ".count", ".in", ".well", ".card",
@@ -620,7 +623,7 @@ def test_app_look_and_app_phone_hold_their_files():
     files = look_and_phone()
     assert sorted(name for name in files if name.startswith("Look/")) == [
         f"Look/DW{n}.swift" for n in sorted(("Palette", "Corners", "Raised", "ButtonStyle", "Field", "Chip", "Segmented",
-                                             "PopUp", "ToggleStyle"))]
+                                             "PopUp", "ToggleStyle", "Meter"))]
     assert sorted(name for name in files if name.startswith("Phone/")) == [
         f"Phone/Phone{n}.swift" for n in sorted(("Strip", "Top", "TabItem", "Mini", "Card", "Switch", "Foot", "Meta"))]
 
@@ -670,6 +673,9 @@ FIXED = {
     "Phone/PhoneSwitch.swift": ["width: CGFloat(PhoneLook.knob), height: CGFloat(PhoneLook.knob)",
                                 "width: CGFloat(PhoneLook.switchWidth), height: CGFloat(PhoneLook.switchHeight)"],
     "Phone/PhoneFoot.swift": ["height: keyboardUp ? 0 : height"],
+    #? (R8) a meter: its fill's width the share of its track, and its height DWLook's - on the phone grown with the text
+    #? by its own @ScaledMetric, so a minimum would only let it stretch
+    "Look/DWMeter.swift": ["width: track.size.width * share", "height: height"],
 }
 
 
@@ -845,7 +851,7 @@ BRANCHES = {
         "case .pri: return Platform.mac ? DWPalette.primaryText : DWPalette.phonePrimaryText",
         "if Platform.mac {"],
     "Look/DWCorners.swift": [f"static var {n}: CGFloat {{ Platform.mac ? Mac.{n} : Phone.{n} }}"
-                             for n in ("button", "box", "chip")],
+                             for n in ("button", "box", "chip", "meter", "meterFill")],
     "Look/DWField.swift": ["if Platform.mac {"],
     "Look/DWRaised.swift": ["static var here: DWLook { .of(Platform.device) }"],
     "Look/DWSegmented.swift": ["if Platform.mac {", ".frame(maxWidth: large && !Platform.mac ? .infinity : nil)"],
@@ -931,10 +937,13 @@ def declared(folder: Path) -> set[str]:
 
 #? R1b draws none of App/Phone's pieces and puts App/Look's only where the Mac's look already was: each slice that draws
 #? one on a phone screen adds that file here - R3: Now Playing's sheet (PhoneTop, PhoneBack, PhoneStrip) and its bottom
-#? row (PhoneTabItem, PhoneLook's sizes, DWPalette's accent for the output's name)
-PHONE_PIECES_DRAWN_IN: set[str] = {"Player/NowPlayingSheet.swift", "Player/NowPlayingView.swift"}
+#? row (PhoneTabItem, PhoneLook's sizes, DWPalette's accent for the output's name); R8: Requests on the phone, its cards
+#? (PhoneCard, DWMeter, DWRaised, DWButtonStyle) and its screen (PhoneCard)
+PHONE_PIECES_DRAWN_IN: set[str] = {"Player/NowPlayingSheet.swift", "Player/NowPlayingView.swift",
+                                   "Requests/RequestCards.swift", "Requests/RequestsScreen.swift"}
 LOOK_PIECES_DRAWN_IN = {"Root/MacSidebarView.swift", "Root/DesktopFrame.swift", "Player/PlayerBar.swift",
-                        "Player/MacPanels.swift", "Player/NowPlayingView.swift"}
+                        "Player/MacPanels.swift", "Player/NowPlayingView.swift", "Requests/RequestCards.swift",
+                        "Requests/RequestsScreen.swift"}
 
 
 def test_the_phones_pieces_are_drawn_nowhere_yet():
@@ -945,7 +954,7 @@ def test_the_phones_pieces_are_drawn_nowhere_yet():
     look = declared(LOOK_DIR) - {"here"}
     assert {"DWPalette", "DWCorners", "DWRaised", "DWRule", "DWButtonStyle", "DWWell", "DWField", "DWFieldRow", "DWChip",
             "DWCount", "DWSegmented", "DWPopUp", "DWCaret", "DWToggleStyle", "DWTarget", "lookHeight",
-            "lookSquare"} <= look, look
+            "lookSquare", "DWMeter"} <= look, look
     phone_use = re.compile(r"\bTypeface\.Phone\b|\bPhoneLook\b|\bPhonePieceWords\b|\b(" + "|".join(sorted(phone, key=len, reverse=True)) + r")\b")
     look_use = re.compile(r"\bTypeface\.Look\b|\bDWLook\b|\bDWLook\.here\b|\b(" + "|".join(sorted(look, key=len, reverse=True))
                           + r")\b")

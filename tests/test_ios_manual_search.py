@@ -67,8 +67,10 @@ def test_the_sources_sheet_is_the_page_in_a_stack_of_its_own():
     # who builds which: the album's Get the sheet, the manual search the page pushed - nobody else either
     builds = {name: (code.count("SourcesSheet("), code.count("SourcesPage(")) for name, code in app.items()
               if "SourcesSheet(" in code or "SourcesPage(" in code}
+    #? (the redesign, R8) the Mac's Requests searches from its toolbar: Choose a source as a sheet of its own, as the album's
+    #? Get opens it
     assert builds == {"Get/SourcesSheet.swift": (0, 1), "Search/GroupView.swift": (1, 0),
-                      "Get/ManualSearchSheet.swift": (0, 1)}, builds
+                      "Get/ManualSearchSheet.swift": (0, 1), "Mac/Requests/MacRequestsPage.swift": (1, 0)}, builds
     assert "SourcesSheet(request: request) {" in app["Search/GroupView.swift"]
     assert "SourcesPage(request: results, pushed: true) {" in app["Get/ManualSearchSheet.swift"]
 

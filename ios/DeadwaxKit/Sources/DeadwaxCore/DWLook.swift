@@ -59,6 +59,11 @@ public struct DWLook: Equatable, Sendable {
     public let tallRowHeight: Double
     public let groupRowHeight: Double
 
+    // MARK: a meter (.meter)
+
+    /// .meter: a download's bar, its track and its fill (R8's DWMeter) - on the phone grown with the text.
+    public let meterHeight: Double
+
     // MARK: the device
 
     /// The least side of what a finger takes (the build plan's "a finger's targets at least 44", iOS's own): every
@@ -85,6 +90,14 @@ public struct DWLook: Equatable, Sendable {
         max(0, (target - height) / 2)
     }
 
+    /// (R8) How much of a meter's track its fill takes, for `fraction` (0 to 1) of the way: never past its track, never
+    /// less than none: a download's 104% full, -3% empty, and a value that is no number (NaN, an infinity) empty.
+    /// App/Look's DWMeter draws it.
+    public static func meterShare(_ fraction: Double) -> Double {
+        guard fraction.isFinite else { return 0 }
+        return min(max(fraction, 0), 1)
+    }
+
     /// The Mac's: MacLook's, dw.css's rules for the window - R1's, unchanged.
     static let onMac = DWLook(
         buttonHeight: MacLook.buttonHeight,             // dw: .btn height
@@ -106,6 +119,7 @@ public struct DWLook: Equatable, Sendable {
         rowHeight: MacLook.rowHeight,                   // dw: .row height
         tallRowHeight: MacLook.rowHeight,               // dw: .row height
         groupRowHeight: MacLook.groupRowHeight,         // dw: .row.grp height
+        meterHeight: 6,                                 // dw: .meter height
         target: 0,
         grows: false)
 
@@ -130,6 +144,7 @@ public struct DWLook: Equatable, Sendable {
         rowHeight: 48,                                  // dw.ph: .row height
         tallRowHeight: 60,                              // dw.ph: .row.tall height
         groupRowHeight: 38,                             // dw.ph: .row.grp height
+        meterHeight: 8,                                 // dw.ph: .meter height
         target: 44,
         grows: true)
 }

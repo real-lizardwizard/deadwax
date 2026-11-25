@@ -37,6 +37,15 @@ enum MacPalette {
     static let statusSheen = rgba(255, 255, 255, 0.04)                // dw: .status box-shadow
     static let divider = hex(0x262430)                                // dw: .status > div border-right
 
+    // MARK: a column list (Requests' table, slice R8)
+
+    static let columnsFace = vertical(hex(0x1a1822), hex(0x131219))   // dw: .cols background
+    static let columnsRule = hex(0x262430)                            // dw: .cols > div border-right
+    static let rowStripe = rgba(255, 255, 255, 0.018)                 // dw: .row.alt background
+    static let groupRowFace = hex(0x100f15)                           // dw: .row.grp background
+    /// (R8's review) A row's cover's edge.
+    static let coverEdge = hex(0x34323c)                              // dw: .cover border
+
     // MARK: the player's keys and display
 
     static let keyEdge = hex(0x4d4959)                                // dw: .key border
